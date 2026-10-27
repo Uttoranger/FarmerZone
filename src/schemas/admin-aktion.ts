@@ -56,6 +56,15 @@ export const ADMIN_AKTIONEN = [
   'adresse_angezeigt',
   'notfall_storno',
   'hofpreis_stichtag_geaendert',
+  // Plattformgebühr je Hof (Nr. 198, Recht geld) und die Ereignisse der Monatsabrechnung (System, N33)
+  'plattformgebuehr_geaendert',
+  'plattformgebuehr_angekuendigt',
+  'monatsabrechnung_erstellt',
+  'lastschrift_mandat_gueltig',
+  'lastschrift_mandat_beendet',
+  'lastschrift_bezahlt',
+  'lastschrift_gescheitert',
+  'lastschrift_zurueckgebucht',
   // Benachrichtigungen (Recht benachrichtigungen)
   'empfaenger_hinzugefuegt',
   'empfaenger_entfernt',

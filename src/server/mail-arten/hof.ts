@@ -3,7 +3,7 @@ import { POSTFACH_TEXT } from '@/lib/postfach'
 import type { StapelMail } from '@/lib/email'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { Verworfen } from '@/server/mail-arten'
-import { VORRANG, fadenBezugSchema, hofBezugSchema, nachrichtBezugSchema } from '@/schemas/mail-auftrag'
+import { VORRANG, abrechnungBezugSchema, fadenBezugSchema, hofBezugSchema, nachrichtBezugSchema } from '@/schemas/mail-auftrag'
 import { hofSichtbar } from '@/lib/hof-sichtbar'
 
 /*
@@ -22,6 +22,22 @@ export function freischaltungAuftrag(farmId: string, freigeschaltetAm: Date): Ei
     vorrang: VORRANG.wichtig,
     schluessel: `freischaltung:${farmId}:${freigeschaltetAm.getTime()}`,
     bezug: { farmId },
+    farmId,
+  }
+}
+
+/** Plattformgebühr: Ankündigung des Einzugs → Hof (Nr. 198), genau einmal je Hof. */
+export function ankuendigungAuftrag(farmId: string): EinstellAuftrag {
+  return { art: 'plattformgebuehr-ankuendigung', vorrang: VORRANG.wichtig, schluessel: `plattformgebuehr-ankuendigung:${farmId}`, bezug: { farmId }, farmId }
+}
+
+/** Lastschrift gescheitert → Hof (Nr. 198): je Versuch von Stripe ein Auftrag. */
+export function lastschriftGescheitertAuftrag(monatsabrechnungId: string, farmId: string, versuch: number): EinstellAuftrag {
+  return {
+    art: 'lastschrift-gescheitert',
+    vorrang: VORRANG.wichtig,
+    schluessel: `lastschrift-gescheitert:${monatsabrechnungId}:${versuch}`,
+    bezug: { monatsabrechnungId },
     farmId,
   }
 }
@@ -93,4 +109,32 @@ export async function rendereRundschreiben(bezug: Record<string, string>): Promi
     link: faden.rundschreiben.linkUrl,
     unterhaltungId,
   })
+}
+
+/** Plattformgebühr: Ankündigung des Einzugs (Nr. 198) — Datum, Satz und Mandat frisch aus der Datenbank. */
+export async function renderePlattformgebuehrAnkuendigung(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
+  const { farmId } = hofBezugSchema.parse(bezug)
+  const { ankuendigungDaten } = await import('@/server/plattformgebuehr-abrechnung')
+  const daten = await ankuendigungDaten(farmId)
+  if (!daten) return { verworfen: 'hof_fehlt' }
+  if (daten.archiviert) return { verworfen: 'hof_stillgelegt' }
+  const { bauePlattformgebuehrAnkuendigung } = await import('@/lib/email')
+  return bauePlattformgebuehrAnkuendigung({ an: daten.an, text: daten.text, datum: daten.datum })
+}
+
+/** Lastschrift gescheitert (Nr. 198). Inzwischen bezahlt: Die Mail stimmte nicht mehr. */
+export async function rendereLastschriftGescheitert(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
+  const { monatsabrechnungId } = abrechnungBezugSchema.parse(bezug)
+  const abr = await prisma.monatsabrechnung.findUnique({
+    where: { id: monatsabrechnungId },
+    select: { stand: true, monat: true, farm: { select: { archivedAt: true, barSperreNachTagen: true, owner: { select: { email: true } } } } },
+  })
+  if (!abr) return { verworfen: 'abrechnung_fehlt' }
+  if (abr.farm.archivedAt) return { verworfen: 'hof_stillgelegt' }
+  if (abr.stand === 'bezahlt') return { verworfen: 'schon_bezahlt' }
+  const { monatText } = await import('@/lib/plattformgebuehr')
+  const { lastschriftGescheitertText } = await import('@/lib/konditionen')
+  const monat = monatText(abr.monat.toISOString().slice(0, 7))
+  const { baueLastschriftGescheitert } = await import('@/lib/email')
+  return baueLastschriftGescheitert({ an: abr.farm.owner.email, text: lastschriftGescheitertText({ monat, tage: abr.farm.barSperreNachTagen }), monat })
 }

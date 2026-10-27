@@ -432,7 +432,7 @@ export function zuletztText(zeitpunkt: Date, jetzt: Date): string {
 
 // ─── Abläufe ─────────────────────────────────────────────────────────────────
 
-export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails' | 'von-aussen' | 'geld-abgleich'
+export type AblaufName = 'aufraeumen' | 'verwaisteBestellungen' | 'betrieb' | 'briefkasten' | 'mails' | 'von-aussen' | 'geld-abgleich' | 'monatsabrechnung'
 /** `vonAussen` (Nr. 184): kein Cron bei Vercel — der Uptime-Dienst ruft /api/gesund etwa alle 5 Minuten, jeder Aufruf ist ein Herzschlag. */
 export type Rhythmus = 'minuetlich' | 'taeglich' | 'woechentlich' | 'vonAussen'
 
@@ -496,6 +496,15 @@ export const ABLAEUFE: readonly Ablauf[] = [
     pfad: '/api/cron/mails',
     zeitplan: '* * * * *',
     rhythmus: 'minuetlich',
+  },
+  // Nr. 198 (Register N38): die SEPA-Monatsabrechnung der Plattformgebühr — Ankündigung und Abrechnung am Abrechnungstag.
+  {
+    name: 'monatsabrechnung',
+    text: 'Monatsabrechnung (Plattformgebühr)',
+    zweck: 'Er kündigt den Einzug der Plattformgebühr vier Wochen vorher an und rechnet am Abrechnungstag jedes Hofs den Vormonat ab: Rechnung online und Lastschrift bar über Stripe.',
+    pfad: '/api/cron/monatsabrechnung',
+    zeitplan: '30 5 * * *',
+    rhythmus: 'taeglich',
   },
   // Nr. 191 (Register N37): der Geld-Abgleich mit Stripe — nur lesend, nach den Aufräum- und Mess-Läufen.
   {

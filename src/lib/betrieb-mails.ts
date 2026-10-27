@@ -94,6 +94,8 @@ export const MAIL_ART_NAME: Record<MailArt, string> = {
   'betreiber-bestaetigung': 'Betreiber-Bestätigung',
   'betreiber-testmail': 'Betreiber-Testmail',
   'abo-bestaetigung': 'Abo bestätigen',
+  'plattformgebuehr-ankuendigung': 'Plattformgebühr: Ankündigung',
+  'lastschrift-gescheitert': 'Lastschrift gescheitert',
   beitrag: 'Beitrag an Abos',
   rundschreiben: 'Rundschreiben',
   bescheid: 'Bescheid an Kundinnen',
@@ -1045,6 +1047,8 @@ export const NOCHMAL_ERLAUBT = [
   'bestellung-bezahlt-hof',
   'bar-bestaetigt-hof',
   'freischaltung',
+  'plattformgebuehr-ankuendigung',
+  'lastschrift-gescheitert',
   // Sonderfall: neuer Token, der alte Link gilt dann nicht mehr (S17)
   'bar-bestaetigungslink',
 ] as const satisfies readonly MailArt[]
@@ -1252,6 +1256,11 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
     if (!hofSichtbar(stand.hof)) return { ok: false, grund: 'Der Hof ist stillgelegt.' }
     return stand.hof.approvedAt ? { ok: true } : { ok: false, grund: 'Der Hof ist nicht mehr freigeschaltet.' }
   }
+  // Plattformgebühr (Nr. 198): an den Hof, solange es ihn gibt und er nicht stillgelegt ist.
+  if (art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') {
+    if (!stand.hof) return { ok: false, grund: 'Den Hof gibt es nicht mehr.' }
+    return stand.hof.archivedAt ? { ok: false, grund: 'Der Hof ist stillgelegt.' } : { ok: true }
+  }
   const b = stand.bestellung
   if (!b) return { ok: false, grund: 'Die Bestellung gibt es nicht mehr.' }
   const s = b.status
@@ -1284,7 +1293,7 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
 /** Woher die Adresse einer Art kommt — frisch geladen, nie aus dem Protokoll. `null`: nirgends gespeichert. */
 export function adresseQuelle(art: string): 'bestellung' | 'hof' | 'hofInhaber' | null {
   if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof') return 'hof'
-  if (art === 'freischaltung') return 'hofInhaber'
+  if (art === 'freischaltung' || art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') return 'hofInhaber'
   if (nochmalErlaubt(art)) return 'bestellung'
   return null
 }

@@ -216,6 +216,15 @@ export const PROTOKOLL_ART_TEXT: Partial<Record<AdminAktionArt, string>> = {
   auskunft_exportiert: 'Auskunft exportiert',
   konto_geschlossen: 'Konto geschlossen',
   konto_wieder_geoeffnet: 'Konto wieder geöffnet',
+  // Plattformgebühr (Nr. 198)
+  plattformgebuehr_geaendert: 'Plattformgebühr geändert',
+  plattformgebuehr_angekuendigt: 'Einzug angekündigt',
+  monatsabrechnung_erstellt: 'Monatsabrechnung erstellt',
+  lastschrift_mandat_gueltig: 'Lastschrift eingerichtet',
+  lastschrift_mandat_beendet: 'Lastschrift beendet',
+  lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
+  lastschrift_gescheitert: 'Lastschrift gescheitert',
+  lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
 }
 
 export function protokollArtText(art: string): string {

@@ -119,6 +119,15 @@ export function bestellGebuehr(positionen: readonly GebuehrPosition[], hundertst
   return { warenCents, gebuehrCents, gesamtCents: warenCents + gebuehrCents, jePosition }
 }
 
+/**
+ * Die Gebühr einer gespeicherten Bestellung als Summe ihrer Positionen
+ * (Snapshot `OrderItem.gebuehrCents`, ganze Cent) — für den Geld-Abgleich,
+ * damit keine Servergrenze die Summe selbst bildet.
+ */
+export function summeGebuehrPositionen(positionen: readonly { gebuehrCents: number }[]): number {
+  return positionen.reduce((summe, p) => summe + p.gebuehrCents, 0)
+}
+
 /** Erreicht der Warenwert den Mindestbestellwert (N38: 10 € Warenwert je Bestellung)? */
 export function mindestbestellwertErreicht(warenCents: number): boolean {
   return warenCents >= MINDESTBESTELLWERT_CENTS
@@ -145,8 +154,11 @@ export function einzugAbFuer(hof: { einzugAb: Date | null }, einstellung: Hofpre
   return tagDanach.getTime() > stichtag.getTime() ? tagDanach : stichtag
 }
 
-/** Was der Einzug über einen Hof wissen muss — `einzugAb` schon aufgelöst (`einzugAbFuer`). */
-export type HofFuerEinzug = { einzugAb: Date; barMandatPflicht: boolean; sepaMandatAm: Date | null }
+/**
+ * Was der Einzug über einen Hof wissen muss — `einzugAb` schon aufgelöst (`einzugAbFuer`).
+ * `barGesperrt` (Nr. 198): eine Monatsabrechnung sperrt bar (`abrechnungSperrtBar`); fehlt es, gilt nein.
+ */
+export type HofFuerEinzug = { einzugAb: Date; barMandatPflicht: boolean; sepaMandatAm: Date | null; barGesperrt?: boolean }
 
 /**
  * Wie die Gebühr einer neuen Bestellung zur Plattform kommt (N38):
@@ -155,9 +167,11 @@ export type HofFuerEinzug = { einzugAb: Date; barMandatPflicht: boolean; sepaMan
  *  - bar mit Mandat: `sepa`
  *  - bar ohne Mandat, Mandat nicht Pflicht: `ueberweisung`
  *  - bar ohne Mandat bei Pflicht: null — dann gibt es bar bei diesem Hof nicht.
+ *  - bar bei gesperrtem Hof (Lastschrift zurückgebucht oder zu lange offen, Nr. 198): null.
  */
 export function einzugFuer(hof: HofFuerEinzug, zahlart: NeueBestellZahlart, jetzt: Date): GebuehrEinzug | null {
   if (zahlart === 'ONLINE') return 'stripe'
+  if (hof.barGesperrt) return null
   if (jetzt.getTime() < hof.einzugAb.getTime()) return 'erlassen'
   if (hof.sepaMandatAm) return 'sepa'
   if (!hof.barMandatPflicht) return 'ueberweisung'
@@ -170,8 +184,9 @@ export type GebuehrLage = { modell: 'bisher' } | ({ modell: 'hofpreis'; hunderts
 /**
  * Darf bei diesem Hof jetzt bar bestellt werden? Im Modell `bisher` immer
  * (dort entscheidet `acceptsOnsite`); im Modell `hofpreis` nicht, wenn der
- * Einzug fällig ist, das Mandat Pflicht ist und keins da ist. EINE Quelle für
- * Kasse und /api/checkout (die Sperre nach offener Rechnung ergänzt Nr. 198 hier).
+ * Einzug fällig ist, das Mandat Pflicht ist und keins da ist, oder wenn eine
+ * Monatsabrechnung den Hof sperrt (`barGesperrt`, Nr. 198). EINE Quelle für
+ * Kasse und /api/checkout (beide über `einzugFuer`).
  */
 export function barMoeglich(lage: GebuehrLage, jetzt: Date): boolean {
   if (lage.modell === 'bisher') return true
@@ -227,7 +242,8 @@ export function gebuehrLageFuer(
   hof: HofMitSatz & { einzugAb: Date | null; barMandatPflicht: boolean; sepaMandatAm: Date | null },
   einstellung: HofpreisEinstellung | null,
   gruendungBis: Date | null,
-  jetzt: Date
+  jetzt: Date,
+  barGesperrt = false
 ): GebuehrLage {
   if (gebuehrModellFuer(einstellung, jetzt) === 'bisher') return { modell: 'bisher' }
   return {
@@ -236,6 +252,7 @@ export function gebuehrLageFuer(
     einzugAb: einzugAbFuer(hof, einstellung, gruendungBis),
     barMandatPflicht: hof.barMandatPflicht,
     sepaMandatAm: hof.sepaMandatAm,
+    barGesperrt,
   }
 }
 
@@ -285,4 +302,177 @@ export function gebuehrFuerMonatsabrechnungJeModell(b: {
 }): boolean {
   if (!istHofpreisBestellung({ gebuehrModell: b.gebuehrModell ?? null })) return gebuehrFuerMonatsabrechnung(b)
   return istVorOrtZahlung(b.paymentMethod) && b.serviceFeeCents > 0 && (b.gebuehrEinzug === 'sepa' || b.gebuehrEinzug === 'ueberweisung')
+}
+
+// ─── Monatsabrechnung (Register N38, Nr. 198): Sperre und Summen ─────────────
+
+/**
+ * Die Stände einer Monatsabrechnung (`Monatsabrechnung.stand`):
+ *   entwurf         angelegt, Rechnung bar noch nicht fertig
+ *   nichts          bar 0 € — keine Rechnung bar (online höchstens „bezahlt außerhalb“)
+ *   offen           Rechnung bar finalisiert, Einzug bzw. Überweisung läuft
+ *   bezahlt         `invoice.paid`
+ *   gescheitert     `invoice.payment_failed` — Stripe versucht es erneut
+ *   zurueckgebucht  `charge.dispute.created` zur Rechnungszahlung
+ */
+export const ABRECHNUNG_STAENDE = ['entwurf', 'nichts', 'offen', 'bezahlt', 'gescheitert', 'zurueckgebucht'] as const
+export type AbrechnungStand = (typeof ABRECHNUNG_STAENDE)[number]
+
+/** Das Wort für den Stand — nie nur als Farbe (DESIGN_SYSTEM). */
+export const ABRECHNUNG_STAND_WORT: Record<AbrechnungStand, string> = {
+  entwurf: 'in Arbeit',
+  nichts: 'nichts fällig',
+  offen: 'offen',
+  bezahlt: 'bezahlt',
+  gescheitert: 'Lastschrift gescheitert',
+  zurueckgebucht: 'zurückgebucht',
+}
+
+/** Der Stand als Wort; ein unbekannter Text bleibt, wie er ist. */
+export function abrechnungStandWort(stand: string): string {
+  const bekannt = ABRECHNUNG_STAENDE.find((s) => s === stand)
+  return bekannt ? ABRECHNUNG_STAND_WORT[bekannt] : stand
+}
+
+/** Die Stände, die eine Sperre auslösen können — für die Abfrage der Lage. */
+export const SPERRE_STAENDE: readonly AbrechnungStand[] = ['offen', 'gescheitert', 'zurueckgebucht']
+
+const TAG_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Sperrt eine Abrechnung bar bei diesem Hof (N38, „Einzug scheitert“)? Ja,
+ * wenn eine zurückgebucht ist, oder wenn eine länger als `barSperreNachTagen`
+ * offen bzw. gescheitert ist (gezählt ab `offenSeit`: erster Fehlschlag, bei
+ * Überweisung das Senden der Rechnung). Nach `invoice.paid` steht die
+ * Abrechnung auf „bezahlt“ — der Hof ist von selbst wieder frei, es gibt kein
+ * eigenes Feld.
+ */
+export function abrechnungSperrtBar(
+  abrechnungen: readonly { stand: string; offenSeit: Date | null }[],
+  barSperreNachTagen: number,
+  jetzt: Date
+): boolean {
+  return abrechnungen.some((a) => {
+    if (a.stand === 'zurueckgebucht') return true
+    if (a.stand !== 'offen' && a.stand !== 'gescheitert') return false
+    if (!a.offenSeit) return false
+    return jetzt.getTime() - a.offenSeit.getTime() > Math.max(0, barSperreNachTagen) * TAG_MS
+  })
+}
+
+/** Eine Bestellung für die Monatsabrechnung — nur Kennung, Nummer, Stände und Cent (der Lader filtert den Monat). */
+export type BestellungFuerAbrechnung = {
+  id: string
+  orderNumber: string
+  paymentMethod: string
+  status: string
+  paymentStatus: string
+  /** Order.serviceFeeCents — im Hofpreis-Modell die aktuelle Summe der Gebühren je Position. */
+  serviceFeeCents: number
+  gebuehrModell: string | null
+  gebuehrEinzug: string | null
+  /** serviceFeeRefundedAt gesetzt (Gebühr entfallen). */
+  gebuehrEntfallen: boolean
+}
+
+export type AbrechnungsZeile = { orderId: string; orderNumber: string; cents: number }
+
+export type MonatsSummen = {
+  /** Bar: je Bestellnummer eine Zeile (Lastschrift oder Überweisung). */
+  barZeilen: AbrechnungsZeile[]
+  barCents: number
+  /** Erlassen (vor dem Einzugsbeginn) — nur zur Information, nie auf einer Rechnung. */
+  erlassenBestellungen: number
+  erlassenCents: number
+  /** Online: schon von Stripe einbehalten, abzüglich erstatteter Gebühren. */
+  onlineZeilen: AbrechnungsZeile[]
+  onlineCents: number
+  nichtAbgeholtBestellungen: number
+}
+
+/**
+ * Die Summen eines Monats aus den Bestellungen (N38, Nr. 198). Rein, ganze
+ * Cent, kein Betrag wird neu gerechnet — es zählt der Snapshot
+ * `serviceFeeCents`:
+ *  - bar: Modell hofpreis, Zahlart vor Ort, abgeholt, Einzug `sepa` oder
+ *    `ueberweisung` → eine Zeile; `erlassen` nur gezählt; nicht abgeholt nur
+ *    gezählt (fällig wird erst mit „Abgeholt“).
+ *  - online: Modell hofpreis, online, bezahlt (PAID) und Gebühr nicht
+ *    entfallen → eine Zeile; voll erstattet (REFUNDED) bzw. entfallen → 0.
+ * Bestellungen im Modell `bisher` zählen nie.
+ */
+export function monatsSummen(bestellungen: readonly BestellungFuerAbrechnung[]): MonatsSummen {
+  const s: MonatsSummen = { barZeilen: [], barCents: 0, erlassenBestellungen: 0, erlassenCents: 0, onlineZeilen: [], onlineCents: 0, nichtAbgeholtBestellungen: 0 }
+  for (const b of bestellungen) {
+    if (!istHofpreisBestellung(b)) continue
+    if (b.paymentMethod === 'ONLINE') {
+      if (b.paymentStatus !== 'PAID' || b.gebuehrEntfallen || b.serviceFeeCents <= 0) continue
+      s.onlineZeilen.push({ orderId: b.id, orderNumber: b.orderNumber, cents: b.serviceFeeCents })
+      s.onlineCents += b.serviceFeeCents
+      continue
+    }
+    if (!istVorOrtZahlung(b.paymentMethod as Zahlungsart)) continue
+    if (b.status === 'NOT_PICKED_UP') {
+      s.nichtAbgeholtBestellungen += 1
+      continue
+    }
+    if (b.status !== 'PICKED_UP' || b.serviceFeeCents <= 0) continue
+    if (b.gebuehrEinzug === 'erlassen') {
+      s.erlassenBestellungen += 1
+      s.erlassenCents += b.serviceFeeCents
+    } else if (b.gebuehrEinzug === 'sepa' || b.gebuehrEinzug === 'ueberweisung') {
+      s.barZeilen.push({ orderId: b.id, orderNumber: b.orderNumber, cents: b.serviceFeeCents })
+      s.barCents += b.serviceFeeCents
+    }
+  }
+  return s
+}
+
+/**
+ * Wie die Rechnung bar eingezogen wird: mit Mandat per Lastschrift, ohne
+ * Mandat nur, wenn es nicht Pflicht ist, per Überweisung (`send_invoice`).
+ * Pflicht und kein Mandat: null — dann steht eine Warnung an, keine Rechnung.
+ */
+export function barEinzugsweg(hof: { sepaMandatAm: Date | null; sepaZahlungsmittelId: string | null; barMandatPflicht: boolean }): 'lastschrift' | 'ueberweisung' | null {
+  if (hof.sepaMandatAm && hof.sepaZahlungsmittelId) return 'lastschrift'
+  if (!hof.barMandatPflicht) return 'ueberweisung'
+  return null
+}
+
+/** Der Vormonat eines Wiener Kalendertags: `2028-03-03` → `2028-02`. */
+export function vormonat(kalendertag: string): string {
+  const [j, m] = kalendertag.split('-').map((t) => Number.parseInt(t, 10))
+  return m === 1 ? `${j - 1}-12` : `${j}-${String(m - 1).padStart(2, '0')}`
+}
+
+/** Der Folgemonat: `2027-12` → `2028-01`. */
+export function folgemonat(monat: string): string {
+  const [j, m] = monat.split('-').map((t) => Number.parseInt(t, 10))
+  return m === 12 ? `${j + 1}-01` : `${j}-${String(m + 1).padStart(2, '0')}`
+}
+
+/** Ist heute (Wiener Kalendertag) der Abrechnungstag dieses Hofs (1–28)? */
+export function istAbrechnungsTag(abrechnungsTag: number, kalendertag: string): boolean {
+  return Number.parseInt(kalendertag.slice(8, 10), 10) === abrechnungsTag
+}
+
+/** „März 2028“ aus `2028-03` — für Rechnung, Postfach und Mail. */
+export function monatText(monat: string): string {
+  const namen = ['Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
+  const [j, m] = monat.split('-').map((t) => Number.parseInt(t, 10))
+  return `${namen[m - 1] ?? monat} ${j}`
+}
+
+/** Die Ankündigung kommt 28 Tage vor dem Einzugsbeginn (N38: „4 Wochen vorher“). */
+export const ANKUENDIGUNG_TAGE = 28
+
+/** Ist die Ankündigung fällig? Einzugsbeginn in höchstens 28 Tagen (auch schon vorbei) und noch nicht angekündigt. */
+export function ankuendigungFaellig(einzugAb: Date, gebuehrHinweisAm: Date | null, jetzt: Date): boolean {
+  if (gebuehrHinweisAm) return false
+  return einzugAb.getTime() - jetzt.getTime() <= ANKUENDIGUNG_TAGE * TAG_MS
+}
+
+/** Die Quote „nicht abgeholt bei bar“ (90 Tage) ist auffällig: ab 10 Barbestellungen und über 20 %. */
+export function nichtAbgeholtAuffaellig(barBestellungen: number, nichtAbgeholt: number): boolean {
+  return barBestellungen >= 10 && nichtAbgeholt * 5 > barBestellungen
 }

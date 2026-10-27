@@ -15,6 +15,8 @@ import { schliessenSperre, wiederOeffnenBis, wiederOeffnenMoeglich } from '@/lib
 import { formatTagKurz } from '@/lib/format'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import type { HofKontoDaten } from '@/components/admin/hof-akte-konto'
+import { HofAktePlattformgebuehr, type PlattformgebuehrAkteAnzeige } from '@/components/admin/hof-akte-plattformgebuehr'
+import { ladePlattformgebuehrAkte } from '@/server/queries/plattformgebuehr'
 
 export const metadata: Metadata = { title: `Akte — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
@@ -40,6 +42,17 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
   }
   if (geladen === 'fehlt') notFound()
 
+  // Abschnitt „Plattformgebühr“ (N38, Nr. 198): ein eigener Teil — scheitert er, bleibt die Akte.
+  let plattformgebuehr: PlattformgebuehrAkteAnzeige | null = null
+  if (geladen) {
+    try {
+      const akte = await ladePlattformgebuehrAkte(id, jetzt)
+      plattformgebuehr = akte ? { farmId: id, ...akte } : null
+    } catch (err) {
+      Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'hof-akte', teil: 'plattformgebuehr' } })
+    }
+  }
+
   return (
     <div className={ADMIN_RAHMEN}>
       {geladen ? (
@@ -63,6 +76,7 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
       ) : (
         <AdminFehler titel="Akte" satz="Wir konnten die Akte gerade nicht laden." nochmal={id ? adminHofHref(id) : ADMIN_HOEFE_HREF} />
       )}
+      {plattformgebuehr && <HofAktePlattformgebuehr daten={plattformgebuehr} />}
     </div>
   )
 }

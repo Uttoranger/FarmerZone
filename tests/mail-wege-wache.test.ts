@@ -81,6 +81,8 @@ const WICHTIG: Record<string, MailArt> = {
   baueHofAntwortAnTeam: 'antwort-an-team',
   baueBetreiberTestmail: 'betreiber-testmail',
   baueAboBestaetigung: 'abo-bestaetigung',
+  bauePlattformgebuehrAnkuendigung: 'plattformgebuehr-ankuendigung',
+  baueLastschriftGescheitert: 'lastschrift-gescheitert',
 }
 
 /** Kann warten: Beiträge, Rundschreiben, Bescheide. `bauePostfachMail` baut auch das Rundschreiben (Art je Aufruf). */

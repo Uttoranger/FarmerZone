@@ -22,6 +22,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/monatsabrechnung",
+      "schedule": "30 5 * * *"
+    },
+    {
       "path": "/api/cron/geld-abgleich",
       "schedule": "30 6 * * *"
     }

@@ -1,3 +1,4 @@
+import { ladePlattformgebuehrAufgaben } from '@/server/queries/plattformgebuehr'
 import { prisma } from '@/lib/prisma'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { ladeErstattungAufgaben, ladeHofAufgaben } from '@/server/queries/postfach'
@@ -60,7 +61,7 @@ async function ladeHoefeAktiv(): Promise<AufgabeHof[]> {
  * wäre ein Fehlalarm (dieselbe Regel wie bisher Punkt und Betriebsleiste).
  */
 export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrieb: boolean }): Promise<AufgabenStand> {
-  const [hoefeWartend, erstattungen, mailProbleme, meldungen, hoefeAktiv, bestellstopp, betrieb] = await Promise.all([
+  const [hoefeWartend, erstattungen, mailProbleme, meldungen, hoefeAktiv, bestellstopp, plattformgebuehr, betrieb] = await Promise.all([
     ladeHofAufgaben(jetzt),
     ladeErstattungAufgaben(),
     ladeProbleme(jetzt),
@@ -68,6 +69,8 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
     ladeHoefeAktiv(),
     // Die Notbremse (Nr. 189) frisch, nicht aus dem Cache der Kundenseiten — gesetzt, steht sie sofort oben.
     leseBestellstopp(),
+    // Monatsabrechnung der Plattformgebühr (Nr. 198): gescheitert, zurückgebucht, Rechnungsangaben, Quote.
+    ladePlattformgebuehrAufgaben(jetzt),
     mitBetrieb
       ? Promise.all([
           ladeAeltesteWichtige(),
@@ -86,6 +89,7 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
     meldungen: meldungen.map((m) => ({ id: m.id, art: m.art, createdAt: m.createdAt, ersteZeile: m.ersteZeile, von: meldungVon(m) })),
     hoefeAktiv,
     bestellstopp,
+    plattformgebuehr,
     ...(betrieb ? { wartendeMail: betrieb[0], warnungen: betrieb[1], laeufe: betrieb[2], geldAbweichungen: betrieb[3] } : {}),
   }
 }

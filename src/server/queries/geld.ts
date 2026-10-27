@@ -8,6 +8,7 @@ import { monatVerschoben, monatsgrenzenWienFuer, type Monatsschluessel } from '@
 import { GELD_ABWEICHUNG_ART, STRIPE_GEBUEHR_ART, erwartetLautDatenbank, leseAbweichungArt, type BestellungFuerAbgleich, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { erstattungenImMonat, stripeGebuehrenImMonat, type ErstattungenMonat } from '@/lib/finanzen'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
+import { summeGebuehrPositionen } from '@/lib/plattformgebuehr'
 
 /*
  * Die Abfragen des Geld-Abgleichs und der Seite Geld (Register N37, Nr. 191).
@@ -33,7 +34,8 @@ const BESTELLUNG_FUER_ABGLEICH = {
   platformFeeAmount: true,
   erstattetCents: true,
   serviceFeeRefundedAt: true,
-  items: { select: { totalPrice: true } },
+  gebuehrModell: true,
+  items: { select: { totalPrice: true, gebuehrCents: true } },
 } as const satisfies Prisma.OrderSelect
 
 type AbgleichZeile = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_FUER_ABGLEICH }>
@@ -51,6 +53,8 @@ function alsAbgleichBestellung(o: AbgleichZeile): BestellungFuerAbgleich {
     provisionCents: alsCents(o.platformFeeAmount),
     erstattetCents: o.erstattetCents,
     gebuehrEntfallen: o.serviceFeeRefundedAt !== null,
+    gebuehrModell: o.gebuehrModell,
+    gebuehrPositionenCents: summeGebuehrPositionen(o.items),
   }
 }
 

@@ -61,6 +61,8 @@ const BESTELLUNG: BestellungFuerAbgleich = {
   provisionCents: 0,
   erstattetCents: 0,
   gebuehrEntfallen: false,
+  gebuehrModell: null,
+  gebuehrPositionenCents: 0,
 }
 const ZAHLUNG: StripeZahlung = { paymentIntentId: 'pi_1', betragCents: 2573, gebuehrCents: 123, erstattetCents: 0 }
 
@@ -136,6 +138,49 @@ describe('Vergleich in Cent', () => {
   })
 })
 
+describe('Modell hofpreis (N38, Nr. 198): eigene Zeile für Betrag und Gebühr', () => {
+  // Erfunden: 2 × 4,00 € (Gebühr je Stück 0,24 €) und 1 × 4,00 € → Ware 12,00 €, Gebühr 0,72 €, Kundin zahlt 12,72 €.
+  // Stripe: amount 1272, application_fee 72 (Summe gebuehrCents), der Hof bekommt 1200 (100 % der Ware).
+  const HOFPREIS: BestellungFuerAbgleich = {
+    ...BESTELLUNG,
+    id: 'bestellung-h',
+    orderNumber: 'HM-2610-H1P1',
+    paymentIntentId: 'pi_h',
+    warenCents: 1200,
+    warenOriginalCents: 1200,
+    serviceFeeCents: 72,
+    gebuehrModell: 'hofpreis',
+    gebuehrPositionenCents: 72,
+  }
+  const ZAHLUNG_H: StripeZahlung = { paymentIntentId: 'pi_h', betragCents: 1272, gebuehrCents: 72, erstattetCents: 0 }
+
+  it('gleich bei Stripe: keine Abweichung; erwartet Ware + Summe gebuehrCents und application_fee = Summe gebuehrCents', () => {
+    expect(erwartetLautDatenbank(HOFPREIS)).toEqual({ bezahlt: true, betragCents: 1272, gebuehrCents: 72, erstattetCents: 0 })
+    expect(vergleicheBestellung(HOFPREIS, ZAHLUNG_H)).toEqual([])
+  })
+
+  it('Gegenprobe: eine andere Gebühr bei Stripe (etwa Prozent auf die Summe, 0,48 €) ist eine Abweichung', () => {
+    expect(vergleicheBestellung(HOFPREIS, { ...ZAHLUNG_H, gebuehrCents: 48 })).toEqual([
+      expect.objectContaining({ feld: 'gebuehr', datenbankCents: 72, stripeCents: 48 }),
+    ])
+    expect(vergleicheBestellung(HOFPREIS, { ...ZAHLUNG_H, betragCents: 1200 })).toEqual([
+      expect.objectContaining({ feld: 'betrag', datenbankCents: 1272, stripeCents: 1200 }),
+    ])
+  })
+
+  it('Teilstorno „Artikel fehlt“: Position 4,00 € + 0,24 € fehlt → Ware 8,00, Gebühr 0,48, erstattet 4,24 — keine Abweichung', () => {
+    const nachher = { ...HOFPREIS, warenCents: 800, serviceFeeCents: 48, erstattetCents: 424 }
+    expect(erwartetLautDatenbank(nachher)).toEqual({ bezahlt: true, betragCents: 1272, gebuehrCents: 72, erstattetCents: 424 })
+    expect(vergleicheBestellung(nachher, { ...ZAHLUNG_H, erstattetCents: 424 })).toEqual([])
+    // Gegenprobe: Stripe hat nichts erstattet → Abweichung „erstattung“.
+    expect(vergleicheBestellung(nachher, ZAHLUNG_H)).toEqual([expect.objectContaining({ feld: 'erstattung', datenbankCents: 424, stripeCents: 0 })])
+  })
+
+  it('mit Provision (im Pilot 0): application_fee = Provision + Summe gebuehrCents, wie intentParameter', () => {
+    expect(erwartetLautDatenbank({ ...HOFPREIS, provisionCents: 30 }).gebuehrCents).toBe(102)
+  })
+})
+
 describe('Art der Zeile und Stripe-Gebühren', () => {
   it('Art hin und zurück; fremde Zeilen sind null', () => {
     expect(leseAbweichungArt(abweichungArt('bestellung-1', 'gebuehr'))).toEqual({ orderId: 'bestellung-1', feld: 'gebuehr' })
@@ -191,7 +236,8 @@ const zeile = (id: string, piId: string, ueber: Record<string, unknown> = {}) =>
   platformFeeAmount: '0',
   erstattetCents: 0,
   serviceFeeRefundedAt: null,
-  items: [{ totalPrice: '24.50' }],
+  items: [{ totalPrice: '24.50', gebuehrCents: 0 }],
+  gebuehrModell: null,
   ...ueber,
 })
 

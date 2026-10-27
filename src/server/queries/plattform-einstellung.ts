@@ -26,7 +26,7 @@ import {
   type PlattformEinstellung,
 } from '@/lib/plattform-einstellung'
 import { bestimmeGruendungBis } from '@/lib/gruendungshof'
-import { barMoeglich, gebuehrLageFuer, gebuehrModellFuer, type GebuehrLage, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
+import { SPERRE_STAENDE, abrechnungSperrtBar, barMoeglich, gebuehrLageFuer, gebuehrModellFuer, type GebuehrLage, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { bestellstoppAus, type BestellstoppStand } from '@/lib/notbremse'
 import { ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung } from '@/server/queries/admin'
@@ -206,6 +206,8 @@ export type HofFuerGebuehrLage = {
   einzugAb: Date | null
   barMandatPflicht: boolean
   sepaMandatAm: Date | null
+  /** Nr. 198: Tage, nach denen eine offene oder gescheiterte Abrechnung bar sperrt. */
+  barSperreNachTagen: number
 }
 
 /** Das Select dazu — EIN Satz Spalten für /api/checkout und die Kasse. */
@@ -216,6 +218,7 @@ export const HOF_FUER_GEBUEHR_LAGE = {
   einzugAb: true,
   barMandatPflicht: true,
   sepaMandatAm: true,
+  barSperreNachTagen: true,
 } as const
 
 /**
@@ -228,7 +231,12 @@ export async function ladeGebuehrLage(hof: HofFuerGebuehrLage, jetzt: Date): Pro
   const einstellung = hofpreisEinstellungAus(await lesePlattformEinstellung())
   if (gebuehrModellFuer(einstellung, jetzt) === 'bisher') return { modell: 'bisher' }
   const gruendungBis = hof.einzugAb ? null : bestimmeGruendungBis(hof, await ladeHoefeFuerGruendung())
-  return gebuehrLageFuer(hof, einstellung, gruendungBis, jetzt)
+  // Sperre nach offener, gescheiterter oder zurückgebuchter Monatsabrechnung (N38, Nr. 198) — frisch gelesen.
+  const abrechnungen = await prisma.monatsabrechnung.findMany({
+    where: { farmId: hof.id, stand: { in: [...SPERRE_STAENDE] } },
+    select: { stand: true, offenSeit: true },
+  })
+  return gebuehrLageFuer(hof, einstellung, gruendungBis, jetzt, abrechnungSperrtBar(abrechnungen, hof.barSperreNachTagen, jetzt))
 }
 
 /** Darf bei diesem Hof jetzt bar bestellt werden? Für die Kasse (Anzeige); verbindlich prüft /api/checkout. */

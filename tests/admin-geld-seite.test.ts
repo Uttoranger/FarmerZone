@@ -14,6 +14,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+// Die Plattformgebühr auf Geld (Nr. 198) hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
+const plattformgebuehrGeld = vi.hoisted(() => vi.fn(async (): Promise<unknown> => null))
+vi.mock('@/server/queries/plattformgebuehr', () => ({ ladePlattformgebuehrGeld: plattformgebuehrGeld }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & Record<string, unknown>) => {
     const attribute = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== 'onNavigate' && k !== 'prefetch'))
@@ -185,6 +188,17 @@ describe('Admin › Geld', () => {
     expect(html).toContain('Hosting Beispiel')
     const summe = html.indexOf('Summe im Monat')
     expect(html.slice(summe, summe + 300)).toContain(formatEuro(235.5))
+  })
+
+  it('Plattformgebühr (Nr. 198): bar und online des Monats, offene, gescheiterte und zurückgebuchte Einzüge als Wort', async () => {
+    plattformgebuehrGeld.mockResolvedValueOnce({ barCents: 342, onlineCents: 120, offen: 2, gescheitert: 1, zurueckgebucht: 0 })
+    const h = (await seite()).replaceAll('\u00a0', ' ')
+    expect(h).toContain('Plattformgebühr · Monatsabrechnung')
+    expect(h).toContain('€ 3,42')
+    expect(h).toContain('€ 1,20')
+    expect(h).toContain('2 offen · 1 gescheitert · 0 zurückgebucht')
+    // Gegenprobe: ohne Daten kein Abschnitt.
+    expect(await seite()).not.toContain('Plattformgebühr · Monatsabrechnung')
   })
 
   it('Gegenprobe: scheitert eine Abfrage, steht der Ladefehler da', async () => {

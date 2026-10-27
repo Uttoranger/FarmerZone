@@ -45,6 +45,8 @@ vi.mock('@/lib/prisma', () => ({
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
+    // Sperre nach offener Monatsabrechnung (Nr. 198) — ohne Zeile frei.
+    monatsabrechnung: { findMany: vi.fn(async () => []) },
   },
 }))
 
@@ -123,6 +125,7 @@ const HOF = {
   einzugAb: null,
   barMandatPflicht: true,
   sepaMandatAm: null,
+  barSperreNachTagen: 14,
 }
 
 function anfrage(overrides: Record<string, unknown> = {}) {
@@ -311,6 +314,41 @@ describe('Bar nur mit einem Weg für die Gebühr (barMoeglich)', () => {
     expect(res.status).toBe(200)
     expect(createData()).toEqual(expect.objectContaining({ gebuehrEinzug: 'erlassen' }))
     expect(prisma.farm.findMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('Sperre nach offener Monatsabrechnung (Nr. 198): bar → 409, online geht, nach der Zahlung frei', () => {
+  const MIT_MANDAT = { ...HOF, sepaMandatAm: new Date('2026-10-01T00:00:00.000Z') }
+  const TAG = 24 * 60 * 60 * 1000
+  const abrechnungen = vi.mocked(prisma.monatsabrechnung.findMany)
+
+  it('Lastschrift gescheitert seit 15 Tagen (Sperre nach 14): bar → 409 mit neutralem Satz, nichts angelegt', async () => {
+    farmFindUnique.mockResolvedValue(MIT_MANDAT as never)
+    abrechnungen.mockResolvedValue([{ stand: 'gescheitert', offenSeit: new Date(JETZT.getTime() - 15 * TAG) }] as never)
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual(expect.objectContaining({ error: BAR_NICHT_MOEGLICH_SATZ, code: CODE_BAR_NICHT_MOEGLICH }))
+    expect(orderCreate).not.toHaveBeenCalled()
+    // Gelesen werden nur die Stände, die sperren können.
+    expect(abrechnungen.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ where: { farmId: 'farm_1', stand: { in: ['offen', 'gescheitert', 'zurueckgebucht'] } } }))
+  })
+
+  it('Gegenprobe: gescheitert seit 13 Tagen → bar geht noch (sepa); online geht bei Sperre weiter', async () => {
+    farmFindUnique.mockResolvedValue(MIT_MANDAT as never)
+    abrechnungen.mockResolvedValue([{ stand: 'gescheitert', offenSeit: new Date(JETZT.getTime() - 13 * TAG) }] as never)
+    expect((await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))).status).toBe(200)
+    expect(createData()).toEqual(expect.objectContaining({ gebuehrEinzug: 'sepa' }))
+    abrechnungen.mockResolvedValue([{ stand: 'zurueckgebucht', offenSeit: null }] as never)
+    orderCreate.mockClear()
+    expect((await POST(anfrage())).status).toBe(200)
+  })
+
+  it('Rückbuchung: sofort gesperrt; nach invoice.paid (Stand bezahlt, nicht mehr gelesen) wieder frei', async () => {
+    farmFindUnique.mockResolvedValue(MIT_MANDAT as never)
+    abrechnungen.mockResolvedValue([{ stand: 'zurueckgebucht', offenSeit: null }] as never)
+    expect((await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))).status).toBe(409)
+    abrechnungen.mockResolvedValue([] as never)
+    expect((await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))).status).toBe(200)
   })
 })
 

@@ -99,6 +99,16 @@ const VOLL: AufgabenStand = {
     { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'betrag', differenzCents: 120, seit: vor(30 * STUNDE) },
     { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'gebuehr', differenzCents: -50, seit: vor(2 * STUNDE) },
   ],
+  // Nr. 198: je Quelle der Plattformgebühr ein Fall (erfunden). Die Quote: 11 bar, 3 nicht abgeholt (27 %) — und ein Hof unter der Schwelle.
+  plattformgebuehr: {
+    gescheitert: [{ abrechnungId: 'abr-1', farmId: 'hof-a', hofName: 'Hof Lastschrift', monat: 'Februar 2027', seit: vor(4 * TAG) }],
+    zurueckgebucht: [{ abrechnungId: 'abr-2', farmId: 'hof-b', hofName: 'Hof Rück', monat: 'Jänner 2027', seit: vor(STUNDE / 2) }],
+    rechnungsangabenFehlenSeit: vor(TAG / 2),
+    nichtAbgeholt: [
+      { farmId: 'hof-c', hofName: 'Hof Quote', bar: 11, nicht: 3, seit: JETZT },
+      { farmId: 'hof-d', hofName: 'Hof Wenig', bar: 9, nicht: 5, seit: JETZT },
+    ],
+  },
 }
 
 /** Was „erledigt“ je Quelle heißt: die Ursache fehlt im Stand. */
@@ -117,7 +127,32 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   hof_ohne_abholzeit: { hoefeAktiv: VOLL.hoefeAktiv.map((h) => ({ ...h, abholzeitAktiv: true, letzteBestellungAm: vor(TAG) })) },
   hof_ohne_bestellung: { hoefeAktiv: VOLL.hoefeAktiv.map((h) => ({ ...h, letzteBestellungAm: vor(2 * TAG) })) },
   geld_abweichung: { geldAbweichungen: [] },
+  einzug_gescheitert: { plattformgebuehr: { ...VOLL.plattformgebuehr, gescheitert: [] } },
+  rueckbuchung: { plattformgebuehr: { ...VOLL.plattformgebuehr, zurueckgebucht: [] } },
+  rechnungsangaben_fehlen: { plattformgebuehr: { ...VOLL.plattformgebuehr, rechnungsangabenFehlenSeit: null } },
+  // 11 bar, 2 nicht abgeholt = 18 % — unter 20 %, die Aufgabe verschwindet.
+  nicht_abgeholt_auffaellig: { plattformgebuehr: { ...VOLL.plattformgebuehr, nichtAbgeholt: [{ farmId: 'hof-c', hofName: 'Hof Quote', bar: 11, nicht: 2, seit: JETZT }] } },
 }
+
+describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {
+  it('Einzug gescheitert: Ziel 3 Tage ab dem ersten Fehlschlag — nach 4 Tagen überfällig; Rückbuchung sofort (1 h)', () => {
+    const [a] = ADMIN_AUFGABEN.einzug_gescheitert(VOLL, JETZT)
+    expect(a.frist.ziel).toEqual(new Date(vor(4 * TAG).getTime() + 3 * TAG))
+    expect(a.frist.ueberfaellig).toBe(true)
+    expect(a.ziel).toBe('/admin/hoefe/hof-a')
+    const [r] = ADMIN_AUFGABEN.rueckbuchung(VOLL, JETZT)
+    expect(r.frist.dauerMs).toBe(STUNDE)
+    expect(r.bereich).toBe('Geld')
+  })
+
+  it('Quote nicht abgeholt: ab 10 Barbestellungen und über 20 % — 9 Bestellungen zählen nie, genau 20 % nicht', () => {
+    const quote = (bar: number, nicht: number) =>
+      ADMIN_AUFGABEN.nicht_abgeholt_auffaellig({ ...VOLL, plattformgebuehr: { ...VOLL.plattformgebuehr, nichtAbgeholt: [{ farmId: 'h', hofName: 'H', bar, nicht, seit: JETZT }] } }, JETZT)
+    expect(quote(10, 3)).toHaveLength(1)
+    expect(quote(10, 2)).toHaveLength(0)
+    expect(quote(9, 9)).toHaveLength(0)
+  })
+})
 
 describe('Braucht dich: je Quelle da und wieder weg', () => {
   for (const quelle of AUFGABE_QUELLEN) {
