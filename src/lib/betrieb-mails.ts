@@ -1259,7 +1259,7 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
   // Plattformgebühr (Nr. 198): an den Hof, solange es ihn gibt und er nicht stillgelegt ist.
   if (art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') {
     if (!stand.hof) return { ok: false, grund: 'Den Hof gibt es nicht mehr.' }
-    return stand.hof.archivedAt ? { ok: false, grund: 'Der Hof ist stillgelegt.' } : { ok: true }
+    return hofSichtbar(stand.hof) ? { ok: true } : { ok: false, grund: 'Der Hof ist stillgelegt.' }
   }
   const b = stand.bestellung
   if (!b) return { ok: false, grund: 'Die Bestellung gibt es nicht mehr.' }

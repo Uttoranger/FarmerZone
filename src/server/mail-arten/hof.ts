@@ -127,10 +127,10 @@ export async function rendereLastschriftGescheitert(bezug: Record<string, string
   const { monatsabrechnungId } = abrechnungBezugSchema.parse(bezug)
   const abr = await prisma.monatsabrechnung.findUnique({
     where: { id: monatsabrechnungId },
-    select: { stand: true, monat: true, farm: { select: { archivedAt: true, barSperreNachTagen: true, owner: { select: { email: true } } } } },
+    select: { stand: true, monat: true, farm: { select: { archivedAt: true, geschlossenAm: true, barSperreNachTagen: true, owner: { select: { email: true } } } } },
   })
   if (!abr) return { verworfen: 'abrechnung_fehlt' }
-  if (abr.farm.archivedAt) return { verworfen: 'hof_stillgelegt' }
+  if (!hofSichtbar(abr.farm)) return { verworfen: 'hof_stillgelegt' }
   if (abr.stand === 'bezahlt') return { verworfen: 'schon_bezahlt' }
   const { monatText } = await import('@/lib/plattformgebuehr')
   const { lastschriftGescheitertText } = await import('@/lib/konditionen')
