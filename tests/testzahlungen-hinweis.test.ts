@@ -17,7 +17,7 @@ const SATZ = 'Testzahlungen vor dem 2. November 2026, 21:00 Uhr sind nicht mitg
 const zustand = vi.hoisted(() => ({ hinweis: null as string | null }))
 
 // Die Plattformgebühr auf Geld (Nr. 198) hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
-vi.mock('@/server/plattformgebuehr-abrechnung', () => ({ ladePlattformgebuehrGeld: async () => null }))
+vi.mock('@/server/queries/plattformgebuehr', () => ({ ladePlattformgebuehrGeld: async () => null }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode; [k: string]: unknown }) => {
     const attribute = { ...rest }

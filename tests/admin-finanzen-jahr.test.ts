@@ -19,7 +19,7 @@ import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // Die Plattformgebühr auf Geld (Nr. 198) hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
-vi.mock('@/server/plattformgebuehr-abrechnung', () => ({ ladePlattformgebuehrGeld: async () => null }))
+vi.mock('@/server/queries/plattformgebuehr', () => ({ ladePlattformgebuehrGeld: async () => null }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & Record<string, unknown>) => {
     const attribute = Object.fromEntries(Object.entries(rest).filter(([k]) => k !== 'onNavigate' && k !== 'prefetch'))
