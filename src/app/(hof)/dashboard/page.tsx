@@ -27,6 +27,8 @@ import {
 import { FreischaltMoment } from '@/components/heute/freischalt-moment'
 import { BeitragAnstoss, DeinBeitragKarte } from '@/components/heute/dein-beitrag'
 import { StartbildschirmKarte } from '@/components/heute/startbildschirm-karte'
+import { LastschriftSperreKarte } from '@/components/heute/lastschrift-karte'
+import { ladeSperrKarte } from '@/server/plattformgebuehr-abrechnung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import { beitragBlock, datumLang, entferneBeitragErinnerung, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
@@ -73,7 +75,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
   // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
   // (Nachtlauf Nr. 31); der Cookie ebenso.
-  const [heute, cookieJar, faeden, deinBeitrag] = await Promise.all([
+  const [heute, cookieJar, faeden, deinBeitrag, sperrKarte] = await Promise.all([
     getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
     cookies(),
     // Postfach (Register N12, Nr. 87): Ein Ladefehler nimmt nur die Karte weg, nie Heute — gemeldet ohne Nachrichtentext.
@@ -84,6 +86,11 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     // „Dein Beitrag“ (Register E12, Nr. 129): Ein Ladefehler nimmt nur den Block weg, nie Heute.
     ladeDeinenBeitrag(farm.id, jetzt).catch((err: unknown) => {
       Sentry.captureException(err, { tags: { bereich: 'dein-beitrag', seite: 'heute' }, extra: { farmId: farm.id } })
+      return null
+    }),
+    // Barzahlung pausiert nach offener Plattformgebühr (Register N38, Nr. 198): ein Ladefehler nimmt nur die Karte weg.
+    ladeSperrKarte(farm.id, jetzt).catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { bereich: 'monatsabrechnung', seite: 'heute' }, extra: { farmId: farm.id } })
       return null
     }),
   ])
@@ -173,6 +180,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       <div className="flex flex-col gap-4 md:gap-5">
         {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
         {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
+        {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} />}
         {zeige(aufbau.oben)}
         <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />
         <Kennzahlen

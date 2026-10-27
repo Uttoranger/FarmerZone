@@ -10,6 +10,8 @@ import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-a
 import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellungen-fehler'
 import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
+import { Barzahlung, type BarzahlungAnzeige } from '@/components/hof-einstellungen/barzahlung'
+import { ladeBarzahlung } from '@/server/plattformgebuehr-abrechnung'
 
 export const metadata: Metadata = { title: `Konditionen — ${MARKE}` }
 
@@ -20,9 +22,11 @@ export const dynamic = 'force-dynamic'
  * und B1) — Mockup web-h1-einstellungen-konditionen. Texte aus
  * src/lib/konditionen.ts, das Rechenbeispiel mit den gespeicherten Sätzen
  * dieses Hofs. Die Admin-Freischaltung (Gründungsplatz) bleibt unberührt.
+ * Darunter „Barzahlung“ und „Monatsabrechnungen“ (Register N38, Nr. 198):
+ * Mandat, Einzug ab, Satz — fehlt das, steht die Seite trotzdem.
  */
 export default async function KonditionenEinstellungenPage(): Promise<React.JSX.Element> {
-  const { userId } = await verlangeHofDerSitzung()
+  const { userId, farmId } = await verlangeHofDerSitzung()
 
   let hof: KonditionenHof | null = null
   let abzeichen: { zeigen: boolean } | null = null
@@ -37,6 +41,14 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
   }
   if (!gefunden) redirect('/onboarding')
 
+  // Barzahlung und Monatsabrechnungen (Nr. 198): ein eigener Teil — scheitert er, bleibt der Rest der Seite.
+  let barzahlung: BarzahlungAnzeige | null = null
+  try {
+    barzahlung = await ladeBarzahlung(farmId, new Date())
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'konditionen', teil: 'barzahlung' } })
+  }
+
   return (
     <div className={EINSTELLUNGEN_RAHMEN}>
       {hof ? (
@@ -48,6 +60,11 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
         />
       ) : (
         <EinstellungenFehler titel="Deine Konditionen" href="/settings/konditionen" />
+      )}
+      {hof && barzahlung && (
+        <div className="mt-6 flex flex-col gap-6">
+          <Barzahlung daten={barzahlung} />
+        </div>
       )}
     </div>
   )

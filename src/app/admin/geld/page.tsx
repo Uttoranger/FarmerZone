@@ -32,6 +32,8 @@ import { ZeitraumPfeil, ZeitraumUmschalter } from '../finanzen/zeitraum-wahl'
 import { Monatsabschluss } from './monatsabschluss'
 import { GELD_TEXT, geldAdresse, geldJahrAdresse } from './texte'
 import { MARKE } from '@/lib/marke'
+import { ladePlattformgebuehrGeld } from '@/server/plattformgebuehr-abrechnung'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 
 export const metadata: Metadata = { title: `Geld — Admin — ${MARKE}` }
 // Geld gehört in keinen Zwischenspeicher.
@@ -71,6 +73,13 @@ export default async function AdminGeldPage({
     abgeschlossene = [...abgeschlossen.keys()]
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'geld' } })
+  }
+  // Plattformgebühr (N38, Nr. 198): ein eigener Teil — scheitert er, bleibt die Seite.
+  let plattformgebuehr: Awaited<ReturnType<typeof ladePlattformgebuehrGeld>> | null = null
+  try {
+    plattformgebuehr = await ladePlattformgebuehrGeld(monat)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'geld', teil: 'plattformgebuehr' } })
   }
   if (!daten || !geld) {
     return (
@@ -230,6 +239,30 @@ export default async function AdminGeldPage({
               csvText={`CSV ${jahrZahl} laden`}
             />
           </div>
+
+          {plattformgebuehr && (
+            <section aria-labelledby="plattformgebuehr-titel" className={cn(KARTE, 'flex max-w-[560px] flex-col gap-2 p-4 md:p-[18px]')}>
+              <h2 id="plattformgebuehr-titel" className="font-heading text-[17px] font-semibold text-foreground">
+                {PLATTFORMGEBUEHR_BEZEICHNUNG} · Monatsabrechnung {daten.bezeichnung}
+              </h2>
+              <ul className="[&>li]:border-t [&>li]:border-border">
+                <li className="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+                  <span className="text-foreground">bar (Lastschrift oder Überweisung)</span>
+                  <span className="tabular-nums text-foreground">{formatEuro(centsAlsEuro(plattformgebuehr.barCents))}</span>
+                </li>
+                <li className="flex min-h-11 items-center justify-between gap-3 py-2 text-[14px]">
+                  <span className="text-foreground">online (von Stripe einbehalten)</span>
+                  <span className="tabular-nums text-foreground">{formatEuro(centsAlsEuro(plattformgebuehr.onlineCents))}</span>
+                </li>
+                <li className="flex min-h-11 flex-wrap items-center gap-2 py-2 text-[14px]">
+                  <StatusBadge status={plattformgebuehr.gescheitert + plattformgebuehr.zurueckgebucht > 0 ? 'offen' : 'neutral'}>
+                    {`${plattformgebuehr.offen} offen · ${plattformgebuehr.gescheitert} gescheitert · ${plattformgebuehr.zurueckgebucht} zurückgebucht`}
+                  </StatusBadge>
+                  <span className={cn('text-[13px]', LEISE)}>Einzüge aller Monate</span>
+                </li>
+              </ul>
+            </section>
+          )}
 
           <div className="max-w-[560px]">
             <KostenListe

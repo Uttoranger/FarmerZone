@@ -84,12 +84,11 @@ describe('einrichtenStand — mit Hof', () => {
     expect(schritt(mitHof({ stripeBereit: true }), 'zahlung')).toMatchObject({ zustand: 'erledigt', aktion: null })
   })
 
-  it('SEPA ist ein Hinweis ohne Eingabe und zählt nie mit', () => {
+  it('Lastschrift (Nr. 198) ist ein Hinweis mit dem Weg zu „Lastschrift einrichten“ und zählt nie mit', () => {
     const s = schritt(mitHof(), 'sepa')
-    expect(s).toMatchObject({ zustand: 'hinweis', aktion: null })
-    expect(s.text).toContain('Jetzt ist nichts zu tun')
-    // Keine Zusage, für die es keinen Weg gibt (Nachbesserung 1): Ob und wann
-    // eine Monatsabrechnung kommt, ist noch nicht entschieden.
+    expect(s).toMatchObject({ zustand: 'hinweis', aktion: { art: 'link', href: '/settings/konditionen#barzahlung', label: 'Lastschrift einrichten' } })
+    expect(s.text).toContain('Plattformgebühr aus Barbestellungen')
+    // Kein Eingabefeld hier: Das Mandat richtet Stripes Formular in Deine Konditionen ein.
     expect(s.text).not.toMatch(/melden uns|bevor/)
   })
 

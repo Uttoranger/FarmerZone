@@ -11,10 +11,10 @@
  *  - Ohne Hof ist Schritt 2 „Hof anlegen" mit dem Formular: Registrieren legt
  *    weiter nur das Konto an (registerFarmer unverändert), den Hof legt
  *    createFarm an. Erst danach gibt es Hofseite, Produkte und Zahlung.
- *  - SEPA ist ein Hinweis ohne Eingabe und zählt nicht mit: Ein SEPA-Mandat
- *    bräuchte einen neuen Geldweg (Stripe SetupIntent), den es nicht gibt —
- *    ein Schritt, der nie fertig werden kann, ließe „Noch 1 Schritt" ewig
- *    stehen.
+ *  - Die Lastschrift (SEPA-Mandat, Register N38, Nr. 198) ist ein Hinweis und
+ *    zählt nicht mit: Sie braucht erst der Einzug der Plattformgebühr aus
+ *    Barbestellungen, nicht der erste Verkauf. Der Hinweis führt zu
+ *    „Lastschrift einrichten“ in Deine Konditionen; eingerichtet sagt er das.
  *
  * Stripe-Pflicht (Register Z1): „Hof online stellen" — die Freischaltung —
  * geht erst mit fertigem Stripe-Konto und (Ergänzung 21.10.2026) mit einer
@@ -22,7 +22,7 @@
  * im Server (freischaltSperre in approveFarmAction).
  */
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
-import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
+import { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT, ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 
 export type EinrichtenDaten = {
@@ -48,6 +48,8 @@ export type EinrichtenDaten = {
     abholzeitAktiv: boolean
     /** approvedAt gesetzt (nur der Betreiber setzt es). */
     freigeschaltet: boolean
+    /** Farm.sepaMandatAm gesetzt — das Lastschrift-Mandat gilt (nur über den Webhook, Nr. 198). Fehlt es, gilt nein. */
+    sepaMandat?: boolean
   } | null
 }
 
@@ -183,15 +185,26 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           aktion: { art: 'link', href: '/settings/payments', label: 'Mit Stripe einrichten', primaer: true },
         }
 
-  const sepa: Omit<EinrichtenSchritt, 'nummer'> = {
-    id: 'sepa',
-    titel: 'SEPA-Mandat für die Monatsabrechnung',
-    titelKurz: 'SEPA-Mandat',
-    text: 'Für Grundgebühr und Servicegebühren aus Barbestellungen. Jetzt ist nichts zu tun.',
-    textKurz: 'für die Monatsabrechnung · jetzt nichts zu tun',
-    zustand: 'hinweis',
-    aktion: null,
-  }
+  // Nr. 198: der Mandat-Schritt — ein Hinweis mit dem Weg zu „Lastschrift einrichten“, zählt nicht mit.
+  const sepa: Omit<EinrichtenSchritt, 'nummer'> = hof?.sepaMandat
+    ? {
+        id: 'sepa',
+        titel: 'Lastschrift für die Monatsabrechnung',
+        titelKurz: 'Lastschrift',
+        text: 'Die Lastschrift ist eingerichtet – die Plattformgebühr aus Barbestellungen ziehen wir einmal im Monat ein.',
+        textKurz: 'eingerichtet',
+        zustand: 'hinweis',
+        aktion: null,
+      }
+    : {
+        id: 'sepa',
+        titel: 'Lastschrift für die Monatsabrechnung',
+        titelKurz: 'Lastschrift',
+        text: 'Für die Plattformgebühr aus Barbestellungen, einmal im Monat. Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.',
+        textKurz: 'für Barbestellungen · einmal im Monat',
+        zustand: 'hinweis',
+        aktion: hof ? { art: 'link', href: LASTSCHRIFT_HREF, label: LASTSCHRIFT_TEXT.einrichten, primaer: false } : null,
+      }
 
   const freischaltung: Omit<EinrichtenSchritt, 'nummer'> = hof?.freigeschaltet
     ? {

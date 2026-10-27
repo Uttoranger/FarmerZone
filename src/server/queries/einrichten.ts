@@ -23,7 +23,7 @@ export type EinrichtenHof = NonNullable<EinrichtenDaten['hof']> & {
 export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof | null> {
   const hof = await prisma.farm.findUnique({
     where: { ownerId },
-    select: { id: true, slug: true, approvedAt: true, tarif: true },
+    select: { id: true, slug: true, approvedAt: true, tarif: true, sepaMandatAm: true },
   })
   if (!hof) return null
 
@@ -51,5 +51,7 @@ export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof 
     // getOwnerFarm liefert nur aktive Abholzeiten — dieselbe Bedingung wie approveFarmAction (Z1-Ergänzung).
     abholzeitAktiv: farm.pickupSlots.length > 0,
     freigeschaltet: hof.approvedAt !== null,
+    // Nr. 198: der Mandat-Schritt sagt „eingerichtet“, sobald der Webhook das Mandat bestätigt hat.
+    sepaMandat: hof.sepaMandatAm !== null,
   }
 }
