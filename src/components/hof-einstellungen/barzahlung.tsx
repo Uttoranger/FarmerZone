@@ -9,6 +9,8 @@ import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { starteLastschrift, oeffneRechnung } from '@/server/actions/lastschrift'
 import { cn } from '@/lib/utils'
 import { StatusBadge, type StatusTon } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ReceiptText } from 'lucide-react'
 import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
 
 const T = LASTSCHRIFT_TEXT
@@ -177,7 +179,7 @@ function Monatsabrechnungen({ zeilen }: { zeilen: BarzahlungAnzeige['abrechnunge
         {T.abrechnungen}
       </h2>
       {zeilen.length === 0 ? (
-        <p className={cn('text-[14px] leading-snug md:text-[13.5px]', LEISE)}>{T.abrechnungenLeer}</p>
+        <EmptyState symbol={ReceiptText} titel={T.abrechnungenLeer} satz={T.abrechnungenLeerSatz} ausweg={{ ohne: 'Sie entsteht von selbst am Abrechnungstag – du musst nichts tun.' }} />
       ) : (
         <ul className={cn(KARTE, '[&>li+li]:border-t [&>li+li]:border-border')}>
           {zeilen.map((z) => (

@@ -11,6 +11,9 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FELD, FELD_LABEL, KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ReceiptText } from 'lucide-react'
+import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
 
 /** Was die Akte über die Plattformgebühr zeigt — nur Text, Zahlen und Cent (kein Date an den Browser). */
 export type PlattformgebuehrAkteAnzeige = {
@@ -82,7 +85,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
       <div>
         <h3 className={cn('mb-1 text-[12.5px] font-semibold', LEISE)}>Letzte Abrechnungen</h3>
         {daten.abrechnungen.length === 0 ? (
-          <p className={cn('text-[14px]', LEISE)}>Noch keine Monatsabrechnung.</p>
+          <EmptyState symbol={ReceiptText} titel={LASTSCHRIFT_TEXT.abrechnungenLeer} satz={LASTSCHRIFT_TEXT.abrechnungenLeerSatz} ausweg={{ ohne: 'Sie entsteht am Abrechnungstag des Hofs von selbst.' }} />
         ) : (
           <ul className="[&>li+li]:border-t [&>li+li]:border-border">
             {daten.abrechnungen.map((a) => (

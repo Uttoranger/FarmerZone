@@ -11,7 +11,7 @@ import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellunge
 import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
 import { Barzahlung, type BarzahlungAnzeige } from '@/components/hof-einstellungen/barzahlung'
-import { ladeBarzahlung } from '@/server/plattformgebuehr-abrechnung'
+import { ladeBarzahlung } from '@/server/queries/plattformgebuehr'
 
 export const metadata: Metadata = { title: `Konditionen — ${MARKE}` }
 

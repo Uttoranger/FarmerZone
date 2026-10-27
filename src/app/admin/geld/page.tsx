@@ -32,7 +32,7 @@ import { ZeitraumPfeil, ZeitraumUmschalter } from '../finanzen/zeitraum-wahl'
 import { Monatsabschluss } from './monatsabschluss'
 import { GELD_TEXT, geldAdresse, geldJahrAdresse } from './texte'
 import { MARKE } from '@/lib/marke'
-import { ladePlattformgebuehrGeld } from '@/server/plattformgebuehr-abrechnung'
+import { ladePlattformgebuehrGeld } from '@/server/queries/plattformgebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 
 export const metadata: Metadata = { title: `Geld — Admin — ${MARKE}` }

@@ -6063,6 +6063,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Anzeige-Fehler:** Kann eine öffentliche Seite die Einstellung nicht laden, zeigt sie die Preise nach der Vorgabe (Sentry `hofpreis-anzeige`); verbindlich bleibt der Betrag von `/api/checkout`.
 - **Offen für 198:** Sperre nach offener Rechnung in `barMoeglich`, Mandat-Schritt, Monatsabrechnung; Rechtstexte nach der Anwältin.
 
+## SEPA-Monatsabrechnung der Plattformgebühr (Register N38, Schritt 2; Nr. 198, Lauf 26, 27.10.2026)
+
+- **Ablauf eines Monats:** Ankündigung 28 Tage vor dem Einzugsbeginn (einmal je Hof) → am Abrechnungstag (Vorgabe der 3.) Rechnung online „bezahlt außerhalb“ und Rechnung bar → Stripe zieht per Lastschrift ein (`invoice.paid` → bezahlt) → scheitert es, versucht Stripe erneut, der Hof bekommt Postfach und Mail → nach `barSperreNachTagen` (Vorgabe 14) offen oder bei Rückbuchung sofort nimmt der Hof keine Barbestellungen mehr an → nach der Zahlung von selbst wieder frei.
+- **Warum die Ankündigung im Ablauf `monatsabrechnung` und nicht im Ablauf `betrieb`:** Beide laufen täglich; so bleibt alles zur Plattformgebühr in einer Route und einer Datei (Freigabe 198, Dateigrenzen).
+- **Warum Mails „Wichtig“ statt „Sofort“:** Nur Arten mit Renderer lassen sich nochmal schicken (N27); Sofort ist Codes und Links vorbehalten. Die Warteschlange schickt binnen einer Minute.
+- **Warum `offenSeit` erst beim Fehlschlag:** Eine SEPA-Lastschrift braucht Tage; die Sperre soll nur zählen, wenn etwas schiefging. Bei Überweisung zählt sie ab dem Senden der Rechnung.
+- **Rückbuchung bleibt stehen:** Nach `zurueckgebucht` hebt nur eine neue Zahlung bzw. ein Eingriff des Teams die Sperre (Nacharbeit, Bericht 198).
+- **Geld-Abgleich:** `erwartetLautDatenbank` hat eine eigene Zeile für das Hofpreis-Modell (application_fee = Provision + Summe `OrderItem.gebuehrCents`).
+
 ## Nützliche Befehle
 
 ```bash

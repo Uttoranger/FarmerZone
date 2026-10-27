@@ -1,17 +1,18 @@
 'use server'
 
+import { headers } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { z } from 'zod'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
 import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
-import { verlangeHofDerSitzung } from '@/server/hofbereich'
-import { stelleStripeKundeSicher } from '@/server/plattformgebuehr-abrechnung'
 
 /*
  * Lastschrift und Monatsrechnungen des Hofs (Register N38, Nr. 198). Nur für
- * den Hof der Sitzung (verlangeHofDerSitzung) — eine Kennung aus dem Browser
- * sichert nichts, jede Abfrage nimmt die farmId der Sitzung mit.
+ * den Hof der Sitzung (`hofDerSitzung`) — eine Kennung aus dem Browser
+ * sichert nichts, jede Abfrage nimmt die farmId der Sitzung mit. Stripe kommt
+ * erst beim Aufruf (`await import`): Die Seiten, die diese Actions einbinden,
+ * ziehen das SDK nicht statisch mit (tests/schwere-module.test.ts).
  *
  * „Lastschrift einrichten“ und „Lastschrift ändern“ legen je einen NEUEN
  * SetupIntent an (sepa_debit, off_session). GÜLTIG wird das Mandat nur über
@@ -19,11 +20,24 @@ import { stelleStripeKundeSicher } from '@/server/plattformgebuehr-abrechnung'
  * meldet, schreibt hier nichts.
  */
 
+/** Der Hof der angemeldeten Person — null ohne Sitzung oder ohne Hof. */
+async function hofDerSitzung(): Promise<string | null> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return null
+  const hof = await prisma.farm.findUnique({ where: { ownerId: session.user.id }, select: { id: true } })
+  return hof?.id ?? null
+}
+
+const ABGEMELDET = 'Bitte melde dich neu an.'
+
 export type LastschriftStart = { clientSecret: string } | { error: string }
 
 export async function starteLastschrift(): Promise<LastschriftStart> {
-  const { farmId } = await verlangeHofDerSitzung()
+  const farmId = await hofDerSitzung()
+  if (!farmId) return { error: ABGEMELDET }
   try {
+    const { stelleStripeKundeSicher } = await import('@/server/plattformgebuehr-abrechnung')
+    const { stripe } = await import('@/lib/stripe')
     const kunde = await stelleStripeKundeSicher(farmId)
     const si = await stripe.setupIntents.create({
       customer: kunde,
@@ -51,7 +65,8 @@ const rechnungSchema = z.object({
  * Hofs; eine fremde Kennung sieht aus wie eine fehlende.
  */
 export async function oeffneRechnung(eingabe: unknown): Promise<{ url: string } | { error: string }> {
-  const { farmId } = await verlangeHofDerSitzung()
+  const farmId = await hofDerSitzung()
+  if (!farmId) return { error: ABGEMELDET }
   const geprueft = rechnungSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
   const { abrechnungId, art, ziel } = geprueft.data
@@ -59,6 +74,7 @@ export async function oeffneRechnung(eingabe: unknown): Promise<{ url: string } 
   const rechnungId = art === 'bar' ? abr?.rechnungBarId : abr?.rechnungOnlineId
   if (!rechnungId) return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
   try {
+    const { stripe } = await import('@/lib/stripe')
     const rechnung = await stripe.invoices.retrieve(rechnungId)
     const url = ziel === 'pdf' ? rechnung.invoice_pdf : rechnung.hosted_invoice_url
     return url ? { url } : { error: LASTSCHRIFT_TEXT.rechnungFehlt }

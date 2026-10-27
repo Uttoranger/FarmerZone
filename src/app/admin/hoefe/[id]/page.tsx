@@ -11,7 +11,7 @@ import { HofAkteAnsicht } from '@/components/admin/hof-akte-ansicht'
 import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { MARKE } from '@/lib/marke'
 import { HofAktePlattformgebuehr, type PlattformgebuehrAkteAnzeige } from '@/components/admin/hof-akte-plattformgebuehr'
-import { ladePlattformgebuehrAkte } from '@/server/plattformgebuehr-abrechnung'
+import { ladePlattformgebuehrAkte } from '@/server/queries/plattformgebuehr'
 
 export const metadata: Metadata = { title: `Akte — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'

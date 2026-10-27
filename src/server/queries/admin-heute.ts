@@ -1,4 +1,4 @@
-import { ladePlattformgebuehrAufgaben } from '@/server/plattformgebuehr-abrechnung'
+import { ladePlattformgebuehrAufgaben } from '@/server/queries/plattformgebuehr'
 import { prisma } from '@/lib/prisma'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { ladeErstattungAufgaben, ladeHofAufgaben } from '@/server/queries/postfach'

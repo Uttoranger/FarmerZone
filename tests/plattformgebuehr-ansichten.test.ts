@@ -62,6 +62,7 @@ describe('Hof › Deine Konditionen: Barzahlung und Monatsabrechnungen', () => {
     expect(h).toContain(LASTSCHRIFT_TEXT.erlassen('1. Februar 2028'))
     expect(h).toContain('>Lastschrift einrichten<')
     expect(h).toContain(LASTSCHRIFT_TEXT.abrechnungenLeer)
+    expect(h).toContain('data-slot="empty-state"')
     // Gegenprobe: ohne Pflicht der andere Satz.
     expect(html(createElement(Barzahlung, { daten: { ...DATEN, mandat: false, mandatPflicht: false } }))).toContain(LASTSCHRIFT_TEXT.mandatFrei)
   })

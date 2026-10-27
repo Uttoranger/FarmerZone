@@ -245,7 +245,7 @@ export const LASTSCHRIFT_TEXT = {
   aendern: 'Lastschrift ändern',
   mandatDa: (bank: string | null, letzte4: string | null): string =>
     `Lastschrift eingerichtet${bank || letzte4 ? ` · ${[bank, letzte4 ? `IBAN endet auf ${letzte4}` : null].filter(Boolean).join(' · ')}` : ''}`,
-  mandatFehlt: 'Noch keine Lastschrift eingerichtet.',
+  mandatFehlt: 'Lastschrift nicht eingerichtet.',
   mandatPflicht: 'Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.',
   mandatFrei: 'Eine Lastschrift ist bei dir nicht Pflicht – ohne sie schicken wir die Rechnung zur Überweisung.',
   einzugAb: (datum: string): string => `Einzug ab ${datum}`,
@@ -254,7 +254,8 @@ export const LASTSCHRIFT_TEXT = {
   wartet: 'Die Bank bestätigt die Lastschrift – das dauert meist nur einen Moment. Lade die Seite gleich neu.',
   fehler: 'Wir konnten die Lastschrift gerade nicht starten. Versuch es bitte gleich noch einmal.',
   abrechnungen: 'Monatsabrechnungen',
-  abrechnungenLeer: 'Noch keine Monatsabrechnung. Die erste kommt nach dem ersten Monat mit Plattformgebühr.',
+  abrechnungenLeer: 'Noch keine Monatsabrechnung',
+  abrechnungenLeerSatz: 'Die erste kommt nach dem ersten Monat mit Plattformgebühr.',
   spalten: { monat: 'Monat', bar: 'bar', online: 'online', stand: 'Stand' },
   rechnung: 'Rechnung (PDF)',
   bezahlen: 'Jetzt bezahlen',
