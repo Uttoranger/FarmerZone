@@ -27,7 +27,7 @@ import {
   type GruendungZahlen,
 } from '@/lib/gruendungshof'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
-import type { HofpreisEinstellung } from '@/lib/plattformgebuehr'
+import { hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 
@@ -327,4 +327,45 @@ export function gruendungZeileKurz(zahlen: Pick<GruendungZahlen, 'gesamt' | 'fre
   const anfang = `${zahlen.gesamt} Plätze · ${zahlen.frei} frei`
   if (zahlen.art === 'bisher') return `${anfang} · bis ${gruendungTagKurz(zahlen.bisTag)}`
   return `${anfang} · ${zahlen.monate} Monate${zahlen.aktionBisTag ? ` · bis ${gruendungTagKurz(zahlen.aktionBisTag)}` : ''}`
+}
+
+// ─── Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197) ──────────────────
+
+/** Die Texte der Karte in Admin › Einstellungen. */
+export const HOFPREIS_STICHTAG_TEXT = {
+  titel: 'Hofpreis-Modell ab',
+  satz: 'Ab diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis (6 %, Mindestbestellwert 10 €). Vorher bleibt alles wie heute.',
+  feld: 'Stichtag',
+  speichern: 'Stichtag speichern',
+  speichert: 'Speichert …',
+  gespeichert: 'Stichtag gespeichert.',
+  erreicht: 'Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.',
+} as const
+
+/** Die Meldungen der Regel — eigene deutsche Sätze, nie Zods Standardtext. */
+export const HOFPREIS_STICHTAG_FEHLER = {
+  datum: 'Bitte gib ein gültiges Datum ein.',
+  zukunft: 'Der Stichtag muss in der Zukunft liegen.',
+  erreicht: 'Der Stichtag ist schon erreicht und lässt sich nicht mehr ändern.',
+  gleich: 'Das ist schon der gespeicherte Stichtag.',
+} as const
+
+/** Der wirksame Stichtag als Wiener Kalendertag (JJJJ-MM-TT) — Einstellung, sonst BAR_SERVICEGEBUEHR_AB. */
+export function hofpreisStichtagTag(einstellung: HofpreisEinstellung): string {
+  return kalendertagInWien(hofpreisModellAb(einstellung))
+}
+
+/**
+ * Die Regel des Stichtags (Freigabe 197, Punkt 6) — dieselbe reine Funktion
+ * für Formular und Action: Ändern nur, solange der wirksame Stichtag noch
+ * nicht erreicht ist, und der neue Tag (Wiener Mitternacht) liegt in der
+ * Zukunft. null = in Ordnung, sonst der Satz.
+ */
+export function pruefeHofpreisStichtag(neuTag: string, bisher: HofpreisEinstellung, jetzt: Date): string | null {
+  if (hofpreisModellAb(bisher).getTime() <= jetzt.getTime()) return HOFPREIS_STICHTAG_FEHLER.erreicht
+  const neu = /^\d{4}-\d{2}-\d{2}$/.test(neuTag) ? wienerMitternacht(neuTag) : null
+  if (!neu) return HOFPREIS_STICHTAG_FEHLER.datum
+  if (neu.getTime() <= jetzt.getTime()) return HOFPREIS_STICHTAG_FEHLER.zukunft
+  if (neu.getTime() === hofpreisModellAb(bisher).getTime()) return HOFPREIS_STICHTAG_FEHLER.gleich
+  return null
 }

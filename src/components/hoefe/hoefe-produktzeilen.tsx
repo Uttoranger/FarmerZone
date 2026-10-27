@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { formatGrundpreis, formatGrundpreisZeile } from '@/lib/format'
+import { PREISE_INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import type { VorschauProdukt } from '@/lib/hofuebersicht'
 import { illustrationPfad } from '@/lib/taxonomie'
 import { cn } from '@/lib/utils'
@@ -117,6 +118,8 @@ export function HoefeProduktzeilen({
           + {weitere} {weitere === 1 ? 'weiteres Produkt' : 'weitere Produkte'}
         </p>
       )}
+      {/* N38: Endpreise — einmal unter den Zeilen gesagt, nicht an jedem Preis. */}
+      {produkte.some((p) => p.inklPlattformgebuehr) && <p className="text-xs text-muted-foreground">{PREISE_INKL_PLATTFORMGEBUEHR}</p>}
     </div>
   )
 }

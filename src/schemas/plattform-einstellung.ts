@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EINSTELLUNGEN_GRUPPEN, GRUENDUNG_EINSTELLUNG_FEHLER, GRUENDUNG_MONATE_MAX, GRUENDUNG_PLAETZE_MAX } from '@/lib/plattform-einstellung'
+import { EINSTELLUNGEN_GRUPPEN, GRUENDUNG_EINSTELLUNG_FEHLER, HOFPREIS_STICHTAG_FEHLER, GRUENDUNG_MONATE_MAX, GRUENDUNG_PLAETZE_MAX } from '@/lib/plattform-einstellung'
 
 /**
  * Die Eingabe der Gruppe Gründungshöfe in Admin › Einstellungen (Register
@@ -38,3 +38,13 @@ export type GruendungEinstellungEingabe = z.infer<typeof gruendungEinstellungSch
  * still die erste Gruppe statt einer Fehlerseite (ARCHITECTURE §4).
  */
 export const einstellungenGruppeSchema = z.enum(EINSTELLUNGEN_GRUPPEN).catch('gruendung')
+
+/**
+ * Die Eingabe „Hofpreis-Modell ab“ (Register N38, Nr. 197): ein Wiener
+ * Kalendertag. Ob er in der Zukunft liegt und ob der alte noch änderbar ist,
+ * sagt `pruefeHofpreisStichtag` mit dem Stand aus der Datenbank.
+ */
+export const hofpreisStichtagSchema = z.strictObject(
+  { tag: z.string(HOFPREIS_STICHTAG_FEHLER.datum).regex(/^\d{4}-\d{2}-\d{2}$/, HOFPREIS_STICHTAG_FEHLER.datum) },
+  HOFPREIS_STICHTAG_FEHLER.datum
+)

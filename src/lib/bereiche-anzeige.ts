@@ -91,7 +91,10 @@ export type AngebotsZeile = {
  */
 export type AngebotsProdukt = AngebotsZeile & {
   id: string
+  /** Im Hofpreis-Modell (N38, Nr. 197) schon der Endpreis — dann ist `inklPlattformgebuehr` gesetzt. */
   price: number
+  /** N38: Der Preis enthält die Plattformgebühr — die Zeile sagt es unter dem Preis. */
+  inklPlattformgebuehr?: boolean
   unit: string
   unitSize: number | null
   imageUrl: string | null

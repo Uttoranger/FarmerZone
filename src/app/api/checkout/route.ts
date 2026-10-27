@@ -12,6 +12,7 @@ import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import {
+  alsCents,
   calcLineTotal,
   calcTotalAmount,
   calcPlatformFeeAmount,
@@ -656,7 +657,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: BAR_NICHT_MOEGLICH_SATZ, code: CODE_BAR_NICHT_MOEGLICH, barAus: true }, { status: 409 })
     }
     const summe = bestellGebuehr(
-      positionen.map((p) => ({ preisCents: decimalZuCents(p.unitPrice), menge: p.quantity })),
+      positionen.map((p) => ({ preisCents: alsCents(p.unitPrice), menge: p.quantity })),
       lage.hundertstel
     )
     gebuehr = {

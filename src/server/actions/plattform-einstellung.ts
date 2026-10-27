@@ -2,7 +2,7 @@
 
 import { revalidatePath, updateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
 import { PLATTFORM_BEZUG } from '@/schemas/admin-aktion'
 import { GRUENDUNGSPLAETZE_SPERRE, bildeGruendungBis, vergebeneGruendungsplaetze } from '@/lib/gruendungshof'
@@ -13,11 +13,15 @@ import {
   PLATTFORM_EINSTELLUNG_SELECT,
   PLATTFORM_EINSTELLUNG_STANDARD,
   PLATTFORM_EINSTELLUNG_TAG,
+  HOFPREIS_STICHTAG_FEHLER,
   gruendungEinstellungAus,
+  hofpreisEinstellungAus,
   plattformEinstellungAus,
   pruefeGruendungEingabe,
+  pruefeHofpreisStichtag,
 } from '@/lib/plattform-einstellung'
-import { gruendungEinstellungSchema } from '@/schemas/plattform-einstellung'
+import { wienerMitternacht } from '@/lib/wiener-tag'
+import { gruendungEinstellungSchema, hofpreisStichtagSchema } from '@/schemas/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
 /** Die Sätze, die eine Zod-Meldung sein dürfen — alles andere wäre Zods englischer Standardtext. */
@@ -92,6 +96,44 @@ export async function speichereGruendungEinstellung(eingabe: unknown): Promise<{
   revalidatePath('/fuer-hoefe')
   revalidatePath('/register')
   revalidatePath('/konditionen')
+  revalidatePath(ADMIN_EINSTELLUNGEN_HREF)
+  return { ok: true }
+}
+
+/**
+ * Den Stichtag „Hofpreis-Modell ab“ speichern (Register N38, Nr. 197,
+ * Punkt 6): Recht `geld`, frisch mit Passkey bestätigt, mit Eintrag im
+ * Protokoll. Nur ein Tag in der Zukunft und nur, solange der wirksame
+ * Stichtag noch nicht erreicht ist (`pruefeHofpreisStichtag`, frisch aus der
+ * Datenbank gelesen — nie aus dem Cache). Geschrieben wird nur dieses Feld.
+ * Danach den Cache der Einstellung leeren: Hofseite, Kasse und /api/checkout
+ * rechnen ab dem Tag im Hofpreis-Modell.
+ */
+export async function speichereHofpreisStichtag(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
+  const guard = await verlangeAdminAktion({ frisch: true, recht: 'geld' })
+  if ('error' in guard) return { error: guard.error }
+
+  const geprueft = hofpreisStichtagSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: HOFPREIS_STICHTAG_FEHLER.datum }
+  const { tag } = geprueft.data
+
+  const zeile = await prisma.plattformEinstellung.findUnique({ where: { id: PLATTFORM_EINSTELLUNG_ID }, select: PLATTFORM_EINSTELLUNG_SELECT })
+  const bisher = hofpreisEinstellungAus(zeile ? plattformEinstellungAus(zeile) : PLATTFORM_EINSTELLUNG_STANDARD)
+  const fehler = pruefeHofpreisStichtag(tag, bisher, new Date())
+  if (fehler) return { error: fehler }
+  const ab = wienerMitternacht(tag)
+  if (!ab) return { error: HOFPREIS_STICHTAG_FEHLER.datum }
+
+  const werte = { hofpreisModellAb: ab, geaendertVonUserId: guard.userId }
+  await prisma.plattformEinstellung.upsert({
+    where: { id: PLATTFORM_EINSTELLUNG_ID },
+    create: { id: PLATTFORM_EINSTELLUNG_ID, ...werte },
+    update: werte,
+  })
+  await protokolliere({ wer: guard.userId, art: 'hofpreis_stichtag_geaendert', bezugArt: 'plattform', bezugId: PLATTFORM_BEZUG, mitPasskey: guard.mitPasskey })
+
+  updateTag(PLATTFORM_EINSTELLUNG_TAG)
+  revalidatePath('/')
   revalidatePath(ADMIN_EINSTELLUNGEN_HREF)
   return { ok: true }
 }

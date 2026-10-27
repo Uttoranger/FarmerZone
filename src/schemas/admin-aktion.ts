@@ -46,6 +46,7 @@ export const ADMIN_AKTIONEN = [
   'kostenposten_geloescht',
   'finanzen_export',
   'erstattung_erledigt',
+  'hofpreis_stichtag_geaendert',
   // Benachrichtigungen (Recht benachrichtigungen)
   'empfaenger_hinzugefuegt',
   'empfaenger_entfernt',

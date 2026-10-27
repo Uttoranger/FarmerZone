@@ -986,6 +986,8 @@ export function baueHofUebersicht(
         unitSize: dto.unitSize,
         imageUrl: zeile.imageUrl,
         bildAusschnitt: leseAusschnitt(zeile.bildAusschnitt),
+        // N38: der Zusatz „inkl. Plattformgebühr“ an der Zeile, wenn der Preis der Endpreis ist.
+        ...((anzeigeJeHof.get(zeile.farmId) ?? null) !== null ? { inklPlattformgebuehr: true } : {}),
       })
       angebotJeHof.set(zeile.farmId, bisher)
     }
@@ -1030,6 +1032,7 @@ export function baueHofUebersicht(
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
         verfuegbar: p.stock - p.reservedStock > 0,
+        ...((anzeigeJeHof.get(hof.id) ?? null) !== null ? { inklPlattformgebuehr: true } : {}),
       })),
       produkteGesamt: hof._count.products,
       produkteJeBereich: jeBereich.get(hof.id) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
