@@ -1,10 +1,11 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
 import { adminHofHref } from '@/lib/admin-hof-akte'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { satzHundertstel, satzText } from '@/lib/plattformgebuehr'
 import { PLATTFORMGEBUEHR_HOF_FEHLER, plattformgebuehrHofSchema } from '@/schemas/plattformgebuehr'
@@ -27,7 +28,7 @@ export async function speichereHofPlattformgebuehr(eingabe: unknown): Promise<{ 
 
   const vorher = await prisma.farm.findUnique({
     where: { id: d.farmId },
-    select: { plattformgebuehrProzent: true, barMandatPflicht: true, barSperreNachTagen: true, abrechnungsTag: true, einzugAb: true },
+    select: { slug: true, plattformgebuehrProzent: true, barMandatPflicht: true, barSperreNachTagen: true, abrechnungsTag: true, einzugAb: true },
   })
   if (!vorher) return { error: 'Den Hof gibt es nicht mehr.' }
   await prisma.farm.update({
@@ -44,6 +45,9 @@ export async function speichereHofPlattformgebuehr(eingabe: unknown): Promise<{ 
     `Einzug ab ${tag(vorher.einzugAb)} → ${tag(einzugAb)}`,
   ]
   await protokolliere({ wer: wache.userId, art: 'plattformgebuehr_geaendert', bezugArt: 'hof', bezugId: d.farmId, mitPasskey: wache.mitPasskey, grund: teile.join(' · ') })
+  // Der Satz steht auf der Hofseite und in der Hofübersicht (Zwischenspeicher) — wie in admin-hof.ts neu laden.
   revalidatePath(adminHofHref(d.farmId))
+  revalidatePath(`/${vorher.slug}`)
+  updateTag(HOEFE_CACHE_TAG)
   return { ok: true }
 }

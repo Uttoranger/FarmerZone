@@ -5,7 +5,8 @@
  * Beweist: Hof › Deine Konditionen zeigt „Barzahlung“ (Satz, Einzug ab bzw.
  * erlassen, Mandat mit Bank und letzten 4 Stellen — nie mehr) und die
  * Monatsabrechnungen mit Stand als Wort; ohne Abrechnung der Leersatz. Die
- * Heute-Karte sagt „Barzahlung ist pausiert“ mit „Jetzt bezahlen“. Die Akte
+ * Heute-Karte sagt „Barzahlung ist pausiert“ mit „Jetzt bezahlen“; nach einer
+ * Rückbuchung ohne Knopf, mit dem Weg ins Postfach. Die Akte
  * zeigt Mandat, Quote und die Einstellungen. Der Einrichten-Schritt führt zu
  * „Lastschrift einrichten“ und zählt nicht mit.
  */
@@ -70,10 +71,21 @@ describe('Hof › Deine Konditionen: Barzahlung und Monatsabrechnungen', () => {
 
 describe('Hof › Heute: Karte „Barzahlung ist pausiert“', () => {
   it('Titel, Satz mit dem Monat, Knopf „Jetzt bezahlen“ (≥ 44 px über die Pille)', () => {
-    const h = html(createElement(LastschriftSperreKarte, { abrechnungId: 'a2', monatText: 'März 2028' }))
+    const h = html(createElement(LastschriftSperreKarte, { abrechnungId: 'a2', monatText: 'März 2028', stand: 'offen' }))
     expect(h).toContain(LASTSCHRIFT_TEXT.heuteTitel)
     expect(h).toContain(LASTSCHRIFT_TEXT.heuteSatz('März 2028'))
     expect(h).toContain('>Jetzt bezahlen<')
+    expect(h).not.toContain(LASTSCHRIFT_TEXT.zurueckgebuchtSatz('März 2028'))
+  })
+
+  it('zurückgebucht: kein „Jetzt bezahlen“ auf die schon bezahlte Rechnung, sondern ein Satz ohne Fachbegriff und der Weg ins Postfach', () => {
+    const h = html(createElement(LastschriftSperreKarte, { abrechnungId: 'a2', monatText: 'März 2028', stand: 'zurueckgebucht' }))
+    expect(h).toContain(LASTSCHRIFT_TEXT.heuteTitel)
+    expect(h).toContain('Die Lastschrift für März 2028 wurde zurückgebucht. Barzahlung ist pausiert – das Team meldet sich bei dir.')
+    expect(h).not.toContain('Jetzt bezahlen')
+    expect(h).not.toContain(LASTSCHRIFT_TEXT.heuteSatz('März 2028'))
+    expect(h).toContain('href="/postfach"')
+    expect(h).toContain(`>${LASTSCHRIFT_TEXT.zumPostfach}<`)
   })
 })
 

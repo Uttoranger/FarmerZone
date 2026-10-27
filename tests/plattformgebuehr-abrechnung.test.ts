@@ -26,7 +26,7 @@ const stripeAttrappe = vi.hoisted(() => ({
   webhooks: { constructEvent: vi.fn() },
   customers: { create: vi.fn() },
   setupIntents: { create: vi.fn() },
-  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn() },
+  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn(), del: vi.fn() },
   invoiceItems: { create: vi.fn(), list: vi.fn() },
   invoicePayments: { list: vi.fn() },
   accounts: { retrieveCurrent: vi.fn() },
@@ -51,7 +51,7 @@ vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: vi.fn(async (
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => ({ user: { id: 'u1' } })) } } }))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/server/admin-wache', () => ({ verlangeAdminAktion: vi.fn() }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
 
 import { POST } from '@/app/api/stripe/webhook/route'
@@ -76,6 +76,10 @@ import { LASTSCHRIFT_TEXT, lastschriftGescheitertText } from '@/lib/konditionen'
 import { summeGebuehrPositionen } from '@/lib/plattformgebuehr'
 import { captureException } from '@sentry/nextjs'
 import { richteRechnungenEin } from './stripe-rechnungen-attrappe'
+import { revalidatePath, updateTag } from 'next/cache'
+import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { rechnungSchema } from '@/schemas/plattformgebuehr'
+import { ladeSperrKarte } from '@/server/queries/plattformgebuehr'
 
 const TAG = 24 * 60 * 60 * 1000
 // Dienstag, 3. März 2027, 06:30 in Wien — der Abrechnungstag (Vorgabe der 3.) für Februar.
@@ -264,7 +268,7 @@ describe('rechneHofAb: Februar abrechnen', () => {
     db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
     db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', stand: 'entwurf', rechnungBarId: 'in_bar_alt', rechnungOnlineId: 'in_online_alt' })
     rechnungen.set('in_online_alt', { status: 'paid', posten: [] })
-    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_alt', schluessel: 'b1', amount: 72 }] })
+    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_alt', schluessel: 'b1', amount: 72 }], default_payment_method: 'pm_sepa_1' })
     const e = await rechneHofAb(HOF, '2027-02', JETZT)
     expect(e.stand).toBe('offen')
     expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
@@ -274,13 +278,15 @@ describe('rechneHofAb: Februar abrechnen', () => {
     expect(rechnungen.get('in_bar_alt')?.posten.reduce((s, x) => s + x.amount, 0)).toBe(342)
     // Die Rechnung online ist schon bezahlt: nichts mehr daran.
     expect(stripeAttrappe.invoices.pay).not.toHaveBeenCalled()
+    // Gegenprobe zum Wegwechsel: Einzugsweg unverändert (Lastschrift) → der Entwurf bleibt, nichts gelöscht.
+    expect(stripeAttrappe.invoices.del).not.toHaveBeenCalled()
   })
 
   it('Rechnungsbetrag weicht von der Summe ab: Warnung, nicht finalisiert, bleibt im Entwurf', async () => {
     db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
     db.monatsabrechnung.upsert.mockResolvedValue({ id: 'abr_1', stand: 'entwurf', rechnungBarId: 'in_bar_alt', rechnungOnlineId: 'in_online_alt' })
     rechnungen.set('in_online_alt', { status: 'paid', posten: [] })
-    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_fremd', schluessel: 'b9', amount: 999 }] })
+    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_fremd', schluessel: 'b9', amount: 999 }], default_payment_method: 'pm_sepa_1' })
     const e = await rechneHofAb(HOF, '2027-02', JETZT)
     expect(e).toEqual({ farmId: 'hof_1', monat: '2027-02', stand: 'entwurf', neu: false })
     expect(stripeAttrappe.invoices.finalizeInvoice).not.toHaveBeenCalled()
@@ -321,6 +327,112 @@ describe('rechneHofAb: Februar abrechnen', () => {
     expect(e.stand).toBe('offen')
     const bar = stripeAttrappe.invoiceItems.create.mock.calls.filter(([p]) => p.invoice === 'in_bar').map(([p]) => [p.amount, p.description])
     expect(bar).toEqual([[monatsSummen(viele).barCents, 'Plattformgebühr bar · 201 Bestellungen']])
+  })
+
+  // ─── Einzugsweg geändert, während die Rechnung bar im Entwurf liegt ────────
+  const ENTWURF_BAR = { id: 'abr_1', stand: 'entwurf', rechnungBarId: 'in_bar_alt', rechnungOnlineId: 'in_online_alt' }
+  function entwurfVorbelegen(weg: 'charge_automatically' | 'send_invoice'): void {
+    db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
+    db.monatsabrechnung.upsert.mockResolvedValue(ENTWURF_BAR)
+    rechnungen.set('in_online_alt', { status: 'paid', posten: [] })
+    rechnungen.set('in_bar_alt', { status: 'draft', posten: [{ id: 'ii_alt', schluessel: 'b1', amount: 72 }], collection_method: weg, default_payment_method: weg === 'charge_automatically' ? 'pm_sepa_1' : undefined })
+  }
+  const OHNE_MANDAT = { ...HOF, barMandatPflicht: false, sepaMandatAm: null, sepaZahlungsmittelId: null, barSperreNachTagen: 10 }
+
+  it('Mandat entfernt (Pflicht aus): Lastschrift-Entwurf gelöscht, neu als Überweisung mit neuem Schlüssel; offen ab dem Senden', async () => {
+    entwurfVorbelegen('charge_automatically')
+    const e = await rechneHofAb(OHNE_MANDAT, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
+    expect(stripeAttrappe.invoices.del).toHaveBeenCalledWith('in_bar_alt')
+    expect(rechnungen.has('in_bar_alt')).toBe(false)
+    const [p, o] = stripeAttrappe.invoices.create.mock.calls[0]
+    expect(p).toEqual(expect.objectContaining({ collection_method: 'send_invoice', days_until_due: 10 }))
+    expect(o).toEqual({ idempotencyKey: 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt' })
+    const neueId = (await stripeAttrappe.invoices.create.mock.results[0].value).id as string
+    expect(neueId).not.toBe('in_bar_alt')
+    expect(db.monatsabrechnung.update).toHaveBeenCalledWith({ where: { id: 'abr_1' }, data: { rechnungBarId: neueId } })
+    // Alle Positionen neu, mit dem neuen Schlüssel — die alten Schlüssel gäben sonst die gelöschten Posten zurück.
+    expect(stripeAttrappe.invoiceItems.create.mock.calls.map(([q, k]) => [q.invoice, q.amount, k.idempotencyKey])).toEqual([
+      [neueId, 72, 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt-pos-b1'],
+      [neueId, 270, 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt-pos-b2'],
+    ])
+    expect(stripeAttrappe.invoices.finalizeInvoice).toHaveBeenCalledWith(neueId, { auto_advance: false }, { idempotencyKey: 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt-fertig' })
+    expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledWith(neueId, {}, { idempotencyKey: 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt-senden' })
+    expect(db.monatsabrechnung.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abr_1', stand: 'entwurf' }, data: { stand: 'offen', offenSeit: JETZT } })
+  })
+
+  it('Mandat neu: Überweisungs-Entwurf gelöscht, neu als Lastschrift mit dem SEPA-Zahlungsmittel; nichts gesendet, offenSeit leer', async () => {
+    entwurfVorbelegen('send_invoice')
+    const e = await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
+    expect(stripeAttrappe.invoices.del).toHaveBeenCalledWith('in_bar_alt')
+    expect(stripeAttrappe.invoices.create.mock.calls[0]).toEqual([
+      expect.objectContaining({ collection_method: 'charge_automatically', default_payment_method: 'pm_sepa_1' }),
+      { idempotencyKey: 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt' },
+    ])
+    expect(stripeAttrappe.invoices.finalizeInvoice).toHaveBeenCalledWith(expect.not.stringMatching(/^in_bar_alt$/), { auto_advance: true }, { idempotencyKey: 'abr-hof_1-2027-02-bar-ersetzt-in_bar_alt-fertig' })
+    expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+    expect(db.monatsabrechnung.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abr_1', stand: 'entwurf' }, data: { stand: 'offen', offenSeit: null } })
+  })
+
+  it('Lastschrift geändert (neues Zahlungsmittel): Entwurf mit dem alten ersetzt; Gegenprobe gleiches Zahlungsmittel → bleibt', async () => {
+    entwurfVorbelegen('charge_automatically')
+    await rechneHofAb({ ...HOF, sepaZahlungsmittelId: 'pm_sepa_2' }, '2027-02', JETZT)
+    expect(stripeAttrappe.invoices.del).toHaveBeenCalledWith('in_bar_alt')
+    expect(stripeAttrappe.invoices.create.mock.calls[0][0]).toEqual(expect.objectContaining({ default_payment_method: 'pm_sepa_2' }))
+  })
+
+  it('Entwurf lässt sich nicht löschen: Warnung, kein neuer Entwurf, nichts finalisiert, bleibt im Entwurf', async () => {
+    entwurfVorbelegen('charge_automatically')
+    stripeAttrappe.invoices.del.mockRejectedValue(new Error('gesperrt'))
+    const e = await rechneHofAb(OHNE_MANDAT, '2027-02', JETZT)
+    expect(e).toEqual({ farmId: 'hof_1', monat: '2027-02', stand: 'entwurf', neu: false })
+    expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+    expect(stripeAttrappe.invoices.finalizeInvoice).not.toHaveBeenCalled()
+    expect(rechnungen.get('in_bar_alt')?.status).toBe('draft')
+    expect(vi.mocked(captureException)).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Monatsabrechnung: Einzugsweg geändert, Entwurf ließ sich nicht löschen — bleibt stehen' }),
+      expect.anything()
+    )
+  })
+
+  it('Abbruch nach dem Löschen (gespeicherte Rechnung fehlt bei Stripe): neu mit dem Ersatz-Schlüssel, keine Warnung über den Stand', async () => {
+    db.monatsabrechnung.findUnique.mockResolvedValue({ id: 'abr_1', stand: 'entwurf' })
+    db.monatsabrechnung.upsert.mockResolvedValue({ ...ENTWURF_BAR, rechnungBarId: 'in_bar_weg' })
+    rechnungen.set('in_online_alt', { status: 'paid', posten: [] })
+    const e = await rechneHofAb(OHNE_MANDAT, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
+    expect(stripeAttrappe.invoices.create.mock.calls[0][1]).toEqual({ idempotencyKey: 'abr-hof_1-2027-02-bar-ersetzt-in_bar_weg' })
+  })
+
+  it('schon finalisierte Rechnung wird nie gelöscht; der Weg der Rechnung zählt (Lastschrift → nichts senden, offenSeit leer)', async () => {
+    entwurfVorbelegen('charge_automatically')
+    rechnungen.set('in_bar_alt', { status: 'open', posten: [{ id: 'ii_1', schluessel: 'b1', amount: 72 }, { id: 'ii_2', schluessel: 'b2', amount: 270 }], collection_method: 'charge_automatically' })
+    const e = await rechneHofAb(OHNE_MANDAT, '2027-02', JETZT)
+    expect(e.stand).toBe('offen')
+    expect(stripeAttrappe.invoices.del).not.toHaveBeenCalled()
+    expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+    expect(db.monatsabrechnung.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abr_1', stand: 'entwurf' }, data: { stand: 'offen', offenSeit: null } })
+  })
+
+  // ─── Ein schnellerer Webhook hat den Stand schon weitergesetzt ─────────────
+  it('updateMany auf „entwurf“ trifft nichts (Webhook war schneller): kein Protokoll, Rückgabe mit dem echten Stand, nicht neu', async () => {
+    db.monatsabrechnung.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ stand: 'bezahlt' })
+    db.monatsabrechnung.updateMany.mockResolvedValue({ count: 0 })
+    const e = await rechneHofAb(HOF, '2027-02', JETZT)
+    expect(e).toEqual({ farmId: 'hof_1', monat: '2027-02', stand: 'bezahlt', neu: false })
+    expect(protokolliere).not.toHaveBeenCalled()
+  })
+
+  it('auch bei 0 € bar: count 0 → kein Protokoll, echter Stand; Gegenprobe count 1 → protokolliert und neu', async () => {
+    db.order.findMany.mockResolvedValue(bestellZeilen(MAERZ))
+    db.monatsabrechnung.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ stand: 'nichts' })
+    db.monatsabrechnung.updateMany.mockResolvedValueOnce({ count: 0 })
+    expect(await rechneHofAb(HOF, '2027-03', JETZT)).toEqual({ farmId: 'hof_1', monat: '2027-03', stand: 'nichts', neu: false })
+    expect(protokolliere).not.toHaveBeenCalled()
+    rechnungen = richteRechnungenEin(stripeAttrappe, (art) => `in_${art}`)
+    expect(await rechneHofAb(HOF, '2027-03', JETZT)).toEqual({ farmId: 'hof_1', monat: '2027-03', stand: 'nichts', neu: true })
+    expect(vi.mocked(protokolliere).mock.calls[0][0]).toEqual(expect.objectContaining({ art: 'monatsabrechnung_erstellt' }))
   })
 
   it('Mandat Pflicht, aber keins da: keine Rechnung bar, bleibt im Entwurf', async () => {
@@ -504,14 +616,45 @@ describe('Einstellungen je Hof im Admin', () => {
 
   it('mit Recht: gespeichert (Satz als Decimal-Text), Protokoll mit alt → neu; Abrechnungstag 29 abgelehnt', async () => {
     vi.mocked(verlangeAdminAktion).mockResolvedValue({ ok: true, userId: 'admin_1', sitzungId: 's', mitPasskey: true })
-    db.farm.findUnique.mockResolvedValue({ plattformgebuehrProzent: null, barMandatPflicht: true, barSperreNachTagen: 14, abrechnungsTag: 3, einzugAb: null })
+    db.farm.findUnique.mockResolvedValue({ slug: 'hof-probe', plattformgebuehrProzent: null, barMandatPflicht: true, barSperreNachTagen: 14, abrechnungsTag: 3, einzugAb: null })
     expect(await speichereHofPlattformgebuehr({ farmId: 'hof_1', satz: '6,5', mandatPflicht: false, sperreTage: 10, abrechnungsTag: 5, einzugAb: '2028-04-01' })).toEqual({ ok: true })
     expect(db.farm.update.mock.calls[0][0].data).toEqual(expect.objectContaining({ plattformgebuehrProzent: '6.50', barMandatPflicht: false, barSperreNachTagen: 10, abrechnungsTag: 5 }))
     expect(vi.mocked(protokolliere).mock.calls[0][0]).toEqual(
       expect.objectContaining({ art: 'plattformgebuehr_geaendert', bezugId: 'hof_1', mitPasskey: true, grund: expect.stringContaining('Satz 6 → 6,5 %') })
     )
+    // Der Satz steht auf der Hofseite und in der Hofübersicht: beide neu laden (wie admin-hof.ts).
+    expect(revalidatePath).toHaveBeenCalledWith('/hof-probe')
+    expect(updateTag).toHaveBeenCalledWith(HOEFE_CACHE_TAG)
     db.farm.update.mockClear()
+    vi.mocked(updateTag).mockClear()
     expect(await speichereHofPlattformgebuehr({ farmId: 'hof_1', satz: '6', mandatPflicht: true, sperreTage: 14, abrechnungsTag: 29, einzugAb: '' })).toEqual({ error: expect.stringContaining('1 bis 28') })
     expect(db.farm.update).not.toHaveBeenCalled()
+    // Gegenprobe: abgelehnt → nichts neu geladen.
+    expect(updateTag).not.toHaveBeenCalled()
+  })
+})
+
+describe('Rechnung öffnen: Schema unter src/schemas', () => {
+  it('nimmt Kennung, Art und Ziel; lehnt Fremdes ab', () => {
+    expect(rechnungSchema.safeParse({ abrechnungId: 'a_1', art: 'bar', ziel: 'bezahlen' }).success).toBe(true)
+    expect(rechnungSchema.safeParse({ abrechnungId: 'a 1', art: 'bar', ziel: 'pdf' }).success).toBe(false)
+    expect(rechnungSchema.safeParse({ abrechnungId: 'a1', art: 'bar', ziel: 'loeschen' }).success).toBe(false)
+  })
+})
+
+describe('Hof › Heute: welche Abrechnung die Karte zeigt', () => {
+  it('zurückgebucht geht vor offen (Bezahlen hebt die Pause dann nicht auf) und kommt mit Stand; ohne sperrende → null', async () => {
+    db.farm.findUnique.mockResolvedValue({ barSperreNachTagen: 14 })
+    const alt = new Date(JETZT.getTime() - 30 * TAG)
+    db.monatsabrechnung.findMany.mockResolvedValue([
+      { id: 'a_jan', monat: new Date('2027-01-01T00:00:00.000Z'), stand: 'offen', offenSeit: alt, rechnungBarId: 'in_1' },
+      { id: 'a_feb', monat: new Date('2027-02-01T00:00:00.000Z'), stand: 'zurueckgebucht', offenSeit: null, rechnungBarId: 'in_2' },
+    ])
+    expect(await ladeSperrKarte('hof_1', JETZT)).toEqual({ abrechnungId: 'a_feb', monatText: 'Februar 2027', stand: 'zurueckgebucht' })
+    // Gegenprobe: nur die offene → sie, mit Stand „offen“.
+    db.monatsabrechnung.findMany.mockResolvedValue([{ id: 'a_jan', monat: new Date('2027-01-01T00:00:00.000Z'), stand: 'offen', offenSeit: alt, rechnungBarId: 'in_1' }])
+    expect(await ladeSperrKarte('hof_1', JETZT)).toEqual({ abrechnungId: 'a_jan', monatText: 'Jänner 2027', stand: 'offen' })
+    db.monatsabrechnung.findMany.mockResolvedValue([])
+    expect(await ladeSperrKarte('hof_1', JETZT)).toBeNull()
   })
 })

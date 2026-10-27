@@ -180,7 +180,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       <div className="flex flex-col gap-4 md:gap-5">
         {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
         {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
-        {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} />}
+        {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
         {zeige(aufbau.oben)}
         <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />
         <Kennzahlen

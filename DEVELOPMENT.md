@@ -6069,7 +6069,8 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Warum die Ankündigung im Ablauf `monatsabrechnung` und nicht im Ablauf `betrieb`:** Beide laufen täglich; so bleibt alles zur Plattformgebühr in einer Route und einer Datei (Freigabe 198, Dateigrenzen).
 - **Warum Mails „Wichtig“ statt „Sofort“:** Nur Arten mit Renderer lassen sich nochmal schicken (N27); Sofort ist Codes und Links vorbehalten. Die Warteschlange schickt binnen einer Minute.
 - **Warum `offenSeit` erst beim Fehlschlag:** Eine SEPA-Lastschrift braucht Tage; die Sperre soll nur zählen, wenn etwas schiefging. Bei Überweisung zählt sie ab dem Senden der Rechnung.
-- **Rückbuchung bleibt stehen:** Nach `zurueckgebucht` hebt nur eine neue Zahlung bzw. ein Eingriff des Teams die Sperre (Nacharbeit, Bericht 198).
+- **Rückbuchung bleibt stehen:** Nach `zurueckgebucht` hebt nur ein Eingriff des Teams die Sperre (Nacharbeit, Bericht 198). Die Heute-Karte bietet dann kein „Jetzt bezahlen“ mehr an — die Rechnung ist ja bezahlt —, sondern sagt, dass das Team sich meldet, und führt ins Postfach.
+- **Warum ein Entwurf bei Wegwechsel ersetzt wird:** Ein Stripe-Entwurf behält den Weg, mit dem er angelegt wurde. Wurde das Mandat entfernt (oder neu eingerichtet), während die Rechnung bar noch im Entwurf lag, hätte der Lauf eine Lastschrift ohne Mandat finalisiert bzw. eine Überweisung geschickt, obwohl abgebucht werden könnte. Gelöscht wird nur ein Entwurf; der Ersatz bekommt neue Schlüssel (`-ersetzt-<alte Kennung>`), weil Stripe die alten 24 Stunden lang wiedererkennt (Nachbesserung Dirigent, Lauf 26).
 - **Geld-Abgleich:** `erwartetLautDatenbank` hat eine eigene Zeile für das Hofpreis-Modell (application_fee = Provision + Summe `OrderItem.gebuehrCents`).
 
 ## Nützliche Befehle
