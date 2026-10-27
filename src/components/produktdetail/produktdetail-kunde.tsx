@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { PreisAnzeigeRahmen } from '@/components/shared/preis-anzeige'
+import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Building2, ChevronLeft, Leaf, ShoppingBasket } from 'lucide-react'
@@ -143,7 +145,9 @@ export function ProduktdetailKunde({
   const nochMoeglich = mengeNochMoeglich(produkt.stock, imKorb(produkt.id))
   // Nach dem Hydrieren kann der Korb schon etwas enthalten — die Menge rückt dann an die Grenze.
   const mengeJetzt = Math.max(1, Math.min(menge, nochMoeglich))
-  const betrag = formatEuro(centsAlsEuro(kaufBetragCents(produkt.price, mengeJetzt)))
+  // Im Hofpreis-Modell (N38) der Endpreis — nur Anzeige; in den Korb geht weiter der Warenpreis.
+  const preisProdukt = mitEndpreis(produkt, farm.preisAnzeige)
+  const betrag = formatEuro(centsAlsEuro(kaufBetragCents(preisProdukt.price, mengeJetzt)))
 
   function waehleGroesse(id: string) {
     setGewaehlt(id)
@@ -184,8 +188,9 @@ export function ProduktdetailKunde({
   const schild = futterSchild(produkt, farm.betriebsstatus)
   const brennmaterial = produkt.brennmaterial ? brennmaterialZeilen(produkt.brennmaterial) : []
   const beschreibung = produkt.description?.trim() ?? ''
-  const zweite = zweitePreiszeile(produkt)
-  const kacheln = groessenKacheln(familie, kaufSperre)
+  const zweite = zweitePreiszeile(mitEndpreis(produkt, farm.preisAnzeige))
+  // Größen mit Endpreis (N38) — die Kacheln zeigen nur Text, gekauft wird über die Kennung.
+  const kacheln = groessenKacheln(familie.map((p) => mitEndpreis(p, farm.preisAnzeige)), kaufSperre)
   const mitGrundpreis = kacheln.some((k) => k.grundpreis)
   const vorrat = vorratText(produkt, zustand)
   const mitnehmen = gleichMitAbholen(produkte, produkt, kaufSperre)
@@ -201,7 +206,8 @@ export function ProduktdetailKunde({
   const knapp = zustand.art === 'knapp' ? knappText(zustand.bestand, produkt.unit, produkt.unitSize) : null
 
   return (
-    <>
+    // Die Preisanzeige (N38, Nr. 197) für Preis, Korb und Seitenspalte dieser Seite.
+    <PreisAnzeigeRahmen anzeige={farm.preisAnzeige}>
       {/* Rückweg ab 768 px als Zeile (Mockup „‹ Alle Produkte"); am Handy sitzt er als runder Knopf auf dem Bild. */}
       <div className="mx-auto hidden max-w-[1200px] px-6 pt-3 md:block">
         <Link
@@ -358,7 +364,7 @@ export function ProduktdetailKunde({
                 <h2 id="kaufen-titel" className="sr-only">
                   Preis und Menge
                 </h2>
-                <p className="text-xl font-semibold text-foreground tabular-nums">{formatGrundpreis(produkt.price, produkt.unit, produkt.unitSize)}</p>
+                <p className="text-xl font-semibold text-foreground tabular-nums">{formatGrundpreis(preisProdukt.price, preisProdukt.unit, preisProdukt.unitSize)}</p>
                 {zweite && <p className="text-[13px] text-muted-foreground tabular-nums">{zweite}</p>}
                 {vorrat && zustand.art === 'kaufbar' && <p className="text-[13px] text-muted-foreground">Vorrat: {vorrat}</p>}
                 {raummass && <RaummassErklaerung className="mt-2" />}
@@ -456,6 +462,6 @@ export function ProduktdetailKunde({
           kaufSperre={{ sperre, hofName: farm.name, pauseMessage: farm.pauseMessage }}
         />
       )}
-    </>
+    </PreisAnzeigeRahmen>
   )
 }

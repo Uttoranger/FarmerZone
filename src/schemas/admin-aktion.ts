@@ -55,6 +55,7 @@ export const ADMIN_AKTIONEN = [
   // Bestellungen (Nr. 186): volle Adresse nach Grund (Recht adresse_anzeigen), Notfall-Storno (Recht hof_sperren_storno)
   'adresse_angezeigt',
   'notfall_storno',
+  'hofpreis_stichtag_geaendert',
   // Benachrichtigungen (Recht benachrichtigungen)
   'empfaenger_hinzugefuegt',
   'empfaenger_entfernt',

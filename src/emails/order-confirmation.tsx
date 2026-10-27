@@ -14,6 +14,7 @@ import {
 } from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
+import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
@@ -35,6 +36,8 @@ export interface OrderConfirmationProps {
   items: Array<{ name: string; betrag: number }>
   /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
   serviceFee?: number
+  /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
+  plattformgebuehr?: number
   /** Was die Kundin zahlt bzw. gezahlt hat: Warenpreis + Servicegebühr. */
   total: number
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
@@ -110,6 +113,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {p.zahlart === 'bar' && <Text style={kleinText}>{`Bring bitte ${formatEuro(p.total)} in bar mit.`}</Text>}
       {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
       {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
+      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
       <Text style={kleinText}>
         Fragen? Ruf direkt beim Hof an:{' '}
         {anrufen ? (

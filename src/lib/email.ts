@@ -7,7 +7,9 @@ import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
-import { barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -336,6 +338,10 @@ export type OrderForEmail = {
   totalAmount: { toString(): string } | number
   /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
   serviceFeeCents?: number
+  /** Gebührenmodell aus dem Snapshot (N38): 'hofpreis' oder null/fehlend = bisher. */
+  gebuehrModell?: string | null
+  /** Einzugsweg aus dem Snapshot (N38): 'erlassen' heißt, die Bargebühr bleibt beim Hof. */
+  gebuehrEinzug?: string | null
   /** Bestellzeitpunkt — für die Frist in „Bitte bestätige" (fristVon); fehlt er, bleibt der allgemeine Satz. */
   createdAt?: Date
   pickupDate: Date
@@ -359,6 +365,12 @@ export type OrderForEmail = {
     quantity: number
     unitPrice: { toString(): string } | number
     totalPrice?: { toString(): string } | number
+    /**
+     * Gebühr dieser Position in Cent (OrderItem.gebuehrCents, N38) — nur im Hofpreis-Modell über 0.
+     * Pflicht, damit der Typecheck jeden Lader meldet, der das Feld vergisst: Sonst zeigt die Mail
+     * Zeilen ohne Gebühr, aber ein Gesamt mit Gebühr.
+     */
+    gebuehrCents: number
     // Einheit optional zur Anzeige gejoint (formatOrderLine-Schreibweise);
     // fehlt sie, bleibt die Darstellung wie bisher
     product?: OrderLineProduct
@@ -401,14 +413,40 @@ function n(v: { toString(): string } | number): number {
  * gerechnet über Decimal und Cent (CODING_STANDARDS §2), nie `Preis × Menge`
  * in Fließkomma: Der Snapshot `totalPrice`, sonst `calcLineTotal`.
  */
-function zeilenBetrag(i: OrderForEmail['items'][number]): number {
+function zeilenBetrag(i: OrderForEmail['items'][number], mitGebuehr: boolean): number {
   const cents = i.totalPrice != null ? alsCents(i.totalPrice) : decimalZuCents(calcLineTotal(i.unitPrice, i.quantity))
-  return centsAlsEuro(cents)
+  // Im Hofpreis-Modell (N38) zeigt die Kundin-Mail den Endpreis der Zeile: Ware + Gebühr der Zeile aus dem Snapshot.
+  return centsAlsEuro(mitGebuehr ? cents + i.gebuehrCents : cents)
 }
 
-/** Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise, Betrag fertig gerechnet. */
+/** Ist die Bestellung im Hofpreis-Modell (N38)? Dann heißt die Gebühr „Plattformgebühr“ und steckt im Preis. */
+function imHofpreis(order: OrderForEmail): boolean {
+  return istHofpreisBestellung({ gebuehrModell: order.gebuehrModell ?? null })
+}
+
+/**
+ * Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise,
+ * Betrag fertig gerechnet — im Hofpreis-Modell der Endpreis inkl.
+ * Plattformgebühr (N38), sonst der Warenpreis.
+ */
 function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
-  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i) }))
+  const hofpreis = imHofpreis(order)
+  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) }))
+}
+
+/**
+ * Die Gebühr in den Kunden-Mails: im Modell `bisher` eine eigene Zeile
+ * „Servicegebühr“ (`serviceFee`), im Hofpreis-Modell keine Zeile — sie steckt
+ * in den Endpreisen, der Satz darunter nennt sie (`plattformgebuehr`).
+ */
+function kundenGebuehr(order: OrderForEmail): { serviceFee: number; plattformgebuehr: number } {
+  const { gebuehr } = betraege(order)
+  return imHofpreis(order) ? { serviceFee: 0, plattformgebuehr: gebuehr } : { serviceFee: gebuehr, plattformgebuehr: 0 }
+}
+
+/** Das Wort für die Gebühr in den Hof-Mails (N8): „Plattformgebühr“ im Hofpreis-Modell, sonst „Servicegebühr“. */
+function gebuehrWort(order: OrderForEmail): string {
+  return imHofpreis(order) ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG
 }
 
 /** Online, bar oder (alte Bestellungen, E5) Karte vor Ort — für Satz und Gesamtzeile der Mail. */
@@ -765,7 +803,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     zahlart: mailZahlart(order.paymentMethod),
     items: mailPositionen(order),
-    serviceFee: betraege(order).gebuehr,
+    ...kundenGebuehr(order),
     total: betraege(order).gesamt,
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
@@ -810,7 +848,7 @@ export async function onsiteConfirmationInhalt(
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: mailPositionen(order),
-    serviceFee: betraege(order).gebuehr,
+    ...kundenGebuehr(order),
     total: betraege(order).gesamt,
     confirmationUrl,
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
@@ -852,6 +890,7 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
+    gebuehrWort: gebuehrWort(order),
     customerTotal: betraege(order).gesamt,
     paymentLabel: 'Online (bereits bezahlt)',
     isOnline: true,
@@ -878,10 +917,16 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
+    gebuehrWort: gebuehrWort(order),
     barZuKassieren: betraege(order).gesamt,
     // B1 nach dem BESTELLzeitpunkt, nicht nach dem Versand. Ohne Zeitpunkt der
     // bisherige Satz — lieber kein Hinweis als ein falscher.
-    barOhneGebuehr: order.paymentMethod === 'ONSITE_CASH' && order.createdAt ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt) : false,
+    // Hofpreis-Modell (N38): Erlassen heißt, die Bargebühr bleibt beim Hof — kein Satz zur Monatsabrechnung.
+    barOhneGebuehr: imHofpreis(order)
+      ? order.gebuehrEinzug === 'erlassen'
+      : order.paymentMethod === 'ONSITE_CASH' && order.createdAt
+        ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt)
+        : false,
     dashboardUrl: `${APP_URL}/orders`,
   }))
 
@@ -1018,6 +1063,7 @@ export async function baueArtikelFehlt(
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
     artikel: positionsZeile(fehlt.position),
+    gebuehrWort: gebuehrWort(order),
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     zahlung: fehlt.zahlung,

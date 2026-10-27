@@ -152,6 +152,8 @@ vi.mock('react', async (importOriginal) => ({
   useTransition: pruefstand.useTransition,
   useOptimistic: pruefstand.useOptimistic,
   useImperativeHandle: pruefstand.useImperativeHandle,
+  // Ohne Rahmen liefert ein Kontext seinen Vorgabewert (Preisanzeige, N38: null = Warenpreis wie bisher).
+  useContext: <T,>(kontext: import('react').Context<T>): T => (kontext as unknown as { _currentValue: T })._currentValue,
 }))
 
 // Das echte useCart, nur umhüllt: was der Hook zuletzt geliefert hat — auch aus dem Produktraster heraus.

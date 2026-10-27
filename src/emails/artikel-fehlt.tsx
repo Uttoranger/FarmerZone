@@ -40,6 +40,8 @@ export interface ArtikelFehltProps {
   neu: number
   /** Online: was wir zurückerstatten, in Euro. */
   erstattet: number | null
+  /** Das Wort für die Gebühr (N8): „Servicegebühr“ (Vorgabe) oder im Hofpreis-Modell „Plattformgebühr“. */
+  gebuehrWort?: string
   /** Signierter Link zur Bestellung (bestellungPfad). */
   orderUrl: string
 }
@@ -61,7 +63,7 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
             {`Bring bitte ${formatEuro(p.neu)} in bar mit (statt ${formatEuro(p.bisher)}).`}
           </Text>
           <Text style={{ ...mutedText, margin: '6px 0 0' }}>
-            Die Servicegebühr gilt nur für das, was du bekommst.
+            {`Die ${p.gebuehrWort ?? 'Servicegebühr'} gilt nur für das, was du bekommst.`}
           </Text>
         </div>
       ) : (
@@ -70,8 +72,7 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
             {`Wir haben dir ${formatEuro(p.erstattet ?? 0)} zurückerstattet.`}
           </Text>
           <Text style={{ ...mutedText, margin: '6px 0 0' }}>
-            Das ist der Preis des Artikels und die Servicegebühr, die dafür angefallen wäre. Die
-            Rückerstattung erscheint in 5–10 Werktagen auf deinem Konto.
+            {`Das ist der Preis des Artikels und die ${p.gebuehrWort ?? 'Servicegebühr'}, die dafür angefallen wäre. Die Rückerstattung erscheint in 5–10 Werktagen auf deinem Konto.`}
           </Text>
         </div>
       )}

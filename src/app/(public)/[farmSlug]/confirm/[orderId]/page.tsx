@@ -100,6 +100,8 @@ async function getOrder(orderId: string) {
       totalAmount: true,
       serviceFeeCents: true,
       serviceFeeRefundedAt: true,
+      // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
+      gebuehrModell: true,
       // Keine Personendaten hier (Nr. 153): Den Namen zeigt die Seite nie, die
       // E-Mail holt `adresseSolangeOffen` nur für eine laufende Bestellung.
       createdAt: true,

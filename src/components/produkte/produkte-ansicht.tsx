@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useId, useOptimistic, useRef, useState, useTransition } from 'react'
+import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import { flushSync } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -68,6 +69,8 @@ type Props = {
   products: ProductData[]
   /** Betriebsnummer aus den Hof-Einstellungen — Anzeige in der Futter-Kennzeichnung. */
   hofBetriebsnummer: string | null
+  /** N38 (Nr. 197): im Hofpreis-Modell der Satz — der Produktdialog zeigt, was die Kundin zahlt. */
+  preisAnzeige?: PreisAnzeige
   /** Nummer und Status des Hofs — „Deine Futtermittel-Registrierungen" im Futter-Formular (Nr. 20). */
   registrierung: HofRegistrierung
   /** teilenMomenteAus: Farm.teilenMomenteAus (Nr. 30) — dann fragt kein Moment. */
@@ -102,7 +105,7 @@ function vorratKnopf(id: string): HTMLElement | null {
  * öffnen ?neu=1 (mit ?bereich= aus „Was legst du an?") und ?edit=<id>.
  * Bearbeiten öffnet der Name; Löschen steht im Bearbeiten-Dialog.
  */
-export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster }: Props): React.JSX.Element {
+export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster, preisAnzeige = null }: Props): React.JSX.Element {
   const ansicht = produkteAnsichtAus(useSearchParams())
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
@@ -375,6 +378,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
           setLoeschen(product)
         }}
         hofBetriebsnummer={hofBetriebsnummer}
+        preisAnzeige={preisAnzeige}
       />
 
       <Dialog open={loeschen !== null} onOpenChange={(o) => !o && setLoeschen(null)}>

@@ -6,6 +6,8 @@ import { AlertCircle, CreditCard, Info, Package, TimerReset } from 'lucide-react
 import { cn } from '@/lib/utils'
 import { formatEuro, formatMenge } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ, PREISE_INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
+import { mitEndpreis, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import {
   GEBUEHR_ENTFAELLT,
   KONTAKT_HINWEIS,
@@ -134,12 +136,15 @@ export function KorbKarte({
   positionen,
   zeilenCents,
   aendernHref,
+  anzeige,
 }: {
   hofName: string
   positionen: readonly KorbPosition[]
   zeilenCents: ReadonlyMap<string, number>
   /** Zum Korb auf der Hofseite — nur, solange keine Bestellung steht. */
   aendernHref?: string
+  /** N38: im Hofpreis-Modell der Satz — dann stehen Endpreise da (mitEndpreis), sonst der Warenpreis. */
+  anzeige?: PreisAnzeige
 }): React.JSX.Element {
   return (
     <section aria-labelledby="kasse-korb" className={KARTE}>
@@ -154,7 +159,10 @@ export function KorbKarte({
         )}
       </div>
       <ul className="mt-2 divide-y divide-border">
-        {positionen.map((p) => (
+        {positionen.map((roh) => {
+          // Nur Anzeige: Endpreis je Stück und Grundpreis aus dem Endpreis (N38); die Zeilensumme kommt aus kassenBetraege.
+          const p = mitEndpreis(roh, anzeige ?? null)
+          return (
           <li key={p.productId} className="flex items-center gap-3 py-2.5">
             {p.imageUrl ? (
               <Image src={p.imageUrl} alt="" width={52} height={52} className="size-[52px] shrink-0 rounded-xl object-cover" />
@@ -176,8 +184,10 @@ export function KorbKarte({
               {formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}
             </span>
           </li>
-        ))}
+          )
+        })}
       </ul>
+      {anzeige && <p className={cn(HINWEIS, 'mt-1')}>{PREISE_INKL_PLATTFORMGEBUEHR}</p>}
     </section>
   )
 }
@@ -275,6 +285,7 @@ export function UebersichtKarte({
   gebuehrText,
   gebuehrErklaerung = SERVICEGEBUEHR_HINWEIS,
   gebuehrEntfaellt = false,
+  hofpreis = false,
   reservierung,
   fehler,
   children,
@@ -286,6 +297,8 @@ export function UebersichtKarte({
   gebuehrErklaerung?: string
   /** Bar vor dem Stichtag (Register B1): „entfällt" statt € 0,00. */
   gebuehrEntfaellt?: boolean
+  /** N38: Hofpreis-Modell — „Ware · Plattformgebühr (6 %) · Gesamt“, der Satz steht offen unter der Summe. */
+  hofpreis?: boolean
   reservierung?: ReactNode
   /** Ein Fehler der Anfrage — inline an der Karte, kein Modal. */
   fehler?: ReactNode
@@ -303,7 +316,7 @@ export function UebersichtKarte({
       {reservierung}
       <dl className="flex flex-col gap-2 text-[13.5px]">
         <div className="flex items-baseline gap-2">
-          <dt className="text-muted-foreground">Warenpreis</dt>
+          <dt className="text-muted-foreground">{hofpreis ? 'Ware' : 'Warenpreis'}</dt>
           <dd className="ml-auto tabular-nums">{formatEuro(centsAlsEuro(betraege.warenCents))}</dd>
         </div>
         {gebuehr && (
@@ -313,7 +326,7 @@ export function UebersichtKarte({
               {/* Tippfläche 44 px, die Zeile bleibt durch den negativen Rand so hoch wie der Text. */}
               <button
                 type="button"
-                aria-label="Was ist die Servicegebühr?"
+                aria-label={hofpreis ? `Was ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG}?` : 'Was ist die Servicegebühr?'}
                 aria-expanded={erklaerungOffen}
                 aria-controls={erklaerungId}
                 onClick={() => setErklaerungOffen((offen) => !offen)}
@@ -340,6 +353,7 @@ export function UebersichtKarte({
         <span className="ml-auto tabular-nums">{formatEuro(centsAlsEuro(betraege.gesamtCents))}</span>
       </p>
       <p className={cn(HINWEIS, '-mt-1.5')}>{PREISE_INKL_UST}</p>
+      {hofpreis && <p className={HINWEIS}>{PLATTFORMGEBUEHR_SATZ}</p>}
       {fehler}
       {children}
     </section>

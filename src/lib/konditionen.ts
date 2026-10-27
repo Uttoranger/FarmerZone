@@ -27,6 +27,7 @@
 import type { Tarif } from '@prisma/client'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import { MARKE } from '@/lib/marke'
 
 /**
  * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
@@ -188,6 +189,49 @@ export const BAR_OHNE_GEBUEHR_ZAHLART = `Ohne Servicegebühr bis ${BAR_OHNE_GEBU
 
 /** Derselbe Inhalt als Satz für Höfe — /konditionen, /fuer-hoefe und die Mail „Vor-Ort-Bestellung bestätigt". */
 export const BAR_OHNE_GEBUEHR_SATZ = `Bei Barzahlung fällt bis ${BAR_OHNE_GEBUEHR_BIS_TEXT} keine Servicegebühr an.`
+
+// ─── Plattformgebühr im Hofpreis (Register N38, Nr. 197) ───────────────────
+
+/**
+ * Der Satz der Plattformgebühr im Hofpreis-Modell (N38): 6 % vom Warenpreis,
+ * je Stück auf den Cent aufgerundet, ohne Mindestgebühr. Je Hof im Admin
+ * änderbar (`Farm.plattformgebuehrProzent`, null = dieser Satz). Gerechnet
+ * wird nur in src/lib/plattformgebuehr.ts.
+ */
+export const PLATTFORMGEBUEHR_PROZENT = 6
+
+/** Mindestbestellwert je Bestellung im Hofpreis-Modell, Warenwert in Cent (N38). */
+export const MINDESTBESTELLWERT_CENTS = 1000
+
+/** Das Wort der Wortliste (N8) für die Gebühr im Hofpreis. */
+export const PLATTFORMGEBUEHR_BEZEICHNUNG = 'Plattformgebühr'
+
+/** Der Zusatz am Endpreis — Hofseite, Produktseite, Karten, Korb und Mails (N38). */
+export const INKL_PLATTFORMGEBUEHR = 'inkl. Plattformgebühr'
+
+/** Der Satz unter Korb und Positionen der Kasse im Hofpreis-Modell. */
+export const PREISE_INKL_PLATTFORMGEBUEHR = `Preise ${INKL_PLATTFORMGEBUEHR}`
+
+/** Der Satz in der Kasse unter der Aufschlüsselung (Freigabe Lauf 26, Nr. 197, wörtlich). */
+export const PLATTFORMGEBUEHR_SATZ = `Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform ${MARKE}.`
+
+/**
+ * Der Satz unter den Beträgen der Kunden-Mails im Hofpreis-Modell: Die
+ * Gebühr steht nicht als eigene Zeile da, sie steckt in den Endpreisen.
+ */
+export function inklPlattformgebuehrSatz(betrag: string): string {
+  return `Alle Preise ${INKL_PLATTFORMGEBUEHR} (darin ${betrag}). ${PLATTFORMGEBUEHR_SATZ}`
+}
+
+/** Der Grund am ausgeschalteten Bestellknopf und die Meldung von /api/checkout (400). */
+export const MINDESTBESTELLWERT_SATZ = `Mindestbestellwert ${formatZahl(centsAlsEuro(MINDESTBESTELLWERT_CENTS))} € bei diesem Hof`
+
+/**
+ * Neutral, wenn bar bei diesem Hof gerade nicht geht (kein Mandat, N38) —
+ * /api/checkout antwortet damit (409), die Kasse bietet dann nur online an.
+ * Sagt nichts über den Grund: Das Mandat ist Sache zwischen Hof und Plattform.
+ */
+export const BAR_NICHT_MOEGLICH_SATZ = 'Bei diesem Hof geht gerade nur Online-Bezahlen. Bitte wähl „Online bezahlen“.'
 
 // ─── Online-Zahlung gehört zum Start (Register Z1) ───────────────────────────
 

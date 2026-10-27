@@ -26,6 +26,7 @@
  */
 
 import { useEffect, useTransition } from 'react'
+import { PreisAnzeigeRahmen } from '@/components/shared/preis-anzeige'
 import { useRouter } from 'next/navigation'
 import { Camera } from 'lucide-react'
 import { toast } from 'sonner'
@@ -149,15 +150,18 @@ const FUER_KUNDINNEN: Pick<SeitenAnsicht, 'art' | 'kaufen'> = { art: 'kundin', k
 export function FarmPageView({ farm, beitraege, beitraegeFehler = false, reorderItems, ansicht = FUER_KUNDINNEN, jetzt, sperre }: Props) {
   // Ohne Zeitpunkt vom Server (kein Aufrufer heute) die eigene Uhr — dann
   // kann „vor N Stunden" zwischen Server und Browser abweichen.
+  // Die Preisanzeige (N38, Nr. 197) einmal für die ganze Seite: Karten, Korb und Seitenspalte lesen sie (usePreisAnzeige).
   return (
-    <HofseiteKunde
-      farm={farm}
-      beitraege={beitraege}
-      beitraegeFehler={beitraegeFehler}
-      reorderItems={reorderItems}
-      ansicht={ansicht}
-      jetzt={jetzt ?? new Date().toISOString()}
-      sperre={sperre}
-    />
+    <PreisAnzeigeRahmen anzeige={farm.preisAnzeige}>
+      <HofseiteKunde
+        farm={farm}
+        beitraege={beitraege}
+        beitraegeFehler={beitraegeFehler}
+        reorderItems={reorderItems}
+        ansicht={ansicht}
+        jetzt={jetzt ?? new Date().toISOString()}
+        sperre={sperre}
+      />
+    </PreisAnzeigeRahmen>
   )
 }

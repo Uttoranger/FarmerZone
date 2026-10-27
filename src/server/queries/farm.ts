@@ -6,6 +6,8 @@ import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
 import { alsCents } from '@/lib/order-totals'
+import { anzeigePreisCents, mitEndpreis, preisAnzeigeFuer, type HofpreisEinstellung, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import type { VerpackungValue } from '@/lib/futter-registrierung'
 import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { DEFAULT_SECTIONS, type SectionConfig } from './appearance'
@@ -185,6 +187,14 @@ export type PublicFarm = {
   serviceFeePercent: number
   serviceFeeMinCents: number
   serviceFeeActiveFrom: string | null
+  /**
+   * Plattformgebühr im Hofpreis (Register N38, Nr. 197): ab dem Stichtag
+   * „Hofpreis-Modell ab“ der Satz des Hofs — dann zeigen Hofseite,
+   * Produktseite, Korb und Kasse den Endpreis „inkl. Plattformgebühr“
+   * (mitEndpreis, src/lib/plattformgebuehr.ts). null = Modell `bisher`.
+   * Die Produktpreise selbst bleiben der Warenpreis (Korb, /api/checkout).
+   */
+  preisAnzeige: PreisAnzeige
   /**
    * Welche Nummer in Farm.betriebsnummer steht (Nr. 11): Das Schild
    * „Futtermittelbetrieb · LFBIS …" (E9) braucht den Status Primärproduktion.
@@ -422,6 +432,7 @@ export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string
       serviceFeePercent: true,
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
+      plattformgebuehrProzent: true,
       farmValues: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
@@ -458,12 +469,15 @@ export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string
       : DEFAULT_SECTIONS
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
-  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, ...rest } = farm
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, plattformgebuehrProzent, ...rest } = farm
+  // N38 (Nr. 197): der Stichtag aus der gecachten Einstellung — nach der Hof-Abfrage, nie im selben Takt (Nr. 47).
+  const preisAnzeige = preisAnzeigeFuer({ plattformgebuehrProzent }, await ladeHofpreisEinstellung(), new Date())
   // Die Verpackung bleibt auf dem Server: Sie geht nur in die Rohwerte des Teilen-Bilds.
   const produkte = farm.products.map(({ verpackung, ...p }) => ({ verpackung, p }))
   const teilen: TeilenRoh = {
     betriebsnummer,
-    produkte: new Map(produkte.map(({ verpackung, p }) => [p.id, { preisCents: alsCents(p.price), verpackung }])),
+    // Das Teilen-Bild zeigt im Hofpreis-Modell den Endpreis (N38) — in Cent aus dem Decimal, nie über `price: number`.
+    produkte: new Map(produkte.map(({ verpackung, p }) => [p.id, { preisCents: anzeigePreisCents(alsCents(p.price), preisAnzeige), verpackung }])),
   }
   const oeffentlich: PublicFarm = {
     ...rest,
@@ -477,6 +491,7 @@ export async function getPublicFarmMitTeilen(wo: { slug: string } | { id: string
     farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
+    preisAnzeige,
     products: produkte.map(({ p }) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
   return { farm: oeffentlich, teilen }
@@ -537,6 +552,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       serviceFeePercent: true,
       serviceFeeMinCents: true,
       serviceFeeActiveFrom: true,
+      plattformgebuehrProzent: true,
       farmValues: {
         orderBy: { sortOrder: 'asc' },
         select: { id: true, icon: true, title: true, subtitle: true },
@@ -572,7 +588,9 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
       : DEFAULT_SECTIONS
 
   // Die Felder des Abzeichens (auch die Nummer des Platzes) fallen hier heraus — nur das Ja/Nein geht weiter.
-  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, ...rest } = farm
+  const { betriebsnummer, approvedAt, gruendungPlatz, gruendungAusgenommen, gruendungAbzeichenZeigen, adminGesperrtAm, plattformgebuehrProzent, ...rest } = farm
+  // N38 (Nr. 197): der Stichtag aus der gecachten Einstellung — nach der Hof-Abfrage, nie im selben Takt (Nr. 47).
+  const preisAnzeige = preisAnzeigeFuer({ plattformgebuehrProzent }, await ladeHofpreisEinstellung(), new Date())
   return {
     ...rest,
     adminGesperrt: adminGesperrtAm !== null,
@@ -585,6 +603,7 @@ export async function getOwnerFarm(ownerId: string): Promise<PublicFarm | null> 
     farmPhotos: farm.farmPhotos.map(alsOeffentlichesFoto),
     serviceFeePercent: Number(farm.serviceFeePercent),
     serviceFeeActiveFrom: farm.serviceFeeActiveFrom?.toISOString() ?? null,
+    preisAnzeige,
     products: farm.products.map((p) => alsOeffentlichesProdukt(p, { betriebsnummer })),
   }
 }
@@ -850,6 +869,8 @@ export const UEBERSICHT_HOF_SELECT = {
   gruendungPlatz: true,
   gruendungAusgenommen: true,
   gruendungAbzeichenZeigen: true,
+  // N38 (Nr. 197): der Satz der Plattformgebühr — die Liste zeigt im Hofpreis-Modell Endpreise.
+  plattformgebuehrProzent: true,
   slug: true,
   name: true,
   postalCode: true,
@@ -918,8 +939,15 @@ export function baueHofUebersicht(
   hoefe: readonly (UebersichtHof & { statusPosts?: NeuerBeitragRoh[] })[],
   schmaleZeilen: readonly UebersichtZeile[],
   jetzt: OrtsZeit,
-  ausgebucht: AusgebuchteTage
+  ausgebucht: AusgebuchteTage,
+  /**
+   * N38 (Nr. 197): Stichtag und Zeitpunkt für die Preisanzeige — im
+   * Hofpreis-Modell stehen in Produktzeilen, Angebot und Kilopreis die
+   * Endpreise „inkl. Plattformgebühr“ (mitEndpreis), je Hof mit seinem Satz.
+   */
+  preise: { einstellung: HofpreisEinstellung | null; zeitpunkt: Date }
 ): HofUebersichtEintrag[] {
+  const anzeigeJeHof = new Map(hoefe.map((h) => [h.id, preisAnzeigeFuer(h, preise.einstellung, preise.zeitpunkt)]))
   // Was die Deckelung oben NICHT verlieren darf: Kategorien, Produktfotos
   // und Suchnamen hängen an ALLEN verfügbaren Produkten, nicht an den
   // ersten acht.
@@ -947,7 +975,8 @@ export function baueHofUebersicht(
     // Kategorien, Suche, Facetten und Karte hängen an EINER Regel
     // (istKaufbar in baueAngebotsZeile). Vorher zählten die Chips jedes
     // sichtbare Produkt, die Suche nur solche mit freiem Bestand.
-    const dto = zuProduktDto(zeile)
+    // Nur Anzeige: im Hofpreis-Modell der Endpreis — auch Kilopreis und Preisfilter rechnen damit.
+    const dto = mitEndpreis(zuProduktDto(zeile), anzeigeJeHof.get(zeile.farmId) ?? null)
     const angebot = baueAngebotsZeile({
       ...dto,
       isAvailable: true, // die Abfrage liest nur sichtbare Produkte
@@ -965,6 +994,8 @@ export function baueHofUebersicht(
         unitSize: dto.unitSize,
         imageUrl: zeile.imageUrl,
         bildAusschnitt: leseAusschnitt(zeile.bildAusschnitt),
+        // N38: der Zusatz „inkl. Plattformgebühr“ an der Zeile, wenn der Preis der Endpreis ist.
+        ...((anzeigeJeHof.get(zeile.farmId) ?? null) !== null ? { inklPlattformgebuehr: true } : {}),
       })
       angebotJeHof.set(zeile.farmId, bisher)
     }
@@ -1000,7 +1031,7 @@ export function baueHofUebersicht(
       produkte: hof.products.map((p) => ({
         id: p.id,
         name: p.name,
-        ...zuProduktDto({ price: p.price, unitSize: p.unitSize }),
+        ...mitEndpreis(zuProduktDto({ price: p.price, unitSize: p.unitSize }), anzeigeJeHof.get(hof.id) ?? null),
         unit: p.unit,
         imageUrl: p.imageUrl,
         bildAusschnitt: leseAusschnitt(p.bildAusschnitt),
@@ -1009,6 +1040,7 @@ export function baueHofUebersicht(
         // „Verfügbar" heißt: Es ist noch etwas da, das nicht schon reserviert
         // ist. Siehe VORSCHAU-VERFÜGBARKEIT im Kopf dieser Datei.
         verfuegbar: p.stock - p.reservedStock > 0,
+        ...((anzeigeJeHof.get(hof.id) ?? null) !== null ? { inklPlattformgebuehr: true } : {}),
       })),
       produkteGesamt: hof._count.products,
       produkteJeBereich: jeBereich.get(hof.id) ?? { LEBENSMITTEL: 0, FUTTERMITTEL: 0 },
@@ -1075,7 +1107,9 @@ export async function getOeffentlicheHoefe(
     zeitpunkt
   )
 
-  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt, ausgebucht)
+  // N38: der Stichtag aus der gecachten Einstellung, nach den Abfragen (kein zweiter Takt im Batch, Nr. 47).
+  const einstellung = await ladeHofpreisEinstellung()
+  return baueHofUebersicht(hoefe, await zeilenJeHof, jetzt, ausgebucht, { einstellung, zeitpunkt })
 }
 
 /** Was der Kopf von „Mein Hof" zeigt (components/mein-hof/seitenkopf.tsx). */

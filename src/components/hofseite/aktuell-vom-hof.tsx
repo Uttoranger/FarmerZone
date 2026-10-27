@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
+import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
@@ -328,7 +330,9 @@ function BeitragProdukt({
 }) {
   const bild = produkt.imageUrl ?? produkt.categoryImageUrl
   const istFoto = produkt.imageUrl !== null
-  const grundpreis = zweitePreiszeile(produkt)
+  // Im Hofpreis-Modell (N38) Endpreis und Grundpreis aus dem Endpreis — nur Anzeige.
+  const preis = mitEndpreis(produkt, usePreisAnzeige())
+  const grundpreis = zweitePreiszeile(preis)
   return (
     <div className="flex items-center gap-2.5">
       <Link href={href} title={produkt.name} className={cn('flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg', FOKUS_RAHMEN)}>
@@ -351,7 +355,7 @@ function BeitragProdukt({
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className={cn('truncate text-[14px] font-semibold', ausverkauft ? 'text-muted-foreground' : 'text-foreground')}>{produkt.name}</span>
-          <span className="truncate text-[12.5px] text-muted-foreground">{formatGrundpreis(produkt.price, produkt.unit, produkt.unitSize)}</span>
+          <span className="truncate text-[12.5px] text-muted-foreground">{formatGrundpreis(preis.price, preis.unit, preis.unitSize)}</span>
           {grundpreis && <span className="truncate text-xs text-muted-foreground">{grundpreis}</span>}
         </span>
       </Link>

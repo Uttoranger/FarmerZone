@@ -50,6 +50,24 @@ interface BestandEintrag {
  */
 const GELD_FLIESSKOMMA_BESTAND: readonly BestandEintrag[] = [
   {
+    datei: 'src/lib/plattformgebuehr.ts',
+    ausdruck: 'p.menge * gebuehrJeStueckCents(p.preisCents, hundertstel)',
+    anzahl: 1,
+    grund: 'ganze Zahlen: Menge (Int) × Gebühr je Stück in Cent (Int) — Plattformgebühr im Hofpreis, N38, Nr. 197',
+  },
+  {
+    datei: 'src/lib/plattformgebuehr.ts',
+    ausdruck: 'p.menge * p.preisCents',
+    anzahl: 1,
+    grund: 'ganze Zahlen: Menge (Int) × Warenpreis in Cent (Int) — Warenwert der Bestellgebühr, N38, Nr. 197',
+  },
+  {
+    datei: 'src/lib/kasse.ts',
+    ausdruck: 'p.menge * endpreisJeStueckCents(p.preisCents, hundertstel)',
+    anzahl: 1,
+    grund: 'ganze Zahlen: Menge (Int) × Endpreis je Stück in Cent (Int) — Zeilensumme der Kasse im Hofpreis-Modell, N38, Nr. 197',
+  },
+  {
     datei: 'src/lib/format.ts',
     ausdruck: 'price * basis.jeBasis',
     anzahl: 1,

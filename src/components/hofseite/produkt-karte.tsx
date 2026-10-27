@@ -1,6 +1,8 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
+import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
@@ -26,7 +28,10 @@ function kurzbeschreibung(p: PublicProduct): string | null {
 /** Was der Preis braucht; null = kein gültiger Preis (nur in der Vorschau des Produktdialogs). */
 type PreisAngabe = Pick<PublicProduct, 'price' | 'unit' | 'unitSize' | 'futter'> | null
 
-function Preis({ preis, className }: { preis: PreisAngabe; className?: string }) {
+function Preis({ preis: roh, className }: { preis: PreisAngabe; className?: string }) {
+  // Im Hofpreis-Modell (N38) der Endpreis je Stück, Grundpreis aus dem Endpreis; ohne Rahmen der Warenpreis.
+  const anzeige = usePreisAnzeige()
+  const preis = roh ? mitEndpreis(roh, anzeige) : null
   if (!preis) {
     // Ruhiger Platzhalter statt „€ 0,00" oder „NaN" (Nr. 51).
     return <span className={cn('flex min-w-0 flex-col text-[15px] text-muted-foreground md:text-base', className)}>{KAEUFER_VORSCHAU.preisFehlt}</span>

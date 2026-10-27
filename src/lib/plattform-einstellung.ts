@@ -27,6 +27,7 @@ import {
   type GruendungZahlen,
 } from '@/lib/gruendungshof'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import { hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 
@@ -51,6 +52,12 @@ export type PlattformEinstellung = {
   gruendungAktionBisTag: string | null
   /** Wann die Zusagen festgeschrieben wurden (ISO-Text); null = noch nicht — alles wie vor Nr. 116. */
   gruendungFestAm: string | null
+  /**
+   * Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197) als ISO-Zeitpunkt;
+   * null = Vorgabe `BAR_SERVICEGEBUEHR_AB` (konditionen.ts). Gelesen über
+   * `hofpreisEinstellungAus`, gerechnet nur in plattformgebuehr.ts.
+   */
+  hofpreisModellAb: string | null
   /** Wer zuletzt gespeichert hat; null = noch nie (Seed-Zeile der Migration). */
   geaendertVonUserId: string | null
   /** Zeitpunkt der letzten Änderung als ISO-Text; null ohne Zeile. */
@@ -65,6 +72,7 @@ export const PLATTFORM_EINSTELLUNG_STANDARD: PlattformEinstellung = {
   gruendungMonate: GRUENDUNG_MONATE_STANDARD,
   gruendungAktionBisTag: null,
   gruendungFestAm: null,
+  hofpreisModellAb: null,
   geaendertVonUserId: null,
   geaendertAm: null,
 }
@@ -77,6 +85,7 @@ export const PLATTFORM_EINSTELLUNG_SELECT = {
   gruendungMonate: true,
   gruendungAktionBis: true,
   gruendungFestAm: true,
+  hofpreisModellAb: true,
   geaendertVonUserId: true,
   updatedAt: true,
 } as const
@@ -89,6 +98,7 @@ export function plattformEinstellungAus(zeile: {
   gruendungMonate: number
   gruendungAktionBis: Date | null
   gruendungFestAm: Date | null
+  hofpreisModellAb: Date | null
   geaendertVonUserId: string | null
   updatedAt: Date
 }): PlattformEinstellung {
@@ -99,9 +109,15 @@ export function plattformEinstellungAus(zeile: {
     gruendungMonate: zeile.gruendungMonate,
     gruendungAktionBisTag: zeile.gruendungAktionBis ? kalendertagInWien(zeile.gruendungAktionBis) : null,
     gruendungFestAm: zeile.gruendungFestAm ? zeile.gruendungFestAm.toISOString() : null,
+    hofpreisModellAb: zeile.hofpreisModellAb ? zeile.hofpreisModellAb.toISOString() : null,
     geaendertVonUserId: zeile.geaendertVonUserId,
     geaendertAm: zeile.updatedAt.toISOString(),
   }
+}
+
+/** Was plattformgebuehr.ts braucht (N38): der Stichtag als Date oder null. */
+export function hofpreisEinstellungAus(einstellung: Pick<PlattformEinstellung, 'hofpreisModellAb'>): HofpreisEinstellung {
+  return { hofpreisModellAb: einstellung.hofpreisModellAb ? new Date(einstellung.hofpreisModellAb) : null }
 }
 
 /** Was die Fachregeln in gruendungshof.ts brauchen. */
@@ -311,4 +327,45 @@ export function gruendungZeileKurz(zahlen: Pick<GruendungZahlen, 'gesamt' | 'fre
   const anfang = `${zahlen.gesamt} Plätze · ${zahlen.frei} frei`
   if (zahlen.art === 'bisher') return `${anfang} · bis ${gruendungTagKurz(zahlen.bisTag)}`
   return `${anfang} · ${zahlen.monate} Monate${zahlen.aktionBisTag ? ` · bis ${gruendungTagKurz(zahlen.aktionBisTag)}` : ''}`
+}
+
+// ─── Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197) ──────────────────
+
+/** Die Texte der Karte in Admin › Einstellungen. */
+export const HOFPREIS_STICHTAG_TEXT = {
+  titel: 'Hofpreis-Modell ab',
+  satz: 'Ab diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis (6 %, Mindestbestellwert 10 €). Vorher bleibt alles wie heute.',
+  feld: 'Stichtag',
+  speichern: 'Stichtag speichern',
+  speichert: 'Speichert …',
+  gespeichert: 'Stichtag gespeichert.',
+  erreicht: 'Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.',
+} as const
+
+/** Die Meldungen der Regel — eigene deutsche Sätze, nie Zods Standardtext. */
+export const HOFPREIS_STICHTAG_FEHLER = {
+  datum: 'Bitte gib ein gültiges Datum ein.',
+  zukunft: 'Der Stichtag muss in der Zukunft liegen.',
+  erreicht: 'Der Stichtag ist schon erreicht und lässt sich nicht mehr ändern.',
+  gleich: 'Das ist schon der gespeicherte Stichtag.',
+} as const
+
+/** Der wirksame Stichtag als Wiener Kalendertag (JJJJ-MM-TT) — Einstellung, sonst BAR_SERVICEGEBUEHR_AB. */
+export function hofpreisStichtagTag(einstellung: HofpreisEinstellung): string {
+  return kalendertagInWien(hofpreisModellAb(einstellung))
+}
+
+/**
+ * Die Regel des Stichtags (Freigabe 197, Punkt 6) — dieselbe reine Funktion
+ * für Formular und Action: Ändern nur, solange der wirksame Stichtag noch
+ * nicht erreicht ist, und der neue Tag (Wiener Mitternacht) liegt in der
+ * Zukunft. null = in Ordnung, sonst der Satz.
+ */
+export function pruefeHofpreisStichtag(neuTag: string, bisher: HofpreisEinstellung, jetzt: Date): string | null {
+  if (hofpreisModellAb(bisher).getTime() <= jetzt.getTime()) return HOFPREIS_STICHTAG_FEHLER.erreicht
+  const neu = /^\d{4}-\d{2}-\d{2}$/.test(neuTag) ? wienerMitternacht(neuTag) : null
+  if (!neu) return HOFPREIS_STICHTAG_FEHLER.datum
+  if (neu.getTime() <= jetzt.getTime()) return HOFPREIS_STICHTAG_FEHLER.zukunft
+  if (neu.getTime() === hofpreisModellAb(bisher).getTime()) return HOFPREIS_STICHTAG_FEHLER.gleich
+  return null
 }

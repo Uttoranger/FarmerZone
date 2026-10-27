@@ -9,7 +9,8 @@ import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tokenKandidaten } from '@/lib/bar-bestaetigung'
 import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
-import { SERVICEGEBUEHR_BEZEICHNUNG, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -72,6 +73,8 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       pickupTimeEnd: true,
       totalAmount: true,
       serviceFeeCents: true,
+      // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
+      gebuehrModell: true,
       farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true } },
       items: {
         select: {
@@ -153,7 +156,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
           )
         })}
         {summen.gebuehrCents > 0 && (
-          <Zeile titel={SERVICEGEBUEHR_BEZEICHNUNG}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
+          <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
         )}
         <div className="h-px bg-border" />
         <div className="flex items-baseline gap-2 text-[15px] font-semibold text-foreground">

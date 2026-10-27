@@ -6054,6 +6054,15 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - Ein Monat lässt sich abschließen, wenn er vorbei ist, der Abgleich danach ohne offene Abweichung lief, keine Erstattung offen ist, Kosten eingetragen sind und die Jahres-CSV nach dem Monatsende geladen wurde. Der Abschluss ist ein Protokoll-Eintrag; danach brauchen Kostenänderungen, die den Monat berühren, einen Grund.
 - „Finanzen“ heißt „Geld“ (`/admin/geld`, alte Adresse 308); die Navigation zieht Nr. 193 nach.
 
+## Plattformgebühr im Hofpreis: Preis, Anzeige, Zahlung (Register N38, Schritt 1; Nr. 197, Lauf 26, 26.10.2026)
+
+- **Warum ein zweites Modell statt Umbau der Servicegebühr:** Bestellungen vor dem Stichtag behalten ihre gespeicherten Beträge (E4, B1); jede Bestellung trägt ihr Modell im Snapshot (`gebuehrModell`). So rechnen Storno, „Artikel fehlt“, Mails und Monatsabrechnung jede Bestellung nach ihrer eigenen Regel.
+- **Je Stück statt Prozent auf die Summe:** Die Kundin sieht auf Karte und Korb Endpreise je Stück; Prozent auf die Summe wiche bei manchen Körben um Cent ab (Eigenschaftstest über 500 zufällige Körbe). Online und bar rechnen dieselbe Funktion (`bestellGebuehr`) — derselbe Korb kostet dasselbe.
+- **`on_behalf_of` nur im neuen Modell:** Der Hof wird Händler (N38); die alte Ladung bleibt unverändert, damit die Wiederholung mit `pi-<id>` bei Stripe dieselben Parameter schickt.
+- **Gründungshöfe:** Der Einzug beginnt nach ihrer Laufzeit (`einzugAbFuer`); bis dahin zahlen ihre Kundinnen trotzdem den Endpreis, bar bleibt die Gebühr beim Hof (`erlassen`, kein Mandat nötig).
+- **Anzeige-Fehler:** Kann eine öffentliche Seite die Einstellung nicht laden, zeigt sie die Preise nach der Vorgabe (Sentry `hofpreis-anzeige`); verbindlich bleibt der Betrag von `/api/checkout`.
+- **Offen für 198:** Sperre nach offener Rechnung in `barMoeglich`, Mandat-Schritt, Monatsabrechnung; Rechtstexte nach der Anwältin.
+
 ## Nützliche Befehle
 
 ```bash

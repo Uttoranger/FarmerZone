@@ -28,6 +28,7 @@ import {
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
 import { preisZahl } from '@/schemas/product'
+import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
 
 /** „Preis je kg" ohne Gebinde, „Preis für das 2-kg-Paket" mit, „Preis für 6 Pakete" bei Stück/Paket. */
 export function preisFeldLabel(unit: string, unitSize?: number | null): string {
@@ -50,9 +51,12 @@ export function kundenVorschau(
   price: number,
   unit: string,
   unitSize?: number | null,
-  netto?: { nettoMenge: number | null | undefined; nettoEinheit: NettoEinheitValue } | null
+  netto?: { nettoMenge: number | null | undefined; nettoEinheit: NettoEinheitValue } | null,
+  /** N38 (Nr. 197): im Hofpreis-Modell der Satz — dann „Du bekommst … · die Kundin zahlt …“. */
+  anzeige: PreisAnzeige = null
 ): string | null {
   if (!Number.isFinite(price) || price <= 0) return null
+  if (anzeige) return `Du bekommst ${formatEuro(price)} · die Kundin zahlt ${formatEuro(endpreisEuro(price, anzeige))}`
   const teile = [formatGrundpreis(price, unit, unitSize)]
   const zeile = formatGrundpreisZeile(price, unit, unitSize)
   if (zeile) teile.push(zeile)

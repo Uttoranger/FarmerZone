@@ -39,8 +39,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    // Keine Notbremse (Nr. 189): die Zeile der Einstellung fehlt.
-    plattformEinstellung: { findUnique: vi.fn(async () => null) },
+    // Keine Notbremse (Nr. 189) und ohne Zeile gilt der Stichtag aus konditionen.ts — Modell `bisher` (N38, Nr. 197).
+    plattformEinstellung: { findUnique: vi.fn().mockResolvedValue(null) },
     farm: { findUnique: vi.fn() },
     product: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     stockReservation: { aggregate: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },

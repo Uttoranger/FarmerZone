@@ -97,6 +97,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       totalAmount: true,
       serviceFeeCents: true,
       serviceFeeRefundedAt: true,
+      // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
+      gebuehrModell: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,

@@ -3,7 +3,9 @@ import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { prisma } from '@/lib/prisma'
 import { gruendungZahlenAdmin, ladeGruendungStandAdmin, lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
-import { EINSTELLUNGEN_TEXT, festgeschriebenZeile, gruendungZeileKurz, protokollZeile, ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
+import { EINSTELLUNGEN_TEXT, festgeschriebenZeile, gruendungZeileKurz, hofpreisEinstellungAus, hofpreisStichtagTag, protokollZeile, ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { HofpreisStichtag } from './hofpreis-stichtag'
 import { einstellungenGruppeSchema } from '@/schemas/plattform-einstellung'
 import { cn } from '@/lib/utils'
 import { ADMIN_RAHMEN, AdminFehler, SEITEN_TITEL } from '@/components/admin/admin-teile'
@@ -16,15 +18,25 @@ export const metadata: Metadata = { title: `Einstellungen — Admin — ${MARKE}
 // Zeigt den gespeicherten Stand und rechnet „frei" mit den Höfen von jetzt — nie aus einem Cache.
 export const dynamic = 'force-dynamic'
 
-async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date): Promise<EinstellungenDaten> {
+/** Was die Karte „Hofpreis-Modell ab“ bekommt (N38, Nr. 197) — nur Text. */
+type StichtagDaten = { tag: string; stichtagIso: string | null; erreicht: boolean; jetzt: string }
+
+async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date): Promise<{ daten: EinstellungenDaten; stichtag: StichtagDaten }> {
   const einstellung = await lesePlattformEinstellung()
+  const hofpreis = hofpreisEinstellungAus(einstellung)
+  const stichtag: StichtagDaten = {
+    tag: hofpreisStichtagTag(hofpreis),
+    stichtagIso: einstellung.hofpreisModellAb,
+    erreicht: hofpreisModellAb(hofpreis).getTime() <= jetzt.getTime(),
+    jetzt: jetzt.toISOString(),
+  }
   const stand = await ladeGruendungStandAdmin(einstellung)
   // Wer zuletzt gespeichert hat — nur der Name, für die Protokollzeile (N15).
   const person = einstellung.geaendertVonUserId
     ? await prisma.user.findUnique({ where: { id: einstellung.geaendertVonUserId }, select: { name: true } })
     : null
   const zahlen = gruendungZahlenAdmin(einstellung, stand.vergeben, jetzt)
-  return {
+  const daten: EinstellungenDaten = {
     gewaehlt,
     // Nr. 116: Felder der Aktion und die Liste fürs Festschreiben (ladeGruendungStandAdmin).
     gruendung: {
@@ -43,6 +55,7 @@ async function ladeDaten(gewaehlt: EinstellungenDaten['gewaehlt'], jetzt: Date):
     },
     gruendungZeile: gruendungZeileKurz(zahlen),
   }
+  return { daten, stichtag }
 }
 
 /**
@@ -65,14 +78,14 @@ export default async function AdminEinstellungenPage({
   const gewaehlt = einstellungenGruppeSchema.parse(gruppe)
   const jetzt = new Date()
 
-  let daten: EinstellungenDaten | null = null
+  let geladen: Awaited<ReturnType<typeof ladeDaten>> | null = null
   try {
-    daten = await ladeDaten(gewaehlt, jetzt)
+    geladen = await ladeDaten(gewaehlt, jetzt)
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'einstellungen' } })
   }
 
-  if (!daten) {
+  if (!geladen) {
     return (
       <div className={ADMIN_RAHMEN}>
         <AdminFehler titel={EINSTELLUNGEN_TEXT.titel} satz={EINSTELLUNGEN_TEXT.ladefehler} nochmal={ADMIN_EINSTELLUNGEN_HREF} />
@@ -87,7 +100,8 @@ export default async function AdminEinstellungenPage({
         <p className="mt-1 hidden text-[13.5px] leading-snug text-muted-foreground lg:block">{EINSTELLUNGEN_TEXT.satz}</p>
         <p className="mt-1 text-[13px] leading-snug text-muted-foreground lg:hidden">{EINSTELLUNGEN_TEXT.satzKurz}</p>
       </header>
-      <EinstellungenGruppen daten={daten} />
+      <EinstellungenGruppen daten={geladen.daten} />
+      <HofpreisStichtag daten={geladen.stichtag} />
     </div>
   )
 }

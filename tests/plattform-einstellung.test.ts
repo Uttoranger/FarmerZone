@@ -160,6 +160,7 @@ describe('Protokollzeile und Zeile aus der Datenbank', () => {
     gruendungMonate: 24,
     gruendungAktionBis: new Date('2027-03-31T00:00:00.000Z'),
     gruendungFestAm: null,
+    hofpreisModellAb: null,
     geaendertVonUserId: 'admin-1',
     updatedAt: new Date('2026-10-12T19:14:00.000Z'),
   }
@@ -172,6 +173,7 @@ describe('Protokollzeile und Zeile aus der Datenbank', () => {
       gruendungMonate: 24,
       gruendungAktionBisTag: '2027-03-31',
       gruendungFestAm: null,
+      hofpreisModellAb: null,
       geaendertVonUserId: 'admin-1',
       geaendertAm: '2026-10-12T19:14:00.000Z',
     })

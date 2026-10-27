@@ -30,6 +30,9 @@ const BESTELLUNG_FUER_MAIL = {
   customerPhone: true,
   totalAmount: true,
   serviceFeeCents: true,
+  // N38 (Nr. 197): Modell und Einzug — die Kunden-Mails zeigen im Hofpreis-Modell Endpreise inkl. Plattformgebühr.
+  gebuehrModell: true,
+  gebuehrEinzug: true,
   createdAt: true,
   pickupDate: true,
   pickupTimeStart: true,
@@ -50,6 +53,7 @@ const BESTELLUNG_FUER_MAIL = {
       quantity: true,
       unitPrice: true,
       totalPrice: true,
+      gebuehrCents: true,
       // Einheit nur für die Anzeige in der Mail
       product: { select: { unit: true, unitSize: true } },
     },
@@ -204,6 +208,8 @@ function alsMailBestellung(b: BestellungFuerMail): OrderForHofMail {
     customerPhone: b.customerPhone,
     totalAmount: b.totalAmount,
     serviceFeeCents: b.serviceFeeCents,
+    gebuehrModell: b.gebuehrModell,
+    gebuehrEinzug: b.gebuehrEinzug,
     createdAt: b.createdAt,
     pickupDate: b.pickupDate,
     pickupTimeStart: b.pickupTimeStart,
@@ -216,6 +222,7 @@ function alsMailBestellung(b: BestellungFuerMail): OrderForHofMail {
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       totalPrice: i.totalPrice,
+      gebuehrCents: i.gebuehrCents,
       product: i.product,
     })),
   }
@@ -289,6 +296,7 @@ export async function rendereArtikelFehlt(bezug: Record<string, string>): Promis
       quantity: position.quantity,
       unitPrice: position.unitPrice,
       totalPrice: position.totalPrice,
+      gebuehrCents: position.gebuehrCents,
       product: position.product,
     },
     // Eine Erstattung gibt es nur bei Online-Zahlung — wie beim Speichern entschieden.

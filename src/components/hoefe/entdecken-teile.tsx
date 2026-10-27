@@ -21,6 +21,7 @@ import {
 import { hofseitenLink, istBestellbar, type AngebotVorhanden, type AngebotsProdukt } from '@/lib/bereiche-anzeige'
 import { SIEGEL, illustrationPfad, type AnzeigeBereich, type ProductCategoryValue } from '@/lib/taxonomie'
 import { formatGrundpreis, formatGrundpreisZeile, formatKilopreis } from '@/lib/format'
+import { INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { hofIllustrationen } from '@/lib/hoefe-anzeige'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
@@ -479,6 +480,7 @@ export function ProduktZeile({
         <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
           <span className="text-[15px] font-semibold whitespace-nowrap text-foreground">{preis}</span>
           {grundpreis && <span className="text-[12px] whitespace-nowrap text-muted-foreground">{grundpreis}</span>}
+          {produkt.inklPlattformgebuehr && <span className="text-[12px] whitespace-nowrap text-muted-foreground">{INKL_PLATTFORMGEBUEHR}</span>}
           <span
             aria-hidden="true"
             className="mt-1 hidden h-8 items-center gap-0.5 rounded-full border border-border px-3 text-[12.5px] font-semibold text-foreground sm:inline-flex"
