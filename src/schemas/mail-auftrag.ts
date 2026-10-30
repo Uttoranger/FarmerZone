@@ -33,6 +33,8 @@ export const MAIL_ARTEN = [
   'email-aendern-link',
   'email-geaendert-hinweis',
   'team-recht-geaendert',
+  // Widerruf (Nr. 200, N39): Eingangsbestätigung sofort und direkt an die Kundin.
+  'widerruf-eingang',
   // Wichtig: Bestellungen, Höfe und Betreiber.
   'bestellung-bestaetigung',
   'bestellung-bezahlt-hof',
@@ -55,6 +57,10 @@ export const MAIL_ARTEN = [
   // Plattformgebühr (N38, Nr. 198): Ankündigung des Einzugs und gescheiterte Lastschrift an den Hof.
   'plattformgebuehr-ankuendigung',
   'lastschrift-gescheitert',
+  // Widerruf (Nr. 200, N39): an den Hof, und das Ergebnis an die Kundin.
+  'widerruf-hof',
+  'widerruf-erstattet',
+  'widerruf-abgelehnt',
   // Kann warten: Beiträge, Rundschreiben, Bescheide.
   'beitrag',
   'rundschreiben',
@@ -96,6 +102,8 @@ export const MAIL_WEG = {
   'email-aendern-link': 'sofort',
   'email-geaendert-hinweis': 'sofort',
   'team-recht-geaendert': 'sofort',
+  // Freigabe 200 Punkt 3: „sofort per Mail“ — direkt, nur Protokoll (kein Token im Inhalt, aber Sofort wie verlangt).
+  'widerruf-eingang': 'sofort',
   'bestellung-bestaetigung': 'wichtig',
   'bestellung-bezahlt-hof': 'wichtig',
   'bar-bestaetigt-hof': 'wichtig',
@@ -116,6 +124,9 @@ export const MAIL_WEG = {
   'abo-bestaetigung': 'wichtig',
   'plattformgebuehr-ankuendigung': 'wichtig',
   'lastschrift-gescheitert': 'wichtig',
+  'widerruf-hof': 'wichtig',
+  'widerruf-erstattet': 'wichtig',
+  'widerruf-abgelehnt': 'wichtig',
   beitrag: 'kannWarten',
   rundschreiben: 'kannWarten',
   bescheid: 'kannWarten',
@@ -224,6 +235,10 @@ export const betreiberBezugSchema = z.object({ empfaengerId: kennung }).strict()
 export const aboBezugSchema = z.object({ aboId: kennung }).strict()
 export const fadenBezugSchema = z.object({ unterhaltungId: kennung }).strict()
 export const meldungBezugSchema = z.object({ meldungId: kennung }).strict()
+/** Widerruf (Nr. 200): nur die Kennung — Name, Adresse und Nachricht lädt der Renderer frisch. */
+export const widerrufBezugSchema = z.object({ widerrufId: kennung }).strict()
+/** Widerruf erstattet: dazu der Betrag, den Stripe eben gebucht hat (online); fehlt er, bar erstattet. */
+export const widerrufErstattetBezugSchema = z.object({ widerrufId: kennung, erstattetCents: ganzzahl.optional() }).strict()
 
 /** Der feste Bezug jeder eingestellten Art (Nr. 159) — Sofort-Arten werden nie eingestellt. */
 const BEZUG_JE_ART: Partial<Record<MailArt, z.ZodType<Record<string, string>>>> = {
@@ -250,6 +265,9 @@ const BEZUG_JE_ART: Partial<Record<MailArt, z.ZodType<Record<string, string>>>> 
   beitrag: beitragBezugSchema,
   rundschreiben: fadenBezugSchema,
   bescheid: meldungBezugSchema,
+  'widerruf-hof': widerrufBezugSchema,
+  'widerruf-erstattet': widerrufErstattetBezugSchema,
+  'widerruf-abgelehnt': widerrufBezugSchema,
 }
 
 /** Das Schema für den Bezug einer Art (fest, sonst nur Kennungen). */

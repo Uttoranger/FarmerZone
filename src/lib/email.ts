@@ -5,7 +5,7 @@ import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
-import { barBestaetigungsPfad, bestellungPfad } from '@/lib/bestell-link'
+import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { istHofpreisBestellung } from '@/lib/plattformgebuehr'
@@ -349,6 +349,8 @@ export type OrderForEmail = {
   pickupTimeEnd: string
   paymentMethod: string
   stripePaymentIntentId?: string | null
+  /** Käuferart (Nr. 200): nur bei PRIVAT steht „Vertrag widerrufen“ in der Mail; fehlt sie, kein Link. */
+  kaeuferArt?: string | null
   farm: {
     id: string
     name: string
@@ -453,6 +455,11 @@ function gebuehrWort(order: OrderForEmail): string {
 function mailZahlart(paymentMethod: string): MailZahlart {
   if (paymentMethod === 'ONLINE') return 'online'
   return paymentMethod === 'ONSITE_CARD' ? 'karte' : 'bar'
+}
+
+/** „Vertrag widerrufen“ (Nr. 200, N39): der signierte Link — nur für Verbraucherinnen. */
+function widerrufUrl(order: OrderForEmail): string | undefined {
+  return order.kaeuferArt === 'PRIVAT' ? `${APP_URL}${widerrufPfad(order.id)}` : undefined
 }
 
 function routeUrl(order: OrderForEmail): string {
@@ -879,6 +886,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
     orderUrl,
+    widerrufUrl: widerrufUrl(order),
   }))
 
   return { an: order.customerEmail, betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`, html }
@@ -1026,6 +1034,7 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     routeUrl: routeUrl(order),
     reorderUrl,
     orderUrl,
+    widerrufUrl: widerrufUrl(order),
   }))
 
   return { an: order.customerEmail, betreff: `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`, html }
@@ -1287,4 +1296,77 @@ export async function sendBetriebWarnung(anlass: BetriebMailAnlass, an: readonly
   })
   if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
   return sendeAnListe(an, mail.betreff, vorlage.html, 'betrieb-warnung')
+}
+
+// ─── Widerruf (Nr. 200, Register N39) ────────────────────────────────────────
+
+export type WiderrufEingangDaten = {
+  bestellnummer: string | null
+  umfang: string[]
+  eingegangenAm: string
+  naechsteSchritte: readonly string[]
+  hofName: string | null
+}
+
+/**
+ * Eingangsbestätigung → Kundin (Sofort, Freigabe 200 Punkt 3): direkt über
+ * sendRaw, nur Protokoll. Betreff ohne Name und ohne Nummer — sendRaw schreibt
+ * ihn ins Log. `protokoll.bestellungId` nur, wenn der Widerruf einer
+ * Bestellung zugeordnet ist (dann kann der Support sie nochmal schicken).
+ */
+export async function sendWiderrufEingang(
+  an: string,
+  daten: WiderrufEingangDaten,
+  protokoll: { bestellungId?: string; farmId?: string; nochmalVon?: string } = {}
+): Promise<VersandErgebnis> {
+  const vorlage = await htmlOderFehler(async () => {
+    const { WiderrufEingangEmail } = await import('@/emails/widerruf')
+    return React.createElement(WiderrufEingangEmail, { ...daten, marke: MARKE })
+  })
+  if (!vorlage.ok) return { error: vorlage.error }
+  return sendRaw(an, WIDERRUF_EINGANG_BETREFF, vorlage.html, { art: 'widerruf-eingang', ...protokoll })
+}
+
+const WIDERRUF_EINGANG_BETREFF = `Dein Widerruf ist eingegangen · ${MARKE}`
+
+/** Dieselbe Mail nur gebaut — für die Vorschau in Admin › Betrieb (Nr. 167) und das Bild der Abnahme. */
+export async function widerrufEingangInhalt(an: string, daten: WiderrufEingangDaten): Promise<StapelMail> {
+  const { WiderrufEingangEmail } = await import('@/emails/widerruf')
+  return { an, betreff: WIDERRUF_EINGANG_BETREFF, html: await toHtml(React.createElement(WiderrufEingangEmail, { ...daten, marke: MARKE })) }
+}
+
+/** Widerruf nach der Abholung → Hof (Wichtig): prüfen, erstatten oder mit Grund ablehnen. */
+export async function baueWiderrufHof(
+  an: string,
+  daten: { bestellnummer: string; umfang: string[]; eingegangenAm: string; bestellungPfad: string; ausnahmeSatz: string }
+): Promise<StapelMail> {
+  const { WiderrufHofEmail } = await import('@/emails/widerruf')
+  const html = await toHtml(
+    React.createElement(WiderrufHofEmail, {
+      bestellnummer: daten.bestellnummer,
+      umfang: daten.umfang,
+      eingegangenAm: daten.eingegangenAm,
+      bestellungUrl: `${APP_URL}${daten.bestellungPfad}`,
+      ausnahmeSatz: daten.ausnahmeSatz,
+    })
+  )
+  return { an, betreff: `Widerruf zu Bestellung ${daten.bestellnummer}`, html }
+}
+
+/** Ergebnis → Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder abgelehnt (Grund des Hofs). */
+export async function baueWiderrufErgebnis(
+  an: string,
+  daten: { bestellnummer: string; hofName: string; erstattetCents: number | null; grund: string | null }
+): Promise<StapelMail> {
+  const { WiderrufErgebnisEmail } = await import('@/emails/widerruf')
+  const html = await toHtml(
+    React.createElement(WiderrufErgebnisEmail, {
+      bestellnummer: daten.bestellnummer,
+      hofName: daten.hofName,
+      erstattet: daten.erstattetCents === null ? null : centsAlsEuro(daten.erstattetCents),
+      grund: daten.grund,
+    })
+  )
+  const betreff = daten.grund === null ? `Dein Widerruf ist erledigt · ${daten.bestellnummer}` : `Dein Widerruf wurde abgelehnt · ${daten.bestellnummer}`
+  return { an, betreff, html }
 }

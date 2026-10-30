@@ -32,6 +32,7 @@
  */
 import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { WIDERRUF_PFAD, WIDERRUF_TEXT } from '@/lib/widerruf'
 
 export type KundenNavId = 'entdecken' | 'so-gehts' | 'fuer-hoefe' | 'bestellungen' | 'anmelden' | 'mein-hof' | 'konto'
 
@@ -92,6 +93,8 @@ export const SEITENFUSS: { rechtlich: readonly FussLink[]; wege: readonly FussLi
     { href: '/datenschutz', label: 'Datenschutz' },
     { href: AGB_PFAD, label: AGB_LINK_TEXT },
     { href: '/problem-melden', label: PROBLEM_MELDEN },
+    // Nr. 200 (N39, § 13a FAGG): der Widerruf online — im Fuß jeder Kundenseite.
+    { href: WIDERRUF_PFAD, label: WIDERRUF_TEXT.fussLink },
   ],
   wege: [ENTDECKEN, FUER_HOEFE, SO_GEHTS].map(({ href, label }) => ({ href, label })),
 }

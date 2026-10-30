@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, textLink } from './_layout'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -16,6 +17,8 @@ export interface OrderReadyProps {
   reorderUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
+  /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
+  widerrufUrl?: string
 }
 
 /**
@@ -60,6 +63,15 @@ export function OrderReadyEmail(p: OrderReadyProps) {
           p.farmPhone
         )}
       </Text>
+
+      {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
+      {p.widerrufUrl && (
+        <Text style={kleinText}>
+          <Link href={p.widerrufUrl} style={textLink}>
+            {WIDERRUF_TEXT.knopfWiderrufen}
+          </Link>
+        </Text>
+      )}
 
       {/* Leise am Ende statt als Knopf über der Mail. Offene Ausnahme von
           „Vertragsmails ohne Werbung" (S11, DESIGN_SYSTEM „E-Mails"): Ob der

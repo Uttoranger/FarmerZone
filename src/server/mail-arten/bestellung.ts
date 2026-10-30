@@ -42,6 +42,8 @@ const BESTELLUNG_FUER_MAIL = {
   cancelReason: true,
   // Nur der Renderer „abholbereit“ liest ihn: Die Mail geht nur, solange die Bestellung bereit ist.
   status: true,
+  // Nr. 200: „Vertrag widerrufen“ steht nur in Mails an Verbraucherinnen (PRIVAT).
+  kaeuferArt: true,
   farm: {
     // Mit der Anmelde-Adresse: ohne Hof-E-Mail gehen die Hof-Mails dorthin (hofKontaktEmail, Nr. 194).
     select: { id: true, name: true, slug: true, ownerName: true, address: true, postalCode: true, city: true, phone: true, ...HOF_KONTAKT_FELDER },
@@ -216,6 +218,7 @@ function alsMailBestellung(b: BestellungFuerMail): OrderForHofMail {
     pickupTimeEnd: b.pickupTimeEnd,
     paymentMethod: b.paymentMethod,
     stripePaymentIntentId: b.stripePaymentIntentId,
+    kaeuferArt: b.kaeuferArt,
     farm: b.farm,
     items: b.items.map((i) => ({
       productName: i.productName,
