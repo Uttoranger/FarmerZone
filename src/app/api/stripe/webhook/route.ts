@@ -21,6 +21,7 @@ import {
 } from '@/server/erstattung-gescheitert'
 import { stripeKontoBereit } from '@/lib/stripe-konto'
 import { istModusSperre } from '@/lib/stripe-modus'
+import { istVerarbeiteterStripeTyp, pruefeStripeObjekt, type VerarbeiteterStripeTyp } from '@/schemas/stripe-ereignis'
 import {
   behandleMandatEingerichtet,
   behandleMandatGeaendert,
@@ -78,8 +79,26 @@ export async function POST(request: NextRequest) {
     }
   }
   if (!event) {
+    // Die Meldung von Stripe nur ins Protokoll (sie nennt nie das Secret):
+    // Nach außen verrät die Antwort nichts darüber, woran die Prüfung scheiterte (Nr. 203).
     console.error('[Webhook] Signature verification failed:', letzterFehler)
-    return NextResponse.json({ error: `Webhook signature invalid: ${letzterFehler}` }, { status: 400 })
+    return NextResponse.json({ error: 'Signatur ungültig' }, { status: 400 })
+  }
+
+  // Vor jeder Verarbeitung die Form (Nr. 203, src/schemas/stripe-ereignis.ts).
+  // Geprüft wird genau, was verarbeitet wird: von einem verbundenen Konto nur
+  // account.updated, sonst die Typen der Liste. Ungültig → 200 ohne
+  // Verarbeitung und ohne Vermerk: Eine andere Antwort ließe Stripe tagelang
+  // dasselbe kaputte Ereignis zustellen, und das Ergebnis wäre jedes Mal gleich.
+  const verarbeitet = event.account ? event.type === 'account.updated' : istVerarbeiteterStripeTyp(event.type)
+  const typ: VerarbeiteterStripeTyp | null = verarbeitet && istVerarbeiteterStripeTyp(event.type) ? event.type : null
+  if (typ) {
+    const pruefung = pruefeStripeObjekt(typ, event.data.object)
+    if (!pruefung.ok) {
+      console.error(`[Webhook] ${typ}: Aufbau unerwartet, nicht verarbeitet (Felder: ${pruefung.felder.join(', ')})`)
+      await meldeUngueltigEinmalJeTag(typ, event.id, pruefung.felder)
+      return NextResponse.json({ received: true, skipped: true })
+    }
   }
 
   // Idempotency: skip already-processed events
@@ -144,6 +163,38 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ received: true })
+}
+
+/**
+ * Ein ungültiges Ereignis an Sentry — höchstens einmal je Typ und UTC-Tag,
+ * nach dem Muster von `erstmalsHeute` (src/lib/umgebung-server.ts): über alle
+ * Instanzen entscheidet EINE Anweisung auf BetriebMessung (Art
+ * `sentry:stripe-schema:<typ>`, Zeile je Tag), nur wer sie anlegt, meldet.
+ * Ohne Deploy in der Art: Ein neuer Deploy behebt ein Ereignis von Stripe
+ * nicht. Nur Typ, Ereignis-Kennung und Feldpfade — nie Werte. Scheitert die
+ * Datenbank oder Sentry, bleibt es still; das Protokoll hat die Zeile schon.
+ * Anders als dort kein Gedächtnis je Instanz: Ungültige Ereignisse sind
+ * selten, eine Anweisung je Zustellung kostet nichts.
+ */
+async function meldeUngueltigEinmalJeTag(typ: VerarbeiteterStripeTyp, eventId: string, felder: string[]): Promise<void> {
+  const jetzt = new Date()
+  const tag = jetzt.toISOString().slice(0, 10)
+  try {
+    const art = `sentry:stripe-schema:${typ}`
+    const angelegt = await prisma.$queryRaw<Array<{ art: string }>>`
+      INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
+      VALUES (${tag}::date, ${art}, 1, ${jetzt}::timestamp(3))
+      ON CONFLICT ("tag", "art") DO NOTHING
+      RETURNING "art"`
+    if (angelegt.length === 0) return
+    Sentry.captureMessage('Stripe-Ereignis mit unerwartetem Aufbau — nicht verarbeitet', {
+      level: 'error',
+      tags: { webhook: typ, grund: 'schema_ungueltig' },
+      extra: { eventId, felder },
+    })
+  } catch {
+    // Telemetrie scheitert leise.
+  }
 }
 
 /** Was die Behandlung einer Zahlung von der Bestellung liest — die Mails laden ihre Daten selbst (Renderer, Nr. 159). */
