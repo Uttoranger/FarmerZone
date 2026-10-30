@@ -39,7 +39,9 @@ vi.mock('@/lib/prisma', () => {
 })
 
 vi.mock('@/server/mail-warteschlange', () => ({ stelleEinOhneRisiko: vi.fn(), stelleMailEinInTransaktion: vi.fn() }))
-vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
+// Nachläufe sammeln: zustellen() führt sie nach der Antwort aus, wie after() es täte.
+const nachlaeufe = vi.hoisted(() => [] as Array<() => Promise<void>>)
+vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn((aufgabe: () => Promise<void>) => void nachlaeufe.push(aufgabe)) }))
 vi.mock('@/server/unbezahlte-bestellung', () => ({ storniereUnbezahlteBestellung: vi.fn() }))
 vi.mock('@/server/erstattung-gescheitert', () => ({
   MELDE_VERMERK_TYP: 'meldung.erstattung_gescheitert',
@@ -88,13 +90,16 @@ const TYPEN = Object.keys(BEHANDLUNG) as VerarbeiteterStripeTyp[]
 /** Jeder Tag der Tests beginnt mit einer leeren Zeile je Typ: die erste Anfrage legt an. */
 let angelegt: Set<string>
 
-function zustellen(type: string, object: unknown, extra: Record<string, unknown> = {}, id = 'evt_1') {
+async function zustellen(type: string, object: unknown, extra: Record<string, unknown> = {}, id = 'evt_1') {
   constructEvent.mockReturnValue({ id, type, data: { object }, ...extra } as never)
-  return POST(new NextRequest('http://localhost/api/stripe/webhook', { method: 'POST', body: '{}', headers: { 'stripe-signature': 'sig_test' } }))
+  const antwort = await POST(new NextRequest('http://localhost/api/stripe/webhook', { method: 'POST', body: '{}', headers: { 'stripe-signature': 'sig_test' } }))
+  for (let aufgabe = nachlaeufe.shift(); aufgabe; aufgabe = nachlaeufe.shift()) await aufgabe()
+  return antwort
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  nachlaeufe.length = 0
   vi.useRealTimers()
   vi.stubEnv('STRIPE_WEBHOOK_SECRET', 'whsec_test_dummy')
   vi.mocked(prisma.webhookEvent.findUnique).mockResolvedValue(null)

@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
     const pruefung = pruefeStripeObjekt(typ, event.data.object)
     if (!pruefung.ok) {
       console.error(`[Webhook] ${typ}: Aufbau unerwartet, nicht verarbeitet (Felder: ${pruefung.felder.join(', ')})`)
-      await meldeUngueltigEinmalJeTag(typ, event.id, pruefung.felder)
+      // Nachlauf: Stripe wartet nicht auf Sentry und die Zeile in BetriebMessung.
+      nachDerAntwort(() => meldeUngueltigEinmalJeTag(typ, event.id, pruefung.felder))
       return NextResponse.json({ received: true, skipped: true })
     }
   }
