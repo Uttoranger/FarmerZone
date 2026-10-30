@@ -100,11 +100,19 @@ describe('„Erneut versuchen" zahlt dieselbe Bestellung', () => {
     const seite = await kasse(farm.slug, { zahlung: orderId, sig: bestellSignatur(orderId) })
 
     expect(seite.type).toBe(ZahlungFortsetzen)
-    const props = seite.props as { zahlung: { clientSecret: string; bestaetigung: string; betrag: unknown }; positionen: unknown[] }
+    const props = seite.props as {
+      zahlung: { clientSecret: string; bestaetigung: string; betrag: unknown }
+      positionen: unknown[]
+      zeilenCents: Record<string, number>
+      anzeige: unknown
+    }
     expect(props.zahlung.clientSecret).toBe(SECRET)
     expect(props.zahlung.bestaetigung).toBe(`/${farm.slug}/confirm/${orderId}?sig=${bestellSignatur(orderId)}`)
     expect(props.zahlung.betrag).toEqual({ amountCents: 2000, serviceFeeCents: 0 })
     expect(props.positionen).toEqual([expect.objectContaining({ productId: produkt.id, quantity: MENGE, price: 10 })])
+    // Die Zeile aus dem Snapshot der Bestellung (OrderItem.totalPrice), nicht neu gerechnet.
+    expect(props.zeilenCents).toEqual({ [produkt.id]: 2000 })
+    expect(props.anzeige).toBeNull()
     // Gelesen, nicht neu angelegt: der gespeicherte Zahlungsvorgang der Bestellung.
     expect(abrufen).toHaveBeenCalledWith(INTENT)
     expect(anlegen).toHaveBeenCalledTimes(1)
@@ -134,6 +142,17 @@ describe('„Erneut versuchen" zahlt dieselbe Bestellung', () => {
 
     expect(fremd.type).toBe(CheckoutForm)
     expect(ohne.type).toBe(CheckoutForm)
+    expect(abrufen).not.toHaveBeenCalled()
+  })
+
+  it('Hof vom Admin gesperrt: keine Fortsetzung, die Kasse mit ihrer Sperre', async () => {
+    const { farm, orderId } = await gescheiterteZahlung()
+    await prisma.farm.update({ where: { id: farm.id }, data: { adminGesperrtAm: new Date() } })
+
+    const seite = await kasse(farm.slug, { zahlung: orderId, sig: bestellSignatur(orderId) })
+
+    expect(seite.type).toBe(CheckoutForm)
+    expect((seite.props as { sperre: unknown }).sperre).toBe('gesperrt')
     expect(abrufen).not.toHaveBeenCalled()
   })
 

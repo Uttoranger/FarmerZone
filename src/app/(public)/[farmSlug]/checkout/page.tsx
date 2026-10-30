@@ -8,7 +8,7 @@ import { CheckoutForm, KassePausiert, ZahlungFortsetzen, type Zahlung } from '@/
 import type { KorbPosition } from '@/components/checkout/kasse-teile'
 import { alsAbholFenster, ausgebuchteSchluessel, ausgebuchteTage } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
-import { FORTSETZEN_PARAMETER, fortsetzungsZiel, kassenVorbelegung, zahlungsGebuehrText, zielNachIntent } from '@/lib/kasse'
+import { FORTSETZEN_PARAMETER, fortsetzungsKorb, fortsetzungsZiel, kassenVorbelegung, zielNachIntent, type FortsetzungsKorb } from '@/lib/kasse'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
 import { bestaetigungsPfad, bestellLinkGilt } from '@/lib/bestell-link'
 import { abholZeitText } from '@/lib/bestaetigung'
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 type Fortsetzung =
   | { art: 'kasse' }
   | { art: 'bestaetigung'; pfad: string }
-  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[] }
+  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[]; korb: Omit<FortsetzungsKorb, 'gebuehrText'> }
 
 const KASSE: Fortsetzung = { art: 'kasse' }
 
@@ -50,11 +50,13 @@ const KASSE: Fortsetzung = { art: 'kasse' }
  * neu angelegt. Ohne gültige Signatur keine Abfrage und dieselbe Kasse wie
  * ohne Parameter — ob es die Bestellung gibt, verrät die Seite nicht.
  * Storniert oder nach der Frist: die Kasse mit dem Korb, den die
- * Bestätigungsseite nicht geleert hat (korbLeeren).
+ * Bestätigungsseite nicht geleert hat (korbLeeren). Hat ein Admin den Hof
+ * gesperrt, geht auch die Zahlung einer bestehenden Bestellung nicht weiter:
+ * dann die Kasse mit ihrer Sperrkarte, wie ohne Parameter.
  */
 async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | string[] | undefined>, jetzt: Date): Promise<Fortsetzung> {
   const orderId = suche[FORTSETZEN_PARAMETER]
-  if (typeof orderId !== 'string') return KASSE
+  if (typeof orderId !== 'string' || farm.adminGesperrt === true) return KASSE
   const { sig } = bestaetigungsParameterSchema.parse(suche)
   if (!sig || !bestellLinkGilt(orderId, sig)) return KASSE
 
@@ -68,6 +70,10 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
       paymentStatus: true,
       stripePaymentIntentId: true,
       serviceFeeCents: true,
+      // Snapshot der Gebühr (N38): Korb und Gebührenzeile nur daraus, nie aus den heutigen Konditionen.
+      gebuehrModell: true,
+      serviceFeePercentApplied: true,
+      serviceFeeMinCentsApplied: true,
       createdAt: true,
       pickupDate: true,
       pickupTimeStart: true,
@@ -80,6 +86,8 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
           productName: true,
           quantity: true,
           unitPrice: true,
+          totalPrice: true,
+          gebuehrCents: true,
           product: { select: { unit: true, unitSize: true, imageUrl: true } },
         },
       },
@@ -105,6 +113,8 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
 
   // Nur Anzeige: der Betrag des Zahlungsvorgangs, wie Stripe ihn führt (wie in antwortFuerBestehendeBestellung).
   const betrag = { amountCents: intent.amount, serviceFeeCents: order.serviceFeeCents }
+  // Zeilen, Endpreis je Stück und Gebührenzeile aus dem Snapshot der Bestellung — keine Rechnung mit heutigen Konditionen.
+  const { gebuehrText, ...korb } = fortsetzungsKorb(order)
   return {
     art: 'zahlung',
     zahlung: {
@@ -112,7 +122,7 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
       bestaetigung: pfad,
       reserviertBis: fristVon(order).toISOString(),
       betrag,
-      gebuehrText: zahlungsGebuehrText(farm, jetzt, betrag),
+      gebuehrText,
       abholung: abholZeitText(order, jetzt),
       name: '',
       email: order.customerEmail,
@@ -127,6 +137,7 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
       // Decimal → Cent → Euro an der Servergrenze (CODING_STANDARDS §2): so führt der Korb im Browser den Preis.
       price: centsAlsEuro(alsCents(item.unitPrice)),
     })),
+    korb,
   }
 }
 
@@ -154,11 +165,20 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   // dieselbe Zählung, mit der /api/checkout ablehnt (src/server/abholfenster.ts).
   const jetzt = new Date()
 
-  // Vor der Kaufsperre: Eine Pause hält neue Bestellungen an, nicht die Zahlung einer bestehenden.
+  // Vor der Kaufsperre: Eine Pause hält neue Bestellungen an, nicht die Zahlung einer bestehenden (die Admin-Sperre schon, ladeFortsetzung).
   const fortsetzung = await ladeFortsetzung(farm, suche, jetzt)
   if (fortsetzung.art === 'bestaetigung') redirect(fortsetzung.pfad)
   if (fortsetzung.art === 'zahlung') {
-    return <ZahlungFortsetzen farm={farm} zahlung={fortsetzung.zahlung} positionen={fortsetzung.positionen} jetztIso={jetzt.toISOString()} />
+    return (
+      <ZahlungFortsetzen
+        farm={farm}
+        zahlung={fortsetzung.zahlung}
+        positionen={fortsetzung.positionen}
+        zeilenCents={fortsetzung.korb.zeilenCents}
+        anzeige={fortsetzung.korb.anzeige}
+        jetztIso={jetzt.toISOString()}
+      />
+    )
   }
 
   const [nurBetriebeIds, ausHof, volleTage] = await Promise.all([
