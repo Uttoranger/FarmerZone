@@ -30,7 +30,7 @@ const anlegen = vi.mocked(stripe.paymentIntents.create)
 const abbrechen = vi.mocked(stripe.paymentIntents.cancel)
 
 /** Fester Schlüssel je Bestellung, kurze Leine (route.ts, intentOptionen). */
-const optionen = (orderId: string) => ({ idempotencyKey: `pi-${orderId}`, timeout: 20_000, maxNetworkRetries: 2 })
+const optionen = (orderId: string) => ({ idempotencyKey: `pi-${orderId}-z2`, timeout: 20_000, maxNetworkRetries: 2 })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -233,6 +233,7 @@ describe('Wiederholung mit demselben Idempotenz-Schlüssel', () => {
         metadata: { orderId: bestellung.id, orderNumber: bestellung.orderNumber, farmId: farm.id },
         transfer_data: { destination: farm.stripeAccountId },
         application_fee_amount: 100,
+        payment_method_types: ['card', 'eps'],
       },
       optionen(bestellung.id)
     )

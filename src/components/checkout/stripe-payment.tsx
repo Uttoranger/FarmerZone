@@ -36,8 +36,10 @@ import {
  * nichts gerechnet (keine Uhr, keine Hofeinstellung), nur Stripes Zahlungsfeld
  * gezeigt und bestätigt.
  *
- * Welche Wege das Feld anbietet (Karte, EPS, Apple/Google Pay), entscheiden
- * die Einstellungen im Stripe-Dashboard und das Gerät — nicht dieser Code.
+ * Welche Wege das Feld anbietet, legt der PaymentIntent fest
+ * (`KASSE_ZAHLARTEN` in src/lib/kasse.ts: Karte mit Apple/Google Pay, EPS) —
+ * das Feld liest sie aus dem clientSecret; das Gerät entscheidet über die
+ * Wallets. Im Stripe-Dashboard müssen diese Zahlarten nur aktiviert sein.
  */
 
 export type StripeZahlungProps = {

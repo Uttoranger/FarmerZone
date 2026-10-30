@@ -81,6 +81,18 @@ describe('neues Konto im Land des Hofs', () => {
   })
 })
 
+describe('Fähigkeiten eines neuen Kontos (Fix Kasse-Zahlarten)', () => {
+  it('fordert Karte, Überweisung und EPS an — EPS braucht das Hofkonto als Händler im Hofpreis-Modell (on_behalf_of)', async () => {
+    hofSuche.mockResolvedValue(hof('AT') as never)
+    await createConnectAccount()
+    expect((kontoErzeugen.mock.calls[0][0] as { capabilities: unknown }).capabilities).toEqual({
+      card_payments: { requested: true },
+      transfers: { requested: true },
+      eps_payments: { requested: true },
+    })
+  })
+})
+
 describe('bestehendes Konto mit abweichendem Land', () => {
   it('meldet einmal, nur mit Hof-ID und Kürzeln; fragt die eigene Drossel', async () => {
     const jetzt = new Date('2026-10-23T09:00:00.000Z')

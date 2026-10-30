@@ -51,6 +51,16 @@ export type KassenHof = ServicegebuehrEinstellung & { preisAnzeige?: PreisAnzeig
 export const NEUE_BESTELLUNG_ZAHLARTEN = ['ONLINE', 'ONSITE_CASH'] as const
 export type NeueZahlart = (typeof NEUE_BESTELLUNG_ZAHLARTEN)[number]
 
+/**
+ * Die Stripe-Zahlarten der Kasse (online): Karte — Apple Pay und Google Pay
+ * laufen im Payment Element als Wallet darüber — und EPS. Fest im
+ * PaymentIntent statt der Konfiguration „Default“ im Stripe-Dashboard: Dort
+ * muss SEPA-Lastschrift für die Monatsabrechnung der Höfe (Nr. 198) an sein,
+ * in der Kasse aber nicht — eine SEPA-Zahlung ist erst nach Tagen bestätigt,
+ * die Bestellung verfiele vorher.
+ */
+export const KASSE_ZAHLARTEN = ['card', 'eps'] as const
+
 /** Darf eine neue Bestellung mit dieser Zahlart angelegt werden? */
 export function zahlartFuerNeueBestellung(paymentMethod: string): paymentMethod is NeueZahlart {
   return (NEUE_BESTELLUNG_ZAHLARTEN as readonly string[]).includes(paymentMethod)

@@ -112,7 +112,7 @@ Vercel erlaubt je Variable und Umgebung nur einen Wert. Deshalb kommt **zuerst S
 
 ## 6. Zahlungsarten live aktivieren
 
-- [ ] Einstellungen → Zahlungsmethoden (Live-Modus): **EPS**, **Apple Pay** und **Google Pay** aktivieren, Karten sind an. Welche Wege die Kasse anbietet, entscheidet allein diese Einstellung. Stripes Zahlungsfeld zeigt nur, was hier aktiv ist und was das Gerät kann.
+- [ ] Einstellungen → Zahlungsmethoden (Live-Modus): **EPS**, **Apple Pay** und **Google Pay** aktivieren, Karten sind an. SEPA-Lastschrift bleibt an (Monatsabrechnung der Höfe). Die Kasse fragt fest nur Karte und EPS an (`KASSE_ZAHLARTEN`), SEPA erscheint dort nie; die Einstellung muss diese Wege nur aktivieren. Apple Pay und Google Pay zeigt das Zahlungsfeld je nach Gerät.
 
 ## 7. Apple-Pay-Domain
 

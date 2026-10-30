@@ -224,6 +224,8 @@ describe('Hofpreis-Modell: derselbe Korb kostet online und bar dasselbe', () => 
         application_fee_amount: 72,
         transfer_data: { destination: 'acct_hof' },
         on_behalf_of: 'acct_hof',
+        // Feste Zahlarten der Kasse statt der Dashboard-Konfiguration (Fix Kasse-Zahlarten).
+        payment_method_types: ['card', 'eps'],
       })
     )
     // Der Hof bekommt die volle Überweisung minus application_fee — genau den Warenpreis (100 %).
@@ -366,6 +368,8 @@ describe('Vor dem Stichtag: Modell bisher, Beträge und Intent-Parameter unverä
       metadata: { orderId: 'order_1', orderNumber: expect.any(String), farmId: 'farm_1' },
       transfer_data: { destination: 'acct_hof' },
       application_fee_amount: 59,
+      // Auch im Modell bisher: genau Karte und EPS, nie die Dashboard-Konfiguration (kein SEPA).
+      payment_method_types: ['card', 'eps'],
     })
   })
 

@@ -92,6 +92,10 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
     capabilities: {
       card_payments: { requested: true },
       transfers: { requested: true },
+      // EPS in der Kasse (KASSE_ZAHLARTEN): Im Hofpreis-Modell ist das Hofkonto Händler
+      // (on_behalf_of) und braucht die Fähigkeit selbst. Bestehende Konten:
+      // scripts/eps-faehigkeit-nachfordern.ts (startet die Projektleitung).
+      eps_payments: { requested: true },
     },
     business_profile: {
       url: `${publicUrl}/${farm.slug}`,
