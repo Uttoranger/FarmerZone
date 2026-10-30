@@ -47,6 +47,7 @@ import {
   CODE_BAR_NICHT_MOEGLICH,
   CODE_MINDESTBESTELLWERT,
   CODE_ZAHLART_NICHT_ANGEBOTEN,
+  KASSE_ZAHLARTEN,
   ZAHLART_NICHT_ANGEBOTEN,
   zahlartFuerNeueBestellung,
 } from '@/lib/kasse'
@@ -146,7 +147,10 @@ const INTENT_WARTEZEIT_MS = 2 * 60 * 1000
  * Bestellung schon als gescheitert storniert hatte.
  */
 const STRIPE_LEINE = { timeout: 20_000, maxNetworkRetries: 2 }
-const intentOptionen = (orderId: string) => ({ idempotencyKey: `pi-${orderId}`, ...STRIPE_LEINE })
+// `-z2`: Seit dem Fix der Kasse-Zahlarten tragen die Parameter `payment_method_types`. Stripe lehnt
+// einen Schlüssel ab, der schon mit anderen Parametern lief — ein Intent unter `pi-<id>` von vor dem
+// Fix ist gespeichert und wird gelesen (antwortFuerBestehendeBestellung), nie neu angelegt.
+const intentOptionen = (orderId: string) => ({ idempotencyKey: `pi-${orderId}-z2`, ...STRIPE_LEINE })
 
 /**
  * 409 von Stripe: Eine zweite Anfrage mit demselben Schlüssel läuft gerade
@@ -159,7 +163,7 @@ function istStripeKonflikt(err: unknown): boolean {
 
 /**
  * Die Parameter des PaymentIntents — aus den GESPEICHERTEN Werten der
- * Bestellung, damit die Wiederholung mit `pi-<id>` exakt dieselben schickt
+ * Bestellung, damit die Wiederholung mit `pi-<id>-z2` exakt dieselben schickt
  * (Stripe lehnt einen Schlüssel mit anderen Parametern ab).
  *
  * ZWEI LADUNGSTYPEN, je nach dem gespeicherten `Order.gebuehrModell`:
@@ -182,8 +186,20 @@ function istStripeKonflikt(err: unknown): boolean {
  * spiegelbildlich zurück — reverse_transfer UND refund_application_fee
  * (cancelOrder); on_behalf_of ändert daran nichts. Wer den Ladungstyp hier
  * ändert, ändert ihn dort mit (tests/storno-erstattung.test.ts,
- * Ladungstyp-Wache). Bestellungen im Modell `bisher` bekommen exakt die
- * Parameter wie vor Nr. 197 — auch die Wiederholung mit `pi-<id>`.
+ * Ladungstyp-Wache). Bestellungen im Modell `bisher` bekommen die Parameter
+ * wie vor Nr. 197, nur zusätzlich die festen Zahlarten (unten) — auch die
+ * Wiederholung mit `pi-<id>-z2`.
+ *
+ * ZAHLARTEN fest (`KASSE_ZAHLARTEN`, in beiden Modellen): Ohne
+ * `payment_method_types` gälte die Konfiguration „Default“ des
+ * Plattformkontos im Stripe-Dashboard — und dort muss SEPA-Lastschrift für
+ * die Monatsabrechnung der Höfe (Nr. 198) an sein. Die Kasse bietet nur
+ * Karte (mit Apple Pay und Google Pay) und EPS an; eine SEPA-Zahlung wäre
+ * erst nach Tagen bestätigt, die Bestellung verfiele vorher. Im Modell
+ * `hofpreis` (on_behalf_of) braucht das Hofkonto dafür die AKTIVE Fähigkeit
+ * `eps_payments` — ohne sie lehnt Stripe den ganzen Intent ab, und der Hof
+ * kann online gar nicht kassieren (stripe-connect.ts,
+ * scripts/eps-faehigkeit-nachfordern.ts).
  */
 function intentParameter(
   bestellung: {
@@ -205,7 +221,8 @@ function intentParameter(
     metadata: { orderId: bestellung.id, orderNumber: bestellung.orderNumber, farmId: bestellung.farmId },
     transfer_data: { destination: hofKonto },
     ...(feeAmountCents > 0 ? { application_fee_amount: feeAmountCents } : {}),
-    // Nur im Hofpreis-Modell ist der Hof Händler (N38) — `bisher` bleibt Zeichen für Zeichen wie vorher.
+    payment_method_types: [...KASSE_ZAHLARTEN],
+    // Nur im Hofpreis-Modell ist der Hof Händler (N38) — `bisher` bekommt kein on_behalf_of.
     ...(istHofpreisBestellung(bestellung) ? { on_behalf_of: hofKonto } : {}),
   }
 }

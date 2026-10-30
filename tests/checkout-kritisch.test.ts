@@ -373,6 +373,65 @@ describe('Idempotenz', () => {
     })
   })
 
+  it('Wiederholung mit schon gespeichertem Intent (auch einem von vor dem Fix): lesen und weiterverwenden, nie neu anlegen', async () => {
+    orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
+      Promise.resolve(
+        where.idempotencyKey
+          ? {
+              id: 'order_alt_intent',
+              orderNumber: 'BH-2009-FFFF',
+              paymentMethod: 'ONLINE',
+              stripePaymentIntentId: 'pi_vor_dem_fix',
+              farm: { slug: 'beispielhof' },
+              status: 'PENDING_CONFIRMATION',
+              createdAt: new Date('2026-10-01T08:00:00Z'),
+              pickupDate: new Date('2026-10-02T12:00:00Z'),
+              pickupTimeStart: '15:00',
+            }
+          : null
+      )) as never)
+    vi.mocked(stripe.paymentIntents.retrieve).mockResolvedValue({ client_secret: 'geheim_alt', amount: 2000 } as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'online-alt', paymentMethod: 'ONLINE' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ orderId: 'order_alt_intent', clientSecret: 'geheim_alt', wiederholt: true })
+    expect(stripe.paymentIntents.retrieve).toHaveBeenCalledWith('pi_vor_dem_fix')
+    expect(stripe.paymentIntents.create).not.toHaveBeenCalled()
+  })
+
+  it('Wiederholung ohne gespeicherten Intent: neuer Schlüssel pi-<id>-z2 und die festen Zahlarten — der alte Schlüssel pi-<id> mit anderen Parametern scheitert nicht', async () => {
+    orderFindUnique.mockImplementation((({ where }: { where: Record<string, unknown> }) =>
+      Promise.resolve(
+        where.idempotencyKey
+          ? {
+              id: 'order_ohne_intent',
+              orderNumber: 'BH-2009-GGGG',
+              farmId: 'farm_1',
+              paymentMethod: 'ONLINE',
+              stripePaymentIntentId: null,
+              status: 'PENDING_CONFIRMATION',
+              createdAt: new Date(),
+              pickupDate: new Date(),
+              pickupTimeStart: '15:00',
+              totalAmount: new Prisma.Decimal(20),
+              platformFeeAmount: new Prisma.Decimal(0),
+              serviceFeeCents: 0,
+              gebuehrModell: null,
+              farm: { slug: 'beispielhof', stripeAccountId: 'acct_1', acceptsOnsite: true },
+            }
+          : null
+      )) as never)
+    vi.mocked(stripe.paymentIntents.create).mockResolvedValue({ id: 'pi_neu', client_secret: 'geheim_neu' } as never)
+
+    const res = await POST(anfrage({ idempotencyKey: 'online-ohne-intent', paymentMethod: 'ONLINE' }))
+
+    expect(res.status).toBe(200)
+    const [parameter, optionen] = vi.mocked(stripe.paymentIntents.create).mock.calls[0]
+    expect(parameter).toMatchObject({ payment_method_types: ['card', 'eps'] })
+    expect(optionen).toMatchObject({ idempotencyKey: 'pi-order_ohne_intent-z2' })
+  })
+
   it('ohne Bestellung zum Schlüssel bleibt es beim 409', async () => {
     reservationFindMany.mockResolvedValue([] as never)
 

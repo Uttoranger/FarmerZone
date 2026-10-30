@@ -6089,6 +6089,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Startseite pünktlich:** Der Mail-Cron prüft jede Minute vor dem Worker, ob eine Fassung seit weniger als 2 Minuten live ist (`fassungFaelligSeit`), und ruft dann einmal `revalidatePath('/')`. Eine sofort veröffentlichte Fassung wird dabei ein zweites Mal neu gebaut — harmlos.
 - **Links:** Monats- und Jahresadressen von Geld zeigen direkt auf /admin/geld; /admin/finanzen bleibt die 308-Weiterleitung (die CSV-Route bleibt unter /admin/finanzen/export). `/admin/loading.tsx` zeigt nur den Kopf, das Höfe-Skelett liegt unter /admin/hoefe.
 
+## Kasse: feste Zahlarten statt Dashboard-Konfiguration (Fix, 30.10.2026)
+
+- **Fund:** Der PaymentIntent der Kasse nannte keine Zahlarten, also galt die Konfiguration „Default“ des Plattformkontos. Dort muss SEPA-Lastschrift für die Monatsabrechnung der Höfe (Nr. 198) an sein; schaltet man sie aus, ist sie für das ganze Konto weg. Die Kundschaft konnte so SEPA wählen – bestätigt erst nach bis zu sechs Werktagen, die Bestellung verfiel vorher, die späte Zahlung ging automatisch zurück. Geprüft am 30.10.2026 gegen die Stripe-Sandbox (nur lesend).
+- **Fix:** `KASSE_ZAHLARTEN = ['card', 'eps']` in `src/lib/kasse.ts`, im Checkout als `payment_method_types` in beiden Gebührenmodellen. Apple Pay und Google Pay laufen als Wallet über `card`.
+- **Schlüssel `pi-<id>-z2`:** Stripe lehnt einen Idempotenzschlüssel ab, der mit anderen Parametern lief. Ein vor dem Fix gespeicherter Intent wird gelesen (wie bisher), nie neu angelegt; fehlt die Kennung (nur in den zwei Minuten der ersten Anfrage), legt die Wiederholung unter dem neuen Schlüssel an. Grenze: Lief genau beim Deploy eine erste Anfrage mit dem alten Schlüssel und scheiterte nur das Speichern, kann ein zweiter, nie bezahlter Intent entstehen.
+- **EPS und `on_behalf_of`:** Im Hofpreis-Modell ist das Hofkonto Händler und braucht `eps_payments` (Stripe-Doku „Manage payment methods for connected accounts“, „Payment method capabilities“). Angefordert reicht nicht: Ohne AKTIVE Fähigkeit lehnt Stripe den ganzen Intent ab, der Hof könnte im Hofpreis-Modell gar nicht online kassieren. Neue Konten fordern die Fähigkeit an; für bestehende `scripts/eps-faehigkeit-nachfordern.ts` (liest ohne `--ausfuehren` nur; meldet jedes nicht aktive Konto und endet dann mit Exit-Code 1; startet die Projektleitung vor dem Stichtag des Hofpreis-Modells, erneut bis alles aktiv ist). Ob die Kasse im Hofpreis-Modell die Zahlarten nach der Fähigkeit des Kontos wählen soll, ist offen.
+- **Wache:** `tests/kasse-zahlarten.test.ts` – kein `paymentIntents.create` unter `src/` ohne `payment_method_types`.
+
 ## Nützliche Befehle
 
 ```bash
