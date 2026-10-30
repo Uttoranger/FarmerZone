@@ -9,6 +9,7 @@
  * keiner.
  */
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { STRIPE_EREIGNIS_SCHEMAS, istVerarbeiteterStripeTyp, pruefeStripeObjekt, type VerarbeiteterStripeTyp } from '@/schemas/stripe-ereignis'
 import { BEISPIELE } from './stripe-ereignis-beispiele'
 
@@ -18,6 +19,13 @@ describe('Schemas der verarbeiteten Stripe-Ereignisse', () => {
   it('die Liste ist die der Route: Lauf 26 plus account.updated', () => {
     expect(Object.keys(STRIPE_EREIGNIS_SCHEMAS).sort()).toEqual([...TYPEN].sort())
     expect(TYPEN).toHaveLength(11)
+  })
+
+  it('Wache: jeder Typ, den die Route abfragt, hat ein Schema — und jedes Schema einen Zweig', () => {
+    const route = readFileSync('src/app/api/stripe/webhook/route.ts', 'utf8')
+    const abgefragt = [...route.matchAll(/(?:event\.type|typ) === '([a-z_.]+)'/g)].map((m) => m[1])
+    expect(abgefragt.length).toBeGreaterThan(5)
+    expect([...new Set(abgefragt)].sort()).toEqual([...TYPEN].sort())
   })
 
   it.each(TYPEN)('%s: gültig geht durch, ungültig nennt nur das Feld', (typ) => {
