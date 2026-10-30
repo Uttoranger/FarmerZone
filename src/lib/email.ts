@@ -1053,6 +1053,7 @@ export async function baueOrderNotReady(order: OrderForEmail): Promise<StapelMai
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
+    widerrufUrl: widerrufUrl(order),
   }))
 
   return { an: order.customerEmail, betreff: `Kurzes Update zu deiner Bestellung ${order.orderNumber}`, html }
@@ -1151,6 +1152,7 @@ export async function baueArtikelFehlt(
     neu: centsAlsEuro(fehlt.neuCents),
     erstattet: fehlt.erstattetCents === null ? null : centsAlsEuro(fehlt.erstattetCents),
     orderUrl: `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`,
+    widerrufUrl: widerrufUrl(order),
   }))
 
   return { an: order.customerEmail, betreff: `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html }

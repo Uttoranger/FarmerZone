@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
 import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, textLink } from './_layout'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -16,6 +17,8 @@ export interface OrderNotReadyProps {
   pickupTime: string
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
+  /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
+  widerrufUrl?: string
 }
 
 export function OrderNotReadyEmail(p: OrderNotReadyProps) {
@@ -47,6 +50,14 @@ export function OrderNotReadyEmail(p: OrderNotReadyProps) {
           p.farmPhone
         )}
       </Text>
+      {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
+      {p.widerrufUrl && (
+        <Text style={kleinText}>
+          <Link href={p.widerrufUrl} style={textLink}>
+            {WIDERRUF_TEXT.knopfWiderrufen}
+          </Link>
+        </Text>
+      )}
     </EmailLayout>
   )
 }
