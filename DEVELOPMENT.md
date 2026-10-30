@@ -6130,3 +6130,11 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 ---
 
 *Zuletzt aktualisiert: 2026-10-01 — Hand-Zeiger an allen Knöpfen, „Schließen" statt „Close", Symbole statt Emojis*
+
+## Widerruf online und Rücktrittssatz in der Kasse (Register N39; Nr. 200, Lauf 27, 30.10.2026)
+
+- Seit 1.10.2026 verlangt § 13a FAGG eine Widerrufsfunktion. /widerruf nimmt jeden Widerruf an — mit signiertem Link oder frei; nicht Zuordenbares bleibt eine Aufgabe für das Team, die Antwort verrät nie, ob es die Bestellung gibt.
+- Vor der Abholung ist der Widerruf ein Storno über die bestehenden Wege (ganz `storniere`, Positionen „Artikel fehlt“), nach der Abholung entscheidet der Hof: erstatten über teilerstattung.ts oder mit Grund ablehnen. Teilmengen einer Position gibt es nicht — der Widerruf nimmt immer die ganze Position, weil kein bestehender Weg Teilmengen bucht.
+- Die Rücktrittsbelehrung nach Anhang I FAGG ist ein Platzhalter: Das RIS war aus der Bauumgebung nicht erreichbar (Netz gesperrt); kein Wortlaut aus dem Gedächtnis. Die Sätze je Kategorie (`ausnahmeHinweis`) prüft die Anwältin.
+- Die Eingangsbestätigung geht Sofort (wie verlangt) und darf trotzdem nochmal geschickt werden — Sonderfall wie der Bar-Link, direkt an die heutige Adresse der Bestellung.
+

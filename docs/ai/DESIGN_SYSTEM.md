@@ -760,6 +760,14 @@ Umgesetzt in `src/components/shells/` (KundeShell, KundeFokusShell, HofShell, Ad
 - **Einstellungen › Anmeldung** (/admin/einstellungen/anmeldung, Eintrag „Anmeldung" in den Gruppen von Admin › Einstellungen): Rückweg „‹ Einstellungen", Karte Passkeys (Name, „eingerichtet …", „Entfernen" — beim letzten gesperrt mit Satz; „Passkey hinzufügen" als grüner Textknopf), Karte Ersatzcodes („n von 10 übrig", zuletzt benutzt, „Neue erstellen" mit Rückfrage), darunter der Baustein `AngemeldeteGeraete`, unten die Regel-Zeile (12 Stunden, 5 Minuten).
 - **Dialog „Bitte bestätige mit deinem Passkey"** (`useFrischBestaetigt`, `src/components/admin/frisch-bestaetigen.tsx`): über `BestellDialog` (ab 768 px Dialog, darunter Blatt), Marke „Heikle Aktion" (`tun`, Schlüssel), Satz, Hinweis auf den Browser und die 5 Minuten, Hauptaktion grün „Mit Passkey bestätigen", Fehler über `DialogFehler`. Steht die heikle Aktion selbst in einem Dialog, kommt der Bestätigungsdialog in dessen Inhalt (verschachtelt). Vor einem CSV-Export dieselbe Karte als Seite /admin/bestaetigen (ohne Ladeskelett: Adresse mit `weiter=`). Nach der Bestätigung steht dort „Der Download startet …“ als `role="status"` (der Bereich ist schon vor dem Text da), und der Knopf bleibt `DOWNLOAD_SPERRE_MS` (3 Sekunden) gesperrt, damit kein zweiter Download startet (Nr. 126).
 
+### Widerruf (Nr. 200, Register N39; ohne Mockup)
+
+- /widerruf in der KundeShell mit Seitenfuß: Titel und Einleitung, darunter EINE Karte mit den zwei Schritten — Schritt 1 endet mit dem grünen Knopf „Vertrag widerrufen“, Schritt 2 (Zusammenfassung als Definitionsliste auf `bg-background`) mit „Widerruf bestätigen“ und „Zurück“ als Rahmenknopf. Knopftexte wörtlich, aus `WIDERRUF_TEXT`.
+- Auswahl „Die ganze Bestellung“ / „Einzelne Artikel“ als Optionskarten (min. 44 px, gewählt mit `border-accent`); je Artikel der Hinweis zur Ausnahme in 12,5 px `text-muted-foreground` unter dem Namen.
+- Danach die Eingangsbestätigung in derselben Karte mit Symbol, Datum/Uhrzeit, Zusammenfassung und „Drucken oder speichern“; Kopf, Fuß und Belehrung `print:hidden`.
+- Einstiege leise: Zeile „Vertrag widerrufen“ unter den Aktionen der Bestätigungs- und Bestellseite (`WiderrufLink`), im Seitenfuß (SEITENFUSS) und als letzte Zeile der Fokus-Shell; in der Kasse ein Satz unter dem AGB-Satz (wie dieser, `AgbSatz`), nicht bei „Betrieb“.
+- Hof: Karte „Widerruf eingegangen“ mit Orange-Rand im Bestell-Detail (Knöpfe „Rückgabe erhalten – erstatten …“ grün, „Ablehnen …“ als Textknopf orange; Ablehnen öffnet den Dialog mit Pflichtgrund) und als orange Hinweiskarte oben in Heute.
+
 ### Dialoge und Blätter
 
 - Web: zentrierter Dialog (480–820 px) über abgedunkeltem Hintergrund, Titel links, Schließen rechts, Aktionen rechts unten (zerstörende Aktion in Orange-Outline, nie Grün).
