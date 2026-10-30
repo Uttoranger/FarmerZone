@@ -9,7 +9,6 @@ import type { KorbPosition } from '@/components/checkout/kasse-teile'
 import { alsAbholFenster, ausgebuchteSchluessel, ausgebuchteTage } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { FORTSETZEN_PARAMETER, fortsetzungsZiel, kassenVorbelegung, zahlungsGebuehrText, zielNachIntent } from '@/lib/kasse'
-import { stripe } from '@/lib/stripe'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
 import { bestaetigungsPfad, bestellLinkGilt } from '@/lib/bestell-link'
 import { abholZeitText } from '@/lib/bestaetigung'
@@ -94,6 +93,8 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
   if (ziel === 'bestaetigung' || !order.stripePaymentIntentId) return { art: 'bestaetigung', pfad }
 
   // Kein try: Scheitert Stripe, zeigt Next die Fehlerseite — eine Kasse daneben führte in eine zweite Bestellung.
+  // Dynamisch: Die Kasse ohne Parameter lädt das Stripe-Paket nie (tests/schwere-module.test.ts).
+  const { stripe } = await import('@/lib/stripe')
   const intent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId)
   const nachIntent = zielNachIntent(intent.status)
   if (nachIntent === 'kasse') return KASSE

@@ -6130,3 +6130,11 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 ---
 
 *Zuletzt aktualisiert: 2026-10-01 — Hand-Zeiger an allen Knöpfen, „Schließen" statt „Close", Symbole statt Emojis*
+
+## Nach gescheiterter Zahlung bleibt der Korb, „Erneut versuchen" zahlt dieselbe Bestellung (Audit A3, Nr. 202, Lauf 27, 30.10.2026)
+
+- **Vorher:** Die Bestätigungsseite leerte den Korb in jedem Zustand, auch ohne gültige Signatur. „Erneut versuchen" führte in die leere Kasse; wer neu bestellte, legte eine zweite Bestellung an, während die erste ihre Ware bis zur Frist (30 Minuten) hielt.
+- **Korb:** `korbLeeren(zustand)` (`src/lib/bestaetigung.ts`) — nur bezahlt, bar bestätigt oder bar wartend. Zahlung fehlgeschlagen, „wird geprüft", verfallen, storniert und nicht abgeholt lassen ihn stehen; die Seite ohne gültige Signatur ebenfalls.
+- **Erneut versuchen:** führt nach `/{hof}/checkout?zahlung={id}&sig={signatur}` (dieselbe Signatur wie die Bestätigungsseite). Die Kassen-Seite prüft die Signatur, gibt verwaiste Bestellungen frei und entscheidet mit `fortsetzungsZiel`/`zielNachIntent` (`src/lib/kasse.ts`): offene Online-Bestellung in der Frist mit wartendem PaymentIntent → `ZahlungFortsetzen` (der Zahlungsschritt der Kasse mit dem gespeicherten Intent, neue Bestätigung im Payment Element); storniert, verfallen oder Intent abgebrochen → die Kasse mit dem Korb aus dem Browser; bezahlt, unterwegs oder ohne Intent → Bestätigungsseite.
+- **Warum nicht über den Idempotenz-Schlüssel** (`antwortFuerBestehendeBestellung`): Der Schlüssel lebt nur im Speicher des Tabs und ist nach Stripes Rückleitung (EPS) weg; ihn in die Adresse zu legen, schüfe ein zweites Zugangsmittel neben der Signatur. Übernommen ist das Prinzip: der Intent wird gelesen, nie neu angelegt, und kein Halt wird erneuert.
+- **Ohne Namen:** Der fortgesetzte Zahlungsschritt zeigt die E-Mail der laufenden Bestellung, nie den Namen (Nr. 153).
