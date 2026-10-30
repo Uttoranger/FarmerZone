@@ -10,8 +10,12 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FELD, FELD_LABEL, KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
+import { HOFPREIS_KARTE_ID } from '@/lib/plattformgebuehr'
 
 const TEXT = HOFPREIS_STICHTAG_TEXT
+
+/** Register N40 (Nr. 201): im Testmodus von Stripe — der Stichtag ist eine Vorbedingung des Live-Gangs (docs/betrieb/stripe-live.md). */
+export const VOR_LIVE_HINWEIS = 'Vor dem Live-Gang von Stripe auf den Live-Tag oder früher setzen.'
 
 /**
  * Der Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197, Punkt 6) — eine
@@ -22,8 +26,11 @@ const TEXT = HOFPREIS_STICHTAG_TEXT
  */
 export function HofpreisStichtag({
   daten,
+  stripeTest = false,
 }: {
   daten: { tag: string; stichtagIso: string | null; erreicht: boolean; jetzt: string }
+  /** Stripe läuft im Testmodus (nur der Wahrheitswert, nie der Schlüssel) — dann der Hinweis vor dem Live-Gang (N40). */
+  stripeTest?: boolean
 }): React.JSX.Element {
   const router = useRouter()
   const [laeuft, startTransition] = useTransition()
@@ -55,7 +62,7 @@ export function HofpreisStichtag({
   }
 
   return (
-    <section aria-labelledby={`${feldId}-titel`} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3.5 lg:p-5">
+    <section id={HOFPREIS_KARTE_ID} aria-labelledby={`${feldId}-titel`} className="flex scroll-mt-6 flex-col gap-3 rounded-2xl border border-border bg-card p-3.5 lg:p-5">
       <h2 id={`${feldId}-titel`} className="font-heading text-lg font-semibold text-foreground">
         {TEXT.titel}
       </h2>
@@ -90,6 +97,7 @@ export function HofpreisStichtag({
         )}
       </form>
       {daten.erreicht && <p className="text-[12.5px] leading-snug text-muted-foreground">{TEXT.erreicht}</p>}
+      {stripeTest && !daten.erreicht && <p className="text-[12.5px] leading-snug text-muted-foreground">{VOR_LIVE_HINWEIS}</p>}
       <DialogFehler text={fehler} />
       {frisch.dialog}
     </section>

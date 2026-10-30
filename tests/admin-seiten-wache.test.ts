@@ -435,7 +435,7 @@ describe('ladeAdminbereich — Verhalten', () => {
     // Meldungen 3 + ungelesene Antworten 4 + wartende Höfe 2 + offene Erstattung 1.
     // betrieb: null — Punkt und Hinweis von Admin › Betrieb nur in der Produktion (N15/N18, Nr. 103; tests/betrieb-seite.test.ts).
     // Seit Nr. 193 (N32): das Postfach zählt nur Gespräche (Meldungen 3 + Antworten 4); Höfe und Erstattungen zählt Heute.
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { heute: 0, hoefe: 2, postfach: 3 + 4 }, reiter: ALLE_REITER, betrieb: null, aufgaben: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, zahlen: { heute: 0, hoefe: 2, postfach: 3 + 4 }, reiter: ALLE_REITER, betrieb: null, aufgaben: null, stripeLiveWarnung: null })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null } })
     expect(farmCount).toHaveBeenCalledWith({ where: { approvedAt: null, archivedAt: null, geschlossenAm: null } })
     expect(meldungCount).toHaveBeenCalledWith({ where: { status: { in: ['NEU', 'GEPRUEFT'] } } })
@@ -450,7 +450,7 @@ describe('ladeAdminbereich — Verhalten', () => {
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, reiter: ALLE_REITER, betrieb: null, aufgaben: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, reiter: ALLE_REITER, betrieb: null, aufgaben: null, stripeLiveWarnung: null })
     expect(ladeAdminAufgaben).not.toHaveBeenCalled()
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()
@@ -465,7 +465,7 @@ describe('ladeAdminbereich — Verhalten', () => {
       // adminPflichtOffen liest adminSeit (Nr. 179: nur Passkeys ab dem Recht zählen).
       .mockResolvedValueOnce({ adminSeit: null } as never)
       .mockResolvedValueOnce({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null } as never)
-    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, reiter: ALLE_REITER, betrieb: null, aufgaben: null })
+    expect(await ladeAdminbereich()).toEqual({ personName: 'Max Mustermann', hatHof: false, reiter: ALLE_REITER, betrieb: null, aufgaben: null, stripeLiveWarnung: null })
     expect(ladeAdminAufgaben).not.toHaveBeenCalled()
     expect(farmCount).not.toHaveBeenCalled()
     expect(meldungCount).not.toHaveBeenCalled()

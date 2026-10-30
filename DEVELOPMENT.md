@@ -6103,6 +6103,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Fix:** `PaymentElement` mit `layout: { type: 'tabs', defaultCollapsed: false }`, darüber die Überschrift `KASSE_ZAHLART_UEBERSCHRIFT` („Wie möchtest du bezahlen?“, `src/lib/kasse.ts`). Reiter über `appearance.rules` (`.Tab` 12 px Innenabstand, Fokus-Schatten in `var(--colorPrimary)`). Stripes Regeln kennen keine Mindesthöhe; die 44 px kommen aus Innenabstand, Symbol und Text.
 - Das Mandat-Feld in `src/components/hof-einstellungen/barzahlung.tsx` bleibt unverändert (Test).
 
+## Signal „Stripe live ohne Hofpreis-Modell“ (Register N40; Nr. 201, Lauf 27, 30.10.2026)
+
+- **Regel:** `liveOhneHofpreisModell(umgebung, einstellung, jetzt)` in `src/lib/plattformgebuehr.ts` — wahr, wenn `bestimmeUmgebung` Produktion mit Stripe „live“ meldet (Präfix, nie der Schlüssel) und `gebuehrModellFuer` noch `bisher` sagt. Vorschau und lokal zählen nie. Ein Signal, keine Sperre: Bestellungen laufen weiter.
+- **Aufgabe:** Quelle `stripe_live_ohne_hofpreis` in `src/lib/admin-aufgaben.ts`, ganz oben direkt nach einer laufenden Notbremse (angehaltene Bestellungen sind dringender), Frist sofort (1 h wie die Rückbuchung) ab `STRIPE_LIVE_AB`, sonst ab jetzt; Ziel die Karte `#hofpreis-modell-ab` in Admin › Einstellungen. Den Stichtag liest `ladeAufgabenStand` nur, wenn Stripe live ist.
+- **Betriebsleiste:** `liveSignalLeiste` nimmt den Titel derselben Aufgabe aus derselben Liste (`ladeAdminbereich`) — ein Satz, eine Quelle.
+- **Karte „Hofpreis-Modell ab“:** im Testmodus von Stripe (`UMGEBUNG.stripe === 'test'`, auch in der Vorschau) und solange der Stichtag offen ist der Hinweis „Vor dem Live-Gang von Stripe auf den Live-Tag oder früher setzen.“ Die Vorbedingung steht in `docs/betrieb/stripe-live.md`.
+- **Tests:** `tests/stripe-live-hofpreis.test.ts`, `tests/admin-heute.test.ts` (Seite und Betriebsleiste), `tests/admin-aufgaben.test.ts` (Wache je Quelle).
+
 ## Nützliche Befehle
 
 ```bash

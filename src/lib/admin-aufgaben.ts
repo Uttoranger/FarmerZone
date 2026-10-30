@@ -16,7 +16,7 @@ import {
 import { artName, fehlerText, wegName, type ProblemAuftrag } from '@/lib/betrieb-mails'
 import { eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } from '@/lib/postfach'
 import { MELDUNG_ART_LABEL, kurznummer } from '@/lib/meldung'
-import { centsAlsEuro, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { TARIFE_AB_TAG } from '@/lib/konditionen'
 import { wienWochenbeginn, wienWochenMontag } from '@/lib/kalender'
 import { VORRANG } from '@/schemas/mail-auftrag'
@@ -29,7 +29,9 @@ import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
 import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { bestellungenHref } from '@/lib/admin-bestellung'
-import { nichtAbgeholtAuffaellig } from '@/lib/plattformgebuehr'
+import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
+import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
+import type { Umgebung } from '@/lib/umgebung'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -69,6 +71,7 @@ export const AUFGABE_QUELLEN = [
   'rueckbuchung',
   'rechnungsangaben_fehlen',
   'nicht_abgeholt_auffaellig',
+  'stripe_live_ohne_hofpreis',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -134,7 +137,12 @@ export type AufgabenStand = {
   geldAbweichungen: readonly OffeneAbweichung[]
   /** Die Monatsabrechnung der Plattformgebühr (Nr. 198) — nur Kennungen, Hofname, Monat und Zahlen. */
   plattformgebuehr: PlattformgebuehrStand
+  /** Stripe live ohne Hofpreis-Modell (N40, Nr. 201) — null, solange Stripe nicht live ist (dann lädt niemand die Einstellung). */
+  liveSignal: LiveSignalStand | null
 }
+
+/** Was die Quelle „Stripe live ohne Hofpreis-Modell“ braucht: den Modus aus `bestimmeUmgebung`, den Stichtag und seit wann live (STRIPE_LIVE_AB). */
+export type LiveSignalStand = { umgebung: Pick<Umgebung, 'art' | 'stripe'>; einstellung: HofpreisEinstellung; liveSeit: Date | null }
 
 /** Eine Monatsabrechnung, die Aufmerksamkeit braucht (gescheitert oder zurückgebucht). */
 export type AbrechnungAufgabeRoh = { abrechnungId: string; farmId: string; hofName: string; monat: string; seit: Date }
@@ -161,6 +169,7 @@ export const LEERER_STAND: AufgabenStand = {
   bestellstopp: null,
   geldAbweichungen: [],
   plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] },
+  liveSignal: null,
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -190,6 +199,8 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   rueckbuchung: STUNDE_MS,
   rechnungsangaben_fehlen: 24 * STUNDE_MS,
   nicht_abgeholt_auffaellig: 7 * TAG_MS,
+  // Nr. 201 (N40): „Frist sofort“ — wie die Rückbuchung 1 h.
+  stripe_live_ohne_hofpreis: STUNDE_MS,
 }
 
 const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
@@ -208,6 +219,7 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   rueckbuchung: 'Geld',
   rechnungsangaben_fehlen: 'Geld',
   nicht_abgeholt_auffaellig: 'Höfe',
+  stripe_live_ohne_hofpreis: 'Betrieb',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -588,6 +600,45 @@ function nichtAbgeholtAuffaelligQuelle(stand: AufgabenStand, jetzt: Date): Aufga
     )
 }
 
+/** Titel der Aufgabe und Satz der Betriebsleiste (N40) — ein Satz für beide. */
+export function stripeLiveOhneHofpreisTitel(ab: Date): string {
+  return `Stripe ist live, aber das Hofpreis-Modell beginnt erst am ${formatDatumLang(ab)} – Stichtag vorziehen`
+}
+
+/**
+ * Stripe live ohne Hofpreis-Modell (Register N40, Nr. 201): Die Produktion
+ * nimmt echtes Geld, der Stichtag „Hofpreis-Modell ab“ liegt aber noch in der
+ * Zukunft. Ganz oben (nach einer laufenden Notbremse), Frist sofort, ab der
+ * Live-Schaltung (STRIPE_LIVE_AB, sonst jetzt). Ein Signal, keine Sperre: Ist
+ * der Stichtag erreicht, verschwindet die Aufgabe von selbst.
+ */
+function stripeLiveOhneHofpreis(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  const signal = stand.liveSignal
+  if (!signal || !liveOhneHofpreisModell(signal.umgebung, signal.einstellung, jetzt)) return []
+  const ab = hofpreisModellAb(signal.einstellung)
+  const seit = signal.liveSeit && signal.liveSeit.getTime() <= jetzt.getTime() ? signal.liveSeit : jetzt
+  return [
+    aufgabe(
+      'stripe_live_ohne_hofpreis',
+      {
+        titel: stripeLiveOhneHofpreisTitel(ab),
+        bezug: { kennung: 'stripe', text: 'Stripe LIVE · Hofpreis-Modell ab' },
+        satz: 'Die Bestellungen laufen weiter, bis zum Stichtag nach dem bisherigen Modell. In den Einstellungen den Stichtag „Hofpreis-Modell ab“ so früh wie möglich setzen.',
+        seit,
+        wasTun: 'oeffnen',
+        ziel: `${ADMIN_EINSTELLUNGEN_HREF}#${HOFPREIS_KARTE_ID}`,
+      },
+      jetzt
+    ),
+  ]
+}
+
+/** Betriebsleiste (N40): derselbe Satz als Warnung, aus derselben Liste wie „Braucht dich“ — null ohne die Aufgabe. */
+export function liveSignalLeiste(aufgaben: readonly Aufgabe[]): { text: string; href: string } | null {
+  const a = aufgaben.find((x) => x.quelle === 'stripe_live_ohne_hofpreis')
+  return a ? { text: a.titel, href: a.ziel } : null
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   notbremse_aktiv: notbremseAktiv,
@@ -605,14 +656,19 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   rueckbuchung,
   rechnungsangaben_fehlen: rechnungsangabenFehlen,
   nicht_abgeholt_auffaellig: nichtAbgeholtAuffaelligQuelle,
+  stripe_live_ohne_hofpreis: stripeLiveOhneHofpreis,
 }
 
-/** Steht vor allem anderen, solange sie gilt — ihre Frist ist ein Ende, kein Ziel (Freigabe 189 Punkt 4: „ganz oben“). */
-const GANZ_OBEN: ReadonlySet<AufgabeQuelle> = new Set(['notbremse_aktiv'])
+/**
+ * Steht vor allem anderen, solange sie gilt — die Notbremse (ihre Frist ist ein Ende, kein Ziel; Freigabe 189 Punkt 4:
+ * „ganz oben“), direkt darunter Stripe live ohne Hofpreis-Modell (Nr. 201, N40: „ganz oben“; angehaltene Bestellungen
+ * sind dringender als ein Signal).
+ */
+const GANZ_OBEN: Partial<Record<AufgabeQuelle, number>> = { notbremse_aktiv: 0, stripe_live_ohne_hofpreis: 1 }
 
-/** Alle Aufgaben aus allen Quellen: die Notbremse ganz oben, sonst nach Frist (das nächste Ziel zuerst — überfällige stehen damit oben). */
+/** Alle Aufgaben aus allen Quellen: Notbremse und Stripe live ganz oben, sonst nach Frist (das nächste Ziel zuerst — überfällige stehen damit oben). */
 export function sammleAufgaben(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
-  const rang = (a: Aufgabe): number => (GANZ_OBEN.has(a.quelle) ? 0 : 1)
+  const rang = (a: Aufgabe): number => GANZ_OBEN[a.quelle] ?? 2
   return AUFGABE_QUELLEN.flatMap((q) => ADMIN_AUFGABEN[q](stand, jetzt)).sort((a, b) => rang(a) - rang(b) || a.frist.ziel.getTime() - b.frist.ziel.getTime())
 }
 
