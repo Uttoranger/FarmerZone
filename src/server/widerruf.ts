@@ -20,9 +20,10 @@ import {
   type WiderrufPosition,
   type WiderrufUmfang,
 } from '@/lib/widerruf'
-import { VORRANG } from '@/schemas/mail-auftrag'
+import type { WiderrufAufgabeRoh } from '@/lib/admin-aufgaben'
 import { protokolliere } from '@/server/admin-protokoll'
-import { stelleEinOhneRisiko, type EinstellAuftrag } from '@/server/mail-warteschlange'
+import { stelleEinOhneRisiko } from '@/server/mail-warteschlange'
+import { widerrufErgebnisAuftrag, widerrufHofAuftrag } from '@/server/mail-arten/widerruf'
 import { storniere } from '@/server/stornieren'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
 import {
@@ -215,17 +216,6 @@ async function meldeAnHof(widerrufId: string, order: { id: string; farmId: strin
     melde('Widerruf: Nachricht an den Hof nicht angelegt', 'hof-postfach', { widerrufId, orderId: order.id }, err)
   }
   await stelleEinOhneRisiko('widerruf-hof', order.id, widerrufHofAuftrag(widerrufId, order))
-}
-
-export function widerrufHofAuftrag(widerrufId: string, order: { id: string; farmId: string }): EinstellAuftrag {
-  return {
-    art: 'widerruf-hof',
-    vorrang: VORRANG.wichtig,
-    schluessel: `widerruf-hof:${widerrufId}`,
-    bezug: { widerrufId },
-    bestellungId: order.id,
-    farmId: order.farmId,
-  }
 }
 
 /** Stand bedingt setzen — nur aus `eingegangen` (die Sperre gegen einen zweiten Weg). */
@@ -471,15 +461,8 @@ export async function erstatteWiderruf(farm: { id: string }, widerrufId: string,
   }
   if ('ok' in ergebnis) {
     await stelleEinOhneRisiko('widerruf-erstattet', orderId, async () => {
-      const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { farmId: true } })
-      return {
-        art: 'widerruf-erstattet',
-        vorrang: VORRANG.wichtig,
-        schluessel: `widerruf-erstattet:${widerrufId}`,
-        bezug: { widerrufId, ...(ergebnis.erstattetCents === null ? {} : { erstattetCents: String(ergebnis.erstattetCents) }) },
-        bestellungId: orderId,
-        farmId: order.farmId,
-      }
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, farmId: true } })
+      return widerrufErgebnisAuftrag('widerruf-erstattet', widerrufId, order, ergebnis.erstattetCents)
     })
   }
   return ergebnis
@@ -515,14 +498,7 @@ export async function lehneWiderrufAb(farm: { id: string }, widerrufId: string, 
   if (!order) return false
   if (!(await setzeStand(widerrufId, 'abgelehnt', jetzt, grund))) return false
   await protokolliere({ wer, art: 'widerruf_abgelehnt', bezugArt: 'bestellung', bezugId: order.id, mitPasskey: false })
-  await stelleEinOhneRisiko('widerruf-abgelehnt', order.id, {
-    art: 'widerruf-abgelehnt',
-    vorrang: VORRANG.wichtig,
-    schluessel: `widerruf-abgelehnt:${widerrufId}`,
-    bezug: { widerrufId },
-    bestellungId: order.id,
-    farmId: farm.id,
-  })
+  await stelleEinOhneRisiko('widerruf-abgelehnt', order.id, widerrufErgebnisAuftrag('widerruf-abgelehnt', widerrufId, { id: order.id, farmId: farm.id }))
   return true
 }
 
@@ -569,5 +545,24 @@ export async function ladeOffeneWiderrufe(farmId: string, orderId?: string): Pro
         bar: istVorOrtZahlung(b.paymentMethod),
       },
     ]
+  })
+}
+
+/** Admin › Heute, „Widerruf offen“ (Nr. 200): alle Widerrufe im Stand `eingegangen` — nur Kennungen, Nummer, Hofname. */
+export async function ladeWiderrufAufgaben(): Promise<WiderrufAufgabeRoh[]> {
+  const offen = await prisma.widerruf.findMany({
+    where: { stand: 'eingegangen' },
+    orderBy: { eingegangenAm: 'asc' },
+    select: { id: true, orderId: true, eingegangenAm: true },
+    take: 200,
+  })
+  if (offen.length === 0) return []
+  const bestellungen = await prisma.order.findMany({
+    where: { id: { in: offen.flatMap((w) => (w.orderId ? [w.orderId] : [])) } },
+    select: { id: true, orderNumber: true, farm: { select: { name: true } } },
+  })
+  return offen.map((w) => {
+    const b = bestellungen.find((o) => o.id === w.orderId)
+    return { id: w.id, orderId: b ? b.id : null, bestellnummer: b?.orderNumber ?? null, hofName: b?.farm.name ?? null, eingegangenAm: w.eingegangenAm }
   })
 }

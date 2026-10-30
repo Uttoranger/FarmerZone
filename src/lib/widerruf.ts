@@ -21,7 +21,7 @@ import type { ProductCategoryValue } from '@/lib/taxonomie'
  * unten ein PLATZHALTER mit Vermerk (`BELEHRUNG`), kein Text aus dem Gedächtnis.
  * Nachtragen: Wortlaut wörtlich übernehmen, nur die Platzhalter ersetzen
  * („der Hof, bei dem du bestellt hast (Name und Anschrift in deiner
- * Bestellung)“ und „Agrilo leitet weiter“), Quelle und Abrufdatum hier.
+ * Bestellung)“ und die Plattform leitet weiter — Name aus MARKE), Quelle und Abrufdatum hier.
  */
 
 /** Frist in Kalendertagen ab der Abholung (§ 11 FAGG; AGB Punkt 12.1). */

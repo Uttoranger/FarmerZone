@@ -497,6 +497,8 @@ describe('kein Big Bang', () => {
     // Nr. 90: die AGB (Register O4) sind gleich in der KundeShell entstanden.
     '(public)/agb/page.tsx',
     '(public)/problem-melden/page.tsx',
+    // Nr. 200: Widerruf online (N39) — gleich in der KundeShell.
+    '(public)/widerruf/page.tsx',
     'not-found.tsx',
     '(public)/[farmSlug]/not-found.tsx',
     '(public)/[farmSlug]/bestaetigen/[token]/page.tsx',

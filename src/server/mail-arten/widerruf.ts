@@ -3,7 +3,8 @@ import type { StapelMail } from '@/lib/email'
 import { HOF_KONTAKT_FELDER, hofKontaktEmail } from '@/lib/hof-kontakt'
 import { WIDERRUF_TEXT, eingangZeitpunkt, lesePositionen } from '@/lib/widerruf'
 import type { Verworfen } from '@/server/mail-arten'
-import { widerrufBezugSchema, widerrufErstattetBezugSchema } from '@/schemas/mail-auftrag'
+import type { EinstellAuftrag } from '@/server/mail-warteschlange'
+import { VORRANG, widerrufBezugSchema, widerrufErstattetBezugSchema } from '@/schemas/mail-auftrag'
 
 /*
  * Die Renderer des Widerrufs (Nr. 200, Register N39): Adresse und Inhalt
@@ -11,6 +12,28 @@ import { widerrufBezugSchema, widerrufErstattetBezugSchema } from '@/schemas/mai
  * Die Eingangsbestätigung geht direkt (Sofort, src/server/widerruf.ts) und hat
  * hier keinen Renderer.
  */
+
+/** An den Hof (Wichtig): je Widerruf höchstens ein Auftrag. */
+export function widerrufHofAuftrag(widerrufId: string, order: { id: string; farmId: string }): EinstellAuftrag {
+  return { art: 'widerruf-hof', vorrang: VORRANG.wichtig, schluessel: `widerruf-hof:${widerrufId}`, bezug: { widerrufId }, bestellungId: order.id, farmId: order.farmId }
+}
+
+/** Ergebnis an die Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder abgelehnt — je Widerruf höchstens einmal. */
+export function widerrufErgebnisAuftrag(
+  art: 'widerruf-erstattet' | 'widerruf-abgelehnt',
+  widerrufId: string,
+  order: { id: string; farmId: string },
+  erstattetCents: number | null = null
+): EinstellAuftrag {
+  return {
+    art,
+    vorrang: VORRANG.wichtig,
+    schluessel: `${art}:${widerrufId}`,
+    bezug: { widerrufId, ...(art === 'widerruf-erstattet' && erstattetCents !== null ? { erstattetCents: String(erstattetCents) } : {}) },
+    bestellungId: order.id,
+    farmId: order.farmId,
+  }
+}
 
 const SELECT = {
   id: true,

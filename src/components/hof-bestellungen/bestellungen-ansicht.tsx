@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CalendarCheck, ChevronRight, Inbox, PartyPopper, Printer } from 'lucide-react'
 import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/server/queries/orders'
+import type { HofWiderruf } from '@/server/widerruf'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -35,10 +36,13 @@ export function BestellungenAnsicht({
   filter,
   detail,
   modus,
+  widerrufe,
 }: {
   seite: BestellungenSeite
   filter: HofBestellFilter
   detail: HofBestellDetail | null
+  /** Offene Widerrufe der gewählten Bestellung (Nr. 200) — nur die Detailseite lädt sie. */
+  widerrufe?: readonly HofWiderruf[]
   /** liste = /orders (Handy: Liste), detail = /orders/[orderId] (Handy: Bestellung). */
   modus: 'liste' | 'detail'
 }): React.JSX.Element {
@@ -80,7 +84,7 @@ export function BestellungenAnsicht({
           </div>
           <div className={cn('min-w-0 flex-1', modus === 'liste' && 'hidden lg:block')}>
             {detail ? (
-              <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} />
+              <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} widerrufe={widerrufe} />
             ) : (
               seite.gruppen.length > 0 && (
                 <p className={cn(KARTE, 'px-5 py-8 text-center text-[13.5px]', LEISE)}>Wähle links eine Bestellung.</p>

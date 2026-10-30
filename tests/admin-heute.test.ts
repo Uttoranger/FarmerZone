@@ -65,6 +65,8 @@ vi.mock('@/server/queries/plattformgebuehr', () => ({
   ladePlattformgebuehrAufgaben: vi.fn(async () => ({ gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] })),
 }))
 vi.mock('@/server/queries/startseite', () => ({ naechsterTermin: vi.fn(async () => null) }))
+// Nr. 200: „Widerruf offen“ — hier ohne Widerrufe (die Quelle prüft tests/widerruf.test.ts).
+vi.mock('@/server/widerruf', () => ({ ladeWiderrufAufgaben: vi.fn(async () => []) }))
 vi.mock('@/server/queries/plattform-einstellung', () => ({
   leseBestellstopp: vi.fn(async () => null),
   lesePlattformEinstellung: vi.fn(async () => ({

@@ -272,6 +272,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/datenschutz/page.tsx': [],
     'src/app/(public)/konditionen/page.tsx': [],
     'src/app/(public)/problem-melden/page.tsx': [],
+    // Nr. 200: Widerruf online (N39) gleich in der KundeShell entstanden.
+    'src/app/(public)/widerruf/page.tsx': [],
     // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
     'src/app/(public)/[farmSlug]/page.tsx': [],
     // Die Produktseite trägt seit Nr. 11 die KundeShell ohne Unterleiste.

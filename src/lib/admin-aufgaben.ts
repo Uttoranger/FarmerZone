@@ -69,6 +69,7 @@ export const AUFGABE_QUELLEN = [
   'rueckbuchung',
   'rechnungsangaben_fehlen',
   'nicht_abgeholt_auffaellig',
+  'widerruf_offen',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -134,7 +135,12 @@ export type AufgabenStand = {
   geldAbweichungen: readonly OffeneAbweichung[]
   /** Die Monatsabrechnung der Plattformgebühr (Nr. 198) — nur Kennungen, Hofname, Monat und Zahlen. */
   plattformgebuehr: PlattformgebuehrStand
+  /** Offene Widerrufe (Nr. 200, N39) — nur Kennungen, Bestellnummer und Hofname, nie Name, Adresse oder Nachricht. */
+  widerrufe: readonly WiderrufAufgabeRoh[]
 }
+
+/** Ein Widerruf im Stand `eingegangen`; ohne Bestellung = nicht zugeordnet. */
+export type WiderrufAufgabeRoh = { id: string; orderId: string | null; bestellnummer: string | null; hofName: string | null; eingegangenAm: Date }
 
 /** Eine Monatsabrechnung, die Aufmerksamkeit braucht (gescheitert oder zurückgebucht). */
 export type AbrechnungAufgabeRoh = { abrechnungId: string; farmId: string; hofName: string; monat: string; seit: Date }
@@ -161,6 +167,7 @@ export const LEERER_STAND: AufgabenStand = {
   bestellstopp: null,
   geldAbweichungen: [],
   plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] },
+  widerrufe: [],
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -190,7 +197,12 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   rueckbuchung: STUNDE_MS,
   rechnungsangaben_fehlen: 24 * STUNDE_MS,
   nicht_abgeholt_auffaellig: 7 * TAG_MS,
+  // Nr. 200 (N39): 14 Tage ab Eingang (Erstattungsfrist); nicht zugeordnet 2 Tage (WIDERRUF_NICHT_ZUGEORDNET_MS).
+  widerruf_offen: 14 * TAG_MS,
 }
+
+/** Ein Widerruf ohne Bestellung braucht das Team schneller: 2 Tage (Freigabe 200 Punkt 6). */
+export const WIDERRUF_NICHT_ZUGEORDNET_MS = 2 * TAG_MS
 
 const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   notbremse_aktiv: 'Betrieb',
@@ -208,6 +220,7 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   rueckbuchung: 'Geld',
   rechnungsangaben_fehlen: 'Geld',
   nicht_abgeholt_auffaellig: 'Höfe',
+  widerruf_offen: 'Geld',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -588,6 +601,43 @@ function nichtAbgeholtAuffaelligQuelle(stand: AufgabenStand, jetzt: Date): Aufga
     )
 }
 
+/**
+ * „Widerruf offen“ (Nr. 200, N39): je Widerruf im Stand `eingegangen` eine
+ * Aufgabe — zugeordnet mit Frist 14 Tage ab Eingang (der Hof erstattet oder
+ * lehnt ab), nicht zugeordnet mit 2 Tagen (das Team ordnet zu und leitet
+ * weiter). Ohne Name, Adresse und Nachricht.
+ */
+function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  return stand.widerrufe.map((w) =>
+    w.orderId && w.bestellnummer
+      ? aufgabe(
+          'widerruf_offen',
+          {
+            titel: 'Widerruf offen',
+            bezug: { kennung: w.bestellnummer, text: [w.bestellnummer, ...(w.hofName ? [w.hofName] : [])].join(' · ') },
+            satz: 'Der Hof erstattet nach der Rückgabe oder lehnt mit Grund ab. Frist 14 Tage ab Eingang.',
+            seit: w.eingegangenAm,
+            wasTun: 'oeffnen',
+            ziel: bestellungenHref({}, { bestellung: w.orderId }),
+          },
+          jetzt
+        )
+      : aufgabe(
+          'widerruf_offen',
+          {
+            titel: 'Widerruf ohne Bestellung',
+            bezug: { kennung: w.id, text: 'nicht zugeordnet' },
+            satz: 'Der Widerruf passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
+            seit: w.eingegangenAm,
+            wasTun: 'pruefen',
+            ziel: bestellungenHref({}, {}),
+          },
+          jetzt,
+          WIDERRUF_NICHT_ZUGEORDNET_MS
+        )
+  )
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   notbremse_aktiv: notbremseAktiv,
@@ -605,6 +655,7 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   rueckbuchung,
   rechnungsangaben_fehlen: rechnungsangabenFehlen,
   nicht_abgeholt_auffaellig: nichtAbgeholtAuffaelligQuelle,
+  widerruf_offen: widerrufOffen,
 }
 
 /** Steht vor allem anderen, solange sie gilt — ihre Frist ist ein Ende, kein Ziel (Freigabe 189 Punkt 4: „ganz oben“). */
@@ -874,6 +925,8 @@ export function routineZeile(erledigt: number): string {
  */
 export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   hof_freigeschaltet: 'Hof freigeschaltet',
+  widerruf_zugeordnet: 'Widerruf einer Bestellung zugeordnet',
+  widerruf_abgelehnt: 'Widerruf abgelehnt (Hof)',
   hof_freigabe_entzogen: 'Freischaltung zurückgenommen',
   hof_abgelehnt: 'Hof abgelehnt',
   servicegebuehr_geaendert: 'Servicegebühr geändert',

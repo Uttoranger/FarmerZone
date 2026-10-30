@@ -109,6 +109,8 @@ const VOLL: AufgabenStand = {
       { farmId: 'hof-d', hofName: 'Hof Wenig', bar: 9, nicht: 5, seit: JETZT },
     ],
   },
+  // Nr. 200: ein zugeordneter Widerruf (erfunden); der nicht zugeordnete steht in tests/widerruf.test.ts.
+  widerrufe: [{ id: 'widerruf-1', orderId: 'bestellung-2', bestellnummer: 'HM-2610-W1D3', hofName: 'Hof am Bach', eingegangenAm: vor(3 * TAG) }],
 }
 
 /** Was „erledigt“ je Quelle heißt: die Ursache fehlt im Stand. */
@@ -132,6 +134,7 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   rechnungsangaben_fehlen: { plattformgebuehr: { ...VOLL.plattformgebuehr, rechnungsangabenFehlenSeit: null } },
   // 11 bar, 2 nicht abgeholt = 18 % — unter 20 %, die Aufgabe verschwindet.
   nicht_abgeholt_auffaellig: { plattformgebuehr: { ...VOLL.plattformgebuehr, nichtAbgeholt: [{ farmId: 'hof-c', hofName: 'Hof Quote', bar: 11, nicht: 2, seit: JETZT }] } },
+  widerruf_offen: { widerrufe: [] },
 }
 
 describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {

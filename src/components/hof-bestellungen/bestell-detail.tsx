@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { StornoDialog } from './storno-dialog'
 import { ArtikelFehltDialog } from './artikel-fehlt-dialog'
+import { WiderrufKarte } from './widerruf-karte'
+import type { HofWiderruf } from '@/server/widerruf'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN, TEXT_ORANGE } from './stil'
 
@@ -48,8 +50,11 @@ type Offen = 'storno' | 'fehlt' | 'nichtAbgeholt' | 'dochNicht' | 'abholungZurue
 export function BestellDetail({
   bestellung,
   zurueckSuche,
+  widerrufe = [],
 }: {
   bestellung: HofBestellDetail
+  /** Offene Widerrufe dieser Bestellung (Nr. 200) — Knöpfe „Rückgabe erhalten – erstatten …“ und „Ablehnen …“. */
+  widerrufe?: readonly HofWiderruf[]
   /** Der gewählte Filter der Liste (`?filter=…` oder leer) — der Rückweg führt mit ihm zurück. */
   zurueckSuche: string
 }): React.JSX.Element {
@@ -266,6 +271,8 @@ export function BestellDetail({
             <DialogFehler text={offen ? null : fehler} />
           </div>
         </div>
+
+        <WiderrufKarte widerrufe={widerrufe} />
 
         <Kundin bestellung={bestellung} />
 

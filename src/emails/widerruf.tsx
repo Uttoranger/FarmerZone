@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Text } from '@react-email/components'
 import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, highlightBox, highlightLabel, highlightValue } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
  * Die Mails des Widerrufs (Nr. 200, Register N39). Sätze kurz, geduzt, ohne
@@ -105,7 +106,7 @@ export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
             {p.hofName} hat deinen Widerruf zur Bestellung <strong>{p.bestellnummer}</strong> abgelehnt. Der Grund:
           </Text>
           <Text style={bodyText}>{p.grund}</Text>
-          <Text style={kleinText}>Bist du nicht einverstanden? Wende dich direkt an den Hof oder antworte über „Problem melden“.</Text>
+          <Text style={kleinText}>Bist du nicht einverstanden? Wende dich direkt an den Hof oder antworte über „{PROBLEM_MELDEN}“.</Text>
         </>
       ) : (
         <>

@@ -17,6 +17,7 @@ import { gruendungEinstellungAus } from '@/lib/plattform-einstellung'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
 import { sammleAufgaben, LEERER_STAND, type Aufgabe, type AufgabeHof, type AufgabenStand, type HeuteWoche, type ProtokollRoh } from '@/lib/admin-aufgaben'
 import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
+import { ladeWiderrufAufgaben } from '@/server/widerruf'
 
 /*
  * Die Daten von Admin › Heute (Register N32, Nr. 185). Die Aufgaben kommen
@@ -61,7 +62,7 @@ async function ladeHoefeAktiv(): Promise<AufgabeHof[]> {
  * wäre ein Fehlalarm (dieselbe Regel wie bisher Punkt und Betriebsleiste).
  */
 export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrieb: boolean }): Promise<AufgabenStand> {
-  const [hoefeWartend, erstattungen, mailProbleme, meldungen, hoefeAktiv, bestellstopp, plattformgebuehr, betrieb] = await Promise.all([
+  const [hoefeWartend, erstattungen, mailProbleme, meldungen, hoefeAktiv, bestellstopp, plattformgebuehr, betrieb, widerrufe] = await Promise.all([
     ladeHofAufgaben(jetzt),
     ladeErstattungAufgaben(),
     ladeProbleme(jetzt),
@@ -80,9 +81,12 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
           ladeOffeneAbweichungen(),
         ])
       : null,
+    // Widerruf offen (Nr. 200, N39): nur Kennungen, Bestellnummer, Hofname.
+    ladeWiderrufAufgaben(),
   ])
   return {
     ...LEERER_STAND,
+    widerrufe,
     hoefeWartend,
     erstattungen,
     mailProbleme,
