@@ -6097,6 +6097,12 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **EPS und `on_behalf_of`:** Im Hofpreis-Modell ist das Hofkonto Händler und braucht `eps_payments` (Stripe-Doku „Manage payment methods for connected accounts“, „Payment method capabilities“). Angefordert reicht nicht: Ohne AKTIVE Fähigkeit lehnt Stripe den ganzen Intent ab, der Hof könnte im Hofpreis-Modell gar nicht online kassieren. Neue Konten fordern die Fähigkeit an; für bestehende `scripts/eps-faehigkeit-nachfordern.ts` (liest ohne `--ausfuehren` nur; meldet jedes nicht aktive Konto und endet dann mit Exit-Code 1; startet die Projektleitung vor dem Stichtag des Hofpreis-Modells, erneut bis alles aktiv ist). Ob die Kasse im Hofpreis-Modell die Zahlarten nach der Fähigkeit des Kontos wählen soll, ist offen.
 - **Wache:** `tests/kasse-zahlarten.test.ts` – kein `paymentIntents.create` unter `src/` ohne `payment_method_types`.
 
+## Kasse: Zahlarten als Reiter statt Akkordeon (Fix, 30.10.2026)
+
+- **Fund (Abnahme in der Testumgebung):** Das Zahlungsfeld lief als aufgeklapptes Akkordeon ohne Abstand. Die Karte war offen, EPS stand im selben Kasten darunter – das las sich, als müsse man nach der Karte noch EPS ausfüllen.
+- **Fix:** `PaymentElement` mit `layout: { type: 'tabs', defaultCollapsed: false }`, darüber die Überschrift `KASSE_ZAHLART_UEBERSCHRIFT` („Wie möchtest du bezahlen?“, `src/lib/kasse.ts`). Reiter über `appearance.rules` (`.Tab` 12 px Innenabstand, Fokus-Schatten in `var(--colorPrimary)`). Stripes Regeln kennen keine Mindesthöhe; die 44 px kommen aus Innenabstand, Symbol und Text.
+- Das Mandat-Feld in `src/components/hof-einstellungen/barzahlung.tsx` bleibt unverändert (Test).
+
 ## Nützliche Befehle
 
 ```bash

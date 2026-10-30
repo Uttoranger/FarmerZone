@@ -8,6 +8,7 @@ import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import {
+  KASSE_ZAHLART_UEBERSCHRIFT,
   bestaetigungMitStatus,
   reservierungsStand,
   zahlungsBetraege,
@@ -81,6 +82,12 @@ export function StripeZahlung(props: StripeZahlungProps): React.JSX.Element {
             // eslint-disable-next-line no-restricted-syntax -- Stripe-iframe kennt keine CSS-Variablen; Wert = --fz-accent (in beiden Themes gleich)
             colorPrimary: '#2E6B45',
             borderRadius: '10px',
+          },
+          // Zahlarten als Reiter: genug Fläche für den Finger (Symbol und Text untereinander,
+          // 2 × 12 px Innenabstand → über 44 px) und ein sichtbarer Fokus in der Primärfarbe.
+          rules: {
+            '.Tab': { padding: '12px' },
+            '.Tab:focus': { boxShadow: '0 0 0 3px var(--colorPrimary)', outline: 'none' },
           },
         },
         locale: 'de',
@@ -203,8 +210,10 @@ function ZahlungsInhalt({
           Bezahlen
         </h2>
         {abgelehnt && <ZahlungAbgelehnt bisUhrzeit={bisUhrzeit} />}
+        <h3 className="text-sm font-semibold leading-snug text-foreground">{KASSE_ZAHLART_UEBERSCHRIFT}</h3>
         <div className="rounded-xl border border-border bg-accent-foreground p-3 md:p-4">
-          <PaymentElement options={{ layout: { type: 'accordion', defaultCollapsed: false, radios: 'always', spacedAccordionItems: false } }} />
+          {/* Reiter statt Akkordeon: Karte und EPS sind eine Auswahl, darunter stehen nur die Felder der gewählten. */}
+          <PaymentElement options={{ layout: { type: 'tabs', defaultCollapsed: false } }} />
         </div>
         <p className={HINWEIS}>Apple Pay bzw. Google Pay erscheint nur, wenn dein Gerät es unterstützt.</p>
         <p className={`${HINWEIS} flex items-center gap-1.5`}>

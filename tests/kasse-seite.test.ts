@@ -28,9 +28,17 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 // Stripes Zahlungsfeld läuft im iframe und braucht ein DOM — hier nur Hülle,
 // damit der Zahlungsschritt selbst serverseitig rendert.
+// Die Attrappe merkt sich die Optionen von Elements und Payment Element (Zahlarten als Reiter).
+const stripeOptionen = vi.hoisted(() => ({ element: [] as unknown[], elements: [] as unknown[] }))
 vi.mock('@stripe/react-stripe-js', () => ({
-  Elements: ({ children }: { children?: ReactNode }) => children,
-  PaymentElement: () => null,
+  Elements: ({ children, options }: { children?: ReactNode; options?: unknown }) => {
+    stripeOptionen.elements.push(options)
+    return children
+  },
+  PaymentElement: ({ options }: { options?: unknown }) => {
+    stripeOptionen.element.push(options)
+    return null
+  },
   useStripe: () => null,
   useElements: () => null,
 }))
@@ -48,7 +56,7 @@ import {
   ZahlartWahl,
   ZahlungAbgelehnt,
 } from '@/components/checkout/kasse-teile'
-import { abholKacheln, gebuehrZeile, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
+import { KASSE_ZAHLART_UEBERSCHRIFT, abholKacheln, gebuehrZeile, kassenBetraege, kassenZahlarten, reservierungsStand } from '@/lib/kasse'
 import { BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { SERVICEGEBUEHR_HINWEIS, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
@@ -337,6 +345,32 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
     expect(html).toContain('Jetzt bezahlen · € 10,82')
     expect(html).toContain('€ 10,30')
     expect(html).toContain('€ 0,52')
+  })
+
+  it('Zahlarten als Reiter: Karte und EPS nebeneinander, darunter nur die Felder der gewählten — kein aufgeklapptes Akkordeon', () => {
+    stripeOptionen.element.length = 0
+    const html = zahlungsschritt({ amountCents: 1030, serviceFeeCents: 0 })
+    expect(stripeOptionen.element).toHaveLength(1)
+    expect(stripeOptionen.element[0]).toMatchObject({ layout: { type: 'tabs', defaultCollapsed: false } })
+    // Gegenprobe: kein Akkordeon mehr.
+    expect(JSON.stringify(stripeOptionen.element[0])).not.toContain('accordion')
+    // Die Überschrift steht genau einmal, der Satz zu Apple Pay und Google Pay bleibt darunter.
+    expect(html.split(KASSE_ZAHLART_UEBERSCHRIFT)).toHaveLength(2)
+    expect(html.indexOf(KASSE_ZAHLART_UEBERSCHRIFT)).toBeLessThan(html.indexOf('Apple Pay bzw. Google Pay'))
+  })
+
+  it('die Reiter sind mindestens 44 px hoch und zeigen den Fokus — über die appearance, ohne neue Hexwerte', () => {
+    stripeOptionen.elements.length = 0
+    zahlungsschritt({ amountCents: 1030, serviceFeeCents: 0 })
+    const appearance = (stripeOptionen.elements[0] as { appearance: { rules?: Record<string, Record<string, string>> } }).appearance
+    // Höhe über den Innenabstand (Stripes Regeln kennen keine Mindesthöhe): 2 × 12 px um Symbol (16 px) und Text.
+    expect(appearance.rules?.['.Tab']).toMatchObject({ padding: '12px' })
+    expect(appearance.rules?.['.Tab:focus']?.boxShadow).toMatch(/var\(--colorPrimary\)/)
+    expect(JSON.stringify(appearance.rules)).not.toMatch(/#[0-9a-fA-F]{3,8}/)
+  })
+
+  it('Gegenprobe: das Payment Element für das Lastschrift-Mandat der Höfe bleibt ohne Optionen', () => {
+    expect(lies('src/components/hof-einstellungen/barzahlung.tsx')).toMatch(/<PaymentElement \/>/)
   })
 
   it('der Zahlungsschritt kennt weder Hofeinstellung noch Uhr für den Betrag, die Kasse reicht den Server-Betrag durch', () => {

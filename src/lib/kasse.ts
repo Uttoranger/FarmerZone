@@ -61,6 +61,9 @@ export type NeueZahlart = (typeof NEUE_BESTELLUNG_ZAHLARTEN)[number]
  */
 export const KASSE_ZAHLARTEN = ['card', 'eps'] as const
 
+/** Überschrift über den Zahlarten der Kasse: eine Auswahl, keine zwei Schritte. */
+export const KASSE_ZAHLART_UEBERSCHRIFT = 'Wie möchtest du bezahlen?'
+
 /** Darf eine neue Bestellung mit dieser Zahlart angelegt werden? */
 export function zahlartFuerNeueBestellung(paymentMethod: string): paymentMethod is NeueZahlart {
   return (NEUE_BESTELLUNG_ZAHLARTEN as readonly string[]).includes(paymentMethod)
