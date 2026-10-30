@@ -609,14 +609,15 @@ export function stripeLiveOhneHofpreisTitel(ab: Date): string {
  * Stripe live ohne Hofpreis-Modell (Register N40, Nr. 201): Die Produktion
  * nimmt echtes Geld, der Stichtag „Hofpreis-Modell ab“ liegt aber noch in der
  * Zukunft. Ganz oben (nach einer laufenden Notbremse), Frist sofort, ab der
- * Live-Schaltung (STRIPE_LIVE_AB, sonst jetzt). Ein Signal, keine Sperre: Ist
+ * Live-Schaltung (STRIPE_LIVE_AB, sonst sofort überfällig). Ein Signal, keine Sperre: Ist
  * der Stichtag erreicht, verschwindet die Aufgabe von selbst.
  */
 function stripeLiveOhneHofpreis(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   const signal = stand.liveSignal
   if (!signal || !liveOhneHofpreisModell(signal.umgebung, signal.einstellung, jetzt)) return []
   const ab = hofpreisModellAb(signal.einstellung)
-  const seit = signal.liveSeit && signal.liveSeit.getTime() <= jetzt.getTime() ? signal.liveSeit : jetzt
+  // Ohne bekannten Live-Beginn sofort überfällig: Ab jetzt gezählt stünde bei jedem Aufruf wieder „noch 1 h“.
+  const seit = signal.liveSeit && signal.liveSeit.getTime() <= jetzt.getTime() ? signal.liveSeit : new Date(jetzt.getTime() - AUFGABE_ZIEL_MS.stripe_live_ohne_hofpreis - 1)
   return [
     aufgabe(
       'stripe_live_ohne_hofpreis',

@@ -70,9 +70,12 @@ describe('Admin › Heute: Aufgabe ganz oben, Frist sofort', () => {
     expect(a.bereich).toBe('Betrieb')
   })
 
-  it('ohne Stichtag der Live-Schaltung (oder einer in der Zukunft) zählt die Frist ab jetzt', () => {
-    expect(ADMIN_AUFGABEN.stripe_live_ohne_hofpreis(stand({}), JETZT)[0].seit).toEqual(JETZT)
-    expect(ADMIN_AUFGABEN.stripe_live_ohne_hofpreis(stand({ liveSeit: new Date(JETZT.getTime() + STUNDE) }), JETZT)[0].seit).toEqual(JETZT)
+  it('ohne Stichtag der Live-Schaltung (oder mit einem in der Zukunft) ist die Aufgabe sofort überfällig', () => {
+    for (const signal of [{}, { liveSeit: new Date(JETZT.getTime() + STUNDE) }]) {
+      const [a] = ADMIN_AUFGABEN.stripe_live_ohne_hofpreis(stand(signal), JETZT)
+      expect(a.seit).toEqual(new Date(JETZT.getTime() - STUNDE - 1))
+      expect(a.frist.ueberfaellig).toBe(true)
+    }
   })
 
   it('ganz oben vor jeder anderen Frist — nur eine laufende Notbremse steht davor', () => {
