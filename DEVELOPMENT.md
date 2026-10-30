@@ -6103,6 +6103,16 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Fix:** `PaymentElement` mit `layout: { type: 'tabs', defaultCollapsed: false }`, darüber die Überschrift `KASSE_ZAHLART_UEBERSCHRIFT` („Wie möchtest du bezahlen?“, `src/lib/kasse.ts`). Reiter über `appearance.rules` (`.Tab` 12 px Innenabstand, Fokus-Schatten in `var(--colorPrimary)`). Stripes Regeln kennen keine Mindesthöhe; die 44 px kommen aus Innenabstand, Symbol und Text.
 - Das Mandat-Feld in `src/components/hof-einstellungen/barzahlung.tsx` bleibt unverändert (Test).
 
+## Ersetzte und gelöschte Bilder verlassen den Bild-Speicher (Audit A8; Nr. 206, Lauf 27, 30.10.2026)
+
+- **Fund:** Seit Nr. 108 löscht der Upload das ersetzte Bild nicht mehr (das Speichern danach kann scheitern). Gelöscht hat es danach niemand: Logo, Titelbild und Produktbild blieben beim Ersetzen, das Bild eines gelöschten Produkts mit der Zeile im Speicher – Datenreste, auf die Stufe 2 von „Konto schließen“ angewiesen wäre.
+- **Fix:** `entferneAltesBild` in `src/server/actions/appearance.ts` (`saveAppearanceAction`, `updateFarmLogoAction`, `updateFarmBannerAction`) und `src/server/actions/products.ts` (`updateProduct`, `updateProductImageAction`, `deleteProduct`). Reihenfolge: erst das Schreiben in der Datenbank, dann das Löschen. Gelöscht wird nur eine Datei im Ordner des eigenen Hofs aus dem eigenen Speicher (`istEigenesBild`) und nur, wenn keine Zeile mehr auf sie zeigt (Hof: Logo, Titelbild, `bannerValue`; Produkt; Galerie; Beitrag; Meldung). Entfernen (null) zählt wie Ersetzen.
+- **Scheitern:** Scheitert die Prüfung oder das Löschen, gilt die Action trotzdem; eine Meldung nach Sentry (`bereich: bild-loeschen`, Anlass, Fehlerklasse) ohne Adresse und ohne Fehlertext. Die Datei bleibt dann als „Bild ohne Verwendung“ (N18).
+- **Archiviert:** Ein Produkt mit Bestellungen wird ausgeblendet statt gelöscht (Nr. 195) und behält sein Bild.
+- **Zwei Kopien:** Die Hilfsfunktion steht in beiden Dateien. Eine exportierte Funktion wäre in einer `'use server'`-Datei eine aufrufbare Aktion, und eine neue Datei lag außerhalb der Grenze von Nr. 206.
+- **Wache:** `tests/blob-loeschen-wache.test.ts` nennt beide Dateien als benannte Wege (je ein `del`). Tests: `tests/bild-ersetzen-loeschen.test.ts`.
+- **Nicht in Nr. 206:** Alte Waisen aufräumen (eigener Auftrag mit Freigabe). Beitragsfotos (`deleteStatusPost` in `status-posts.ts`) und Bilder der Startseite (`startseite.ts`) löschen beim Ersetzen oder Löschen weiterhin nichts.
+
 ## Nützliche Befehle
 
 ```bash

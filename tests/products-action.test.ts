@@ -295,12 +295,14 @@ describe('updateProduct — Sperre je Gebinde (S7, Nr. 20)', () => {
     expect(farmFindUnique).not.toHaveBeenCalled()
   })
 
-  it('kein Futter: keine Abfrage; ausgeblendetes Futter: die Kategorie wird gelesen, der Hof nicht', async () => {
+  it('kein Futter: keine Abfrage der Sperre; ausgeblendetes Futter: die Kategorie wird gelesen, der Hof nicht', async () => {
+    // Gelesen wird seit Nr. 206 immer das bisherige Bild (fürs Löschen nach dem Speichern) — nur diese Spalte.
     await updateProduct('p_1', basis as never)
-    expect(productFindFirst).not.toHaveBeenCalled()
+    expect(productFindFirst).toHaveBeenCalledTimes(1)
+    expect(productFindFirst).toHaveBeenCalledWith({ where: { id: 'p_1', farmId: 'farm_1' }, select: { imageUrl: true } })
 
     await updateProduct('p_heu', { ...heu, isAvailable: false } as never)
-    expect(productFindFirst).toHaveBeenCalledTimes(1)
+    expect(productFindFirst).toHaveBeenCalledTimes(3)
     expect(farmFindUnique).not.toHaveBeenCalled()
   })
 })
