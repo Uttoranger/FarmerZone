@@ -8651,3 +8651,356 @@ Wie Lauf 25, dazu:
     - Steuerfrage für Agrilo (UID, Kleinunternehmer) mit der Steuerberatung klären
   - nach dem Merge in Admin › Einstellungen › Team prüfen, wer Inhaber ist (2 Admin-Konten in Produktion)
   - Merge per Merge-Commit; danach eine Testbestellung, in Heute und Bestellungen nachsehen
+
+## 31. Lauf 27 (uttoranger, im Chat erteilt, 30.10.2026)
+
+Nachtlauf 27 – Freigabe (uttoranger, im Chat 30.10.2026) · Go-Live: Code-Blocker
+
+Geschrieben auf main add624f (30.10.2026, #421 „Kasse als Reiter“). Im Chat geprüft am 30.10.2026, nur lesend:
+- main enthält Lauf 26 (#419), #420 (feste Zahlarten) und #421 (Reiter).
+- Production READY; letzte Migration `20261026100000_regelbetrieb`.
+- Die Testumgebung test.agrilo.at läuft (Branch `staging`, eigener Stripe-Webhook).
+- Ein Testkauf mit Karte wurde an beide Webhook-Ziele zugestellt.
+
+Grundlage: Projekt-Doc claude/go-live-checkliste-2026-10-30.md (Abschnitt B), Audit vom 25.10.2026 (claude/audit-2026-10-25.md), docs/recht/agb.md Punkt 12 und Anhang.
+
+Befunde, die dieser Lauf behebt (vor dem Bau am Code bestätigen):
+- **Rollenwechsel ohne Prüfung (Audit A1, Hoch):** `setFarmerRole` steht weiter exportiert in src/server/actions/register.ts:161. Die Action hat keinen Aufrufer.
+- **Keine Widerrufsfunktion nach § 13a FAGG:** Diese Pflicht gilt für Verträge ab 1.10.2026. „Widerruf“ steht im Code nur in der Datenschutzerklärung. Dazu fehlt in der Kasse der Hinweis zum Rücktrittsrecht (§ 4 Abs. 1 Z 8 FAGG).
+- **Stripe live mit altem Gebührenmodell:** Nichts verhindert, dass Stripe live geht, solange der Stichtag „Hofpreis-Modell ab“ (N38) noch in der Zukunft liegt. Dann gälte online ein Aufschlag (§ 56 Abs. 3 ZaDiG), und Agrilo wäre der Händler.
+- **Leerer Korb nach gescheiterter Zahlung (Audit A3):** `ClearCartOnMount` leert den Korb in jedem Zustand der Bestätigungsseite (src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx ~74 und ~220). „Erneut versuchen“ führt deshalb in eine leere Kasse, und die alte Bestellung hält die Ware bis zur Frist.
+- **Webhook gibt Details der Signaturprüfung heraus:** src/app/api/stripe/webhook/route.ts ~82 schreibt den Fehler in den 400-Text. Das Ereignis wird nicht mit Zod geprüft (Altlast aus Morgenbericht 26).
+- **`/api/status-image/[id]`:** prüft nur den Testhof, nicht die Sichtbarkeit des Hofs (`hofSichtbar`, Nr. 190).
+- **CSP nur zum Beobachten** (G8, src/lib/csp.ts:41 `Content-Security-Policy-Report-Only`).
+- **Ersetzte und gelöschte Bilder bleiben im Blob-Speicher (Audit A8):** Das sind Datenreste; die Stufe 2 von „Konto schließen“ hängt davon ab.
+- **Kleinigkeiten:**
+  - Der Mini-Warenkorb der Seitenspalte zeigt während der Notbremse „Zur Kasse“ (Morgenbericht 26).
+  - „Bestellungen“ in der Hof-Unterleiste ist bei 320 px abgeschnitten (Morgenbericht 26).
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+- **Nummern:** 199–206 sind neu.
+- **Regeln:** Es gelten G10, die G10-Ergänzung und §0 wie in Lauf 26 (freigabe.md §30), mit der Zuordnung unten. Der Dirigent führt ein Zeitbuch (docs/nachtlauf/berichte/zeitbuch-lauf27.md).
+- **Migration:** genau eine (Nr. 200, nur Expand). Kein neues Paket, keine neue Variable.
+- **Tests:** nach docs/ai/TESTING_GUIDELINES.md; Fachregeln als reine Funktionen in src/lib/.
+- **Mockups:** Es gibt keine Mockups für diesen Lauf. Neue Seiten folgen docs/ai/DESIGN_SYSTEM.md (Kundenseiten im Geltungsbereich `data-design="neu"`). Die Bilder nach §0 sind die Abnahme.
+- **Abnahme:** Für Abläufe mit Stripe gibt es die Testumgebung test.agrilo.at. Die Abnahme dort macht die Projektleitung nach dem Merge.
+
+## Zuerst der Doku-PR (Branch docs/lauf27 von main, model: sonnet)
+
+- **docs/nachtlauf/freigabe.md:** diesen Text wörtlich als „## 31. Lauf 27 (uttoranger, im Chat erteilt, 30.10.2026)“
+- **docs/nachtlauf.md §3:** die Zeilen 199–206 und „Sammel 27“
+- **docs/nachtlauf/status.md:** die Zeilen 184–198 und „Sammel 26“ tragen „gemergt (#419)“; neu die Zeilen 199–206 und „Sammel 27“, Status „offen“
+- **docs/entscheidungen.md:**
+  - die Einträge unter „Entscheidungen“ wörtlich, dazu die Zeile „Stand Lauf 27“
+  - vorher prüfen, ob N39 und N40 frei sind; sonst die nächste freie Kennung nehmen und im PR nennen
+- **docs/betrieb/testumgebung.md:**
+  - Die „Korrektur (15.10.2026)“ ersetzen durch „Eingerichtet am 30.10.2026 (Projektleitung): Branch staging, Domain test.agrilo.at, Variablen für staging, zweiter Stripe-Webhook mit Protection Bypass.“
+  - In Schritt 5 die Liste der Ereignisse durch die 10 Ereignisse aus Lauf 26 ersetzen.
+- **docs/betrieb/stripe-live.md:**
+  - Schritt 3 nennt dieselben 10 Ereignisse plus `account.updated`.
+  - Ganz oben bei „0. Vorher“ der Punkt: „Stichtag ‚Hofpreis-Modell ab‘ am oder vor dem Live-Tag (N40)“.
+- **Commit- und PR-Texte** immer über eine Datei, Präfixe nach CLAUDE.md §5.
+
+## Stand – vor dem Start prüfen, sonst STOPP und melden
+
+- main enthält #421 (add624f oder später).
+- `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün.
+- Stripe ist in Vorschau und Produktion im Testmodus.
+
+**Priorität, falls das Budget nicht reicht:**
+199 → 200 → 201 → 202 → 203 → 204 → 206 → 205
+
+## Nicht in diesem Lauf
+
+- **Rechtstexte:** AGB 1.0, Hof-AGB-Klausel zur Plattformgebühr, Datenschutz-Ergänzungen über die Fakten aus 200 hinaus. Sie kommen nach Rückmeldung der Anwältin.
+- **Die 13 offenen Entscheidungen aus Morgenbericht 26:** Notfallzugang, WebhookEvent mit Bezug zur Bestellung usw. Die Projektleitung entscheidet sie gesondert.
+- **DPMG:** Steuernummer bzw. UID der Höfe erfassen (braucht eine Entscheidung und eine Migration).
+- **Text „So rechnen wir ab“ auf „Deine Konditionen“:** erst mit den Rechtstexten.
+- **CSP mit Nonces statt `'unsafe-inline'`:** würde statische Seiten dynamisch machen (N19), eigener Auftrag.
+- **Stripe live schalten, Connect-Webhook, Resend-Webhook:** macht die Projektleitung.
+
+## Entscheidungen (uttoranger, im Chat 30.10.2026 – mit diesem Start freigegeben; wörtlich ins Register)
+
+- „N39 · Widerruf online (§ 13a FAGG) (30.10.2026):
+  - **Zugang:** Jede Bestellung einer Verbraucherin (`kaeuferArt` PRIVAT) kann online ohne Anmeldung widerrufen werden. Einstieg: Link ‚Vertrag widerrufen‘ in jeder Bestellmail an die Kundin, auf der Bestätigungsseite, auf der Bestellseite und im Fuß jeder Kundenseite (/widerruf).
+  - **Zwei Schritte:** Erst der Knopf ‚Vertrag widerrufen‘, dann eine Zusammenfassung mit dem Knopf ‚Widerruf bestätigen‘. Gewählt werden die ganze Bestellung oder einzelne Positionen.
+  - **Eingangsbestätigung:** sofort per Mail, mit Inhalt, Datum und Uhrzeit.
+  - **Hof:** Der Widerruf geht an den Hof (Postfach, Mail, Heute). Der Hof bestätigt die Rückgabe und erstattet über den bestehenden Weg der Teilerstattung, bar oder online.
+  - **Ausnahmen nach § 18 FAGG** (etwa schnell verderbliche Ware) prüft der Hof im Einzelfall und begründet eine Ablehnung. Die App zeigt nur einen Hinweis je Kategorie und entscheidet nichts selbst.
+  - **Ohne Zuordnung:** Ein Widerruf, der sich keiner Bestellung zuordnen lässt, wird trotzdem angenommen, bestätigt und dem Team als Aufgabe gezeigt.
+  - **Aufbewahrung:** wie Bestellungen.
+  - **Belehrung:** Die Rücktrittsbelehrung folgt wörtlich der Muster-Widerrufsbelehrung in Anhang I FAGG.
+  - Keine Rechtsberatung; die Texte prüft die Anwältin.“
+- „N40 · Stripe live nur mit Hofpreis-Modell (30.10.2026): Ist Stripe live (Live-Schlüssel in der Produktion) und liegt der Stichtag ‚Hofpreis-Modell ab‘ noch in der Zukunft, steht in Admin › Heute ganz oben eine Aufgabe, und die Betriebsleiste warnt. Die Bestellungen laufen weiter; es ist ein Signal, keine Sperre. stripe-live.md nennt den Stichtag als Vorbedingung.“
+- „G8 · Ergänzung (30.10.2026): Die CSP wird in Stufe 1 scharf geschaltet: dieselbe Policy wie heute, aber erzwingend, `'unsafe-inline'` bleibt; Meldungen weiter an /api/csp-bericht. Nonces bzw. Hashes kommen in einem eigenen Auftrag.“
+- Stand-Zeile: „Stand Lauf 27 (uttoranger, 30.10.2026): N39 (Widerruf online), N40 (Stripe live nur mit Hofpreis-Modell) und die Ergänzung zu G8 (CSP Stufe 1) sind entschieden und in Nr. 199–206 eingeplant (freigabe.md §31). Dazu die Audit-Funde A1, A3, A8 und Reste aus Morgenbericht 26. Lauf 27 hat eine Migration (200), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Rechtstexte, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.“
+
+## §0 Zuordnung
+
+**Modell:**
+- Doku-PR und 205 mit Sonnet, alle übrigen mit Opus.
+- tester und sichter mit Sonnet, pruefer immer mit Opus, höchstens 22 Schritte je Aufruf.
+
+**Prüfdurchgänge:**
+- ein voller Durchgang für 199, 200, 201, 202, 203, 204, 206
+- gezielt für 205
+
+**`pnpm test:integration`:**
+- GANZ bei 199 (Rechte), 200 (Geld und Daten) und 202 (Bestellungen)
+- sonst jede Datei, die sich ändert
+- im Sammel-PR ganz
+
+**Bilder:**
+- 200: /widerruf (390 und 1440, hell und dunkel) mit beiden Schritten, die Mail der Eingangsbestätigung, der Hinweis in der Kasse und die Karte im Hof-Heute
+- 202: Bestätigungsseite „Zahlung nicht geklappt“ (390)
+- 205: Hof-Unterleiste bei 320 px
+
+**Lesemappe:**
+- alle: CLAUDE.md §2, ARCHITECTURE §5
+- 200: docs/recht/agb.md Punkt 12 und Anhang, N2, N26, N29, E7, src/server/teilerstattung.ts, src/lib/bestell-link.ts
+- 201: N38, Z2, src/lib/umgebung.ts
+- 204: G8, src/lib/csp.ts, tests/csp.test.ts
+
+## §1 Warteschlange (fest)
+
+- Doku-PR
+- **Welle 1**, alle von docs/lauf27: 199 ∥ 200 ∥ 201 ∥ 202 ∥ 203 ∥ 205 ∥ 206
+- **Welle 2**, vom Zwischenstand integration/lauf27, nach allen aus Welle 1: 204 (CSP zuletzt, damit sie alle neuen Seiten sieht)
+- Dann der Sammel-PR (Haltepunkt), Merge per Merge-Commit. Branches nacht/<datum>/<nr>-<kurz>.
+
+**Geteilt in getrennten Zeilen** (der Dirigent löst Konflikte beim Hineinmergen):
+- src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx: 200 (Link „Vertrag widerrufen“) und 202 (Korb, Erneut versuchen)
+- src/lib/admin-aufgaben.ts: 200 (Widerruf eingegangen) und 201 (Stripe live ohne Hofpreis-Modell)
+- src/app/api/stripe/webhook/route.ts: nur 203
+- src/lib/csp.ts und next.config.ts (Header): nur 204
+- Mail-Arten und `NOCHMAL_*`: nur 200
+- DEVELOPMENT.md je ein Eintrag; ARCHITECTURE je eigener Abschnitt
+
+## Die Nummern
+
+### 199 `setFarmerRole` löschen, Wache „jede exportierte Action hat einen Aufrufer“ (Audit A1) – Opus, voller Durchgang, keine Migration, von docs/lauf27
+
+1. `setFarmerRole` aus src/server/actions/register.ts entfernen, samt nicht mehr genutzter Imports. Vorher per `git grep` bestätigen, dass es keinen Aufrufer gibt, auch nicht in tests/ oder scripts/.
+2. **Wache** tests/actions-aufrufer-wache.test.ts:
+   - Jede exportierte Funktion aus einer Datei mit `'use server'` unter src/server/actions hat mindestens einen Aufrufer unter src/ außerhalb ihrer eigenen Datei.
+   - Ausnahmen nur in einer Liste mit Grund (Bestandsliste, die nur schrumpft).
+   - Gegenprobe: eine erfundene exportierte Action ohne Aufrufer → rot.
+3. Weitere Actions ohne Aufrufer, die die Wache findet: nicht löschen, in die Bestandsliste mit „Fund Lauf 27“. Liste in den Bericht; ein Fund mit Rechtewirkung (Rolle, Admin, Geld) ist ein Sicherheits-Fund: STOPP und zuerst in den Bericht.
+
+Dateien: src/server/actions/register.ts (NUR die Funktion), der Test, DEVELOPMENT.md.
+
+Tests: die Wache mit Gegenprobe; die Registrierung als Hof läuft weiter (bestehende Tests grün).
+
+### 200 Widerruf online (§ 13a FAGG) und Rücktrittshinweis in der Kasse (N39) – Opus, voller Durchgang, EINE Migration (Expand), von docs/lauf27
+
+**Migration** (nach Regel 3, nur Expand): Tabelle `Widerruf`. Felder:
+- `id`
+- `orderId String?` (null = nicht zugeordnet), Index
+- `eingegangenAm DateTime @default(now())`
+- `name String` (höchstens 120 Zeichen)
+- `email String`
+- `bestellnummerEingabe String?`
+- `umfang String` (`ganz` | `teil`)
+- `positionen Json?` (Liste aus `orderItemId` und Menge; nur bei `teil`)
+- `nachricht String?` (höchstens 500)
+- `stand String @default("eingegangen")`: `eingegangen` | `rueckgabe_erhalten` | `erstattet` | `abgelehnt`
+- `standGeaendertAm DateTime?`, `grund String?` (Pflicht bei `abgelehnt`, höchstens 300)
+- Indizes (`stand`, `eingegangenAm`) und (`orderId`)
+- kein Fremdschlüssel; RLS wie alle Tabellen
+- keine Datenänderung
+
+**Fachregeln** in src/lib/widerruf.ts (rein):
+- `widerrufMoeglich(bestellung, jetzt)`:
+  - nur `kaeuferArt` PRIVAT
+  - nicht bei stornierten Bestellungen
+  - bis 14 Tage nach der Abholung (`pickedUpAt`)
+  - vor der Abholung immer (ein Widerruf vor der Abholung ist fachlich ein Storno, siehe Punkt 4)
+- `ausnahmeHinweis(kategorie)`: ein Satz je Produktkategorie, ob § 18 Abs. 1 FAGG wahrscheinlich greift (etwa schnell verderbliche Ware). Nur Hinweis, keine Entscheidung. Die Liste der Kategorien kommt aus `ProductCategory`.
+- `WIDERRUF_TEXT`: alle Sätze aus einer Quelle. Knöpfe wörtlich „Vertrag widerrufen“ und „Widerruf bestätigen“.
+
+**Belehrung:**
+- /widerruf zeigt die Rücktrittsbelehrung wörtlich nach der Muster-Widerrufsbelehrung, Anhang I FAGG, Teil A, und das Muster-Formular, Teil B.
+- Den Wortlaut aus dem RIS übernehmen (Quelle und Abrufdatum als Kommentar in src/lib/widerruf.ts) und dabei nur die Platzhalter ersetzen: „der Hof, bei dem du bestellt hast (Name und Anschrift in deiner Bestellung)“ und „Agrilo leitet weiter“.
+- Ohne Zugang zum RIS: STOPP für die Belehrung, die übrigen Teile laufen weiter.
+
+**Wege:**
+1. **Mit signiertem Link:** /widerruf?bestellung=…&sig=… (Zweck `widerruf` in src/lib/bestell-link.ts; noindex, no-referrer).
+   - Zeigt die Bestellung gekürzt und die Positionen zum Ankreuzen, mit dem `ausnahmeHinweis` je Position.
+   - Schritt 1: Knopf „Vertrag widerrufen“ → Schritt 2: Zusammenfassung, Name (vorbelegt), optionale Nachricht, Knopf „Widerruf bestätigen“.
+2. **Ohne Link** (Fuß, direkt): dieselbe Seite mit Formular aus Name, E-Mail, Bestellnummer, „ganze Bestellung“ oder Freitext. Dann dieselben zwei Schritte.
+   - Zuordnung nur bei genau passender Bestellnummer UND E-Mail der Bestellung. Sonst `orderId` null.
+   - Die Antwort ist in beiden Fällen gleich und verrät nie, ob es die Bestellung gibt.
+3. **Eingangsbestätigung:** sofort per Mail an die angegebene bzw. die Bestell-Adresse (neue Mail-Art `widerruf-eingang`, Sofort, NOCHMAL_ERLAUBT). Inhalt: Bestellnummer wie eingegeben, Umfang bzw. Positionen, Datum und Uhrzeit (Wien), die nächsten Schritte, der Hof als Vertragspartner.
+   - Die Bestätigungsseite zeigt dasselbe und lässt es speichern bzw. drucken.
+4. **Vor der Abholung:** Der Widerruf storniert die Bestellung bzw. die Positionen über den bestehenden Weg (`storniere` aus src/server/stornieren.ts, Teilstorno über die bestehende Funktion). Danach Stand `erstattet` ohne Zutun des Hofs. Erstattung und Mail wie beim Storno.
+5. **Nach der Abholung:**
+   - Der Hof bekommt eine Postfach-Nachricht, die Mail `widerruf-hof` (Wichtig) und eine Karte in Heute.
+   - In der Bestellung des Hofs gibt es die Knöpfe „Rückgabe erhalten – erstatten …“ und „Ablehnen …“ (Grund Pflicht).
+   - Die Erstattung läuft über src/server/teilerstattung.ts: online über Stripe inklusive des Anteils der Gebühr, bar mit dem Vermerk „bar erstattet“.
+   - Die Kundin bekommt die passende Mail (bestehende Erstattungs-Mail bzw. `widerruf-abgelehnt` mit Grund).
+6. **Admin:**
+   - Aufgabenquelle „Widerruf offen“ in src/lib/admin-aufgaben.ts: Frist 14 Tage ab Eingang; „nicht zugeordnet“ mit Frist 2 Tage.
+   - Die Hof-Akte und Admin › Bestellungen zeigen Widerrufe.
+   - Das Protokoll vermerkt Zuordnen und Ablehnen.
+7. **Einstiege:**
+   - Link „Vertrag widerrufen“ in den Bestellmails an die Kundin (Bestätigung, abholbereit, abgeholt, falls vorhanden)
+   - auf der Bestätigungsseite und der Bestellseite, jeweils nur wenn `widerrufMoeglich`
+   - im Fuß aller Kundenseiten (`KundeShell`, `KundeFokusShell`)
+8. **Kasse:** Neben bzw. unter dem Kaufknopf der Satz „Du kannst vom Kauf innerhalb von 14 Tagen nach der Abholung zurücktreten – außer bei schnell verderblicher Ware. So geht’s: Rücktritt“. Der Link führt zu /widerruf, der Text kommt aus `WIDERRUF_TEXT`. Bei „Betrieb“ entfällt der Satz.
+9. **Bremse:** /widerruf ohne Link höchstens 5 je IP und Stunde und 3 je E-Mail-Adresse und Tag (bestehende Bremse über alle Instanzen). Kein Text der Kundin landet in Logs oder Sentry.
+10. **Datenschutz:** In der Datenschutzerklärung nur die Fakten: Zweck „Widerruf“, Daten (Name, E-Mail, Bestellung, Nachricht), Frist wie Bestellungen.
+
+**Dateien:**
+- prisma/schema.prisma und die Migration
+- src/lib/widerruf.ts (neu), src/server/widerruf.ts (neu), src/server/actions/widerruf.ts (neu)
+- src/app/(public)/widerruf/* (neu; in `KEINE_HOFSEITE` bzw. src/lib/slug.ts eintragen)
+- src/lib/bestell-link.ts (NUR der Zweck)
+- Mail-Arten und Vorlagen, `NOCHMAL_*`
+- die Bestätigungs- und Bestellseite und die Mails (NUR der Link)
+- `KundeShell` und `KundeFokusShell` (NUR der Fuß-Link)
+- die Kasse (NUR der Satz)
+- Hof: Bestell-Detail (NUR die Knöpfe) und Heute (NUR die Karte)
+- src/lib/admin-aufgaben.ts (NUR die Quelle)
+- src/app/(public)/datenschutz/page.tsx (NUR der Abschnitt)
+- Tests, ARCHITECTURE (Abschnitt Widerruf), DESIGN_SYSTEM (Widerruf), DEVELOPMENT.md
+
+**Tests (mit Gegenprobe):**
+- `widerrufMoeglich`: PRIVAT/BETRIEB, storniert, Tag 14 und Tag 15 nach der Abholung
+- signierter Link falsch → 404; Positionen fremder Bestellungen → abgelehnt
+- ohne Link: passende Nummer und E-Mail → zugeordnet; andere Kombination → `orderId` null, gleiche Antwort und gleiche Statuscodes
+- vor der Abholung: Storno mit Erstattung und Bestand (Integration)
+- nach der Abholung: Erstattung über teilerstattung.ts in Cent; Ablehnen ohne Grund → 400
+- Eingangsbestätigung wird eingestellt; keine Adresse im Log
+- Bremse greift
+- die Knöpfe heißen wörtlich „Vertrag widerrufen“ und „Widerruf bestätigen“
+
+`pnpm test:integration` ganz.
+
+Fertig, wenn: grün. Der Bericht enthält die Quelle der Belehrung (RIS, Abrufdatum) und die Liste der `ausnahmeHinweis`-Sätze je Kategorie, für die Anwältin.
+
+### 201 Signal „Stripe live ohne Hofpreis-Modell“ (N40) – Opus, voller Durchgang, keine Migration, von docs/lauf27
+
+1. Eine reine Funktion `liveOhneHofpreisModell(umgebung, einstellung, jetzt)` in src/lib/plattformgebuehr.ts. Wahr, wenn der Stripe-Modus in der Produktion „live“ ist (`bestimmeUmgebung`, nie der Schlüssel) und `gebuehrModellFuer(einstellung, jetzt)` noch `bisher` ist.
+2. **Aufgabenquelle** in src/lib/admin-aufgaben.ts, ganz oben, Frist sofort: „Stripe ist live, aber das Hofpreis-Modell beginnt erst am … – Stichtag vorziehen“. Ziel ist die Karte „Hofpreis-Modell ab“ in Admin › Einstellungen.
+3. **Betriebsleiste:** derselbe Satz als Warnung (dieselbe Quelle).
+4. **Admin › Einstellungen, Karte „Hofpreis-Modell ab“:** im Testmodus der Hinweis „Vor dem Live-Gang von Stripe auf den Live-Tag oder früher setzen.“
+
+Dateien: src/lib/plattformgebuehr.ts (NUR die Funktion), src/lib/admin-aufgaben.ts (NUR die Quelle), die Betriebsleiste (NUR der Satz), src/app/admin/einstellungen/hofpreis-stichtag.tsx (NUR der Hinweis), Tests, DEVELOPMENT.md.
+
+Tests: live und Stichtag in der Zukunft → Aufgabe und Warnung; live und Stichtag erreicht → nichts; Testmodus → nichts, nur der Hinweis in der Karte.
+
+### 202 Nach gescheiterter Zahlung bleibt der Korb, „Erneut versuchen“ zahlt dieselbe Bestellung (Audit A3) – Opus, voller Durchgang, keine Migration, von docs/lauf27
+
+1. **Korb:** `ClearCartOnMount` nur noch, wenn die Bestellung bezahlt, bar bestätigt oder bar wartend ist (Zustand aus `bestaetigungsZustand`, src/lib/bestaetigung.ts). Bei „Zahlung nicht geklappt“ bleibt der Korb. Die Regel ist eine reine Funktion `korbLeeren(zustand)`.
+2. **„Erneut versuchen“** führt in die Zahlung DERSELBEN Bestellung, solange ihre Reservierung gilt:
+   - bestehende Zahlungsseite bzw. Intent der Bestellung, neue Bestätigung im Payment Element
+   - keine zweite Bestellung, keine zweite Reservierung
+   - Ist die Frist vorbei oder die Bestellung storniert, führt der Knopf in die Kasse mit dem erhaltenen Korb.
+   - Einen bestehenden Weg wiederverwenden (die Kasse kennt Wiederholungen über `antwortFuerBestehendeBestellung`). Den gewählten Weg im PR begründen.
+3. **Alte Bestätigungs-URL ohne gültige Signatur** (`BestellungEingegangen`, ~74) leert den Korb nicht mehr (Audit Phase 3, Punkt 12).
+
+Dateien: src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx (NUR Korb und Knopf), src/lib/bestaetigung.ts (NUR `korbLeeren`), ggf. die Kasse bzw. stripe-payment.tsx (NUR der Einstieg mit bestehender Bestellung), Tests, DEVELOPMENT.md.
+
+Tests:
+- `korbLeeren` je Zustand
+- Integration: gescheiterte Zahlung → „Erneut versuchen“ → derselbe PaymentIntent, keine neue Bestellung, Bestand unverändert
+- Frist abgelaufen → Kasse mit Korb
+
+`pnpm test:integration` ganz. Bild nach §0.
+
+### 203 Webhook ohne Detail im Fehlertext, Ereignisse mit Zod; `/api/status-image` mit `hofSichtbar` – Opus, voller Durchgang, keine Migration, von docs/lauf27
+
+1. src/app/api/stripe/webhook/route.ts:
+   - Bei ungültiger Signatur antwortet die Route nur `{ error: 'Signatur ungültig' }` (400). Die Einzelheiten stehen nur im Server-Log, ohne Secret.
+   - Bestehende Antworten 503 (Modus-Sperre) und 500 (Verarbeitung) unverändert.
+2. Jedes verarbeitete Ereignis wird vor der Verarbeitung mit einem Zod-Schema der genutzten Felder geprüft (src/schemas/stripe-ereignis.ts, je Ereignistyp der Lauf-26-Liste plus `account.updated`). Ungültig → Sentry einmal je Typ und Tag, Antwort 200 ohne Verarbeitung (Stripe soll nicht endlos wiederholen). Unbekannte Typen: wie heute.
+3. src/app/api/status-image/[id]/route.tsx liest die Sichtbarkeit über `hofSichtbar` (Nr. 190) zusätzlich zum Testhof. Nicht sichtbar → 404 wie heute.
+
+Dateien: die zwei Routen (NUR diese Stellen), src/schemas/stripe-ereignis.ts (neu), Tests, ARCHITECTURE (Webhook), DEVELOPMENT.md.
+
+Tests:
+- falsche Signatur → 400 ohne Detail
+- je Typ ein gültiges und ein ungültiges Ereignis
+- status-image eines geschlossenen bzw. nicht freigeschalteten Hofs → 404
+
+### 204 CSP Stufe 1: erzwingen (G8-Ergänzung) – Opus, voller Durchgang, keine Migration, vom Zwischenstand nach Welle 1
+
+1. **Vorher auswerten:** die Meldungen an /api/csp-bericht der letzten 14 Tage, Speicherort am Code finden. Tabelle im Bericht: Direktive, blockierte Quelle, Anzahl, zuletzt, erwartet ja/nein.
+   - Eine Quelle, die wir brauchen und die fehlt: in die Policy aufnehmen, mit Quelle als Kommentar wie die übrigen.
+   - Unklare Meldungen: STOPP für 204, Bericht.
+2. **Umschalten:** `CSP_HEADER` wird `Content-Security-Policy`. Policy unverändert außer Punkt 1; `report-uri`/`report-to` bleiben; `'unsafe-inline'` bleibt (Nonces sind ein eigener Auftrag).
+3. **Zusätzlich (Stufe 2 beobachten):** den Header `Content-Security-Policy-Report-Only` mit einer strengeren Policy ohne `'unsafe-eval'` senden, falls Zod v4 im Browser nicht mehr `eval` braucht (196 hat Zod aus den Kundenseiten genommen). Sonst weglassen und begründen.
+4. **Prüfen:**
+   - in der Vorschau alle Hauptwege ohne Verstoß in der Konsole: Startseite, Hofseite, Kasse mit Stripe (Karte, EPS, 3-D-Secure-Test), Mein Hof mit Vorschau-Rahmen, Admin › Startseite, Upload
+   - Liste der geprüften Seiten in den Bericht
+
+Dateien: src/lib/csp.ts, next.config.ts (NUR die Header), tests/csp.test.ts, DEVELOPMENT.md, ARCHITECTURE (CSP).
+
+Tests: Header-Name erzwingend, Policy wie erwartet; Report-Only nur, wenn Punkt 3 greift.
+
+Fertig, wenn: grün und die Seitenliste ohne Verstoß. Für die Projektleitung im Bericht: wie man die CSP im Notfall per Revert zurück auf Report-Only stellt.
+
+### 205 Kleinigkeiten aus Morgenbericht 26 – Sonnet, gezielt, keine Migration, von docs/lauf27
+
+1. Der Mini-Warenkorb der Seitenspalte (Hofseite) zeigt während der Notbremse bzw. einer Sperre statt „Zur Kasse“ den Satz mit Grund, wie das Korb-Blatt (src/components/farm/cart-sheet.tsx). Eine Quelle für beide.
+2. Hof-Unterleiste: „Bestellungen“ bei 320 px nicht abgeschnitten (kürzere Beschriftung nur unter 360 px aus einer Konstante, oder Silbentrennung). tests/kunde-shell-masse.test.ts bleibt grün.
+3. Die zwei verbliebenen Lint-Warnungen (`form.watch`) beheben, falls ohne Verhaltensänderung möglich; sonst begründen.
+
+Tests: je Punkt mit Gegenprobe. Bild nach §0.
+
+### 206 Bilder im Blob-Speicher beim Ersetzen und Löschen entfernen (Audit A8) – Opus, voller Durchgang, keine Migration, von docs/lauf27
+
+1. Beim Ersetzen von Logo, Titelbild und Produktbild und beim Löschen eines Produkts das alte Bild über den bestehenden benannten Weg löschen (Wache `blob-loeschen`). Nur Pfade unter dem Präfix des eigenen Hofs, nie fremde.
+2. Löschen nach dem erfolgreichen Schreiben in der Datenbank. Scheitert das Löschen: Sentry, die Action gilt trotzdem.
+3. Archivierte Produkte (bestellt, `isAvailable = false`) behalten ihr Bild, denn Bestellungen zeigen es.
+4. Bestandsliste der heutigen Waisen: nur zählen und im Bericht nennen, nichts löschen. Das Aufräumen alter Waisen ist ein eigener Auftrag mit Freigabe.
+
+Dateien: src/server/actions/appearance.ts, src/server/actions/products.ts (NUR das Löschen alter Bilder), Tests, DEVELOPMENT.md.
+
+Tests: Ersetzen löscht das alte Bild; fremder Pfad wird nie gelöscht; Löschen scheitert → Action ok, Sentry einmal; archiviertes Produkt behält das Bild.
+
+## §2 Regeln
+
+- Es gelten die Regeln aus Lauf 26 (freigabe.md §30, §2), mit der Migration aus 200.
+- **Geld:** Erstattungen nur über die bestehenden Wege (`storniere`, teilerstattung.ts). Beträge in Cent als Int. Ändert sich ein Betrag außerhalb dieser Wege: Geld-Fund, STOPP.
+- **Recht:**
+  - Die Knöpfe heißen wörtlich „Vertrag widerrufen“ und „Widerruf bestätigen“.
+  - Die Belehrung folgt wörtlich dem Muster aus Anhang I FAGG.
+  - Keine weiteren Rechtssätze erfinden; was fehlt, kommt in den Bericht für die Anwältin.
+- **Datenschutz:**
+  - Widerruf-Daten nur für Zweck und Frist wie oben.
+  - Keine Nachricht, Adresse oder kein Name in Logs, Sentry oder Protokoll.
+  - Beispieldaten erfunden.
+- **Sicherheit:** Keine Nummer lockert eine Prüfung. Antworten verraten nie, ob eine Bestellung oder ein Konto existiert. Funde als Ursache, Auswirkung und Fix.
+- **Design:** jede UI-Änderung in beiden Modi, 390 und 1440 px; Touch-Ziele ≥ 44 px; Text ≥ 4,5:1; Felder 16 px; keine Hexwerte in Komponenten.
+- **Mails:** Kein Test verschickt echte Mails. Neue Mail-Arten stehen im selben Commit in genau einer Liste `NOCHMAL_ERLAUBT`/`NOCHMAL_NIE`.
+
+## §3 Checkliste je PR
+
+Wie Lauf 26 (§30, §3), mit „Migration: nur 200 (Expand) · Paket: nein · Variable: nein“. „Alle Einstiege geprüft“ gilt für:
+
+| Nummer | alle Einstiege |
+|---|---|
+| 199 | alle exportierten Server Actions (Zahl im Bericht) |
+| 200 | alle Kundenmails zu Bestellungen; alle Kundenseiten mit Fuß; alle Wege, die erstatten |
+| 202 | alle Zustände der Bestätigungsseite |
+| 203 | alle verarbeiteten Ereignistypen |
+| 204 | alle Seiten mit Stripe, Rahmen oder Upload |
+| 206 | alle Actions, die ein Bild ersetzen oder löschen |
+
+## §4 Morgenbericht (morgenbericht-<datum>-lauf27.md)
+
+Wie Lauf 26, dazu:
+- **Ganz oben:** je Nummer, ob die Ausgangslage am Code bestätigt war; Migration angewandt (Regel 3); nicht begonnene Nummern.
+- **199:** die Liste der Actions ohne Aufrufer.
+- **200:** Quelle der Belehrung; die `ausnahmeHinweis`-Sätze je Kategorie; offene Rechtsfragen für die Anwältin.
+- **204:** die Tabelle der CSP-Meldungen; die geprüften Seiten; der Weg zurück.
+- **206:** die Zahl der heutigen Waisen im Blob-Speicher.
+- **„Für dich zu tun“:**
+  - Abnahme in der Testumgebung test.agrilo.at:
+    - Widerruf vor und nach der Abholung, mit und ohne Link
+    - gescheiterte EPS-Zahlung abbrechen und „Erneut versuchen“
+    - Kasse mit Rücktrittssatz
+    - CSP: Kasse mit 3-D-Secure
+  - die Texte aus 200 an die Anwältin
+  - Merge per Merge-Commit

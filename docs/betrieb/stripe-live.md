@@ -26,6 +26,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 ## 0. Vorher
 
+- [ ] **Stichtag „Hofpreis-Modell ab“ am oder vor dem Live-Tag (N40).** Admin › Einstellungen › „Hofpreis-Modell ab“ vor dem Live-Schalten auf den Live-Tag oder früher setzen. Liegt der Stichtag danach noch in der Zukunft, gälte online ein Aufschlag (§ 56 Abs. 3 ZaDiG) und Agrilo wäre der Händler; Admin › Heute und die Betriebsleiste melden das als Signal (Nr. 201), sperren aber nichts.
 - [ ] Die Testumgebung läuft und der Probelauf ist bestanden: `docs/betrieb/testumgebung.md` (Nr. 43), `docs/nachtlauf/probelauf-checkliste.md` (Nr. 48).
 - [ ] **Offene Online-Bestellungen aus der Testzeit abschließen**, solange der Test-Schlüssel noch gilt: bezahlte abholen lassen oder stornieren.
   > **Hinweis:** Nach der Umstellung lassen sich Testzahlungen von vor der Umstellung **nicht mehr über Stripe erstatten**. Ihre Zahlungsvorgänge liegen im Testmodus, und den sieht der Live-Schlüssel nicht. Ein späterer Storno meldet dem Hof „Rückerstattung fehlgeschlagen“. Erstatten lässt sich dann nur noch von Hand im Stripe-Dashboard (Testmodus) – es ist ohnehin kein echtes Geld.
@@ -59,7 +60,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets. Die alte Adresse farmerzone.at leitet auf agrilo.at um; Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen.
 
-- [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), alle Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet:
+- [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), die 10 Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet, plus `account.updated`:
 
   | Ereignis | Wozu |
   |---|---|
@@ -68,6 +69,11 @@ Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route
   | `payment_intent.canceled` | unbezahlte Bestellung stornieren, Ware freigeben |
   | `refund.failed` | gescheiterte Erstattung zurücknehmen, Hof und Betreiber informieren |
   | `charge.refund.updated` | dasselbe, wenn eine Erstattung später scheitert |
+  | `invoice.paid` | Monatsabrechnung der Plattformgebühr: Rechnung als bezahlt vermerken (N38) |
+  | `invoice.payment_failed` | Einzug gescheitert: Hof im Postfach und per Mail informieren, Sperre für Barbestellungen nach Frist |
+  | `charge.dispute.created` | Rückbuchung des Einzugs: Hof nimmt sofort nur noch online an |
+  | `setup_intent.succeeded` | SEPA-Mandat des Hofs eingerichtet |
+  | `mandate.updated` | Mandat geändert oder widerrufen: Stand beim Hof nachziehen |
   | `account.updated` | Kontostand eines Hofs aktuell halten (kommt auch über diesen Endpunkt) |
 
 - [ ] **Endpunkt B – Connect** („Ereignisse in verbundenen Konten“): `account.updated`. Ohne diesen Endpunkt bleibt es unbemerkt, wenn Stripe ein Hof-Konto sperrt oder freigibt.

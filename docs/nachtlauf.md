@@ -271,6 +271,15 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 197 | Plattformgebühr im Hofpreis: Preis, Anzeige, Zahlung (vom Zwischenstand `integration/lauf26` nach 188, 195 und 196) | `freigabe.md` §30 | N38, E4, B1, K2 |
 | 198 | SEPA-Monatsabrechnung der Plattformgebühr (vom Zwischenstand `integration/lauf26` nach 185, 187, 191 und 197) | `freigabe.md` §30 | N38, K2 |
 | Sammel 26 | Sammel-PR `integration/lauf26` | `freigabe.md` §30 | G3, G10 |
+| 199 | `setFarmerRole` löschen, Wache „jede exportierte Action hat einen Aufrufer“ (von `docs/lauf27`) | `freigabe.md` §31 | – |
+| 200 | Widerruf online (§ 13a FAGG) und Rücktrittshinweis in der Kasse, eine Migration (von `docs/lauf27`) | `freigabe.md` §31 | N39 |
+| 201 | Signal „Stripe live ohne Hofpreis-Modell“ (von `docs/lauf27`) | `freigabe.md` §31 | N40 |
+| 202 | Nach gescheiterter Zahlung bleibt der Korb, „Erneut versuchen“ zahlt dieselbe Bestellung (von `docs/lauf27`) | `freigabe.md` §31 | – |
+| 203 | Webhook ohne Detail im Fehlertext, Ereignisse mit Zod; `/api/status-image` mit `hofSichtbar` (von `docs/lauf27`) | `freigabe.md` §31 | – |
+| 204 | CSP Stufe 1: erzwingen (vom Zwischenstand `integration/lauf27` nach allen aus Welle 1) | `freigabe.md` §31 | G8 |
+| 205 | Kleinigkeiten aus Morgenbericht 26 (von `docs/lauf27`) | `freigabe.md` §31 | – |
+| 206 | Bilder im Blob-Speicher beim Ersetzen und Löschen entfernen (von `docs/lauf27`) | `freigabe.md` §31 | – |
+| Sammel 27 | Sammel-PR `integration/lauf27` | `freigabe.md` §31 | G3, G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
