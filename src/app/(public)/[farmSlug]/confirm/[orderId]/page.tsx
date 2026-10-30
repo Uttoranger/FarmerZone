@@ -11,8 +11,10 @@ import {
   bestaetigungsZustand,
   bestaetigungZeigtPerson,
   bestellSchritte,
+  korbLeeren,
   neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
+import { zahlungFortsetzenPfad } from '@/lib/kasse'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
@@ -69,9 +71,10 @@ const SPALTE = 'mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pt-8 pb-12
  * Ausweg führt zur Hofübersicht, nicht zu einem beliebigen Pfad.
  */
 function BestellungEingegangen() {
+  // Kein ClearCartOnMount (Nr. 202, Audit Phase 3 Punkt 12): Ohne Signatur kennt die
+  // Seite den Stand nicht — ein alter Link oder ein Lesezeichen leert keinen neuen Korb.
   return (
     <KundeShellMitSitzung unterleiste={false}>
-      <ClearCartOnMount />
       <div className={SPALTE}>
         <BestaetigungKopf
           kopf={{
@@ -216,8 +219,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
 
   return (
     <KundeShellMitSitzung unterleiste={false}>
-      {/* Die Bestellung ist abgeschickt — der Korb ist ab hier leer, in jedem Zustand. */}
-      <ClearCartOnMount />
+      {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
+      {korbLeeren(zustand) && <ClearCartOnMount />}
       <div className={SPALTE}>
         <BestaetigungKopf kopf={kopf} />
 
@@ -280,7 +283,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             </AktionsLink>
           )}
           {bloecke.aktion === 'erneut-versuchen' && (
-            <AktionsLink href={`/${farmSlug}/checkout`} haupt>
+            // Die Zahlung DERSELBEN Bestellung (Nr. 202); ob sie noch geht, prüft die Kasse beim Laden.
+            <AktionsLink href={zahlungFortsetzenPfad(farmSlug, order.id, sig)} haupt>
               Erneut versuchen
             </AktionsLink>
           )}

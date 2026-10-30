@@ -38,7 +38,10 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
     return createElement('div', { 'data-shell': 'kunde' }, p.children)
   },
 }))
-vi.mock('@/components/checkout/clear-cart-on-mount', () => ({ ClearCartOnMount: () => null }))
+// Ein Marker statt des Effekts: Ob die Seite den Korb leert, steht so im gerenderten Baum (Nr. 202).
+vi.mock('@/components/checkout/clear-cart-on-mount', () => ({
+  ClearCartOnMount: () => createElement('span', { 'data-korb-leeren': '' }),
+}))
 vi.mock('@/components/bestaetigung/hof-teilen-karte', () => ({
   HofTeilenKarte: (p: Record<string, unknown>) => {
     teilenProps.push(p)
@@ -336,5 +339,48 @@ describe('Neuigkeiten per E-Mail auf der Bestätigungsseite (Register N2, Nr. 46
     expect(await seite()).not.toContain('data-neuigkeiten')
     expect(await seite({})).not.toContain('data-neuigkeiten')
     expect(neuigkeitenProps).toEqual([])
+  })
+})
+
+describe('Korb und „Erneut versuchen" (Audit A3, Nr. 202) — alle Zustände der Seite', () => {
+  const LEEREN = 'data-korb-leeren'
+  const online = { paymentMethod: 'ONLINE', status: 'PENDING_CONFIRMATION', paymentStatus: 'PENDING' }
+
+  it('alte Adresse ohne gültige Signatur leert den Korb nicht (Phase 3, Punkt 12)', async () => {
+    expect(await seite({})).not.toContain(LEEREN)
+    expect(await seite({ sig: bestellSignatur('order-2') })).not.toContain(LEEREN)
+  })
+
+  it('bezahlt, bar bestätigt und bar wartend: der Korb wird geleert', async () => {
+    findUnique.mockResolvedValue(bestellung({ ...online, status: 'PAID', paymentStatus: 'PAID' }) as never)
+    expect(await seite()).toContain(LEEREN)
+    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    expect(await seite()).toContain(LEEREN)
+    findUnique.mockResolvedValue(bestellung() as never)
+    expect(await seite()).toContain(LEEREN)
+  })
+
+  it('Zahlung nicht geklappt: der Korb bleibt, „Erneut versuchen" führt in die Zahlung derselben Bestellung', async () => {
+    findUnique.mockResolvedValue(bestellung({ ...online, paymentStatus: 'FAILED' }) as never)
+    for (const html of [await seite(), await seite({ sig: GUELTIG, redirect_status: 'failed' })]) {
+      expect(html).not.toContain(LEEREN)
+      expect(text(html)).toContain('Erneut versuchen')
+      const erneut = hrefs(html).find((h) => h.includes('/checkout'))
+      const url = new URL(erneut ?? '', 'http://localhost')
+      expect(url.pathname).toBe('/hof-test/checkout')
+      expect(url.searchParams.get('zahlung')).toBe('order-1')
+      expect(bestellLinkGilt('order-1', url.searchParams.get('sig') ?? '')).toBe(true)
+    }
+  })
+
+  it('Zahlung wird geprüft, verfallen, storniert, nicht abgeholt: der Korb bleibt', async () => {
+    findUnique.mockResolvedValue(bestellung(online) as never)
+    expect(await seite({ sig: GUELTIG, redirect_status: 'succeeded' })).not.toContain(LEEREN)
+    findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT }) as never)
+    expect(await seite()).not.toContain(LEEREN)
+    findUnique.mockResolvedValue(bestellung({ ...online, status: 'CANCELLED' }) as never)
+    expect(await seite()).not.toContain(LEEREN)
+    findUnique.mockResolvedValue(bestellung({ status: 'NOT_PICKED_UP' }) as never)
+    expect(await seite()).not.toContain(LEEREN)
   })
 })
