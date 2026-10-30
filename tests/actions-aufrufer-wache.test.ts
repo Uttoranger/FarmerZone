@@ -17,11 +17,12 @@
  *
  * GRENZE: Ein dynamischer Import (`await import('@/server/actions/…')`) zählt nicht als Aufrufer — es gibt heute
  * keinen; wer einen braucht, trägt die Action mit Grund in den Bestand ein. Ob der Aufrufer selbst erreichbar ist
- * (eine Seite, die niemand verlinkt), sieht die Wache nicht.
+ * (eine Seite, die niemand verlinkt), sieht die Wache nicht; ebenso wenig, ob eine Datei, die eine Action mit
+ * `export { … } from` weiterreicht, selbst benutzt wird.
  *
  * Gegenprobe (Text-Attrappen, keine Datei im Repository wird verändert): eine erfundene exportierte Action ohne
  * Aufrufer, eine nur im Kommentar oder Text genannte, eine nur in der eigenen Datei gerufene und eine nur importierte,
- * aber nie benutzte schlagen an; ein benannter, ein umbenannter, ein relativer, ein weitergereichter und ein Import
+ * aber nie oder nur als Eigenschaftsname benutzte schlagen an; ein benannter, ein umbenannter, ein relativer, ein weitergereichter und ein Import
  * über `* as` nicht, ebenso wenig eine Datei ohne `'use server'`. Ein veralteter Bestandseintrag macht die Wache rot.
  */
 import { readdirSync, readFileSync } from 'node:fs'
@@ -99,13 +100,15 @@ function zielpfad(von: string, angabe: string, vorhanden: ReadonlySet<string>): 
 /** Ob `name` in `sf` als Bezeichner außerhalb jeder Import-/Export-Zeile vorkommt. */
 function wirdBenutzt(sf: ts.SourceFile, name: string): boolean {
   let gefunden = false
-  function besuche(k: ts.Node): void {
+  function besuche(k: ts.Node, eltern?: ts.Node): void {
     if (gefunden || ts.isImportDeclaration(k)) return
-    if (ts.isIdentifier(k) && k.text === name) {
+    // Ein Eigenschaftsname (`obj.name`, `{ name: 1 }`) ist nicht der importierte Name.
+    const eigenschaft = !!eltern && (ts.isPropertyAccessExpression(eltern) || ts.isPropertyAssignment(eltern)) && eltern.name === k
+    if (ts.isIdentifier(k) && k.text === name && !eigenschaft) {
       gefunden = true
       return
     }
-    ts.forEachChild(k, besuche)
+    ts.forEachChild(k, (kind) => besuche(kind, k))
   }
   besuche(sf)
   return gefunden
@@ -244,6 +247,11 @@ export type Nur = { a: 1 }
 
   it('nur importiert, aber nie benutzt, zählt nicht', () => {
     const seite = `${nutztAlle}import { erfunden } from '@/server/actions/attrappe'\n`
+    expect(ohne({ 'src/app/seite.tsx': seite })).toEqual([`${ACTION}#erfunden`])
+  })
+
+  it('nur als Eigenschaftsname benutzt zählt nicht', () => {
+    const seite = `${nutztAlle}import { erfunden } from '@/server/actions/attrappe'\nexport const o = { erfunden: 1 }\nexport const p = o.erfunden\n`
     expect(ohne({ 'src/app/seite.tsx': seite })).toEqual([`${ACTION}#erfunden`])
   })
 
