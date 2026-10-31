@@ -3,6 +3,8 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { Prisma } from '@prisma/client'
+import { del } from '@vercel/blob'
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import {
   productAnlegenSchema,
@@ -34,7 +36,8 @@ import {
 } from '@/server/produkte-schreiben'
 import { formatZahl } from '@/lib/format'
 import { bestandVorherSchema, vorratSetzenSchema } from '@/schemas/vorrat'
-import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt, istEigenesBild } from '@/server/bild-url'
+import { bildUrlsAusInhalt, pfadAusAdresse } from '@/lib/betrieb'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -42,6 +45,44 @@ async function getAuthenticatedFarm() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) throw new Error('Kein Hof gefunden')
   return farm
+}
+
+/**
+ * Das ersetzte Produktbild bzw. das Bild eines gelöschten Produkts verlässt den
+ * Bild-Speicher (Audit A8, Nr. 206) — gleicher Weg wie in appearance.ts (eine
+ * exportierte Hilfsfunktion wäre in einer 'use server'-Datei eine aufrufbare Aktion).
+ * Erst NACH dem erfolgreichen Schreiben in der Datenbank; nur eine Datei im Ordner
+ * DIESES Hofs aus unserem Speicher; nur, wenn keine Zeile mehr auf sie zeigt.
+ * Die Felder sind dieselben wie in ladeBildVerwendung (src/server/betrieb-bilder.ts);
+ * ein neues Bildfeld gehört in beide Kopien hier UND dorthin (Wache tests/bild-ersetzen-loeschen.test.ts).
+ * Ein archiviertes Produkt (mit Bestellungen) behält sein Bild — die Aufrufer
+ * rufen das hier dann nicht. Scheitert das Löschen, gilt die Aktion trotzdem:
+ * eine Meldung nach Sentry, ohne Adresse und ohne Fehlertext.
+ */
+async function entferneAltesBild(alt: string | null | undefined, neu: string | null | undefined, farmId: string, anlass: 'produktbild' | 'produkt-geloescht'): Promise<void> {
+  if (!alt || alt === neu || !istEigenesBild(alt, farmId)) return
+  try {
+    const verwendet = await Promise.all([
+      prisma.farm.count({ where: { OR: [{ logoUrl: alt }, { bannerUrl: alt }, { bannerValue: alt }] } }),
+      prisma.product.count({ where: { imageUrl: alt } }),
+      prisma.farmPhoto.count({ where: { url: alt } }),
+      prisma.statusPost.count({ where: { photoUrl: alt } }),
+      prisma.meldung.count({ where: { screenshotUrl: alt } }),
+      // Die Startseite (Blöcke und Fassungen) zählt mit wie in ladeBildVerwendung (src/server/betrieb-bilder.ts):
+      // startseite.ts lässt eine unveränderte alte Adresse stehen, auch ein Hofbild.
+      prisma.startseiteBlock.count({ where: { bildUrl: alt } }),
+      prisma.startseiteFassung
+        .findMany({ select: { inhalt: true } })
+        .then((fassungen) => fassungen.filter((f) => bildUrlsAusInhalt(f.inhalt).some((u) => pfadAusAdresse(u) === pfadAusAdresse(alt))).length),
+    ])
+    if (verwendet.some((n) => n > 0)) return
+    await del(alt, { token: process.env.BLOB_READ_WRITE_TOKEN })
+  } catch (fehler) {
+    Sentry.captureMessage('Ersetztes Bild nicht aus dem Speicher gelöscht', {
+      level: 'warning',
+      tags: { bereich: 'bild-loeschen', anlass, klasse: fehler instanceof Error ? fehler.name : typeof fehler },
+    })
+  }
 }
 
 /** Alles neu laden, was Produkte dieses Hofs zeigt (src/server/produkte-schreiben.ts). */
@@ -173,10 +214,9 @@ export async function updateProduct(
     return { error: 'Bitte lade die Seite neu und versuch es noch einmal.' }
   }
   // Wie beim Anlegen; ein unverändertes Altbild bleibt speicherbar.
-  const bildErlaubt = await bildUrlErlaubt(v.imageUrl, farm.id, async () => {
-    const bisher = await prisma.product.findFirst({ where: { id: productId, farmId: farm.id }, select: { imageUrl: true } })
-    return bisher?.imageUrl
-  })
+  // Das bisherige Bild einmal gelesen: für die Prüfung und fürs Löschen nach dem Speichern (Nr. 206).
+  const bisherigesBild = (await prisma.product.findFirst({ where: { id: productId, farmId: farm.id }, select: { imageUrl: true } }))?.imageUrl
+  const bildErlaubt = await bildUrlErlaubt(v.imageUrl, farm.id, async () => bisherigesBild)
   if (!bildErlaubt) return { error: BILD_NICHT_UEBERNOMMEN }
   const futter = futterAus(v)
   const vorratSetzen = bestandVorher !== undefined && v.stock !== bestandVorher
@@ -256,6 +296,7 @@ export async function updateProduct(
 
   if (ergebnis === 'nicht-gefunden') return { error: 'Produkt nicht gefunden.' }
   if (typeof ergebnis === 'object') return { error: vorratGeaendertText(ergebnis.geaendert), code: 'GEAENDERT', vorrat: ergebnis.geaendert }
+  await entferneAltesBild(bisherigesBild, daten.imageUrl, farm.id, 'produktbild')
 
   revalidate(farm.slug)
   return sperre ? { ok: true, hinweis: `Gespeichert, aber nicht im Shop. ${sperre}.` } : { ok: true }
@@ -417,6 +458,7 @@ export async function updateProductImageAction(
   if (!(await bildUrlErlaubt(imageUrl, farm.id, async () => existing.imageUrl))) return { error: BILD_NICHT_UEBERNOMMEN }
 
   await prisma.product.update({ where: { id: productId }, data: { imageUrl } })
+  await entferneAltesBild(existing.imageUrl, imageUrl, farm.id, 'produktbild')
 
   revalidate(farm.slug)
   return {}
@@ -498,15 +540,16 @@ export async function deleteProduct(productId: string): Promise<ProduktLoeschErg
 
   const existing = await prisma.product.findFirst({
     where: { id: productId, farmId: farm.id },
-    select: { id: true },
+    select: { id: true, imageUrl: true },
   })
   if (!existing) throw new Error('Produkt nicht gefunden')
 
   const bestellungen = await prisma.orderItem.count({ where: { productId: existing.id } })
   let archiviert = bestellungen > 0
+  let geloescht = false
   if (!archiviert) {
     try {
-      await prisma.product.deleteMany({ where: { id: existing.id, farmId: farm.id } })
+      geloescht = (await prisma.product.deleteMany({ where: { id: existing.id, farmId: farm.id } })).count > 0
     } catch (err) {
       if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003')) throw err
       archiviert = true
@@ -515,6 +558,8 @@ export async function deleteProduct(productId: string): Promise<ProduktLoeschErg
   if (archiviert) {
     await prisma.product.updateMany({ where: { id: existing.id, farmId: farm.id }, data: { isAvailable: false } })
   }
+  // Archiviert behält das Produkt sein Bild (Bestellungen zeigen es) — gelöscht wird es nur mit der Zeile.
+  if (geloescht) await entferneAltesBild(existing.imageUrl, null, farm.id, 'produkt-geloescht')
 
   revalidate(farm.slug)
   return { archiviert }

@@ -6125,6 +6125,16 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Bewusst locker:** `created` der Erstattung und `attempt_count` der Rechnung sind optional, weil die Behandlung ihr Fehlen schon abfängt; unbekannte Felder lässt Zod durch. Ereignisse verbundener Konten: geprüft wird nur `account.updated`, alles andere bleibt wie bisher ohne Wirkung.
 - **status-image:** Die Bedingung `OEFFENTLICH_SICHTBAR` enthielt `HOF_SICHTBAR_WO` schon; neu prüft die Route den gelesenen Hof zusätzlich mit `hofSichtbar` — auch für das eigene Konto eines Testhofs.
 
+## Ersetzte und gelöschte Bilder verlassen den Bild-Speicher (Audit A8; Nr. 206, Lauf 27, 30.10.2026)
+
+- **Fund:** Seit Nr. 108 löscht der Upload das ersetzte Bild nicht mehr (das Speichern danach kann scheitern). Gelöscht hat es danach niemand: Logo, Titelbild und Produktbild blieben beim Ersetzen, das Bild eines gelöschten Produkts mit der Zeile im Speicher – Datenreste, auf die Stufe 2 von „Konto schließen“ angewiesen wäre.
+- **Fix:** `entferneAltesBild` in `src/server/actions/appearance.ts` (`saveAppearanceAction`, `updateFarmLogoAction`, `updateFarmBannerAction`) und `src/server/actions/products.ts` (`updateProduct`, `updateProductImageAction`, `deleteProduct`). Reihenfolge: erst das Schreiben in der Datenbank, dann das Löschen. Gelöscht wird nur eine Datei im Ordner des eigenen Hofs aus dem eigenen Speicher (`istEigenesBild`) und nur, wenn keine Zeile mehr auf sie zeigt (Hof: Logo, Titelbild, `bannerValue`; Produkt; Galerie; Beitrag; Meldung; Startseiten-Block und die `bildUrl`-Werte in den Fassungen der Startseite – dieselbe Liste wie `ladeBildVerwendung` in `src/server/betrieb-bilder.ts`, Nachbesserung Runde 1). Die Startseite kann ein Hofbild noch zeigen (`startseite.ts` lässt eine unveränderte alte Adresse stehen); ein gelöschter Blob lässt sich nicht zurückholen. Entfernen (null) zählt wie Ersetzen.
+- **Scheitern:** Scheitert die Prüfung oder das Löschen, gilt die Action trotzdem; eine Meldung nach Sentry (`bereich: bild-loeschen`, Anlass, Fehlerklasse) ohne Adresse und ohne Fehlertext. Die Datei bleibt dann als „Bild ohne Verwendung“ (N18).
+- **Archiviert:** Ein Produkt mit Bestellungen wird ausgeblendet statt gelöscht (Nr. 195) und behält sein Bild.
+- **Zwei Kopien:** Die Hilfsfunktion steht in beiden Dateien. Eine exportierte Funktion wäre in einer `'use server'`-Datei eine aufrufbare Aktion, und eine neue Datei lag außerhalb der Grenze von Nr. 206.
+- **Wache:** `tests/blob-loeschen-wache.test.ts` nennt beide Dateien als benannte Wege (je ein `del`). Tests: `tests/bild-ersetzen-loeschen.test.ts`; dort prüft eine Quelltext-Wache, dass jede Tabelle und jedes Feld aus `ladeBildVerwendung` auch in beiden Kopien steht – ein neues Bildfeld fällt so auf, statt still übersehen zu werden.
+- **Nicht in Nr. 206:** Alte Waisen aufräumen (eigener Auftrag mit Freigabe). Beitragsfotos (`deleteStatusPost` in `status-posts.ts`) und Bilder der Startseite (`startseite.ts`) löschen beim Ersetzen oder Löschen weiterhin nichts.
+
 ## Nützliche Befehle
 
 ```bash
