@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { hofAnlegenFormularSchema, profilBearbeitenSchema, profileSchema } from '@/schemas/hofprofil'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { PROFIL_MELDUNG } from '@/lib/profil-meldungen'
 
 const BASIS = {
@@ -93,8 +94,10 @@ describe('Meldungen sagen, was fehlt und wozu', () => {
     }
   })
 
-  it('das Anlegen-Formular nutzt für die Hof-E-Mail denselben Satz', () => {
+  it('das Anlegen-Formular sagt bei ungültiger Hof-E-Mail seinen eigenen Satz (Pflichtfeld: „oder lass das Feld leer“ stimmte nicht mehr, Nr. 212)', () => {
     const r = hofAnlegenFormularSchema.safeParse({ ...BASIS, email: 'kaputt' })
-    expect(r.success ? [] : r.error.issues.map((i) => i.message)).toContain(PROFIL_MELDUNG.email)
+    const meldungen = r.success ? [] : r.error.issues.map((i) => i.message)
+    expect(meldungen).toContain(HOF_EMAIL_TEXT.ungueltig)
+    expect(meldungen).not.toContain(PROFIL_MELDUNG.email)
   })
 })

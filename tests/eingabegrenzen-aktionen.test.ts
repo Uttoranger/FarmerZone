@@ -30,6 +30,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/email', () => ({ sendNewFarmNotification: vi.fn() }))
 
 import { createFarm } from '@/server/actions/onboarding'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { registerFarmer } from '@/server/actions/register'
 import { updateProfile } from '@/server/actions/farm'
 import { generateFormToken } from '@/lib/form-token'
@@ -104,6 +105,23 @@ describe('createFarm — Obergrenzen beim Anlegen', () => {
     const res = await createFarm({ ...ANLAGE, phone: text(31, '1') })
 
     expect(res).toHaveProperty('error')
+    expect(farmCreate).not.toHaveBeenCalled()
+  })
+
+  it('Nr. 212: ohne Hof-E-Mail (leer, nur Leerzeichen) legt createFarm keinen Hof an — derselbe Satz wie im Formular', async () => {
+    for (const email of ['', '   ']) {
+      const res = await createFarm({ ...ANLAGE, email })
+      expect(res).toEqual({ error: HOF_EMAIL_TEXT.pflicht })
+    }
+    expect(farmCreate).not.toHaveBeenCalled()
+    // Gegenprobe: mit Adresse wird angelegt.
+    expect(await createFarm(ANLAGE)).not.toHaveProperty('error')
+    expect(farmCreate).toHaveBeenCalledTimes(1)
+  })
+
+  it('Nr. 212: eine ungültige Hof-E-Mail lehnt createFarm mit dem Satz für ein Pflichtfeld ab (kein „oder lass das Feld leer“)', async () => {
+    const res = await createFarm({ ...ANLAGE, email: 'hof at example' })
+    expect(res).toEqual({ error: HOF_EMAIL_TEXT.ungueltig })
     expect(farmCreate).not.toHaveBeenCalled()
   })
 

@@ -14,6 +14,7 @@ import { zuletztText } from '@/lib/betrieb'
 import { mitAnzahl } from '@/lib/format'
 import type { AdminAktionArt } from '@/schemas/admin-aktion'
 import { agbAkteText } from '@/lib/agb-zustimmung'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 
 export const ADMIN_HOEFE_HREF = '/admin/hoefe'
 
@@ -71,10 +72,14 @@ export const AKTE_PROTOKOLL_LEER = {
 
 // ─── Kontakt ────────────────────────────────────────────────────────────────
 
-/** „wie Anmeldung“, wenn die Hof-E-Mail leer ist oder der Anmeldung gleicht (hofKontaktEmail, Nr. 194); sonst „eigene Adresse“. */
+/**
+ * „Hof-E-Mail fehlt“ bei leerem Feld (Nr. 212: die Belehrung braucht die Adresse des Betriebs),
+ * „wie Anmeldung“, wenn sie der Anmeldung gleicht; sonst „eigene Adresse“. Nie die Adresse selbst.
+ */
 export function hofEmailText(hofEmail: string, anmeldung: string): string {
   const h = hofEmail.trim().toLowerCase()
-  return h === '' || h === anmeldung.trim().toLowerCase() ? 'wie Anmeldung' : 'eigene Adresse'
+  if (h === '') return HOF_EMAIL_TEXT.akteFehlt
+  return h === anmeldung.trim().toLowerCase() ? 'wie Anmeldung' : 'eigene Adresse'
 }
 
 // ─── Aktivität ──────────────────────────────────────────────────────────────

@@ -13,7 +13,8 @@
  * Zeile kommt fertig als Text, Zahl und Wahrheitswert vom Server.
  */
 import { zuletztText } from '@/lib/betrieb'
-import { freischaltSperre, FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT, FREISCHALTUNG_PRODUKT_OFFEN_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
+import { freischaltSperre, FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT, FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT, FREISCHALTUNG_PRODUKT_OFFEN_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { ADMIN_HOEFE_HREF } from '@/lib/admin-hof-akte'
 
@@ -68,6 +69,8 @@ export type SignalHof = ZustandHof & {
   stripeBereit: boolean
   produktImShop: boolean
   abholzeitAktiv: boolean
+  /** Hof-E-Mail für die Kundschaft fehlt (Nr. 212) — Teil der Freischalt-Sperre. */
+  hofEmailFehlt: boolean
   /** Die jüngste Bestellung des Hofs (ohne Testzahlungen) — null ohne Bestellung. */
   letzteBestellungAm: Date | null
 }
@@ -79,6 +82,7 @@ function freischaltKurz(hof: SignalHof): string {
   if (sperre === FREISCHALTUNG_STRIPE_OFFEN_TEXT) return 'Stripe fehlt'
   if (sperre === FREISCHALTUNG_PRODUKT_OFFEN_TEXT) return 'kein Produkt im Shop'
   if (sperre === FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT) return 'Abholzeit fehlt'
+  if (sperre === FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT) return HOF_EMAIL_TEXT.akteFehlt
   return 'bereit zum Prüfen'
 }
 
