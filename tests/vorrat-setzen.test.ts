@@ -290,6 +290,8 @@ function produkt(teil: Partial<ProductData> = {}): ProductData {
     familieId: null,
     verpackung: null,
     abholhinweise: [],
+    keinRuecktritt: false,
+    ruecksendekostenCents: null,
     sperre: null,
     ...teil,
   }

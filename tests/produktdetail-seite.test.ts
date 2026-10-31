@@ -368,3 +368,25 @@ describe('Telefon und E-Mail des Hofs gehen nicht an die Client-Komponente (Nr. 
     expect(farm.products).toHaveLength(HOF.products.length)
   })
 })
+
+describe('Rücktritt je Produkt (Nr. 214)', () => {
+  const hof = (teil: Partial<PublicProduct>): PublicFarm => publicFarm({ ...HOF, products: [produkt('p_r', { name: 'Brennholz Buche', ...teil })] })
+
+  it('mit Angabe des Hofs: „Kein Rücktritt“ und die Schätzung unter dem Namen', async () => {
+    const html = await seite('p_r', {}, hof({ keinRuecktritt: true, ruecksendekostenCents: 4000 }))
+    expect(html).toContain('Kein Rücktritt: verdirbt schnell')
+    expect(html).toContain('Rücksendung geschätzt ca. € 40,00')
+  })
+
+  it('ohne Angabe steht nichts', async () => {
+    const html = await seite('p_r', {}, hof({}))
+    expect(html).not.toContain('data-ruecktritt-hinweis')
+    expect(html).not.toContain('Rücksendung geschätzt')
+  })
+
+  it('Ware nur für Betriebe: kein Hinweis, auch mit Angabe', async () => {
+    const html = await seite('p_r', {}, hof({ ...HEU, abgabe: 'NUR_BETRIEBE', futter: futter(250), keinRuecktritt: true, ruecksendekostenCents: 4000 }))
+    expect(html).toContain('Nur an Betriebe')
+    expect(html).not.toContain('data-ruecktritt-hinweis')
+  })
+})

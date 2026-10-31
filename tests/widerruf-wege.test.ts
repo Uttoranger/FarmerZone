@@ -55,7 +55,9 @@ import { lehneWiderrufAbAction, reicheWiderrufMitLinkEin, reicheWiderrufOhneLink
 import { ladeWiderrufeDesHofs, ladeWiderrufeOhneBestellung, ladeWiderrufeZurBestellung, verarbeiteWiderruf } from '@/server/widerruf'
 import { ordneWiderrufZu } from '@/server/actions/admin-bestellung'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
-import { WIDERRUF_ADMIN_TEXT } from '@/lib/widerruf'
+import { WIDERRUF_ADMIN_TEXT, ausnahmeHinweis } from '@/lib/widerruf'
+import { RUECKTRITT_TEXT } from '@/lib/ruecktritt-angaben'
+import { findeElement } from './element-suche'
 import WiderrufPage from '@/app/(public)/widerruf/page'
 import { WiderrufFormular } from '@/app/(public)/widerruf/widerruf-formular'
 
@@ -463,6 +465,29 @@ describe('Seite /widerruf', () => {
     await expect(WiderrufPage({ searchParams: Promise.resolve({ bestellung: 'bestellung-1', sig: 'falsch' }) })).rejects.toThrow('NEXT_NOT_FOUND')
     await expect(WiderrufPage({ searchParams: Promise.resolve({ bestellung: 'bestellung-1' }) })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(db.order.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('Nr. 214: mit Link nimmt der Hinweis je Position zuerst die Angabe des Hofs, sonst den Satz je Kategorie — beide Positionen bleiben wählbar', async () => {
+    db.order.findUnique.mockResolvedValue({
+      id: 'bestellung-1',
+      orderNumber: 'HM-2611-TEST',
+      customerName: 'Erika Test',
+      kaeuferArt: 'PRIVAT',
+      status: 'PICKED_UP',
+      pickedUpAt: new Date(),
+      farm: { name: 'Hof Test', ownerName: '', address: 'Feldweg 1', postalCode: '4910', city: 'Beispieldorf', phone: '', archivedAt: null, geschlossenAm: null, email: 'hof@example.com', owner: { email: 'inhaber@example.com' } },
+      items: [
+        { id: 'pos-a', productName: 'Honig', quantity: 1, fehltSeit: null, product: { category: 'HONIG', unit: 'STUECK', unitSize: null, keinRuecktritt: true } },
+        { id: 'pos-b', productName: 'Honig klein', quantity: 1, fehltSeit: null, product: { category: 'HONIG', unit: 'STUECK', unitSize: null, keinRuecktritt: false } },
+      ],
+    } as never)
+    const baum = await WiderrufPage({ searchParams: Promise.resolve({ bestellung: 'bestellung-1', sig: widerrufSignatur('bestellung-1') }) })
+    const formular = findeElement(baum, WiderrufFormular)
+    const positionen = (formular?.props.bestellung as { positionen: Array<{ id: string; hinweis: string }> }).positionen
+    expect(positionen.map((p) => p.id)).toEqual(['pos-a', 'pos-b'])
+    expect(positionen[0]!.hinweis).toBe(RUECKTRITT_TEXT.widerrufKeinRuecktritt)
+    expect(positionen[1]!.hinweis).toBe(ausnahmeHinweis('HONIG'))
+    expect(positionen[1]!.hinweis).toContain('wahrscheinlich möglich')
   })
 
   it('die Knöpfe heißen wörtlich „Vertrag widerrufen“ und „Widerruf bestätigen“', () => {

@@ -16,6 +16,7 @@ import { fristVon } from '@/lib/fristen'
 import { alsCents } from '@/lib/order-totals'
 import { centsAlsEuro, gebindeGroesse } from '@/lib/format'
 import { kaufSperre } from '@/lib/bereiche-anzeige'
+import { ruecktrittFuerPosition } from '@/lib/ruecktritt-angaben'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
 import { prisma } from '@/lib/prisma'
@@ -80,6 +81,8 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
       pickupTimeEnd: true,
       // Die Adresse zeigt auch die Bestätigungsseite, solange die Bestellung läuft; den Namen nie (Nr. 153).
       customerEmail: true,
+      // Nr. 214: der Hinweis zum Rücktritt je Position nur bei Verbraucherinnen.
+      kaeuferArt: true,
       items: {
         select: {
           productId: true,
@@ -88,7 +91,7 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
           unitPrice: true,
           totalPrice: true,
           gebuehrCents: true,
-          product: { select: { unit: true, unitSize: true, imageUrl: true } },
+          product: { select: { unit: true, unitSize: true, imageUrl: true, keinRuecktritt: true, ruecksendekostenCents: true } },
         },
       },
     },
@@ -136,6 +139,8 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
       unitSize: gebindeGroesse(item.product?.unitSize),
       // Decimal → Cent → Euro an der Servergrenze (CODING_STANDARDS §2): so führt der Korb im Browser den Preis.
       price: centsAlsEuro(alsCents(item.unitPrice)),
+      // Nr. 214: Angaben des Hofs zum Rücktritt, wie heute am Produkt gespeichert — bei „Betrieb“ keine.
+      ruecktritt: ruecktrittFuerPosition(item.product, order.kaeuferArt === 'PRIVAT'),
     })),
     korb,
   }

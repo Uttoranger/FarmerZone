@@ -70,6 +70,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { StripeZahlung } from './stripe-payment'
+import { ruecktrittFuerPosition } from '@/lib/ruecktritt-angaben'
 import { KaufZusammenfassung } from './kauf-zusammenfassung'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
@@ -558,6 +559,10 @@ export function CheckoutForm({
   // Leerer Korb — mit Ausweg und, wenn die Prüfung alles herausgenommen hat, mit dem Grund (Register N28).
   if (cart.length === 0) return fokusShell('Bestellen', <KasseLeer hof={farm} hinweis={korbHinweis} />)
 
+  // Rücktritt je Produkt (Nr. 214): die Angaben des Hofs aus den Produkten der Seite (Server), nie aus dem Korb im
+  // Browser — und nur bei Verbraucherinnen; bei „Betrieb“ gibt es kein Rücktrittsrecht, also keinen Hinweis.
+  const privat = !(betriebAbschnitt && kaeuferArt === 'BETRIEB')
+  const produkte = new Map(farm.products.map((p) => [p.id, p]))
   const korbPositionen = cart.map((i) => ({
     productId: i.productId,
     name: i.name,
@@ -566,6 +571,7 @@ export function CheckoutForm({
     unit: i.unit,
     unitSize: i.unitSize,
     price: i.price,
+    ruecktritt: ruecktrittFuerPosition(produkte.get(i.productId), privat),
   }))
 
   // Zahlungsschritt: Bestellung und Zahlungsvorgang stehen (Stripe).
@@ -668,7 +674,7 @@ export function CheckoutForm({
             wirdGesendet={isPending}
             gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null || mindestGrund !== null}
             gesamt={gesamt}
-            privat={!(betriebAbschnitt && kaeuferArt === 'BETRIEB')}
+            privat={privat}
             zusammenfassung={
               <KaufZusammenfassung
                 karte

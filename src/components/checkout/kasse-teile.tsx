@@ -8,6 +8,8 @@ import { formatEuro, formatMenge } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ, PREISE_INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { mitEndpreis, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import type { RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
+import { RuecktrittHinweis } from '@/components/shared/ruecktritt-hinweis'
 import {
   GEBUEHR_ENTFAELLT,
   KONTAKT_HINWEIS,
@@ -128,6 +130,11 @@ export type KorbPosition = {
   unit: string
   unitSize?: number | null
   price: number
+  /**
+   * Angaben des Hofs zum Rücktritt (Nr. 214) — der Hinweis unter dem Namen. Nur bei Verbraucherinnen
+   * gesetzt; bei „Betrieb“ und ohne Angabe null bzw. weggelassen, dann steht nichts.
+   */
+  ruecktritt?: RuecktrittAngabe | null
 }
 
 /** „Dein Korb bei …" — Positionen mit Menge und Zeilensumme in Cent; ändern nur auf der Hofseite. */
@@ -179,6 +186,7 @@ export function KorbKarte({
                 {formatMenge(p.quantity, p.unit, p.unitSize)} × {formatEuro(p.price)}
               </p>
               <GrundpreisZeile price={p.price} unit={p.unit} unitSize={p.unitSize} className="text-[11.5px]" />
+              {p.ruecktritt && <RuecktrittHinweis angabe={p.ruecktritt} className="mt-0.5 text-[11.5px]" />}
             </div>
             <span className="shrink-0 text-right text-[14.5px] font-semibold tabular-nums">
               {formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}

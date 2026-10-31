@@ -50,6 +50,12 @@ interface BestandEintrag {
  */
 const GELD_FLIESSKOMMA_BESTAND: readonly BestandEintrag[] = [
   {
+    datei: 'src/lib/ruecktritt-angaben.ts',
+    ausdruck: 'p.menge * p.ruecksendekostenCents',
+    anzahl: 1,
+    grund: 'ganze Zahlen: Menge (Int) × geschätzte Rücksendekosten in Cent (Int) — nur der Satz in der Belehrung, kein Betrag einer Rechnung, Nr. 214',
+  },
+  {
     datei: 'src/lib/plattformgebuehr.ts',
     ausdruck: 'p.menge * gebuehrJeStueckCents(p.preisCents, hundertstel)',
     anzahl: 1,
