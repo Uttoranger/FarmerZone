@@ -277,7 +277,7 @@ describe('Rücktritt je Position (Nr. 214)', () => {
   it('mit Angabe des Hofs: die Hinweise unter dem Namen', () => {
     const html = karte({ keinRuecktritt: true, ruecksendekostenCents: 4000 })
     expect(html).toContain('Kein Rücktritt: verdirbt schnell')
-    expect(html).toContain('Rücksendung geschätzt ca. € 40,00')
+    expect(html).toContain('Rücksendung geschätzt ca. €\u00a040,00')
     expect(html.indexOf('Brennholz Buche')).toBeLessThan(html.indexOf('Kein Rücktritt'))
   })
 

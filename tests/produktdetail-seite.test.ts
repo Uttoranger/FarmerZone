@@ -375,7 +375,7 @@ describe('Rücktritt je Produkt (Nr. 214)', () => {
   it('mit Angabe des Hofs: „Kein Rücktritt“ und die Schätzung unter dem Namen', async () => {
     const html = await seite('p_r', {}, hof({ keinRuecktritt: true, ruecksendekostenCents: 4000 }))
     expect(html).toContain('Kein Rücktritt: verdirbt schnell')
-    expect(html).toContain('Rücksendung geschätzt ca. € 40,00')
+    expect(html).toContain('Rücksendung geschätzt ca. €\u00a040,00')
   })
 
   it('ohne Angabe steht nichts', async () => {

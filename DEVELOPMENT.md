@@ -6208,3 +6208,11 @@ pnpm briefkasten export   # Briefkasten als Markdown (nur lesend; Leseroute oder
 - Die Fußzeile unter „Jetzt bezahlen“ ist weg: Die Abholung steht oben in der Zusammenfassung; „Bezahlung sicher über Stripe“ entfiel, weil die Karte „Bezahlen“ denselben Satz („Sichere Zahlung über Stripe“) trägt. Das Formular behält seine Zeile `kaufknopfZeile` (src/lib/kasse.ts lag außerhalb der Dateigrenze).
 - Am Handy steht die Übersicht im Zahlungsschritt jetzt zuletzt (`uebersichtZuletzt`), damit die Zusammenfassung beim Scrollen bis unten direkt über der festen Leiste steht; vorher stand sie unter dem Korb.
 - Keine Logik geändert: Beträge kommen wie bisher aus `zahlungsBetraege` bzw. `kassenBetraege`, der Zusatz am Gesamt sind nur Worte zu diesen Beträgen.
+
+## Rücktritt je Produkt: „verdirbt schnell“ und geschätzte Rücksendekosten (Register N39, Ergänzung 31.10.2026; Nr. 214, Lauf 28, 31.10.2026)
+
+- Befund: Rücktrittsausnahme und Rücksendekosten standen nur je Kategorie (`ausnahmeHinweis`), nicht je Ware; eine Schätzung der Rücksendekosten sperriger Ware (§ 4 Abs. 1 Z 9 FAGG, AGB-Prüfhinweise 6 und 21) gab es nicht. Entschieden: Der Hof gibt beides je Produkt an, die App zeigt es nur.
+- Migration `20261031200000_ruecktritt_je_produkt` (Expand): `Product.keinRuecktritt` (false) und `Product.ruecksendekostenCents` (null). Keine Datenänderung — kein Bestandsprodukt bekommt eine Angabe; ohne Angabe gilt der Satz je Kategorie bzw. keine Rücksendekosten für die Kundschaft.
+- Produktformular (Details, Block „Rücktritt“): Haken und Euro-Feld. Euro wird über die Ziffern zu Cent (`euroEingabeZuCent`), Unlesbares und Negatives lehnt das Schema mit einem Satz ab, 0 heißt „leer lassen“. Der Haken startet beim Anlegen je Kategorie (Milch, Eier, Fleisch, Fisch, Gemüse, Obst, Brot gesetzt), beim Bearbeiten mit dem gespeicherten Wert.
+- Anzeige unter dem Namen auf Produktseite, in der Kasse und in der Produktliste des Hofs; nie bei „Betrieb“. /widerruf: die Angabe des Hofs hat Vorrang vor dem Satz je Kategorie.
+- Belehrung in den drei Bestätigungsmails: mit mindestens einer Schätzung der Satz aus Gestaltungshinweis 5 b mit der Summe (Schätzung × Menge, aufgerundet auf ganze Euro), sonst unverändert. Die Futter-Familie (neues Futter mit Verkaufsgrößen) hat die zwei Felder noch nicht; der Hof trägt sie über „Bearbeiten“ nach.

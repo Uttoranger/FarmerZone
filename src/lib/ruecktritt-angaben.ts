@@ -24,7 +24,7 @@ export const RUECKSENDEKOSTEN_MAX_CENTS = 1_000_000
 export const RUECKTRITT_TEXT = {
   // Produktformular (Hof, einfache Sprache)
   abschnitt: 'Rücktritt',
-  keinRuecktritt: 'Verdirbt schnell – kein Rücktritt möglich (z. B. frisches Fleisch, Milch, Brot)',
+  keinRuecktritt: 'Verdirbt schnell – kein Rücktritt möglich (z.\u00a0B. frisches Fleisch, Milch, Brot)',
   keinRuecktrittErklaerung:
     'Kundinnen können bei schnell verderblicher Ware nicht vom Kauf zurücktreten. Wir zeigen das vor dem Bestellen bei diesem Produkt an.',
   ruecksendekosten: 'Geschätzte Kosten, wenn die Kundin die Ware zurückschickt (nur bei sperriger Ware wie Brennholz, Heu, Großgebinden)',
@@ -36,7 +36,8 @@ export const RUECKTRITT_TEXT = {
   betragZuHoch: 'Der Betrag ist zu hoch. Bitte prüf die Eingabe.',
   // Produktseite, Kasse, Produktliste des Hofs
   hinweisKeinRuecktritt: 'Kein Rücktritt: verdirbt schnell',
-  hinweisRuecksendung: (cents: number) => `Rücksendung geschätzt ca. ${formatEuro(centsAlsEuro(cents))}`,
+  // Geschütztes Leerzeichen nach „€“: In der schmalen Kassen-Zeile brach der Betrag sonst vom Zeichen ab.
+  hinweisRuecksendung: (cents: number) => `Rücksendung geschätzt ca. ${formatEuro(centsAlsEuro(cents)).replace('€ ', '€\u00a0')}`,
   // /widerruf: Vorrang vor dem Satz je Kategorie (Freigabe 214 Punkt 3)
   widerrufKeinRuecktritt:
     'Für diese Ware besteht nach Angabe des Hofs kein Rücktrittsrecht (§ 18 Abs. 1 Z 4 FAGG). Der Hof prüft das im Einzelfall.',

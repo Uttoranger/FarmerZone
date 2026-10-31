@@ -76,13 +76,13 @@ describe('ruecktrittHinweise', () => {
 
   it('nennt „kein Rücktritt“ und die Schätzung im Euro-Format der Seite', () => {
     expect(ruecktrittHinweise({ keinRuecktritt: true, ruecksendekostenCents: null })).toEqual(['Kein Rücktritt: verdirbt schnell'])
-    expect(ruecktrittHinweise({ keinRuecktritt: false, ruecksendekostenCents: 2550 })).toEqual(['Rücksendung geschätzt ca. € 25,50'])
+    expect(ruecktrittHinweise({ keinRuecktritt: false, ruecksendekostenCents: 2550 })).toEqual(['Rücksendung geschätzt ca. €\u00a025,50'])
     expect(ruecktrittHinweise({ keinRuecktritt: true, ruecksendekostenCents: 12000 })).toEqual([
       RUECKTRITT_TEXT.hinweisKeinRuecktritt,
-      'Rücksendung geschätzt ca. € 120,00',
+      'Rücksendung geschätzt ca. €\u00a0120,00',
     ])
     // Tausender wie jeder Betrag der Seite (formatEuro, de-AT).
-    expect(ruecktrittHinweise({ keinRuecktritt: false, ruecksendekostenCents: 120000 })).toEqual([`Rücksendung geschätzt ca. ${formatEuro(1200)}`])
+    expect(ruecktrittHinweise({ keinRuecktritt: false, ruecksendekostenCents: 120000 })).toEqual([`Rücksendung geschätzt ca. ${formatEuro(1200).replace('€ ', '€\u00a0')}`])
   })
 })
 
