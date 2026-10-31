@@ -15,8 +15,16 @@ import { z } from 'zod'
  * harmlos. Eine zweite, strengere Policy zum Beobachten (Stufe 2) gibt es
  * deshalb nicht: Sie wäre dieselbe.
  *
- * Notfall: den Commit von Nr. 204 per `git revert` zurücknehmen — dann heißt
- * der Header wieder `Content-Security-Policy-Report-Only` und blockiert nichts.
+ * Notfall (zurück auf Report-Only): `git revert 871a3e9b` — dieser Commit
+ * trägt den Code von Nr. 204 (CSP_HEADER, cspRegeln, Tests) —, oder beide
+ * zusammen `git revert 5bfcf4c8 871a3e9b`. Nur 5bfcf4c8 (feat-Titel) zurück-
+ * nehmen ändert nichts, der ist reine Doku. Die Hashes bleiben nach dem
+ * Sammel-PR (Merge-Commit) gleich. Zweiter Weg, eine Zeile: CSP_HEADER unten
+ * wieder auf 'Content-Security-Policy-Report-Only' setzen; dann greift auch
+ * die Rahmen-Regel in cspRegeln (next.config.ts) nicht mehr, weil sie auf den
+ * Namen 'Content-Security-Policy' filtert. Die Erwartungen in tests/csp.test.ts
+ * und tests/sicherheits-header.test.ts müssen dann mit zurück, sonst ist die
+ * CI rot. Danach blockiert der Header nichts mehr.
  *
  * JEDER HOST HAT EINE QUELLE (nicht geraten):
  *  - Die Stripe-Hosts (Register G8, Ergänzung Nr. 132) — Quelle für jeden:

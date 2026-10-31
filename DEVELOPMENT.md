@@ -6143,7 +6143,7 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Umgeschaltet:** `CSP_HEADER` = `Content-Security-Policy`, Policy unverändert, Meldungen weiter an /api/csp-bericht, `'unsafe-inline'` bleibt.
 - **Falle gleicher Header-Name:** Die Vorschau-Rahmen setzen `Content-Security-Policy: frame-ancestors 'self'`. Die später angehängten CSP-Regeln hätten das überschrieben (Next: die letzte Regel gewinnt je Header). `cspRegeln` hängt darum je solcher Regel ganz hinten eine mit Policy plus `frame-ancestors` an.
 - **Stufe 2 weggelassen:** Die Policy enthielt nie `'unsafe-eval'`; eine strengere Policy „ohne `'unsafe-eval'`“ zum Beobachten wäre dieselbe.
-- **Notfall:** `git revert <Commit von Nr. 204>` auf einem Branch, PR, Merge — der Header heißt dann wieder `Content-Security-Policy-Report-Only` und blockiert nichts.
+- **Notfall:** `git revert 871a3e9b` — dieser Commit trägt den ganzen Code von Nr. 204 (`CSP_HEADER`, `cspRegeln`, beide Tests) —, oder beide Commits zusammen: `git revert 5bfcf4c8 871a3e9b`. Nur `5bfcf4c8` (Titel „feat: CSP Stufe 1 erzwingend …“) zurückzunehmen ändert nichts, der Commit ist reine Doku. Nach dem Sammel-PR (Merge-Commit) bleiben die Hashes gleich. Zweiter Weg, eine Zeile: in `src/lib/csp.ts` die Konstante `CSP_HEADER` wieder auf `'Content-Security-Policy-Report-Only'` setzen; dann greift auch die Rahmen-Regel in `cspRegeln` (`next.config.ts`) nicht mehr, weil sie auf den Namen `Content-Security-Policy` filtert. Die Erwartungen in `tests/csp.test.ts` und `tests/sicherheits-header.test.ts` müssen dann mit zurück, sonst ist die CI rot. Jeweils auf einem Branch, PR, Merge — der Header heißt dann wieder `Content-Security-Policy-Report-Only` und blockiert nichts.
 
 ## Nützliche Befehle
 
