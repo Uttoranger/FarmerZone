@@ -1,15 +1,22 @@
 import { z } from 'zod'
 
 /*
- * Content-Security-Policy ZUM BEOBACHTEN (Register G8, Nr. 125) — rein, ohne
- * Next und ohne Datenbank; next.config.ts baut daraus die Header,
- * /api/csp-bericht nimmt die Meldungen damit entgegen.
+ * Content-Security-Policy (Register G8, Nr. 125) — rein, ohne Next und ohne
+ * Datenbank; next.config.ts baut daraus die Header, /api/csp-bericht nimmt die
+ * Meldungen damit entgegen.
  *
- * Der Browser blockiert mit `Content-Security-Policy-Report-Only` nichts, er
- * meldet nur, was eine scharfe Policy blockieren würde. Scharf geschaltet wird
- * erst nach Auswertung der Meldungen (eigener Auftrag); dann wird aus dem
- * Header-Namen `Content-Security-Policy`, und Nonces bzw. Hashes ersetzen
- * `'unsafe-inline'`.
+ * ERZWINGEND seit Stufe 1 (G8, Ergänzung 30.10.2026; Nr. 204): dieselbe Policy
+ * wie zum Beobachten, nach Auswertung der Meldungen der 14 Tage bis
+ * 31.10.2026 (Bericht 204). Der Browser blockiert jetzt, was nicht in der Liste steht, und
+ * meldet es weiter an /api/csp-bericht. `'unsafe-inline'` bleibt, bis Nonces
+ * bzw. Hashes kommen (eigener Auftrag). `'unsafe-eval'` steht bewusst nicht
+ * drin: Zod 4 probiert nur `new Function('')` (allowsEval, in try/catch) und
+ * prüft dann ohne JIT — die Meldung `script-src eval` daraus ist erwartet und
+ * harmlos. Eine zweite, strengere Policy zum Beobachten (Stufe 2) gibt es
+ * deshalb nicht: Sie wäre dieselbe.
+ *
+ * Notfall: den Commit von Nr. 204 per `git revert` zurücknehmen — dann heißt
+ * der Header wieder `Content-Security-Policy-Report-Only` und blockiert nichts.
  *
  * JEDER HOST HAT EINE QUELLE (nicht geraten):
  *  - Die Stripe-Hosts (Register G8, Ergänzung Nr. 132) — Quelle für jeden:
@@ -38,7 +45,7 @@ import { z } from 'zod'
  *    Startseite; Register G8, Ergänzung 23.10.2026, Nr. 155).
  */
 
-export const CSP_HEADER = 'Content-Security-Policy-Report-Only'
+export const CSP_HEADER = 'Content-Security-Policy'
 export const CSP_BERICHT_PFAD = '/api/csp-bericht'
 /** Name der Gruppe in `Reporting-Endpoints` und in `report-to`. */
 export const CSP_BERICHT_GRUPPE = 'csp'
@@ -100,7 +107,7 @@ export type CspOptionen = {
   sentryDsn?: string
 }
 
-/** Der Wert für `Content-Security-Policy-Report-Only`. */
+/** Der Wert für `Content-Security-Policy` (CSP_HEADER). */
 export function baueCsp({ melden, berichtAdresse = null, toolbar: mitToolbar = false, sentryDsn }: CspOptionen): string {
   const toolbar = mitToolbar ? [VERCEL_TOOLBAR] : []
   const sentry = sentryHost(sentryDsn)

@@ -24,12 +24,14 @@
  *  - Seiten mit Token in der Adresse schicken keinen Referrer und stehen in
  *    keinem Suchindex — seit Nr. 54 auch /reset-password, wie /verify; die mit
  *    Nr. 54 umgezogenen Seiten behalten ihre Header.
- *  - CSP zum Beobachten (Register G8, Nr. 125): Nur im Produktions-Build trägt
- *    jede Seite `Content-Security-Policy-Report-Only` aus src/lib/csp.ts; gemeldet
+ *  - CSP (Register G8, Nr. 125; erzwingend seit Nr. 204): Nur im Produktions-Build trägt
+ *    jede Seite `Content-Security-Policy` aus src/lib/csp.ts; gemeldet
  *    wird nur bei VERCEL_ENV=production (mit `Reporting-Endpoints`). Die Seiten
  *    mit `no-referrer`, Bestellseite samt Kalender, die Bestätigung der Zustellung,
  *    alles unter /api/ und jede Adresse mit einem heiklen Query-Wert melden nie.
- *    Die bisherigen Header bleiben in jeder Umgebung unverändert.
+ *    Die bisherigen Header bleiben in jeder Umgebung unverändert; die Vorschau-Rahmen tragen
+ *    die Policy samt ihrem `frame-ancestors 'self'` (gleicher Header-Name, Nr. 204). Eine
+ *    zweite Policy zum Beobachten (Stufe 2) gibt es nicht.
  *
  * Gematcht wird mit Nexts eigenem Pfadvergleich (path-to-regexp), nicht mit
  * einer Nachbildung — so gilt auch die Lookahead-Schreibweise der Quelle.
@@ -40,6 +42,7 @@ import { join } from 'node:path'
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match'
 import { matchHas } from 'next/dist/shared/lib/router/utils/prepare-destination'
 import { ansichtsModus } from '@/lib/ansichts-modus'
+import { baueCsp } from '@/lib/csp'
 
 type Regel = {
   source: string
@@ -376,9 +379,13 @@ describe('Kein X-Powered-By', () => {
 })
 
 
-// ─── CSP zum Beobachten (Register G8, Nr. 125) ──────────────────────────────
+// ─── CSP (Register G8, Nr. 125; erzwingend seit Stufe 1, Nr. 204) ────────────
 
-const CSP = 'Content-Security-Policy-Report-Only'
+const CSP = 'Content-Security-Policy'
+/** Stufe 2 (eine strengere Policy zum Beobachten) gibt es nicht: die erzwungene hat schon kein 'unsafe-eval' (Bericht 204). */
+const NUR_BEOBACHTEN = 'Content-Security-Policy-Report-Only'
+/** Ob ein Header die ganze Policy trägt (nicht nur frame-ancestors der Vorschau-Rahmen). */
+const istPolicy = (h: { key: string; value: string }): boolean => h.key === CSP && h.value.includes("default-src 'self'")
 
 /** Die Regeln einer Umgebung — headers() liest die Umgebung erst beim Aufruf (wie beim Build). */
 async function regelnFuer(umgebung: Record<string, string>): Promise<Regel[]> {
@@ -412,7 +419,7 @@ const WEITERE_NIE_MELDEN = ['/hof-test/bestellung/bestellungA', '/hof-test/beste
 const HEIKLE_WERTE = ['s', 'sig', 'token', 't', 'code', 'vorschau', 'reorder']
 const MIT_MELDUNG = ['/', '/hoefe', '/hof-test', '/hof-test/produkt/produkt-a', '/hof-test/checkout', '/region', '/products']
 
-describe('CSP zum Beobachten (G8)', () => {
+describe('CSP (G8, erzwingend seit Nr. 204)', () => {
   let produktion: Regel[] = []
   let vorschau: Regel[] = []
   let entwicklung: Regel[] = []
@@ -425,12 +432,13 @@ describe('CSP zum Beobachten (G8)', () => {
 
   it('in next dev und in Tests keine CSP — sie gilt nur im Produktions-Build', () => {
     for (const liste of [regeln, entwicklung]) {
-      expect(liste.flatMap((r) => r.headers.map((h) => h.key))).not.toContain(CSP)
+      expect(liste.flatMap((r) => r.headers).filter(istPolicy)).toEqual([])
+      expect(liste.flatMap((r) => r.headers.map((h) => h.key))).not.toContain(NUR_BEOBACHTEN)
       expect(liste.flatMap((r) => r.headers.map((h) => h.key))).not.toContain('Reporting-Endpoints')
     }
   })
 
-  it('Report-Only mit Meldung auf Startseite, /hoefe, Hofseite, Produktseite und Kasse — samt Reporting-Endpoints', () => {
+  it('erzwingend mit Meldung auf Startseite, /hoefe, Hofseite, Produktseite und Kasse — samt Reporting-Endpoints', () => {
     for (const pfad of MIT_MELDUNG) {
       const h = headerFuer(pfad, {}, produktion)
       expect(h[CSP], pfad).toContain("default-src 'self'")
@@ -438,8 +446,10 @@ describe('CSP zum Beobachten (G8)', () => {
       expect(h[CSP], pfad).toContain('report-to csp')
       expect(h[CSP], pfad).toContain('https://o4501.ingest.de.sentry.io')
       expect(h['Reporting-Endpoints'], pfad).toBe('csp="https://example.com/api/csp-bericht"')
-      // Nie die scharfe Policy: Die einzige echte CSP bleibt frame-ancestors der Vorschau-Rahmen.
-      expect(h['Content-Security-Policy'], pfad).toBeUndefined()
+      // Wer uns einbettet, regelt hier weiter X-Frame-Options (DENY), nicht die Policy.
+      expect(h[CSP], pfad).not.toContain('frame-ancestors')
+      expect(h['X-Frame-Options'], pfad).toBe('DENY')
+      expect(h[NUR_BEOBACHTEN], pfad).toBeUndefined()
     }
   })
 
@@ -489,6 +499,7 @@ describe('CSP zum Beobachten (G8)', () => {
   })
 
   it('die bisherigen Header bleiben in jeder Umgebung unverändert — auch die Vorschau-Rahmen', () => {
+    // Ohne CSP auf beiden Seiten: frame-ancestors der Vorschau-Rahmen steht seit Nr. 204 in der Policy (eigener Test unten).
     const ohneCsp = (h: Record<string, string>) => Object.fromEntries(Object.entries(h).filter(([k]) => k !== CSP && k !== 'Reporting-Endpoints'))
     const faelle: [string, Record<string, string>][] = [
       ...[...MIT_MELDUNG, ...OHNE_REFERRER_BEISPIELE, ...WEITERE_NIE_MELDEN].map((p): [string, Record<string, string>] => [p, {}]),
@@ -498,20 +509,48 @@ describe('CSP zum Beobachten (G8)', () => {
     ]
     for (const [pfad, query] of faelle) {
       const vorher = headerFuer(pfad, query)
-      expect(ohneCsp(headerFuer(pfad, query, produktion)), pfad).toEqual(vorher)
-      expect(ohneCsp(headerFuer(pfad, query, vorschau)), pfad).toEqual(vorher)
+      expect(ohneCsp(headerFuer(pfad, query, produktion)), pfad).toEqual(ohneCsp(vorher))
+      expect(ohneCsp(headerFuer(pfad, query, vorschau)), pfad).toEqual(ohneCsp(vorher))
     }
-    expect(headerFuer('/hof-test', { vorschau: '1' }, produktion)['Content-Security-Policy']).toBe("frame-ancestors 'self'")
-    expect(produktion.filter(oeffnetEinbetten)).toHaveLength(EINBETTBAR_MIT_PARAMETER.length)
+  })
+
+  it("die Vorschau-Rahmen tragen die ganze Policy samt frame-ancestors 'self' — ohne Meldung, ohne neue Öffnung", () => {
+    for (const e of EINBETTBAR_MIT_PARAMETER) {
+      expect(headerFuer(e.beispiel, e.query)[CSP], e.beispiel).toBe("frame-ancestors 'self'")
+      for (const [name, liste] of [['produktion', produktion], ['vorschau', vorschau]] as const) {
+        const h = headerFuer(e.beispiel, e.query, liste)
+        const optionen = name === 'vorschau' ? { toolbar: true } : { sentryDsn: 'https://schluesselAbc@o4501.ingest.de.sentry.io/4502' }
+        expect(h[CSP], `${name} ${e.beispiel}`).toBe(`${baueCsp({ melden: false, ...optionen })}; frame-ancestors 'self'`)
+        expect(h['X-Frame-Options'], `${name} ${e.beispiel}`).toBe('SAMEORIGIN')
+        // Ohne den Parameter bleibt die Seite gesperrt.
+        expect(headerFuer(e.beispiel, {}, liste)['X-Frame-Options'], `${name} ${e.beispiel} ohne Parameter`).toBe('DENY')
+      }
+    }
+    // Dieselben Öffnungen wie ohne CSP: je Eintrag die Regel oben und ihre Policy-Regel am Ende, beide am Parameter.
+    const offene = produktion.filter(oeffnetEinbetten)
+    expect(offene).toHaveLength(2 * EINBETTBAR_MIT_PARAMETER.length)
+    for (const regel of offene) expect(regel.has?.length, regel.source).toBeGreaterThan(0)
+    expect(new Set(offene.map((r) => `${r.source} ${JSON.stringify(r.has)}`)).size).toBe(EINBETTBAR_MIT_PARAMETER.length)
+  })
+
+  it('eine Policy zum Beobachten (Stufe 2) gibt es nicht — in keiner Umgebung', () => {
+    for (const liste of [produktion, vorschau, entwicklung]) {
+      expect(liste.flatMap((r) => r.headers.map((h) => h.key))).not.toContain(NUR_BEOBACHTEN)
+    }
   })
 
   it('alle Regeln „nie melden" stehen NACH der allgemeinen — sonst überschriebe sie sie', () => {
-    const allgemein = produktion.findIndex((r) => r.headers.some((h) => h.key === CSP && h.value.includes('report-uri')))
-    const ohne = produktion.map((r, i) => [r, i] as const).filter(([r]) => r.headers.some((h) => h.key === CSP && !h.value.includes('report-uri')))
+    const allgemein = produktion.findIndex((r) => r.headers.some((h) => istPolicy(h) && h.value.includes('report-uri')))
+    const ohne = produktion.map((r, i) => [r, i] as const).filter(([r]) => r.headers.some((h) => istPolicy(h) && !h.value.includes('report-uri')))
+    const nieMelden = ohne.filter(([r]) => !r.headers.some((h) => h.value.includes('frame-ancestors')))
+    const rahmen = ohne.filter(([r]) => r.headers.some((h) => h.value.includes('frame-ancestors')))
     expect(allgemein).toBeGreaterThanOrEqual(0)
-    expect(ohne.length).toBe(OHNE_REFERRER_BEISPIELE.length + 4 + HEIKLE_WERTE.length)
+    expect(nieMelden.length).toBe(OHNE_REFERRER_BEISPIELE.length + 4 + HEIKLE_WERTE.length)
     for (const [, i] of ohne) expect(i).toBeGreaterThan(allgemein)
     // je Query-Wert eine eigene Regel: `has` verknüpft seine Einträge mit UND
-    for (const [r] of ohne) expect(r.has?.length ?? 0).toBeLessThanOrEqual(1)
+    for (const [r] of nieMelden) expect(r.has?.length ?? 0).toBeLessThanOrEqual(1)
+    // Die Policy der Vorschau-Rahmen steht ganz hinten — sonst überschriebe sie eine Regel „nie melden".
+    expect(rahmen).toHaveLength(EINBETTBAR_MIT_PARAMETER.length)
+    for (const [, i] of rahmen) expect(i).toBeGreaterThan(Math.max(...nieMelden.map(([, j]) => j)))
   })
 })
