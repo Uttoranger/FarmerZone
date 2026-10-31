@@ -34,7 +34,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({ KundeShellMitSit
 
 import { prisma } from '@/lib/prisma'
 import { widerrufSignatur } from '@/lib/bestell-link'
-import { BELEHRUNG, HOF_ANGABEN_OHNE_LINK, belehrungHof, belehrungMitHof, type Belehrung } from '@/lib/widerruf'
+import { BELEHRUNG, HOF_ANGABEN_OHNE_LINK, belehrungHof, belehrungMitHof, belehrungMitKostenschaetzung, type Belehrung } from '@/lib/widerruf'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 import WiderrufPage from '@/app/(public)/widerruf/page'
 
@@ -82,6 +82,27 @@ describe('Wortlaut Anhang I FAGG (Auftrag 207)', () => {
     expect(alle).not.toContain('§ 18')
     // Gegenprobe: Der Platzhalter für die Hofangaben steht roh im Text — er ist Daten, kein Wortlaut.
     expect(alle).toContain('[Name, Anschrift, Telefonnummer und E-Mail-Adresse des Hofs]')
+  })
+})
+
+describe('belehrungMitKostenschaetzung — der eine erlaubte Satz (Gestaltungshinweis 5 b, Nr. 214)', () => {
+  const KOSTEN = 'Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.'
+
+  it('ohne Schätzung bleibt die Belehrung Wort für Wort, wie sie ist', () => {
+    const b = belehrungMitHof(null)
+    expect(belehrungMitKostenschaetzung(b, null)).toBe(b)
+    expect(texte(belehrungMitKostenschaetzung(b, null)).join('\n')).not.toContain('geschätzt')
+  })
+
+  it('mit Schätzung steht der Satz direkt nach „Sie tragen …“ im selben Absatz — sonst ändert sich kein Wort', () => {
+    const b = belehrungMitHof(null)
+    const mit = belehrungMitKostenschaetzung(b, 31)
+    const folgen = mit.teilA.abschnitte[1]!.absaetze
+    expect(folgen).toContain(`${KOSTEN} Die Kosten werden auf höchstens etwa 31 EUR geschätzt.`)
+    expect(folgen).not.toContain(KOSTEN)
+    const roh = texte(b)
+    const unterschiede = texte(mit).filter((t, i) => t !== roh[i])
+    expect(unterschiede).toEqual([`${KOSTEN} Die Kosten werden auf höchstens etwa 31 EUR geschätzt.`])
   })
 })
 

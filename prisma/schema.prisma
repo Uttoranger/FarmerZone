@@ -776,6 +776,14 @@ model Product {
   // im Bereich Futtermittel, sonst immer leer; Texte in src/lib/abholhinweise.ts.
   abholhinweise Abholhinweis[] @default([])
 
+  // Rücktritt je Produkt (Register N39, Ergänzung 31.10.2026, Nr. 214) — Angaben
+  // des Hofs, die App entscheidet nichts. keinRuecktritt: Ware verdirbt schnell
+  // (§ 18 Abs. 1 Z 4 FAGG). ruecksendekostenCents: geschätzte Kosten der
+  // Rücksendung für Ware, die nicht per Post zurückgeht (§ 4 Abs. 1 Z 9 FAGG);
+  // null = keine Angabe. Texte und Regeln in src/lib/ruecktritt-angaben.ts.
+  keinRuecktritt        Boolean @default(false)
+  ruecksendekostenCents Int?
+
   // Lebensmittel-spezifisch
   allergens       String[] @default([])
   // isOrganic: Altlast, wird in einem späteren Sprint entfernt. Seit Sprint

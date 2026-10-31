@@ -3,8 +3,6 @@
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { Prisma } from '@prisma/client'
-import { del } from '@vercel/blob'
-import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import {
   productAnlegenSchema,
@@ -36,8 +34,8 @@ import {
 } from '@/server/produkte-schreiben'
 import { formatZahl } from '@/lib/format'
 import { bestandVorherSchema, vorratSetzenSchema } from '@/schemas/vorrat'
-import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt, istEigenesBild } from '@/server/bild-url'
-import { bildUrlsAusInhalt, pfadAusAdresse } from '@/lib/betrieb'
+import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt } from '@/server/bild-url'
+import { entferneAltesBild } from '@/server/bild-loeschen'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -45,44 +43,6 @@ async function getAuthenticatedFarm() {
   const farm = await getFarmForUser(session.user.id)
   if (!farm) throw new Error('Kein Hof gefunden')
   return farm
-}
-
-/**
- * Das ersetzte Produktbild bzw. das Bild eines gelöschten Produkts verlässt den
- * Bild-Speicher (Audit A8, Nr. 206) — gleicher Weg wie in appearance.ts (eine
- * exportierte Hilfsfunktion wäre in einer 'use server'-Datei eine aufrufbare Aktion).
- * Erst NACH dem erfolgreichen Schreiben in der Datenbank; nur eine Datei im Ordner
- * DIESES Hofs aus unserem Speicher; nur, wenn keine Zeile mehr auf sie zeigt.
- * Die Felder sind dieselben wie in ladeBildVerwendung (src/server/betrieb-bilder.ts);
- * ein neues Bildfeld gehört in beide Kopien hier UND dorthin (Wache tests/bild-ersetzen-loeschen.test.ts).
- * Ein archiviertes Produkt (mit Bestellungen) behält sein Bild — die Aufrufer
- * rufen das hier dann nicht. Scheitert das Löschen, gilt die Aktion trotzdem:
- * eine Meldung nach Sentry, ohne Adresse und ohne Fehlertext.
- */
-async function entferneAltesBild(alt: string | null | undefined, neu: string | null | undefined, farmId: string, anlass: 'produktbild' | 'produkt-geloescht'): Promise<void> {
-  if (!alt || alt === neu || !istEigenesBild(alt, farmId)) return
-  try {
-    const verwendet = await Promise.all([
-      prisma.farm.count({ where: { OR: [{ logoUrl: alt }, { bannerUrl: alt }, { bannerValue: alt }] } }),
-      prisma.product.count({ where: { imageUrl: alt } }),
-      prisma.farmPhoto.count({ where: { url: alt } }),
-      prisma.statusPost.count({ where: { photoUrl: alt } }),
-      prisma.meldung.count({ where: { screenshotUrl: alt } }),
-      // Die Startseite (Blöcke und Fassungen) zählt mit wie in ladeBildVerwendung (src/server/betrieb-bilder.ts):
-      // startseite.ts lässt eine unveränderte alte Adresse stehen, auch ein Hofbild.
-      prisma.startseiteBlock.count({ where: { bildUrl: alt } }),
-      prisma.startseiteFassung
-        .findMany({ select: { inhalt: true } })
-        .then((fassungen) => fassungen.filter((f) => bildUrlsAusInhalt(f.inhalt).some((u) => pfadAusAdresse(u) === pfadAusAdresse(alt))).length),
-    ])
-    if (verwendet.some((n) => n > 0)) return
-    await del(alt, { token: process.env.BLOB_READ_WRITE_TOKEN })
-  } catch (fehler) {
-    Sentry.captureMessage('Ersetztes Bild nicht aus dem Speicher gelöscht', {
-      level: 'warning',
-      tags: { bereich: 'bild-loeschen', anlass, klasse: fehler instanceof Error ? fehler.name : typeof fehler },
-    })
-  }
 }
 
 /** Alles neu laden, was Produkte dieses Hofs zeigt (src/server/produkte-schreiben.ts). */
@@ -129,6 +89,9 @@ function produktDaten(v: ProductFormData) {
     labels: bereinigeSiegel(v.labels),
     abgabe: v.abgabe,
     abholhinweise: abholhinweiseDaten(v.category ?? null, v.abholhinweise),
+    // Nr. 214: Angaben des Hofs zum Rücktritt — wie getippt, ohne Ableitung aus der Kategorie.
+    keinRuecktritt: v.keinRuecktritt,
+    ruecksendekostenCents: v.ruecksendekostenCents,
     countsTowardLimit: v.countsTowardLimit,
     price: v.price,
     vatRate: v.vatRate,

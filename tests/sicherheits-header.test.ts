@@ -23,7 +23,8 @@
  *  - Die Regel für /hoefe (Standort) bleibt.
  *  - Seiten mit Token in der Adresse schicken keinen Referrer und stehen in
  *    keinem Suchindex — seit Nr. 54 auch /reset-password, wie /verify; die mit
- *    Nr. 54 umgezogenen Seiten behalten ihre Header.
+ *    Nr. 54 umgezogenen Seiten behalten ihre Header. Seit Nr. 213.6 auch die
+ *    Kasse mit „Zahlung fortsetzen“ (?zahlung=&sig=), nur mit beiden Werten.
  *  - CSP (Register G8, Nr. 125; erzwingend seit Nr. 204): Nur im Produktions-Build trägt
  *    jede Seite `Content-Security-Policy` aus src/lib/csp.ts; gemeldet
  *    wird nur bei VERCEL_ENV=production (mit `Reporting-Endpoints`). Die Seiten
@@ -224,6 +225,19 @@ describe('Bestätigungsseite', () => {
     expect(headerFuer('/account/profile')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
   })
 
+  it('die Kasse mit „Zahlung fortsetzen“ (?zahlung=&sig=) genauso — die Adresse trägt den signierten Link (Nr. 202, Nr. 213.6)', () => {
+    const header = headerFuer(KASSE_FORTSETZEN.pfad, KASSE_FORTSETZEN.query)
+    expect(header['Referrer-Policy']).toBe('no-referrer')
+    expect(header['X-Robots-Tag']).toBe('noindex, nofollow')
+    // Gegenprobe: ohne Link oder mit nur einem der beiden Werte die allgemeine Regel.
+    for (const query of [{}, { zahlung: 'bestellungA' }, { sig: 'ab12' }] as Record<string, string>[]) {
+      expect(headerFuer('/hof-test/checkout', query)['Referrer-Policy'], JSON.stringify(query)).toBe('strict-origin-when-cross-origin')
+      expect(headerFuer('/hof-test/checkout', query)['X-Robots-Tag'], JSON.stringify(query)).toBeUndefined()
+    }
+    // Gegenprobe: eine Unterseite der Kasse gibt es nicht — die Regel trifft nur die Kasse selbst.
+    expect(headerFuer('/hof-test/checkout/x', KASSE_FORTSETZEN.query)['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
+  })
+
   it('die übrigen Seiten behalten ihre Referrer-Regel — Gegenprobe', () => {
     expect(headerFuer('/hof-test')['Referrer-Policy']).toBe('strict-origin-when-cross-origin')
     expect(headerFuer('/hof-test/bestellung/order-1')['X-Robots-Tag']).toBeUndefined()
@@ -415,6 +429,8 @@ const OHNE_REFERRER_BEISPIELE = [
   // Nr. 190: „Neue Anmelde-Adresse bestätigen“ trägt den Einmal-Token.
   '/konto/email-bestaetigen',
 ]
+/** Die Kasse mit „Zahlung fortsetzen“ (Nr. 202): no-referrer nur MIT beiden Werten (Nr. 213.6). */
+const KASSE_FORTSETZEN = { pfad: '/hof-test/checkout', query: { zahlung: 'bestellungA', sig: 'ab12' } }
 const WEITERE_NIE_MELDEN = ['/hof-test/bestellung/bestellungA', '/hof-test/bestellung/bestellungA/kalender', '/admin/postfach/zustellung/bestaetigen', '/api/csp-bericht', '/api/checkout']
 const HEIKLE_WERTE = ['s', 'sig', 'token', 't', 'code', 'vorschau', 'reorder']
 const MIT_MELDUNG = ['/', '/hoefe', '/hof-test', '/hof-test/produkt/produkt-a', '/hof-test/checkout', '/region', '/products']
@@ -453,12 +469,20 @@ describe('CSP (G8, erzwingend seit Nr. 204)', () => {
     }
   })
 
-  it('genau zwölf Seiten mit no-referrer — und jede davon meldet nie', () => {
+  it('genau dreizehn Seiten mit no-referrer — und jede davon meldet nie; die Kasse nur mit ihrem Link', () => {
     const ohneReferrer = produktion.filter((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
-    expect(ohneReferrer).toHaveLength(OHNE_REFERRER_BEISPIELE.length)
-    for (const regel of ohneReferrer) {
+    expect(ohneReferrer).toHaveLength(OHNE_REFERRER_BEISPIELE.length + 1)
+    for (const regel of ohneReferrer.filter((r) => !r.has)) {
       expect(OHNE_REFERRER_BEISPIELE.some((b) => getPathMatch(regel.source)(b)), regel.source).toBe(true)
     }
+    const mitBedingung = ohneReferrer.filter((r) => r.has)
+    expect(mitBedingung.map((r) => r.source)).toEqual(['/:farmSlug/checkout'])
+    const kasse = headerFuer(KASSE_FORTSETZEN.pfad, KASSE_FORTSETZEN.query, produktion)
+    expect(kasse[CSP]).toContain("default-src 'self'")
+    expect(kasse[CSP]).not.toContain('report-uri')
+    expect(kasse[CSP]).not.toContain('report-to')
+    // Gegenprobe: die Kasse ohne Link meldet weiter (steht in MIT_MELDUNG).
+    expect(headerFuer('/hof-test/checkout', { zahlung: 'bestellungA' }, produktion)[CSP]).toContain('report-uri')
     for (const pfad of [...OHNE_REFERRER_BEISPIELE, ...WEITERE_NIE_MELDEN]) {
       const h = headerFuer(pfad, {}, produktion)
       expect(h[CSP], pfad).toContain("default-src 'self'")
@@ -506,6 +530,7 @@ describe('CSP (G8, erzwingend seit Nr. 204)', () => {
       ['/hof-test', { vorschau: '1' }],
       ['/startseite-vorschau', { vorschau: 'aW5oYWx0', sig: 'ab12' }],
       ['/sicherheit/nicht-ich', { t: 'abc' }],
+      [KASSE_FORTSETZEN.pfad, KASSE_FORTSETZEN.query],
     ]
     for (const [pfad, query] of faelle) {
       const vorher = headerFuer(pfad, query)
@@ -545,10 +570,12 @@ describe('CSP (G8, erzwingend seit Nr. 204)', () => {
     const nieMelden = ohne.filter(([r]) => !r.headers.some((h) => h.value.includes('frame-ancestors')))
     const rahmen = ohne.filter(([r]) => r.headers.some((h) => h.value.includes('frame-ancestors')))
     expect(allgemein).toBeGreaterThanOrEqual(0)
-    expect(nieMelden.length).toBe(OHNE_REFERRER_BEISPIELE.length + 4 + HEIKLE_WERTE.length)
+    // + 1: die Kasse mit „Zahlung fortsetzen“ (no-referrer mit Bedingung, Nr. 213.6)
+    expect(nieMelden.length).toBe(OHNE_REFERRER_BEISPIELE.length + 1 + 4 + HEIKLE_WERTE.length)
     for (const [, i] of ohne) expect(i).toBeGreaterThan(allgemein)
-    // je Query-Wert eine eigene Regel: `has` verknüpft seine Einträge mit UND
-    for (const [r] of nieMelden) expect(r.has?.length ?? 0).toBeLessThanOrEqual(1)
+    // je Query-Wert eine eigene Regel: `has` verknüpft seine Einträge mit UND — nur die Kasse will
+    // bewusst BEIDE Werte (zahlung UND sig); ?sig= allein meldet ohnehin nie (eigene Regel).
+    for (const [r] of nieMelden.filter(([r]) => r.source !== '/:farmSlug/checkout')) expect(r.has?.length ?? 0).toBeLessThanOrEqual(1)
     // Die Policy der Vorschau-Rahmen steht ganz hinten — sonst überschriebe sie eine Regel „nie melden".
     expect(rahmen).toHaveLength(EINBETTBAR_MIT_PARAMETER.length)
     for (const [, i] of rahmen) expect(i).toBeGreaterThan(Math.max(...nieMelden.map(([, j]) => j)))

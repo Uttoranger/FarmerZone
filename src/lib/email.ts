@@ -28,7 +28,8 @@ import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
 import { hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
-import { belehrungHof, belehrungMitHof, type Belehrung } from '@/lib/widerruf'
+import { belehrungHof, belehrungMitHof, belehrungMitKostenschaetzung, type Belehrung } from '@/lib/widerruf'
+import { ruecksendekostenSchaetzungEuro } from '@/lib/ruecktritt-angaben'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -451,8 +452,10 @@ export type OrderForEmail = {
      */
     gebuehrCents: number
     // Einheit optional zur Anzeige gejoint (formatOrderLine-Schreibweise);
-    // fehlt sie, bleibt die Darstellung wie bisher
-    product?: OrderLineProduct
+    // fehlt sie, bleibt die Darstellung wie bisher. ruecksendekostenCents
+    // (Nr. 214): die Schätzung des Hofs für den Satz aus Gestaltungshinweis 5 b
+    // in der Belehrung — die Lader der drei Bestätigungsmails lesen sie mit.
+    product?: (NonNullable<OrderLineProduct> & { ruecksendekostenCents?: number | null }) | null
   }>
 }
 
@@ -550,7 +553,10 @@ function belehrungFuer(order: OrderForEmail): Belehrung | undefined {
   if (order.kaeuferArt !== 'PRIVAT') return undefined
   // Ohne Anmelde-Adresse (nur alte Testdaten) bleibt die Hof-E-Mail des Profils, sonst nichts — nie ein erfundener Wert.
   const { owner, ...farm } = order.farm
-  return belehrungMitHof(belehrungHof(farm, hofKontaktEmail({ ...farm, owner: owner ?? { email: '' } })))
+  const belehrung = belehrungMitHof(belehrungHof(farm, hofKontaktEmail({ ...farm, owner: owner ?? { email: '' } })))
+  // Nr. 214: geschätzte Rücksendekosten sperriger Ware (Gestaltungshinweis 5 b) — ohne Schätzung bleibt der Satz weg.
+  const euro = ruecksendekostenSchaetzungEuro(order.items.map((i) => ({ menge: i.quantity, ruecksendekostenCents: i.product?.ruecksendekostenCents ?? null })))
+  return belehrungMitKostenschaetzung(belehrung, euro)
 }
 
 /** Die AGB als Datei im Anhang (Nr. 207) — erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). */

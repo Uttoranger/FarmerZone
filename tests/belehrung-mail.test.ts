@@ -122,6 +122,23 @@ describe.each(MAILS)('%s', (_name, baue, teil) => {
     expect(mail.anhaenge?.[0]?.dateiname).toMatch(/^agb-[a-z]+-\d+(\.\d+)*\.html$/)
   }, 30_000)
 
+  it('Nr. 214: ohne Produkt mit geschätzten Rücksendekosten kein 5-b-Satz', async () => {
+    const text = klartext((await baue(bestellung(teil))).html)
+    expect(text).toContain('Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.')
+    expect(text).not.toContain('Die Kosten werden auf höchstens etwa')
+  }, 30_000)
+
+  it('Nr. 214: mit Schätzung der 5-b-Satz nach „Sie tragen …“ — Summe × Menge, auf ganze Euro aufgerundet', async () => {
+    const items: OrderForEmail['items'] = [
+      { productName: 'Brennholz', quantity: 2, unitPrice: '90.00', totalPrice: '180.00', gebuehrCents: 0, product: { unit: 'RAUMMETER', unitSize: null, ruecksendekostenCents: 1250 } },
+      { productName: 'Freilandeier', quantity: 1, unitPrice: '4.50', totalPrice: '4.50', gebuehrCents: 0, product: { unit: 'STUECK', unitSize: null, ruecksendekostenCents: null } },
+      { productName: 'Heu', quantity: 3, unitPrice: '5.00', totalPrice: '15.00', gebuehrCents: 0, product: { unit: 'BALLEN', unitSize: null, ruecksendekostenCents: 199 } },
+    ]
+    const text = klartext((await baue(bestellung({ ...teil, items }))).html)
+    // 2 × 12,50 € + 3 × 1,99 € = 30,97 € → 31 EUR
+    expect(text).toContain('Sie tragen die unmittelbaren Kosten der Rücksendung der Waren. Die Kosten werden auf höchstens etwa 31 EUR geschätzt.')
+  }, 30_000)
+
   it('Gegenprobe Betrieb: keine Belehrung, kein Formular, kein Widerruf-Link — der Anhang bleibt', async () => {
     const mail = await baue(bestellung({ ...teil, kaeuferArt: 'BETRIEB' }))
     const text = klartext(mail.html)

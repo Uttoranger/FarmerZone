@@ -8,6 +8,7 @@ import { ohneTestzahlungenSql } from '@/lib/testzahlung'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { nummerAnzeige } from '@/lib/admin-hoefe'
+import { hofEmailFehlt } from '@/lib/hof-kontakt'
 import {
   GRUENDUNG_EINSTELLUNG_STANDARD,
   baueGruendungAnzeige,
@@ -107,6 +108,8 @@ export type AdminFarmRow = {
   produktImShop: boolean
   /** Mindestens eine aktive Abholzeit (`isActive: true`) — Bedingung fürs Freischalten, sonst Marke „Abholzeit fehlt“ (Z1, Ergänzung 21.10.2026). */
   abholzeitAktiv: boolean
+  /** Die Hof-E-Mail für die Kundschaft fehlt (`hofEmailFehlt`, Nr. 212) — nur Ja/Nein, nie die Adresse; Bedingung fürs Freischalten. */
+  hofEmailFehlt: boolean
   /** Was der Freischalt-Dialog zur Gründung sagt (nur wartende Höfe), mit den Plätzen der Einstellung. */
   freischaltHinweis: FreischaltHinweis | null
   /** Regelbetrieb (Nr. 187): Konto geschlossen (N36) und Sperre durch das Team (N34) — nur die Zeitpunkte. */
@@ -271,6 +274,8 @@ export async function getAdminFarms(
         geschlossenAm: true,
         adminGesperrtAm: true,
         city: true,
+        // Nr. 212: nur für das Ja/Nein „Hof-E-Mail fehlt“ (hofEmailFehlt) — die Adresse verlässt diese Funktion nicht.
+        email: true,
         owner: {
           select: {
             email: true,
@@ -342,6 +347,7 @@ export async function getAdminFarms(
     gruendungFest: fest,
     produktImShop: f.products.length > 0,
     abholzeitAktiv: f.pickupSlots.length > 0,
+    hofEmailFehlt: hofEmailFehlt(f),
     freischaltHinweis: f.approvedAt === null ? freischaltHinweis(f, platzListe, einstellung, jetzt) : null,
     geschlossenAm: f.geschlossenAm,
     adminGesperrtAm: f.adminGesperrtAm,

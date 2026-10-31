@@ -38,6 +38,8 @@ export function publicProduct(teil: Partial<PublicProduct> = {}): PublicProduct 
     familieId: null,
     brennmaterial: null,
     abholhinweise: [],
+    keinRuecktritt: false,
+    ruecksendekostenCents: null,
     ...teil,
   }
 }
