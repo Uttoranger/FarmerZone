@@ -338,3 +338,33 @@ describe('Neuigkeiten per E-Mail auf der Bestätigungsseite (Register N2, Nr. 46
     expect(neuigkeitenProps).toEqual([])
   })
 })
+
+describe('„Vertrag widerrufen“ (Nr. 200, Nachbesserung Runde 2): nur bei widerrufMoeglich — auch nach der Abholung', () => {
+  const widerrufLinks = (html: string) => hrefs(html).filter((h) => h.startsWith('/widerruf?'))
+
+  it('abgeholt vor 3 Tagen (privat): der Link steht da, mit eigener Signatur', async () => {
+    findUnique.mockResolvedValue(bestellung({ status: 'PICKED_UP', kaeuferArt: 'PRIVAT', pickedUpAt: new Date(JETZT.getTime() - 3 * 24 * 60 * 60 * 1000) }) as never)
+    const links = widerrufLinks(await seite())
+    expect(links).toHaveLength(1)
+    expect(links[0]).toContain('bestellung=order-1')
+  })
+
+  it('ohne Abholkarte (bar, als nicht abgeholt vermerkt) zählt nur widerrufMoeglich: der Link steht da', async () => {
+    // Früher hing der Link zusätzlich an der Abholkarte — die fehlt hier, widerrufMoeglich sagt ja (Frist offen, Rechtsfrage im Bericht).
+    findUnique.mockResolvedValue(bestellung({ status: 'NOT_PICKED_UP', kaeuferArt: 'PRIVAT', pickedUpAt: null }) as never)
+    const html = await seite()
+    expect(text(html)).not.toContain('Route planen')
+    expect(widerrufLinks(html)).toHaveLength(1)
+  })
+
+  it('Gegenproben: abgeholt vor 20 Tagen, Betrieb, storniert → kein Link; laufend und privat → Link', async () => {
+    findUnique.mockResolvedValue(bestellung({ status: 'PICKED_UP', kaeuferArt: 'PRIVAT', pickedUpAt: new Date(JETZT.getTime() - 20 * 24 * 60 * 60 * 1000) }) as never)
+    expect(widerrufLinks(await seite())).toEqual([])
+    findUnique.mockResolvedValue(bestellung({ status: 'PICKED_UP', kaeuferArt: 'BETRIEB', pickedUpAt: new Date(JETZT.getTime() - 3 * 24 * 60 * 60 * 1000) }) as never)
+    expect(widerrufLinks(await seite())).toEqual([])
+    findUnique.mockResolvedValue(bestellung({ status: 'CANCELLED', kaeuferArt: 'PRIVAT', cancelReason: 'Vom Hof storniert' }) as never)
+    expect(widerrufLinks(await seite())).toEqual([])
+    findUnique.mockResolvedValue(bestellung({ status: 'READY', kaeuferArt: 'PRIVAT', pickedUpAt: null }) as never)
+    expect(widerrufLinks(await seite())).toHaveLength(1)
+  })
+})

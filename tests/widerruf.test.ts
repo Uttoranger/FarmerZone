@@ -147,6 +147,9 @@ describe('Admin › Heute: Widerruf offen', () => {
     expect(zugeordnet!.ziel).toContain('o-1')
     expect(ohne!.frist.ziel.getTime() - eingang.getTime()).toBe(2 * TAG)
     expect(ohne!.bezug.text).toBe('nicht zugeordnet')
+    // Nachbesserung Runde 2: Ziel ist die Liste „Widerrufe ohne Bestellung“ (Anker); der zugeordnete führt zur Bestellung, nicht dorthin.
+    expect(ohne!.ziel).toBe('/admin/bestellungen#widerrufe-ohne-bestellung')
+    expect(zugeordnet!.ziel).not.toContain('#')
     // Gegenprobe ohne Widerruf: keine Aufgabe.
     expect(sammleAufgaben(LEERER_STAND, jetzt).some((a) => a.quelle === 'widerruf_offen')).toBe(false)
   })
@@ -154,7 +157,7 @@ describe('Admin › Heute: Widerruf offen', () => {
 
 describe('Mail „Dein Widerruf ist erledigt“', () => {
   const basis = { bestellnummer: 'HM-2611-TEST', hofName: 'Testhof', grund: null }
-  const html = (p: { erstattet: number | null; vorAbholung?: boolean }) => renderToStaticMarkup(createElement(WiderrufErgebnisEmail, { ...basis, ...p }))
+  const html = (p: { erstattet: number | null; vorAbholung?: boolean; teilweise?: boolean }) => renderToStaticMarkup(createElement(WiderrufErgebnisEmail, { ...basis, ...p }))
 
   it('vor der Abholung: keine Rückgabe, kein „bar zurückgegeben“ — online mit Betrag, vor Ort ohne', () => {
     const online = html({ erstattet: 4.95, vorAbholung: true })
@@ -171,5 +174,15 @@ describe('Mail „Dein Widerruf ist erledigt“', () => {
     expect(bar).toContain('Rückgabe')
     expect(bar).toContain('bar zurückgegeben')
     expect(bar).not.toContain('gestrichen')
+  })
+
+  it('vor der Abholung nur zum Teil gebucht (Nachbesserung Runde 2): „zum Teil erledigt“, der Rest beim Hof — Gegenprobe ganz gebucht ohne diesen Satz', () => {
+    const teil = html({ erstattet: 4.95, vorAbholung: true, teilweise: true })
+    expect(teil).toContain('Dein Widerruf ist zum Teil erledigt')
+    expect(teil).toContain('Die übrigen prüft der Hof')
+    expect(teil).toContain('4,95')
+    const ganz = html({ erstattet: 4.95, vorAbholung: true })
+    expect(ganz).not.toContain('zum Teil')
+    expect(ganz).toContain('Dein Widerruf ist erledigt')
   })
 })

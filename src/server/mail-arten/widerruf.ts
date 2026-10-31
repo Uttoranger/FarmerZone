@@ -22,23 +22,28 @@ export function widerrufHofAuftrag(widerrufId: string, order: { id: string; farm
  * Ergebnis an die Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder
  * abgelehnt — je Widerruf höchstens einmal. `vorAbholung`: Teilstorno vor der
  * Abholung (Freigabe 200 Punkt 4), die Mail spricht dann nicht von einer Rückgabe.
+ * `teilweise`: davon ist nur ein Teil gebucht, den Rest entscheidet der Hof —
+ * eigener Schlüssel, damit dessen spätere Erstattung ihre eigene Mail bekommt.
  */
 export function widerrufErgebnisAuftrag(
   art: 'widerruf-erstattet' | 'widerruf-abgelehnt',
   widerrufId: string,
   order: { id: string; farmId: string },
   erstattetCents: number | null = null,
-  vorAbholung = false
+  vorAbholung = false,
+  teilweise = false
 ): EinstellAuftrag {
   const erstattet = art === 'widerruf-erstattet'
+  const nurTeil = erstattet && vorAbholung && teilweise
   return {
     art,
     vorrang: VORRANG.wichtig,
-    schluessel: `${art}:${widerrufId}`,
+    schluessel: nurTeil ? `${art}:${widerrufId}:teilweise` : `${art}:${widerrufId}`,
     bezug: {
       widerrufId,
       ...(erstattet && erstattetCents !== null ? { erstattetCents: String(erstattetCents) } : {}),
       ...(erstattet && vorAbholung ? { vorAbholung: '1' } : {}),
+      ...(nurTeil ? { teilweise: '1' } : {}),
     },
     bestellungId: order.id,
     farmId: order.farmId,
@@ -95,7 +100,7 @@ export async function rendereWiderrufHof(bezug: Record<string, string>): Promise
 
 /** Erstattet → Kundin, an die Adresse der Bestellung; der Betrag steht im Auftrag (online) oder fehlt (bar bzw. vor der Abholung vor Ort). */
 export async function rendereWiderrufErstattet(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
-  const { widerrufId, erstattetCents, vorAbholung } = widerrufErstattetBezugSchema.parse(bezug)
+  const { widerrufId, erstattetCents, vorAbholung, teilweise } = widerrufErstattetBezugSchema.parse(bezug)
   const geladen = await lade(widerrufId)
   if (!geladen) return FEHLT
   const { baueWiderrufErgebnis } = await import('@/lib/email')
@@ -105,6 +110,7 @@ export async function rendereWiderrufErstattet(bezug: Record<string, string>): P
     erstattetCents: erstattetCents === undefined ? null : Number.parseInt(erstattetCents, 10),
     grund: null,
     vorAbholung: vorAbholung === '1',
+    teilweise: teilweise === '1',
   })
 }
 

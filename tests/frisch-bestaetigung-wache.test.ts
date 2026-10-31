@@ -25,6 +25,8 @@ const HEIKLE_AKTIONEN: Array<{ datei: string; namen: string[] }> = [
   { datei: 'src/server/actions/postfach.ts', namen: ['sendeRundschreiben', 'fuegeEmpfaengerHinzu'] },
   // Nr. 186: Admin › Bestellungen — „Außerhalb erstattet“ (aus dem Postfach hierher), volle Adresse, Notfall-Storno.
   { datei: 'src/server/actions/admin-bestellung.ts', namen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
+  // Nr. 200 (Nachbesserung Runde 2): Zuordnen eines Widerrufs — kann vor der Abholung einen Storno mit Erstattung auslösen.
+  { datei: 'src/server/actions/admin-bestellung.ts', namen: ['ordneWiderrufZu'] },
   { datei: 'src/server/actions/startseite.ts', namen: ['veroeffentlicheStartseite'] },
   { datei: 'src/server/actions/admin-anmeldung.ts', namen: ['erstelleErsatzcodes', 'entfernePasskey', 'pruefeFrischFuerPasskey'] },
   // Nr. 188 (Audit D10): was live wirkt oder löscht — Zurückziehen, Block löschen, Ablegen, Kostenposten, Gründungs-Einstellungen.
@@ -58,6 +60,7 @@ const OBERFLAECHEN: Array<{ datei: string; aktionen: string[] }> = [
   { datei: 'src/components/admin/postfach-zustellung.tsx', aktionen: ['entferneEmpfaenger', 'speichereZustellRegeln'] },
   // Nr. 186
   { datei: 'src/app/admin/bestellungen/bestellung-aktionen.tsx', aktionen: ['markiereErstattungErledigt', 'zeigeKundinAdresse', 'notfallStorno'] },
+  { datei: 'src/app/admin/bestellungen/widerruf-zuordnen.tsx', aktionen: ['ordneWiderrufZu'] },
   // Nr. 187
   { datei: 'src/components/admin/hof-akte-sperre-dialog.tsx', aktionen: ['sperreHof', 'hebeHofSperreAuf'] },
 ]

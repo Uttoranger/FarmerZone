@@ -17,6 +17,8 @@ import { kalendertagInWien } from '@/lib/wiener-tag'
 import type { HofKontoDaten } from '@/components/admin/hof-akte-konto'
 import { HofAktePlattformgebuehr, type PlattformgebuehrAkteAnzeige } from '@/components/admin/hof-akte-plattformgebuehr'
 import { ladePlattformgebuehrAkte } from '@/server/queries/plattformgebuehr'
+import { HofAkteWiderrufe, type HofAkteWiderrufAnzeige } from '@/components/admin/hof-akte-widerrufe'
+import { ladeWiderrufeDesHofs } from '@/server/widerruf'
 
 export const metadata: Metadata = { title: `Akte — Admin — ${MARKE}` }
 export const dynamic = 'force-dynamic'
@@ -53,6 +55,16 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
     }
   }
 
+  // Abschnitt „Widerrufe“ (Nr. 200, Nachbesserung Runde 2): ebenso eigen — ohne Name, Adresse und Nachricht.
+  let widerrufe: HofAkteWiderrufAnzeige[] | null = null
+  if (geladen) {
+    try {
+      widerrufe = await ladeWiderrufeDesHofs(id)
+    } catch (err) {
+      Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'hof-akte', teil: 'widerrufe' } })
+    }
+  }
+
   return (
     <div className={ADMIN_RAHMEN}>
       {geladen ? (
@@ -77,6 +89,7 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
         <AdminFehler titel="Akte" satz="Wir konnten die Akte gerade nicht laden." nochmal={id ? adminHofHref(id) : ADMIN_HOEFE_HREF} />
       )}
       {plattformgebuehr && <HofAktePlattformgebuehr daten={plattformgebuehr} />}
+      {widerrufe && <HofAkteWiderrufe liste={widerrufe} />}
     </div>
   )
 }

@@ -26,10 +26,12 @@ vi.mock('@/lib/prisma', () => ({
     widerruf: { create: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
     farm: { findUnique: vi.fn() },
     unterhaltung: { create: vi.fn() },
+    $queryRaw: vi.fn(),
   },
 }))
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/server/admin-protokoll', () => ({ protokolliere: vi.fn(async () => true) }))
+vi.mock('@/server/admin-wache', async (original) => ({ ...(await original<typeof import('@/server/admin-wache')>()), verlangeFrischeBestaetigung: vi.fn() }))
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
 vi.mock('@/server/mail-warteschlange', () => ({ stelleEinOhneRisiko: vi.fn(async () => {}) }))
 vi.mock('@/lib/email', () => ({ sendWiderrufEingang: vi.fn(async () => ({ id: 'mail-1' })) }))
@@ -50,7 +52,10 @@ import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
 import { widerrufSignatur } from '@/lib/bestell-link'
 import { adressMerkmal } from '@/lib/bremse-datenbank'
 import { lehneWiderrufAbAction, reicheWiderrufMitLinkEin, reicheWiderrufOhneLinkEin } from '@/server/actions/widerruf'
-import { verarbeiteWiderruf } from '@/server/widerruf'
+import { ladeWiderrufeDesHofs, ladeWiderrufeOhneBestellung, ladeWiderrufeZurBestellung, verarbeiteWiderruf } from '@/server/widerruf'
+import { ordneWiderrufZu } from '@/server/actions/admin-bestellung'
+import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
+import { WIDERRUF_ADMIN_TEXT } from '@/lib/widerruf'
 import WiderrufPage from '@/app/(public)/widerruf/page'
 import { WiderrufFormular } from '@/app/(public)/widerruf/widerruf-formular'
 
@@ -263,6 +268,184 @@ describe('Nachlauf: vor der Abholung', () => {
     vi.mocked(meldeFehlendenArtikel).mockResolvedValue(teil('online', 495) as never)
     await verarbeiteWiderruf('widerruf-1', true)
     expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
+  })
+})
+
+describe('Nachlauf: Teilwiderruf vor der Abholung, eine spätere Position scheitert (Nachbesserung Runde 2, Punkt 4)', () => {
+  const WIDERRUF = {
+    id: 'widerruf-1',
+    orderId: 'bestellung-1',
+    eingegangenAm: new Date(),
+    email: ADRESSE,
+    bestellnummerEingabe: 'HM-2611-TEST',
+    umfang: 'teil',
+    positionen: [
+      { orderItemId: 'pos-a', menge: 1 },
+      { orderItemId: 'pos-b', menge: 2 },
+    ],
+    nachricht: null,
+    stand: 'eingegangen',
+  }
+  // Drei Positionen: zwei gewählt — fachlich nicht die ganze Bestellung.
+  const BESTELLUNG = {
+    id: 'bestellung-1',
+    farmId: 'hof-1',
+    orderNumber: 'HM-2611-TEST',
+    kaeuferArt: 'PRIVAT',
+    status: 'PAID',
+    pickedUpAt: null,
+    farm: { name: 'Testhof' },
+    items: [
+      { id: 'pos-a', productName: 'Eier', quantity: 1, fehltSeit: null },
+      { id: 'pos-b', productName: 'Brot', quantity: 2, fehltSeit: null },
+      { id: 'pos-c', productName: 'Honig', quantity: 1, fehltSeit: null },
+    ],
+  }
+  const teil = (zahlung: 'online' | 'vor_ort', erstattetCents: number) => ({ art: 'teil', rechnung: { zahlung }, erstattetCents, rueckbuchungOffen: false })
+  const auftraegeDer = (art: string) => vi.mocked(stelleEinOhneRisiko).mock.calls.filter((c) => c[0] === art)
+
+  beforeEach(() => {
+    db.order.findUnique.mockResolvedValue(BESTELLUNG as never)
+    db.widerruf.findUnique.mockResolvedValue(WIDERRUF as never)
+    db.widerruf.updateMany.mockResolvedValue({ count: 1 } as never)
+  })
+
+  it.each([
+    ['abgelehnt', () => vi.mocked(meldeFehlendenArtikel).mockResolvedValueOnce(teil('online', 495) as never).mockResolvedValueOnce({ art: 'abgelehnt', grund: 'status' } as never)],
+    ['wirft', () => vi.mocked(meldeFehlendenArtikel).mockResolvedValueOnce(teil('online', 495) as never).mockRejectedValueOnce(new Error('Stripe weg'))],
+  ])('zweite Position %s → genau ein Auftrag `widerruf-erstattet` (vorAbholung, teilweise) mit 495 Cent; Stand bleibt offen, der Rest geht an den Hof', async (_fall, richte) => {
+    richte()
+    await verarbeiteWiderruf('widerruf-1', true)
+
+    expect(meldeFehlendenArtikel).toHaveBeenCalledTimes(2)
+    const erstattet = auftraegeDer('widerruf-erstattet')
+    expect(erstattet).toHaveLength(1)
+    expect(erstattet[0]![1]).toBe('bestellung-1')
+    expect(erstattet[0]![2]).toEqual(
+      expect.objectContaining({
+        art: 'widerruf-erstattet',
+        schluessel: 'widerruf-erstattet:widerruf-1:teilweise',
+        bezug: { widerrufId: 'widerruf-1', erstattetCents: '495', vorAbholung: '1', teilweise: '1' },
+      })
+    )
+    // Nicht `erstattet`: Der Hof entscheidet über den Rest (Postfach und Mail an den Hof).
+    expect(db.widerruf.updateMany).not.toHaveBeenCalled()
+    expect(db.unterhaltung.create).toHaveBeenCalledTimes(1)
+    expect(auftraegeDer('widerruf-hof')).toHaveLength(1)
+    expect(storniere).not.toHaveBeenCalled()
+    // Kein Text, kein Name, keine Adresse an Sentry.
+    expect(JSON.stringify(vi.mocked((await import('@sentry/nextjs')).captureException).mock.calls)).not.toContain(ADRESSE)
+  })
+
+  it('Gegenproben: scheitert schon die erste Position, keine Erstattungs-Mail; gehen alle durch, die gewohnte Mail ohne `teilweise`', async () => {
+    vi.mocked(meldeFehlendenArtikel).mockResolvedValueOnce({ art: 'abgelehnt', grund: 'status' } as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+    expect(meldeFehlendenArtikel).toHaveBeenCalledTimes(1)
+    expect(auftraegeDer('widerruf-erstattet')).toHaveLength(0)
+    expect(auftraegeDer('widerruf-hof')).toHaveLength(1)
+
+    vi.mocked(stelleEinOhneRisiko).mockClear()
+    vi.mocked(meldeFehlendenArtikel).mockReset()
+    vi.mocked(meldeFehlendenArtikel).mockResolvedValueOnce(teil('online', 495) as never).mockResolvedValueOnce(teil('online', 1162) as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+    const erstattet = auftraegeDer('widerruf-erstattet')
+    expect(erstattet).toHaveLength(1)
+    expect(erstattet[0]![2]).toEqual(expect.objectContaining({ schluessel: 'widerruf-erstattet:widerruf-1', bezug: { widerrufId: 'widerruf-1', erstattetCents: '1657', vorAbholung: '1' } }))
+    expect(auftraegeDer('widerruf-hof')).toHaveLength(0)
+  })
+
+  it('vor Ort: teilweise ohne Betrag', async () => {
+    vi.mocked(meldeFehlendenArtikel).mockResolvedValueOnce(teil('vor_ort', 0) as never).mockResolvedValueOnce({ art: 'abgelehnt', grund: 'status' } as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+    const erstattet = auftraegeDer('widerruf-erstattet')
+    expect(erstattet).toHaveLength(1)
+    expect(erstattet[0]![2]).toEqual(expect.objectContaining({ bezug: { widerrufId: 'widerruf-1', vorAbholung: '1', teilweise: '1' } }))
+  })
+})
+
+describe('Admin: Zuordnen (Nachbesserung Runde 2)', () => {
+  const W_ID = 'cmfwiderruf00000000001ab'
+  const BESTELLUNG = {
+    id: 'bestellung-1',
+    farmId: 'hof-1',
+    orderNumber: 'HM-2611-TEST',
+    kaeuferArt: 'PRIVAT',
+    status: 'PICKED_UP',
+    pickedUpAt: new Date(),
+    farm: { name: 'Testhof' },
+    items: [{ id: 'pos-a', productName: 'Eier', quantity: 1, fehltSeit: null }],
+  }
+  const W = { id: W_ID, orderId: 'bestellung-1', eingegangenAm: new Date(), email: ADRESSE, bestellnummerEingabe: 'HM-2611-TSET', umfang: 'ganz', positionen: null, nachricht: 'Bitte Eier zurück', stand: 'eingegangen' }
+
+  beforeEach(() => {
+    vi.mocked(verlangeFrischeBestaetigung).mockResolvedValue({ ok: true, userId: 'admin-1', sitzungId: 's-1', mitPasskey: true })
+  })
+
+  it('unbekannte Nummer → „Diese Bestellnummer gibt es nicht.“, nichts geändert; leere Nummer → Satz, ohne Abfrage', async () => {
+    db.order.findUnique.mockResolvedValue(null as never)
+    expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'HM-0000-NEIN', grund: 'Anruf der Kundin' })).toEqual({ error: 'Diese Bestellnummer gibt es nicht.' })
+    expect(db.widerruf.updateMany).not.toHaveBeenCalled()
+    expect(protokolliere).not.toHaveBeenCalled()
+
+    expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: '  ', grund: 'Anruf der Kundin' })).toEqual({ error: WIDERRUF_ADMIN_TEXT.nummerFehlt })
+    expect(db.order.findUnique).toHaveBeenCalledTimes(1)
+    expect(verlangeFrischeBestaetigung).toHaveBeenCalledWith({ recht: 'hof_sperren_storno' })
+  })
+
+  it('Gegenprobe: passende Nummer → bedingt zugeordnet (orderId null in der WHERE-Klausel), Protokoll ohne Personendaten, weiter an den Hof; zweites Mal → schon zugeordnet', async () => {
+    db.order.findUnique.mockResolvedValue(BESTELLUNG as never)
+    db.widerruf.updateMany.mockResolvedValue({ count: 1 } as never)
+    db.widerruf.findUnique.mockResolvedValue(W as never)
+    expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'hm-2611-test', grund: 'Anruf der Kundin' })).toEqual({ ok: true, weiter: 'hof' })
+    expect(db.order.findUnique.mock.calls[0]![0]).toMatchObject({ where: { orderNumber: 'HM-2611-TEST' } })
+    expect(db.widerruf.updateMany.mock.calls[0]![0]).toEqual({ where: { id: W_ID, orderId: null, stand: 'eingegangen' }, data: { orderId: 'bestellung-1' } })
+    expect(protokolliere).toHaveBeenCalledWith({ wer: 'admin-1', art: 'widerruf_zugeordnet', bezugArt: 'bestellung', bezugId: 'bestellung-1', grund: 'Anruf der Kundin', mitPasskey: true })
+    expect(JSON.stringify(vi.mocked(protokolliere).mock.calls)).not.toMatch(/Eier zurück|erfunden@/)
+    // Keine zweite Eingangsbestätigung; nach der Abholung an den Hof.
+    expect(sendWiderrufEingang).not.toHaveBeenCalled()
+    expect(vi.mocked(stelleEinOhneRisiko).mock.calls.map((c) => c[0])).toEqual(['widerruf-hof'])
+
+    db.widerruf.updateMany.mockResolvedValue({ count: 0 } as never)
+    expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'HM-2611-TEST', grund: 'Anruf der Kundin' })).toEqual({ error: WIDERRUF_ADMIN_TEXT.schonZugeordnet })
+  })
+
+  it('ohne frische Bestätigung → der Satz der Wache, keine Abfrage', async () => {
+    vi.mocked(verlangeFrischeBestaetigung).mockResolvedValue({ error: 'frisch' } as never)
+    expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'HM-2611-TEST', grund: 'x' })).toEqual({ error: 'frisch' })
+    expect(db.order.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe('Admin: Lesen (Nachbesserung Runde 2)', () => {
+  it('ohne Bestellung: Name und eingegebene Nummer, E-Mail nur gekürzt; der Freitext nur als eigenes Feld (für den Dialog)', async () => {
+    db.widerruf.findMany.mockResolvedValue([
+      { id: 'w-1', name: 'Erika Test', email: ADRESSE, bestellnummerEingabe: 'HM-0000-X', eingegangenAm: new Date('2026-10-30T13:05:00Z'), umfang: 'teil', nachricht: 'Die Eier bitte' },
+    ] as never)
+    const [w] = await ladeWiderrufeOhneBestellung()
+    expect(db.widerruf.findMany.mock.calls[0]![0]).toMatchObject({ where: { orderId: null, stand: 'eingegangen' } })
+    expect(w).toMatchObject({ name: 'Erika Test', bestellnummerEingabe: 'HM-0000-X', eingegangenAm: '30. Oktober 2026, 14:05 Uhr', umfang: 'Einzelne Artikel (Freitext)', nachricht: 'Die Eier bitte' })
+    // Gegenprobe: die volle Adresse steht nirgends in der Zeile.
+    expect(w!.emailGekuerzt).not.toBe(ADRESSE)
+    expect(JSON.stringify(w)).not.toContain(ADRESSE)
+  })
+
+  it('Bestellung: Umfang ohne Freitext (der steht nur in `nachricht`); Akte: weder Name noch Adresse noch Nachricht gelesen', async () => {
+    db.widerruf.findMany.mockResolvedValueOnce([
+      { id: 'w-1', stand: 'abgelehnt', eingegangenAm: new Date('2026-10-30T13:05:00Z'), umfang: 'teil', positionen: null, nachricht: 'Die Eier bitte', grund: 'verderblich' },
+    ] as never)
+    const [d] = await ladeWiderrufeZurBestellung('bestellung-1', [])
+    expect(d).toMatchObject({ stand: 'abgelehnt', umfang: ['Einzelne Artikel (Freitext)'], nachricht: 'Die Eier bitte', grund: 'verderblich' })
+    expect(d!.umfang.join(' ')).not.toContain('Eier')
+
+    db.$queryRaw.mockResolvedValue([{ id: 'w-1' }] as never)
+    db.widerruf.findMany.mockResolvedValueOnce([{ id: 'w-1', orderId: 'bestellung-1', stand: 'unbekannt', eingegangenAm: new Date(), umfang: 'ganz', positionen: null }] as never)
+    db.order.findMany.mockResolvedValue([{ id: 'bestellung-1', orderNumber: 'HM-2611-TEST', items: [] }] as never)
+    const [a] = await ladeWiderrufeDesHofs('hof-1')
+    const select = (db.widerruf.findMany.mock.calls.at(-1)![0] as { select: Record<string, unknown> }).select
+    expect(['name', 'email', 'nachricht'].filter((f) => f in select)).toEqual([])
+    // Ein unbekannter Stand zählt als offen, nie still als erledigt.
+    expect(a).toMatchObject({ bestellnummer: 'HM-2611-TEST', stand: 'eingegangen', umfang: ['Die ganze Bestellung'] })
+    expect(db.order.findMany.mock.calls.at(-1)![0]).toMatchObject({ where: { farmId: 'hof-1' } })
   })
 })
 

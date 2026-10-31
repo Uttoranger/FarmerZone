@@ -8,9 +8,12 @@ import { istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { onlineBezahlt, restNachTeilerstattung } from '@/lib/storno'
 import { artikelFehltRechnung, nachFehlendemArtikel, type ArtikelFehltBestellung } from '@/lib/artikel-fehlt'
 import { POSTFACH_HREF } from '@/lib/postfach'
+import { maskiereAdresse } from '@/lib/betrieb-mails'
 import {
   BAR_ERSTATTET,
+  WIDERRUF_ADMIN_TEXT,
   WIDERRUF_TEXT,
+  alsWiderrufStand,
   deckungGanz,
   eingangZeitpunkt,
   lesePositionen,
@@ -18,6 +21,7 @@ import {
   waehlePositionen,
   widerrufMoeglich,
   type WiderrufPosition,
+  type WiderrufStand,
   type WiderrufUmfang,
 } from '@/lib/widerruf'
 import type { WiderrufAufgabeRoh } from '@/lib/admin-aufgaben'
@@ -230,9 +234,15 @@ async function setzeStand(widerrufId: string, stand: 'erstattet', jetzt: Date): 
  * Was der Storno vor der Abholung gebucht hat: `storno` — die ganze
  * Bestellung, die Mail verschickt `storniere`; `teil` — einzelne Positionen,
  * Betrag in Cent (online, von Stripe bestätigt) bzw. null (vor Ort, nichts
- * bezahlt); null — nicht (ganz) gebucht, der Hof entscheidet.
+ * bezahlt); `teilweise` — nur die ersten Positionen sind gebucht, eine
+ * spätere ging nicht (Betrag wie bei `teil`, den Rest entscheidet der Hof);
+ * null — nichts gebucht, der Hof entscheidet.
  */
-type VorAbholungErgebnis = { art: 'storno' } | { art: 'teil'; erstattetCents: number | null } | null
+type VorAbholungErgebnis =
+  | { art: 'storno' }
+  | { art: 'teil'; erstattetCents: number | null }
+  | { art: 'teilweise'; erstattetCents: number | null }
+  | null
 
 /**
  * Vor der Abholung ist der Widerruf fachlich ein Storno (Freigabe 200 Punkt
@@ -240,6 +250,11 @@ type VorAbholungErgebnis = { art: 'storno' } | { art: 'teil'; erstattetCents: nu
  * „Artikel fehlt" (dieselbe Teilerstattung). Erstattung wie beim Storno; die
  * Mail zum Teilstorno stellt der Aufrufer ein (`meldeFehlendenArtikel`
  * verschickt keine).
+ *
+ * Jede Position bucht `meldeFehlendenArtikel` in einer eigenen Transaktion —
+ * scheitert eine spätere, bleiben die früheren gebucht. Das Ergebnis sagt
+ * das dann (`teilweise`), statt so zu tun, als wäre nichts geschehen
+ * (Nachbesserung Runde 2, Punkt 4).
  */
 async function storniereVorAbholung(
   w: { id: string; umfang: string; positionen: unknown },
@@ -256,15 +271,81 @@ async function storniereVorAbholung(
   if (positionen.length === 0) return null
   let summeCents = 0
   let online = false
+  let gebucht = 0
+  const bisher = (art: 'teil' | 'teilweise'): VorAbholungErgebnis => ({ art, erstattetCents: online ? summeCents : null })
+  // Ab der ersten gebuchten Position zählt jeder Abbruch als `teilweise` — nie null, nie ein Wurf.
+  const abbruch = (err?: unknown): VorAbholungErgebnis => {
+    if (gebucht === 0) {
+      if (err !== undefined) throw err
+      return null
+    }
+    if (err !== undefined) melde('Widerruf: Teilstorno vor der Abholung nur teilweise gebucht', 'storno_teilweise', { widerrufId: w.id, orderId: order.id }, err)
+    return bisher('teilweise')
+  }
   for (const p of positionen) {
-    const ausgang = await meldeFehlendenArtikel({ farmId: order.farmId, orderId: order.id, itemId: p.orderItemId, jetzt })
-    if (ausgang.art === 'storno') return ganz()
-    if (ausgang.art !== 'teil') return null
+    let ausgang: Awaited<ReturnType<typeof meldeFehlendenArtikel>>
+    try {
+      ausgang = await meldeFehlendenArtikel({ farmId: order.farmId, orderId: order.id, itemId: p.orderItemId, jetzt })
+    } catch (err) {
+      return abbruch(err)
+    }
+    if (ausgang.art === 'storno') {
+      try {
+        return (await ganz()) ?? abbruch()
+      } catch (err) {
+        return abbruch(err)
+      }
+    }
+    if (ausgang.art !== 'teil') return abbruch()
     // Gezählt wird, was Stripe bestätigt hat — nie neu gerechnet.
     if (ausgang.rechnung.zahlung === 'online') online = true
     summeCents += ausgang.erstattetCents
+    gebucht += 1
   }
-  return { art: 'teil', erstattetCents: online ? summeCents : null }
+  return bisher('teil')
+}
+
+/** Ein Widerruf mit Bestellung: vor der Abholung Storno, sonst (oder wenn der Storno nicht ging) an den Hof. */
+type ZumWeiterleiten = { id: string; umfang: string; positionen: unknown }
+type BestellungZumWiderruf = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_ZUM_WIDERRUF }>
+
+/**
+ * Der Weg eines zugeordneten Widerrufs — derselbe für den Nachlauf und das
+ * Zuordnen im Admin: vor der Abholung storniert er (ganz bzw. die Positionen),
+ * danach Stand `erstattet` ohne Zutun des Hofs; nach der Abholung, bei
+ * Freitext oder wenn der Storno nicht (ganz) ging, entscheidet der Hof.
+ * Wirft nie: Fehler gehen mit Kennungen an Sentry.
+ */
+async function leiteWeiter(w: ZumWeiterleiten, order: BestellungZumWiderruf, jetzt: Date): Promise<'erstattet' | 'hof'> {
+  const vorAbholung = !(ABHOLUNG_ERLEDIGT as readonly string[]).includes(order.status)
+  if (widerrufMoeglich(order, jetzt) && vorAbholung && (w.umfang === 'ganz' || lesePositionen(w.positionen).length > 0)) {
+    try {
+      const gebucht = await storniereVorAbholung(w, order, jetzt)
+      const bestellung = { id: order.id, farmId: order.farmId }
+      if (gebucht?.art === 'teilweise') {
+        // Für das Gebuchte genau eine Mail mit dessen Summe (eigener Schlüssel, damit die spätere
+        // Erstattung des Hofs ihre Mail noch bekommt); der Rest geht unten an den Hof.
+        await stelleEinOhneRisiko(
+          'widerruf-erstattet',
+          order.id,
+          widerrufErgebnisAuftrag('widerruf-erstattet', w.id, bestellung, gebucht.erstattetCents, true, true)
+        )
+      } else if (gebucht) {
+        const gesetzt = await setzeStand(w.id, 'erstattet', new Date())
+        // Erstattung und Mail wie beim Storno (Freigabe 200 Punkt 4): Die Storno-Mail kommt aus `storniere`,
+        // das Teilstorno meldet Betrag bzw. Streichung hier — je Widerruf höchstens einmal (Schlüssel).
+        if (gesetzt && gebucht.art === 'teil') {
+          await stelleEinOhneRisiko('widerruf-erstattet', order.id, widerrufErgebnisAuftrag('widerruf-erstattet', w.id, bestellung, gebucht.erstattetCents, true))
+        }
+        return 'erstattet'
+      }
+    } catch (err) {
+      melde('Widerruf: Storno vor der Abholung gescheitert', 'storno', { widerrufId: w.id, orderId: order.id }, err)
+    }
+  }
+  // Nach der Abholung, Freitext oder ein Storno, der nicht (ganz) ging: Der Hof entscheidet.
+  await meldeAnHof(w.id, order)
+  return 'hof'
 }
 
 /**
@@ -281,30 +362,31 @@ export async function verarbeiteWiderruf(widerrufId: string, ueberLink: boolean,
   const order = w.orderId ? await prisma.order.findUnique({ where: { id: w.orderId }, select: BESTELLUNG_ZUM_WIDERRUF }) : null
   await schickeEingang(w, order, ueberLink)
   if (!order) return
+  await leiteWeiter(w, order, jetzt)
+}
 
-  const vorAbholung = !(ABHOLUNG_ERLEDIGT as readonly string[]).includes(order.status)
-  if (widerrufMoeglich(order, jetzt) && vorAbholung && (w.umfang === 'ganz' || lesePositionen(w.positionen).length > 0)) {
-    try {
-      const gebucht = await storniereVorAbholung(w, order, jetzt)
-      if (gebucht) {
-        const gesetzt = await setzeStand(widerrufId, 'erstattet', new Date())
-        // Erstattung und Mail wie beim Storno (Freigabe 200 Punkt 4): Die Storno-Mail kommt aus `storniere`,
-        // das Teilstorno meldet Betrag bzw. Streichung hier — je Widerruf höchstens einmal (Schlüssel).
-        if (gesetzt && gebucht.art === 'teil') {
-          await stelleEinOhneRisiko(
-            'widerruf-erstattet',
-            order.id,
-            widerrufErgebnisAuftrag('widerruf-erstattet', widerrufId, { id: order.id, farmId: order.farmId }, gebucht.erstattetCents, true)
-          )
-        }
-        return
-      }
-    } catch (err) {
-      melde('Widerruf: Storno vor der Abholung gescheitert', 'storno', { widerrufId, orderId: order.id }, err)
-    }
-  }
-  // Nach der Abholung, Freitext oder ein Storno, der nicht ging: Der Hof entscheidet.
-  await meldeAnHof(widerrufId, order)
+export type ZuordnenErgebnis = { ok: true; orderId: string; weiter: 'erstattet' | 'hof' } | { error: 'unbekannt' | 'nicht_offen' }
+
+/**
+ * Admin › Bestellungen, „Zuordnen …“ (Nachbesserung Runde 2): ein Widerruf
+ * ohne Bestellung bekommt die Bestellung mit genau dieser Nummer — bedingt
+ * (nur solange `orderId` null und der Stand `eingegangen` ist; ein zweites
+ * Zuordnen ergibt 0 Zeilen), dann derselbe Weg wie ein zugeordneter Widerruf (`leiteWeiter`):
+ * vor der Abholung Storno mit Erstattung, sonst an den Hof. Die
+ * Eingangsbestätigung ging schon beim Eingang hinaus — keine zweite. Das
+ * Protokoll `widerruf_zugeordnet` schreibt die Action (Person, Grund, Passkey).
+ */
+export async function weiseWiderrufZu(
+  e: { widerrufId: string; bestellnummer: string },
+  jetzt: Date = new Date()
+): Promise<ZuordnenErgebnis> {
+  const order = await prisma.order.findUnique({ where: { orderNumber: normalisiereBestellnummer(e.bestellnummer) }, select: BESTELLUNG_ZUM_WIDERRUF })
+  if (!order) return { error: 'unbekannt' }
+  const { count } = await prisma.widerruf.updateMany({ where: { id: e.widerrufId, orderId: null, stand: 'eingegangen' }, data: { orderId: order.id } })
+  if (count !== 1) return { error: 'nicht_offen' }
+  const w = await prisma.widerruf.findUnique({ where: { id: e.widerrufId }, select: VERARBEITEN })
+  if (!w) return { ok: true, orderId: order.id, weiter: 'hof' }
+  return { ok: true, orderId: order.id, weiter: await leiteWeiter(w, order, jetzt) }
 }
 
 /** Support: Eingangsbestätigung des neuesten Widerrufs dieser Bestellung nochmal (Sofort, N27). */
@@ -614,5 +696,109 @@ export async function ladeWiderrufAufgaben(): Promise<WiderrufAufgabeRoh[]> {
   return offen.map((w) => {
     const b = bestellungen.find((o) => o.id === w.orderId)
     return { id: w.id, orderId: b ? b.id : null, bestellnummer: b?.orderNumber ?? null, hofName: b?.farm.name ?? null, eingegangenAm: w.eingegangenAm }
+  })
+}
+
+// ─── Lesen für Admin › Bestellungen und die Hof-Akte (Nachbesserung Runde 2) ──
+
+/** Die Zeilen „Umfang“ fürs Team: ganze Bestellung, die Artikel — der Freitext steht nie hier, nur in `nachricht`. */
+function adminUmfang(w: { umfang: string; positionen: unknown }, items: readonly { id: string; productName: string; quantity: number }[]): string[] {
+  if (w.umfang === 'ganz') return [WIDERRUF_TEXT.ganz]
+  const positionen = lesePositionen(w.positionen)
+  if (positionen.length === 0) return [WIDERRUF_ADMIN_TEXT.freitext]
+  return positionen.map((p) => {
+    const item = items.find((i) => i.id === p.orderItemId)
+    return item ? `${p.menge} × ${item.productName}` : WIDERRUF_TEXT.teil
+  })
+}
+
+export type AdminWiderruf = {
+  id: string
+  stand: WiderrufStand
+  eingegangenAm: string
+  umfang: string[]
+  /** Text der Kundin — nur im Detail für Admins, nie in Logs, Sentry oder Protokoll. */
+  nachricht: string | null
+  /** Ablehnung des Hofs bzw. „bar erstattet“. */
+  grund: string | null
+}
+
+/** Die Widerrufe einer Bestellung, neueste zuerst — für das Detail in Admin › Bestellungen. */
+export async function ladeWiderrufeZurBestellung(orderId: string, items: readonly { id: string; productName: string; quantity: number }[]): Promise<AdminWiderruf[]> {
+  const liste = await prisma.widerruf.findMany({
+    where: { orderId },
+    orderBy: { eingegangenAm: 'desc' },
+    take: 20,
+    select: { id: true, stand: true, eingegangenAm: true, umfang: true, positionen: true, nachricht: true, grund: true },
+  })
+  return liste.map((w) => ({
+    id: w.id,
+    stand: alsWiderrufStand(w.stand),
+    eingegangenAm: eingangZeitpunkt(w.eingegangenAm),
+    umfang: adminUmfang(w, items),
+    nachricht: w.nachricht,
+    grund: w.grund,
+  }))
+}
+
+export type WiderrufOhneBestellung = {
+  id: string
+  name: string
+  /** Gekürzt wie überall im Admin (N33, N35) — voll nur über „Kundin schreiben …“. */
+  emailGekuerzt: string
+  bestellnummerEingabe: string | null
+  eingegangenAm: string
+  umfang: string
+  nachricht: string | null
+}
+
+/** Höchstens so viele offene Widerrufe ohne Bestellung lädt die Liste (älteste zuerst). */
+export const WIDERRUFE_OHNE_BESTELLUNG_HOECHSTENS = 100
+
+/** Die offenen Widerrufe ohne Bestellung, älteste zuerst — die Liste in Admin › Bestellungen (Ziel der Aufgabe). */
+export async function ladeWiderrufeOhneBestellung(): Promise<WiderrufOhneBestellung[]> {
+  const liste = await prisma.widerruf.findMany({
+    where: { orderId: null, stand: 'eingegangen' },
+    orderBy: { eingegangenAm: 'asc' },
+    take: WIDERRUFE_OHNE_BESTELLUNG_HOECHSTENS,
+    select: { id: true, name: true, email: true, bestellnummerEingabe: true, eingegangenAm: true, umfang: true, nachricht: true },
+  })
+  return liste.map((w) => ({
+    id: w.id,
+    name: w.name,
+    emailGekuerzt: maskiereAdresse(w.email),
+    bestellnummerEingabe: w.bestellnummerEingabe,
+    eingegangenAm: eingangZeitpunkt(w.eingegangenAm),
+    umfang: w.umfang === 'ganz' ? WIDERRUF_TEXT.ganz : WIDERRUF_ADMIN_TEXT.freitext,
+    nachricht: w.nachricht,
+  }))
+}
+
+export type HofAkteWiderruf = { id: string; orderId: string; bestellnummer: string; stand: WiderrufStand; eingegangenAm: string; umfang: string[] }
+
+/**
+ * Die Widerrufe zu Bestellungen eines Hofs, neueste zuerst — für die Akte.
+ * Erst der Hof (SQL-Verbindung über `farmId`, kein Fremdschlüssel), dann die
+ * Grenze; ohne Name, Adresse und Nachricht.
+ */
+export async function ladeWiderrufeDesHofs(farmId: string): Promise<HofAkteWiderruf[]> {
+  const zeilen = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT w.id FROM "Widerruf" w JOIN "Order" o ON o.id = w."orderId"
+    WHERE o."farmId" = ${farmId}
+    ORDER BY w."eingegangenAm" DESC LIMIT 50`
+  if (zeilen.length === 0) return []
+  const liste = await prisma.widerruf.findMany({
+    where: { id: { in: zeilen.map((z) => z.id) } },
+    orderBy: { eingegangenAm: 'desc' },
+    select: { id: true, orderId: true, stand: true, eingegangenAm: true, umfang: true, positionen: true },
+  })
+  const bestellungen = await prisma.order.findMany({
+    where: { farmId, id: { in: liste.flatMap((w) => (w.orderId ? [w.orderId] : [])) } },
+    select: { id: true, orderNumber: true, items: { select: { id: true, productName: true, quantity: true } } },
+  })
+  return liste.flatMap((w) => {
+    const b = bestellungen.find((o) => o.id === w.orderId)
+    if (!b) return []
+    return [{ id: w.id, orderId: b.id, bestellnummer: b.orderNumber, stand: alsWiderrufStand(w.stand), eingegangenAm: eingangZeitpunkt(w.eingegangenAm), umfang: adminUmfang(w, b.items) }]
   })
 }

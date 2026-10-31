@@ -298,8 +298,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           )}
         </Aktionen>
 
-        {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur solange die Bestellung läuft und widerrufen werden kann. */}
-        {bloecke.abholkarte && widerrufMoeglich(order, jetzt) && <WiderrufLink href={widerrufPfad(order.id)} />}
+        {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur wenn widerrufen werden kann, auch nach der Abholung in der 14-Tage-Frist. */}
+        {widerrufMoeglich(order, jetzt) && <WiderrufLink href={widerrufPfad(order.id)} />}
       </div>
     </KundeShellMitSitzung>
   )

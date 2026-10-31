@@ -10,6 +10,11 @@
  *    Cent); ein zweiter Klick bucht nichts. Bar: kein Stripe, Vermerk.
  *  - Ohne Link: zugeordnet nur bei Nummer UND Adresse; das Protokoll vermerkt es (im Nachlauf).
  *  - Ablehnen nur für den eigenen Hof; die Mail mit Grund steht als Auftrag.
+ *  - Zuordnen im Admin (Nachbesserung Runde 2): unbekannte Nummer ändert
+ *    nichts; danach derselbe Weg wie ein zugeordneter Widerruf (vor der
+ *    Abholung Storno mit Erstattung, sonst an den Hof), ein zweites
+ *    Zuordnen bucht nichts. Admin › Bestellungen und die Akte
+ *    lesen nur, was dazugehört.
  *
  * Stripe ist gemockt (Buchungen werden gezählt, Idempotenz je Schlüssel).
  */
@@ -32,7 +37,17 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendWiderrufEingang } from '@/lib/email'
-import { erstatteWiderruf, ladeOffeneWiderrufe, legeWiderrufAn, lehneWiderrufAb, verarbeiteWiderruf } from '@/server/widerruf'
+import {
+  erstatteWiderruf,
+  ladeOffeneWiderrufe,
+  ladeWiderrufeDesHofs,
+  ladeWiderrufeOhneBestellung,
+  ladeWiderrufeZurBestellung,
+  legeWiderrufAn,
+  lehneWiderrufAb,
+  verarbeiteWiderruf,
+  weiseWiderrufZu,
+} from '@/server/widerruf'
 import { BAR_ERSTATTET } from '@/lib/widerruf'
 import { INT_PRAEFIX, auftraege, erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
@@ -242,5 +257,63 @@ describe('ohne Link', () => {
     await prisma.adminAktion.deleteMany({ where: { bezugId: order.id } })
     // Die Großschreibung der eingegebenen Adresse bleibt beim Widerruf; aufgeräumt wird über das Präfix.
     await prisma.widerruf.deleteMany({ where: { id: passt.widerrufId } })
+  })
+})
+
+describe('Zuordnen im Admin (Nachbesserung Runde 2)', () => {
+  /** Ein Widerruf ohne Link mit fremder Adresse — bleibt ohne Bestellung. */
+  async function ohneBestellung(nummer: string) {
+    const angelegt = await legeWiderrufAn({ art: 'frei', name: 'Erika Test', email: `${intKennung('fremd')}@example.com`, bestellnummer: nummer, umfang: 'ganz' }, new Date())
+    if (!('ok' in angelegt)) throw new Error('nicht angelegt')
+    await verarbeiteWiderruf(angelegt.widerrufId, false)
+    expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: angelegt.widerrufId } })).orderId).toBeNull()
+    return angelegt.widerrufId
+  }
+
+  it('vor der Abholung: unbekannte Nummer ändert nichts; dann Storno mit Erstattung, Protokoll mit Person; ein zweites Zuordnen bucht nichts', async () => {
+    const { order } = await bestellung({ online: true, abgeholt: false, gebuehrCents: 52 })
+    const widerrufId = await ohneBestellung('HM-0000-FALSCH')
+    vi.mocked(sendWiderrufEingang).mockClear()
+    expect((await ladeWiderrufeOhneBestellung()).map((w) => w.id)).toContain(widerrufId)
+
+    const daneben = await weiseWiderrufZu({ widerrufId, bestellnummer: 'HM-9999-GIBTSNICHT' })
+    expect(daneben).toEqual({ error: 'unbekannt' })
+    expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: widerrufId } })).orderId).toBeNull()
+    expect(stripe.refunds.create).not.toHaveBeenCalled()
+
+    const ergebnis = await weiseWiderrufZu({ widerrufId, bestellnummer: ` ${order.orderNumber.toLowerCase()} ` })
+    expect(ergebnis).toEqual({ ok: true, orderId: order.id, weiter: 'erstattet' })
+    const w = await prisma.widerruf.findUniqueOrThrow({ where: { id: widerrufId } })
+    expect([w.orderId, w.stand]).toEqual([order.id, 'erstattet'])
+    const nachher = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    expect([nachher.status, nachher.paymentStatus]).toEqual(['CANCELLED', 'REFUNDED'])
+    expect(stripe.refunds.create).toHaveBeenCalledTimes(1)
+    expect((await auftraege({ bestellungId: order.id, art: 'storniert' })).length).toBe(1)
+    // Die Eingangsbestätigung ging schon beim Eingang hinaus — keine zweite.
+    expect(sendWiderrufEingang).not.toHaveBeenCalled()
+
+    // Gegenprobe: ein zweites Zuordnen ergibt 0 Zeilen — kein zweiter Storno (das Protokoll schreibt die Action, tests/widerruf-wege.test.ts).
+    expect(await weiseWiderrufZu({ widerrufId, bestellnummer: order.orderNumber })).toEqual({ error: 'nicht_offen' })
+    expect(stripe.refunds.create).toHaveBeenCalledTimes(1)
+    expect((await ladeWiderrufeOhneBestellung()).map((w) => w.id)).not.toContain(widerrufId)
+    await prisma.adminAktion.deleteMany({ where: { bezugId: order.id } })
+  })
+
+  it('nach der Abholung: an den Hof (Mail-Auftrag), nichts gebucht; Bestellung und Akte zeigen ihn, die Akte eines fremden Hofs nicht', async () => {
+    const { farm, order } = await bestellung({ online: true, abgeholt: true, gebuehrCents: 52 })
+    const { farm: fremd } = await erstelleHof()
+    const widerrufId = await ohneBestellung(order.orderNumber)
+
+    const ergebnis = await weiseWiderrufZu({ widerrufId, bestellnummer: order.orderNumber })
+    expect(ergebnis).toEqual({ ok: true, orderId: order.id, weiter: 'hof' })
+    expect(erstattungen).toEqual([])
+    expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: widerrufId } })).stand).toBe('eingegangen')
+    expect((await auftraege({ bestellungId: order.id, art: 'widerruf-hof' })).length).toBe(1)
+
+    const zurBestellung = await ladeWiderrufeZurBestellung(order.id, order.items)
+    expect(zurBestellung.map((w) => [w.id, w.stand, w.umfang])).toEqual([[widerrufId, 'eingegangen', ['Die ganze Bestellung']]])
+    expect((await ladeWiderrufeDesHofs(farm.id)).map((w) => [w.id, w.bestellnummer])).toEqual([[widerrufId, order.orderNumber]])
+    expect(await ladeWiderrufeDesHofs(fremd.id)).toEqual([])
+    await prisma.adminAktion.deleteMany({ where: { bezugId: order.id } })
   })
 })

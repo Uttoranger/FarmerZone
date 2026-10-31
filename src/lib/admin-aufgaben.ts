@@ -29,6 +29,7 @@ import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
 import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { bestellungenHref } from '@/lib/admin-bestellung'
+import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
 import { nichtAbgeholtAuffaellig } from '@/lib/plattformgebuehr'
 
 /*
@@ -630,7 +631,8 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
             satz: 'Der Widerruf passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
             seit: w.eingegangenAm,
             wasTun: 'pruefen',
-            ziel: bestellungenHref({}, {}),
+            // Die Liste „Widerrufe ohne Bestellung“ mit Name, Nummer und „Zuordnen …“ (Nachbesserung Runde 2).
+            ziel: `${bestellungenHref({}, {})}#${WIDERRUF_OHNE_BESTELLUNG_ANKER}`,
           },
           jetzt,
           WIDERRUF_NICHT_ZUGEORDNET_MS

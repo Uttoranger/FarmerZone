@@ -1358,7 +1358,7 @@ export async function baueWiderrufHof(
 /** Ergebnis → Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder abgelehnt (Grund des Hofs). */
 export async function baueWiderrufErgebnis(
   an: string,
-  daten: { bestellnummer: string; hofName: string; erstattetCents: number | null; grund: string | null; vorAbholung?: boolean }
+  daten: { bestellnummer: string; hofName: string; erstattetCents: number | null; grund: string | null; vorAbholung?: boolean; teilweise?: boolean }
 ): Promise<StapelMail> {
   const { WiderrufErgebnisEmail } = await import('@/emails/widerruf')
   const html = await toHtml(
@@ -1368,8 +1368,14 @@ export async function baueWiderrufErgebnis(
       erstattet: daten.erstattetCents === null ? null : centsAlsEuro(daten.erstattetCents),
       grund: daten.grund,
       vorAbholung: daten.vorAbholung === true,
+      teilweise: daten.teilweise === true,
     })
   )
-  const betreff = daten.grund === null ? `Dein Widerruf ist erledigt · ${daten.bestellnummer}` : `Dein Widerruf wurde abgelehnt · ${daten.bestellnummer}`
+  const betreff =
+    daten.grund !== null
+      ? `Dein Widerruf wurde abgelehnt · ${daten.bestellnummer}`
+      : daten.teilweise === true
+        ? `Dein Widerruf ist zum Teil erledigt · ${daten.bestellnummer}`
+        : `Dein Widerruf ist erledigt · ${daten.bestellnummer}`
   return { an, betreff, html }
 }

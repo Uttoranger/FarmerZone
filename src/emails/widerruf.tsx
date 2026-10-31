@@ -94,14 +94,18 @@ export interface WiderrufErgebnisProps {
   grund: string | null
   /** Teilstorno vor der Abholung: keine Rückgabe; ohne Betrag (vor Ort) zahlt sie bei der Abholung weniger. */
   vorAbholung?: boolean
+  /** Vor der Abholung nur zum Teil gebucht (eine spätere Position ging nicht): den Rest prüft der Hof. */
+  teilweise?: boolean
 }
 
 /** Das Ergebnis an die Kundin: erstattet (mit Betrag) oder abgelehnt (mit Grund). */
 export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
   const abgelehnt = p.grund !== null
+  const teilweise = !abgelehnt && p.vorAbholung === true && p.teilweise === true
+  const titel = abgelehnt ? 'Dein Widerruf wurde abgelehnt' : teilweise ? 'Dein Widerruf ist zum Teil erledigt' : 'Dein Widerruf ist erledigt'
   return (
-    <EmailLayout previewText={abgelehnt ? 'Dein Widerruf wurde abgelehnt' : 'Dein Widerruf ist erledigt'}>
-      <Text style={h1}>{abgelehnt ? 'Dein Widerruf wurde abgelehnt' : 'Dein Widerruf ist erledigt'}</Text>
+    <EmailLayout previewText={titel}>
+      <Text style={h1}>{titel}</Text>
       {abgelehnt ? (
         <>
           <Text style={bodyText}>
@@ -112,7 +116,11 @@ export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
         </>
       ) : (
         <>
-          {p.vorAbholung ? (
+          {teilweise ? (
+            <Text style={bodyText}>
+              Einen Teil der widerrufenen Artikel haben wir aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen. Die übrigen prüft der Hof.
+            </Text>
+          ) : p.vorAbholung ? (
             <Text style={bodyText}>
               Die widerrufenen Artikel sind aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen.
             </Text>

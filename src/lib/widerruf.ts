@@ -1,6 +1,7 @@
 import type { DbBremse } from '@/lib/bremse-datenbank'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { MARKE } from '@/lib/marke'
+import type { MarkeArt } from '@/lib/marke-art'
 import { link, type AgbStueck } from '@/lib/rechtstexte/stuecke'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
 
@@ -162,6 +163,47 @@ export const WIDERRUF_STAND_TEXT: Record<WiderrufStand, string> = {
   erstattet: 'Erstattet',
   abgelehnt: 'Abgelehnt',
 }
+
+/** Welche Marke der Stand trägt (Admin) — offen ist ein Auftrag, erstattet erledigt, abgelehnt abgebrochen. */
+export const WIDERRUF_STAND_MARKE: Record<WiderrufStand, MarkeArt> = {
+  eingegangen: 'tun',
+  rueckgabe_erhalten: 'laeuft',
+  erstattet: 'erledigt',
+  abgelehnt: 'abgebrochen',
+}
+
+/** Der Stand aus der Datenbank; ein unbekannter Wert zählt als offen (nie still als erledigt). */
+export function alsWiderrufStand(roh: string): WiderrufStand {
+  return (WIDERRUF_STAENDE as readonly string[]).includes(roh) ? (roh as WiderrufStand) : 'eingegangen'
+}
+
+/** Der Anker der Liste „Widerrufe ohne Bestellung“ in Admin › Bestellungen (Ziel der Aufgabe). */
+export const WIDERRUF_OHNE_BESTELLUNG_ANKER = 'widerrufe-ohne-bestellung'
+
+/** Die Sätze im Admin (Bestellungen, Akte) — sachlich (Nachbesserung Runde 2). */
+export const WIDERRUF_ADMIN_TEXT = {
+  titel: 'Widerrufe',
+  eingang: (zeit: string) => `Eingang ${zeit}`,
+  nachricht: 'Nachricht der Kundin',
+  grundHof: 'Grund des Hofs',
+  ohneBestellungTitel: 'Widerrufe ohne Bestellung',
+  ohneBestellungSatz: 'Nummer und E-Mail passten zu keiner Bestellung. Prüf die Angaben, such die Bestellung und ordne den Widerruf zu – danach läuft er wie jeder andere: vor der Abholung Storno, sonst an den Hof.',
+  eingegebeneNummer: (nummer: string | null) => (nummer ? `eingegeben: ${nummer}` : 'ohne Nummer'),
+  freitext: 'Einzelne Artikel (Freitext)',
+  zuordnen: 'Zuordnen …',
+  zuordnenTitel: 'Widerruf einer Bestellung zuordnen',
+  zuordnenSatz: 'Vor der Abholung storniert das die Bestellung bzw. erstattet online bezahlte Artikel, danach geht der Widerruf an den Hof. Die Kundin hat die Eingangsbestätigung schon.',
+  bestellnummer: 'Bestellnummer',
+  zuordnenKnopf: 'Zuordnen',
+  nummerFehlt: 'Gib bitte die Bestellnummer ein.',
+  nummerZuLang: 'Die Bestellnummer ist zu lang.',
+  nummerUnbekannt: 'Diese Bestellnummer gibt es nicht.',
+  schonZugeordnet: 'Dieser Widerruf ist schon zugeordnet. Lade die Seite neu.',
+  fertigErstattet: 'Zugeordnet. Vor der Abholung storniert – die Kundin bekommt die Mail dazu.',
+  fertigHof: 'Zugeordnet. Der Hof hat den Widerruf im Postfach.',
+  akteLeer: 'Zu Bestellungen dieses Hofs gibt es keinen Widerruf.',
+  akteSatz: 'Die neuesten Widerrufe zu Bestellungen dieses Hofs – ohne Name, Adresse und Nachricht.',
+} as const
 
 /** Alle Sätze aus einer Quelle (Freigabe 200: Knöpfe wörtlich). */
 export const WIDERRUF_TEXT = {
