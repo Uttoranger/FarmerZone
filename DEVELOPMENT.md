@@ -6103,6 +6103,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Fix:** `PaymentElement` mit `layout: { type: 'tabs', defaultCollapsed: false }`, darüber die Überschrift `KASSE_ZAHLART_UEBERSCHRIFT` („Wie möchtest du bezahlen?“, `src/lib/kasse.ts`). Reiter über `appearance.rules` (`.Tab` 12 px Innenabstand, Fokus-Schatten in `var(--colorPrimary)`). Stripes Regeln kennen keine Mindesthöhe; die 44 px kommen aus Innenabstand, Symbol und Text.
 - Das Mandat-Feld in `src/components/hof-einstellungen/barzahlung.tsx` bleibt unverändert (Test).
 
+## Jede Server Action hat einen Aufrufer (Audit A1; Nr. 199, Lauf 27, 30.10.2026)
+
+- **Fund (Audit A1, Hoch):** `setFarmerRole` in `src/server/actions/register.ts` setzte die Rolle der eigenen Sitzung ohne weitere Prüfung auf FARMER, „für spätere Verwendung“, ohne Aufrufer. Ein Export einer `'use server'`-Datei ist trotzdem ein öffentlicher Endpunkt: Wer seine Kennung kennt, ruft ihn per POST. Die Registrierung als Hof setzt die Rolle in `registerFarmer` selbst und brauchte die Action nie.
+- **Fix:** Funktion entfernt (die Imports nutzt `registerFarmer` weiter). Vorher per `git grep` geprüft: kein Aufrufer in `src/`, `tests/` oder `scripts/`.
+- **Wache:** `tests/actions-aufrufer-wache.test.ts` – jede exportierte Funktion einer `'use server'`-Datei unter `src/server/actions/` wird von einer anderen Datei unter `src/` importiert und benutzt (Syntaxbaum; umbenannt, relativ, weitergereicht und `* as` zählen, Tests und Kommentare nicht). Ausnahmen in `AUFRUFER_BESTAND` mit Grund, der nur schrumpft.
+- **Fund Lauf 27 (im Bestand, ohne Rechtewirkung):** `reorderPhotosAction` (farm-photos.ts) ruft nur `moveFarmPhotoAction` derselben Datei; sie ändert nur die Reihenfolge der Fotos des eigenen Hofs. Löschen oder intern machen ist ein eigener Punkt.
+
 ## Nützliche Befehle
 
 ```bash
