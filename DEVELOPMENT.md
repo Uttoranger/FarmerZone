@@ -6110,6 +6110,14 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Wache:** `tests/actions-aufrufer-wache.test.ts` – jede exportierte Funktion einer `'use server'`-Datei unter `src/server/actions/` wird von einer anderen Datei unter `src/` importiert und benutzt (Syntaxbaum; umbenannt, relativ, weitergereicht und `* as` zählen, Tests und Kommentare nicht). Ausnahmen in `AUFRUFER_BESTAND` mit Grund, der nur schrumpft.
 - **Fund Lauf 27 (im Bestand, ohne Rechtewirkung):** `reorderPhotosAction` (farm-photos.ts) ruft nur `moveFarmPhotoAction` derselben Datei; sie ändert nur die Reihenfolge der Fotos des eigenen Hofs. Löschen oder intern machen ist ein eigener Punkt.
 
+## Signal „Stripe live ohne Hofpreis-Modell“ (Register N40; Nr. 201, Lauf 27, 30.10.2026)
+
+- **Regel:** `liveOhneHofpreisModell(umgebung, einstellung, jetzt)` in `src/lib/plattformgebuehr.ts` — wahr, wenn `bestimmeUmgebung` Produktion mit Stripe „live“ meldet (Präfix, nie der Schlüssel) und `gebuehrModellFuer` noch `bisher` sagt. Vorschau und lokal zählen nie. Ein Signal, keine Sperre: Bestellungen laufen weiter.
+- **Aufgabe:** Quelle `stripe_live_ohne_hofpreis` in `src/lib/admin-aufgaben.ts`, ganz oben direkt nach einer laufenden Notbremse (angehaltene Bestellungen sind dringender), Frist sofort (1 h wie die Rückbuchung) ab `STRIPE_LIVE_AB`, sonst ab jetzt; Ziel die Karte `#hofpreis-modell-ab` in Admin › Einstellungen. Den Stichtag liest `ladeAufgabenStand` nur, wenn Stripe live ist.
+- **Betriebsleiste:** `liveSignalLeiste` nimmt den Titel derselben Aufgabe aus derselben Liste (`ladeAdminbereich`) — ein Satz, eine Quelle.
+- **Karte „Hofpreis-Modell ab“:** im Testmodus von Stripe (`UMGEBUNG.stripe === 'test'`, auch in der Vorschau) und solange der Stichtag offen ist der Hinweis „Vor dem Live-Gang von Stripe auf den Live-Tag oder früher setzen.“ Die Vorbedingung steht in `docs/betrieb/stripe-live.md`.
+- **Tests:** `tests/stripe-live-hofpreis.test.ts`, `tests/admin-heute.test.ts` (Seite und Betriebsleiste), `tests/admin-aufgaben.test.ts` (Wache je Quelle).
+
 ## Nützliche Befehle
 
 ```bash

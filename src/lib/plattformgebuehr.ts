@@ -20,6 +20,7 @@ import { BAR_SERVICEGEBUEHR_AB, MINDESTBESTELLWERT_CENTS, PLATTFORMGEBUEHR_BEZEI
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS, gebuehrFuerMonatsabrechnung, istVorOrtZahlung, type Zahlungsart } from '@/lib/servicegebuehr'
 import { alsCents } from '@/lib/order-totals'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
+import type { Umgebung } from '@/lib/umgebung'
 
 /** Das Gebührenmodell einer Bestellung bzw. eines Hofs zu einem Zeitpunkt. */
 export type GebuehrModell = 'bisher' | 'hofpreis'
@@ -52,6 +53,23 @@ export function hofpreisModellAb(einstellung: HofpreisEinstellung | null): Date 
 export function gebuehrModellFuer(einstellung: HofpreisEinstellung | null, jetzt: Date): GebuehrModell {
   return jetzt.getTime() >= hofpreisModellAb(einstellung).getTime() ? 'hofpreis' : 'bisher'
 }
+
+/**
+ * Stripe live ohne Hofpreis-Modell (Register N40, Nr. 201): Die Produktion
+ * nimmt echtes Geld (Live-Schlüssel), aber der Stichtag „Hofpreis-Modell ab“
+ * liegt noch in der Zukunft — es gilt noch `bisher`. Ein Signal für Admin ›
+ * Heute und die Betriebsleiste, keine Sperre: Bestellungen laufen weiter.
+ * Den Modus kennt nur `bestimmeUmgebung` (aus dem Präfix, nie aus dem
+ * Schlüssel, Register Z2); Vorschau und lokal zählen nie, dort startet ein
+ * Live-Schlüssel ohnehin nicht (stripe-modus.ts).
+ */
+export function liveOhneHofpreisModell(umgebung: Pick<Umgebung, 'art' | 'stripe'>, einstellung: HofpreisEinstellung | null, jetzt: Date): boolean {
+  if (umgebung.art !== 'produktion' || umgebung.stripe !== 'live') return false
+  return gebuehrModellFuer(einstellung, jetzt) === 'bisher'
+}
+
+/** Die Kennung der Karte „Hofpreis-Modell ab“ in Admin › Einstellungen — Ziel des Signals (Aufgabe und Betriebsleiste). */
+export const HOFPREIS_KARTE_ID = 'hofpreis-modell-ab'
 
 /**
  * Ein Prozentsatz als Hundertstel-Prozent über die Ziffern („6.50“ → 650),

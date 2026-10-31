@@ -78,21 +78,34 @@ vi.mock('@/server/queries/plattform-einstellung', () => ({
     geaendertAm: null,
   })),
 }))
+// Nr. 201 (N40): der Stripe-Modus umschaltbar — Vorgabe Test, wie in jeder Vorschau.
+const modus = vi.hoisted(() => ({ stripe: 'test' as 'test' | 'live', art: 'produktion' as const }))
 vi.mock('@/lib/umgebung-server', async (importOriginal) => {
   const echt = await importOriginal<typeof import('@/lib/umgebung-server')>()
-  return { ...echt, STRIPE_LIVE_AB: null, TESTBETRIEB: false, STRIPE_MARKE: null, UMGEBUNG: { ...echt.UMGEBUNG, vercelProduktion: false } }
+  const umgebung = {
+    ...echt.UMGEBUNG,
+    vercelProduktion: false,
+    get stripe() {
+      return modus.stripe
+    },
+    get art() {
+      return modus.art
+    },
+  }
+  return { ...echt, STRIPE_LIVE_AB: null, TESTBETRIEB: false, STRIPE_MARKE: null, UMGEBUNG: umgebung }
 })
 
 import * as Sentry from '@sentry/nextjs'
 import AdminHeutePage from '@/app/admin/page'
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { verlangeAdminSeite } from '@/server/admin-wache'
-import { leseBestellstopp } from '@/server/queries/plattform-einstellung'
+import { leseBestellstopp, lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 
 const STUNDE = 60 * 60_000
 
 beforeEach(() => {
   vi.clearAllMocks()
+  modus.stripe = 'test'
   vi.useFakeTimers({ now: JETZT, toFake: ['Date'] })
   quellen.ladeHofAufgaben.mockResolvedValue([
     {
@@ -230,5 +243,31 @@ describe('Betriebsleiste: dieselbe Zahl wie „Braucht dich“', () => {
     expect(bereich.personName).toBe('Max Mustermann')
     const [gemeldet] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error]
     expect([gemeldet.name, gemeldet.message]).toEqual(['PrismaClientKnownRequestError', 'Heute: Zahl der Betriebsleiste nicht gelesen'])
+  })
+})
+
+describe('Stripe live ohne Hofpreis-Modell (Nr. 201, N40): Aufgabe und Betriebsleiste aus derselben Liste', () => {
+  const SATZ = 'Stripe ist live, aber das Hofpreis-Modell beginnt erst am 1.\u00a0Februar 2027 – Stichtag vorziehen'
+
+  it('live und Stichtag in der Zukunft (Vorgabe 1.2.2027): Aufgabe ganz oben in „Braucht dich“ und dieselbe Warnung in der Betriebsleiste', async () => {
+    modus.stripe = 'live'
+    const html = await seite()
+    const eintraege = html.slice(html.indexOf('id="braucht-dich"')).split('<li').slice(1)
+    expect(eintraege[0]).toContain(SATZ)
+    const bereich = await ladeAdminbereich()
+    expect(bereich.stripeLiveWarnung).toEqual({ text: SATZ, href: '/admin/einstellungen#hofpreis-modell-ab' })
+  })
+
+  it('live und Stichtag erreicht → weder Aufgabe noch Warnung', async () => {
+    modus.stripe = 'live'
+    vi.mocked(lesePlattformEinstellung).mockResolvedValue({ hofpreisModellAb: new Date(JETZT.getTime() - STUNDE).toISOString() } as Awaited<ReturnType<typeof lesePlattformEinstellung>>)
+    expect(await seite()).not.toContain('Stripe ist live')
+    expect((await ladeAdminbereich()).stripeLiveWarnung).toBeNull()
+  })
+
+  it('Testmodus → nichts, und der Stichtag wird gar nicht erst gelesen', async () => {
+    const bereich = await ladeAdminbereich()
+    expect(bereich.stripeLiveWarnung).toBeNull()
+    expect(vi.mocked(lesePlattformEinstellung)).not.toHaveBeenCalled()
   })
 })
