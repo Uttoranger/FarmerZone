@@ -107,4 +107,13 @@ describe('stimmeAgbZu mit echter Anmeldung', () => {
     expect(neu.agbFassung).toBe(agbFassung())
     expect(neu.agbZugestimmtAm!.getTime()).toBeGreaterThan(alt.getTime())
   })
+
+  it('angemeldet, aber ohne eigenen Hof: kein Erfolg, nichts geschrieben (mit Hof: Erfolg, siehe oben)', async () => {
+    const { farm, cookie } = await erstelleHofMitAnmeldung()
+    const { farm: fremd } = await erstelleHof()
+    await prisma.farm.delete({ where: { id: farm.id } })
+    await angemeldet(cookie)
+    expect(await stimmeAgbZu({ fassung: agbFassung() })).toEqual({ error: expect.any(String) })
+    expect(await prisma.farm.findUniqueOrThrow({ where: { id: fremd.id }, select: { agbFassung: true } })).toEqual({ agbFassung: null })
+  })
 })

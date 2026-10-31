@@ -11,6 +11,7 @@
  * Karte da.
  */
 import { AGB_LINK_TEXT, AGB_PFAD } from '@/lib/rechtstexte/agb-einbindung'
+import { uhrzeitInWien } from '@/lib/fristen'
 
 /** Die Sätze der Karte „AGB bestätigen“ — Hofsprache, geduzt. */
 export const AGB_ZUSTIMMUNG_TEXT = {
@@ -35,6 +36,5 @@ export function brauchtAgbZustimmung(hof: { agbFassung: string | null }, aktuell
 export function agbAkteText(hof: { agbFassung: string | null; agbZugestimmtAm: Date | null }): string {
   if (!hof.agbFassung || !hof.agbZugestimmtAm) return 'noch nicht zugestimmt'
   const datum = hof.agbZugestimmtAm.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Vienna' })
-  const zeit = hof.agbZugestimmtAm.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })
-  return `Fassung ${hof.agbFassung} · ${datum}, ${zeit} Uhr`
+  return `Fassung ${hof.agbFassung} · ${datum}, ${uhrzeitInWien(hof.agbZugestimmtAm)} Uhr`
 }

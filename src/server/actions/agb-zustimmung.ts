@@ -27,10 +27,12 @@ export async function stimmeAgbZu(eingabe: unknown): Promise<{ ok: true } | { er
   const aktuell = agbFassung()
   if (geprueft.data.fassung !== aktuell) return { error: AGB_ZUSTIMMUNG_TEXT.veraltet }
   try {
-    await prisma.farm.updateMany({
+    const { count } = await prisma.farm.updateMany({
       where: { ownerId: session.user.id, OR: [{ agbFassung: null }, { agbFassung: { not: aktuell } }] },
       data: { agbFassung: aktuell, agbZugestimmtAm: new Date() },
     })
+    // Nichts geschrieben: entweder schon zugestimmt (Erfolg) oder gar kein eigener Hof (kein Erfolg melden).
+    if (count === 0 && (await prisma.farm.count({ where: { ownerId: session.user.id } })) === 0) return { error: AGB_ZUSTIMMUNG_TEXT.fehler }
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'agb-zustimmung' }, extra: { userId: session.user.id } })
     return { error: AGB_ZUSTIMMUNG_TEXT.fehler }
