@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { OEFFENTLICH_SICHTBAR } from '@/server/queries/farm'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
 import { AKTIVER_BEITRAG } from '@/server/queries/status-posts'
 import { stripStatusVariables } from '@/lib/status-body'
 import { hofInitialen } from '@/lib/hof-initialen'
@@ -29,6 +30,9 @@ const MARKE_KANTE = 64
  * der Hofseite zeigen" (AKTIVER_BEITRAG) — sonst 404, gleich ob es den
  * Beitrag gibt. Ein Testhof (N21) nur für sein eigenes Konto: Ein Fremder
  * bekommt über eine geratene Kennung kein Bild aus einem Testhof.
+ * Seit Nr. 203 prüft die Route den gelesenen Hof zusätzlich mit `hofSichtbar`
+ * (N36): Ein geschlossener oder stillgelegter Hof gibt 404, auch wenn die
+ * Bedingung einmal geändert würde — und auch für sein eigenes Konto.
  */
 export async function GET(
   req: NextRequest,
@@ -38,10 +42,10 @@ export async function GET(
 
   const post = await prisma.statusPost.findFirst({
     where: { id, AND: [AKTIVER_BEITRAG(new Date())], farm: OEFFENTLICH_SICHTBAR },
-    select: { title: true, body: true, anlass: true, farm: { select: { name: true, istTesthof: true, ownerId: true } } },
+    select: { title: true, body: true, anlass: true, farm: { select: { name: true, istTesthof: true, ownerId: true, archivedAt: true, geschlossenAm: true } } },
   })
 
-  if (!post || (post.farm.istTesthof && !(await istEigenerHof(req, post.farm.ownerId)))) {
+  if (!post || !hofSichtbar(post.farm) || (post.farm.istTesthof && !(await istEigenerHof(req, post.farm.ownerId)))) {
     return new Response('Not found', { status: 404 })
   }
 

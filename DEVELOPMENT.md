@@ -6118,6 +6118,13 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Karte „Hofpreis-Modell ab“:** im Testmodus von Stripe (`UMGEBUNG.stripe === 'test'`, auch in der Vorschau) und solange der Stichtag offen ist der Hinweis „Vor dem Live-Gang von Stripe auf den Live-Tag oder früher setzen.“ Die Vorbedingung steht in `docs/betrieb/stripe-live.md`.
 - **Tests:** `tests/stripe-live-hofpreis.test.ts`, `tests/admin-heute.test.ts` (Seite und Betriebsleiste), `tests/admin-aufgaben.test.ts` (Wache je Quelle).
 
+## Webhook: Signaturfehler ohne Detail, Ereignisse mit Zod; status-image mit hofSichtbar (Nr. 203, Lauf 27, 30.10.2026)
+
+- **Signatur:** Die 400 bei ungültiger Signatur sagt nur noch „Signatur ungültig“. Vorher stand Stripes Meldung im Antworttext (Ursache: Template-String; Auswirkung: jeder Aufrufer erfuhr, woran die Prüfung scheiterte; Fix: Meldung nur ins Server-Protokoll). 503 (Modus-Sperre) und 500 (Verarbeitung) unverändert.
+- **Schemas:** `src/schemas/stripe-ereignis.ts` prüft je verarbeitetem Typ (elf, Liste aus Lauf 26 plus `account.updated`) die Felder, die die Behandlung liest. Ungültig: 200 ohne Verarbeitung und ohne Vermerk in `WebhookEvent` — Stripe soll dasselbe kaputte Ereignis nicht tagelang wiederholen. Sentry höchstens einmal je Typ und UTC-Tag über BetriebMessung (`sentry:stripe-schema:<typ>`, Muster von `erstmalsHeute`, ohne Deploy in der Art), nur Typ, Ereignis-Kennung und Feldpfade.
+- **Bewusst locker:** `created` der Erstattung und `attempt_count` der Rechnung sind optional, weil die Behandlung ihr Fehlen schon abfängt; unbekannte Felder lässt Zod durch. Ereignisse verbundener Konten: geprüft wird nur `account.updated`, alles andere bleibt wie bisher ohne Wirkung.
+- **status-image:** Die Bedingung `OEFFENTLICH_SICHTBAR` enthielt `HOF_SICHTBAR_WO` schon; neu prüft die Route den gelesenen Hof zusätzlich mit `hofSichtbar` — auch für das eigene Konto eines Testhofs.
+
 ## Nützliche Befehle
 
 ```bash

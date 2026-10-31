@@ -10,6 +10,10 @@
  *    bekommen 404, der Hof selbst sein Bild.
  *  - Gegenprobe: ein sichtbarer Beitrag eines echten Hofs ergibt ein Bild,
  *    ohne nach der Sitzung zu fragen.
+ *  - Nr. 203: Zusätzlich zur Bedingung liest die Route die Sichtbarkeit des
+ *    gelesenen Hofs über `hofSichtbar` (N36) — ein geschlossener oder
+ *    stillgelegter Hof gibt 404, auch für sein eigenes Konto; ein nicht
+ *    freigeschalteter Hof trifft die Bedingung nicht (404).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -35,11 +39,11 @@ const getSession = vi.mocked(auth.api.getSession)
 
 const anfrage = (): NextRequest => new Request('http://localhost/api/status-image/beitrag_1') as unknown as NextRequest
 const aufruf = () => GET(anfrage(), { params: Promise.resolve({ id: 'beitrag_1' }) })
-const beitrag = (istTesthof: boolean) => ({
+const beitrag = (istTesthof: boolean, hof: { archivedAt?: Date | null; geschlossenAm?: Date | null } = {}) => ({
   title: 'Erdbeeren sind da',
   body: 'Frisch vom Feld.',
   anlass: 'FRESH_PRODUCT',
-  farm: { name: 'Testhof A', istTesthof, ownerId: 'besitzer_1' },
+  farm: { name: 'Testhof A', istTesthof, ownerId: 'besitzer_1', archivedAt: null, geschlossenAm: null, ...hof },
 })
 
 beforeEach(() => {
@@ -74,5 +78,26 @@ describe('status-image: Sichtbarkeit wie die Hofseite', () => {
     expect(antwort.status).toBe(200)
     expect(antwort.headers.get('content-type')).toBe('image/png')
     expect(getSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('status-image: geschlossen, stillgelegt, nicht freigeschaltet (Nr. 203)', () => {
+  it('liest archivedAt und geschlossenAm des Hofs mit, die Bedingung verlangt die Freischaltung', async () => {
+    findFirst.mockResolvedValue(null)
+    expect((await aufruf()).status).toBe(404)
+    const anfrage = findFirst.mock.calls[0][0]!
+    expect(anfrage.where!.farm).toMatchObject({ approvedAt: { not: null }, archivedAt: null, geschlossenAm: null })
+    expect(anfrage.select!.farm).toEqual({ select: expect.objectContaining({ archivedAt: true, geschlossenAm: true }) })
+  })
+
+  it.each([
+    ['geschlossen', { geschlossenAm: new Date('2026-10-01T00:00:00Z') }],
+    ['stillgelegt', { archivedAt: new Date('2026-10-01T00:00:00Z') }],
+  ])('ein %ser Hof gibt 404 — auch für sein eigenes Konto', async (_art, hof) => {
+    findFirst.mockResolvedValue(beitrag(false, hof) as never)
+    expect((await aufruf()).status).toBe(404)
+    findFirst.mockResolvedValue(beitrag(true, hof) as never)
+    getSession.mockResolvedValue({ user: { id: 'besitzer_1' } } as never)
+    expect((await aufruf()).status).toBe(404)
   })
 })
