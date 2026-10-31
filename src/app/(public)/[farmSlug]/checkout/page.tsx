@@ -1,13 +1,20 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
-import { getPublicFarmGeteilt } from '@/server/queries/farm'
+import { getPublicFarmGeteilt, type PublicFarm } from '@/server/queries/farm'
 import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
-import { CheckoutForm, KassePausiert } from '@/components/checkout/checkout-form'
+import { CheckoutForm, KassePausiert, ZahlungFortsetzen, type Zahlung } from '@/components/checkout/checkout-form'
+import type { KorbPosition } from '@/components/checkout/kasse-teile'
 import { alsAbholFenster, ausgebuchteSchluessel, ausgebuchteTage } from '@/server/abholfenster'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
-import { kassenVorbelegung } from '@/lib/kasse'
+import { FORTSETZEN_PARAMETER, fortsetzungsKorb, fortsetzungsZiel, kassenVorbelegung, zielNachIntent, type FortsetzungsKorb } from '@/lib/kasse'
+import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
+import { bestaetigungsPfad, bestellLinkGilt } from '@/lib/bestell-link'
+import { abholZeitText } from '@/lib/bestaetigung'
+import { fristVon } from '@/lib/fristen'
+import { alsCents } from '@/lib/order-totals'
+import { centsAlsEuro, gebindeGroesse } from '@/lib/format'
 import { kaufSperre } from '@/lib/bereiche-anzeige'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
@@ -25,6 +32,113 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Aufrufe liefen in einer Prisma-Transaktion gleichzeitig über eine Verbindung.
   const farm = await getPublicFarmGeteilt(farmSlug)
   return { title: farm ? `Bestellen — ${farm.name}` : 'Bestellen' }
+}
+
+type Fortsetzung =
+  | { art: 'kasse' }
+  | { art: 'bestaetigung'; pfad: string }
+  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[]; korb: Omit<FortsetzungsKorb, 'gebuehrText'> }
+
+const KASSE: Fortsetzung = { art: 'kasse' }
+
+/**
+ * „Erneut versuchen" nach gescheiterter Zahlung (Audit A3, Nr. 202):
+ * `?zahlung={id}&sig={signatur}` führt in die Zahlung DERSELBEN Bestellung —
+ * ihr gespeicherter PaymentIntent, keine zweite Bestellung, keine zweite
+ * Reservierung. Wie die Wiederholung in /api/checkout
+ * (antwortFuerBestehendeBestellung) wird der Zahlungsvorgang gelesen, nie
+ * neu angelegt. Ohne gültige Signatur keine Abfrage und dieselbe Kasse wie
+ * ohne Parameter — ob es die Bestellung gibt, verrät die Seite nicht.
+ * Storniert oder nach der Frist: die Kasse mit dem Korb, den die
+ * Bestätigungsseite nicht geleert hat (korbLeeren). Hat ein Admin den Hof
+ * gesperrt, geht auch die Zahlung einer bestehenden Bestellung nicht weiter:
+ * dann die Kasse mit ihrer Sperrkarte, wie ohne Parameter.
+ */
+async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | string[] | undefined>, jetzt: Date): Promise<Fortsetzung> {
+  const orderId = suche[FORTSETZEN_PARAMETER]
+  if (typeof orderId !== 'string' || farm.adminGesperrt === true) return KASSE
+  const { sig } = bestaetigungsParameterSchema.parse(suche)
+  if (!sig || !bestellLinkGilt(orderId, sig)) return KASSE
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      farmId: true,
+      status: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      stripePaymentIntentId: true,
+      serviceFeeCents: true,
+      // Snapshot der Gebühr (N38): Korb und Gebührenzeile nur daraus, nie aus den heutigen Konditionen.
+      gebuehrModell: true,
+      serviceFeePercentApplied: true,
+      serviceFeeMinCentsApplied: true,
+      createdAt: true,
+      pickupDate: true,
+      pickupTimeStart: true,
+      pickupTimeEnd: true,
+      // Die Adresse zeigt auch die Bestätigungsseite, solange die Bestellung läuft; den Namen nie (Nr. 153).
+      customerEmail: true,
+      items: {
+        select: {
+          productId: true,
+          productName: true,
+          quantity: true,
+          unitPrice: true,
+          totalPrice: true,
+          gebuehrCents: true,
+          product: { select: { unit: true, unitSize: true, imageUrl: true } },
+        },
+      },
+    },
+  })
+  if (!order || order.farmId !== farm.id) return KASSE
+
+  const pfad = bestaetigungsPfad(farm.slug, order.id)
+  const ziel = fortsetzungsZiel(order, jetzt)
+  if (ziel === 'kasse') return KASSE
+  if (ziel === 'bestaetigung' || !order.stripePaymentIntentId) return { art: 'bestaetigung', pfad }
+
+  // Kein try: Scheitert Stripe, zeigt Next die Fehlerseite — eine Kasse daneben führte in eine zweite Bestellung.
+  // Dynamisch: Die Kasse ohne Parameter lädt das Stripe-Paket nie (tests/schwere-module.test.ts).
+  const { stripe } = await import('@/lib/stripe')
+  const intent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId)
+  const nachIntent = zielNachIntent(intent.status)
+  if (nachIntent === 'kasse') return KASSE
+  if (nachIntent === 'bestaetigung' || !intent.client_secret) {
+    // Unterwegs oder durch, der Webhook fehlt noch: dort „Zahlung wird geprüft".
+    return { art: 'bestaetigung', pfad: `${pfad}&redirect_status=${intent.status === 'succeeded' ? 'succeeded' : 'processing'}` }
+  }
+
+  // Nur Anzeige: der Betrag des Zahlungsvorgangs, wie Stripe ihn führt (wie in antwortFuerBestehendeBestellung).
+  const betrag = { amountCents: intent.amount, serviceFeeCents: order.serviceFeeCents }
+  // Zeilen, Endpreis je Stück und Gebührenzeile aus dem Snapshot der Bestellung — keine Rechnung mit heutigen Konditionen.
+  const { gebuehrText, ...korb } = fortsetzungsKorb(order)
+  return {
+    art: 'zahlung',
+    zahlung: {
+      clientSecret: intent.client_secret,
+      bestaetigung: pfad,
+      reserviertBis: fristVon(order).toISOString(),
+      betrag,
+      gebuehrText,
+      abholung: abholZeitText(order, jetzt),
+      name: '',
+      email: order.customerEmail,
+    },
+    positionen: order.items.map((item) => ({
+      productId: item.productId,
+      name: item.productName,
+      imageUrl: item.product?.imageUrl ?? null,
+      quantity: item.quantity,
+      unit: item.product?.unit ?? '',
+      unitSize: gebindeGroesse(item.product?.unitSize),
+      // Decimal → Cent → Euro an der Servergrenze (CODING_STANDARDS §2): so führt der Korb im Browser den Preis.
+      price: centsAlsEuro(alsCents(item.unitPrice)),
+    })),
+    korb,
+  }
 }
 
 export default async function CheckoutPage({ params, searchParams }: Props) {
@@ -50,6 +164,23 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
   // Volle Abholfenster (maxOrders erreicht) zeigt das Formular ausgegraut —
   // dieselbe Zählung, mit der /api/checkout ablehnt (src/server/abholfenster.ts).
   const jetzt = new Date()
+
+  // Vor der Kaufsperre: Eine Pause hält neue Bestellungen an, nicht die Zahlung einer bestehenden (die Admin-Sperre schon, ladeFortsetzung).
+  const fortsetzung = await ladeFortsetzung(farm, suche, jetzt)
+  if (fortsetzung.art === 'bestaetigung') redirect(fortsetzung.pfad)
+  if (fortsetzung.art === 'zahlung') {
+    return (
+      <ZahlungFortsetzen
+        farm={farm}
+        zahlung={fortsetzung.zahlung}
+        positionen={fortsetzung.positionen}
+        zeilenCents={fortsetzung.korb.zeilenCents}
+        anzeige={fortsetzung.korb.anzeige}
+        jetztIso={jetzt.toISOString()}
+      />
+    )
+  }
+
   const [nurBetriebeIds, ausHof, volleTage] = await Promise.all([
     getNurBetriebeProduktIds(farm.id),
     session?.user ? getBetriebsVorbelegung(session.user.id) : Promise.resolve(null),
