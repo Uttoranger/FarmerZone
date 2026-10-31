@@ -322,7 +322,7 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
         gebuehrText: 'Servicegebühr',
         korb: null,
         angaben: null,
-        fussnote: 'Bezahlung sicher über Stripe',
+        zusammenfassung: null,
       })
     )
   }
