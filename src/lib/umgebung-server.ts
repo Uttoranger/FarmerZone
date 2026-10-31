@@ -4,7 +4,7 @@ import { STICHTAG_ZUKUNFT_WARNUNG, bestimmeUmgebung, stichtagWeitInDerZukunft, t
 import { istTestbetrieb } from '@/lib/stripe-modus'
 import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { einmalJeTag, utcTagVon } from '@/lib/einmal-je-tag'
+import { einmalJeTag, utcTagVon, type LegeTageszeileAn } from '@/lib/einmal-je-tag'
 
 /**
  * Die Umgebung, einmal je Prozess berechnet — der Serverzweig zu umgebung.ts.
@@ -105,13 +105,32 @@ function heuteNeu(zustand: BekannterZustand, jetzt: Date): boolean {
 }
 
 /**
+ * Die eine Anweisung hinter `einmalJeTag` (Nr. 213.3): legt die Zeile des
+ * Tages in BetriebMessung an (ON CONFLICT DO NOTHING) und liefert, wie viele
+ * Zeilen neu sind. Sie steht hier und nicht im Helfer, weil der rein bleibt
+ * (src/lib/einmal-je-tag.ts); der Stripe-Webhook reicht dieselbe Anweisung
+ * herein. Prisma kommt dynamisch: Dieses Modul laden auch Seed und
+ * E-Mail-Tests, die keine Datenbank wollen. Fehler wirft sie weiter — der
+ * Helfer macht daraus false.
+ */
+export const legeTageszeileAn: LegeTageszeileAn = async (tag, art, jetzt) => {
+  const { prisma } = await import('@/lib/prisma')
+  const angelegt = await prisma.$queryRaw<Array<{ art: string }>>`
+    INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
+    VALUES (${tag}::date, ${art}, 1, ${jetzt}::timestamp(3))
+    ON CONFLICT ("tag", "art") DO NOTHING
+    RETURNING "art"`
+  return angelegt.length
+}
+
+/**
  * Legt die Zeile des Tages für Zustand und Deploy an — true nur für die
- * Anfrage, die sie anlegt. Die Anweisung steht im Helfer (src/lib/einmal-je-tag.ts,
- * Nr. 213.3); scheitert die Datenbank, wird nicht gemeldet — der Zustand
- * steht weiter in der Betriebsleiste, und eine fehlende Datenbank meldet sich selbst.
+ * Anfrage, die sie anlegt (Helfer src/lib/einmal-je-tag.ts, Nr. 213.3);
+ * scheitert die Datenbank, wird nicht gemeldet — der Zustand steht weiter in
+ * der Betriebsleiste, und eine fehlende Datenbank meldet sich selbst.
  */
 export async function erstmalsHeute(zustand: BekannterZustand, jetzt: Date): Promise<boolean> {
-  return einmalJeTag(`sentry:${zustand}:${DEPLOY_KENNUNG}`, jetzt)
+  return einmalJeTag(`sentry:${zustand}:${DEPLOY_KENNUNG}`, jetzt, legeTageszeileAn)
 }
 
 async function meldeEinmal(zustand: BekannterZustand, satz: string, jetzt: Date): Promise<void> {

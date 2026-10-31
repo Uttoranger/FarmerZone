@@ -7,6 +7,7 @@ import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import { einmalJeTag } from '@/lib/einmal-je-tag'
+import { legeTageszeileAn } from '@/lib/umgebung-server'
 import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag } from '@/server/mail-warteschlange'
 import { bestellMailAuftrag, zahlungZuSpaetMailAuftrag } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
@@ -170,16 +171,17 @@ export async function POST(request: NextRequest) {
 /**
  * Ein ungültiges Ereignis an Sentry — höchstens einmal je Typ und UTC-Tag
  * über den Helfer `einmalJeTag` (src/lib/einmal-je-tag.ts, Nr. 213.3; derselbe
- * wie `erstmalsHeute`): über alle Instanzen entscheidet EINE Anweisung auf
- * BetriebMessung (Art `sentry:stripe-schema:<typ>`, Zeile je Tag), nur wer
- * sie anlegt, meldet. Ohne Deploy in der Art: Ein neuer Deploy behebt ein
- * Ereignis von Stripe nicht. Nur Typ, Ereignis-Kennung und Feldpfade — nie
- * Werte. Scheitert die Datenbank oder Sentry, bleibt es still; das Protokoll
- * hat die Zeile schon. Anders als dort kein Gedächtnis je Instanz: Ungültige
- * Ereignisse sind selten, eine Anweisung je Zustellung kostet nichts.
+ * wie `erstmalsHeute`, mit derselben Anweisung `legeTageszeileAn`): über alle
+ * Instanzen entscheidet EINE Anweisung auf BetriebMessung (Art
+ * `sentry:stripe-schema:<typ>`, Zeile je Tag), nur wer sie anlegt, meldet.
+ * Ohne Deploy in der Art: Ein neuer Deploy behebt ein Ereignis von Stripe
+ * nicht. Nur Typ, Ereignis-Kennung und Feldpfade — nie Werte. Scheitert die
+ * Datenbank oder Sentry, bleibt es still; das Protokoll hat die Zeile schon.
+ * Anders als dort kein Gedächtnis je Instanz: Ungültige Ereignisse sind
+ * selten, eine Anweisung je Zustellung kostet nichts.
  */
 async function meldeUngueltigEinmalJeTag(typ: VerarbeiteterStripeTyp, eventId: string, felder: string[]): Promise<void> {
-  if (!(await einmalJeTag(`sentry:stripe-schema:${typ}`, new Date()))) return
+  if (!(await einmalJeTag(`sentry:stripe-schema:${typ}`, new Date(), legeTageszeileAn))) return
   try {
     Sentry.captureMessage('Stripe-Ereignis mit unerwartetem Aufbau — nicht verarbeitet', {
       level: 'error',
