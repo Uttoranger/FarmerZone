@@ -272,6 +272,8 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     'src/app/(public)/datenschutz/page.tsx': [],
     'src/app/(public)/konditionen/page.tsx': [],
     'src/app/(public)/problem-melden/page.tsx': [],
+    // Nr. 200: Widerruf online (N39) gleich in der KundeShell entstanden.
+    'src/app/(public)/widerruf/page.tsx': [],
     // Die Hofseite trägt seit Nr. 10 die KundeShell (siehe unten).
     'src/app/(public)/[farmSlug]/page.tsx': [],
     // Die Produktseite trägt seit Nr. 11 die KundeShell ohne Unterleiste.
@@ -330,8 +332,11 @@ describe('Jede Kundenseite hat ihre Kopfzeile — am Quelltext', () => {
     expect(text).toMatch(/setBestellungAngelegt\(true\)\s*setZahlung\(/)
     // Laden, leerer Korb, Zahlung und Formular — alle in derselben Fokus-Shell.
     expect(text.match(/fokusShell\(/g)?.length).toBeGreaterThanOrEqual(4)
-    // Zwei Stellen: die Kasse selbst und die Kasse eines pausierten Hofs (KassePausiert, Nr. 176).
-    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(2)
+    // Drei Stellen: die Kasse selbst, die Kasse eines pausierten Hofs (KassePausiert, Nr. 176) und die
+    // Zahlung einer bestehenden Bestellung (ZahlungFortsetzen, Nr. 202) — deren „Zurück" führt zur
+    // Bestätigung derselben Bestellung, nicht aus der Kasse zum Hof.
+    expect(text.match(/<KundeFokusShell\b/g)).toHaveLength(3)
+    expect(text).toMatch(/zurueck=\{\{ href: zahlung\.bestaetigung, label: 'Zurück zur Bestellung' \}\}/)
   })
 
   it('die Bestätigungsseite trägt die KundeShell ohne Unterleiste, nie den Verlauf als Rückweg (Nr. 13)', () => {

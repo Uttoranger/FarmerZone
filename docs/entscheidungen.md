@@ -202,6 +202,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Ergänzung (uttoranger, im Chat, 21.10.2026; Nr. 132):** „Die Stripe-Hosts stehen nach der Stripe-Doku ‚Integration security guide › Content Security Policy › Stripe.js‘ (docs.stripe.com/security/guide, abgerufen 21.10.2026) in der Policy: `https://api.stripe.com` in connect-src; `https://js.stripe.com` und `https://*.js.stripe.com` in script-src und frame-src; `https://hooks.stripe.com` in frame-src (3-D-Secure). `https://maps.googleapis.com` (nur mit eigenem Google-Schlüssel im Address Element) und die Hosts von Link kommen nur dazu, wenn wir das nutzen.“
 - **Ergänzung (uttoranger, im Chat, 22.10.2026):** „Die CSP wird in einem eigenen Auftrag ab 28.10.2026 scharf geschaltet, nach Auswertung der Meldungen vom 21.10. bis mindestens 28.10., mit Nonces bzw. Hashes statt `'unsafe-inline'`. Lauf 21 läuft deshalb schon am 22.10. und ohne CSP (Entscheidung 22.10.2026). Vor dem Auftrag prüft die Projektleitung, ob im Stripe-Dashboard Link an ist (docs/betrieb/stripe-live.md, „0. Vorher“).“
 - **Ergänzung (uttoranger, im Chat, 23.10.2026):** „`frame-src` erlaubt zusätzlich `'self'` für unsere eigenen Vorschau-Rahmen (Mein Hof, Admin › Startseite). `frame-ancestors` bleibt eng: DENY, außer der Hofseite mit `?vorschau=1` und der Startseite mit `?vorschau`.“
+- **Ergänzung (uttoranger, im Chat, 30.10.2026):** „G8 · Ergänzung (30.10.2026): Die CSP wird in Stufe 1 scharf geschaltet: dieselbe Policy wie heute, aber erzwingend, `'unsafe-inline'` bleibt; Meldungen weiter an /api/csp-bericht. Nonces bzw. Hashes kommen in einem eigenen Auftrag.“ Umsetzung: Nr. 204 (freigabe.md §31).
 
 ### G9 · Seed-Höfe in Bildern (21.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 20):** „In den Bildern der Läufe dürfen die erfundenen Höfe aus dem Seed (prisma/seed-daten.ts) stehen, mit ihren Gemeinden und Postleitzahlen. In Tests heißen Höfe weiter ‚Testhof A‘, ‚Testhof B‘ und ‚Sonnhof‘; nur Tests, die den Seed selbst prüfen, nennen seine Slugs. Der Seed bleibt erfunden: Hof- und Personennamen, Straßen und Telefonnummern sind ausgedacht, Adressen enden auf @example.com. Nur die Gemeinden sind echt. Welche Orte der Seed nicht trägt, gibt die Projektleitung je Auftrag vor. Eine Liste dieser Orte steht nicht im öffentlichen Repository.“
@@ -872,6 +873,23 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Keine Rechtsberatung.“
 - **Umsetzung:** Nr. 188 (Felder, Expand-Migration), Nr. 197 (Preis, Anzeige, Zahlung), Nr. 198 (Mandat, Monatsabrechnung, Sperre) (freigabe.md §30). Rechtstexte (Hof-AGB, Ankündigung, Datenschutz) folgen als eigener Auftrag nach Rückmeldung der Anwältin und müssen vor dem Stichtag stehen.
 
+### N39 · Widerruf online (§ 13a FAGG) (30.10.2026)
+- **Entscheidung (uttoranger, im Chat, 30.10.2026):**
+  - „**Zugang:** Jede Bestellung einer Verbraucherin (`kaeuferArt` PRIVAT) kann online ohne Anmeldung widerrufen werden. Einstieg: Link ‚Vertrag widerrufen‘ in jeder Bestellmail an die Kundin, auf der Bestätigungsseite, auf der Bestellseite und im Fuß jeder Kundenseite (/widerruf).
+  - **Zwei Schritte:** Erst der Knopf ‚Vertrag widerrufen‘, dann eine Zusammenfassung mit dem Knopf ‚Widerruf bestätigen‘. Gewählt werden die ganze Bestellung oder einzelne Positionen.
+  - **Eingangsbestätigung:** sofort per Mail, mit Inhalt, Datum und Uhrzeit.
+  - **Hof:** Der Widerruf geht an den Hof (Postfach, Mail, Heute). Der Hof bestätigt die Rückgabe und erstattet über den bestehenden Weg der Teilerstattung, bar oder online.
+  - **Ausnahmen nach § 18 FAGG** (etwa schnell verderbliche Ware) prüft der Hof im Einzelfall und begründet eine Ablehnung. Die App zeigt nur einen Hinweis je Kategorie und entscheidet nichts selbst.
+  - **Ohne Zuordnung:** Ein Widerruf, der sich keiner Bestellung zuordnen lässt, wird trotzdem angenommen, bestätigt und dem Team als Aufgabe gezeigt.
+  - **Aufbewahrung:** wie Bestellungen.
+  - **Belehrung:** Die Rücktrittsbelehrung folgt wörtlich der Muster-Widerrufsbelehrung in Anhang I FAGG.
+  - Keine Rechtsberatung; die Texte prüft die Anwältin.“
+- **Umsetzung:** Nr. 200 (eine Migration, nur Expand) (freigabe.md §31).
+
+### N40 · Stripe live nur mit Hofpreis-Modell (30.10.2026)
+- **Entscheidung (uttoranger, im Chat, 30.10.2026):** „Ist Stripe live (Live-Schlüssel in der Produktion) und liegt der Stichtag ‚Hofpreis-Modell ab‘ noch in der Zukunft, steht in Admin › Heute ganz oben eine Aufgabe, und die Betriebsleiste warnt. Die Bestellungen laufen weiter; es ist ein Signal, keine Sperre. stripe-live.md nennt den Stichtag als Vorbedingung.“
+- **Umsetzung:** Nr. 201 (freigabe.md §31).
+
 ---
 
 ## I – Illustrationen
@@ -941,3 +959,5 @@ Stand Lauf 24 (uttoranger, 24.10.2026): N26 (Mails über die Warteschlange) und 
 Stand Lauf 25 (uttoranger, 25.10.2026): Die Ergänzungen zu N26 (Mail-Auftrag hält keine Bestellung auf, Beträge in Cent, betreiber-bestaetigung Sofort), N27 (Nochmal schicken nicht bei gesperrt oder verworfen) und N16 (eigene Vorschau-Route) sowie N28 (Warenkorb ehrlich), N29 (kein Netz als Zustand), N30 (Korb ohne Blatt-Pingpong), N31 (App-Start nach Sitzung), die E7-Ergänzung (Passkey für Höfe) und S18 (Sitzungsdauer) sind entschieden und in Nr. 168–183 eingeplant (freigabe.md §29); dazu die Regelvorschläge aus Morgenbericht 24. Lauf 25 hat keine Migration, kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Servicegebühr bei Barzahlung ab 1.2.2027 (Entscheidung offen, bis Dezember), Tarifwahl und SEPA, Rücktritt und Widerruf, Datenschutzerklärung über Fakten hinaus, CSP scharf, Service Worker, Paketänderungen, Obergrenze je Warenkorb-Sitzung, Hofliste aufteilen, Rückruf, eine gemeinsame Checkliste.
 
 Stand Lauf 26 (uttoranger, 26.10.2026): N32 (Admin im Regelbetrieb), N33 (Admin-Protokoll, 5 Jahre), N34 (Hof sperren, Notfall-Storno, Notbremse), N35 (Rechte je Person), N36 (Konto-Anfragen; Stufe 2 erst nach Freigabe der Liste), N37 (Geld-Abgleich), N38 (Plattformgebühr im Hofpreis, bar per SEPA-Monatsabrechnung; 6 %, Mindestbestellwert 10 €, Stichtag 1.2.2027, Gründungshöfe nach ihrer Laufzeit, Einstellungen je Hof), die Änderung von E4, die Ergänzungen zu B1 und K2 und die Ergänzungen zu N18 (Uptime, 15 Minuten, bekannte Zustände), N29 (Netzsatz bei nicht wiederholbaren Aktionen) und N8 (Wortliste) sind entschieden und in Nr. 184–198 eingeplant (freigabe.md §30); dazu die Entscheidungen 2, 4, 5, 6, 10 aus Morgenbericht 25 (Hof-E-Mail fällt auf die Anmelde-Adresse zurück; Enter springt in der Kasse weiter; Zurück-Knopf im Titelbild; 11 px in der Hof-Unterleiste unter 360 px; Kicker ‚Aus der Region‘ entfällt). Lauf 26 hat eine Migration (188), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Stufe 2 scharf, Uptime-Dienst einrichten (Projektleitung), Rücktritt und Widerruf, CSP scharf, Tarife und Grundgebühr, Rechtstexte zur Plattformgebühr, Rückfrage-Mail nach dem Abholtermin, Paketänderungen.
+
+Stand Lauf 27 (uttoranger, 30.10.2026): N39 (Widerruf online), N40 (Stripe live nur mit Hofpreis-Modell) und die Ergänzung zu G8 (CSP Stufe 1) sind entschieden und in Nr. 199–206 eingeplant (freigabe.md §31). Dazu die Audit-Funde A1, A3, A8 und Reste aus Morgenbericht 26. Lauf 27 hat eine Migration (200), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: Rechtstexte, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.

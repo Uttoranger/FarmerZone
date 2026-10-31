@@ -34,6 +34,8 @@ vi.mock('@/lib/prisma', async () => ({
     order: { updateMany: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(async () => []), count: vi.fn(async () => 3) },
     unterhaltung: { create: vi.fn(async () => ({ id: 'cmffaden0000000000001abc' })), findFirst: vi.fn(async () => null) },
     adminAktion: { create: vi.fn(async () => ({ id: 'cmfeintrag00000000000001' })), findMany: vi.fn(async () => []) },
+    // Nr. 200 (Nachbesserung Runde 2): das Detail liest die Widerrufe der Bestellung.
+    widerruf: { findMany: vi.fn(async () => []) },
   },
 }))
 

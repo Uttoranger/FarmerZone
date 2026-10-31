@@ -9,7 +9,7 @@ import { UMGEBUNG } from '@/lib/umgebung-server'
 import { fehlerKlasse, type BetriebHinweis } from '@/lib/betrieb'
 import { ladeBetriebHinweis } from '@/server/queries/betrieb'
 import { ladeAdminAufgaben } from '@/server/queries/admin-heute'
-import { aufgabenLeiste, aufgabenZahl, type AufgabenLeiste, type AufgabenZahl } from '@/lib/admin-aufgaben'
+import { aufgabenLeiste, aufgabenZahl, liveSignalLeiste, type Aufgabe, type AufgabenLeiste } from '@/lib/admin-aufgaben'
 
 export type Adminbereich = {
   personName: string
@@ -38,6 +38,12 @@ export type Adminbereich = {
    * nichts offen ist, im Pflicht-Zustand und wenn das Laden scheitert.
    */
   aufgaben: AufgabenLeiste | null
+  /**
+   * Stripe live ohne Hofpreis-Modell (Register N40, Nr. 201): derselbe Satz wie
+   * die Aufgabe in „Braucht dich“, als Warnung in der Betriebsleiste — null ohne
+   * Signal, im Pflicht-Zustand und wenn das Laden scheitert.
+   */
+  stripeLiveWarnung: { text: string; href: string } | null
 }
 
 /**
@@ -57,9 +63,9 @@ async function ladeBetriebHinweisSicher(): Promise<BetriebHinweis | null> {
 }
 
 /** Wie der Punkt: Die Zahl darf den Admin nie aufhalten — scheitert eine Quelle, fehlen nur Zeile und Zahl an Heute (Sentry, nur die Klasse). */
-async function ladeAufgabenZahlSicher(jetzt: Date): Promise<AufgabenZahl | null> {
+async function ladeAufgabenSicher(jetzt: Date): Promise<Aufgabe[] | null> {
   try {
-    return aufgabenZahl(await ladeAdminAufgaben(jetzt, { mitBetrieb: UMGEBUNG.vercelProduktion }))
+    return await ladeAdminAufgaben(jetzt, { mitBetrieb: UMGEBUNG.vercelProduktion })
   } catch (err) {
     const meldung = new Error('Heute: Zahl der Betriebsleiste nicht gelesen')
     meldung.name = fehlerKlasse(err)
@@ -90,15 +96,16 @@ export async function ladeAdminbereich(): Promise<Adminbereich> {
   const reiter = sichtbareReiter(person)
   if (!inhaltOffen) {
     const nutzer = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } })
-    return { personName: nutzer?.name ?? '', hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }), reiter, betrieb: null, aufgaben: null }
+    return { personName: nutzer?.name ?? '', hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }), reiter, betrieb: null, aufgaben: null, stripeLiveWarnung: null }
   }
-  const [nutzer, hoefe, offen, betrieb, zahl] = await Promise.all([
+  const [nutzer, hoefe, offen, betrieb, aufgaben] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, farm: { select: { id: true } } } }),
     zaehleWartendeHoefe(),
     zaehleOffenImEingang(),
     ladeBetriebHinweisSicher(),
-    ladeAufgabenZahlSicher(new Date()),
+    ladeAufgabenSicher(new Date()),
   ])
+  const zahl = aufgaben ? aufgabenZahl(aufgaben) : null
   return {
     personName: nutzer?.name ?? '',
     hatHof: kontoHatHof({ rolle: nutzer?.role, hofVorhanden: nutzer?.farm != null }),
@@ -107,5 +114,6 @@ export async function ladeAdminbereich(): Promise<Adminbereich> {
     reiter,
     betrieb,
     aufgaben: aufgabenLeiste(zahl),
+    stripeLiveWarnung: aufgaben ? liveSignalLeiste(aufgaben) : null,
   }
 }

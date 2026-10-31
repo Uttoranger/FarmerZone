@@ -6,13 +6,16 @@ import { prisma } from '@/lib/prisma'
 import { ADMIN_BESTELLUNGEN_HREF, ADMIN_BESTELLUNG_TEXT, hofNachrichtGeld, notfallStornoStand, type HofNachrichtGeld } from '@/lib/admin-bestellung'
 import { onlineBezahlt } from '@/lib/storno'
 import { ADMIN_POSTFACH_HREF, POSTFACH_HREF } from '@/lib/postfach'
-import { adminBestellAktionSchema, adminBestellFehler } from '@/schemas/admin-bestellung'
+import { adminBestellAktionSchema, adminBestellFehler, adminWiderrufFehler, adminWiderrufZuordnenSchema } from '@/schemas/admin-bestellung'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
 import { storniere, type StornoErgebnis } from '@/server/stornieren'
+import { weiseWiderrufZu } from '@/server/widerruf'
+import { WIDERRUF_ADMIN_TEXT } from '@/lib/widerruf'
 
 /*
- * Die Aktionen von Admin › Bestellungen (Register N33, N34, N35; Nr. 186).
+ * Die Aktionen von Admin › Bestellungen (Register N33, N34, N35; Nr. 186;
+ * „Zuordnen …“ eines Widerrufs seit Nr. 200).
  * Jede ist heikel: zuerst `verlangeFrischeBestaetigung({ recht })` — das ist
  * `verlangeAdminAktion({ frisch: true, recht })` unter dem Namen, den die
  * Quelltext-Wache der heiklen Aktionen sucht (src/server/admin-wache.ts) —,
@@ -130,4 +133,28 @@ export async function notfallStorno(eingabe: unknown): Promise<StornoErgebnis> {
   await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'hof', bezugId: bestellung.farmId, grund, mitPasskey: wache.mitPasskey })
   revalidatePath(ADMIN_BESTELLUNGEN_HREF)
   return ergebnis
+}
+
+/**
+ * „Zuordnen …“ (Nachbesserung Runde 2 zu Nr. 200, Freigabe 200 Punkt 6):
+ * Ein Widerruf ohne Bestellung bekommt die Bestellung mit genau dieser Nummer.
+ * Heikel wie der Notfall-Storno (gleiches Recht `hof_sperren_storno`, frischer
+ * Passkey): Vor der Abholung löst das Zuordnen einen Storno mit Erstattung aus
+ * (`weiseWiderrufZu` → derselbe Weg wie ein zugeordneter Widerruf). Bedingt
+ * geschrieben (`orderId: null` in der WHERE-Klausel); Protokoll
+ * `widerruf_zugeordnet` mit Grund — nie Name, Adresse oder Nachricht.
+ */
+export async function ordneWiderrufZu(eingabe: unknown): Promise<{ ok: true; weiter: 'erstattet' | 'hof' } | { error: string }> {
+  const wache = await verlangeFrischeBestaetigung({ recht: 'hof_sperren_storno' })
+  if ('error' in wache) return { error: wache.error }
+  const geprueft = adminWiderrufZuordnenSchema.safeParse(eingabe)
+  if (!geprueft.success) return { error: adminWiderrufFehler(geprueft.error) }
+  const { widerrufId, bestellnummer, grund } = geprueft.data
+
+  const ergebnis = await weiseWiderrufZu({ widerrufId, bestellnummer })
+  if ('error' in ergebnis) return { error: ergebnis.error === 'unbekannt' ? WIDERRUF_ADMIN_TEXT.nummerUnbekannt : WIDERRUF_ADMIN_TEXT.schonZugeordnet }
+  // Nach Zuordnen und Weiterleiten — protokolliere wirft nie, rollt nichts zurück.
+  await protokolliere({ wer: wache.userId, art: 'widerruf_zugeordnet', bezugArt: 'bestellung', bezugId: ergebnis.orderId, grund, mitPasskey: wache.mitPasskey })
+  revalidatePath(ADMIN_BESTELLUNGEN_HREF)
+  return { ok: true, weiter: ergebnis.weiter }
 }

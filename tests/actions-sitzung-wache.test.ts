@@ -39,6 +39,8 @@ type Ausnahme = { datei: string; name: string; grund: string }
 
 /** Öffentliche Wege: ohne Konto aufrufbar, der Schutz ist ein Token, ein Code oder die Bremse. */
 const OEFFENTLICH: Ausnahme[] = [
+  { datei: 'widerruf.ts', name: 'reicheWiderrufMitLinkEin', grund: 'Widerruf online nach § 13a FAGG ohne Anmeldung (Freigabe 200, N39): der signierte Link mit Zweck widerruf bestimmt die Bestellung' },
+  { datei: 'widerruf.ts', name: 'reicheWiderrufOhneLinkEin', grund: 'Widerruf online nach § 13a FAGG ohne Anmeldung (Freigabe 200, N39): Bremse je IP und je Adresse, Zuordnung nur bei Nummer und Adresse, immer dieselbe Antwort' },
   { datei: 'bar-bestaetigung.ts', name: 'bestaetigeBarBestellung', grund: 'Der Link in der Mail an die Kundin trägt ein signiertes Token, das die Bestellung bestimmt; eine Sitzung gibt es nicht' },
   { datei: 'bar-bestaetigung.ts', name: 'sendeBarLinkErneut', grund: 'Freigabe §27 (Nr. 151, S17 Punkt 2): die Signatur der Bestätigungsseite statt einer Sitzung; Mail nur an die Adresse der Bestellung, nur offen, Bremse je Bestellung, immer dieselbe Antwort' },
   { datei: 'bar-bestaetigung.ts', name: 'storniereBarBestellung', grund: 'Der Link in der Mail an die Kundin trägt ein signiertes Token, das die Bestellung bestimmt; eine Sitzung gibt es nicht' },

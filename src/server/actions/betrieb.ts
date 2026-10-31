@@ -280,6 +280,11 @@ export async function schickeMailNochmalAction(eingabe: unknown): Promise<Antwor
   if (m.art === 'bar-bestaetigungslink') {
     if (!m.bestellungId) return { error: 'Die Bestellung gibt es nicht mehr.' }
     antwort = await schickeBarLinkNochmal(m.bestellungId, pruefung.wurzel)
+  } else if (m.art === 'widerruf-eingang') {
+    // Sofort wie der Bar-Link (Nr. 200): direkt neu verschickt, an die heutige Adresse der Bestellung.
+    if (!m.bestellungId) return { error: 'Die Bestellung gibt es nicht mehr.' }
+    const { schickeEingangNochmal } = await import('@/server/widerruf')
+    antwort = (await schickeEingangNochmal(m.bestellungId, pruefung.wurzel)) ? { ok: true, satz: ALLE_MAILS_TEXT.unterwegs } : { ok: true, satz: MAIL_TEXT.nichtsGeaendert }
   } else {
     const auftrag = nochmalAuftrag(m, pruefung.wurzel, pruefung.n)
     if (!auftrag) return { error: MAIL_TEXT.eingabeUngueltig }
@@ -303,7 +308,8 @@ export async function schickeArtNochmalAction(eingabe: unknown): Promise<Antwort
   if ('error' in frisch) return frisch
   const gelesen = mailArtEingabeSchema.safeParse(eingabe)
   if (!gelesen.success) return { error: MAIL_TEXT.eingabeUngueltig }
-  if (!nochmalErlaubt(gelesen.data.art) || gelesen.data.art === 'bar-bestaetigungslink') return { error: nochmalNieGrund(gelesen.data.art) }
+  // Die Sofort-Arten (Bar-Link, Widerruf-Eingang) nur einzeln — sie gehen direkt, nicht über die Warteschlange.
+  if (!nochmalErlaubt(gelesen.data.art) || gelesen.data.art === 'bar-bestaetigungslink' || gelesen.data.art === 'widerruf-eingang') return { error: nochmalNieGrund(gelesen.data.art) }
 
   const jetzt = new Date()
   const kandidaten = (await ladeGescheiterteDerArt(gelesen.data.art, jetzt)).filter((m) => nochmalVorab(m) === null)

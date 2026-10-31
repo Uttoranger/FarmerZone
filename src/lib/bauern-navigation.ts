@@ -261,6 +261,12 @@ export const HOF_NEU_TITEL = 'Was legst du an?'
 /** Die zweite Gruppe des Neu-Menüs (Mockup web-h2-neu-was-legst-du-an). */
 export const HOF_NEU_ANDERES_TITEL = 'Oder etwas anderes'
 
+/**
+ * Kürzere Beschriftung der Handy-Leiste, nur unter 360 px Breite (Nr. 205): Fünf Plätze à 61 px tragen
+ * „Bestellungen“ bei 320 px nicht. Das Kurzwort steckt im vollen Namen; der Name bleibt der lange.
+ */
+export const HOF_LEISTE_KURZ: Readonly<Partial<Record<HofNavId, string>>> = { bestellungen: 'Bestellung' }
+
 /** Das Wort am Neu-Knopf: in der Seitenleiste und unter dem Plus der Unterleiste (freigabe.md §12 Nr. 45). */
 export const HOF_NEU_KNOPF = 'Neu'
 

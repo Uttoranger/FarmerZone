@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, type FieldErrors } from 'react-hook-form'
@@ -20,6 +20,7 @@ import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
+import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import type { CartItem } from '@/lib/use-cart'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
 import {
@@ -60,6 +61,7 @@ import {
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { KASSE_AGB_SATZ } from '@/lib/rechtstexte/agb-einbindung'
+import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -84,6 +86,7 @@ import {
   TEXTLINK,
   KontaktHinweis,
   KorbKarte,
+  type KorbPosition,
   ReservierungsHinweis,
   UebersichtKarte,
   ZahlartWahl,
@@ -147,7 +150,7 @@ function uebernehmePreise(
 }
 
 /** Der Zahlungsschritt, sobald /api/checkout Bestellung und Zahlungsvorgang angelegt hat. */
-type Zahlung = {
+export type Zahlung = {
   clientSecret: string
   bestaetigung: string
   reserviertBis: string | null
@@ -654,6 +657,7 @@ export function CheckoutForm({
             wirdGesendet={isPending}
             gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null || mindestGrund !== null}
             gesamt={gesamt}
+            privat={!(betriebAbschnitt && kaeuferArt === 'BETRIEB')}
             fussnote={
               mindestGrund ??
               kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })
@@ -945,6 +949,7 @@ export function KassenAbschluss({
   gesperrt,
   gesamt,
   fussnote,
+  privat = true,
 }: {
   hof: AngabenHof
   /** Die Übersicht mit Frist, Beträgen und einem Fehler der Anfrage. */
@@ -956,6 +961,8 @@ export function KassenAbschluss({
   /** Der Gesamtbetrag, fertig formatiert. */
   gesamt: string
   fussnote: string
+  /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt — bei „Betrieb“ entfällt er. */
+  privat?: boolean
 }): React.JSX.Element {
   return (
     // max-md:mb-8: Mit dem AGB-Satz ist die feste Leiste am Handy rund 190 px hoch (vorher 125);
@@ -983,6 +990,8 @@ export function KassenAbschluss({
             Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
             in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
         <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
+        {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf im neuen Tab. */}
+        {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
       </AktionsLeiste>
     </div>
   )
@@ -1011,6 +1020,64 @@ function Feld({
   )
 }
 
+/**
+ * „Erneut versuchen" nach gescheiterter Zahlung (Audit A3, Nr. 202): der
+ * Zahlungsschritt der Kasse für eine BESTEHENDE Bestellung — derselbe
+ * Zahlungsvorgang, eine neue Bestätigung im Payment Element. Die Kassen-Seite
+ * hat Signatur, Frist und Zahlungsvorgang geprüft und reicht alles fertig
+ * herein; hier wird nichts angelegt, kein Halt erneuert (das täte das
+ * Formular beim Öffnen — eine zweite Reservierung neben der Bestellung) und
+ * der Korb im Browser nicht gelesen: Gezeigt werden die Positionen der
+ * Bestellung, die bezahlt wird — mit Zeilen und Satz aus ihrem Snapshot
+ * (fortsetzungsKorb). Hier rechnet nichts mit den heutigen Konditionen des Hofs.
+ */
+export function ZahlungFortsetzen({
+  farm,
+  zahlung,
+  positionen,
+  zeilenCents,
+  anzeige,
+  jetztIso,
+}: {
+  farm: PublicFarm
+  zahlung: Zahlung
+  positionen: KorbPosition[]
+  /** Zeilensumme je Produkt in Cent aus dem Snapshot der Bestellung. */
+  zeilenCents: Record<string, number>
+  /** Der Satz der Bestellung (N38) für die Endpreise je Stück, sonst null. */
+  anzeige: PreisAnzeige
+  /** Die Uhr des Servers als Startwert — gleiche Restzeit beim Rendern auf dem Server und im Browser. */
+  jetztIso: string
+}): React.JSX.Element {
+  const [jetzt, setJetzt] = useState(() => new Date(jetztIso))
+  useEffect(() => {
+    const uhr = window.setInterval(() => setJetzt(new Date()), 15_000)
+    return () => window.clearInterval(uhr)
+  }, [])
+  const zeilen = useMemo(() => new Map(Object.entries(zeilenCents)), [zeilenCents])
+  return (
+    <KundeFokusShell
+      titel="Bezahlen"
+      rechts={<span title={farm.name}>{farm.name}</span>}
+      zurueck={{ href: zahlung.bestaetigung, label: 'Zurück zur Bestellung' }}
+    >
+      <StripeZahlung
+        clientSecret={zahlung.clientSecret}
+        bestaetigung={zahlung.bestaetigung}
+        farmSlug={farm.slug}
+        reserviertBis={zahlung.reserviertBis}
+        stand={reservierungsStand(zahlung.reserviertBis, jetzt)}
+        betrag={zahlung.betrag}
+        gebuehrText={zahlung.gebuehrText}
+        hofpreis={anzeige !== null}
+        korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
+        angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
+        fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}${ZAHLWEG_ONLINE}`}
+      />
+    </KundeFokusShell>
+  )
+}
+
 /** Im Zahlungsschritt: Abholung und Kontakt, wie sie beim Anlegen feststanden. */
 function FesteAngaben({ zahlung, adresse }: { zahlung: Zahlung; adresse: string }): React.JSX.Element {
   return (
@@ -1026,10 +1093,13 @@ function FesteAngaben({ zahlung, adresse }: { zahlung: Zahlung; adresse: string 
         <h2 id="kasse-daten-fest" className={KARTEN_TITEL}>
           Deine Daten
         </h2>
-        <p className="mt-2 truncate text-[14px] font-semibold" title={zahlung.name}>
-          {zahlung.name}
-        </p>
-        <p className="truncate text-[13.5px]" title={zahlung.email}>
+        {/* Ohne Namen, wenn die Zahlung über den signierten Link weitergeht (Nr. 202): Den Namen zeigt dieser Weg nie (Nr. 153). */}
+        {zahlung.name && (
+          <p className="mt-2 truncate text-[14px] font-semibold" title={zahlung.name}>
+            {zahlung.name}
+          </p>
+        )}
+        <p className={cn('truncate text-[13.5px]', !zahlung.name && 'mt-2')} title={zahlung.email}>
           {zahlung.email}
         </p>
         <KontaktHinweis />

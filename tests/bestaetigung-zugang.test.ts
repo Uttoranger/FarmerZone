@@ -481,6 +481,8 @@ describe('Die Signatur einer Bestellung öffnet genau zwei Schreibwege (Nr. 46, 
   const LESEWEGE = [
     'src/app/(public)/[farmSlug]/bestellung/[orderId]/kalender/route.ts',
     'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx',
+    // Nr. 202: „Erneut versuchen" — die Kasse liest Bestellung und gespeicherten Zahlungsvorgang, schreibt nichts.
+    'src/app/(public)/[farmSlug]/checkout/page.tsx',
     'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
   ]
 

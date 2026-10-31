@@ -30,7 +30,7 @@ vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
 
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeShell } from '@/components/shells/kunde-shell'
-import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
+import { HOF_LEISTE_KURZ, HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
@@ -120,5 +120,28 @@ describe('Unterleiste Hof: 11 px unter 360 px Breite (Entscheidung 6, Nr. 195)',
     expect(ELF).toContain('max-[359px]')
     expect(quelle('src/components/ui/bottom-nav.tsx')).toContain('engUnter360')
     expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav ueberSchleier={offen !== null} engUnter360>')
+  })
+})
+
+describe('Unterleiste Hof: „Bestellungen“ bei 320 px nicht abgeschnitten (Nr. 205)', () => {
+  it('unter 360 px steht die kürzere Fassung aus der Konstante, ab 360 px das volle Wort; der Name bleibt voll', () => {
+    expect(HOF_LEISTE_KURZ.bestellungen).toBe('Bestellung')
+    // Das sichtbare Kurzwort steckt im vollen Namen (Label im Namen).
+    expect('Bestellungen').toContain(HOF_LEISTE_KURZ.bestellungen)
+    expect(leiste).toContain('max-[359px]:hidden')
+    expect(leiste).toMatch(new RegExp(`max-\\[359px\\]:inline[^>]*>${HOF_LEISTE_KURZ.bestellungen}<`))
+  })
+
+  it('der Link trägt kein aria-label; der Zählertext „3 offene Bestellungen“ steht im Namen (Zaehler: Zahl und Bedeutung als sr-only)', () => {
+    const link = abschnitt(leiste, '<a href="/orders"', '</a>')
+    expect(link).not.toContain('aria-label')
+    expect(link).toContain('3 offene Bestellungen')
+    expect(link).toContain('>Bestellungen<')
+  })
+
+  it('Gegenprobe: andere Einträge und die Kunden-Leiste haben keine Kurzfassung', () => {
+    expect(leiste.match(/max-\[359px\]:inline/g)?.length).toBe(1)
+    const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
+    expect(abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')).not.toContain('max-[359px]:inline')
   })
 })

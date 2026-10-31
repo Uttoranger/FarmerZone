@@ -35,6 +35,13 @@ export async function baueMailVorschau(
     const mail = await onsiteConfirmationInhalt(bestellung, VORSCHAU_TOKEN)
     return { betreff: entschaerfeLinks(mail.betreff), html: entschaerfeLinks(mail.html) }
   }
+  if (art.data === 'widerruf-eingang') {
+    // Sofort ohne Renderer (Nr. 200): die Vorlage mit dem neuesten Widerruf der Bestellung.
+    const { eingangVorschau } = await import('@/server/widerruf')
+    const mail = auftrag.bestellungId ? await eingangVorschau(auftrag.bestellungId) : null
+    if (!mail) return { verworfen: 'widerruf_fehlt' }
+    return { betreff: entschaerfeLinks(mail.betreff), html: entschaerfeLinks(mail.html) }
+  }
   const rendere = renderer[art.data]
   const bezug = bezugSchemaFuer(art.data).safeParse(auftrag.bezug)
   if (!rendere || !bezug.success) return { verworfen: 'bezug_ungueltig' }

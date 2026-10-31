@@ -126,6 +126,12 @@ export type AdminShellProps = {
   /** Register N32 (Nr. 185): „n offen · m überfällig – ansehen“ aus „Braucht dich“ — rechts in der Betriebsleiste; null = nichts offen. */
   aufgaben?: AufgabenLeiste | null
   /**
+   * Register N40 (Nr. 201): Stripe ist live, das Hofpreis-Modell beginnt erst
+   * später — derselbe Satz wie die Aufgabe in „Braucht dich“ (liveSignalLeiste),
+   * als Warnung in der Betriebsleiste; null = kein Signal.
+   */
+  stripeLiveWarnung?: { text: string; href: string } | null
+  /**
    * Nur für die Vorschau unter /intern: ersetzt das echte Abmelden, damit der
    * Admin vor der Vorschau nicht abgemeldet wird (wie bei der HofShell).
    */
@@ -340,6 +346,7 @@ export function AdminShell({
   stripeMarke = null,
   betrieb = null,
   aufgaben = null,
+  stripeLiveWarnung = null,
   onAbmelden,
   children,
 }: AdminShellProps): React.JSX.Element {
@@ -442,9 +449,19 @@ export function AdminShell({
               schon voll. Rechts seit Nr. 185 „n offen · m überfällig – ansehen“
               (Register N32) statt der einzelnen Warnung von Nr. 103/161. Ohne Marke
               und ohne offene Aufgabe keine Leiste. */}
-          {(stripeMarke || leiste) && (
-            <div className="flex min-h-11 items-center gap-3 border-t border-border px-4 md:px-8">
+          {(stripeMarke || leiste || stripeLiveWarnung) && (
+            <div className="flex min-h-11 flex-wrap items-center gap-x-3 border-t border-border px-4 md:px-8">
               {stripeMarke && <StatusBadge status={stripeMarke.ton}>{stripeMarke.text}</StatusBadge>}
+              {/* Register N40 (Nr. 201): ein Signal, keine Sperre — der Satz der Aufgabe, als Link auf die Karte „Hofpreis-Modell ab“. */}
+              {stripeLiveWarnung && (
+                <Link
+                  href={stripeLiveWarnung.href}
+                  className={cn('inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline', FOKUS_RAHMEN)}
+                >
+                  <TriangleAlert className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                  <span className="min-w-0">{stripeLiveWarnung.text}</span>
+                </Link>
+              )}
               {leiste && (
                 <Link
                   href={leiste.href}

@@ -93,6 +93,9 @@ export const ADMIN_AKTIONEN = [
   // Eigener Zugang (Inhaber: Notfallzugang)
   'ersatzcodes_erstellt',
   'passkey_entfernt',
+  // Widerruf (Nr. 200, N39): Zuordnen ohne Link (System) und Ablehnen durch den Hof — Bezug die Bestellung
+  'widerruf_zugeordnet',
+  'widerruf_abgelehnt',
 ] as const
 
 export type AdminAktionArt = (typeof ADMIN_AKTIONEN)[number]

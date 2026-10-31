@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ADMIN_GRUND_FEHLER, ADMIN_GRUND_MAX, adminGrundSchema } from '@/schemas/admin-aktion'
 import type { MailZeitraum } from '@/schemas/betrieb-mails'
+import { WIDERRUF_ADMIN_TEXT, WIDERRUF_GRENZEN } from '@/lib/widerruf'
 
 /*
  * Admin › Bestellungen (Register N32, N34; Nr. 186): die Adresse der Seite
@@ -74,4 +75,23 @@ export function adminBestellFehler(fehler: z.ZodError): string {
   if (problem.message === ADMIN_GRUND_FEHLER) return ADMIN_GRUND_FEHLER
   if (problem.code === 'too_big') return `Der Grund ist zu lang – höchstens ${ADMIN_GRUND_MAX} Zeichen.`
   return ADMIN_BESTELLUNG_GRUND_FEHLT
+}
+
+/**
+ * „Zuordnen …“ eines Widerrufs ohne Bestellung (Nachbesserung Runde 2 zu
+ * Nr. 200): Kennung des Widerrufs (aus der Seite), die Bestellnummer (vom
+ * Menschen) und der Grund (Pflicht wie bei jeder Aktion hier, N34).
+ */
+export const adminWiderrufZuordnenSchema = z.strictObject({
+  widerrufId: z.cuid(ADMIN_BESTELLUNG_EINGABE_FEHLER),
+  bestellnummer: z.string().trim().min(1, WIDERRUF_ADMIN_TEXT.nummerFehlt).max(WIDERRUF_GRENZEN.bestellnummer, WIDERRUF_ADMIN_TEXT.nummerZuLang),
+  grund: adminGrundSchema,
+})
+export type AdminWiderrufZuordnen = z.infer<typeof adminWiderrufZuordnenSchema>
+
+/** Der Satz zu einer abgelehnten Eingabe beim Zuordnen: die Bestellnummer mit ihrem Satz, sonst wie oben. */
+export function adminWiderrufFehler(fehler: z.ZodError): string {
+  const problem = fehler.issues[0]
+  if (problem?.path[0] === 'bestellnummer') return problem.code === 'too_big' ? WIDERRUF_ADMIN_TEXT.nummerZuLang : WIDERRUF_ADMIN_TEXT.nummerFehlt
+  return adminBestellFehler(fehler)
 }

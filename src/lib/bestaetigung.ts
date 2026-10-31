@@ -51,6 +51,19 @@ export function bestaetigungsZustand(
   return VOR_ORT_BESTAETIGT.includes(order.status) ? 'bestaetigt' : null
 }
 
+/**
+ * Leert die Bestätigungsseite den Warenkorb (Audit A3, Nr. 202)? Nur, wenn
+ * die Bestellung steht (bezahlt, bar bestätigt) oder bar auf die Bestätigung
+ * per Mail wartet — dann ist sie abgeschickt, ein zweites Mal soll sie
+ * niemand aus dem Korb bestellen. Nach gescheiterter Zahlung bleibt der Korb:
+ * Vorher war er leer, und wer die Zahlung aufgab, musste alles neu
+ * zusammensuchen. „Zahlung wird geprüft" leert ihn ebenfalls noch nicht —
+ * das entscheidet erst der Stand aus der Datenbank beim nächsten Laden.
+ */
+export function korbLeeren(zustand: BestaetigungsZustand | null): boolean {
+  return zustand === 'bezahlt' || zustand === 'bestaetigt' || zustand === 'bestaetigung-offen'
+}
+
 // ─── Nr. 13: Status-Schritte, Kopf und Blöcke der Bestätigungsseite ─────────
 //
 // Alles aus dem Datenbankstand, rein und ohne Uhr: `jetzt` kommt als

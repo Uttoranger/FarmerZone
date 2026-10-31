@@ -78,3 +78,27 @@ export function bestaetigungsPfad(farmSlug: string, orderId: string): string {
 export function barBestaetigungsPfad(farmSlug: string, token: string): string {
   return `/${farmSlug}/bestaetigen/${encodeURIComponent(token)}`
 }
+
+/*
+ * Widerruf online (§ 13a FAGG, Nr. 200): ein EIGENER Zweck, nicht die
+ * Signatur der Bestellseite — der Widerruf ist ein Schreibweg (siehe oben:
+ * „Ein dritter Schreibweg braucht ein eigenes Token mit eigenem Zweck"). Die
+ * Signatur erlaubt genau eins: auf /widerruf diese Bestellung gekürzt zu
+ * zeigen und für sie einen Widerruf einzureichen. Ohne Ablaufdatum wie die
+ * Bestellseite: Ob die Frist noch läuft, entscheidet `widerrufMoeglich`
+ * (src/lib/widerruf.ts) beim Lesen, nicht der Link.
+ */
+const ZWECK_WIDERRUF = 'widerruf'
+
+export function widerrufSignatur(orderId: string): string {
+  return signiereLink(ZWECK_WIDERRUF, orderId)
+}
+
+export function widerrufLinkGilt(orderId: string, signatur: string): boolean {
+  return pruefeLink(ZWECK_WIDERRUF, orderId, signatur)
+}
+
+/** /widerruf?bestellung=…&sig=… — für Mails, Bestätigungs- und Bestellseite. */
+export function widerrufPfad(orderId: string): string {
+  return `/widerruf?bestellung=${encodeURIComponent(orderId)}&sig=${widerrufSignatur(orderId)}`
+}

@@ -2,7 +2,7 @@
 
 Schritte für den Menschen (Register Z3). In der Produktion gibt es keinen Umschalter zwischen Test und Live. Echte Abläufe testest du in der **Testumgebung**: Branch `staging`, Entwicklungsdatenbank, Stripe im Testmodus, erreichbar unter **`https://test.agrilo.at`**.
 
-**Korrektur (15.10.2026, Register Z3, Nr. 94):** Eine Testumgebung wurde nie eingerichtet (keine Variable `NEXT_PUBLIC_TESTUMGEBUNG_URL`, kein Branch `staging`). Die Betriebsleiste im Admin der echten Seite zeigt deshalb bis auf Weiteres nur den Stripe-Modus; den Link „Zur Testumgebung“ gibt es nicht mehr. Die Variable bleibt in der App lesbar (`TESTUMGEBUNG_URL` in `src/lib/umgebung-server.ts`) — wird die Testumgebung später eingerichtet, braucht der Link eine eigene Nummer. Die Zeilen dazu unten sind bis dahin gegenstandslos.
+**Eingerichtet am 30.10.2026 (Projektleitung):** Branch staging, Domain test.agrilo.at, Variablen für staging, zweiter Stripe-Webhook mit Protection Bypass.
 
 Kein Agent ruft Vercel, DNS oder Stripe auf. Hier stehen nur Schritte, keine Werte: Schlüssel und Secrets gehören nur in Vercel und Stripe, nie in Chat, Tickets oder Commits.
 
@@ -12,7 +12,7 @@ Danach kommt der Probelauf (`docs/nachtlauf/probelauf-checkliste.md`, Nr. 48) un
 
 - **Eigene Adresse:** In einer Vorschau gilt `NEXT_PUBLIC_APP_URL` als Adresse der App — aber nur als reine https-Adresse und nie als `agrilo.at`. Links in Mails, die Rücksprünge von Stripe und die Anmeldung laufen dann über `test.agrilo.at`. Andere Vorschauen bleiben bei ihrer Vercel-Adresse.
 - **Banner:** Oben steht „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · staging", daneben der Link „Zur echten Seite".
-- **Admin der echten Seite:** Unter dem Kopf steht eine Leiste mit der Marke „Stripe Test" (nach der Live-Schaltung „Stripe Live"). Der Link „Zur Testumgebung“ ist seit Nr. 94 entfallen (siehe Korrektur oben).
+- **Admin der echten Seite:** Unter dem Kopf steht eine Leiste mit der Marke „Stripe Test" (nach der Live-Schaltung „Stripe Live"). Der Link „Zur Testumgebung“ ist seit Nr. 94 entfallen (siehe Hinweis oben).
 - **Post nur an dich:** An jede Adresse geht Post nur im Produktions-Deployment bei Vercel. Überall sonst gehen Mails nur an Adressen aus `TEST_EMPFAENGER` und an `@example.com`: in der Testumgebung, in Vorschauen, lokal und in einem lokalen Produktions-Build. Grenze: Wer lokal `vercel env pull --environment=production` und dann `next start` ausführt, hat `VERCEL_ENV=production` und damit freie Post. Alles andere wird nicht verschickt, nur gezählt: Im Log steht „[E-Mail] Nicht verschickt …" mit einer Zahl, ohne Adresse.
 - **Action „Staging nachziehen"** (`.github/workflows/staging-nachziehen.yml`): Nach jedem Push auf `main` setzt sie `staging` per Fast-Forward auf `main`, ohne Force. Vercel baut daraufhin die Testumgebung neu. Hat `staging` eigene Commits, wird die Action rot, statt sie zu überschreiben.
 
@@ -54,7 +54,7 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 
 ## 4. Variable in Production
 
-- [ ] **`NEXT_PUBLIC_TESTUMGEBUNG_URL`** = `https://test.agrilo.at`, nur Umgebung **Production**. Seit Nr. 94 zeigt der Admin dazu keinen Link mehr (siehe Korrektur oben).
+- [ ] **`NEXT_PUBLIC_TESTUMGEBUNG_URL`** = `https://test.agrilo.at`, nur Umgebung **Production**. Seit Nr. 94 zeigt der Admin dazu keinen Link mehr (siehe Hinweis oben).
   - Gilt nur als reine https-Adresse ohne Pfad. Ein Tippfehler lässt den Link weg, und Sentry bekommt die Warnung „NEXT_PUBLIC_TESTUMGEBUNG_URL ist keine reine https-Adresse …". Der Deploy läuft trotzdem.
   - In der Testumgebung selbst zeigt der Admin den Link nie, auch wenn die Variable dort ankäme.
 - [ ] Production neu deployen, damit die Variable greift.
@@ -64,7 +64,13 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 - [ ] Stripe-Dashboard, **Testmodus** → Entwickler → Webhooks → Endpunkt hinzufügen: **`https://test.agrilo.at/api/stripe/webhook`**.
   - **Zusätzlich, nicht statt des bestehenden** Endpunkts `https://agrilo.at/api/stripe/webhook`: Die Produktion läuft bis zur Live-Schaltung selbst im Testmodus und braucht ihren Test-Endpunkt weiter.
   - Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen.
-  - Ereignisse: dieselben wie Endpunkt A in `docs/betrieb/stripe-live.md`, Schritt 3.
+  - Ereignisse (die 10, die `src/app/api/stripe/webhook/route.ts` verarbeitet; Stand Lauf 26, Liste mit Wirkung in `docs/betrieb/stripe-live.md`, Schritt 3):
+    - `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`
+    - `refund.failed`, `charge.refund.updated`
+    - `invoice.paid`, `invoice.payment_failed`
+    - `charge.dispute.created`
+    - `setup_intent.succeeded`, `mandate.updated`
+  - `account.updated` gehört zum Connect-Endpunkt und wird hier nicht eingetragen (siehe „Nicht nötig“ unten).
 - [ ] **Vercel-Sperre für Stripe öffnen:** Stripe kann sich nicht bei Vercel anmelden und bekäme sonst 401.
   - Vercel → Settings → Deployment Protection → „Protection Bypass for Automation": ein Geheimnis erzeugen.
   - Es an die Adresse des Endpunkts hängen: `https://test.agrilo.at/api/stripe/webhook?x-vercel-protection-bypass=<Geheimnis>`.

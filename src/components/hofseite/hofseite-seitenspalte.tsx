@@ -21,7 +21,8 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-registrierung'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
-import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
+import { KaufGrund } from '@/components/hofseite/kauf-grund'
+import { useBestellstopp } from '@/components/notbremse-band'
 
 /*
  * Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt):
@@ -225,6 +226,8 @@ function MiniWarenkorb({
   // Der Satz nach dem Abgleich der Hofseite (Register N28) — auch wenn danach nichts mehr im Korb liegt:
   // Dann steht er allein unter dem Titel, damit die Kundin erfährt, wohin ihr Korb ist.
   const hinweis = useKorbHinweis(farmId)
+  // Notbremse (N34): wie eine Sperre — statt „Zur Kasse“ der Satz (KaufGrund, wie im Korb-Blatt).
+  const stopp = useBestellstopp()
   if (positionen.length === 0 && !hinweis) return null
   const anzahl = warenkorbAnzahl(positionen)
   // In ganzen Cent auf dem Weg des Checkouts (korbBetraege), nie price × Menge
@@ -267,8 +270,8 @@ function MiniWarenkorb({
         {gebuehrKorb && <span className="text-[13px] font-normal text-muted-foreground">&nbsp;{gebuehrKorb}</span>}
       </p>
       <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
-      {sperre !== null ? (
-        <KaufSperreHinweis sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} kurz />
+      {sperre !== null || stopp !== null ? (
+        <KaufGrund sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} stopp={stopp} kurz />
       ) : (
         <Link
           href={kasseHref ?? `/${slug}/checkout`}

@@ -12,7 +12,7 @@ const KEINE_HOFSEITE = [
   'account', 'admin', 'agb', 'analytics', 'api', 'app', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen', 'konto',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
-  'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify',
+  'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify', 'widerruf',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
 const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;
@@ -20,8 +20,8 @@ const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9
 type Regel = Awaited<ReturnType<NonNullable<NextConfig['headers']>>>[number];
 
 /**
- * Content-Security-Policy ZUM BEOBACHTEN (Register G8, Nr. 125) — der Wert
- * kommt aus src/lib/csp.ts. Nur im Produktions-Build (`next build`; in
+ * Content-Security-Policy (Register G8, Nr. 125; erzwingend seit Stufe 1,
+ * Nr. 204) — Header-Name und Wert kommen aus src/lib/csp.ts. Nur im Produktions-Build (`next build`; in
  * `next dev` störten die Meldungen nur). Gelesen wird die Umgebung beim
  * Aufruf, also beim Build: VERCEL_ENV und NEXT_PUBLIC_SENTRY_DSN stehen dort.
  *
@@ -31,7 +31,11 @@ type Regel = Awaited<ReturnType<NonNullable<NextConfig['headers']>>>[number];
  * Schlüssel (spätere Regeln überschreiben frühere) — die Seiten mit
  * `no-referrer` oben, die Liste NIE_MELDEN_PFADE und je heiklem Query-Wert
  * eine eigene Regel (`has` verknüpft seine Einträge mit UND). Die Vorschau-
- * Rahmen mit `frame-ancestors` haben einen anderen Schlüssel und bleiben.
+ * Rahmen setzen oben `Content-Security-Policy: frame-ancestors 'self'` —
+ * seit Stufe 1 derselbe Schlüssel wie die Policy, die Regeln hier überschrieben
+ * ihn also. Darum steht je solcher Regel ganz hinten eine mit derselben Quelle
+ * und demselben `has`: die Policy ohne Meldung (die Rahmen tragen `vorschau`
+ * bzw. `sig`, melden also ohnehin nie) plus ihr `frame-ancestors`.
  */
 function cspRegeln(bisherige: Regel[]): Regel[] {
   if (process.env.NODE_ENV !== 'production') return [];
@@ -53,6 +57,11 @@ function cspRegeln(bisherige: Regel[]): Regel[] {
     },
     ...[...ohneReferrer, ...NIE_MELDEN_PFADE].map((source) => ({ source, headers: ohneMelden })),
     ...NIE_MELDEN_PARAMETER.map((key) => ({ source: '/(.*)', has: [{ type: 'query' as const, key }], headers: ohneMelden })),
+    ...bisherige.flatMap((regel) =>
+      regel.headers
+        .filter((h) => h.key === CSP_HEADER)
+        .map((h) => ({ source: regel.source, ...(regel.has ? { has: regel.has } : {}), headers: [{ key: CSP_HEADER, value: `${ohneMelden[0].value}; ${h.value}` }] }))
+    ),
   ];
 }
 
@@ -125,9 +134,8 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Security-Header (Härtung 2b). Die Content-Security-Policy steht zunächst
-  // nur zum Beobachten (Report-Only, Register G8, Nr. 125) — scharf erst nach
-  // Auswertung der Meldungen; die Regeln dafür hängt cspRegeln() hinten an.
+  // Security-Header (Härtung 2b). Die Content-Security-Policy (Register G8,
+  // Nr. 125; erzwingend seit Nr. 204) hängt cspRegeln() hinten an.
   async headers() {
     const regeln: Regel[] = [
       {

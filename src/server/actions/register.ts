@@ -156,17 +156,3 @@ export async function registerFarmer(data: {
 
   return { ok: true }
 }
-
-// Kept for potential future use (e.g. admin flow)
-export async function setFarmerRole(): Promise<{ ok: true } | { error: string }> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Keine aktive Session gefunden.' }
-
-  try {
-    await prisma.user.update({ where: { id: session.user.id }, data: { role: 'FARMER' } })
-    return { ok: true }
-  } catch (err) {
-    console.error('[setFarmerRole] error:', err)
-    return { error: 'Rollen-Update fehlgeschlagen.' }
-  }
-}

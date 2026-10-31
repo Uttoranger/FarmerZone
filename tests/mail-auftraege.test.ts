@@ -52,6 +52,7 @@ import { betreiberAuftraege, betreiberKennungen, empfaengerKennungen, erstattung
 import { ankuendigungAuftrag, freischaltungAuftrag, lastschriftGescheitertAuftrag, postfachAntwortAuftrag, rundschreibenAuftraege } from '@/server/mail-arten/hof'
 import { aboBestaetigungAuftrag, bescheidAuftraege } from '@/server/mail-arten/kundin'
 import { beitragAuftraege, gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
+import { widerrufErgebnisAuftrag, widerrufHofAuftrag } from '@/server/mail-arten/widerruf'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import type { StapelMail } from '@/lib/email'
@@ -91,6 +92,11 @@ const AUFTRAEGE: EinstellAuftrag[] = [
   aboBestaetigungAuftrag({ id: 'cabo00000000000000000001', farmId: BESTELLUNG.farmId }, JETZT),
   ...bescheidAuftraege(['cmeldung0000000000000001'], JETZT),
   ...beitragAuftraege({ id: 'cbeitrag0000000000000001', farmId: BESTELLUNG.farmId }, ['cabo00000000000000000001']),
+  // Nr. 200: Widerruf an den Hof und das Ergebnis an die Kundin (online mit Betrag, bar ohne, abgelehnt).
+  widerrufHofAuftrag('cwiderruf000000000000001', BESTELLUNG),
+  widerrufErgebnisAuftrag('widerruf-erstattet', 'cwiderruf000000000000001', BESTELLUNG, 1238),
+  widerrufErgebnisAuftrag('widerruf-erstattet', 'cwiderruf000000000000002', BESTELLUNG),
+  widerrufErgebnisAuftrag('widerruf-abgelehnt', 'cwiderruf000000000000001', BESTELLUNG),
 ]
 
 const ZU_BESTELLUNGEN: readonly MailArt[] = [

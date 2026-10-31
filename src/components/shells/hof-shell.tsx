@@ -30,6 +30,7 @@ import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
   EINSTELLUNG_KONTO,
   HOF_NEU_ANDERES_TITEL,
+  HOF_LEISTE_KURZ,
   HOF_NEU_KNOPF,
   HOF_NEU_KNOPF_NAME,
   HOF_NEU_TITEL,
@@ -434,6 +435,7 @@ export function HofShell({
                 key={punkt.id}
                 href={punkt.href}
                 label={punkt.label}
+                labelKurz={HOF_LEISTE_KURZ[punkt.id]}
                 symbol={SYMBOL[punkt.id]}
                 aktuell={offen ? undefined : hofHandyAriaAktuell(pathname, punkt)}
                 zahl={zahlFuer(punkt, zahlen)}

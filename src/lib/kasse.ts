@@ -9,11 +9,12 @@
  */
 import { abholSchluessel, angeboteneAbholfenster, type AbholSlot } from '@/lib/abholfenster'
 import { formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
-import { uhrzeitInWien } from '@/lib/fristen'
+import type { OrderStatus, PaymentStatus } from '@prisma/client'
+import { istVerwaist, uhrzeitInWien, type FristBestellung } from '@/lib/fristen'
 import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
 import { BAR_OHNE_GEBUEHR_ZAHLART, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
-import { bestellGebuehr, endpreisJeStueckCents, mindestbestellwertErreicht, satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { bestellGebuehr, endpreisJeStueckCents, istHofpreisBestellung, mindestbestellwertErreicht, satzHundertstel, satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { alsCents, calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import { RESERVIERUNG_TTL_MS } from '@/lib/reservierung'
@@ -622,4 +623,133 @@ export function weiterBeiEnter(e: EnterEreignis): void {
   const felder = Array.from(e.currentTarget.querySelectorAll('input:not([type=radio]):not([type=checkbox]):not([type=submit]):not([type=button]):not([disabled]), textarea:not([disabled])'))
   const i = felder.indexOf(ziel as (typeof felder)[number])
   felder[i + 1]?.focus()
+}
+
+// ─── Erneut versuchen nach gescheiterter Zahlung (Audit A3, Nr. 202) ────────
+//
+// „Erneut versuchen" auf der Bestätigungsseite führt in die Zahlung DERSELBEN
+// Bestellung: die Kasse mit Kennung und Signatur der Bestellung (dieselbe
+// Signatur wie die Bestätigungsseite, bestell-link.ts). Die Kassen-Seite
+// prüft die Signatur und liest den gespeicherten Zahlungsvorgang — keine
+// zweite Bestellung, keine zweite Reservierung. Der Idempotenz-Schlüssel der
+// ersten Anfrage hilft hier nicht: Er lebt nur im Speicher des Tabs und ist
+// nach Stripes Rückleitung (EPS) weg.
+
+/** Der Parameter der Kasse mit der Kennung der Bestellung, deren Zahlung weitergeht. */
+export const FORTSETZEN_PARAMETER = 'zahlung'
+
+/** /{hof}/checkout?zahlung={id}&sig={signatur} — baut nur die Bestätigungsseite, mit ihrer geprüften Signatur. */
+export function zahlungFortsetzenPfad(farmSlug: string, orderId: string, sig: string): string {
+  const suche = new URLSearchParams({ [FORTSETZEN_PARAMETER]: orderId, sig })
+  return `/${farmSlug}/checkout?${suche.toString()}`
+}
+
+/** Wohin der Knopf führt: Zahlung derselben Bestellung, die Kasse mit dem Korb oder die Bestätigungsseite. */
+export type FortsetzungsZiel = 'zahlung' | 'kasse' | 'bestaetigung'
+
+export type FortsetzungsBestellung = FristBestellung & {
+  status: OrderStatus
+  paymentStatus: PaymentStatus
+  stripePaymentIntentId: string | null
+}
+
+/**
+ * Darf die Zahlung dieser Bestellung weitergehen? Nur online, offen, nicht
+ * bezahlt, mit gespeichertem Zahlungsvorgang und solange ihre Frist läuft —
+ * die Frist gilt beim Lesen (fristen.ts), auch wenn noch niemand storniert
+ * hat. Storniert oder verfallen: die Kasse, der Korb ist ja geblieben.
+ * Alles andere (bezahlt, weiter im Ablauf, bar, Zahlungsvorgang wird gerade
+ * angelegt) zeigt die Bestätigungsseite — eine zweite Bestellung daneben
+ * entstünde sonst aus einem alten Knopf.
+ */
+export function fortsetzungsZiel(b: FortsetzungsBestellung, jetzt: Date): FortsetzungsZiel {
+  if (b.status === 'CANCELLED') return 'kasse'
+  if (b.paymentMethod !== 'ONLINE' || b.status !== 'PENDING_CONFIRMATION' || b.paymentStatus === 'PAID') return 'bestaetigung'
+  if (istVerwaist(b, jetzt)) return 'kasse'
+  return b.stripePaymentIntentId ? 'zahlung' : 'bestaetigung'
+}
+
+/**
+ * Die Zustände eines Stripe-Zahlungsvorgangs (`PaymentIntent.status`) — eigene
+ * Liste statt des Typs aus dem Stripe-Paket, weil diese Datei auch im Browser
+ * läuft. Kennt Stripe einen Zustand mehr, meldet der Typecheck die Kassen-Seite.
+ */
+export type IntentZustand =
+  | 'requires_payment_method'
+  | 'requires_confirmation'
+  | 'requires_action'
+  | 'processing'
+  | 'requires_capture'
+  | 'canceled'
+  | 'succeeded'
+
+/** Stripe-Zustände, in denen der Zahlungsvorgang auf eine (neue) Bestätigung im Payment Element wartet. */
+const INTENT_WARTET: readonly IntentZustand[] = ['requires_payment_method', 'requires_confirmation', 'requires_action']
+
+/** Der gespeicherte Zahlungsvorgang: wartet er, geht es in die Zahlung; abgebrochen in die Kasse; unterwegs oder durch zur Bestätigung. */
+export function zielNachIntent(status: IntentZustand): FortsetzungsZiel {
+  if (INTENT_WARTET.includes(status)) return 'zahlung'
+  return status === 'canceled' ? 'kasse' : 'bestaetigung'
+}
+
+/** Was die Fortsetzung aus der gespeicherten Bestellung für Korb und Gebührenzeile liest — nur Snapshots. */
+export type FortsetzungsSnapshot = {
+  gebuehrModell: string | null
+  serviceFeeCents: number
+  /** Order.serviceFeePercentApplied: im Hofpreis-Modell der Satz („6.00“), sonst der Prozentsatz der Servicegebühr. */
+  serviceFeePercentApplied: { toString(): string } | null
+  serviceFeeMinCentsApplied: number | null
+  items: readonly {
+    productId: string
+    /** OrderItem.unitPrice / totalPrice (Decimal) — der Warenpreis beim Anlegen. */
+    unitPrice: { toString(): string }
+    totalPrice: { toString(): string }
+    /** OrderItem.gebuehrCents (N38): Menge × Gebühr je Stück, im Modell `bisher` 0. */
+    gebuehrCents: number
+  }[]
+}
+
+export type FortsetzungsKorb = {
+  /** Zeilensumme je Produkt in Cent — reines JSON, weil es vom Server in den Browser geht. */
+  zeilenCents: Record<string, number>
+  /** Der Satz der Bestellung für die Endpreise je Stück (N38), sonst null. */
+  anzeige: PreisAnzeige
+  /** Die Bezeichnung der Gebührenzeile im Zahlungsschritt. */
+  gebuehrText: string
+}
+
+/**
+ * Korb und Gebührenzeile einer BESTEHENDEN Bestellung (Nr. 202, Nachbesserung 1):
+ * nur aus ihrem Snapshot, nie mit den heutigen Konditionen des Hofs. Ändert
+ * sich innerhalb der Frist der Hofpreis-Satz, der Stichtag oder die
+ * Servicegebühr, passen die Zeilen trotzdem zum Betrag, den Stripe abbucht.
+ * Zeile = `totalPrice` in Cent, im Hofpreis-Modell plus die gespeicherte
+ * Gebühr der Position — dieselbe Rechnung wie die Kunden-Mail (email.ts).
+ * Den Satz für den Endpreis je Stück legt /api/checkout im Hofpreis-Modell
+ * immer in `serviceFeePercentApplied` ab; mit ihm ergibt der Endpreis je
+ * Stück × Menge genau die Zeile.
+ */
+export function fortsetzungsKorb(b: FortsetzungsSnapshot): FortsetzungsKorb {
+  const hofpreis = istHofpreisBestellung({ gebuehrModell: b.gebuehrModell })
+  const zeilenCents: Record<string, number> = {}
+  for (const item of b.items) {
+    const zeile = alsCents(item.totalPrice) + (hofpreis ? item.gebuehrCents : 0)
+    zeilenCents[item.productId] = (zeilenCents[item.productId] ?? 0) + zeile
+  }
+  if (hofpreis) {
+    return {
+      zeilenCents,
+      anzeige: { hundertstel: satzHundertstel({ plattformgebuehrProzent: b.serviceFeePercentApplied }) },
+      gebuehrText: PLATTFORMGEBUEHR_BEZEICHNUNG,
+    }
+  }
+  return { zeilenCents, anzeige: null, gebuehrText: servicegebuehrTextAusSnapshot(b) }
+}
+
+/** „Servicegebühr · 5 %, mind. € 0,50" aus Satz und Mindestgebühr der Bestellung; ohne Gebühr nur das Wort. */
+function servicegebuehrTextAusSnapshot(b: FortsetzungsSnapshot): string {
+  if (b.serviceFeeCents === 0 || b.serviceFeePercentApplied === null) return SERVICEGEBUEHR_BEZEICHNUNG
+  // Nur Text: der Prozentsatz über Hundertstel (ohne Gleitkomma geparst), nie ein Geldbetrag.
+  const prozent = satzHundertstel({ plattformgebuehrProzent: b.serviceFeePercentApplied }) / 100
+  return `${SERVICEGEBUEHR_BEZEICHNUNG} · ${satzMitMindestgebuehr({ prozent, mindestCents: b.serviceFeeMinCentsApplied ?? 0 })}`
 }

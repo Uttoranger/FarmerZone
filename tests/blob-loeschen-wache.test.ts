@@ -5,8 +5,8 @@
  * Regel (ARCHITECTURE „Upload", Register N17/N18): Ein Blob wird erst gelöscht, wenn keine Zeile mehr auf ihn
  * zeigt — nie im Upload, nie vor dem Speichern. Ursache (Nr. 108): `/api/upload/verarbeiten` löschte das
  * ERSETZTE Bild, bevor Produkt oder Hof gespeichert war; scheiterte das Speichern, zeigte die Seite ein
- * gelöschtes Bild. Seither löscht dieser Weg nur noch das Original des Uploads; ersetzte Bilder bleiben als
- * „Bild ohne Verwendung“ liegen, bis ein Mensch sie nach Durchsicht entfernt.
+ * gelöschtes Bild. Seither löscht dieser Weg nur noch das Original des Uploads. Ersetzte Logos, Titelbilder
+ * und Produktbilder löschen seit Nr. 206 (Audit A8) die speichernden Actions selbst — NACH dem Schreiben.
  *
  * Beweist (TypeScript-Syntaxbaum über jede .ts/.tsx unter src/):
  *  - Jeder Aufruf von `del` aus '@vercel/blob' — benannt importiert (auch umbenannt), als Namespace
@@ -27,6 +27,14 @@ const WEGE: Record<string, { aufrufe: number; grund: string }> = {
   'src/server/actions/farm-photos.ts': {
     aufrufe: 1,
     grund: 'deleteFarmPhotoAction löscht erst die Zeile FarmPhoto (Besitz geprüft), dann den Blob dieses Fotos — danach zeigt nichts mehr auf ihn.',
+  },
+  'src/server/actions/appearance.ts': {
+    aufrufe: 1,
+    grund: 'entferneAltesBild (Nr. 206, Audit A8): das ersetzte Logo bzw. Titelbild erst nach dem erfolgreichen Update, nur im Ordner dieses Hofs aus dem eigenen Speicher und nur, wenn keine Zeile mehr auf die Datei zeigt (Hof, Produkt, Galerie, Beitrag, Meldung).',
+  },
+  'src/server/actions/products.ts': {
+    aufrufe: 1,
+    grund: 'entferneAltesBild (Nr. 206, Audit A8): das ersetzte Produktbild bzw. das Bild eines gelöschten (nicht archivierten) Produkts erst nach dem Schreiben, nur im Ordner dieses Hofs und nur, wenn keine Zeile mehr auf die Datei zeigt.',
   },
   'src/lib/konto-schliessen.ts': {
     aufrufe: 1,

@@ -59,6 +59,7 @@ const SOFORT: Record<string, MailArt> = {
   sendOnsiteConfirmation: 'bar-bestaetigungslink',
   sendBetreiberBestaetigung: 'betreiber-bestaetigung',
   sendBetriebWarnung: 'betrieb-warnung',
+  sendWiderrufEingang: 'widerruf-eingang',
 }
 
 /** Wichtig: Bestellungen, Höfe, Betreiber — die Funktion baut nur, der Worker verschickt. */
@@ -83,6 +84,8 @@ const WICHTIG: Record<string, MailArt> = {
   baueAboBestaetigung: 'abo-bestaetigung',
   bauePlattformgebuehrAnkuendigung: 'plattformgebuehr-ankuendigung',
   baueLastschriftGescheitert: 'lastschrift-gescheitert',
+  baueWiderrufHof: 'widerruf-hof',
+  baueWiderrufErgebnis: 'widerruf-erstattet',
 }
 
 /** Kann warten: Beiträge, Rundschreiben, Bescheide. `bauePostfachMail` baut auch das Rundschreiben (Art je Aufruf). */
@@ -95,6 +98,7 @@ const KANN_WARTEN: Record<string, MailArt> = {
 const OHNE_EIGENE_FUNKTION: Record<string, string> = {
   testmail: 'Die Testmail (/api/test-email) ruft sendRaw selbst mit ihrer Art.',
   rundschreiben: 'bauePostfachMail baut Rundschreiben und Antwort; die Art wählt der Renderer.',
+  'widerruf-abgelehnt': 'baueWiderrufErgebnis baut erstattet und abgelehnt (Nr. 200); die Art wählt der Renderer.',
   'login-link': 'Magic Links gibt es seit Nr. 178 nicht mehr (Plugin und Vorlage entfernt); die Art bleibt für alte Zeilen im Protokoll.',
 }
 

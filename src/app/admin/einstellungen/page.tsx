@@ -15,6 +15,7 @@ import { redirect } from 'next/navigation'
 import { ADMIN_BETRIEB_HREF } from '@/lib/betrieb'
 import { ladeTeam } from '@/server/queries/team'
 import { BenachrichtigungenGruppe, ladeBenachrichtigungen } from './benachrichtigungen'
+import { UMGEBUNG } from '@/lib/umgebung-server'
 
 export const metadata: Metadata = { title: `Einstellungen — Admin — ${MARKE}` }
 // Zeigt den gespeicherten Stand und rechnet „frei" mit den Höfen von jetzt — nie aus einem Cache.
@@ -112,7 +113,8 @@ export default async function AdminEinstellungenPage({
         <p className="mt-1 text-[13px] leading-snug text-muted-foreground lg:hidden">{EINSTELLUNGEN_TEXT.satzKurz}</p>
       </header>
       <EinstellungenGruppen daten={geladen.daten} />
-      <HofpreisStichtag daten={geladen.stichtag} />
+      {/* Register N40 (Nr. 201): im Testmodus der Hinweis vor dem Live-Gang — nur der Wahrheitswert geht an die Karte. */}
+      <HofpreisStichtag daten={geladen.stichtag} stripeTest={UMGEBUNG.stripe === 'test'} />
     </div>
   )
 }

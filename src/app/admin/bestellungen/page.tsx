@@ -39,6 +39,9 @@ import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { FELD, FELD_LABEL, KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { BestellungAktionen } from './bestellung-aktionen'
+import { WiderrufZuordnen } from './widerruf-zuordnen'
+import { WIDERRUF_ADMIN_TEXT as W, WIDERRUF_OHNE_BESTELLUNG_ANKER, WIDERRUF_STAND_MARKE, WIDERRUF_STAND_TEXT } from '@/lib/widerruf'
+import { ladeWiderrufeOhneBestellung, type AdminWiderruf, type WiderrufOhneBestellung } from '@/server/widerruf'
 import { AuskunftKundin } from '@/components/admin/auskunft-kundin'
 
 export const metadata: Metadata = { title: `${T.titel} — Admin — ${MARKE}` }
@@ -150,6 +153,71 @@ function Feld({ titel, children }: { titel: string; children: React.ReactNode })
   )
 }
 
+/** Die Widerrufe der Bestellung (Nr. 200, Nachbesserung Runde 2): Stand, Eingang in Wiener Zeit, Umfang — und nur hier der Text der Kundin. */
+function BestellWiderrufe({ orderId, widerrufe }: { orderId: string; widerrufe: readonly AdminWiderruf[] }): React.JSX.Element {
+  return (
+    <section aria-labelledby={`widerrufe-${orderId}`}>
+      <h3 id={`widerrufe-${orderId}`} className={cn(KICKER, 'mb-1.5')}>
+        {W.titel}
+      </h3>
+      <ul className="flex flex-col">
+        {widerrufe.map((w) => (
+          <li key={w.id} className="flex flex-col gap-1 border-t border-border py-2.5 text-[13.5px]">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Marke art={WIDERRUF_STAND_MARKE[w.stand]}>{WIDERRUF_STAND_TEXT[w.stand]}</Marke>
+              <span className={LEISE}>{W.eingang(w.eingegangenAm)}</span>
+            </span>
+            <span className="text-foreground">{w.umfang.join(' · ')}</span>
+            {w.nachricht && (
+              <span className="break-words whitespace-pre-line text-foreground">
+                <span className={LEISE}>{`${W.nachricht}: `}</span>
+                {w.nachricht}
+              </span>
+            )}
+            {w.grund && (
+              <span className="break-words text-foreground">
+                <span className={LEISE}>{`${W.grundHof}: `}</span>
+                {w.grund}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/**
+ * „Widerrufe ohne Bestellung“ (Ziel der Aufgabe in Admin › Heute, Anker):
+ * Name, E-Mail gekürzt (N33, N35), die eingegebene Nummer, Eingang, Umfang und
+ * „Zuordnen …“. Den Text der Kundin zeigt erst der Dialog.
+ */
+function WiderrufeOhneBestellungListe({ liste }: { liste: readonly WiderrufOhneBestellung[] }): React.JSX.Element {
+  return (
+    <section id={WIDERRUF_OHNE_BESTELLUNG_ANKER} aria-labelledby={`${WIDERRUF_OHNE_BESTELLUNG_ANKER}-titel`} className={cn(KARTE, 'flex scroll-mt-4 flex-col gap-2 p-3.5 md:p-4')}>
+      <div className="flex items-baseline gap-2">
+        <h2 id={`${WIDERRUF_OHNE_BESTELLUNG_ANKER}-titel`} className={KICKER}>
+          {W.ohneBestellungTitel}
+        </h2>
+        <p className={cn('ml-auto text-[12.5px]', LEISE)}>{liste.length}</p>
+      </div>
+      <p className={cn('text-[13px] leading-relaxed', LEISE)}>{W.ohneBestellungSatz}</p>
+      <ul className="flex flex-col">
+        {liste.map((w) => (
+          <li key={w.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border py-2.5">
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-[14px] font-semibold text-foreground">{w.name}</span>
+              <span className={cn('text-[12.5px] break-words', LEISE)}>{`${w.emailGekuerzt} · ${W.eingegebeneNummer(w.bestellnummerEingabe)}`}</span>
+              <span className={cn('text-[12.5px]', LEISE)}>{`${W.eingang(w.eingegangenAm)} · ${w.umfang}`}</span>
+            </span>
+            <WiderrufZuordnen widerrufId={w.id} name={w.name} nachricht={w.nachricht} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function Detail({ d, jetzt }: { d: BestellDetail; jetzt: Date }): React.JSX.Element {
   const fall = bestellFall(d)
   const faelle = BESTELL_FAELLE[fall]
@@ -210,6 +278,8 @@ function Detail({ d, jetzt }: { d: BestellDetail; jetzt: Date }): React.JSX.Elem
           </p>
         )}
       </section>
+
+      {d.widerrufe.length > 0 && <BestellWiderrufe orderId={d.id} widerrufe={d.widerrufe} />}
 
       <section aria-labelledby={`verlauf-${d.id}`}>
         <h3 id={`verlauf-${d.id}`} className={cn(KICKER, 'mb-1.5')}>
@@ -284,10 +354,15 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
   const gewaehlt = gewaehlteBestellungAus(roh.bestellung)
   const jetzt = new Date()
 
-  let geladen: { zeilen: BestellZeile[]; hoefe: Array<{ id: string; name: string }>; detail: BestellDetail | null } | null = null
+  let geladen: { zeilen: BestellZeile[]; hoefe: Array<{ id: string; name: string }>; detail: BestellDetail | null; ohneBestellung: WiderrufOhneBestellung[] } | null = null
   try {
-    const [zeilen, hoefe, detail] = await Promise.all([ladeBestellListe(suche, f, jetzt), ladeHofAuswahl(), gewaehlt ? ladeBestellDetail(gewaehlt, jetzt) : Promise.resolve(null)])
-    geladen = { zeilen, hoefe, detail }
+    const [zeilen, hoefe, detail, ohneBestellung] = await Promise.all([
+      ladeBestellListe(suche, f, jetzt),
+      ladeHofAuswahl(),
+      gewaehlt ? ladeBestellDetail(gewaehlt, jetzt) : Promise.resolve(null),
+      ladeWiderrufeOhneBestellung(),
+    ])
+    geladen = { zeilen, hoefe, detail, ohneBestellung }
   } catch (err) {
     // Nur Bereich und Seite — nie Suchwort oder Adresse.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'bestellungen' } })
@@ -300,7 +375,7 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
     )
   }
 
-  const { zeilen, hoefe, detail } = geladen
+  const { zeilen, hoefe, detail, ohneBestellung } = geladen
   const mitDetail = gewaehlt !== null
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-4 md:gap-5')}>
@@ -309,6 +384,7 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
         <SuchUndFilter sucheRoh={sucheRoh} f={f} hoefe={hoefe} />
         <LadeInhalt className="flex flex-col gap-3.5">
           {suche.art === 'ungueltig' && <Hinweiskarte ton="orange">{MAIL_TEXT.sucheUngueltig}</Hinweiskarte>}
+          {ohneBestellung.length > 0 && <WiderrufeOhneBestellungListe liste={ohneBestellung} />}
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[480px_minmax(0,1fr)]">
             <section aria-label={T.listeBeschriftung} className={cn(SPALTE, mitDetail ? 'hidden lg:flex' : 'flex')}>
               <div className="flex items-baseline gap-2 px-3.5 pt-3 pb-2">

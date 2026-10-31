@@ -22,6 +22,7 @@ import {
 } from '@/server/mail-arten/betreiber'
 import { rendereFreischaltung, rendereLastschriftGescheitert, renderePlattformgebuehrAnkuendigung, renderePostfachAntwort, rendereRundschreiben } from '@/server/mail-arten/hof'
 import { rendereAboBestaetigung, rendereBescheid } from '@/server/mail-arten/kundin'
+import { rendereWiderrufAbgelehnt, rendereWiderrufErstattet, rendereWiderrufHof } from '@/server/mail-arten/widerruf'
 
 /*
  * Die Renderer der Mail-Warteschlange (Register N26, Nr. 158/159): je Art eine
@@ -68,4 +69,7 @@ export const RENDERER: RendererTabelle = {
   beitrag: rendereBeitrag,
   rundschreiben: rendereRundschreiben,
   bescheid: rendereBescheid,
+  'widerruf-hof': rendereWiderrufHof,
+  'widerruf-erstattet': rendereWiderrufErstattet,
+  'widerruf-abgelehnt': rendereWiderrufAbgelehnt,
 }
