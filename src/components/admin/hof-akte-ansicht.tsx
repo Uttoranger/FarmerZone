@@ -123,6 +123,8 @@ export function HofAkteAnsicht({
               {/* Ein Hinweis, keine Sperre (Nr. 119) — leise, nie orange. */}
               {hof.kartenpunktZeile && <span className={cn('block text-[12.5px]', LEISE)}>{hof.kartenpunktZeile}</span>}
             </Eintrag>
+            {/* Nr. 207 (§ 104 JN, P2B): welcher AGB-Fassung der Hof zugestimmt hat und wann (Wiener Zeit). */}
+            <Eintrag titel="AGB">{akte.kontakt.agb}</Eintrag>
             <Eintrag titel="Betriebsnr.">
               {hof.nummer ?? '–'} <span className={LEISE}>· {NUMMER_HINWEIS}</span>
             </Eintrag>

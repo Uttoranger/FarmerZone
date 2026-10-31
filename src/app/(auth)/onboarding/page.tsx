@@ -13,6 +13,8 @@ import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
 import { MARKE } from '@/lib/marke'
+import { agbFassung } from '@/lib/rechtstexte/agb-datei'
+import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
 
 export const metadata: Metadata = {
   title: `Hof einrichten — ${MARKE}`,
@@ -51,6 +53,9 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
   const emailOffen = bestaetigung?.offen ?? false
   const person = { name: session.user.name ?? '', email: session.user.email ?? '' }
   const stand = einrichtenStand({ personName: person.name, email: person.email, hof, emailOffen })
+  // Nr. 207 (§ 104 JN, P2B): Zustimmung zur aktuellen AGB-Fassung — erst mit Hof, nie ein Lockout.
+  const fassung = agbFassung()
+  const agb = hof && brauchtAgbZustimmung(hof, fassung) ? { fassung, geaendert: hof.agbFassung !== null } : null
   const inhalt = (
     <EinrichtenSeite
       stand={stand}
@@ -58,6 +63,7 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
       person={person}
       tarif={hof?.tarif ?? null}
       freigeschaltet={hof?.freigeschaltet ?? false}
+      agb={agb}
       emailBestaetigung={
         bestaetigung?.offen
           ? { email: bestaetigung.email, warteSekunden: await restWartezeitBestaetigung(session.user.id) }

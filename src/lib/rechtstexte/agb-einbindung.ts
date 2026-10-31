@@ -51,11 +51,15 @@ export const KASSE_AGB_SATZ: SatzMitLinks = [
   ` von ${MARKE}. Dein Vertragspartner ist der Hof. Mit dem Bestellen stimmst du zu, dass ${MARKE} die Vermittlung sofort ausführt.`,
 ]
 
-/** Bestellbestätigung per Mail: Die AGB gehören zum Vertragstext (§ 11 ECG), der Link führt zur Seite. */
+/**
+ * Bestellbestätigung per Mail: Die AGB gehören zum Vertragstext (§ 11 ECG), der
+ * Link führt zur Seite. Seit Nr. 207 hängen sie der Mail auch als Datei an
+ * (src/lib/rechtstexte/agb-datei.ts) — der Satz nennt den Anhang.
+ */
 export const MAIL_AGB_ZEILE: SatzMitLinks = [
   'Es gelten die ',
   link(AGB_LINK_TEXT, AGB_PFAD),
-  ` von ${MARKE}. Du kannst sie jederzeit nachlesen, speichern und ausdrucken.`,
+  ` von ${MARKE}. Du findest sie auch als Datei im Anhang dieser E-Mail und kannst sie jederzeit nachlesen, speichern und ausdrucken.`,
 ]
 
 /** Unter der Liste der Höfe (§ 4a Abs. 1 Z 1 FAGG): nach welchen Hauptparametern gereiht wird. */

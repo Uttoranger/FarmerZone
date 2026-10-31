@@ -79,7 +79,7 @@ const ZUSTAND: Record<'wartet' | 'verkauft' | 'testhof', HofZustand> = {
 }
 
 const AKTE: HofAkteAnsichtDaten = {
-  kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich' },
+  kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich', agb: 'noch nicht zugestimmt' },
   aktivitaet: { bestellungen: 0, bestellungenZeile: '0 storniert · 0 nicht abgeholt', umsatzCents: 0, servicegebuehrCents: 0, zuletztAngemeldet: 'noch nie', anmeldung: null, antwortzeit: 'noch keine Antwort' },
   zustand: [],
   sperre: { gesperrt: false, grund: null, seit: null },

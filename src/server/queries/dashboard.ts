@@ -13,7 +13,8 @@ export async function getFarmForUser(userId: string) {
     // `approvedAt` fehlt hier absichtlich — es kommt aus getFarmBannerState,
     // das im Layout für die Balken bereits geladen wird.
     // Sperre durch das Team (N34, Nr. 187): die Karte in Heute zeigt dem Hof den Grund.
-    select: { id: true, name: true, slug: true, logoUrl: true, logoAusschnitt: true, adminGesperrtAm: true, adminSperrGrund: true },
+    // agbFassung (Nr. 207): die Karte „AGB bestätigen“ in Heute.
+    select: { id: true, name: true, slug: true, logoUrl: true, logoAusschnitt: true, adminGesperrtAm: true, adminSperrGrund: true, agbFassung: true },
   })
 }
 

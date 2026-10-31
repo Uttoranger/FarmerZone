@@ -31,6 +31,9 @@ import { LastschriftSperreKarte } from '@/components/heute/lastschrift-karte'
 import { ladeSperrKarte } from '@/server/queries/plattformgebuehr'
 import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { WiderrufHeuteKarte } from '@/components/heute/widerruf-karte'
+import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
+import { agbFassung } from '@/lib/rechtstexte/agb-datei'
+import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import { beitragBlock, datumLang, entferneBeitragErinnerung, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
@@ -102,6 +105,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     }),
   ])
   const postfach = heutePostfach(faeden, jetzt)
+  // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.
+  const fassung = agbFassung()
+  const agbOffen = brauchtAgbZustimmung(farm, fassung)
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
@@ -189,6 +195,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
         {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
         <WiderrufHeuteKarte widerrufe={widerrufe} />
+        {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
         {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
         {zeige(aufbau.oben)}
         <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />

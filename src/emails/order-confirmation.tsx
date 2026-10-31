@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { WIDERRUF_TEXT } from '@/lib/widerruf'
+import { WIDERRUF_TEXT, type Belehrung } from '@/lib/widerruf'
+import { BelehrungTeil } from './belehrung-teil'
 import { Text, Link } from '@react-email/components'
 import {
   EmailLayout,
@@ -48,6 +49,12 @@ export interface OrderConfirmationProps {
   orderUrl?: string
   /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
   widerrufUrl?: string
+  /**
+   * Die Belehrung nach Anhang I FAGG mit den Angaben des Hofs (Nr. 207) —
+   * fertig gefüllt (belehrungMitHof), nur bei Verbraucherinnen; bei „Betrieb“
+   * fehlt sie, der Anhang mit den AGB bleibt.
+   */
+  belehrung?: Belehrung
   /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
   appUrl?: string
 }
@@ -117,8 +124,8 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
       {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
       {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
-      {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
-      {p.widerrufUrl && (
+      {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. Mit Belehrung steht er unter ihr. */}
+      {p.widerrufUrl && !p.belehrung && (
         <Text style={kleinText}>
           <Link href={p.widerrufUrl} style={textLink}>
             {WIDERRUF_TEXT.knopfWiderrufen}
@@ -135,6 +142,8 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           p.farmPhone
         )}
       </Text>
+      {/* Nr. 207: Teil A, Teil B, Hinweis zur Rückgabe am Hof und der Link zum Widerruf. */}
+      {p.belehrung && <BelehrungTeil belehrung={p.belehrung} widerrufUrl={p.widerrufUrl} />}
     </EmailLayout>
   )
 }

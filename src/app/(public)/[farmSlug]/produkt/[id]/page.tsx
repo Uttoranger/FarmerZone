@@ -14,6 +14,7 @@ import { GROESSE_PARAMETER, leseGroesse } from '@/schemas/produktdetail'
 import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
+import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
 import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
 import { ProduktSkelett } from './produkt-skelett'
 
@@ -112,6 +113,8 @@ async function Produktseite({ farmSlug, id, suche }: { farmSlug: string; id: str
   return (
     // „Entdecken" aktiv wie auf der Hofseite (Nr. 177) — hier im Kopf, eine Unterleiste hat die Fokus-Seite nicht.
     <KundeShellMitSitzung unterleiste={false} aktiv="entdecken">
+      {/* Nr. 207: oben der Hinweis auf einen Testhof — für echte Höfe nichts. */}
+      <TesthofHinweis farm={farm} className="pt-4" />
       <ProduktdetailKunde
         // Telefon und E-Mail erst nach dem Kauf (Nr. 60, hier seit Nr. 70): Sie bleiben auf
         // dem Server und stehen so nicht in den Seitendaten der Client-Komponente.
