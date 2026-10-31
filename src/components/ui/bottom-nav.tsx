@@ -81,6 +81,7 @@ export function BottomNavLink({
   zahl,
   zahlWofuer = '',
   onNavigate,
+  labelKurz,
 }: {
   href: string
   label: string
@@ -90,6 +91,11 @@ export function BottomNavLink({
   zahl?: number
   zahlWofuer?: string
   onNavigate?: () => void
+  /**
+   * Kürzere Beschriftung nur unter 360 px Breite (Nr. 205: „Bestellungen“ passte bei 320 px nicht in den Platz).
+   * Sie muss im vollen Namen stecken. Kein aria-label: Die jeweils versteckte Fassung ist per display:none aus dem Baum, der Name entsteht aus dem sichtbaren Text plus Zählertext.
+   */
+  labelKurz?: string
 }): React.JSX.Element {
   return (
     <Link href={href} onClick={onNavigate} aria-current={aktuell} className={bottomNavEintragKlassen(aktuell !== undefined)}>
@@ -97,7 +103,14 @@ export function BottomNavLink({
         <Symbol className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
         <Zaehler anzahl={zahl} wofuer={zahlWofuer} className="absolute -top-1.5 -right-2.5 h-4 min-w-4 px-1 text-[9.5px]" />
       </span>
-      <span className="max-w-full truncate px-0.5">{label}</span>
+      {labelKurz ? (
+        <>
+          <span className="max-w-full truncate px-0.5 max-[359px]:hidden">{label}</span>
+          <span className="hidden max-w-full truncate px-0.5 max-[359px]:inline">{labelKurz}</span>
+        </>
+      ) : (
+        <span className="max-w-full truncate px-0.5">{label}</span>
+      )}
     </Link>
   )
 }

@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import type { ComponentProps } from 'react'
+import type { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
 import { Info, Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
@@ -21,8 +22,8 @@ import { korbBetraege } from '@/lib/hofseite-kunde'
 import { RESERVIERUNG_MINUTEN } from '@/lib/kasse'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
-import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
-import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-band'
+import { KaufGrund } from '@/components/hofseite/kauf-grund'
+import { useBestellstopp } from '@/components/notbremse-band'
 import { KORB_LEER, type CartItem } from '@/lib/use-cart'
 import { EmptyState } from '@/components/ui/empty-state'
 import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
@@ -213,10 +214,8 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
             </p>
             <FutterVerantwortung saetze={futterHinweis} />
             {/* Mit Kaufsperre nimmt die Kasse nichts an — der Grund steht hier, nicht erst dort. */}
-            {kaufSperre.sperre !== null ? (
-              <KaufSperreHinweis {...kaufSperre} />
-            ) : stopp !== null ? (
-              <BestellstoppHinweis stopp={stopp} />
+            {ruht ? (
+              <KaufGrund {...kaufSperre} stopp={stopp} />
             ) : (
               <Link
                 href={kasseHref ?? `/${farmSlug}/checkout`}
