@@ -12,6 +12,7 @@ import type { SectionConfig } from '@/server/queries/appearance'
 import { appearanceSchema } from '@/schemas/auftritt'
 import { ABSCHNITT_SPEICHERN_TEXT, auftrittFehlerText } from '@/lib/abschnitt-stand'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt, istEigenesBild } from '@/server/bild-url'
+import { bildUrlsAusInhalt, pfadAusAdresse } from '@/lib/betrieb'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 
 // Das Schema liegt in src/schemas/auftritt.ts — der Hofseiten-Editor prüft
@@ -28,6 +29,8 @@ export type AppearanceSaveInput = z.infer<typeof appearanceSchema>
  * eine fremde Adresse, auch kein Altbild von vor der Prüfung. Und nur, wenn keine
  * Zeile mehr auf die Datei zeigt (ein Galeriefoto als Titelbild, das Logo auch als
  * Titelbild): Ein Blob wird erst gelöscht, wenn nichts mehr auf ihn zeigt.
+ * Die Felder sind dieselben wie in ladeBildVerwendung (src/server/betrieb-bilder.ts);
+ * ein neues Bildfeld gehört in beide Kopien hier UND dorthin (Wache tests/bild-ersetzen-loeschen.test.ts).
  * Scheitert das Löschen, gilt die Aktion trotzdem — eine Meldung nach Sentry, ohne
  * Adresse und ohne Fehlertext; die Datei bleibt als „Bild ohne Verwendung“ (N18).
  * Gleicher Weg in products.ts; eine exportierte Hilfsfunktion wäre in einer
@@ -42,6 +45,12 @@ async function entferneAltesBild(alt: string | null | undefined, neu: string | n
       prisma.farmPhoto.count({ where: { url: alt } }),
       prisma.statusPost.count({ where: { photoUrl: alt } }),
       prisma.meldung.count({ where: { screenshotUrl: alt } }),
+      // Die Startseite (Blöcke und Fassungen) zählt mit wie in ladeBildVerwendung (src/server/betrieb-bilder.ts):
+      // startseite.ts lässt eine unveränderte alte Adresse stehen, auch ein Hofbild.
+      prisma.startseiteBlock.count({ where: { bildUrl: alt } }),
+      prisma.startseiteFassung
+        .findMany({ select: { inhalt: true } })
+        .then((fassungen) => fassungen.filter((f) => bildUrlsAusInhalt(f.inhalt).some((u) => pfadAusAdresse(u) === pfadAusAdresse(alt))).length),
     ])
     if (verwendet.some((n) => n > 0)) return
     await del(alt, { token: process.env.BLOB_READ_WRITE_TOKEN })

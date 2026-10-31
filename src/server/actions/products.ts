@@ -37,6 +37,7 @@ import {
 import { formatZahl } from '@/lib/format'
 import { bestandVorherSchema, vorratSetzenSchema } from '@/schemas/vorrat'
 import { BILD_NICHT_UEBERNOMMEN, bildUrlErlaubt, istEigenesBild } from '@/server/bild-url'
+import { bildUrlsAusInhalt, pfadAusAdresse } from '@/lib/betrieb'
 
 async function getAuthenticatedFarm() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -52,6 +53,8 @@ async function getAuthenticatedFarm() {
  * exportierte Hilfsfunktion wäre in einer 'use server'-Datei eine aufrufbare Aktion).
  * Erst NACH dem erfolgreichen Schreiben in der Datenbank; nur eine Datei im Ordner
  * DIESES Hofs aus unserem Speicher; nur, wenn keine Zeile mehr auf sie zeigt.
+ * Die Felder sind dieselben wie in ladeBildVerwendung (src/server/betrieb-bilder.ts);
+ * ein neues Bildfeld gehört in beide Kopien hier UND dorthin (Wache tests/bild-ersetzen-loeschen.test.ts).
  * Ein archiviertes Produkt (mit Bestellungen) behält sein Bild — die Aufrufer
  * rufen das hier dann nicht. Scheitert das Löschen, gilt die Aktion trotzdem:
  * eine Meldung nach Sentry, ohne Adresse und ohne Fehlertext.
@@ -65,6 +68,12 @@ async function entferneAltesBild(alt: string | null | undefined, neu: string | n
       prisma.farmPhoto.count({ where: { url: alt } }),
       prisma.statusPost.count({ where: { photoUrl: alt } }),
       prisma.meldung.count({ where: { screenshotUrl: alt } }),
+      // Die Startseite (Blöcke und Fassungen) zählt mit wie in ladeBildVerwendung (src/server/betrieb-bilder.ts):
+      // startseite.ts lässt eine unveränderte alte Adresse stehen, auch ein Hofbild.
+      prisma.startseiteBlock.count({ where: { bildUrl: alt } }),
+      prisma.startseiteFassung
+        .findMany({ select: { inhalt: true } })
+        .then((fassungen) => fassungen.filter((f) => bildUrlsAusInhalt(f.inhalt).some((u) => pfadAusAdresse(u) === pfadAusAdresse(alt))).length),
     ])
     if (verwendet.some((n) => n > 0)) return
     await del(alt, { token: process.env.BLOB_READ_WRITE_TOKEN })

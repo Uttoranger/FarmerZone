@@ -15,6 +15,7 @@
  *  - Ein archiviertes Produkt (mit Bestellungen, ausgeblendet) behält sein Bild.
  *  - Gegenproben: unverändertes Bild, gescheitertes Schreiben, Bild noch in Verwendung → kein Löschen.
  */
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 
@@ -39,6 +40,8 @@ const db = vi.hoisted(() => {
     farmPhoto: { count: vi.fn() },
     statusPost: { count: vi.fn() },
     meldung: { count: vi.fn() },
+    startseiteBlock: { count: vi.fn() },
+    startseiteFassung: { findMany: vi.fn() },
     $transaction: vi.fn(async (arg: unknown) =>
       typeof arg === 'function' ? (arg as (t: typeof tx) => Promise<unknown>)(tx) : Promise.all(arg as unknown[])
     ),
@@ -80,9 +83,10 @@ beforeEach(() => {
   vi.stubEnv('BLOB_READ_WRITE_TOKEN', SCHLUESSEL)
   vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'nutzer_1' } } as never)
   vi.mocked(getFarmForUser).mockResolvedValue({ id: HOF, slug: 'mein-hof' } as never)
-  for (const zaehler of [db.farm.count, db.product.count, db.farmPhoto.count, db.statusPost.count, db.meldung.count]) {
+  for (const zaehler of [db.farm.count, db.product.count, db.farmPhoto.count, db.statusPost.count, db.meldung.count, db.startseiteBlock.count]) {
     zaehler.mockResolvedValue(0)
   }
+  db.startseiteFassung.findMany.mockResolvedValue([])
   db.farm.update.mockImplementation(async () => {
     reihenfolge.push('db')
     return {}
@@ -124,10 +128,31 @@ describe('Ersetzen löscht das alte Bild — nach dem Schreiben', () => {
     expect(reihenfolge).toEqual(['db', 'del'])
   })
 
-  it('Logo entfernt (null): das alte Logo hängt an nichts mehr und geht ebenfalls', async () => {
+  it('Logo entfernt (null): das alte Logo hängt an nichts mehr und geht ebenfalls, nach dem Update', async () => {
     hofMit({ logoUrl: ALT })
     expect(await updateFarmLogoAction(null)).toEqual({})
     expect(delMock).toHaveBeenCalledWith(ALT, { token: SCHLUESSEL })
+    expect(reihenfolge).toEqual(['db', 'del'])
+  })
+
+  it('Altbestand: Foto-Adresse in bannerValue durch einen Verlauf ersetzt → altes Foto gelöscht, nach der Transaktion', async () => {
+    const alt = bild('banner/1.webp')
+    hofMit({ bannerValue: alt })
+    expect(await saveAppearanceAction({ bannerType: 'GRADIENT', bannerValue: 'verlauf-wiese' } as never)).toEqual({})
+    expect(delMock).toHaveBeenCalledTimes(1)
+    expect(delMock).toHaveBeenCalledWith(alt, { token: SCHLUESSEL })
+    expect(reihenfolge).toEqual(['db', 'del'])
+  })
+
+  it('Altbestand: dieselbe Adresse zieht von bannerValue nach bannerUrl um → bleibt (die Zeile zeigt noch darauf)', async () => {
+    const alt = bild('banner/1.webp')
+    hofMit({ bannerValue: alt })
+    // Nach dem Schreiben trägt der Hof die Adresse in bannerUrl: die Zählung findet ihn.
+    db.farm.count.mockImplementation((async (arg: { where: { OR: Array<Record<string, string>> } }) =>
+      arg.where.OR.some((feld) => feld.bannerUrl === alt) ? 1 : 0) as never)
+    expect(await saveAppearanceAction({ bannerType: 'PHOTO', bannerUrl: alt, bannerValue: null } as never)).toEqual({})
+    expect(db.farm.count).toHaveBeenCalled()
+    expect(delMock).not.toHaveBeenCalled()
   })
 
   it('Titelbild: altes Titelbild gelöscht', async () => {
@@ -181,6 +206,18 @@ describe('fremder Pfad wird nie gelöscht', () => {
   it.each(FREMDE)('Logo: %s', async (_name, fremd) => {
     hofMit({ logoUrl: fremd })
     expect(await updateFarmLogoAction(NEU)).toEqual({})
+    expect(delMock).not.toHaveBeenCalled()
+  })
+
+  it.each(FREMDE)('Produktbild (Hofseite): %s', async (_name, fremd) => {
+    db.product.findFirst.mockResolvedValue({ id: 'p_1', imageUrl: fremd })
+    expect(await updateProductImageAction('p_1', bild('product/2.webp'))).toEqual({})
+    expect(delMock).not.toHaveBeenCalled()
+  })
+
+  it.each(FREMDE)('Produkt bearbeiten: %s', async (_name, fremd) => {
+    db.product.findFirst.mockResolvedValue({ imageUrl: fremd })
+    expect(await updateProduct('p_1', formular(bild('product/2.webp')))).toEqual({ ok: true })
     expect(delMock).not.toHaveBeenCalled()
   })
 
@@ -262,6 +299,7 @@ describe('Gegenproben: kein Löschen', () => {
     ['ein Galeriefoto', () => db.farmPhoto.count],
     ['ein Beitrag', () => db.statusPost.count],
     ['eine Meldung', () => db.meldung.count],
+    ['ein Block der Startseite', () => db.startseiteBlock.count],
   ])('Bild hängt noch an %s', async (_name, zaehler) => {
     zaehler().mockResolvedValue(1)
     hofMit({ logoUrl: ALT })
@@ -270,10 +308,57 @@ describe('Gegenproben: kein Löschen', () => {
     expect(meldung).not.toHaveBeenCalled()
   })
 
+  it('Bild steht noch in einer Fassung der Startseite (verschachtelt): bleibt — Logo und Produkt', async () => {
+    db.startseiteFassung.findMany.mockResolvedValue([
+      { inhalt: { bloecke: [{ art: 'hof', felder: { bildUrl: bild('product/1.webp') } }] } },
+      { inhalt: [{ bildUrl: ALT }] },
+    ])
+    hofMit({ logoUrl: ALT })
+    expect(await updateFarmLogoAction(NEU)).toEqual({})
+    db.product.findFirst.mockResolvedValue({ id: 'p_1', imageUrl: bild('product/1.webp') })
+    expect(await deleteProduct('p_1')).toEqual({ archiviert: false })
+    expect(delMock).not.toHaveBeenCalled()
+    expect(meldung).not.toHaveBeenCalled()
+  })
+
+  it('Fassungen mit anderen Bildern halten das alte Bild nicht fest', async () => {
+    db.startseiteFassung.findMany.mockResolvedValue([{ inhalt: { bloecke: [{ bildUrl: NEU }, { bildUrl: bild('logo/9.webp') }] } }])
+    hofMit({ logoUrl: ALT })
+    expect(await updateFarmLogoAction(NEU)).toEqual({})
+    expect(delMock).toHaveBeenCalledWith(ALT, { token: SCHLUESSEL })
+  })
+
   it('die Verwendung wird mit der genauen Adresse gesucht', async () => {
     hofMit({ logoUrl: ALT })
     await updateFarmLogoAction(NEU)
     expect(db.product.count).toHaveBeenCalledWith({ where: { imageUrl: ALT } })
     expect(db.farm.count).toHaveBeenCalledWith({ where: { OR: [{ logoUrl: ALT }, { bannerUrl: ALT }, { bannerValue: ALT }] } })
+    expect(db.startseiteBlock.count).toHaveBeenCalledWith({ where: { bildUrl: ALT } })
+  })
+})
+
+/*
+ * Wache: Die Prüfung „noch in Verwendung“ steht in beiden Aktionen als Kopie (eine
+ * exportierte Hilfsfunktion wäre in einer 'use server'-Datei eine aufrufbare Aktion).
+ * Maßgeblich ist ladeBildVerwendung (src/server/betrieb-bilder.ts): Jede Tabelle und
+ * jedes Feld, das dort gelesen wird, muss auch in beiden Kopien stehen — sonst würde ein
+ * neues Bildfeld still übersehen und sein Bild endgültig gelöscht.
+ */
+describe('Wache: Prüfung „noch in Verwendung“ deckt ladeBildVerwendung ab', () => {
+  const quelle = readFileSync('src/server/betrieb-bilder.ts', 'utf8')
+  const rumpf = quelle.slice(quelle.indexOf('export async function ladeBildVerwendung'), quelle.indexOf('export async function findeBilderOhneVerwendung'))
+  const tabellen = [...new Set([...rumpf.matchAll(/prisma\.(\w+)\.findMany/g)].map((m) => m[1]))]
+  const felder = [...new Set([...rumpf.matchAll(/select: \{ (\w+): true \}/g)].map((m) => m[1]))].filter((f) => f !== 'id')
+
+  it('die Liste aus ladeBildVerwendung ist nicht leer (sonst prüft die Wache nichts)', () => {
+    expect(tabellen.length).toBeGreaterThanOrEqual(7)
+    expect(felder).toContain('bildUrl')
+  })
+
+  it.each(['src/server/actions/appearance.ts', 'src/server/actions/products.ts'])('%s', (datei) => {
+    const text = readFileSync(datei, 'utf8')
+    const kopie = text.slice(text.indexOf('async function entferneAltesBild'), text.indexOf('await del('))
+    for (const tabelle of tabellen) expect(kopie, tabelle).toContain(`prisma.${tabelle}`)
+    for (const feld of felder) expect(kopie, feld).toMatch(new RegExp(`\\b${feld}\\b`))
   })
 })
