@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
+import { config as zodEinstellung } from 'zod/v4/core'
 import { bereinigeEreignis, ermittleUmgebung } from '@/lib/sentry-hygiene'
 
 // Sentry, Browser-Seite — die Datei, die der Foto-Upload-Suche gefehlt hat:
@@ -15,6 +16,16 @@ import { bereinigeEreignis, ermittleUmgebung } from '@/lib/sentry-hygiene'
 // durch bereinigeEreignis (src/lib/sentry-hygiene.ts — Sentry sieht, WAS
 // kaputt ging, nicht WER es war). KEIN Session Replay, KEIN Profiling.
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
+
+// Zod 4 im Browser ohne eval-Probe (Register G8, Ergänzung 31.10.2026; Nr. 208): Beim Anlegen jedes
+// Objekt-Schemas prüft Zod mit `new Function('')`, ob es seine Prüfer kompilieren darf. Die CSP
+// erlaubt kein eval, der Browser meldet den abgefangenen Wurf trotzdem als Verstoß und füllt den
+// Bericht mit Treffern ohne Wirkung. `jitless` schaltet Probe und Kompilieren ab — kein
+// Sicherheitsgewinn, nur Signalqualität; die Policy bleibt unverändert. Zod liest die Einstellung
+// beim ANLEGEN des Schemas, sie muss also vor dem ersten Schema-Modul laufen: Next führt diese
+// Datei vor dem übrigen Code des Browsers aus, darum steht sie hier und nur hier (eine Quelle,
+// Wache in tests/zod-jitless.test.ts). Der Server bleibt unberührt: kein CSP, JIT ist dort schneller.
+zodEinstellung({ jitless: true })
 
 if (dsn) {
   const umgebung = ermittleUmgebung(process.env.NEXT_PUBLIC_VERCEL_ENV)
