@@ -51,7 +51,6 @@ const FARMID_BESTAND: readonly Eintrag[] = [
   { datei: 'farm-photos.ts', funktion: 'updateFarmPhotoCaptionAction', aufruf: 'farmPhoto.update', anzahl: 1, grund: VORAB },
   { datei: 'farm-photos.ts', funktion: 'deleteFarmPhotoAction', aufruf: 'farmPhoto.delete', anzahl: 1, grund: VORAB },
   { datei: 'farm-photos.ts', funktion: 'deleteFarmPhotoAction', aufruf: 'farmPhoto.update', anzahl: 1, grund: 'Neu nummerieren: die Kennungen kommen aus findMany mit farmId des eigenen Hofs' },
-  { datei: 'farm-photos.ts', funktion: 'reorderPhotosAction', aufruf: 'farmPhoto.update', anzahl: 1, grund: 'Die Liste ist vorher als genau die Fotos des eigenen Hofs geprüft (Transaktion); farmId in die WHERE nachziehen' },
   { datei: 'stornieren.ts', funktion: 'storniere', aufruf: 'product.update', anzahl: 1, grund: 'Bestand zurückbuchen: die Produkte kommen aus der Bestellung, die mit farmId des Hofs gelesen und bedingt storniert wurde' },
   { datei: 'stornieren.ts', funktion: 'storniere', aufruf: 'order.updateMany', anzahl: 2, grund: 'Nach dem bedingten Storno mit farmId: dieselbe Bestellung, nur Erstattungsfelder' },
   { datei: 'stornieren.ts', funktion: 'storniere', aufruf: 'order.update', anzahl: 1, grund: 'Nach dem bedingten Storno mit farmId: dieselbe Bestellung, nur Erstattungsfelder' },
