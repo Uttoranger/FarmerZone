@@ -280,6 +280,13 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 205 | Kleinigkeiten aus Morgenbericht 26 (von `docs/lauf27`) | `freigabe.md` §31 | – |
 | 206 | Bilder im Blob-Speicher beim Ersetzen und Löschen entfernen (von `docs/lauf27`) | `freigabe.md` §31 | – |
 | Sammel 27 | Sammel-PR `integration/lauf27` | `freigabe.md` §31 | G3, G10 |
+| 208 | Zod ohne eval-Probe (`z.config({ jitless: true })`), asn1.js im Admin-Bündel prüfen (von `docs/lauf28`) | `freigabe.md` §32 | G8 |
+| 210 | Zahlungsschritt: Zusammenfassung unmittelbar über „Jetzt bezahlen“ (§ 8 Abs. 1 FAGG) (von `docs/lauf28`) | `freigabe.md` §32 | N2 |
+| 211 | Harmonisierte Gewährleistungs-Mitteilung (Anhang II FAGG) (vom Zwischenstand `integration/lauf28` nach 210) | `freigabe.md` §32 | – |
+| 212 | Hof-E-Mail Pflicht für aktive Höfe (von `docs/lauf28`) | `freigabe.md` §32 | – |
+| 213 | Nacharbeit aus Morgenbericht 27 (von `docs/lauf28`) | `freigabe.md` §32 | N17, N39 |
+| 214 | Je Produkt: „kein Rücktritt“ und geschätzte Rücksendekosten, eine Migration (vom Zwischenstand `integration/lauf28` nach 210) | `freigabe.md` §32 | N39 |
+| Sammel 28 | Sammel-PR `integration/lauf28` | `freigabe.md` §32 | G3, G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
