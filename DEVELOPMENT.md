@@ -6135,6 +6135,16 @@ Ein Konto mit Admin-Recht meldet sich nur noch mit Passkey (`@better-auth/passke
 - **Wache:** `tests/blob-loeschen-wache.test.ts` nennt beide Dateien als benannte Wege (je ein `del`). Tests: `tests/bild-ersetzen-loeschen.test.ts`; dort prüft eine Quelltext-Wache, dass jede Tabelle und jedes Feld aus `ladeBildVerwendung` auch in beiden Kopien steht – ein neues Bildfeld fällt so auf, statt still übersehen zu werden.
 - **Nicht in Nr. 206:** Alte Waisen aufräumen (eigener Auftrag mit Freigabe). Beitragsfotos (`deleteStatusPost` in `status-posts.ts`) und Bilder der Startseite (`startseite.ts`) löschen beim Ersetzen oder Löschen weiterhin nichts.
 
+## CSP Stufe 1: erzwingend (Register G8, Ergänzung 30.10.2026; Nr. 204, Lauf 27, 31.10.2026)
+
+- **Auswertung vorher** (Sentry, 14 Tage bis 31.10.; die Route speichert nichts in der Datenbank): `script-src eval` 98× (zuletzt 27.10., u. a. /register) und `frame-src https://agrilo.at` 2× (22.10., /farm-page). Beide erklärt, keine neue Quelle nötig.
+  - `eval`: die Probe von Zod 4 (`allowsEval`: `new Function('')` in try/catch), sobald ein Formular im Browser ein Objekt-Schema prüft (zodResolver: Registrieren, Anmelden, Mein Hof, Produkte, Beiträge, Admin); im Admin-Bündel dazu asn1.js (`runInThisContext` in try/catch). Beide fallen ohne eval zurück. Lokal nachgemessen: Mit erzwungener Policy meldet der Browser die Probe weiter, Registrieren und Anmelden funktionieren.
+  - `frame-src https://agrilo.at`: unsere eigene Herkunft im Vorschau-Rahmen von Mein Hof — die beiden Releases (21./22.10.) hatten `'self'` noch nicht in frame-src; das kam mit Nr. 155 am 23.10. Seither keine Meldung.
+- **Umgeschaltet:** `CSP_HEADER` = `Content-Security-Policy`, Policy unverändert, Meldungen weiter an /api/csp-bericht, `'unsafe-inline'` bleibt.
+- **Falle gleicher Header-Name:** Die Vorschau-Rahmen setzen `Content-Security-Policy: frame-ancestors 'self'`. Die später angehängten CSP-Regeln hätten das überschrieben (Next: die letzte Regel gewinnt je Header). `cspRegeln` hängt darum je solcher Regel ganz hinten eine mit Policy plus `frame-ancestors` an.
+- **Stufe 2 weggelassen:** Die Policy enthielt nie `'unsafe-eval'`; eine strengere Policy „ohne `'unsafe-eval'`“ zum Beobachten wäre dieselbe.
+- **Notfall:** `git revert <Commit von Nr. 204>` auf einem Branch, PR, Merge — der Header heißt dann wieder `Content-Security-Policy-Report-Only` und blockiert nichts.
+
 ## Nützliche Befehle
 
 ```bash
