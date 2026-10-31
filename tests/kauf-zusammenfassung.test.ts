@@ -19,12 +19,8 @@ import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-vi.mock('@stripe/react-stripe-js', () => ({
-  Elements: ({ children }: { children?: ReactNode }) => children,
-  PaymentElement: () => null,
-  useStripe: () => null,
-  useElements: () => null,
-}))
+// Kein Mock auf Stripes Paket (tests/paket-mock-wache.test.ts): Ohne Stripe.js (stripe = null) rendert die
+// echte Hülle ihr Zahlungsfeld leer, der Knopf ist aus — die Zusammenfassung darüber steht trotzdem.
 vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }), usePathname: () => '/hof-test/checkout' }))
 vi.mock('next/image', () => ({ default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }) }))
@@ -38,7 +34,7 @@ import { StripeZahlung } from '@/components/checkout/stripe-payment'
 import { KassenAbschluss, ZahlungFortsetzen, type Zahlung } from '@/components/checkout/checkout-form'
 import { UebersichtKarte } from '@/components/checkout/kasse-teile'
 import type { AngabenHof } from '@/components/checkout/angaben-zum-hof'
-import type { PublicFarm } from '@/server/queries/farm'
+import { publicFarm } from './fabrik/public-farm'
 import { reservierungsStand } from '@/lib/kasse'
 
 const WURZEL = join(__dirname, '..')
@@ -68,7 +64,7 @@ describe('KaufZusammenfassung', () => {
   it('zeigt Positionen mit Menge, Abholtermin und Vertragspartner', () => {
     const html = renderToStaticMarkup(createElement(KaufZusammenfassung, { positionen: ZWEI, abholung: ABHOLUNG, hofName: HOFNAME }))
     expect(html).toContain('Ware 1')
-    expect(html).toContain('× 2 Stück')
+    expect(html).toContain('· 2 Stück')
     expect(html).toContain(ABHOLUNG)
     expect(html).toContain('Dein Vertragspartner:')
     expect(html).toContain(HOFNAME)
@@ -134,7 +130,7 @@ describe('Zahlungsschritt: die Zusammenfassung unmittelbar über „Jetzt bezahl
 
 describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit Zusammenfassung', () => {
   it('Positionen, Gesamtpreis, Abholtermin und Hofname stehen vor dem Knopf', () => {
-    const farm = { id: 'f1', slug: 'hof-test', name: HOFNAME, address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf' } as unknown as PublicFarm
+    const farm = publicFarm({ name: HOFNAME })
     const zahlung: Zahlung = {
       clientSecret: 'pi_test_secret',
       bestaetigung: '/hof-test/confirm/o1?sig=abc',

@@ -29,7 +29,8 @@ export type ZusammenfassungPosition = Pick<KorbPosition, 'productId' | 'name' | 
 function PositionsZeile({ p }: { p: ZusammenfassungPosition }): React.JSX.Element {
   return (
     <li className="break-words">
-      {p.name} <span className="text-muted-foreground">× {formatMenge(p.quantity, p.unit, p.unitSize)}</span>
+      {/* Mittelpunkt statt „×“: Gebinde schreibt formatMenge schon mit „×“ („1 × 10 kg“). */}
+      {p.name} <span className="text-muted-foreground">· {formatMenge(p.quantity, p.unit, p.unitSize)}</span>
     </li>
   )
 }
