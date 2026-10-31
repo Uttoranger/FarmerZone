@@ -20,6 +20,7 @@ import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
 import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
+import { HOF_EMAIL_TEXT, hofEmailFehlt } from '@/lib/hof-kontakt'
 import {
   GRUENDUNG_BIS_GEAENDERT,
   GRUENDUNG_BIS_UNGUELTIG,
@@ -120,6 +121,8 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
       name: true,
       slug: true,
       stripeAccountReady: true,
+      // Nr. 212: die Hof-E-Mail für die Kundschaft (hofEmailFehlt) — nur ob, nie welche.
+      email: true,
       owner: { select: { email: true, emailVerified: true, createdAt: true } },
       // Register K2, Änderung Nr. 116: mindestens ein Produkt im Shop — nur ob, nie welches.
       products: { where: IM_SHOP_WHERE, select: { id: true }, take: 1 },
@@ -148,6 +151,9 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
     abholzeitAktiv: farm._count.pickupSlots > 0,
   })
   if (sperre) return { error: sperre }
+  // Nr. 212 (§ 4 Abs. 1 Z 3 FAGG): Die Belehrung nennt die Adresse des Betriebs. Ohne Hof-E-Mail
+  // wird nicht freigeschaltet — keine Schema-Änderung; der Rückfall in hofKontaktEmail bleibt für Bestandshöfe.
+  if (hofEmailFehlt(farm)) return { error: `${HOF_EMAIL_TEXT.freischaltenFehlt}.` }
 
   // Freischalten und Platz bestimmen in EINER Transaktion unter der Sperre der
   // Gründungsplätze (Register K2, Nr. 109) — dieselbe wie Ausnehmen,

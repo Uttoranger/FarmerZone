@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react'
 import { createFarm } from '@/server/actions/onboarding'
 import { leseHofnameEntwurf, loescheHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
 import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { hofAnlegenFormularSchema, type HofAnlegenFormular } from '@/schemas/hofprofil'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -157,10 +158,18 @@ export function HofAnlegenFormular({ personName, email }: { personName: string; 
         })}
         {Textfeld({
           feld: 'email',
-          label: 'E-Mail des Hofs (freiwillig)',
+          label: HOF_EMAIL_TEXT.label,
           typ: 'email',
           autoComplete: 'email',
           inputMode: 'email',
+          zusatz: {
+            id: `${id}-email-hilfe`,
+            inhalt: (
+              <p id={`${id}-email-hilfe`} className="mt-1 text-[12.5px] text-muted-foreground">
+                {HOF_EMAIL_TEXT.erklaerung}
+              </p>
+            ),
+          },
           zaehler: { laenge: hofEmail.trim().length, max: EMAIL_MAX },
         })}
       </div>

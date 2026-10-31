@@ -11,6 +11,7 @@ import {
 import { hofBetriebsnummerSchema, betriebsstatusSchema } from '@/schemas/betrieb'
 import { emailSchema } from '@/schemas/email'
 import { PROFIL_MELDUNG } from '@/lib/profil-meldungen'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 
 /**
  * Was gespeichert ist — für die Felder, die erst nachträglich eine Obergrenze
@@ -21,7 +22,7 @@ import { PROFIL_MELDUNG } from '@/lib/profil-meldungen'
 // Bestand als Parameter, ein abgeleiteter Typ wäre ein Zirkelbezug (TS2456).
 export type ProfilBestand = { name: string; ownerName: string; phone: string }
 
-/** Die Hof-E-Mail: freiwillig, klein, ohne Ränder; leer ist erlaubt (Profil und Anlegen). */
+/** Die Hof-E-Mail: freiwillig, klein, ohne Ränder; leer ist erlaubt (Profil und Server beim Anlegen); das Formular „Hof anlegen“ verlangt sie (Nr. 212). */
 const hofEmailSchema = z
   .string()
   .trim()
@@ -121,6 +122,7 @@ export const hofAnlegenSchema = z.object({
   phone: z.string().trim().max(TELEFON_MAX, ZU_LANG.telefon),
   // Die Hof-E-Mail ist im Onboarding freiwillig: leer bleibt leer. Sonst gilt
   // emailSchema (src/schemas/email.ts) — klein, ohne Ränder, gültiges Format.
+  // Pflicht ist sie erst im Formular (hofAnlegenFormularSchema, Nr. 212).
   email: hofEmailSchema,
 })
 
@@ -142,6 +144,8 @@ export const hofAnlegenFormularSchema = hofAnlegenSchema.extend({
   phone: hofAnlegenSchema.shape.phone
     .min(1, 'Bitte gib eine Telefonnummer an.')
     .min(6, 'Bitte gib eine gültige Telefonnummer an.'),
+  // Nr. 212 (§ 4 Abs. 1 Z 3 FAGG): Die Belehrung nennt die Adresse des Betriebs, also Pflicht.
+  email: hofAnlegenSchema.shape.email.min(1, HOF_EMAIL_TEXT.pflicht),
 })
 
 export type HofAnlegenFormular = z.input<typeof hofAnlegenFormularSchema>

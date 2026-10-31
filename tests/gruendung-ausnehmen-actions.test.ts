@@ -206,6 +206,7 @@ describe('approveFarmAction nimmt dieselbe Sperre', () => {
       name: 'Testhof A',
       slug: 'testhof-a',
       stripeAccountReady: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'hof@example.com', emailVerified: true, createdAt: new Date('2026-01-01T00:00:00Z') },
       // Seit Nr. 116: mindestens ein Produkt im Shop.
       products: [{ id: 'p_1' }],
