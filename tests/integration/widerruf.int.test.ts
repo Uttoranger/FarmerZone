@@ -8,7 +8,7 @@
  *  - Nach der Abholung erstattet der Hof über teilerstattung.ts: Artikelpreis
  *    plus Gebührendifferenz an die Kundin, genau der Artikelpreis vom Hof (in
  *    Cent); ein zweiter Klick bucht nichts. Bar: kein Stripe, Vermerk.
- *  - Ohne Link: zugeordnet nur bei Nummer UND Adresse; das Protokoll vermerkt es.
+ *  - Ohne Link: zugeordnet nur bei Nummer UND Adresse; das Protokoll vermerkt es (im Nachlauf).
  *  - Ablehnen nur für den eigenen Hof; die Mail mit Grund steht als Auftrag.
  *
  * Stripe ist gemockt (Buchungen werden gezählt, Idempotenz je Schlüssel).
@@ -32,7 +32,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendWiderrufEingang } from '@/lib/email'
-import { erstatteWiderruf, legeWiderrufAn, lehneWiderrufAb, verarbeiteWiderruf } from '@/server/widerruf'
+import { erstatteWiderruf, ladeOffeneWiderrufe, legeWiderrufAn, lehneWiderrufAb, verarbeiteWiderruf } from '@/server/widerruf'
 import { BAR_ERSTATTET } from '@/lib/widerruf'
 import { INT_PRAEFIX, auftraege, erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
@@ -148,6 +148,10 @@ describe('vor der Abholung: der Widerruf storniert', () => {
     expect(cents(nachher.totalAmount)).toBe(450)
     expect(nachher.erstattetCents).toBe(582)
     expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: angelegt.widerrufId } })).stand).toBe('erstattet')
+    // Mail wie beim Storno: genau ein Auftrag an die Kundin, mit dem von Stripe gebuchten Betrag.
+    const mails = await auftraege({ bestellungId: order.id, art: 'widerruf-erstattet' })
+    expect(mails.length).toBe(1)
+    expect(mails[0]!.bezug).toMatchObject({ widerrufId: angelegt.widerrufId, erstattetCents: '582', vorAbholung: '1' })
   })
 })
 
@@ -202,6 +206,20 @@ describe('nach der Abholung: der Hof erstattet oder lehnt ab', () => {
   })
 })
 
+describe('Lesen für den Hof', () => {
+  it('offene Widerrufe nur des eigenen Hofs — auch über die Bestellnummer eines fremden Hofs nicht', async () => {
+    const a = await bestellung({ online: false, abgeholt: true, gebuehrCents: 0 })
+    const b = await bestellung({ online: false, abgeholt: true, gebuehrCents: 0 })
+    const wa = await legeWiderrufAn({ art: 'link', orderId: a.order.id, umfang: 'ganz', positionen: [], name: 'Erika Test' }, new Date())
+    const wb = await legeWiderrufAn({ art: 'link', orderId: b.order.id, umfang: 'ganz', positionen: [], name: 'Erika Test' }, new Date())
+    if (!('ok' in wa) || !('ok' in wb)) throw new Error('nicht angelegt')
+
+    expect((await ladeOffeneWiderrufe(a.farm.id)).map((w) => w.id)).toEqual([wa.widerrufId])
+    expect((await ladeOffeneWiderrufe(a.farm.id, a.order.id)).map((w) => w.id)).toEqual([wa.widerrufId])
+    expect(await ladeOffeneWiderrufe(a.farm.id, b.order.id)).toEqual([])
+  })
+})
+
 describe('ohne Link', () => {
   it('Nummer UND Adresse → zugeordnet (Protokoll); andere Adresse → nicht zugeordnet', async () => {
     const { order } = await bestellung({ online: false, abgeholt: true, gebuehrCents: 0 })
@@ -214,6 +232,10 @@ describe('ohne Link', () => {
       new Date()
     )
     if (!('ok' in passt) || !('ok' in fremd)) throw new Error('nicht angelegt')
+    // Das Protokoll schreibt erst der Nachlauf (nach der Antwort).
+    expect(await prisma.adminAktion.count({ where: { art: 'widerruf_zugeordnet', bezugId: order.id } })).toBe(0)
+    await verarbeiteWiderruf(passt.widerrufId, false)
+    await verarbeiteWiderruf(fremd.widerrufId, false)
     expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: passt.widerrufId } })).orderId).toBe(order.id)
     expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: fremd.widerrufId } })).orderId).toBeNull()
     expect(await prisma.adminAktion.count({ where: { art: 'widerruf_zugeordnet', bezugId: order.id } })).toBe(1)

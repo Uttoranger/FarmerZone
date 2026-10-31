@@ -33,6 +33,9 @@ vi.mock('@/server/admin-protokoll', () => ({ protokolliere: vi.fn(async () => tr
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn(async () => true) }))
 vi.mock('@/server/mail-warteschlange', () => ({ stelleEinOhneRisiko: vi.fn(async () => {}) }))
 vi.mock('@/lib/email', () => ({ sendWiderrufEingang: vi.fn(async () => ({ id: 'mail-1' })) }))
+// Storno und Teilstorno haben eigene Tests (stornieren, artikel-fehlt); hier zählt, was der Widerruf daraus macht.
+vi.mock('@/server/stornieren', () => ({ storniere: vi.fn(async () => ({})) }))
+vi.mock('@/server/artikel-fehlt', () => ({ meldeFehlendenArtikel: vi.fn() }))
 const nachlauf = vi.hoisted(() => ({ aufgaben: [] as Array<() => Promise<void>> }))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: (a: () => Promise<void>) => nachlauf.aufgaben.push(a) }))
 
@@ -41,6 +44,9 @@ import { auth } from '@/lib/auth'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { protokolliere } from '@/server/admin-protokoll'
 import { sendWiderrufEingang } from '@/lib/email'
+import { stelleEinOhneRisiko } from '@/server/mail-warteschlange'
+import { storniere } from '@/server/stornieren'
+import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
 import { widerrufSignatur } from '@/lib/bestell-link'
 import { adressMerkmal } from '@/lib/bremse-datenbank'
 import { lehneWiderrufAbAction, reicheWiderrufMitLinkEin, reicheWiderrufOhneLinkEin } from '@/server/actions/widerruf'
@@ -131,7 +137,16 @@ describe('ohne Link', () => {
     expect(Object.keys(mit).sort()).toEqual(Object.keys(ohne).sort())
     expect(mit).toMatchObject({ ok: true })
     expect(ohne).toMatchObject({ ok: true })
-    // Das Zuordnen steht im Protokoll — nur die Kennung.
+    // Vor der Antwort schreibt kein Weg ins Protokoll — ein Treffer dauert nicht länger als ein Fehlversuch.
+    expect(protokolliere).not.toHaveBeenCalled()
+    expect(nachlauf.aufgaben).toHaveLength(2)
+
+    // Nach der Antwort steht das Zuordnen im Protokoll — nur die Kennung, nur beim Treffer.
+    const gespeichert = { eingegangenAm: new Date(), email: ADRESSE, bestellnummerEingabe: 'hm-2611-test', umfang: 'ganz', positionen: null, nachricht: null, stand: 'eingegangen' }
+    db.widerruf.findUnique.mockResolvedValueOnce({ ...gespeichert, id: 'widerruf-1', orderId: 'bestellung-1' } as never)
+    db.widerruf.findUnique.mockResolvedValueOnce({ ...gespeichert, id: 'widerruf-2', orderId: null } as never)
+    db.order.findUnique.mockResolvedValue(null as never)
+    for (const aufgabe of nachlauf.aufgaben) await aufgabe()
     expect(protokolliere).toHaveBeenCalledTimes(1)
     expect(protokolliere).toHaveBeenCalledWith({ wer: null, art: 'widerruf_zugeordnet', bezugArt: 'bestellung', bezugId: 'bestellung-1', mitPasskey: false })
   })
@@ -177,6 +192,77 @@ describe('Nachlauf: Eingangsbestätigung', () => {
     const geloggt = JSON.stringify([...log.mock.calls, ...fehler.mock.calls])
     expect(geloggt).not.toContain(ADRESSE)
     expect(geloggt).not.toContain('Erika')
+  })
+})
+
+describe('Nachlauf: vor der Abholung', () => {
+  const WIDERRUF = {
+    id: 'widerruf-1',
+    orderId: 'bestellung-1',
+    eingegangenAm: new Date(),
+    email: ADRESSE,
+    bestellnummerEingabe: 'HM-2611-TEST',
+    umfang: 'teil',
+    positionen: [{ orderItemId: 'pos-a', menge: 1 }],
+    nachricht: null,
+    stand: 'eingegangen',
+  }
+  const BESTELLUNG = {
+    id: 'bestellung-1',
+    farmId: 'hof-1',
+    orderNumber: 'HM-2611-TEST',
+    kaeuferArt: 'PRIVAT',
+    status: 'CONFIRMED',
+    pickedUpAt: null,
+    farm: { name: 'Testhof' },
+    items: [
+      { id: 'pos-a', productName: 'Eier', quantity: 1, fehltSeit: null },
+      { id: 'pos-b', productName: 'Brot', quantity: 2, fehltSeit: null },
+    ],
+  }
+  const teil = (zahlung: 'online' | 'vor_ort', erstattetCents: number) => ({ art: 'teil', rechnung: { zahlung }, erstattetCents, rueckbuchungOffen: false })
+
+  beforeEach(() => {
+    db.order.findUnique.mockResolvedValue(BESTELLUNG as never)
+    db.widerruf.updateMany.mockResolvedValue({ count: 1 } as never)
+  })
+
+  it('Teilwiderruf, online: genau ein Mail-Auftrag `widerruf-erstattet` mit dem gebuchten Betrag', async () => {
+    db.widerruf.findUnique.mockResolvedValue(WIDERRUF as never)
+    vi.mocked(meldeFehlendenArtikel).mockResolvedValue(teil('online', 495) as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+
+    expect(meldeFehlendenArtikel).toHaveBeenCalledTimes(1)
+    expect(db.widerruf.updateMany.mock.calls[0]![0]).toMatchObject({ where: { id: 'widerruf-1', stand: 'eingegangen' }, data: { stand: 'erstattet' } })
+    expect(stelleEinOhneRisiko).toHaveBeenCalledTimes(1)
+    const [art, bestellung, auftrag] = vi.mocked(stelleEinOhneRisiko).mock.calls[0]!
+    expect([art, bestellung]).toEqual(['widerruf-erstattet', 'bestellung-1'])
+    expect(auftrag).toMatchObject({ art: 'widerruf-erstattet', schluessel: 'widerruf-erstattet:widerruf-1', bezug: { widerrufId: 'widerruf-1', erstattetCents: '495', vorAbholung: '1' } })
+    // Kein Storno der ganzen Bestellung, keine Meldung an den Hof.
+    expect(storniere).not.toHaveBeenCalled()
+    expect(db.unterhaltung.create).not.toHaveBeenCalled()
+  })
+
+  it('Gegenproben: vor Ort ohne Betrag; ganze Bestellung über storniere ohne zweite Mail; Stand schon gesetzt → keine Mail', async () => {
+    db.widerruf.findUnique.mockResolvedValue(WIDERRUF as never)
+    vi.mocked(meldeFehlendenArtikel).mockResolvedValue(teil('vor_ort', 0) as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+    expect(stelleEinOhneRisiko).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(stelleEinOhneRisiko).mock.calls[0]![2]).toMatchObject({ bezug: { widerrufId: 'widerruf-1', vorAbholung: '1' } })
+    expect(vi.mocked(stelleEinOhneRisiko).mock.calls[0]![2]).not.toHaveProperty('bezug.erstattetCents')
+
+    vi.mocked(stelleEinOhneRisiko).mockClear()
+    db.widerruf.findUnique.mockResolvedValue({ ...WIDERRUF, umfang: 'ganz', positionen: null } as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+    expect(storniere).toHaveBeenCalledWith({ id: 'hof-1' }, 'bestellung-1', 'Widerruf der Kundin')
+    // Die Storno-Mail stellt `storniere` selbst ein — der Widerruf legt keine zweite dazu.
+    expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
+
+    db.widerruf.findUnique.mockResolvedValue(WIDERRUF as never)
+    db.widerruf.updateMany.mockResolvedValue({ count: 0 } as never)
+    vi.mocked(meldeFehlendenArtikel).mockResolvedValue(teil('online', 495) as never)
+    await verarbeiteWiderruf('widerruf-1', true)
+    expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
   })
 })
 

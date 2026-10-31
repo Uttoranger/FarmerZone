@@ -237,8 +237,15 @@ export const fadenBezugSchema = z.object({ unterhaltungId: kennung }).strict()
 export const meldungBezugSchema = z.object({ meldungId: kennung }).strict()
 /** Widerruf (Nr. 200): nur die Kennung — Name, Adresse und Nachricht lädt der Renderer frisch. */
 export const widerrufBezugSchema = z.object({ widerrufId: kennung }).strict()
-/** Widerruf erstattet: dazu der Betrag, den Stripe eben gebucht hat (online); fehlt er, bar erstattet. */
-export const widerrufErstattetBezugSchema = z.object({ widerrufId: kennung, erstattetCents: ganzzahl.optional() }).strict()
+/**
+ * Widerruf erstattet: dazu der Betrag, den Stripe eben gebucht hat (online);
+ * fehlt er, bar erstattet bzw. vor der Abholung nichts bezahlt. `vorAbholung`
+ * markiert das Teilstorno vor der Abholung — es gibt keine Rückgabe, die der
+ * Hof bestätigen könnte.
+ */
+export const widerrufErstattetBezugSchema = z
+  .object({ widerrufId: kennung, erstattetCents: ganzzahl.optional(), vorAbholung: z.literal('1').optional() })
+  .strict()
 
 /** Der feste Bezug jeder eingestellten Art (Nr. 159) — Sofort-Arten werden nie eingestellt. */
 const BEZUG_JE_ART: Partial<Record<MailArt, z.ZodType<Record<string, string>>>> = {

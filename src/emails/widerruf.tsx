@@ -92,6 +92,8 @@ export interface WiderrufErgebnisProps {
   erstattet: number | null
   /** Abgelehnt: der Grund des Hofs. */
   grund: string | null
+  /** Teilstorno vor der Abholung: keine Rückgabe; ohne Betrag (vor Ort) zahlt sie bei der Abholung weniger. */
+  vorAbholung?: boolean
 }
 
 /** Das Ergebnis an die Kundin: erstattet (mit Betrag) oder abgelehnt (mit Grund). */
@@ -110,15 +112,23 @@ export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
         </>
       ) : (
         <>
-          <Text style={bodyText}>
-            {p.hofName} hat die Rückgabe zur Bestellung <strong>{p.bestellnummer}</strong> bestätigt.
-          </Text>
+          {p.vorAbholung ? (
+            <Text style={bodyText}>
+              Die widerrufenen Artikel sind aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen.
+            </Text>
+          ) : (
+            <Text style={bodyText}>
+              {p.hofName} hat die Rückgabe zur Bestellung <strong>{p.bestellnummer}</strong> bestätigt.
+            </Text>
+          )}
           {p.erstattet !== null ? (
             <div style={highlightBox}>
               <Text style={highlightLabel}>Zurück an dich</Text>
               <Text style={highlightValue}>{formatEuro(p.erstattet)}</Text>
               <Text style={{ ...kleinText, margin: 0 }}>Das Geld ist in 5–10 Werktagen wieder auf deinem Konto.</Text>
             </div>
+          ) : p.vorAbholung ? (
+            <Text style={bodyText}>Bei der Abholung zahlst du nur noch die übrigen Artikel.</Text>
           ) : (
             <Text style={bodyText}>Der Hof hat dir den Betrag bar zurückgegeben.</Text>
           )}

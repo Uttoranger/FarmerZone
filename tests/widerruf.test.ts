@@ -14,6 +14,9 @@
  *  - „Widerruf offen“: zugeordnet Frist 14 Tage, nicht zugeordnet 2 Tage, ohne Personendaten.
  */
 import { describe, it, expect } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { WiderrufErgebnisEmail } from '@/emails/widerruf'
 import {
   WIDERRUF_TEXT,
   ausnahmeHinweis,
@@ -146,5 +149,27 @@ describe('Admin › Heute: Widerruf offen', () => {
     expect(ohne!.bezug.text).toBe('nicht zugeordnet')
     // Gegenprobe ohne Widerruf: keine Aufgabe.
     expect(sammleAufgaben(LEERER_STAND, jetzt).some((a) => a.quelle === 'widerruf_offen')).toBe(false)
+  })
+})
+
+describe('Mail „Dein Widerruf ist erledigt“', () => {
+  const basis = { bestellnummer: 'HM-2611-TEST', hofName: 'Testhof', grund: null }
+  const html = (p: { erstattet: number | null; vorAbholung?: boolean }) => renderToStaticMarkup(createElement(WiderrufErgebnisEmail, { ...basis, ...p }))
+
+  it('vor der Abholung: keine Rückgabe, kein „bar zurückgegeben“ — online mit Betrag, vor Ort ohne', () => {
+    const online = html({ erstattet: 4.95, vorAbholung: true })
+    expect(online).toContain('gestrichen')
+    expect(online).toContain('4,95')
+    expect(online).not.toContain('Rückgabe')
+    const vorOrt = html({ erstattet: null, vorAbholung: true })
+    expect(vorOrt).toContain('nur noch die übrigen Artikel')
+    expect(vorOrt).not.toContain('bar zurückgegeben')
+  })
+
+  it('Gegenprobe nach der Abholung: Rückgabe bestätigt, bar zurückgegeben', () => {
+    const bar = html({ erstattet: null })
+    expect(bar).toContain('Rückgabe')
+    expect(bar).toContain('bar zurückgegeben')
+    expect(bar).not.toContain('gestrichen')
   })
 })
