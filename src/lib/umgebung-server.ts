@@ -4,7 +4,8 @@ import { STICHTAG_ZUKUNFT_WARNUNG, bestimmeUmgebung, stichtagWeitInDerZukunft, t
 import { istTestbetrieb } from '@/lib/stripe-modus'
 import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
-import { einmalJeTag, utcTagVon, type LegeTageszeileAn } from '@/lib/einmal-je-tag'
+import { einmalJeTag, type LegeTageszeileAn } from '@/lib/einmal-je-tag'
+import { utcTag } from '@/lib/betrieb'
 
 /**
  * Die Umgebung, einmal je Prozess berechnet — der Serverzweig zu umgebung.ts.
@@ -98,7 +99,7 @@ const gemerktAm = new Map<BekannterZustand, string>()
 
 /** Ob diese Instanz den Zustand heute schon angefragt hat; merkt ihn sonst. */
 function heuteNeu(zustand: BekannterZustand, jetzt: Date): boolean {
-  const tag = utcTagVon(jetzt)
+  const tag = utcTag(jetzt)
   if (gemerktAm.get(zustand) === tag) return false
   gemerktAm.set(zustand, tag)
   return true

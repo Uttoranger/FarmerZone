@@ -13,18 +13,15 @@
  * ergibt — lieber eine Meldung zu wenig als ein Wurf in einem Nachlauf.
  */
 
+import { utcTag } from '@/lib/betrieb'
+
 /** Legt die Zeile (Tag, Schlüssel) an, falls es sie noch nicht gibt; liefert die Zahl der angelegten Zeilen. */
 export type LegeTageszeileAn = (tag: string, art: string, jetzt: Date) => Promise<number>
-
-/** Der UTC-Tag als JJJJ-MM-TT — wie BetriebMessung zählt. */
-export function utcTagVon(jetzt: Date): string {
-  return jetzt.toISOString().slice(0, 10)
-}
 
 /** true genau für die Anfrage, die heute (UTC) die Zeile für `art` anlegt; sonst und bei jedem Fehler false. */
 export async function einmalJeTag(art: string, jetzt: Date, legeAn: LegeTageszeileAn): Promise<boolean> {
   try {
-    return (await legeAn(utcTagVon(jetzt), art, jetzt)) > 0
+    return (await legeAn(utcTag(jetzt), art, jetzt)) > 0
   } catch {
     return false
   }

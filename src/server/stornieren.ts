@@ -197,7 +197,7 @@ export async function storniere(
       await nachSperre()
     } catch (err) {
       // Nachlauf (CLAUDE.md §2): storniert ist storniert, nur die Meldung bleibt.
-      Sentry.captureException(err, { tags: { aktion: 'cancelOrder', grund: 'nach_sperre' }, extra: { orderId } })
+      Sentry.captureException(err, { tags: { aktion: 'notfallStorno', grund: 'nach_sperre' }, extra: { orderId } })
     }
   }
   // Direkt nach dem Commit, VOR Hofliste, Stripe und trageStornoErstattungEin:

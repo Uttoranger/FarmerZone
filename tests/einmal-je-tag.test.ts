@@ -24,7 +24,8 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: vi.fn() } }))
 
 import { prisma } from '@/lib/prisma'
-import { einmalJeTag, utcTagVon, type LegeTageszeileAn } from '@/lib/einmal-je-tag'
+import { einmalJeTag, type LegeTageszeileAn } from '@/lib/einmal-je-tag'
+import { utcTag as utcTagVon } from '@/lib/betrieb'
 import { legeTageszeileAn } from '@/lib/umgebung-server'
 
 const JETZT = new Date('2026-10-31T23:59:30.000Z')
