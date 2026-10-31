@@ -368,6 +368,7 @@ describe('Freigabe-Actions', () => {
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
 
@@ -377,6 +378,25 @@ describe('Freigabe-Actions', () => {
     expect(farmUpdateMany).toHaveBeenCalledTimes(1)
     const arg = farmUpdateMany.mock.calls[0][0] as { data: { approvedAt: Date } }
     expect(arg.data.approvedAt).toBeInstanceOf(Date)
+  })
+
+  it('Nr. 212: ohne Hof-E-Mail (leer oder nur Leerzeichen) keine Freischaltung — Satz im Fehler, nichts geschrieben, keine Mail', async () => {
+    userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
+    for (const email of ['', '   ']) {
+      farmFindUnique.mockResolvedValue({
+        name: 'Testhof',
+        slug: 'testhof',
+        products: [{ id: 'p_1' }],
+        _count: { pickupSlots: 1 },
+        stripeAccountReady: true,
+        email,
+        owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
+      } as never)
+      const result = await approveFarmAction('farm_1')
+      expect(result.error).toContain('Der Hof hat noch keine E-Mail-Adresse für Kundschaft')
+    }
+    expect(farmUpdateMany).not.toHaveBeenCalled()
+    expect(stelleMailEin).not.toHaveBeenCalled()
   })
 
   it('verschickt nach der Freischaltung die Zusage-Mail an den Inhaber', async () => {
@@ -392,6 +412,7 @@ describe('Freigabe-Actions', () => {
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
 
@@ -416,6 +437,7 @@ describe('Freigabe-Actions', () => {
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       // Konto vor dem Stichtag, unbestätigt: bestehende Höfe bleiben unberührt (17b).
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: false },
     } as never)
     freischaltMail.mockRejectedValueOnce(new Error('Resend down'))
@@ -435,6 +457,7 @@ describe('Freigabe-Actions', () => {
       products: [{ id: 'p_1' }],
       // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
       _count: { pickupSlots: 1 },
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
     } as never)
 
@@ -455,6 +478,7 @@ describe('Freigabe-Actions', () => {
       // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: true },
     } as never)
 
@@ -473,6 +497,7 @@ describe('Freigabe-Actions', () => {
       _count: { pickupSlots: 1 },
       stripeAccountReady: false,
       acceptsOnline: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
 
@@ -494,6 +519,7 @@ describe('Freigabe-Actions', () => {
       _count: { pickupSlots: 1 },
       stripeAccountReady: false,
       acceptsOnline: false,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
 
@@ -515,6 +541,7 @@ describe('Freigabe-Actions', () => {
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
       acceptsOnline: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
 
@@ -541,6 +568,7 @@ describe('Freigabe-Actions', () => {
       // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
 
@@ -562,6 +590,7 @@ describe('Freigabe-Actions', () => {
       products: [{ id: 'p_1' }],
       _count: { pickupSlots: 0 },
       stripeAccountReady: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'hof@example.com', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
 
@@ -582,6 +611,7 @@ describe('Freigabe-Actions', () => {
       // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
       _count: { pickupSlots: 1 },
       stripeAccountReady: true,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date('2026-01-01T00:00:00Z'), emailVerified: true },
     } as never)
     farmUpdateMany.mockResolvedValueOnce({ count: 0 } as never)
@@ -612,6 +642,7 @@ describe('Freigabe-Actions', () => {
       // Seit der Z1-Ergänzung (21.10.2026): mindestens eine aktive Abholzeit.
       _count: { pickupSlots: 1 },
       stripeAccountReady: false,
+      email: 'kontakt@testhof.example',
       owner: { email: 'bauer@testhof.at', createdAt: new Date(EMAIL_BESTAETIGUNG_STICHTAG.getTime() + 1), emailVerified: false },
     } as never)
 

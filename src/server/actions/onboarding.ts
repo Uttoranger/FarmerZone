@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateSlug, RESERVED_SLUGS } from '@/lib/slug'
-import { hofAnlegenSchema } from '@/schemas/hofprofil'
+import { hofAnlegenServerSchema } from '@/schemas/hofprofil'
 import { adressPruefungSchema, hofSlugSchema } from '@/schemas/hof-adresse'
 import { ADRESS_PRUEFUNG_MAX_PRO_MINUTE, type AdressPruefung } from '@/lib/hof-adresse'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
@@ -68,7 +68,9 @@ export async function createFarm(data: {
 
   // Hier entsteht der Hofname zum ersten Mal — ohne Schema lief beliebig
   // langer Text in die Datenbank. Das Schema schneidet auch die Ränder ab.
-  const parsed = hofAnlegenSchema.safeParse(data)
+  // Nr. 212: hofAnlegenServerSchema = nachsichtig wie bisher, nur die Hof-E-Mail ist Pflicht —
+  // dieselbe Regel wie im Formular, damit auch ein direkter Aufruf keinen Hof ohne Adresse anlegt.
+  const parsed = hofAnlegenServerSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Bitte prüfe deine Angaben.' }
   const hof = parsed.data
 

@@ -45,7 +45,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
-import { FREIWILLIG, HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
+import { HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
 import { hilfeKennung } from '@/components/shared/formular-meldungen'
 
 /*
@@ -270,8 +270,8 @@ export function KontaktForm({ einstellungen, ...rueckmeldung }: ProfilFormularPr
           <Input id="hofseite-telefon" className="h-11" type="tel" autoComplete="tel" {...register('phone')} />
           <FeldZaehler control={control} name="phone" max={TELEFON_MAX} leise="text-muted-foreground" />
         </Feld>
-        {/* Leer heißt Anmelde-Adresse (Nr. 194) — derselbe Hinweis wie im Profil, damit beide Wege dasselbe sagen. */}
-        <Feld id="hofseite-email" label={`E-Mail ${FREIWILLIG}`} fehler={formState.errors.email}>
+        {/* Nr. 212: derselbe Satz wie im Profil (kein „freiwillig“ mehr), damit beide Wege dasselbe sagen. */}
+        <Feld id="hofseite-email" label="E-Mail" fehler={formState.errors.email}>
           <Input
             id="hofseite-email"
             className="h-11"
