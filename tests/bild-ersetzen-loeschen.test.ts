@@ -338,10 +338,11 @@ describe('Gegenproben: kein Löschen', () => {
 })
 
 /*
- * Wache: Die Prüfung „noch in Verwendung“ steht in beiden Aktionen als Kopie (eine
- * exportierte Hilfsfunktion wäre in einer 'use server'-Datei eine aufrufbare Aktion).
+ * Wache: Die Prüfung „noch in Verwendung“ steht seit Nr. 213.4 EINMAL in
+ * src/server/bild-loeschen.ts (keine 'use server'-Datei, also kein öffentlicher
+ * Endpunkt); beide Aktionen importieren sie und haben keine eigene Kopie mehr.
  * Maßgeblich ist ladeBildVerwendung (src/server/betrieb-bilder.ts): Jede Tabelle und
- * jedes Feld, das dort gelesen wird, muss auch in beiden Kopien stehen — sonst würde ein
+ * jedes Feld, das dort gelesen wird, muss auch im Helfer stehen — sonst würde ein
  * neues Bildfeld still übersehen und sein Bild endgültig gelöscht.
  */
 describe('Wache: Prüfung „noch in Verwendung“ deckt ladeBildVerwendung ab', () => {
@@ -355,10 +356,19 @@ describe('Wache: Prüfung „noch in Verwendung“ deckt ladeBildVerwendung ab',
     expect(felder).toContain('bildUrl')
   })
 
-  it.each(['src/server/actions/appearance.ts', 'src/server/actions/products.ts'])('%s', (datei) => {
+  it('src/server/bild-loeschen.ts', () => {
+    const text = readFileSync('src/server/bild-loeschen.ts', 'utf8')
+    expect(text.startsWith("'use server'")).toBe(false)
+    const rumpfHelfer = text.slice(text.indexOf('export async function entferneAltesBild'), text.indexOf('await del('))
+    expect(rumpfHelfer.length).toBeGreaterThan(0)
+    for (const tabelle of tabellen) expect(rumpfHelfer, tabelle).toContain(`prisma.${tabelle}`)
+    for (const feld of felder) expect(rumpfHelfer, feld).toMatch(new RegExp(`\\b${feld}\\b`))
+  })
+
+  it.each(['src/server/actions/appearance.ts', 'src/server/actions/products.ts'])('%s importiert den Helfer und hat keine eigene Kopie (Nr. 213.4)', (datei) => {
     const text = readFileSync(datei, 'utf8')
-    const kopie = text.slice(text.indexOf('async function entferneAltesBild'), text.indexOf('await del('))
-    for (const tabelle of tabellen) expect(kopie, tabelle).toContain(`prisma.${tabelle}`)
-    for (const feld of felder) expect(kopie, feld).toMatch(new RegExp(`\\b${feld}\\b`))
+    expect(text).toMatch(/import \{ entferneAltesBild \} from '@\/server\/bild-loeschen'/)
+    expect(text).not.toContain('function entferneAltesBild')
+    expect(text).not.toContain('await del(')
   })
 })

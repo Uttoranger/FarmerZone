@@ -43,9 +43,10 @@ function cspRegeln(bisherige: Regel[]): Regel[] {
   const berichtAdresse = melden ? cspBerichtAdresse(process.env.NEXT_PUBLIC_APP_URL) : null;
   const optionen = { toolbar: process.env.VERCEL_ENV === 'preview', sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN };
   const ohneMelden = [{ key: CSP_HEADER, value: baueCsp({ ...optionen, melden: false }) }];
+  // Mit ihrem `has` (Nr. 213.6): Die Kasse meldet nur MIT ?zahlung=&sig= nie — ohne bleibt sie meldend.
   const ohneReferrer = bisherige
     .filter((regel) => regel.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
-    .map((regel) => regel.source);
+    .map((regel) => ({ source: regel.source, ...(regel.has ? { has: regel.has } : {}) }));
   return [
     {
       source: '/(.*)',
@@ -55,7 +56,7 @@ function cspRegeln(bisherige: Regel[]): Regel[] {
         ...(berichtAdresse ? [{ key: 'Reporting-Endpoints', value: `${CSP_BERICHT_GRUPPE}="${berichtAdresse}"` }] : []),
       ],
     },
-    ...[...ohneReferrer, ...NIE_MELDEN_PFADE].map((source) => ({ source, headers: ohneMelden })),
+    ...[...ohneReferrer, ...NIE_MELDEN_PFADE.map((source) => ({ source }))].map((regel) => ({ ...regel, headers: ohneMelden })),
     ...NIE_MELDEN_PARAMETER.map((key) => ({ source: '/(.*)', has: [{ type: 'query' as const, key }], headers: ohneMelden })),
     ...bisherige.flatMap((regel) =>
       regel.headers
@@ -179,6 +180,23 @@ const nextConfig: NextConfig = {
         // mehr; die Sperre bleibt, weil die Adresse selbst das Zugangsmittel ist.
         // Steht nach der allgemeinen Regel, damit sie dort gewinnt.
         source: '/:farmSlug/confirm/:orderId',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+      {
+        // „Zahlung fortsetzen“ (Nr. 202): Die Kasse mit ?zahlung=&sig= trägt den
+        // signierten Link zu einer angenommenen Bestellung (zahlungFortsetzenPfad,
+        // src/lib/kasse.ts) — beim Klick hinaus (Hofseite, Stripe) geht er NICHT
+        // als Referrer mit, und in keinen Suchindex (Nr. 213.6). Nur mit BEIDEN
+        // Werten (`has` verknüpft mit UND); die Kasse ohne Link behält die
+        // allgemeine Regel. Steht nach der allgemeinen Regel, damit sie gewinnt.
+        source: '/:farmSlug/checkout',
+        has: [
+          { type: 'query', key: 'zahlung' },
+          { type: 'query', key: 'sig' },
+        ],
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
