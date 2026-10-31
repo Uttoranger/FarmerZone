@@ -15,7 +15,7 @@ import {
   type KasseFormularDaten as CheckoutFormData,
 } from '@/lib/kasse-pruefung'
 import { formatEuro } from '@/lib/format'
-import { BAR_NICHT_MOEGLICH_SATZ } from '@/lib/konditionen'
+import { BAR_NICHT_MOEGLICH_SATZ, INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
@@ -55,7 +55,6 @@ import {
   kaufknopfZeile,
   reservierungsStand,
   zahlungsGebuehrText,
-  ZAHLWEG_ONLINE,
   type ZahlungsBetrag,
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
@@ -71,6 +70,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { StripeZahlung } from './stripe-payment'
+import { KaufZusammenfassung } from './kauf-zusammenfassung'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import {
@@ -350,6 +350,14 @@ export function CheckoutForm({
   // N38: Unter dem Mindestbestellwert ruht der Knopf, der Grund steht darunter. Steht die Bestellung, zählt sie.
   const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
+  const gebuehrTitel = zahlung?.gebuehrText ?? gebuehr.titel
+  // Der Zusatz am Gesamtbetrag der Zusammenfassung (Nr. 210): nur Worte zu Beträgen aus `betraege`, nichts gerechnet.
+  const gesamtZusatz =
+    farm.preisAnzeige !== null
+      ? INKL_PLATTFORMGEBUEHR
+      : betraege.gebuehrCents > 0
+        ? `inkl. ${gebuehrTitel} ${formatEuro(centsAlsEuro(betraege.gebuehrCents))}`
+        : null
   const hof = { farmId: farm.id, farmSlug: farm.slug }
 
   /** Nach einer fehlgeschlagenen Prüfung zum ERSTEN Fehlerfeld springen (Befund 6). */
@@ -575,7 +583,7 @@ export function CheckoutForm({
         hofpreis={farm.preisAnzeige !== null}
         korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} anzeige={farm.preisAnzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
-        fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}${ZAHLWEG_ONLINE}`}
+        zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
       />
     )
   }
@@ -629,7 +637,7 @@ export function CheckoutForm({
             uebersicht={
               <UebersichtKarte
                 betraege={betraege}
-                gebuehrText={zahlung?.gebuehrText ?? gebuehr.titel}
+                gebuehrText={gebuehrTitel}
                 gebuehrErklaerung={zahlung ? undefined : gebuehr.erklaerung}
                 gebuehrEntfaellt={gebuehr.entfaellt}
                 hofpreis={farm.preisAnzeige !== null}
@@ -661,6 +669,15 @@ export function CheckoutForm({
             gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null || mindestGrund !== null}
             gesamt={gesamt}
             privat={!(betriebAbschnitt && kaeuferArt === 'BETRIEB')}
+            zusammenfassung={
+              <KaufZusammenfassung
+                karte
+                positionen={korbPositionen}
+                abholung={gewaehlt ? abholSatz(gewaehlt) : null}
+                hofName={farm.name}
+                gesamt={{ betrag: gesamt, zusatz: gesamtZusatz }}
+              />
+            }
             fussnote={
               mindestGrund ??
               kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })
@@ -953,6 +970,7 @@ export function KassenAbschluss({
   gesamt,
   fussnote,
   privat = true,
+  zusammenfassung,
 }: {
   hof: AngabenHof
   /** Die Übersicht mit Frist, Beträgen und einem Fehler der Anfrage. */
@@ -966,6 +984,8 @@ export function KassenAbschluss({
   fussnote: string
   /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt — bei „Betrieb“ entfällt er. */
   privat?: boolean
+  /** Ware, Gesamtpreis, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210). */
+  zusammenfassung?: React.ReactNode
 }): React.JSX.Element {
   return (
     // max-md:mb-8: Mit dem AGB-Satz ist die feste Leiste am Handy rund 190 px hoch (vorher 125);
@@ -973,6 +993,7 @@ export function KassenAbschluss({
     <div className="flex flex-col gap-3.5 max-md:mb-8">
       {uebersicht}
       <AngabenZumHof hof={hof} />
+      {zusammenfassung}
       <AktionsLeiste>
         <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={KNOPF_GRUEN}>
           {wirdGesendet ? (
@@ -1076,7 +1097,7 @@ export function ZahlungFortsetzen({
         hofpreis={anzeige !== null}
         korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
-        fussnote={`${zahlung.abholung ? `Abholung ${zahlung.abholung} · ` : ''}${ZAHLWEG_ONLINE}`}
+        zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
       />
     </KundeFokusShell>
   )
