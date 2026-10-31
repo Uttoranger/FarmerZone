@@ -4,6 +4,7 @@ import { STICHTAG_ZUKUNFT_WARNUNG, bestimmeUmgebung, stichtagWeitInDerZukunft, t
 import { istTestbetrieb } from '@/lib/stripe-modus'
 import { stripeMarke, type StripeMarke } from '@/lib/testumgebung'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { einmalJeTag, utcTagVon } from '@/lib/einmal-je-tag'
 
 /**
  * Die Umgebung, einmal je Prozess berechnet — der Serverzweig zu umgebung.ts.
@@ -95,11 +96,6 @@ export type BekannterZustand = 'umgebung' | 'stichtag'
  */
 const gemerktAm = new Map<BekannterZustand, string>()
 
-/** Der UTC-Tag als JJJJ-MM-TT — wie BetriebMessung zählt. */
-function utcTagVon(jetzt: Date): string {
-  return jetzt.toISOString().slice(0, 10)
-}
-
 /** Ob diese Instanz den Zustand heute schon angefragt hat; merkt ihn sonst. */
 function heuteNeu(zustand: BekannterZustand, jetzt: Date): boolean {
   const tag = utcTagVon(jetzt)
@@ -110,24 +106,12 @@ function heuteNeu(zustand: BekannterZustand, jetzt: Date): boolean {
 
 /**
  * Legt die Zeile des Tages für Zustand und Deploy an — true nur für die
- * Anfrage, die sie anlegt (ON CONFLICT DO NOTHING). Prisma kommt dynamisch:
- * Dieses Modul laden auch Seed und E-Mail-Tests, die keine Datenbank wollen.
- * Scheitert die Datenbank, wird nicht gemeldet — der Zustand steht weiter in
- * der Betriebsleiste, und eine fehlende Datenbank meldet sich selbst.
+ * Anfrage, die sie anlegt. Die Anweisung steht im Helfer (src/lib/einmal-je-tag.ts,
+ * Nr. 213.3); scheitert die Datenbank, wird nicht gemeldet — der Zustand
+ * steht weiter in der Betriebsleiste, und eine fehlende Datenbank meldet sich selbst.
  */
 export async function erstmalsHeute(zustand: BekannterZustand, jetzt: Date): Promise<boolean> {
-  try {
-    const { prisma } = await import('@/lib/prisma')
-    const art = `sentry:${zustand}:${DEPLOY_KENNUNG}`
-    const angelegt = await prisma.$queryRaw<Array<{ art: string }>>`
-      INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
-      VALUES (${utcTagVon(jetzt)}::date, ${art}, 1, ${jetzt}::timestamp(3))
-      ON CONFLICT ("tag", "art") DO NOTHING
-      RETURNING "art"`
-    return angelegt.length > 0
-  } catch {
-    return false
-  }
+  return einmalJeTag(`sentry:${zustand}:${DEPLOY_KENNUNG}`, jetzt)
 }
 
 async function meldeEinmal(zustand: BekannterZustand, satz: string, jetzt: Date): Promise<void> {

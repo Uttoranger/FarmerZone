@@ -6,6 +6,7 @@ import { stripe } from '@/lib/stripe'
 import { env } from '@/lib/env'
 import { prisma } from '@/lib/prisma'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
+import { einmalJeTag } from '@/lib/einmal-je-tag'
 import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag } from '@/server/mail-warteschlange'
 import { bestellMailAuftrag, zahlungZuSpaetMailAuftrag } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
@@ -167,27 +168,19 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Ein ungültiges Ereignis an Sentry — höchstens einmal je Typ und UTC-Tag,
- * nach dem Muster von `erstmalsHeute` (src/lib/umgebung-server.ts): über alle
- * Instanzen entscheidet EINE Anweisung auf BetriebMessung (Art
- * `sentry:stripe-schema:<typ>`, Zeile je Tag), nur wer sie anlegt, meldet.
- * Ohne Deploy in der Art: Ein neuer Deploy behebt ein Ereignis von Stripe
- * nicht. Nur Typ, Ereignis-Kennung und Feldpfade — nie Werte. Scheitert die
- * Datenbank oder Sentry, bleibt es still; das Protokoll hat die Zeile schon.
- * Anders als dort kein Gedächtnis je Instanz: Ungültige Ereignisse sind
- * selten, eine Anweisung je Zustellung kostet nichts.
+ * Ein ungültiges Ereignis an Sentry — höchstens einmal je Typ und UTC-Tag
+ * über den Helfer `einmalJeTag` (src/lib/einmal-je-tag.ts, Nr. 213.3; derselbe
+ * wie `erstmalsHeute`): über alle Instanzen entscheidet EINE Anweisung auf
+ * BetriebMessung (Art `sentry:stripe-schema:<typ>`, Zeile je Tag), nur wer
+ * sie anlegt, meldet. Ohne Deploy in der Art: Ein neuer Deploy behebt ein
+ * Ereignis von Stripe nicht. Nur Typ, Ereignis-Kennung und Feldpfade — nie
+ * Werte. Scheitert die Datenbank oder Sentry, bleibt es still; das Protokoll
+ * hat die Zeile schon. Anders als dort kein Gedächtnis je Instanz: Ungültige
+ * Ereignisse sind selten, eine Anweisung je Zustellung kostet nichts.
  */
 async function meldeUngueltigEinmalJeTag(typ: VerarbeiteterStripeTyp, eventId: string, felder: string[]): Promise<void> {
-  const jetzt = new Date()
-  const tag = jetzt.toISOString().slice(0, 10)
+  if (!(await einmalJeTag(`sentry:stripe-schema:${typ}`, new Date()))) return
   try {
-    const art = `sentry:stripe-schema:${typ}`
-    const angelegt = await prisma.$queryRaw<Array<{ art: string }>>`
-      INSERT INTO "BetriebMessung" ("tag", "art", "wert", "gemessenAm")
-      VALUES (${tag}::date, ${art}, 1, ${jetzt}::timestamp(3))
-      ON CONFLICT ("tag", "art") DO NOTHING
-      RETURNING "art"`
-    if (angelegt.length === 0) return
     Sentry.captureMessage('Stripe-Ereignis mit unerwartetem Aufbau — nicht verarbeitet', {
       level: 'error',
       tags: { webhook: typ, grund: 'schema_ungueltig' },

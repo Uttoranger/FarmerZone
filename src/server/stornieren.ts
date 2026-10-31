@@ -39,7 +39,8 @@ import {
  * darf darum nie einer werden (tests/actions-in-actions-wache.test.ts).
  * Aufrufer: cancelOrder und meldeArtikelFehlt (Hof, eigener Hof aus der
  * Sitzung) und notfallStorno (Team, Hof aus der Bestellung, Recht
- * `hof_sperren_storno`). Stripe kommt erst im Aufruf per `await import()`.
+ * `hof_sperren_storno`, Protokoll über `nachSperre` vor der Erstattung).
+ * Stripe kommt erst im Aufruf per `await import()`.
  */
 
 /** Was der Storno vor der Sperre liest — nur für den Vermerk der Servicegebühr. */
@@ -99,7 +100,18 @@ const STORNO_STAND = {
  * prüfen Anmeldung, Recht und Eingabe selbst; der Hof steht in jeder
  * WHERE-Klausel, eine fremde Bestellung ergibt „nicht gefunden".
  */
-export async function storniere(farm: { id: string }, orderId: string, reason?: string): Promise<StornoErgebnis> {
+export async function storniere(
+  farm: { id: string },
+  orderId: string,
+  reason?: string,
+  /**
+   * Läuft genau dann, wenn DIESER Aufruf die Sperre gewonnen hat — direkt nach
+   * dem Commit, VOR Stripe (Nr. 213.1): Das Team schreibt hier sein Protokoll,
+   * damit ein Abbruch bei Stripe keinen gebuchten, aber unprotokollierten
+   * Storno hinterlässt. Ein Fehler darin kippt den Storno nie.
+   */
+  nachSperre?: () => Promise<void>
+): Promise<StornoErgebnis> {
   // Nur LESEN — die Daten für die Mail. Die Entscheidung, ob storniert werden
   // darf, fällt NICHT hier: eine Leseprüfung lassen zwei gleichzeitige Aufrufe
   // (Doppeltipp) beide passieren.
@@ -180,6 +192,14 @@ export async function storniere(farm: { id: string }, orderId: string, reason?: 
   }
 
   if (!storno) return { error: 'Diese Bestellung ist schon storniert oder abgeholt.' }
+  if (nachSperre) {
+    try {
+      await nachSperre()
+    } catch (err) {
+      // Nachlauf (CLAUDE.md §2): storniert ist storniert, nur die Meldung bleibt.
+      Sentry.captureException(err, { tags: { aktion: 'cancelOrder', grund: 'nach_sperre' }, extra: { orderId } })
+    }
+  }
   // Direkt nach dem Commit, VOR Hofliste, Stripe und trageStornoErstattungEin:
   // Das Nachtragen schreibt nur in einen schon vorhandenen Auftrag — fehlte
   // er dann noch, bekäme die Kundin keine Storno-Mail.

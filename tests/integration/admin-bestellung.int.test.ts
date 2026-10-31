@@ -14,6 +14,10 @@
  *    beim Team: Nachricht an den Hof, zwei Einträge im Protokoll.
  *  - Notfall-Storno nach der Abholung, ohne Recht und ohne Grund: nichts
  *    ändert sich, kein Stripe-Aufruf.
+ *  - Protokoll vor der Erstattung (Nr. 213.1): Notfall-Storno und Zuordnen
+ *    eines Widerrufs schreiben ihren Eintrag nach dem bedingten Schreiben und
+ *    VOR dem Stripe-Aufruf — wirft Stripe, steht der Eintrag, die Bestellung
+ *    zeigt „Erstattung offen“, nichts ist gebucht.
  *  - „Außerhalb erstattet“ löscht nur das Merkmal, ruft Stripe nie.
  *  - Die volle Adresse gibt es nur nach Grund, mit Eintrag ohne Adresse.
  * Testhöfe heißen „Testhof …“, Adressen @example.com, Texte erfunden.
@@ -35,7 +39,7 @@ import { ADMIN_BESTELLUNG_TEXT } from '@/lib/admin-bestellung'
 import { ADMIN_BESTELLUNG_GRUND_FEHLT, bestellFilterAus } from '@/schemas/admin-bestellung'
 import { mailSucheAus } from '@/schemas/betrieb-mails'
 import { cancelOrder } from '@/server/actions/orders'
-import { markiereErstattungErledigt, notfallStorno, zeigeKundinAdresse } from '@/server/actions/admin-bestellung'
+import { markiereErstattungErledigt, notfallStorno, ordneWiderrufZu, zeigeKundinAdresse } from '@/server/actions/admin-bestellung'
 import { ladeBestellListe } from '@/server/queries/admin-bestellungen'
 import { artenZu, erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, machePasskeyAdmin, raeumeAuf } from './setup/basis'
 
@@ -191,6 +195,59 @@ describe('Notfall-Storno — derselbe Weg wie der Storno des Hofs', () => {
     await alsSitzung(await admin({ inhaber: false, rechte: ['hof_sperren_storno'] }))
     expect(await notfallStorno({ orderId: offen.id, grund: 'Hof nicht erreichbar' })).not.toHaveProperty('error')
     expect(await stand(offen.id)).toMatchObject({ status: 'CANCELLED' })
+  })
+})
+
+describe('Protokoll vor der Erstattung (Nr. 213.1) — Stripe wirft', () => {
+  /** Stripe wirft; vorher zählt die Attrappe, welche Einträge zu diesem Zeitpunkt schon in der Datenbank stehen. */
+  function stripeWirft(art: string, bezugId: () => string): { vorStripe: number[] } {
+    const gesehen = { vorStripe: [] as number[] }
+    erstatten.mockImplementation((async () => {
+      gesehen.vorStripe.push(await prisma.adminAktion.count({ where: { art, bezugId: bezugId() } }))
+      throw new Error('Stripe nicht erreichbar')
+    }) as never)
+    return gesehen
+  }
+
+  it('Notfall-Storno: beide Einträge stehen schon beim Stripe-Aufruf; danach storniert, „Erstattung offen“, nichts gebucht', async () => {
+    const { farm } = await erstelleHof({ name: 'Testhof Protokoll', acceptsOnline: true })
+    const produkt = await erstelleProdukt(farm.id, { stock: BESTAND })
+    const b = await bezahlteBestellung(farm.id, produkt.id)
+    await alsSitzung(await admin())
+    const gesehen = stripeWirft('notfall_storno', () => b.id)
+
+    expect(await notfallStorno({ orderId: b.id, grund: 'Hof nicht erreichbar' })).toMatchObject({ erstattungOffen: true })
+    expect(gesehen.vorStripe).toEqual([1])
+    const eintraege = await prisma.adminAktion.findMany({ where: { art: 'notfall_storno', bezugId: { in: [b.id, farm.id] } }, orderBy: { bezugArt: 'asc' } })
+    expect(eintraege.map((e) => [e.bezugArt, e.grund])).toEqual([
+      ['bestellung', 'Hof nicht erreichbar'],
+      ['hof', 'Hof nicht erreichbar'],
+    ])
+    const nachher = await stand(b.id)
+    expect(nachher).toMatchObject({ status: 'CANCELLED', paymentStatus: 'PAID' })
+    expect(nachher.erstattungOffenSeit).not.toBeNull()
+    expect(await prisma.order.findUniqueOrThrow({ where: { id: b.id }, select: { erstattetCents: true } })).toEqual({ erstattetCents: 0 })
+  })
+
+  it('Zuordnen eines Widerrufs vor der Abholung: der Eintrag steht schon beim Stripe-Aufruf; die Bestellung zeigt „Erstattung offen“', async () => {
+    const { farm } = await erstelleHof({ name: 'Testhof Zuordnen', acceptsOnline: true })
+    const produkt = await erstelleProdukt(farm.id, { stock: BESTAND })
+    const b = await bezahlteBestellung(farm.id, produkt.id)
+    const widerruf = await prisma.widerruf.create({ data: { name: 'Erika Test', email: `${intKennung('fremd')}@example.com`, bestellnummerEingabe: 'HM-0000-FALSCH', umfang: 'ganz' }, select: { id: true } })
+    try {
+      await alsSitzung(await admin())
+      const gesehen = stripeWirft('widerruf_zugeordnet', () => b.id)
+
+      const ergebnis = await ordneWiderrufZu({ widerrufId: widerruf.id, bestellnummer: b.orderNumber, grund: 'Anruf der Kundin' })
+      expect(ergebnis).toHaveProperty('ok', true)
+      expect(gesehen.vorStripe).toEqual([1])
+      expect(await prisma.adminAktion.count({ where: { art: 'widerruf_zugeordnet', bezugId: b.id } })).toBe(1)
+      const nachher = await stand(b.id)
+      expect(nachher).toMatchObject({ status: 'CANCELLED', paymentStatus: 'PAID' })
+      expect(nachher.erstattungOffenSeit).not.toBeNull()
+    } finally {
+      await prisma.widerruf.deleteMany({ where: { id: widerruf.id } })
+    }
   })
 })
 

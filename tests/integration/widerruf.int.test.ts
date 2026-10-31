@@ -14,7 +14,7 @@
  *    nichts; danach derselbe Weg wie ein zugeordneter Widerruf (vor der
  *    Abholung Storno mit Erstattung, sonst an den Hof), ein zweites
  *    Zuordnen bucht nichts. Admin › Bestellungen und die Akte
- *    lesen nur, was dazugehört.
+ *    lesen nur, was dazugehört — beim offenen Widerruf nur den Rest (Nr. 213.2).
  *
  * Stripe ist gemockt (Buchungen werden gezählt, Idempotenz je Schlüssel).
  */
@@ -350,6 +350,10 @@ describe('Rest eines teilweise gebuchten Teilwiderrufs (Nachbesserung Runde 3)',
     const hofMail = await rendereWiderrufHof(hofAuftrag!.bezug as Record<string, string>)
     expect('html' in hofMail && hofMail.html).toContain('Brot')
     expect('html' in hofMail && hofMail.html).not.toContain('Eier')
+    // Nr. 213.2: auch Admin › Bestellungen und die Hof-Akte zeigen beim offenen Widerruf nur den Rest.
+    const items = await prisma.orderItem.findMany({ where: { orderId: order.id }, select: { id: true, productName: true, quantity: true, fehltSeit: true } })
+    expect((await ladeWiderrufeZurBestellung(order.id, items)).map((w) => w.umfang)).toEqual([['1 × Brot']])
+    expect((await ladeWiderrufeDesHofs(farm.id)).map((w) => w.umfang)).toEqual([['1 × Brot']])
 
     expect(await erstatteWiderruf({ id: farm.id }, widerrufId, new Date())).toEqual({ ok: true, erstattetCents: 580 })
     expect(erstattungen.map((e) => e.betrag)).toEqual([450, 580])
