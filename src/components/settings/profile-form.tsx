@@ -19,6 +19,7 @@ import { aktionOhneWurf, meldeGescheitertesSpeichern, speichereProfil, speichern
 import { FeldFehlerSatz, SpeicherFehler, feldFehlerAttribute, hilfeKennung } from '@/components/shared/formular-meldungen'
 import { FELD_ATTRIBUTE, enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
 import { FREIWILLIG, HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
+import { HOF_EMAIL_ANKER, HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { NETZ_SATZ } from '@/lib/netz'
 import { geaendertSeitLaden, profilWieImSchema } from '@/lib/abschnitt-stand'
 import type { FarmSettings } from '@/server/queries/farm'
@@ -249,7 +250,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
   }
 
   const istAttributFeld = (id: FeldId): id is FeldId & keyof typeof FELD_ATTRIBUTE => id in FELD_ATTRIBUTE
-  type FeldId = 'name' | 'ownerName' | 'address' | 'phone' | 'email' | 'betriebsnummer'
+  type FeldId = 'name' | 'ownerName' | 'address' | 'phone' | typeof HOF_EMAIL_ANKER | 'betriebsnummer'
   /**
    * Ein Textfeld mit Fehlersatz am Feld (aria-invalid, aria-describedby, role="alert"),
    * den Attributen aus FELD_ATTRIBUTE und der Taste unten rechts am Handy. Pflicht ist
@@ -272,7 +273,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           enterKeyHint={enterTaste(letztes === true)}
           placeholder={placeholder}
           {...feldFehlerAttribute(id, Boolean(errors[id]), Boolean(hilfe))}
-          className={errors[id] ? 'min-h-11 border-status-offen' : 'min-h-11'}
+          className={errors[id] ? 'min-h-11 scroll-mt-6 border-status-offen' : 'min-h-11 scroll-mt-6'}
         />
         {max !== undefined && <FeldZaehler control={control} name={id} max={max} />}
         {hilfe && (
@@ -419,7 +420,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <h2 className="font-medium text-foreground">Kontakt</h2>
         {field('phone', 'Telefon', { placeholder: '+43 660 000 0000' })}
-        {field('email', `Hof-E-Mail ${FREIWILLIG}`, { placeholder: 'hof@beispiel.at', hilfe: HOF_EMAIL_HILFE })}
+        {/* Ziel der Karte in Heute (HOF_EMAIL_TEXT.einstellungenPfad, Nr. 212): Das Feld trägt die id des Ankers. */}
+        {field(HOF_EMAIL_ANKER, HOF_EMAIL_TEXT.profilLabel, { placeholder: 'hof@beispiel.at', hilfe: HOF_EMAIL_HILFE })}
       </div>
 
       {/* Betriebsnummer (Sprint Bereiche 1): gehört dem Hof, nicht einem

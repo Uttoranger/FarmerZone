@@ -20,7 +20,7 @@ import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
 import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
-import { HOF_EMAIL_TEXT, hofEmailFehlt } from '@/lib/hof-kontakt'
+import { hofEmailFehlt } from '@/lib/hof-kontakt'
 import {
   GRUENDUNG_BIS_GEAENDERT,
   GRUENDUNG_BIS_UNGUELTIG,
@@ -143,17 +143,18 @@ export async function approveFarmAction(farmId: string): Promise<{ error?: strin
   // - Register K2 (Nr. 116): mindestens ein Produkt im Shop.
   // - Register Z1, Ergänzung 21.10.2026: mindestens eine aktive Abholzeit —
   //   ohne sie nimmt die Hofseite keine Bestellung an (N24).
+  // - Nr. 212: die Hof-E-Mail für die Kundschaft (Belehrung).
   // Bereits freigeschaltete Höfe berührt das nicht; es wirkt nur auf diesen Klick.
   const sperre = freischaltSperre({
     emailBestaetigungOffen: bestaetigungOffen(farm.owner),
     stripeBereit: farm.stripeAccountReady === true,
     produktImShop: farm.products.length > 0,
     abholzeitAktiv: farm._count.pickupSlots > 0,
+    // Nr. 212 (§ 4 Abs. 1 Z 3 FAGG): Die Belehrung nennt die Adresse des Betriebs; ohne Hof-E-Mail
+    // keine Freischaltung. Dieselbe Regel (hofEmailFehlt) und derselbe Satz wie in der Warteliste.
+    hofEmailFehlt: hofEmailFehlt(farm),
   })
   if (sperre) return { error: sperre }
-  // Nr. 212 (§ 4 Abs. 1 Z 3 FAGG): Die Belehrung nennt die Adresse des Betriebs. Ohne Hof-E-Mail
-  // wird nicht freigeschaltet — keine Schema-Änderung; der Rückfall in hofKontaktEmail bleibt für Bestandshöfe.
-  if (hofEmailFehlt(farm)) return { error: `${HOF_EMAIL_TEXT.freischaltenFehlt}.` }
 
   // Freischalten und Platz bestimmen in EINER Transaktion unter der Sperre der
   // Gründungsplätze (Register K2, Nr. 109) — dieselbe wie Ausnehmen,

@@ -29,9 +29,12 @@ type Feld = keyof HofAnlegenFormular
  * bisherigen ersten Onboarding-Schritts, ins neue Design gezogen. Gespeichert
  * wird wie bisher über createFarm (Besitz aus der Sitzung, Slug auf dem
  * Server, Betreiber-Mail); danach lädt die Seite neu und zeigt die übrigen
- * Schritte. Der Hofname ist mit dem Namen vom Registrieren vorbelegt.
+ * Schritte. Der Inhabername ist mit dem Namen vom Registrieren vorbelegt.
+ * Die Hof-E-Mail bleibt bewusst LEER (Nr. 212): Mit der Anmelde-Adresse
+ * vorbelegt landete sie unbemerkt in Belehrung und Bestellung (Bericht 207);
+ * die Inhaberin trägt die Adresse für Kundschaft selbst ein.
  */
-export function HofAnlegenFormular({ personName, email }: { personName: string; email: string }): React.JSX.Element {
+export function HofAnlegenFormular({ personName }: { personName: string }): React.JSX.Element {
   const router = useRouter()
   const id = useId()
   const [fehler, setFehler] = useState('')
@@ -39,7 +42,7 @@ export function HofAnlegenFormular({ personName, email }: { personName: string; 
   const form = useForm<HofAnlegenFormular>({
     resolver: zodResolver(hofAnlegenFormularSchema) as Resolver<HofAnlegenFormular>,
     mode: 'onTouched',
-    defaultValues: { name: '', ownerName: personName, description: '', address: '', postalCode: '', city: '', phone: '', email },
+    defaultValues: { name: '', ownerName: personName, description: '', address: '', postalCode: '', city: '', phone: '', email: '' },
   })
   const { errors, isSubmitting } = form.formState
   const [name, ownerName, phone, hofEmail] = useWatch({ control: form.control, name: ['name', 'ownerName', 'phone', 'email'] })

@@ -22,7 +22,7 @@ import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 // Bestand als Parameter, ein abgeleiteter Typ wäre ein Zirkelbezug (TS2456).
 export type ProfilBestand = { name: string; ownerName: string; phone: string }
 
-/** Die Hof-E-Mail: freiwillig, klein, ohne Ränder; leer ist erlaubt (Profil und Server beim Anlegen); das Formular „Hof anlegen“ verlangt sie (Nr. 212). */
+/** Die Hof-E-Mail im Profil: klein, ohne Ränder; leer bleibt speicherbar (Bestandshöfe, Nr. 212); beim Anlegen ist sie Pflicht (hofAnlegenEmailPflichtSchema). */
 const hofEmailSchema = z
   .string()
   .trim()
@@ -56,11 +56,10 @@ function profilSchemaFuer(bestand?: ProfilBestand) {
       .min(1, PROFIL_MELDUNG.phoneFehlt)
       .min(4, PROFIL_MELDUNG.phoneKurz)
       .refine((v) => passtInGrenze(v, TELEFON_MAX, bestand?.phone), ZU_LANG.telefon),
-    // Freiwillig wie beim Anlegen: leer bleibt leer, sonst gilt emailSchema
-    // (klein, ohne Ränder, gültiges Format). Die Spalte ist NOT NULL — leer
-    // heißt Leerstring, wie ihn das Anlegen schon speichert. Leer heißt: Wir
-    // schreiben die Anmelde-Adresse an (hofKontaktEmail, Nr. 194) — darum darf
-    // auch ein Hof mit gespeicherter Adresse sie leeren.
+    // Leer bleibt speicherbar (Bestandshöfe dürfen nicht ausgesperrt werden, Nr. 212),
+    // sonst gilt emailSchema (klein, ohne Ränder, gültiges Format). Die Spalte ist
+    // NOT NULL — leer heißt Leerstring. Die Karte in Heute weist auf das leere Feld hin;
+    // bis dahin schreiben wir die Anmelde-Adresse an (hofKontaktEmail, Nr. 194).
     email: hofEmailSchema,
     // Der Kartenpunkt wird MIT dem Profil gespeichert — es gibt keinen eigenen
     // Bestätigen-Schritt mehr. null heißt: (noch) kein Punkt gesetzt; ein
@@ -122,13 +121,35 @@ export const hofAnlegenSchema = z.object({
   phone: z.string().trim().max(TELEFON_MAX, ZU_LANG.telefon),
   // Die Hof-E-Mail ist im Onboarding freiwillig: leer bleibt leer. Sonst gilt
   // emailSchema (src/schemas/email.ts) — klein, ohne Ränder, gültiges Format.
-  // Pflicht ist sie erst im Formular (hofAnlegenFormularSchema, Nr. 212).
+  // Pflicht ist sie beim Anlegen über hofAnlegenEmailPflichtSchema (Formular und createFarm, Nr. 212);
+  // dieses Schema bleibt die nachsichtige Grundlage.
   email: hofEmailSchema,
 })
 
 /**
+ * Die Hof-E-Mail beim Anlegen als Pflicht (Nr. 212, § 4 Abs. 1 Z 3 FAGG): EINE
+ * Regel für das Formular (hofAnlegenFormularSchema) und für createFarm — ein
+ * direkter Aufruf legt so keinen Hof ohne Adresse an. Das Profil bleibt
+ * nachsichtig (hofEmailSchema): Bestandshöfe dürfen sich nicht aussperren.
+ */
+export const hofAnlegenEmailPflichtSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(1, HOF_EMAIL_TEXT.pflicht)
+  .max(EMAIL_MAX, ZU_LANG.email)
+  // Nicht PROFIL_MELDUNG.email: „… oder lass das Feld leer“ stimmt hier nicht mehr.
+  .refine((v) => v === '' || emailSchema().safeParse(v).success, HOF_EMAIL_TEXT.ungueltig)
+
+/**
+ * Was createFarm prüft: hofAnlegenSchema (nachsichtig, ohne PLZ-Format und Mindestlängen)
+ * plus die Pflicht der Hof-E-Mail — dieselbe Regel wie im Formular, eine Quelle.
+ */
+export const hofAnlegenServerSchema = hofAnlegenSchema.extend({ email: hofAnlegenEmailPflichtSchema })
+
+/**
  * Das Formular „Hof anlegen" auf Einrichten (Nr. 15) — strenger als
- * hofAnlegenSchema, das createFarm prüft: Die Pflichtfelder und die
+ * hofAnlegenSchema und hofAnlegenServerSchema (createFarm): Die Pflichtfelder und die
  * Postleitzahl hielt bisher das Formular von Hand nach, jetzt an den Feldern
  * selbst (CODING_STANDARDS §8, „Anlegen strenger als Bearbeiten → zwei
  * Schemas"). Die Meldungen sind die bisherigen.
@@ -145,7 +166,7 @@ export const hofAnlegenFormularSchema = hofAnlegenSchema.extend({
     .min(1, 'Bitte gib eine Telefonnummer an.')
     .min(6, 'Bitte gib eine gültige Telefonnummer an.'),
   // Nr. 212 (§ 4 Abs. 1 Z 3 FAGG): Die Belehrung nennt die Adresse des Betriebs, also Pflicht.
-  email: hofAnlegenSchema.shape.email.min(1, HOF_EMAIL_TEXT.pflicht),
+  email: hofAnlegenEmailPflichtSchema,
 })
 
 export type HofAnlegenFormular = z.input<typeof hofAnlegenFormularSchema>

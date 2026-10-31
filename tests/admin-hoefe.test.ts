@@ -18,6 +18,7 @@ import { join } from 'node:path'
 import {
   ABHOLZEIT_FEHLT_TEXT,
   FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT,
+  FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT,
   FREISCHALTUNG_PRODUKT_OFFEN_TEXT,
   FREISCHALTUNG_STRIPE_OFFEN_TEXT,
   HOF_FILTER_LABEL,
@@ -38,6 +39,7 @@ import {
 } from '@/lib/admin-hoefe'
 import { hoefeAnsichtAus } from '@/schemas/admin-hoefe'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
 import { hofRohdaten } from './fabrik/hof-rohdaten'
 
@@ -57,24 +59,24 @@ function roh(ueber: Partial<HofRohdaten> = {}): HofRohdaten {
 
 describe('freischaltSperre', () => {
   it('ohne bestätigte E-Mail: der Satz aus S3 — vor Stripe, wie der Server', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, produktImShop: false, abholzeitAktiv: true })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: true, stripeBereit: false, produktImShop: false, abholzeitAktiv: true, hofEmailFehlt: false })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
   })
   it('ohne fertiges Stripe-Konto: gesperrt mit Grund (Register Z1)', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, abholzeitAktiv: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, abholzeitAktiv: true, hofEmailFehlt: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
   it('ohne Produkt im Shop: gesperrt mit dem Satz der Freigabe (Register K2, Nr. 116) — nach E-Mail und Stripe', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: false, abholzeitAktiv: true })).toBe(
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: false, abholzeitAktiv: true, hofEmailFehlt: false })).toBe(
       'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
     )
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: false, abholzeitAktiv: true })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: false, produktImShop: false, abholzeitAktiv: true, hofEmailFehlt: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
   it('mit Stripe, bestätigter E-Mail und einem Produkt im Shop: nichts im Weg', () => {
-    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true })).toBeNull()
+    expect(freischaltSperre({ emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true, hofEmailFehlt: false })).toBeNull()
   })
   it('ein Hof, der früher „nur bar" wählen konnte, ist ohne Stripe gesperrt — die Wahl zählt nicht mehr (Z1)', () => {
     // Die Regel kennt acceptsOnline nicht: Auch ein Bestandshof mit
     // acceptsOnline=false bekommt ohne Stripe keine Freischaltung.
-    const hof = { emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, abholzeitAktiv: true, acceptsOnline: false }
+    const hof = { emailBestaetigungOffen: false, stripeBereit: false, produktImShop: true, abholzeitAktiv: true, hofEmailFehlt: false, acceptsOnline: false }
     expect(freischaltSperre(hof)).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
   })
   it('die Warteliste zeigt denselben Satz: ein wartender Hof ohne Produkt im Shop trägt ihn als Sperre (adminHofZeile)', () => {
@@ -84,8 +86,32 @@ describe('freischaltSperre', () => {
   })
 })
 
+describe('Hof-E-Mail vor dem Freischalten (Nr. 212, § 4 Abs. 1 Z 3 FAGG)', () => {
+  const bereit = { emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true, hofEmailFehlt: false }
+
+  it('ohne Hof-E-Mail gesperrt, mit demselben Satz wie die Action (HOF_EMAIL_TEXT)', () => {
+    expect(freischaltSperre({ ...bereit, hofEmailFehlt: true })).toBe(FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT)
+    expect(FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT).toBe(`${HOF_EMAIL_TEXT.freischaltenFehlt}.`)
+  })
+  it('nach E-Mail, Stripe, Produkt und Abholzeit — die Gründe davor stechen', () => {
+    expect(freischaltSperre({ ...bereit, hofEmailFehlt: true, emailBestaetigungOffen: true })).toBe(FREISCHALTUNG_EMAIL_OFFEN_TEXT)
+    expect(freischaltSperre({ ...bereit, hofEmailFehlt: true, stripeBereit: false })).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    expect(freischaltSperre({ ...bereit, hofEmailFehlt: true, produktImShop: false })).toBe(FREISCHALTUNG_PRODUKT_OFFEN_TEXT)
+    expect(freischaltSperre({ ...bereit, hofEmailFehlt: true, abholzeitAktiv: false })).toBe(FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT)
+  })
+  it('Gegenprobe: mit Hof-E-Mail nichts im Weg', () => {
+    expect(freischaltSperre(bereit)).toBeNull()
+  })
+  it('die Warteliste zeigt denselben Satz (adminHofZeile); ein freigeschalteter Hof trägt keine Sperre', () => {
+    expect(adminHofZeile(roh({ approvedAt: null, hofEmailFehlt: true }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT).sperre).toBe(
+      FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT
+    )
+    expect(adminHofZeile(roh({ approvedAt: JETZT, hofEmailFehlt: true }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT).sperre).toBeNull()
+  })
+})
+
 describe('Abholzeit vor dem Freischalten (Register Z1, Ergänzung 21.10.2026)', () => {
-  const bereit = { emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true }
+  const bereit = { emailBestaetigungOffen: false, stripeBereit: true, produktImShop: true, abholzeitAktiv: true, hofEmailFehlt: false }
 
   it('ohne aktive Abholzeit gesperrt, mit dem Satz der Freigabe', () => {
     expect(freischaltSperre({ ...bereit, abholzeitAktiv: false })).toBe(FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT)

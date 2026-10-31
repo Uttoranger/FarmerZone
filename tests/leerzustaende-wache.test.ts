@@ -206,7 +206,6 @@ function ordneTextquellen(funde: Fund[], verweise: Verweis[]): void {
 type Ausnahme = { datei: string; text: string | RegExp; art: 'B' | 'C'; grund: string }
 const AUSNAHMEN: Ausnahme[] = [
   // B — eine einzelne Zeile in einer Karte oder Liste, ohne Aktion, mit nur einer Fassung
-  { datei: 'src/lib/hof-kontakt.ts', text: 'Der Hof hat noch keine E-Mail-Adresse für Kundschaft', art: 'C', grund: 'Grund an der gesperrten Freischaltung (Fehlersatz der Action, Wortlaut der Freigabe Nr. 212) — kein Leerzustand' },
   { datei: 'src/lib/admin-hoefe.ts', text: /^Noch kein Produkt im Shop – Freischalten erst/, art: 'C', grund: 'Grund an der gesperrten Freischaltung (Warteliste in Admin › Höfe und Satz der Action), Wortlaut der Freigabe §21 (Nr. 116) — kein Leerzustand' },
   { datei: 'src/lib/betrieb.ts', text: /^Noch keine Meldung( von Vercel\. Vercel meldet erst ab 50 % des Limits)?/, art: 'C', grund: 'Stand der Karte „Vercel-Ausgaben“ ohne jede Meldung von Spend Management (Nr. 162, Wortlaut der Freigabe §28) — ein Wert neben dem Link nach Vercel, kein Leerzustand' },
   { datei: 'src/app/admin/geld/page.tsx', text: /^noch kein(er| Lauf ·)$/, art: 'C', grund: 'Stand der Zeilen „Zahlungen“ und „Letzter Lauf“ in der Karte „Abgleich mit Stripe“ von Admin › Geld vor dem ersten Lauf (Nr. 191) — ein Wert in einer Zeile, kein Leerzustand' },
@@ -219,6 +218,7 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/lib/hofseite-fortschritt.ts', text: /noch kein Leitspruch$/, art: 'B', grund: 'Wert der Zeile „Leitspruch“ in der Liste der Hofseite (Gründungsjahr da, Spruch nicht); die Zeile ist selbst der Link' },
   { datei: 'src/lib/farm-aktivitaet.ts', text: 'Noch keine Inhalte', art: 'B', grund: 'Zeile „Aktivität“ eines Hofs in der Hofliste im Admin; eine Zeile in einer Tabelle, kein Weg nötig' },
   // C — kein Leerzustand
+  { datei: 'src/lib/hof-kontakt.ts', text: 'Der Hof hat noch keine E-Mail-Adresse für Kundschaft', art: 'C', grund: 'Grund an der gesperrten Freischaltung (Fehlersatz der Action, Wortlaut der Freigabe Nr. 212) — kein Leerzustand' },
   { datei: 'src/components/products/product-dialog.tsx', text: 'Noch keine Kategorie', art: 'C', grund: 'Zusammenfassung unter dem zugeklappten Abschnittstitel im Produktdialog, kein Leerzustand' },
   { datei: 'src/components/products/product-dialog.tsx', text: 'Noch keine hinterlegt.', art: 'C', grund: 'Feldwert der „Betriebsnummer“, kein Leerzustand; der Link „In den Hof-Einstellungen ändern“ steht direkt darunter' },
   { datei: 'src/lib/umsatz.ts', text: /^Noch keine? (Vorwoche|Vormonat|Vorjahr) zum Vergleich$/, art: 'C', grund: 'Vergleichssatz unter der Umsatzsumme: ein Wert, keine leere Liste' },

@@ -7,7 +7,8 @@
  *  - die Karte in Heute: Titel, Satz, Link zu den Einstellungen; die Seite zeigt sie nur bei leerem Feld
  *    (Regel hofEmailFehlt, Verdrahtung am Quelltext der Seite);
  *  - Admin-Hof-Akte: „Hof-E-Mail fehlt“ bei leerem Feld, sonst „wie Anmeldung“ / „eigene Adresse“ — nie die Adresse;
- *  - Hof einrichten: das Feld trägt den Erklärsatz und ist nicht mehr „freiwillig“.
+ *  - Hof einrichten: das Feld trägt den Erklärsatz, ist nicht „freiwillig“, ist LEER vorgegeben (nicht mit der
+ *    Anmelde-Adresse) und lässt sich leer nicht absenden; dieselbe Adresse wie die Anmeldung darf die Inhaberin eintippen.
  */
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
@@ -21,6 +22,7 @@ import { HOF_EMAIL_TEXT, hofEmailFehlt, hofKontaktEmail } from '@/lib/hof-kontak
 import { hofEmailText } from '@/lib/admin-hof-akte'
 import { HofEmailKarte } from '@/components/heute/hof-email-karte'
 import { HofAnlegenFormular } from '@/components/einrichten/hof-anlegen-formular'
+import { hofAnlegenFormularSchema } from '@/schemas/hofprofil'
 
 describe('hofEmailFehlt und hofKontaktEmail', () => {
   it('leer und nur Leerzeichen fehlen; eine Adresse fehlt nicht', () => {
@@ -61,11 +63,40 @@ describe('Admin-Hof-Akte: hofEmailText', () => {
 })
 
 describe('Hof einrichten: Schritt Kontakt', () => {
-  const html = renderToStaticMarkup(createElement(HofAnlegenFormular, { personName: 'Max Mustermann', email: 'login@example.com' }))
+  const html = renderToStaticMarkup(createElement(HofAnlegenFormular, { personName: 'Max Mustermann' }))
+  const quelle = readFileSync('src/components/einrichten/hof-anlegen-formular.tsx', 'utf8')
+  const gueltig = {
+    name: 'Hof Test',
+    ownerName: 'Max Mustermann',
+    description: '',
+    address: 'Teststraße 1',
+    postalCode: '1010',
+    city: 'Wien',
+    phone: '+43 660 0000000',
+  }
 
   it('Erklärsatz aus einer Quelle, Label ohne „freiwillig“', () => {
     expect(html).toContain(HOF_EMAIL_TEXT.erklaerung)
     expect(html).toContain(HOF_EMAIL_TEXT.label)
     expect(html).not.toContain('E-Mail des Hofs (freiwillig)')
+  })
+
+  it('das Feld ist leer vorgegeben — keine Anmelde-Adresse, kein Wert im Markup, keine Eigenschaft dafür', () => {
+    expect(quelle).toMatch(/phone: '', email: '' \}/)
+    expect(quelle).not.toMatch(/\{ personName, email \}/)
+    expect(html.match(/<input[^>]*type="email"[^>]*>/)?.[0]).not.toMatch(/value=/)
+    // Gegenprobe: Der Inhabername bleibt vorbelegt (er steht im Konto, nicht in Belehrung und Bestellung).
+    expect(quelle).toMatch(/ownerName: personName/)
+  })
+
+  it('leer lässt sich nicht absenden: der Resolver (hofAnlegenFormularSchema) meldet den Satz am Feld', () => {
+    for (const email of ['', '   ']) {
+      const r = hofAnlegenFormularSchema.safeParse({ ...gueltig, email })
+      expect(r.success ? [] : r.error.issues.map((i) => [i.path[0], i.message])).toEqual([['email', HOF_EMAIL_TEXT.pflicht]])
+    }
+  })
+
+  it('Gegenprobe: dieselbe Adresse wie die Anmeldung darf die Inhaberin bewusst eintippen', () => {
+    expect(hofAnlegenFormularSchema.safeParse({ ...gueltig, email: 'login@example.com' }).success).toBe(true)
   })
 })

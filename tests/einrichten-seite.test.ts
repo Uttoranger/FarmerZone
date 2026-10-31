@@ -118,7 +118,7 @@ describe('hofAnlegenFormularSchema — strenger als createFarm', () => {
     expect(felder.sort()).toEqual(['address', 'name', 'phone', 'postalCode'])
   })
 
-  it('der Server bleibt nachsichtig wie bisher (hofAnlegenSchema unverändert)', () => {
+  it('hofAnlegenSchema bleibt nachsichtig wie bisher (die Pflicht der Hof-E-Mail prüft createFarm zusätzlich, Nr. 212)', () => {
     expect(hofAnlegenSchema.safeParse({ ...gueltig, postalCode: '10100', email: '' }).success).toBe(true)
   })
 })
