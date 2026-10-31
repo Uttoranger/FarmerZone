@@ -89,6 +89,9 @@ function produktDaten(v: ProductFormData) {
     labels: bereinigeSiegel(v.labels),
     abgabe: v.abgabe,
     abholhinweise: abholhinweiseDaten(v.category ?? null, v.abholhinweise),
+    // Nr. 214: Angaben des Hofs zum Rücktritt — wie getippt, ohne Ableitung aus der Kategorie.
+    keinRuecktritt: v.keinRuecktritt,
+    ruecksendekostenCents: v.ruecksendekostenCents,
     countsTowardLimit: v.countsTowardLimit,
     price: v.price,
     vatRate: v.vatRate,

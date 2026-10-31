@@ -269,6 +269,31 @@ describe('Korb und Zahlarten (N10)', () => {
   })
 })
 
+describe('Rücktritt je Position (Nr. 214)', () => {
+  const position = { productId: 'holz', name: 'Brennholz Buche', quantity: 2, unit: 'RAUMMETER', price: 90 }
+  const karte = (ruecktritt: { keinRuecktritt: boolean; ruecksendekostenCents: number | null } | null) =>
+    renderToStaticMarkup(createElement(KorbKarte, { hofName: 'Hof Test', positionen: [{ ...position, ruecktritt }], zeilenCents: new Map([['holz', 18000]]) }))
+
+  it('mit Angabe des Hofs: die Hinweise unter dem Namen', () => {
+    const html = karte({ keinRuecktritt: true, ruecksendekostenCents: 4000 })
+    expect(html).toContain('Kein Rücktritt: verdirbt schnell')
+    expect(html).toContain('Rücksendung geschätzt ca. €\u00a040,00')
+    expect(html.indexOf('Brennholz Buche')).toBeLessThan(html.indexOf('Kein Rücktritt'))
+  })
+
+  it('ohne Angabe und bei „Betrieb“ (ruecktritt null) steht nichts', () => {
+    expect(karte({ keinRuecktritt: false, ruecksendekostenCents: null })).not.toContain('data-ruecktritt-hinweis')
+    expect(karte(null)).not.toContain('data-ruecktritt-hinweis')
+  })
+
+  it('Formular und „Zahlung fortsetzen“ nehmen die Angabe über ruecktrittFuerPosition — mit der Käuferart, nie aus dem Korb', () => {
+    const formular = readFileSync('src/components/checkout/checkout-form.tsx', 'utf8')
+    expect(formular).toContain('ruecktritt: ruecktrittFuerPosition(produkte.get(i.productId), privat)')
+    const seite = readFileSync('src/app/(public)/[farmSlug]/checkout/page.tsx', 'utf8')
+    expect(seite).toContain("ruecktritt: ruecktrittFuerPosition(item.product, order.kaeuferArt === 'PRIVAT')")
+  })
+})
+
 describe('Reservierungsfrist sichtbar', () => {
   it('läuft: Uhrzeit und Restzeit', () => {
     const html = renderToStaticMarkup(

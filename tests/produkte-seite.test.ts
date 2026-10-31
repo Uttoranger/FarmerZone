@@ -528,6 +528,8 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
       familieId: null,
       verpackung: null,
       abholhinweise: [],
+      keinRuecktritt: false,
+      ruecksendekostenCents: null,
       sperre: null,
       ...teil,
     }

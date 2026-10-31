@@ -17,6 +17,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { ImShopSchalter } from '@/components/products/im-shop-schalter'
 import { ProductDialog } from '@/components/products/product-dialog'
+import { RuecktrittHinweis } from '@/components/shared/ruecktritt-hinweis'
 import { produktHinweise } from '@/components/products/produkt-hinweise'
 import { VorratFeld } from '@/components/produkte/vorrat-feld'
 import { VorratBlatt } from '@/components/produkte/vorrat-blatt'
@@ -472,6 +473,8 @@ function Tabelle({
                 <td className="px-3 py-2.5">
                   <NamenKnopf product={product} onOeffnen={oeffnen(product)} />
                   <p className="text-[12.5px] text-muted-foreground xl:hidden">{formatGebinde(product.unit, product.unitSize)}</p>
+                  {/* Nr. 214: die zwei Angaben zum Rücktritt, wie die Kundin sie sieht. */}
+                  <RuecktrittHinweis angabe={product} className="mt-0.5" />
                   <Hinweise product={product} onOeffnen={oeffnen(product)} />
                 </td>
                 <td className="hidden px-3 py-2.5 text-[12.5px] whitespace-nowrap text-muted-foreground xl:table-cell">{formatGebinde(product.unit, product.unitSize)}</td>
@@ -599,6 +602,7 @@ function ProduktZeile({ product, onOeffnen, onVorrat }: { product: ProductData; 
         <p className="max-w-full truncate text-[12.5px] text-muted-foreground">
           {formatGebinde(product.unit, product.unitSize)} · {formatEuro(product.price)}
         </p>
+        <RuecktrittHinweis angabe={product} />
         {ausnahme && (
           <StatusBadge status={status.ton} className="whitespace-nowrap">
             {status.text}

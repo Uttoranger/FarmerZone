@@ -91,6 +91,10 @@ export type ProductData = {
   verpackung: Verpackung | null
   /** Seit Nr. 123 (N23): Abholhinweise eines Futters; bei anderen Produkten leer. */
   abholhinweise: AbholhinweisValue[]
+  /** Seit Nr. 214 (N39): „verdirbt schnell – kein Rücktritt“ laut Hof. */
+  keinRuecktritt: boolean
+  /** Seit Nr. 214 (N39): geschätzte Rücksendekosten in Cent; null = keine Angabe. */
+  ruecksendekostenCents: number | null
   /**
    * Seit Nr. 20 (S7): Warum diese Größe ohne Registrierung nicht in den Shop
    * darf („Wird erst sichtbar mit …"), sonst null. Nur getProdukteSeite kennt
@@ -152,6 +156,8 @@ export async function getProductsForFarm(farmId: string): Promise<ProductData[]>
     familieId: p.familieId,
     verpackung: p.verpackung,
     abholhinweise: p.abholhinweise,
+    keinRuecktritt: p.keinRuecktritt,
+    ruecksendekostenCents: p.ruecksendekostenCents,
     sperre: null,
   }))
 }

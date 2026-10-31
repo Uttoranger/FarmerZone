@@ -81,6 +81,8 @@ describe('hatHandlung: Abschnitt „Braucht dich" oder „Im Shop"', () => {
       familieId: null,
       verpackung: null,
       abholhinweise: [],
+      keinRuecktritt: false,
+      ruecksendekostenCents: null,
       sperre: null,
       ...teil,
     }

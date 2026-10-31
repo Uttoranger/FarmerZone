@@ -194,6 +194,28 @@ describe('Cache-Entwertung', () => {
   })
 })
 
+describe('Rücktritt je Produkt (Nr. 214)', () => {
+  it('Anlegen schreibt beide Angaben, wie getippt', async () => {
+    await createProduct({ ...basis, keinRuecktritt: true, ruecksendekostenCents: 2500 } as never)
+    const data = productCreate.mock.calls[0][0].data as Record<string, unknown>
+    expect(data.keinRuecktritt).toBe(true)
+    expect(data.ruecksendekostenCents).toBe(2500)
+  })
+
+  it('Bearbeiten schreibt beide Angaben — auch das Zurücksetzen auf „keine Angabe“', async () => {
+    await updateProduct('p_1', { ...basis, keinRuecktritt: false, ruecksendekostenCents: null } as never)
+    const aufruf = tx.product.updateMany.mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(aufruf.data.keinRuecktritt).toBe(false)
+    expect(aufruf.data.ruecksendekostenCents).toBeNull()
+  })
+
+  it('ein negativer Betrag wird abgelehnt und nichts geschrieben', async () => {
+    const ergebnis = await createProduct({ ...basis, ruecksendekostenCents: -100 } as never)
+    expect(ergebnis).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(productCreate).not.toHaveBeenCalled()
+  })
+})
+
 describe('updateProduct', () => {
   it('prüft den Besitz in der WHERE-Klausel und schreibt Siegel statt isOrganic', async () => {
     const ergebnis = await updateProduct('p_1', basis as never)
