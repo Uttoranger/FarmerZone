@@ -66,6 +66,7 @@ import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
@@ -535,6 +536,8 @@ export function CheckoutForm({
             : { label: zurueck.label, onClick: () => zeigeSchritt(zurueck.ziel) }
         }
       >
+        {/* Nr. 207: oben der Hinweis auf einen Testhof — für echte Höfe nichts. */}
+        <TesthofHinweis farm={farm} className="pt-4 md:pt-6" />
         {inhalt}
       </KundeFokusShell>
     )
@@ -1061,6 +1064,7 @@ export function ZahlungFortsetzen({
       rechts={<span title={farm.name}>{farm.name}</span>}
       zurueck={{ href: zahlung.bestaetigung, label: 'Zurück zur Bestellung' }}
     >
+      <TesthofHinweis farm={farm} className="pt-4 md:pt-6" />
       <StripeZahlung
         clientSecret={zahlung.clientSecret}
         bestaetigung={zahlung.bestaetigung}

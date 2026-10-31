@@ -5,12 +5,10 @@ import { widerrufLinkGilt } from '@/lib/bestell-link'
 import { hofSichtbar } from '@/lib/hof-sichtbar'
 import { formatPosition } from '@/lib/format'
 import { MARKE } from '@/lib/marke'
-import { BELEHRUNG, WIDERRUF_TEXT, ausnahmeHinweis, widerrufMoeglich } from '@/lib/widerruf'
-import { AgbStuecke } from '@/components/rechtstexte/agb-stuecke'
+import { HOF_KONTAKT_FELDER, hofKontaktEmail } from '@/lib/hof-kontakt'
+import { WIDERRUF_TEXT, ausnahmeHinweis, belehrungHof, belehrungMitHof, widerrufMoeglich, type BelehrungHof } from '@/lib/widerruf'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { cn } from '@/lib/utils'
 import { WiderrufFormular, type WiderrufBestellAnsicht } from './widerruf-formular'
 
 // Private Seite (signierter Link) — nie in Suchmaschinen, und die Adresse mit
@@ -32,8 +30,10 @@ export const dynamic = 'force-dynamic'
  *    Kategorie. Eine falsche Signatur ergibt 404 — vor jeder Abfrage.
  *  - Ohne Link (Fuß, direkt): Name, E-Mail, Bestellnummer, „ganze Bestellung“
  *    oder Freitext. Die Seite verrät nie, ob es eine Bestellung gibt.
- * Darunter die Rücktrittsbelehrung — Platzhalter, bis der Wortlaut aus dem RIS
- * übernommen ist (src/lib/widerruf.ts, Kopfkommentar).
+ * Darunter die Belehrung nach Anhang I FAGG (Nr. 207, src/lib/widerruf.ts):
+ * Mit gültigem Link stehen Name, Anschrift, Telefon und E-Mail des Hofs der
+ * Bestellung an den Platzhaltern, ohne Link der Hinweis „… – stehen in deiner
+ * Bestellung“ — ohne Link verrät die Seite keinen Hof.
  * Keine Mockups in Lauf 27: Aufbau nach DESIGN_SYSTEM (Karte, Felder 16 px,
  * Knöpfe 44 px), in der KundeShell mit Seitenfuß.
  */
@@ -43,6 +43,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
   const sig = typeof params.sig === 'string' ? params.sig : null
 
   let ansicht: WiderrufBestellAnsicht | null = null
+  let hofAngaben: BelehrungHof | null = null
   let nichtMehr = false
   if (bestellung !== null || sig !== null) {
     // Signatur ZUERST — eine falsche löst keine Abfrage aus.
@@ -56,7 +57,20 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
         kaeuferArt: true,
         status: true,
         pickedUpAt: true,
-        farm: { select: { name: true, address: true, postalCode: true, city: true, archivedAt: true, geschlossenAm: true } },
+        farm: {
+          select: {
+            name: true,
+            ownerName: true,
+            address: true,
+            postalCode: true,
+            city: true,
+            phone: true,
+            archivedAt: true,
+            geschlossenAm: true,
+            // Die E-Mail für die Belehrung: die Adresse, unter der der Hof erreichbar ist (hofKontaktEmail).
+            ...HOF_KONTAKT_FELDER,
+          },
+        },
         items: {
           select: { id: true, productName: true, quantity: true, fehltSeit: true, product: { select: { category: true, unit: true, unitSize: true } } },
         },
@@ -64,6 +78,8 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
     })
     if (!order) notFound()
     nichtMehr = !widerrufMoeglich(order, new Date())
+    // Nur mit gültigem Link (oben geprüft): die Angaben des Hofs DIESER Bestellung.
+    hofAngaben = belehrungHof(order.farm, hofKontaktEmail(order.farm), hofSichtbar(order.farm))
     ansicht = {
       bestellung,
       sig,
@@ -95,22 +111,45 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
           <WiderrufFormular bestellung={ansicht} />
         )}
 
-        <section aria-labelledby="belehrung-titel" className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px] print:hidden">
-          <h2 id="belehrung-titel" className="font-heading text-[18px] font-semibold text-foreground">
-            {WIDERRUF_TEXT.belehrungTitel}
-          </h2>
-          {/* PLATZHALTER (Freigabe 200, „Ohne Zugang zum RIS: STOPP für die Belehrung“): kein Wortlaut aus dem Gedächtnis. */}
-          <p className="text-[14px] leading-normal text-muted-foreground">{BELEHRUNG.vermerk}</p>
-          <p className="text-[14px] leading-normal text-muted-foreground">
-            <AgbStuecke
-              stuecke={BELEHRUNG.agbHinweis}
-              linkKlasse={cn('rounded-sm font-semibold text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}
-            />
-          </p>
-          <h3 className="mt-2 text-[15px] font-semibold text-foreground">{WIDERRUF_TEXT.formularTitel}</h3>
-          <p className="text-[14px] leading-normal text-muted-foreground">{BELEHRUNG.vermerk}</p>
-        </section>
+        <BelehrungAbschnitt hof={hofAngaben} />
       </div>
     </KundeShellMitSitzung>
+  )
+}
+
+/** Teil A, Teil B und der Hinweis zur Rückgabe am Hof — Wortlaut aus BELEHRUNG, nur die Hofangaben eingesetzt. */
+function BelehrungAbschnitt({ hof }: { hof: BelehrungHof | null }): React.JSX.Element {
+  const b = belehrungMitHof(hof)
+  return (
+    <section aria-labelledby="belehrung-titel" className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px] print:border-0 print:px-0">
+      <h2 id="belehrung-titel" className="font-heading text-[18px] font-semibold text-foreground">
+        {b.teilA.titel}
+      </h2>
+      {b.teilA.abschnitte.map((a) => (
+        <div key={a.titel} className="flex flex-col gap-2">
+          <h3 className="mt-2 text-[15px] font-semibold text-foreground">{a.titel}</h3>
+          {a.absaetze.map((absatz) => (
+            <p key={absatz} className="text-[14px] leading-normal text-foreground [overflow-wrap:anywhere]">
+              {absatz}
+            </p>
+          ))}
+        </div>
+      ))}
+      <h2 className="mt-4 font-heading text-[18px] font-semibold text-foreground">{b.teilB.titel}</h2>
+      <p className="text-[14px] leading-normal text-muted-foreground">{b.teilB.einleitung}</p>
+      <ul className="flex flex-col gap-1.5">
+        {b.teilB.zeilen.map((zeile) => (
+          <li key={zeile} className="text-[14px] leading-normal text-foreground [overflow-wrap:anywhere]">
+            {zeile}
+          </li>
+        ))}
+      </ul>
+      <p className="text-[14px] leading-normal text-muted-foreground">{b.teilB.fussnote}</p>
+      {/* Getrennt vom Muster und als Hinweis gekennzeichnet (Auftrag 207). */}
+      <aside aria-label={b.hinweisTitel} className="mt-3 rounded-xl border border-border bg-muted px-3.5 py-3 text-[14px] leading-normal text-foreground">
+        <span className="font-semibold">{b.hinweisTitel}: </span>
+        {b.hinweis}
+      </aside>
+    </section>
   )
 }

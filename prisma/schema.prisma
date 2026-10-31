@@ -701,6 +701,16 @@ model Farm {
   sepaZahlungsmittelId    String?
   gebuehrHinweisAm        DateTime?
 
+  // Zustimmung des Hofs zu den AGB (§ 104 JN, P2B-Verordnung; Nachtlauf
+  // Nr. 207): die Fassung, der der Hof zugestimmt hat (Kennung aus
+  // AGB_STAND_VERMERK, z. B. „0.9“), und wann. null = noch keiner Fassung
+  // zugestimmt — bewusst ohne Default und ohne Backfill (Expand): Eine
+  // Zustimmung entsteht nur durch den Knopf „Ich stimme den AGB zu“, nie
+  // durch den Code (keine Zustimmungsfiktion). Geschrieben nur über
+  // stimmeAgbZu (src/server/actions/agb-zustimmung.ts).
+  agbFassung      String?
+  agbZugestimmtAm DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

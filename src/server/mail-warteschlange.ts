@@ -25,7 +25,7 @@ import type { Zustellung } from '@/schemas/resend-ereignis'
  *  - arbeiteWarteschlange: der Worker — nur einer zur Zeit (Advisory-Lock),
  *    Seiten zu 100, Wichtig vor Kann warten, Versand als Stapel über
  *    `versendeStapel` (src/lib/email.ts), zwischen zwei Anfragen an Resend
- *    mindestens 200 ms.
+ *    mindestens 200 ms. Mails mit Anhang (Nr. 207) gehen einzeln.
  *  - protokolliereSofortMail: die Zeile jeder direkten Mail aus `sendRaw`.
  *  - vermerkeZustellung: Zustellung, Bounce oder Spam-Meldung aus dem
  *    Webhook von Resend (Nr. 160), über die `resendId`.
@@ -539,7 +539,14 @@ async function arbeite(optionen: WorkerOptionen, start: number): Promise<WorkerE
         }
       }
     }
-    for (const gruppe of nachBelegung(versand)) await versende(gruppe)
+    for (const gruppe of nachBelegung(versand)) {
+      // Nr. 207: Resend nimmt Anhänge nur einzeln (emails.send) — eine Mail mit
+      // Anhang (die AGB in der Bestätigung) geht allein, mit dem Schlüssel aus
+      // ihrem Auftrag; die übrigen bleiben ein Stapel.
+      const ohneAnhang = gruppe.filter((v) => !email.hatAnhang(v.mail))
+      if (ohneAnhang.length > 0) await versende(ohneAnhang)
+      for (const v of gruppe) if (email.hatAnhang(v.mail)) await versende([v])
+    }
 
     const geschrieben = await schreibeAusgaenge(ausgaenge, new Date(), belegtBis)
     if (geschrieben < ausgaenge.length) meldeFehler('Mail-Warteschlange: Belegung verloren, Ergebnis nicht geschrieben', new Error('belegung_verloren'))

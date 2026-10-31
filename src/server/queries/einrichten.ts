@@ -10,6 +10,8 @@ export type EinrichtenHof = NonNullable<EinrichtenDaten['hof']> & {
   slug: string
   /** Farm.tarif — heute bei jedem Hof leer (E6, gesetzt erst ab Gate 8). */
   tarif: Tarif | null
+  /** Farm.agbFassung (Nr. 207): zugestimmte AGB-Fassung, null = noch keiner. */
+  agbFassung: string | null
 }
 
 /**
@@ -23,7 +25,8 @@ export type EinrichtenHof = NonNullable<EinrichtenDaten['hof']> & {
 export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof | null> {
   const hof = await prisma.farm.findUnique({
     where: { ownerId },
-    select: { id: true, slug: true, approvedAt: true, tarif: true, sepaMandatAm: true },
+    // agbFassung (Nr. 207): ob die Karte „AGB bestätigen“ steht.
+    select: { id: true, slug: true, approvedAt: true, tarif: true, sepaMandatAm: true, agbFassung: true },
   })
   if (!hof) return null
 
@@ -44,6 +47,7 @@ export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof 
     id: hof.id,
     slug: hof.slug,
     tarif: hof.tarif,
+    agbFassung: hof.agbFassung,
     name: farm.name,
     hofseite: { erledigt: fortschritt.erledigt, gesamt: fortschritt.gesamt, fehlend: fortschritt.fehlend },
     produkte,

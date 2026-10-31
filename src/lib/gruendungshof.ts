@@ -804,9 +804,6 @@ export const TESTHOF_MARKE = 'Testhof'
 /** Der Grund am ausgegrauten „Wieder als Gründungshof zählen“ und der Satz der Action (Register N21: ein Testhof ist immer ausgenommen). */
 export const TESTHOF_ZAEHLT_NIE = 'Ein Testhof zählt nie als Gründungshof.'
 
-/** Der Hinweis oben auf der Hofseite eines Testhofs (Register N21) — Bestellen bleibt möglich. */
-export const TESTHOF_HINWEIS = 'Testhof – nur zum Ausprobieren. Er erscheint nicht in der Suche.'
-
 /** Wie viele freigeschaltete, nicht stillgelegte Höfe ausgenommen sind — „· k ausgenommen“ in Admin › Höfe und Einstellungen. */
 export function zaehleAusgenommene(hoefe: readonly HofFuerPlatz[]): number {
   return hoefe.filter((h) => h.approvedAt !== null && h.archivedAt === null && h.gruendungAusgenommen).length

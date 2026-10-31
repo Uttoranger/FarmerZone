@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Text } from '@react-email/components'
+import { Link, Text } from '@react-email/components'
 import {
   EmailLayout,
   BetragsZeile,
@@ -11,10 +11,15 @@ import {
   bodyText,
   kleinText,
   MAIL_FARBE,
+  textLink,
 } from './_layout'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
+import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+import type { Belehrung } from '@/lib/widerruf'
+import { BelehrungTeil } from './belehrung-teil'
 
 export interface OnsiteConfirmationProps {
   orderNumber: string
@@ -39,6 +44,12 @@ export interface OnsiteConfirmationProps {
    * Fehlt sie, bleibt der allgemeine Satz.
    */
   bestaetigenBis?: string
+  /** Die Belehrung nach Anhang I FAGG mit den Angaben des Hofs (Nr. 207) — nur bei Verbraucherinnen. */
+  belehrung?: Belehrung
+  /** „Vertrag widerrufen“ unter der Belehrung (signiert, Nr. 200) — nur bei Verbraucherinnen. */
+  widerrufUrl?: string
+  /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
+  appUrl?: string
 }
 
 /**
@@ -93,6 +104,19 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
         Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.
         Bitte bestätige bald: Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei.
       </Text>
+      {/* Nr. 207: Die AGB hängen auch dieser Mail als Datei an — derselbe Satz wie in der Bestätigung (Register O4). */}
+      <Text style={kleinText}>
+        {MAIL_AGB_ZEILE.map((stueck, i) =>
+          typeof stueck === 'string' ? (
+            stueck
+          ) : (
+            <Link key={i} href={`${p.appUrl ?? PRODUKTION_ADRESSE}${stueck.ziel}`} style={textLink}>
+              {stueck.text}
+            </Link>
+          )
+        )}
+      </Text>
+      {p.belehrung && <BelehrungTeil belehrung={p.belehrung} widerrufUrl={p.widerrufUrl} />}
     </EmailLayout>
   )
 }

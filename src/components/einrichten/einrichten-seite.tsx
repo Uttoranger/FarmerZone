@@ -8,6 +8,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HofAnlegenFormular } from '@/components/einrichten/hof-anlegen-formular'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { ErneutSendenKnopf } from '@/components/email-bestaetigung/erneut-senden'
+import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
 
 /*
  * „Hof einrichten" (/onboarding, Gate 5 Nr. 15) nach den Mockups
@@ -202,6 +203,7 @@ export function EinrichtenSeite({
   tarif,
   freigeschaltet,
   emailBestaetigung = null,
+  agb = null,
 }: {
   stand: EinrichtenStand
   vorname: string
@@ -210,6 +212,8 @@ export function EinrichtenSeite({
   freigeschaltet: boolean
   /** Nur wenn die Bestätigung aussteht (bestaetigungOffen, frisch aus der Datenbank). */
   emailBestaetigung?: { email: string; warteSekunden: number } | null
+  /** Nr. 207: Der Hof hat der aktuellen AGB-Fassung noch nicht zugestimmt — die Karte „AGB bestätigen“ (ohne Hof: null). */
+  agb?: { fassung: string; geaendert: boolean } | null
 }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-5 pb-12 md:px-8 md:pt-8">
@@ -222,6 +226,7 @@ export function EinrichtenSeite({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-7">
         <div className="flex min-w-0 flex-col gap-3">
           {emailBestaetigung && <EmailBestaetigenHinweis {...emailBestaetigung} />}
+          {agb && <AgbZustimmenKarte fassung={agb.fassung} geaendert={agb.geaendert} />}
           <Fortschritt stand={stand} freigeschaltet={freigeschaltet} />
           <section aria-labelledby="einrichten-schritte">
             <h2 id="einrichten-schritte" className="sr-only">

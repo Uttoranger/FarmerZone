@@ -69,6 +69,8 @@ function barMailBestellung(order: NonNullable<Awaited<ReturnType<typeof leseBest
     pickupTimeEnd: order.pickupTimeEnd,
     paymentMethod: order.paymentMethod,
     stripePaymentIntentId: order.stripePaymentIntentId,
+    // Nr. 207: Belehrung und Widerruf-Link nur bei Verbraucherinnen.
+    kaeuferArt: order.kaeuferArt,
     farm: order.farm,
     items: order.items,
   }
@@ -91,6 +93,8 @@ async function leseBestellung(where: Prisma.OrderWhereInput) {
           // Für „Erneut senden": ein stillgelegter Hof bekommt keine Mail mehr.
           archivedAt: true,
           geschlossenAm: true,
+          // Nr. 207: Rückfall der Hof-E-Mail in der Belehrung (hofKontaktEmail).
+          owner: { select: { email: true } },
         },
       },
       items: {

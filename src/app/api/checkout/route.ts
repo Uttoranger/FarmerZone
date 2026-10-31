@@ -479,7 +479,8 @@ export async function POST(request: NextRequest) {
   // 1. Load farm
   const farm = await prisma.farm.findUnique({
     where: { id: data.farmId },
-    include: { owner: { select: { name: true } } },
+    // E-Mail der Inhaberin nur für die Belehrung im Bestätigungslink (Nr. 207, hofKontaktEmail).
+    include: { owner: { select: { name: true, email: true } } },
   })
   if (!farm || !farm.isActive) {
     return NextResponse.json({ error: 'Hof nicht gefunden' }, { status: 404 })
@@ -975,6 +976,8 @@ export async function POST(request: NextRequest) {
           pickupTimeStart: data.pickupTimeStart,
           pickupTimeEnd: data.pickupTimeEnd,
           paymentMethod: data.paymentMethod,
+          // Nr. 207: Belehrung und Widerruf-Link nur bei Verbraucherinnen.
+          kaeuferArt: data.kaeuferArt,
           farm: {
             id: farm.id,
             name: farm.name,
@@ -985,6 +988,7 @@ export async function POST(request: NextRequest) {
             postalCode: farm.postalCode,
             city: farm.city,
             phone: farm.phone,
+            owner: { email: farm.owner.email },
           },
           items: positionen.map((i, index) => ({
             productName: i.name,

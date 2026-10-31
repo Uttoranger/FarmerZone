@@ -86,6 +86,9 @@ const AKTE_HOF_SELECT = {
   isPaused: true,
   adminGesperrtAm: true,
   adminSperrGrund: true,
+  // Nr. 207: Fassung und Zeitpunkt der AGB-Zustimmung.
+  agbFassung: true,
+  agbZugestimmtAm: true,
   owner: {
     select: {
       email: true,

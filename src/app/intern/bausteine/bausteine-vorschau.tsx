@@ -39,7 +39,7 @@ import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
-import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
+import { TESTHOF_HINWEIS } from '@/lib/testhof'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen

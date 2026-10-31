@@ -199,7 +199,7 @@ describe('Bestellbestätigung per Mail: eine Zeile mit Link auf die AGB', () => 
     const html = await mail()
     expect(html).toContain(`href="${PRODUKTION_ADRESSE}${AGB_PFAD}"`)
     expect(html).toContain(`Es gelten die <a`)
-    expect(html).toContain(`von ${MARKE}. Du kannst sie jederzeit nachlesen, speichern und ausdrucken.`)
+    expect(html).toContain(`von ${MARKE}. Du findest sie auch als Datei im Anhang dieser E-Mail und kannst sie jederzeit nachlesen, speichern und ausdrucken.`)
   })
 
   it('eine übergebene Adresse gilt für den Link — Gegenprobe zur echten Seite', async () => {

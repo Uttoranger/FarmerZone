@@ -1,6 +1,8 @@
 import type { DbBremse } from '@/lib/bremse-datenbank'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { MARKE } from '@/lib/marke'
+import { PRODUKTION_HOST } from '@/lib/umgebung'
+import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import type { MarkeArt } from '@/lib/marke-art'
 import { link, type AgbStueck } from '@/lib/rechtstexte/stuecke'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
@@ -15,14 +17,18 @@ import type { ProductCategoryValue } from '@/lib/taxonomie'
  * Bewusst ohne zod und ohne Prisma-Laufzeit: Die Kasse liest den Rücktrittssatz
  * von hier (CODING_STANDARDS §3, „Kein Zod im Browser der Kundenseiten").
  *
- * BELEHRUNG: Der Wortlaut der Muster-Widerrufsbelehrung (Anhang I FAGG,
- * Teil A) und des Muster-Formulars (Teil B) kommt aus dem RIS
- * (ris.bka.gv.at, Bundesrecht konsolidiert, FAGG). Beim Bau am 30.10.2026 war
- * das RIS aus der Bauumgebung nicht erreichbar (Netz gesperrt) — deshalb steht
- * unten ein PLATZHALTER mit Vermerk (`BELEHRUNG`), kein Text aus dem Gedächtnis.
- * Nachtragen: Wortlaut wörtlich übernehmen, nur die Platzhalter ersetzen
- * („der Hof, bei dem du bestellt hast (Name und Anschrift in deiner
- * Bestellung)“ und die Plattform leitet weiter — Name aus MARKE), Quelle und Abrufdatum hier.
+ * BELEHRUNG (Nr. 207): Muster-Widerrufsbelehrung (Teil A) und
+ * Muster-Widerrufsformular (Teil B) nach Anhang I FAGG idF BGBl. I Nr. 59/2026
+ * (gilt ab 1.10.2026), Wort für Wort.
+ *   Quelle: https://ris.bka.gv.at/Dokumente/Bundesnormen/NOR40279264/NOR40279264.pdf
+ *   Abgerufen: 31.10.2026.
+ *   Wortlaut von der Projektleitung gegen das RIS geprüft übergeben; aus der
+ *   Bauumgebung nicht abrufbar (Netz gesperrt).
+ * Die Platzhalter in eckigen Klammern sind Daten, keine Textteile: Mit
+ * signiertem Link bzw. in der Mail der eigenen Bestellung füllt sie
+ * `belehrungMitHof` mit den Angaben des Hofs, sonst steht der Satz „… – stehen
+ * in deiner Bestellung“. Nur die Domain steht als PRODUKTION_HOST (Register M1,
+ * tests/marke-name-wache.test.ts); sonst ist kein Wort verändert.
  */
 
 /** Frist in Kalendertagen ab der Abholung (§ 11 FAGG; AGB Punkt 12.1). */
@@ -261,9 +267,6 @@ export const WIDERRUF_TEXT = {
   fehlerSpeichern: 'Wir konnten deinen Widerruf nicht speichern. Versuch es bitte gleich noch einmal.',
   nichtMehr: 'Diese Bestellung lässt sich hier nicht mehr widerrufen. Wende dich bitte direkt an den Hof.',
   linkUngueltig: 'Dieser Link ist nicht gültig',
-  // Belehrung: Platzhalter, solange der RIS-Wortlaut fehlt (Kopfkommentar).
-  belehrungTitel: 'Rücktrittsbelehrung',
-  formularTitel: 'Muster-Rücktrittsformular',
   // Hof
   hofKarteTitel: 'Widerruf eingegangen',
   hofKarteSatz: (n: number) => (n === 1 ? 'Eine Kundin hat einen Kauf widerrufen.' : `${n} Kundinnen haben einen Kauf widerrufen.`),
@@ -281,12 +284,123 @@ export const WIDERRUF_TEXT = {
   hofAusnahme: 'Ausnahmen nach § 18 FAGG (etwa schnell verderbliche Ware) prüfst du im Einzelfall.',
 } as const
 
-/** Die Belehrung — Platzhalter mit Vermerk, bis der Wortlaut aus dem RIS übernommen ist. */
-export const BELEHRUNG = {
-  platzhalter: true,
-  vermerk: 'Der Wortlaut der Muster-Widerrufsbelehrung (Anhang I FAGG, Teil A) und des Muster-Formulars (Teil B) wird nach Prüfung hier eingefügt.',
-  agbHinweis: [
-    'Bis dahin gilt, was in unseren AGB unter Punkt 12 „Rücktritt vom Kaufvertrag“ steht: ',
-    link('AGB lesen', '/agb'),
-  ] satisfies AgbStueck[] as readonly AgbStueck[],
+/** Die Platzhalter in Anhang I FAGG — Daten, keine Textteile (Kopfkommentar). */
+const HOF_ANGABEN_VOLL = '[Name, Anschrift, Telefonnummer und E-Mail-Adresse des Hofs]'
+const HOF_ANGABEN_FORMULAR = '[Name, Anschrift und E-Mail-Adresse des Hofs]'
+
+/** Ohne signierten Link (Auftrag 207, Punkt 0): der Hinweis, wo die Angaben stehen. */
+export const HOF_ANGABEN_OHNE_LINK = {
+  voll: '[Name, Anschrift, Telefonnummer und E-Mail-Adresse des Hofs – stehen in deiner Bestellung]',
+  formular: '[Name, Anschrift und E-Mail-Adresse des Hofs – stehen in deiner Bestellung]',
 } as const
+
+export type BelehrungAbschnitt = { titel: string; absaetze: readonly string[] }
+export type Belehrung = {
+  teilA: { titel: string; abschnitte: readonly BelehrungAbschnitt[] }
+  teilB: { titel: string; einleitung: string; zeilen: readonly string[]; fussnote: string }
+  hinweisTitel: string
+  hinweis: string
+}
+
+/** Anhang I FAGG, Teil A und B, wörtlich (Quelle im Kopfkommentar). */
+export const BELEHRUNG: Belehrung = {
+  teilA: {
+    titel: 'Teil A – Widerrufsbelehrung',
+    abschnitte: [
+      {
+        titel: 'Widerrufsrecht',
+        absaetze: [
+          'Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen.',
+          'Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag, an dem Sie oder ein von Ihnen benannter Dritter, der nicht der Beförderer ist, die Waren in Besitz genommen haben bzw. hat.',
+          `Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (${HOF_ANGABEN_VOLL}) mittels einer eindeutigen Erklärung (z. B. mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das beigefügte Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist.`,
+          `Sie können Ihr Widerrufsrecht auch online unter ${PRODUKTION_HOST}${WIDERRUF_PFAD} ausüben. Wenn Sie diese Online-Funktion nutzen, übermitteln wir Ihnen auf einem dauerhaften Datenträger (z. B. durch eine E-Mail) unverzüglich eine Eingangsbestätigung mit Informationen zum Inhalt der Widerrufserklärung sowie dem Datum und der Uhrzeit ihres Eingangs.`,
+          'Zur Wahrung der Widerrufsfrist reicht es aus, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden.',
+        ],
+      },
+      {
+        titel: 'Folgen des Widerrufs',
+        absaetze: [
+          'Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten (mit Ausnahme der zusätzlichen Kosten, die sich daraus ergeben, dass Sie eine andere Art der Lieferung als die von uns angebotene, günstigste Standardlieferung gewählt haben), unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf dieses Vertrags bei uns eingegangen ist. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden Ihnen wegen dieser Rückzahlung Entgelte berechnet.',
+          'Wir können die Rückzahlung verweigern, bis wir die Waren wieder zurückerhalten haben oder bis Sie den Nachweis erbracht haben, dass Sie die Waren zurückgesandt haben, je nachdem, welches der frühere Zeitpunkt ist.',
+          'Sie haben die Waren unverzüglich und in jedem Fall spätestens binnen vierzehn Tagen ab dem Tag, an dem Sie uns über den Widerruf dieses Vertrags unterrichten, an uns zurückzusenden oder zu übergeben. Die Frist ist gewahrt, wenn Sie die Waren vor Ablauf der Frist von vierzehn Tagen absenden.',
+          'Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.',
+          'Sie müssen für einen etwaigen Wertverlust der Waren nur aufkommen, wenn dieser Wertverlust auf einen zur Prüfung der Beschaffenheit, Eigenschaften und Funktionsweise der Waren nicht notwendigen Umgang mit ihnen zurückzuführen ist.',
+        ],
+      },
+    ],
+  },
+  teilB: {
+    titel: 'Teil B – Muster-Widerrufsformular',
+    einleitung: '(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und senden Sie es zurück)',
+    zeilen: [
+      `– An ${HOF_ANGABEN_FORMULAR}:`,
+      '– Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über den Kauf der folgenden Waren (*)/die Erbringung der folgenden Dienstleistung (*)',
+      '– Bestellt am (*)/erhalten am (*)',
+      '– Name des/der Verbraucher(s)',
+      '– Anschrift des/der Verbraucher(s)',
+      '– Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)',
+      '– Datum',
+    ],
+    fussnote: '(*) Unzutreffendes streichen.',
+  },
+  // Getrennt vom Muster und als Hinweis gekennzeichnet (Auftrag 207, du-Form). Die Ausnahmen
+  // nach § 18 Abs. 1 FAGG stehen NICHT hier, sondern je Position (ausnahmeHinweis).
+  hinweisTitel: 'Hinweis',
+  hinweis: 'Waren, die du am Hof abgeholt hast, kannst du dort auch zurückgeben; dann entstehen dir keine Rücksendekosten.',
+}
+
+/**
+ * Die Angaben des Hofs für die Belehrung (Anhang I FAGG, Gestaltungshinweis 2):
+ * Name (Hofname und Inhaber wie „Angaben zum Hof“), Anschrift, Telefon und
+ * E-Mail. Was fehlt, ist ein leerer Text und fällt in der Zeile weg — kein
+ * Platzhalter wird erfunden.
+ */
+export type BelehrungHof = { name: string; anschrift: string; telefon: string; email: string }
+
+/**
+ * Baut die vier Angaben aus dem Hof. `email` ist die Adresse, unter der der Hof
+ * erreichbar ist (hofKontaktEmail, vom Aufrufer bestimmt); `sichtbar` = false
+ * (stillgelegt oder geschlossen, hofSichtbar) lässt wie auf /widerruf bisher
+ * nur den Namen stehen.
+ */
+export function belehrungHof(
+  farm: { name: string; ownerName: string; address: string; postalCode: string; city: string; phone: string },
+  email: string,
+  sichtbar = true
+): BelehrungHof {
+  const name = [farm.name, farm.ownerName].map((t) => t.trim()).filter(Boolean).join(', ')
+  if (!sichtbar) return { name, anschrift: '', telefon: '', email: '' }
+  const ort = [farm.postalCode, farm.city].map((t) => t.trim()).filter(Boolean).join(' ')
+  const telefon = farm.phone.trim()
+  return {
+    name,
+    anschrift: [farm.address.trim(), ort].filter(Boolean).join(', '),
+    telefon: telefon ? formatiereTelefon(telefon) : '',
+    email: email.trim(),
+  }
+}
+
+/** „Hof X, Inhaberin, Feldweg 1, 4910 Ried, Telefon …, E-Mail …“ — fehlende Angaben fallen weg. */
+function hofZeile(angaben: BelehrungHof, mitTelefon: boolean): string {
+  const { name, anschrift, telefon, email } = angaben
+  return [name, anschrift, mitTelefon && telefon ? `Telefon ${telefon}` : '', email ? `E-Mail ${email}` : '']
+    .filter(Boolean)
+    .join(', ')
+}
+
+/**
+ * Die Belehrung zum Anzeigen: mit Hof (signierter Link, Mail der eigenen
+ * Bestellung) stehen seine Angaben an den Platzhaltern, ohne Hof der Hinweis
+ * „… – stehen in deiner Bestellung“. Sonst bleibt jedes Wort, wie es ist.
+ */
+export function belehrungMitHof(hof: BelehrungHof | null): Belehrung {
+  const voll = hof ? hofZeile(hof, true) : HOF_ANGABEN_OHNE_LINK.voll
+  const formular = hof ? hofZeile(hof, false) : HOF_ANGABEN_OHNE_LINK.formular
+  // Als Funktion ersetzt: Ein „$“ in den Hofdaten wäre sonst ein Muster der Ersetzung.
+  const fuelle = (text: string): string => text.replace(HOF_ANGABEN_VOLL, () => voll).replace(HOF_ANGABEN_FORMULAR, () => formular)
+  return {
+    ...BELEHRUNG,
+    teilA: { ...BELEHRUNG.teilA, abschnitte: BELEHRUNG.teilA.abschnitte.map((a) => ({ ...a, absaetze: a.absaetze.map(fuelle) })) },
+    teilB: { ...BELEHRUNG.teilB, zeilen: BELEHRUNG.teilB.zeilen.map(fuelle) },
+  }
+}

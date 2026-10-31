@@ -13,6 +13,7 @@ import { DAY_NAMES } from '@/lib/pickup-slot-rules'
 import { zuletztText } from '@/lib/betrieb'
 import { mitAnzahl } from '@/lib/format'
 import type { AdminAktionArt } from '@/schemas/admin-aktion'
+import { agbAkteText } from '@/lib/agb-zustimmung'
 
 export const ADMIN_HOEFE_HREF = '/admin/hoefe'
 
@@ -249,6 +250,9 @@ export type HofAkteEingabe = {
     isPaused: boolean
     adminGesperrtAm: Date | null
     adminSperrGrund: string | null
+    /** Nr. 207: zugestimmte AGB-Fassung und Zeitpunkt; null = noch nicht zugestimmt. */
+    agbFassung: string | null
+    agbZugestimmtAm: Date | null
     owner: { email: string; sessions: ReadonlyArray<{ createdAt: Date; userAgent: string | null; anmeldeart: string | null }> }
     pickupSlots: ReadonlyArray<{ dayOfWeek: number }>
     products: ReadonlyArray<{ stock: number }>
@@ -260,7 +264,8 @@ export type HofAkteEingabe = {
 }
 
 export type HofAkteAnsicht = {
-  kontakt: { telefon: string; anmeldung: string; emailBestaetigt: string; hofEmail: string; ort: string }
+  /** `agb`: „Fassung 0.9 · 31.10.2026, 14:05 Uhr“ (Wien) oder „noch nicht zugestimmt“ (Nr. 207). */
+  kontakt: { telefon: string; anmeldung: string; emailBestaetigt: string; hofEmail: string; ort: string; agb: string }
   aktivitaet: {
     bestellungen: number
     bestellungenZeile: string
@@ -294,6 +299,7 @@ export function hofAkteAnsicht(
       emailBestaetigt: zusatz.emailBestaetigt,
       hofEmail: hofEmailText(roh.hof.email, roh.hof.owner.email),
       ort: `${`${roh.hof.postalCode} ${roh.hof.city}`.trim()} · ${roh.hof.landText}`,
+      agb: agbAkteText(roh.hof),
     },
     aktivitaet: {
       bestellungen: zahlen.bestellungen,

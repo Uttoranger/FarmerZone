@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Check, ChevronLeft, ChevronRight, Clock, FlaskConical, MapPin, Navigation, Share2, ShoppingBasket, Sprout } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, MapPin, Navigation, Share2, ShoppingBasket, Sprout } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -55,7 +55,7 @@ import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
 import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { Abzeichen, AbzeichenKnopf } from '@/components/ui/abzeichen'
-import { TESTHOF_HINWEIS } from '@/lib/gruendungshof'
+import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
 
 /*
  * Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4).
@@ -452,12 +452,8 @@ export function HofseiteKunde({
 
       {rueckwegZeile}
 
-      {/* Testhof (Register N21, Nr. 119): oben ein ruhiger Hinweis im neutralen Ton, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
-      {farm.istTesthof && (
-        <div className="mx-auto max-w-[1200px] px-4 pt-1 pb-3 md:px-6 md:pt-0">
-          <Hinweiskarte ton="neutral" symbol={FlaskConical}>{TESTHOF_HINWEIS}</Hinweiskarte>
-        </div>
-      )}
+      {/* Testhof (Register N21, Nr. 119/207): oben ein ruhiger Hinweis im neutralen Ton, nie orange — Bestellen bleibt möglich (Testbestellungen sind der Zweck). */}
+      <TesthofHinweis farm={farm} className="pt-1 pb-3 md:pt-0" />
 
       {/* ── Titelbild, Name, Aktionen ── */}
       <div className="relative">

@@ -885,6 +885,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - **Belehrung:** Die Rücktrittsbelehrung folgt wörtlich der Muster-Widerrufsbelehrung in Anhang I FAGG.
   - Keine Rechtsberatung; die Texte prüft die Anwältin.“
 - **Umsetzung:** Nr. 200 (eine Migration, nur Expand) (freigabe.md §31).
+- **Ergänzung (31.10.2026, Auftrag 207):** Belehrung nachgetragen aus RIS NOR40279264 (31.10.2026) — Wortlaut Anhang I FAGG idF BGBl. I Nr. 59/2026, von der Projektleitung gegen das RIS geprüft übergeben (aus der Bauumgebung nicht abrufbar); mit den Angaben des Hofs in /widerruf (signierter Link) und in den Bestätigungsmails, dazu die AGB als Datei im Anhang. Umsetzung: Nr. 207.
 
 ### N40 · Stripe live nur mit Hofpreis-Modell (30.10.2026)
 - **Entscheidung (uttoranger, im Chat, 30.10.2026):** „Ist Stripe live (Live-Schlüssel in der Produktion) und liegt der Stichtag ‚Hofpreis-Modell ab‘ noch in der Zukunft, steht in Admin › Heute ganz oben eine Aufgabe, und die Betriebsleiste warnt. Die Bestellungen laufen weiter; es ist ein Signal, keine Sperre. stripe-live.md nennt den Stichtag als Vorbedingung.“

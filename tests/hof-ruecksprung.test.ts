@@ -162,7 +162,7 @@ describe('verlangeHofDerSitzung', () => {
 
   it('FARMER mit Hof → userId und farmId', async () => {
     getSession.mockResolvedValue({ user: { id: 'nutzerin-1', role: 'FARMER' } } as never)
-    farmForUser.mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', logoUrl: null, logoAusschnitt: null, adminGesperrtAm: null, adminSperrGrund: null })
+    farmForUser.mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', logoUrl: null, logoAusschnitt: null, adminGesperrtAm: null, adminSperrGrund: null, agbFassung: null })
     expect(await verlangeHofDerSitzung()).toEqual({ userId: 'nutzerin-1', farmId: 'hof-1' })
   })
 })

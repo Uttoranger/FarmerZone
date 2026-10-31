@@ -58,7 +58,13 @@ vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi
 const OHNE_GRENZE = { mailsTag: null, mailsMonat: null }
 /** Adressen aus dem Bezug — die Attrappe zeigt, welche Mail hinausging. */
 const FAKE: RendererTabelle = {
-  abholbereit: async (b) => ({ an: `${b.orderId}@example.com`, betreff: 'Abholbereit', html: '<p>abholbereit</p>' }),
+  // Eine Kennung, die auf „-mit-datei“ endet, trägt eine Datei wie die Bestätigung mit den AGB (Nr. 207).
+  abholbereit: async (b) => ({
+    an: `${b.orderId}@example.com`,
+    betreff: 'Abholbereit',
+    html: '<p>abholbereit</p>',
+    ...(b.orderId.endsWith('-mit-datei') ? { anhaenge: [{ dateiname: 'agb.html', inhalt: '<p>agb</p>' }] } : {}),
+  }),
   rundschreiben: async (b) => ({ an: b.unterhaltungId.startsWith('int-gesperrt') ? `${b.unterhaltungId}@example.org` : `${b.unterhaltungId}@example.com`, betreff: 'Rundschreiben', html: '<p>rundschreiben</p>' }),
 }
 
@@ -179,6 +185,20 @@ describe('Worker', () => {
     const schluessel = batchMock.mock.calls.map(([, optionen]) => (optionen as { idempotencyKey: string }).idempotencyKey)
     expect(schluessel[0]).toMatch(/^mail-stapel-[0-9a-f]{40}$/)
     expect(schluessel.slice(1).every((s) => /^mail-.+-0$/.test(s))).toBe(true)
+  })
+
+  it('Nr. 207: eine Mail mit Anhang geht allein über emails.send mit dem Schlüssel ihres Auftrags; Gegenprobe: die anderen als Stapel', async () => {
+    const k = intKennung('anhang')
+    sendMock.mockResolvedValue({ data: { id: `int-re-${randomUUID()}` }, error: null, headers: null })
+    await stelleMailEin([wichtig(`${k}-a`), wichtig(`${k}-mit-datei`), wichtig(`${k}-b`)])
+    await arbeite()
+    expect(gesendeteAdressen().filter((x) => x.startsWith(k)).sort()).toEqual([`${k}-a@example.com`, `${k}-b@example.com`])
+    expect(sendMock).toHaveBeenCalledTimes(1)
+    const [payload, optionen] = sendMock.mock.calls[0]! as [{ to: string; attachments: Array<{ filename: string; content: string }> }, { idempotencyKey: string }]
+    expect(payload.to).toBe(`${k}-mit-datei@example.com`)
+    expect(payload.attachments).toEqual([{ filename: 'agb.html', content: Buffer.from('<p>agb</p>', 'utf8').toString('base64') }])
+    expect(optionen.idempotencyKey).toMatch(/^mail-stapel-[0-9a-f]{40}$/)
+    for (const s of [`${k}-a:w`, `${k}-mit-datei:w`, `${k}-b:w`]) expect((await zeile(s)).status).toBe('gesendet')
   })
 
   it('zwei Worker gleichzeitig → jede Mail genau einmal', async () => {

@@ -28,6 +28,7 @@ import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
 import { hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
+import { belehrungHof, belehrungMitHof, type Belehrung } from '@/lib/widerruf'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
 
 const apiKey = process.env.RESEND_API_KEY
@@ -129,7 +130,28 @@ export type VersandErgebnis = { id?: string; error?: string; gesperrt?: true }
  * Filter in „Alle Mails“, die ursprüngliche Mail beim Nochmal-Schicken durch
  * den Support (dann steht die Zeile als „vom Support“).
  */
-export type MailOptionen = { art: MailArt; bestellungId?: string; farmId?: string; nochmalVon?: string; headers?: Record<string, string> }
+export type MailOptionen = {
+  art: MailArt
+  bestellungId?: string
+  farmId?: string
+  nochmalVon?: string
+  headers?: Record<string, string>
+  /** Dateien im Anhang (Nr. 207: die AGB) — nie Text der Kundin. */
+  anhaenge?: readonly MailAnhang[]
+}
+
+/**
+ * Eine Datei im Anhang (Nr. 207): Name und Inhalt als Text (UTF-8). Heute nur
+ * die AGB aus agb-datei.ts — fester Text, nie Daten der Kundin; in Logs und
+ * Sentry steht weder Name noch Inhalt.
+ */
+export type MailAnhang = { dateiname: string; inhalt: string }
+
+/** Für Resend: der Inhalt als Base64 (die API nimmt Text so entgegen), der Typ aus der Endung. */
+function alsResendAnhaenge(anhaenge: readonly MailAnhang[] | undefined): { filename: string; content: string }[] | undefined {
+  if (!anhaenge || anhaenge.length === 0) return undefined
+  return anhaenge.map((a) => ({ filename: a.dateiname, content: Buffer.from(a.inhalt, 'utf8').toString('base64') }))
+}
 
 /**
  * Zählt `menge` verschickte Mails für Admin › Betrieb (Register N18, Nr. 103) —
@@ -233,7 +255,15 @@ export async function sendRaw(to: string, subject: string, html: string, optione
   try {
     // Im try: Scheitert schon das Laden des SDK, bleibt es beim { error } — sendRaw wirft nie.
     const resend = await resendClient(apiKey)
-    const result = await resend.emails.send({ from: FROM, to, subject, html, ...(optionen.headers ? { headers: optionen.headers } : {}) })
+    const attachments = alsResendAnhaenge(optionen.anhaenge)
+    const result = await resend.emails.send({
+      from: FROM,
+      to,
+      subject,
+      html,
+      ...(optionen.headers ? { headers: optionen.headers } : {}),
+      ...(attachments ? { attachments } : {}),
+    })
     if (result.error) {
       console.error(`[E-Mail] Resend-Fehler: ${JSON.stringify(result.error)}`)
       await protokolliere(to, optionen, { status: 'gescheitert', fehlerCode: resendFehlerCode(result.error) })
@@ -253,7 +283,12 @@ export async function sendRaw(to: string, subject: string, html: string, optione
 }
 
 /** Eine fertige Mail für den Stapelversand des Workers — die Adresse lebt nur im Speicher, nie in der Tabelle. */
-export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string> }
+export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string>; anhaenge?: readonly MailAnhang[] }
+
+/** Trägt die Mail einen Anhang? Dann geht sie nie im Stapel (Resend nimmt Anhänge nur einzeln), sondern allein. */
+export function hatAnhang(mail: Pick<StapelMail, 'anhaenge'>): boolean {
+  return (mail.anhaenge?.length ?? 0) > 0
+}
 
 /**
  * Ergebnis eines Stapels: `ok` mit einer Resend-ID je Mail in derselben
@@ -269,9 +304,15 @@ export type StapelErgebnis = { ok: true; ids: string[] } | { ok: false; statusCo
  * der Idempotenz-Schlüssel gilt für die ganze Anfrage. Strikte Prüfung (alles
  * oder nichts): So gehört die n-te ID sicher zur n-ten Mail. Gezählt werden
  * die angenommenen Mails in EINEM Schritt. Wirft nie.
+ *
+ * Mit Anhang (Nr. 207, die AGB in der Bestätigung): genau EINE Mail über
+ * `emails.send` mit demselben Idempotenz-Schlüssel — der Worker schickt solche
+ * Mails einzeln (`hatAnhang`). Mehrere Mails mit Anhang in einer Anfrage
+ * lehnt die Funktion ab, statt den Anhang still wegzulassen.
  */
 export async function versendeStapel(mails: readonly StapelMail[], idempotenzSchluessel: string): Promise<StapelErgebnis> {
   if (!apiKey) return { ok: false, statusCode: null, code: 'ohne_schluessel' }
+  if (mails.some(hatAnhang)) return versendeMitAnhang(mails, idempotenzSchluessel)
   try {
     const resend = await resendClient(apiKey)
     const result = await resend.batch.send(
@@ -289,6 +330,36 @@ export async function versendeStapel(mails: readonly StapelMail[], idempotenzSch
     return { ok: true, ids }
   } catch (err) {
     console.error(`[E-Mail] Exception im Stapel: ${fehlerKlasse(err)}`)
+    return { ok: false, statusCode: null, code: 'ausnahme' }
+  }
+}
+
+async function versendeMitAnhang(mails: readonly StapelMail[], idempotenzSchluessel: string): Promise<StapelErgebnis> {
+  const [m] = mails
+  if (!apiKey || !m || mails.length !== 1) return { ok: false, statusCode: null, code: 'anhang_im_stapel' }
+  try {
+    const resend = await resendClient(apiKey)
+    const result = await resend.emails.send(
+      {
+        from: FROM,
+        to: m.an,
+        subject: m.betreff,
+        html: m.html,
+        ...(m.headers ? { headers: m.headers } : {}),
+        attachments: alsResendAnhaenge(m.anhaenge),
+      },
+      { idempotencyKey: idempotenzSchluessel }
+    )
+    if (result.error) {
+      const statusCode = 'statusCode' in result.error && typeof result.error.statusCode === 'number' ? result.error.statusCode : null
+      console.error(`[E-Mail] Resend-Fehler (Mail mit Anhang): ${resendFehlerCode(result.error)} (${statusCode ?? 'ohne Status'})`)
+      return { ok: false, statusCode, code: resendFehlerCode(result.error) }
+    }
+    console.log('[E-Mail] ✓ Mail mit Anhang gesendet')
+    await zaehleVersand(1)
+    return { ok: true, ids: [result.data?.id ?? ''] }
+  } catch (err) {
+    console.error(`[E-Mail] Exception (Mail mit Anhang): ${fehlerKlasse(err)}`)
     return { ok: false, statusCode: null, code: 'ausnahme' }
   }
 }
@@ -361,6 +432,12 @@ export type OrderForEmail = {
     postalCode: string
     phone: string
     slug: string
+    /**
+     * Die Anmelde-Adresse der Inhaberin (Nr. 207): Rückfall der Hof-E-Mail in
+     * der Belehrung (hofKontaktEmail). Alle Lader liefern sie; fehlt sie (alte
+     * Testdaten), bleibt die Zeile ohne E-Mail, wenn das Profil keine hat.
+     */
+    owner?: { email: string }
   }
   items: Array<{
     productName: string
@@ -460,6 +537,26 @@ function mailZahlart(paymentMethod: string): MailZahlart {
 /** „Vertrag widerrufen“ (Nr. 200, N39): der signierte Link — nur für Verbraucherinnen. */
 function widerrufUrl(order: OrderForEmail): string | undefined {
   return order.kaeuferArt === 'PRIVAT' ? `${APP_URL}${widerrufPfad(order.id)}` : undefined
+}
+
+/**
+ * Die Belehrung nach Anhang I FAGG für die Bestätigungsmails (Nr. 207): nur
+ * bei Verbraucherinnen (PRIVAT, wie der Widerruf-Link — fehlt die Käuferart,
+ * keine Belehrung), gefüllt mit Name, Anschrift, Telefon und E-Mail des Hofs
+ * DIESER Bestellung. Die E-Mail ist die Adresse, unter der der Hof erreichbar
+ * ist (hofKontaktEmail, ohne Hof-E-Mail die Anmelde-Adresse).
+ */
+function belehrungFuer(order: OrderForEmail): Belehrung | undefined {
+  if (order.kaeuferArt !== 'PRIVAT') return undefined
+  // Ohne Anmelde-Adresse (nur alte Testdaten) bleibt die Hof-E-Mail des Profils, sonst nichts — nie ein erfundener Wert.
+  const { owner, ...farm } = order.farm
+  return belehrungMitHof(belehrungHof(farm, hofKontaktEmail({ ...farm, owner: owner ?? { email: '' } })))
+}
+
+/** Die AGB als Datei im Anhang (Nr. 207) — erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). */
+async function agbAnhang(): Promise<MailAnhang> {
+  const { agbAlsHtml, agbDateiname } = await import('@/lib/rechtstexte/agb-datei')
+  return { dateiname: agbDateiname(), inhalt: agbAlsHtml() }
 }
 
 function routeUrl(order: OrderForEmail): string {
@@ -887,9 +984,16 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     manageUrl: `${APP_URL}/account/profile`,
     orderUrl,
     widerrufUrl: widerrufUrl(order),
+    belehrung: belehrungFuer(order),
   }))
 
-  return { an: order.customerEmail, betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`, html }
+  // Nr. 207: die AGB als Datei im Anhang — auch bei „Betrieb“ (nur Belehrung und Formular entfallen).
+  return {
+    an: order.customerEmail,
+    betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
+    html,
+    anhaenge: [await agbAnhang()],
+  }
 }
 
 /**
@@ -931,9 +1035,12 @@ export async function onsiteConfirmationInhalt(
     total: betraege(order).gesamt,
     confirmationUrl,
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
+    belehrung: belehrungFuer(order),
+    widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`, html }
+  // Nr. 207: die AGB als Datei im Anhang, wie in der Bestätigung.
+  return { an: order.customerEmail, betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`, html, anhaenge: [await agbAnhang()] }
 }
 
 /**
@@ -952,6 +1059,7 @@ export async function sendOnsiteConfirmation(
     bestellungId: order.id,
     farmId: order.farm.id,
     ...(protokoll.nochmalVon ? { nochmalVon: protokoll.nochmalVon } : {}),
+    ...(mail.anhaenge ? { anhaenge: mail.anhaenge } : {}),
   })
 }
 

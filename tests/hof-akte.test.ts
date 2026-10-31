@@ -100,6 +100,8 @@ describe('hofAkteAnsicht — kein Date, keine volle Anmelde-E-Mail', () => {
       isPaused: false,
       adminGesperrtAm: new Date(JETZT.getTime() - 2 * STD),
       adminSperrGrund: 'Beschwerden klären',
+      agbFassung: '0.9',
+      agbZugestimmtAm: new Date('2026-10-31T13:05:00Z'),
       owner: { email: 'hof.inhaber@example.com', sessions: [{ createdAt: new Date(JETZT.getTime() - 3 * STD), userAgent: 'Mozilla/5.0 (iPhone)', anmeldeart: 'passwort' }] },
       pickupSlots: [{ dayOfWeek: 2 }],
       products: [{ stock: 0 }, { stock: 4 }],
@@ -113,6 +115,8 @@ describe('hofAkteAnsicht — kein Date, keine volle Anmelde-E-Mail', () => {
 
   it('Werte als Text und Cent; „wie Anmeldung“ bei leerer Hof-E-Mail; Gerät gekürzt', () => {
     expect(ansicht.kontakt).toMatchObject({ anmeldung: 'h•••@example.com', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich' })
+    // Nr. 207: Fassung und Zeitpunkt der AGB-Zustimmung in Wiener Zeit (13:05 UTC = 14:05 MEZ).
+    expect(ansicht.kontakt.agb).toBe('Fassung 0.9 · 31.10.2026, 14:05 Uhr')
     expect(ansicht.aktivitaet).toMatchObject({ bestellungen: 41, bestellungenZeile: '2 storniert · 0 nicht abgeholt', umsatzCents: 123_000, anmeldung: 'Handy · Passwort' })
     expect(ansicht.sperre).toMatchObject({ gesperrt: true, grund: 'Beschwerden klären' })
     expect(ansicht.protokoll[0]).toMatchObject({ wer: 'System', text: 'Vorübergehend gesperrt' })
@@ -155,7 +159,7 @@ describe('Akte und Dialog', () => {
         hof,
         zustand: gesperrt ? { id: 'gesperrt', text: 'Gesperrt', ton: 'offen' } : { id: 'verkauft', text: 'Verkauft', ton: 'fertig' },
         akte: {
-          kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich' },
+          kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich', agb: 'Fassung 0.9 · 31.10.2026, 14:05 Uhr' },
           aktivitaet: { bestellungen: 0, bestellungenZeile: '', umsatzCents: 0, servicegebuehrCents: 0, zuletztAngemeldet: 'noch nie', anmeldung: null, antwortzeit: '' },
           zustand: [],
           sperre: { gesperrt, grund: gesperrt ? 'Beschwerden klären' : null, seit: gesperrt ? 'heute 08:00' : null },
