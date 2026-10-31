@@ -26,6 +26,8 @@ import {
   waehlePositionen,
   widerrufFristEnde,
   widerrufMoeglich,
+  offenePositionen,
+  teilweiseGestrichen,
 } from '@/lib/widerruf'
 import { PRODUCT_CATEGORY_VALUES } from '@/lib/taxonomie'
 import { bestellSignatur, widerrufLinkGilt, widerrufPfad, widerrufSignatur, bestellLinkGilt } from '@/lib/bestell-link'
@@ -184,5 +186,37 @@ describe('Mail „Dein Widerruf ist erledigt“', () => {
     const ganz = html({ erstattet: 4.95, vorAbholung: true })
     expect(ganz).not.toContain('zum Teil')
     expect(ganz).toContain('Dein Widerruf ist erledigt')
+  })
+
+  it('Ablehnung nach Teilbuchung (Nachbesserung Runde 3): „für die übrigen Artikel abgelehnt“ — Gegenprobe ohne Teilbuchung ohne Zusatz', () => {
+    const abgelehnt = (teilweise?: boolean) => renderToStaticMarkup(createElement(WiderrufErgebnisEmail, { ...basis, erstattet: null, grund: 'Ware angebrochen', teilweise }))
+    expect(abgelehnt(true)).toContain('für die übrigen Artikel')
+    expect(abgelehnt(true)).toContain('Dein Widerruf wurde abgelehnt')
+    expect(abgelehnt()).not.toContain('übrigen')
+  })
+})
+
+describe('Rest eines Teilwiderrufs (Nachbesserung Runde 3)', () => {
+  const pos = [
+    { orderItemId: 'a', menge: 1 },
+    { orderItemId: 'b', menge: 2 },
+  ]
+  it('offenePositionen: nur, was noch nicht gestrichen ist; teilweiseGestrichen erkennt die Teilbuchung', () => {
+    const bestellung = [
+      { id: 'a', fehlt: true },
+      { id: 'b', fehlt: false },
+      { id: 'c', fehlt: false },
+    ]
+    expect(offenePositionen(pos, bestellung)).toEqual([{ orderItemId: 'b', menge: 2 }])
+    expect(teilweiseGestrichen(pos, bestellung)).toBe(true)
+  })
+  it('Gegenprobe: nichts gestrichen → alle bleiben, keine Teilbuchung; fremde Position fällt weg', () => {
+    const bestellung = [
+      { id: 'a', fehlt: false },
+      { id: 'b', fehlt: false },
+    ]
+    expect(offenePositionen(pos, bestellung)).toEqual(pos)
+    expect(teilweiseGestrichen(pos, bestellung)).toBe(false)
+    expect(offenePositionen([{ orderItemId: 'x', menge: 1 }], bestellung)).toEqual([])
   })
 })

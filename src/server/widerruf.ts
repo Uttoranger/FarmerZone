@@ -18,6 +18,7 @@ import {
   eingangZeitpunkt,
   lesePositionen,
   normalisiereBestellnummer,
+  offenePositionen,
   waehlePositionen,
   widerrufMoeglich,
   type WiderrufPosition,
@@ -537,7 +538,11 @@ export async function erstatteWiderruf(farm: { id: string }, widerrufId: string,
             gebuehrEinzug: stand.gebuehrEinzug,
             positionen: stand.items.map((i) => ({ id: i.id, betragCents: alsCents(i.totalPrice), fehlt: i.fehltSeit !== null, gebuehrCents: i.gebuehrCents })),
           }
-          for (const p of gewaehlt) {
+          // Nur der Rest: Was ein teilweise gebuchter Teilwiderruf vor der Abholung schon gestrichen
+          // (und erstattet) hat, bucht der Hof nie ein zweites Mal (Nachbesserung Runde 3).
+          const rest = offenePositionen(gewaehlt, items)
+          if (rest.length === 0) throw new StatusFalsch()
+          for (const p of rest) {
             const r = artikelFehltRechnung(zustand, p.orderItemId)
             if (r.art !== 'teil') throw new StatusFalsch()
             let gebucht = 0
@@ -659,12 +664,15 @@ export async function ladeOffeneWiderrufe(farmId: string, orderId?: string): Pro
   if (liste.length === 0) return []
   const bestellungen = await prisma.order.findMany({
     where: { farmId, id: { in: liste.flatMap((w) => (w.orderId ? [w.orderId] : [])) } },
-    select: { id: true, orderNumber: true, status: true, paymentMethod: true, items: { select: { id: true, productName: true, quantity: true } } },
+    select: { id: true, orderNumber: true, status: true, paymentMethod: true, items: { select: { id: true, productName: true, quantity: true, fehltSeit: true } } },
   })
   return liste.flatMap((w) => {
     const b = bestellungen.find((o) => o.id === w.orderId)
     if (!b) return []
-    const mitPositionen = w.umfang === 'ganz' || lesePositionen(w.positionen).length > 0
+    const gewaehlt = lesePositionen(w.positionen)
+    // Schon gestrichene Positionen (teilweise gebucht vor der Abholung) sind erledigt — der Hof sieht nur den Rest.
+    const rest = offenePositionen(gewaehlt, b.items.map((i) => ({ id: i.id, fehlt: i.fehltSeit !== null })))
+    const mitPositionen = w.umfang === 'ganz' || rest.length > 0
     return [
       {
         id: w.id,
@@ -672,7 +680,7 @@ export async function ladeOffeneWiderrufe(farmId: string, orderId?: string): Pro
         bestellnummer: b.orderNumber,
         eingegangenAm: eingangZeitpunkt(w.eingegangenAm),
         // Der Freitext ohne Positionen ist Text der Kundin an den Hof — der Hof darf ihn lesen.
-        umfang: umfangZeilen(w, b.items),
+        umfang: umfangZeilen(gewaehlt.length > 0 ? { ...w, positionen: rest } : w, b.items),
         erstattbar: b.status === 'PICKED_UP' && mitPositionen,
         bar: istVorOrtZahlung(b.paymentMethod),
       },
@@ -744,7 +752,7 @@ export async function ladeWiderrufeZurBestellung(orderId: string, items: readonl
 export type WiderrufOhneBestellung = {
   id: string
   name: string
-  /** Gekürzt wie überall im Admin (N33, N35) — voll nur über „Kundin schreiben …“. */
+  /** Gekürzt wie überall im Admin (N33, N35). Eine volle Ansicht gibt es für Widerrufe ohne Bestellung nicht — „Kundin schreiben …“ hängt an einer Bestellung, also erst nach dem Zuordnen. */
   emailGekuerzt: string
   bestellnummerEingabe: string | null
   eingegangenAm: string

@@ -138,6 +138,22 @@ export function waehlePositionen(
   return ergebnis
 }
 
+/**
+ * Die gewählten Positionen, die noch nicht gestrichen sind (Nachbesserung
+ * Runde 3): Nach einem nur teilweise gebuchten Teilwiderruf vor der Abholung
+ * stehen die schon gestrichenen weiter im Widerruf — der Hof sieht und
+ * erstattet nur den Rest. Eine Position, die es in der Bestellung nicht gibt,
+ * fällt ebenfalls weg.
+ */
+export function offenePositionen(positionen: readonly WiderrufPosition[], bestellung: readonly { id: string; fehlt: boolean }[]): WiderrufPosition[] {
+  return positionen.filter((p) => bestellung.some((b) => b.id === p.orderItemId && !b.fehlt))
+}
+
+/** Wurde von der Wahl schon etwas gestrichen (teilweise gebucht)? Dann gilt eine Ablehnung nur noch dem Rest. */
+export function teilweiseGestrichen(positionen: readonly WiderrufPosition[], bestellung: readonly { id: string; fehlt: boolean }[]): boolean {
+  return positionen.some((p) => bestellung.some((b) => b.id === p.orderItemId && b.fehlt))
+}
+
 /** Umfasst die Auswahl alle noch vorhandenen Positionen? Dann ist es fachlich die ganze Bestellung. */
 export function deckungGanz(positionen: readonly WiderrufPosition[], bestellung: readonly { id: string; fehlt: boolean }[]): boolean {
   const offen = bestellung.filter((b) => !b.fehlt)

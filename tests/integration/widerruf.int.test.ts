@@ -49,6 +49,7 @@ import {
   weiseWiderrufZu,
 } from '@/server/widerruf'
 import { BAR_ERSTATTET } from '@/lib/widerruf'
+import { rendereWiderrufAbgelehnt, rendereWiderrufHof } from '@/server/mail-arten/widerruf'
 import { INT_PRAEFIX, auftraege, erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
 
 type Buchung = { schluessel: string; betrag: number; metadata: Record<string, string> }
@@ -92,11 +93,14 @@ afterEach(async () => {
 })
 
 /** Eine Bestellung mit Eier (4,50) und Brot (5,80); Vorrat je 5. */
-async function bestellung(e: { online: boolean; abgeholt: boolean; gebuehrCents: number }) {
+async function bestellung(e: { online: boolean; abgeholt: boolean; gebuehrCents: number; honig?: true }) {
   const { farm } = await erstelleHof()
   const eier = await erstelleProdukt(farm.id, { stock: 5, price: 4.5, name: 'Eier' })
   const brot = await erstelleProdukt(farm.id, { stock: 5, price: 5.8, name: 'Brot' })
-  bezahlt = e.online ? 1030 + e.gebuehrCents : 0
+  // Mit Honig (3,00) drei Positionen — zwei gewählt ist dann nicht die ganze Bestellung.
+  const honig = e.honig ? await erstelleProdukt(farm.id, { stock: 5, price: 3, name: 'Honig' }) : null
+  const warenCents = honig ? 1330 : 1030
+  bezahlt = e.online ? warenCents + e.gebuehrCents : 0
   const order = await prisma.order.create({
     data: {
       orderNumber: intKennung('nr').toUpperCase(),
@@ -106,7 +110,7 @@ async function bestellung(e: { online: boolean; abgeholt: boolean; gebuehrCents:
       customerPhone: '+43 660 0000000',
       status: e.abgeholt ? 'PICKED_UP' : e.online ? 'PAID' : 'CONFIRMED',
       pickedUpAt: e.abgeholt ? new Date() : null,
-      totalAmount: new Prisma.Decimal(1030).div(100),
+      totalAmount: new Prisma.Decimal(warenCents).div(100),
       pickupDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
       pickupTimeStart: '15:00',
       pickupTimeEnd: '18:00',
@@ -120,6 +124,7 @@ async function bestellung(e: { online: boolean; abgeholt: boolean; gebuehrCents:
         create: [
           { productId: eier.id, productName: 'Eier', unitPrice: 4.5, quantity: 1, totalPrice: 4.5, vatRate: 10 },
           { productId: brot.id, productName: 'Brot', unitPrice: 5.8, quantity: 1, totalPrice: 5.8, vatRate: 10 },
+          ...(honig ? [{ productId: honig.id, productName: 'Honig', unitPrice: 3, quantity: 1, totalPrice: 3, vatRate: 10 }] : []),
         ],
       },
     },
@@ -315,5 +320,58 @@ describe('Zuordnen im Admin (Nachbesserung Runde 2)', () => {
     expect((await ladeWiderrufeDesHofs(farm.id)).map((w) => [w.id, w.bestellnummer])).toEqual([[widerrufId, order.orderNumber]])
     expect(await ladeWiderrufeDesHofs(fremd.id)).toEqual([])
     await prisma.adminAktion.deleteMany({ where: { bezugId: order.id } })
+  })
+})
+
+describe('Rest eines teilweise gebuchten Teilwiderrufs (Nachbesserung Runde 3)', () => {
+  /** Eier und Brot gewählt, Honig bleibt; Stripe lehnt die zweite Erstattung (Brot) ab → nur Eier gebucht. */
+  async function teilweiseGebucht() {
+    const b = await bestellung({ online: true, abgeholt: false, gebuehrCents: 0, honig: true })
+    const angelegt = await legeWiderrufAn({ art: 'link', orderId: b.order.id, umfang: 'teil', positionen: [b.position('Eier'), b.position('Brot')], name: 'Erika Test' }, new Date())
+    if (!('ok' in angelegt)) throw new Error('nicht angelegt')
+    const normal = vi.mocked(stripe.refunds.create).getMockImplementation()!
+    vi.mocked(stripe.refunds.create).mockImplementationOnce(normal).mockRejectedValueOnce(new Error('Stripe weg'))
+    await verarbeiteWiderruf(angelegt.widerrufId, true)
+    vi.mocked(stripe.refunds.create).mockImplementation(normal)
+    const items = await prisma.orderItem.findMany({ where: { orderId: b.order.id }, select: { productName: true, fehltSeit: true } })
+    expect(items.filter((i) => i.fehltSeit !== null).map((i) => i.productName)).toEqual(['Eier'])
+    expect(erstattungen.map((e) => e.betrag)).toEqual([450])
+    expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: angelegt.widerrufId } })).stand).toBe('eingegangen')
+    // Abholen: danach erstattet bzw. lehnt der Hof den Rest ab.
+    await prisma.order.update({ where: { id: b.order.id }, data: { status: 'PICKED_UP', pickedUpAt: new Date() } })
+    return { ...b, widerrufId: angelegt.widerrufId }
+  }
+
+  it('nach der Abholung erstattet der Hof nur den Rest (Brot 580 Cent) — die gestrichenen Eier nie ein zweites Mal; Karte und Hof-Mail zeigen nur Brot', async () => {
+    const { farm, order, widerrufId } = await teilweiseGebucht()
+    const karte = await ladeOffeneWiderrufe(farm.id, order.id)
+    expect(karte.map((k) => [k.umfang, k.erstattbar])).toEqual([[['1 × Brot'], true]])
+    const [hofAuftrag] = await auftraege({ bestellungId: order.id, art: 'widerruf-hof' })
+    const hofMail = await rendereWiderrufHof(hofAuftrag!.bezug as Record<string, string>)
+    expect('html' in hofMail && hofMail.html).toContain('Brot')
+    expect('html' in hofMail && hofMail.html).not.toContain('Eier')
+
+    expect(await erstatteWiderruf({ id: farm.id }, widerrufId, new Date())).toEqual({ ok: true, erstattetCents: 580 })
+    expect(erstattungen.map((e) => e.betrag)).toEqual([450, 580])
+    const nachher = await prisma.order.findUniqueOrThrow({ where: { id: order.id } })
+    expect([cents(nachher.totalAmount), nachher.erstattetCents]).toEqual([300, 1030])
+    expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: widerrufId } })).stand).toBe('erstattet')
+  })
+
+  it('Ablehnen nach Teilbuchung: die Mail sagt „für die übrigen Artikel“; Gegenprobe ohne Teilbuchung ohne diesen Zusatz', async () => {
+    const { farm, order, widerrufId } = await teilweiseGebucht()
+    const { owner } = await erstelleHof()
+    expect(await lehneWiderrufAb({ id: farm.id }, widerrufId, 'Ware angebrochen', owner.id, new Date())).toBe(true)
+    const mail = await rendereWiderrufAbgelehnt({ widerrufId })
+    expect('html' in mail && mail.html).toContain('für die übrigen Artikel')
+    await prisma.adminAktion.deleteMany({ where: { bezugId: order.id } })
+
+    const g = await bestellung({ online: true, abgeholt: true, gebuehrCents: 0 })
+    const w = await legeWiderrufAn({ art: 'link', orderId: g.order.id, umfang: 'ganz', positionen: [], name: 'Erika Test' }, new Date())
+    if (!('ok' in w)) throw new Error('nicht angelegt')
+    expect(await lehneWiderrufAb({ id: g.farm.id }, w.widerrufId, 'Ware angebrochen', owner.id, new Date())).toBe(true)
+    const ohne = await rendereWiderrufAbgelehnt({ widerrufId: w.widerrufId })
+    expect('html' in ohne && ohne.html).not.toContain('übrigen Artikel')
+    await prisma.adminAktion.deleteMany({ where: { bezugId: g.order.id } })
   })
 })

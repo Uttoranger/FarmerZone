@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import type { StapelMail } from '@/lib/email'
 import { HOF_KONTAKT_FELDER, hofKontaktEmail } from '@/lib/hof-kontakt'
-import { WIDERRUF_TEXT, eingangZeitpunkt, lesePositionen } from '@/lib/widerruf'
+import { WIDERRUF_TEXT, eingangZeitpunkt, lesePositionen, offenePositionen, teilweiseGestrichen } from '@/lib/widerruf'
 import type { Verworfen } from '@/server/mail-arten'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import { VORRANG, widerrufBezugSchema, widerrufErstattetBezugSchema } from '@/schemas/mail-auftrag'
@@ -70,7 +70,7 @@ async function lade(widerrufId: string) {
       orderNumber: true,
       customerEmail: true,
       farm: { select: { name: true, ...HOF_KONTAKT_FELDER } },
-      items: { select: { id: true, productName: true, quantity: true } },
+      items: { select: { id: true, productName: true, quantity: true, fehltSeit: true } },
     },
   })
   return order ? { w, order } : null
@@ -87,7 +87,8 @@ export async function rendereWiderrufHof(bezug: Record<string, string>): Promise
   const umfang =
     w.umfang === 'ganz'
       ? [WIDERRUF_TEXT.ganz]
-      : lesePositionen(w.positionen).map((p) => `${p.menge} × ${order.items.find((i) => i.id === p.orderItemId)?.productName ?? WIDERRUF_TEXT.teil}`)
+      : // Nur der Rest: Schon vor der Abholung gestrichene Positionen sind erledigt (Nachbesserung Runde 3).
+        offenePositionen(lesePositionen(w.positionen), order.items.map((i) => ({ id: i.id, fehlt: i.fehltSeit !== null }))).map((p) => `${p.menge} × ${order.items.find((i) => i.id === p.orderItemId)?.productName ?? WIDERRUF_TEXT.teil}`)
   const { baueWiderrufHof } = await import('@/lib/email')
   return baueWiderrufHof(hofKontaktEmail(order.farm), {
     bestellnummer: order.orderNumber,
@@ -126,5 +127,7 @@ export async function rendereWiderrufAbgelehnt(bezug: Record<string, string>): P
     hofName: geladen.order.farm.name,
     erstattetCents: null,
     grund: geladen.w.grund,
+    // Teilweise vor der Abholung gebucht: Die Ablehnung gilt nur noch den übrigen Artikeln.
+    teilweise: teilweiseGestrichen(lesePositionen(geladen.w.positionen), geladen.order.items.map((i) => ({ id: i.id, fehlt: i.fehltSeit !== null }))),
   })
 }

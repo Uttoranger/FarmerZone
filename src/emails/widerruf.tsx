@@ -94,7 +94,7 @@ export interface WiderrufErgebnisProps {
   grund: string | null
   /** Teilstorno vor der Abholung: keine Rückgabe; ohne Betrag (vor Ort) zahlt sie bei der Abholung weniger. */
   vorAbholung?: boolean
-  /** Vor der Abholung nur zum Teil gebucht (eine spätere Position ging nicht): den Rest prüft der Hof. */
+  /** Vor der Abholung nur zum Teil gebucht (eine spätere Position ging nicht): den Rest prüft der Hof; eine Ablehnung gilt dann nur den übrigen Artikeln. */
   teilweise?: boolean
 }
 
@@ -109,7 +109,8 @@ export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
       {abgelehnt ? (
         <>
           <Text style={bodyText}>
-            {p.hofName} hat deinen Widerruf zur Bestellung <strong>{p.bestellnummer}</strong> abgelehnt. Der Grund:
+            {p.hofName} hat deinen Widerruf zur Bestellung <strong>{p.bestellnummer}</strong>
+            {p.teilweise ? ' für die übrigen Artikel' : ''} abgelehnt. Der Grund:
           </Text>
           <Text style={bodyText}>{p.grund}</Text>
           <Text style={kleinText}>Bist du nicht einverstanden? Wende dich direkt an den Hof oder antworte über „{PROBLEM_MELDEN}“.</Text>
