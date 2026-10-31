@@ -1,5 +1,6 @@
 /**
- * Die Content-Security-Policy zum Beobachten (Register G8, Nr. 125) — reine Regeln aus src/lib/csp.ts.
+ * Die Content-Security-Policy (Register G8, Nr. 125; erzwingend seit Stufe 1, Ergänzung 30.10.2026,
+ * Nr. 204) — reine Regeln aus src/lib/csp.ts.
  *
  * Beweist:
  *  - baueCsp liefert alle Anweisungen der Freigabe mit den belegten Hosts; mit `melden` kommen
@@ -13,6 +14,8 @@
  *  - Die Stripe-Hosts (G8, Ergänzung Nr. 132) stehen genau in ihren Anweisungen und in keiner anderen —
  *    auch mit Meldungen, Toolbar und Sentry; Link, Google Maps und *.stripe.com fehlen. Gegenprobe:
  *    Ein Stripe-Host in einer fremden Anweisung oder ein fehlender schlägt an.
+ *  - Stufe 1 (Nr. 204): der Header-Name erzwingt; 'unsafe-inline' bleibt, 'unsafe-eval' kommt in keiner
+ *    Spielart dazu (Zod 4 prüft `new Function('')` nur und fällt ohne JIT zurück).
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -275,8 +278,26 @@ describe('eigene Rahmen (Register G8, Ergänzung 23.10.2026; Nr. 155)', () => {
     expect(eigeneRahmen(ohne)).toBe(false)
   })
 
-  it('bleibt zum Beobachten und regelt nicht, wer uns einbettet (frame-ancestors steht in next.config.ts)', () => {
-    expect(CSP_HEADER).toBe('Content-Security-Policy-Report-Only')
+  it('regelt nicht, wer uns einbettet (frame-ancestors steht in next.config.ts)', () => {
     expect(baueCsp({ melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', toolbar: true })).not.toContain('frame-ancestors')
+  })
+})
+
+describe('Stufe 1: erzwingen (Register G8, Ergänzung 30.10.2026; Nr. 204)', () => {
+  it('der Header erzwingt — nicht mehr nur beobachten', () => {
+    expect(CSP_HEADER).toBe('Content-Security-Policy')
+  })
+
+  it("'unsafe-inline' bleibt in script-src und style-src, 'unsafe-eval' steht in keiner Spielart", () => {
+    for (const optionen of [
+      { melden: false },
+      { melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', sentryDsn: DSN },
+      { melden: false, toolbar: true },
+    ]) {
+      const p = zerlege(baueCsp(optionen))
+      expect(p.get('script-src'), JSON.stringify(optionen)).toContain("'unsafe-inline'")
+      expect(p.get('style-src'), JSON.stringify(optionen)).toContain("'unsafe-inline'")
+      expect(baueCsp(optionen), JSON.stringify(optionen)).not.toContain('unsafe-eval')
+    }
   })
 })

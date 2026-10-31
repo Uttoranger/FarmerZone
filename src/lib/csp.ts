@@ -1,15 +1,35 @@
 import { z } from 'zod'
 
 /*
- * Content-Security-Policy ZUM BEOBACHTEN (Register G8, Nr. 125) — rein, ohne
- * Next und ohne Datenbank; next.config.ts baut daraus die Header,
- * /api/csp-bericht nimmt die Meldungen damit entgegen.
+ * Content-Security-Policy (Register G8, Nr. 125) — rein, ohne Next und ohne
+ * Datenbank; next.config.ts baut daraus die Header, /api/csp-bericht nimmt die
+ * Meldungen damit entgegen.
  *
- * Der Browser blockiert mit `Content-Security-Policy-Report-Only` nichts, er
- * meldet nur, was eine scharfe Policy blockieren würde. Scharf geschaltet wird
- * erst nach Auswertung der Meldungen (eigener Auftrag); dann wird aus dem
- * Header-Namen `Content-Security-Policy`, und Nonces bzw. Hashes ersetzen
- * `'unsafe-inline'`.
+ * ERZWINGEND seit Stufe 1 (G8, Ergänzung 30.10.2026; Nr. 204): dieselbe Policy
+ * wie zum Beobachten, nach Auswertung der Meldungen der 14 Tage bis
+ * 31.10.2026 (Bericht 204). Der Browser blockiert jetzt, was nicht in der Liste steht, und
+ * meldet es weiter an /api/csp-bericht. `'unsafe-inline'` bleibt, bis Nonces
+ * bzw. Hashes kommen (eigener Auftrag). `'unsafe-eval'` steht bewusst nicht
+ * drin: Zod 4 probiert nur `new Function('')` (allowsEval, in try/catch) und
+ * prüft dann ohne JIT — die Meldung `script-src eval` daraus ist erwartet und
+ * harmlos. Eine zweite, strengere Policy zum Beobachten (Stufe 2) gibt es
+ * deshalb nicht: Sie wäre dieselbe.
+ *
+ * Notfall (zurück auf Report-Only), sicherer erster Weg, eine Zeile:
+ * CSP_HEADER unten wieder auf 'Content-Security-Policy-Report-Only' setzen;
+ * dann greift auch die Rahmen-Regel in cspRegeln (next.config.ts) nicht mehr,
+ * weil sie auf den Namen 'Content-Security-Policy' filtert. Die Erwartungen in
+ * tests/csp.test.ts und tests/sicherheits-header.test.ts müssen mit zurück,
+ * sonst ist die CI rot. Zweiter Weg, alle Commits von Nr. 204 zurück, neuester
+ * zuerst: git revert --no-edit $(git log --format=%h 9bf9b605..HEAD --
+ * src/lib/csp.ts docs/nachtlauf/berichte/204.md) — das sind die Nachbesserung
+ * Runde 2, e2586455, 5bfcf4c8 und 871a3e9b (Stand Lauf 27). Nie nur einen Teil
+ * davon (etwa git revert 871a3e9b oder git revert e2586455 5bfcf4c8 871a3e9b
+ * ohne die Nachbesserung Runde 2): Die späteren schreiben dieselben Zeilen um,
+ * der Revert bricht mit Konflikt ab. Wer csp.ts, next.config.ts oder die beiden
+ * Tests nach dem Merge noch einmal anfasst, muss diese Commits mit zurücknehmen
+ * (für csp.ts findet der Befehl sie mit). Die Hashes bleiben nach dem
+ * Sammel-PR (Merge-Commit) gleich. Danach blockiert der Header nichts mehr.
  *
  * JEDER HOST HAT EINE QUELLE (nicht geraten):
  *  - Die Stripe-Hosts (Register G8, Ergänzung Nr. 132) — Quelle für jeden:
@@ -38,7 +58,7 @@ import { z } from 'zod'
  *    Startseite; Register G8, Ergänzung 23.10.2026, Nr. 155).
  */
 
-export const CSP_HEADER = 'Content-Security-Policy-Report-Only'
+export const CSP_HEADER = 'Content-Security-Policy'
 export const CSP_BERICHT_PFAD = '/api/csp-bericht'
 /** Name der Gruppe in `Reporting-Endpoints` und in `report-to`. */
 export const CSP_BERICHT_GRUPPE = 'csp'
@@ -100,7 +120,7 @@ export type CspOptionen = {
   sentryDsn?: string
 }
 
-/** Der Wert für `Content-Security-Policy-Report-Only`. */
+/** Der Wert für `Content-Security-Policy` (CSP_HEADER). */
 export function baueCsp({ melden, berichtAdresse = null, toolbar: mitToolbar = false, sentryDsn }: CspOptionen): string {
   const toolbar = mitToolbar ? [VERCEL_TOOLBAR] : []
   const sentry = sentryHost(sentryDsn)
