@@ -61,7 +61,11 @@ export type StripeZahlungProps = {
   /** Korb (ohne „ändern") und die festen Angaben zur Abholung — vom Formular gebaut. */
   korb: ReactNode
   angaben: ReactNode
-  fussnote: string
+  /**
+   * Ware, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210;
+   * `KaufZusammenfassung`, vom Formular gebaut). Ersetzt die Fußzeile unter dem Knopf.
+   */
+  zusammenfassung: ReactNode
 }
 
 export function StripeZahlung(props: StripeZahlungProps): React.JSX.Element {
@@ -108,7 +112,7 @@ function ZahlungsInhalt({
   hofpreis = false,
   korb,
   angaben,
-  fussnote,
+  zusammenfassung,
 }: StripeZahlungProps): React.JSX.Element {
   const stripe = useStripe()
   const elements = useElements()
@@ -164,7 +168,10 @@ function ZahlungsInhalt({
   }
 
   return (
+    // uebersichtZuletzt (Nr. 210): Am Handy steht die Übersicht mit der Zusammenfassung nach „Bezahlen“,
+    // also unmittelbar über der festen Leiste mit dem Knopf — wie im Formular.
     <KassenRaster
+      uebersichtZuletzt
       korb={korb}
       uebersicht={
         <UebersichtKarte
@@ -174,14 +181,14 @@ function ZahlungsInhalt({
           reservierung={
             <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
           }
-          fehler={
-            fehler && (
-              <p role="alert" className="text-[13px] leading-snug font-medium text-status-offen">
-                {fehler}
-              </p>
-            )
-          }
         >
+          {/* Zwischen Gesamtbetrag und Knopf: Ware, Abholtermin, Vertragspartner — dann ein Fehler, direkt am Knopf. */}
+          {zusammenfassung}
+          {fehler && (
+            <p role="alert" className="text-[13px] leading-snug font-medium text-status-offen">
+              {fehler}
+            </p>
+          )}
           <AktionsLeiste>
             <button
               type="button"
@@ -199,7 +206,6 @@ function ZahlungsInhalt({
                 `${abgelehnt ? 'Erneut bezahlen' : 'Jetzt bezahlen'} · ${gesamt}`
               )}
             </button>
-            <p className={HINWEIS}>{fussnote}</p>
           </AktionsLeiste>
         </UebersichtKarte>
       }

@@ -106,6 +106,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/checkout/clear-cart-on-mount.tsx · ClearCartOnMount · kein Zweck vermerkt · genutzt
 - src/components/checkout/kasse-skelett.tsx · KasseSkelett · Die Platzhalter der Kasse — zweimal gebraucht, einmal gebaut. · genutzt
 - src/components/checkout/kasse-teile.tsx · AbholWahl, AktionsLeiste, FELD, FELD_LABEL, FeldFehler, HINWEIS, KARTE, KARTEN_TITEL, KNOPF_GRUEN, KassenRaster, KontaktHinweis, KorbKarte, ReservierungsHinweis, TEXTLINK, UebersichtKarte, ZahlartWahl, ZahlungAbgelehnt, type KorbPosition · Die Bausteine der Kasse im neuen Design (Nachtlauf Nr. 12), abgenommen von docs/mockups/web-k3-warenkorb-bezahlen.html, web-k3-zahlung-abgelehnt.html, mobil-k3-warenkorb-bezahlen.html und … · genutzt
+- src/components/checkout/kauf-zusammenfassung.tsx · KAUF_ZUSAMMENFASSUNG_TEXT, KaufZusammenfassung, ZUSAMMENFASSUNG_SICHTBAR, type ZusammenfassungPosition · Die Zusammenfassung unmittelbar über dem Kaufknopf (§ 8 Abs. 1 FAGG, Nr. 210): Ware, Abholtermin und Vertragspartner — der Gesamtpreis steht im Zahlungsschritt direkt darüber in derselben Übersicht, … · genutzt
 - src/components/checkout/stripe-payment.tsx · StripeZahlung, type StripeZahlungProps · Der Zahlungsschritt der Kasse (Nachtlauf Nr. 12; Mockups web-k3-zahlung-abgelehnt, mobil-k3-zahlung-abgelehnt). · genutzt
 
 ## src/components/einrichten
