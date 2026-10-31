@@ -96,6 +96,10 @@ export const MAIL_ART_NAME: Record<MailArt, string> = {
   'abo-bestaetigung': 'Abo bestätigen',
   'plattformgebuehr-ankuendigung': 'Plattformgebühr: Ankündigung',
   'lastschrift-gescheitert': 'Lastschrift gescheitert',
+  'widerruf-eingang': 'Widerruf: Eingangsbestätigung',
+  'widerruf-hof': 'Widerruf (an den Hof)',
+  'widerruf-erstattet': 'Widerruf: erstattet',
+  'widerruf-abgelehnt': 'Widerruf: abgelehnt',
   beitrag: 'Beitrag an Abos',
   rundschreiben: 'Rundschreiben',
   bescheid: 'Bescheid an Kundinnen',
@@ -1043,12 +1047,17 @@ export const NOCHMAL_ERLAUBT = [
   'artikel-fehlt',
   'verfallen',
   'zahlung-zu-spaet',
+  // Widerruf (Nr. 200): Eingang (Sofort, Sonderfall wie der Bar-Link: direkt neu verschickt), Ergebnis
+  'widerruf-eingang',
+  'widerruf-erstattet',
+  'widerruf-abgelehnt',
   // Hof
   'bestellung-bezahlt-hof',
   'bar-bestaetigt-hof',
   'freischaltung',
   'plattformgebuehr-ankuendigung',
   'lastschrift-gescheitert',
+  'widerruf-hof',
   // Sonderfall: neuer Token, der alte Link gilt dann nicht mehr (S17)
   'bar-bestaetigungslink',
 ] as const satisfies readonly MailArt[]
@@ -1287,12 +1296,19 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
     case 'verfallen':
     case 'zahlung-zu-spaet':
       return s === 'CANCELLED' ? { ok: true } : nein
+    // Widerruf (Nr. 200): Eingang, Ergebnis und Mail an den Hof passen, solange es die Bestellung gibt —
+    // der Widerruf selbst bleibt eingegangen, auch wenn die Bestellung inzwischen storniert ist.
+    case 'widerruf-eingang':
+    case 'widerruf-erstattet':
+    case 'widerruf-abgelehnt':
+    case 'widerruf-hof':
+      return { ok: true }
   }
 }
 
 /** Woher die Adresse einer Art kommt — frisch geladen, nie aus dem Protokoll. `null`: nirgends gespeichert. */
 export function adresseQuelle(art: string): 'bestellung' | 'hof' | 'hofInhaber' | null {
-  if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof') return 'hof'
+  if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof' || art === 'widerruf-hof') return 'hof'
   if (art === 'freischaltung' || art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') return 'hofInhaber'
   if (nochmalErlaubt(art)) return 'bestellung'
   return null

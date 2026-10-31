@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { CalendarPlus, LinkIcon, MapPin } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { bestellLinkGilt, bestellSignatur } from '@/lib/bestell-link'
+import { bestellLinkGilt, bestellSignatur, widerrufPfad } from '@/lib/bestell-link'
+import { widerrufMoeglich } from '@/lib/widerruf'
+import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
 import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
 import { formatPosition } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
@@ -103,6 +105,9 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
+      // Nr. 200 (N39): ob „Vertrag widerrufen“ erscheint (widerrufMoeglich).
+      kaeuferArt: true,
+      pickedUpAt: true,
       farm: {
         // Telefon und E-Mail für „Hof erreichen" (Nr. 60) — gelesen erst
         // hinter der Signatur oben, nie über die Bestellnummer.
@@ -226,6 +231,9 @@ export default async function BestellungPage({ params, searchParams }: Props) {
         <Aktionen>
           <AktionsLink href={`/${order.farm.slug}`}>Zum Hof</AktionsLink>
         </Aktionen>
+
+        {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur solange er möglich ist. */}
+        {widerrufMoeglich(order, new Date()) && <WiderrufLink href={widerrufPfad(order.id)} />}
       </div>
     </KundeShellMitSitzung>
   )

@@ -8,6 +8,7 @@ import { SITZUNGEN_NACH_ABLAUF_TAGE } from '@/lib/betrieb'
 import { GERAETE_COOKIE, GERAETE_COOKIE_MAX_ALTER_SEKUNDEN } from '@/lib/geraete'
 import { DATENSCHUTZ_EMAIL } from '@/lib/support'
 import { MARKE } from '@/lib/marke'
+import { WIDERRUF_PFAD } from '@/lib/widerruf'
 
 export const metadata: Metadata = { title: `Datenschutz — ${MARKE}`, alternates: { canonical: '/datenschutz' } }
 
@@ -56,6 +57,14 @@ export default function DatenschutzPage() {
               <li>Gewählter Abholtermin und Zahlungsart</li>
               <li>Optionale Notiz an den Hof</li>
             </ul>
+            {/* Nr. 200 (N39): nur die Fakten des Widerrufs online — Zweck, Daten, Frist. */}
+            <p className="mt-3"><strong className="text-foreground">Bei einem Widerruf:</strong></p>
+            <p>
+              Widerrufst du einen Kauf über {WIDERRUF_PFAD}, speichern wir deinen Namen, deine E-Mail-Adresse,
+              die Bestellung (bzw. die Bestellnummer, die du angibst) und deine Nachricht. Zweck: den Widerruf an
+              den Hof weiterzuleiten, dir den Eingang zu bestätigen und die Erstattung abzuwickeln. Wir bewahren
+              diese Daten so lange auf wie die Daten der Bestellung.
+            </p>
             <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
             <p>
               Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.{' '}

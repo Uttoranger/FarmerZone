@@ -29,6 +29,7 @@ import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
 import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { bestellungenHref } from '@/lib/admin-bestellung'
+import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
 import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import type { Umgebung } from '@/lib/umgebung'
@@ -72,6 +73,7 @@ export const AUFGABE_QUELLEN = [
   'rechnungsangaben_fehlen',
   'nicht_abgeholt_auffaellig',
   'stripe_live_ohne_hofpreis',
+  'widerruf_offen',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -139,10 +141,15 @@ export type AufgabenStand = {
   plattformgebuehr: PlattformgebuehrStand
   /** Stripe live ohne Hofpreis-Modell (N40, Nr. 201) — null, solange Stripe nicht live ist (dann lädt niemand die Einstellung). */
   liveSignal: LiveSignalStand | null
+  /** Offene Widerrufe (Nr. 200, N39) — nur Kennungen, Bestellnummer und Hofname, nie Name, Adresse oder Nachricht. */
+  widerrufe: readonly WiderrufAufgabeRoh[]
 }
 
 /** Was die Quelle „Stripe live ohne Hofpreis-Modell“ braucht: den Modus aus `bestimmeUmgebung`, den Stichtag und seit wann live (STRIPE_LIVE_AB). */
 export type LiveSignalStand = { umgebung: Pick<Umgebung, 'art' | 'stripe'>; einstellung: HofpreisEinstellung; liveSeit: Date | null }
+
+/** Ein Widerruf im Stand `eingegangen`; ohne Bestellung = nicht zugeordnet. */
+export type WiderrufAufgabeRoh = { id: string; orderId: string | null; bestellnummer: string | null; hofName: string | null; eingegangenAm: Date }
 
 /** Eine Monatsabrechnung, die Aufmerksamkeit braucht (gescheitert oder zurückgebucht). */
 export type AbrechnungAufgabeRoh = { abrechnungId: string; farmId: string; hofName: string; monat: string; seit: Date }
@@ -170,6 +177,7 @@ export const LEERER_STAND: AufgabenStand = {
   geldAbweichungen: [],
   plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] },
   liveSignal: null,
+  widerrufe: [],
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -201,7 +209,12 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   nicht_abgeholt_auffaellig: 7 * TAG_MS,
   // Nr. 201 (N40): „Frist sofort“ — wie die Rückbuchung 1 h.
   stripe_live_ohne_hofpreis: STUNDE_MS,
+  // Nr. 200 (N39): 14 Tage ab Eingang (Erstattungsfrist); nicht zugeordnet 2 Tage (WIDERRUF_NICHT_ZUGEORDNET_MS).
+  widerruf_offen: 14 * TAG_MS,
 }
+
+/** Ein Widerruf ohne Bestellung braucht das Team schneller: 2 Tage (Freigabe 200 Punkt 6). */
+export const WIDERRUF_NICHT_ZUGEORDNET_MS = 2 * TAG_MS
 
 const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   notbremse_aktiv: 'Betrieb',
@@ -220,6 +233,7 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   rechnungsangaben_fehlen: 'Geld',
   nicht_abgeholt_auffaellig: 'Höfe',
   stripe_live_ohne_hofpreis: 'Betrieb',
+  widerruf_offen: 'Geld',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -640,6 +654,44 @@ export function liveSignalLeiste(aufgaben: readonly Aufgabe[]): { text: string; 
   return a ? { text: a.titel, href: a.ziel } : null
 }
 
+/**
+ * „Widerruf offen“ (Nr. 200, N39): je Widerruf im Stand `eingegangen` eine
+ * Aufgabe — zugeordnet mit Frist 14 Tage ab Eingang (der Hof erstattet oder
+ * lehnt ab), nicht zugeordnet mit 2 Tagen (das Team ordnet zu und leitet
+ * weiter). Ohne Name, Adresse und Nachricht.
+ */
+function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  return stand.widerrufe.map((w) =>
+    w.orderId && w.bestellnummer
+      ? aufgabe(
+          'widerruf_offen',
+          {
+            titel: 'Widerruf offen',
+            bezug: { kennung: w.bestellnummer, text: [w.bestellnummer, ...(w.hofName ? [w.hofName] : [])].join(' · ') },
+            satz: 'Der Hof erstattet nach der Rückgabe oder lehnt mit Grund ab. Frist 14 Tage ab Eingang.',
+            seit: w.eingegangenAm,
+            wasTun: 'oeffnen',
+            ziel: bestellungenHref({}, { bestellung: w.orderId }),
+          },
+          jetzt
+        )
+      : aufgabe(
+          'widerruf_offen',
+          {
+            titel: 'Widerruf ohne Bestellung',
+            bezug: { kennung: w.id, text: 'nicht zugeordnet' },
+            satz: 'Der Widerruf passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
+            seit: w.eingegangenAm,
+            wasTun: 'pruefen',
+            // Die Liste „Widerrufe ohne Bestellung“ mit Name, Nummer und „Zuordnen …“ (Nachbesserung Runde 2).
+            ziel: `${bestellungenHref({}, {})}#${WIDERRUF_OHNE_BESTELLUNG_ANKER}`,
+          },
+          jetzt,
+          WIDERRUF_NICHT_ZUGEORDNET_MS
+        )
+  )
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   notbremse_aktiv: notbremseAktiv,
@@ -658,6 +710,7 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   rechnungsangaben_fehlen: rechnungsangabenFehlen,
   nicht_abgeholt_auffaellig: nichtAbgeholtAuffaelligQuelle,
   stripe_live_ohne_hofpreis: stripeLiveOhneHofpreis,
+  widerruf_offen: widerrufOffen,
 }
 
 /**
@@ -931,6 +984,8 @@ export function routineZeile(erledigt: number): string {
  */
 export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   hof_freigeschaltet: 'Hof freigeschaltet',
+  widerruf_zugeordnet: 'Widerruf einer Bestellung zugeordnet',
+  widerruf_abgelehnt: 'Widerruf abgelehnt (Hof)',
   hof_freigabe_entzogen: 'Freischaltung zurückgenommen',
   hof_abgelehnt: 'Hof abgelehnt',
   servicegebuehr_geaendert: 'Servicegebühr geändert',

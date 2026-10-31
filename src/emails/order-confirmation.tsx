@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
 import {
   EmailLayout,
@@ -45,6 +46,8 @@ export interface OrderConfirmationProps {
   manageUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
+  /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
+  widerrufUrl?: string
   /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
   appUrl?: string
 }
@@ -114,6 +117,14 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
       {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
       {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
+      {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
+      {p.widerrufUrl && (
+        <Text style={kleinText}>
+          <Link href={p.widerrufUrl} style={textLink}>
+            {WIDERRUF_TEXT.knopfWiderrufen}
+          </Link>
+        </Text>
+      )}
       <Text style={kleinText}>
         Fragen? Ruf direkt beim Hof an:{' '}
         {anrufen ? (

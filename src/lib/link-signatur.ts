@@ -19,7 +19,7 @@ import { geheimnisGleich } from '@/lib/geheimnis'
  * die 2, wenn LINK_SECRET fehlt. Tausch mit Kennung 3: docs/ai/ARCHITECTURE.md
  * §5, „Signierte Links".
  */
-export type LinkZweck = 'bestellung-ansehen' | 'nachbestellen' | 'abmelden' | 'abo-optin'
+export type LinkZweck = 'bestellung-ansehen' | 'nachbestellen' | 'abmelden' | 'abo-optin' | 'widerruf'
 
 /** Die Kennung, die neue Signaturen mit LINK_SECRET tragen. */
 export const LINK_KENNUNG = '2'
@@ -36,6 +36,8 @@ const ALTES_PRAEFIX: Record<LinkZweck, boolean> = {
   abmelden: false,
   // Bis Nr. 171 HMAC über `abo-optin:<aboId>:<ms>` — mit Präfix bitgleich.
   'abo-optin': true,
+  // Nr. 200: neu, mit Präfix — die Signatur gilt nie zugleich als Bestell-Link.
+  widerruf: true,
 }
 
 function hmac(geheimnis: string, text: string): string {

@@ -61,6 +61,7 @@ import {
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { KASSE_AGB_SATZ } from '@/lib/rechtstexte/agb-einbindung'
+import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -656,6 +657,7 @@ export function CheckoutForm({
             wirdGesendet={isPending}
             gesperrt={isPending || kacheln.length === 0 || zahlarten.length === 0 || sperre !== null || mindestGrund !== null}
             gesamt={gesamt}
+            privat={!(betriebAbschnitt && kaeuferArt === 'BETRIEB')}
             fussnote={
               mindestGrund ??
               kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })
@@ -947,6 +949,7 @@ export function KassenAbschluss({
   gesperrt,
   gesamt,
   fussnote,
+  privat = true,
 }: {
   hof: AngabenHof
   /** Die Übersicht mit Frist, Beträgen und einem Fehler der Anfrage. */
@@ -958,6 +961,8 @@ export function KassenAbschluss({
   /** Der Gesamtbetrag, fertig formatiert. */
   gesamt: string
   fussnote: string
+  /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt — bei „Betrieb“ entfällt er. */
+  privat?: boolean
 }): React.JSX.Element {
   return (
     // max-md:mb-8: Mit dem AGB-Satz ist die feste Leiste am Handy rund 190 px hoch (vorher 125);
@@ -985,6 +990,8 @@ export function KassenAbschluss({
             Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
             in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
         <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
+        {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf im neuen Tab. */}
+        {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
       </AktionsLeiste>
     </div>
   )

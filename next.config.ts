@@ -12,7 +12,7 @@ const KEINE_HOFSEITE = [
   'account', 'admin', 'agb', 'analytics', 'api', 'app', 'bestellungen', 'customers', 'dashboard', 'datenschutz',
   'farm-page', 'fehler-melden', 'forgot-password', 'fuer-hoefe', 'hoefe', 'impressum', 'intern', 'konditionen', 'konto',
   'login', 'meldungen', 'onboarding', 'orders', 'postfach', 'problem-melden', 'products', 'region', 'register',
-  'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify',
+  'reset-password', 'sales', 'settings', 'sicherheit', 'startseite-vorschau', 'status', 'teilen', 'verify', 'widerruf',
 ];
 // Genau EIN Pfadstück aus Slug-Zeichen (src/lib/slug.ts), das keine Route ist.
 const HOFSEITEN_QUELLE = `/:farmSlug((?!(?:${KEINE_HOFSEITE.join('|')})$)[a-z0-9-]+)`;

@@ -6,6 +6,7 @@ import { STAND_STATUS, type BestellProtokoll } from '@/lib/admin-bestellung'
 import type { BestellFilter } from '@/schemas/admin-bestellung'
 import type { MailSuche } from '@/schemas/betrieb-mails'
 import { sucheMails } from '@/server/queries/mails'
+import { ladeWiderrufeZurBestellung, type AdminWiderruf } from '@/server/widerruf'
 
 /*
  * Lesen für Admin › Bestellungen (Register N32, N34; Nr. 186). Gerechnet
@@ -119,13 +120,15 @@ export type BestellDetail = Omit<DetailRoh, 'customerEmail' | 'farm'> & {
   protokoll: BestellProtokoll[]
   mails: SuchMail[]
   hofFadenId: string | null
+  /** Die Widerrufe dieser Bestellung (Nr. 200, Nachbesserung Runde 2) — mit Text der Kundin, nur hier im Detail. */
+  widerrufe: AdminWiderruf[]
 }
 
 export async function ladeBestellDetail(id: string, jetzt: Date): Promise<BestellDetail | null> {
   const roh = await prisma.order.findUnique({ where: { id }, select: DETAIL_FELDER })
   if (!roh) return null
   const ab = new Date(jetzt.getTime() - MAIL_PROTOKOLL_AUFBEWAHREN_TAGE * TAG_MS)
-  const [kundinBestellungen90, protokoll, gefunden, faden] = await Promise.all([
+  const [kundinBestellungen90, protokoll, gefunden, faden, widerrufe] = await Promise.all([
     prisma.order.count({ where: { customerEmail: roh.customerEmail, createdAt: { gte: ab } } }),
     prisma.adminAktion.findMany({
       where: { bezugArt: 'bestellung', bezugId: roh.id },
@@ -136,6 +139,7 @@ export async function ladeBestellDetail(id: string, jetzt: Date): Promise<Bestel
     // Die Mails zur Bestellung: dieselbe Suche wie Admin › Betrieb › E-Mails (Nr. 167).
     sucheMails({ art: 'bestellung', nummer: roh.orderNumber }, jetzt),
     prisma.unterhaltung.findFirst({ where: { farmId: roh.farmId }, orderBy: { letzteNachrichtAm: 'desc' }, select: { id: true } }),
+    ladeWiderrufeZurBestellung(roh.id, roh.items),
   ])
   const { customerEmail, farm, ...rest } = roh
   return {
@@ -146,5 +150,6 @@ export async function ladeBestellDetail(id: string, jetzt: Date): Promise<Bestel
     protokoll,
     mails: gefunden.mails,
     hofFadenId: faden?.id ?? null,
+    widerrufe,
   }
 }

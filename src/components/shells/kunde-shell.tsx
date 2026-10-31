@@ -17,6 +17,7 @@ import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { KundeFuss } from '@/components/shells/kunde-fuss'
 import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 import { MARKE } from '@/lib/marke'
+import { WIDERRUF_PFAD, WIDERRUF_TEXT } from '@/lib/widerruf'
 import { VORSCHAU_LEISTE_HINWEIS, VORSCHAU_LEISTE_HINWEIS_MS } from '@/lib/hofseite-vorschau'
 import { useImVorschauRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
@@ -358,6 +359,15 @@ export function KundeFokusShell({ titel, zurueck, rechts, aktion, children }: Ku
 
       <main id={INHALT_ID} tabIndex={-1} className={cn('outline-none', aktion && 'pb-28 md:pb-0')}>
         {children}
+        {/* Nr. 200 (N39): Auch Fokus-Seiten ohne Seitenfuß tragen den Weg zum Widerruf — eine leise Zeile am Ende. */}
+        <p className="mx-auto max-w-[1200px] px-4 pt-2 pb-4 md:px-6 print:hidden">
+          <Link
+            href={WIDERRUF_PFAD}
+            className={cn('inline-flex min-h-11 items-center rounded-md px-1 text-[13px] text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
+          >
+            {WIDERRUF_TEXT.fussLink}
+          </Link>
+        </p>
       </main>
 
       {aktion && (

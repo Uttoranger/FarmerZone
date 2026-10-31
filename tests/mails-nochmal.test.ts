@@ -61,8 +61,9 @@ describe('Wache: jede Art in genau einer Liste', () => {
     expect(fehler).toEqual(expect.arrayContaining(['beitrag: in 2 Listen', 'anmeldecode: in 0 Listen', 'neue-art: in 0 Listen']))
   })
 
-  it('erlaubt sind nur Wichtig-Arten und der Bar-Bestätigungslink — nie Kann warten, nie ein Code oder eine Betreiber-Mail', () => {
-    for (const art of NOCHMAL_ERLAUBT) expect(art === 'bar-bestaetigungslink' || MAIL_WEG[art] === 'wichtig').toBe(true)
+  it('erlaubt sind nur Wichtig-Arten, der Bar-Bestätigungslink und die Eingangsbestätigung des Widerrufs — nie Kann warten, nie ein Code oder eine Betreiber-Mail', () => {
+    // Sonderfälle mit Weg Sofort: neuer Token (S17) bzw. Freigabe 200 Punkt 3 (Eingang sofort, nochmal erlaubt).
+    for (const art of NOCHMAL_ERLAUBT) expect(art === 'bar-bestaetigungslink' || art === 'widerruf-eingang' || MAIL_WEG[art] === 'wichtig').toBe(true)
     for (const art of ['anmeldecode', 'bestellcode', 'passwort-link', 'login-link', 'admin-sicherheit', 'neue-anmeldung', 'beitrag', 'rundschreiben', 'bescheid', 'erstattung-offen', 'postfach'] as const) {
       expect(nochmalErlaubt(art)).toBe(false)
     }

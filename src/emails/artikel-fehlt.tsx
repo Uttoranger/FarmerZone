@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
 import {
   EmailLayout,
@@ -44,6 +45,8 @@ export interface ArtikelFehltProps {
   gebuehrWort?: string
   /** Signierter Link zur Bestellung (bestellungPfad). */
   orderUrl: string
+  /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
+  widerrufUrl?: string
 }
 
 export function ArtikelFehltEmail(p: ArtikelFehltProps) {
@@ -98,6 +101,14 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
           p.farmPhone
         )}
       </Text>
+      {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
+      {p.widerrufUrl && (
+        <Text style={kleinText}>
+          <Link href={p.widerrufUrl} style={textLink}>
+            {WIDERRUF_TEXT.knopfWiderrufen}
+          </Link>
+        </Text>
+      )}
     </EmailLayout>
   )
 }

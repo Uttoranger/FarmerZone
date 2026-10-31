@@ -1650,3 +1650,30 @@ model AdminAktion {
   @@index([bezugArt, bezugId, wann])
   @@index([wer, wann])
 }
+
+// Widerruf online (§ 13a FAGG, Register N39, Nr. 200): jeder Widerruf einer
+// Verbraucherin, mit oder ohne Bestellung. `orderId` ohne Fremdschlüssel
+// (null = nicht zugeordnet: weder signierter Link noch passende Nummer UND
+// E-Mail) — ein Widerruf wird nie abgewiesen, nur nicht zugeordnet. Name,
+// E-Mail und Nachricht sind Personendaten: nie in Logs, Sentry, Protokoll
+// oder Aufgaben; aufbewahrt wie Bestellungen. `positionen` nur bei `teil`:
+// Liste aus `orderItemId` und `menge` (src/lib/widerruf.ts prüft beim Lesen).
+// `stand`: eingegangen | rueckgabe_erhalten | erstattet | abgelehnt; `grund`
+// Pflicht bei abgelehnt. Fachregeln in src/lib/widerruf.ts.
+model Widerruf {
+  id                   String    @id @default(cuid())
+  orderId              String?
+  eingegangenAm        DateTime  @default(now())
+  name                 String    @db.VarChar(120)
+  email                String
+  bestellnummerEingabe String?
+  umfang               String
+  positionen           Json?
+  nachricht            String?   @db.VarChar(500)
+  stand                String    @default("eingegangen")
+  standGeaendertAm     DateTime?
+  grund                String?   @db.VarChar(300)
+
+  @@index([stand, eingegangenAm])
+  @@index([orderId])
+}

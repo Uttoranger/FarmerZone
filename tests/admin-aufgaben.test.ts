@@ -111,6 +111,8 @@ const VOLL: AufgabenStand = {
   },
   // Nr. 201 (N40): Stripe live in der Produktion, der Stichtag liegt noch in der Zukunft.
   liveSignal: { umgebung: { art: 'produktion', stripe: 'live' }, einstellung: { hofpreisModellAb: new Date('2027-02-01T00:00:00.000+01:00') }, liveSeit: vor(2 * STUNDE) },
+  // Nr. 200: ein zugeordneter Widerruf (erfunden); der nicht zugeordnete steht in tests/widerruf.test.ts.
+  widerrufe: [{ id: 'widerruf-1', orderId: 'bestellung-2', bestellnummer: 'HM-2610-W1D3', hofName: 'Hof am Bach', eingegangenAm: vor(3 * TAG) }],
 }
 
 /** Was „erledigt“ je Quelle heißt: die Ursache fehlt im Stand. */
@@ -136,6 +138,7 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   nicht_abgeholt_auffaellig: { plattformgebuehr: { ...VOLL.plattformgebuehr, nichtAbgeholt: [{ farmId: 'hof-c', hofName: 'Hof Quote', bar: 11, nicht: 2, seit: JETZT }] } },
   // Stichtag vorgezogen (erreicht) — das Signal verschwindet von selbst.
   stripe_live_ohne_hofpreis: { liveSignal: { umgebung: { art: 'produktion', stripe: 'live' }, einstellung: { hofpreisModellAb: vor(STUNDE) }, liveSeit: vor(2 * STUNDE) } },
+  widerruf_offen: { widerrufe: [] },
 }
 
 describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {

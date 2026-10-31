@@ -37,6 +37,7 @@ const BESTAND: Record<string, string> = {
   'src/components/startseite/startseite-abschnitte.tsx': 'Beispielrechnung der Konditionen für Höfe, kein Produktpreis',
   'src/emails/order-cancelled.tsx': 'Storno: erstattete Summe aus dem Snapshot',
   'src/emails/zahlung-zu-spaet.tsx': 'Erstattete Summe aus dem Snapshot',
+  'src/emails/widerruf.tsx': 'Widerruf: der Betrag, den Stripe eben erstattet hat — kein Produktpreis',
   'src/lib/teilen-bild.ts': 'bekommt preisCents schon als Endpreis (getPublicFarmMitTeilen, anzeigePreisCents)',
 }
 

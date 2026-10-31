@@ -54,7 +54,7 @@ import { verlangeAdminAktion, verlangeFrischeBestaetigung } from '@/server/admin
 import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction, setServiceFeeAction, setzeGruendungBisAction } from '@/server/actions/admin'
 import { markiereAlsTesthof, nimmAusGruendung, nimmTesthofZurueck, nimmWiederAuf, schreibeZusagenFest } from '@/server/actions/gruendung'
 import { fuegeEmpfaengerHinzu, sendeRundschreiben } from '@/server/actions/postfach'
-import { markiereErstattungErledigt, notfallStorno, zeigeKundinAdresse } from '@/server/actions/admin-bestellung'
+import { markiereErstattungErledigt, notfallStorno, ordneWiderrufZu, zeigeKundinAdresse } from '@/server/actions/admin-bestellung'
 import { ADMIN_BESTELLUNG_EINGABE_FEHLER } from '@/schemas/admin-bestellung'
 import { veroeffentlicheStartseite } from '@/server/actions/startseite'
 import { schickeMailJetztAction, verwirfMailAction } from '@/server/actions/betrieb'
@@ -103,6 +103,8 @@ const AKTIONEN: Array<{ name: string; rufe: () => Promise<unknown>; danach: unkn
   // Nr. 186: volle Adresse und Notfall-Storno in Admin › Bestellungen.
   { name: 'zeigeKundinAdresse', rufe: () => zeigeKundinAdresse(null), danach: { error: ADMIN_BESTELLUNG_EINGABE_FEHLER } },
   { name: 'notfallStorno', rufe: () => notfallStorno(null), danach: { error: ADMIN_BESTELLUNG_EINGABE_FEHLER } },
+  // Nr. 200 (Nachbesserung Runde 2): Zuordnen eines Widerrufs (Storno mit Erstattung möglich).
+  { name: 'ordneWiderrufZu', rufe: () => ordneWiderrufZu(null), danach: { error: ADMIN_BESTELLUNG_EINGABE_FEHLER } },
   // Nr. 161: Jetzt schicken und Verwerfen in Admin › Betrieb › E-Mails.
   { name: 'schickeMailJetztAction', rufe: () => schickeMailJetztAction(null), danach: { error: MAIL_TEXT.eingabeUngueltig } },
   { name: 'verwirfMailAction', rufe: () => verwirfMailAction(null), danach: { error: MAIL_TEXT.eingabeUngueltig } },

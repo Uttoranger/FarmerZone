@@ -4,6 +4,7 @@ import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
+import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import { MARKE } from '@/lib/marke'
@@ -55,7 +56,11 @@ export default async function OrderDetailPage({
   if (!detail) notFound()
 
   const filter = hofBestellFilterAus((await searchParams).filter)
-  const seite = await getBestellungenSeite(farm.id, filter, jetzt)
+  const [seite, widerrufe] = await Promise.all([
+    getBestellungenSeite(farm.id, filter, jetzt),
+    // Nr. 200 (N39): die offenen Widerrufe dieser Bestellung — ein Fehler hier nimmt dem Hof nie die Bestellung.
+    ladeOffeneWiderrufe(farm.id, detail.id).catch(() => []),
+  ])
 
-  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="detail" />
+  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="detail" widerrufe={widerrufe} />
 }

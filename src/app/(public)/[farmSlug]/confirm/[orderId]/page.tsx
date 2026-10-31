@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { formatPosition } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { bestellLinkGilt, bestellungPfad, kalenderPfad } from '@/lib/bestell-link'
+import { widerrufPfad } from '@/lib/bestell-link'
+import { widerrufMoeglich } from '@/lib/widerruf'
+import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
 import {
   abholZeitText,
   bestaetigungsBloecke,
@@ -110,6 +113,9 @@ async function getOrder(orderId: string) {
       // E-Mail holt `adresseSolangeOffen` nur für eine laufende Bestellung.
       createdAt: true,
       cancelReason: true,
+      // Nr. 200 (N39): ob „Vertrag widerrufen“ erscheint (widerrufMoeglich).
+      kaeuferArt: true,
+      pickedUpAt: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
@@ -295,6 +301,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
             </>
           )}
         </Aktionen>
+
+        {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur wenn widerrufen werden kann, auch nach der Abholung in der 14-Tage-Frist. */}
+        {widerrufMoeglich(order, jetzt) && <WiderrufLink href={widerrufPfad(order.id)} />}
       </div>
     </KundeShellMitSitzung>
   )
