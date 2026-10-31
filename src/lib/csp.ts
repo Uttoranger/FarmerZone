@@ -15,16 +15,21 @@ import { z } from 'zod'
  * harmlos. Eine zweite, strengere Policy zum Beobachten (Stufe 2) gibt es
  * deshalb nicht: Sie wäre dieselbe.
  *
- * Notfall (zurück auf Report-Only): `git revert 871a3e9b` — dieser Commit
- * trägt den Code von Nr. 204 (CSP_HEADER, cspRegeln, Tests) —, oder beide
- * zusammen `git revert 5bfcf4c8 871a3e9b`. Nur 5bfcf4c8 (feat-Titel) zurück-
- * nehmen ändert nichts, der ist reine Doku. Die Hashes bleiben nach dem
- * Sammel-PR (Merge-Commit) gleich. Zweiter Weg, eine Zeile: CSP_HEADER unten
- * wieder auf 'Content-Security-Policy-Report-Only' setzen; dann greift auch
- * die Rahmen-Regel in cspRegeln (next.config.ts) nicht mehr, weil sie auf den
- * Namen 'Content-Security-Policy' filtert. Die Erwartungen in tests/csp.test.ts
- * und tests/sicherheits-header.test.ts müssen dann mit zurück, sonst ist die
- * CI rot. Danach blockiert der Header nichts mehr.
+ * Notfall (zurück auf Report-Only), sicherer erster Weg, eine Zeile:
+ * CSP_HEADER unten wieder auf 'Content-Security-Policy-Report-Only' setzen;
+ * dann greift auch die Rahmen-Regel in cspRegeln (next.config.ts) nicht mehr,
+ * weil sie auf den Namen 'Content-Security-Policy' filtert. Die Erwartungen in
+ * tests/csp.test.ts und tests/sicherheits-header.test.ts müssen mit zurück,
+ * sonst ist die CI rot. Zweiter Weg, alle Commits von Nr. 204 zurück, neuester
+ * zuerst: git revert --no-edit $(git log --format=%h 9bf9b605..HEAD --
+ * src/lib/csp.ts docs/nachtlauf/berichte/204.md) — das sind die Nachbesserung
+ * Runde 2, e2586455, 5bfcf4c8 und 871a3e9b (Stand Lauf 27). Nie nur einen Teil
+ * davon (etwa git revert 871a3e9b oder git revert e2586455 5bfcf4c8 871a3e9b
+ * ohne die Nachbesserung Runde 2): Die späteren schreiben dieselben Zeilen um,
+ * der Revert bricht mit Konflikt ab. Wer csp.ts, next.config.ts oder die beiden
+ * Tests nach dem Merge noch einmal anfasst, muss diese Commits mit zurücknehmen
+ * (für csp.ts findet der Befehl sie mit). Die Hashes bleiben nach dem
+ * Sammel-PR (Merge-Commit) gleich. Danach blockiert der Header nichts mehr.
  *
  * JEDER HOST HAT EINE QUELLE (nicht geraten):
  *  - Die Stripe-Hosts (Register G8, Ergänzung Nr. 132) — Quelle für jeden:
