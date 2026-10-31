@@ -129,13 +129,19 @@ describe('Unterleiste Hof: „Bestellungen“ bei 320 px nicht abgeschnitten (Nr
     // Das sichtbare Kurzwort steckt im vollen Namen (Label im Namen).
     expect('Bestellungen').toContain(HOF_LEISTE_KURZ.bestellungen)
     expect(leiste).toContain('max-[359px]:hidden')
-    expect(leiste).toMatch(new RegExp(`min-\\[360px\\]:hidden[^>]*>${HOF_LEISTE_KURZ.bestellungen}<`))
-    expect(leiste).toContain('aria-label="Bestellungen"')
+    expect(leiste).toMatch(new RegExp(`max-\\[359px\\]:inline[^>]*>${HOF_LEISTE_KURZ.bestellungen}<`))
+  })
+
+  it('der Link trägt kein aria-label; der Zählertext „3 offene Bestellungen“ steht im Namen (Zaehler: Zahl und Bedeutung als sr-only)', () => {
+    const link = abschnitt(leiste, '<a href="/orders"', '</a>')
+    expect(link).not.toContain('aria-label')
+    expect(link).toContain('3 offene Bestellungen')
+    expect(link).toContain('>Bestellungen<')
   })
 
   it('Gegenprobe: andere Einträge und die Kunden-Leiste haben keine Kurzfassung', () => {
-    expect(leiste.match(/min-\[360px\]:hidden/g)?.length).toBe(1)
+    expect(leiste.match(/max-\[359px\]:inline/g)?.length).toBe(1)
     const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
-    expect(abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')).not.toContain('min-[360px]:hidden')
+    expect(abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')).not.toContain('max-[359px]:inline')
   })
 })

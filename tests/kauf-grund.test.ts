@@ -29,11 +29,23 @@ vi.mock('@/components/notbremse-band', async (original) => ({
   ...(await original<typeof import('@/components/notbremse-band')>()),
   useBestellstopp: () => browser.stopp,
 }))
+// Das Korb-Blatt rendert sein Fenster beim Server-Rendern nicht (Portal): Der Inhalt steht an Ort und Stelle.
+vi.mock('@/components/ui/sheet', async (original) => {
+  const echt = await original<typeof import('@/components/ui/sheet')>()
+  type Kinder = { children?: ReactNode }
+  return {
+    ...echt,
+    Sheet: (p: Kinder) => createElement('div', null, p.children),
+    SheetContent: (p: Kinder) => createElement('section', null, p.children),
+    SheetTitle: (p: Kinder) => createElement('h2', null, p.children),
+  }
+})
 vi.mock('@/lib/use-warenkorb-kopf', () => ({
   useWarenkorbVomHof: () => [{ productId: 'p1', name: 'Heumilch', price: 1.5, quantity: 2, unit: 'L', unitSize: null, imageUrl: null, farmId: 'f1' }],
 }))
 
 import { HofseiteSeitenspalte, type SeitenspalteHof } from '@/components/hofseite/hofseite-seitenspalte'
+import { CartSheet } from '@/components/farm/cart-sheet'
 import { KaufGrund } from '@/components/hofseite/kauf-grund'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
 
@@ -69,6 +81,45 @@ describe('Mini-Warenkorb der Seitenspalte: Grund statt „Zur Kasse“', () => {
   it('Sperre des Hofs geht vor der Notbremse', () => {
     browser.stopp = STOPP
     const html = spalte('pause')
+    expect(html).toContain('Musterdorf pausiert gerade.')
+    expect(html).not.toContain(STOPP.satz)
+    expect(html).not.toContain('Zur Kasse')
+  })
+})
+
+describe('Korb-Blatt: Grund statt „Zur Kasse“ (Nr. 205)', () => {
+  const posten = { productId: 'p1', name: 'Heumilch', price: 1.5, quantity: 2, unit: 'L', unitSize: null, imageUrl: null, farmId: 'f1' }
+  function blatt(sperre: KaufSperre = null): string {
+    return renderToStaticMarkup(
+      createElement(CartSheet, {
+        open: true,
+        onOpenChange: () => {},
+        items: [posten],
+        total: 3,
+        farmSlug: 'hof-test',
+        onUpdateQuantity: () => {},
+        onRemoveItem: () => {},
+        kaufSperre: { hofName: 'Musterdorf', pauseMessage: null, sperre },
+      })
+    )
+  }
+
+  it('Gegenprobe: ohne Sperre und Notbremse steht „Zur Kasse“', () => {
+    const html = blatt()
+    expect(html).toContain('Zur Kasse')
+    expect(html).not.toContain(STOPP.satz)
+  })
+
+  it('mit Notbremse steht der Satz, „Zur Kasse“ fehlt', () => {
+    browser.stopp = STOPP
+    const html = blatt()
+    expect(html).toContain(STOPP.satz)
+    expect(html).not.toContain('Zur Kasse')
+  })
+
+  it('mit Sperre des Hofs steht ihr Grund statt des Notbremse-Satzes', () => {
+    browser.stopp = STOPP
+    const html = blatt('pause')
     expect(html).toContain('Musterdorf pausiert gerade.')
     expect(html).not.toContain(STOPP.satz)
     expect(html).not.toContain('Zur Kasse')
