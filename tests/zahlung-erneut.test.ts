@@ -110,7 +110,7 @@ describe('zahlungFortsetzenPfad', () => {
 })
 
 describe('fortsetzungsKorb: nur der Snapshot der Bestellung', () => {
-  it('Hofpreis-Modell: Zeile = totalPrice + gespeicherte Gebühr, Satz der Bestellung — auch wenn der Hof heute einen anderen hat', () => {
+  it('Hofpreis-Modell: Zeile = totalPrice + gespeicherte Gebühr, Satz der Bestellung — nur aus dem Snapshot, ohne Hof-Eingabe', () => {
     // Bestellt mit 6 %: 3 × 2,15 € → Gebühr je Stück 13 Cent (aufgerundet), Zeile 6,45 € + 0,39 €.
     const b: FortsetzungsSnapshot = {
       gebuehrModell: 'hofpreis',
