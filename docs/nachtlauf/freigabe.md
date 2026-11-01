@@ -9004,3 +9004,222 @@ Wie Lauf 26, dazu:
     - CSP: Kasse mit 3-D-Secure
   - die Texte aus 200 an die Anwältin
   - Merge per Merge-Commit
+
+## 32. Lauf 28 (uttoranger, im Chat erteilt, 31.10.2026)
+
+Nachtlauf 28 – Freigabe (uttoranger, im Chat 31.10.2026) · Kasse rechtssicher, Nacharbeit aus Lauf 27
+
+Geschrieben auf main 0eb716b (31.10.2026, #432 „Sprint 207“). Im Chat geprüft am 31.10.2026, nur lesend:
+- main enthält Lauf 27 (#431: 199–206) und Sprint 207 (#432: Belehrung nachgetragen, AGB im Mail-Anhang, Testhof-Hinweis, AGB-Zustimmung der Höfe).
+- Production READY; letzte Migration `20261031100000_agb_zustimmung`.
+- Vier freigeschaltete Höfe in der Produktion, alle aus der Gründungsvergabe ausgenommen, keine SEPA-Mandate; Stichtag „Hofpreis-Modell ab“ im Admin leer.
+
+Grundlage: Projekt-Doc claude/lauf28-vormerkung.md, Morgenbericht 27 („Bitte entscheiden“, „Nacharbeit“), Bericht 207 (STOPP Gewährleistungs-Mitteilung, Gegenprobe § 8 Abs. 1 FAGG, zwei Fragen), Go-Live-Checkliste 30.10. (Abschnitt A und B).
+
+Befunde, die dieser Lauf behebt (vor dem Bau am Code bestätigen):
+- **Zahlungsschritt verletzt § 8 Abs. 1 FAGG** (Bericht 207, Gegenprobe): Direkt über „Jetzt bezahlen“ steht nur der Gesamtpreis; der Abholtermin steht in der Fußzeile UNTER dem Knopf (src/components/checkout/stripe-payment.tsx ~202), Produkte und Hof am Desktop daneben.
+- **Harmonisierte Gewährleistungs-Mitteilung fehlt** (§ 4 Abs. 1 Z 12 und Anhang II FAGG, Pflicht seit 27.9.2026). 207 hat zu Recht gestoppt: Die Mitteilung ist eine nicht editierbare Grafik der EU-Kommission (Farben, QR-Code), kein Text.
+- **Belehrung nennt ohne Hof-E-Mail die Anmelde-Adresse der Inhaberin** (`hofKontaktEmail`, Bericht 207 Frage 1). `Farm.email` ist Pflichtfeld im Schema, darf aber leer sein.
+- **CSP-Bericht voll mit eval-Proben** (98 Meldungen, Zod 4 `new Function('')`, Morgenbericht 27): echte Treffer gehen unter.
+- **Nacharbeit aus Morgenbericht 27** (sechs Punkte, siehe 213).
+- **Rücktrittsausnahme und Rücksendekosten stehen nur je Kategorie, nicht je Ware** (§ 4 Abs. 1 Z 9 und 11 FAGG; AGB 1.0 Prüfhinweise 6 und 21): heute `ausnahmeHinweis(kategorie)`, keine Schätzung der Rücksendekosten für sperrige Ware.
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+- **Nummern:** 208, 210, 211, 212, 213, 214 sind neu. 209 (`useWatch`) ist bewusst NICHT in diesem Lauf (nach dem Go-live).
+- **Regeln:** Es gelten G10, die G10-Ergänzung und §0 wie in Lauf 27 (freigabe.md §31), mit der Zuordnung unten. Zeitbuch docs/nachtlauf/berichte/zeitbuch-lauf28.md.
+- **Migration:** genau eine (Nr. 214, nur Expand). Kein neues Paket, keine neue Variable.
+- **Tests:** nach docs/ai/TESTING_GUIDELINES.md; Fachregeln als reine Funktionen in src/lib/.
+- **Mockups:** keine für diesen Lauf. UI nach docs/ai/DESIGN_SYSTEM.md; Kundenseiten im Geltungsbereich `data-design="neu"`. Die Bilder nach §0 sind die Abnahme.
+- **Abnahme:** test.agrilo.at nach dem Merge durch die Projektleitung.
+
+## Zuerst der Doku-PR (Branch docs/lauf28 von main, model: sonnet)
+
+- **docs/nachtlauf/freigabe.md:** diesen Text wörtlich als „## 32. Lauf 28 (uttoranger, im Chat erteilt, 31.10.2026)“
+- **docs/nachtlauf.md §3:** die Zeilen 208, 210–214 und „Sammel 28“
+- **docs/nachtlauf/status.md:** 199–206 und „Sammel 27“ tragen „gemergt (#431)“, 207 „gemergt (#432)“; neu 208, 210–214 und „Sammel 28“ mit „offen“; 209 als „vorgemerkt (nach Go-live)“
+- **docs/entscheidungen.md:** die vier Ergänzungen unter „Entscheidungen“ wörtlich, dazu die Stand-Zeile
+- **docs/nachtlauf/morgenbericht-2026-10-31-lauf27.md:** unter „Bitte entscheiden“ je Punkt die Zeile „Entschieden 31.10.2026: …“ (Wortlaut aus den Entscheidungen unten)
+- **Commit- und PR-Texte** immer über eine Datei, Präfixe nach CLAUDE.md §5.
+
+## Stand – vor dem Start prüfen, sonst STOPP und melden
+
+- main enthält #432 (0eb716b oder später).
+- `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün.
+- Stripe ist in Vorschau und Produktion im Testmodus.
+- **Nur für 211:** Die Datei `public/recht/gewaehrleistung-mitteilung-de.png` (oder `.svg`) liegt auf main bzw. im Arbeitsverzeichnis – die Projektleitung legt sie vor dem Start ab. Fehlt sie: 211 nicht beginnen, die übrigen Nummern laufen, im Bericht nennen.
+
+**Priorität, falls das Budget nicht reicht:**
+210 → 211 → 212 → 214 → 213 → 208
+
+## Nicht in diesem Lauf
+
+- **AGB 1.0:** eigener /fix mit Datum T (Prompt liegt bereit: claude/fix-agb-1-0-prompt.md). Dieser Lauf ändert nichts an docs/recht/agb.md oder src/lib/rechtstexte/agb.ts.
+- **209** `form.watch` → `useWatch` (nach dem Go-live).
+- **Monatsabrechnung:** automatische Gutschrift der Bar-Gebühr für zurückgegebene Ware (nach dem Stichtag).
+- **Die 13 offenen Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live, Connect- und Resend-Webhook:** wie in Lauf 27.
+- **Aufräumen alter Bild-Waisen** (Altbestand vor 206): eigener Auftrag mit Freigabe.
+
+## Entscheidungen (uttoranger, im Chat 31.10.2026 – mit diesem Start freigegeben; wörtlich ins Register)
+
+- „Ergänzung zu N17 (31.10.2026, Nr. 206): Logo, Titel- und Produktbild werden nach erfolgreichem Speichern des Ersatzes gelöscht; nur Beitragsfotos und Startseiten-Bilder bleiben als ‚Bilder ohne Verwendung‘ liegen. Der Schutzgrund von N17 bleibt erfüllt, weil erst nach dem Schreiben gelöscht wird. Altbestand vor 206 über Admin › Betrieb aufräumen (eigener Auftrag mit Freigabe).“
+- „Ergänzung zu G8 (31.10.2026): Die eval-Probe von Zod 4 (`new Function('')`) wird mit `z.config({ jitless: true })` in einem Client-Einstieg abgestellt, damit der CSP-Bericht echte Treffer zeigt; kein Sicherheitsgewinn, nur Signalqualität. asn1.js im Admin-Bündel wird dabei geprüft.“
+- „Ergänzung zu N2/E5 (31.10.2026, Nr. 202): Pausiert ein Hof, nachdem eine Bestellung angenommen und reserviert wurde, darf die Kundin die Zahlung dieser Bestellung noch abschließen; nur neue Bestellungen sind gesperrt. Die Admin-Sperre hält auch bestehende Zahlungen an.“
+- „Nacharbeit nach dem Go-live (31.10.2026): Formulare Kasse und Produkt für den React Compiler aufräumen (`form.watch` → `useWatch`), mit Integrationsprobe im Geld-Pfad. Nicht vor dem Go-live (Nr. 209, vorgemerkt).“
+- „Ergänzung zu N39 (31.10.2026, Nr. 214): Ob eine Ware vom Rücktritt ausgenommen ist (§ 18 Abs. 1 Z 4 FAGG, schnell verderblich) und was die Rücksendung sperriger Ware schätzungsweise kostet (§ 4 Abs. 1 Z 9 FAGG), gibt der Hof je Produkt an. Die App zeigt es vor dem Bestellen, in der Belehrung der Bestätigungsmail und auf /widerruf; sie entscheidet nichts selbst. Ohne Angabe gilt der bisherige Hinweis je Kategorie bzw. keine Rücksendekosten für die Kundschaft.“
+- Stand-Zeile: „Stand Lauf 28 (uttoranger, 31.10.2026): Die Ergänzungen zu N17, G8, N2/E5 und N39 sowie die Vormerkung Nr. 209 sind entschieden und in Nr. 208, 210–214 eingeplant (freigabe.md §32). Dazu die Befunde aus Bericht 207 (§ 8 Abs. 1 FAGG, Gewährleistungs-Mitteilung, Hof-E-Mail) und die Nacharbeit aus Morgenbericht 27. Lauf 28 hat eine Migration (214), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, Monatsabrechnungs-Gutschrift, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.“
+
+## §0 Zuordnung
+
+**Modell:**
+- Doku-PR, 208, 211, 212 mit Sonnet; 210, 213, 214 mit Opus.
+- tester und sichter mit Sonnet, pruefer immer mit Opus, höchstens 22 Schritte je Aufruf.
+
+**Prüfdurchgänge:**
+- ein voller Durchgang für 210, 213, 214
+- gezielt für 208, 211, 212
+
+**`pnpm test:integration`:**
+- GANZ bei 213 (Geld-Pfad: Protokoll vor der Erstattung) und 214 (Migration)
+- sonst jede Datei, die sich ändert
+- im Sammel-PR ganz
+
+**Bilder:**
+- 210: Zahlungsschritt 390 und 1440, hell und dunkel: Zusammenfassung direkt über „Jetzt bezahlen“
+- 211: Kasse bar und online mit der Mitteilung (390, hell und dunkel); Bestätigungsmail (Vorschau)
+- 212: Hof einrichten mit Pflichtfeld Hof-E-Mail (390); Karte in Heute bei leerem Feld
+- 214: Produktformular mit den zwei neuen Feldern (390); Produktseite mit Hinweis; Kasse-Position mit Hinweis; /widerruf mit Hinweis je Position; Belehrung in der Mail mit Kostenschätzung
+
+**Lesemappe:**
+- alle: CLAUDE.md §2, ARCHITECTURE §5, Bericht 207 (docs/nachtlauf/berichte/207.md)
+- 210: src/components/checkout/stripe-payment.tsx, checkout-form.tsx (Bausteine `UebersichtKarte`, `AktionsLeiste`), N2
+- 211: src/emails/belehrung-teil.tsx, src/lib/rechtstexte/agb-einbindung.ts, DESIGN_SYSTEM (Bilder, Kontrast), Register O4
+- 212: src/lib/hof-kontakt.ts, src/components/einrichten/einrichten-seite.tsx, src/server/actions/admin.ts (`approveFarmAction`), src/components/heute/agb-karte.tsx (Muster für eine Karte)
+- 213: Morgenbericht 27 „Nacharbeit“, src/server/widerruf.ts, src/server/stornieren.ts, src/server/actions/appearance.ts, src/server/actions/products.ts, src/app/api/stripe/webhook/route.ts, next.config.ts (Header), src/server/actions/farm-photos.ts
+- 214: src/lib/widerruf.ts (`ausnahmeHinweis`, `BELEHRUNG`), src/emails/belehrung-teil.tsx, Produktformular, docs/recht/agb.md (Entwurf 1.0: 14.2, 18.6, Anhang 1 Hinweise), Anhang I FAGG Gestaltungshinweis 5 b
+
+## §1 Warteschlange (fest)
+
+- Doku-PR
+- **Welle 1**, alle von docs/lauf28: 208 ∥ 210 ∥ 212 ∥ 213
+- **Welle 2**, vom Zwischenstand integration/lauf28 nach 210: 211 ∥ 214 (beide berühren den Zahlungsschritt und die Belehrungs-Mail, die 210 umbaut)
+- Dann der Sammel-PR (Haltepunkt), Merge per Merge-Commit. Branches nacht/<datum>/<nr>-<kurz>.
+
+**Geteilt in getrennten Zeilen** (der Dirigent löst Konflikte beim Hineinmergen):
+- src/components/checkout/stripe-payment.tsx: 210 (Zusammenfassung über dem Knopf), 211 (Mitteilung), 214 (Hinweis je Position) – 211 und 214 bauen auf 210 auf
+- src/emails/belehrung-teil.tsx: 211 (Mitteilung), 214 (Kostenschätzung) – nur in Welle 2
+- src/lib/widerruf.ts: nur 214
+- src/lib/hof-kontakt.ts: nur 212
+- next.config.ts (Header): nur 213
+- DEVELOPMENT.md je ein Eintrag; ARCHITECTURE je eigener Abschnitt
+
+## Die Nummern
+
+### 208 Zod ohne eval-Probe, asn1.js prüfen (G8-Ergänzung) – Sonnet, gezielt, keine Migration, von docs/lauf28
+
+1. `z.config({ jitless: true })` genau einmal, in dem Client-Einstieg, der vor jedem `zodResolver` läuft (Kandidat: der oberste Client-Provider unter src/app/layout.tsx; sonst ein kleines `src/lib/zod-einstellung.ts`, das jede Datei mit `zodResolver` importiert – eine Quelle, Wache dafür). Serverseitig nichts ändern.
+2. Prüfen, woher asn1.js im Admin-Bündel kommt (`pnpm build` mit Bündel-Analyse oder `git grep`-Spur über die Importkette). Nur dokumentieren; ein Austausch ist ein eigener Auftrag.
+3. tests/csp.test.ts: Gegenprobe, dass die Policy unverändert ist (dieser Punkt ändert die CSP nicht).
+
+Dateien: ein Client-Einstieg (oder src/lib/zod-einstellung.ts + Wache), DEVELOPMENT.md, docs/ai/TECH_STACK.md (Zod-Abschnitt: jitless, warum). Bericht: Fundort von asn1.js.
+
+### 210 Zahlungsschritt: Zusammenfassung unmittelbar über „Jetzt bezahlen“ (§ 8 Abs. 1 FAGG) – Opus, voller Durchgang, keine Migration, von docs/lauf28
+
+**Befund:** Bericht 207, Gegenprobe: Über dem Knopf steht nur der Gesamtpreis; der Abholtermin steht darunter, Produkte und Hof am Desktop daneben. § 8 Abs. 1 FAGG verlangt die wesentlichen Angaben (Ware, Gesamtpreis, Abholtermin, Vertragspartner) unmittelbar bevor die Kundin bestellt.
+
+1. In `UebersichtKarte` des Zahlungsschritts (stripe-payment.tsx) direkt über dem Knopf eine kompakte Zusammenfassung aus einer Quelle (Baustein in src/components/checkout/, auch von der Bar-Kasse genutzt, wenn dort nicht schon alles über dem Knopf steht): Positionen (Name × Menge, bei mehr als fünf „und n weitere“ mit aufklappbarer Liste), Gesamtpreis mit „inkl. Plattformgebühr“ bzw. Servicegebühr-Zeile wie heute, Abholtermin (Tag und Zeitfenster), „Dein Vertragspartner: <Hof>“. Die bisherige Fußzeile unter dem Knopf entfällt bzw. zieht nach oben.
+2. Der Satz zu AGB und Rücktritt (`KASSE_AGB_SATZ`, Rücktrittssatz aus 200) bleibt direkt unter dem Knopf, unverändert.
+3. Bar-Kasse (checkout-form.tsx): Gegenprobe, dass über „Zahlungspflichtig bestellen“ dieselben Angaben stehen; fehlt eine, denselben Baustein nutzen.
+4. Keine Logik-Änderung an Zahlung, Idempotenz oder Fristen. Beträge nur anzeigen, nie neu rechnen (Werte aus der bestehenden Übersicht).
+
+Dateien: src/components/checkout/stripe-payment.tsx, checkout-form.tsx (NUR Anzeige), neuer Baustein, Tests, DESIGN_SYSTEM (Kasse: Zusammenfassung über dem Kaufknopf), DEVELOPMENT.md.
+
+Tests: Rendertest je Schritt: Positionen, Gesamtpreis, Abholtermin und Hofname stehen im DOM VOR dem Kaufknopf (Reihenfolge prüfen); bei sechs Positionen „und 1 weitere“; Bar-Kasse gleich. Gegenprobe: Beträge sind identisch mit der Übersicht (eine Quelle).
+
+### 211 Harmonisierte Gewährleistungs-Mitteilung (Anhang II FAGG) – Sonnet, gezielt, keine Migration, von Zwischenstand nach 210
+
+**Voraussetzung:** `public/recht/gewaehrleistung-mitteilung-de.png` (oder .svg) liegt vor (siehe Stand). Es ist die amtliche Grafik der EU-Kommission in Deutsch; sie darf nicht verändert, zugeschnitten oder umgefärbt werden (Erläuterung 1 zu Anhang II). Quelle und Abrufdatum kommen von der Projektleitung in den PR-Text und als Kommentar nach `src/lib/rechtstexte/gewaehrleistung-mitteilung.ts` (neu: Pfad, Alt-Text, Überschrift – eine Quelle).
+
+1. Kasse, beide Schritte (bar über „Zahlungspflichtig bestellen“, online über „Jetzt bezahlen“), unterhalb der Zusammenfassung aus 210 und oberhalb des Knopfs: die Grafik hervorgehoben, in voller Breite der Karte, farbig (RGB), nicht kleiner als lesbar (Erläuterung 5: online farbig), mit `alt="Harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht (Anhang II FAGG): Für Waren gilt eine gesetzliche Gewährleistung von mindestens zwei Jahren ab Übergabe."` und einer Überschrift „Gesetzliche Gewährleistung“ aus der Quelle. Bei Käuferart „Betrieb“ entfällt sie. Kein Zuklappen.
+2. Dieselbe Grafik in den Bestätigungsmails (online, bar, „Bitte bestätige“) unter der Belehrung (src/emails/belehrung-teil.tsx), als eingebettetes Bild über den bestehenden Weg für Bilder in Mails (wenn es keinen gibt: als absolute URL auf `PRODUKTION_HOST`/recht/…; keine Base64-Inline-Bilder über 100 kB). Bei „Betrieb“ nicht.
+3. Lighthouse/axe: Alt-Text vorhanden, keine Kontrastprüfung auf die Grafik (amtliche Farben).
+
+Dateien: src/lib/rechtstexte/gewaehrleistung-mitteilung.ts (neu), stripe-payment.tsx und checkout-form.tsx (NUR die Grafik), src/emails/belehrung-teil.tsx, Tests, DEVELOPMENT.md, DESIGN_SYSTEM (Abschnitt Rechtsgrafiken: unverändert einbinden).
+
+Tests: Kasse rendert die Grafik genau einmal je Schritt mit Alt-Text, bei „Betrieb“ nicht; Mails enthalten sie bei PRIVAT, bei „Betrieb“ nicht; die Datei liegt unter public/recht und wird nicht durch den Bild-Baustein geschleust.
+
+### 212 Hof-E-Mail Pflicht für aktive Höfe – Sonnet, gezielt, keine Migration, von docs/lauf28
+
+**Befund:** `hofKontaktEmail` fällt auf die Anmelde-Adresse der Inhaberin zurück; die steht dann in der Belehrung (Bericht 207, Frage 1). Für die Kundschaft braucht es die Adresse des Betriebs (§ 4 Abs. 1 Z 3 FAGG).
+
+1. Freischaltung (`approveFarmAction`): STOPP mit Satz „Der Hof hat noch keine E-Mail-Adresse für Kundschaft“, wenn `Farm.email` leer ist. Keine Schema-Änderung; der Rückfall in `hofKontaktEmail` bleibt für Bestandsfälle.
+2. „Hof einrichten“: Schritt Kontakt verlangt die Hof-E-Mail (Zod: E-Mail, Pflicht), Erklärsatz aus einer Quelle („Diese Adresse sehen deine Kundinnen und Kunden in der Bestellung und in der Rücktrittsbelehrung.“).
+3. Bestandshöfe mit leerem Feld: Karte in Heute „E-Mail-Adresse für Kundschaft eintragen“ nach dem Muster der AGB-Karte (agb-karte.tsx), Link zu den Einstellungen; verschwindet, sobald das Feld gefüllt ist. Admin-Hof-Akte zeigt „Hof-E-Mail fehlt“.
+4. Bericht: Zahl der freigeschalteten Höfe ohne Hof-E-Mail (lesend, keine Adressen).
+
+Dateien: src/server/actions/admin.ts (NUR die Prüfung), Einrichten-Schritt Kontakt und Schema, src/components/heute/ (neue Karte), src/lib/admin-hof-akte.ts, Tests, DEVELOPMENT.md.
+
+Tests: Freischalten ohne Hof-E-Mail → Fehler mit dem Satz; Einrichten ohne E-Mail → Formularfehler; Karte nur bei leerem Feld; `hofKontaktEmail` unverändert.
+
+### 213 Nacharbeit aus Morgenbericht 27 – Opus, voller Durchgang, keine Migration, von docs/lauf28
+
+Sechs kleine Punkte, je mit Gegenprobe:
+1. **Protokoll vor der Erstattung** (200/186): Beim Zuordnen eines Widerrufs und beim Notfall-Storno entsteht der Protokolleintrag direkt nach dem bedingten Schreiben in der Datenbank, VOR dem Stripe-Aufruf; scheitert Stripe, bleibt der Eintrag mit Stand „Erstattung offen“ stehen (bestehende Wache „nie zweimal“ unberührt). Test: Stripe wirft → Protokoll vorhanden, keine Buchung.
+2. **Teilwiderruf nach Teilstorno:** Die Anzeige des Widerrufs zeigt nur die Positionen, die noch offen sind (`offenePositionen`), nicht alle gewählten. Test mit teilweise storniertem Widerruf.
+3. **Helfer „einmal je Tag“** (203): `erstmalsHeute` und das Muster im Webhook in einen Helfer mit freiem Art-Schlüssel ziehen (src/lib/, rein). Beide Aufrufer umstellen, Verhalten gleich.
+4. **`entferneAltesBild` einmal** (206): nach `src/server/bild-loeschen.ts`, beide Actions importieren es; die `'use server'`-Datei exportiert es nicht mehr.
+5. **`reorderPhotosAction`** (199): intern machen (kein Export) oder löschen, falls kein Aufrufer; Bestandsliste der Aufrufer-Wache schrumpft um einen Eintrag.
+6. **`no-referrer` für die Kasse mit `?zahlung=&sig=`** (202): Header-Regel in next.config.ts nach dem bestehenden Muster für signierte Links (NIE_MELDEN_PFADE, Zeile ~183), Test in tests/sicherheits-header.test.ts.
+
+Dateien: nur die genannten plus Tests und DEVELOPMENT.md. Keine Nummer ändert einen Betrag oder einen Erstattungsweg.
+
+### 214 Je Produkt: „kein Rücktritt“ und geschätzte Rücksendekosten (N39-Ergänzung) – Opus, voller Durchgang, EINE Migration (Expand), von Zwischenstand nach 210
+
+**Migration** (Regel 3, nur Expand): `Product.keinRuecktritt Boolean @default(false)` (Ware verdirbt schnell, § 18 Abs. 1 Z 4 FAGG) und `Product.ruecksendekostenCents Int?` (Schätzung für Ware, die nicht per Post zurückgeht; null = keine Angabe). Keine Datenänderung.
+
+1. **Produktformular:** zwei Felder in einfacher Sprache. Haken „Verdirbt schnell – kein Rücktritt möglich (z. B. frisches Fleisch, Milch, Brot)“ mit einem Satz Erklärung; Zahlenfeld „Geschätzte Kosten, wenn die Kundin die Ware zurückschickt (nur bei sperriger Ware wie Brennholz, Heu, Großgebinden)“ in Euro, leer erlaubt. Texte aus einer Quelle (src/lib/ruecktritt-angaben.ts, neu). Vorbelegung des Hakens je Kategorie aus der bisherigen `ausnahmeHinweis`-Liste NUR beim Anlegen eines neuen Produkts, nie rückwirkend.
+2. **Produktseite und Kasse (je Position, unter dem Namen):** „Kein Rücktritt: verdirbt schnell“ bzw. „Rücksendung geschätzt ca. X €“, als Hinweis-Baustein; nichts bei Produkten ohne Angabe. Bei „Betrieb“ nicht.
+3. **/widerruf:** `ausnahmeHinweis` nimmt zuerst das Produktmerkmal (gesetzt → „Für diese Ware besteht nach Angabe des Hofs kein Rücktrittsrecht (§ 18 Abs. 1 Z 4 FAGG). Der Hof prüft das im Einzelfall.“), sonst den bisherigen Satz je Kategorie. Die Position bleibt wählbar; die App entscheidet nichts.
+4. **Belehrung in der Mail** (belehrung-teil.tsx): Enthält die Bestellung mindestens ein Produkt mit `ruecksendekostenCents`, steht nach „Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.“ der Satz aus Gestaltungshinweis 5 b: „Die Kosten werden auf höchstens etwa X EUR geschätzt.“ (X = Summe der Schätzungen der betroffenen Positionen × Menge, auf ganze Euro aufgerundet, Format wie Beträge in Mails). Ohne solche Produkte bleibt der Satz weg. Wortlaut sonst unverändert (Wache aus 207 bleibt grün bzw. wird um diesen einen erlaubten Satz ergänzt).
+5. **Hof-Export/Admin:** keine Änderung außer Anzeige der zwei Werte in der Produktliste des Hofs.
+
+Dateien: prisma/schema.prisma + Migration; src/lib/ruecktritt-angaben.ts (neu); src/lib/widerruf.ts (NUR `ausnahmeHinweis`-Vorrang und der 5-b-Satz); Produktformular und Schema; Produktseite, Kasse (Position), /widerruf, belehrung-teil.tsx; Tests; DEVELOPMENT.md; ARCHITECTURE (Rechtstexte: produktbezogene Angaben); docs/recht/agb.md NICHT anfassen (der /fix AGB 1.0 bringt den Text, der zu diesem Bau passt).
+
+Tests: Migrationsfolge frisch (Regel 3); Formular speichert beide Felder, lehnt negative Beträge ab; Anzeige nur mit Angabe; `ausnahmeHinweis` mit Vorrang; Mail mit und ohne 5-b-Satz, Summe korrekt (Cent-Rechnung als Int, aufgerundet); Betrieb ohne Hinweise.
+
+## §2 Regeln
+
+- Es gelten die Regeln aus Lauf 27 (freigabe.md §31, §2), mit der Migration aus 214.
+- **Geld:** Keine Nummer ändert einen Betrag, einen Erstattungsweg oder einen Idempotenzschlüssel. 210 zeigt nur an; 213.1 verschiebt nur den Protokolleintrag. Sonst Geld-Fund, STOPP.
+- **Recht:** Belehrung bleibt wörtlich; einzige erlaubte Ergänzung ist der 5-b-Satz aus 214 mit Betrag. Die Grafik aus 211 wird nie verändert. Keine weiteren Rechtssätze erfinden; was fehlt, kommt in den Bericht für die Anwältin.
+- **Datenschutz:** Keine E-Mail-Adresse, kein Name in Logs, Sentry oder Protokoll. Beispieldaten erfunden. 212 zählt nur.
+- **Sicherheit:** Keine Nummer lockert eine Prüfung. 208 ändert die CSP nicht.
+- **Design:** jede UI-Änderung in beiden Modi, 390 und 1440 px; Touch-Ziele ≥ 44 px; Text ≥ 4,5:1; Felder 16 px; keine Hexwerte in Komponenten; die amtliche Grafik ist von der Palette-Wache ausgenommen (Bestandsliste mit Grund).
+- **Mails:** Kein Test verschickt echte Mails. Keine neue Mail-Art.
+
+## §3 Checkliste je PR
+
+Wie Lauf 27 (§31, §3), mit „Migration: nur 214 (Expand) · Paket: nein · Variable: nein“. „Alle Einstiege geprüft“ gilt für:
+
+| Nummer | alle Einstiege |
+|---|---|
+| 208 | alle Dateien mit `zodResolver` (Zahl im Bericht) |
+| 210 | beide Kassen-Schritte (bar, online, Zahlung fortsetzen), Betrieb und Privat |
+| 211 | beide Kassen-Schritte; drei Bestätigungsmails |
+| 212 | Freischalten, Hof einrichten, Heute, Admin-Hof-Akte |
+| 213 | alle Wege, die erstatten (213.1); alle Actions, die Bilder ersetzen (213.4) |
+| 214 | Produktformular (neu, bearbeiten), Produktseite, Kasse, /widerruf mit und ohne Link, drei Bestätigungsmails |
+
+## §4 Morgenbericht (morgenbericht-<datum>-lauf28.md)
+
+Wie Lauf 27, dazu:
+- **Ganz oben:** je Nummer, ob die Ausgangslage am Code bestätigt war; Migration angewandt (Regel 3); nicht begonnene Nummern (211 ohne Datei ausdrücklich).
+- **208:** Fundort von asn1.js; Zahl der `zodResolver`-Dateien.
+- **210:** Bild der Zusammenfassung über dem Knopf; was aus der Fußzeile wohin gezogen ist.
+- **211:** Quelle und Abrufdatum der Grafik (aus dem PR-Text der Projektleitung), Dateigröße.
+- **212:** Zahl der freigeschalteten Höfe ohne Hof-E-Mail.
+- **214:** die Vorbelegungs-Liste je Kategorie; offene Rechtsfragen (Formulierung der zwei Hinweise, Summe der Schätzung).
+- **„Für dich zu tun“:**
+  - Abnahme in der Testumgebung test.agrilo.at: Zahlungsschritt mit Zusammenfassung und Grafik (bar und online, Betrieb ohne), Bestätigungsmail mit Grafik und ggf. 5-b-Satz, Produkt mit beiden Feldern anlegen und in Kasse und /widerruf sehen, Freischalten eines Hofs ohne E-Mail (Fehler), Heute-Karte
+  - Höfe bitten, die zwei Produktangaben zu pflegen (Rundschreiben, Textvorschlag im Bericht)
+  - die Texte aus 214 an die Anwältin
+  - Merge per Merge-Commit

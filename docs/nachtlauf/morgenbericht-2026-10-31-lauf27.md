@@ -70,9 +70,13 @@ Keine Zahl: Dafür braucht es die Liste des echten Speichers, und darauf hatte d
 ## Bitte entscheiden
 
 1. **Register N17** (Ergänzung 16.10.2026: ein ersetztes Foto bleibt als „Bild ohne Verwendung“ liegen) widerspricht Nr. 206 für Logo, Titel- und Produktbild. Ergänzen?
+   Entschieden 31.10.2026: Ergänzung zu N17 (31.10.2026, Nr. 206): Logo, Titel- und Produktbild werden nach erfolgreichem Speichern des Ersatzes gelöscht; nur Beitragsfotos und Startseiten-Bilder bleiben als ‚Bilder ohne Verwendung‘ liegen. Der Schutzgrund von N17 bleibt erfüllt, weil erst nach dem Schreiben gelöscht wird. Altbestand vor 206 über Admin › Betrieb aufräumen (eigener Auftrag mit Freigabe).
 2. **CSP-Meldungen `eval`:** so annehmen, oder als nächste Nummer `z.config({ jitless: true })` in einem Client-Einstieg (dann keine Meldungen mehr)?
+   Entschieden 31.10.2026: Ergänzung zu G8 (31.10.2026): Die eval-Probe von Zod 4 (`new Function('')`) wird mit `z.config({ jitless: true })` in einem Client-Einstieg abgestellt, damit der CSP-Bericht echte Treffer zeigt; kein Sicherheitsgewinn, nur Signalqualität. asn1.js im Admin-Bündel wird dabei geprüft.
 3. **202 Pause des Hofs:** Die Zahlung einer bestehenden Bestellung geht bei Pause weiter (wie `/api/checkout` heute). So lassen?
+   Entschieden 31.10.2026: Ergänzung zu N2/E5 (31.10.2026, Nr. 202): Pausiert ein Hof, nachdem eine Bestellung angenommen und reserviert wurde, darf die Kundin die Zahlung dieser Bestellung noch abschließen; nur neue Bestellungen sind gesperrt. Die Admin-Sperre hält auch bestehende Zahlungen an.
 4. **205 `form.watch`:** eigene Nummer „Formulare Kasse und Produkt für React Compiler aufräumen“ (Geld-Pfad, mit Integrationsprobe)?
+   Entschieden 31.10.2026: Nacharbeit nach dem Go-live (31.10.2026): Formulare Kasse und Produkt für den React Compiler aufräumen (`form.watch` → `useWatch`), mit Integrationsprobe im Geld-Pfad. Nicht vor dem Go-live (Nr. 209, vorgemerkt).
 
 ## Nacharbeit (Vorschläge, nicht gebaut)
 - 200/186: Beim Zuordnen und beim Notfall-Storno entsteht der Protokolleintrag erst nach der Erstattung. Bricht der Aufruf bei Stripe ab, ist gebucht, aber nicht protokolliert. Protokoll direkt nach dem bedingten Schreiben.
