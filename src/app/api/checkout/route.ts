@@ -951,12 +951,13 @@ export async function POST(request: NextRequest) {
     try {
       const produkte = await prisma.product.findMany({
         where: { id: { in: data.items.map((i) => i.productId) } },
-        select: { id: true, unit: true, unitSize: true },
+        // ruecksendekostenCents (Nr. 214): Schätzung für den 5-b-Satz der Belehrung — nur Anzeige in der Mail.
+        select: { id: true, unit: true, unitSize: true, ruecksendekostenCents: true },
       })
       const einheit = new Map(
         produkte.map((p) => [
           p.id,
-          { unit: p.unit, unitSize: p.unitSize == null ? null : Number(p.unitSize) },
+          { unit: p.unit, unitSize: p.unitSize == null ? null : Number(p.unitSize), ruecksendekostenCents: p.ruecksendekostenCents },
         ])
       )
 

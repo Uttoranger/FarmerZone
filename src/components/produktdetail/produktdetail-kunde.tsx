@@ -56,6 +56,7 @@ import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-reg
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { FutterSchild } from '@/components/produkte/futter-schild'
 import { AbholhinweisZeile } from '@/components/region/futter-abholhinweise'
+import { RuecktrittHinweis } from '@/components/shared/ruecktritt-hinweis'
 import { kassenAdresse } from '@/lib/kasse'
 import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
@@ -263,6 +264,8 @@ export function ProduktdetailKunde({
               <h1 id="produkt-titel" className="font-heading text-2xl leading-[1.1] font-semibold break-words text-foreground md:text-[30px]">
                 {produkt.name}
               </h1>
+              {/* Rücktritt je Produkt (Nr. 214): Angaben des Hofs unter dem Namen — nicht bei Ware nur für Betriebe (kein Rücktritt für Unternehmer). */}
+              {produkt.abgabe !== 'NUR_BETRIEBE' && <RuecktrittHinweis angabe={produkt} className="-mt-1 text-[13px]" />}
 
               {(marke || produkt.labels.length > 0 || produkt.abgabe === 'NUR_BETRIEBE' || produkt.brennmaterial || produkt.category === 'BRENNHOLZ') && (
                 <ul className="flex flex-wrap gap-1.5">

@@ -375,16 +375,27 @@ export type ZuordnenErgebnis = { ok: true; orderId: string; weiter: 'erstattet' 
  * Zuordnen ergibt 0 Zeilen), dann derselbe Weg wie ein zugeordneter Widerruf (`leiteWeiter`):
  * vor der Abholung Storno mit Erstattung, sonst an den Hof. Die
  * Eingangsbestätigung ging schon beim Eingang hinaus — keine zweite. Das
- * Protokoll `widerruf_zugeordnet` schreibt die Action (Person, Grund, Passkey).
+ * Protokoll `widerruf_zugeordnet` schreibt die Action (Person, Grund, Passkey)
+ * in `nachZuordnen`: direkt nach dem bedingten Schreiben, VOR Storno und
+ * Erstattung (Nr. 213.1) — ein Abbruch bei Stripe lässt den Eintrag stehen.
  */
 export async function weiseWiderrufZu(
   e: { widerrufId: string; bestellnummer: string },
-  jetzt: Date = new Date()
+  jetzt: Date = new Date(),
+  nachZuordnen?: (orderId: string) => Promise<void>
 ): Promise<ZuordnenErgebnis> {
   const order = await prisma.order.findUnique({ where: { orderNumber: normalisiereBestellnummer(e.bestellnummer) }, select: BESTELLUNG_ZUM_WIDERRUF })
   if (!order) return { error: 'unbekannt' }
   const { count } = await prisma.widerruf.updateMany({ where: { id: e.widerrufId, orderId: null, stand: 'eingegangen' }, data: { orderId: order.id } })
   if (count !== 1) return { error: 'nicht_offen' }
+  if (nachZuordnen) {
+    try {
+      await nachZuordnen(order.id)
+    } catch (err) {
+      // Nachlauf: zugeordnet ist zugeordnet, der Weg läuft weiter.
+      melde('Widerruf: Nachlauf des Zuordnens gescheitert', 'zuordnen', { widerrufId: e.widerrufId, orderId: order.id }, err)
+    }
+  }
   const w = await prisma.widerruf.findUnique({ where: { id: e.widerrufId }, select: VERARBEITEN })
   if (!w) return { ok: true, orderId: order.id, weiter: 'hof' }
   return { ok: true, orderId: order.id, weiter: await leiteWeiter(w, order, jetzt) }
@@ -709,11 +720,20 @@ export async function ladeWiderrufAufgaben(): Promise<WiderrufAufgabeRoh[]> {
 
 // ─── Lesen für Admin › Bestellungen und die Hof-Akte (Nachbesserung Runde 2) ──
 
-/** Die Zeilen „Umfang“ fürs Team: ganze Bestellung, die Artikel — der Freitext steht nie hier, nur in `nachricht`. */
-function adminUmfang(w: { umfang: string; positionen: unknown }, items: readonly { id: string; productName: string; quantity: number }[]): string[] {
+type AdminPosition = { id: string; productName: string; quantity: number; fehltSeit?: Date | null }
+
+/**
+ * Die Zeilen „Umfang“ fürs Team: ganze Bestellung, die Artikel — der Freitext steht nie hier, nur in `nachricht`.
+ * Ein offener Widerruf (`eingegangen`) zeigt nur den Rest (`offenePositionen`, Nr. 213.2): Was vor der
+ * Abholung schon gestrichen und erstattet ist, steht nicht mehr da — wie in Heute und der Mail an den Hof.
+ * Ein erledigter zeigt, was die Kundin gewählt hat.
+ */
+function adminUmfang(w: { umfang: string; positionen: unknown; stand: string }, items: readonly AdminPosition[]): string[] {
   if (w.umfang === 'ganz') return [WIDERRUF_TEXT.ganz]
-  const positionen = lesePositionen(w.positionen)
-  if (positionen.length === 0) return [WIDERRUF_ADMIN_TEXT.freitext]
+  const gewaehlt = lesePositionen(w.positionen)
+  if (gewaehlt.length === 0) return [WIDERRUF_ADMIN_TEXT.freitext]
+  const offen = alsWiderrufStand(w.stand) === 'eingegangen'
+  const positionen = offen ? offenePositionen(gewaehlt, items.map((i) => ({ id: i.id, fehlt: (i.fehltSeit ?? null) !== null }))) : gewaehlt
   return positionen.map((p) => {
     const item = items.find((i) => i.id === p.orderItemId)
     return item ? `${p.menge} × ${item.productName}` : WIDERRUF_TEXT.teil
@@ -732,7 +752,7 @@ export type AdminWiderruf = {
 }
 
 /** Die Widerrufe einer Bestellung, neueste zuerst — für das Detail in Admin › Bestellungen. */
-export async function ladeWiderrufeZurBestellung(orderId: string, items: readonly { id: string; productName: string; quantity: number }[]): Promise<AdminWiderruf[]> {
+export async function ladeWiderrufeZurBestellung(orderId: string, items: readonly AdminPosition[]): Promise<AdminWiderruf[]> {
   const liste = await prisma.widerruf.findMany({
     where: { orderId },
     orderBy: { eingegangenAm: 'desc' },
@@ -802,7 +822,7 @@ export async function ladeWiderrufeDesHofs(farmId: string): Promise<HofAkteWider
   })
   const bestellungen = await prisma.order.findMany({
     where: { farmId, id: { in: liste.flatMap((w) => (w.orderId ? [w.orderId] : [])) } },
-    select: { id: true, orderNumber: true, items: { select: { id: true, productName: true, quantity: true } } },
+    select: { id: true, orderNumber: true, items: { select: { id: true, productName: true, quantity: true, fehltSeit: true } } },
   })
   return liste.flatMap((w) => {
     const b = bestellungen.find((o) => o.id === w.orderId)

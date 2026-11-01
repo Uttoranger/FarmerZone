@@ -86,6 +86,7 @@ vi.mock('react-hook-form', async (importOriginal) => {
 })
 
 import { ProfileForm } from '@/components/settings/profile-form'
+import { HOF_EMAIL_ANKER, HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import type { FarmSettings } from '@/server/queries/farm'
 
 /** So steht der Hof in der Datenbank — mit Altwerten aus der Zeit vor dem Schema. */
@@ -209,16 +210,25 @@ describe('Hof-Profil: Felder (Nr. 174)', () => {
   it('freiwillig steht am Feld, kein „*" an Pflichtfeldern; die Hof-E-Mail erklärt sich', () => {
     const markup = html()
     expect(markup).toContain('Beschreibung (freiwillig)')
-    // Auch mit gespeicherter Adresse freiwillig (Nr. 194): leer heißt Anmelde-Adresse.
-    expect(markup).toContain('Hof-E-Mail (freiwillig)')
     expect(markup).not.toMatch(/ \*<\/label>/)
     expect(markup).toMatch(/aria-describedby="email-hilfe"/)
   })
 
-  it('ohne gespeicherte Hof-E-Mail ist das Feld freiwillig; die Hilfe nennt den Rückfall auf die Anmelde-Adresse', () => {
-    const markup = renderToStaticMarkup(createElement(ProfileForm, { farm: { ...HOF, email: '' } }))
-    expect(markup).toContain('Hof-E-Mail (freiwillig)')
-    expect(markup).toMatch(/id="email-hilfe"[^>]*>[^<]*Anmelde-Adresse/)
+  it('Nr. 212: die Hof-E-Mail heißt nicht mehr „freiwillig“; die Hilfe ist der Erklärsatz, nicht „leer → Anmelde-Adresse“ (mit und ohne gespeicherte Adresse)', () => {
+    for (const email of [HOF.email, '']) {
+      const markup = renderToStaticMarkup(createElement(ProfileForm, { farm: { ...HOF, email } }))
+      expect(markup).toContain(`>${HOF_EMAIL_TEXT.profilLabel}</label>`)
+      expect(markup).not.toContain('Hof-E-Mail (freiwillig)')
+      expect(markup).toMatch(/id="email-hilfe"[^>]*>Diese Adresse sehen deine Kundinnen und Kunden in der Bestellung und in der Rücktrittsbelehrung\.</)
+      expect(markup).not.toMatch(/id="email-hilfe"[^>]*>[^<]*Anmelde-Adresse/)
+    }
+    // Gegenprobe: Die Beschreibung bleibt freiwillig.
+    expect(html()).toContain('Beschreibung (freiwillig)')
+  })
+
+  it('Nr. 212: das Feld trägt die id des Ankers, auf den die Karte in Heute zeigt', () => {
+    expect(HOF_EMAIL_TEXT.einstellungenPfad).toBe(`/settings/profile#${HOF_EMAIL_ANKER}`)
+    expect(feld(HOF_EMAIL_ANKER)).toMatch(/type="email"/)
   })
 
   it('das Formular ist noValidate: Die Sätze am Feld gelten, nicht die Blase des Browsers (type="email")', () => {

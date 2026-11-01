@@ -1,10 +1,9 @@
 /**
  * Mein Hof › Kontakt sagt dasselbe über die Hof-E-Mail wie das Profil (Nr. 194,
- * Nachbesserung Runde 1): Das Feld ist freiwillig, und leer heißt Anmelde-Adresse.
- * Beide Formulare bearbeiten Farm.email — ohne den Hinweis leerte der Hof das
- * Feld unter Mein Hof, ohne zu erfahren, wohin seine Bestellmeldungen dann gehen.
+ * Nachbesserung Runde 1; seit Nr. 212 ohne „freiwillig“ und ohne „leer → Anmelde-Adresse“,
+ * sondern mit dem Erklärsatz). Beide Formulare bearbeiten Farm.email.
  *
- * Beweist (renderToStaticMarkup, kein DOM, kein Netz): Label mit „(freiwillig)",
+ * Beweist (renderToStaticMarkup, kein DOM, kein Netz): Label ohne „(freiwillig)",
  * HOF_EMAIL_HILFE unter dem Feld und per aria-describedby mit ihm verbunden; der
  * Satz darunter behauptet nicht mehr, die E-Mail stehe auf der Hofseite.
  * Gegenprobe: Das Telefon trägt keinen Freiwillig-Zusatz und keine Hilfe.
@@ -38,9 +37,11 @@ function text(html: string): string {
 }
 
 describe('KontaktForm unter Mein Hof: Hof-E-Mail', () => {
-  it.each(['', 'hof@example.org'])('Label freiwillig, Hinweis auf die Anmelde-Adresse (gespeichert: "%s")', (email) => {
+  it.each(['', 'hof@example.org'])('Nr. 212: Label ohne „freiwillig“, der Erklärsatz unter dem Feld (gespeichert: "%s")', (email) => {
     const html = zeichne(email)
-    expect(text(html)).toContain(`E-Mail ${FREIWILLIG}`)
+    expect(text(html)).not.toContain(`E-Mail ${FREIWILLIG}`)
+    expect(html).toMatch(/<label[^>]*for="hofseite-email"[^>]*>E-Mail<\/label>/)
+    expect(text(html)).not.toContain('Anmelde-Adresse')
     expect(text(html)).toContain(HOF_EMAIL_HILFE)
     expect(html).toMatch(/<input[^>]*id="hofseite-email"[^>]*aria-describedby="hofseite-email-hilfe"/)
     expect(html).toContain('<p id="hofseite-email-hilfe"')

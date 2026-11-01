@@ -53,9 +53,19 @@ describe('filtereAnalyticsEreignis', () => {
 
 describe('Zusatzliste gegen next.config.ts', () => {
   it('jede Seite mit Referrer-Policy no-referrer steht in der Filterliste', async () => {
-    const regeln = (await konfiguration.headers!()) as { source: string; headers: { key: string; value: string }[] }[]
-    const quellen = regeln.filter((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer')).map((r) => r.source)
+    const regeln = (await konfiguration.headers!()) as { source: string; has?: { key: string }[]; headers: { key: string; value: string }[] }[]
+    const ohneReferrer = regeln.filter((r) => r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
+    const quellen = ohneReferrer.filter((r) => !r.has).map((r) => r.source)
     expect(quellen.length).toBeGreaterThan(5)
     expect([...quellen].sort()).toEqual([...ANALYTICS_ZUSATZ_PFADE].sort())
+  })
+
+  it('eine Regel mit Bedingung (Kasse mit ?zahlung=&sig=, Nr. 213.6) sperrt nicht die ganze Seite — ihr heikler Wert wird gestrichen', async () => {
+    const regeln = (await konfiguration.headers!()) as { source: string; has?: { key: string }[]; headers: { key: string; value: string }[] }[]
+    const mitBedingung = regeln.filter((r) => r.has && r.headers.some((h) => h.key === 'Referrer-Policy' && h.value === 'no-referrer'))
+    expect(mitBedingung.map((r) => r.source)).toEqual(['/:farmSlug/checkout'])
+    for (const r of mitBedingung) expect(r.has!.some((h) => (NIE_MELDEN_PARAMETER as readonly string[]).includes(h.key)), r.source).toBe(true)
+    const gefiltert = filtereAnalyticsEreignis(ereignis('/hof-test/checkout?zahlung=bestellungA&sig=ab12'))
+    expect(gefiltert?.url).not.toContain('sig=')
   })
 })

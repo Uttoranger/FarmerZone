@@ -49,6 +49,7 @@ function roh(ueber: Partial<HoefeListenRoh> = {}): HoefeListenRoh {
     stripeBereit: true,
     produktImShop: true,
     abholzeitAktiv: true,
+    hofEmailFehlt: false,
     letzteBestellungAm: vor(2),
     bestellungen30: 7,
     zuletztAktivAm: null,
@@ -79,6 +80,9 @@ describe('hofSignale — EINE Regel für Liste und Aufgaben', () => {
     expect(hofSignale(roh({ approvedAt: null, abholzeitAktiv: false }), JETZT)).toEqual([{ id: 'wartet', text: 'Abholzeit fehlt' }])
     expect(hofSignale(roh({ approvedAt: null, stripeBereit: false }), JETZT)).toEqual([{ id: 'wartet', text: 'Stripe fehlt' }])
     expect(hofSignale(roh({ approvedAt: null }), JETZT)).toEqual([{ id: 'wartet', text: 'bereit zum Prüfen' }])
+    // Nr. 212: ohne Hof-E-Mail wartet der Hof mit „Hof-E-Mail fehlt“ — nie „bereit zum Prüfen“; ein Freigeschalteter bekommt kein Signal.
+    expect(hofSignale(roh({ approvedAt: null, hofEmailFehlt: true }), JETZT)).toEqual([{ id: 'wartet', text: 'Hof-E-Mail fehlt' }])
+    expect(hofSignale(roh({ hofEmailFehlt: true }), JETZT)).toEqual([])
   })
 
   it('verkauft: Stripe fehlt, ohne Abholzeit, lange ohne Bestellung', () => {

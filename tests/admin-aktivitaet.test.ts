@@ -43,6 +43,7 @@ function dbZeile(overrides: Record<string, unknown> = {}) {
     description: 'Wir sind ein kleiner Familienbetrieb.',
     logoUrl: 'https://blob.example/logo.png',
     country: 'AT',
+    email: 'kontakt@testhof.example',
     // Servicegebühr-Einstellung (Sprint servicegebuehr) — Decimal kommt als Objekt
     serviceFeePercent: { toString: () => '4.90' },
     serviceFeeMinCents: 50,

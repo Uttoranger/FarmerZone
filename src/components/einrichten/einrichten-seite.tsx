@@ -53,7 +53,7 @@ function Zeichen({ schritt }: { schritt: EinrichtenSchritt }) {
   )
 }
 
-function SchrittKarte({ schritt, person }: { schritt: EinrichtenSchritt; person: { name: string; email: string } }) {
+function SchrittKarte({ schritt, person }: { schritt: EinrichtenSchritt; person: { name: string } }) {
   const offen = schritt.zustand === 'offen'
   const leise = schritt.zustand === 'gesperrt' || schritt.zustand === 'wartet' || schritt.zustand === 'hinweis'
   const aktion = schritt.aktion
@@ -83,7 +83,7 @@ function SchrittKarte({ schritt, person }: { schritt: EinrichtenSchritt; person:
           </Link>
         )}
       </div>
-      {aktion?.art === 'formular' && <HofAnlegenFormular personName={person.name} email={person.email} />}
+      {aktion?.art === 'formular' && <HofAnlegenFormular personName={person.name} />}
     </li>
   )
 }

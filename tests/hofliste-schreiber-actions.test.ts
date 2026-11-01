@@ -27,7 +27,7 @@ vi.mock('@/lib/prisma', async () => {
   const prisma: Record<string, unknown> = {
     farm: { findUnique: vi.fn(), update: vi.fn() },
     pickupSlot: { findMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
-    farmPhoto: { count: vi.fn(), create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    farmPhoto: { count: vi.fn(), create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() },
     farmValue: { deleteMany: vi.fn(), createMany: vi.fn() },
     order: { count: vi.fn() },
     user: { findUnique: vi.fn() },
@@ -51,7 +51,6 @@ import {
   addFarmPhotoAction,
   deleteFarmPhotoAction,
   moveFarmPhotoAction,
-  reorderPhotosAction,
   updateFarmPhotoCaptionAction,
 } from '@/server/actions/farm-photos'
 import { archiveFarm, reactivateFarm } from '@/server/actions/farm-archive'
@@ -63,7 +62,7 @@ type Fn = ReturnType<typeof vi.fn>
 const db = prisma as unknown as {
   farm: { findUnique: Fn; update: Fn }
   pickupSlot: { findMany: Fn; create: Fn; deleteMany: Fn; updateMany: Fn }
-  farmPhoto: { count: Fn; create: Fn; findUnique: Fn; findMany: Fn; update: Fn; delete: Fn }
+  farmPhoto: { count: Fn; create: Fn; findUnique: Fn; findMany: Fn; update: Fn; updateMany: Fn; delete: Fn }
   order: { count: Fn }
   user: { findUnique: Fn }
   $transaction: Fn
@@ -99,7 +98,6 @@ const SCHREIBER: Array<[string, () => Promise<unknown>, () => Fn]> = [
   ['setPause', () => setPause(true, 'Urlaub bis Montag'), () => db.farm.update],
   ['addFarmPhotoAction', () => addFarmPhotoAction({ url: EIGENES_FOTO }), () => db.farmPhoto.create],
   ['deleteFarmPhotoAction', () => deleteFarmPhotoAction('foto_a'), () => db.farmPhoto.update],
-  ['reorderPhotosAction', () => reorderPhotosAction(['foto_b', 'foto_a']), () => db.$transaction],
   ['moveFarmPhotoAction', () => moveFarmPhotoAction('foto_a', 'down'), () => db.$transaction],
   ['archiveFarm', () => archiveFarm(), () => db.farm.update],
   ['reactivateFarm', () => reactivateFarm(), () => db.$transaction],

@@ -38,7 +38,6 @@ const ZOD_BESTAND: readonly Eintrag[] = [
   { datei: 'admin.ts', name: 'rejectFarmAction', grund: ALTBESTAND },
   { datei: 'appearance.ts', name: 'updateFarmLogoAction', grund: 'Altbestand vor Nr. 178: die Adresse prüft bildUrlErlaubt (nur eigener Blob-Speicher); Schema nachziehen' },
   { datei: 'appearance.ts', name: 'updateFarmBannerAction', grund: 'Altbestand vor Nr. 178: Art fest im Code verglichen, Adresse über bildUrlErlaubt; Schema nachziehen' },
-  { datei: 'farm-photos.ts', name: 'reorderPhotosAction', grund: 'Altbestand vor Nr. 178: die Liste muss genau die eigenen Fotos sein (Transaktion); Schema nachziehen' },
   { datei: 'farm-photos.ts', name: 'moveFarmPhotoAction', grund: ALTBESTAND },
   { datei: 'farm.ts', name: 'holeAdresseZumPunkt', grund: 'Altbestand vor Nr. 178: Number.isFinite prüft beide Zahlen, sie gehen nur an die Geokodierung; Schema nachziehen' },
   { datei: 'farm.ts', name: 'deletePickupSlot', grund: ALTBESTAND },

@@ -78,6 +78,10 @@ export type PublicProduct = {
   brennmaterial: PublicBrennmaterial | null
   /** Seit Nr. 123 (N23): Abholhinweise eines Futters für die Produktseite; sonst leer. */
   abholhinweise: AbholhinweisValue[]
+  /** Seit Nr. 214 (N39): „verdirbt schnell – kein Rücktritt“ laut Hof — Hinweis auf Produktseite und in der Kasse. */
+  keinRuecktritt: boolean
+  /** Seit Nr. 214 (N39): geschätzte Rücksendekosten in Cent, null = keine Angabe. */
+  ruecksendekostenCents: number | null
 }
 
 /**
@@ -328,6 +332,9 @@ const OEFFENTLICHES_PRODUKT_SELECT = {
   familieId: true,
   // Seit Nr. 123: Abholhinweise eines Futters für die Produktseite (N23).
   abholhinweise: true,
+  // Seit Nr. 214: Angaben des Hofs zum Rücktritt (N39) für Produktseite und Kasse.
+  keinRuecktritt: true,
+  ruecksendekostenCents: true,
   brennmaterial: {
     select: {
       holzart: true,

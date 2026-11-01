@@ -41,6 +41,8 @@ const ABSCHNITT_VON_FELD: Record<Feld, Abschnitt> = {
   requiresCool: 'details',
   requiresFreezer: 'details',
   countsTowardLimit: 'details',
+  keinRuecktritt: 'details',
+  ruecksendekostenCents: 'details',
   vatRate: 'details',
   futter: 'kennzeichnung',
   // Der Schalter „Nur an landwirtschaftliche Betriebe" steht in der Futter-Sektion (Konzept 6.1).

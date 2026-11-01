@@ -17,6 +17,7 @@ vi.mock('@/server/actions/email-bestaetigung', () => ({ sendeBestaetigungErneut:
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
 import { einrichtenStand, type EinrichtenDaten } from '@/lib/einrichten'
 import { hofAnlegenFormularSchema, hofAnlegenSchema } from '@/schemas/hofprofil'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 
 const person = { name: 'Max Mustermann', email: 'max@example.com' }
 
@@ -94,11 +95,20 @@ describe('hofAnlegenFormularSchema — strenger als createFarm', () => {
     postalCode: '1010',
     city: 'Wien',
     phone: '+43 660 0000000',
-    email: '',
+    email: 'hof@example.com',
   }
 
-  it('nimmt ein vollständiges Formular, die Hof-E-Mail darf leer bleiben', () => {
+  it('nimmt ein vollständiges Formular mit Hof-E-Mail', () => {
     expect(hofAnlegenFormularSchema.safeParse(gueltig).success).toBe(true)
+  })
+
+  it('Nr. 212: ohne Hof-E-Mail (auch nur Leerzeichen) ein Formularfehler am Feld mit dem Satz; ungültig ebenso', () => {
+    for (const email of ['', '   ']) {
+      const e = hofAnlegenFormularSchema.safeParse({ ...gueltig, email })
+      expect(e.success).toBe(false)
+      expect(e.success ? [] : e.error.issues.map((i) => [i.path[0], i.message])).toEqual([['email', HOF_EMAIL_TEXT.pflicht]])
+    }
+    expect(hofAnlegenFormularSchema.safeParse({ ...gueltig, email: 'hof at example' }).success).toBe(false)
   })
 
   it('Pflichtfelder und PLZ mit vier Ziffern', () => {
@@ -108,8 +118,8 @@ describe('hofAnlegenFormularSchema — strenger als createFarm', () => {
     expect(felder.sort()).toEqual(['address', 'name', 'phone', 'postalCode'])
   })
 
-  it('der Server bleibt nachsichtig wie bisher (hofAnlegenSchema unverändert)', () => {
-    expect(hofAnlegenSchema.safeParse({ ...gueltig, postalCode: '10100' }).success).toBe(true)
+  it('hofAnlegenSchema bleibt nachsichtig wie bisher (die Pflicht der Hof-E-Mail prüft createFarm zusätzlich, Nr. 212)', () => {
+    expect(hofAnlegenSchema.safeParse({ ...gueltig, postalCode: '10100', email: '' }).success).toBe(true)
   })
 })
 

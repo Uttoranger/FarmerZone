@@ -37,13 +37,7 @@ type Eintrag = { datei: string; name: string; grund: string }
 
 /** Exportierte Actions ohne Aufrufer unter `src/`. Nur schrumpfen. */
 const AUFRUFER_BESTAND: readonly Eintrag[] = [
-  {
-    datei: 'src/server/actions/farm-photos.ts',
-    name: 'reorderPhotosAction',
-    grund:
-      'Fund Lauf 27: nur aus moveFarmPhotoAction derselben Datei gerufen, keine Komponente importiert sie; ' +
-      'ändert nur die Reihenfolge der Fotos des eigenen Hofs (Besitz geprüft), keine Rolle, kein Admin, kein Geld',
-  },
+  // Leer seit Nr. 213.5: die Drag-&-Drop-Action der Fotos (Fund Lauf 27) ist in moveFarmPhotoAction aufgegangen.
 ]
 
 /** Alle `.ts`/`.tsx` unter `ordner`, als Pfad ab der Wurzel mit `/`. */

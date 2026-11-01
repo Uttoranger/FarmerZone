@@ -44,6 +44,8 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
+import { RuecktrittFelder } from './ruecktritt-felder'
+import { RUECKTRITT_TEXT, keinRuecktrittNachKategoriewechsel } from '@/lib/ruecktritt-angaben'
 import {
   Select,
   SelectContent,
@@ -254,6 +256,9 @@ const EMPTY_DEFAULTS: ProductFormData = {
   futter: null,
   abgabe: 'ALLE',
   abholhinweise: [],
+  // Nr. 214: ohne Kategorie kein Haken — die Vorbelegung setzt kategorieSetzen beim Anlegen.
+  keinRuecktritt: false,
+  ruecksendekostenCents: null,
   countsTowardLimit: true,
   // NaN statt 0: Das Preisfeld startet leer, und die Prüfung meldet „Bitte gib
   // einen Preis ein" statt „größer als 0" für eine Null, die niemand getippt hat.
@@ -301,6 +306,9 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
       : null,
     abgabe: p.abgabe,
     abholhinweise: p.abholhinweise,
+    // Beim Bearbeiten immer der gespeicherte Wert — nie die Vorbelegung der Kategorie (Nr. 214).
+    keinRuecktritt: p.keinRuecktritt,
+    ruecksendekostenCents: p.ruecksendekostenCents,
     countsTowardLimit: p.countsTowardLimit,
     price: p.price,
     vatRate: p.vatRate,
@@ -336,6 +344,7 @@ function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
       const teile: string[] = []
       teile.push(w.labels.length > 0 ? w.labels.map((l) => SIEGEL[l].name).join(', ') : 'Keine Siegel')
       if (w.allergens.length > 0) teile.push(mitAnzahl(w.allergens.length, 'Allergen', 'Allergene'))
+      if (w.keinRuecktritt) teile.push(RUECKTRITT_TEXT.hinweisKeinRuecktritt)
       // Der MwSt-Satz steht nur da, wenn er vom Standard der Kategorie abweicht.
       if (Number.isFinite(w.vatRate) && w.vatRate !== mwstStandard(w.category)) {
         teile.push(`MwSt ${formatZahl(w.vatRate)} %`)
@@ -727,6 +736,10 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
     if (form.getValues('vatRate') === mwstStandard(alt)) {
       form.setValue('vatRate', mwstStandard(neu), { shouldDirty: true })
     }
+    // „Verdirbt schnell“ (Nr. 214): Vorbelegung je Kategorie NUR beim Anlegen, nie rückwirkend.
+    const haken = form.getValues('keinRuecktritt')
+    const hakenNeu = keinRuecktrittNachKategoriewechsel({ anlegen: !isEdit, aktuell: haken, alt, neu })
+    if (hakenNeu !== haken) form.setValue('keinRuecktritt', hakenNeu, { shouldDirty: true })
     // Ballen und Big Bags gibt es bei Lebensmitteln nicht (F7).
     if (!grossgebindeEinheitenAngeboten(neu) && istGrossgebindeEinheit(form.getValues('unit'))) {
       einheitSetzen('STUECK')
@@ -1651,6 +1664,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                           </div>
                         )}
                       />
+
+                      {/* Rücktritt je Produkt (Nr. 214): Haken und geschätzte Rücksendekosten */}
+                      <RuecktrittFelder control={form.control} />
 
                       {/* MwSt: kein täglicher Handgriff, deshalb hier statt beim Preis */}
                       <FormField

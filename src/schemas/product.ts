@@ -24,6 +24,7 @@ import { nachkommastellen, parseDezimal } from '@/lib/format'
 import { PRODUKTNAME_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
 import { FUTTER_BESTAETIGUNG_FEHLT, KENNZEICHNUNG_VERWEIS } from '@/lib/futter-registrierung'
 import { ABHOLHINWEISE_MAX, ABHOLHINWEIS_VALUES } from '@/lib/abholhinweise'
+import { RUECKSENDEKOSTEN_MAX_CENTS, RUECKTRITT_TEXT } from '@/lib/ruecktritt-angaben'
 
 // Kategorien, Unterkategorien und Siegel leben seit Sprint Taxonomie 1 in
 // src/lib/taxonomie.ts — der EINEN Quelle. Die drei Namen bleiben hier
@@ -277,6 +278,22 @@ export const abholhinweiseSchema = z
   .default([])
   .refine((h) => new Set(h).size === h.length, ABHOLHINWEIS_DOPPELT)
 
+/**
+ * Geschätzte Rücksendekosten (Nr. 214, § 4 Abs. 1 Z 9 FAGG) in ganzen Cent;
+ * null = keine Angabe. Das Formular rechnet den getippten Euro-Betrag über
+ * die Ziffern in Cent (ruecksendekostenAusEingabe) und schickt Unlesbares als
+ * NaN — hier abgelehnt, nie still als „keine Angabe“ gespeichert. 0 ist keine
+ * Schätzung: dann bleibt das Feld leer.
+ */
+export const ruecksendekostenSchema = z
+  .number({ error: RUECKTRITT_TEXT.betragUngueltig })
+  .int(RUECKTRITT_TEXT.betragUngueltig)
+  .min(0, RUECKTRITT_TEXT.betragNegativ)
+  .refine((c) => c !== 0, RUECKTRITT_TEXT.betragNull)
+  .refine((c) => c <= RUECKSENDEKOSTEN_MAX_CENTS, RUECKTRITT_TEXT.betragZuHoch)
+  .nullable()
+  .default(null)
+
 /** Kategorie-Feld: null = „Keine Angabe" (heutiges Verhalten); ungültige Werte werden abgelehnt. */
 const kategorieFeld = z.preprocess(leerZuNull, z.enum(PRODUCT_CATEGORY_VALUES).nullable()).default(null)
 
@@ -304,6 +321,9 @@ const produktFelder = z.object({
   // ≠ ALLE nur im Bereich Futtermittel (superRefine).
   abgabe: z.enum(ABGABE_VALUES).default('ALLE'),
   abholhinweise: abholhinweiseSchema,
+  // Rücktritt je Produkt (Nr. 214, N39-Ergänzung): Angaben des Hofs, gespeichert wie getippt.
+  keinRuecktritt: z.boolean().default(false),
+  ruecksendekostenCents: ruecksendekostenSchema,
   countsTowardLimit: z.boolean().default(true),
   price: preisZahl,
   vatRate: mwstZahl,
@@ -478,6 +498,8 @@ export const PRODUKT_FELD_REIHENFOLGE = [
   'requiresCool',
   'requiresFreezer',
   'countsTowardLimit',
+  'keinRuecktritt',
+  'ruecksendekostenCents',
   'vatRate',
   'futter',
   'abgabe',

@@ -6,6 +6,7 @@ import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import type { MarkeArt } from '@/lib/marke-art'
 import { link, type AgbStueck } from '@/lib/rechtstexte/stuecke'
 import type { ProductCategoryValue } from '@/lib/taxonomie'
+import { RUECKTRITT_TEXT, kostenSchaetzungSatz } from '@/lib/ruecktritt-angaben'
 
 /*
  * Widerruf online (§ 13a FAGG, Register N39, Nr. 200) — die reinen Regeln:
@@ -108,8 +109,14 @@ const AUSNAHME_HINWEIS: Record<ProductCategoryValue, string> = {
   SONSTIGES: JE_NACH_WARE,
 }
 
-export function ausnahmeHinweis(kategorie: ProductCategoryValue): string {
-  return AUSNAHME_HINWEIS[kategorie]
+/**
+ * Der Hinweis je Position auf /widerruf: Hat der Hof beim Produkt „verdirbt
+ * schnell – kein Rücktritt“ angegeben, steht zuerst diese Angabe (Nr. 214,
+ * N39-Ergänzung), sonst der Satz je Kategorie. Die Position bleibt wählbar —
+ * die App entscheidet nichts.
+ */
+export function ausnahmeHinweis(kategorie: ProductCategoryValue, keinRuecktritt = false): string {
+  return keinRuecktritt ? RUECKTRITT_TEXT.widerrufKeinRuecktritt : AUSNAHME_HINWEIS[kategorie]
 }
 
 /** Eine gewählte Position: immer die ganze Menge der Position (Teilmengen bucht kein bestehender Weg). */
@@ -302,6 +309,9 @@ export type Belehrung = {
   hinweis: string
 }
 
+/** Nach diesem Satz steht bei sperriger Ware die Schätzung (Gestaltungshinweis 5 b, belehrungMitKostenschaetzung). */
+const RUECKSENDEKOSTEN_SATZ = 'Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.'
+
 /** Anhang I FAGG, Teil A und B, wörtlich (Quelle im Kopfkommentar). */
 export const BELEHRUNG: Belehrung = {
   teilA: {
@@ -323,7 +333,7 @@ export const BELEHRUNG: Belehrung = {
           'Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten (mit Ausnahme der zusätzlichen Kosten, die sich daraus ergeben, dass Sie eine andere Art der Lieferung als die von uns angebotene, günstigste Standardlieferung gewählt haben), unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf dieses Vertrags bei uns eingegangen ist. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden Ihnen wegen dieser Rückzahlung Entgelte berechnet.',
           'Wir können die Rückzahlung verweigern, bis wir die Waren wieder zurückerhalten haben oder bis Sie den Nachweis erbracht haben, dass Sie die Waren zurückgesandt haben, je nachdem, welches der frühere Zeitpunkt ist.',
           'Sie haben die Waren unverzüglich und in jedem Fall spätestens binnen vierzehn Tagen ab dem Tag, an dem Sie uns über den Widerruf dieses Vertrags unterrichten, an uns zurückzusenden oder zu übergeben. Die Frist ist gewahrt, wenn Sie die Waren vor Ablauf der Frist von vierzehn Tagen absenden.',
-          'Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.',
+          RUECKSENDEKOSTEN_SATZ,
           'Sie müssen für einen etwaigen Wertverlust der Waren nur aufkommen, wenn dieser Wertverlust auf einen zur Prüfung der Beschaffenheit, Eigenschaften und Funktionsweise der Waren nicht notwendigen Umgang mit ihnen zurückzuführen ist.',
         ],
       },
@@ -402,5 +412,22 @@ export function belehrungMitHof(hof: BelehrungHof | null): Belehrung {
     ...BELEHRUNG,
     teilA: { ...BELEHRUNG.teilA, abschnitte: BELEHRUNG.teilA.abschnitte.map((a) => ({ ...a, absaetze: a.absaetze.map(fuelle) })) },
     teilB: { ...BELEHRUNG.teilB, zeilen: BELEHRUNG.teilB.zeilen.map(fuelle) },
+  }
+}
+
+/**
+ * Gestaltungshinweis 5 b (Nr. 214, Freigabe Punkt 4): Trägt die Bestellung
+ * mindestens ein Produkt mit geschätzten Rücksendekosten, steht direkt nach
+ * „Sie tragen die unmittelbaren Kosten der Rücksendung der Waren.“ im selben
+ * Absatz „Die Kosten werden auf höchstens etwa X EUR geschätzt.“ — X aus
+ * `ruecksendekostenSchaetzungEuro`. Ohne Schätzung (null) bleibt die
+ * Belehrung Wort für Wort, wie sie ist; sonst ändert sich kein Wort.
+ */
+export function belehrungMitKostenschaetzung(belehrung: Belehrung, euro: number | null): Belehrung {
+  if (euro === null) return belehrung
+  const ergaenze = (t: string): string => (t === RUECKSENDEKOSTEN_SATZ ? `${t} ${kostenSchaetzungSatz(euro)}` : t)
+  return {
+    ...belehrung,
+    teilA: { ...belehrung.teilA, abschnitte: belehrung.teilA.abschnitte.map((a) => ({ ...a, absaetze: a.absaetze.map(ergaenze) })) },
   }
 }

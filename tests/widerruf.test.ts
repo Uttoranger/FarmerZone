@@ -67,6 +67,16 @@ describe('ausnahmeHinweis', () => {
     // Nur ein Hinweis — entscheiden tut der Hof.
     for (const k of PRODUCT_CATEGORY_VALUES) expect(ausnahmeHinweis(k)).toContain('Der Hof prüft das im Einzelfall.')
   })
+
+  it('Nr. 214: die Angabe des Hofs „verdirbt schnell“ hat Vorrang vor dem Satz je Kategorie — bei jeder Kategorie', () => {
+    const satz = 'Für diese Ware besteht nach Angabe des Hofs kein Rücktrittsrecht (§ 18 Abs. 1 Z 4 FAGG). Der Hof prüft das im Einzelfall.'
+    for (const k of PRODUCT_CATEGORY_VALUES) expect(ausnahmeHinweis(k, true)).toBe(satz)
+  })
+
+  it('Nr. 214 Gegenprobe: ohne Angabe bleibt der Satz je Kategorie (Honig: Rücktritt wahrscheinlich möglich)', () => {
+    expect(ausnahmeHinweis('HONIG', false)).toBe(ausnahmeHinweis('HONIG'))
+    expect(ausnahmeHinweis('HONIG', false)).toContain('wahrscheinlich möglich')
+  })
 })
 
 describe('Positionen', () => {

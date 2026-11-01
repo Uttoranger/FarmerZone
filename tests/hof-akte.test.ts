@@ -113,8 +113,8 @@ describe('hofAkteAnsicht — kein Date, keine volle Anmelde-E-Mail', () => {
   }
   const ansicht = hofAkteAnsicht(roh, { anmeldungGekuerzt: 'h•••@example.com', emailBestaetigt: 'ja', stripeBereit: true, onlineAn: true, ich: 'u1' }, JETZT)
 
-  it('Werte als Text und Cent; „wie Anmeldung“ bei leerer Hof-E-Mail; Gerät gekürzt', () => {
-    expect(ansicht.kontakt).toMatchObject({ anmeldung: 'h•••@example.com', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich' })
+  it('Werte als Text und Cent; „Hof-E-Mail fehlt“ bei leerem Feld (Nr. 212); Gerät gekürzt', () => {
+    expect(ansicht.kontakt).toMatchObject({ anmeldung: 'h•••@example.com', hofEmail: 'Hof-E-Mail fehlt', ort: '1234 Musterort · Österreich' })
     // Nr. 207: Fassung und Zeitpunkt der AGB-Zustimmung in Wiener Zeit (13:05 UTC = 14:05 MEZ).
     expect(ansicht.kontakt.agb).toBe('Fassung 0.9 · 31.10.2026, 14:05 Uhr')
     expect(ansicht.aktivitaet).toMatchObject({ bestellungen: 41, bestellungenZeile: '2 storniert · 0 nicht abgeholt', umsatzCents: 123_000, anmeldung: 'Handy · Passwort' })

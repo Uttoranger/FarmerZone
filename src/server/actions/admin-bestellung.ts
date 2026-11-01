@@ -108,9 +108,12 @@ async function schreibeHofNachricht(farmId: string, orderId: string, nummer: str
  * Mail). Die Sperre selbst ist der bedingte Statuswechsel dort; die Prüfung
  * hier davor gibt nur den passenden Satz.
  *
- * Danach, auch wenn nur die Erstattung scheiterte (storniert ist dann
- * trotzdem): die Nachricht an den Hof und zwei Einträge im Protokoll — an der
- * Bestellung und am Hof (seine Akte, Nr. 187).
+ * Die zwei Einträge im Protokoll — an der Bestellung und am Hof (seine Akte,
+ * Nr. 187) — entstehen direkt nach der Sperre in `storniere` und VOR der
+ * Erstattung (Nr. 213.1, `nachSperre`): Bricht der Aufruf bei Stripe ab,
+ * steht der Eingriff trotzdem im Protokoll, die Bestellung zeigt „Erstattung
+ * offen“. Danach, auch wenn nur die Erstattung scheiterte (storniert ist dann
+ * trotzdem): die Nachricht an den Hof.
  */
 export async function notfallStorno(eingabe: unknown): Promise<StornoErgebnis> {
   const wache = await verlangeFrischeBestaetigung({ recht: 'hof_sperren_storno' })
@@ -124,13 +127,15 @@ export async function notfallStorno(eingabe: unknown): Promise<StornoErgebnis> {
   const stand = notfallStornoStand(bestellung)
   if (!stand.moeglich) return { error: stand.grund }
 
-  const ergebnis = await storniere({ id: bestellung.farmId }, orderId)
+  // Kein Grund für die Mail (dritter Wert): Der Grund ist für Hof und Protokoll.
+  const ergebnis = await storniere({ id: bestellung.farmId }, orderId, undefined, async () => {
+    await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'bestellung', bezugId: orderId, grund, mitPasskey: wache.mitPasskey })
+    await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'hof', bezugId: bestellung.farmId, grund, mitPasskey: wache.mitPasskey })
+  })
   if (ergebnis.error && !ergebnis.erstattungOffen) return ergebnis
 
   const geld = hofNachrichtGeld(onlineBezahlt(bestellung), Boolean(ergebnis.erstattungOffen))
   await schreibeHofNachricht(bestellung.farmId, orderId, bestellung.orderNumber, grund, geld)
-  await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'bestellung', bezugId: orderId, grund, mitPasskey: wache.mitPasskey })
-  await protokolliere({ wer: wache.userId, art: 'notfall_storno', bezugArt: 'hof', bezugId: bestellung.farmId, grund, mitPasskey: wache.mitPasskey })
   revalidatePath(ADMIN_BESTELLUNGEN_HREF)
   return ergebnis
 }
@@ -142,7 +147,8 @@ export async function notfallStorno(eingabe: unknown): Promise<StornoErgebnis> {
  * Passkey): Vor der Abholung löst das Zuordnen einen Storno mit Erstattung aus
  * (`weiseWiderrufZu` → derselbe Weg wie ein zugeordneter Widerruf). Bedingt
  * geschrieben (`orderId: null` in der WHERE-Klausel); Protokoll
- * `widerruf_zugeordnet` mit Grund — nie Name, Adresse oder Nachricht.
+ * `widerruf_zugeordnet` mit Grund direkt danach, vor der Erstattung (Nr. 213.1)
+ * — nie Name, Adresse oder Nachricht.
  */
 export async function ordneWiderrufZu(eingabe: unknown): Promise<{ ok: true; weiter: 'erstattet' | 'hof' } | { error: string }> {
   const wache = await verlangeFrischeBestaetigung({ recht: 'hof_sperren_storno' })
@@ -151,10 +157,11 @@ export async function ordneWiderrufZu(eingabe: unknown): Promise<{ ok: true; wei
   if (!geprueft.success) return { error: adminWiderrufFehler(geprueft.error) }
   const { widerrufId, bestellnummer, grund } = geprueft.data
 
-  const ergebnis = await weiseWiderrufZu({ widerrufId, bestellnummer })
+  // Das Protokoll direkt nach dem bedingten Zuordnen, VOR Storno und Erstattung (Nr. 213.1) — protokolliere wirft nie.
+  const ergebnis = await weiseWiderrufZu({ widerrufId, bestellnummer }, new Date(), async (orderId) => {
+    await protokolliere({ wer: wache.userId, art: 'widerruf_zugeordnet', bezugArt: 'bestellung', bezugId: orderId, grund, mitPasskey: wache.mitPasskey })
+  })
   if ('error' in ergebnis) return { error: ergebnis.error === 'unbekannt' ? WIDERRUF_ADMIN_TEXT.nummerUnbekannt : WIDERRUF_ADMIN_TEXT.schonZugeordnet }
-  // Nach Zuordnen und Weiterleiten — protokolliere wirft nie, rollt nichts zurück.
-  await protokolliere({ wer: wache.userId, art: 'widerruf_zugeordnet', bezugArt: 'bestellung', bezugId: ergebnis.orderId, grund, mitPasskey: wache.mitPasskey })
   revalidatePath(ADMIN_BESTELLUNGEN_HREF)
   return { ok: true, weiter: ergebnis.weiter }
 }

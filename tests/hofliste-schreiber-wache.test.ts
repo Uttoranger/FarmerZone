@@ -221,7 +221,7 @@ describe('Wache: jede Action, die etwas schreibt, das die Hofliste zeigt, erneue
       'src/server/actions/farm.ts#togglePickupSlotActive',
       'src/server/actions/appearance.ts#saveAppearanceAction',
       'src/server/actions/farm-archive.ts#reactivateFarm',
-      'src/server/actions/farm-photos.ts#reorderPhotosAction',
+      'src/server/actions/farm-photos.ts#moveFarmPhotoAction',
       'src/server/actions/admin.ts#revokeFarmApprovalAction',
     ]) {
       expect(funktionen).toContain(bekannt)

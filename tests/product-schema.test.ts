@@ -22,6 +22,7 @@ import {
 import { FUTTER_BESTAETIGUNG_FEHLT } from '@/lib/futter-registrierung'
 import { mwstStandard } from '@/lib/mwst'
 import { istFuttermittel } from '@/lib/taxonomie'
+import { RUECKSENDEKOSTEN_MAX_CENTS, RUECKTRITT_TEXT } from '@/lib/ruecktritt-angaben'
 
 const minimalValid = {
   name: 'Heumilch',
@@ -290,5 +291,40 @@ describe('countsTowardLimit', () => {
     expect(() =>
       productFormSchema.parse({ ...minimalValid, countsTowardLimit: 'ja' })
     ).toThrow()
+  })
+})
+
+describe('Rücktritt je Produkt (Nr. 214)', () => {
+  function fehler(eingabe: Record<string, unknown>): string[] {
+    const r = productFormSchema.safeParse({ ...minimalValid, ...eingabe })
+    return r.success ? [] : r.error.issues.filter((i) => i.path[0] === 'ruecksendekostenCents').map((i) => i.message)
+  }
+
+  it('ohne Angabe: kein Haken, keine Schätzung (null) — wie jedes Bestandsprodukt', () => {
+    const v = productFormSchema.parse(minimalValid)
+    expect(v.keinRuecktritt).toBe(false)
+    expect(v.ruecksendekostenCents).toBeNull()
+  })
+
+  it('nimmt beide Angaben an, wie getippt', () => {
+    const v = productFormSchema.parse({ ...minimalValid, keinRuecktritt: true, ruecksendekostenCents: 2550 })
+    expect(v.keinRuecktritt).toBe(true)
+    expect(v.ruecksendekostenCents).toBe(2550)
+  })
+
+  it('lehnt negative Beträge mit einem Satz ab', () => {
+    expect(fehler({ ruecksendekostenCents: -500 })).toEqual([RUECKTRITT_TEXT.betragNegativ])
+  })
+
+  it('lehnt Unlesbares (NaN aus dem Feld), Bruchteile von Cent, 0 und zu hohe Beträge ab', () => {
+    expect(fehler({ ruecksendekostenCents: Number.NaN })).toEqual([RUECKTRITT_TEXT.betragUngueltig])
+    expect(fehler({ ruecksendekostenCents: 12.5 })).toEqual([RUECKTRITT_TEXT.betragUngueltig])
+    expect(fehler({ ruecksendekostenCents: 0 })).toEqual([RUECKTRITT_TEXT.betragNull])
+    expect(fehler({ ruecksendekostenCents: RUECKSENDEKOSTEN_MAX_CENTS + 1 })).toEqual([RUECKTRITT_TEXT.betragZuHoch])
+    expect(fehler({ ruecksendekostenCents: RUECKSENDEKOSTEN_MAX_CENTS })).toEqual([])
+  })
+
+  it('verweigert einen Haken, der kein Wahrheitswert ist', () => {
+    expect(productFormSchema.safeParse({ ...minimalValid, keinRuecktritt: 'ja' }).success).toBe(false)
   })
 })

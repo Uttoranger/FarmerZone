@@ -27,7 +27,8 @@ export const dynamic = 'force-dynamic'
  * „Widerruf bestätigen“).
  *  - Mit signiertem Link (?bestellung=…&sig=…, Zweck `widerruf`): die
  *    Bestellung gekürzt, die Positionen zum Ankreuzen mit dem Hinweis je
- *    Kategorie. Eine falsche Signatur ergibt 404 — vor jeder Abfrage.
+ *    Kategorie bzw. — hat der Hof „verdirbt schnell“ angegeben — mit dieser
+ *    Angabe (Nr. 214). Eine falsche Signatur ergibt 404 — vor jeder Abfrage.
  *  - Ohne Link (Fuß, direkt): Name, E-Mail, Bestellnummer, „ganze Bestellung“
  *    oder Freitext. Die Seite verrät nie, ob es eine Bestellung gibt.
  * Darunter die Belehrung nach Anhang I FAGG (Nr. 207, src/lib/widerruf.ts):
@@ -72,7 +73,14 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
           },
         },
         items: {
-          select: { id: true, productName: true, quantity: true, fehltSeit: true, product: { select: { category: true, unit: true, unitSize: true } } },
+          select: {
+            id: true,
+            productName: true,
+            quantity: true,
+            fehltSeit: true,
+            // keinRuecktritt (Nr. 214): die Angabe des Hofs hat Vorrang vor dem Satz je Kategorie.
+            product: { select: { category: true, unit: true, unitSize: true, keinRuecktritt: true } },
+          },
         },
       },
     })
@@ -92,7 +100,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
         .map((i) => ({
           id: i.id,
           text: formatPosition({ name: i.productName, quantity: i.quantity, unit: i.product?.unit ?? null, unitSize: i.product?.unitSize ?? null }),
-          hinweis: ausnahmeHinweis(i.product?.category ?? 'SONSTIGES'),
+          hinweis: ausnahmeHinweis(i.product?.category ?? 'SONSTIGES', i.product?.keinRuecktritt ?? false),
         })),
     }
   }

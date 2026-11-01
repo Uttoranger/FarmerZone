@@ -300,4 +300,23 @@ describe('Stufe 1: erzwingen (Register G8, Ergänzung 30.10.2026; Nr. 204)', () 
       expect(baueCsp(optionen), JSON.stringify(optionen)).not.toContain('unsafe-eval')
     }
   })
+
+  it("Nr. 208: Zod jitless ändert die Policy nicht — script-src bleibt genau so, ohne eval-Erlaubnis in irgendeiner Form", () => {
+    // Zod stellt im Browser seine eval-Probe ab (src/instrumentation-client.ts, tests/zod-jitless.test.ts),
+    // damit der Bericht echte Treffer zeigt. Die Policy selbst wird dafür weder gelockert noch verändert.
+    for (const optionen of [
+      { melden: false },
+      { melden: true, berichtAdresse: 'https://example.com/api/csp-bericht', sentryDsn: DSN },
+    ]) {
+      const p = zerlege(baueCsp(optionen))
+      expect(p.get('script-src'), JSON.stringify(optionen)).toEqual([
+        "'self'",
+        "'unsafe-inline'",
+        'https://js.stripe.com',
+        'https://*.js.stripe.com',
+      ])
+      expect(baueCsp(optionen), JSON.stringify(optionen)).not.toMatch(/unsafe-eval|wasm-unsafe-eval|strict-dynamic/)
+    }
+    expect(CSP_HEADER).toBe('Content-Security-Policy')
+  })
 })

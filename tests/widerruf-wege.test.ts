@@ -55,7 +55,9 @@ import { lehneWiderrufAbAction, reicheWiderrufMitLinkEin, reicheWiderrufOhneLink
 import { ladeWiderrufeDesHofs, ladeWiderrufeOhneBestellung, ladeWiderrufeZurBestellung, verarbeiteWiderruf } from '@/server/widerruf'
 import { ordneWiderrufZu } from '@/server/actions/admin-bestellung'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
-import { WIDERRUF_ADMIN_TEXT } from '@/lib/widerruf'
+import { WIDERRUF_ADMIN_TEXT, ausnahmeHinweis } from '@/lib/widerruf'
+import { RUECKTRITT_TEXT } from '@/lib/ruecktritt-angaben'
+import { findeElement } from './element-suche'
 import WiderrufPage from '@/app/(public)/widerruf/page'
 import { WiderrufFormular } from '@/app/(public)/widerruf/widerruf-formular'
 
@@ -409,6 +411,21 @@ describe('Admin: Zuordnen (Nachbesserung Runde 2)', () => {
     expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'HM-2611-TEST', grund: 'Anruf der Kundin' })).toEqual({ error: WIDERRUF_ADMIN_TEXT.schonZugeordnet })
   })
 
+  it('Protokoll vor der Erstattung (Nr. 213.1): vor der Abholung steht der Eintrag nach dem Zuordnen und VOR dem Storno — auch wenn der Storno bei Stripe abbricht', async () => {
+    db.order.findUnique.mockResolvedValue({ ...BESTELLUNG, status: 'PAID', pickedUpAt: null } as never)
+    db.widerruf.updateMany.mockResolvedValue({ count: 1 } as never)
+    db.widerruf.findUnique.mockResolvedValue(W as never)
+    vi.mocked(storniere).mockRejectedValueOnce(new Error('Stripe-Aufruf abgebrochen'))
+    expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'HM-2611-TEST', grund: 'Anruf der Kundin' })).toEqual({ ok: true, weiter: 'hof' })
+    expect(protokolliere).toHaveBeenCalledTimes(1)
+    expect(protokolliere).toHaveBeenCalledWith({ wer: 'admin-1', art: 'widerruf_zugeordnet', bezugArt: 'bestellung', bezugId: 'bestellung-1', grund: 'Anruf der Kundin', mitPasskey: true })
+    const [zuordnen] = db.widerruf.updateMany.mock.invocationCallOrder
+    const [eintrag] = vi.mocked(protokolliere).mock.invocationCallOrder
+    const [storno] = vi.mocked(storniere).mock.invocationCallOrder
+    expect(zuordnen!).toBeLessThan(eintrag!)
+    expect(eintrag!).toBeLessThan(storno!)
+  })
+
   it('ohne frische Bestätigung → der Satz der Wache, keine Abfrage', async () => {
     vi.mocked(verlangeFrischeBestaetigung).mockResolvedValue({ error: 'frisch' } as never)
     expect(await ordneWiderrufZu({ widerrufId: W_ID, bestellnummer: 'HM-2611-TEST', grund: 'x' })).toEqual({ error: 'frisch' })
@@ -449,6 +466,39 @@ describe('Admin: Lesen (Nachbesserung Runde 2)', () => {
   })
 })
 
+describe('Admin: nur der offene Rest eines teilweise gebuchten Teilwiderrufs (Nr. 213.2)', () => {
+  // Eier und Brot gewählt; die Eier sind vor der Abholung schon gestrichen (teilweise gebucht).
+  const ITEMS = [
+    { id: 'pos-a', productName: 'Eier', quantity: 1, fehltSeit: new Date('2026-10-30T12:00:00Z') },
+    { id: 'pos-b', productName: 'Brot', quantity: 2, fehltSeit: null },
+  ]
+  const GEWAEHLT = [
+    { orderItemId: 'pos-a', menge: 1 },
+    { orderItemId: 'pos-b', menge: 2 },
+  ]
+  const zeile = (stand: string) => ({ id: 'w-1', orderId: 'bestellung-1', stand, eingegangenAm: new Date('2026-10-30T13:05:00Z'), umfang: 'teil', positionen: GEWAEHLT, nachricht: null, grund: null })
+
+  it('Bestellung und Akte zeigen bei offenem Widerruf nur Brot — die gestrichenen Eier nicht mehr', async () => {
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', ITEMS))[0]!.umfang).toEqual(['2 × Brot'])
+
+    db.$queryRaw.mockResolvedValue([{ id: 'w-1' }] as never)
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
+    db.order.findMany.mockResolvedValue([{ id: 'bestellung-1', orderNumber: 'HM-2611-TEST', items: ITEMS }] as never)
+    expect((await ladeWiderrufeDesHofs('hof-1'))[0]!.umfang).toEqual(['2 × Brot'])
+    // Die Akte liest dafür, ob eine Position fehlt.
+    expect(db.order.findMany.mock.calls.at(-1)![0]).toMatchObject({ select: { items: { select: { fehltSeit: true } } } })
+  })
+
+  it('Gegenprobe: ein erledigter Widerruf zeigt weiter alles, was die Kundin gewählt hat; ohne Streichung bleibt die Wahl ganz', async () => {
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('erstattet')] as never)
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', ITEMS))[0]!.umfang).toEqual(['1 × Eier', '2 × Brot'])
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
+    const ohneStreichung = ITEMS.map((i) => ({ ...i, fehltSeit: null }))
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', ohneStreichung))[0]!.umfang).toEqual(['1 × Eier', '2 × Brot'])
+  })
+})
+
 describe('Hof: Ablehnen', () => {
   it('ohne Grund → Fehlersatz, nichts geändert', async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'u-1', role: 'FARMER' } } as never)
@@ -463,6 +513,29 @@ describe('Seite /widerruf', () => {
     await expect(WiderrufPage({ searchParams: Promise.resolve({ bestellung: 'bestellung-1', sig: 'falsch' }) })).rejects.toThrow('NEXT_NOT_FOUND')
     await expect(WiderrufPage({ searchParams: Promise.resolve({ bestellung: 'bestellung-1' }) })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(db.order.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('Nr. 214: mit Link nimmt der Hinweis je Position zuerst die Angabe des Hofs, sonst den Satz je Kategorie — beide Positionen bleiben wählbar', async () => {
+    db.order.findUnique.mockResolvedValue({
+      id: 'bestellung-1',
+      orderNumber: 'HM-2611-TEST',
+      customerName: 'Erika Test',
+      kaeuferArt: 'PRIVAT',
+      status: 'PICKED_UP',
+      pickedUpAt: new Date(),
+      farm: { name: 'Hof Test', ownerName: '', address: 'Feldweg 1', postalCode: '4910', city: 'Beispieldorf', phone: '', archivedAt: null, geschlossenAm: null, email: 'hof@example.com', owner: { email: 'inhaber@example.com' } },
+      items: [
+        { id: 'pos-a', productName: 'Honig', quantity: 1, fehltSeit: null, product: { category: 'HONIG', unit: 'STUECK', unitSize: null, keinRuecktritt: true } },
+        { id: 'pos-b', productName: 'Honig klein', quantity: 1, fehltSeit: null, product: { category: 'HONIG', unit: 'STUECK', unitSize: null, keinRuecktritt: false } },
+      ],
+    } as never)
+    const baum = await WiderrufPage({ searchParams: Promise.resolve({ bestellung: 'bestellung-1', sig: widerrufSignatur('bestellung-1') }) })
+    const formular = findeElement(baum, WiderrufFormular)
+    const positionen = (formular?.props.bestellung as { positionen: Array<{ id: string; hinweis: string }> }).positionen
+    expect(positionen.map((p) => p.id)).toEqual(['pos-a', 'pos-b'])
+    expect(positionen[0]!.hinweis).toBe(RUECKTRITT_TEXT.widerrufKeinRuecktritt)
+    expect(positionen[1]!.hinweis).toBe(ausnahmeHinweis('HONIG'))
+    expect(positionen[1]!.hinweis).toContain('wahrscheinlich möglich')
   })
 
   it('die Knöpfe heißen wörtlich „Vertrag widerrufen“ und „Widerruf bestätigen“', () => {

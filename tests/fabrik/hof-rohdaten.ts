@@ -34,6 +34,7 @@ export function hofRohdaten(teil: Partial<HofRohdaten> = {}): HofRohdaten {
     hatKartenpunkt: true,
     produktImShop: true,
     abholzeitAktiv: true,
+    hofEmailFehlt: false,
     ...teil,
   }
 }

@@ -32,6 +32,8 @@ import { ladeSperrKarte } from '@/server/queries/plattformgebuehr'
 import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { WiderrufHeuteKarte } from '@/components/heute/widerruf-karte'
 import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
+import { HofEmailKarte } from '@/components/heute/hof-email-karte'
+import { hofEmailFehlt } from '@/lib/hof-kontakt'
 import { agbFassung } from '@/lib/rechtstexte/agb-datei'
 import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
@@ -196,6 +198,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
         <WiderrufHeuteKarte widerrufe={widerrufe} />
         {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
+        {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
+        {hofEmailFehlt(farm) && <HofEmailKarte />}
         {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
         {zeige(aufbau.oben)}
         <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />

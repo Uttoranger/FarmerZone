@@ -42,6 +42,7 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     approvedAt: null,
     archivedAt: null,
     country: 'AT',
+    email: 'kontakt@testhof.example',
     description: '',
     logoUrl: null,
     serviceFeePercent: { toString: () => '5.00' },
@@ -79,6 +80,13 @@ describe('getAdminFarms — Nr. 22f', () => {
     const [a, b] = await getAdminFarms()
     expect(a).toMatchObject({ stripeBereit: false, onlineAn: true, isPaused: false, betriebsnummer: null, sepaErteilt: false })
     expect(b).toMatchObject({ stripeBereit: true, onlineAn: false, isPaused: true, betriebsnummer: '1234567', sepaErteilt: true })
+  })
+
+  it('Nr. 212: liefert nur Ja/Nein „Hof-E-Mail fehlt“ (leer und Leerzeichen), nie die Adresse', async () => {
+    farmFindMany.mockResolvedValue([dbZeile(), dbZeile({ id: 'farm_2', email: '' }), dbZeile({ id: 'farm_3', email: '  ' })] as never)
+    const zeilen = await getAdminFarms()
+    expect(zeilen.map((z) => z.hofEmailFehlt)).toEqual([false, true, true])
+    expect(JSON.stringify(zeilen)).not.toContain('kontakt@testhof.example')
   })
 })
 

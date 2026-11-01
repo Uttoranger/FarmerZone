@@ -14,7 +14,9 @@
  *    mit Eintrag `adresse_angezeigt` ohne die Adresse;
  *  - Notfall-Storno: ohne Recht und ohne Grund nichts; sonst `storniere` mit
  *    dem Hof AUS DER BESTELLUNG, ohne Grund für die Mail; Nachricht an den Hof
- *    und zwei Protokoll-Einträge;
+ *    und zwei Protokoll-Einträge — geschrieben direkt nach der Sperre in
+ *    `storniere`, VOR der Erstattung (Nr. 213.1): Bricht der Aufruf bei Stripe
+ *    ab, stehen beide Einträge schon;
  *  - die Suche nimmt die Treffer von `sucheMails` (eine Quelle); eine
  *    Teiladresse sucht nichts.
  */
@@ -65,6 +67,17 @@ const db = prisma as unknown as {
 const getSession = vi.mocked(auth.api.getSession)
 const stornieren = vi.mocked(storniere)
 
+/**
+ * `storniere` mit dem Ablauf des echten: erst die Sperre, dann `nachSperre`
+ * (der Protokolleintrag, Nr. 213.1), dann die Erstattung — hier das Ergebnis.
+ */
+function stornoMit(ergebnis: Awaited<ReturnType<typeof storniere>>): void {
+  stornieren.mockImplementation(async (_hof, _id, _grund, nachSperre) => {
+    await nachSperre?.()
+    return ergebnis
+  })
+}
+
 const BESTELLUNG = 'cmfbestellung000000001ab'
 const HOF = 'cmfhof00000000000000test'
 const ALLE_STATUS = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP', 'CANCELLED', 'NOT_PICKED_UP']
@@ -78,7 +91,7 @@ beforeEach(() => {
   db.user.findUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true, adminRechte: [] })
   db.order.updateMany.mockResolvedValue({ count: 1 })
   db.order.findUnique.mockResolvedValue({ farmId: HOF, orderNumber: 'HM-2610-B7C2', status: 'PAID', customerEmail: 'kundin@example.com' })
-  stornieren.mockResolvedValue({ erstattetCents: 2100, vomHofCents: 2000 })
+  stornoMit({ erstattetCents: 2100, vomHofCents: 2000 })
 })
 
 describe('Notfall-Storno nur vor der Abholung — dieselbe Liste wie beim Hof', () => {
@@ -202,7 +215,7 @@ describe('„Kundin schreiben“ — volle Adresse nur nach Grund, mit Eintrag',
 describe('Notfall-Storno — derselbe Storno wie beim Hof', () => {
   it('ruft storniere mit dem Hof aus der Bestellung und ohne Grund für die Mail; Nachricht an den Hof; zwei Einträge', async () => {
     expect(await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })).toEqual({ erstattetCents: 2100, vomHofCents: 2000 })
-    expect(stornieren).toHaveBeenCalledWith({ id: HOF }, BESTELLUNG)
+    expect(stornieren).toHaveBeenCalledWith({ id: HOF }, BESTELLUNG, undefined, expect.any(Function))
     const nachricht = (db.unterhaltung.create.mock.calls[0]?.[0] as { data: { farmId: string; nachrichten: { create: { text: string; art: string; linkUrl: string } } } }).data
     expect(nachricht.farmId).toBe(HOF)
     expect(nachricht.nachrichten.create).toMatchObject({ art: 'SYSTEM', linkUrl: `/orders/${BESTELLUNG}` })
@@ -241,10 +254,36 @@ describe('Notfall-Storno — derselbe Storno wie beim Hof', () => {
     expect(db.unterhaltung.create).not.toHaveBeenCalled()
     expect(eintraege()).toEqual([])
 
-    stornieren.mockResolvedValue({ error: 'Rückerstattung fehlgeschlagen.', erstattungOffen: true })
+    stornoMit({ error: 'Rückerstattung fehlgeschlagen.', erstattungOffen: true })
     expect(await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })).toMatchObject({ erstattungOffen: true })
     expect(db.unterhaltung.create).toHaveBeenCalledTimes(1)
     expect(eintraege()).toHaveLength(2)
+  })
+
+  it('Protokoll vor der Erstattung (Nr. 213.1): bricht der Aufruf bei Stripe ab, stehen beide Einträge schon — keine Buchung', async () => {
+    const reihenfolge: string[] = []
+    db.adminAktion.create.mockImplementation(async () => {
+      reihenfolge.push('protokoll')
+      return { id: 'cmfeintrag00000000000001' }
+    })
+    stornieren.mockImplementation(async (_hof, _id, _grund, nachSperre) => {
+      reihenfolge.push('sperre')
+      await nachSperre?.()
+      reihenfolge.push('stripe')
+      throw new Error('Stripe-Aufruf abgebrochen')
+    })
+    await expect(notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })).rejects.toThrow('Stripe-Aufruf abgebrochen')
+    expect(reihenfolge).toEqual(['sperre', 'protokoll', 'protokoll', 'stripe'])
+    expect(eintraege().map((e) => [e.art, e.bezugArt])).toEqual([
+      ['notfall_storno', 'bestellung'],
+      ['notfall_storno', 'hof'],
+    ])
+    expect(stripe.refunds.create).not.toHaveBeenCalled()
+    // Gegenprobe: ohne Sperre (schon storniert) kein Eintrag.
+    db.adminAktion.create.mockClear()
+    stornieren.mockResolvedValue({ error: 'Diese Bestellung ist schon storniert oder abgeholt.' })
+    await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
+    expect(eintraege()).toEqual([])
   })
 
   it('der Geld-Satz an den Hof folgt dem echten Ausgang: online erstattet, Erstattung offen, vor Ort bezahlt', async () => {
@@ -254,13 +293,13 @@ describe('Notfall-Storno — derselbe Storno wie beim Hof', () => {
     await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
     expect(text(0)).toContain('Die Kundin bekommt ihr Geld zurück.')
 
-    stornieren.mockResolvedValue({ error: 'Rückerstattung fehlgeschlagen.', erstattungOffen: true })
+    stornoMit({ error: 'Rückerstattung fehlgeschlagen.', erstattungOffen: true })
     await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
     expect(text(1)).toContain('Die Erstattung hat noch nicht geklappt')
     expect(text(1)).not.toContain('bekommt ihr Geld zurück')
 
     // Gegenprobe: Barzahlung verspricht keine Erstattung.
-    stornieren.mockResolvedValue({ erstattetCents: 0, vomHofCents: 0 })
+    stornoMit({ erstattetCents: 0, vomHofCents: 0 })
     db.order.findUnique.mockResolvedValue({ ...online, stripePaymentIntentId: null, paymentStatus: 'PENDING' })
     await notfallStorno({ orderId: BESTELLUNG, grund: 'Hof nicht erreichbar' })
     expect(text(2)).toContain('nichts zu erstatten')

@@ -11,6 +11,7 @@ import { euroEingabeZuCent, formatZahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
 import { SERVICEGEBUEHR_STANDARD_PROZENT } from '@/lib/konditionen'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
+import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 import { einstellungKurz, kalendertagInWien } from '@/lib/servicegebuehr'
 import { MINDESTGEBUEHR_KEINE_ZAHL } from '@/schemas/servicegebuehr'
@@ -28,6 +29,12 @@ export const FREISCHALTUNG_PRODUKT_OFFEN_TEXT = 'Noch kein Produkt im Shop – F
 
 /** Register Z1, Ergänzung 21.10.2026: Freischalten erst mit mindestens einer aktiven Abholzeit (Wortlaut des Auftrags). */
 export const FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT = 'Erst freischalten, wenn der Hof eine Abholzeit eingetragen hat – sonst kann niemand bestellen.'
+
+/**
+ * Nr. 212 (§ 4 Abs. 1 Z 3 FAGG): Die Belehrung nennt die Adresse des Betriebs. Ohne Hof-E-Mail wird
+ * nicht freigeschaltet — derselbe Satz wie überall (HOF_EMAIL_TEXT), mit Punkt wie die anderen Sperren.
+ */
+export const FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT = `${HOF_EMAIL_TEXT.freischaltenFehlt}.`
 
 /**
  * Das bedingte Schreiben der Freischaltung traf nichts: Zwischen Lesen und
@@ -51,17 +58,22 @@ export const FREISCHALTUNG_GEAENDERT_TEXT =
  * - Dann mindestens eine aktive Abholzeit (Register Z1, Ergänzung 21.10.2026):
  *   Ohne sie kann niemand bestellen (Hofseite und Kasse sperren, N24). „Aktiv“
  *   wie in Hofliste und Kasse (`isActive: true`).
+ * - Zuletzt die Hof-E-Mail für die Kundschaft (Nr. 212, `hofEmailFehlt`): leer
+ *   oder nur Leerzeichen sperrt; Bestandshöfe bleiben freigeschaltet, nur dieser
+ *   Klick prüft es. Dieselbe Regel für die Warteliste in Admin › Höfe und die Action.
  */
 export function freischaltSperre(hof: {
   emailBestaetigungOffen: boolean
   stripeBereit: boolean
   produktImShop: boolean
   abholzeitAktiv: boolean
+  hofEmailFehlt: boolean
 }): string | null {
   if (hof.emailBestaetigungOffen) return FREISCHALTUNG_EMAIL_OFFEN_TEXT
   if (!hof.stripeBereit) return FREISCHALTUNG_STRIPE_OFFEN_TEXT
   if (!hof.produktImShop) return FREISCHALTUNG_PRODUKT_OFFEN_TEXT
   if (!hof.abholzeitAktiv) return FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT
+  if (hof.hofEmailFehlt) return FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT
   return null
 }
 
@@ -300,6 +312,8 @@ export type HofRohdaten = {
   produktImShop: boolean
   /** Mindestens eine aktive Abholzeit — Bedingung fürs Freischalten und Kennzeichen „Abholzeit fehlt“ (Z1, Ergänzung 21.10.2026). */
   abholzeitAktiv: boolean
+  /** Die Hof-E-Mail für die Kundschaft fehlt (`hofEmailFehlt`, Nr. 212) — nur Ja/Nein, nie die Adresse; sperrt das Freischalten. */
+  hofEmailFehlt: boolean
   /** Zusagen festgeschrieben (Nr. 116) — dann ändert Zurücknehmen keinen Platz. Fehlt es: nein. */
   gruendungFest?: boolean
   /** Was der Freischalt-Dialog zur Gründung sagt — fertig vom Server (getAdminFarms), nur für wartende Höfe. */

@@ -103,8 +103,8 @@ async function leseBestellung(where: Prisma.OrderWhereInput) {
           // N38: die Gebühr der Zeile — ohne sie zeigt die Mail im Hofpreis-Modell
           // Zeilen ohne Gebühr, aber ein Gesamt mit Gebühr.
           gebuehrCents: true,
-          // Einheit nur für die Anzeige in der Mail gejoint
-          product: { select: { unit: true, unitSize: true } },
+          // Einheit nur für die Anzeige in der Mail gejoint; die Schätzung (Nr. 214) für den 5-b-Satz der Belehrung
+          product: { select: { unit: true, unitSize: true, ruecksendekostenCents: true } },
         },
       },
     },

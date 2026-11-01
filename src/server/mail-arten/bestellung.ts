@@ -57,7 +57,8 @@ const BESTELLUNG_FUER_MAIL = {
       totalPrice: true,
       gebuehrCents: true,
       // Einheit nur für die Anzeige in der Mail
-      product: { select: { unit: true, unitSize: true } },
+      // ruecksendekostenCents (Nr. 214): Schätzung für den 5-b-Satz der Belehrung in der Bestätigung.
+      product: { select: { unit: true, unitSize: true, ruecksendekostenCents: true } },
     },
   },
 } satisfies Prisma.OrderSelect
