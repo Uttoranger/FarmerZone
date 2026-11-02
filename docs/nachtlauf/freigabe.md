@@ -9223,3 +9223,202 @@ Wie Lauf 27, dazu:
   - Höfe bitten, die zwei Produktangaben zu pflegen (Rundschreiben, Textvorschlag im Bericht)
   - die Texte aus 214 an die Anwältin
   - Merge per Merge-Commit
+
+## 33. Lauf 29 (uttoranger, im Chat erteilt, 1.11.2026)
+
+Nachtlauf 29 – Freigabe (uttoranger, im Chat 1.11.2026) · Gewährleistungs-Mitteilung, Kaufknopf, Nacharbeit aus Lauf 28
+
+Geschrieben auf main 96a43e3 (1.11.2026). Im Chat geprüft am 1.11.2026, nur lesend:
+- main enthält Lauf 28 (#433, #439) und danach zwei Commits der Projektleitung: #440 (Ordner public/recht mit .gitkeep) und 96a43e3 „Add files via upload“ – **48 SVG-Dateien** der harmonisierten Mitteilung (24 Sprachen, je Farbe und Schwarz-Weiß, rund 27 MB) direkt auf main.
+- Production READY auf 098adff (Lauf 28); die drei Migrationen `widerruf`, `agb_zustimmung`, `ruecktritt_je_produkt` sind in der Produktion fertig.
+- `public/recht/Legal guarantee_notice DE.svg` (644 kB): A4 hoch (viewBox 595×842), Adobe-Illustrator-Export, kein `<script>`, keine externen Verweise – geeignet.
+- Sentry seit dem Merge: keine neuen Issues. Zwei Issues vom 31.10. sind offen (216).
+
+Grundlage: Morgenbericht 28 („Bitte entscheiden“, „Nacharbeit“, „Für dich zu tun“ 2), Lauf-28-Prompt Abschnitt 211 (nicht begonnen), Projekt-Doc claude/go-live-checkliste-2026-10-30.md.
+
+Befunde, die dieser Lauf behebt (vor dem Bau am Code bestätigen):
+- **Gewährleistungs-Mitteilung fehlt in Kasse und Mails** (§ 4 Abs. 1 Z 12 und Anhang II FAGG, Pflicht seit 27.9.2026). Die Grafik liegt jetzt vor, aber 47 nicht benötigte Dateien liegen mit ihr in public/recht und gehen in jedes Deployment.
+- **AGB- und Rücktrittssatz stehen nicht unter „Jetzt bezahlen“** (Morgenbericht 28, Entscheidung 1): Beide stehen nur unter „Weiter zur Zahlung“; verbindlich wird die Online-Bestellung aber erst mit „Jetzt bezahlen“ (N2, O4).
+- **Abholtermin doppelt** im Bar-Formular (Zusammenfassung und Zeile unter dem Knopf); `KaufZusammenfassung` fehlt in der Bausteine-Vorschau (Morgenbericht 28, Nacharbeit 210).
+- **Sentry-Rauschen aus Browser-Erweiterungen:** JAVASCRIPT-NEXTJS-H (und -8, 24 Tage alt) „toLowerCase of undefined“ auf `/` mit Frames `ext:core/01_core.js` und `<obscura:bootstrap>` – fremder Code, kein Fehler von Agrilo; der Client-Filter kennt keine Erweiterungen.
+- **Kleinigkeiten aus Lauf 28:** Umfangszeile bei einem Widerruf, dessen gewählte Positionen alle schon gestrichen sind (213); Seiten-Tests mocken das entfernte `reorderPhotosAction` (213); `hinweisRuecksendung` setzt das geschützte Leerzeichen per `replace` nach `formatEuro` (214).
+- **Die zwei Produktfelder aus 214 fehlen im Familien-Formular** (neues Futter, Brennholz mit Verkaufsgrößen); Höfe müssen heute über „Bearbeiten“ gehen.
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate, 4a Tempo, §5 Stoppen, §6 Morgenbericht. Dieser Text ist die Freigabe.
+- **Nummern:** 211 (aus Lauf 28 übernommen), 215, 216, 217, 218 sind neu.
+- **Regeln:** Es gelten G10, die G10-Ergänzung und §0 wie in Lauf 28 (freigabe.md §32), mit der Zuordnung unten. Zeitbuch docs/nachtlauf/berichte/zeitbuch-lauf29.md.
+- **Migration:** keine. Kein neues Paket, keine neue Variable.
+- **Tests:** nach docs/ai/TESTING_GUIDELINES.md; Fachregeln als reine Funktionen in src/lib/.
+- **Mockups:** keine neuen. Die Handy-Reihenfolge des Zahlungsschritts aus 210 gilt (Entscheidung 2 unten); der Doku-PR vermerkt das im Mockup-Index.
+- **Abnahme:** test.agrilo.at nach dem Merge durch die Projektleitung.
+
+## Zuerst der Doku-PR (Branch docs/lauf29 von main, model: sonnet)
+
+- **docs/nachtlauf/freigabe.md:** diesen Text wörtlich als „## 33. Lauf 29 (uttoranger, im Chat erteilt, 1.11.2026)“
+- **docs/nachtlauf.md §3:** die Zeilen 211, 215–218 und „Sammel 29“
+- **docs/nachtlauf/status.md:** 208, 210, 212–214 und „Sammel 28“ tragen „gemergt (#439)“; 211 wechselt von „nicht begonnen“ auf „offen (Lauf 29)“; neu 215–218 und „Sammel 29“ mit „offen“
+- **docs/entscheidungen.md:** die drei Entscheidungen unten wörtlich, dazu die Stand-Zeile
+- **docs/nachtlauf/morgenbericht-2026-10-31-lauf28.md:** unter „Bitte entscheiden“ je Punkt „Entschieden 1.11.2026: …“
+- **docs/mockups/README.md:** beim Mockup der Kasse (Zahlungsschritt) die Zeile „Abweichung seit Nr. 210 (1.11.2026): Am Handy steht die Übersicht am Ende, direkt über dem Kaufknopf (§ 8 Abs. 1 FAGG); das Mockup zeigt sie noch unter dem Korb.“
+- **Commit- und PR-Texte** immer über eine Datei, Präfixe nach CLAUDE.md §5.
+
+## Stand – vor dem Start prüfen, sonst STOPP und melden
+
+- main enthält 96a43e3 oder später; `public/recht/Legal guarantee_notice DE.svg` liegt dort.
+- `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün.
+- Stripe ist in Vorschau und Produktion im Testmodus.
+
+**Priorität, falls das Budget nicht reicht:**
+211 → 215 → 216 → 218 → 217
+
+## Nicht in diesem Lauf
+
+- **AGB 1.0:** eigener /fix mit Datum T (claude/fix-agb-1-0-prompt.md). Nichts an docs/recht/agb.md oder src/lib/rechtstexte/agb.ts.
+- **209** `form.watch` → `useWatch` (nach dem Go-live); **212-Nacharbeit** Pflichtfeld Hof-E-Mail auch im Profil (nach dem Go-live).
+- **Monatsabrechnung** (automatische Gutschrift der Bar-Gebühr), **die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live, Connect- und Resend-Webhook.**
+- **Aufräumen alter Bild-Waisen** (Altbestand vor 206): eigener Auftrag mit Freigabe.
+- **JAVASCRIPT-NEXTJS-G** („Mail ‚Admin-Sicherheit‘ nicht verschickt“, 31.10., Umgebung preview, Grund `resend_fehler`, Anlass Einrichtungscode): kein Code-Fehler, sondern der Resend-Schlüssel der Testumgebung hat den Empfänger abgelehnt. Die Projektleitung prüft den Schlüssel bzw. `TEST_EMPFAENGER` für `staging`; im Bericht nur nennen.
+
+## Entscheidungen (uttoranger, im Chat 1.11.2026 – Empfehlungen des Teams aus dem Morgenbericht 28, mit diesem Start freigegeben; wörtlich ins Register)
+
+- „Ergänzung zu N2/O4 (1.11.2026, Nr. 215): Der Satz zu den AGB und der Rücktrittssatz stehen unter jedem Knopf, mit dem eine Bestellung verbindlich wird – bar unter ‚Zahlungspflichtig bestellen‘, online unter ‚Jetzt bezahlen‘ bzw. ‚Erneut bezahlen‘. Unter ‚Weiter zur Zahlung‘ bleiben sie zusätzlich stehen.“
+- „Ergänzung zu N2 (1.11.2026, Nr. 210): Am Handy steht die Übersicht im Zahlungsschritt am Ende, unmittelbar über dem Kaufknopf; die Reservierungsfrist rückt mit. Das Gesetz (§ 8 Abs. 1 FAGG) geht dem Mockup vor; das Mockup wird nicht nachgezeichnet, der Index vermerkt die Abweichung.“
+- „Ergänzung zu G-Wachen (1.11.2026, Nr. 214): Die Fließkomma-Wache bekommt einen Bestandseintrag ‚Int-Cent × Menge‘ mit Grund (Summe der Rücksendekosten-Schätzung). Keine allgemeine Ausnahme ‚Int × Int‘; die Wache bleibt eng.“
+- Stand-Zeile: „Stand Lauf 29 (uttoranger, 1.11.2026): Die Ergänzungen zu N2/O4, N2 (Handy-Reihenfolge) und zur Fließkomma-Wache sind entschieden; 211 (Gewährleistungs-Mitteilung, Grafik liegt vor) und 215–218 sind eingeplant (freigabe.md §33). Lauf 29 hat keine Migration, kein neues Paket, keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, 212-Profil, Monatsabrechnung, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.“
+
+## §0 Zuordnung
+
+**Modell:**
+- Doku-PR, 216, 217 mit Sonnet; 211, 215, 218 mit Opus.
+- tester und sichter mit Sonnet, pruefer immer mit Opus, höchstens 22 Schritte je Aufruf.
+
+**Prüfdurchgänge:**
+- ein voller Durchgang für 211, 215, 218
+- gezielt für 216, 217
+
+**`pnpm test:integration`:** jede Datei, die sich ändert; im Sammel-PR ganz.
+
+**Bilder:**
+- 211: Kasse bar und online mit der Mitteilung (390 und 1440, hell und dunkel); Bestätigungsmail (Vorschau)
+- 215: Zahlungsschritt mit beiden Sätzen unter „Jetzt bezahlen“ (390); Bar-Kasse ohne doppelten Abholtermin (390); Bausteine-Vorschau mit `KaufZusammenfassung`
+- 218: Familien-Formular mit den zwei Feldern (390)
+
+**Lesemappe:**
+- alle: CLAUDE.md §2, ARCHITECTURE §5, Morgenbericht 28
+- 211: Bericht 207 und 210 (Datenweg der Mails, `KaufZusammenfassung`), src/emails/belehrung-teil.tsx, src/emails/_layout.tsx, src/lib/rechtstexte/agb-datei.ts (Muster für eine Rechtstext-Quelle), DESIGN_SYSTEM (Bilder), docs/ai/TECH_STACK.md (sharp)
+- 215: src/components/checkout/stripe-payment.tsx, checkout-form.tsx, src/lib/rechtstexte/agb-einbindung.ts (`KASSE_AGB_SATZ`), src/lib/widerruf.ts (Rücktrittssatz), Register O4
+- 216: src/instrumentation-client.ts (`bereinigeEreignis`), src/lib/sentry-hygiene.ts
+- 217: Berichte 213 und 214, src/lib/format.ts, src/server/widerruf.ts
+- 218: Bericht 214, src/lib/ruecktritt-angaben.ts, das Familien-Formular (Futter, Brennholz) und das Produktformular
+
+## §1 Warteschlange (fest)
+
+- Doku-PR
+- **Welle 1**, alle von docs/lauf29: 211 ∥ 216 ∥ 217 ∥ 218
+- **Welle 2**, vom Zwischenstand integration/lauf29 nach 211: 215 (berührt dieselben Kassen-Dateien wie 211)
+- Dann der Sammel-PR (Haltepunkt), Merge per Merge-Commit. Branches nacht/<datum>/<nr>-<kurz>.
+
+**Geteilt in getrennten Zeilen** (der Dirigent löst Konflikte beim Hineinmergen):
+- src/components/checkout/stripe-payment.tsx und checkout-form.tsx: 211 (Grafik), danach 215 (Sätze, Abholtermin) – nacheinander
+- src/emails/belehrung-teil.tsx: nur 211
+- src/lib/format.ts: nur 217
+- src/instrumentation-client.ts: nur 216
+- Produkt- und Familien-Formular: nur 218
+- DEVELOPMENT.md je ein Eintrag; ARCHITECTURE je eigener Abschnitt
+
+## Die Nummern
+
+### 211 Harmonisierte Gewährleistungs-Mitteilung (Anhang II FAGG): aufräumen und einbinden – Opus, voller Durchgang, keine Migration, von docs/lauf29
+
+**Aufräumen zuerst (eigener Commit, Präfix chore:):**
+1. Vor dem Löschen die Liste aller Dateien unter public/recht mit Größe in den Bericht.
+2. `public/recht/Legal guarantee_notice DE.svg` nach `public/recht/gewaehrleistung-mitteilung-de.svg` verschieben (`git mv`, Inhalt Byte-gleich; SHA-256 vorher und nachher in den Bericht).
+3. **Alles andere in public/recht löschen:** die 46 anderen Sprach- und Schwarz-Weiß-Fassungen, `Legal guarantee_notice DE_BW.svg`, `.gitkeep`, etwaige `__MACOSX`-/`.DS_Store`-Reste. Danach liegt genau eine Datei im Ordner. Gegenprobe im Test: `public/recht` enthält genau `gewaehrleistung-mitteilung-de.svg`.
+4. Prüfen, dass die SVG kein `<script>`, kein `<foreignObject>` und keine externen `href`/`xlink:href` enthält (Wache in den Tests, damit ein späterer Austausch das nicht einschleppt).
+
+**Einbinden:**
+5. `src/lib/rechtstexte/gewaehrleistung-mitteilung.ts` (neu, eine Quelle): Pfad `/recht/gewaehrleistung-mitteilung-de.svg`, Überschrift „Gesetzliche Gewährleistung“, Alt-Text „Harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht (Anhang II FAGG): Für Waren gilt eine gesetzliche Gewährleistung von mindestens zwei Jahren ab Übergabe.“, als Kommentar: Quelle https://commission.europa.eu/publications/practical-guidelines-and-high-resolution-vector-files-eu-notice-and-label-product-guarantees_en (ZIP „SVG“, Fassung DE, Farbe), abgerufen 1.11.2026 durch die Projektleitung; Durchführungsverordnung (EU) 2025/1960; Erläuterungen: nicht verändern, online farbig.
+6. **Kasse, beide Schritte** (bar über „Zahlungspflichtig bestellen“, online über „Jetzt bezahlen“ / „Erneut bezahlen“): die Grafik unterhalb der `KaufZusammenfassung` aus 210 und oberhalb des Knopfs, als `<img>` in voller Breite der Karte (A4-Proportion, am Handy rund 390 × 552 px), mit Überschrift und Alt-Text aus der Quelle, `loading="lazy"` NICHT (sie muss beim Bestellen sichtbar sein), kein Zuklappen, keine Verkleinerung unter die Kartenbreite. Bei Käuferart „Betrieb“ entfällt sie. Keine Farbänderung, kein Filter in dunklem Modus (amtliche Farben; die Karte um die Grafik bleibt wie bisher).
+7. **Bestätigungsmails** (online, bar, „Bitte bestätige“), unter der Belehrung in `belehrung-teil.tsx`: Mail-Programme zeigen SVG meist nicht an. Deshalb ein **PNG** aus der amtlichen SVG: einmalig per Skript `scripts/gewaehrleistung-png.ts` mit `sharp` (Breite 1240 px, Hintergrund weiß, nichts beschnitten, nichts umgefärbt – reine Rasterung) nach `public/recht/gewaehrleistung-mitteilung-de.png` erzeugen und committen; Skript, Quelle und Befehl im Kommentar der Quelle aus Punkt 5. In der Mail als `<img>` mit absoluter URL (`PRODUKTION_HOST` + Pfad, wie die bestehenden Mail-Bilder, kein Base64), Alt-Text aus der Quelle, Breite 100 % bis 600 px. Bei „Betrieb“ nicht. Liefert die Kommission später eine offizielle PNG, ersetzt sie diese Datei (Vermerk im Kommentar).
+8. **Palette-Wache und Bild-Baustein:** die zwei Dateien unter public/recht sind amtlich und werden nicht durch den Bild-Baustein, nicht durch `next/image`-Optimierung mit Umfärbung geschleust; falls die Palette-Wache SVGs unter public/ prüft, Ausnahme mit Grund in der Bestandsliste.
+
+Dateien: public/recht/* (Aufräumen, Umbenennen, PNG), scripts/gewaehrleistung-png.ts (neu), src/lib/rechtstexte/gewaehrleistung-mitteilung.ts (neu), stripe-payment.tsx und checkout-form.tsx (NUR Grafik und Überschrift), src/emails/belehrung-teil.tsx, Tests, DEVELOPMENT.md, DESIGN_SYSTEM (Abschnitt „Amtliche Grafiken: unverändert, farbig, nicht zuklappbar“), ARCHITECTURE (Rechtstexte).
+
+Tests: Ordner enthält genau die zwei Dateien `gewaehrleistung-mitteilung-de.svg` und `.png`; SVG ohne Script/externe Verweise; Kasse rendert die Grafik genau einmal je Schritt mit Alt-Text, bei „Betrieb“ nicht; drei Mails enthalten das PNG mit absoluter URL bei PRIVAT, bei „Betrieb“ nicht; PNG-Maße ≥ 1240 px Breite, A4-Verhältnis (Toleranz 1 %).
+
+### 215 AGB- und Rücktrittssatz unter jedem Kaufknopf; Abholtermin einmal; Bausteine-Vorschau – Opus, voller Durchgang, keine Migration, von Zwischenstand nach 211
+
+1. **Zahlungsschritt** (stripe-payment.tsx): Unter „Jetzt bezahlen“ bzw. „Erneut bezahlen“ stehen `KASSE_AGB_SATZ` (mit Link in neuem Tab, wie heute im Formular) und der Rücktrittssatz aus 200 (`WIDERRUF_TEXT`, Link zu /widerruf) – dieselben Bausteine wie unter „Weiter zur Zahlung“, eine Quelle, kein zweiter Text. Bei „Betrieb“ entfällt der Rücktrittssatz wie heute.
+2. **„Weiter zur Zahlung“** behält beide Sätze (Entscheidung oben).
+3. **Bar-Formular:** Der Abholtermin steht nur noch in der `KaufZusammenfassung`; die Zeile unter dem Knopf entfällt (Entscheidung 210-Nacharbeit). Reservierungsfrist bleibt sichtbar.
+4. **Bausteine-Vorschau** (src/app/intern/bausteine/bausteine-vorschau.tsx): `KaufZusammenfassung` mit zwei Zuständen (bar, online) aufnehmen; `pnpm bausteine` laufen lassen.
+
+Dateien: stripe-payment.tsx, checkout-form.tsx (NUR Sätze und Abholtermin-Zeile), bausteine-vorschau.tsx, Tests, DESIGN_SYSTEM (Kasse: Sätze unter jedem Kaufknopf), DEVELOPMENT.md.
+
+Tests: Rendertest Zahlungsschritt: beide Sätze NACH dem Knopf im DOM, genau einmal; Betrieb ohne Rücktrittssatz; Bar-Formular: „Abholung“ genau einmal im Formular; Gegenprobe tests/agb-einbindung.test.ts bleibt grün (Satz unverändert).
+
+### 216 Sentry-Client: Fehler aus Browser-Erweiterungen filtern – Sonnet, gezielt, keine Migration, von docs/lauf29
+
+**Befund:** JAVASCRIPT-NEXTJS-H und -8 („Cannot read properties of undefined (reading 'toLowerCase')“ auf `/`) stammen aus Frames `ext:core/01_core.js`, `<obscura:bootstrap>` und `<script>` ohne eigene Datei – Code einer Browser-Erweiterung, nicht von Agrilo.
+
+1. In `bereinigeEreignis` (src/instrumentation-client.ts) bzw. einer reinen Funktion in src/lib/sentry-hygiene.ts: Ein Fehler-Ereignis, dessen Stack ausschließlich Frames aus Erweiterungen enthält (`chrome-extension://`, `moz-extension://`, `safari-web-extension://`, `ext:`, `<obscura`), wird verworfen (return null). Enthält der Stack mindestens einen eigenen Frame (`/_next/`, eigene Domain), bleibt das Ereignis.
+2. Keine `ignoreErrors` nach Fehlertext (die Meldung „toLowerCase“ kann auch von uns kommen).
+3. Tests: Ereignis nur mit Erweiterungs-Frames → null; gemischt → bleibt; ohne Stack → bleibt. Datenschutz-Bereinigung unverändert (bestehende Tests grün).
+4. Bericht: Commit-Text nennt `Fixes JAVASCRIPT-NEXTJS-H`; -8 schließt die Projektleitung von Hand als „ignoriert“.
+
+Dateien: src/lib/sentry-hygiene.ts, src/instrumentation-client.ts, Tests, DEVELOPMENT.md.
+
+### 217 Kleinigkeiten aus Lauf 28 – Sonnet, gezielt, keine Migration, von docs/lauf29
+
+1. **Widerruf, alle gewählten Positionen schon gestrichen** (213): Admin › Bestellungen und Hof-Akte zeigen statt einer leeren Positionsliste die Umfangszeile „Alle gewählten Positionen wurden schon vor der Abholung storniert“ (Text aus `WIDERRUF_TEXT`). Test mit einem Widerruf, dessen Positionen alle `fehltSeit` tragen.
+2. **Seiten-Tests** (213): Mocks des entfernten `reorderPhotosAction` entfernen; `moveFarmPhotoAction` mocken, wo nötig.
+3. **`hinweisRuecksendung`** (214): Option `geschuetztesLeerzeichen` (oder gleichwertig) in `formatEuro` in src/lib/format.ts, statt `replace` nach dem Formatieren; alle Aufrufer prüfen, Verhalten gleich (Tests der Beträge grün).
+
+Dateien: src/server/widerruf.ts bzw. Admin-/Akte-Ansicht (NUR Umfangszeile), betroffene Tests, src/lib/format.ts, src/lib/ruecktritt-angaben.ts, DEVELOPMENT.md.
+
+### 218 Rücktritts-Angaben auch im Familien-Formular (214-Nacharbeit) – Opus, voller Durchgang, keine Migration, von docs/lauf29
+
+1. Die zwei Felder aus 214 (Haken „Verdirbt schnell – kein Rücktritt möglich“, Zahlenfeld „Geschätzte Kosten, wenn die Kundin die Ware zurückschickt“) auch im Familien-Formular für neues Futter und Brennholz mit Verkaufsgrößen, derselbe Baustein und dieselben Texte wie im Produktformular (src/lib/ruecktritt-angaben.ts; kein zweiter Text).
+2. Vorbelegung des Hakens je Kategorie wie in 214 nur beim Anlegen; bei mehreren Verkaufsgrößen gilt die Angabe für alle Größen der Familie (ein Wert je Produkt, identisch gesetzt).
+3. Schema und Server-Action der Familie nehmen die Felder an; Zod wie im Produktformular (keine negativen Beträge).
+
+Dateien: Familien-Formular und -Action, Schema, Tests, DEVELOPMENT.md. Keine Änderung an 214-Anzeigen.
+
+Tests: Familie anlegen mit Haken und Schätzung → alle Größen tragen beide Werte; ohne Angabe → false/null; negativer Betrag → Formularfehler.
+
+## §2 Regeln
+
+- Es gelten die Regeln aus Lauf 28 (freigabe.md §32, §2).
+- **Geld:** Keine Nummer ändert einen Betrag, einen Erstattungsweg oder einen Idempotenzschlüssel. 217.3 ändert nur die Formatierung (Gegenprobe: identische Zeichenkette).
+- **Recht:** Die Grafik aus 211 wird nie verändert (Rasterung zur PNG ist erlaubt, kein Zuschnitt, keine Farbe). Belehrung bleibt wörtlich. Keine weiteren Rechtssätze erfinden.
+- **Datenschutz:** Keine E-Mail-Adresse, kein Name in Logs, Sentry oder Protokoll. 216 verwirft nur, es liest nichts aus.
+- **Sicherheit:** Keine Nummer lockert eine Prüfung. Die SVG-Wache aus 211 bleibt dauerhaft.
+- **Design:** jede UI-Änderung in beiden Modi, 390 und 1440 px; Touch-Ziele ≥ 44 px; Text ≥ 4,5:1; keine Hexwerte in Komponenten; amtliche Grafik von der Palette-Wache ausgenommen (Bestandsliste mit Grund).
+- **Mails:** Kein Test verschickt echte Mails. Keine neue Mail-Art.
+- **Löschen:** Nur 211 löscht Dateien, nur unter public/recht, nur nach der Liste im Bericht.
+
+## §3 Checkliste je PR
+
+Wie Lauf 28 (§32, §3), mit „Migration: nein · Paket: nein · Variable: nein“. „Alle Einstiege geprüft“ gilt für:
+
+| Nummer | alle Einstiege |
+|---|---|
+| 211 | beide Kassen-Schritte (bar, online, Zahlung fortsetzen) je Privat und Betrieb; drei Bestätigungsmails; Dateiliste public/recht |
+| 215 | Zahlungsschritt (Jetzt bezahlen, Erneut bezahlen), Bar-Formular, Betrieb; Bausteine-Vorschau |
+| 216 | alle Pfade in `bereinigeEreignis` (Fehler und Transaktionen) |
+| 217 | Admin › Bestellungen, Hof-Akte, Heute (Widerruf-Karte); alle Aufrufer von `formatEuro` |
+| 218 | Familien-Formular Futter und Brennholz, anlegen und bearbeiten |
+
+## §4 Morgenbericht (morgenbericht-<datum>-lauf29.md)
+
+Wie Lauf 28, dazu:
+- **Ganz oben:** je Nummer, ob die Ausgangslage am Code bestätigt war; nicht begonnene Nummern.
+- **211:** Liste der gelöschten Dateien mit Größen, SHA-256 der SVG vor und nach dem Umbenennen, Maße und Größe der PNG, Bild der Kasse mit Grafik.
+- **215:** Bild des Zahlungsschritts mit beiden Sätzen.
+- **216:** Zahl der Ereignisse der letzten 7 Tage, die der Filter verworfen hätte (aus Sentry ablesen, falls Zugriff; sonst „–“).
+- **„Für dich zu tun“:**
+  - Abnahme in der Testumgebung test.agrilo.at: Kasse bar und online mit Grafik und Sätzen unter dem Kaufknopf (Privat und Betrieb), Bestätigungsmail mit PNG, Familien-Formular mit den zwei Feldern, Admin-Widerruf mit vollständig gestrichenen Positionen.
+  - Sentry: JAVASCRIPT-NEXTJS-8 als „ignoriert“ schließen; -H schließt der Commit.
+  - Resend-Schlüssel bzw. `TEST_EMPFAENGER` der Testumgebung prüfen (JAVASCRIPT-NEXTJS-G).
+  - Nach dem Merge: Produktion zeigt die Grafik in der Kasse; Datum T für den AGB-Fix festlegen.
+  - Merge per Merge-Commit, zuerst Doku-PR, dann Sammel-PR.

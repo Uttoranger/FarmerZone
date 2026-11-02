@@ -287,6 +287,12 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 213 | Nacharbeit aus Morgenbericht 27 (von `docs/lauf28`) | `freigabe.md` §32 | N17, N39 |
 | 214 | Je Produkt: „kein Rücktritt“ und geschätzte Rücksendekosten, eine Migration (vom Zwischenstand `integration/lauf28` nach 210) | `freigabe.md` §32 | N39 |
 | Sammel 28 | Sammel-PR `integration/lauf28` | `freigabe.md` §32 | G3, G10 |
+| 211 (Lauf 29) | Harmonisierte Gewährleistungs-Mitteilung (Anhang II FAGG): aufräumen und einbinden (von `docs/lauf29`) | `freigabe.md` §33 | – |
+| 215 | AGB- und Rücktrittssatz unter jedem Kaufknopf; Abholtermin einmal; Bausteine-Vorschau (vom Zwischenstand `integration/lauf29` nach 211) | `freigabe.md` §33 | N2, O4 |
+| 216 | Sentry-Client: Fehler aus Browser-Erweiterungen filtern (von `docs/lauf29`) | `freigabe.md` §33 | – |
+| 217 | Kleinigkeiten aus Lauf 28 (von `docs/lauf29`) | `freigabe.md` §33 | – |
+| 218 | Rücktritts-Angaben auch im Familien-Formular (214-Nacharbeit) (von `docs/lauf29`) | `freigabe.md` §33 | N39 |
+| Sammel 29 | Sammel-PR `integration/lauf29` | `freigabe.md` §33 | G3, G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 

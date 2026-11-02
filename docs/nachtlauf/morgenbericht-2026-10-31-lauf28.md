@@ -47,8 +47,11 @@ Freigeschaltete Höfe ohne Hof-E-Mail in der Produktion (lesend gezählt): **0 v
 ## Bitte entscheiden
 
 1. **210 – AGB- und Rücktrittssatz unter „Jetzt bezahlen“:** Beide stehen nur unter „Weiter zur Zahlung“, nicht unter „Jetzt bezahlen“, wo die Online-Bestellung verbindlich wird (N2). Die Freigabe sagte „unverändert“. Ergänzen?
+   Entschieden 1.11.2026: Ja – beide Sätze stehen unter jedem Knopf, mit dem eine Bestellung verbindlich wird (Ergänzung zu N2/O4, Nr. 215); unter ‚Weiter zur Zahlung‘ bleiben sie zusätzlich.
 2. **210 – Handy-Reihenfolge im Zahlungsschritt** (Übersicht am Ende statt unter dem Korb, Reservierungsfrist rückt mit nach unten): so abnehmen?
+   Entschieden 1.11.2026: So abnehmen – am Handy steht die Übersicht am Ende, unmittelbar über dem Kaufknopf; das Mockup wird nicht nachgezeichnet, der Index vermerkt die Abweichung (Ergänzung zu N2).
 3. **214 – Fließkomma-Wache:** ein Bestandseintrag mehr (Int-Cent × Menge, mit Grund), obwohl der Bestand nur schrumpfen soll. Bestätigen oder eine Ausnahme für Int × Int als Regel?
+   Entschieden 1.11.2026: Bestandseintrag ‚Int-Cent × Menge‘ mit Grund bestätigt; keine allgemeine Ausnahme ‚Int × Int‘ (Ergänzung zu G-Wachen).
 
 ## Nacharbeit (Vorschläge, nicht gebaut)
 - 214: die zwei Felder im Familien-Formular (neues Futter, Brennholz mit Verkaufsgrößen); bis dahin über „Bearbeiten“.
