@@ -8,7 +8,8 @@
  * dem Stand des Hofs aus der Datenbank — gesperrte Größen entstehen als
  * Entwurf, der Rest geht online; NUR_BETRIEBE steht an jeder Größe;
  * Brennmaterial bekommt seine Angaben je Größe und geht ganz online. Ohne
- * Anmeldung oder mit ungültiger Eingabe wird nichts geschrieben.
+ * Anmeldung oder mit ungültiger Eingabe wird nichts geschrieben. Rücktritt
+ * (Nr. 218): Haken und Schätzung der Familie stehen an jeder Größe gleich.
  *
  * Prisma, Auth und Next sind gemockt — die Datenbank-Seite prüft
  * tests/integration/futter-familie.int.test.ts.
@@ -351,6 +352,46 @@ describe('legeBrennmaterialFamilieAn', () => {
     expect(await legeBrennmaterialFamilieAn({ ...BUCHE, scheitlaengeCm: null })).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
     getSession.mockResolvedValue(null as never)
     expect(await legeBrennmaterialFamilieAn(BUCHE)).toEqual({ error: 'Bitte melde dich neu an.' })
+    expect(productCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('Rücktritt je Familie (Nr. 218): derselbe Wert an jeder Größe', () => {
+  const ruecktritt = (): [unknown, unknown][] => angelegt().map((p) => [p.keinRuecktritt, p.ruecksendekostenCents])
+
+  it('Futter mit Haken und Schätzung: alle vier Größen tragen beide Werte, in EINER Transaktion', async () => {
+    const ergebnis = await legeFutterFamilieAn({ ...HEU, keinRuecktritt: true, ruecksendekostenCents: 2500 })
+
+    expect(ergebnis).toMatchObject({ ok: true })
+    expect(ruecktritt()).toEqual(Array(4).fill([true, 2500]))
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+  })
+
+  it('Brennmaterial mit Schätzung ohne Haken: alle drei Größen tragen sie', async () => {
+    await legeBrennmaterialFamilieAn({ ...BUCHE, ruecksendekostenCents: 4990 })
+
+    expect(ruecktritt()).toEqual(Array(3).fill([false, 4990]))
+  })
+
+  it('ohne Angabe: jede Größe false/null — nichts aus der Kategorie abgeleitet', async () => {
+    await legeFutterFamilieAn(HEU)
+    expect(ruecktritt()).toEqual(Array(4).fill([false, null]))
+
+    vi.clearAllMocks()
+    await legeBrennmaterialFamilieAn(BUCHE)
+    expect(ruecktritt()).toEqual(Array(3).fill([false, null]))
+  })
+
+  it('negativer Betrag: { error }, keine Größe angelegt — bei beiden Familien', async () => {
+    expect(await legeFutterFamilieAn({ ...HEU, ruecksendekostenCents: -500 })).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(await legeBrennmaterialFamilieAn({ ...BUCHE, ruecksendekostenCents: -500 })).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+    expect(productCreate).not.toHaveBeenCalled()
+  })
+
+  it('Futter: fehlt neben dem Pflicht-Haken auch eine gültige Schätzung, kommt der allgemeine Satz', async () => {
+    const ergebnis = await legeFutterFamilieAn({ ...HEU, ruecksendekostenCents: Number.NaN, kennzeichnung: { ...HEU.kennzeichnung, bestaetigt: false } })
+
+    expect(ergebnis).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
     expect(productCreate).not.toHaveBeenCalled()
   })
 })

@@ -33,6 +33,7 @@ import {
 import { formatEuro, formatZahl, einheitLabel } from '@/lib/format'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
 import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
+import { keinRuecktrittVorbelegung, type RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
 import {
   Abschnitt,
   EINGABE,
@@ -41,6 +42,7 @@ import {
   FamilienDialog,
   Feld,
   FeldFehler,
+  RuecktrittAbschnitt,
   Wahl,
   feldId,
   springeZuFeld,
@@ -94,6 +96,11 @@ export function BrennmaterialFormular({
   const [koernung, setKoernung] = useState<number | null>(null)
   const [gelagertJahre, setGelagertJahre] = useState<number | null>(null)
   const [ueberdacht, setUeberdacht] = useState(false)
+  // Nr. 218: Vorbelegung des Hakens wie im Produktdialog (Brennmaterial: nicht gesetzt) — dieses Formular legt nur an.
+  const [ruecktritt, setRuecktritt] = useState<RuecktrittAngabe>(() => ({
+    keinRuecktritt: keinRuecktrittVorbelegung('BRENNHOLZ'),
+    ruecksendekostenCents: null,
+  }))
   const [zeilen, setZeilen] = useState<Zeile[]>(() => startZeilen('BRENNHOLZ_SCHEIT', (i) => `s${i}`))
   const [versucht, setVersucht] = useState(false)
   const [speichert, setSpeichert] = useState(false)
@@ -109,6 +116,8 @@ export function BrennmaterialFormular({
     koernung,
     gelagertJahre,
     ueberdacht,
+    keinRuecktritt: ruecktritt.keinRuecktritt,
+    ruecksendekostenCents: ruecktritt.ruecksendekostenCents,
     groessen: zeilen.map(({ bezeichnung, unit, price, stock }) => ({ bezeichnung, unit, price: price ?? undefined, stock })),
   }
   const pruefung = brennmaterialFamilieSchema.safeParse(eingabe)
@@ -423,6 +432,13 @@ export function BrennmaterialFormular({
 
         {raummassErklaeren(zeilen.map((z) => z.unit)) && <RaummassErklaerung />}
       </Abschnitt>
+
+      <RuecktrittAbschnitt
+        id="brenn-ruecktritt"
+        wert={ruecktritt}
+        onWert={(teil) => setRuecktritt((r) => ({ ...r, ...teil }))}
+        fehler={fehler.ruecksendekostenCents}
+      />
 
       <p className="text-[12.5px] leading-snug text-muted-foreground">
         Für Holz brauchst du keine Futtermittel-Registrierung. Den Mehrwertsteuersatz bitte mit deinem Steuerberater abklären.

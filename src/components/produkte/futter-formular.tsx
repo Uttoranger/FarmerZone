@@ -62,12 +62,14 @@ import {
   FamilienDialog,
   Feld,
   FeldFehler,
+  RuecktrittAbschnitt,
   SperrZeile,
   Wahl,
   feldId,
   springeZuFeld,
 } from './familien-teile'
 import { FutterRegistrierungen } from './futter-registrierungen'
+import { keinRuecktrittNachKategoriewechsel, keinRuecktrittVorbelegung, type RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
 
 /*
  * „Neues Futtermittel" mit Verkaufsgrößen (Gate 6, Nachtlauf Nr. 20; Mockups
@@ -108,6 +110,9 @@ const KENNZEICHNUNG_LEER: Kennzeichnung = {
   bestaetigt: false,
 }
 
+/** Die Kategorie beim Öffnen — davon hängt auch die Vorbelegung des Hakens „kein Rücktritt“ ab. */
+const START_KATEGORIE: (typeof FUTTER_KATEGORIEN)[number] = 'HEU_STROH'
+
 const EINHEIT_WAHL: Record<FutterGroessenEinheit, string> = { STUECK: 'Stück', BALLEN: 'Ballen', BIGBAG: 'Big Bag' }
 
 function zeileAus(vorlage: FutterVorlage, schluessel: string): Zeile {
@@ -143,11 +148,16 @@ export function FutterFormular({
   const neuerSchluessel = () => `z${naechster.current++}`
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState<(typeof FUTTER_KATEGORIEN)[number]>('HEU_STROH')
+  const [category, setCategory] = useState<(typeof FUTTER_KATEGORIEN)[number]>(START_KATEGORIE)
   const [subcategory, setSubcategory] = useState<ProductSubcategoryValue | null>(null)
   const [bio, setBio] = useState(false)
   const [nurBetriebe, setNurBetriebe] = useState(false)
   const [abholhinweise, setAbholhinweise] = useState<AbholhinweisValue[]>([])
+  // Nr. 218: Vorbelegung des Hakens je Kategorie wie im Produktdialog — dieses Formular legt nur an.
+  const [ruecktritt, setRuecktritt] = useState<RuecktrittAngabe>(() => ({
+    keinRuecktritt: keinRuecktrittVorbelegung(START_KATEGORIE),
+    ruecksendekostenCents: null,
+  }))
   const [kennzeichnung, setKennzeichnung] = useState<Kennzeichnung>(KENNZEICHNUNG_LEER)
   const [zeilen, setZeilen] = useState<Zeile[]>(() =>
     FUTTER_VORLAGEN.filter((v) => FUTTER_VORLAGEN_START.includes(v.id)).map((v, i) => zeileAus(v, `s${i}`))
@@ -164,6 +174,8 @@ export function FutterFormular({
     abgabe: nurBetriebe ? 'NUR_BETRIEBE' : 'ALLE',
     abholhinweise,
     kennzeichnung,
+    keinRuecktritt: ruecktritt.keinRuecktritt,
+    ruecksendekostenCents: ruecktritt.ruecksendekostenCents,
     groessen: zeilen.map(({ bezeichnung, verpackung, unit, nettoMenge, price, stock }) => ({
       bezeichnung,
       verpackung,
@@ -189,6 +201,10 @@ export function FutterFormular({
     if (neu === category) return
     setCategory(neu)
     setSubcategory(null)
+    setRuecktritt((r) => ({
+      ...r,
+      keinRuecktritt: keinRuecktrittNachKategoriewechsel({ anlegen: true, aktuell: r.keinRuecktritt, alt: category, neu }),
+    }))
     kennzeichnungSetzen({
       futtermittelart: artFuer(neu),
       zusammensetzung: zusammensetzungVorbelegung(kennzeichnung.zusammensetzung, subcategory, null),
@@ -429,6 +445,13 @@ export function FutterFormular({
       </Abschnitt>
 
       <AbholhinweisWahl wert={abholhinweise} onWert={setAbholhinweise} />
+
+      <RuecktrittAbschnitt
+        id="futter-ruecktritt"
+        wert={ruecktritt}
+        onWert={(teil) => setRuecktritt((r) => ({ ...r, ...teil }))}
+        fehler={fehler.ruecksendekostenCents}
+      />
 
       <Abschnitt
         id="futter-kennzeichnung"
