@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import { config as zodEinstellung } from 'zod/v4/core'
-import { bereinigeEreignis, ermittleUmgebung } from '@/lib/sentry-hygiene'
+import { bereinigeEreignis, bereinigeFehlerEreignis, ermittleUmgebung } from '@/lib/sentry-hygiene'
 
 // Sentry, Browser-Seite — die Datei, die der Foto-Upload-Suche gefehlt hat:
 // Erst sie macht Fehler auf den Geräten der Bauern sichtbar.
@@ -41,7 +41,10 @@ if (dsn) {
     // BEIDE Haken, ein Filter: beforeSend läuft nur für Fehler; ohne
     // beforeSendTransaction gingen Pageload-Transaktionen samt roher URL
     // (…?token=…) ungefiltert raus (siehe sentry-hygiene.ts).
-    beforeSend: bereinigeEreignis,
+    // Nur im Browser verwirft beforeSend zusätzlich Fehler, deren Stack allein
+    // aus Browser-Erweiterungen stammt (Nr. 216); Transaktionen und der Server
+    // behalten bereinigeEreignis ohne Verwerfen.
+    beforeSend: bereinigeFehlerEreignis,
     beforeSendTransaction: bereinigeEreignis,
   })
 }

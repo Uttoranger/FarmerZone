@@ -62,7 +62,9 @@
  *
  * Die Funktionen sind bewusst rein (Ereignis rein, Ereignis raus) und ohne
  * Sentry-Laufzeit-Import, damit die Tests sie ohne Netz und ohne SDK-Aufbau
- * prüfen können. Ereignisse werden nie verworfen, nur bereinigt.
+ * prüfen können. Ereignisse werden nie verworfen, nur bereinigt — mit einer
+ * Ausnahme im Browser: Fehler, die nur aus Code einer Browser-Erweiterung
+ * stammen, verwirft bereinigeFehlerEreignis (Nr. 216).
  */
 import type { Event as SentryEvent } from '@sentry/nextjs'
 
@@ -1488,7 +1490,8 @@ export function ohneAnfrage<E extends SentryEvent>(event: E): E {
  * Der zentrale Filter — läuft auf Server, Edge und im Browser, für
  * FEHLER-Ereignisse (beforeSend) wie für TRANSAKTIONEN (beforeSendTransaction).
  * Entfernt, was der Kopfkommentar aufzählt; verwirft nie ein Ereignis —
- * ein gefiltertes Ereignis ist besser als keines.
+ * ein gefiltertes Ereignis ist besser als keines. (Das Verwerfen von
+ * Erweiterungs-Fehlern im Browser steht in bereinigeFehlerEreignis.)
  *
  * WIRFT NIE: Ein Fehler in beforeSend lässt das SDK das Ereignis verwerfen,
  * und wir sähen den Fehler nie. Scheitert die Bereinigung trotzdem an einer
@@ -1501,6 +1504,78 @@ export function bereinigeEreignis<E extends SentryEvent>(event: E): E {
   } catch {
     return minimalEreignis(event)
   }
+}
+
+/** Schemata, mit denen der Dateiname eines Frames auf Code einer
+ *  Browser-Erweiterung zeigt. */
+const ERWEITERUNG_PRAEFIXE = ['chrome-extension://', 'moz-extension://', 'safari-web-extension://', 'safari-extension://', 'ext:']
+
+/** Platzhalter ohne Aussage über die Herkunft: Inline-Skripte, Konsole,
+ *  eingebauter Code. Ein solcher Frame spricht weder für noch gegen uns. */
+const NEUTRALE_FRAMES = new Set(['<anonymous>', '<script>', '[native code]', 'native'])
+
+type FrameHerkunft = 'erweiterung' | 'neutral' | 'eigen'
+
+function herkunftDesFrames(frame: unknown): FrameHerkunft {
+  if (!istObjekt(frame)) return 'neutral'
+  const namen: string[] = []
+  for (const feld of [frame.filename, frame.abs_path]) {
+    if (typeof feld === 'string' && feld.trim() !== '') namen.push(feld.trim().toLowerCase())
+  }
+  if (namen.length === 0) return 'neutral'
+  if (namen.some((n) => n.includes('<obscura') || ERWEITERUNG_PRAEFIXE.some((p) => n.startsWith(p)))) {
+    return 'erweiterung'
+  }
+  return namen.every((n) => NEUTRALE_FRAMES.has(n)) ? 'neutral' : 'eigen'
+}
+
+/**
+ * Stammt der Fehler ausschließlich aus Code einer Browser-Erweiterung?
+ * Wahr nur, wenn der Stack mindestens einen Erweiterungs-Frame hat und KEINEN
+ * eigenen (alles, was weder Erweiterung noch Platzhalter ist: `/_next/…`,
+ * `app:///`, die eigene Domain). Ohne Stack: falsch — dann kennen wir die
+ * Herkunft nicht und behalten das Ereignis. Gelesen werden nur
+ * `filename` und `abs_path` der Frames; nichts wird verändert oder ausgegeben.
+ *
+ * Bewusst KEIN Filter nach Fehlertext: „reading 'toLowerCase'" kann auch aus
+ * unserem Code kommen, die Herkunft des Stacks nicht.
+ *
+ * WIRFT NIE: Eine unerwartete Gestalt heißt „nicht sicher fremd" (falsch).
+ */
+export function nurErweiterungsFrames(event: SentryEvent): boolean {
+  try {
+    const ausnahme = event.exception
+    const werte = istObjekt(ausnahme) ? ausnahme.values : undefined
+    if (!Array.isArray(werte)) return false
+    let erweiterung = false
+    for (const wert of werte) {
+      const frames = istObjekt(wert) && istObjekt(wert.stacktrace) ? wert.stacktrace.frames : undefined
+      if (!Array.isArray(frames)) continue
+      for (const frame of frames) {
+        const herkunft = herkunftDesFrames(frame)
+        if (herkunft === 'eigen') return false
+        if (herkunft === 'erweiterung') erweiterung = true
+      }
+    }
+    return erweiterung
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Der Filter für FEHLER-Ereignisse im Browser (beforeSend in
+ * instrumentation-client.ts): Fehler, die nur aus Code einer Browser-
+ * Erweiterung stammen, gehen nicht raus (null) — sie sind nicht von uns
+ * und nicht zu beheben (Nr. 216). Alles andere läuft unverändert durch
+ * bereinigeEreignis. Transaktionen und der Server nutzen bereinigeEreignis
+ * direkt: verworfen wird nur hier.
+ *
+ * WIRFT NIE (siehe nurErweiterungsFrames und bereinigeEreignis).
+ */
+export function bereinigeFehlerEreignis<E extends SentryEvent>(event: E): E | null {
+  if (nurErweiterungsFrames(event)) return null
+  return bereinigeEreignis(event)
 }
 
 /** Notbehelf, wenn die Bereinigung scheitert: Nur Kennung, Zeit, Art, Stufe,
