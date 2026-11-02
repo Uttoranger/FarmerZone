@@ -348,6 +348,7 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
         korb: null,
         angaben: null,
         zusammenfassung: null,
+        privat: true,
       })
     )
   }

@@ -107,7 +107,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/checkout/kasse-skelett.tsx · KasseSkelett · Die Platzhalter der Kasse — zweimal gebraucht, einmal gebaut. · genutzt
 - src/components/checkout/kasse-teile.tsx · AbholWahl, AktionsLeiste, FELD, FELD_LABEL, FeldFehler, HINWEIS, KARTE, KARTEN_TITEL, KNOPF_GRUEN, KassenRaster, KontaktHinweis, KorbKarte, ReservierungsHinweis, TEXTLINK, UebersichtKarte, ZahlartWahl, ZahlungAbgelehnt, type KorbPosition · Die Bausteine der Kasse im neuen Design (Nachtlauf Nr. 12), abgenommen von docs/mockups/web-k3-warenkorb-bezahlen.html, web-k3-zahlung-abgelehnt.html, mobil-k3-warenkorb-bezahlen.html und … · genutzt
 - src/components/checkout/kauf-zusammenfassung.tsx · KAUF_ZUSAMMENFASSUNG_TEXT, KaufZusammenfassung, ZUSAMMENFASSUNG_SICHTBAR, type ZusammenfassungPosition · Die Zusammenfassung unmittelbar über dem Kaufknopf (§ 8 Abs. 1 FAGG, Nr. 210): Ware, Abholtermin und Vertragspartner — der Gesamtpreis steht im Zahlungsschritt direkt darüber in derselben Übersicht, … · genutzt
-- src/components/checkout/stripe-payment.tsx · StripeZahlung, type StripeZahlungProps · Der Zahlungsschritt der Kasse (Nachtlauf Nr. 12; Mockups web-k3-zahlung-abgelehnt, mobil-k3-zahlung-abgelehnt). · genutzt
+- src/components/checkout/stripe-payment.tsx · GewaehrleistungsMitteilung, StripeZahlung, type StripeZahlungProps · Der Zahlungsschritt der Kasse (Nachtlauf Nr. 12; Mockups web-k3-zahlung-abgelehnt, mobil-k3-zahlung-abgelehnt). · genutzt
 
 ## src/components/einrichten
 
@@ -698,6 +698,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/lib/rechtstexte/agb-datei.ts · AGB_DATEI_MAX_BYTES, agbAlsHtml, agbDateiname, agbFassung · Die AGB als Datei für den Anhang der Bestätigungsmails (Nr. 207, Auftrag Punkt 1; § 11 ECG, dauerhafter Datenträger — eine Webseite ist keiner, EuGH C-49/11) und die Kennung der Fassung, der ein Hof … · genutzt
 - src/lib/rechtstexte/agb-einbindung.ts · AGB_LINK_TEXT, AGB_PFAD, AGB_SEITE_TEXT, KASSE_AGB_SATZ, MAIL_AGB_ZEILE, REGISTRIERUNG_AGB_SATZ, REIHENFOLGE_HINWEIS · Wo und wie die AGB eingebunden werden (Register O4, geändert 13.10.2026): die kurzen Sätze mit Link in Registrierung, Kasse und Bestellbestätigung, der Link in den Fußzeilen und der Satz zur … · genutzt
 - src/lib/rechtstexte/agb.ts · AGB_ANHANG, AGB_ANHANG_ANKER, AGB_KURZ_ERKLAERT, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL, agbAnker, agbTeilAnker, type AgbAnhang, type AgbBlock, type AgbKurzErklaert, type AgbPunkt, type AgbTeil · Die AGB als Daten (Register O4, Nr. 90) — der Text von /agb. · genutzt
+- src/lib/rechtstexte/gewaehrleistung-mitteilung.ts · GEWAEHRLEISTUNG_MITTEILUNG · Die harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht (§ 4 Abs. 1 Z 12 und Anhang II FAGG, Pflicht seit 27.9.2026; Nr. 211) — EINE Quelle für Kasse und Bestätigungsmails: Pfade, … · genutzt
 - src/lib/rechtstexte/stuecke.ts · BETREIBER, E_MAIL, PLATZHALTER_ANGABE, fett, kursiv, link, mail, type AgbLink, type AgbPlatzhalter, type AgbStueck, type SatzMitLinks · Textstücke für Rechtstexte und die Sätze, die auf sie verweisen (Register O4): Klartext, Fett, Kursiv, Link, Mail-Adresse und die zwei Platzhalter des AGB-Entwurfs. · genutzt
 
 ## src/server

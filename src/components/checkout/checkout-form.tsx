@@ -69,7 +69,7 @@ import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
-import { StripeZahlung } from './stripe-payment'
+import { GewaehrleistungsMitteilung, StripeZahlung } from './stripe-payment'
 import { ruecktrittFuerPosition } from '@/lib/ruecktritt-angaben'
 import { KaufZusammenfassung } from './kauf-zusammenfassung'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
@@ -590,6 +590,7 @@ export function CheckoutForm({
         korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} anzeige={farm.preisAnzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
+        privat={privat}
       />
     )
   }
@@ -988,7 +989,7 @@ export function KassenAbschluss({
   /** Der Gesamtbetrag, fertig formatiert. */
   gesamt: string
   fussnote: string
-  /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt — bei „Betrieb“ entfällt er. */
+  /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt und die Gewährleistungs-Mitteilung (Nr. 211) — bei „Betrieb“ entfallen sie. */
   privat?: boolean
   /** Ware, Gesamtpreis, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210). */
   zusammenfassung?: React.ReactNode
@@ -1000,6 +1001,8 @@ export function KassenAbschluss({
       {uebersicht}
       <AngabenZumHof hof={hof} />
       {zusammenfassung}
+      {/* Nr. 211: die Gewährleistungs-Mitteilung (Anhang II FAGG) im Fluss über der Leiste, nie in ihr — nur bei Privat. */}
+      {privat && <GewaehrleistungsMitteilung karte />}
       <AktionsLeiste>
         <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={KNOPF_GRUEN}>
           {wirdGesendet ? (
@@ -1068,6 +1071,7 @@ export function ZahlungFortsetzen({
   zeilenCents,
   anzeige,
   jetztIso,
+  privat,
 }: {
   farm: PublicFarm
   zahlung: Zahlung
@@ -1078,6 +1082,8 @@ export function ZahlungFortsetzen({
   anzeige: PreisAnzeige
   /** Die Uhr des Servers als Startwert — gleiche Restzeit beim Rendern auf dem Server und im Browser. */
   jetztIso: string
+  /** Käuferart der Bestellung ist PRIVAT (Seite, aus der Datenbank) — nur dann die Gewährleistungs-Mitteilung (Nr. 211). */
+  privat: boolean
 }): React.JSX.Element {
   const [jetzt, setJetzt] = useState(() => new Date(jetztIso))
   useEffect(() => {
@@ -1104,6 +1110,7 @@ export function ZahlungFortsetzen({
         korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
+        privat={privat}
       />
     </KundeFokusShell>
   )
