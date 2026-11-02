@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 type Fortsetzung =
   | { art: 'kasse' }
   | { art: 'bestaetigung'; pfad: string }
-  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[]; korb: Omit<FortsetzungsKorb, 'gebuehrText'> }
+  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[]; korb: Omit<FortsetzungsKorb, 'gebuehrText'>; privat: boolean }
 
 const KASSE: Fortsetzung = { art: 'kasse' }
 
@@ -143,6 +143,8 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
       ruecktritt: ruecktrittFuerPosition(item.product, order.kaeuferArt === 'PRIVAT'),
     })),
     korb,
+    // Nr. 211: die Gewährleistungs-Mitteilung über dem Knopf nur bei Verbraucherinnen — aus der Bestellung, wie oben der Rücktritt.
+    privat: order.kaeuferArt === 'PRIVAT',
   }
 }
 
@@ -182,6 +184,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
         zeilenCents={fortsetzung.korb.zeilenCents}
         anzeige={fortsetzung.korb.anzeige}
         jetztIso={jetzt.toISOString()}
+        privat={fortsetzung.privat}
       />
     )
   }

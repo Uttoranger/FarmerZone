@@ -9,6 +9,9 @@
  *  - jede dieser Mails trägt die AGB als Datei agb-<marke>-<fassung>.html,
  *    deren Inhalt genau agbAlsHtml() ist (aus agb.ts) — auch bei „Betrieb“;
  *  - bei „Betrieb“ entfallen Belehrung und Formular (Gegenprobe);
+ *  - Nr. 211: unter der Belehrung die Gewährleistungs-Mitteilung (Anhang II
+ *    FAGG) als PNG mit absoluter Adresse auf der echten Seite, Alt-Text aus
+ *    der Quelle, 100 % bis 600 px breit, kein Base64 — bei „Betrieb“ nicht;
  *  - MAIL_AGB_ZEILE nennt den Anhang;
  *  - sendRaw gibt den Anhang an Resend weiter (Base64, Dateiname), ohne ihn
  *    ins Log zu schreiben; versendeStapel schickt eine Mail mit Anhang einzeln
@@ -30,6 +33,8 @@ vi.mock('resend', () => ({
 
 import { agbAlsHtml, agbDateiname } from '@/lib/rechtstexte/agb-datei'
 import { BELEHRUNG, HOF_ANGABEN_OHNE_LINK } from '@/lib/widerruf'
+import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import type { OrderForEmail, StapelMail } from '@/lib/email'
 
 let email: typeof import('@/lib/email')
@@ -99,6 +104,10 @@ async function onsite(order: OrderForEmail): Promise<StapelMail> {
   return email.onsiteConfirmationInhalt(order, 'token-1')
 }
 
+/** Die Bilder der Gewährleistungs-Mitteilung in einer Mail (am Dateinamen erkannt, egal mit welcher Adresse davor). */
+const mitteilungBilder = (html: string): string[] =>
+  [...html.matchAll(/<img\b[^>]*>/g)].map((t) => t[0]).filter((tag) => tag.includes('gewaehrleistung-mitteilung'))
+
 const MAILS: Array<[string, (o: OrderForEmail) => Promise<StapelMail>, Partial<OrderForEmail>]> = [
   ['Bestätigung online', (o) => email.baueOrderConfirmation(o), {}],
   ['Bestätigung bar', (o) => email.baueOrderConfirmation(o), { paymentMethod: 'ONSITE_CASH' }],
@@ -139,9 +148,28 @@ describe.each(MAILS)('%s', (_name, baue, teil) => {
     expect(text).toContain('Sie tragen die unmittelbaren Kosten der Rücksendung der Waren. Die Kosten werden auf höchstens etwa 31 EUR geschätzt.')
   }, 30_000)
 
-  it('Gegenprobe Betrieb: keine Belehrung, kein Formular, kein Widerruf-Link — der Anhang bleibt', async () => {
+  it('Nr. 211: Verbraucherin — unter der Belehrung die Gewährleistungs-Mitteilung als PNG mit absoluter Adresse, genau einmal', async () => {
+    const mail = await baue(bestellung(teil))
+    const [bild, ...mehr] = mitteilungBilder(mail.html)
+    expect(mehr).toEqual([])
+    expect(bild).toContain(`src="${PRODUKTION_ADRESSE}${GEWAEHRLEISTUNG_MITTEILUNG.pngPfad}"`)
+    expect(bild).toMatch(/src="https:\/\//)
+    expect(bild).not.toContain('data:')
+    expect(bild).toContain(`alt="${GEWAEHRLEISTUNG_MITTEILUNG.altText}"`)
+    expect(bild).toMatch(/width:100%/)
+    expect(bild).toMatch(/max-width:600px/)
+    const text = klartext(mail.html)
+    expect(text).toContain(GEWAEHRLEISTUNG_MITTEILUNG.ueberschrift)
+    // Unter der Belehrung: nach Teil B und dem Hinweis zur Rückgabe am Hof.
+    expect(mail.html.indexOf(bild ?? '<img')).toBeGreaterThan(mail.html.indexOf(BELEHRUNG.teilB.titel))
+    expect(text.indexOf(GEWAEHRLEISTUNG_MITTEILUNG.ueberschrift)).toBeGreaterThan(text.indexOf(BELEHRUNG.hinweis))
+  }, 30_000)
+
+  it('Gegenprobe Betrieb: keine Belehrung, kein Formular, kein Widerruf-Link, keine Gewährleistungs-Mitteilung — der Anhang bleibt', async () => {
     const mail = await baue(bestellung({ ...teil, kaeuferArt: 'BETRIEB' }))
     const text = klartext(mail.html)
+    expect(mitteilungBilder(mail.html)).toEqual([])
+    expect(text).not.toContain(GEWAEHRLEISTUNG_MITTEILUNG.ueberschrift)
     expect(text).not.toContain(BELEHRUNG.teilA.titel)
     expect(text).not.toContain(BELEHRUNG.teilB.titel)
     expect(text).not.toContain('Widerrufsrecht')

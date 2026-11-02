@@ -195,6 +195,7 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: /^Zur Wahrung der Widerrufsfrist reicht es aus, dass Sie die Mitteilung über die Ausübung/, grund: 'Wortlaut der Muster-Widerrufsbelehrung, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: /^Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen/, grund: 'Wortlaut der Muster-Widerrufsbelehrung, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: '– Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)', grund: 'Wortlaut des Muster-Widerrufsformulars, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
+  { datei: 'src/lib/rechtstexte/gewaehrleistung-mitteilung.ts', wort: 'Mitteilung', text: /^Harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht \(Anhang II FAGG\)/, grund: 'Alt-Text der amtlichen Grafik nach Anhang II FAGG (Nr. 211, Wortlaut aus der Freigabe) — Name des Rechtstexts, keine Nachricht im Postfach' },
   { datei: 'src/lib/beitrag-anlass.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach — seit Nr. 134 die einzige Stelle (BEITRAG_ANLASS; tests/anlass-woerter-wache.test.ts)' },
   // Newsletter (Register N12)
   {

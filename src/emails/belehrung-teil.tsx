@@ -1,7 +1,9 @@
 import * as React from 'react'
-import { Link, Text } from '@react-email/components'
+import { Img, Link, Text } from '@react-email/components'
 import { MAIL_FARBE, SCHRIFT_UEBERSCHRIFT, Trenner, bodyText, kleinText, textLink } from './_layout'
 import { WIDERRUF_TEXT, type Belehrung } from '@/lib/widerruf'
+import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 const zwischentitel: React.CSSProperties = {
   color: MAIL_FARBE.text,
@@ -15,6 +17,8 @@ const zwischentitel: React.CSSProperties = {
 const abschnittTitel: React.CSSProperties = { ...bodyText, fontWeight: '600', margin: '12px 0 6px' }
 const absatz: React.CSSProperties = { ...bodyText, fontSize: '13px', margin: '0 0 8px' }
 const formularZeile: React.CSSProperties = { ...absatz, margin: '0 0 4px' }
+// Volle Breite der Karte, höchstens 600 px; die Höhe folgt dem Bild (A4) — nichts beschnitten.
+const mitteilungBild: React.CSSProperties = { display: 'block', width: '100%', maxWidth: '600px', height: 'auto', border: '0' }
 
 /**
  * Die Belehrung nach Anhang I FAGG in den Bestätigungsmails (Nr. 207, Auftrag
@@ -23,6 +27,12 @@ const formularZeile: React.CSSProperties = { ...absatz, margin: '0 0 4px' }
  * Wortlaut kommt fertig gefüllt aus `belehrungMitHof` (src/lib/widerruf.ts) —
  * diese Vorlage zeichnet nur. Eine Webseite ist kein dauerhafter Datenträger
  * (EuGH C-49/11), darum steht der Text in der Mail selbst.
+ *
+ * Darunter die Gewährleistungs-Mitteilung (Anhang II FAGG, Nr. 211) als PNG —
+ * Mailprogramme zeigen SVG meist nicht an. Absolute Adresse auf der echten
+ * Seite (die Mail wird außerhalb unseres Servers gelesen), kein Base64; die
+ * Grafik bleibt unverändert. Wie die Belehrung nur bei Verbraucherinnen: Die
+ * drei Mails rendern diesen Teil nur mit `belehrung` (PRIVAT).
  */
 export function BelehrungTeil({ belehrung, widerrufUrl }: { belehrung: Belehrung; widerrufUrl?: string }): React.JSX.Element {
   return (
@@ -58,6 +68,13 @@ export function BelehrungTeil({ belehrung, widerrufUrl }: { belehrung: Belehrung
           </Link>
         </Text>
       )}
+      <Trenner />
+      <Text style={zwischentitel}>{GEWAEHRLEISTUNG_MITTEILUNG.ueberschrift}</Text>
+      <Img
+        src={`${PRODUKTION_ADRESSE}${GEWAEHRLEISTUNG_MITTEILUNG.pngPfad}`}
+        alt={GEWAEHRLEISTUNG_MITTEILUNG.altText}
+        style={mitteilungBild}
+      />
     </>
   )
 }

@@ -7,6 +7,8 @@ import { getStripePromise } from '@/lib/stripe-client'
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
+import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
+import { cn } from '@/lib/utils'
 import {
   KASSE_ZAHLART_UEBERSCHRIFT,
   bestaetigungMitStatus,
@@ -66,6 +68,39 @@ export type StripeZahlungProps = {
    * `KaufZusammenfassung`, vom Formular gebaut). Ersetzt die Fußzeile unter dem Knopf.
    */
   zusammenfassung: ReactNode
+  /**
+   * Verbraucherin (Käuferart PRIVAT): nur dann die Gewährleistungs-Mitteilung über dem Knopf
+   * (Anhang II FAGG, Nr. 211) — bei „Betrieb“ entfällt sie. Pflicht, damit kein Einstieg sie vergisst.
+   */
+  privat: boolean
+}
+
+/**
+ * Die harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht (§ 4 Abs. 1 Z 12 und
+ * Anhang II FAGG, Nr. 211): unter der Zusammenfassung, über dem Kaufknopf — im Zahlungsschritt
+ * als Abschnitt der Übersicht, im Formular (`KassenAbschluss`) als eigene Karte. Ob sie steht
+ * (nur bei Privat), entscheidet der Aufrufer.
+ *
+ * Die amtliche Grafik bleibt, wie sie ist (DESIGN_SYSTEM, „Amtliche Grafiken“): ein schlichtes
+ * `<img>` in voller Breite, nicht über `next/image` (keine Umrechnung), ohne `loading="lazy"`
+ * (sie muss beim Bestellen schon da sein), ohne Zuklappen, ohne Filter. Ihr Grund ist
+ * durchsichtig — darunter liegt deshalb eine Fläche, die in beiden Themes hell ist
+ * (`bg-accent-foreground`, wie Stripes Zahlungsfeld): Schwarze Schrift auf dunkler Karte wäre
+ * unlesbar, eine Umfärbung der Grafik verboten (CODING_STANDARDS §7, „Was dem Modus NICHT folgt“).
+ */
+export function GewaehrleistungsMitteilung({ karte = false }: { karte?: boolean }): React.JSX.Element {
+  const g = GEWAEHRLEISTUNG_MITTEILUNG
+  return (
+    <section
+      aria-label={g.ueberschrift}
+      data-gewaehrleistung=""
+      className={cn('flex flex-col gap-2', karte ? KARTE : 'border-t border-border pt-3')}
+    >
+      <h3 className="text-sm font-semibold text-foreground">{g.ueberschrift}</h3>
+      {/* eslint-disable-next-line @next/next/no-img-element -- amtliche Grafik (Anhang II FAGG): unverändert ausliefern, keine Bildoptimierung */}
+      <img src={g.svgPfad} alt={g.altText} width={g.breite} height={g.hoehe} className="h-auto w-full bg-accent-foreground" />
+    </section>
+  )
 }
 
 export function StripeZahlung(props: StripeZahlungProps): React.JSX.Element {
@@ -113,6 +148,7 @@ function ZahlungsInhalt({
   korb,
   angaben,
   zusammenfassung,
+  privat,
 }: StripeZahlungProps): React.JSX.Element {
   const stripe = useStripe()
   const elements = useElements()
@@ -182,8 +218,10 @@ function ZahlungsInhalt({
             <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
           }
         >
-          {/* Zwischen Gesamtbetrag und Knopf: Ware, Abholtermin, Vertragspartner — dann ein Fehler, direkt am Knopf. */}
+          {/* Zwischen Gesamtbetrag und Knopf: Ware, Abholtermin, Vertragspartner, bei Privat die
+              Gewährleistungs-Mitteilung (Nr. 211) — dann ein Fehler, direkt am Knopf. */}
           {zusammenfassung}
+          {privat && <GewaehrleistungsMitteilung />}
           {fehler && (
             <p role="alert" className="text-[13px] leading-snug font-medium text-status-offen">
               {fehler}
