@@ -36,8 +36,8 @@ export const RUECKTRITT_TEXT = {
   betragZuHoch: 'Der Betrag ist zu hoch. Bitte prüf die Eingabe.',
   // Produktseite, Kasse, Produktliste des Hofs
   hinweisKeinRuecktritt: 'Kein Rücktritt: verdirbt schnell',
-  // Geschütztes Leerzeichen nach „€“: In der schmalen Kassen-Zeile brach der Betrag sonst vom Zeichen ab.
-  hinweisRuecksendung: (cents: number) => `Rücksendung geschätzt ca. ${formatEuro(centsAlsEuro(cents)).replace('€ ', '€\u00a0')}`,
+  // Geschütztes Leerzeichen nach „€“ (Option von formatEuro): In der schmalen Kassen-Zeile brach der Betrag sonst vom Zeichen ab.
+  hinweisRuecksendung: (cents: number) => `Rücksendung geschätzt ca. ${formatEuro(centsAlsEuro(cents), 2, { geschuetztesLeerzeichen: true })}`,
   // /widerruf: Vorrang vor dem Satz je Kategorie (Freigabe 214 Punkt 3)
   widerrufKeinRuecktritt:
     'Für diese Ware besteht nach Angabe des Hofs kein Rücktrittsrecht (§ 18 Abs. 1 Z 4 FAGG). Der Hof prüft das im Einzelfall.',

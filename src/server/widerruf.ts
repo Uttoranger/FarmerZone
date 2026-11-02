@@ -734,6 +734,12 @@ function adminUmfang(w: { umfang: string; positionen: unknown; stand: string }, 
   if (gewaehlt.length === 0) return [WIDERRUF_ADMIN_TEXT.freitext]
   const offen = alsWiderrufStand(w.stand) === 'eingegangen'
   const positionen = offen ? offenePositionen(gewaehlt, items.map((i) => ({ id: i.id, fehlt: (i.fehltSeit ?? null) !== null }))) : gewaehlt
+  // Nichts mehr offen, weil alles Gewählte schon gestrichen ist: ein Satz statt einer leeren Zeile (Nr. 217.1).
+  // Nur wenn jede Wahl auf eine gestrichene Position zeigt — fehlt eine in der Bestellung, bleibt es bei „Einzelne Artikel“.
+  if (positionen.length === 0) {
+    const alleGestrichen = gewaehlt.every((p) => (items.find((i) => i.id === p.orderItemId)?.fehltSeit ?? null) !== null)
+    return [alleGestrichen ? WIDERRUF_TEXT.alleGestrichen : WIDERRUF_TEXT.teil]
+  }
   return positionen.map((p) => {
     const item = items.find((i) => i.id === p.orderItemId)
     return item ? `${p.menge} × ${item.productName}` : WIDERRUF_TEXT.teil

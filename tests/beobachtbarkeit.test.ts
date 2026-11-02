@@ -15,7 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ErrorEvent } from '@sentry/nextjs'
-import { bereinigeEreignis, ermittleUmgebung } from '@/lib/sentry-hygiene'
+import { bereinigeEreignis, bereinigeFehlerEreignis, ermittleUmgebung, nurErweiterungsFrames } from '@/lib/sentry-hygiene'
 import { validateEnv } from '@/lib/env'
 import { baueUploadMeldung, meldeUploadFehler, uploadUrsacheVon } from '@/lib/upload-meldung'
 import {
@@ -680,13 +680,14 @@ describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-P
     const fehler: string[] = []
     if (!optionen.startsWith('{')) fehler.push('kein Objekt-Literal (nicht prüfbar)')
     if (!/\bsendDefaultPii\s*:\s*false\b/.test(optionen)) fehler.push('sendDefaultPii: false fehlt')
-    if (!/\bbeforeSend\s*:\s*bereinigeEreignis\b/.test(optionen)) fehler.push('beforeSend fehlt')
+    // beforeSend darf im Browser die Fehler-Variante sein (verwirft Erweiterungs-Fehler, Nr. 216).
+    if (!/\bbeforeSend\s*:\s*(?:bereinigeEreignis|bereinigeFehlerEreignis)\b/.test(optionen)) fehler.push('beforeSend fehlt')
     if (!/\bbeforeSendTransaction\s*:\s*bereinigeEreignis\b/.test(optionen)) fehler.push('beforeSendTransaction fehlt')
     // Jede WEITERE Stelle mit anderem Wert — verschachtelt, als Variable oder
     // als eigene Funktion — überstimmt womöglich die richtige. Der Leerraum
     // steht IM Lookahead, sonst wiche \s* per Backtracking aus.
     if (/\bsendDefaultPii\s*:(?!\s*false\b)/.test(optionen)) fehler.push('sendDefaultPii mit anderem Wert als false')
-    if (/\bbeforeSend\s*:(?!\s*bereinigeEreignis\b)/.test(optionen)) {
+    if (/\bbeforeSend\s*:(?!\s*(?:bereinigeEreignis|bereinigeFehlerEreignis)\b)/.test(optionen)) {
       fehler.push('beforeSend mit anderem Wert als bereinigeEreignis')
     }
     if (/\bbeforeSendTransaction\s*:(?!\s*bereinigeEreignis\b)/.test(optionen)) {
@@ -801,6 +802,122 @@ describe('Sentry-Initialisierung — statisch: jeder init-Aufruf ohne Standard-P
       'beforeSendTransaction mit anderem Wert als bereinigeEreignis',
     ])
     expect(ergebnis[8].fehler).toEqual(['beforeSend mit anderem Wert als bereinigeEreignis'])
+  })
+})
+
+describe('Fehler aus Browser-Erweiterungen (Nr. 216)', () => {
+  /** Ein Ereignis mit genau diesen Frames (Dateinamen; leer = Frame ohne Datei). */
+  function mitFrames(...dateien: Array<string | { filename?: string; abs_path?: string }>): ErrorEvent {
+    return ereignis({
+      message: 'x',
+      exception: {
+        values: [
+          {
+            type: 'TypeError',
+            value: "Cannot read properties of undefined (reading 'toLowerCase')",
+            stacktrace: {
+              frames: dateien.map((d) => (typeof d === 'string' ? { filename: d } : d)),
+            },
+          },
+        ],
+      },
+    })
+  }
+
+  it('verwirft ein Ereignis, dessen Frames nur aus Erweiterungen stammen (Frames aus dem Befund)', () => {
+    const e = mitFrames('<script>', '<obscura:bootstrap>', 'ext:core/01_core.js')
+    expect(nurErweiterungsFrames(e)).toBe(true)
+    expect(bereinigeFehlerEreignis(e)).toBeNull()
+  })
+
+  it.each([
+    'chrome-extension://abcdef/inhalt.js',
+    'moz-extension://abcdef/inhalt.js',
+    'safari-web-extension://abcdef/inhalt.js',
+    'safari-extension://abcdef/inhalt.js',
+    'ext:core/01_core.js',
+    '<obscura:bootstrap>',
+  ])('zählt %s als Erweiterung', (datei) => {
+    expect(bereinigeFehlerEreignis(mitFrames(datei))).toBeNull()
+  })
+
+  it('liest auch abs_path, wenn filename fehlt', () => {
+    expect(bereinigeFehlerEreignis(mitFrames({ abs_path: 'moz-extension://abcdef/inhalt.js' }))).toBeNull()
+  })
+
+  it('behält ein Ereignis mit mindestens einem eigenen Frame — und bereinigt es wie bisher', () => {
+    const e = bereinigeFehlerEreignis(
+      mitFrames('ext:core/01_core.js', 'https://agrilo.at/_next/static/chunks/app-1234.js', '<anonymous>')
+    )
+    expect(e).not.toBeNull()
+    expect(e?.exception?.values?.[0]?.stacktrace?.frames).toHaveLength(3)
+    const mitMail = bereinigeFehlerEreignis(
+      ereignis({ message: 'von hof@beispiel.at', exception: { values: [{ stacktrace: { frames: [{ filename: '/_next/static/chunks/a.js' }] } }] } })
+    )
+    expect(mitMail?.message).toBe('von [e-mail entfernt]')
+  })
+
+  it('behält ein Ereignis mit eigener Domain, app:/// oder relativem Pfad', () => {
+    for (const eigen of ['app:///_next/static/chunks/a.js', 'https://agrilo.at/x.js', '/_next/static/chunks/a.js']) {
+      expect(bereinigeFehlerEreignis(mitFrames('chrome-extension://abc/x.js', eigen))).not.toBeNull()
+    }
+  })
+
+  it('behält ein Ereignis ohne Stack, ohne Frames und mit nur neutralen Frames', () => {
+    expect(bereinigeFehlerEreignis(ereignis({ message: 'ohne Stack' }))).not.toBeNull()
+    expect(bereinigeFehlerEreignis(ereignis({ exception: { values: [{ type: 'Error' }] } }))).not.toBeNull()
+    expect(bereinigeFehlerEreignis(mitFrames())).not.toBeNull()
+    expect(bereinigeFehlerEreignis(mitFrames('<anonymous>', '<script>', '[native code]', {}))).not.toBeNull()
+  })
+
+  it('filtert nicht nach dem Fehlertext: dieselbe Meldung aus eigenem Code bleibt', () => {
+    expect(bereinigeFehlerEreignis(mitFrames('https://agrilo.at/_next/static/chunks/a.js'))).not.toBeNull()
+  })
+
+  it('wirft nie, auch bei unerwarteter Gestalt', () => {
+    const werfend = ereignis({})
+    Object.defineProperty(werfend, 'exception', {
+      get: () => {
+        throw new Error('Getter')
+      },
+    })
+    expect(nurErweiterungsFrames(werfend)).toBe(false)
+    for (const kaputt of [
+      { exception: 'text' },
+      { exception: { values: 'text' } },
+      { exception: { values: [null, 3, { stacktrace: 'x' }, { stacktrace: { frames: 'x' } }] } },
+      { exception: { values: [{ stacktrace: { frames: [null, 'x', 7, { filename: 5 }] } }] } },
+    ]) {
+      expect(() => bereinigeFehlerEreignis(ereignis(kaputt))).not.toThrow()
+      expect(bereinigeFehlerEreignis(ereignis(kaputt))).not.toBeNull()
+    }
+  })
+
+  it('Transaktionen laufen unverändert durch bereinigeEreignis — auch mit Erweiterungs-Frames', () => {
+    const t = mitFrames('ext:core/01_core.js') as unknown as ErrorEvent
+    expect(bereinigeEreignis(t)).toBe(t)
+  })
+
+  it('Client: beforeSend verwirft Erweiterungs-Fehler, beforeSendTransaction nie', async () => {
+    vi.resetModules()
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', 'https://k@o.ingest.de.sentry.io/1')
+    const Sentry = await import('@sentry/nextjs')
+    vi.mocked(Sentry.init).mockClear()
+    await import('@/instrumentation-client')
+    const optionen = vi.mocked(Sentry.init).mock.calls[0][0] as {
+      beforeSend?: (e: ErrorEvent) => ErrorEvent | null
+      beforeSendTransaction?: (e: ErrorEvent) => ErrorEvent | null
+    }
+    expect(optionen.beforeSend?.(mitFrames('<obscura:bootstrap>', 'ext:core/01_core.js'))).toBeNull()
+    expect(optionen.beforeSend?.(mitFrames('/_next/static/chunks/a.js'))).not.toBeNull()
+    expect(optionen.beforeSendTransaction?.(mitFrames('ext:core/01_core.js'))).not.toBeNull()
+    vi.unstubAllEnvs()
+  })
+
+  it('Server: beforeSend bleibt bereinigeEreignis — dort wird nichts verworfen', () => {
+    const text = fs.readFileSync(path.resolve(__dirname, '..', 'src/instrumentation.ts'), 'utf8')
+    expect(text).toMatch(/\bbeforeSend\s*:\s*bereinigeEreignis\b/)
+    expect(text).not.toMatch(/bereinigeFehlerEreignis/)
   })
 })
 

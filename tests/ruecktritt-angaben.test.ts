@@ -26,7 +26,7 @@ import {
 } from '@/lib/ruecktritt-angaben'
 import { ausnahmeHinweis } from '@/lib/widerruf'
 import { PRODUCT_CATEGORY_VALUES } from '@/lib/taxonomie'
-import { formatEuro, formatZahl } from '@/lib/format'
+import { centsAlsEuro, formatEuro, formatZahl } from '@/lib/format'
 
 const OHNE = { keinRuecktritt: false, ruecksendekostenCents: null }
 
@@ -156,5 +156,22 @@ describe('kostenSchaetzungSatz — Gestaltungshinweis 5 b', () => {
   it('Wortlaut des Musters mit dem Betrag in ganzen Euro', () => {
     expect(kostenSchaetzungSatz(31)).toBe('Die Kosten werden auf höchstens etwa 31 EUR geschätzt.')
     expect(kostenSchaetzungSatz(1200)).toBe(`Die Kosten werden auf höchstens etwa ${formatZahl(1200)} EUR geschätzt.`)
+  })
+})
+
+describe('hinweisRuecksendung (Nr. 217.3)', () => {
+  // Gegenprobe: dieselbe Zeichenkette wie vorher, als der Betrag erst formatiert und dann ersetzt wurde.
+  const frueher = (cents: number) => `Rücksendung geschätzt ca. ${formatEuro(centsAlsEuro(cents)).replace('€ ', '€\u00a0')}`
+
+  it.each([0, 1250, 2500, 123456])('%i Cent: gleiche Zeichenkette wie vorher, geschütztes Leerzeichen nach dem €', (cents) => {
+    const text = RUECKTRITT_TEXT.hinweisRuecksendung(cents)
+    expect(text).toBe(frueher(cents))
+    expect(text).toContain('€\u00a0')
+    expect(text).not.toContain('€ ')
+  })
+
+  it('nennt den Betrag wörtlich', () => {
+    expect(RUECKTRITT_TEXT.hinweisRuecksendung(1250)).toBe('Rücksendung geschätzt ca. €\u00a012,50')
+    expect(RUECKTRITT_TEXT.hinweisRuecksendung(0)).toBe('Rücksendung geschätzt ca. €\u00a00,00')
   })
 })

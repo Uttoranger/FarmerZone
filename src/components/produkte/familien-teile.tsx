@@ -8,6 +8,9 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
 import { feldFehlerAttribute, fehlerKennung, hilfeKennung } from '@/components/shared/formular-meldungen'
 import { cn } from '@/lib/utils'
+import { EuroCentFeld, KeinRuecktrittHaken } from '@/components/products/ruecktritt-felder'
+import { FREIWILLIG } from '@/lib/profil-meldungen'
+import { RUECKTRITT_TEXT, type RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
 
 /*
  * Bausteine der beiden Formulare mit Verkaufsgrößen (Futter, Brennmaterial;
@@ -253,6 +256,53 @@ export function AbholhinweisWahl({
       </div>
       <p className="text-[12.5px] leading-snug text-muted-foreground">{ABHOLUNG_ABSCHNITT.satz}</p>
     </fieldset>
+  )
+}
+
+/**
+ * Der Abschnitt „Rücktritt" (Nr. 218, Nacharbeit zu 214): Haken „Verdirbt
+ * schnell" und geschätzte Rücksendekosten für die ganze Familie — dieselben
+ * Bausteine und Texte wie im Produktdialog (ruecktritt-felder.tsx,
+ * src/lib/ruecktritt-angaben.ts), hier im Rahmen `Feld`, weil die Formulare mit
+ * Verkaufsgrößen ohne react-hook-form arbeiten. Der Wert sind ganze Cent; der
+ * Fehlersatz kommt aus dem Schema (ruecksendekostenSchema).
+ */
+export function RuecktrittAbschnitt({
+  id,
+  wert,
+  onWert,
+  fehler,
+}: {
+  id: string
+  wert: RuecktrittAngabe
+  onWert: (teil: Partial<RuecktrittAngabe>) => void
+  fehler?: string
+}): React.JSX.Element {
+  return (
+    <Abschnitt id={id} titel={RUECKTRITT_TEXT.abschnitt}>
+      <div data-feld="keinRuecktritt">
+        <KeinRuecktrittHaken
+          name="keinRuecktritt"
+          checked={wert.keinRuecktritt}
+          onChange={(haken) => onWert({ keinRuecktritt: haken })}
+          className="border border-border p-3"
+        />
+      </div>
+      <Feld
+        feld="ruecksendekostenCents"
+        label={`${RUECKTRITT_TEXT.ruecksendekosten} ${FREIWILLIG}`}
+        labelKlasse="leading-snug"
+        hilfe={RUECKTRITT_TEXT.ruecksendekostenErklaerung}
+        fehler={fehler}
+      >
+        <EuroCentFeld
+          id={feldId('ruecksendekostenCents')}
+          name="ruecksendekostenCents"
+          value={wert.ruecksendekostenCents}
+          onChange={(cents) => onWert({ ruecksendekostenCents: cents })}
+        />
+      </Feld>
+    </Abschnitt>
   )
 }
 

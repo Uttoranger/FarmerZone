@@ -69,7 +69,7 @@ import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
-import { StripeZahlung } from './stripe-payment'
+import { GewaehrleistungsMitteilung, StripeZahlung } from './stripe-payment'
 import { ruecktrittFuerPosition } from '@/lib/ruecktritt-angaben'
 import { KaufZusammenfassung } from './kauf-zusammenfassung'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
@@ -590,6 +590,8 @@ export function CheckoutForm({
         korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} anzeige={farm.preisAnzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
+        privat={privat}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
       />
     )
   }
@@ -597,6 +599,7 @@ export function CheckoutForm({
   const stand = reservierungsStand(reserviertBis, jetzt)
   // Online gewählt oder die Bestellung steht schon — dann geht es weiter zur Zahlung.
   const online = bestellungAngelegt || paymentMethod === 'ONLINE'
+  const barMitTermin = !online && zahlweg === 'ONSITE_CASH' && gewaehlt !== undefined
 
   return fokusShell(
     'Bestellen',
@@ -686,7 +689,12 @@ export function CheckoutForm({
             }
             fussnote={
               mindestGrund ??
-              kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })
+              // Nr. 215: Bar mit gewähltem Termin steht die Abholung schon in der Zusammenfassung über dem Knopf —
+              // die Zeile darunter entfällt, statt den Termin ein zweites Mal zu nennen. Ohne Termin bleibt die
+              // Bitte zu wählen; online bleibt die Zeile, wie sie ist (Register N10).
+              (barMitTermin
+                ? ''
+                : kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null }))
             }
           />
         }
@@ -988,7 +996,7 @@ export function KassenAbschluss({
   /** Der Gesamtbetrag, fertig formatiert. */
   gesamt: string
   fussnote: string
-  /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt — bei „Betrieb“ entfällt er. */
+  /** Verbraucherin (Nr. 200, N39): nur dann der Satz zum Rücktritt und die Gewährleistungs-Mitteilung (Nr. 211) — bei „Betrieb“ entfallen sie. */
   privat?: boolean
   /** Ware, Gesamtpreis, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210). */
   zusammenfassung?: React.ReactNode
@@ -1000,6 +1008,8 @@ export function KassenAbschluss({
       {uebersicht}
       <AngabenZumHof hof={hof} />
       {zusammenfassung}
+      {/* Nr. 211: die Gewährleistungs-Mitteilung (Anhang II FAGG) im Fluss über der Leiste, nie in ihr — nur bei Privat. */}
+      {privat && <GewaehrleistungsMitteilung karte />}
       <AktionsLeiste>
         <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={KNOPF_GRUEN}>
           {wirdGesendet ? (
@@ -1016,14 +1026,29 @@ export function KassenAbschluss({
           )}
         </button>
         {fussnote && <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>}
-        {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
-            Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
-            in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
-        <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
-        {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf im neuen Tab. */}
-        {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
+        <KaufknopfSaetze privat={privat} />
       </AktionsLeiste>
     </div>
+  )
+}
+
+/**
+ * Die Sätze unter jedem Knopf, mit dem eine Bestellung verbindlich wird (Register N2/O4, Ergänzung
+ * 1.11.2026, Nr. 215): „Zahlungspflichtig bestellen“, „Jetzt bezahlen“ bzw. „Erneut bezahlen“ — und
+ * zusätzlich unter „Weiter zur Zahlung“. EINE Quelle für Formular (`KassenAbschluss`) und
+ * Zahlungsschritt (`StripeZahlung`, Prop `kaufknopfSaetze`), damit beide Leisten nie auseinanderlaufen.
+ */
+export function KaufknopfSaetze({ privat }: { privat: boolean }): React.JSX.Element {
+  return (
+    <>
+      {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
+          Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
+          in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
+      <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
+      {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf
+          im neuen Tab. Bei „Betrieb“ gibt es kein Rücktrittsrecht, also keinen Satz. */}
+      {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
+    </>
   )
 }
 
@@ -1068,6 +1093,7 @@ export function ZahlungFortsetzen({
   zeilenCents,
   anzeige,
   jetztIso,
+  privat,
 }: {
   farm: PublicFarm
   zahlung: Zahlung
@@ -1078,6 +1104,8 @@ export function ZahlungFortsetzen({
   anzeige: PreisAnzeige
   /** Die Uhr des Servers als Startwert — gleiche Restzeit beim Rendern auf dem Server und im Browser. */
   jetztIso: string
+  /** Käuferart der Bestellung ist PRIVAT (Seite, aus der Datenbank) — nur dann die Gewährleistungs-Mitteilung (Nr. 211). */
+  privat: boolean
 }): React.JSX.Element {
   const [jetzt, setJetzt] = useState(() => new Date(jetztIso))
   useEffect(() => {
@@ -1104,6 +1132,8 @@ export function ZahlungFortsetzen({
         korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
+        privat={privat}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
       />
     </KundeFokusShell>
   )

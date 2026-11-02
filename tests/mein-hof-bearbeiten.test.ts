@@ -55,7 +55,6 @@ vi.mock('@/server/actions/farm-photos', () => ({
   deleteFarmPhotoAction: vi.fn(),
   moveFarmPhotoAction: vi.fn(),
   updateFarmPhotoCaptionAction: vi.fn(),
-  reorderPhotosAction: vi.fn(),
 }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/components/farm/cart-sheet', () => ({ CartSheet: () => null }))

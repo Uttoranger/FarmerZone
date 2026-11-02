@@ -45,7 +45,7 @@ vi.mock('@/server/abholfenster', async (importOriginal) => ({
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => null) } } }))
 vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
-vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
+vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 // Der Korb liegt im Browser-Speicher; beim Server-Rendern wäre er leer. Gestellt, damit der Mini-Warenkorb erscheint.

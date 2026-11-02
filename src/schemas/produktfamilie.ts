@@ -21,7 +21,14 @@ import {
   namePasstFuerGroessen,
 } from '@/lib/verkaufsgroessen'
 import { PRODUKTNAME_MAX, VORRAT_MAX, ZU_LANG } from '@/lib/eingabegrenzen'
-import { FUTTER_FEHLER, abholhinweiseSchema, futterKennzeichnungSchema, nettoMengeZahl, preisZahl } from '@/schemas/product'
+import {
+  FUTTER_FEHLER,
+  abholhinweiseSchema,
+  futterKennzeichnungSchema,
+  nettoMengeZahl,
+  preisZahl,
+  ruecksendekostenSchema,
+} from '@/schemas/product'
 
 /*
  * Futter und Brennmaterial mit Verkaufsgrößen (Register E3, E10, E11; Gate 6,
@@ -59,6 +66,17 @@ const bezeichnungFeld = z.string().trim().min(1, FAMILIE_FEHLER.bezeichnung).max
 const nameFeld = z.string().trim().min(2, 'Mindestens 2 Zeichen').max(PRODUKTNAME_MAX, ZU_LANG.produktname)
 
 const beschreibungFeld = z.string().trim().max(1000, 'Maximal 1000 Zeichen').optional().or(z.literal(''))
+
+/**
+ * Rücktritt je Produkt (Nr. 214, nachgezogen für Familien in Nr. 218): derselbe
+ * Haken und dieselbe Schätzung in ganzen Cent wie im Produktformular — die
+ * Schemas daraus, keine zweite Grenze. Gilt wie Bio und Abgabe für alle Größen
+ * der Familie gleich; die Action schreibt den Wert an jede Größe.
+ */
+const ruecktrittFelder = {
+  keinRuecktritt: z.boolean().default(false),
+  ruecksendekostenCents: ruecksendekostenSchema,
+}
 
 /** Gemeinsame Prüfung beider Formulare: Größen eindeutig, jeder Name passt in die Grenze. */
 function pruefeGroessen(
@@ -103,6 +121,7 @@ export const futterFamilieSchema = z
     abgabe: z.enum(ABGABE_VALUES).default('ALLE'),
     // Wie Bio und Abgabe für alle Größen der Familie gleich (N23, Nr. 123).
     abholhinweise: abholhinweiseSchema,
+    ...ruecktrittFelder,
     kennzeichnung: familienKennzeichnungSchema,
     groessen: z.array(futterGroesseSchema).min(1, FAMILIE_FEHLER.groessen).max(GROESSEN_MAX, FAMILIE_FEHLER.zuVieleGroessen),
   })
@@ -167,6 +186,7 @@ export const brennmaterialFamilieSchema = z
       z.coerce.number().int().min(0).max(GELAGERT_JAHRE_MAX).nullable()
     ),
     ueberdacht: z.boolean().default(false),
+    ...ruecktrittFelder,
     groessen: z.array(brennGroesseSchema).min(1, FAMILIE_FEHLER.groessen).max(GROESSEN_MAX, FAMILIE_FEHLER.zuVieleGroessen),
   })
   .superRefine((daten, ctx) => {

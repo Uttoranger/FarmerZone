@@ -362,6 +362,18 @@ describe('Rest eines teilweise gebuchten Teilwiderrufs (Nachbesserung Runde 3)',
     expect((await prisma.widerruf.findUniqueOrThrow({ where: { id: widerrufId } })).stand).toBe('erstattet')
   })
 
+  it('Nr. 217.1: sind alle gewählten Positionen schon gestrichen, zeigen Bestellung und Akte den Satz statt einer leeren Liste', async () => {
+    const b = await bestellung({ online: true, abgeholt: false, gebuehrCents: 0, honig: true })
+    const angelegt = await legeWiderrufAn({ art: 'link', orderId: b.order.id, umfang: 'teil', positionen: [b.position('Eier'), b.position('Brot')], name: 'Erika Test' }, new Date())
+    if (!('ok' in angelegt)) throw new Error('nicht angelegt')
+    // Wie nach einem Storno vor der Abholung: Eier und Brot sind gestrichen, Honig bleibt.
+    await prisma.orderItem.updateMany({ where: { orderId: b.order.id, productName: { in: ['Eier', 'Brot'] } }, data: { fehltSeit: new Date() } })
+    const items = await prisma.orderItem.findMany({ where: { orderId: b.order.id }, select: { id: true, productName: true, quantity: true, fehltSeit: true } })
+    const satz = 'Alle gewählten Positionen wurden schon vor der Abholung storniert'
+    expect((await ladeWiderrufeZurBestellung(b.order.id, items)).map((w) => w.umfang)).toEqual([[satz]])
+    expect((await ladeWiderrufeDesHofs(b.farm.id)).map((w) => w.umfang)).toEqual([[satz]])
+  })
+
   it('Ablehnen nach Teilbuchung: die Mail sagt „für die übrigen Artikel“; Gegenprobe ohne Teilbuchung ohne diesen Zusatz', async () => {
     const { farm, order, widerrufId } = await teilweiseGebucht()
     const { owner } = await erstelleHof()

@@ -7,11 +7,14 @@
  * Brennmaterial verlangt je Art die richtigen Angaben (Scheitlänge,
  * Wassergehalt und Körnung) und kennt keine Raummeter für Hackschnitzel.
  * Die Sperre je Gebinde entscheidet das Schema NICHT — sie hängt am Hof.
+ * Rücktritt (Nr. 218): beide Familien nehmen Haken und Schätzung in ganzen
+ * Cent an — dieselbe Grenze und dieselben Sätze wie das Produktformular.
  */
 import { describe, it, expect } from 'vitest'
 import { brennmaterialFamilieSchema, futterFamilieSchema, FAMILIE_FEHLER } from '@/schemas/produktfamilie'
 import { FUTTER_FEHLER } from '@/schemas/product'
 import { PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
+import { RUECKSENDEKOSTEN_MAX_CENTS, RUECKTRITT_TEXT, ruecksendekostenAusEingabe } from '@/lib/ruecktritt-angaben'
 
 const KENNZEICHNUNG = {
   futtermittelart: 'EINZELFUTTERMITTEL',
@@ -188,5 +191,45 @@ describe('brennmaterialFamilieSchema', () => {
     expect(pfade(brennmaterialFamilieSchema.safeParse({ ...BUCHE, groessen: [{ ...BUCHE.groessen[0], unit: 'BALLEN' }] }))).toContain(
       'groessen.0.unit'
     )
+  })
+})
+
+describe('Rücktritt in beiden Familien (Nr. 218, wie Nr. 214 im Produktformular)', () => {
+  const familien = [
+    ['Futter', futterFamilieSchema, HEU],
+    ['Brennmaterial', brennmaterialFamilieSchema, BUCHE],
+  ] as const
+
+  /** Der Satz am Feld der Schätzung — derselbe, den das Produktformular zeigt. */
+  function satzAmFeld(schema: (typeof familien)[number][1], eingabe: object): string | undefined {
+    const r = schema.safeParse(eingabe)
+    return r.success ? undefined : r.error.issues.find((i) => i.path.join('.') === 'ruecksendekostenCents')?.message
+  }
+
+  it.each(familien)('%s ohne Angabe: kein Haken, keine Schätzung (false/null)', (_, schema, familie) => {
+    const r = schema.safeParse(familie)
+    expect(r.success && [r.data.keinRuecktritt, r.data.ruecksendekostenCents]).toEqual([false, null])
+  })
+
+  it.each(familien)('%s mit Haken und Schätzung: beide Werte kommen in ganzen Cent durch', (_, schema, familie) => {
+    const r = schema.safeParse({ ...familie, keinRuecktritt: true, ruecksendekostenCents: ruecksendekostenAusEingabe('25,50') })
+    expect(r.success && [r.data.keinRuecktritt, r.data.ruecksendekostenCents]).toEqual([true, 2550])
+  })
+
+  it.each(familien)('%s: ein negativer Betrag ist ein Fehler am Feld, getippt „-5“ ebenso', (_, schema, familie) => {
+    expect(satzAmFeld(schema, { ...familie, ruecksendekostenCents: -500 })).toBe(RUECKTRITT_TEXT.betragNegativ)
+    // Getippt wird ein „-“ nicht zu Cent, sondern zu NaN — abgelehnt, nie still „keine Angabe“.
+    expect(satzAmFeld(schema, { ...familie, ruecksendekostenCents: ruecksendekostenAusEingabe('-5') })).toBe(RUECKTRITT_TEXT.betragUngueltig)
+  })
+
+  it.each(familien)('%s: 0 €, halbe Cent und über der Grenze werden abgelehnt; an der Grenze geht es', (_, schema, familie) => {
+    expect(satzAmFeld(schema, { ...familie, ruecksendekostenCents: 0 })).toBe(RUECKTRITT_TEXT.betragNull)
+    expect(satzAmFeld(schema, { ...familie, ruecksendekostenCents: 12.5 })).toBe(RUECKTRITT_TEXT.betragUngueltig)
+    expect(satzAmFeld(schema, { ...familie, ruecksendekostenCents: RUECKSENDEKOSTEN_MAX_CENTS + 1 })).toBe(RUECKTRITT_TEXT.betragZuHoch)
+    expect(schema.safeParse({ ...familie, ruecksendekostenCents: RUECKSENDEKOSTEN_MAX_CENTS }).success).toBe(true)
+  })
+
+  it('Gegenprobe: ein Text statt Cent geht nicht durch (kein coerce)', () => {
+    expect(satzAmFeld(futterFamilieSchema, { ...HEU, ruecksendekostenCents: '25' })).toBe(RUECKTRITT_TEXT.betragUngueltig)
   })
 })

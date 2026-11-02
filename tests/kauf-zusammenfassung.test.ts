@@ -101,6 +101,9 @@ describe('Zahlungsschritt: die Zusammenfassung unmittelbar über „Jetzt bezahl
         korb: null,
         angaben: null,
         zusammenfassung: createElement(KaufZusammenfassung, { positionen, abholung: ABHOLUNG, hofName: HOFNAME }),
+        privat: true,
+        // Die Sätze unter dem Knopf prüft tests/kaufknopf-saetze.test.ts (Nr. 215); hier geht es um die Zusammenfassung.
+        kaufknopfSaetze: null,
       })
     )
 
@@ -149,6 +152,7 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit Zusammenfas
         zeilenCents: { p1: 500, p2: 1000 },
         anzeige: null,
         jetztIso: JETZT.toISOString(),
+        privat: true,
       })
     )
     vorDemKnopf(html, 'Jetzt bezahlen · € 10,30', ['Gesamt', ABHOLUNG])

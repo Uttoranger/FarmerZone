@@ -161,7 +161,7 @@ Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Pa
 
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
-| `mobil-k3-kasse-glatt.html` | K3 · Kasse geglättet am Handy, feste Leiste mit Kaufknopf | `/[farmSlug]/checkout` | Umbau (Kasse glätten) | 390×1820 |
+| `mobil-k3-kasse-glatt.html` | K3 · Kasse geglättet am Handy, feste Leiste mit Kaufknopf. Abweichung seit Nr. 210 (1.11.2026): Am Handy steht die Übersicht am Ende, direkt über dem Kaufknopf (§ 8 Abs. 1 FAGG); das Mockup zeigt sie noch unter dem Korb. | `/[farmSlug]/checkout` | Umbau (Kasse glätten) | 390×1820 |
 | `mobil-k3-zahlung-abgelehnt.html` | K3 · Zahlung abgelehnt | `/[farmSlug]/checkout (Fehler)` | Zustand | 390×844 |
 | `mobil-k3-bestaetigung.html` | K3 · Bestätigung | `/[farmSlug]/confirm/[orderId]?sig=` | Umbau | 390×844 |
 | `mobil-k3-bar-bestaetigen.html` | K3 · Bar bestätigen | `/[farmSlug]/bestaetigen/[token] (neu, H3)` | neu | 390×844 |

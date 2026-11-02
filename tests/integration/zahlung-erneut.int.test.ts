@@ -105,6 +105,7 @@ describe('„Erneut versuchen" zahlt dieselbe Bestellung', () => {
       positionen: unknown[]
       zeilenCents: Record<string, number>
       anzeige: unknown
+      privat: boolean
     }
     expect(props.zahlung.clientSecret).toBe(SECRET)
     expect(props.zahlung.bestaetigung).toBe(`/${farm.slug}/confirm/${orderId}?sig=${bestellSignatur(orderId)}`)
@@ -113,10 +114,22 @@ describe('„Erneut versuchen" zahlt dieselbe Bestellung', () => {
     // Die Zeile aus dem Snapshot der Bestellung (OrderItem.totalPrice), nicht neu gerechnet.
     expect(props.zeilenCents).toEqual({ [produkt.id]: 2000 })
     expect(props.anzeige).toBeNull()
+    // Nr. 211: Käuferart der Bestellung PRIVAT → die Gewährleistungs-Mitteilung steht über dem Knopf.
+    expect(props.privat).toBe(true)
     // Gelesen, nicht neu angelegt: der gespeicherte Zahlungsvorgang der Bestellung.
     expect(abrufen).toHaveBeenCalledWith(INTENT)
     expect(anlegen).toHaveBeenCalledTimes(1)
     expect(await stand(farm.id, produkt.id)).toEqual(vorher)
+  })
+
+  it('Nr. 211: Käuferart der Bestellung „Betrieb“ → privat ist false (keine Gewährleistungs-Mitteilung)', async () => {
+    const { farm, orderId } = await gescheiterteZahlung()
+    await prisma.order.update({ where: { id: orderId }, data: { kaeuferArt: 'BETRIEB' } })
+
+    const seite = await kasse(farm.slug, { zahlung: orderId, sig: bestellSignatur(orderId) })
+
+    expect(seite.type).toBe(ZahlungFortsetzen)
+    expect((seite.props as { privat: boolean }).privat).toBe(false)
   })
 
   it('Frist abgelaufen: in die Kasse (Korb aus dem Browser), die Ware ist frei, keine Zahlung derselben Bestellung', async () => {

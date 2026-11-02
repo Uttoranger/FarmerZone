@@ -22,7 +22,7 @@ vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => 
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(), ladeAktivenBeitrag: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), addBreadcrumb: vi.fn() }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
-vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
+vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 vi.mock('next/navigation', () => ({

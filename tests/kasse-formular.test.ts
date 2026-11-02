@@ -63,6 +63,7 @@ import { barGuenstiger, PREISE_INKL_UST, SERVICEGEBUEHR_ZUSATZ } from '@/lib/kas
 import { BAR_OHNE_GEBUEHR_HINWEIS, BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
+import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
@@ -92,13 +93,16 @@ const SPEICHER: Record<string, string> = {
 }
 
 /** Ein frischer Aufbau der Kasse — jeder Effekt läuft dafür wieder einmal. */
-function kasse(hof: PublicFarm, optionen: { testbetrieb?: boolean; nurBetriebeIds?: string[]; sperre?: KaufSperre } = {}): string {
+function kasse(
+  hof: PublicFarm,
+  optionen: { testbetrieb?: boolean; nurBetriebeIds?: string[]; sperre?: KaufSperre; vorbelegung?: { kaeuferArt: 'BETRIEB'; betriebsnummer: string } } = {}
+): string {
   pruefstand.gelaufen.clear()
   return renderToStaticMarkup(
     createElement(CheckoutForm, {
       farm: hof,
       nurBetriebeIds: optionen.nurBetriebeIds ?? [],
-      vorbelegung: null,
+      vorbelegung: optionen.vorbelegung ?? null,
       ausgebuchteAbholfenster: [],
       sperre: optionen.sperre ?? null,
       testbetrieb: optionen.testbetrieb,
@@ -278,3 +282,24 @@ describe('Kasse: Vertrauen, Grund, Ausweg (Nr. 176)', () => {
   })
 })
 
+describe('Gewährleistungs-Mitteilung im ganzen Formular (Nr. 211)', () => {
+  const bilder = (html: string): number => (html.match(/<img\b[^>]*recht\/gewaehrleistung-mitteilung-de\.svg[^>]*>/g) ?? []).length
+
+  it('Privat (ohne Abschnitt „Betrieb“): die Grafik genau einmal, vor dem Kaufknopf', () => {
+    const html = kasse(HOF)
+    expect(bilder(html)).toBe(1)
+    expect(html.indexOf(`<img src="${GEWAEHRLEISTUNG_MITTEILUNG.svgPfad}"`)).toBeLessThan(html.indexOf('type="submit"'))
+  })
+
+  it('Privat mit Abschnitt „Betrieb“ (Haken nicht gesetzt): die Grafik bleibt', () => {
+    expect(bilder(kasse(HOF, { nurBetriebeIds: ['eier'] }))).toBe(1)
+  })
+
+  it('Betrieb (Haken vorbelegt): keine Grafik — Gegenprobe, das Formular steht', () => {
+    const html = kasse(HOF, { nurBetriebeIds: ['eier'], vorbelegung: { kaeuferArt: 'BETRIEB', betriebsnummer: 'LFBIS 0000000' } })
+    expect(html).toContain('Freilandeier 10er')
+    expect(html).toContain('type="submit"')
+    expect(bilder(html)).toBe(0)
+    expect(html).not.toContain(GEWAEHRLEISTUNG_MITTEILUNG.ueberschrift)
+  })
+})

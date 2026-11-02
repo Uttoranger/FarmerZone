@@ -97,6 +97,9 @@ export async function legeFutterFamilieAn(eingabe: unknown): Promise<FamilieErge
           abgabe: v.abgabe,
           // Jede Größe übernimmt die Hinweise der Familie wie Bio, Abgabe und Kennzeichnung.
           abholhinweise: abholhinweiseDaten(v.category, v.abholhinweise),
+          // Nr. 218: die Angaben zum Rücktritt der Familie, an jeder Größe gleich (wie getippt, Nr. 214).
+          keinRuecktritt: v.keinRuecktritt,
+          ruecksendekostenCents: v.ruecksendekostenCents,
           price: g.price,
           vatRate: mwstStandard(v.category),
           unit: g.unit,
@@ -163,6 +166,9 @@ export async function legeBrennmaterialFamilieAn(eingabe: unknown): Promise<Fami
           description: v.description || null,
           category: 'BRENNHOLZ',
           subcategory: v.art,
+          // Nr. 218: wie beim Futter an jeder Größe derselbe Wert.
+          keinRuecktritt: v.keinRuecktritt,
+          ruecksendekostenCents: v.ruecksendekostenCents,
           price: g.price,
           vatRate: mwstStandard('BRENNHOLZ'),
           unit: g.unit,

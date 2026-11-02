@@ -79,10 +79,12 @@ function betrag(n: number, stellen: 0 | 2): string {
 /**
  * „€ 2,90" · „€ 1.234,50" · „€ 0,00". Mit `stellen = 0` in ganzen Euro:
  * „€ 150" — nur für Grundpreise je Tonne oder Doppelzentner (Umfeld), wo ein
- * Cent bedeutungslos ist. Abgerechnet wird nie in ganzen Euro.
+ * Cent bedeutungslos ist. Abgerechnet wird nie in ganzen Euro. Mit
+ * `geschuetztesLeerzeichen` steht nach dem „€“ ein geschütztes Leerzeichen.
  */
-export function formatEuro(n: number, stellen: 0 | 2 = 2): string {
-  return `€ ${betrag(n, stellen)}`
+export function formatEuro(n: number, stellen: 0 | 2 = 2, optionen?: { geschuetztesLeerzeichen?: boolean }): string {
+  // Geschütztes Leerzeichen (U+00A0) für schmale Zeilen: Sonst bricht der Betrag vom „€“ ab (Nr. 217.3).
+  return `€${optionen?.geschuetztesLeerzeichen ? '\u00a0' : ' '}${betrag(n, stellen)}`
 }
 
 /**
