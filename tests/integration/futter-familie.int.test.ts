@@ -17,6 +17,9 @@
  *      Spaltentypen (Decimal, Listen): nur Preis geändert → ohne Haken
  *      gespeichert, bestaetigtAm bleibt; Kennzeichnung geändert → ohne Haken
  *      abgelehnt und nichts geschrieben, mit Haken bestaetigtAm = jetzt.
+ *   6. Rücktritt je Familie (Nr. 218): Haken und Schätzung stehen an jeder
+ *      Größe in der Spalte (Boolean, Int-Cent), ohne Angabe false/null; beim
+ *      Bearbeiten einer Größe (Produktdialog) ändert sich nur diese.
  * Geprüft wird der Zustand danach (TESTING_GUIDELINES §1).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
@@ -206,6 +209,99 @@ describe('Brennmaterial mit Verkaufsgrößen — echte Datenbank', () => {
     expect(new Set(produkte.map((p) => p.brennmaterial?.id)).size).toBe(3)
     expect(produkte[0].brennmaterial).toMatchObject({ holzart: 'Buche', scheitlaengeCm: 33, restfeuchteMax: 20, ueberdacht: true })
     expect(produkte[0].brennmaterial?.gelagertSeit).toBeInstanceOf(Date)
+  })
+})
+
+describe('Rücktritt je Familie (Nr. 218) — echte Datenbank', () => {
+  const BUCHE = {
+    name: 'Buche, ofenfertig',
+    description: '',
+    art: 'BRENNHOLZ_SCHEIT',
+    holzart: 'Buche',
+    scheitlaengeCm: 33,
+    trocknung: 'OFENFERTIG',
+    wassergehalt: null,
+    koernung: null,
+    gelagertJahre: null,
+    ueberdacht: false,
+    groessen: [
+      { bezeichnung: 'Sack ca. 15 kg', unit: 'STUECK', price: 8.9, stock: 30 },
+      { bezeichnung: 'Raummeter', unit: 'RAUMMETER', price: 129, stock: 4 },
+    ],
+  }
+  const ruecktritt = async (farmId: string) =>
+    (await familie(farmId)).map((p) => [p.name, p.keinRuecktritt, p.ruecksendekostenCents])
+
+  it('Futter mit Haken und Schätzung: alle vier Größen tragen beide Werte', async () => {
+    const farm = await lfbisHof()
+
+    expect(await legeFutterFamilieAn({ ...HEU, keinRuecktritt: true, ruecksendekostenCents: 2550 })).toMatchObject({ ok: true })
+
+    expect(await ruecktritt(farm.id)).toEqual([
+      ['Bergwiesen-Heu 1 kg-Sackerl', true, 2550],
+      ['Bergwiesen-Heu Kleinballen', true, 2550],
+      ['Bergwiesen-Heu 5 kg-Sack', true, 2550],
+      ['Bergwiesen-Heu Rundballen', true, 2550],
+    ])
+  })
+
+  it('Brennmaterial mit Schätzung, Futter ohne Angabe: jede Größe wie angegeben bzw. false/null', async () => {
+    const farm = await lfbisHof()
+
+    await legeBrennmaterialFamilieAn({ ...BUCHE, ruecksendekostenCents: 4000 })
+    await legeFutterFamilieAn(HEU)
+
+    const zeilen = await ruecktritt(farm.id)
+    expect(zeilen.filter(([name]) => String(name).startsWith('Buche')).map(([, haken, cents]) => [haken, cents])).toEqual([
+      [false, 4000],
+      [false, 4000],
+    ])
+    expect(zeilen.filter(([name]) => String(name).startsWith('Bergwiesen')).map(([, haken, cents]) => [haken, cents])).toEqual(
+      Array(4).fill([false, null])
+    )
+  })
+
+  it('negativer Betrag: abgelehnt, keine Größe in der Datenbank', async () => {
+    const farm = await lfbisHof()
+
+    expect(await legeBrennmaterialFamilieAn({ ...BUCHE, ruecksendekostenCents: -500 })).toEqual({ error: 'Bitte prüfe deine Eingaben.' })
+
+    expect(await prisma.product.count({ where: { farmId: farm.id } })).toBe(0)
+  })
+
+  it('Bearbeiten einer Größe im Produktdialog ändert nur diese — die übrigen behalten den Wert der Familie', async () => {
+    const farm = await lfbisHof()
+    await legeBrennmaterialFamilieAn({ ...BUCHE, keinRuecktritt: true, ruecksendekostenCents: 4000 })
+    const raummeter = await prisma.product.findFirstOrThrow({ where: { farmId: farm.id, name: { endsWith: 'Raummeter' } } })
+
+    const ergebnis = await updateProduct(
+      raummeter.id,
+      {
+        name: raummeter.name,
+        description: '',
+        imageUrl: '',
+        category: raummeter.category,
+        subcategory: raummeter.subcategory,
+        labels: raummeter.labels,
+        abgabe: raummeter.abgabe,
+        countsTowardLimit: raummeter.countsTowardLimit,
+        price: raummeter.price.toNumber(),
+        vatRate: raummeter.vatRate.toNumber(),
+        unit: raummeter.unit,
+        unitSize: null,
+        stock: raummeter.stock,
+        isAvailable: raummeter.isAvailable,
+        keinRuecktritt: false,
+        ruecksendekostenCents: 6500,
+      } as never,
+      raummeter.stock
+    )
+
+    expect(ergebnis).toEqual({ ok: true })
+    expect(await ruecktritt(farm.id)).toEqual([
+      ['Buche, ofenfertig Sack ca. 15 kg', true, 4000],
+      ['Buche, ofenfertig Raummeter', false, 6500],
+    ])
   })
 })
 
