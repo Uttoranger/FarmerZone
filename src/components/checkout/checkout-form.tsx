@@ -591,6 +591,7 @@ export function CheckoutForm({
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
         privat={privat}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
       />
     )
   }
@@ -598,6 +599,7 @@ export function CheckoutForm({
   const stand = reservierungsStand(reserviertBis, jetzt)
   // Online gewählt oder die Bestellung steht schon — dann geht es weiter zur Zahlung.
   const online = bestellungAngelegt || paymentMethod === 'ONLINE'
+  const barMitTermin = !online && zahlweg === 'ONSITE_CASH' && gewaehlt !== undefined
 
   return fokusShell(
     'Bestellen',
@@ -687,7 +689,12 @@ export function CheckoutForm({
             }
             fussnote={
               mindestGrund ??
-              kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null })
+              // Nr. 215: Bar mit gewähltem Termin steht die Abholung schon in der Zusammenfassung über dem Knopf —
+              // die Zeile darunter entfällt, statt den Termin ein zweites Mal zu nennen. Ohne Termin bleibt die
+              // Bitte zu wählen; online bleibt die Zeile, wie sie ist (Register N10).
+              (barMitTermin
+                ? ''
+                : kaufknopfZeile({ termin: gewaehlt ? abholSatz(gewaehlt) : null, online, bar: zahlweg === 'ONSITE_CASH', gesperrt: sperre !== null }))
             }
           />
         }
@@ -1019,14 +1026,29 @@ export function KassenAbschluss({
           )}
         </button>
         {fussnote && <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>}
-        {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
-            Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
-            in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
-        <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
-        {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf im neuen Tab. */}
-        {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
+        <KaufknopfSaetze privat={privat} />
       </AktionsLeiste>
     </div>
+  )
+}
+
+/**
+ * Die Sätze unter jedem Knopf, mit dem eine Bestellung verbindlich wird (Register N2/O4, Ergänzung
+ * 1.11.2026, Nr. 215): „Zahlungspflichtig bestellen“, „Jetzt bezahlen“ bzw. „Erneut bezahlen“ — und
+ * zusätzlich unter „Weiter zur Zahlung“. EINE Quelle für Formular (`KassenAbschluss`) und
+ * Zahlungsschritt (`StripeZahlung`, Prop `kaufknopfSaetze`), damit beide Leisten nie auseinanderlaufen.
+ */
+export function KaufknopfSaetze({ privat }: { privat: boolean }): React.JSX.Element {
+  return (
+    <>
+      {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
+          Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
+          in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
+      <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
+      {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf
+          im neuen Tab. Bei „Betrieb“ gibt es kein Rücktrittsrecht, also keinen Satz. */}
+      {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
+    </>
   )
 }
 
@@ -1111,6 +1133,7 @@ export function ZahlungFortsetzen({
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
         privat={privat}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
       />
     </KundeFokusShell>
   )

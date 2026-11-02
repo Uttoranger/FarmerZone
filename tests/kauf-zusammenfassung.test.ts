@@ -102,6 +102,8 @@ describe('Zahlungsschritt: die Zusammenfassung unmittelbar über „Jetzt bezahl
         angaben: null,
         zusammenfassung: createElement(KaufZusammenfassung, { positionen, abholung: ABHOLUNG, hofName: HOFNAME }),
         privat: true,
+        // Die Sätze unter dem Knopf prüft tests/kaufknopf-saetze.test.ts (Nr. 215); hier geht es um die Zusammenfassung.
+        kaufknopfSaetze: null,
       })
     )
 

@@ -36,7 +36,7 @@ vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOu
 
 import { KaufZusammenfassung } from '@/components/checkout/kauf-zusammenfassung'
 import { StripeZahlung } from '@/components/checkout/stripe-payment'
-import { KassenAbschluss, ZahlungFortsetzen, type Zahlung } from '@/components/checkout/checkout-form'
+import { KassenAbschluss, KaufknopfSaetze, ZahlungFortsetzen, type Zahlung } from '@/components/checkout/checkout-form'
 import { UebersichtKarte } from '@/components/checkout/kasse-teile'
 import type { AngabenHof } from '@/components/checkout/angaben-zum-hof'
 import { GEWAEHRLEISTUNG_MITTEILUNG as G } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
@@ -137,6 +137,7 @@ describe('Zahlungsschritt: über „Jetzt bezahlen“', () => {
         angaben: null,
         zusammenfassung: createElement(KaufZusammenfassung, { positionen: POSITIONEN, abholung: ABHOLUNG, hofName: HOFNAME }),
         privat,
+        kaufknopfSaetze: createElement(KaufknopfSaetze, { privat }),
       })
     )
 
