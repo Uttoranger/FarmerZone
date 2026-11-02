@@ -515,6 +515,13 @@ describe('Admin: nur der offene Rest eines teilweise gebuchten Teilwiderrufs (Nr
     expect((await ladeWiderrufeZurBestellung('bestellung-1', alleGestrichen))[0]!.umfang).toEqual(['1 × Eier', '2 × Brot'])
     db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
     expect((await ladeWiderrufeZurBestellung('bestellung-1', []))[0]!.umfang).toEqual([WIDERRUF_TEXT.teil])
+
+    // Gemischt: eine gestrichene Position gewählt plus eine, die es nicht gibt → „Einzelne Artikel“ (every, nicht some).
+    const einsGestrichen = [{ ...ITEMS[0]!, fehltSeit: new Date('2026-10-30T12:00:00Z') }]
+    db.widerruf.findMany.mockResolvedValueOnce([
+      { ...zeile('eingegangen'), positionen: [{ orderItemId: 'pos-a', menge: 1 }, { orderItemId: 'gibt-es-nicht', menge: 1 }] },
+    ] as never)
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', einsGestrichen))[0]!.umfang).toEqual([WIDERRUF_TEXT.teil])
   })
 })
 
