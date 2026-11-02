@@ -42,6 +42,15 @@ describe('Geld', () => {
     expect(formatEuro(9.985)).toBe('€ 9,99')
   })
 
+  it('Nr. 217.3: mit geschuetztesLeerzeichen steht nach dem „€“ U+00A0, sonst bleibt alles beim Alten', () => {
+    expect(formatEuro(2.9, 2, { geschuetztesLeerzeichen: true })).toBe('€\u00a02,90')
+    expect(formatEuro(150, 0, { geschuetztesLeerzeichen: true })).toBe('€\u00a0150')
+    expect(formatEuro(2.9, 2, {})).toBe('€ 2,90')
+    expect(formatEuro(2.9, 2, { geschuetztesLeerzeichen: false })).toBe('€ 2,90')
+    // Der Betrag selbst ändert sich nicht, nur das Zeichen danach.
+    expect(formatEuro(1234.5, 2, { geschuetztesLeerzeichen: true })).toBe(formatEuro(1234.5).replace('€ ', '€\u00a0'))
+  })
+
   it('trennt Tausender wie im österreichischen Deutsch — mit Leerzeichen, nicht mit Punkt', () => {
     // de-AT setzt laut Intl ein schmales geschütztes Leerzeichen; de-DE hätte
     // hier den Punkt. Die Plattform ist österreichisch, das bleibt so.

@@ -248,6 +248,8 @@ export const WIDERRUF_TEXT = {
   ] satisfies AgbStueck[] as readonly AgbStueck[],
   ganz: 'Die ganze Bestellung',
   teil: 'Einzelne Artikel',
+  // Admin › Bestellungen und Hof-Akte: statt einer leeren Liste, wenn vor der Abholung schon alles Gewählte gestrichen wurde (Nr. 217.1).
+  alleGestrichen: 'Alle gewählten Positionen wurden schon vor der Abholung storniert',
   positionenTitel: 'Was willst du widerrufen?',
   name: 'Dein Name',
   email: 'Deine E-Mail-Adresse',

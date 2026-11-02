@@ -17,7 +17,7 @@ vi.mock('@/server/queries/seo', () => ({ pruefeHofseiteGeteilt: vi.fn(async () =
 vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => null) }))
 // Die Seite bindet die Hofseite mit Stiften ein; deren Speicherwege bleiben hier ohne Wirkung.
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
-vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
+vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 
