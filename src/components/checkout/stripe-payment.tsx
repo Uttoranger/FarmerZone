@@ -73,6 +73,12 @@ export type StripeZahlungProps = {
    * (Anhang II FAGG, Nr. 211) — bei „Betrieb“ entfällt sie. Pflicht, damit kein Einstieg sie vergisst.
    */
   privat: boolean
+  /**
+   * AGB- und (bei Privat) Rücktrittssatz unter dem Knopf (Register N2/O4, Nr. 215): „Jetzt bezahlen“
+   * macht die Online-Bestellung verbindlich. Vom Formular gebaut (`KaufknopfSaetze`, dieselbe Quelle wie
+   * unter „Weiter zur Zahlung“) — Pflicht, damit kein Einstieg sie vergisst.
+   */
+  kaufknopfSaetze: ReactNode
 }
 
 /**
@@ -86,7 +92,7 @@ export type StripeZahlungProps = {
  * (sie muss beim Bestellen schon da sein), ohne Zuklappen, ohne Filter. Ihr Grund ist
  * durchsichtig — darunter liegt deshalb eine Fläche, die in beiden Themes hell ist
  * (`bg-accent-foreground`, wie Stripes Zahlungsfeld): Schwarze Schrift auf dunkler Karte wäre
- * unlesbar, eine Umfärbung der Grafik verboten (CODING_STANDARDS §7, „Was dem Modus NICHT folgt“).
+ * unlesbar, eine Umfärbung der Grafik verboten (DESIGN_SYSTEM, „Amtliche Grafiken: unverändert, farbig, nicht zuklappbar“).
  */
 export function GewaehrleistungsMitteilung({ karte = false }: { karte?: boolean }): React.JSX.Element {
   const g = GEWAEHRLEISTUNG_MITTEILUNG
@@ -149,6 +155,7 @@ function ZahlungsInhalt({
   angaben,
   zusammenfassung,
   privat,
+  kaufknopfSaetze,
 }: StripeZahlungProps): React.JSX.Element {
   const stripe = useStripe()
   const elements = useElements()
@@ -210,42 +217,48 @@ function ZahlungsInhalt({
       uebersichtZuletzt
       korb={korb}
       uebersicht={
-        <UebersichtKarte
-          betraege={betraege}
-          gebuehrText={gebuehrText}
-          hofpreis={hofpreis}
-          reservierung={
-            <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
-          }
-        >
-          {/* Zwischen Gesamtbetrag und Knopf: Ware, Abholtermin, Vertragspartner, bei Privat die
-              Gewährleistungs-Mitteilung (Nr. 211) — dann ein Fehler, direkt am Knopf. */}
-          {zusammenfassung}
-          {privat && <GewaehrleistungsMitteilung />}
-          {fehler && (
-            <p role="alert" className="text-[13px] leading-snug font-medium text-status-offen">
-              {fehler}
-            </p>
-          )}
-          <AktionsLeiste>
-            <button
-              type="button"
-              onClick={bezahle}
-              disabled={!stripe || verarbeitet || abgelaufen}
-              aria-busy={verarbeitet}
-              className={KNOPF_GRUEN}
-            >
-              {verarbeitet ? (
-                <>
-                  <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                  Wird bezahlt …
-                </>
-              ) : (
-                `${abgelehnt ? 'Erneut bezahlen' : 'Jetzt bezahlen'} · ${gesamt}`
-              )}
-            </button>
-          </AktionsLeiste>
-        </UebersichtKarte>
+        // max-md:mb-12: Mit Knopf, AGB- und Rücktrittssatz (Nr. 215) ist die feste Leiste am Handy rund 205 px hoch
+        // (je Satz drei Zeilen bei 390 px). Der Platz unten im Raster (pb-44, 176 px) reichte nur für den Knopf;
+        // mit 48 px mehr scrollt die Unterkante der Übersicht über die Leiste, statt darunter zu bleiben.
+        <div className="max-md:mb-12">
+          <UebersichtKarte
+            betraege={betraege}
+            gebuehrText={gebuehrText}
+            hofpreis={hofpreis}
+            reservierung={
+              <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
+            }
+          >
+            {/* Zwischen Gesamtbetrag und Knopf: Ware, Abholtermin, Vertragspartner, bei Privat die
+                Gewährleistungs-Mitteilung (Nr. 211) — dann ein Fehler, direkt am Knopf. */}
+            {zusammenfassung}
+            {privat && <GewaehrleistungsMitteilung />}
+            {fehler && (
+              <p role="alert" className="text-[13px] leading-snug font-medium text-status-offen">
+                {fehler}
+              </p>
+            )}
+            <AktionsLeiste>
+              <button
+                type="button"
+                onClick={bezahle}
+                disabled={!stripe || verarbeitet || abgelaufen}
+                aria-busy={verarbeitet}
+                className={KNOPF_GRUEN}
+              >
+                {verarbeitet ? (
+                  <>
+                    <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+                    Wird bezahlt …
+                  </>
+                ) : (
+                  `${abgelehnt ? 'Erneut bezahlen' : 'Jetzt bezahlen'} · ${gesamt}`
+                )}
+              </button>
+              {kaufknopfSaetze}
+            </AktionsLeiste>
+          </UebersichtKarte>
+        </div>
       }
     >
       {angaben}

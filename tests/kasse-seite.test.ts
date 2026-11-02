@@ -349,6 +349,8 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
         angaben: null,
         zusammenfassung: null,
         privat: true,
+        // Die Sätze unter dem Knopf prüft tests/kaufknopf-saetze.test.ts (Nr. 215); hier geht es um den Betrag.
+        kaufknopfSaetze: null,
       })
     )
   }

@@ -37,6 +37,7 @@ import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigg
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
+import { KaufZusammenfassung, type ZusammenfassungPosition } from '@/components/checkout/kauf-zusammenfassung'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
@@ -53,6 +54,19 @@ import { TESTHOF_HINWEIS } from '@/lib/testhof'
 const MARKE_BEISPIEL: Record<MarkeArt, string> = { tun: 'Zum Packen', laeuft: 'Gepackt', erledigt: 'Abgeholt', abgebrochen: 'Storniert' }
 
 const LANGER_NAME = 'Biohof zur alten Linde am Waldrand oberhalb des Mühlbachs in der Gemeinde Beispielberg'
+
+/** Erfundene Körbe für `KaufZusammenfassung`: bar mit zwei Waren, online mit sechs (der Rest klappt auf). */
+const KORB_BAR: ZusammenfassungPosition[] = [
+  { productId: 'eier', name: 'Freilandeier 10er', quantity: 2, unit: 'STUECK', unitSize: null },
+  { productId: 'erdaepfel', name: 'Erdäpfel festkochend', quantity: 1, unit: 'KG', unitSize: 5 },
+]
+const KORB_ONLINE: ZusammenfassungPosition[] = [
+  ...KORB_BAR,
+  { productId: 'honig', name: 'Blütenhonig', quantity: 1, unit: 'STUECK', unitSize: null },
+  { productId: 'kaese', name: 'Bergkäse', quantity: 1, unit: 'STUECK', unitSize: null },
+  { productId: 'brot', name: 'Bauernbrot', quantity: 2, unit: 'STUECK', unitSize: null },
+  { productId: 'apfelsaft', name: 'Apfelsaft naturtrüb', quantity: 3, unit: 'STUECK', unitSize: null },
+]
 
 /** Knopf-Gestalt für die Beispiel-Aktionen (Pille, Inhaltsbreite). */
 const KNOPF = {
@@ -229,6 +243,21 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
               <Groessenkachel wert="rund" name="Rundballen" hinweis="ca. 250 kg" preis="€ 45,00" grundpreis="€ 0,18/kg" vorrat="nur noch 8" zustand="knapp" />
               <Groessenkachel wert="klein" name="Kleinballen" hinweis="ca. 15 kg" preis="€ 4,50" grundpreis="€ 0,30/kg" vorrat="ausverkauft" zustand="ausverkauft" />
             </GroessenWahl>
+          </Abschnitt>
+
+          <Abschnitt
+            id="kauf-zusammenfassung"
+            titel="KaufZusammenfassung"
+            satz="Ware, Abholtermin und Vertragspartner unmittelbar über dem Kaufknopf (§ 8 Abs. 1 FAGG); im Formular als eigene Karte mit Gesamt. Bar ohne Zusatz, online mit der Servicegebühr; ab sechs Waren klappt der Rest auf."
+          >
+            <KaufZusammenfassung karte positionen={KORB_BAR} abholung="Sa, 10. Okt, 09:00–12:00 Uhr" hofName="Hof Beispielberg" gesamt={{ betrag: '€ 19,80' }} />
+            <KaufZusammenfassung
+              karte
+              positionen={KORB_ONLINE}
+              abholung="Mi, 14. Okt (morgen), 15:00–18:00 Uhr"
+              hofName={LANGER_NAME}
+              gesamt={{ betrag: '€ 52,40', zusatz: 'inkl. Servicegebühr (5 %) € 2,50' }}
+            />
           </Abschnitt>
 
           <Abschnitt id="hinweis" titel="Hinweiskarte" satz="Grün für Kundensachen und Gutes, Orange für Hofsachen und Offenes, Neutral für ruhige Hinweise ohne Wertung.">
