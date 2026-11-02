@@ -55,7 +55,7 @@ import { lehneWiderrufAbAction, reicheWiderrufMitLinkEin, reicheWiderrufOhneLink
 import { ladeWiderrufeDesHofs, ladeWiderrufeOhneBestellung, ladeWiderrufeZurBestellung, verarbeiteWiderruf } from '@/server/widerruf'
 import { ordneWiderrufZu } from '@/server/actions/admin-bestellung'
 import { verlangeFrischeBestaetigung } from '@/server/admin-wache'
-import { WIDERRUF_ADMIN_TEXT, ausnahmeHinweis } from '@/lib/widerruf'
+import { WIDERRUF_ADMIN_TEXT, WIDERRUF_TEXT, ausnahmeHinweis } from '@/lib/widerruf'
 import { RUECKTRITT_TEXT } from '@/lib/ruecktritt-angaben'
 import { findeElement } from './element-suche'
 import WiderrufPage from '@/app/(public)/widerruf/page'
@@ -496,6 +496,25 @@ describe('Admin: nur der offene Rest eines teilweise gebuchten Teilwiderrufs (Nr
     db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
     const ohneStreichung = ITEMS.map((i) => ({ ...i, fehltSeit: null }))
     expect((await ladeWiderrufeZurBestellung('bestellung-1', ohneStreichung))[0]!.umfang).toEqual(['1 × Eier', '2 × Brot'])
+  })
+
+  it('Nr. 217.1: sind alle gewählten Positionen schon gestrichen, steht der Satz aus WIDERRUF_TEXT statt einer leeren Liste — in Bestellung und Akte', async () => {
+    const alleGestrichen = ITEMS.map((i) => ({ ...i, fehltSeit: new Date('2026-10-30T12:00:00Z') }))
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', alleGestrichen))[0]!.umfang).toEqual(['Alle gewählten Positionen wurden schon vor der Abholung storniert'])
+
+    db.$queryRaw.mockResolvedValue([{ id: 'w-1' }] as never)
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
+    db.order.findMany.mockResolvedValue([{ id: 'bestellung-1', orderNumber: 'HM-2611-TEST', items: alleGestrichen }] as never)
+    expect((await ladeWiderrufeDesHofs('hof-1'))[0]!.umfang).toEqual([WIDERRUF_TEXT.alleGestrichen])
+  })
+
+  it('Gegenprobe 217.1: ein erledigter Widerruf zeigt weiter die Wahl; eine Wahl auf eine Position, die es nicht gibt, bleibt „Einzelne Artikel“', async () => {
+    const alleGestrichen = ITEMS.map((i) => ({ ...i, fehltSeit: new Date('2026-10-30T12:00:00Z') }))
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('erstattet')] as never)
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', alleGestrichen))[0]!.umfang).toEqual(['1 × Eier', '2 × Brot'])
+    db.widerruf.findMany.mockResolvedValueOnce([zeile('eingegangen')] as never)
+    expect((await ladeWiderrufeZurBestellung('bestellung-1', []))[0]!.umfang).toEqual([WIDERRUF_TEXT.teil])
   })
 })
 

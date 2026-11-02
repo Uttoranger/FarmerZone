@@ -42,7 +42,7 @@ vi.mock('next/link', () => ({
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn() }) }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 vi.mock('@/server/actions/appearance', () => ({ updateFarmBannerAction: vi.fn() }))
-vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn(), reorderPhotosAction: vi.fn() }))
+vi.mock('@/server/actions/farm-photos', () => ({ addFarmPhotoAction: vi.fn() }))
 vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(), reorderProductsAction: vi.fn() }))
 vi.mock('@/lib/use-cart', () => ({
   useCart: () => ({
