@@ -6272,3 +6272,10 @@ Die Belehrung nennt die Adresse des Betriebs, nicht das Anmelde-Konto der Inhabe
 - Die feste Leiste im Zahlungsschritt wird damit am Handy rund 205 px hoch (geschätzt, je Satz drei Zeilen bei 390 px); der Block der Übersicht bekommt `max-md:mb-12`, damit die Unterkante über die Leiste scrollt. kasse-teile.tsx bleibt unverändert.
 - Bar mit gewähltem Termin entfällt die Zeile unter dem Knopf (ganz, auch „bar am Hof · Bestätigung per E-Mail“ — die Bar-Option sagt das schon). `kaufknopfZeile` bleibt unverändert; die Entscheidung steht als `barMitTermin` an der einen Aufrufstelle. Online bleibt die Zeile mit Termin (N10).
 - Bausteine-Vorschau: `KaufZusammenfassung` bar (zwei Waren) und online (sechs Waren, „und 1 weitere“, Zusatz zur Servicegebühr), erfundene Daten.
+
+## Impressum: Pflichtangaben nach § 5 ECG, § 25 MedienG und Kontaktstelle nach DSA (/fix, 3.11.2026)
+
+- Befund: Das Impressum nannte seit Nr. 54 nur Name, Anschrift und E-Mail. Es fehlten Rechtsform, UID, Gewerbe mit GISA-Zahl, Gewerbebehörde, Kammer und Fachgruppe, die anwendbaren Rechtsvorschriften, ein zweiter Kontaktweg, die Offenlegung nach § 25 MedienG und die Kontaktstelle nach Art. 11/12 DSA. Damit ist auch der offene Punkt „Rechtsform des Betreibers“ (AGB-Einbindung, Nr. 90) für das Impressum erledigt.
+- Die Werte stehen nur in `src/app/(public)/impressum/page.tsx` (ausdrückliche Ausnahme der Projektleitung zum öffentlichen Repository). Jede Pflichtzeile trägt ein `data-angabe`; `tests/impressum-seite.test.ts` prüft nur Überschriften und diese Zeilen, nie die Werte.
+- Zweiter Kontaktweg ist das bestehende Formular „Problem melden“ (`/problem-melden`), kein neues Formular. Die Kontaktstelle nach dem DSA ist `KONTAKT_EMAIL`, auf Deutsch oder Englisch.
+- `PILOTBETRIEB` (`src/lib/pilotbetrieb.ts`, heute `true`) schaltet die orange Hinweiskarte und „im Pilotbetrieb“ im Unternehmensgegenstand. Der /fix AGB 1.0 setzt ihn am Tag T auf `false`; der Test hat dafür eine Gegenprobe (kein „Pilot“ mehr auf der Seite). Der alte Abschnitt „Unternehmensgegenstand“ ist in die Offenlegung nach § 25 MedienG gewandert, damit er nicht doppelt steht.
