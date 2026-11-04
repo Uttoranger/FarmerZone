@@ -207,8 +207,8 @@ describe('Register N8: Hof-Bestelldetail nimmt die Gebührenwörter aus den Kons
   it('bestell-detail.tsx schreibt „Plattformgebühr“/„Servicegebühr“ nirgends selbst', () => {
     const quelle = readFileSync(join(process.cwd(), 'src/components/hof-bestellungen/bestell-detail.tsx'), 'utf8')
     expect(woerterImCode(quelle)).toEqual([])
-    expect(quelle).toContain('PLATTFORMGEBUEHR_BEZEICHNUNG')
-    expect(quelle).toContain('SERVICEGEBUEHR_BEZEICHNUNG')
+    // Seit Nr. 222 (V62/V63) über den Wort-Helfer je Bestellung statt der zwei Konstanten (gebuehrBezeichnungFuer).
+    expect(quelle).toContain('gebuehrBezeichnungFuer')
   })
 
   it('Gegenprobe: ein selbst geschriebenes Wort fällt auf, ein Kommentar nicht', () => {
