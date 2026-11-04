@@ -4,6 +4,100 @@ Eigenständige HTML-Dateien, direkt im Browser zu öffnen. Alle Farben, Abständ
 
 Stand 23.10.2026 (aufgeräumt nach Lauf 22): Die Kernabschnitte zeigen den gebauten Stand; die Gründungshöfe, die Bilder, Entdecken v2, Region v2/v3, Beiträge v2, Mein Hof v3, Betrieb und die Anmeldung stehen jetzt in ihren Abschnitten. Abgelöste Mockups stehen unten unter ARCHIV (nicht mehr bauen), offene Vorschläge und Ideen darüber. Seit 15.10.2026 zeigen alle Mockups die Marke Agrilo (Bildmarke klein + Wort, Register M1, Nr. 92), die Hof-Seitenleiste mit Postfach und Tarif-Zeile (Nr. 61, 86/87), die Handy-Leiste Heute · Bestellungen · Neu · Mein Hof · Mehr (N3), das Mehr-Blatt mit Postfach und Produkten, die Startseite mit Regionskarte (Nr. 59) und die Hofseite ohne Telefonnummer vor dem Kauf (Nr. 60). Die Kasse (Nr. 82) und das Hof-Postfach (Nr. 86/87) stehen jetzt in den Kernzeilen K3 und H6.
 
+## Redesign November 2026 (gilt vor älteren Mockups derselben Route)
+
+Ordner `redesign-2026-11/` (Stand 3.11.2026, 81 Board-Paare, 304 Dateien mit den dunklen Fassungen; Namen und Anzahl in `redesign-2026-11/LISTE.txt`). Canvas-Exporte, die Dateien werden nicht umgebaut. Handy-Boards heißen `s1-…` bis `s3-…` (bzw. `t-…` für die Tarif-Vorschläge), Web-Boards `w1-…` bis `w3-…` (bzw. `w-…`), jeweils mit der Endung `.dc.html`. **Jede Datei hat eine Fassung `-dunkel`** (z. B. `s1-kasse-dunkel.dc.html`); die Druckseite (`s2-druck`, `w2-druck`) und die Mails (`s3-mail-…`, `w3-mail-…`) haben keine, weil sie immer hell sind. Die Nummer ist die Nummer im Nachtlauf 30 (`../nachtlauf/freigabe.md` §34); „–“ heißt: wird in Lauf 30 nicht gebaut.
+
+- t-/w-Boards: „Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen“
+- t-n/w-n: „Vorschlag Preise vergleichen v2 (PR #329, offen) – nicht bauen“
+- Kasse: „Recht vor Mockup: Zusammenfassung unmittelbar über dem Kaufknopf, Gewährleistungs-Grafik, Sätze unter jedem Kaufknopf (210, 211, 215)“
+- widerruf/Mails: „Online-Rücktrittsfunktion: Wortlaut nach N39, bis die Anwältin entscheidet“
+- Fristen in Boards sind Beispieldaten (Regel `src/lib/fristen.ts`).
+
+| Board | Handy | Web | Route im Code | Arbeit | Nummer |
+|---|---|---|---|---|---|
+| Bestätigung | `s1-bestaetigung` | `w1-bestaetigung` | `/[farmSlug]/confirm` | Umbau (Rücktritts-Einstieg bleibt, N43) | 227 |
+| Bestellung per Link | `s1-bestellung-link` | `w1-bestellung-link` | `/[farmSlug]/bestellung`, `/[farmSlug]/bestaetigen` | Umbau | 227 |
+| Bestellung (Hof) | `s1-bestellung` | `w1-bestellung` | `/orders/[orderId]` | Umbau | 222 |
+| Bestellungen (Hof) | `s1-bestellungen` | `w1-bestellungen` | `/orders` | Umbau | 222 |
+| Einstellungen (Hof) | `s1-einstellungen` | `w1-einstellungen` | `/settings` | Umbau | 224 |
+| Heute (Hof) | `s1-heute` | `w1-heute` | `/dashboard` | Umbau | 222 |
+| Höfe finden | `s1-hoefe` | `w1-hoefe` | `/hoefe` | Umbau | 226 |
+| Hofseite | `s1-hofseite` | `w1-hofseite` | `/[farmSlug]` | Umbau | 226 |
+| Kasse | `s1-kasse` | `w1-kasse` | `/[farmSlug]/checkout` | Umbau. Recht vor Mockup: Zusammenfassung unmittelbar über dem Kaufknopf, Gewährleistungs-Grafik, Sätze unter jedem Kaufknopf (210, 211, 215) | 227 |
+| Warenkorb | `s1-korb` | `w1-korb` | Blatt über der Hofseite (`cart-sheet`) | Umbau | 227 |
+| Mehr und Neu | `s1-mehr-neu` | `w1-mehr-neu` | HofShell (Unterleiste, Blätter „Mehr“ und „Neu“) | Umbau | 220 |
+| Mein Hof | `s1-mein-hof` | `w1-mein-hof` | `/farm-page` | Umbau | 224 |
+| Meine Bestellungen | `s1-meine-bestellungen` | `w1-meine-bestellungen` | `/bestellungen` | Umbau | 227 |
+| Produkt anlegen | `s1-produkt-neu` | `w1-produkt-neu` | siehe Notiz im Board (Formulare unter `/products`) | Umbau | 223 |
+| Produkt ansehen | `s1-produkt` | `w1-produkt` | `/[farmSlug]/produkt/[id]` | Umbau | 226 |
+| Produkte (Hof) | `s1-produkte` | `w1-produkte` | `/products` | Umbau | 223 |
+| Region | `s1-region` | `w1-region` | `/region` | Umbau (gebauter Stand gilt) | 224 |
+| Startseite | `s1-startseite` | `w1-startseite` | `/` | Umbau | 226 |
+| Newsletter abmelden | `s2-abmelden` | `w2-abmelden` | `/account/unsubscribe` | Umbau | 228 |
+| Anmelden | `s2-anmelden` | `w2-anmelden` | `/login` | Umbau | 228 |
+| Auswertung | `s2-auswertung` | `w2-auswertung` | `/analytics` | Umbau | 225 |
+| Beiträge | `s2-beitraege` | `w2-beitraege` | `/status`, `/status/new` (Rückweg Mein Hof › Beiträge) | Umbau | 225 |
+| Druck (nur hell) | `s2-druck` | `w2-druck` | `/orders/[orderId]/print`, `/orders/today/print` | Umbau | 222 |
+| Hofdaten und Zahlung | `s2-hofdaten-zahlung` | `w2-hofdaten-zahlung` | `/settings/profile`, `/settings/payments` | Umbau | 224 |
+| Konto (Hof) | `s2-konto-hof` | `w2-konto-hof` | `/settings/account` | Umbau | 224 |
+| Kunden (Hof) | `s2-kunden` | `w2-kunden` | `/customers` | Umbau | 225 |
+| Kundenkonto | `s2-kundenkonto` | `w2-kundenkonto` | `/account/profile` | Umbau | 228 |
+| Problem melden (Hof) | `s2-meldungen` | `w2-meldungen` | `/fehler-melden`, `/meldungen` | Umbau | 225 |
+| Neuigkeiten bestätigen | `s2-neuigkeiten` | `w2-neuigkeiten` | `/account/neuigkeiten-bestaetigen` | Umbau | 228 |
+| Passwort | `s2-passwort` | `w2-passwort` | `/forgot-password`, `/reset-password` | Umbau | 228 |
+| Postfach (Hof) | `s2-postfach` | `w2-postfach` | `/postfach` | Umbau | 225 |
+| Registrieren | `s2-registrieren` | `w2-registrieren` | `/register`, `/verify`, `/onboarding` | Umbau | 228 |
+| Systemseiten | `s2-systemseiten` | `w2-systemseiten` | `/sicherheit/nicht-ich`, `/konto/email-bestaetigen` | Umbau | 228 |
+| Teilen | `s2-teilen` | `w2-teilen` | `/teilen` | Umbau | 225 |
+| Verkäufe | `s2-verkaeufe` | `w2-verkaeufe` | `/sales` | Umbau | 225 |
+| WhatsApp und Plakat | `s2-whatsapp-plakat` | `w2-whatsapp-plakat` | `/status/[id]/send-whatsapp`, `/status/plakat` | Umbau | 225 |
+| Admin · Akte | `s3-admin-akte` | `w3-admin-akte` | `/admin/hoefe/[id]` | Umbau | 229 |
+| Admin · Bestellungen | `s3-admin-bestellungen` | `w3-admin-bestellungen` | `/admin/bestellungen` | Umbau | 229 |
+| Admin · Betrieb | `s3-admin-betrieb` | `w3-admin-betrieb` | `/admin/betrieb` | Umbau | 230 |
+| Admin · Einstellungen | `s3-admin-einstellungen` | `w3-admin-einstellungen` | `/admin/einstellungen` | Umbau | 230 |
+| Admin · Freischalten | `s3-admin-freischalten` | `w3-admin-freischalten` | Dialog in `/admin/hoefe/[id]` | Umbau | 229 |
+| Admin · Geld | `s3-admin-geld` | `w3-admin-geld` | `/admin/geld` | Umbau | 230 |
+| Admin · Heute | `s3-admin-heute` | `w3-admin-heute` | `/admin` | Umbau | 229 |
+| Admin · Höfe | `s3-admin-hoefe` | `w3-admin-hoefe` | `/admin/hoefe` | Umbau | 229 |
+| Admin · Postfach | `s3-admin-postfach` | `w3-admin-postfach` | `/admin/postfach` | Umbau | 230 |
+| Admin · Rahmen | `s3-admin-shell` | `w3-admin-shell` | AdminShell | Umbau | 220 |
+| Admin · Startseite | `s3-admin-startseite` | `w3-admin-startseite` | `/admin/startseite` | Umbau | 230 |
+| Admin · Zugang | `s3-admin-zugang` | `w3-admin-zugang` | `/admin/bestaetigen`, `/admin/einrichten` | Umbau | 230 |
+| Fehlerseiten | `s3-fehlerseiten` | `w3-fehlerseiten` | `not-found.tsx`, `error.tsx`, `global-error.tsx` | Umbau | 231 |
+| Problem melden (Kundschaft) | `s3-problem-melden` | `w3-problem-melden` | `/problem-melden` | Umbau | 225 |
+| Rechtstexte | `s3-rechtstexte` | `w3-rechtstexte` | `/agb`, `/datenschutz`, `/konditionen` | Umbau (nur Rahmen, nie Wortlaut) | 231 |
+| Rücktrittsrecht | `s3-widerruf` | `w3-widerruf` | `/widerruf` | Umbau. Online-Rücktrittsfunktion: Wortlaut nach N39, bis die Anwältin entscheidet | 231 |
+| Betriebs-Mails | `s3-mail-betrieb` | `w3-mail-betrieb` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau | 232 |
+| Mails an den Hof (Bestellung) | `s3-mail-hof-bestellung` | `w3-mail-hof-bestellung` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau. Online-Rücktrittsfunktion: Wortlaut nach N39, bis die Anwältin entscheidet | 232 |
+| Mails an den Hof (Konto) | `s3-mail-hof-konto` | `w3-mail-hof-konto` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau | 232 |
+| Mails zum Kauf | `s3-mail-kauf` | `w3-mail-kauf` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau. Online-Rücktrittsfunktion: Wortlaut nach N39, bis die Anwältin entscheidet | 232 |
+| Mails Neuigkeiten | `s3-mail-neuigkeiten` | `w3-mail-neuigkeiten` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau | 232 |
+| Sicherheits-Mails | `s3-mail-sicherheit` | `w3-mail-sicherheit` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau | 232 |
+| Storno-Mails | `s3-mail-storno` | `w3-mail-storno` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau. Online-Rücktrittsfunktion: Wortlaut nach N39, bis die Anwältin entscheidet | 232 |
+| Team-Mails | `s3-mail-team` | `w3-mail-team` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau | 232 |
+| Zugangs-Mails | `s3-mail-zugang` | `w3-mail-zugang` | E-Mail-Vorlagen unter `src/emails/**` (keine Route) | Umbau | 232 |
+| Tarifzeile | `t-a-tarifzeile` | `w-a-tarifzeile` | Mehr-Blatt und Seitenleiste (HofShell) | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 224 |
+| Produkte (Tarif) | `t-b-produkte` | `w-b-produkte` | `/products` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 223 |
+| Zählweise (Entscheidung) | `t-b2-zaehlweise` | `w-b2-zaehlweise` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Zustände (Leer, Laden, Fehler) | `t-b3-zustaende` | `w-b3-zustaende` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 223 |
+| Abholzeiten | `t-c-abholzeiten` | `w-c-abholzeiten` | `/settings/pickup-slots` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 224 |
+| Packliste | `t-d-packliste` | `w-d-packliste` | `/dashboard`, `/orders` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 222 |
+| Pause und Urlaub | `t-e-pause-urlaub` | `w-e-pause-urlaub` | `/settings/pause` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Konditionen (Hof) | `t-f-konditionen` | `w-f-konditionen` | `/settings/konditionen` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 224 |
+| Auswahl vor Ende der Gründungszeit | `t-g-auswahl` | `w-g-auswahl` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Hofladen wählen | `t-h-hofladen-waehlen` | `w-h-hofladen-waehlen` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Kündigen | `t-i-kuendigen` | `w-i-kuendigen` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Abrechnung | `t-j-abrechnung` | `w-j-abrechnung` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Nachrichten zum Tarif | `t-k-nachrichten` | `w-k-nachrichten` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Kundenseite | `t-l-kundenseite` | `w-l-kundenseite` | `/[farmSlug]` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 226 |
+| Admin (Tarif) | `t-m-admin` | `w-m-admin` | `/admin/hoefe` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Region (Preise vergleichen v2) | `t-n-region` | `w-n-region` | `/region` | Vorschlag Preise vergleichen v2 (PR #329, offen) – nicht bauen | – |
+| Für Höfe | `t-o-fuer-hoefe` | `w-o-fuer-hoefe` | `/fuer-hoefe` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 226 |
+| Meine Bestellungen (Ausschnitt) | `t-p-meine-bestellungen` | `w-p-meine-bestellungen` | `/bestellungen` | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | 227 |
+| Admin · Gratiszeit | `t-q-admin-gratiszeit` | `w-q-admin-gratiszeit` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+| Admin · Freischalten (Tarif) | `t-r-admin-freischalten` | `w-r-admin-freischalten` | siehe Notiz im Board | Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen | – |
+
 Farben sind auf das dunkle Standard-Theme aufgelöst. Die verbindlichen Token-Paare stehen in `../ai/DESIGN_SYSTEM.md`. Beispieldaten (Höfe, Namen, Preise, Nummern) sind Platzhalter.
 
 **Dateinamen:** `web-` oder `mobil-`, dann der Schritt im Ablauf (`k0`–`k4` Kunde, `h0`–`h6` Hof), dann der Bildschirm. `admin-`, `fehler-` und `system-` sind Querschnitt.

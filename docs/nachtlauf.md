@@ -293,6 +293,21 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 217 | Kleinigkeiten aus Lauf 28 (von `docs/lauf29`) | `freigabe.md` §33 | – |
 | 218 | Rücktritts-Angaben auch im Familien-Formular (214-Nacharbeit) (von `docs/lauf29`) | `freigabe.md` §33 | N39 |
 | Sammel 29 | Sammel-PR `integration/lauf29` | `freigabe.md` §33 | G3, G10 |
+| 219 | Bausteine und Wortliste: neue Wörter (Rücktritt, Hinweis, Hofseite …), Varianten für Dialog, Blatt, Marke, Feldfehler (von `docs/lauf30`) | `freigabe.md` §34 | N8, N41, N42, N43 |
+| 220 | Shells und Navigation: Kunde, Hof, Admin (vom Zwischenstand `integration/lauf30` nach 219) | `freigabe.md` §34 | N41 |
+| 221 | Gebühren-Texte und Gründungszeit 12 Monate (vom Zwischenstand `integration/lauf30` nach 219, parallel zu 220) | `freigabe.md` §34 | N38, N44, K2 |
+| 222 | Hof-Alltag: Heute, Bestellungen, Bestellung, Druck (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N41 |
+| 223 | Produkte und Produkt-Formulare (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | – |
+| 224 | Mein Hof, Einstellungen, Region (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N42 |
+| 225 | Hof-Werkzeuge: Auswertung, Kunden, Verkäufe, Postfach, Beiträge, Problem melden (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N14 |
+| 226 | Kundschaft: Finden – Startseite, Höfe, Hofseite, Produktseite, Für Höfe (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | E8, N16 |
+| 227 | Kauf: Warenkorb, Kasse, Bestätigung, Bestellung ansehen, Meine Bestellungen; Sperrzone Kasse (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N41, N43 |
+| 228 | Anmelden und Konto (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N42 |
+| 229 | Admin Teil 1: Heute, Höfe, Akte, Freischalten, Bestellungen (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N43 |
+| 230 | Admin Teil 2: Postfach, Startseite, Geld, Betrieb, Einstellungen, Zugang (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N44 |
+| 231 | Rechtstexte, Rücktrittsrecht, Fehlerseiten (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N43 |
+| 232 | E-Mails: Fuß-Arten, Reply-To, Texte (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N43 |
+| Sammel 30 | Sammel-PR `integration/lauf30` | `freigabe.md` §34 | G3, G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 

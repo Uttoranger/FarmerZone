@@ -314,6 +314,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Stand:** umgesetzt in 17d.
 
 ### K2 · Gründungs-Enddatum je Hof (12.10.2026)
+- **Verweis:** geändert durch N44, 3.11.2026 (Gründungszeit 12 Monate, Einzugsbeginn der Bargebühr).
 - **Verweis:** ergänzt durch N38, 26.10.2026 (siehe Ergänzung am Ende dieses Eintrags).
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** Gründungshöfe gelten als Hofladen ohne Grundgebühr bis zu einem Enddatum; Standard 31.12.2027, je Hof im Admin änderbar, auch für die bestehenden Testhöfe. Danach gilt die normale Regel (E6-Ergänzung). Vor einer Änderung des Standards werden bestehende Zusagen je Hof festgeschrieben (eigene Migration mit Freigabe). Der Satz „danach dauerhaft 3 %" verschwindet aus jeder Anzeige.
 - **Verhältnis zu anderen Einträgen:** entscheidet O7 (Variante b); ergänzt E6 und K1.
@@ -612,6 +613,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** Web-Vorschau bleibt 1 408 px, DESIGN_SYSTEM nennt 1 408. Quelle: Morgenbericht 12 §10, zu Nr. 75; Umsetzung Nr. 85.
 
 ### N8 · Wortliste (13.10.2026)
+- **Verweis:** ergänzt durch N42 (Wortliste vor Code) und N43 (Rücktritt statt Widerruf in Nutzertexten), 3.11.2026.
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Für jede Sache gibt es in Nutzertexten genau ein Wort; die Liste steht in docs/ai/DESIGN_SYSTEM.md und ein Test schützt sie. Erste Einträge: **Abholzeiten** = die Zeiten, die der Hof anbietet; **Abholtermin** = der Termin, den die Kundin gewählt hat; nicht: Zeitfenster, Abholslot. **Vorrat**; nicht: Bestand, Lagerstand, Lager (Code-Bezeichner wie `stock` bleiben). **Beitrag**; nicht: Status, Post, Neuigkeit als Objekt (Route /status bleibt, Register 22e). **Problem melden** als Türname auf beiden Seiten; „Meine Meldungen" bleibt die Übersicht des Hofs; nicht: Hilfe und Rückmeldung, Fehler melden. **Kundin/Kunden**: Beschriftungen, Reiter, Kennzahlen „Kunden" (z. B. „Kunden", „12 Kunden"); ganze Sätze „die Kundin"/„deine Kundinnen" (gewachsener Hausstil); „Käufer" nur für die Futter-Käuferarten (Betrieb/privat). **Telefonnummern** werden einheitlich angezeigt: „+43 660 000 0000" (Ländercode, Leerzeichen nach Vorwahl und in Dreier-/Vierergruppen), gespeichert bleibt die Eingabe. Jeder weitere Eintrag kommt nur über eine Freigabe.
 - **Verhältnis zu anderen Einträgen:** ergänzt CLAUDE.md §5 (Sprache) und E11 (Brennmaterial).
 - **Umsetzung:** Nr. 77 (Liste und Test), Nr. 78 (Begriffe), Nr. 81 (Telefonnummern); freigabe.md §16.
@@ -878,8 +880,12 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - **Rechtstexte** (Hof-AGB, Ankündigung, Datenschutz) kommen nach Rückmeldung der Anwältin. Vor dem Stichtag müssen sie stehen.
   - Keine Rechtsberatung.“
 - **Umsetzung:** Nr. 188 (Felder, Expand-Migration), Nr. 197 (Preis, Anzeige, Zahlung), Nr. 198 (Mandat, Monatsabrechnung, Sperre) (freigabe.md §30). Rechtstexte (Hof-AGB, Ankündigung, Datenschutz) folgen als eigener Auftrag nach Rückmeldung der Anwältin und müssen vor dem Stichtag stehen.
+- **Ergänzung (uttoranger, im Chat, 3.11.2026; Lauf 30, A1):** Knopf „Servicegebühr …“ in der Akte:
+  - Ab dem Stichtag „Hofpreis-Modell ab“ nicht mehr zeigen. Der eine Weg zum Satz ist die Karte „Plattformgebühr“.
+  - Grund: Der Knopf schreibt den Satz des alten Modells (servicegebuehr-dialog.tsx), also ein anderes Feld. Ein Umbenennen würde in die Irre führen.
 
 ### N39 · Widerruf online (§ 13a FAGG) (30.10.2026)
+- **Verweis:** ergänzt durch N43 (Wort „Rücktritt“ in Nutzertexten; die Beschriftung der Online-Funktion bleibt), 3.11.2026.
 - **Entscheidung (uttoranger, im Chat, 30.10.2026):**
   - „**Zugang:** Jede Bestellung einer Verbraucherin (`kaeuferArt` PRIVAT) kann online ohne Anmeldung widerrufen werden. Einstieg: Link ‚Vertrag widerrufen‘ in jeder Bestellmail an die Kundin, auf der Bestätigungsseite, auf der Bestellseite und im Fuß jeder Kundenseite (/widerruf).
   - **Zwei Schritte:** Erst der Knopf ‚Vertrag widerrufen‘, dann eine Zusammenfassung mit dem Knopf ‚Widerruf bestätigen‘. Gewählt werden die ganze Bestellung oder einzelne Positionen.
@@ -897,6 +903,31 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ### N40 · Stripe live nur mit Hofpreis-Modell (30.10.2026)
 - **Entscheidung (uttoranger, im Chat, 30.10.2026):** „Ist Stripe live (Live-Schlüssel in der Produktion) und liegt der Stichtag ‚Hofpreis-Modell ab‘ noch in der Zukunft, steht in Admin › Heute ganz oben eine Aufgabe, und die Betriebsleiste warnt. Die Bestellungen laufen weiter; es ist ein Signal, keine Sperre. stripe-live.md nennt den Stichtag als Vorbedingung.“
 - **Umsetzung:** Nr. 201 (freigabe.md §31).
+
+### N41 · Redesign Welle 1 (3.11.2026; Projekt E-014)
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „Mindestbestellwert als ‚Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir fehlen noch Waren für € X.‘; Pause ohne Enddatum; ‚Warenkorb · n‘ nur bei gefülltem Warenkorb; Web-Dialoge: Neu = Dropdown, Warenkorb = Blatt rechts (≤ 448 px), sonst zentrierter Dialog ≤ 560 px; Zähler ‚Bestellungen‘ = alles nicht Abgeholte, Stornierte oder Verfallene; Kaufknopf grün.“
+- **Ergänzung (uttoranger, im Chat, 3.11.2026; Lauf 30, A3):** Mindestbestellwert-Satz:
+  - „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir fehlen noch Waren für € X.“
+  - Ohne Gebührenbetrag beim Fehlbetrag, weil die Gebühr je Stück aufgerundet wird und jede Zahl dort nur ungefähr stimmt.
+  - Im PR unter „Offen für Recht“ (Preisangabe).
+- **Umsetzung:** Nr. 219–232 (freigabe.md §34).
+
+### N42 · Redesign Welle 2 (3.11.2026; Projekt E-015)
+- **Verweis:** ergänzt N8 (Wortliste).
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „Hauptknopf im Hofbereich orange; Kundschaft grün, Hof-Eingänge orange; Wortliste vor Code (‚Hinweis‘ statt ‚Mitteilung‘, ‚Hofseite‘, ‚Anmelde-Adresse‘, Papier = Bildschirm); ‚Hof‘ statt ‚Hofladen‘ beim Stilllegen; Balken ‚Richte deinen Hof fertig ein …‘ bzw. ‚Dein Hof wird noch geprüft …‘; ‚Lastschrift einrichten‘.“
+- **Umsetzung:** Nr. 219–232 (freigabe.md §34).
+
+### N43 · Rücktritt in Nutzertexten (3.11.2026; Projekt E-017; ergänzt N8 und N39)
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „In Nutzertexten heißt es ‚Rücktritt‘ bzw. ‚Rücktrittsrecht‘, nie ‚Widerruf‘. Die Route /widerruf bleibt, der Titel lautet ‚Rücktrittsrecht‘. Wörtlich bleiben bis zur Entscheidung der Anwältin: die Beschriftung der Online-Funktion nach § 13a FAGG (Einstiege und Knöpfe, N39), die Belehrung und das Muster-Formular nach Anhang I FAGG, die AGB und die Datenschutzerklärung. Der Widerruf einer Einwilligung bleibt ‚Widerruf‘.“
+- **Umsetzung:** Nr. 219 und 231 (freigabe.md §34).
+
+### N44 · Gründungszeit 12 Monate (3.11.2026; Projekt E-018; ändert K2)
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „Gründungshöfe bekommen den Hofladen 12 statt 24 Monate ohne Grundgebühr, einstellbar im Feld ‚Monate ohne Grundgebühr‘ (Admin › Einstellungen). Beginn am späteren Tag von Tarifstart und Freischaltung. Die Laufzeit bestimmt auch den Einzugsbeginn der Bargebühr aus N38 (K2-Ergänzung 26.10.2026): Gründungshöfe zahlen sie ab dem Tag nach dem Gründungs-Ende, bei Freischaltung vor dem Tarifstart also ab 1.2.2028. Das feste Datum (Art ‚bisher‘) entfällt mit dem Festschreiben. ‚Monate nur erhöhen‘ gilt erst nach dem Festschreiben; vorher ist jeder Wert von 1 bis zum Höchstwert erlaubt.“
+- **Ergänzung (uttoranger, im Chat, 3.11.2026; Lauf 30, A2):** Gründungszeit 12 Monate (N44):
+  - Bestätigt, mit der Folge für den Einzug der Bargebühr (siehe Entschieden).
+  - Wert setzen und Festschreiben macht die Projektleitung nach dem Merge, vor dem Tarifstart am 1.2.2027.
+  - Der Lauf ändert keine Daten.
+- **Umsetzung:** Nr. 221 (freigabe.md §34).
 
 ---
 
@@ -975,3 +1006,5 @@ Vormerkung (uttoranger, im Chat, 31.10.2026; Nr. 209): „Nacharbeit nach dem Go
 Stand Lauf 28 (uttoranger, 31.10.2026): Die Ergänzungen zu N17, G8, N2/E5 und N39 sowie die Vormerkung Nr. 209 sind entschieden und in Nr. 208, 210–214 eingeplant (freigabe.md §32). Dazu die Befunde aus Bericht 207 (§ 8 Abs. 1 FAGG, Gewährleistungs-Mitteilung, Hof-E-Mail) und die Nacharbeit aus Morgenbericht 27. Lauf 28 hat eine Migration (214), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, Monatsabrechnungs-Gutschrift, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.
 
 Stand Lauf 29 (uttoranger, 1.11.2026): Die Ergänzungen zu N2/O4, N2 (Handy-Reihenfolge) und zur Fließkomma-Wache sind entschieden; 211 (Gewährleistungs-Mitteilung, Grafik liegt vor) und 215–218 sind eingeplant (freigabe.md §33). Lauf 29 hat keine Migration, kein neues Paket, keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, 212-Profil, Monatsabrechnung, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.
+
+Stand Lauf 30 (uttoranger, 3.11.2026): N41–N44 entschieden; Redesign nach den Mockups November 2026 in Nr. 219–232 (freigabe.md §34). Keine Migration, kein Paket, keine Variable. Nicht: Ab Hof, Willkommenszeit, Zahl der Gründungsplätze, Kartenquelle, Tarife als Abrechnung, Preise vergleichen v2 (PR #329), AGB 1.0, Impressum (A001).
