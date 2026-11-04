@@ -4,6 +4,8 @@ import { useSyncExternalStore, type CSSProperties } from 'react'
 import { useTheme } from 'next-themes'
 import { Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { DARSTELLUNG_TEXT } from '@/lib/kunden-navigation'
 
 /**
  * Der Schnellumschalter Hell ↔ Dunkel — ein Tipp statt drei Klicks tief in
@@ -34,6 +36,7 @@ function useThemeUmschalter(): {
   dunkel: boolean
   beschriftung: string
   umschalten: () => void
+  setze: (modus: 'light' | 'dark') => void
 } {
   const { resolvedTheme, setTheme } = useTheme()
   const montiert = useSyncExternalStore(nichtsAbonnieren, imBrowser, aufDemServer)
@@ -46,6 +49,7 @@ function useThemeUmschalter(): {
     // stimmen aria-label und title beim Hydrieren nicht überein, und React gleicht Attribute nicht mehr an.
     beschriftung: montiert && dunkel ? 'Hellen Modus einschalten' : 'Dunkelmodus einschalten',
     umschalten: () => setTheme(dunkel ? 'light' : 'dark'),
+    setze: (modus) => setTheme(modus),
   }
 }
 
@@ -73,10 +77,8 @@ export function ThemeUmschalter({
       onClick={umschalten}
       aria-label={beschriftung}
       title={beschriftung}
-      className={cn(
-        'inline-flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-        className
-      )}
+      // Der sichtbare Fokus aller Shells (FOKUS_RAHMEN); vorher ein Halo `ring/50`, der hell unter 3:1 lag (Nr. 220).
+      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors', FOKUS_RAHMEN, className)}
       style={style}
     >
       {dunkel ? (
@@ -89,39 +91,69 @@ export function ThemeUmschalter({
 }
 
 /**
- * Dieselbe Funktion als Zeile mit Text — für die Seitenleiste und das
- * Mehr-Sheet des Bauern-Bereichs, wo alle Einträge Symbol + Wort tragen.
- * Farben kommen von außen (die Leiste ist in beiden Modi dunkelgrün und
- * beschriftet sich über --app-bar-ink-soft).
+ * „Darstellung: hell“ bzw. „Darstellung: dunkel“ als Umriss-Pille mit 44 px —
+ * am Handy im Seitenfuß der KundeShell (Board s1-startseite, Bild 4). Sie nennt
+ * den Modus, der gerade gilt, mit seinem Symbol (Sonne hell, Mond dunkel); ein
+ * Tipp schaltet um. Der Name beginnt mit dem sichtbaren Text (WCAG 2.5.3), der
+ * Rest sagt, was der Tipp tut. Vor dem Einhängen steht nur „Darstellung“ — der
+ * Server kennt den Modus nicht.
  */
-export function ThemeUmschalterZeile({
-  className,
-  style,
-}: {
-  className?: string
-  style?: CSSProperties
-}): React.JSX.Element {
-  const { montiert, dunkel, beschriftung, umschalten } = useThemeUmschalter()
-  const Symbol = dunkel ? Sun : Moon
-
+export function ThemeUmschalterPille({ className }: { className?: string }): React.JSX.Element {
+  const { montiert, dunkel, umschalten } = useThemeUmschalter()
+  const Symbol = dunkel ? Moon : Sun
+  const sichtbar = montiert ? `${DARSTELLUNG_TEXT.titel}: ${dunkel ? DARSTELLUNG_TEXT.dunkel.toLowerCase() : DARSTELLUNG_TEXT.hell.toLowerCase()}` : DARSTELLUNG_TEXT.titel
   return (
     <button
       type="button"
       onClick={umschalten}
       disabled={!montiert}
-      aria-label={beschriftung}
-      title={beschriftung}
-      className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm min-h-[44px] text-left transition-colors', className)}
-      style={style}
-    >
-      {/* Vor dem Mount ein neutrales Symbol gleicher Größe statt Sonne oder
-          Mond — sonst hüpft das Zeichen beim Hydrieren. */}
-      {montiert ? (
-        <Symbol className="h-[18px] w-[18px] flex-shrink-0" strokeWidth={1.7} aria-hidden="true" />
-      ) : (
-        <span className="h-[18px] w-[18px] flex-shrink-0" aria-hidden="true" />
+      aria-label={montiert ? `${sichtbar} – ${dunkel ? DARSTELLUNG_TEXT.aufHell : DARSTELLUNG_TEXT.aufDunkel}` : undefined}
+      className={cn(
+        'inline-flex min-h-11 items-center gap-2 rounded-full border border-input px-4 text-[13.5px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted',
+        FOKUS_RAHMEN,
+        className
       )}
-      {montiert ? (dunkel ? 'Heller Modus' : 'Dunkelmodus') : 'Darstellung'}
+    >
+      {montiert ? (
+        <Symbol className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+      ) : (
+        <span className="size-4 shrink-0" aria-hidden="true" />
+      )}
+      {sichtbar}
     </button>
+  )
+}
+
+/**
+ * Die Zeile „Darstellung“ mit den zwei Pillen „Hell“ und „Dunkel“ — im Blatt
+ * „Mehr“ der HofShell (Board s1-mehr-neu, Bild 2). Gewählt ist die gefüllte
+ * Pille (`aria-pressed`), je 44 px hoch. Vor dem Einhängen ist keine gewählt:
+ * Der Server kennt den Modus nicht, eine geratene Wahl wäre beim Hydrieren falsch.
+ */
+export function ThemeWahl({ className }: { className?: string }): React.JSX.Element {
+  const { montiert, dunkel, setze } = useThemeUmschalter()
+  const pille = (modus: 'light' | 'dark', wort: string) => {
+    const gewaehlt = montiert && (modus === 'dark') === dunkel
+    return (
+      <button
+        type="button"
+        onClick={() => setze(modus)}
+        disabled={!montiert}
+        aria-pressed={gewaehlt}
+        className={cn(
+          'inline-flex min-h-11 items-center rounded-full border px-3.5 text-[13.5px] font-semibold transition-colors duration-[250ms]',
+          gewaehlt ? 'border-foreground bg-foreground text-background' : 'border-input text-foreground hover:bg-muted',
+          FOKUS_RAHMEN
+        )}
+      >
+        {wort}
+      </button>
+    )
+  }
+  return (
+    <div role="group" aria-label={DARSTELLUNG_TEXT.titel} className={cn('flex items-center gap-2', className)}>
+      {pille('light', DARSTELLUNG_TEXT.hell)}
+      {pille('dark', DARSTELLUNG_TEXT.dunkel)}
+    </div>
   )
 }

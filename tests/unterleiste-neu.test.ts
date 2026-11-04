@@ -11,7 +11,7 @@
  *    fest eingetippt (Runde 1).
  *  - Das Wort kommt aus der Navigations-Quelle (HOF_NEU_KNOPF), dieselbe wie
  *    der Neu-Knopf der Seitenleiste.
- *  - Gegenprobe: Die Kunden-Unterleiste (Warenkorb) bleibt ohne Wort.
+ *  - Gegenprobe: Die Kunden-Unterleiste trägt nicht „Neu“, sondern „Warenkorb“ (seit Nr. 220, V10).
  */
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -31,6 +31,7 @@ vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeShell } from '@/components/shells/kunde-shell'
 import { HOF_LEISTE_KURZ, HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
+import { WARENKORB_WORT } from '@/lib/kunden-navigation'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
@@ -87,10 +88,11 @@ describe('Unterleiste Hof: „Neu" unter dem Plus', () => {
     expect(seitenleiste).toContain(`>${HOF_NEU_KNOPF}<`)
   })
 
-  it('Gegenprobe: die Kunden-Unterleiste bleibt beim Warenkorb ohne Wort', () => {
+  it('Gegenprobe: die Kunden-Unterleiste trägt nicht „Neu“, sondern seit Nr. 220 ihr eigenes Wort „Warenkorb“ (V10)', () => {
     const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
     const kundenLeiste = abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')
     expect(kundenLeiste).not.toContain(`>${HOF_NEU_KNOPF}<`)
+    expect(kundenLeiste).toContain(`>${WARENKORB_WORT}<`)
   })
 })
 
@@ -119,7 +121,8 @@ describe('Unterleiste Hof: 11 px unter 360 px Breite (Entscheidung 6, Nr. 195)',
   it('die Breitenstufe liegt unter 360, nicht darauf: max-[359px]', () => {
     expect(ELF).toContain('max-[359px]')
     expect(quelle('src/components/ui/bottom-nav.tsx')).toContain('engUnter360')
-    expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav ueberSchleier={offen !== null} engUnter360>')
+    // Seit Nr. 220 liegen die Blätter über der Leiste (Board s1-mehr-neu) — die Leiste bleibt auf ihrer Ebene, ohne ueberSchleier.
+    expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav engUnter360>')
   })
 })
 

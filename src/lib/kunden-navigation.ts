@@ -99,11 +99,37 @@ export const SEITENFUSS: { rechtlich: readonly FussLink[]; wege: readonly FussLi
   wege: [ENTDECKEN, FUER_HOEFE, SO_GEHTS].map(({ href, label }) => ({ href, label })),
 }
 
-export type KundenLeistenPlatz = { art: 'punkt'; punkt: KundenNavPunkt } | { art: 'warenkorb' }
+/**
+ * Die Wörter des Darstellungs-Schalters (Nr. 220): „Darstellung: hell“ im
+ * Seitenfuß der Kundschaft (Board s1-startseite), die Pillen „Hell“ und
+ * „Dunkel“ im Blatt „Mehr“ des Hofbereichs (Board s1-mehr-neu). Hier und nicht
+ * bei der HofShell, weil der Schalter jede Kundenseite mitlädt.
+ */
+export const DARSTELLUNG_TEXT = {
+  titel: 'Darstellung',
+  hell: 'Hell',
+  dunkel: 'Dunkel',
+  aufHell: 'auf hell umschalten',
+  aufDunkel: 'auf dunkel umschalten',
+} as const
+
+/** Das Wort unter dem grünen Mittelknopf der Unterleiste (V10, Board s1-startseite) — Wortliste: „Warenkorb“. */
+export const WARENKORB_WORT = 'Warenkorb'
+
+/**
+ * „Warenkorb · n“ im Browser-Kopf (N41 c, V12): nur bei gefülltem Warenkorb —
+ * die Shell zeigt leer gar nichts. Dieselbe Fassung nennt der Mittelknopf am
+ * Handy seinem Screenreader-Namen voran.
+ */
+export function warenkorbKopfText(anzahl: number): string {
+  return `${WARENKORB_WORT} · ${anzahl}`
+}
+
+export type KundenLeistenPlatz = { art: 'punkt'; punkt: KundenNavPunkt } | { art: 'warenkorb'; wort: string }
 
 const HANDY_LEISTE: readonly KundenLeistenPlatz[] = [
   { art: 'punkt', punkt: ENTDECKEN },
-  { art: 'warenkorb' },
+  { art: 'warenkorb', wort: WARENKORB_WORT },
   { art: 'punkt', punkt: BESTELLUNGEN },
 ]
 
@@ -216,4 +242,15 @@ export function kundenSitzung(nutzer: { role?: string | null } | null | undefine
   if (nutzer?.role === 'CUSTOMER') return 'kunde'
   if (nutzer?.role === 'FARMER') return 'hof'
   return 'gast'
+}
+
+/**
+ * aria-current in der Unterleiste am Handy (Nr. 220, Board s1-startseite): wie
+ * `kundenAriaAktuell`, nur steht auf der Startseite „Entdecken“ als Ort
+ * (`true`) — die Startseite IST am Handy der Einstieg ins Entdecken, die Leiste
+ * zeigt sonst keinen Ort. Der Web-Kopf bleibt dort ohne aktiven Punkt (V12).
+ */
+export function kundenHandyAriaAktuell(pfad: string, punkt: KundenNavPunkt, aktiv?: KundenNavId): 'page' | 'true' | undefined {
+  if (!aktiv && pfad === '/') return punkt.id === ENTDECKEN.id ? 'true' : undefined
+  return kundenAriaAktuell(pfad, punkt, aktiv)
 }

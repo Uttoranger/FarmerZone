@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { OrderStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { gebuehrFuerMonatsabrechnungJeModell, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { stornoBetraege, type StornoBetraege } from '@/lib/storno'
@@ -107,7 +107,13 @@ export async function getOrderDetail(farmId: string, orderId: string) {
   return row ? serialize(row) : null
 }
 
-const OPEN_STATUSES = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const
+/**
+ * Offen = alles, was nicht abgeholt, storniert oder verfallen (nicht abgeholt) ist —
+ * auch „Bestätigung offen“ (Register N41 e). EINE Quelle für die Zahl an
+ * „Bestellungen“ in Unterleiste und Seitenleiste der HofShell und für den Chip
+ * „Noch offen · n“; exportiert, damit Tests und Seiten keine zweite Liste führen.
+ */
+export const OPEN_STATUSES = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const satisfies readonly OrderStatus[]
 
 export async function getOpenOrdersCount(farmId: string): Promise<number> {
   return prisma.order.count({

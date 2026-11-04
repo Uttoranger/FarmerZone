@@ -71,7 +71,7 @@ vi.mock('@/server/actions/meldung', () => ({ meldungAbsenden: vi.fn() }))
 
 import { Abholzeile } from '@/components/hoefe/abholzeile'
 import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
-import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
+import { ThemeUmschalter, ThemeUmschalterPille, ThemeWahl } from '@/components/shared/theme-umschalter'
 import { CookieBanner } from '@/components/cookie-banner'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
@@ -187,16 +187,23 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
     expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
   })
 
-  // Fund aus Nr. 135: Die Beschriftung am Knopf richtete sich schon beim ersten Rendern im Browser nach dem Modus, den der Server nicht kennt.
-  it('ThemeUmschalterZeile: „Darstellung“ im Server-HTML, danach das Wort zum Modus des Browsers', async () => {
-    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalterZeile), { imBrowser: () => localStorage.setItem('theme', 'dark') })
-    expect(ergebnis.serverHtml).toContain('Darstellung')
+  // Fund aus Nr. 135 (damals an ThemeUmschalterZeile, die seit Nr. 220 der Pille und der Wahl gewichen ist): Die
+  // Beschriftung richtete sich schon beim ersten Rendern im Browser nach dem Modus, den der Server nicht kennt.
+  // Nr. 220: die Pille im Seitenfuß der Kundschaft und die Wahl Hell/Dunkel im Mehr-Blatt des Hofbereichs.
+  it('ThemeUmschalterPille: „Darstellung“ im Server-HTML, danach „Darstellung: dunkel“ aus dem Speicher', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalterPille), { imBrowser: () => localStorage.setItem('theme', 'dark') })
+    expect(ergebnis.serverHtml).toContain('>Darstellung</button>')
     expect(ergebnis.meldungen).toEqual([])
-    expect(ergebnis.container.textContent).toBe('Heller Modus')
-    // Im Browser ist es dunkel: Beschriftung und Tooltip bieten den hellen Modus an.
-    const knopf = ergebnis.container.querySelector('button')
-    expect(knopf?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
-    expect(knopf?.getAttribute('title')).toBe('Hellen Modus einschalten')
+    expect(ergebnis.container.textContent).toBe('Darstellung: dunkel')
+    expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Darstellung: dunkel – auf hell umschalten')
+  })
+
+  it('ThemeWahl: im Server-HTML keine Pille gewählt, danach „Dunkel“ aus dem Speicher', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeWahl), { imBrowser: () => localStorage.setItem('theme', 'dark') })
+    expect(ergebnis.serverHtml).not.toContain('aria-pressed="true"')
+    expect(ergebnis.meldungen).toEqual([])
+    const gewaehlt = [...ergebnis.container.querySelectorAll('button[aria-pressed="true"]')].map((k) => k.textContent)
+    expect(gewaehlt).toEqual(['Dunkel'])
   })
 })
 
@@ -506,7 +513,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/hoefe/hoefe-client.tsx': ['HoefeClient'],
   'src/components/hoefe/use-hoefe-adresse.ts': ['useHoefeAdresse'],
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
-  'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
+  'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterPille', 'ThemeWahl'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
   'src/components/notbremse-band.tsx': ['NotbremseBand'],

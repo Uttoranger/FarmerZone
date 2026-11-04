@@ -7,9 +7,9 @@
  * Betreiber ohne Hof hatte gar keinen Weg.
  *
  * Beweist:
- *  - Die Shell zeigt „Abmelden" (44 px hoch) — mit und ohne eigenen Hof;
- *    am Handy öffnet die Plakette ein Menü mit „Abmelden" (und mit Hof
- *    „Konto und Sicherheit"), am Computer steht der Knopf neben der Plakette.
+ *  - Die Plakette öffnet in jeder Breite ein Menü (seit Nr. 220, Boards
+ *    s3-/w3-admin-shell Bild 4) mit „Angemeldet als …“, „Abmelden" und mit Hof
+ *    „Konto und Sicherheit" — mit und ohne eigenen Hof; der Auslöser ist 44 px.
  *  - Das Abmelden ist der Weg der HofShell (`fuehreAbmeldenAus`, kein zweites
  *    Abmelden): signOut, dann /login/admin und neu laden; bei einem Fehler
  *    der Satz der HofShell und KEIN Weiterleiten; in der Vorschau unter
@@ -32,10 +32,10 @@ vi.mock('@/lib/auth-client', () => ({ signOut: () => signOut() }))
 vi.mock('sonner', () => ({ toast: { error: (satz: string) => toastFehler(satz) } }))
 
 import { AdminShell } from '@/components/shells/admin-shell'
-import { AdminAbmeldenKnopf, AdminKontoMenue } from '@/components/shells/admin-konto'
+import { AdminKontoMenue } from '@/components/shells/admin-konto'
 import { DropdownMenuItem, DropdownMenuLinkItem } from '@/components/ui/dropdown-menu'
 import { ABMELDEN_FEHLGESCHLAGEN } from '@/lib/abmelden'
-import { ADMIN_ABMELDEN, ADMIN_KONTO } from '@/lib/admin-navigation'
+import { ADMIN_ABMELDEN, ADMIN_MEHR_TEXT } from '@/lib/admin-navigation'
 import { ADMIN_PFAD } from '@/lib/admin-anmeldung'
 import { findeElement } from './element-suche'
 
@@ -46,11 +46,17 @@ function shell(hatHof: boolean): string {
   return renderToStaticMarkup(createElement(typ, { personName: 'Max Mustermann', hatHof }, INHALT))
 }
 
-/** Das öffnende Tag des ersten Knopfes, in dem „Abmelden" steht. */
-function abmeldenKnopf(html: string): string {
-  const knopf = html.match(/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*?Abmelden/)?.[0]
-  expect(knopf, 'Knopf „Abmelden"').toBeDefined()
-  return knopf?.match(/^<button\b[^>]*>/)?.[0] ?? ''
+/** Das Menü der Plakette als Baum (es liegt im Portal und steht im Server-HTML nur offen). */
+function menue(hatHof: boolean, ersatz?: () => void) {
+  return AdminKontoMenue({ anzeige: 'Max Mustermann', hatHof, ersatz })
+}
+
+/** Der Text eines Elements im Baum, flach. */
+function text(knoten: unknown): string {
+  if (typeof knoten === 'string' || typeof knoten === 'number') return String(knoten)
+  if (Array.isArray(knoten)) return knoten.map(text).join('')
+  if (knoten && typeof knoten === 'object' && 'props' in knoten) return text((knoten as { props: { children?: unknown } }).props.children)
+  return ''
 }
 
 /** Der Klick-Griff eines Elements. */
@@ -65,22 +71,28 @@ beforeEach(() => {
 })
 
 describe('Abmelden in der AdminShell', () => {
-  it('ist da — mit und ohne eigenen Hof, als Knopf von 44 px Höhe', () => {
+  it('ist da — mit und ohne eigenen Hof, als Eintrag im Menü der Plakette (Einträge 44 px im Baustein)', () => {
     for (const hatHof of [true, false]) {
-      const knopf = abmeldenKnopf(shell(hatHof))
-      expect(knopf).toContain('type="button"')
-      expect(knopf).toMatch(/\bmin-h-11\b/)
+      expect(text(findeElement(menue(hatHof), DropdownMenuItem))).toContain(ADMIN_ABMELDEN.label)
     }
   })
 
-  it('am Handy öffnet die Plakette ein Menü: Der Auslöser trägt die Initialen und ist 44 px groß', () => {
-    const html = shell(true)
-    const ausloeser = html.match(/<button\b[^>]*aria-label="MM – Konto-Menü[^"]*"[^>]*>/)?.[0]
-    expect(ausloeser, 'Auslöser des Menüs').toBeDefined()
-    expect(ausloeser).toMatch(/\bsize-11\b/)
-    expect(ausloeser).toMatch(/\bmd:hidden\b/)
-    // Gegenprobe: Der Weg zu „Konto und Sicherheit" bleibt am Computer ein Link.
-    expect(html).toContain(`href="${ADMIN_KONTO.href}"`)
+  it('die Plakette öffnet in jeder Breite das Menü: Auslöser mit den Initialen, 44 px, nie ausgeblendet (Nr. 220)', () => {
+    for (const hatHof of [true, false]) {
+      const html = shell(hatHof)
+      const ausloeser = html.match(/<button\b[^>]*aria-label="MM – Konto-Menü[^"]*"[^>]*>/g) ?? []
+      expect(ausloeser, 'genau ein Auslöser').toHaveLength(1)
+      expect(ausloeser[0]).toMatch(/\bsize-11\b/)
+      expect(ausloeser[0]).not.toMatch(/\b(?:md|lg|max-md):hidden\b|\bhidden\b/)
+      // Kein zweiter Knopf „Abmelden“ neben der Plakette mehr (vorher ab 768 px).
+      expect(html).not.toMatch(/<button\b[^>]*title="Abmelden"/)
+    }
+  })
+
+  it('oben im Menü steht, wer angemeldet ist', () => {
+    const baum = text(menue(false))
+    expect(baum).toContain(ADMIN_MEHR_TEXT.angemeldetAls)
+    expect(baum).toContain('Max Mustermann')
   })
 
   it('führt nach dem Abmelden auf /login/admin', () => {
@@ -90,8 +102,8 @@ describe('Abmelden in der AdminShell', () => {
 })
 
 describe('der Weg hinter „Abmelden" — derselbe wie in der HofShell', () => {
-  it('Knopf am Computer: signOut, dann /login/admin und neu laden', async () => {
-    await klick(AdminAbmeldenKnopf({}) as unknown as { props: Record<string, unknown> })()
+  it('Menü der Plakette: signOut, dann /login/admin und neu laden', async () => {
+    await klick(findeElement(menue(true), DropdownMenuItem))()
 
     expect(signOut).toHaveBeenCalledTimes(1)
     expect(router.push).toHaveBeenCalledWith('/login/admin')
@@ -99,16 +111,7 @@ describe('der Weg hinter „Abmelden" — derselbe wie in der HofShell', () => {
     expect(toastFehler).not.toHaveBeenCalled()
   })
 
-  it('Menü am Handy: derselbe Weg', async () => {
-    const menue = AdminKontoMenue({ anzeige: 'Max Mustermann', hatHof: true })
-
-    await klick(findeElement(menue, DropdownMenuItem))()
-
-    expect(signOut).toHaveBeenCalledTimes(1)
-    expect(router.push).toHaveBeenCalledWith('/login/admin')
-  })
-
-  it('Menü am Handy: „Konto und Sicherheit" nur mit eigenem Hof', () => {
+  it('Menü der Plakette: „Konto und Sicherheit" nur mit eigenem Hof', () => {
     expect(findeElement(AdminKontoMenue({ anzeige: 'Max Mustermann', hatHof: true }), DropdownMenuLinkItem)).not.toBeNull()
     expect(findeElement(AdminKontoMenue({ anzeige: 'Max Mustermann', hatHof: false }), DropdownMenuLinkItem)).toBeNull()
   })
@@ -116,7 +119,7 @@ describe('der Weg hinter „Abmelden" — derselbe wie in der HofShell', () => {
   it('scheitert das Abmelden, steht der Satz der HofShell da und es geht nirgends hin', async () => {
     signOut.mockResolvedValue({ error: { message: 'x' } })
 
-    await klick(AdminAbmeldenKnopf({}) as unknown as { props: Record<string, unknown> })()
+    await klick(findeElement(menue(false), DropdownMenuItem))()
 
     expect(toastFehler).toHaveBeenCalledWith(ABMELDEN_FEHLGESCHLAGEN)
     expect(router.push).not.toHaveBeenCalled()
@@ -125,7 +128,7 @@ describe('der Weg hinter „Abmelden" — derselbe wie in der HofShell', () => {
   it('in der Vorschau unter /intern gilt der Ersatz und das echte Abmelden läuft nie', async () => {
     const ersatz = vi.fn()
 
-    await klick(AdminAbmeldenKnopf({ ersatz }) as unknown as { props: Record<string, unknown> })()
+    await klick(findeElement(menue(false, ersatz), DropdownMenuItem))()
 
     expect(ersatz).toHaveBeenCalledTimes(1)
     expect(signOut).not.toHaveBeenCalled()
