@@ -129,7 +129,8 @@ export function BestellungenListe({
           symbol={ReceiptText}
           titel="Keine Bestellungen gefunden"
           satz="Zu dieser Adresse gibt es bei uns keine Bestellung. Vielleicht hast du mit einer anderen bestellt?"
-          className="border-solid py-6"
+          // Board Bild 4: die Wege über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
+          className="items-stretch border-solid py-6 [&>span]:self-center"
           ausweg={
             <div className="flex w-full flex-col gap-1">
               <Link href="/hoefe" className={KNOPF_BREIT_GRUEN}>

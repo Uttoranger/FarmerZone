@@ -1,5 +1,7 @@
 ﻿'use client'
 
+/** Der Warenkorb der Hofseite als Blatt — am Handy von unten, ab 768 px von rechts (Boards s1-/w1-korb, Nr. 227). */
+
 import type { ComponentProps } from 'react'
 import type { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
@@ -24,10 +26,8 @@ import { KORB_LEER, type CartItem } from '@/lib/use-cart'
 import { EmptyState } from '@/components/ui/empty-state'
 import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
 
-/**
- * Der Titel der Hinweiskarte nach dem Abgleich (Board s1-/w1-korb, Bild 2) — darunter der Satz, was passiert ist.
- * Nacharbeit: gehört zu KORB_LEER nach src/lib/use-cart.ts (Grenze von Nr. 227 ohne diese Datei).
- */
+// Der Titel der Hinweiskarte nach dem Abgleich (Board s1-/w1-korb, Bild 2) — darunter der Satz, was passiert ist.
+// Nacharbeit: gehört zu KORB_LEER nach src/lib/use-cart.ts (Grenze von Nr. 227 ohne diese Datei).
 export const KORB_GEAENDERT_TITEL = 'Dein Warenkorb hat sich geändert.'
 
 type Props = {
@@ -121,7 +121,8 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               symbol={ShoppingBasket}
               titel={KORB_LEER.titel}
               satz={KORB_LEER.satz}
-              className="border-solid py-6"
+              // Board Bild 3: der Ausweg über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
+              className="items-stretch border-solid py-6 [&>span]:self-center"
               ausweg={
                 <Link
                   href={`/${farmSlug}`}

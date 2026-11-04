@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { CalendarPlus, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
@@ -122,7 +121,6 @@ export function AbholKarte({
       <div className="mt-2 grid grid-cols-2 gap-2">
         {kalenderHref && (
           <a href={kalenderHref} className={cn(kalenderHaupt ? KNOPF_BREIT_GRUEN : KNOPF_BREIT_RAHMEN, 'px-2 text-[15px]')}>
-            <CalendarPlus className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
             In den Kalender
           </a>
         )}
@@ -132,7 +130,6 @@ export function AbholKarte({
           rel="noopener noreferrer"
           className={cn(KNOPF_BREIT_RAHMEN, 'px-2 text-[15px]', !kalenderHref && 'col-span-2')}
         >
-          <MapPin className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
           Route planen
         </a>
       </div>
@@ -254,31 +251,18 @@ export function BestellPositionen({
   )
 }
 
-/** Eine Zeile Aktionen unter den Karten, mittig. */
-export function Aktionen({ children }: { children: ReactNode }): React.JSX.Element {
-  return <div className="flex flex-wrap justify-center gap-2.5">{children}</div>
-}
-
-/** Link im Design der Aktionen. */
-export function AktionsLink({ href, haupt, children }: { href: string; haupt?: boolean; children: ReactNode }): React.JSX.Element {
-  return (
-    <Link href={href} className={haupt ? KNOPF_GRUEN : KNOPF_RAHMEN}>
-      {children}
-    </Link>
-  )
-}
-
 /**
- * Die eine Hauptaktion unten (Boards s1-/w1-bestaetigung): am Handy eine feste Leiste mit dem grünen Knopf über
- * die volle Breite und dem leisen Nebenweg darunter, ab 768 px unter einer Linie rechts bündig (Nebenweg, dann
- * Knopf). `data-unten-fest`: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts); die Seite
- * hält am Handy darunter Platz frei (`HAUPTAKTION_PLATZ`).
+ * Die eine Hauptaktion unten (Boards s1-/w1-bestaetigung): am Handy eine Leiste, die beim Scrollen unten klebt, mit
+ * dem grünen Knopf über die volle Breite und dem leisen Nebenweg darunter; ab 768 px unter einer Linie rechts
+ * bündig (Nebenweg, dann Knopf). Sie klebt nur innerhalb der Spalte (`sticky`, nicht `fixed`): Am Ende der Seite
+ * gibt sie den Seitenfuß frei, statt ihn zu verdecken. `data-unten-fest`: Der Cookie-Hinweis steht darüber, nie
+ * darauf (src/lib/cookie-hinweis.ts).
  */
 export function Hauptaktion({ haupt, neben }: { haupt: { href: string; text: string }; neben?: { href: string; text: string } }): React.JSX.Element {
   return (
     <div
       data-unten-fest=""
-      className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-1 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:static md:z-auto md:mt-2 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:bg-transparent md:px-0 md:pt-4 md:pb-0 print:hidden"
+      className="sticky bottom-0 z-30 -mx-4 -mb-12 mt-2 flex flex-col gap-1 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:static md:z-auto md:mx-0 md:mb-0 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:bg-transparent md:px-0 md:pt-4 md:pb-0 print:hidden"
     >
       <Link href={haupt.href} className={cn(KNOPF_BREIT_GRUEN, 'md:w-auto md:rounded-full md:px-5')}>
         {haupt.text}
@@ -295,5 +279,3 @@ export function Hauptaktion({ haupt, neben }: { haupt: { href: string; text: str
   )
 }
 
-/** Platz unter dem Inhalt am Handy, damit die feste Leiste von `Hauptaktion` nichts verdeckt. */
-export const HAUPTAKTION_PLATZ = 'max-md:pb-36'

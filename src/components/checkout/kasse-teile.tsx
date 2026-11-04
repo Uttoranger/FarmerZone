@@ -119,7 +119,9 @@ export function KassenRaster({
     // Tastatur kommt erst durch die Angaben, dann zum Knopf. Ohne
     // `uebersichtZuletzt` zeigt `order` sie am Handy direkt unter dem Korb,
     // ab 1024 px steht sie rechts.
-    <div className="mx-auto grid max-w-[1200px] gap-4 px-4 pt-4 pb-44 md:px-6 md:pt-7 md:pb-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-x-7">
+    // lg:grid-rows-[auto_1fr]: Die rechte Spalte (zwei Zeilen hoch) ist meist länger als der Korb; ohne die Regel
+    // verteilte das Raster den Überhang auf beide Zeilen, und unter dem Korb klaffte eine Lücke vor „Abholung“.
+    <div className="mx-auto grid max-w-[1200px] gap-4 px-4 pt-4 pb-44 md:px-6 md:pt-7 md:pb-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_1fr] lg:gap-x-7">
       <div className={cn(!uebersichtZuletzt && 'order-1', 'min-w-0 lg:order-none lg:col-start-1 lg:row-start-1')}>{korb}</div>
       <div className={cn(!uebersichtZuletzt && 'order-3', 'flex min-w-0 flex-col gap-4 lg:order-none lg:col-start-1 lg:row-start-2')}>
         {children}

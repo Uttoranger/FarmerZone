@@ -29,7 +29,6 @@ import {
   BestaetigungKopf,
   BestellPositionen,
   FristHinweis,
-  HAUPTAKTION_PLATZ,
   Hauptaktion,
   KARTE,
   KNOPF_BREIT_RAHMEN,
@@ -249,7 +248,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
     <KundeShellMitSitzung unterleiste={false}>
       {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
       {korbLeeren(zustand) && <ClearCartOnMount />}
-      <div className={cn(SPALTE, HAUPTAKTION_PLATZ)}>
+      <div className={SPALTE}>
         {/* Je Zustand ein klarer Kopf (Board): „Bestellung bei <Hof>“ nur als Kicker darüber. Bar offen steht der Satz
             in der Karte mit der Frist. */}
         <BestaetigungKopf kopf={kopf} kicker={`Bestellung bei ${order.farm.name}`} ohneSatz={bloecke.fristHinweis} />

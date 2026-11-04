@@ -29,7 +29,7 @@ export function BarLinkErneutSenden({ orderId, sig }: { orderId: string; sig: st
         aria-busy={laeuft}
         // Nicht `disabled` während der Anfrage: Ein deaktivierter Knopf gibt den Fokus an den Seitenanfang ab.
         // Board s1-/w1-bestaetigung Bild 3: der Knopf mit Rand über die volle Breite, in der Karte mit der Frist.
-        className={cn(KNOPF_BREIT_RAHMEN, 'mt-1 aria-busy:opacity-60')}
+        className={cn(KNOPF_BREIT_RAHMEN, 'mt-1 px-3 text-[15px] aria-busy:opacity-60')}
       >
         {laeuft && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         {laeuft ? 'Wird gesendet …' : 'Mail nicht bekommen? Erneut senden'}
