@@ -722,6 +722,15 @@ Boards s1-/w1-mehr-neu, s3-/w3-admin-shell, Köpfe und Unterleisten der s1–s3-
 - **Wache:** `tests/gebuehr-wort-wache.test.ts` — jeder Text mit „Servicegebühr“ unter `src/` und jeder Rückfall darauf (Verwendung von `SERVICEGEBUEHR_BEZEICHNUNG` oder eines festen Satzes „bisher“ außerhalb seiner Quelle, Wort-Helfer ohne Wort, Leser einer festgehaltenen Vorgabe) steht in ihrer festen Liste (mit Grund), in NACHARBEIT oder in `tests/gebuehr-wort-offen/<nr>.ts` der Nummer, der die Datei gehört. Wort-Parameter bekommen das Wort immer als Argument — die Vorgabe „bisher“ ist kein Ersatz; jede Seite mit Stichtag prüft „kein ‚Servicegebühr‘ nach dem Stichtag“ gerendert.
 - **Gründungszeit (N44):** Feld „Monate ohne Grundgebühr“ mit der Zeile „ab Freischaltung, frühestens ab Tarifstart; vor dem Festschreiben frei wählbar, danach nur mehr“; Texte sagen „ab der Freischaltung, frühestens ab Tarifstart“, nie „Anmeldung bis“.
 
+### Kundschaft: Finden (Startseite, /hoefe, Hofseite, Produktseite, /fuer-hoefe; Nr. 226, Lauf 30)
+
+Boards s1-/w1-startseite, -hoefe, -hofseite, -produkt, t-o-fuer-hoefe. Was hier steht, geht den älteren Sätzen oben vor („Entdecken“, „Kaufstrecke“, „Für Höfe“).
+
+- **Pause in Listen (V18):** Die Abholzeile eines pausierten Hofs („Macht gerade Pause – Bestellen geht bald wieder“) steht halbfett in `text-muted-foreground`, nicht in `text-status-offen` — dazu wie bisher gestrichelter Rand, Grund `background`, entsättigtes Bild.
+- **Beispiel der Startseite (V62, Board w1-startseite):** Ab „Hofpreis-Modell ab“ ein Satz statt der Rechnung („Der Hof verlangt … Du zahlst … – darin stecken 6 % Plattformgebühr. …“, `beispielRechnung(jetzt, cents, modell).satz`), ohne Fußnote; „Der Hof bekommt den vollen Preis“ sagt dann „Der Hof setzt seinen Preis selbst.“ „Wie bezahle ich?“ nimmt `WIE_BEZAHLE_ICH_HOFPREIS`. Davor bleibt die Rechnung mit der Servicegebühr.
+- **/fuer-hoefe je Modell:** Preise mit `gebuehrGrundsatz(modell, jetzt)`, Fragen über `fuerHoefeFragen(jetzt, modell)`; der Vorteil „Voller Preis für dich“ nennt keine Gebühr („Du bekommst deinen vollen Warenpreis.“). Kein Willkommens-Versprechen (Willkommenszeit offen), Tarife nur wie gebaut.
+- **„Zur Kasse“ auf der Produktseite** als Umriss (`HofseiteSeitenspalte kasseUmriss`, Rand `input`, Fläche `card`): „In den Korb · €“ ist dort die eine grüne Aktion. Auf der Hofseite bleibt „Zur Kasse“ grün.
+
 ### Infoseiten (/impressum, /konditionen, seit Nr. 54)
 
 - **/agb (seit Nr. 90, Register O4):** Rechtstext aus `src/lib/rechtstexte/agb.ts` (Wort für Wort `docs/recht/agb.md`, der Test `agb-text` vergleicht jede Zeile), Verzeichnis mit Sprüngen, Stand-Vermerk („Entwurf“ bis Fassung 1.0), Druckknopf (`print:hidden` für Kopf, Knopf und Verzeichnis); Sätze der Einbindung (Registrierung, Kasse, Mail, Fußzeile, /hoefe) aus `src/lib/rechtstexte/agb-einbindung.ts`. Rechtstext ist von den Textwachen ausgenommen (Wortliste, Fachwort, „Problem melden“).
