@@ -10,12 +10,12 @@ export interface PasswordResetProps {
 
 export function PasswordResetEmail({ resetUrl }: PasswordResetProps) {
   return (
-    <EmailLayout previewText={`Passwort zurücksetzen — Link gültig ${PASSWORT_LINK_DAUER_TEXT}`}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`Passwort zurücksetzen — Link gültig ${PASSWORT_LINK_DAUER_TEXT}`}>
       <Text style={h1}>Passwort zurücksetzen</Text>
       <Text style={bodyText}>
         Hallo,
         <br />
-        {`du möchtest das Passwort für dein ${MARKE}-Konto zurücksetzen. Klicke auf den Button unten und wähle ein neues Passwort.`}
+        {`du möchtest das Passwort für dein ${MARKE}-Konto zurücksetzen. Tipp auf den Knopf unten und wähle ein neues Passwort.`}
       </Text>
 
       <div style={{ textAlign: 'center' as const, margin: '28px 0' }}>

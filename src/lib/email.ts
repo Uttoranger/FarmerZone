@@ -8,7 +8,7 @@ import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
-import { istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { gebuehrHinweisFuer, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
@@ -27,7 +27,7 @@ import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
-import { hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
+import { hofEmailFehlt, hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
 import { belehrungHof, belehrungMitHof, belehrungMitKostenschaetzung, type Belehrung } from '@/lib/widerruf'
 import { ruecksendekostenSchaetzungEuro } from '@/lib/ruecktritt-angaben'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
@@ -139,6 +139,8 @@ export type MailOptionen = {
   headers?: Record<string, string>
   /** Dateien im Anhang (Nr. 207: die AGB) — nie Text der Kundin. */
   anhaenge?: readonly MailAnhang[]
+  /** „Antwort an“ (V86): nur die Hof-E-Mail aus dem Profil, nur bei Bestellmails an die Kundin — siehe `antwortAnHof`. */
+  antwortAn?: string
 }
 
 /**
@@ -263,6 +265,7 @@ export async function sendRaw(to: string, subject: string, html: string, optione
       subject,
       html,
       ...(optionen.headers ? { headers: optionen.headers } : {}),
+      ...(optionen.antwortAn ? { replyTo: optionen.antwortAn } : {}),
       ...(attachments ? { attachments } : {}),
     })
     if (result.error) {
@@ -283,8 +286,12 @@ export async function sendRaw(to: string, subject: string, html: string, optione
   return ergebnis
 }
 
-/** Eine fertige Mail für den Stapelversand des Workers — die Adresse lebt nur im Speicher, nie in der Tabelle. */
-export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string>; anhaenge?: readonly MailAnhang[] }
+/**
+ * Eine fertige Mail für den Stapelversand des Workers — die Adresse lebt nur im
+ * Speicher, nie in der Tabelle. `antwortAn` (V86) baut der Renderer beim
+ * Versand frisch aus dem Hof der Bestellung; auch sie steht nie im Auftrag.
+ */
+export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string>; anhaenge?: readonly MailAnhang[]; antwortAn?: string }
 
 /** Trägt die Mail einen Anhang? Dann geht sie nie im Stapel (Resend nimmt Anhänge nur einzeln), sondern allein. */
 export function hatAnhang(mail: Pick<StapelMail, 'anhaenge'>): boolean {
@@ -301,7 +308,8 @@ export type StapelErgebnis = { ok: true; ids: string[] } | { ok: false; statusCo
  * Bis zu 100 Mails in EINER Anfrage an Resend (`batch.send`, Nr. 158) — nur
  * für den Worker der Warteschlange, der vorher die Post-Sperre über
  * `postSperreLaesstDurch` geprüft hat. `batch.send` nimmt je Mail dieselben
- * Felder wie `emails.send` ohne Anhänge und ohne Termin, also auch `headers`;
+ * Felder wie `emails.send` ohne Anhänge und ohne Termin, also auch `headers`
+ * und `replyTo`;
  * der Idempotenz-Schlüssel gilt für die ganze Anfrage. Strikte Prüfung (alles
  * oder nichts): So gehört die n-te ID sicher zur n-ten Mail. Gezählt werden
  * die angenommenen Mails in EINEM Schritt. Wirft nie.
@@ -317,7 +325,14 @@ export async function versendeStapel(mails: readonly StapelMail[], idempotenzSch
   try {
     const resend = await resendClient(apiKey)
     const result = await resend.batch.send(
-      mails.map((m) => ({ from: FROM, to: m.an, subject: m.betreff, html: m.html, ...(m.headers ? { headers: m.headers } : {}) })),
+      mails.map((m) => ({
+        from: FROM,
+        to: m.an,
+        subject: m.betreff,
+        html: m.html,
+        ...(m.headers ? { headers: m.headers } : {}),
+        ...(m.antwortAn ? { replyTo: m.antwortAn } : {}),
+      })),
       { idempotencyKey: idempotenzSchluessel }
     )
     if (result.error) {
@@ -347,6 +362,7 @@ async function versendeMitAnhang(mails: readonly StapelMail[], idempotenzSchlues
         subject: m.betreff,
         html: m.html,
         ...(m.headers ? { headers: m.headers } : {}),
+        ...(m.antwortAn ? { replyTo: m.antwortAn } : {}),
         attachments: alsResendAnhaenge(m.anhaenge),
       },
       { idempotencyKey: idempotenzSchluessel }
@@ -517,13 +533,33 @@ function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: num
 }
 
 /**
- * Die Gebühr in den Kunden-Mails: im Modell `bisher` eine eigene Zeile
- * „Servicegebühr“ (`serviceFee`), im Hofpreis-Modell keine Zeile — sie steckt
- * in den Endpreisen, der Satz darunter nennt sie (`plattformgebuehr`).
+ * Die Gebühr in den Kunden-Mails: im Modell `bisher` eine eigene Zeile mit dem
+ * Wort und dem Erklärsatz der Bestellung (`gebuehrZeile`), im Hofpreis-Modell
+ * keine Zeile — sie steckt in den Endpreisen, der Satz darunter nennt sie
+ * (`plattformgebuehr`).
  */
-function kundenGebuehr(order: OrderForEmail): { serviceFee: number; plattformgebuehr: number } {
+function kundenGebuehr(order: OrderForEmail): { gebuehrZeile?: { wort: string; betrag: number; hinweis: string }; plattformgebuehr: number } {
   const { gebuehr } = betraege(order)
-  return imHofpreis(order) ? { serviceFee: 0, plattformgebuehr: gebuehr } : { serviceFee: gebuehr, plattformgebuehr: 0 }
+  if (imHofpreis(order)) return { plattformgebuehr: gebuehr }
+  return { gebuehrZeile: { wort: gebuehrWort(order), betrag: gebuehr, hinweis: gebuehrHinweisFuer({ gebuehrModell: order.gebuehrModell ?? null }) }, plattformgebuehr: 0 }
+}
+
+/**
+ * „Antwort an“ in den Bestellmails an die Kundin (V86): nur die Hof-E-Mail aus
+ * dem Profil, nur wenn sie gesetzt ist — sonst keine, und die Antwort landet
+ * wie bisher bei der Absenderadresse. Nie die Anmelde-Adresse und nie
+ * hofKontaktEmail: Die fällt auf die Anmelde-Adresse zurück, und die sähe die
+ * Kundin sonst beim Antworten (Kopfkommentar von src/lib/hof-kontakt.ts).
+ * Nur die Adresse, ohne Namen davor: Der Hofname ist Fremdtext.
+ */
+function antwortAnHof(farm: { email: string }): string | undefined {
+  return hofEmailFehlt(farm) ? undefined : farm.email.trim()
+}
+
+/** `antwortAn` für eine Bestellmail an die Kundin — ohne Hof-E-Mail fehlt das Feld ganz. */
+function mitAntwortAn(farm: { email: string }): { antwortAn?: string } {
+  const adresse = antwortAnHof(farm)
+  return adresse ? { antwortAn: adresse } : {}
 }
 
 /** Das Wort für die Gebühr in den Hof-Mails (N8): „Plattformgebühr“ im Hofpreis-Modell, sonst „Servicegebühr“. */
@@ -999,6 +1035,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
     html,
     anhaenge: [await agbAnhang()],
+    ...mitAntwortAn(order.farm),
   }
 }
 
@@ -1046,7 +1083,13 @@ export async function onsiteConfirmationInhalt(
   }))
 
   // Nr. 207: die AGB als Datei im Anhang, wie in der Bestätigung.
-  return { an: order.customerEmail, betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`, html, anhaenge: [await agbAnhang()] }
+  return {
+    an: order.customerEmail,
+    betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`,
+    html,
+    anhaenge: [await agbAnhang()],
+    ...mitAntwortAn(order.farm),
+  }
 }
 
 /**
@@ -1066,7 +1109,14 @@ export async function sendOnsiteConfirmation(
     farmId: order.farm.id,
     ...(protokoll.nochmalVon ? { nochmalVon: protokoll.nochmalVon } : {}),
     ...(mail.anhaenge ? { anhaenge: mail.anhaenge } : {}),
+    ...(mail.antwortAn ? { antwortAn: mail.antwortAn } : {}),
   })
+}
+
+/** „Bei Heute ansehen →“ in den Hof-Mails: die Startseite des Hofbereichs (Wortliste N42 c), dieselbe Adresse wie in der Navigation. */
+async function heuteUrl(): Promise<string> {
+  const { hauptPunktHref } = await import('@/lib/bauern-navigation')
+  return `${APP_URL}${hauptPunktHref('heute')}`
 }
 
 /** Online-Zahlung → Bauer */
@@ -1087,16 +1137,15 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     customerTotal: betraege(order).gesamt,
     paymentLabel: 'Online (bereits bezahlt)',
     isOnline: true,
-    dashboardUrl: `${APP_URL}/orders`,
+    heuteUrl: await heuteUrl(),
   }))
 
   return { an: hofKontaktEmail(order.farm), betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
 }
 
-/** Vor-Ort bestätigt → Bauer */
+/** Bar bestätigt → Bauer (alte Bestellungen mit Karte bei Abholung, E5, gehen denselben Weg) */
 export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promise<StapelMail> {
-  const paymentLabel =
-    order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
+  const bar = order.paymentMethod === 'ONSITE_CASH'
 
   const { OrderConfirmedEmail } = await import('@/emails/order-confirmed')
   const html = await toHtml(React.createElement(OrderConfirmedEmail, {
@@ -1120,12 +1169,14 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
       : order.paymentMethod === 'ONSITE_CASH' && order.createdAt
         ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt)
         : false,
-    dashboardUrl: `${APP_URL}/orders`,
+    zahlart: bar ? 'bar' : 'karte',
+    heuteUrl: await heuteUrl(),
   }))
 
+  // Wortliste (N42 c, V57): „Bar-Bestellung bestätigt“ wie am Bildschirm, nie „Vor-Ort-Bestellung“.
   return {
     an: hofKontaktEmail(order.farm),
-    betreff: `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
+    betreff: bar ? `Bar-Bestellung ${order.orderNumber} bestätigt` : `Bestellung ${order.orderNumber} bestätigt (Karte bei Abholung)`,
     html,
   }
 }
@@ -1151,7 +1202,7 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`, html }
+  return { an: order.customerEmail, betreff: `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`, html, ...mitAntwortAn(order.farm) }
 }
 
 /** Fertig-Rückschritt → Kunde (optional, Haken im Dialog): neutrales Update,
@@ -1170,7 +1221,7 @@ export async function baueOrderNotReady(order: OrderForEmail): Promise<StapelMai
     widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `Kurzes Update zu deiner Bestellung ${order.orderNumber}`, html }
+  return { an: order.customerEmail, betreff: `Kurzes Update zu deiner Bestellung ${order.orderNumber}`, html, ...mitAntwortAn(order.farm) }
 }
 
 /** Was eine Beitragsmail braucht — gemeinsam für den Versand heute und den Renderer der Warteschlange (Nr. 158). */
@@ -1233,7 +1284,7 @@ export async function baueOrderCancelled(
     cancelReason: cancelReason ?? undefined,
   }))
 
-  return { an: order.customerEmail, betreff: `Deine Bestellung ${order.orderNumber} wurde storniert`, html }
+  return { an: order.customerEmail, betreff: `Deine Bestellung ${order.orderNumber} wurde storniert`, html, ...mitAntwortAn(order.farm) }
 }
 
 /**
@@ -1269,13 +1320,13 @@ export async function baueArtikelFehlt(
     widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html }
+  return { an: order.customerEmail, betreff: `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html, ...mitAntwortAn(order.farm) }
 }
 
 /** Zahlung nach dem Storno eingegangen und sofort voll erstattet → Kunde */
 export async function baueZahlungZuSpaet(
   order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
-    farm: Pick<OrderForEmail['farm'], 'name'>
+    farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
   },
   erstattetCents: number
 ): Promise<StapelMail> {
@@ -1288,13 +1339,13 @@ export async function baueZahlungZuSpaet(
     supportEmail: SUPPORT_EMAIL,
   }))
 
-  return { an: order.customerEmail, betreff: 'Deine Zahlung kam zu spät – das Geld ist zurück', html }
+  return { an: order.customerEmail, betreff: 'Deine Zahlung kam zu spät – das Geld ist zurück', html, ...mitAntwortAn(order.farm) }
 }
 
-/** Vor-Ort-Bestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
+/** Barbestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
 export async function baueBestellungVerfallen(
   order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
-    farm: Pick<OrderForEmail['farm'], 'name'>
+    farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
   }
 ): Promise<StapelMail> {
   const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
@@ -1304,7 +1355,7 @@ export async function baueBestellungVerfallen(
     farmName: order.farm.name,
   }))
 
-  return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html }
+  return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html, ...mitAntwortAn(order.farm) }
 }
 
 /**
@@ -1437,7 +1488,7 @@ export async function sendWiderrufEingang(
 ): Promise<VersandErgebnis> {
   const vorlage = await htmlOderFehler(async () => {
     const { WiderrufEingangEmail } = await import('@/emails/widerruf')
-    return React.createElement(WiderrufEingangEmail, { ...daten, marke: MARKE })
+    return React.createElement(WiderrufEingangEmail, daten)
   })
   if (!vorlage.ok) return { error: vorlage.error }
   return sendRaw(an, WIDERRUF_EINGANG_BETREFF, vorlage.html, { art: 'widerruf-eingang', ...protokoll })
@@ -1448,10 +1499,10 @@ const WIDERRUF_EINGANG_BETREFF = `Dein Widerruf ist eingegangen · ${MARKE}`
 /** Dieselbe Mail nur gebaut — für die Vorschau in Admin › Betrieb (Nr. 167) und das Bild der Abnahme. */
 export async function widerrufEingangInhalt(an: string, daten: WiderrufEingangDaten): Promise<StapelMail> {
   const { WiderrufEingangEmail } = await import('@/emails/widerruf')
-  return { an, betreff: WIDERRUF_EINGANG_BETREFF, html: await toHtml(React.createElement(WiderrufEingangEmail, { ...daten, marke: MARKE })) }
+  return { an, betreff: WIDERRUF_EINGANG_BETREFF, html: await toHtml(React.createElement(WiderrufEingangEmail, daten)) }
 }
 
-/** Widerruf nach der Abholung → Hof (Wichtig): prüfen, erstatten oder mit Grund ablehnen. */
+/** Rücktritt nach der Abholung → Hof (Wichtig): prüfen, erstatten oder mit Grund ablehnen. Wortlaut „Rücktritt“ (N43). */
 export async function baueWiderrufHof(
   an: string,
   daten: { bestellnummer: string; umfang: string[]; eingegangenAm: string; bestellungPfad: string; ausnahmeSatz: string }
@@ -1466,15 +1517,27 @@ export async function baueWiderrufHof(
       ausnahmeSatz: daten.ausnahmeSatz,
     })
   )
-  return { an, betreff: `Widerruf zu Bestellung ${daten.bestellnummer}`, html }
+  return { an, betreff: `Rücktritt zu Bestellung ${daten.bestellnummer}`, html }
 }
 
-/** Ergebnis → Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder abgelehnt (Grund des Hofs). */
+/**
+ * Ergebnis → Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder
+ * abgelehnt (Grund des Hofs). Eine Bestellmail an die Kundin: „Antwort an“
+ * den Hof der Bestellung (V86), über `hof` aus dem Renderer.
+ */
 export async function baueWiderrufErgebnis(
   an: string,
-  daten: { bestellnummer: string; hofName: string; erstattetCents: number | null; grund: string | null; vorAbholung?: boolean; teilweise?: boolean }
+  daten: {
+    bestellnummer: string
+    hofName: string
+    erstattetCents: number | null
+    grund: string | null
+    vorAbholung?: boolean
+    teilweise?: boolean
+    hof: { email: string }
+  }
 ): Promise<StapelMail> {
-  const { WiderrufErgebnisEmail } = await import('@/emails/widerruf')
+  const { WiderrufErgebnisEmail, WIDERRUF_ERGEBNIS_TITEL } = await import('@/emails/widerruf')
   const html = await toHtml(
     React.createElement(WiderrufErgebnisEmail, {
       bestellnummer: daten.bestellnummer,
@@ -1485,11 +1548,11 @@ export async function baueWiderrufErgebnis(
       teilweise: daten.teilweise === true,
     })
   )
-  const betreff =
+  const titel =
     daten.grund !== null
-      ? `Dein Widerruf wurde abgelehnt · ${daten.bestellnummer}`
+      ? WIDERRUF_ERGEBNIS_TITEL.abgelehnt
       : daten.teilweise === true
-        ? `Dein Widerruf ist zum Teil erledigt · ${daten.bestellnummer}`
-        : `Dein Widerruf ist erledigt · ${daten.bestellnummer}`
-  return { an, betreff, html }
+        ? WIDERRUF_ERGEBNIS_TITEL.teilweise
+        : WIDERRUF_ERGEBNIS_TITEL.erledigt
+  return { an, betreff: `${titel} · ${daten.bestellnummer}`, html, ...mitAntwortAn(daten.hof) }
 }

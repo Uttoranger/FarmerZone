@@ -46,7 +46,7 @@ export function AdminSicherheitEmail({ anlass, geraet, wann, code }: AdminSicher
   const betreff = text.betreff[anlass]
   if (anlass === 'einrichtungscode') {
     return (
-      <EmailLayout previewText={betreff}>
+      <EmailLayout fuss={{ art: 'agrilo' }} previewText={betreff}>
         <Text style={h1}>{betreff}</Text>
         <Text style={bodyText}>
           {text.anrede}
@@ -63,7 +63,7 @@ export function AdminSicherheitEmail({ anlass, geraet, wann, code }: AdminSicher
     )
   }
   return (
-    <EmailLayout previewText={`${betreff} · ${geraet}`}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`${betreff} · ${geraet}`}>
       <Text style={h1}>{betreff}</Text>
       <Text style={bodyText}>
         {text.anrede}

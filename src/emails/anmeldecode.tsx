@@ -63,7 +63,7 @@ const codeText: React.CSSProperties = {
 export function AnmeldecodeEmail({ code, minuten, zweck = 'anmelden' }: AnmeldecodeProps) {
   const text = TEXTE[zweck]
   return (
-    <EmailLayout previewText={`${text.kurztext} – ${minuten} Minuten gültig`}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`${text.kurztext} – ${minuten} Minuten gültig`}>
       <Text style={h1}>{text.titel}</Text>
       <Text style={bodyText}>
         Hallo,

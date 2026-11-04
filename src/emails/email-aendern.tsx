@@ -19,7 +19,7 @@ const knopfOrange: React.CSSProperties = {
 export function EmailAendernEmail({ hof, link }: { hof: string | null; link: string }): React.JSX.Element {
   const t = EMAIL_AENDERN_MAIL
   return (
-    <EmailLayout previewText={t.betreff}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={t.betreff}>
       <Text style={h1}>{t.betreff}</Text>
       <Text style={bodyText}>
         {t.anrede(hof)}
@@ -42,7 +42,7 @@ export function EmailAendernEmail({ hof, link }: { hof: string | null; link: str
 export function EmailGeaendertEmail({ hof, wann, link }: { hof: string | null; wann: string; link: string }): React.JSX.Element {
   const t = EMAIL_GEAENDERT_MAIL
   return (
-    <EmailLayout previewText={t.betreff}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={t.betreff}>
       <Text style={h1}>{t.betreff}</Text>
       <Text style={bodyText}>
         {t.anrede(hof)}

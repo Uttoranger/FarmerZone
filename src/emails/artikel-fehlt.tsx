@@ -52,7 +52,7 @@ export interface ArtikelFehltProps {
 export function ArtikelFehltEmail(p: ArtikelFehltProps) {
   const anrufen = telefonLink(p.farmPhone)
   return (
-    <EmailLayout previewText={`Ein Artikel fehlt in deiner Bestellung ${p.orderNumber}`}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Ein Artikel fehlt in deiner Bestellung ${p.orderNumber}`}>
       <Text style={h1}>Ein Artikel fehlt</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />

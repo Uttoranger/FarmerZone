@@ -468,7 +468,7 @@ Boards s1-/w1-mehr-neu, s3-/w3-admin-shell, Köpfe und Unterleisten der s1–s3-
 - **Tage in Mails immer fest:** Wochentag, Datum, Uhrzeit in Wiener Zeit (`zeitpunktFuerMail`, `formatPickupDate`) — nie „heute"/„morgen", denn eine Mail wird später gelesen als verschickt. Relative Helfer (`tagInWorten`, `abholZeitText`) nur auf Seiten, die beim Lesen rechnen; `tests/mail-vorlagen.test.ts` prüft beides.
 - **Bestätigung folgt der Zahlart:** online „Online bezahlt", bar „Bar bei Abholung" + „Bring bitte € … in bar mit.", alte Karte-Bestellungen „Karte bei Abholung".
 - Keine Webfonts laden; Schriftstapel mit Fraunces/Instrument Sans zuerst, dann Systemschriften.
-- **Der Fuß nennt den Absender:** Ohne Angabe schreibt `EmailLayout` „Versandt von `MARKE` im Auftrag eines Hofes." (Mails im Namen eines Hofs). Mails des Teams übergeben ihren Satz über `fusszeile` — das Postfach `POSTFACH_MAIL_TEXT.fuss` (seit Nr. 87, Runde 1; `tests/postfach-mail.test.ts`).
+- **Der Fuß nennt den Absender:** seit Nr. 232 als Fuß-Art je Vorlage, siehe „E-Mails: Fuß, Anbieterzeile, Antwort an“.
 
 ### Anmelden
 
@@ -713,6 +713,15 @@ Boards s1-/w1-mehr-neu, s3-/w3-admin-shell, Köpfe und Unterleisten der s1–s3-
 - **Gestalt:** Stern (lucide `Star`) als Schmuck mit `aria-hidden`, Farbe `text-status-offen`; der hervorgehobene Teil fett in `text-foreground`. Auf dem Verlauf des Für-Höfe-Bands steht der ganze Satz in `text-foreground` (die leise Schrift erreichte dort hell nur 4,4:1); Pill und Preiszeile auf `primary/14` bzw. `/10` mit Rand `primary/50` bzw. `/45`.
 - **Ein oranger Knopf:** Mit `zeigen` heißt der orange Knopf im Kopf von /fuer-hoefe `GRUENDUNG_TEXT.knopf`, darunter die Fußnote statt des Übergangs (den nennt der Abschnitt Preise); ohne `zeigen` wieder „Kostenlos starten" und der Übergang. Auf der Startseite kommt kein Knopf dazu.
 - **Nach der Freischaltung** keine Karte im Hofbereich, sondern EINE Nachricht vom Team im Postfach (Art SYSTEM, `GRUENDUNGS_NACHRICHT`, Link „Deine Konditionen") — sie steht als Postfach-Karte auf Heute und verschwindet mit „Gelesen".
+
+### E-Mails: Fuß, Anbieterzeile, Antwort an (V68, V78, V79, V86, V87; Register N42 c, N43; seit Nr. 232)
+
+- **Fuß-Art je Vorlage (Pflicht-Prop `fuss` von `EmailLayout`, Sätze in `MAIL_FUSS_TEXT`):** `hof` „Versandt von Agrilo im Auftrag eines Hofes.“ nur für Bestellmails an die Kundin (auch Verfallen, Zahlung zu spät, Ergebnis eines Rücktritts); `agrilo` „Versandt von Agrilo.“ für Konto, Code, Passwort, Sicherheit, Freischaltung, Lastschrift, Team, Eingangsbestätigung des Rücktritts und alle Mails an den Hof; `betrieb` „Betriebs-Mail von Agrilo.“ für alle Mails an das Team; `postfach` „Versandt vom Agrilo-Team.“; `beitrag` „Im Auftrag von <Hofname> · versandt von Agrilo“ (ohne Anschrift — Recht prüft). Die Liste je Datei steht in `tests/mail-vorschau.test.ts`.
+- **Anbieterzeile** (`Anbieterzeile`): „Agrilo · agrilo.at/impressum“ als Link auf die echte Seite, unter jedem Fuß außer `betrieb`. Keine Betreiberdaten in Mails (A001).
+- **Verwalten-Link:** in Beitrags-Mails „Neuigkeiten verwalten“, sonst „Benachrichtigungen verwalten“; Abmelde-Link, `manageUrl` und List-Unsubscribe/-Post bleiben.
+- **Knöpfe:** `ctaButton` 13 px 18 px Abstand, Zeilenhöhe 16 px, 1 px Rand = 44 px; `Knopf` und alle eigenen Knöpfe (orange Warnknöpfe) leiten sich davon ab.
+- **Antwort an:** nur Bestellmails an die Kundin, nur mit Hof-E-Mail aus dem Profil, nie die Anmelde-Adresse (`antwortAnHof` in `src/lib/email.ts`).
+- **Vorschau:** `MAIL_VORSCHAU=1 pnpm vitest run tests/mail-vorschau.test.ts` → `.nachtlauf/mails/<name>.html`, Bilder bei 390 und 600 px, nur hell.
 
 ### Gebühren-Wort je Modell (V62, V63; Register N38, N44; seit Nr. 221)
 

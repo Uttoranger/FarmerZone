@@ -14,7 +14,7 @@ export interface PlattformgebuehrAnkuendigungProps {
 /** Vier Wochen vor dem Einzugsbeginn (Register N38, Nr. 198): ab wann, Satz, Mandat nötig ja/nein. */
 export function PlattformgebuehrAnkuendigungEmail({ text, datum, lastschriftUrl, knopf }: PlattformgebuehrAnkuendigungProps) {
   return (
-    <EmailLayout previewText={`Plattformgebühr ab ${datum}`}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`Plattformgebühr ab ${datum}`}>
       <Text style={h1}>Plattformgebühr ab {datum}</Text>
       <Text style={bodyText}>{text}</Text>
       <Link href={lastschriftUrl} style={ctaButton}>

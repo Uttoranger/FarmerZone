@@ -6,7 +6,7 @@ import { beitragLink } from '@/lib/teilen-fenster'
 import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
 
 // Farben aus der Mail-Palette (_layout.tsx): Grün für Frisches und Saison,
-// Orange für Aktionen, neutral für Mitteilungen — Schrift und Fläche je Anlass.
+// Orange für Aktionen, neutral für Hinweise — Schrift und Fläche je Anlass.
 const ANLASS_FARBE: Record<BeitragAnlass, { schrift: string; flaeche: string }> = {
   FRESH_PRODUCT: { schrift: MAIL_FARBE.gruen, flaeche: MAIL_FARBE.gruenFlaeche },
   NEW_SEASON: { schrift: MAIL_FARBE.gruen, flaeche: MAIL_FARBE.gruenFlaeche },
@@ -44,13 +44,13 @@ export function StatusUpdateEmail({
 }: StatusUpdateEmailProps) {
   const hofUrl = `${appUrl}/${farmSlug}`
   const farmUrl = beitragId ? beitragLink(hofUrl, beitragId) : hofUrl
-  // Die Mail nimmt den Anlass als Text (opts.anlass in lib/email.ts); ein unbekannter gilt als Mitteilung.
+  // Die Mail nimmt den Anlass als Text (opts.anlass in lib/email.ts); ein unbekannter gilt als Hinweis.
   const anlassArt: BeitragAnlass = BEITRAG_ANLAESSE.find((a) => a === anlass) ?? 'ANNOUNCEMENT'
   const anlassLabel = BEITRAG_ANLASS[anlassArt].wort
   const anlassFarbe = ANLASS_FARBE[anlassArt]
 
   return (
-    <EmailLayout
+    <EmailLayout fuss={{ art: 'beitrag', hof: farmName }}
       previewText={`${farmName}: ${title}`}
       manageUrl={unsubscribeUrl}
     >
@@ -97,13 +97,13 @@ export function StatusUpdateEmail({
       {/* CTA */}
       <div style={{ textAlign: 'center', margin: '24px 0 8px' }}>
         <Link href={farmUrl} style={ctaButton}>
-          Mehr ansehen beim {farmName}
+          {`Zu ${farmName}`}
         </Link>
       </div>
 
       {/* Unsubscribe */}
       <Text style={{ color: MAIL_FARBE.textLeise, fontSize: '11px', textAlign: 'center', marginTop: '16px' }}>
-        Du erhältst diese E-Mail, weil du E-Mail-Updates für {farmName} aktiviert hast.{' '}
+        {`Du bekommst diese E-Mail, weil du Neuigkeiten von ${farmName} per E-Mail bestellt hast. `}
         <Link href={unsubscribeUrl} style={{ color: MAIL_FARBE.textLeise }}>
           Abmelden
         </Link>

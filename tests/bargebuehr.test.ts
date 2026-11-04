@@ -517,7 +517,7 @@ describe('Texte — ehrlich, aus einer Quelle', () => {
   })
 })
 
-describe('Mail „Vor-Ort-Bestellung bestätigt" an den Hof', () => {
+describe('Mail „Bar-Bestellung bestätigt" an den Hof', () => {
   const GRUND = {
     farmerName: 'Franz',
     customerName: 'Anna',
@@ -527,7 +527,7 @@ describe('Mail „Vor-Ort-Bestellung bestätigt" an den Hof', () => {
     pickupTime: '09:00–12:00',
     items: [{ name: 'Eier', quantity: 1 }],
     total: 10.3,
-    dashboardUrl: 'http://localhost:3000/orders',
+    heuteUrl: 'http://localhost:3000/dashboard',
   }
   const text = (props: Partial<Parameters<typeof OrderConfirmedEmail>[0]>): string =>
     normal(

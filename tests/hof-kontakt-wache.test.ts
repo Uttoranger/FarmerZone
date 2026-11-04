@@ -31,6 +31,7 @@ const BESTAND: Record<string, { stellen: number; grund: string }> = {
   'src/lib/hofseite-fortschritt.ts': { stellen: 1, grund: 'Fortschritt der Hofseite: zählt, ob Kundinnen eine Hof-E-Mail sehen' },
   'src/components/settings/profile-form.tsx': { stellen: 1, grund: 'Startwert des Profil-Formulars: der Hof bearbeitet das Feld selbst' },
   'src/app/api/checkout/route.ts': { stellen: 1, grund: 'Bar-Bestätigungslink an die Kundin: das Feld reist nur mit, die Mail an die Kundin liest es nicht' },
+  'src/lib/email.ts': { stellen: 1, grund: '„Antwort an“ in den Bestellmails an die Kundin (V86, antwortAnHof, Nr. 232): nur das Profilfeld, ohne Hof-E-Mail keine Antwortadresse, nie die Anmelde-Adresse' },
 }
 
 function* quelldateien(ordner: string): Generator<string> {

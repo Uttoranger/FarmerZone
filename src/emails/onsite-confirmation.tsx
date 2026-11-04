@@ -13,7 +13,6 @@ import {
   MAIL_FARBE,
   textLink,
 } from './_layout'
-import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
@@ -30,18 +29,23 @@ export interface OnsiteConfirmationProps {
   pickupTime: string
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
   items: Array<{ name: string; betrag: number }>
-  /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
-  serviceFee?: number
+  /**
+   * Die Gebührenzeile im Modell „bisher“ (N38): Wort und Erklärsatz der
+   * Bestellung (gebuehrWort, gebuehrHinweisFuer in src/lib/email.ts) und der
+   * Betrag in Euro aus dem Snapshot. Fehlt sie, gibt es keine Zeile — im
+   * Hofpreis-Modell steckt die Gebühr in den Preisen (`plattformgebuehr`).
+   */
+  gebuehrZeile?: { wort: string; betrag: number; hinweis: string }
   /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
   plattformgebuehr?: number
-  /** Was die Kundin vor Ort bezahlt: Warenpreis + Servicegebühr. */
+  /** Was die Kundin vor Ort bezahlt: Warenpreis + Gebühr. */
   total: number
   /** Zur Seite mit dem Knopf (/{hof}/bestaetigen/{token}) — der Link selbst bestätigt nichts. */
   confirmationUrl: string
   /**
    * „Montag, 5. Oktober, 12:12 Uhr" — die Frist aus fristen.ts (fristVon) als
    * fester Tag (zeitpunktFuerMail), wenn der Bestellzeitpunkt bekannt ist.
-   * Fehlt sie, bleibt der allgemeine Satz.
+   * Fehlt sie, bleibt ein Satz ohne Dauer (V87: keine zweite, unvollständige Frist).
    */
   bestaetigenBis?: string
   /** Die Belehrung nach Anhang I FAGG mit den Angaben des Hofs (Nr. 207) — nur bei Verbraucherinnen. */
@@ -58,10 +62,10 @@ export interface OnsiteConfirmationProps {
  * Hauptaktion ist der Knopf zur Bestätigungsseite (H3).
  */
 export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
-  const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const gebuehr = p.gebuehrZeile && p.gebuehrZeile.betrag > 0 ? p.gebuehrZeile : null
 
   return (
-    <EmailLayout previewText={`Bestellung bei ${p.farmName} bestätigen – Abholung ${p.pickupDate}`}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Bestellung bei ${p.farmName} bestätigen – Abholung ${p.pickupDate}`}>
       <Text style={h1}>Bitte bestätige deine Bestellung</Text>
       <Text style={bodyText}>
         {`Du hast bei ${p.farmName} bestellt. Erst mit deiner Bestätigung packt der Hof deine Sachen.`}
@@ -89,20 +93,18 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
-      {mitGebuehr && <BetragsZeile links={SERVICEGEBUEHR_BEZEICHNUNG} rechts={formatEuro(p.serviceFee ?? 0)} />}
+      {gebuehr && <BetragsZeile links={gebuehr.wort} rechts={formatEuro(gebuehr.betrag)} />}
       <BetragsZeile stark links="Bar bei Abholung" rechts={formatEuro(p.total)} />
 
-      {mitGebuehr && (
-        <Text style={{ ...kleinText, marginTop: '12px' }}>
-          {SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}
-        </Text>
-      )}
+      {gebuehr && <Text style={{ ...kleinText, marginTop: '12px' }}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
       {(p.plattformgebuehr ?? 0) > 0 && (
         <Text style={{ ...kleinText, marginTop: '12px' }}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>
       )}
+      {/* V87: Die Frist steht oben mit Tag und Uhrzeit (fristVon). Ein zweiter Satz mit einer Dauer nannte sie doppelt und unvollständig. */}
       <Text style={{ ...kleinText, marginTop: '12px' }}>
-        Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.
-        Bitte bestätige bald: Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei.
+        {p.bestaetigenBis
+          ? 'Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.'
+          : 'Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach. Bitte bestätige bald – sonst geben wir die Ware wieder frei.'}
       </Text>
       {/* Nr. 207: Die AGB hängen auch dieser Mail als Datei an — derselbe Satz wie in der Bestätigung (Register O4). */}
       <Text style={kleinText}>

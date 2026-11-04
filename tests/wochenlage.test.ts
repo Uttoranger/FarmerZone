@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/prisma', () => ({ prisma: {} }))
 
-import { servicegebuehrDerWoche, wochenlageZeilen, type WochenlageZahlen } from '@/lib/wochenlage'
+import { servicegebuehrDerWoche, wochenlageGebuehrWort, wochenlageZeilen, type WochenlageZahlen } from '@/lib/wochenlage'
 import type { BestellungFuerFinanzen } from '@/lib/finanzen'
 
 const TAG = new Date('2026-10-22T09:00:00.000Z')
@@ -70,7 +70,7 @@ describe('servicegebuehrDerWoche', () => {
 })
 
 describe('wochenlageZeilen', () => {
-  const text = (z: WochenlageZahlen) => wochenlageZeilen(z).map((r) => `${r.label}: ${r.wert}`)
+  const text = (z: WochenlageZahlen, wort = 'Servicegebühr') => wochenlageZeilen(z, wort).map((r) => `${r.label}: ${r.wert}`)
 
   it('nennt Bestellungen, Umsatz, Servicegebühr, neue Höfe, Aufgaben, Fehler und Kosten', () => {
     const zeilen = text(ZAHLEN)
@@ -100,5 +100,29 @@ describe('wochenlageZeilen', () => {
     expect(zeilen).toHaveLength(7)
     expect(zeilen[0]).toBe('Bestellungen: 0')
     expect(zeilen[1]).toBe('Umsatz der Höfe: € 0,00')
+  })
+
+  it('die Gebührenzeile trägt das Wort, das sie bekommt — nie eine Vorgabe (V63)', () => {
+    expect(text(ZAHLEN, 'Plattformgebühr')).toContain('Plattformgebühr: € 18,00 (dazu erwartet: € 3,00)')
+    expect(text(ZAHLEN, 'Plattformgebühr').join('\n')).not.toContain('Servicegebühr')
+  })
+})
+
+describe('wochenlageGebuehrWort (V63, gebuehrWortFuerZeitraum über die letzten 7 Tage)', () => {
+  const STICHTAG = new Date('2027-03-01T00:00:00.000Z')
+  const tage = (n: number) => n * 24 * 60 * 60 * 1000
+
+  it('die Woche ganz vor dem Stichtag: „Servicegebühr“', () => {
+    expect(wochenlageGebuehrWort(new Date(STICHTAG.getTime() - tage(1)), STICHTAG)).toBe('Servicegebühr')
+  })
+
+  it('die Woche ganz ab dem Stichtag: „Plattformgebühr“ — kein „Servicegebühr“ nach dem Stichtag', () => {
+    // Genau 7 Tage danach beginnt die Woche am Stichtag selbst.
+    expect(wochenlageGebuehrWort(new Date(STICHTAG.getTime() + tage(7)), STICHTAG)).toBe('Plattformgebühr')
+    expect(wochenlageGebuehrWort(new Date(STICHTAG.getTime() + tage(8)), STICHTAG)).toBe('Plattformgebühr')
+  })
+
+  it('die Woche über den Stichtag: „Gebühren“', () => {
+    expect(wochenlageGebuehrWort(new Date(STICHTAG.getTime() + tage(3)), STICHTAG)).toBe('Gebühren')
   })
 })

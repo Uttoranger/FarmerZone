@@ -18,7 +18,7 @@ export interface MeldungNotificationProps {
 /** Nachricht an den Betreiber: eine neue FEHLER-Meldung im Postfach. */
 export function MeldungNotificationEmail(p: MeldungNotificationProps) {
   return (
-    <EmailLayout previewText={`Fehlermeldung ${p.kurznummer}${p.farmName ? ` von ${p.farmName}` : ''}`}>
+    <EmailLayout fuss={{ art: 'betrieb' }} previewText={`Fehlermeldung ${p.kurznummer}${p.farmName ? ` von ${p.farmName}` : ''}`}>
       <Text style={h1}>Neue Fehlermeldung {p.kurznummer}</Text>
       <Text style={bodyText}>
         {p.farmName ? <><strong>{p.farmName}</strong> hat</> : 'Eine Kundin hat'} einen Fehler gemeldet.

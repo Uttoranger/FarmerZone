@@ -238,11 +238,12 @@ describe('„Bitte bestätige" — Frist aus fristen.ts', () => {
     expect(text).not.toMatch(RELATIVER_TAG)
   })
 
-  it('ohne Bestellzeitpunkt bleibt der allgemeine Satz — nie eine erfundene Uhrzeit', async () => {
+  it('ohne Bestellzeitpunkt bleibt ein Satz ohne Dauer — nie eine erfundene Uhrzeit (V87)', async () => {
     await email.sendOnsiteConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH', createdAt: undefined }), 'token-1')
     const { text } = zuletzt()
     expect(text).not.toContain('Bitte bestätige bis')
-    expect(text).toContain('spätestens zwei Stunden')
+    expect(text).toContain('Bitte bestätige bald')
+    expect(text).not.toContain('zwei Stunden')
   })
 })
 
@@ -320,7 +321,8 @@ describe('„Bestätige deine E-Mail" (S3, Nr. 17b)', () => {
     const { html, text, subject } = zuletzt()
     expect(text).toContain('Bestätige deine E-Mail-Adresse')
     expect(text).toContain('24 Stunden')
-    expect(links(html).map((l) => `${l.pathname}${l.search}`)).toEqual(['/verify?token=kopf.inhalt.signatur'])
+    // Dazu nur die Anbieterzeile unter dem Fuß (V68): der Link auf das Impressum.
+    expect(links(html).map((l) => `${l.pathname}${l.search}`)).toEqual(['/verify?token=kopf.inhalt.signatur', '/impressum'])
     expect(html).not.toContain('verify-email')
     expect(subject).not.toMatch(/https?:|token/i)
     expect(BILDZEICHEN.test(`${subject} ${text}`)).toBe(false)

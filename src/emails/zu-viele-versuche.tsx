@@ -22,7 +22,7 @@ export interface ZuVieleVersucheProps {
 export function ZuVieleVersucheEmail({ art, bis }: ZuVieleVersucheProps): React.JSX.Element {
   const text = ZU_VIELE_VERSUCHE_MAIL[art]
   return (
-    <EmailLayout previewText={text.titel}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={text.titel}>
       <Text style={h1}>{text.titel}</Text>
       <Text style={bodyText}>
         Hallo,

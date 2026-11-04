@@ -13,7 +13,7 @@ import { TEAM_MAIL, type TeamAnlass } from '@/lib/admin-team'
 export function TeamRechtGeaendertEmail({ anlass, name, rechte }: { anlass: TeamAnlass; name: string | null; rechte: string[] }): React.JSX.Element {
   const t = TEAM_MAIL
   return (
-    <EmailLayout previewText={t.betreff[anlass]}>
+    <EmailLayout fuss={{ art: 'agrilo' }} previewText={t.betreff[anlass]}>
       <Text style={h1}>{t.betreff[anlass]}</Text>
       <Text style={bodyText}>
         {t.anrede(name)}

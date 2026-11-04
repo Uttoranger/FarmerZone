@@ -108,6 +108,8 @@ export async function rendereWiderrufErstattet(bezug: Record<string, string>): P
   return baueWiderrufErgebnis(geladen.order.customerEmail, {
     bestellnummer: geladen.order.orderNumber,
     hofName: geladen.order.farm.name,
+    // „Antwort an“ (V86): nur die Hof-E-Mail aus dem Profil; email.ts entscheidet, ob es eine gibt.
+    hof: geladen.order.farm,
     erstattetCents: erstattetCents === undefined ? null : Number.parseInt(erstattetCents, 10),
     grund: null,
     vorAbholung: vorAbholung === '1',
@@ -125,6 +127,8 @@ export async function rendereWiderrufAbgelehnt(bezug: Record<string, string>): P
   return baueWiderrufErgebnis(geladen.order.customerEmail, {
     bestellnummer: geladen.order.orderNumber,
     hofName: geladen.order.farm.name,
+    // „Antwort an“ (V86): nur die Hof-E-Mail aus dem Profil; email.ts entscheidet, ob es eine gibt.
+    hof: geladen.order.farm,
     erstattetCents: null,
     grund: geladen.w.grund,
     // Teilweise vor der Abholung gebucht: Die Ablehnung gilt nur noch den übrigen Artikeln.

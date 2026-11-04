@@ -16,6 +16,12 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
 import { MARKE } from '@/lib/marke'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+
+/** Die Links der Mail ohne die Anbieterzeile — den Link auf das Impressum trägt jede Mail außer den Betriebs-Mails (V68, Nr. 232). */
+const fremdeLinks = (html: string): string[] =>
+  [...html.matchAll(/<a\s[^>]*?href="([^"]*)"/gi)].map((m) => m[1]).filter((h) => h !== `${PRODUKTION_ADRESSE}/impressum`)
+
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -84,7 +90,7 @@ describe('sendAnmeldeCodeEmail', () => {
   it('kein Link, der anmeldet — der Code ist der einzige Weg', async () => {
     const { aufruf } = await versende()
     expect(aufruf.html).not.toContain('/api/auth')
-    expect(aufruf.html).not.toMatch(/<a [^>]*href=/)
+    expect(fremdeLinks(aufruf.html)).toEqual([])
   })
 
   it('ohne Schlüssel: kein Versand, Ergebnis ohne ID', async () => {
@@ -116,7 +122,7 @@ describe('sendBestellCodeEmail', () => {
     expect(aufruf.html).toContain('10 Minuten')
     expect(aufruf.html.indexOf('905173')).toBe(aufruf.html.lastIndexOf('905173'))
     expect(aufruf.html).not.toMatch(/anzumelden|Anmeldecode/)
-    expect(aufruf.html).not.toMatch(/<a [^>]*href=/)
+    expect(fremdeLinks(aufruf.html)).toEqual([])
   })
 
   it('Gegenprobe: die Anmelde-Mail bleibt beim alten Text', async () => {
