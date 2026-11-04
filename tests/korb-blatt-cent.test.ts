@@ -20,6 +20,9 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
     ...echt,
     Sheet: (props: Kinder) => createElement(Fragment, null, props.open ? props.children : null),
     SheetContent: (props: Kinder) => createElement('section', null, props.children),
+    // Nr. 227: Der Warenkorb steht im Blatt rechts (SheetBlatt seite="rechts", SheetKopf) — ebenso an Ort und Stelle.
+    SheetBlatt: (props: Kinder) => createElement('section', null, props.children),
+    SheetKopf: (props: { titel?: ReactNode }) => createElement('h2', null, props.titel),
     SheetTitle: (props: Kinder) => createElement('h2', null, props.children),
   }
 })

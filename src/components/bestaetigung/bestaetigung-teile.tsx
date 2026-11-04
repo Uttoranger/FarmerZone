@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { CalendarPlus, Check, CheckCircle2, Clock, Info, MapPin, XCircle } from 'lucide-react'
+import { CalendarPlus, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { formatEuro } from '@/lib/format'
 import { bestellSummen, centsAlsEuro, gebuehrEntfallen } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer, gebuehrHinweisFuer } from '@/lib/plattformgebuehr'
 import type { BestaetigungsKopf, BestellSchritt } from '@/lib/bestaetigung'
+import { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
+
+export { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN }
 
 /*
  * Bausteine der Bestätigungsseite /{hof}/confirm/{id} (Nr. 13). Mockups:
@@ -18,8 +20,6 @@ import type { BestaetigungsKopf, BestellSchritt } from '@/lib/bestaetigung'
  * Knöpfe): dieselbe Bestellung sieht an beiden Stellen gleich aus.
  */
 
-export const KARTE = 'rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]'
-const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
 
 /** Volle Pille in Grün — die eine Hauptaktion der Seite. */
 export const KNOPF_GRUEN = cn(
@@ -32,55 +32,63 @@ export const KNOPF_RAHMEN = cn(
   FOKUS_RAHMEN
 )
 
-const KOPF_SYMBOL = { haken: CheckCircle2, uhr: Clock, kreuz: XCircle, info: Info } as const
-
-/** Zeichen, Überschrift (das h1 der Seite) und der Satz darunter. */
-export function BestaetigungKopf({ kopf }: { kopf: BestaetigungsKopf }): React.JSX.Element {
-  const Symbol = KOPF_SYMBOL[kopf.symbol]
+/**
+ * Der Kopf der Seite (Boards s1-/w1-bestaetigung, Nr. 227): links bündig, darüber leise „Bestellung bei <Hof>“
+ * als Kicker, dann die Überschrift (das h1 der Seite) und der Satz — ohne Zeichen im Kreis. Je Zustand ein
+ * klarer Kopf: Den Wortlaut entscheidet `bestaetigungsKopf` (src/lib/bestaetigung.ts). `ohneSatz`, wo der Satz
+ * an anderer Stelle steht (bar offen: in der Karte mit der Frist).
+ */
+export function BestaetigungKopf({
+  kopf,
+  kicker,
+  ohneSatz = false,
+}: {
+  kopf: BestaetigungsKopf
+  kicker?: string
+  ohneSatz?: boolean
+}): React.JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-2.5 text-center">
-      <div
-        className={cn(
-          'flex size-16 items-center justify-center rounded-full',
-          kopf.ton === 'gruen' && 'bg-accent/25',
-          kopf.ton === 'orange' && 'bg-primary/18',
-          kopf.ton === 'neutral' && 'bg-muted'
-        )}
-      >
-        {kopf.ton === 'gruen' ? (
-          <span className="flex size-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
-            <Check className="size-5" strokeWidth={2.4} aria-hidden="true" />
-          </span>
-        ) : (
-          <Symbol
-            className={cn('size-8', kopf.ton === 'orange' ? 'text-status-offen' : 'text-muted-foreground')}
-            strokeWidth={1.7}
-            aria-hidden="true"
-          />
-        )}
-      </div>
+    <div className="flex flex-col gap-1.5">
+      {kicker && (
+        <p className={cn(ETIKETT, 'break-words')} title={kicker}>
+          {kicker}
+        </p>
+      )}
       <h1 className="font-heading text-[26px] leading-tight font-semibold text-balance break-words md:text-[28px]">{kopf.titel}</h1>
       {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
-      <p className="max-w-[56ch] text-[13.5px] leading-normal [overflow-wrap:anywhere] text-muted-foreground">{kopf.satz}</p>
+      {!ohneSatz && <p className="text-[15px] leading-normal [overflow-wrap:anywhere] text-foreground">{kopf.satz}</p>}
     </div>
   )
 }
 
-/** Bar offen: bis wann bestätigt sein muss — die Uhrzeit aus fristen.ts. */
-export function FristHinweis({ bis }: { bis: string }): React.JSX.Element {
+/**
+ * Bar offen (Boards s1-/w1-bestaetigung Bild 3; V87): die orange Karte „Bitte bis … bestätigen“ mit der Frist aus
+ * `fristVon` (fristen.ts), darunter der Satz an die Kundin und der Termin — und als Kinder der Knopf „Mail nicht
+ * bekommen? Erneut senden“. Farben aus dem Paar „tun“ (≥ 4,5:1 in beiden Themes); kein `role="alert"`, denn es ist
+ * kein Fehler, sondern der nächste Schritt.
+ */
+export function FristHinweis({ titel, satz, children }: { titel: string; satz: string; children?: ReactNode }): React.JSX.Element {
   return (
-    <Hinweiskarte ton="orange" symbol={Clock} titel={`Bestätigen bis ${bis}`}>
-      <p className="text-[12.5px] leading-normal text-muted-foreground">
-        Danach geben wir die Ware wieder frei, und die Bestellung verfällt – ohne Kosten für dich.
-      </p>
-    </Hinweiskarte>
+    <section
+      aria-label={titel}
+      data-frist-hinweis=""
+      className="flex flex-col gap-2 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun"
+    >
+      <p className="text-[15px] font-bold">{titel}</p>
+      {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
+      <p className="text-[14px] leading-normal [overflow-wrap:anywhere]">{satz}</p>
+      {children}
+    </section>
   )
 }
 
 /**
- * Bestellnummer und Abholung. Die Nummer ist NUR Anzeige: Sie steht in
- * keinem Link und öffnet nichts — der Zugang zur Bestellung ist allein der
- * signierte Link (S1). Es gibt keinen eigenen Abholcode (Bericht Nr. 07).
+ * Abholung und Bestellnummer (Boards s1-/w1-bestaetigung, s1-/w1-bestellung-link; Nr. 227): „ABHOLUNG“, der
+ * Termin, Hof und Adresse, die Bestellnummer gestrichelt, darunter „In den Kalender“ und „Route planen“ zu
+ * gleichen Teilen. Die Nummer ist NUR Anzeige: Sie steht in keinem Link und öffnet nichts — der Zugang zur
+ * Bestellung ist allein der signierte Link (S1). Es gibt keinen eigenen Abholcode (Bericht Nr. 07).
+ * `kalenderHaupt`: Auf der Bestellseite ist „In den Kalender“ die eine grüne Hauptaktion, auf der
+ * Bestätigung ist es „Bestellung ansehen“ — dort hat der Kalender einen Rand.
  */
 export function AbholKarte({
   bestellnummer,
@@ -89,6 +97,7 @@ export function AbholKarte({
   adresse,
   routeHref,
   kalenderHref,
+  kalenderHaupt = false,
 }: {
   bestellnummer: string
   abholZeit: string
@@ -96,35 +105,36 @@ export function AbholKarte({
   adresse: string
   routeHref: string
   kalenderHref: string | null
+  kalenderHaupt?: boolean
 }): React.JSX.Element {
   return (
-    <section aria-label="Abholung" className={cn(KARTE, 'flex flex-col gap-4 md:flex-row md:items-stretch md:gap-5')}>
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 md:order-2">
-        <p className={ETIKETT}>Abholung</p>
-        <p className="text-[17px] font-semibold">{abholZeit}</p>
-        <p className="text-[13px] leading-normal break-words text-muted-foreground">
-          {hofName} · {adresse}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <a href={routeHref} target="_blank" rel="noopener noreferrer" className={cn(KNOPF_RAHMEN, 'h-11 px-4 text-[13.5px]')}>
-            <MapPin className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            Route planen
+    <section aria-labelledby="abholung-titel" className={cn(KARTE, 'flex min-w-0 flex-col gap-1.5')}>
+      <h2 id="abholung-titel" className={ETIKETT}>
+        Abholung
+      </h2>
+      <p className="text-[17px] font-semibold break-words">{abholZeit}</p>
+      <p className="text-[14px] leading-normal break-words text-muted-foreground">
+        {hofName} · {adresse}
+      </p>
+      <p className="mt-1 self-start rounded-lg border border-dashed border-input px-2.5 py-1 text-[14px] break-words">
+        Bestellnummer <b className="font-bold">{bestellnummer}</b>
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {kalenderHref && (
+          <a href={kalenderHref} className={cn(kalenderHaupt ? KNOPF_BREIT_GRUEN : KNOPF_BREIT_RAHMEN, 'px-2 text-[15px]')}>
+            <CalendarPlus className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+            In den Kalender
           </a>
-          {kalenderHref && (
-            <a href={kalenderHref} className={cn(KNOPF_RAHMEN, 'h-11 px-4 text-[13.5px]')}>
-              <CalendarPlus className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              In den Kalender
-            </a>
-          )}
-        </div>
-      </div>
-      <div className="hidden w-px self-stretch bg-border md:order-1 md:block" aria-hidden="true" />
-      <div className="min-w-0 flex-1 rounded-xl border border-dashed border-accent/50 bg-accent/8 p-3 text-center md:order-0 md:border-0 md:bg-transparent md:p-0 md:text-left">
-        <p className={ETIKETT}>Bestellnummer</p>
-        <p className="mt-1 font-heading text-[30px] leading-tight font-semibold tracking-[2px] break-words md:text-[34px]">{bestellnummer}</p>
-        <p className="mt-0.5 text-[12px] leading-normal text-muted-foreground">
-          Nenn sie bei der Abholung – der Hof gleicht zusätzlich deinen Namen ab.
-        </p>
+        )}
+        <a
+          href={routeHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(KNOPF_BREIT_RAHMEN, 'px-2 text-[15px]', !kalenderHref && 'col-span-2')}
+        >
+          <MapPin className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          Route planen
+        </a>
       </div>
     </section>
   )
@@ -136,37 +146,34 @@ const SCHRITT_VORGELESEN: Record<BestellSchritt['stand'], string> = {
   offen: 'noch offen',
 }
 
-/** Die Status-Schritte aus dem Bestellstatus (bestellSchritte). */
+/**
+ * Die Status-Schritte aus dem Bestellstatus (bestellSchritte), als vier Balken mit dem Wort darunter (Boards
+ * s1-/w1-bestaetigung): erledigt grün und fett, offen leise. Was im nächsten Schritt bis wann geschehen muss,
+ * steht für den Screenreader dabei — sichtbar sagt es die Karte mit der Frist bzw. die Abholkarte.
+ */
 export function StatusSchritte({ schritte }: { schritte: readonly BestellSchritt[] }): React.JSX.Element {
   return (
-    <section aria-labelledby="stand-ueberschrift" className={KARTE}>
+    <section aria-labelledby="stand-ueberschrift">
       <h2 id="stand-ueberschrift" className="sr-only">
         Stand deiner Bestellung
       </h2>
-      <ol className="grid grid-cols-4 gap-1">
+      <ol className="grid grid-cols-4 gap-1.5">
         {schritte.map((s) => (
           <li
             key={s.id}
             data-schritt={s.id}
             data-stand={s.stand}
             aria-current={s.stand === 'naechster' ? 'step' : undefined}
-            className="flex min-w-0 flex-col items-center gap-1.5 text-center"
+            className="flex min-w-0 flex-col gap-1.5"
           >
-            <span
-              className={cn(
-                'flex size-6 shrink-0 items-center justify-center rounded-full',
-                s.stand === 'erledigt' && 'bg-accent text-accent-foreground',
-                s.stand === 'naechster' && 'border-2 border-status-fertig',
-                s.stand === 'offen' && 'border-2 border-border'
-              )}
-            >
-              {s.stand === 'erledigt' && <Check className="size-3.5" strokeWidth={2.6} aria-hidden="true" />}
-            </span>
-            <span className={cn('text-[12.5px] font-semibold', s.stand === 'offen' ? 'text-muted-foreground' : 'text-foreground')}>
+            <span aria-hidden="true" className={cn('h-1.5 rounded-full', s.stand === 'erledigt' ? 'bg-accent' : 'bg-border')} />
+            <span className={cn('truncate text-[12.5px]', s.stand === 'erledigt' ? 'font-bold text-foreground' : 'text-muted-foreground')}>
               {s.titel}
-              <span className="sr-only">: {SCHRITT_VORGELESEN[s.stand]}</span>
+              <span className="sr-only">
+                : {SCHRITT_VORGELESEN[s.stand]}
+                {s.zusatz && `, ${s.zusatz}`}
+              </span>
             </span>
-            {s.zusatz && <span className="text-[11.5px] leading-snug text-muted-foreground">{s.zusatz}</span>}
           </li>
         ))}
       </ol>
@@ -185,6 +192,7 @@ export function BestellPositionen({
   summen,
   zahlung,
   fuss,
+  titel = 'Deine Bestellung',
 }: {
   /** `fehlt`: Der Hof hat die Position als fehlend gemeldet (E14) — sie ist nicht mehr im Betrag. */
   positionen: ReadonlyArray<{ text: string; betragCents: number; fehlt?: boolean }>
@@ -198,15 +206,20 @@ export function BestellPositionen({
   }
   zahlung: string
   fuss?: ReactNode
+  /** Die kleine Überschrift über der Karte: „Deine Bestellung“ (Bestätigung), „Positionen“ (Bestellseite). */
+  titel?: string
 }): React.JSX.Element {
   const s = bestellSummen(summen)
   const entfallen = gebuehrEntfallen(summen)
   return (
-    <section aria-label="Deine Bestellung" className={cn(KARTE, 'flex flex-col gap-3')}>
-      <ul className="flex flex-col gap-3">
+    // Board: die kleine Überschrift über der Karte, darin die Zeilen, „Gesamt“ und darunter Zahlart und Gebühr leise.
+    <section aria-label={titel} className="flex flex-col gap-2">
+      <h2 className={ETIKETT}>{titel}</h2>
+      <div className={cn(KARTE, 'flex flex-col gap-2')}>
+      <ul className="flex flex-col gap-1.5">
         {positionen.map((p, i) => (
-          <li key={i} className="flex items-baseline gap-2 text-[13.5px]">
-            <span className="min-w-0 flex-1 break-words text-muted-foreground">
+          <li key={i} className="flex items-baseline gap-2 text-[15px]">
+            <span className="min-w-0 flex-1 break-words">
               {p.text}
               {p.fehlt && <span className="text-foreground"> · fehlt leider</span>}
             </span>
@@ -218,8 +231,8 @@ export function BestellPositionen({
           </li>
         ))}
         {s.gebuehrCents > 0 && (
-          <li className="flex items-baseline gap-2 text-[13.5px]">
-            <span className="min-w-0 flex-1 text-muted-foreground">
+          <li className="flex items-baseline gap-2 text-[15px]">
+            <span className="min-w-0 flex-1">
               {gebuehrBezeichnungFuer(summen)}
               {entfallen && <span className="text-[12px]"> ({summen.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'})</span>}
             </span>
@@ -229,13 +242,14 @@ export function BestellPositionen({
           </li>
         )}
       </ul>
-      <div className="h-px bg-border" aria-hidden="true" />
-      <p className="flex items-baseline gap-2 text-[15px] font-semibold">
-        <span className="min-w-0 flex-1">{zahlung}</span>
+      <p className="flex items-baseline gap-2 text-[16px] font-bold">
+        <span className="min-w-0 flex-1">Gesamt</span>
         <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(s.gesamtCents))}</span>
       </p>
-      {s.gebuehrCents > 0 && <p className="text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
+      <p className="text-[13px] leading-normal text-muted-foreground">{zahlung}</p>
+      {s.gebuehrCents > 0 && <p className="text-[12.5px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
       {fuss}
+      </div>
     </section>
   )
 }
@@ -253,3 +267,33 @@ export function AktionsLink({ href, haupt, children }: { href: string; haupt?: b
     </Link>
   )
 }
+
+/**
+ * Die eine Hauptaktion unten (Boards s1-/w1-bestaetigung): am Handy eine feste Leiste mit dem grünen Knopf über
+ * die volle Breite und dem leisen Nebenweg darunter, ab 768 px unter einer Linie rechts bündig (Nebenweg, dann
+ * Knopf). `data-unten-fest`: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts); die Seite
+ * hält am Handy darunter Platz frei (`HAUPTAKTION_PLATZ`).
+ */
+export function Hauptaktion({ haupt, neben }: { haupt: { href: string; text: string }; neben?: { href: string; text: string } }): React.JSX.Element {
+  return (
+    <div
+      data-unten-fest=""
+      className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-1 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:static md:z-auto md:mt-2 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:bg-transparent md:px-0 md:pt-4 md:pb-0 print:hidden"
+    >
+      <Link href={haupt.href} className={cn(KNOPF_BREIT_GRUEN, 'md:w-auto md:rounded-full md:px-5')}>
+        {haupt.text}
+      </Link>
+      {neben && (
+        <Link
+          href={neben.href}
+          className={cn('inline-flex min-h-11 items-center justify-center rounded-full px-3 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+        >
+          {neben.text}
+        </Link>
+      )}
+    </div>
+  )
+}
+
+/** Platz unter dem Inhalt am Handy, damit die feste Leiste von `Hauptaktion` nichts verdeckt. */
+export const HAUPTAKTION_PLATZ = 'max-md:pb-36'

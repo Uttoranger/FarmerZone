@@ -276,14 +276,15 @@ describe('Seite /{hof}/bestaetigen/{token}', () => {
     const text = await seite()
 
     expect(text).toContain('Bestellung bei Hof Test bestätigen')
-    expect(text).toContain('Bitte bestätige bis heute, 12:00 Uhr – erst dann packt der Hof für dich.')
+    // Seit Nr. 227 mit Wochentag und Datum (V9), Frist aus fristVon.
+    expect(text).toMatch(/Bitte bestätige bis heute, Fr, 2\.\sOkt, 12:00 Uhr – erst dann packt der Hof für dich\./)
     expect(text).toContain('Freilandeier')
     expect(text).toContain('Bauernbrot')
     expect(text).toContain('Servicegebühr')
     expect(text).toContain('€ 0,52')
     expect(text).toContain('Bar bei Abholung')
     expect(text).toContain('€ 10,82')
-    expect(text).toContain('Abholung heute, 15:00–18:00 Uhr')
+    expect(text).toMatch(/Abholung heute, Fr, 2\.\sOkt, 15:00–18:00 Uhr/)
     expect(text).toContain(`KNOEPFE:${TOKEN}`)
   })
 

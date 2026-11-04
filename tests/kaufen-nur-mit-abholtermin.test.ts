@@ -84,6 +84,11 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
       blattInline.an ? createElement('section', null, (props as Kinder).children) : createElement(echt.SheetContent, props),
     SheetTitle: (props: Parameters<typeof echt.SheetTitle>[0]) =>
       blattInline.an ? createElement('h2', null, (props as Kinder).children) : createElement(echt.SheetTitle, props),
+    // Nr. 227: Der Warenkorb steht im Blatt rechts (SheetBlatt seite="rechts", SheetKopf) — ebenso an Ort und Stelle.
+    SheetBlatt: (props: Parameters<typeof echt.SheetBlatt>[0]) =>
+      blattInline.an ? createElement('section', null, (props as Kinder).children) : createElement(echt.SheetBlatt, props),
+    SheetKopf: (props: Parameters<typeof echt.SheetKopf>[0]) =>
+      blattInline.an ? createElement('h2', null, props.titel) : createElement(echt.SheetKopf, props),
   }
 })
 // Die Kasse prüft hier nur, was ihre Seite dem Formular gibt (die Props); das Formular selbst rendert

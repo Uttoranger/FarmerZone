@@ -8,12 +8,13 @@ import { widerrufPfad } from '@/lib/bestell-link'
 import { widerrufMoeglich } from '@/lib/widerruf'
 import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
 import {
-  abholZeitText,
+  abholTerminZeile,
   bestaetigungsBloecke,
   bestaetigungsKopf,
   bestaetigungsZustand,
   bestaetigungZeigtPerson,
   bestellSchritte,
+  fristHinweisTitel,
   korbLeeren,
   neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
@@ -25,11 +26,13 @@ import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import {
   AbholKarte,
-  Aktionen,
-  AktionsLink,
   BestaetigungKopf,
   BestellPositionen,
   FristHinweis,
+  HAUPTAKTION_PLATZ,
+  Hauptaktion,
+  KARTE,
+  KNOPF_BREIT_RAHMEN,
   StatusSchritte,
 } from '@/components/bestaetigung/bestaetigung-teile'
 import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
@@ -37,7 +40,9 @@ import { HofTeilenKarte } from '@/components/bestaetigung/hof-teilen-karte'
 import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
 import { BarLinkErneutSenden } from '@/components/bestaetigung/bar-link-erneut-senden'
 import { barLinkErneutMoeglich } from '@/lib/bar-bestaetigung'
-import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { fristVon } from '@/lib/fristen'
+import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
 import { hofSichtbar } from '@/lib/hof-sichtbar'
@@ -55,8 +60,11 @@ export const metadata: Metadata = {
   referrer: 'no-referrer',
 }
 
-/** Die Spalte der Seite: 640 px wie im Mockup, am Handy mit 16 px Rand. */
-const SPALTE = 'mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pt-8 pb-12 md:pt-10'
+/** Die Spalte der Seite: 896 px wie im Board w1-bestaetigung (ab 768 px Karten paarweise), am Handy mit 16 px Rand. */
+const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:px-4 md:pt-8'
+
+/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen, Erzähl's weiter · Neuigkeiten). */
+const PAAR = 'grid items-start gap-4 md:grid-cols-2'
 
 /*
  * Neues Design (Nr. 13): KundeShell ohne Unterleiste — eine Fokus-Seite mit
@@ -78,18 +86,21 @@ function BestellungEingegangen() {
   // Seite den Stand nicht — ein alter Link oder ein Lesezeichen leert keinen neuen Korb.
   return (
     <KundeShellMitSitzung unterleiste={false}>
-      <div className={SPALTE}>
-        <BestaetigungKopf
-          kopf={{
-            ton: 'gruen',
-            symbol: 'haken',
-            titel: 'Deine Bestellung ist eingegangen',
-            satz: 'Danke – alle Details stehen in deiner E-Mail.',
-          }}
-        />
-        <Aktionen>
-          <AktionsLink href="/hoefe">Höfe entdecken</AktionsLink>
-        </Aktionen>
+      {/* Board s1-/w1-bestaetigung Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zu den Höfen. */}
+      <div className={cn(SPALTE, 'max-w-[592px]')}>
+        <div className={cn(KARTE, 'flex flex-col gap-3')}>
+          <BestaetigungKopf
+            kopf={{
+              ton: 'gruen',
+              symbol: 'haken',
+              titel: 'Deine Bestellung ist eingegangen',
+              satz: 'Danke – alle Details stehen in deiner E-Mail.',
+            }}
+          />
+          <Link href="/hoefe" className={KNOPF_BREIT_RAHMEN}>
+            Höfe entdecken
+          </Link>
+        </div>
       </div>
     </KundeShellMitSitzung>
   )
@@ -205,7 +216,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   })
   const schritte = bestellSchritte(order, jetzt)
   const frist = fristVon(order)
-  const abholZeit = abholZeitText(order, jetzt)
+  // Mit Wochentag und Datum (V9): „heute, Mi, 3. März, 15:00–18:00 Uhr“.
+  const abholZeit = abholTerminZeile(order, jetzt)
   const adresse = `${order.farm.address}, ${order.farm.postalCode} ${order.farm.city}`
   // Der signierte Weg zurück zur Bestellung (Sprint Bestellverfolgung):
   // dieselbe Adresse steht als Knopf in der Bestätigungs-Mail.
@@ -223,33 +235,51 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
     fehlt: Boolean(item.fehltSeit),
   }))
 
+  // Die eine Hauptaktion unten (Board): „Bestellung ansehen“, daneben leise „Weiter einkaufen“ — auch bar offen
+  // (Board Bild 3). Neu bestellen nach Verfall, die Zahlung derselben Bestellung nach einem Fehlschlag.
+  const hauptaktion =
+    bloecke.aktion === 'neu-bestellen'
+      ? { haupt: { href: `/${farmSlug}`, text: 'Neu bestellen' } }
+      : bloecke.aktion === 'erneut-versuchen'
+        ? // Die Zahlung DERSELBEN Bestellung (Nr. 202); ob sie noch geht, prüft die Kasse beim Laden.
+          { haupt: { href: zahlungFortsetzenPfad(farmSlug, order.id, sig), text: 'Erneut versuchen' } }
+        : { haupt: { href: bestellungHref, text: 'Bestellung ansehen' }, neben: { href: `/${farmSlug}`, text: 'Weiter einkaufen' } }
+
   return (
     <KundeShellMitSitzung unterleiste={false}>
       {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
       {korbLeeren(zustand) && <ClearCartOnMount />}
-      <div className={SPALTE}>
-        <BestaetigungKopf kopf={kopf} />
+      <div className={cn(SPALTE, HAUPTAKTION_PLATZ)}>
+        {/* Je Zustand ein klarer Kopf (Board): „Bestellung bei <Hof>“ nur als Kicker darüber. Bar offen steht der Satz
+            in der Karte mit der Frist. */}
+        <BestaetigungKopf kopf={kopf} kicker={`Bestellung bei ${order.farm.name}`} ohneSatz={bloecke.fristHinweis} />
 
-        {bloecke.fristHinweis && <FristHinweis bis={`${tagInWorten(frist, jetzt)}, ${uhrzeitInWien(frist)} Uhr`} />}
-
-        {/* Nr. 151: Die Mail mit dem Bestätigungslink neu anfordern — nur solange die Barbestellung offen ist. */}
-        {barLinkErneutMoeglich(order, jetzt) && <BarLinkErneutSenden orderId={order.id} sig={sig} />}
-
-        {bloecke.abholkarte && (
-          <AbholKarte
-            bestellnummer={order.orderNumber}
-            abholZeit={abholZeit}
-            hofName={order.farm.name}
-            adresse={adresse}
-            routeHref={buildMapsUrl(order.farm.address, order.farm.postalCode, order.farm.city)}
-            kalenderHref={bloecke.kalender ? kalenderPfad(farmSlug, order.id) : null}
-          />
+        {/* Bar offen (V87): die Frist aus fristVon, der Satz an die Kundin, der Termin — und Nr. 151: die Mail mit dem
+            Bestätigungslink neu anfordern, solange die Barbestellung offen ist. Keine Abholkarte (bestaetigungsBloecke). */}
+        {bloecke.fristHinweis ? (
+          <FristHinweis titel={fristHinweisTitel(frist, jetzt)} satz={`${kopf.satz} Abholung: ${abholZeit}.`}>
+            {barLinkErneutMoeglich(order, jetzt) && <BarLinkErneutSenden orderId={order.id} sig={sig} />}
+          </FristHinweis>
+        ) : (
+          barLinkErneutMoeglich(order, jetzt) && <BarLinkErneutSenden orderId={order.id} sig={sig} />
         )}
 
-        {/* Telefon und E-Mail des Hofs erst nach dem Kauf (Nr. 60): mit der Abholkarte, also wenn die Bestellung läuft. */}
-        {bloecke.abholkarte && <HofErreichen telefon={order.farm.phone} email={order.farm.email} />}
-
         {schritte && <StatusSchritte schritte={schritte} />}
+
+        {bloecke.abholkarte && (
+          <div className={PAAR}>
+            <AbholKarte
+              bestellnummer={order.orderNumber}
+              abholZeit={abholZeit}
+              hofName={order.farm.name}
+              adresse={adresse}
+              routeHref={buildMapsUrl(order.farm.address, order.farm.postalCode, order.farm.city)}
+              kalenderHref={bloecke.kalender ? kalenderPfad(farmSlug, order.id) : null}
+            />
+            {/* Telefon und E-Mail des Hofs erst nach dem Kauf (Nr. 60): mit der Abholkarte, also wenn die Bestellung läuft. */}
+            <HofErreichen telefon={order.farm.phone} email={order.farm.email} />
+          </div>
+        )}
 
         <BestellPositionen
           positionen={positionen}
@@ -264,46 +294,24 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           }
         />
 
-        {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
-        {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
-
-        {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
-            Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
-            Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
-        {neuigkeiten && (
-          <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={customerEmail ?? undefined} />
+        {(bloecke.teilen || neuigkeiten) && (
+          <div className={PAAR}>
+            {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
+            {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
+            {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
+                Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
+                Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
+            {neuigkeiten && (
+              <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={customerEmail ?? undefined} />
+            )}
+          </div>
         )}
 
-        <Aktionen>
-          {bloecke.aktion === 'bestellung' && (
-            <>
-              <AktionsLink href={bestellungHref} haupt>
-                Bestellung ansehen
-              </AktionsLink>
-              <AktionsLink href={`/${farmSlug}`}>Weiter einkaufen</AktionsLink>
-            </>
-          )}
-          {bloecke.aktion === 'neu-bestellen' && (
-            <AktionsLink href={`/${farmSlug}`} haupt>
-              Neu bestellen
-            </AktionsLink>
-          )}
-          {bloecke.aktion === 'erneut-versuchen' && (
-            // Die Zahlung DERSELBEN Bestellung (Nr. 202); ob sie noch geht, prüft die Kasse beim Laden.
-            <AktionsLink href={zahlungFortsetzenPfad(farmSlug, order.id, sig)} haupt>
-              Erneut versuchen
-            </AktionsLink>
-          )}
-          {bloecke.aktion === 'keine' && (
-            <>
-              <AktionsLink href={bestellungHref}>Bestellung ansehen</AktionsLink>
-              <AktionsLink href={`/${farmSlug}`}>Zum Hof</AktionsLink>
-            </>
-          )}
-        </Aktionen>
-
-        {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur wenn widerrufen werden kann, auch nach der Abholung in der 14-Tage-Frist. */}
+        {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur wenn widerrufen werden kann, auch nach der Abholung in der
+            14-Tage-Frist. Die Beschriftung bleibt „Vertrag widerrufen“ bis zur Entscheidung der Anwältin (N43 (1), V88). */}
         {widerrufMoeglich(order, jetzt) && <WiderrufLink href={widerrufPfad(order.id)} />}
+
+        <Hauptaktion {...hauptaktion} />
       </div>
     </KundeShellMitSitzung>
   )

@@ -132,9 +132,13 @@ describe('mit bewiesener Adresse', () => {
     expect(html).toContain('href="/hof-test/confirm/alt?sig=def456"')
     // Kein Link ohne Signatur zu einer Bestellung.
     expect(html).not.toMatch(/href="\/[^"]*\/confirm\/[^"?]*"/)
-    expect(html).toContain('€ 10,82')
+    // Seit Nr. 227 (Board s1-/w1-meine-bestellungen): Status, Abholung und Bestellnummer je Zeile, kein Betrag
+    // (der steht auf der Bestellseite); „Abmelden“ heißt „Ansicht beenden“ (V26).
+    expect(html).toContain('HT-0001')
+    expect(html).not.toContain('€ 10,82')
     expect(html).toContain('kundin@example.com')
-    expect(html).toContain('Abmelden')
+    expect(html).toContain('Ansicht beenden')
+    expect(html).not.toContain('Abmelden')
   })
 
   it('leer: Satz und Ausweg — Höfe entdecken, andere E-Mail-Adresse', async () => {
@@ -148,9 +152,9 @@ describe('mit bewiesener Adresse', () => {
     const lang = 'Hof '.padEnd(80, 'x')
     laden.mockResolvedValueOnce([bestellung({ hofName: lang }), bestellung({ id: 'f', status: 'PICKED_UP', hofName: lang, pickupDate: new Date(Date.now() - 9 * 24 * 3600_000) })])
     const html = await render()
-    expect(html).toContain(`title="HT-0001 · ${lang}"`)
     expect(html).toContain(`title="${lang}"`)
-    expect(html).toMatch(/truncate[^"]*" title="HT-0001/)
+    // Die Karte „Aktuell“ kürzt den Namen selbst (Board: Name fett, darunter Stand · Abholung · Nummer).
+    expect(html).toMatch(/truncate[^"]*" title="Hof x/)
   })
 
   it('Fehler beim Laden: inline mit Ausweg, Sentry ohne Adresse', async () => {

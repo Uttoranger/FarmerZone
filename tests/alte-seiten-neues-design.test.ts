@@ -280,14 +280,16 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
 })
 
 describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
-  it('die grüne Marke der Bestellseite steht auf der Kopf-Karte, nicht auf dem hellen Seitengrund', () => {
+  it('die Marke der Bestellseite steht im Kopf als Schild auf ihrer eigenen Fläche, vor der Abholung', () => {
+    // Seit Nr. 227 (Board s1-/w1-bestellung-link) steht der Kopf ohne Karte auf dem Grund. Der Axe-Befund galt der
+    // Marke mit Rand und durchsichtiger Fläche; das Schild trägt seine eigene Fläche (zustand-…-grund), deren Paar
+    // tests/design-tokens.test.ts in beiden Themes auf ≥ 4,5:1 nachrechnet — gleich, worauf es liegt.
     const text = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
-    const karte = text.indexOf("<div className={cn(KARTE, 'flex flex-col gap-2')}>")
-    const marke = text.indexOf('<Marke art={status.art}')
-    const abholung = text.indexOf('abholung-titel')
-    expect(karte).toBeGreaterThan(-1)
-    // Die Marke steht im Kopf — nach dem Öffnen der Karte, vor der Karte „Abholung".
-    expect(marke).toBeGreaterThan(karte)
+    const kopf = text.indexOf('<h1')
+    const marke = text.indexOf('<Marke art={status.art} form="schild">')
+    const abholung = text.indexOf('<AbholKarte')
+    expect(kopf).toBeGreaterThan(-1)
+    expect(marke).toBeGreaterThan(kopf)
     expect(marke).toBeLessThan(abholung)
   })
 
@@ -305,16 +307,17 @@ describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
 describe('Ladeansicht der Bestellseite — dieselben Karten wie die Seite', () => {
   const SEITE = 'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx'
   const LADEN = 'src/app/(public)/[farmSlug]/bestellung/[orderId]/loading.tsx'
-  /** Der Kopf der Seite ist seit dem Axe-Befund eine Karte (b98c13a). */
-  const KOPF_KARTE = "className={cn(KARTE, 'flex flex-col gap-2')}"
+  /** Seit Nr. 227 (Board s1-/w1-bestellung-link) steht der Kopf ohne Karte; Abholung und „Hof erreichen“ ab 768 px nebeneinander. */
+  const PAAR = 'grid items-start gap-4 md:grid-cols-2'
 
-  it('der Kopf steht im Skeleton als dieselbe Karte wie auf der Seite — beim Umschalten springt nichts', () => {
+  it('der Kopf und das Paar Abholung · Hof erreichen stehen im Skeleton wie auf der Seite — beim Umschalten springt nichts', () => {
     const seite = lies(SEITE)
     const laden = lies(LADEN)
-    expect(seite).toContain(KOPF_KARTE)
-    // Die erste Karte der Ladeansicht ist der Kopf, vor „Abholung".
-    expect(laden.indexOf(KOPF_KARTE)).toBeGreaterThan(-1)
-    expect(laden.indexOf(KOPF_KARTE)).toBeLessThan(laden.indexOf('{/* Abholung */}'))
+    expect(seite).toContain(PAAR)
+    expect(laden).toContain(PAAR)
+    // Der Kopf ist im Skeleton keine Karte und steht vor „Abholung".
+    expect(laden.indexOf('{/* Kopf wie auf der Seite, ohne Karte')).toBeGreaterThan(-1)
+    expect(laden.indexOf('{/* Kopf wie auf der Seite, ohne Karte')).toBeLessThan(laden.indexOf('{/* Abholung */}'))
   })
 
   it('alle drei Karten nehmen die Klasse der Seite, nicht eine Abschrift', () => {
@@ -455,6 +458,6 @@ describe('Die Marke der Bestellseite ist die Marke der Liste (Art aus bestellSta
   it('die Bestellseite zeichnet die Art aus bestellStatusAnzeige mit dem Baustein Marke', () => {
     const seite = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
     expect(seite).toMatch(/const status = bestellStatusAnzeige\(order\.status, /)
-    expect(seite).toMatch(/<Marke art=\{status\.art\}>\{status\.marke\}<\/Marke>/)
+    expect(seite).toMatch(/<Marke art=\{status\.art\} form="schild">\s*\{status\.marke\}\s*<\/Marke>/)
   })
 })

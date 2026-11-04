@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Loader2, Mail, MailCheck } from 'lucide-react'
+import { Loader2, MailCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { ETIKETT, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { meldeNeuigkeitenAn } from '@/server/actions/neuigkeiten'
 
 /**
@@ -51,18 +52,15 @@ export function NeuigkeitenKarte({
   }
 
   return (
-    <section aria-labelledby="neuigkeiten-titel" className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
-      <div className="flex min-w-0 gap-3">
-        <Mail className="mt-0.5 size-5 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <h2 id="neuigkeiten-titel" className="text-[15px] font-semibold">
-            {NEUIGKEITEN_TEXT.titel}
-          </h2>
-          <p className="mt-0.5 text-[13px] leading-normal break-words text-muted-foreground">
-            {NEUIGKEITEN_TEXT.satz[0]} <strong className="font-semibold text-foreground">{hofName}</strong> {NEUIGKEITEN_TEXT.satz[1]}
-          </p>
-        </div>
-      </div>
+    // Board s1-/w1-bestaetigung: die kleine Überschrift, ein Satz, der Knopf mit Rand über die volle Breite. Die
+    // Texte der Einwilligung (Satz, Bestätigung, Datenschutz) bleiben wörtlich aus NEUIGKEITEN_TEXT.
+    <section aria-labelledby="neuigkeiten-titel" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+      <h2 id="neuigkeiten-titel" className={ETIKETT}>
+        {NEUIGKEITEN_TEXT.titel}
+      </h2>
+      <p className="text-[14px] leading-normal break-words text-muted-foreground">
+        {NEUIGKEITEN_TEXT.satz[0]} <strong className="font-semibold text-foreground">{hofName}</strong> {NEUIGKEITEN_TEXT.satz[1]}
+      </p>
 
       {/* Dauerhaft im Baum: Eine Live-Region, die erst mit ihrem Text entsteht, sprechen manche Vorleseprogramme nicht. */}
       <p role="status" className={stand.art === 'offen' ? 'sr-only' : 'flex items-start gap-2 text-[13.5px] leading-normal font-medium break-words'}>
@@ -82,10 +80,7 @@ export function NeuigkeitenKarte({
             onClick={anmelden}
             aria-busy={laeuft}
             // Nicht `disabled` während der Anfrage: Ein deaktivierter Knopf gibt den Fokus an den Seitenanfang ab.
-            className={cn(
-              'inline-flex h-11 items-center justify-center gap-2 self-start rounded-full border border-border px-[18px] text-[14px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted aria-busy:opacity-60',
-              FOKUS_RAHMEN
-            )}
+            className={cn(KNOPF_BREIT_RAHMEN, 'mt-1 aria-busy:opacity-60')}
           >
             {laeuft && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             {laeuft ? NEUIGKEITEN_TEXT.laeuft : NEUIGKEITEN_TEXT.knopf}
