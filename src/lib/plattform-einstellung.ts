@@ -68,7 +68,12 @@ export type PlattformEinstellung = {
   geaendertAm: string | null
 }
 
-/** Ohne Zeile: die Standardwerte der Spalten — dieselben Zahlen wie die Konstanten. */
+/**
+ * Ohne Zeile: die Vorgaben aus den Konstanten. Sie decken sich mit den
+ * Spalten-Defaults bis auf `gruendungMonate`: Die Konstante sagt 12 (N44), der
+ * Spalten-Default in prisma/schema.prisma bleibt 24 (keine Migration in Nr. 221) —
+ * eine bestehende Zeile (etwa die Seed-Zeile der Migration) trägt also 24, bis jemand speichert.
+ */
 export const PLATTFORM_EINSTELLUNG_STANDARD: PlattformEinstellung = {
   gruendungPlaetze: MAX_GRUENDUNGSHOEFE,
   gruendungBisTag: GRUENDUNG_BIS_STANDARD_TAG,

@@ -280,6 +280,37 @@ describe('speichereGruendungEinstellung — die Wache, die Sperre und was geschr
     expect(vi.mocked(updateTag)).toHaveBeenCalledWith('plattform-einstellung')
     for (const pfad of ['/', '/fuer-hoefe', '/register', '/konditionen', '/admin/einstellungen']) expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith(pfad)
   })
+
+  it('Monate senken (N44): vor dem Festschreiben geschrieben, danach abgelehnt — entschieden an der Zeile nach der Sperre', async () => {
+    angemeldet(true)
+    const gespeichert = {
+      gruendungPlaetze: 100,
+      gruendungBisStandard: new Date('2027-12-31T00:00:00.000Z'),
+      gruendungAnzeige: true,
+      gruendungMonate: 24,
+      gruendungAktionBis: new Date('2027-03-31T00:00:00.000Z'),
+      gruendungFestAm: null as Date | null,
+      hofpreisModellAb: null,
+      geaendertVonUserId: null,
+      updatedAt: new Date('2026-10-01T00:00:00.000Z'),
+    }
+    const zwoelf = { plaetze: 100, monate: 12, aktionBisTag: '2027-03-31', anzeige: true }
+
+    p.plattformEinstellung.findUnique.mockResolvedValue(gespeichert as never)
+    expect(await speichereGruendungEinstellung(zwoelf)).toEqual({ ok: true })
+    expect(p.plattformEinstellung.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: expect.objectContaining({ gruendungMonate: 12 }) }))
+
+    vi.clearAllMocks()
+    p.$transaction.mockImplementation((async (rueckruf: (tx: typeof prisma) => unknown) => rueckruf(prisma)) as never)
+    p.farm.findMany.mockResolvedValue(sieben as never)
+    angemeldet(true)
+    p.plattformEinstellung.findUnique.mockResolvedValue({ ...gespeichert, gruendungFestAm: new Date('2026-10-14T08:00:00.000Z') } as never)
+    expect(await speichereGruendungEinstellung(zwoelf)).toEqual({ error: GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24) })
+    // Die Sperre kam vor dem Lesen der Zeile; geschrieben und geleert wird nichts.
+    expect(p.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(p.plattformEinstellung.findUnique.mock.invocationCallOrder[0])
+    expect(p.plattformEinstellung.upsert).not.toHaveBeenCalled()
+    expect(vi.mocked(updateTag)).not.toHaveBeenCalled()
+  })
 })
 
 describe('EinstellungenGruendung — Felder der Aktion und „Zusagen festschreiben“', () => {

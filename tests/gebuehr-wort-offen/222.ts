@@ -7,6 +7,10 @@
  * schon nur im Modell „bisher“ erreichbar, gehört sie mit diesem Grund in FESTE_LISTE von
  * tests/gebuehr-wort-wache.test.ts. Geglichen wird über Datei und Text (`stelle` nur zum
  * Finden, Zeile vom 4.11.2026); die Wache liest den ganzen Ordner.
+ *
+ * Einträge mit „ · “ sind Rückfälle auf die Fassung „bisher“ ohne das Wort im Text
+ * (Wert aus RUECKFALL_WERTE, Wort-Helfer ohne Wort, Leser einer festgehaltenen Vorgabe):
+ * GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS → gebuehrErstattungOffenHinweisFuer(bestellung).
  */
 export const OFFEN: { stelle: string; text: string }[] = [
   { stelle: 'src/app/(druck)/orders/[orderId]/print/page.tsx:131', text: 'Servicegebühr' },
@@ -16,4 +20,5 @@ export const OFFEN: { stelle: string; text: string }[] = [
   { stelle: 'src/components/hof-bestellungen/storno-dialog.tsx:103', text: 'Die Servicegebühr erstattet' },
   { stelle: 'src/lib/storno.ts:86', text: 'Warenpreis + Servicegebühr' },
   { stelle: 'src/lib/storno.ts:91', text: 'Die Servicegebühr erstattet' },
+  { stelle: 'src/components/hof-bestellungen/bestell-detail.tsx:376', text: 'GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS · {GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS}' },
 ]

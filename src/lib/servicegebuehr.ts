@@ -60,8 +60,16 @@ export type ServicegebuehrErgebnis = {
  * „Hofpreis-Modell ab“. Ab dem Stichtag heißt es überall „Plattformgebühr“
  * (V62, V63): Wer das Wort zu einer Bestellung braucht, nimmt
  * `gebuehrBezeichnungFuer`, für einen Zeitraum `gebuehrWortFuerZeitraum`
- * (plattformgebuehr.ts) — nie diese Konstante ohne Bedingung
- * (tests/gebuehr-wort-wache.test.ts).
+ * (plattformgebuehr.ts) — nie diese Konstante ohne Bedingung.
+ *
+ * Der Schutz (tests/gebuehr-wort-wache.test.ts, RUECKFALL_WERTE): Die Wache
+ * meldet jede Verwendung außerhalb dieser Datei und plattformgebuehr.ts, jeden
+ * Aufruf eines Helfers, dessen Wort-Parameter auf diese Konstante zurückfällt,
+ * ohne Wort (z. B. `inklGebuehr`, `jahrAlsCsv`), jeden Aufruf mit Wort-Feld
+ * (`lage.gebuehrWort ?? …`) ohne das Feld und jeden Leser einer Modul-Konstante,
+ * die sie festhält. Jede Meldung steht entweder mit Grund „nur Modell bisher“ in
+ * der festen Liste oder als offen bei der Nummer, der die Datei gehört — die
+ * Typprüfung allein verhindert den Rückfall nicht.
  */
 export const SERVICEGEBUEHR_BEZEICHNUNG = 'Servicegebühr'
 

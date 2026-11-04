@@ -23,7 +23,7 @@ import {
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { BAR_OHNE_GEBUEHR_HINWEIS, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_PROZENT, mitBarAusnahme } from '@/lib/konditionen'
-import { bestellGebuehr, satzText, type GebuehrModell } from '@/lib/plattformgebuehr'
+import { bestellGebuehr, satzHundertstel, satzText, type GebuehrModell } from '@/lib/plattformgebuehr'
 import { gruppenBeschriftung, type PinPunkt } from '@/lib/hoefe-anzeige'
 import { liegtImAusschnitt, type GeoPunkt } from '@/lib/regionskarte'
 
@@ -350,7 +350,8 @@ export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL
 
 /** Das Beispiel im Hofpreis-Modell: Endpreis = Warenpreis + Gebühr je Stück (N38), der Hof bekommt den Warenpreis. */
 function beispielImHofpreis(warenpreisCents: number): Beispielrechnung {
-  const hundertstel = PLATTFORMGEBUEHR_PROZENT * 100
+  // Der Standardsatz in Hundertstel über dieselbe Funktion wie Kasse und Hofseite (ohne eigenen Satz des Hofs).
+  const hundertstel = satzHundertstel({ plattformgebuehrProzent: null })
   const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: warenpreisCents, menge: 1 }], hundertstel)
   const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
   return {
