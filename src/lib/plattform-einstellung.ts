@@ -12,9 +12,11 @@
  * Die Prüfungen sind reine Funktionen mit festen Sätzen: dieselben im
  * Formular (sofort) und in der Action (Schutz, mit dem Stand nach der Sperre).
  * Seit Nr. 116 (Register K2, Aktion „100 Gründungshöfe“): Plätze nur erhöhen
- * und nie unter die vergebenen, Monate nur erhöhen (mehr nur, solange die
- * Aktion nicht vorbei ist), „Aktion bis“ einmal gesetzt nur noch früher. Das
- * Standard-Ende bleibt für die Übernahme stehen und ist nicht mehr änderbar.
+ * und nie unter die vergebenen, „Aktion bis“ einmal gesetzt nur noch früher.
+ * Monate (Register N44, Nr. 221): vor dem Festschreiben frei von 1 bis
+ * GRUENDUNG_MONATE_MAX, danach nur erhöhen (mehr nur, solange die Aktion
+ * nicht vorbei ist). Das Standard-Ende bleibt für die Übernahme stehen und
+ * ist nicht mehr änderbar.
  */
 import {
   GRUENDUNG_BIS_STANDARD_TAG,
@@ -30,6 +32,8 @@ import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
+import { MINDESTBESTELLWERT_TEXT, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_PROZENT } from '@/lib/konditionen'
+import { formatZahl } from '@/lib/format'
 
 /** Die Kennung der einen Zeile. */
 export const PLATTFORM_EINSTELLUNG_ID = 'plattform'
@@ -147,7 +151,7 @@ export const GRUENDUNG_EINSTELLUNG_FEHLER = {
   plaetze: `Trag bei „Plätze gesamt“ eine ganze Zahl von 0 bis ${GRUENDUNG_PLAETZE_MAX} ein.`,
   plaetzeNurMehr: (bisher: number): string => `Plätze lassen sich nur erhöhen – gerade sind es ${bisher}.`,
   monate: `Trag bei „Monate“ eine ganze Zahl von 1 bis ${GRUENDUNG_MONATE_MAX} ein.`,
-  monateNurMehr: (bisher: number): string => `Die Monate lassen sich nur erhöhen – gerade sind es ${bisher}.`,
+  monateNurMehr: (bisher: number): string => `Nach dem Festschreiben lassen sich die Monate nur erhöhen – gerade sind es ${bisher}.`,
   monateVorbei: 'Die Aktion ist vorbei – mehr Monate gehen nur, solange sie läuft.',
   datum: 'Wähle den letzten Tag der Aktion.',
   vergangen: 'Dieser Tag ist schon vorbei. Wähle heute oder einen späteren Tag.',
@@ -169,10 +173,16 @@ function istKalendertag(tag: string): boolean {
  * Die Regeln der Gruppe Gründungshöfe (Register K2, Änderung Nr. 116) gegen
  * den gespeicherten Stand (`bisher`, in der Action nach der Sperre gelesen)
  * und die vergebenen Plätze: Plätze nur erhöhen, nie unter die vergebenen
- * (wer einen Platz hat, behält ihn — K1); Monate nur erhöhen, und mehr nur,
- * solange die Aktion nicht vorbei ist (sie gelten nur für künftige Zusagen);
- * „Aktion bis“ einmal gesetzt nur noch früher (nie leer, nie später) und nie
- * vor dem heutigen WIENER Tag. Zurück kommt der erste verletzte Satz oder null.
+ * (wer einen Platz hat, behält ihn — K1); „Aktion bis“ einmal gesetzt nur
+ * noch früher (nie leer, nie später) und nie vor dem heutigen WIENER Tag.
+ *
+ * Monate (Register N44): Vor dem Festschreiben (`festAm` leer) gibt es noch
+ * keine Zusage nach Monaten — jede Freischaltung bekommt das feste Ende der
+ * Art „bisher“, und `festschreibenListe` nimmt beim Festschreiben immer den
+ * späteren Tag von bisherigem und neuem Ende. Senken nimmt dann niemandem
+ * etwas: 1 bis GRUENDUNG_MONATE_MAX ist frei. Danach nur erhöhen, und mehr
+ * nur, solange die Aktion nicht vorbei ist (sie gelten nur für künftige
+ * Zusagen; K1). Zurück kommt der erste verletzte Satz oder null.
  */
 export function pruefeGruendungEingabe(eingabe: GruendungEingabe, bisher: GruendungEinstellung, vergeben: number, jetzt: Date): string | null {
   if (!Number.isInteger(eingabe.plaetze) || eingabe.plaetze < 0 || eingabe.plaetze > GRUENDUNG_PLAETZE_MAX) {
@@ -181,7 +191,7 @@ export function pruefeGruendungEingabe(eingabe: GruendungEingabe, bisher: Gruend
   if (eingabe.plaetze < vergeben) return GRUENDUNG_EINSTELLUNG_FEHLER.weniger(vergeben)
   if (eingabe.plaetze < bisher.plaetze) return GRUENDUNG_EINSTELLUNG_FEHLER.plaetzeNurMehr(bisher.plaetze)
   if (!Number.isInteger(eingabe.monate) || eingabe.monate < 1 || eingabe.monate > GRUENDUNG_MONATE_MAX) return GRUENDUNG_EINSTELLUNG_FEHLER.monate
-  if (eingabe.monate < bisher.monate) return GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(bisher.monate)
+  if (bisher.festAm !== null && eingabe.monate < bisher.monate) return GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(bisher.monate)
 
   if (eingabe.aktionBisTag !== bisher.aktionBisTag) {
     if (eingabe.aktionBisTag === null) return GRUENDUNG_EINSTELLUNG_FEHLER.nieNachHinten
@@ -249,7 +259,8 @@ export const EINSTELLUNGEN_TEXT = {
     feldPlaetze: 'Plätze gesamt',
     feldPlaetzeZeile: 'nur erhöhen, nie unter die vergebenen',
     feldMonate: 'Monate ohne Grundgebühr',
-    feldMonateZeile: 'nur erhöhen; gilt nur für künftige Zusagen',
+    // Board s3/w3-admin-einstellungen („ab Freischaltung, frühestens ab Tarifstart“) und die Regel N44.
+    feldMonateZeile: 'ab Freischaltung, frühestens ab Tarifstart; vor dem Festschreiben frei wählbar, danach nur mehr',
     feldAktionBis: 'Aktion bis',
     feldAktionBisZeile: 'leer = ohne Stichtag; einmal gesetzt nur noch früher',
     /** Das Standard-Ende von vor Nr. 116 — nur noch für die Übernahme beim Festschreiben, nicht änderbar. */
@@ -335,16 +346,27 @@ export function gruendungZeileKurz(zahlen: Pick<GruendungZahlen, 'gesamt' | 'fre
 
 // ─── Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197) ──────────────────
 
+/** Was ab dem Stichtag gilt — Zahlen aus konditionen.ts, nie als Literal. */
+const HOFPREIS_GILT = `für neue Bestellungen die ${PLATTFORMGEBUEHR_BEZEICHNUNG} im Hofpreis (${formatZahl(PLATTFORMGEBUEHR_PROZENT)} %, Mindestbestellwert ${MINDESTBESTELLWERT_TEXT})`
+
 /** Die Texte der Karte in Admin › Einstellungen. */
 export const HOFPREIS_STICHTAG_TEXT = {
   titel: 'Hofpreis-Modell ab',
-  satz: 'Ab diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis (6 %, Mindestbestellwert 10 €). Vorher bleibt alles wie heute.',
+  /** Vor dem Stichtag. */
+  satz: `Ab diesem Tag gilt ${HOFPREIS_GILT}. Vorher bleibt alles wie heute.`,
+  /** Nach Erreichen (V62, Board s3/w3-admin-einstellungen Bild 4): „Vorher bleibt alles wie heute.“ wäre sinnlos. */
+  satzErreicht: `Seit diesem Tag gilt ${HOFPREIS_GILT}.`,
   feld: 'Stichtag',
   speichern: 'Stichtag speichern',
   speichert: 'Speichert …',
   gespeichert: 'Stichtag gespeichert.',
   erreicht: 'Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.',
 } as const
+
+/** Der Satz der Karte: vor dem Stichtag `satz`, danach `satzErreicht` — `erreicht` kommt von der Seite wie heute. */
+export function hofpreisStichtagSatz(erreicht: boolean): string {
+  return erreicht ? HOFPREIS_STICHTAG_TEXT.satzErreicht : HOFPREIS_STICHTAG_TEXT.satz
+}
 
 /** Die Meldungen der Regel — eigene deutsche Sätze, nie Zods Standardtext. */
 export const HOFPREIS_STICHTAG_FEHLER = {

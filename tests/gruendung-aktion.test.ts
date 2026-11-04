@@ -302,7 +302,7 @@ describe('Sätze der Aktion — EINE Quelle, alle Zustände', () => {
 
   it('Fußnote und Registrieren nennen Tarifstart, Bedingungen und Stichtag — ohne Stichtag ohne diesen Teil', () => {
     expect(lang(GRUENDUNG_TEXT.fussnote(seiten(3)).join(' · '))).toBe(
-      '24 Monate ohne Grundgebühr ab Tarifstart am 1. Februar 2027 bzw. ab deiner Freischaltung · Freischaltung mit mindestens einem Produkt und Stripe · Aktion bis 31. März 2027 · danach Tarif nach Wahl, ohne Wahl bleibt Hoftor, kostenlos'
+      '24 Monate ohne Grundgebühr ab der Freischaltung, frühestens ab Tarifstart am 1. Februar 2027 · Freischaltung mit mindestens einem Produkt und Stripe · Aktion bis 31. März 2027 · danach Tarif nach Wahl, ohne Wahl bleibt Hoftor, kostenlos'
     )
     expect(GRUENDUNG_TEXT.fussnote(seiten(3, { aktionBisTag: null })).some((t) => t.startsWith('Aktion bis'))).toBe(false)
     expect(satz(GRUENDUNG_TEXT.registrieren(seiten(3), 4))).toBe(

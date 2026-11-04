@@ -13,8 +13,17 @@ import type { OrderStatus, PaymentStatus } from '@prisma/client'
 import { istVerwaist, uhrzeitInWien, type FristBestellung } from '@/lib/fristen'
 import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
-import { BAR_OHNE_GEBUEHR_ZAHLART, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
-import { bestellGebuehr, endpreisJeStueckCents, istHofpreisBestellung, mindestbestellwertErreicht, satzHundertstel, satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { BAR_OHNE_GEBUEHR_ZAHLART, MINDESTBESTELLWERT_CENTS, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
+import {
+  bestellGebuehr,
+  endpreisJeStueckCents,
+  istHofpreisBestellung,
+  mindestbestellwertErreicht,
+  mindestbestellwertHinweis,
+  satzHundertstel,
+  satzText,
+  type PreisAnzeige,
+} from '@/lib/plattformgebuehr'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { alsCents, calcTotalAmount, decimalZuCents } from '@/lib/order-totals'
 import { RESERVIERUNG_TTL_MS } from '@/lib/reservierung'
@@ -231,11 +240,18 @@ function hofpreisBetraege(positionen: readonly { productId: string; price: numbe
 /**
  * Der Grund am ausgeschalteten Bestellknopf (N38): im Hofpreis-Modell unter
  * 10 € Warenwert der Satz zum Mindestbestellwert, sonst null. Verbindlich
- * prüft /api/checkout (400 mit demselben Satz).
+ * prüft /api/checkout (400 mit `MINDESTBESTELLWERT_SATZ`).
+ *
+ * Mit `hundertstel` (dem Satz des Hofs, Register N41 a, A3) steht der Hinweis
+ * „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir
+ * fehlen noch Waren für € X.“ (`mindestbestellwertHinweis`). Ohne ihn der
+ * Satz von heute — den Aufruf in checkout-form.tsx stellt Nr. 227 um. Vor dem
+ * Stichtag gibt es keinen Mindestbestellwert (null), wie bisher.
  */
-export function mindestbestellwertGrund(hof: KassenHof, warenCents: number): string | null {
+export function mindestbestellwertGrund(hof: KassenHof, warenCents: number, hundertstel?: number): string | null {
   if (!hof.preisAnzeige) return null
-  return mindestbestellwertErreicht(warenCents) ? null : MINDESTBESTELLWERT_SATZ
+  if (mindestbestellwertErreicht(warenCents)) return null
+  return hundertstel === undefined ? MINDESTBESTELLWERT_SATZ : mindestbestellwertHinweis(MINDESTBESTELLWERT_CENTS - warenCents, hundertstel)
 }
 
 /** Was /api/checkout an Stripe gab (checkoutZahlungsBetragSchema in src/schemas/checkout.ts). */

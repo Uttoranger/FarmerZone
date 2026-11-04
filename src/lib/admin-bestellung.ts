@@ -17,6 +17,8 @@ import { OFFEN_STATUS } from '@/lib/hof-bestellungen'
 import { formatTagKurz } from '@/lib/format'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { uhrzeitInWien } from '@/lib/fristen'
+import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 
 // ─── Adressen ────────────────────────────────────────────────────────────────
 
@@ -247,8 +249,16 @@ export const ADMIN_BESTELLUNG_TEXT = {
   kundinBestellungen: (n: number): string => (n === 1 ? '1 Bestellung in 90 Tagen' : `${n} Bestellungen in 90 Tagen`),
   abholung: 'Abholung',
   zahlung: 'Zahlung',
-  inklGebuehr: (gebuehr: string): string => `inkl. ${gebuehr} Servicegebühr`,
-  servicegebuehr: 'Servicegebühr',
+  /**
+   * „inkl. € 0,50 Servicegebühr“ bzw. „… Plattformgebühr“ — das Wort der
+   * Bestellung über `gebuehrBezeichnungFuer` (V63); ohne Wort die Fassung
+   * „bisher“, bis Nr. 229 die Seite umstellt.
+   */
+  inklGebuehr: (gebuehr: string, wort: string = SERVICEGEBUEHR_BEZEICHNUNG): string => `inkl. ${gebuehr} ${wort}`,
+  /** Die Zeile der Gebühr: das Wort der Bestellung (V63). */
+  gebuehrZeile: (bestellung: { gebuehrModell?: string | null }): string => gebuehrBezeichnungFuer(bestellung),
+  /** Fassung „bisher“ der Zeile — Seiten nehmen `gebuehrZeile`. */
+  servicegebuehr: SERVICEGEBUEHR_BEZEICHNUNG,
   positionen: 'Positionen',
   verlauf: 'Verlauf',
   wasTun: 'Was tun',

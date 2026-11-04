@@ -5,8 +5,9 @@
  * ohne Mock; die Action mit gemockter Datenbank und Sitzung, die Berechtigung
  * echt (verlangeAdminAktion).
  *
- * Beweist: Plätze nur erhöhen und nie unter die vergebenen; Monate nur
- * erhöhen, mehr nur, solange die Aktion nicht vorbei ist; „Aktion bis“ einmal
+ * Beweist: Plätze nur erhöhen und nie unter die vergebenen; Monate vor dem
+ * Festschreiben frei von 1 bis zum Höchstwert, danach nur erhöhen (Register
+ * N44), mehr nur, solange die Aktion nicht vorbei ist; „Aktion bis“ einmal
  * gesetzt nur früher (nie leer, nie später, nie vor dem heutigen WIENER Tag);
  * das Schema gibt nur eigene deutsche Sätze heraus; ohne Admin-Recht wird
  * nichts geschrieben und nichts gelesen; mit Recht nur die Felder der Gruppe,
@@ -40,6 +41,7 @@ import { bildeGruendungBis, type GruendungEinstellung } from '@/lib/gruendungsho
 import {
   EINSTELLUNGEN_TEXT,
   GRUENDUNG_EINSTELLUNG_FEHLER,
+  GRUENDUNG_MONATE_MAX,
   PLATTFORM_EINSTELLUNG_STANDARD,
   festgeschriebenZeile,
   gruendungZeileKurz,
@@ -77,10 +79,20 @@ describe('pruefeGruendungEingabe — Plätze', () => {
 })
 
 describe('pruefeGruendungEingabe — Monate', () => {
-  it('nur erhöhen: 24 → 30 geht, 24 → 18 nicht', () => {
+  it('vor dem Festschreiben frei (N44): 24 → 12 und 24 → 1 gehen, 24 → 30 auch; 0 und über dem Höchstwert nicht', () => {
+    expect(pruefeGruendungEingabe({ ...GUT, monate: 12 }, STAND, 0, JETZT)).toBeNull()
+    expect(pruefeGruendungEingabe({ ...GUT, monate: 1 }, STAND, 0, JETZT)).toBeNull()
     expect(pruefeGruendungEingabe({ ...GUT, monate: 30 }, STAND, 0, JETZT)).toBeNull()
-    expect(pruefeGruendungEingabe({ ...GUT, monate: 18 }, STAND, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24))
     expect(pruefeGruendungEingabe({ ...GUT, monate: 0 }, STAND, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monate)
+    expect(pruefeGruendungEingabe({ ...GUT, monate: GRUENDUNG_MONATE_MAX + 1 }, STAND, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monate)
+  })
+
+  it('nach dem Festschreiben nur erhöhen: 24 → 30 geht, 24 → 12 nicht, gleich bleibt', () => {
+    const eingabe = { plaetze: 100, monate: 24, aktionBisTag: '2027-03-31', anzeige: true }
+    expect(pruefeGruendungEingabe({ ...eingabe, monate: 30 }, FEST, 5, JETZT)).toBeNull()
+    expect(pruefeGruendungEingabe(eingabe, FEST, 5, JETZT)).toBeNull()
+    expect(pruefeGruendungEingabe({ ...eingabe, monate: 12 }, FEST, 5, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24))
+    expect(GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24)).toBe('Nach dem Festschreiben lassen sich die Monate nur erhöhen – gerade sind es 24.')
   })
 
   it('mehr Monate nur, solange die Aktion läuft — nach dem Stichtag nicht mehr, gleich viele schon', () => {
