@@ -6,7 +6,7 @@ import { ETIKETT, KARTE } from '@/components/bestaetigung/bestaetigung-teile'
 /*
  * „Hof erreichen" — EINE Karte für Bestätigungsseite und Bestellseite (Nr. 60; seit Nr. 227 nach den Boards
  * s1-/w1-bestaetigung und s1-/w1-bestellung-link): die kleine Überschrift „HOF ERREICHEN“, darunter zwei
- * grüne Textlinks mit 44 px Trefferfläche (V16) — „<Nummer> anrufen“ (`tel:`) und die Adresse (`mailto:`).
+ * grüne Textlinks mit 44 px Trefferfläche (V16) — „<Nummer> anrufen“ (Telefon-Link über telefonLink) und die Adresse (Mail-Link).
  * Kein eigener Knopf: Beide Seiten haben ihre eine grüne Hauptaktion schon.
  * Telefon und E-Mail des Hofs gibt es erst nach dem Kauf: Beide Seiten lesen sie erst, nachdem die
  * Signatur geprüft ist (S1) — nie über die Bestellnummer.
