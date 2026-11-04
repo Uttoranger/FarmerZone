@@ -10,11 +10,12 @@ import type { UnterreiterDaten } from '@/lib/admin-seiten'
 import { TARIFE_AB, TARIF_ZEILE } from '@/lib/konditionen'
 import type { Monatsschluessel } from '@/lib/servicegebuehr'
 
+/** Die Jahresansicht heißt „Geld“ wie die Seite (Register N32, Wortliste N42 c: nicht „Finanzen“). */
 export const FINANZEN_SEITE = {
-  titel: 'Finanzen',
+  titel: 'Geld',
   satz: 'Ein Überblick, keine Buchhaltung: was die Plattform einnimmt, was sie kostet, ob sie sich trägt.',
-  kennzahlen: 'Finanzen in Zahlen',
-  reiter: 'Ansicht der Finanzen',
+  kennzahlen: 'Geld in Zahlen',
+  reiter: 'Ansicht von Geld',
 } as const
 
 // ─── Unterreiter ─────────────────────────────────────────────────────────────

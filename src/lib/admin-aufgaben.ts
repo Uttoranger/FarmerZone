@@ -30,7 +30,7 @@ import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremse
 import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { bestellungenHref } from '@/lib/admin-bestellung'
 import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
-import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
+import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type GebuehrWort, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import type { Umgebung } from '@/lib/umgebung'
 
@@ -666,7 +666,7 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       ? aufgabe(
           'widerruf_offen',
           {
-            titel: 'Widerruf offen',
+            titel: 'Rücktritt offen',
             bezug: { kennung: w.bestellnummer, text: [w.bestellnummer, ...(w.hofName ? [w.hofName] : [])].join(' · ') },
             satz: 'Der Hof erstattet nach der Rückgabe oder lehnt mit Grund ab. Frist 14 Tage ab Eingang.',
             seit: w.eingegangenAm,
@@ -678,9 +678,9 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       : aufgabe(
           'widerruf_offen',
           {
-            titel: 'Widerruf ohne Bestellung',
+            titel: 'Rücktritt ohne Bestellung',
             bezug: { kennung: w.id, text: 'nicht zugeordnet' },
-            satz: 'Der Widerruf passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
+            satz: 'Der Rücktritt passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
             seit: w.eingegangenAm,
             wasTun: 'pruefen',
             // Die Liste „Widerrufe ohne Bestellung“ mit Name, Nummer und „Zuordnen …“ (Nachbesserung Runde 2).
@@ -809,7 +809,7 @@ export const HEUTE_TEXT = {
 /** Die Woche aller Höfe nach der Umsatzregel (abgeholt seit Montag, ohne Testzahlungen); Beträge in Cent. */
 export type HeuteWoche = {
   umsatzCents: number
-  /** Servicegebühr dieser Bestellungen, ohne entfallene. */
+  /** Gebühr dieser Bestellungen (Service- bzw. Plattformgebühr), ohne entfallene. */
   gebuehrCents: number
   anzahl: number
   /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt. */
@@ -831,6 +831,12 @@ export type HeuteLage = {
   hoefe: { verkaufen: number; warten: number }
   /** Der letzte erfolgreiche Geld-Abgleich (Nr. 191); null = noch keiner (außerhalb der Produktion immer). */
   geldAbgleichOk?: boolean
+  /**
+   * Das Wort der Gebühr dieser Woche (V63): `gebuehrWortFuerZeitraum(Wochenbeginn,
+   * jetzt, hofpreisModellAb(einstellung))` — die Seite setzt es (Nr. 229). Ohne
+   * Wort die Fassung „bisher“.
+   */
+  gebuehrWort?: GebuehrWort
 }
 
 export type LageKachel = {
@@ -868,7 +874,7 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       // „stimmt“ nur nach einem erfolgreichen Abgleich (Nr. 191); „Auszahlung Do“ hat keine Quelle im Code und fehlt weiter.
       marke: lage.geldAbgleichOk ? (abweichungen === 0 ? { wort: 'stimmt', art: 'laeuft' } : { wort: mitAnzahlWort(abweichungen, 'Abweichung', 'Abweichungen'), art: 'tun' }) : null,
       zeilen: [
-        `${SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`,
+        `${lage.gebuehrWort ?? SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`,
         ...(lage.geldAbgleichOk ? [abweichungen === 0 ? 'Abgleich mit Stripe ohne Abweichung' : 'Abgleich mit Stripe: Abweichung in Braucht dich'] : []),
       ],
     },
@@ -984,8 +990,8 @@ export function routineZeile(erledigt: number): string {
  */
 export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   hof_freigeschaltet: 'Hof freigeschaltet',
-  widerruf_zugeordnet: 'Widerruf einer Bestellung zugeordnet',
-  widerruf_abgelehnt: 'Widerruf abgelehnt (Hof)',
+  widerruf_zugeordnet: 'Rücktritt einer Bestellung zugeordnet',
+  widerruf_abgelehnt: 'Rücktritt abgelehnt (Hof)',
   hof_freigabe_entzogen: 'Freischaltung zurückgenommen',
   hof_abgelehnt: 'Hof abgelehnt',
   servicegebuehr_geaendert: 'Servicegebühr geändert',

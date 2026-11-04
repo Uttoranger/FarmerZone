@@ -16,7 +16,14 @@
  * nur über `alsCents` und `centsAlsEuro`.
  */
 import { centsAlsEuro } from '@/lib/format'
-import { BAR_SERVICEGEBUEHR_AB, MINDESTBESTELLWERT_CENTS, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_PROZENT, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
+import {
+  BAR_SERVICEGEBUEHR_AB,
+  MINDESTBESTELLWERT_CENTS,
+  mindestbestellwertHinweisText,
+  PLATTFORMGEBUEHR_BEZEICHNUNG,
+  PLATTFORMGEBUEHR_PROZENT,
+  PLATTFORMGEBUEHR_SATZ,
+} from '@/lib/konditionen'
 import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS, gebuehrFuerMonatsabrechnung, istVorOrtZahlung, type Zahlungsart } from '@/lib/servicegebuehr'
 import { alsCents } from '@/lib/order-totals'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
@@ -302,6 +309,74 @@ export function gebuehrBezeichnungFuer(bestellung: { gebuehrModell?: string | nu
 /** Der Erklärsatz zur Gebühr einer gespeicherten Bestellung — N38-Satz im Hofpreis-Modell, sonst der bisherige. */
 export function gebuehrHinweisFuer(bestellung: { gebuehrModell?: string | null }): string {
   return istHofpreisBestellung({ gebuehrModell: bestellung.gebuehrModell ?? null }) ? PLATTFORMGEBUEHR_SATZ : SERVICEGEBUEHR_HINWEIS
+}
+
+/**
+ * Der Vermerk im Hofbereich, wenn die Erstattung der Gebühr bei Stripe offen
+ * ist — mit dem Wort der Bestellung (V63). `GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS`
+ * (servicegebuehr.ts) bleibt die Fassung „bisher“; Seiten nehmen diesen Helfer.
+ */
+export function gebuehrErstattungOffenHinweisFuer(bestellung: { gebuehrModell?: string | null }): string {
+  return `${gebuehrBezeichnungFuer(bestellung)}-Erstattung ausstehend.`
+}
+
+// ─── Das Wort für die Gebühr ohne einzelne Bestellung (V62, V63; Nr. 221) ────
+
+/** Das Wort, wenn ein Zeitraum Bestellungen aus beiden Modellen enthält. */
+export const GEBUEHREN_WORT = 'Gebühren'
+
+/** Eines der drei Wörter für die Gebühr: je Modell oder über einen Zeitraum. */
+export type GebuehrWort = typeof SERVICEGEBUEHR_BEZEICHNUNG | typeof PLATTFORMGEBUEHR_BEZEICHNUNG | typeof GEBUEHREN_WORT
+
+/**
+ * Das Wort in einem Modell — für Texte, die an keiner gespeicherten
+ * Bestellung hängen (Konditionen, Hinweise): ab dem Stichtag
+ * „Plattformgebühr“, davor „Servicegebühr“. Das Modell kommt aus
+ * `gebuehrModellFuer` — keine zweite Datumsregel.
+ */
+export function gebuehrWortFuerModell(modell: GebuehrModell): GebuehrWort {
+  return modell === 'hofpreis' ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG
+}
+
+/**
+ * Das Wort für Gebühren über einen Zeitraum (V63) — Summen, Kennzahlen,
+ * Diagramme. Der Zeitraum ist halboffen [von, bis) und meint die
+ * Bestellzeitpunkte (`createdAt`, danach richtet sich `Order.gebuehrModell`):
+ *  - ganz vor dem Stichtag (`bis` ≤ Stichtag) → „Servicegebühr“
+ *  - ganz ab dem Stichtag (`von` ≥ Stichtag) → „Plattformgebühr“
+ *  - beides → „Gebühren“
+ * Der Stichtag ist `hofpreisModellAb(einstellung)`. Ein leerer oder
+ * verdrehter Zeitraum (`bis` ≤ `von`) zählt wie der Zeitpunkt `von`.
+ */
+export function gebuehrWortFuerZeitraum(von: Date, bis: Date, stichtag: Date): GebuehrWort {
+  const anfang = von.getTime()
+  const ende = Math.max(bis.getTime(), anfang)
+  const grenze = stichtag.getTime()
+  if (anfang >= grenze) return PLATTFORMGEBUEHR_BEZEICHNUNG
+  if (ende <= grenze) return SERVICEGEBUEHR_BEZEICHNUNG
+  return GEBUEHREN_WORT
+}
+
+/** „Servicegebühren“, „Plattformgebühren“, „Gebühren“ — die Mehrzahl für Summen und Legenden. */
+export function gebuehrenMehrzahl(wort: GebuehrWort): string {
+  return wort === GEBUEHREN_WORT ? wort : `${wort}en`
+}
+
+// ─── Mindestbestellwert-Satz (Register N41 a, A3) ────────────────────────────
+
+/**
+ * „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir
+ * fehlen noch Waren für € 3,20.“ (A3) — mit dem Satz des Hofs in
+ * Hundertstel-Prozent. „ab“ ist der Endpreis des Mindestwerts als EIN Stück
+ * (`endpreisJeStueckCents`): Je Stück aufgerundet wird es nur mehr, nie
+ * weniger. Beim Fehlbetrag steht bewusst keine Gebühr — jede Zahl dort stimmte
+ * nur ungefähr (A3). Liegt hier statt in konditionen.ts, weil konditionen.ts
+ * diese Datei nicht einbinden darf (Ring über servicegebuehr.ts, Kopf von
+ * konditionen.ts); der Wortlaut steht dort (`mindestbestellwertHinweisText`).
+ * `MINDESTBESTELLWERT_SATZ` bleibt die Meldung von /api/checkout.
+ */
+export function mindestbestellwertHinweis(fehlendCents: number, hundertstel: number): string {
+  return mindestbestellwertHinweisText(endpreisJeStueckCents(MINDESTBESTELLWERT_CENTS, hundertstel), Math.max(0, fehlendCents))
 }
 
 /**

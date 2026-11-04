@@ -22,7 +22,8 @@ import {
   barOhneServicegebuehr,
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
-import { BAR_OHNE_GEBUEHR_HINWEIS, mitBarAusnahme } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_HINWEIS, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_PROZENT, mitBarAusnahme } from '@/lib/konditionen'
+import { bestellGebuehr, satzHundertstel, satzText, type GebuehrModell } from '@/lib/plattformgebuehr'
 import { gruppenBeschriftung, type PinPunkt } from '@/lib/hoefe-anzeige'
 import { liegtImAusschnitt, type GeoPunkt } from '@/lib/regionskarte'
 
@@ -290,6 +291,14 @@ export type Beispielrechnung = {
   hofBekommtCents: number
   /** Der Satz unter dem Beispiel: für welche Zahlart es gilt (Register B1). */
   fussnote: string
+  /**
+   * Nur im Hofpreis-Modell (N38, Board w1-startseite „Beispiel“): das Modell
+   * und der Satz „Der Hof verlangt … Du zahlst … – darin stecken 6 %
+   * Plattformgebühr. …“. Im Modell „bisher“ fehlen beide — das Beispiel ist
+   * dann genau das von vor Nr. 221.
+   */
+  modell?: 'hofpreis'
+  satz?: string
 }
 
 /** Unter dem Beispiel, sobald bar und online wieder gleich viel kosten. */
@@ -307,8 +316,15 @@ export const BEISPIEL_WARENPREIS_CENTS = 2000
  * Gerechnet wird die ONLINE-Zahlung. Vor dem SEPA-Start kostet bar keine
  * Gebühr (B1) — dann sagt die Fußnote genau das, statt „egal ob online oder
  * bar". `jetzt` kommt von der Seite (Server-Uhr), wie überall.
+ *
+ * Ab dem Stichtag „Hofpreis-Modell ab“ (`modell` = 'hofpreis', von der Seite
+ * über `gebuehrModellFuer`; V62, Nr. 221) rechnet das Beispiel über
+ * `bestellGebuehr` mit dem Standardsatz — dieselbe Funktion wie Kasse und
+ * /api/checkout, online und bar gleich. Ohne `modell` bleibt alles wie vor
+ * Nr. 221 (die Seite stellt Nr. 226 um).
  */
-export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL_WARENPREIS_CENTS): Beispielrechnung {
+export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL_WARENPREIS_CENTS, modell: GebuehrModell = 'bisher'): Beispielrechnung {
+  if (modell === 'hofpreis') return beispielImHofpreis(warenpreisCents)
   const { gebuehrCents } = berechneServicegebuehr(
     warenpreisCents,
     {
@@ -329,6 +345,27 @@ export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL
     fussnote: barOhneServicegebuehr('ONSITE_CASH', jetzt)
       ? `Bei Online-Zahlung. ${BAR_OHNE_GEBUEHR_HINWEIS}`
       : BEISPIEL_GLEICH,
+  }
+}
+
+/** Das Beispiel im Hofpreis-Modell: Endpreis = Warenpreis + Gebühr je Stück (N38), der Hof bekommt den Warenpreis. */
+function beispielImHofpreis(warenpreisCents: number): Beispielrechnung {
+  // Der Standardsatz in Hundertstel über dieselbe Funktion wie Kasse und Hofseite (ohne eigenen Satz des Hofs).
+  const hundertstel = satzHundertstel({ plattformgebuehrProzent: null })
+  const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: warenpreisCents, menge: 1 }], hundertstel)
+  const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
+  return {
+    warenpreisCents,
+    gebuehrCents,
+    prozent: PLATTFORMGEBUEHR_PROZENT,
+    mindestCents: 0,
+    duZahlstCents: gesamtCents,
+    hofBekommtCents: warenpreisCents,
+    fussnote: BEISPIEL_GLEICH,
+    modell: 'hofpreis',
+    satz:
+      `Der Hof verlangt ${euro(warenpreisCents)} für deinen Einkauf. Du zahlst ${euro(gesamtCents)} – darin stecken ` +
+      `${satzText(hundertstel)} % ${PLATTFORMGEBUEHR_BEZEICHNUNG}. Der Hof bekommt seine vollen ${euro(warenpreisCents)}.`,
   }
 }
 
