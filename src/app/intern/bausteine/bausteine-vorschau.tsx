@@ -50,6 +50,7 @@ import { KaufZusammenfassung, type ZusammenfassungPosition } from '@/components/
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -147,7 +148,7 @@ function MeldungVorschau({ welt }: { welt: MeldungWelt }): React.JSX.Element {
         welt={welt}
         alsHof={welt === 'hof'}
         abbrechenHref="/intern/bausteine#meldung"
-        titel={welt === 'kunde' ? 'Problem melden' : undefined}
+        titel={welt === 'kunde' ? PROBLEM_MELDEN : undefined}
         satz={welt === 'kunde' ? 'Danke, dass du Bescheid gibst. Wir schauen uns das an.' : undefined}
       />
     </div>
@@ -490,11 +491,11 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             </div>
           </Abschnitt>
 
-          <Abschnitt id="meldung" titel="Problem melden" satz="Eine Darstellung, Ton je Welt (V51): Kundschaft grün, Hof orange. Die Logik bleibt useMeldungFormular — hier wird nichts geschickt.">
+          <Abschnitt id="meldung" titel={PROBLEM_MELDEN} satz="Eine Darstellung, Ton je Welt (V51): Kundschaft grün, Hof orange. Die Logik bleibt useMeldungFormular — hier wird nichts geschickt.">
             <MeldungVorschau welt="kunde" />
           </Abschnitt>
 
-          <Abschnitt id="meldung-hof" titel="Problem melden im Hofbereich" satz="Dieselbe Darstellung in Orange; der angemeldete Hof sieht „Bildschirmfoto hinzufügen“ statt der E-Mail.">
+          <Abschnitt id="meldung-hof" titel={`${PROBLEM_MELDEN} im Hofbereich`} satz="Dieselbe Darstellung in Orange; der angemeldete Hof sieht „Bildschirmfoto hinzufügen“ statt der E-Mail.">
             <MeldungVorschau welt="hof" />
           </Abschnitt>
 
