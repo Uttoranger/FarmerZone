@@ -206,6 +206,12 @@ export const HEUTE_LABEL = hauptPunkt('heute').label
 /** Der Textlink in der Hofkarte der Seitenleiste. */
 export const HOFSEITE_ANSEHEN = 'Hofseite ansehen'
 
+/**
+ * Der Kopf eines Blatts der Shells bleibt beim Scrollen oben stehen (Board
+ * s1-mehr-neu, Bild 2: „Mehr · Schließen“ über der gescrollten Liste).
+ */
+export const BLATT_KOPF_KLEBT = 'sticky top-0 z-10 bg-popover'
+
 /** Titel und das eine Schließen-Element des Blatts „Mehr“. */
 export const HOF_MEHR_TITEL = 'Mehr'
 export const HOF_MEHR_SCHLIESSEN = 'Schließen'

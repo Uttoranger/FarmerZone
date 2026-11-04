@@ -31,6 +31,7 @@ import {
   type AdminReiter,
   type AdminReiterId,
 } from '@/lib/admin-navigation'
+import { BLATT_KOPF_KLEBT } from '@/lib/bauern-navigation'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import type { StripeMarke } from '@/lib/testumgebung'
 import { cn } from '@/lib/utils'
@@ -245,7 +246,7 @@ function AdminLeiste({
           <span>{ADMIN_MEHR_TEXT.titel}</span>
         </SheetTrigger>
         <SheetBlatt className={ueberDerLeiste}>
-          <SheetKopf titel={ADMIN_MEHR_TEXT.titel} schliessen={ADMIN_MEHR_TEXT.schliessen} />
+          <SheetKopf titel={ADMIN_MEHR_TEXT.titel} schliessen={ADMIN_MEHR_TEXT.schliessen} className={BLATT_KOPF_KLEBT} />
           <ListGruppe beschriftung={ADMIN_MEHR_TEXT.bereiche}>
             {mehr.map((r) => (
               <ListRow

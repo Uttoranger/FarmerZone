@@ -44,6 +44,7 @@ import {
   HOF_NEU_TITEL,
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
+  BLATT_KOPF_KLEBT,
   hofAriaAktuell,
   hofHandyAriaAktuell,
   hofMehrAktiv,
@@ -494,7 +495,7 @@ export function HofShell({
                     <span>{HOF_NEU_KNOPF}</span>
                   </SheetTrigger>
                   <SheetBlatt>
-                    <SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} />
+                    <SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} className={BLATT_KOPF_KLEBT} />
                     {[neuAnlegen, neuAnderes].map((gruppe, i) => (
                       <div key={i} className="flex flex-col gap-2">
                         {i > 0 && <BlattUeberschrift>{HOF_NEU_ANDERES_TITEL}</BlattUeberschrift>}
@@ -539,7 +540,7 @@ export function HofShell({
                 <span>{HOF_MEHR_TITEL}</span>
               </SheetTrigger>
               <SheetBlatt>
-                <SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} />
+                <SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} className={BLATT_KOPF_KLEBT} />
                 {hauptImMehr.length > 0 && (
                   <ListGruppe>
                     {hauptImMehr.map((punkt) => {
