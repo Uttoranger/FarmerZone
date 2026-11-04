@@ -75,6 +75,7 @@ import { DARSTELLUNG_TEXT, WARENKORB_WORT, kundenHandyAriaAktuell, kundenNavigat
 import { ADMIN_MEHR_ZEILE } from '@/lib/admin-navigation'
 import { POSTFACH_HREF, POSTFACH_TEXT } from '@/lib/postfach'
 import { KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
+import { MARKE } from '@/lib/marke'
 import type { TarifZeileDaten } from '@/lib/konditionen'
 
 const INHALT = createElement('p', null, 'Inhalt der Seite')
@@ -266,7 +267,7 @@ describe('HofShell: Seitenleiste (V13, Board w1-mehr-neu)', () => {
 
   it('oben die Marke, die Hofkarte mit „Hofseite ansehen“, dann „+ Neu ▾“ als Pille', () => {
     const leiste = seitenleiste()
-    const marke = leiste.indexOf('aria-label="Agrilo – Heute"')
+    const marke = leiste.indexOf(`aria-label="${MARKE} – Heute"`)
     const hofseite = leiste.indexOf('>Hofseite ansehen<')
     const neu = leiste.indexOf('>Neu<')
     expect(marke).toBeGreaterThan(-1)
