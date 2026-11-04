@@ -85,7 +85,8 @@ const VERBOTE = verbotene(TABELLE)
 
 // ── Die Suche ────────────────────────────────────────────────────────────────
 
-type Fund = { datei: string; zeile: number; wort: string; text: string }
+/** `schluessel`: Name der Eigenschaft, deren Wert der Text ist (`{ titel: '…' }`), sonst leer. */
+type Fund = { datei: string; zeile: number; wort: string; text: string; schluessel?: string }
 
 /**
  * Wendungen, in denen ein verbotenes Wort etwas anderes meint — je Zeile mit Grund.
@@ -130,6 +131,15 @@ function imLog(knoten: ts.Node): boolean {
   return false
 }
 
+/** Name der Eigenschaft, deren Wert der Text ist — eine Vorlage zählt als Ganzes. */
+function eigenschaftVon(knoten: ts.Node): string | undefined {
+  let k = knoten
+  while (k.parent && (ts.isTemplateSpan(k.parent) || ts.isTemplateExpression(k.parent))) k = k.parent
+  const eltern = k.parent
+  if (eltern === undefined || !ts.isPropertyAssignment(eltern) || eltern.initializer !== k) return undefined
+  return ts.isIdentifier(eltern.name) || ts.isStringLiteral(eltern.name) ? eltern.name.text : undefined
+}
+
 /** Verbotene Wörter in Zeichenketten, Vorlagen, Attributen und JSX-Text — Kommentare, Bezeichner und Logs zählen nicht. */
 function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel.tsx'): Fund[] {
   const art = datei.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -144,11 +154,12 @@ function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel
       // Ein Zeilenumbruch mitten im JSX-Text trennt keine Wortgruppe („Hilfe und\n Rückmeldung").
       const text = roh.replace(/\s+/g, ' ').trim()
       const zeile = quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1
+      const schluessel = eigenschaftVon(knoten)
       let suchtext = text
       for (const { wendung } of ERLAUBTE_WENDUNGEN) suchtext = suchtext.replaceAll(wendung, ' '.repeat(wendung.length))
       for (const v of verbote) {
         if (sinnAusnahme(v.wort, text)) continue
-        funde.push(...[...suchtext.matchAll(v.muster)].map(() => ({ datei, zeile, wort: v.wort, text })))
+        funde.push(...[...suchtext.matchAll(v.muster)].map(() => ({ datei, zeile, wort: v.wort, text, ...(schluessel === undefined ? {} : { schluessel }) })))
       }
     }
     ts.forEachChild(knoten, besuche)
@@ -181,13 +192,15 @@ const ohneDateien = (funde: Fund[], dateien: AusnahmeDatei[]): Fund[] => funde.f
 /**
  * Wo ein verbotenes Wort in anderem Sinn richtig ist — dauerhaft, je Text mit Grund.
  * `text` ist der ganze Text (genau gleich) oder ein Muster; ein Eintrag gilt für jeden
- * Treffer mit diesem Text in der Datei. Zeilennummern stehen hier nie.
+ * Treffer mit diesem Text in der Datei. Zeilennummern stehen hier nie. Nennt ein Eintrag
+ * `eigenschaften`, deckt er je Name genau einen Treffer, dessen Text der Wert dieser Eigenschaft
+ * ist — ein weiterer gleicher Text (andere Eigenschaft oder zweites Mal) bleibt ein Fund.
  *
  * „Status", „Post" und „Neuigkeit" meinen in der Wortliste den Beitrag. Der Status einer
  * Bestellung, Zahlung, Freischaltung oder Meldung, der Name der WhatsApp-Funktion „Status"
  * und ein HTTP-Kopf bleiben, wie sie heißen.
  */
-type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: string }
+type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: string; eigenschaften?: string[] }
 const AUSNAHMEN: Ausnahme[] = [
   // Version
   { datei: 'src/app/admin/betrieb/dienste.ts', wort: 'Version', text: 'Version', grund: 'Karte „Version“ in Admin › Betrieb meint den Deploy, der live ist (Board admin-betrieb-neu, Nr. 184) — keine Fassung der Startseite' },
@@ -226,13 +239,6 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: /^Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen/, grund: 'Wortlaut der Muster-Widerrufsbelehrung, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: '– Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)', grund: 'Wortlaut des Muster-Widerrufsformulars, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
   { datei: 'src/lib/rechtstexte/gewaehrleistung-mitteilung.ts', wort: 'Mitteilung', text: /^Harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht \(Anhang II FAGG\)/, grund: 'Alt-Text der amtlichen Grafik nach Anhang II FAGG (Nr. 211, Wortlaut aus der Freigabe) — Name des Rechtstexts, keine Nachricht im Postfach' },
-  // Newsletter (Register N12)
-  {
-    datei: 'src/app/(public)/datenschutz/page.tsx',
-    wort: 'Newsletter',
-    text: '9. Newsletter und Neuigkeiten von Höfen',
-    grund: 'Anmeldung bei einem Hof (Neuigkeiten), Entscheidung offen (Freigabe Lauf 13: keine Änderung)',
-  },
   // Lager
   {
     datei: 'src/lib/taxonomie.ts',
@@ -246,12 +252,6 @@ const AUSNAHMEN: Ausnahme[] = [
     wort: 'Bounce',
     text: /\(Bounce: das Postfach weist die Mail zurück\)/,
     grund: 'Regel-Zeile von Betrieb › E-Mails: Das Fachwort steht genau einmal erklärt (Freigabe Nr. 161 Punkt 2)',
-  },
-  {
-    datei: 'src/app/(public)/datenschutz/page.tsx',
-    wort: 'Beschwerde',
-    text: /Datenschutzbehörde Beschwerde einzulegen/,
-    grund: 'Rechtsbegriff der Datenschutzerklärung (Beschwerde bei der Aufsichtsbehörde), keine Spam-Meldung',
   },
   {
     datei: 'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
@@ -271,13 +271,15 @@ const AUSNAHMEN: Ausnahme[] = [
     datei: 'src/lib/widerruf.ts',
     wort: 'widerrufen',
     text: 'Vertrag widerrufen',
-    grund: 'Recht prüft: Beschriftung der Online-Funktion nach § 13a FAGG (N39; knopfWiderrufen, fussLink), wörtlich bis zur Entscheidung der Anwältin (N43 (1))',
+    eigenschaften: ['knopfWiderrufen', 'fussLink'],
+    grund: 'Recht prüft: Beschriftung der Online-Funktion nach § 13a FAGG (N39; Knopf und Einstieg), wörtlich bis zur Entscheidung der Anwältin (N43 (1)) — der Titel der Seite nicht (Offen-Datei 231)',
   },
   {
     datei: 'src/lib/widerruf.ts',
     wort: 'Widerruf',
     text: 'Widerruf bestätigen',
-    grund: 'Recht prüft: Knopf der Online-Funktion nach § 13a FAGG (N39; knopfBestaetigen), wörtlich bis zur Entscheidung der Anwältin (N43 (1))',
+    eigenschaften: ['knopfBestaetigen'],
+    grund: 'Recht prüft: Knopf der Online-Funktion nach § 13a FAGG (N39), wörtlich bis zur Entscheidung der Anwältin (N43 (1))',
   },
   {
     datei: 'src/lib/widerruf.ts',
@@ -353,10 +355,12 @@ type Offen = { stelle: string; wort: string; text: string; nummer?: string }
 const OFFEN_ORDNER = join(WURZEL, 'tests/wortliste-offen')
 const OFFEN_NAMEN = existsSync(OFFEN_ORDNER) ? readdirSync(OFFEN_ORDNER).sort() : []
 /** Jede Datei des Ordners mit ihrer Nummer — gelesen wird alles, was dort liegt. */
-const OFFEN_DATEIEN: { name: string; nummer: string; eintraege: Offen[] }[] = await Promise.all(
+const OFFEN_DATEIEN: { name: string; nummer: string; export: unknown; eintraege: Offen[] }[] = await Promise.all(
   OFFEN_NAMEN.map(async (name) => {
-    const modul = (await import(pathToFileURL(join(OFFEN_ORDNER, name)).href)) as { OFFEN?: Offen[] }
-    return { name, nummer: name.replace(/\.ts$/, ''), eintraege: modul.OFFEN ?? [] }
+    const modul = (await import(pathToFileURL(join(OFFEN_ORDNER, name)).href)) as { OFFEN?: unknown }
+    // Fehlt der Export oder ist er keine Liste, fällt das in „exportiert OFFEN als Liste“ auf — nie still als leer.
+    const eintraege = Array.isArray(modul.OFFEN) ? (modul.OFFEN as Offen[]) : []
+    return { name, nummer: name.replace(/\.ts$/, ''), export: modul.OFFEN, eintraege }
   })
 )
 
@@ -365,6 +369,22 @@ const dateiVon = (stelle: string): string => stelle.slice(0, stelle.lastIndexOf(
 
 const deckt = (a: Ausnahme, f: Fund): boolean =>
   a.datei === f.datei && a.wort === f.wort && (typeof a.text === 'string' ? a.text === f.text : a.text.test(f.text))
+
+/**
+ * Die Funde ohne die, die eine Ausnahme deckt. Eine Ausnahme mit `eigenschaften` deckt je Name genau
+ * einen Fund mit diesem Eigenschaftsnamen; `ungenutzt` nennt die Namen, für die kein Fund da war.
+ */
+function ohneAusnahmenAus(funde: Fund[], ausnahmen: Ausnahme[]): { rest: Fund[]; ungenutzt: string[] } {
+  const frei = ausnahmen.map((a) => new Set(a.eigenschaften ?? []))
+  const rest = funde.filter((f) => {
+    const i = ausnahmen.findIndex((a, j) => deckt(a, f) && (a.eigenschaften === undefined || frei[j].has(f.schluessel ?? '')))
+    if (i === -1) return true
+    if (ausnahmen[i].eigenschaften !== undefined) frei[i].delete(f.schluessel ?? '')
+    return false
+  })
+  const ungenutzt = ausnahmen.flatMap((a, i) => [...frei[i]].map((name) => `${a.datei} „${a.wort}“ ${name}`))
+  return { rest, ungenutzt }
+}
 
 /** Jede Fundstelle nimmt höchstens einen Eintrag; was bleibt, ist offen bzw. ohne Fundstelle. */
 function gleicheAb<E extends Deckt>(funde: Fund[], liste: E[]): { rest: Fund[]; ungenutzt: E[] } {
@@ -527,6 +547,27 @@ describe('Wortliste', () => {
       expect(rest.map((f) => f.datei)).toEqual(['src/lib/b.ts'])
     })
 
+    it('Gegenprobe (N43 (1)): „Vertrag widerrufen“ in widerruf.ts gilt nur für Knopf und Einstieg — der Titel und ein drittes Mal bleiben Funde', () => {
+      const quelle = [
+        'export const WIDERRUF_TEXT = {',
+        "  knopfWiderrufen: 'Vertrag widerrufen',",
+        "  knopfBestaetigen: 'Widerruf bestätigen',",
+        "  fussLink: 'Vertrag widerrufen',",
+        "  titel: 'Vertrag widerrufen',",
+        '}',
+        "export const NOCHMAL = { fussLink: 'Vertrag widerrufen', knopfBestaetigen: 'Widerruf bestätigen' }",
+      ].join('\n')
+      const { rest, ungenutzt } = ohneAusnahmenAus(findeVerbotene(quelle, VERBOTE, 'src/lib/widerruf.ts'), AUSNAHMEN)
+      expect(rest.map((f) => `${f.zeile} ${f.schluessel} ${f.wort}`)).toEqual(['5 titel widerrufen', '7 fussLink widerrufen', '7 knopfBestaetigen Widerruf'])
+      expect(ungenutzt.filter((u) => u.startsWith('src/lib/widerruf.ts'))).toEqual([])
+      // Fehlt der Knopf, fällt sein Name als ungenutzt auf.
+      const ohneKnopf = findeVerbotene("const T = { fussLink: 'Vertrag widerrufen' }", VERBOTE, 'src/lib/widerruf.ts')
+      expect(ohneAusnahmenAus(ohneKnopf, AUSNAHMEN).ungenutzt.filter((u) => u.startsWith('src/lib/widerruf.ts'))).toEqual([
+        'src/lib/widerruf.ts „widerrufen“ knopfWiderrufen',
+        'src/lib/widerruf.ts „Widerruf“ knopfBestaetigen',
+      ])
+    })
+
     it('Gegenprobe: ein kurzer Text nimmt einem längeren, der ihn enthält, den Platz nicht weg — gleich in welcher Reihenfolge', () => {
       const kurz = { datei: 'src/f.ts', wort: 'Bestand', text: 'Bestand (' }
       const lang = { datei: 'src/f.ts', wort: 'Bestand', text: 'Bestand (Pakete)' }
@@ -552,7 +593,7 @@ describe('Wortliste', () => {
       )
     }, 30_000)
 
-    const ohneAusnahmen = (): Fund[] => ohneDateien(funde, AUSNAHME_DATEIEN).filter((f) => !AUSNAHMEN.some((a) => deckt(a, f)))
+    const ohneAusnahmen = (): Fund[] => ohneAusnahmenAus(ohneDateien(funde, AUSNAHME_DATEIEN), AUSNAHMEN).rest
 
     it('kein Wort der Spalte „nicht" steht in einem Text — außer Ausnahmen und den Offen-Dateien', () => {
       const statt = new Map(VERBOTE.map((v) => [v.wort, v.statt.join(' / ')]))
@@ -567,6 +608,8 @@ describe('Wortliste', () => {
       expect(ERLAUBTE_WENDUNGEN.filter((w) => w.grund.trim().length < 5)).toEqual([])
       const ungenutzt = AUSNAHMEN.filter((a) => !funde.some((f) => deckt(a, f)))
       expect(ungenutzt.map((a) => `${a.datei} „${a.wort}“: ${a.grund}`)).toEqual([])
+      // Eine Ausnahme mit Eigenschaften: jeder Name hat noch seinen Text.
+      expect(ohneAusnahmenAus(ohneDateien(funde, AUSNAHME_DATEIEN), AUSNAHMEN).ungenutzt).toEqual([])
       // Eine Ausnahmedatei hat einen Grund und trägt noch ein Wort der Liste — sonst gehört sie aus der Liste.
       expect(AUSNAHME_DATEIEN.filter((d) => d.grund.trim().length < 10).map((d) => d.datei)).toEqual([])
       expect(AUSNAHME_DATEIEN.filter((d) => !funde.some((f) => f.datei === d.datei)).map((d) => d.datei)).toEqual([])
@@ -587,7 +630,7 @@ describe('Wortliste', () => {
   describe('Offen-Ordner tests/wortliste-offen', () => {
     it('jede Datei heißt nach ihrer Nummer (<nr>.ts) und exportiert OFFEN als Liste', () => {
       expect(OFFEN_DATEIEN.filter((d) => !/^\d{3}\.ts$/.test(d.name)).map((d) => d.name)).toEqual([])
-      for (const d of OFFEN_DATEIEN) expect(Array.isArray(d.eintraege), d.name).toBe(true)
+      expect(OFFEN_DATEIEN.filter((d) => !Array.isArray(d.export)).map((d) => d.name)).toEqual([])
     })
 
     it('eine Nummer trägt nur ihre eigenen Einträge — kein Eintrag steht in zwei Dateien', () => {

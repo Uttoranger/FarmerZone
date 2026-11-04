@@ -8,9 +8,9 @@
  * den ganzen Ordner.
  *
  * Nicht hier, weil Ausnahme nach N43 (1) bzw. (2) in tests/wortliste.test.ts: „Vertrag widerrufen“
- * und „Widerruf bestätigen“ (N39) und die BELEHRUNG. Die Ausnahme „Vertrag widerrufen“ deckt jeden
- * Text mit genau diesem Wortlaut in src/lib/widerruf.ts — also auch WIDERRUF_TEXT.titel, das nach
- * N43 „Rücktrittsrecht“ heißt: 231 stellt es trotzdem um (die Wache meldet es nicht). Lesart
+ * (nur knopfWiderrufen und fussLink) und „Widerruf bestätigen“ (knopfBestaetigen, N39) und die
+ * BELEHRUNG. WIDERRUF_TEXT.titel hat denselben Wortlaut, ist aber kein Knopf und kein Einstieg: Er
+ * steht hier und heißt nach N43 „Rücktrittsrecht“. Lesart
  * (Bericht 219): Die Sätze in WIDERRUF_ADMIN_TEXT stehen in derselben Datei und damit hier, obwohl
  * die Grenze von 231 „nur WIDERRUF_TEXT“ nennt.
  */
@@ -21,6 +21,7 @@ export const OFFEN: { stelle: string; wort: string; text: string }[] = [
   { stelle: 'src/lib/widerruf.ts:230', wort: 'Widerruf', text: 'Dieser Widerruf ist schon zugeordnet.' },
   { stelle: 'src/lib/widerruf.ts:232', wort: 'Widerruf', text: 'Der Hof hat den Widerruf im Postfach.' },
   { stelle: 'src/lib/widerruf.ts:233', wort: 'Widerruf', text: 'Zu Bestellungen dieses Hofs gibt es keinen Widerruf.' },
+  { stelle: 'src/lib/widerruf.ts:242', wort: 'widerrufen', text: 'Vertrag widerrufen' },
   { stelle: 'src/lib/widerruf.ts:243', wort: 'widerrufen', text: 'Hier kannst du deinen Kaufvertrag mit dem Hof widerrufen.' },
   { stelle: 'src/lib/widerruf.ts:243', wort: 'Widerruf', text: 'leitet deinen Widerruf an ihn weiter' },
   { stelle: 'src/lib/widerruf.ts:253', wort: 'widerrufen', text: 'Was willst du widerrufen?' },
