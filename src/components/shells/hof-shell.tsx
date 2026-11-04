@@ -9,12 +9,10 @@ import {
   ChevronDown,
   ChevronRight,
   Compass,
-  Eye,
   Home,
   Inbox,
   LifeBuoy,
-  LogOut,
-  MoreHorizontal,
+  Menu,
   Package,
   Plus,
   ReceiptText,
@@ -29,7 +27,17 @@ import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import {
   EINSTELLUNG_KONTO,
+  HEUTE_LABEL,
+  HOFSEITE_ANSEHEN,
+  HOF_MEHR_SCHLIESSEN,
+  HOF_MEHR_TITEL,
+  HOF_NEU_ABBRECHEN,
   HOF_NEU_ANDERES_TITEL,
+  KONTO_KURZ,
+  KONTO_UND_HILFE_TITEL,
+  datumOhneUmbruch,
+  hauptPunktHref,
+  postfachUnterzeile,
   HOF_LEISTE_KURZ,
   HOF_NEU_KNOPF,
   HOF_NEU_KNOPF_NAME,
@@ -53,7 +61,7 @@ import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Zaehler } from '@/components/ui/zaehler'
 import { MenueZielAnbieter } from '@/components/ui/menue-ziel'
-import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetKopf, SheetTrigger } from '@/components/ui/sheet'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,10 +71,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
+import { ThemeUmschalter, ThemeWahl } from '@/components/shared/theme-umschalter'
+import { Wortmarke } from '@/components/shared/wortmarke'
+import { Textlink } from '@/components/ui/textlink'
+import { DARSTELLUNG_TEXT } from '@/lib/kunden-navigation'
+import { MARKE } from '@/lib/marke'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { useAbmelden } from '@/components/shells/admin-konto'
-import { NEU_SYMBOL } from '@/components/hofbereich/neu-symbol'
 import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
 
 /*
@@ -80,6 +91,16 @@ import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
  * Mehr-Blatt beginnt ohne Hofkarte. Seit Nr. 61 steht oben im Mehr-Blatt die
  * Gruppe „Dein Tarif" und unten in der Seitenleiste vor der Person die
  * Tarif-Zeile (TarifZeile; Zustand und Texte als Prop vom Server).
+ *
+ * Seit Nr. 220 (Boards s1-/w1-mehr-neu, V13): oben in der Seitenleiste die
+ * Marke, eine schlanke Hofkarte mit „Hofseite ansehen“ als Textlink, „+ Neu ▾“
+ * als orange Pille mit dem Menü am Knopf; unten „Konto · <Name>“ mit
+ * Sonne/Mond und „Abmelden“ darunter; das Datum der Tarif-Zeile bricht nicht
+ * um. Am Handy liegen „Mehr“ und „Neu“ als Blatt bis zum unteren Rand, mit Kopf
+ * (Titel und genau ein Schließen-Element), ohne Symbole in den Zeilen; „Mehr“
+ * gliedert in Postfach · Dein Tarif · Verkauf und Kunden · Konto und Hilfe
+ * (Person, Einstellungen, Problem melden, Admin, Darstellung Hell/Dunkel,
+ * Abmelden).
  *
  * Die Shell setzt data-design="neu" und damit die Tokens des Design-Systems
  * für das ganze Dokument. Der Hofbereich unter (hof) läuft über diese Shell;
@@ -139,14 +160,18 @@ function zahlWofuer(punkt: HofNavPunkt): string {
   return punkt.zahl === 'admin' ? 'Meldungen zu entscheiden' : 'offene Bestellungen'
 }
 
-/** Initialen auf einer runden Plakette — für Hof und Person, keine Fotos (hof-initialen.ts). */
+/**
+ * Initialen auf einer runden Plakette — für Hof und Person, keine Fotos
+ * (hof-initialen.ts). Grün getönt wie in den Boards w1-mehr-neu und
+ * s1-mehr-neu (Paar „läuft“, ≥ 4,5:1 in beiden Modi).
+ */
 function Plakette({ name, gross = false }: { name: string; gross?: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-border font-semibold text-foreground',
-        gross ? 'size-9 text-[15px]' : 'size-[30px] text-[11.5px]'
+        'flex shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund font-semibold text-zustand-laeuft',
+        gross ? 'size-9 text-[13px]' : 'size-[34px] text-[12px]'
       )}
     >
       {hofInitialen(name)}
@@ -155,41 +180,30 @@ function Plakette({ name, gross = false }: { name: string; gross?: boolean }) {
 }
 
 /**
- * Die Hofkarte am Kopf der Seitenleiste: der Hof tritt auf. Bis Nr. 49 stand
- * sie auch oben im Mehr-Blatt als Punkt „Mein Hof" — seit Register N3 steht
- * Mein Hof in der Handy-Leiste, die Karte nur noch in der Seitenleiste.
+ * Die Hofkarte am Kopf der Seitenleiste (Board w1-mehr-neu): Plakette, Hofname
+ * und „Hofseite ansehen“ als Textlink mit 44-px-Fläche (V16). Bis Nr. 49 stand
+ * sie auch oben im Mehr-Blatt — seit Register N3 nur noch in der Seitenleiste.
  */
 function Hofkarte({ hofName, hofSlug }: { hofName: string; hofSlug: string }) {
   return (
-    <div className="flex flex-col gap-2.5 rounded-[14px] border border-border bg-muted p-3">
-      <div className="flex items-center gap-2.5">
-        <Plakette name={hofName} gross />
-        <span className="min-w-0">
-          <span className="block text-[10px] font-semibold tracking-[1.2px] text-muted-foreground uppercase">Mein Hof</span>
-          <span className="block truncate text-[15px] font-semibold text-foreground" title={hofName}>
-            {hofName}
-          </span>
+    <div className="flex items-center gap-2.5 rounded-[14px] border border-border bg-background px-3 py-2.5">
+      <Plakette name={hofName} gross />
+      <span className="min-w-0">
+        <span className="block truncate text-[13.5px] font-semibold text-foreground" title={hofName}>
+          {hofName}
         </span>
-      </div>
-      <Link
-        href={vorschauLink(hofSlug)}
-        className={cn(
-          'flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[13.5px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-card',
-          FOKUS_RAHMEN
-        )}
-      >
-        <Eye className="size-[15px]" strokeWidth={1.7} aria-hidden="true" />
-        Hofseite ansehen
-      </Link>
+        <Textlink href={vorschauLink(hofSlug)} form="im-satz" className="text-[12.5px] font-medium">
+          {HOFSEITE_ANSEHEN}
+        </Textlink>
+      </span>
     </div>
   )
 }
 
 /**
- * Wer angemeldet ist — das Menü unten gehört der Person, nicht dem Hof. Im
- * Mehr-Blatt ist die Zeile seit Nr. 44 ein Link auf „Konto und Sicherheit"
- * (dort Passwort, Darstellung, Hof stilllegen); in der Seitenleiste steht
- * „Einstellungen" gleich darunter, dort bleibt sie Anzeige.
+ * Die Person im Mehr-Blatt (Board s1-mehr-neu, „Konto und Hilfe“): Plakette,
+ * Name und darunter das Ziel „Konto und Sicherheit“ — die ganze Zeile ist der
+ * Link (seit Nr. 44), Pfeil rechts. Steht als erste Zeile der Gruppe.
  */
 export function PersonZeile({
   name,
@@ -197,50 +211,68 @@ export function PersonZeile({
   onNavigate,
 }: {
   name: string
-  /** Mit Ziel ein Link (Mehr-Blatt), sonst Anzeige (Seitenleiste). */
-  konto?: { label: string; href: string }
+  konto: { label: string; href: string }
   onNavigate?: () => void
 }): React.JSX.Element {
   const anzeige = name.trim() || 'Dein Konto'
-  const inhalt = (
-    <>
-      <Plakette name={anzeige} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-[10px] font-semibold tracking-[1.2px] text-muted-foreground uppercase">Angemeldet</span>
-        <span className="block truncate text-[13.5px] font-semibold text-foreground" title={anzeige}>
-          {anzeige}
-        </span>
-      </span>
-    </>
-  )
-  if (!konto) return <div className="flex items-center gap-2.5 px-3 pt-1 pb-2">{inhalt}</div>
   return (
     <Link
       href={konto.href}
       onClick={onNavigate}
-      className={cn('flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-1.5 transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+      className={cn('flex min-h-[60px] w-full items-center gap-3 px-3.5 py-2 text-left transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN_INNEN)}
     >
-      {inhalt}
-      {/* Wohin der Link führt — sichtbar zeigt der Pfeil nur, dass es weitergeht. */}
-      <span className="sr-only">{`, ${konto.label}`}</span>
+      <Plakette name={anzeige} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14.5px] font-semibold text-foreground" title={anzeige}>
+          {anzeige}
+        </span>
+        <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">{konto.label}</span>
+      </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
     </Link>
   )
 }
 
-/** Ein Eintrag im Neu-Menü: Symbol, Titel, ein Satz. */
-function NeuInhalt({ punkt }: { punkt: HofNeuPunkt }) {
-  const Symbol = NEU_SYMBOL[punkt.id]
+/**
+ * Die Konto-Zeile unten in der Seitenleiste (V13, Board w1-mehr-neu):
+ * „Konto · <Name>“ als Link auf „Konto und Sicherheit“, rechts daneben Sonne
+ * bzw. Mond als runder Knopf (44 px); „Abmelden“ steht darunter.
+ */
+function KontoZeile({ name }: { name: string }) {
+  const anzeige = name.trim() || 'Dein Konto'
   return (
-    <>
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/14 text-status-offen">
-        <Symbol className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[14.5px] font-semibold text-foreground">{punkt.label}</span>
-        <span className="block text-[12.5px] text-muted-foreground">{punkt.satz}</span>
-      </span>
-    </>
+    <div className="flex items-center gap-1">
+      <Link
+        href={EINSTELLUNG_KONTO.href}
+        className={cn('flex min-h-11 min-w-0 flex-1 items-center rounded-xl px-3 text-[14px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+      >
+        <span className="truncate" title={anzeige}>
+          {KONTO_KURZ} · {anzeige}
+        </span>
+        {/* Wohin der Link führt — sichtbar steht nur „Konto“. */}
+        <span className="sr-only">{`, ${EINSTELLUNG_KONTO.label}`}</span>
+      </Link>
+      <ThemeUmschalter className="rounded-full border border-input text-foreground hover:bg-muted" />
+    </div>
+  )
+}
+
+/** Überschrift einer Gruppe im Mehr-Blatt — leise, Großbuchstaben (die Liste darunter trägt den Namen für den Screenreader). */
+function BlattUeberschrift({ children }: { children: ReactNode }) {
+  return (
+    <p aria-hidden="true" className="px-0.5 pt-1.5 text-[11.5px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
+      {children}
+    </p>
+  )
+}
+
+/** Ein Eintrag im Neu-Menü: Titel und ein Satz — ohne Symbol wie in den Boards s1-/w1-mehr-neu. */
+function NeuInhalt({ punkt }: { punkt: HofNeuPunkt }) {
+  return (
+    <span className="min-w-0">
+      <span className="block text-[14.5px] font-semibold text-foreground">{punkt.label}</span>
+      <span className="block text-[12.5px] text-muted-foreground">{punkt.satz}</span>
+    </span>
   )
 }
 
@@ -287,19 +319,8 @@ export function HofShell({
   // Hierhin hängt das Menü „Neu" (Nr. 132): in die Seitenleiste statt frei in den <body>.
   const menueZiel = useRef<HTMLDivElement>(null)
 
-  const abmeldenKnopf = (klassen: string) => (
-    <button
-      type="button"
-      onClick={abmelden}
-      className={cn('flex w-full items-center gap-[11px] text-left text-foreground transition-colors duration-[250ms] hover:bg-muted', klassen)}
-    >
-      <LogOut className="size-[17px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-      {ABMELDEN_LABEL}
-    </button>
-  )
-
-  // Das Mehr-Blatt liegt über der Leiste; sie bleibt sichtbar und bedienbar.
-  const ueberDerLeiste = 'bottom-[calc(68px+env(safe-area-inset-bottom))] max-h-[calc(100dvh-68px-env(safe-area-inset-bottom)-1rem)] pb-4'
+  // Das Datum der Tarif-Zeile bricht nie um (V13): „31. Jänner 2028“ bleibt beisammen.
+  const tarif = tarifZeile ? { ...tarifZeile, zeile: datumOhneUmbruch(tarifZeile.zeile), zeileHandy: datumOhneUmbruch(tarifZeile.zeileHandy) } : null
 
   // Hauptpunkte ohne Platz in der Leiste stehen ganz oben im Blatt — seit Nr. 87 das Postfach (Register N12).
   const hauptImMehr = nav.mehr.filter((p) => nav.haupt.some((h) => h.id === p.id))
@@ -307,6 +328,9 @@ export function HofShell({
   const postfachImMehr = hauptImMehr.find((p) => p.zahl === 'postfach')
   const vukImMehr = nav.mehr.filter((p) => nav.verkaufUndKunden.some((v) => v.id === p.id))
   const untenImMehr = nav.mehr.filter((p) => nav.unten.some((u) => u.id === p.id))
+
+  // Eine Zeile im Mehr-Blatt ohne Ziel (Darstellung, Abmelden) — Maße wie ListRow.
+  const blattZeile = 'flex min-h-[54px] w-full items-center gap-3 px-3.5 py-1.5 text-left text-[14.5px] font-medium text-foreground'
 
   return (
     // data-scroll-rand: Der Fokus scrollt nie unter Unterleiste und Unterseiten-Kopf (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
@@ -322,27 +346,31 @@ export function HofShell({
           className="hidden border-r border-border bg-card md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[264px] md:flex-col print:hidden"
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3.5">
+            {/* Die Marke oben (Board w1-mehr-neu) führt nach Heute, die Startseite des Hofbereichs. */}
+            <Link href={hauptPunktHref('heute')} aria-label={`${MARKE} – ${HEUTE_LABEL}`} className={cn('mb-3 inline-flex min-h-11 items-center self-start rounded-md px-1', FOKUS_RAHMEN)}>
+              <Wortmarke priority={false} />
+            </Link>
             <Hofkarte hofName={hofName} hofSlug={hofSlug} />
 
-            {/* Volle Breite, deshalb Radius 13 statt Pille (DESIGN_SYSTEM „Form"). */}
+            {/* „+ Neu ▾“ als orange Pille (N42 a); das Menü öffnet direkt am Knopf (N41 d). */}
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  'group mt-3.5 flex min-h-11 w-full items-center gap-[11px] rounded-[13px] border border-primary-foreground/25 bg-primary px-3.5 text-left text-[14.5px] font-semibold text-primary-foreground shadow-[inset_0_-1px_0_0] shadow-primary-foreground/20 transition-colors duration-[250ms] hover:bg-primary/90',
+                  'group mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-[14.5px] font-semibold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
                   FOKUS_RAHMEN
                 )}
               >
-                <Plus className="size-[17px] shrink-0" strokeWidth={2.2} aria-hidden="true" />
-                <span className="flex-1">{HOF_NEU_KNOPF}</span>
+                <Plus className="size-4 shrink-0" strokeWidth={2.4} aria-hidden="true" />
+                <span>{HOF_NEU_KNOPF}</span>
                 <ChevronDown
-                  className="size-3.5 shrink-0 opacity-75 transition-transform group-data-[popup-open]:rotate-180"
-                  strokeWidth={2}
+                  className="size-3.5 shrink-0 transition-transform group-data-[popup-open]:rotate-180"
+                  strokeWidth={2.4}
                   aria-hidden="true"
                 />
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-72" container={menueZiel}>
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel>{HOF_NEU_TITEL}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="px-2.5 pt-2 pb-1 font-heading text-[16px] font-semibold text-foreground">{HOF_NEU_TITEL}</DropdownMenuLabel>
                   {neuAnlegen.map((punkt) => (
                     <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
                       <NeuInhalt punkt={punkt} />
@@ -351,7 +379,8 @@ export function HofShell({
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel>{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
+                  {/* Im Web trennt nur die Linie (Board w1-mehr-neu, Bild 3); der Name der Gruppe bleibt für den Screenreader. */}
+                  <DropdownMenuLabel className="sr-only">{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
                   {neuAnderes.map((punkt) => (
                     <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
                       <NeuInhalt punkt={punkt} />
@@ -361,7 +390,7 @@ export function HofShell({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <nav aria-label="Hauptnavigation" className="mt-3.5 flex flex-1 flex-col">
+            <nav aria-label="Hauptnavigation" className="mt-3 flex flex-1 flex-col">
               <SidebarGruppe>
                 {nav.haupt.map((punkt) => (
                   <SidebarEintrag
@@ -387,13 +416,12 @@ export function HofShell({
                 ))}
               </SidebarGruppe>
 
-              {tarifZeile && (
-                <div className="mt-auto pt-4">
-                  <TarifZeile daten={tarifZeile} ziel={nav.tarif.ziel} ort="seitenleiste" />
+              {tarif && (
+                <div className="pt-4">
+                  <TarifZeile daten={tarif} ziel={nav.tarif.ziel} ort="seitenleiste" />
                 </div>
               )}
-              <div className={cn('flex flex-col gap-1 border-t border-border pt-3', tarifZeile ? 'mt-3' : 'mt-auto')}>
-                <PersonZeile name={personName} />
+              <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
                 <SidebarGruppe>
                   {nav.unten.map((punkt) => (
                     <SidebarEintrag
@@ -408,8 +436,15 @@ export function HofShell({
                     />
                   ))}
                 </SidebarGruppe>
-                <ThemeUmschalterZeile className={cn('min-h-11 gap-[11px] rounded-xl py-2 text-[14px] text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-                {abmeldenKnopf(cn('min-h-11 rounded-xl px-3 text-[14px]', FOKUS_RAHMEN))}
+                {/* V13: Konto mit Sonne/Mond, „Abmelden“ darunter. */}
+                <KontoZeile name={personName} />
+                <button
+                  type="button"
+                  onClick={abmelden}
+                  className={cn('flex min-h-11 w-full items-center rounded-xl px-3 text-left text-[14px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+                >
+                  {ABMELDEN_LABEL}
+                </button>
               </div>
             </nav>
           </div>
@@ -426,7 +461,9 @@ export function HofShell({
       </main>
 
       {/* ===== Handy: Unterleiste ===== */}
-      <BottomNav ueberSchleier={offen !== null} engUnter360>
+      {/* Die Blätter „Neu“ und „Mehr“ liegen seit Nr. 220 über der Leiste bis zum unteren Rand (Board s1-mehr-neu);
+          geschlossen wird oben im Kopf des Blatts, die Leiste bleibt unter dem Schleier. */}
+      <BottomNav engUnter360>
         {nav.handyLeiste.map((platz) => {
           if (platz.art === 'punkt') {
             const { punkt } = platz
@@ -452,40 +489,33 @@ export function HofShell({
                   {/* Wort unter dem Plus (freigabe.md §12 Nr. 45): Kreis und Wort sind EIN Knopf. */}
                   <SheetTrigger aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
                     <span className={mittelkreisKlassen('orange')}>
-                      <Plus
-                        className={cn('size-6 motion-safe:transition-transform motion-safe:duration-200', offen === 'neu' && 'rotate-45')}
-                        strokeWidth={2.2}
-                        aria-hidden="true"
-                      />
+                      <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
                     </span>
                     <span>{HOF_NEU_KNOPF}</span>
                   </SheetTrigger>
-                  <SheetBlatt className={ueberDerLeiste}>
-                    <SheetTitle className="font-heading text-xl font-semibold">{HOF_NEU_TITEL}</SheetTitle>
+                  <SheetBlatt>
+                    <SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} />
                     {[neuAnlegen, neuAnderes].map((gruppe, i) => (
-                      <ul
-                        key={i}
-                        aria-label={i === 0 ? HOF_NEU_TITEL : HOF_NEU_ANDERES_TITEL}
-                        className={cn('flex flex-col gap-1', i > 0 && 'border-t border-border pt-2')}
-                      >
-                        {gruppe.map((punkt) => (
-                          <li key={punkt.id}>
-                            <Link
-                              href={punkt.href}
-                              onClick={schliessen}
-                              className={cn('flex min-h-14 items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted', FOKUS_RAHMEN)}
-                            >
-                              <NeuInhalt punkt={punkt} />
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
+                      <div key={i} className="flex flex-col gap-2">
+                        {i > 0 && <BlattUeberschrift>{HOF_NEU_ANDERES_TITEL}</BlattUeberschrift>}
+                        <ul aria-label={i === 0 ? HOF_NEU_TITEL : HOF_NEU_ANDERES_TITEL} className="flex flex-col gap-2.5">
+                          {gruppe.map((punkt) => (
+                            <li key={punkt.id}>
+                              <Link
+                                href={punkt.href}
+                                onClick={schliessen}
+                                className={cn(
+                                  'flex min-h-[64px] items-center rounded-[14px] border border-border bg-card px-3.5 py-2.5 transition-colors duration-[250ms] hover:bg-muted',
+                                  FOKUS_RAHMEN
+                                )}
+                              >
+                                <NeuInhalt punkt={punkt} />
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                    <SheetClose
-                      className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-brand-text hover:bg-muted', FOKUS_RAHMEN)}
-                    >
-                      Abbrechen
-                    </SheetClose>
                   </SheetBlatt>
                 </Sheet>
               </BottomNavMitte>
@@ -497,7 +527,7 @@ export function HofShell({
             <Sheet key="mehr" open={offen === 'mehr'} onOpenChange={wechsle('mehr')}>
               <SheetTrigger aria-current={!offen && hofMehrAktiv(pathname) ? 'true' : undefined} className={bottomNavEintragKlassen(mehrAktiv)}>
                 <span className="relative">
-                  <MoreHorizontal className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+                  <Menu className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
                   {postfachImMehr && (
                     <Zaehler
                       anzahl={zahlFuer(postfachImMehr, zahlen)}
@@ -506,70 +536,73 @@ export function HofShell({
                     />
                   )}
                 </span>
-                <span>Mehr</span>
+                <span>{HOF_MEHR_TITEL}</span>
               </SheetTrigger>
-              <SheetBlatt className={ueberDerLeiste}>
-                <div className="flex items-center justify-between gap-2">
-                  <SheetTitle className="font-heading text-2xl font-semibold">Mehr</SheetTitle>
-                  <SheetClose className={cn('min-h-11 rounded-full px-4 text-sm font-semibold text-brand-text hover:bg-muted', FOKUS_RAHMEN)}>
-                    Schließen
-                  </SheetClose>
-                </div>
+              <SheetBlatt>
+                <SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} />
                 {hauptImMehr.length > 0 && (
                   <ListGruppe>
-                    {hauptImMehr.map((punkt) => (
-                      <ListRow
-                        key={punkt.id}
-                        titel={punkt.label}
-                        symbol={SYMBOL[punkt.id]}
-                        href={punkt.href}
-                        aktuell={hofHandyAriaAktuell(pathname, punkt)}
-                        ende={<Zaehler anzahl={zahlFuer(punkt, zahlen)} wofuer={zahlWofuer(punkt)} />}
-                        onNavigate={schliessen}
-                      />
-                    ))}
+                    {hauptImMehr.map((punkt) => {
+                      const zahl = zahlFuer(punkt, zahlen)
+                      return (
+                        <ListRow
+                          key={punkt.id}
+                          titel={punkt.label}
+                          // Sichtbar „1 neue Nachricht“; der Screenreader hört die Zahl über den Zähler (kein doppelter Satz).
+                          untertitel={punkt.zahl === 'postfach' && zahl ? <span aria-hidden="true">{postfachUnterzeile(zahl)}</span> : undefined}
+                          href={punkt.href}
+                          aktuell={hofHandyAriaAktuell(pathname, punkt)}
+                          ende={<Zaehler anzahl={zahl} wofuer={zahlWofuer(punkt)} />}
+                          onNavigate={schliessen}
+                        />
+                      )
+                    })}
                   </ListGruppe>
                 )}
-                {tarifZeile && (
-                  <div role="group" aria-label={nav.tarif.titel} className="flex flex-col gap-2 pb-1">
-                    <p aria-hidden="true" className="px-0.5 pt-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
-                      {nav.tarif.titel}
-                    </p>
-                    <TarifZeile daten={tarifZeile} ziel={nav.tarif.ziel} ort="blatt" onNavigate={schliessen} />
+                {tarif && (
+                  <div role="group" aria-label={nav.tarif.titel} className="flex flex-col gap-2">
+                    <BlattUeberschrift>{nav.tarif.titel}</BlattUeberschrift>
+                    <TarifZeile daten={tarif} ziel={nav.tarif.ziel} ort="blatt" onNavigate={schliessen} />
                   </div>
                 )}
-                <p aria-hidden="true" className="px-0.5 pt-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
-                  {VERKAUF_UND_KUNDEN_TITEL}
-                </p>
+                <BlattUeberschrift>{VERKAUF_UND_KUNDEN_TITEL}</BlattUeberschrift>
                 <ListGruppe beschriftung={VERKAUF_UND_KUNDEN_TITEL}>
                   {vukImMehr.map((punkt) => (
                     <ListRow
                       key={punkt.id}
                       titel={punkt.label}
-                      symbol={SYMBOL[punkt.id]}
                       href={punkt.href}
                       aktuell={hofHandyAriaAktuell(pathname, punkt)}
                       onNavigate={schliessen}
                     />
                   ))}
                 </ListGruppe>
-                <PersonZeile name={personName} konto={EINSTELLUNG_KONTO} onNavigate={schliessen} />
-                <ListGruppe beschriftung="Konto und Hilfe">
+                <BlattUeberschrift>{KONTO_UND_HILFE_TITEL}</BlattUeberschrift>
+                <ListGruppe beschriftung={KONTO_UND_HILFE_TITEL}>
+                  <li>
+                    <PersonZeile name={personName} konto={EINSTELLUNG_KONTO} onNavigate={schliessen} />
+                  </li>
                   {untenImMehr.map((punkt) => (
                     <ListRow
                       key={punkt.id}
                       titel={punkt.label}
-                      symbol={SYMBOL[punkt.id]}
                       href={punkt.href}
                       aktuell={hofHandyAriaAktuell(pathname, punkt)}
                       ende={<Zaehler anzahl={zahlFuer(punkt, zahlen)} wofuer={zahlWofuer(punkt)} />}
                       onNavigate={schliessen}
                     />
                   ))}
-                  <li>
-                    <ThemeUmschalterZeile className={cn('min-h-[50px] gap-3 rounded-none px-3.5 text-[14.5px] font-medium text-foreground hover:bg-muted', FOKUS_RAHMEN_INNEN)} />
+                  <li className={blattZeile}>
+                    <span aria-hidden="true" className="flex-1">
+                      {DARSTELLUNG_TEXT.titel}
+                    </span>
+                    <ThemeWahl />
                   </li>
-                  <li>{abmeldenKnopf(cn('min-h-[50px] px-3.5 text-[14.5px] font-medium', FOKUS_RAHMEN_INNEN))}</li>
+                  <li>
+                    <button type="button" onClick={abmelden} className={cn(blattZeile, 'transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN_INNEN)}>
+                      {ABMELDEN_LABEL}
+                    </button>
+                  </li>
                 </ListGruppe>
               </SheetBlatt>
             </Sheet>

@@ -90,6 +90,11 @@ function linkTag(html: string, href: string): string {
   return tag ?? ''
 }
 
+/** Der Quelltext einer Datei des Projekts. */
+function quelle(datei: string): string {
+  return readFileSync(join(process.cwd(), datei), 'utf8')
+}
+
 /** Der Teil des HTML zwischen dem ersten Vorkommen von `start` und dem nächsten `ende` danach. */
 function abschnitt(html: string, start: string, ende: string): string {
   const von = html.indexOf(start)
@@ -283,9 +288,10 @@ describe('KundeShell', () => {
     expect(html.indexOf('<footer')).toBeGreaterThan(html.indexOf('</main>'))
     const fuss = abschnitt(html, '<footer', '</footer>')
     for (const href of ['/impressum', '/datenschutz', '/agb', '/problem-melden']) expect(fuss, href).toContain(`href="${href}"`)
-    expect(fuss).toContain('aria-label="Dunkelmodus einschalten"')
-    // Gegenprobe: Die Zeile fehlt im Kopf — dort steht vor der Hydration nur der Platzhalter des runden Schalters.
-    expect(abschnitt(html, '<header', '</header>')).not.toContain('aria-label="Dunkelmodus einschalten"')
+    // Seit Nr. 220 die Pille „Darstellung: hell|dunkel“ (Board s1-startseite); vor dem Einhängen steht nur „Darstellung“.
+    expect(fuss).toMatch(/<button type="button" disabled=""[^>]*rounded-full[^>]*><span[^>]*><\/span>Darstellung<\/button>/)
+    // Gegenprobe: Die Pille fehlt im Kopf — dort steht vor der Hydration nur der Platzhalter des runden Schalters.
+    expect(abschnitt(html, '<header', '</header>')).not.toContain('Darstellung')
   })
 
   // Nr. 127 (Register N22, Ergänzung): Am Computer hat jede Seite der Kundschaft genau einen Fuß, diesen. Der
@@ -425,22 +431,20 @@ describe('AdminShell', () => {
     expect(admin(true)).toContain(`>${ADMIN_ZURUECK.kurz}<`)
   })
 
-  it('mit Hof: die Initialen-Plakette ist ein Link auf „Konto und Sicherheit", auch am Handy sichtbar, 44 px', () => {
-    const plakette = linkTag(admin(true), ADMIN_KONTO.href)
-    // WCAG 2.5.3: Der zugängliche Name beginnt mit den sichtbaren Initialen.
-    expect(plakette).toContain('aria-label="MM – Konto und Sicherheit (angemeldet: Max Mustermann)"')
-    expect(plakette).not.toMatch(/\bhidden\b/)
-    expect(plakette).toMatch(/\bsize-11\b/)
-    expect(admin(true)).toMatch(/<a [^>]*href="\/settings\/account"[^>]*>[\s\S]*?>MM<\/span>/)
+  it('die Plakette öffnet in jeder Breite das Konto-Menü — mit und ohne Hof, 44 px, nie ausgeblendet (Nr. 220)', () => {
+    for (const hatHof of [true, false]) {
+      const html = admin(hatHof)
+      const ausloeser = html.match(/<button\b[^>]*aria-label="MM – Konto-Menü \(angemeldet: Max Mustermann\)"[^>]*>/)?.[0]
+      // WCAG 2.5.3: Der zugängliche Name beginnt mit den sichtbaren Initialen.
+      expect(ausloeser, `Auslöser (hatHof: ${hatHof})`).toBeDefined()
+      expect(ausloeser).toMatch(/\bsize-11\b/)
+      expect(ausloeser).not.toMatch(/\bhidden\b/)
+    }
   })
 
-  it('ohne Hof: die Plakette steht auch am Handy da, ist aber kein Link ins Leere (/settings/account liegt im Hofbereich)', () => {
-    const ohne = admin(false)
-    expect(ohne).not.toContain(`href="${ADMIN_KONTO.href}"`)
-    const plakette = ohne.match(/<span title="Angemeldet: Max Mustermann"[^>]*>/)?.[0]
-    expect(plakette).toBeDefined()
-    expect(plakette).not.toMatch(/\bhidden\b/)
-    expect(ohne).toContain('Angemeldet: Max Mustermann')
+  it('ohne Hof: kein Link auf /settings/account im Kopf (die Seite liegt im Hofbereich) — Gegenprobe: der Weg steht im Menü nur mit Hof', () => {
+    expect(admin(false)).not.toContain(`href="${ADMIN_KONTO.href}"`)
+    expect(quelle('src/components/shells/admin-konto.tsx')).toMatch(/\{hatHof && \(\s*<DropdownMenuLinkItem render=\{<Link href=\{ADMIN_KONTO\.href\} \/>\}>/)
   })
 })
 

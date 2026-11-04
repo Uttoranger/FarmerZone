@@ -6,19 +6,16 @@ import { usePathname } from 'next/navigation'
 import {
   Activity,
   ArrowLeft,
-  BookOpen,
   CircleAlert,
   ClipboardList,
   Euro,
   Inbox,
   LayoutTemplate,
-  LogOut,
-  MoreHorizontal,
+  Menu,
   Settings,
   Store,
   Sun,
   TriangleAlert,
-  UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -34,14 +31,13 @@ import {
   type AdminReiter,
   type AdminReiterId,
 } from '@/lib/admin-navigation'
-import { hofInitialen } from '@/lib/hof-initialen'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import type { StripeMarke } from '@/lib/testumgebung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { BottomNav, BottomNavLink, bottomNavEintragKlassen } from '@/components/ui/bottom-nav'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
-import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetKopf, SheetTrigger } from '@/components/ui/sheet'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Zaehler } from '@/components/ui/zaehler'
@@ -49,7 +45,7 @@ import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
 import { ADMIN_RAHMEN } from '@/components/admin/admin-teile'
-import { AdminAbmeldenKnopf, AdminKontoMenue, PLAKETTEN_KREIS, useAbmelden } from '@/components/shells/admin-konto'
+import { AdminKontoMenue, useAbmelden } from '@/components/shells/admin-konto'
 import { MenueZielAnbieter } from '@/components/ui/menue-ziel'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_POSTFACH_TEXT } from '@/lib/postfach'
@@ -100,6 +96,12 @@ import type { AufgabenLeiste } from '@/lib/admin-aufgaben'
  * Muster BottomNav: Heute · Höfe · Bestellungen · Postfach · Mehr; „Mehr“ als
  * Blatt mit Startseite, Geld, Betrieb, Einstellungen, Handbuch, Zu meinem Hof,
  * Konto und Sicherheit und Abmelden.
+ *
+ * Seit Nr. 220 (Boards s3-/w3-admin-shell): die Marke „Admin“ leise
+ * (neutral), Hell/Dunkel und Plakette als runde Knöpfe; die Plakette öffnet in
+ * jeder Breite das Konto-Menü („Angemeldet als …“, Konto und Sicherheit,
+ * Abmelden) statt am Computer eines Knopfs daneben; „n offen – ansehen“ als
+ * grüner Textlink; das Blatt „Mehr“ ohne Symbole mit Kopf „Mehr · Schließen“.
  */
 
 export type AdminShellProps = {
@@ -181,6 +183,7 @@ function AdminLeiste({
   zahlen,
   betrieb,
   hatHof,
+  personName,
   onAbmelden,
 }: {
   reiter: readonly AdminReiter[]
@@ -189,6 +192,7 @@ function AdminLeiste({
   zahlen: AdminShellProps['zahlen']
   betrieb: BetriebHinweis | null
   hatHof: boolean
+  personName: string
   onAbmelden?: () => void
 }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
@@ -210,7 +214,7 @@ function AdminLeiste({
   const leiste = reiter.filter((r) => r.amHandy === 'leiste')
   const mehr = reiter.filter((r) => r.amHandy === 'mehr')
   const mehrAktiv = mehr.some((r) => r.id === aktiv)
-  // Das Blatt liegt über der Leiste; sie bleibt sichtbar und bedienbar (wie in der HofShell).
+  // Das Blatt liegt über der Leiste; sie bleibt sichtbar und bedienbar (Board s3-admin-shell, Bild 4).
   const ueberDerLeiste = 'bottom-[calc(68px+env(safe-area-inset-bottom))] max-h-[calc(100dvh-68px-env(safe-area-inset-bottom)-1rem)] pb-4'
   const zeile = cn('flex min-h-[50px] w-full items-center gap-3 px-3.5 text-left text-[14.5px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN_INNEN)
   return (
@@ -233,7 +237,7 @@ function AdminLeiste({
       <Sheet open={offen} onOpenChange={setOffen}>
         <SheetTrigger aria-current={!offen && mehrAktiv ? 'true' : undefined} className={bottomNavEintragKlassen(offen || mehrAktiv)}>
           <span className="relative">
-            <MoreHorizontal className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+            <Menu className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
             {betrieb && mehr.some((r) => r.warnpunkt) && (
               <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="absolute -top-0.5 -right-1 size-2 rounded-full bg-primary" />
             )}
@@ -241,19 +245,13 @@ function AdminLeiste({
           <span>{ADMIN_MEHR_TEXT.titel}</span>
         </SheetTrigger>
         <SheetBlatt className={ueberDerLeiste}>
-          <div className="flex items-center justify-between gap-2">
-            <SheetTitle className="font-heading text-2xl font-semibold">{ADMIN_MEHR_TEXT.titel}</SheetTitle>
-            <SheetClose className={cn('min-h-11 rounded-full px-4 text-sm font-semibold text-brand-text hover:bg-muted', FOKUS_RAHMEN)}>
-              {ADMIN_MEHR_TEXT.schliessen}
-            </SheetClose>
-          </div>
+          <SheetKopf titel={ADMIN_MEHR_TEXT.titel} schliessen={ADMIN_MEHR_TEXT.schliessen} />
           <ListGruppe beschriftung={ADMIN_MEHR_TEXT.bereiche}>
             {mehr.map((r) => (
               <ListRow
                 key={r.id}
                 titel={r.label}
                 untertitel={ADMIN_MEHR_ZEILE[r.id]}
-                symbol={SYMBOL[r.id]}
                 href={r.href}
                 aktuell={ariaAktuell(r, aktiv, pfad)}
                 ende={r.warnpunkt && betrieb ? <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="size-2 shrink-0 rounded-full bg-primary" /> : undefined}
@@ -262,7 +260,6 @@ function AdminLeiste({
             ))}
             <li>
               <a href={ADMIN_HANDBUCH.href} target="_blank" rel="noopener noreferrer" className={zeile}>
-                <BookOpen className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{ADMIN_HANDBUCH.label}</span>
                   <span className="mt-0.5 block truncate text-[12.5px] font-normal text-muted-foreground">{ADMIN_HANDBUCH.zeile}</span>
@@ -272,11 +269,11 @@ function AdminLeiste({
             </li>
           </ListGruppe>
           <ListGruppe beschriftung={ADMIN_MEHR_TEXT.konto}>
-            {hatHof && <ListRow titel={ADMIN_ZURUECK.label} symbol={ArrowLeft} href={ADMIN_ZURUECK.href} onNavigate={schliessen} />}
-            {hatHof && <ListRow titel={ADMIN_KONTO.label} symbol={UserRound} href={ADMIN_KONTO.href} onNavigate={schliessen} />}
+            {hatHof && <ListRow titel={ADMIN_ZURUECK.label} href={ADMIN_ZURUECK.href} onNavigate={schliessen} />}
+            {/* „Konto und Sicherheit“ mit dem Namen darunter (Board s3-admin-shell, Bild 4) — nur mit eigenem Hof, die Seite liegt im Hofbereich. */}
+            {hatHof && <ListRow titel={ADMIN_KONTO.label} untertitel={personName} href={ADMIN_KONTO.href} onNavigate={schliessen} />}
             <li>
               <button type="button" onClick={abmelden} className={zeile}>
-                <LogOut className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                 {ADMIN_ABMELDEN.label}
               </button>
             </li>
@@ -287,55 +284,6 @@ function AdminLeiste({
   )
 }
 
-
-/**
- * Die Initialen der angemeldeten Person und „Abmelden". Am Computer: mit
- * eigenem Hof ein Link auf „Konto und Sicherheit" (44 px Fläche, der Kreis
- * bleibt 32 px), ohne Hof kein Link — die Seite liegt im Hofbereich und
- * schickte das Konto auf /login —, daneben der Knopf „Abmelden". Am Handy
- * öffnet dieselbe Plakette ein Menü mit beidem (admin-konto.tsx).
- */
-function KontoPlakette({
-  anzeige,
-  hatHof,
-  onAbmelden,
-  menueZiel,
-}: {
-  anzeige: string
-  hatHof: boolean
-  onAbmelden?: () => void
-  menueZiel: React.RefObject<HTMLElement | null>
-}): React.JSX.Element {
-  const initialen = hofInitialen(anzeige)
-  // Der Name beginnt mit dem, was man sieht (WCAG 2.5.3 „Label in Name"):
-  // Wer per Sprache „MM antippen" sagt, trifft den Link.
-  const beschriftung = `${initialen} – ${ADMIN_KONTO.label} (angemeldet: ${anzeige})`
-  return (
-    <>
-      <AdminKontoMenue anzeige={anzeige} hatHof={hatHof} ersatz={onAbmelden} menueZiel={menueZiel} />
-      <div className="hidden items-center gap-0.5 md:flex lg:gap-1.5">
-        {hatHof ? (
-          <Link
-            href={ADMIN_KONTO.href}
-            aria-label={beschriftung}
-            title={beschriftung}
-            className={cn('flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted', FOKUS_RAHMEN)}
-          >
-            <span aria-hidden="true" className={PLAKETTEN_KREIS}>
-              {initialen}
-            </span>
-          </Link>
-        ) : (
-          <span title={`Angemeldet: ${anzeige}`} className={PLAKETTEN_KREIS}>
-            <span aria-hidden="true">{initialen}</span>
-            <span className="sr-only">Angemeldet: {anzeige}</span>
-          </span>
-        )}
-        <AdminAbmeldenKnopf ersatz={onAbmelden} />
-      </div>
-    </>
-  )
-}
 
 export function AdminShell({
   personName,
@@ -377,11 +325,12 @@ export function AdminShell({
         <header className="border-b border-border bg-card print:hidden">
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 px-4 py-2 sm:gap-x-3 md:min-h-16 md:flex-nowrap md:gap-x-[18px] md:px-8">
             <div className="flex min-h-11 items-center gap-2.5">
-              <Link href="/admin" aria-label={`${MARKE} Admin – Heute`} className={cn('rounded-md', FOKUS_RAHMEN)}>
+              <Link href="/admin" aria-label={`${MARKE} Admin – Heute`} className={cn('inline-flex min-h-11 items-center rounded-md', FOKUS_RAHMEN)}>
                 <Wortmarke />
               </Link>
               {/* Am schmalen Handy passt die Marke nicht neben Rückweg und Hell/Dunkel in eine Zeile; die Reiter darunter sagen ohnehin, wo man ist. */}
-              <StatusBadge status="offen" className="hidden min-[400px]:inline-flex">
+              {/* Die Marke „Admin“ leise neben der Wortmarke (Board w3-admin-shell) — sie sagt, wo man ist, nicht, dass etwas wartet. */}
+              <StatusBadge status="neutral" className="hidden min-[400px]:inline-flex">
                 Admin
               </StatusBadge>
             </div>
@@ -437,8 +386,9 @@ export function AdminShell({
                   <span className="hidden lg:inline">{ADMIN_ZURUECK.label}</span>
                 </Link>
               )}
-              <ThemeUmschalter className={cn('rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)} />
-              <KontoPlakette anzeige={anzeige} hatHof={hatHof} onAbmelden={onAbmelden} menueZiel={menueZiel} />
+              <ThemeUmschalter className="rounded-full border border-input text-foreground hover:bg-muted" />
+              {/* Seit Nr. 220 in jeder Breite ein Menü hinter der Plakette (Boards s3-/w3-admin-shell, Bild 4). */}
+              <AdminKontoMenue anzeige={anzeige} hatHof={hatHof} ersatz={onAbmelden} menueZiel={menueZiel} />
             </div>
           </div>
           {/* Ziel des Konto-Menüs: ohne Höhe, außerhalb der scrollenden Reiterzeile — der Kopf hat kein
@@ -463,14 +413,11 @@ export function AdminShell({
                 </Link>
               )}
               {leiste && (
+                // „n offen · m überfällig – ansehen“ als grüner Textlink (Board w3-admin-shell): ein Weg nach Heute, keine Warnung.
                 <Link
                   href={leiste.href}
-                  className={cn(
-                    'ml-auto inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md text-[13px] font-semibold text-status-offen hover:underline',
-                    FOKUS_RAHMEN
-                  )}
+                  className={cn('ml-auto inline-flex min-h-11 min-w-0 items-center rounded-md text-[13px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)}
                 >
-                  <TriangleAlert className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
                   <span className="truncate sm:hidden">{leiste.kurz}</span>
                   <span className="hidden truncate sm:inline">{leiste.text}</span>
                 </Link>
@@ -492,7 +439,7 @@ export function AdminShell({
           )}
           {children}
         </main>
-        <AdminLeiste reiter={reiterListe} aktiv={aktiv} pfad={pathname} zahlen={zahlen} betrieb={betrieb} hatHof={hatHof} onAbmelden={onAbmelden} />
+        <AdminLeiste reiter={reiterListe} aktiv={aktiv} pfad={pathname} zahlen={zahlen} betrieb={betrieb} hatHof={hatHof} personName={anzeige} onAbmelden={onAbmelden} />
       </MenueZielAnbieter>
     </div>
   )
