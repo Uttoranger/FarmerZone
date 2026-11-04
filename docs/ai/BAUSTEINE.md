@@ -423,29 +423,33 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/accordion.tsx · Accordion, AccordionItem, AccordionPanel, AccordionTrigger · kein Zweck vermerkt · genutzt
 - src/components/ui/alert.tsx · Alert, AlertAction, AlertDescription, AlertTitle · kein Zweck vermerkt · unbenutzt
 - src/components/ui/badge.tsx · Badge, badgeVariants · kein Zweck vermerkt · unbenutzt
+- src/components/ui/bild-platzhalter.tsx · BildPlatzhalter, FOTO_HINZUFUEGEN, FotoHinzufuegen · Der Text des Knopfs im Formular. · genutzt
 - src/components/ui/bottom-nav.tsx · BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen · BottomNav: die Unterleiste am Handy (unter 768 px) mit erhobenem Mittelknopf — Kunde: Warenkorb (grün), Hof: „+ Neu" (orange) (docs/ai/DESIGN_SYSTEM.md, „Navigation"). · genutzt
 - src/components/ui/button.tsx · Button, TREFFER_44, buttonVariants · Trefferfläche von mindestens 44 × 44 px für Knöpfe, die sichtbar kleiner sind (WCAG 2.5.8, DESIGN_SYSTEM „Qualität"): ein unsichtbares ::before, mittig, so groß wie der Knopf, aber nie unter 44 px — … · genutzt
 - src/components/ui/card.tsx · Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle · kein Zweck vermerkt · genutzt
 - src/components/ui/chip.tsx · Chip, FilterChip, FilterChipReihe · Chip: ein kurzes Merkmal ohne Handlung („Eier", „Gemüse", „Frontlader vor Ort"). · genutzt
-- src/components/ui/dialog.tsx · Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogPortal, DialogTitle, DialogTrigger · kein Zweck vermerkt · genutzt
+- src/components/ui/dialog.tsx · Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogMitte, DialogOverlay, DialogPortal, DialogTitle, DialogTrigger · kein Zweck vermerkt · genutzt
 - src/components/ui/dropdown-menu.tsx · DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuLinkItem, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuTrigger · Das Aufklappmenü im shadcn-Stil über Base UI (wie sheet.tsx und dialog.tsx): Tastatur — Enter oder Leertaste öffnet, Pfeile wandern, Esc schließt —, Fokusführung und aria-Attribute kommen von Base UI. · genutzt
 - src/components/ui/empty-state.tsx · EmptyState, type Ausweg · EmptyState: der Leerzustand nach docs/ai/DESIGN_SYSTEM.md — Symbol, ein Satz, eine nächste Handlung („Noch keine Produkte — Lege dein erstes an"). · genutzt
+- src/components/ui/feld-fehler.tsx · FELD_FEHLER_RAHMEN, FeldMitFehler, type FeldVerbindung · Der orange Rand eines Felds mit Fehler (V17; Board s1-produkt-neu Bild 5): 2 px in `--fz-status-offen`, gesetzt über `aria-invalid` — der Zustand, den der Screenreader liest, ist derselbe, den man … · genutzt
 - src/components/ui/fokus.ts · FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN · Der sichtbare Fokus der neuen Bausteine und Shells — ein Rahmen außen in der Ringfarbe (im neuen Design --fz-status-fertig, ≥ 3:1 auf Grund und Fläche in beiden Modi). · genutzt
 - src/components/ui/form.tsx · Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, useFormField · kein Zweck vermerkt · genutzt
 - src/components/ui/groessenkachel.tsx · GroessenWahl, Groessenkachel · GroessenWahl + Groessenkachel: Verkaufsgrößen als Kacheln (Futter, Brennmaterial, alles mit Gebinden) — Größe, Hinweis, Preis, Grundpreis, Vorrat (docs/ai/DESIGN_SYSTEM.md, „Kaufstrecke"). · genutzt
-- src/components/ui/hinweiskarte.tsx · Hinweiskarte · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
+- src/components/ui/hinweiskarte.tsx · Hinweiskarte, HinweiskarteFehler · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
+- src/components/ui/hofkarte-rahmen.tsx · HofkarteRahmen, hofkarteKlassen · Die Klassen einer Hofkarte in Listen (/hoefe, Startseite) je Zustand (V18; Board s1-hoefe, „Hof am Weiher"): Ein pausierter Hof ist ausgegraut, nicht versteckt — Fläche `bg-muted` statt `bg-card`, … · genutzt
 - src/components/ui/input.tsx · Input · kein Zweck vermerkt · genutzt
 - src/components/ui/label.tsx · Label · kein Zweck vermerkt · genutzt
 - src/components/ui/lade-punkt.tsx · LadeInhalt, LadePunkt, LadeRahmen · Laden ohne Ladebild (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig): Ein Wechsel über einen Link lässt den bisherigen Inhalt stehen, bis der neue da ist. · genutzt
 - src/components/ui/list-row.tsx · ListGruppe, ListRow · ListGruppe: Zeilen auf einer Karte, durch feine Linien getrennt — wie das Mehr-Blatt und die Bestellliste in den Mockups. · genutzt
-- src/components/ui/marke.tsx · Marke · Die Marke: ein Zustand als kurzes Wort auf seiner Bedeutungsfarbe (Register G5) — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen. · genutzt
+- src/components/ui/marke.tsx · AUSVERKAUFT_WORT, AusverkauftMarke, Marke · Die Marke: ein Zustand als kurzes Wort auf seiner Bedeutungsfarbe (Register G5) — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen. · genutzt
+- src/components/ui/meldung-formular-ansicht.tsx · MELDUNG_ANSICHT_TEXT, MeldungFormularAnsicht, type MeldungWelt · Die zwei Welten (Register N42 b, V51): Kundschaft grün, Hof orange. · genutzt
 - src/components/ui/menue-ziel.tsx · MenueZielAnbieter, useMenueZiel, type MenueZiel · Der Zielort für das Portal der Menüs (Regelvorschlag 132 aus Morgenbericht 20, freigegeben 21.10.2026). · genutzt
 - src/components/ui/netz-hinweis.tsx · NetzHinweis, NetzZeile · Die Netz-Zeile unter dem Kopf der Shells (Register N29; Board system-sterne-kein-netz, Punkt 1): Geht dem Browser das Netz verloren, steht hier „Keine Verbindung – du siehst den letzten Stand.", bis … · genutzt
 - src/components/ui/password-input.tsx · PasswordInput · Passwortfeld mit Auge-Knopf — die EINE Umsetzung für alle Formulare (Nr. 173; vorher je eine Kopie in Registrierung und neuem Passwort). · genutzt
 - src/components/ui/progress-bar.tsx · ProgressBar · ProgressBar: Fortschritt als Balken, z. B. „Deine Hofseite · 64 %". · genutzt
 - src/components/ui/segment.tsx · Segment, type SegmentOption · Segment: ein Umschalter mit genau einer Wahl („Handy | Web", „10 km | 25 km | 50 km"). · genutzt
 - src/components/ui/select.tsx · Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectScrollDownButton, SelectScrollUpButton, SelectSeparator, SelectTrigger, SelectValue · kein Zweck vermerkt · genutzt
-- src/components/ui/sheet.tsx · Sheet, SheetBlatt, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger · kein Zweck vermerkt · genutzt
+- src/components/ui/sheet.tsx · Sheet, SheetBlatt, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetKopf, SheetTitle, SheetTrigger · kein Zweck vermerkt · genutzt
 - src/components/ui/sidebar-gruppe.tsx · SidebarEintrag, SidebarGruppe · SidebarGruppe + SidebarEintrag: die Seitenleiste des Hofbereichs ab 768 px (Mockup system-komponente-seitenleiste-hof.html). · genutzt
 - src/components/ui/skeleton.tsx · Skeleton · kein Zweck vermerkt · unbenutzt
 - src/components/ui/sonner.tsx · Toaster · kein Zweck vermerkt · genutzt
@@ -455,6 +459,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/table.tsx · Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow · kein Zweck vermerkt · genutzt
 - src/components/ui/tabs.tsx · Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants · kein Zweck vermerkt · unbenutzt
 - src/components/ui/textarea.tsx · Textarea · kein Zweck vermerkt · genutzt
+- src/components/ui/textlink.tsx · Textlink, textlinkKlassen · Die Klassen eines Textlinks mit Trefferfläche ≥ 44 px (V16; Boards w1-korb „Route planen →", w1-mehr-neu „Hofseite ansehen"). · genutzt
 - src/components/ui/zaehler.tsx · Zaehler · Eine kleine Zahl an einem Eintrag: offene Bestellungen, Meldungen zu entscheiden, Artikel im Korb. · genutzt
 
 ## src/lib

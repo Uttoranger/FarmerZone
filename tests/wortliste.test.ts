@@ -16,16 +16,23 @@
  *    AUSNAHME_DATEIEN, mit Grund; hat die Datei kein Wort der Liste mehr, fällt die Ausnahme auf.
  *  - Steht ein Wort in anderem Sinn richtig da (der Status einer Bestellung), steht
  *    der Text mit Grund in AUSNAHMEN — je Text, nicht je Datei, ohne Zeilennummer.
- *  - OFFEN_BIS_86 war die Arbeitsliste für Nr. 86 (die Fundstellen der neuen „nicht"-Wörter
- *    aus N12: Briefkasten, Mitteilung, Newsletter) und ist leer: Jede Fundstelle ist
- *    umgestellt oder steht als Ausnahme mit Grund da. Ein Eintrag griffe über Datei, Wort und
- *    Text, nicht über die Zeile — im Sammel-PR verschieben andere Nummern die Zeilen. Er deckt
- *    genau eine Fundstelle; ein Eintrag, hinter dem kein Text mehr steht, fällt auf.
- *  - Gegenprobe: Die Suche schlägt am Wort im String an, nicht im Kommentar.
+ *  - Die Offen-Dateien (seit Nr. 219, Lauf 30): Für die neuen „nicht"-Wörter aus N42 c und N43
+ *    stehen die Fundstellen, die eine spätere Nummer umstellt, in tests/wortliste-offen/<nr>.ts
+ *    dieser Nummer. Die Wache liest den ganzen Ordner; jede Datei heißt nach ihrer Nummer, jeder
+ *    Eintrag hat einen Text. Ein Eintrag greift über Datei, Wort und Text, nicht über die Zeile —
+ *    im Sammel-PR verschieben andere Nummern die Zeilen. Er deckt genau eine Fundstelle; ein
+ *    Eintrag, hinter dem kein Text mehr steht, fällt auf. Jede Nummer leert und löscht nur ihre
+ *    eigene Datei, ein leerer oder fehlender Ordner ist der Normalfall (vorher: OFFEN_BIS_86, die
+ *    Arbeitsliste von Nr. 86, leer seit 86).
+ *  - Wortlaut, der bis zur Entscheidung der Anwältin bleibt (N43 (1)–(5)), steht als Ausnahme:
+ *    die N39-Beschriftung, Belehrung und Muster-Formular, AGB, Datenschutzerklärung; ein Text,
+ *    der „Einwilligung" nennt, zählt für „Widerruf"/„widerrufen" nicht (N43 (5)).
+ *  - Gegenprobe: Die Suche schlägt am Wort im String an, nicht im Kommentar — je neuem Wort.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
 
 const WURZEL = process.cwd()
@@ -78,7 +85,8 @@ const VERBOTE = verbotene(TABELLE)
 
 // ── Die Suche ────────────────────────────────────────────────────────────────
 
-type Fund = { datei: string; zeile: number; wort: string; text: string }
+/** `schluessel`: Name der Eigenschaft, deren Wert der Text ist (`{ titel: '…' }`), sonst leer. */
+type Fund = { datei: string; zeile: number; wort: string; text: string; schluessel?: string }
 
 /**
  * Wendungen, in denen ein verbotenes Wort etwas anderes meint — je Zeile mit Grund.
@@ -87,7 +95,25 @@ type Fund = { datei: string; zeile: number; wort: string; text: string }
 const ERLAUBTE_WENDUNGEN: { wendung: string; grund: string }[] = [
   { wendung: 'per Post', grund: 'Briefpost, kein Beitrag' },
   { wendung: 'Per Post', grund: 'Briefpost am Satzanfang, kein Beitrag' },
+  // N43 (1): Wer die N39-Beschriftung in einem Satz nennt, zitiert sie wörtlich — das übrige Wort zählt weiter.
+  { wendung: '„Vertrag widerrufen“', grund: 'zitierte Beschriftung der Online-Funktion nach § 13a FAGG (N39), bleibt bis zur Entscheidung der Anwältin (N43 (1))' },
+  { wendung: '„Widerruf bestätigen“', grund: 'zitierter Knopf der Online-Funktion nach § 13a FAGG (N39), bleibt bis zur Entscheidung der Anwältin (N43 (1))' },
 ]
+
+/**
+ * Wörter, die in einem bestimmten Zusammenhang etwas anderes meinen — je Regel mit Grund. Nennt
+ * ein Text den Zusammenhang, zählen diese Wörter in ihm nicht; andere Wörter der Liste schon.
+ */
+const SINN_REGELN: { woerter: string[]; zusammenhang: RegExp; grund: string }[] = [
+  {
+    woerter: ['Widerruf', 'widerrufen'],
+    zusammenhang: /Einwilligung/,
+    grund: 'Register N43 (5): Der Widerruf einer Einwilligung (Abo, Neuigkeiten, Datenschutz) ist kein Rücktritt vom Kauf — dort bleibt „widerrufen“',
+  },
+]
+
+/** Fällt das Wort in diesem Text unter eine Sinn-Regel? */
+const sinnAusnahme = (wort: string, text: string): boolean => SINN_REGELN.some((r) => r.woerter.includes(wort) && r.zusammenhang.test(text))
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {
@@ -105,6 +131,15 @@ function imLog(knoten: ts.Node): boolean {
   return false
 }
 
+/** Name der Eigenschaft, deren Wert der Text ist — eine Vorlage zählt als Ganzes. */
+function eigenschaftVon(knoten: ts.Node): string | undefined {
+  let k = knoten
+  while (k.parent && (ts.isTemplateSpan(k.parent) || ts.isTemplateExpression(k.parent))) k = k.parent
+  const eltern = k.parent
+  if (eltern === undefined || !ts.isPropertyAssignment(eltern) || eltern.initializer !== k) return undefined
+  return ts.isIdentifier(eltern.name) || ts.isStringLiteral(eltern.name) ? eltern.name.text : undefined
+}
+
 /** Verbotene Wörter in Zeichenketten, Vorlagen, Attributen und JSX-Text — Kommentare, Bezeichner und Logs zählen nicht. */
 function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel.tsx'): Fund[] {
   const art = datei.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
@@ -119,10 +154,12 @@ function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel
       // Ein Zeilenumbruch mitten im JSX-Text trennt keine Wortgruppe („Hilfe und\n Rückmeldung").
       const text = roh.replace(/\s+/g, ' ').trim()
       const zeile = quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1
+      const schluessel = eigenschaftVon(knoten)
       let suchtext = text
       for (const { wendung } of ERLAUBTE_WENDUNGEN) suchtext = suchtext.replaceAll(wendung, ' '.repeat(wendung.length))
       for (const v of verbote) {
-        funde.push(...[...suchtext.matchAll(v.muster)].map(() => ({ datei, zeile, wort: v.wort, text })))
+        if (sinnAusnahme(v.wort, text)) continue
+        funde.push(...[...suchtext.matchAll(v.muster)].map(() => ({ datei, zeile, wort: v.wort, text, ...(schluessel === undefined ? {} : { schluessel }) })))
       }
     }
     ts.forEachChild(knoten, besuche)
@@ -143,6 +180,10 @@ function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel
 type AusnahmeDatei = { datei: string; grund: string }
 const AUSNAHME_DATEIEN: AusnahmeDatei[] = [
   { datei: 'src/lib/rechtstexte/agb.ts', grund: 'Rechtstext, wörtlich aus docs/recht/agb.md, Register O4' },
+  {
+    datei: 'src/app/(public)/datenschutz/page.tsx',
+    grund: 'Recht prüft: Die Datenschutzerklärung bleibt als ganze Datei wörtlich bis zur Entscheidung der Anwältin (N43 (4)); „Widerruf“ meint dort auch den Widerruf einer Einwilligung (N43 (5))',
+  },
 ]
 
 /** Die Funde ohne die der Ausnahmedateien. */
@@ -151,13 +192,15 @@ const ohneDateien = (funde: Fund[], dateien: AusnahmeDatei[]): Fund[] => funde.f
 /**
  * Wo ein verbotenes Wort in anderem Sinn richtig ist — dauerhaft, je Text mit Grund.
  * `text` ist der ganze Text (genau gleich) oder ein Muster; ein Eintrag gilt für jeden
- * Treffer mit diesem Text in der Datei. Zeilennummern stehen hier nie.
+ * Treffer mit diesem Text in der Datei. Zeilennummern stehen hier nie. Nennt ein Eintrag
+ * `eigenschaften`, deckt er je Name genau einen Treffer, dessen Text der Wert dieser Eigenschaft
+ * ist — ein weiterer gleicher Text (andere Eigenschaft oder zweites Mal) bleibt ein Fund.
  *
  * „Status", „Post" und „Neuigkeit" meinen in der Wortliste den Beitrag. Der Status einer
  * Bestellung, Zahlung, Freischaltung oder Meldung, der Name der WhatsApp-Funktion „Status"
  * und ein HTTP-Kopf bleiben, wie sie heißen.
  */
-type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: string }
+type Ausnahme = { datei: string; wort: string; text: string | RegExp; grund: string; eigenschaften?: string[] }
 const AUSNAHMEN: Ausnahme[] = [
   // Version
   { datei: 'src/app/admin/betrieb/dienste.ts', wort: 'Version', text: 'Version', grund: 'Karte „Version“ in Admin › Betrieb meint den Deploy, der live ist (Board admin-betrieb-neu, Nr. 184) — keine Fassung der Startseite' },
@@ -196,14 +239,6 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: /^Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen/, grund: 'Wortlaut der Muster-Widerrufsbelehrung, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
   { datei: 'src/lib/widerruf.ts', wort: 'Mitteilung', text: '– Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)', grund: 'Wortlaut des Muster-Widerrufsformulars, Anhang I FAGG (Nr. 207) — Gesetzestext, keine Nachricht im Postfach' },
   { datei: 'src/lib/rechtstexte/gewaehrleistung-mitteilung.ts', wort: 'Mitteilung', text: /^Harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht \(Anhang II FAGG\)/, grund: 'Alt-Text der amtlichen Grafik nach Anhang II FAGG (Nr. 211, Wortlaut aus der Freigabe) — Name des Rechtstexts, keine Nachricht im Postfach' },
-  { datei: 'src/lib/beitrag-anlass.ts', wort: 'Mitteilung', text: 'Mitteilung', grund: 'Anlass eines Beitrags (Register 22e), keine Nachricht im Postfach — seit Nr. 134 die einzige Stelle (BEITRAG_ANLASS; tests/anlass-woerter-wache.test.ts)' },
-  // Newsletter (Register N12)
-  {
-    datei: 'src/app/(public)/datenschutz/page.tsx',
-    wort: 'Newsletter',
-    text: '9. Newsletter und Neuigkeiten von Höfen',
-    grund: 'Anmeldung bei einem Hof (Neuigkeiten), Entscheidung offen (Freigabe Lauf 13: keine Änderung)',
-  },
   // Lager
   {
     datei: 'src/lib/taxonomie.ts',
@@ -219,12 +254,6 @@ const AUSNAHMEN: Ausnahme[] = [
     grund: 'Regel-Zeile von Betrieb › E-Mails: Das Fachwort steht genau einmal erklärt (Freigabe Nr. 161 Punkt 2)',
   },
   {
-    datei: 'src/app/(public)/datenschutz/page.tsx',
-    wort: 'Beschwerde',
-    text: /Datenschutzbehörde Beschwerde einzulegen/,
-    grund: 'Rechtsbegriff der Datenschutzerklärung (Beschwerde bei der Aufsichtsbehörde), keine Spam-Meldung',
-  },
-  {
     datei: 'src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx',
     wort: 'Erneut versuchen',
     text: 'Erneut versuchen',
@@ -237,25 +266,125 @@ const AUSNAHMEN: Ausnahme[] = [
     text: /Käuferinnen und Käufer\.$/,
     grund: 'Rechtstext im Impressum (Haftungsausschluss) bleibt wörtlich; „Käufer“ ist dort der juristische Begriff',
   },
+  // Rücktritt (Register N43): Wortlaut, der bis zur Entscheidung der Anwältin bleibt
+  {
+    datei: 'src/lib/widerruf.ts',
+    wort: 'widerrufen',
+    text: 'Vertrag widerrufen',
+    eigenschaften: ['knopfWiderrufen', 'fussLink'],
+    grund: 'Recht prüft: Beschriftung der Online-Funktion nach § 13a FAGG (N39; Knopf und Einstieg), wörtlich bis zur Entscheidung der Anwältin (N43 (1)) — der Titel der Seite nicht (Offen-Datei 231)',
+  },
+  {
+    datei: 'src/lib/widerruf.ts',
+    wort: 'Widerruf',
+    text: 'Widerruf bestätigen',
+    eigenschaften: ['knopfBestaetigen'],
+    grund: 'Recht prüft: Knopf der Online-Funktion nach § 13a FAGG (N39), wörtlich bis zur Entscheidung der Anwältin (N43 (1))',
+  },
+  {
+    datei: 'src/lib/widerruf.ts',
+    wort: 'Widerrufsrecht',
+    text: /^(Widerrufsrecht$|Um Ihr Widerrufsrecht auszuüben|Sie können Ihr Widerrufsrecht auch online)/,
+    grund: 'Recht prüft: Wortlaut der Muster-Widerrufsbelehrung, Anhang I FAGG (BELEHRUNG, Nr. 207), bleibt wörtlich (N43 (2))',
+  },
+  {
+    datei: 'src/lib/widerruf.ts',
+    wort: 'widerrufen',
+    text: /^(Sie haben das Recht, binnen vierzehn Tagen|\) mittels einer eindeutigen Erklärung|Wenn Sie diesen Vertrag widerrufen|\(Wenn Sie den Vertrag widerrufen wollen)/,
+    grund: 'Recht prüft: Wortlaut der Muster-Widerrufsbelehrung und des Muster-Formulars, Anhang I FAGG (BELEHRUNG, Nr. 207), bleibt wörtlich (N43 (2))',
+  },
+  {
+    datei: 'src/lib/widerruf.ts',
+    wort: 'Widerruf',
+    text: /^(Wenn Sie diesen Vertrag widerrufen|Sie haben die Waren unverzüglich)/,
+    grund: 'Recht prüft: Wortlaut der Muster-Widerrufsbelehrung, Anhang I FAGG (BELEHRUNG, Nr. 207), bleibt wörtlich (N43 (2))',
+  },
+  {
+    datei: 'src/emails/widerruf.tsx',
+    wort: 'Widerruf',
+    text: 'Dein Widerruf ist eingegangen',
+    grund: 'Recht prüft: Betreff (Vorschautext) der Eingangsbestätigung nach § 13a FAGG (N39), bleibt bis zur Entscheidung der Anwältin (Auftrag Lauf 30, Nr. 219)',
+  },
+  {
+    datei: 'src/lib/email.ts',
+    wort: 'Widerruf',
+    text: 'Dein Widerruf ist eingegangen ·',
+    grund: 'Recht prüft: Betreff der Eingangsbestätigung nach § 13a FAGG (N39, WIDERRUF_EINGANG_BETREFF) — derselbe Betreff wie in src/emails/widerruf.tsx',
+  },
+  // Rücktritt (Register N43): keine Nutzertexte
+  { datei: 'src/server/widerruf.ts', wort: 'Widerruf', text: /^Widerruf: /, grund: 'Meldung an Sentry für die Entwicklerin (melde), kein Text für Kundin oder Hof' },
+  { datei: 'src/server/widerruf.ts', wort: 'Widerruf', text: /FROM "Widerruf"/, grund: 'Name der Tabelle in einer SQL-Abfrage — Datenbankfelder behalten ihren Namen (N43)' },
+  { datei: 'src/server/actions/widerruf.ts', wort: 'Widerruf', text: /^Widerruf: /, grund: 'Meldung an Sentry für die Entwicklerin (captureException), kein Text für Kundin oder Hof' },
+  // Rücktritt (Register N43): Dateien, die in Lauf 30 keiner Nummer gehören — Umstellung ist Nacharbeit (Bericht 219)
+  {
+    datei: 'src/server/widerruf.ts',
+    wort: 'Widerruf',
+    text: 'Widerruf der Kundin',
+    grund: 'Nacharbeit: Storno-Grund an der Bestellung (sieht der Hof); src/server/** gehört in Lauf 30 keiner Nummer — „Rücktritt“ mit eigenem Auftrag (Bericht 219)',
+  },
+  {
+    datei: 'src/lib/betrieb-mails.ts',
+    wort: 'Widerruf',
+    text: /^Widerruf(: | \()/,
+    grund: 'Nacharbeit: Namen der Mail-Arten in Admin › Betrieb › E-Mails; die Datei gehört in Lauf 30 keiner Nummer — „Rücktritt“ mit eigenem Auftrag (Bericht 219)',
+  },
+  // Dashboard (Register N42 c): das Dashboard eines fremden Dienstes heißt, wie der Dienst es nennt
+  { datei: 'src/lib/betrieb.ts', wort: 'Dashboard', text: 'Nur im Dashboard', grund: 'Karte in Admin › Betrieb für Werte, die nur die Dashboards fremder Dienste zeigen (Vercel, Supabase, Sentry, Resend) — Auftrag Lauf 30, Nr. 219' },
+  { datei: 'src/lib/betrieb.ts', wort: 'Dashboard', text: /Vercel-Dashboard/, grund: 'Name der Ansicht bei Vercel, einem fremden Dienst — nicht Heute' },
+  { datei: 'src/lib/admin-aufgaben.ts', wort: 'Dashboard', text: /Stripe-Dashboard/, grund: 'Name der Ansicht bei Stripe, einem fremden Dienst — nicht Heute' },
+  { datei: 'src/lib/postfach.ts', wort: 'Dashboard', text: /Stripe-Dashboard/, grund: 'Name der Ansicht bei Stripe, einem fremden Dienst — nicht Heute' },
+  {
+    datei: 'src/server/plattformgebuehr-abrechnung.ts',
+    wort: 'Dashboard',
+    text: /^Monatsabrechnung: Rechnungsangaben fehlen im Stripe-Dashboard$/,
+    grund: 'Warnung an Sentry für die Entwicklerin; Stripe-Dashboard ist die Ansicht eines fremden Dienstes',
+  },
 ]
 
 /**
- * Die Arbeitsliste von Nr. 86: Sie hielt die 23 Fundstellen der neuen „nicht"-Wörter aus N12
- * (Stand main 5e75103), bis 86 jeden Text auf das Wort der Tabelle umgestellt oder als Ausnahme
- * mit Grund eingetragen hat — jetzt ist sie leer und bleibt es (letzter Test). Wer künftig
- * mehrere Texte nummernweise umstellt, trägt sie hier ein: `stelle` ist Datei:Zeile von heute
- * (nur zum Finden; geglichen wird über Datei, Wort und Text), `text` ein Ausschnitt, `nummer`
- * die Nummer, die den Text umstellt. Eine neue Arbeitsliste
- * gibt es nur mit Freigabe (Muster 77/78: Liste und `it.skip`, bis sie leer ist).
+ * Die Offen-Dateien (seit Nr. 219, Lauf 30; vorher die Arbeitsliste OFFEN_BIS_86 von Nr. 86): je
+ * Nummer eine Datei tests/wortliste-offen/<nr>.ts mit `export const OFFEN`. Sie hält die
+ * Fundstellen der neuen „nicht"-Wörter in den Dateien dieser Nummer, bis die Nummer den Text auf
+ * das Wort der Tabelle umstellt; dann leert und löscht sie ihre Datei. `stelle` ist Datei:Zeile
+ * vom Tag des Eintrags (nur zum Finden; geglichen wird über Datei, Wort und Text), `text` ein
+ * Ausschnitt. Wer nach Lauf 30 wieder nummernweise umstellt, legt hier Dateien an — nur mit
+ * Freigabe. Der Ordner fehlt oder ist leer, wenn nichts offen ist.
  */
 type Offen = { stelle: string; wort: string; text: string; nummer?: string }
-const OFFEN_BIS_86: Offen[] = []
+
+const OFFEN_ORDNER = join(WURZEL, 'tests/wortliste-offen')
+const OFFEN_NAMEN = existsSync(OFFEN_ORDNER) ? readdirSync(OFFEN_ORDNER).sort() : []
+/** Jede Datei des Ordners mit ihrer Nummer — gelesen wird alles, was dort liegt. */
+const OFFEN_DATEIEN: { name: string; nummer: string; export: unknown; eintraege: Offen[] }[] = await Promise.all(
+  OFFEN_NAMEN.map(async (name) => {
+    const modul = (await import(pathToFileURL(join(OFFEN_ORDNER, name)).href)) as { OFFEN?: unknown }
+    // Fehlt der Export oder ist er keine Liste, fällt das in „exportiert OFFEN als Liste“ auf — nie still als leer.
+    const eintraege = Array.isArray(modul.OFFEN) ? (modul.OFFEN as Offen[]) : []
+    return { name, nummer: name.replace(/\.ts$/, ''), export: modul.OFFEN, eintraege }
+  })
+)
 
 type Deckt = { datei: string; wort: string; text: string }
 const dateiVon = (stelle: string): string => stelle.slice(0, stelle.lastIndexOf(':'))
 
 const deckt = (a: Ausnahme, f: Fund): boolean =>
   a.datei === f.datei && a.wort === f.wort && (typeof a.text === 'string' ? a.text === f.text : a.text.test(f.text))
+
+/**
+ * Die Funde ohne die, die eine Ausnahme deckt. Eine Ausnahme mit `eigenschaften` deckt je Name genau
+ * einen Fund mit diesem Eigenschaftsnamen; `ungenutzt` nennt die Namen, für die kein Fund da war.
+ */
+function ohneAusnahmenAus(funde: Fund[], ausnahmen: Ausnahme[]): { rest: Fund[]; ungenutzt: string[] } {
+  const frei = ausnahmen.map((a) => new Set(a.eigenschaften ?? []))
+  const rest = funde.filter((f) => {
+    const i = ausnahmen.findIndex((a, j) => deckt(a, f) && (a.eigenschaften === undefined || frei[j].has(f.schluessel ?? '')))
+    if (i === -1) return true
+    if (ausnahmen[i].eigenschaften !== undefined) frei[i].delete(f.schluessel ?? '')
+    return false
+  })
+  const ungenutzt = ausnahmen.flatMap((a, i) => [...frei[i]].map((name) => `${a.datei} „${a.wort}“ ${name}`))
+  return { rest, ungenutzt }
+}
 
 /** Jede Fundstelle nimmt höchstens einen Eintrag; was bleibt, ist offen bzw. ohne Fundstelle. */
 function gleicheAb<E extends Deckt>(funde: Fund[], liste: E[]): { rest: Fund[]; ungenutzt: E[] } {
@@ -274,14 +403,14 @@ function gleicheAb<E extends Deckt>(funde: Fund[], liste: E[]): { rest: Fund[]; 
   return { rest, ungenutzt: frei }
 }
 
-const OFFEN = OFFEN_BIS_86.map((e) => ({ ...e, datei: dateiVon(e.stelle) }))
+const OFFEN = OFFEN_DATEIEN.flatMap((d) => d.eintraege.map((e) => ({ ...e, nummer: d.nummer, datei: dateiVon(e.stelle) })))
 const posix = (pfad: string): string => pfad.split(sep).join('/')
 
 // ── Prüfungen ────────────────────────────────────────────────────────────────
 
 describe('Wortliste', () => {
   describe('Tabelle', () => {
-    it('hat in jeder Zeile Sache, Wort und Beispiel, und die verbotenen Wörter aus N8 und N12 stehen in „nicht"', () => {
+    it('hat in jeder Zeile Sache, Wort und Beispiel, und die verbotenen Wörter aus N8, N12, N42 c und N43 stehen in „nicht"', () => {
       for (const z of TABELLE) {
         expect(z.sache, z.wort).not.toBe('')
         expect(z.wort, z.sache).not.toBe('')
@@ -290,7 +419,10 @@ describe('Wortliste', () => {
       const nicht = new Set(TABELLE.flatMap((z) => z.nicht))
       const n8 = ['Zeitfenster', 'Abholslot', 'Bestand', 'Lagerstand', 'Lager', 'Status', 'Post', 'Neuigkeit', 'Hilfe und Rückmeldung', 'Fehler melden', 'Käufer']
       const n12 = ['Briefkasten', 'Posteingang', 'Mitteilung', 'Benachrichtigung', 'Newsletter', 'Chat', 'Thread', 'Konversation']
-      for (const wort of [...n8, ...n12]) {
+      // Lauf 30 (Nr. 219): N42 c und N43.
+      const n42 = ['Login-E-Mail', 'Mitteilung', 'Vor-Ort-Bestellung', 'Barzahlung vor Ort', 'Hof-Seite', 'Hof-Profil', 'Mandat erteilen', 'Button', 'E-Mail-Updates', 'Finanzen', 'Dashboard']
+      const n43 = ['Widerruf', 'widerrufen', 'Widerrufsrecht']
+      for (const wort of [...n8, ...n12, ...n42, ...n43]) {
         expect(nicht.has(wort), wort).toBe(true)
       }
     })
@@ -340,6 +472,54 @@ describe('Wortliste', () => {
       expect(findeVerbotene(schnipsel, VERBOTE).map((f) => `${f.zeile} ${f.wort}`)).toEqual(['1 Briefkasten', '2 Newsletter', '3 Mitteilung'])
     })
 
+    // Lauf 30 (Nr. 219): je neuem Wort — im String schlägt es an, im Kommentar und im Bezeichner nicht.
+    it.each([
+      ['Widerruf', 'Dein Widerruf ist eingegangen'],
+      ['widerrufen', 'Was willst du widerrufen?'],
+      ['Widerrufsrecht', 'Dein Widerrufsrecht'],
+      ['Login-E-Mail', 'Deine Login-E-Mail'],
+      ['Mitteilung', 'Mitteilung'],
+      ['Vor-Ort-Bestellung', 'Neue Vor-Ort-Bestellung'],
+      ['Barzahlung vor Ort', 'Barzahlung vor Ort'],
+      ['Hof-Seite', 'Auf deiner Hof-Seite'],
+      ['Hof-Profil', 'Hof-Profil speichern'],
+      ['Mandat erteilen', 'Jetzt Mandat erteilen'],
+      ['Button', 'Klicke auf den Button'],
+      ['E-Mail-Updates', 'E-Mail-Updates abonniert'],
+      ['Finanzen', 'Finanzen in Zahlen'],
+      ['Dashboard', 'Im Dashboard ansehen →'],
+    ])('Gegenprobe (N42 c, N43): „%s“ schlägt im String an, nicht im Kommentar', (wort, satz) => {
+      const imString = findeVerbotene(`const a = <p title="x">{'${satz}'}</p>`, VERBOTE)
+      expect(imString.map((f) => f.wort)).toContain(wort)
+      const imKommentar = findeVerbotene(`// ${satz}\n/** ${satz} */\nconst b = 1`, VERBOTE)
+      expect(imKommentar).toEqual([])
+    })
+
+    it('Gegenprobe (N43): nicht bei Bezeichner, Route oder längerem Wort — Widerrufsfrist, Rücktritt, /widerruf, WIDERRUF_TEXT', () => {
+      const schnipsel = [
+        "const a = '/widerruf'",
+        "const b = 'Die Widerrufsfrist beträgt vierzehn Tage.'",
+        "const c = 'Rücktrittsrecht'",
+        'const WIDERRUF_TEXT = { knopf: 1 }',
+        "const d = 'Buttons, Dashboards, Hofseite, Anmelde-Adresse, Neuigkeiten'",
+      ].join('\n')
+      expect(findeVerbotene(schnipsel, VERBOTE)).toEqual([])
+    })
+
+    it('Gegenprobe (N43 (5)): nicht beim Widerruf einer Einwilligung — andere Wörter im selben Text zählen weiter', () => {
+      expect(findeVerbotene("const a = 'Du kannst deine Einwilligung jederzeit widerrufen.'", VERBOTE)).toEqual([])
+      expect(findeVerbotene("const b = 'Widerruf der Einwilligung'", VERBOTE)).toEqual([])
+      // Ohne Einwilligung schlägt dasselbe Wort an; der Zusammenhang hebt nur die Wörter der Regel auf.
+      expect(findeVerbotene("const c = 'Du kannst den Kauf jederzeit widerrufen.'", VERBOTE).map((f) => f.wort)).toEqual(['widerrufen'])
+      expect(findeVerbotene("const d = 'Einwilligung im Dashboard widerrufen'", VERBOTE).map((f) => f.wort)).toEqual(['Dashboard'])
+    })
+
+    it('Gegenprobe (N43 (1)): die zitierte N39-Beschriftung zählt nicht, das übrige Wort im Satz schon', () => {
+      const funde = findeVerbotene("const a = 'Mit „Widerruf bestätigen“ schickst du den Widerruf ab.'", VERBOTE)
+      expect(funde.map((f) => f.wort)).toEqual(['Widerruf'])
+      expect(findeVerbotene("const b = 'Tipp auf „Vertrag widerrufen“.'", VERBOTE)).toEqual([])
+    })
+
     it('Gegenprobe: ein Wort neben einer erlaubten Wendung zählt trotzdem', () => {
       const funde = findeVerbotene("const a = 'Neuer Post, nicht per Post'", VERBOTE)
       expect(funde.map((f) => f.wort)).toEqual(['Post'])
@@ -367,6 +547,27 @@ describe('Wortliste', () => {
       expect(rest.map((f) => f.datei)).toEqual(['src/lib/b.ts'])
     })
 
+    it('Gegenprobe (N43 (1)): „Vertrag widerrufen“ in widerruf.ts gilt nur für Knopf und Einstieg — der Titel und ein drittes Mal bleiben Funde', () => {
+      const quelle = [
+        'export const WIDERRUF_TEXT = {',
+        "  knopfWiderrufen: 'Vertrag widerrufen',",
+        "  knopfBestaetigen: 'Widerruf bestätigen',",
+        "  fussLink: 'Vertrag widerrufen',",
+        "  titel: 'Vertrag widerrufen',",
+        '}',
+        "export const NOCHMAL = { fussLink: 'Vertrag widerrufen', knopfBestaetigen: 'Widerruf bestätigen' }",
+      ].join('\n')
+      const { rest, ungenutzt } = ohneAusnahmenAus(findeVerbotene(quelle, VERBOTE, 'src/lib/widerruf.ts'), AUSNAHMEN)
+      expect(rest.map((f) => `${f.zeile} ${f.schluessel} ${f.wort}`)).toEqual(['5 titel widerrufen', '7 fussLink widerrufen', '7 knopfBestaetigen Widerruf'])
+      expect(ungenutzt.filter((u) => u.startsWith('src/lib/widerruf.ts'))).toEqual([])
+      // Fehlt der Knopf, fällt sein Name als ungenutzt auf.
+      const ohneKnopf = findeVerbotene("const T = { fussLink: 'Vertrag widerrufen' }", VERBOTE, 'src/lib/widerruf.ts')
+      expect(ohneAusnahmenAus(ohneKnopf, AUSNAHMEN).ungenutzt.filter((u) => u.startsWith('src/lib/widerruf.ts'))).toEqual([
+        'src/lib/widerruf.ts „widerrufen“ knopfWiderrufen',
+        'src/lib/widerruf.ts „Widerruf“ knopfBestaetigen',
+      ])
+    })
+
     it('Gegenprobe: ein kurzer Text nimmt einem längeren, der ihn enthält, den Platz nicht weg — gleich in welcher Reihenfolge', () => {
       const kurz = { datei: 'src/f.ts', wort: 'Bestand', text: 'Bestand (' }
       const lang = { datei: 'src/f.ts', wort: 'Bestand', text: 'Bestand (Pakete)' }
@@ -392,9 +593,9 @@ describe('Wortliste', () => {
       )
     }, 30_000)
 
-    const ohneAusnahmen = (): Fund[] => ohneDateien(funde, AUSNAHME_DATEIEN).filter((f) => !AUSNAHMEN.some((a) => deckt(a, f)))
+    const ohneAusnahmen = (): Fund[] => ohneAusnahmenAus(ohneDateien(funde, AUSNAHME_DATEIEN), AUSNAHMEN).rest
 
-    it('kein Wort der Spalte „nicht" steht in einem Text — außer Ausnahmen und OFFEN_BIS_86', () => {
+    it('kein Wort der Spalte „nicht" steht in einem Text — außer Ausnahmen und den Offen-Dateien', () => {
       const statt = new Map(VERBOTE.map((v) => [v.wort, v.statt.join(' / ')]))
       const verstoesse = gleicheAb(ohneAusnahmen(), OFFEN).rest.map(
         (f) => `${f.datei}:${f.zeile} „${f.wort}“ (statt: ${statt.get(f.wort)}): ${f.text.slice(0, 90)}`
@@ -407,20 +608,41 @@ describe('Wortliste', () => {
       expect(ERLAUBTE_WENDUNGEN.filter((w) => w.grund.trim().length < 5)).toEqual([])
       const ungenutzt = AUSNAHMEN.filter((a) => !funde.some((f) => deckt(a, f)))
       expect(ungenutzt.map((a) => `${a.datei} „${a.wort}“: ${a.grund}`)).toEqual([])
+      // Eine Ausnahme mit Eigenschaften: jeder Name hat noch seinen Text.
+      expect(ohneAusnahmenAus(ohneDateien(funde, AUSNAHME_DATEIEN), AUSNAHMEN).ungenutzt).toEqual([])
       // Eine Ausnahmedatei hat einen Grund und trägt noch ein Wort der Liste — sonst gehört sie aus der Liste.
       expect(AUSNAHME_DATEIEN.filter((d) => d.grund.trim().length < 10).map((d) => d.datei)).toEqual([])
       expect(AUSNAHME_DATEIEN.filter((d) => !funde.some((f) => f.datei === d.datei)).map((d) => d.datei)).toEqual([])
     })
 
-    it('OFFEN_BIS_86: jeder Eintrag hat einen Text und steht noch so da — Erledigtes gehört gestrichen', () => {
-      expect(OFFEN.filter((e) => e.text.trim() === '').map((e) => e.stelle)).toEqual([])
+    it('Offen-Dateien: jeder Eintrag hat einen Text und steht noch so da — Erledigtes gehört gestrichen', () => {
+      expect(OFFEN.filter((e) => e.text.trim() === '').map((e) => `${e.nummer}: ${e.stelle}`)).toEqual([])
       const { ungenutzt } = gleicheAb(ohneAusnahmen(), OFFEN)
-      expect(ungenutzt.map((e) => `${e.stelle} „${e.wort}“: ${e.text}`)).toEqual([])
+      expect(ungenutzt.map((e) => `${e.nummer}: ${e.stelle} „${e.wort}“: ${e.text}`)).toEqual([])
+    })
+
+    it('Offen-Dateien: ein Eintrag nennt ein Wort der Spalte „nicht“ und eine Datei unter src/', () => {
+      const woerter = new Set(VERBOTE.map((v) => v.wort))
+      expect(OFFEN.filter((e) => !woerter.has(e.wort) || !e.datei.startsWith('src/')).map((e) => `${e.nummer}: ${e.stelle} „${e.wort}“`)).toEqual([])
     })
   })
 
-  // Seit Nr. 86 gilt die Tabelle ohne Arbeitsliste: Ein Eintrag in OFFEN_BIS_86 macht diesen Test rot.
-  it('OFFEN_BIS_86 ist leer — jede Fundstelle ist umgestellt', () => {
-    expect(OFFEN_BIS_86).toEqual([])
+  describe('Offen-Ordner tests/wortliste-offen', () => {
+    it('jede Datei heißt nach ihrer Nummer (<nr>.ts) und exportiert OFFEN als Liste', () => {
+      expect(OFFEN_DATEIEN.filter((d) => !/^\d{3}\.ts$/.test(d.name)).map((d) => d.name)).toEqual([])
+      expect(OFFEN_DATEIEN.filter((d) => !Array.isArray(d.export)).map((d) => d.name)).toEqual([])
+    })
+
+    it('eine Nummer trägt nur ihre eigenen Einträge — kein Eintrag steht in zwei Dateien', () => {
+      const schluessel = OFFEN.map((e) => `${e.datei}|${e.wort}|${e.text}|${e.stelle}`)
+      expect(schluessel.filter((s, i) => schluessel.indexOf(s) !== i)).toEqual([])
+      for (const e of OFFEN) if (e.nummer !== undefined) expect(OFFEN_DATEIEN.some((d) => d.nummer === e.nummer)).toBe(true)
+    })
+
+    it('Gegenprobe: Ein Eintrag aus einer Offen-Datei nimmt genau seine Fundstelle aus, eine zweite gleiche bleibt offen', () => {
+      const fund = (zeile: number): Fund => ({ datei: 'src/a.tsx', zeile, wort: 'Hof-Seite', text: 'Auf meiner Hof-Seite anzeigen' })
+      const liste = [{ stelle: 'src/a.tsx:3', datei: 'src/a.tsx', wort: 'Hof-Seite', text: 'Auf meiner Hof-Seite', nummer: '225' }]
+      expect(gleicheAb([fund(3), fund(9)], liste).rest.map((f) => f.zeile)).toEqual([9])
+    })
   })
 })
