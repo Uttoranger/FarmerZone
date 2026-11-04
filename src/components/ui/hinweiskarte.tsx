@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { NETZ_KNOPF } from '@/lib/netz'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 type Ton = 'gruen' | 'orange' | 'neutral'
 
@@ -70,6 +72,58 @@ export function Hinweiskarte({
         </div>
       </div>
       {aktion && <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">{aktion}</div>}
+    </div>
+  )
+}
+
+/**
+ * Die orange Hinweiskarte für einen Fehler, der kein Feld betrifft (V17; Boards w1-kasse Bild 4
+ * „Deine Karte wurde abgelehnt", s1-produkt-neu Bild 5 und 6 „Bitte prüfe die markierten Felder.",
+ * „Speichern hat nicht geklappt"): Fläche und Schrift aus dem Bedeutungs-Paar „tun"
+ * (`bg-zustand-tun-grund`, `text-zustand-tun`, ≥ 4,5:1 in beiden Modi, tests/design-tokens.test.ts),
+ * Titel fett, darunter ein Satz. `role="alert"`, damit der Screenreader ihn beim Erscheinen liest.
+ *
+ * Mit `nochmal` steht darunter der Knopf „Nochmal" (NETZ_KNOPF, Register N29) über die volle Breite,
+ * 52 px, als Rahmenknopf — die Eingabe bleibt stehen, ein Tipp wiederholt den Aufruf. Nie bei
+ * Aktionen, die der Server schon ausgeführt haben kann (NETZ_SATZ_UNSICHER, DESIGN_SYSTEM „Zustände").
+ */
+export function HinweiskarteFehler({
+  titel,
+  children,
+  nochmal,
+  laeuft,
+  className,
+}: {
+  titel: string
+  children?: ReactNode
+  /** Wiederholt den Aufruf; ohne sie kein Knopf. */
+  nochmal?: () => void
+  /** Solange der zweite Versuch läuft, ist der Knopf gesperrt. */
+  laeuft?: boolean
+  className?: string
+}): React.JSX.Element {
+  return (
+    <div
+      role="alert"
+      data-slot="hinweiskarte-fehler"
+      className={cn('flex flex-col gap-1.5 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun', className)}
+    >
+      <p className="text-[15px] font-bold">{titel}</p>
+      {children && <div className="text-[14px] leading-normal">{children}</div>}
+      {nochmal && (
+        <button
+          type="button"
+          onClick={nochmal}
+          disabled={laeuft}
+          aria-busy={laeuft || undefined}
+          className={cn(
+            'mt-1.5 inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-3 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
+            FOKUS_RAHMEN
+          )}
+        >
+          {NETZ_KNOPF}
+        </button>
+      )}
     </div>
   )
 }

@@ -26,14 +26,23 @@ import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { Marke } from '@/components/ui/marke'
+import { AusverkauftMarke, Marke } from '@/components/ui/marke'
 import { MARKE_ARTEN, type MarkeArt } from '@/lib/marke-art'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { Zaehler } from '@/components/ui/zaehler'
-import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Dialog, DialogMitte, DialogTrigger } from '@/components/ui/dialog'
+import { FeldMitFehler } from '@/components/ui/feld-fehler'
+import { Textlink } from '@/components/ui/textlink'
+import { BildPlatzhalter, FotoHinzufuegen } from '@/components/ui/bild-platzhalter'
+import { HofkarteRahmen, hofkarteKlassen } from '@/components/ui/hofkarte-rahmen'
+import { MeldungFormularAnsicht, type MeldungWelt } from '@/components/ui/meldung-formular-ansicht'
+import type { MeldungFormular } from '@/components/shared/use-meldung-formular'
+import type { MeldungArt } from '@/lib/meldung'
+import { Input } from '@/components/ui/input'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
@@ -86,6 +95,62 @@ function Abschnitt({ id, titel, satz, children }: { id: string; titel: string; s
       </div>
       {children}
     </section>
+  )
+}
+
+/** Zustände der Meldungs-Vorschau — gezeigt, nie geschickt. */
+type MeldungZustand = 'leer' | 'fehler' | 'danke'
+
+/**
+ * Ein Formular-Zustand nur zum Ansehen: Die Vorschau ruft NIE useMeldungFormular — Absenden
+ * schickte sonst eine echte Meldung in den Briefkasten. Absenden zeigt hier nur den Dank.
+ */
+function useVorschauFormular(zustand: MeldungZustand, setZustand: (z: MeldungZustand) => void): MeldungFormular {
+  const [art, setArt] = useState<MeldungArt>('FEHLER')
+  const [text, setText] = useState('')
+  const [kennung, setKennung] = useState('')
+  const [email, setEmail] = useState('')
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null)
+  const [website, setWebsite] = useState('')
+  return {
+    art, setArt, text, setText, kennung, setKennung, email, setEmail, screenshotUrl, setScreenshotUrl, website, setWebsite,
+    fehler: zustand === 'fehler' ? 'Wir konnten deine Meldung gerade nicht speichern. Dein Text ist noch da – versuch es bitte gleich noch einmal.' : '',
+    kurznummer: zustand === 'danke' ? 'AB12' : null,
+    isPending: false,
+    kontext: { seiteUrl: '', userAgent: '', viewport: '' },
+    upload: { fileInput: null, openFilePicker: () => {}, isUploading: false, progress: null } as unknown as MeldungFormular['upload'],
+    absenden: (e) => {
+      e.preventDefault()
+      setZustand('danke')
+    },
+    nochEtwas: () => setZustand('leer'),
+  }
+}
+
+function MeldungVorschau({ welt }: { welt: MeldungWelt }): React.JSX.Element {
+  const [zustand, setZustand] = useState<MeldungZustand>('leer')
+  const formular = useVorschauFormular(zustand, setZustand)
+  return (
+    <div className="flex flex-col gap-3">
+      <Segment
+        beschriftung={welt === 'kunde' ? 'Zustand Kundschaft' : 'Zustand Hof'}
+        optionen={[
+          { wert: 'leer', label: 'Leer' },
+          { wert: 'fehler', label: 'Serverfehler' },
+          { wert: 'danke', label: 'Danke' },
+        ]}
+        wert={zustand}
+        onWertChange={(w) => setZustand(w as MeldungZustand)}
+      />
+      <MeldungFormularAnsicht
+        formular={formular}
+        welt={welt}
+        alsHof={welt === 'hof'}
+        abbrechenHref="/intern/bausteine#meldung"
+        titel={welt === 'kunde' ? 'Problem melden' : undefined}
+        satz={welt === 'kunde' ? 'Danke, dass du Bescheid gibst. Wir schauen uns das an.' : undefined}
+      />
+    </div>
   )
 }
 
@@ -194,7 +259,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           >
             {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5), damit die Leiste hier sichtbar klebt. */}
             <div className="relative h-72 overflow-y-auto rounded-xl border border-border bg-background px-4 pt-5 md:px-8 md:pt-8">
-              <UnterseitenKopf pfad="/settings/profile" titel="Hof-Profil" satz="Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind." />
+              <UnterseitenKopf pfad="/settings/profile" titel="Hofdaten" satz="Informationen, die auf deiner öffentlichen Hofseite sichtbar sind." />
               {[0, 1, 2, 3].map((i) => (
                 <div key={i} className="mb-3 h-24 rounded-2xl border border-border bg-card" />
               ))}
@@ -309,6 +374,128 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 </SheetClose>
               </SheetBlatt>
             </Sheet>
+          </Abschnitt>
+
+          <Abschnitt
+            id="dialog-mitte"
+            titel="Dialog zentriert"
+            satz="Im Web höchstens 560 px, Titel links, genau ein Schließen-Element rechts (Textknopf, 44 px); am Handy nimmt die Seite das Blatt."
+          >
+            <Dialog>
+              <DialogTrigger className={KNOPF.rand}>Dialog öffnen</DialogTrigger>
+              <DialogMitte titel="Vorrat: Freilandeier" schliessen="Abbrechen">
+                <p className="text-muted-foreground">Wie viele Packungen à 10 Stück hast du gerade?</p>
+                <Stepper beschriftung="Vorrat Freilandeier" standardWert={3} min={0} max={99} />
+                <p className="text-[14px] text-muted-foreground">Bei 0 steht „Ausverkauft“, das Produkt bleibt sichtbar.</p>
+                <button type="button" className={cn(KNOPF.orange, 'h-12 self-start rounded-[14px] px-5 text-[16px]')}>
+                  Speichern
+                </button>
+              </DialogMitte>
+            </Dialog>
+          </Abschnitt>
+
+          <Abschnitt
+            id="blatt-rechts"
+            titel="Blatt rechts (Warenkorb)"
+            satz="Am Handy von unten mit Griff, ab 768 px von rechts über die volle Höhe, höchstens 448 px; Kopf mit Titel und „Schließen“."
+          >
+            <Sheet>
+              <SheetTrigger className={KNOPF.rand}>Warenkorb öffnen</SheetTrigger>
+              <SheetBlatt seite="rechts">
+                <SheetKopf titel="Warenkorb · Hof Beispielberg" />
+                <ListGruppe beschriftung="Im Warenkorb">
+                  <ListRow titel="Freilandeier, 10 Stk." untertitel="€ 0,48 / Stk." ende={<span className="text-[15px] font-semibold">€ 4,77</span>} />
+                  <ListRow titel="Bergkäse, 250 g" untertitel="€ 26,32 / kg" ende={<span className="text-[15px] font-semibold">€ 6,58</span>} />
+                </ListGruppe>
+                <div className="flex items-baseline justify-between border-t border-border pt-2.5">
+                  <strong className="text-base">Gesamt</strong>
+                  <strong className="text-[22px]">€ 11,35</strong>
+                </div>
+                <p className="text-[13px] text-muted-foreground">Inkl. Plattformgebühr · Reservierung gilt 15 Minuten.</p>
+                <SheetClose className={cn(KNOPF.gruen, 'h-[52px] w-full justify-center rounded-[14px] text-[16px]')}>Zur Kasse</SheetClose>
+              </SheetBlatt>
+            </Sheet>
+          </Abschnitt>
+
+          <Abschnitt id="ausverkauft" titel="Marke „Ausverkauft“" satz="Neutral (V19): die Art „erledigt“ als Schild, 22 px, ohne Rand — kein Orange, kein Rot.">
+            <div className="flex flex-wrap items-center gap-2">
+              <AusverkauftMarke />
+              <Marke art="laeuft" form="schild">
+                Sichtbar
+              </Marke>
+              <Marke art="tun" form="schild">
+                Nur noch 3
+              </Marke>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="feldfehler" titel="Feldfehler" satz="Orange am Feld (V17): Rand 2 px, Satz darunter mit role=alert, aria-invalid und aria-describedby am Feld.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FeldMitFehler id="vorschau-einheit" label="Einheit" hilfe="Glas, Stück, kg …">
+                {(feld) => <Input {...feld} defaultValue="Glas" />}
+              </FeldMitFehler>
+              <FeldMitFehler id="vorschau-preis" label="Preis je Glas" fehler="Trag einen Preis ein, z. B. 7,50.">
+                {(feld) => <Input {...feld} inputMode="decimal" />}
+              </FeldMitFehler>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="textlink" titel="Textlink" satz="Sieht aus wie Text, trifft sich wie ein Knopf (V16): in der Zeile 44 px hoch, im Satz über ::before.">
+            <div className="flex flex-wrap items-center gap-4">
+              <Textlink href="/intern/bausteine#textlink">Route planen →</Textlink>
+              <Textlink href="/intern/bausteine#textlink" ton="orange">
+                Hofseite ansehen
+              </Textlink>
+              <Textlink href="/intern/bausteine#textlink" ton="leise">
+                Impressum
+              </Textlink>
+            </div>
+            <p className="text-[14px] text-muted-foreground">
+              Fragen zur Abholung? Schreib dem Hof über die{' '}
+              <Textlink href="/intern/bausteine#textlink" form="im-satz">
+                Bestellseite
+              </Textlink>
+              .
+            </p>
+          </Abschnitt>
+
+          <Abschnitt id="bild-platzhalter" titel="Bild-Platzhalter" satz="Ohne Dateinamen (V15), dunkel mit eigenem Verlauf; im Formular „Foto hinzufügen“.">
+            <div className="grid grid-cols-3 gap-2">
+              <BildPlatzhalter className="h-24" />
+              <BildPlatzhalter className="h-24" gedaempft />
+              <BildPlatzhalter className="h-24 rounded-none border-0" />
+            </div>
+            <FotoHinzufuegen />
+          </Abschnitt>
+
+          <Abschnitt id="hinweis-fehler" titel="Hinweiskarte mit „Nochmal“" satz="Orange für Fehler, die kein Feld betreffen (V17): Karten-Ablehnung ohne Knopf, Speicherfehler mit „Nochmal“.">
+            <HinweiskarteFehler titel="Deine Karte wurde abgelehnt">Es wurde nichts abgebucht. Deine Ware bleibt bis 07:55 Uhr für dich reserviert.</HinweiskarteFehler>
+            <HinweiskarteFehler titel="Speichern hat nicht geklappt" nochmal={() => {}}>
+              Deine Eingaben sind noch da. Prüf den Empfang und versuch es noch einmal.
+            </HinweiskarteFehler>
+          </Abschnitt>
+
+          <Abschnitt id="hofkarte" titel="Hofkarte pausiert" satz="V18: ausgegraut, gestrichelt, neutraler Text — der Hof bleibt sichtbar und lesbar.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[false, true].map((pausiert) => (
+                <HofkarteRahmen key={String(pausiert)} pausiert={pausiert}>
+                  <BildPlatzhalter className="h-24 rounded-none border-0" gedaempft={pausiert} />
+                  <div className="flex flex-col gap-1 px-3 py-2.5">
+                    <strong className="text-[17px]">{pausiert ? 'Hof am Weiher' : 'Hof am Bach'}</strong>
+                    <span className="text-[13px] text-muted-foreground">{pausiert ? '5282 Beispielort · 7 km' : '5280 Beispielort · 4 km'}</span>
+                    <span className={hofkarteKlassen(pausiert).abholung}>{pausiert ? 'Macht gerade Pause' : 'Abholung Sa, 6. März, 9–12 Uhr'}</span>
+                  </div>
+                </HofkarteRahmen>
+              ))}
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="meldung" titel="Problem melden" satz="Eine Darstellung, Ton je Welt (V51): Kundschaft grün, Hof orange. Die Logik bleibt useMeldungFormular — hier wird nichts geschickt.">
+            <MeldungVorschau welt="kunde" />
+          </Abschnitt>
+
+          <Abschnitt id="meldung-hof" titel="Problem melden im Hofbereich" satz="Dieselbe Darstellung in Orange; der angemeldete Hof sieht „Bildschirmfoto hinzufügen“ statt der E-Mail.">
+            <MeldungVorschau welt="hof" />
           </Abschnitt>
 
           <Abschnitt id="sidebar" titel="Sidebar-Gruppe mit Zähler" satz="Die Seitenleiste des Hofbereichs ab 768 px; aktiv in umgekehrter Textfarbe.">
