@@ -47,6 +47,7 @@ import {
   bestellKopfzeile,
   bestellListeHref,
   bestellMarke,
+  papierMarke,
   filterChips,
   fensterZeit,
   gruppiereNachAbholfenster,
@@ -148,8 +149,9 @@ describe('filterChips und Kopfzeile', () => {
     expect(bestellListeHref('erledigt')).toBe('/orders?filter=erledigt')
   })
 
-  it('„4 offen · 1 gepackt"', () => {
-    expect(bestellKopfzeile(LISTE)).toBe('4 offen · 1 gepackt')
+  it('„4 offen, davon 1 gepackt" (Board s1-bestellungen) — ohne Gepacktes nur „n offen"', () => {
+    expect(bestellKopfzeile(LISTE)).toBe('4 offen, davon 1 gepackt')
+    expect(bestellKopfzeile(LISTE.filter((x) => x.status !== 'READY'))).toBe('3 offen')
   })
 })
 
@@ -158,8 +160,9 @@ describe('gruppiereNachAbholfenster', () => {
     const gruppen = gruppiereNachAbholfenster(LISTE, 'offen', JETZT)
     expect(gruppen.map((g) => [g.titel, g.bestellungen.map((x) => x.id)])).toEqual([
       // Im selben Fenster fest nach Kennung — eine Zeile springt nicht nach jedem Speichern.
-      ['Heute, 15–18 Uhr · 3 Bestellungen', ['anna', 'lena', 'thomas']],
-      ['Samstag, 9–12 Uhr · 1 Bestellung', ['markus']],
+      // Tag mit Wochentag und Datum (V9), die Zahl ohne Wort (Board s1-bestellungen).
+      ['Heute, Di 6.\u00a0Okt, 15–18 Uhr · 3', ['anna', 'lena', 'thomas']],
+      ['Sa, 10.\u00a0Okt, 9–12 Uhr · 1', ['markus']],
     ])
   })
 
@@ -169,12 +172,12 @@ describe('gruppiereNachAbholfenster', () => {
       'offen',
       JETZT
     )
-    expect(gruppen.map((g) => g.titel)).toEqual(['Heute, 9:30–12 Uhr · 1 Bestellung', 'Heute, 15–18 Uhr · 1 Bestellung'])
+    expect(gruppen.map((g) => g.titel)).toEqual(['Heute, Di 6.\u00a0Okt, 9:30–12 Uhr · 1', 'Heute, Di 6.\u00a0Okt, 15–18 Uhr · 1'])
   })
 
   it('erledigt: neu nach alt', () => {
     const gruppen = gruppiereNachAbholfenster(LISTE, 'erledigt', JETZT)
-    expect(gruppen.map((g) => g.titel)).toEqual(['Morgen, 15–18 Uhr · 1 Bestellung', 'Gestern, 15–18 Uhr · 1 Bestellung'])
+    expect(gruppen.map((g) => g.titel)).toEqual(['Morgen, Mi 7.\u00a0Okt, 15–18 Uhr · 1', 'Gestern, Mo 5.\u00a0Okt, 15–18 Uhr · 1'])
   })
 
   it('leer bleibt leer', () => {
@@ -195,15 +198,20 @@ describe('Kleinigkeiten der Anzeige', () => {
     expect(abholTag(SAMSTAG_MITTAG, JETZT)).toBe('Samstag')
   })
 
-  it('abholungKurz: „heute" klein, Wochentage groß', () => {
-    expect(abholungKurz(HEUTE_MITTAG, '15:00', '18:00', JETZT)).toBe('heute, 15–18 Uhr')
-    expect(abholungKurz(SAMSTAG_MITTAG, '09:00', '12:00', JETZT)).toBe('Samstag, 9–12 Uhr')
+  it('abholungKurz: mit Wochentag und Datum (V9), „heute" klein, Wochentage groß', () => {
+    expect(abholungKurz(HEUTE_MITTAG, '15:00', '18:00', JETZT)).toBe('heute, Di 6.\u00a0Okt, 15–18 Uhr')
+    expect(abholungKurz(MORGEN_MITTAG, '15:00', '18:00', JETZT)).toBe('morgen, Mi 7.\u00a0Okt, 15–18 Uhr')
+    expect(abholungKurz(SAMSTAG_MITTAG, '09:00', '12:00', JETZT)).toBe('Sa, 10.\u00a0Okt, 9–12 Uhr')
   })
 
   it('Marken (Register G5): zum Packen tun, gepackt läuft, wartend und abgeschlossen erledigt, storniert abgebrochen', () => {
     expect(bestellMarke('CONFIRMED')).toEqual({ text: 'Zum Packen', art: 'tun' })
     expect(bestellMarke('READY')).toEqual({ text: 'Gepackt', art: 'laeuft' })
-    expect(bestellMarke('PENDING_CONFIRMATION')).toEqual({ text: 'Wartet auf Kunde', art: 'erledigt' })
+    // V22: am Bildschirm „Bestätigung offen" (orange), auf Packliste und Papier „Wartet auf Kunde".
+    expect(bestellMarke('PENDING_CONFIRMATION')).toEqual({ text: 'Bestätigung offen', art: 'tun' })
+    expect(papierMarke('PENDING_CONFIRMATION')).toEqual({ text: 'Wartet auf Kunde', art: 'erledigt' })
+    expect(papierMarke('CONFIRMED')).toEqual({ text: 'Zum Packen', art: 'tun' })
+    expect(papierMarke('PICKED_UP')).toEqual({ text: 'Abgeholt', art: 'erledigt' })
     expect(bestellMarke('PICKED_UP')).toEqual({ text: 'Abgeholt', art: 'erledigt' })
     // Freigabe Lauf 13 (Nr. 85): Storniert rot, Nicht abgeholt erledigt — vorher beide grau (neutral).
     expect(bestellMarke('CANCELLED')).toEqual({ text: 'Storniert', art: 'abgebrochen' })
@@ -297,23 +305,46 @@ describe('Ansicht /orders — die Filterreihe', () => {
   }
 
   it('zeigt genau die drei Filter als Links, der gewählte trägt aria-current', () => {
-    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'heute', detail: null, modus: 'liste' }))
+    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'heute', detail: null, modus: 'liste', hofName: 'Hof Test' }))
     expect(filterLinks(html)).toEqual(['/orders?filter=heute', '/orders', '/orders?filter=erledigt'])
     expect(html).toMatch(/<a href="\/orders\?filter=heute"[^>]*aria-current="page"/)
     for (const alt of ['Zum Packen ·', 'Gepackt ·', '>Alle<']) expect(html).not.toContain(alt)
   })
 
   it('leer bei „Heute abholen": derselbe Satz wie die Packliste, Ausweg zu den noch offenen', () => {
-    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'heute', detail: null, modus: 'liste' }))
+    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'heute', detail: null, modus: 'liste', hofName: 'Hof Test' }))
     expect(html).toContain(HEUTE_NIEMAND)
     expect(html).toMatch(/<a href="\/orders"[^>]*>Noch offene ansehen</)
   })
 
+  it('leer bei „Heute abholen" mit Abholzeit: die Karte der Packliste mit der nächsten Abholung samt Zahl, ohne Knopf (Board s1-bestellungen, Bild 2)', () => {
+    const satz = 'Nächste Abholung: Sa, 10.\u00a0Okt, 9–12 Uhr · 2 Bestellungen'
+    const html = renderToStaticMarkup(
+      createElement(BestellungenAnsicht, { seite: seite(), filter: 'heute', detail: null, modus: 'liste', hofName: 'Hof Test', naechsteAbholung: satz })
+    )
+    expect(html).toContain(HEUTE_NIEMAND)
+    expect(html).toContain(satz)
+    expect(html).not.toContain('Noch offene ansehen')
+  })
+
+  it('ohne Bestellungen steht der Hofname unter der Überschrift, kein Druckknopf (Board s1-bestellungen, Bild 3)', () => {
+    const html = renderToStaticMarkup(
+      createElement(BestellungenAnsicht, { seite: seite({ hatBestellungen: false, kopfzeile: '0 offen' }), filter: 'offen', detail: null, modus: 'liste', hofName: 'Hof Test' })
+    )
+    expect(html).toContain('Hof Test')
+    expect(html).not.toContain('0 offen')
+    expect(html).not.toContain('Packliste für heute drucken')
+    // Gegenprobe: mit Bestellungen die Kopfzeile und der Druckknopf.
+    const voll = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'offen', detail: null, modus: 'liste', hofName: 'Hof Test' }))
+    expect(voll).toContain('4 offen · 1 gepackt')
+    expect(voll).toContain('Packliste für heute drucken')
+  })
+
   it('leer bei „Noch offen": „Alles erledigt" mit Weg zu den erledigten; nie ein Link auf ?filter=alle', () => {
-    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'offen', detail: null, modus: 'liste' }))
+    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'offen', detail: null, modus: 'liste', hofName: 'Hof Test' }))
     expect(html).toContain('Alles erledigt')
     expect(html).toContain('href="/orders?filter=erledigt"')
-    const erledigt = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'erledigt', detail: null, modus: 'liste' }))
+    const erledigt = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'erledigt', detail: null, modus: 'liste', hofName: 'Hof Test' }))
     expect(erledigt).toContain('Noch nichts erledigt')
     expect(html + erledigt).not.toContain('filter=alle')
   })
@@ -347,6 +378,7 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
         filter: 'offen',
         detail: bestellung(telefon),
         modus: 'detail',
+        hofName: 'Hof Test',
       })
     )
 

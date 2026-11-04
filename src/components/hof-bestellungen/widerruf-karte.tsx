@@ -83,11 +83,12 @@ export function WiderrufKarte({ widerrufe }: { widerrufe: readonly HofWiderruf[]
       ))}
 
       <BestellDialog
+        mitte
         offen={offen?.art === 'erstatten'}
         onOffenChange={(o) => !o && setOffen(null)}
         titel={WIDERRUF_TEXT.hofErstatten.replace(' …', '')}
         unterzeile={aktuell?.bestellnummer}
-        hauptaktion={{ text: 'Erstatten', onClick: ausfuehren, ton: 'gruen', laeuft }}
+        hauptaktion={{ text: 'Erstatten', onClick: ausfuehren, ton: 'haupt', laeuft }}
       >
         <div className="flex flex-col gap-2 text-[13.5px]">
           <p>{aktuell?.bar ? WIDERRUF_TEXT.hofBarSatz : WIDERRUF_TEXT.hofErstattenSatz}</p>
@@ -96,6 +97,7 @@ export function WiderrufKarte({ widerrufe }: { widerrufe: readonly HofWiderruf[]
       </BestellDialog>
 
       <BestellDialog
+        mitte
         offen={offen?.art === 'ablehnen'}
         onOffenChange={(o) => !o && setOffen(null)}
         titel={WIDERRUF_TEXT.hofAblehnen.replace(' …', '')}

@@ -19,6 +19,10 @@
 import { formatEuro } from '@/lib/format'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { MARKE } from '@/lib/marke'
+import { gebuehrBezeichnungFuer, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+
+/** Das Modell der stornierten Bestellung (`Order.gebuehrModell`, null = bisher) — es bestimmt das Wort der Gebühr (V62/V63). */
+export type StornoModell = { gebuehrModell: string | null }
 
 export type StornoBetraege = {
   /** Was die Kundin zurückbekommt: Warenpreis + Servicegebühr. */
@@ -67,28 +71,55 @@ const NICHTS_ZU_ERSTATTEN: Record<string, string> = {
 }
 
 /**
+ * Wie sich der Betrag zusammensetzt, den die Kundin zurückbekommt (Storno-Dialog):
+ * „Warenpreis € 10,00 + Servicegebühr € 0,50“ bzw. im Hofpreis-Modell mit „Plattformgebühr“ —
+ * das Wort je Modell der Bestellung (gebuehrBezeichnungFuer), nie ein festes Wort.
+ */
+export function stornoZusammensetzung(betraege: StornoBetraege, bestellung: StornoModell): string {
+  if (betraege.servicegebuehrCents <= 0) return 'Warenpreis'
+  const waren = formatEuro(centsAlsEuro(betraege.erstattetCents - betraege.servicegebuehrCents))
+  return `Warenpreis ${waren} + ${gebuehrBezeichnungFuer(bestellung)} ${formatEuro(centsAlsEuro(betraege.servicegebuehrCents))}`
+}
+
+/**
+ * Wer die Gebühr zurückgibt — beide Modelle nehmen denselben Geldweg (src/server/stornieren.ts:
+ * Vollerstattung mit reverse_transfer und refund_application_fee, ohne Unterschied je Modell):
+ * Der Hof gibt genau seinen Warenpreis zurück, die Gebühr gibt die Plattform aus der
+ * einbehaltenen application_fee zurück. Im Hofpreis-Modell steckt sie im Preis, den die
+ * Kundin zahlte — darum „wird mit erstattet“.
+ */
+export function stornoGebuehrSatz(betraege: StornoBetraege, bestellung: StornoModell): string | null {
+  if (betraege.servicegebuehrCents <= 0) return null
+  const wort = gebuehrBezeichnungFuer(bestellung)
+  return istHofpreisBestellung(bestellung) ? `Die ${wort} wird mit erstattet – sie gibt ${MARKE} zurück, nicht du.` : `Die ${wort} erstattet ${MARKE}.`
+}
+
+/**
  * Die Sätze über das Geld im Storno-Dialog. Online bezahlt: wer was
  * zurückbekommt und was vom Hof abgezogen wird; vor Ort: dass nichts
  * erstattet wird. Online, aber nie bezahlt: kein Satz — es gibt kein Geld zu bewegen.
+ * Das Wort der Gebühr kommt aus dem Modell der Bestellung (`gebuehrModell`, Pflicht).
  */
 export function stornoGeldSaetze(eingabe: {
   kundenName: string
   paymentMethod: string
   betraege: StornoBetraege | null
+  gebuehrModell: string | null
 }): string[] {
-  const { kundenName, paymentMethod, betraege } = eingabe
+  const { kundenName, paymentMethod, betraege, gebuehrModell } = eingabe
   if (!betraege) {
     const satz = NICHTS_ZU_ERSTATTEN[paymentMethod]
     return satz ? [satz] : []
   }
   const mitGebuehr = betraege.servicegebuehrCents > 0
   const zurueck = `${kundenName} bekommt zurück: ${formatEuro(centsAlsEuro(betraege.erstattetCents))} (${
-    mitGebuehr ? 'Warenpreis + Servicegebühr' : 'Warenpreis'
+    mitGebuehr ? `Warenpreis + ${gebuehrBezeichnungFuer({ gebuehrModell })}` : 'Warenpreis'
   })`
+  const gebuehrSatz = stornoGebuehrSatz(betraege, { gebuehrModell })
   const abgezogen =
     `Von deiner nächsten Auszahlung abgezogen: ${formatEuro(centsAlsEuro(betraege.vomHofCents))} – ` +
     (betraege.provisionCents > 0 ? 'der Warenpreis ohne die Provision.' : 'genau der Warenpreis.') +
-    (mitGebuehr ? ` Die Servicegebühr erstattet ${MARKE}.` : '')
+    (gebuehrSatz ? ` ${gebuehrSatz}` : '')
   return [zurueck, abgezogen]
 }
 

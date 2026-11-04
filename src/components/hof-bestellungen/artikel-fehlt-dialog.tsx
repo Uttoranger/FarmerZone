@@ -78,6 +78,7 @@ export function ArtikelFehltDialog({
 
   return (
     <BestellDialog
+      mitte
       offen={offen}
       onOffenChange={(o) => {
         if (!o) setFehler(null)
@@ -89,7 +90,7 @@ export function ArtikelFehltDialog({
       hauptaktion={{
         text: stornieren ? 'Weiter zum Stornieren' : `Änderung speichern und ${kunde.vorname} informieren`,
         onClick: speichern,
-        ton: stornieren ? 'orange' : 'gruen',
+        ton: stornieren ? 'orange' : 'haupt',
         laeuft,
         gesperrt: !gewaehlt && !stornieren,
       }}

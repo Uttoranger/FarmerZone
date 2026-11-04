@@ -352,7 +352,7 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
   const MIT_GEBUEHR = { erstattetCents: 2550, vomHofCents: 2400, servicegebuehrCents: 150, provisionCents: 0 }
 
   it('online bezahlt: wer was zurückbekommt und was von der Auszahlung abgezogen wird', () => {
-    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: MIT_GEBUEHR })).toEqual([
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: MIT_GEBUEHR, gebuehrModell: null })).toEqual([
       'Anna Muster bekommt zurück: € 25,50 (Warenpreis + Servicegebühr)',
       `Von deiner nächsten Auszahlung abgezogen: € 24,00 – genau der Warenpreis. Die Servicegebühr erstattet ${MARKE}.`,
     ])
@@ -360,7 +360,7 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
 
   it('ohne Servicegebühr kein Wort über sie', () => {
     const ohne = { ...MIT_GEBUEHR, erstattetCents: 2400, servicegebuehrCents: 0 }
-    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: ohne })).toEqual([
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: ohne, gebuehrModell: null })).toEqual([
       'Anna Muster bekommt zurück: € 24,00 (Warenpreis)',
       'Von deiner nächsten Auszahlung abgezogen: € 24,00 – genau der Warenpreis.',
     ])
@@ -368,19 +368,19 @@ describe('stornoGeldSaetze — was der Hof im Storno-Dialog liest', () => {
 
   it('mit Provision stimmt der Satz zur Zahl', () => {
     const mitProvision = { ...MIT_GEBUEHR, vomHofCents: 2280, provisionCents: 120 }
-    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: mitProvision })[1]).toBe(
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: mitProvision, gebuehrModell: null })[1]).toBe(
       `Von deiner nächsten Auszahlung abgezogen: € 22,80 – der Warenpreis ohne die Provision. Die Servicegebühr erstattet ${MARKE}.`
     )
   })
 
   it('vor Ort: nichts erstattet, je Zahlungsart beim Namen — online nie bezahlt: kein Satz über Geld', () => {
-    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONSITE_CASH', betraege: null })).toEqual([
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONSITE_CASH', betraege: null, gebuehrModell: null })).toEqual([
       'Bei Barzahlung wird nichts erstattet – die Bestellung entfällt.',
     ])
-    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONSITE_CARD', betraege: null })).toEqual([
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONSITE_CARD', betraege: null, gebuehrModell: null })).toEqual([
       'Bei Kartenzahlung vor Ort wird nichts erstattet – die Bestellung entfällt.',
     ])
-    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: null })).toEqual([])
+    expect(stornoGeldSaetze({ kundenName: 'Anna Muster', paymentMethod: 'ONLINE', betraege: null, gebuehrModell: null })).toEqual([])
   })
 })
 

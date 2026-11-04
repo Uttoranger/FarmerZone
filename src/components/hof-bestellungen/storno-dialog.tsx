@@ -12,7 +12,8 @@ import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { FELD, FELD_LABEL, LEISE } from './stil'
-import { MARKE } from '@/lib/marke'
+import { stornoGebuehrSatz, stornoZusammensetzung } from '@/lib/storno'
+import { modellDerBestellung } from '@/lib/hof-bestellungen'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
 
@@ -38,6 +39,9 @@ export function StornoDialog({
   const { storno, kunde } = bestellung
   const fehlende = bestellung.positionen.filter((p) => p.fehlt).length
   const zuLang = [...grund.trim()].length > STORNO_GRUND_MAX
+  // Das Wort der Gebühr je Modell der Bestellung (V62/V63; der Geldweg ist in beiden Modellen derselbe, stornieren.ts).
+  const modell = modellDerBestellung(bestellung.betrag)
+  const gebuehrSatz = storno ? stornoGebuehrSatz(storno, modell) : null
 
   function stornieren() {
     setFehler(null)
@@ -65,6 +69,7 @@ export function StornoDialog({
 
   return (
     <BestellDialog
+      mitte
       offen={offen}
       onOffenChange={(o) => {
         if (!o) setFehler(null)
@@ -86,11 +91,7 @@ export function StornoDialog({
             <span className={LEISE}>{kunde.vorname} bekommt zurück</span>
             <span className="ml-auto font-semibold tabular-nums">{euro(storno.erstattetCents)}</span>
           </p>
-          <p className={cn('text-[12.5px]', LEISE)}>
-            {storno.servicegebuehrCents > 0
-              ? `Warenpreis ${euro(storno.erstattetCents - storno.servicegebuehrCents)} + Servicegebühr ${euro(storno.servicegebuehrCents)}`
-              : 'Warenpreis'}
-          </p>
+          <p className={cn('text-[12.5px]', LEISE)}>{stornoZusammensetzung(storno, modell)}</p>
           <div aria-hidden="true" className="my-2 h-px bg-border" />
           <p className="flex items-baseline gap-3 text-[15px]">
             <span>Von deiner nächsten Auszahlung abgezogen</span>
@@ -100,7 +101,7 @@ export function StornoDialog({
             {storno.provisionCents > 0
               ? 'Das ist der Warenpreis ohne die Provision.'
               : 'Das ist genau der Warenpreis, den du für diese Bestellung bekommen hast.'}
-            {storno.servicegebuehrCents > 0 ? ` Die Servicegebühr erstattet ${MARKE}.` : ''}
+            {gebuehrSatz ? ` ${gebuehrSatz}` : ''}
           </p>
         </div>
       ) : (
