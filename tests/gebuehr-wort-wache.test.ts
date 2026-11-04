@@ -243,8 +243,8 @@ describe('Gegenprobe: die Suche', () => {
 
   it('eine neue Fundstelle ohne Eintrag bliebe offen — ein Offen-Eintrag deckt genau eine', () => {
     const neu: Fund[] = [
-      { datei: 'src/x.ts', zeile: 1, text: 'Die Servicegebühr erstattet Agrilo.' },
-      { datei: 'src/x.ts', zeile: 9, text: 'Die Servicegebühr erstattet Agrilo.' },
+      { datei: 'src/x.ts', zeile: 1, text: 'Die Servicegebühr erstattet der Hof.' },
+      { datei: 'src/x.ts', zeile: 9, text: 'Die Servicegebühr erstattet der Hof.' },
     ]
     expect(gleicheAb(neu, []).rest).toHaveLength(2)
     const eins = gleicheAb(neu, [{ datei: 'src/x.ts', text: 'Servicegebühr erstattet' }])
