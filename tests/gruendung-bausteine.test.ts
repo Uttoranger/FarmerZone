@@ -35,7 +35,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
 vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: vi.fn() }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: vi.fn(), ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
 
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import { KEINE_GRUENDUNG_SEITEN, type GruendungSeiten } from '@/lib/gruendungshof'
@@ -164,7 +164,7 @@ describe('/fuer-hoefe', () => {
   })
 
   it('Preise mit Zahlen: die Angebotszeile vor den Karten, der Gründungspreis nur in der Hofladen-Karte', () => {
-    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, gruendung: ZEIGEN }))
+    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, modell: 'bisher', gruendung: ZEIGEN }))
     expect(preise.indexOf('Gründungshöfe zahlen bis')).toBeLessThan(preise.indexOf('Hoftor'))
     const hofladen = preise.slice(preise.indexOf('>Hofladen<'))
     expect(hofladen).toContain('€ 0')
@@ -173,7 +173,7 @@ describe('/fuer-hoefe', () => {
   })
 
   it('Preise ohne `zeigen`: keine Angebotszeile, der Hofladen mit seinem Preis', () => {
-    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, gruendung: AUS }))
+    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, modell: 'bisher', gruendung: AUS }))
     expect(preise).not.toContain('Gründungshöfe zahlen')
     expect(preise).not.toContain('dann €')
     expect(preise.slice(preise.indexOf('>Hofladen<'))).toContain('€ 19')

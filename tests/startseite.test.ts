@@ -599,7 +599,7 @@ describe('Abschnitte', () => {
   })
 
   it('Fragen: alle Antworten im HTML, auch zugeklappt — die erste offen', () => {
-    const text = html(createElement(Fragen, { jetzt: JETZT }))
+    const text = html(createElement(Fragen, { jetzt: JETZT, modell: 'bisher' }))
     for (const { frage, antwort } of STARTSEITE_FRAGEN) {
       expect(text).toContain(frage)
       expect(text).toContain(antwort.replace(/&/g, '&amp;'))
@@ -607,7 +607,7 @@ describe('Abschnitte', () => {
   })
 
   it('Fragen ohne Skript: <details name="fragen">, nur die erste offen, Fokus sichtbar', () => {
-    const text = html(createElement(Fragen, { jetzt: JETZT }))
+    const text = html(createElement(Fragen, { jetzt: JETZT, modell: 'bisher' }))
     const details = text.match(/<details\b[^>]*>/g) ?? []
     expect(details).toHaveLength(STARTSEITE_FRAGEN.length)
     for (const tag of details) expect(tag).toContain('name="fragen"')
@@ -766,7 +766,7 @@ describe('Themes: Farben nur über Tokens', () => {
     html(createElement(BrennmaterialBand)),
     html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) })),
     html(createElement(FuerHoefeBandInhalt)),
-    html(createElement(Fragen, { jetzt: JETZT })),
+    html(createElement(Fragen, { jetzt: JETZT, modell: 'bisher' })),
     html(createElement(StartseiteFuss, { jahr: 2026 })),
   ]
 

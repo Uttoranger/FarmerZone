@@ -70,6 +70,7 @@ export function HofseiteSeitenspalte({
   jetzt,
   produkte = [],
   kasseHref,
+  kasseUmriss = false,
   className,
 }: {
   hof: SeitenspalteHof
@@ -88,6 +89,11 @@ export function HofseiteSeitenspalte({
   produkte?: readonly (FutterAbgabe & { id: string })[]
   /** Adresse von „Zur Kasse" — die Produktseite gibt `?kaeufer=betrieb` mit (Nr. 29); sonst die Kasse des Hofs. */
   kasseHref?: string
+  /**
+   * „Zur Kasse" als Umriss statt grün — auf der Produktseite ist „In den Korb · €"
+   * die eine Hauptaktion (Boards s1/w1-produkt); auf der Hofseite bleibt „Zur Kasse" grün.
+   */
+  kasseUmriss?: boolean
   className?: string
 }): React.JSX.Element {
   const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 3, new Date(jetzt)), [hof.pickupSlots, jetzt])
@@ -96,7 +102,7 @@ export function HofseiteSeitenspalte({
 
   return (
     <aside aria-label="Abholung, Zahlung und Anfahrt" className={cn('flex flex-col gap-[18px]', className)}>
-      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} />}
+      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} kasseUmriss={kasseUmriss} />}
 
       {/* Mit Kaufsperre (Pause, keine Abholzeit, ausgebucht) keine Termine: Ankündigen, was man nicht
           buchen kann, wäre ein leeres Versprechen — auch ein heute noch laufendes Fenster nicht. */}
@@ -211,12 +217,14 @@ function MiniWarenkorb({
   gebuehrKorb,
   produkte,
   kasseHref,
+  kasseUmriss,
 }: {
   hof: SeitenspalteHof
   sperre: KaufSperre
   gebuehrKorb: string | null
   produkte: readonly (FutterAbgabe & { id: string })[]
   kasseHref?: string
+  kasseUmriss: boolean
 }): ReactNode {
   const { id: farmId, slug } = hof
   const imKorb = useWarenkorbVomHof(farmId)
@@ -275,8 +283,10 @@ function MiniWarenkorb({
       ) : (
         <Link
           href={kasseHref ?? `/${slug}/checkout`}
+          data-kasse={kasseUmriss ? 'umriss' : 'gruen'}
           className={cn(
-            'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+            'flex min-h-11 items-center justify-center rounded-xl px-4 text-[14.5px] font-semibold transition-opacity duration-[250ms] hover:opacity-90',
+            kasseUmriss ? 'border border-input bg-card text-foreground' : 'bg-accent text-accent-foreground',
             FOKUS_RAHMEN
           )}
         >

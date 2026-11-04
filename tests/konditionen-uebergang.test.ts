@@ -26,7 +26,7 @@ vi.mock('next/image', () => ({
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => '/register' }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null, ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))

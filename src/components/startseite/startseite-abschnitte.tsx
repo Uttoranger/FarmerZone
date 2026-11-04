@@ -5,6 +5,7 @@ import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
+  BEISPIEL_WARENPREIS_CENTS,
   BRENNMATERIAL_ADRESSE,
   FUTTER_ZIELGRUPPEN,
   beispielRechnung,
@@ -30,6 +31,8 @@ import { GruendungSatz } from '@/components/gruendung/satz'
 import { NeuBeiDenHoefen } from '@/components/startseite/neu-bei-den-hoefen'
 import { ladeNeuigkeiten } from '@/server/queries/neuigkeiten'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { gebuehrModellFuer, type GebuehrModell } from '@/lib/plattformgebuehr'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -226,9 +229,16 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
             <HandCoins className="mt-0.5 size-5 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
             <div>
               <h3 className="text-[15px] font-semibold">Der Hof bekommt den vollen Preis</h3>
+              {/* Im Hofpreis-Modell (N38) der Satz aus Board w1-startseite: Die Gebühr steckt im Preis, das Beispiel rechnet es vor. */}
               <p className="text-[13px] leading-normal text-muted-foreground">
-                Für dich kommen {rechnung.prozent} % {SERVICEGEBUEHR_BEZEICHNUNG} dazu, mindestens{' '}
-                {formatEuro(centsAlsEuro(rechnung.mindestCents))} – offen ausgewiesen.
+                {rechnung.modell === 'hofpreis' ? (
+                  'Der Hof setzt seinen Preis selbst.'
+                ) : (
+                  <>
+                    Für dich kommen {rechnung.prozent} % {SERVICEGEBUEHR_BEZEICHNUNG} dazu, mindestens{' '}
+                    {formatEuro(centsAlsEuro(rechnung.mindestCents))} – offen ausgewiesen.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -243,13 +253,22 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
           </div>
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-[18px] py-4 dark:ring-1 dark:ring-border">
             <p className="text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">Beispiel</p>
-            <dl className="flex flex-col gap-3">
-              <Zeile name="Warenpreis" betrag={rechnung.warenpreisCents} />
-              <Zeile name={`${SERVICEGEBUEHR_BEZEICHNUNG} · ${rechnung.prozent} %`} betrag={rechnung.gebuehrCents} />
-              <Zeile name="Du zahlst" betrag={rechnung.duZahlstCents} stark trenner />
-              <Zeile name="Der Hof bekommt" betrag={rechnung.hofBekommtCents} stark gruen />
-            </dl>
-            <p className="text-xs leading-normal text-muted-foreground">{rechnung.fussnote}</p>
+            {/* Im Hofpreis-Modell ein Satz statt der Rechnung (Board w1-startseite, Bild 3): keine eigene Gebührenzeile, online und bar gleich. */}
+            {rechnung.modell === 'hofpreis' ? (
+              <p data-beispiel="hofpreis" className="text-[15px] leading-normal text-foreground">
+                {rechnung.satz}
+              </p>
+            ) : (
+              <>
+                <dl className="flex flex-col gap-3">
+                  <Zeile name="Warenpreis" betrag={rechnung.warenpreisCents} />
+                  <Zeile name={`${SERVICEGEBUEHR_BEZEICHNUNG} · ${rechnung.prozent} %`} betrag={rechnung.gebuehrCents} />
+                  <Zeile name="Du zahlst" betrag={rechnung.duZahlstCents} stark trenner />
+                  <Zeile name="Der Hof bekommt" betrag={rechnung.hofBekommtCents} stark gruen />
+                </dl>
+                <p className="text-xs leading-normal text-muted-foreground">{rechnung.fussnote}</p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -326,7 +345,8 @@ export function FuerHoefeBandInhalt({ gruendung = null }: { gruendung?: Gruendun
  * Bildschirmleser bedienen <summary> wie einen Knopf.
  */
 /** `jetzt` von der Seite: „Wie bezahle ich?" nennt die Bar-Ausnahme nur vor dem Stichtag (B1). */
-export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
+/** „Wie bezahle ich?" je Modell (`startseitenFragen`); `modell` von der Seite (`gebuehrModellFuer`). */
+export function Fragen({ jetzt, modell }: { jetzt: Date; modell: GebuehrModell }): React.JSX.Element {
   return (
     <section aria-labelledby="fragen-titel" className="pt-6 pb-14 md:pb-20">
       <div className={cn(CONTAINER, 'flex flex-col gap-4 md:flex-row md:gap-[60px]')}>
@@ -337,7 +357,7 @@ export function Fragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
           </h2>
         </div>
         <div className="flex flex-1 flex-col border-t border-border">
-          {startseitenFragen(jetzt).map((eintrag, i) => (
+          {startseitenFragen(jetzt, modell).map((eintrag, i) => (
             <details key={eintrag.frage} name="fragen" open={i === 0} className="group border-b border-border last:border-b-0">
               <summary
                 className={cn(
@@ -453,6 +473,25 @@ async function NeuBeiDenHoefenGeladen({ jetzt }: AbschnittProps) {
 }
 
 /**
+ * Das Gebühren-Modell zum Zeitpunkt der Seite (V62, N38): aus dem Stichtag
+ * „Hofpreis-Modell ab“ (gecachte Zeile; ladeHofpreisEinstellung wirft nie und
+ * fällt auf die Vorgabe zurück). „Stand am“ der Vorschau zählt wie der Bau.
+ */
+async function modellZu(jetzt: Date): Promise<GebuehrModell> {
+  return gebuehrModellFuer(await ladeHofpreisEinstellung(), jetzt)
+}
+
+/** „So funktioniert’s“ mit dem Beispiel je Modell — im Hofpreis-Modell über bestellGebuehr (beispielRechnung, Nr. 221). */
+async function SoFunktioniertsGeladen({ jetzt }: AbschnittProps) {
+  return <SoFunktionierts rechnung={beispielRechnung(jetzt, BEISPIEL_WARENPREIS_CENTS, await modellZu(jetzt))} />
+}
+
+/** „Gut zu wissen“ mit „Wie bezahle ich?" je Modell. */
+async function FragenGeladen({ jetzt }: AbschnittProps) {
+  return <Fragen jetzt={jetzt} modell={await modellZu(jetzt)} />
+}
+
+/**
  * Die Abschnitte dieser Datei je Art (Register N16, Nr. 96): page.tsx rendert
  * die Liste aus Admin › Startseite darüber. Kopf und „Höfe in deiner Nähe"
  * stehen in eigenen Dateien und brauchen die Höfe der Seite — die rendert
@@ -462,9 +501,9 @@ async function NeuBeiDenHoefenGeladen({ jetzt }: AbschnittProps) {
 export const STARTSEITE_ABSCHNITTE = {
   FUTTER: () => <FutterAbschnitt />,
   BRENNMATERIAL: () => <BrennmaterialBand />,
-  SO_FUNKTIONIERTS: ({ jetzt }) => <SoFunktionierts rechnung={beispielRechnung(jetzt)} />,
+  SO_FUNKTIONIERTS: ({ jetzt }) => <SoFunktioniertsGeladen jetzt={jetzt} />,
   FUER_HOEFE: () => <FuerHoefeBand />,
-  FRAGEN: ({ jetzt }) => <Fragen jetzt={jetzt} />,
+  FRAGEN: ({ jetzt }) => <FragenGeladen jetzt={jetzt} />,
   FUSS: ({ jetzt }) => <StartseiteFuss jahr={jetzt.getFullYear()} />,
   NEUIGKEITEN: ({ jetzt }) => (
     <Suspense fallback={null}>

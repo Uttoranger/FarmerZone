@@ -23,7 +23,8 @@ vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => createElement('img', { alt }),
 }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
+// Seit Nr. 226 dazu der Stichtag „Hofpreis-Modell ab“ — ohne Zeile die Vorgabe (BAR_SERVICEGEBUEHR_AB), wie im Betrieb beim Lesefehler.
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null, ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
