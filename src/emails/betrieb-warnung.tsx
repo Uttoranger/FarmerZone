@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { Link, Text } from '@react-email/components'
 import { BETRIEB_MAIL_TEXT, type BetriebMail } from '@/lib/betrieb'
-import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
 import { EmailLayout, bodyText, ctaButton, h1, kleinText, mutedText } from './_layout'
 
 export interface BetriebWarnungProps {
@@ -19,7 +18,7 @@ export interface BetriebWarnungProps {
  */
 export function BetriebWarnungEmail({ mail, url }: BetriebWarnungProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={mail.titel} fusszeile={ZUSTELLUNG_MAIL_TEXT.fuss}>
+    <EmailLayout fuss={{ art: 'betrieb' }} previewText={mail.titel}>
       <Text style={mutedText}>{BETRIEB_MAIL_TEXT.kopf}</Text>
       <Text style={h1}>{mail.titel}</Text>
       {mail.absaetze.map((satz) => (

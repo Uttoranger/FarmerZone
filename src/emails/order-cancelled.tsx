@@ -17,7 +17,7 @@ export function OrderCancelledEmail(p: OrderCancelledProps) {
   const wasOnline = p.refundAmount !== null
 
   return (
-    <EmailLayout previewText={`Deine Bestellung ${p.orderNumber} wurde storniert`}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Deine Bestellung ${p.orderNumber} wurde storniert`}>
       <Text style={h1}>Bestellung storniert</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />

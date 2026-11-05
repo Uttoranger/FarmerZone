@@ -20,7 +20,7 @@ export interface AboBestaetigungProps {
  */
 export function AboBestaetigungEmail({ hofName, url, tage }: AboBestaetigungProps) {
   return (
-    <EmailLayout previewText={`Bitte bestätige deine Anmeldung für Neuigkeiten von ${hofName}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Bitte bestätige deine Anmeldung für Neuigkeiten von ${hofName}`}>
       <Text style={h1}>Bitte bestätige deine Anmeldung</Text>
       <Text style={bodyText}>
         Hallo,

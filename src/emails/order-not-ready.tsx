@@ -24,7 +24,7 @@ export interface OrderNotReadyProps {
 export function OrderNotReadyEmail(p: OrderNotReadyProps) {
   const anrufen = telefonLink(p.farmPhone)
   return (
-    <EmailLayout previewText={`Kurzes Update zu deiner Bestellung bei ${p.farmName}`}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Kurzes Update zu deiner Bestellung bei ${p.farmName}`}>
       <Text style={h1}>Kurzes Update zu deiner Bestellung</Text>
       <Text style={bodyText}>
         {`Deine Bestellung bei ${p.farmName} ist doch noch nicht abholbereit. Wir melden uns, sobald sie fertig ist – dein Abholtermin bleibt wie geplant.`}

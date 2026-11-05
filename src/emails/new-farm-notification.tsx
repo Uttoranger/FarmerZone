@@ -19,7 +19,7 @@ export function NewFarmNotificationEmail({
   registeredAt,
 }: NewFarmNotificationProps) {
   return (
-    <EmailLayout previewText={`Neuer Hof wartet auf Freischaltung: ${farmName}`}>
+    <EmailLayout fuss={{ art: 'betrieb' }} previewText={`Neuer Hof wartet auf Freischaltung: ${farmName}`}>
       <Text style={h1}>Neuer Hof registriert</Text>
       <Text style={bodyText}>
         <strong>{farmName}</strong> hat sich registriert und wartet auf die Freischaltung.

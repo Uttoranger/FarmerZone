@@ -21,7 +21,7 @@ export interface PostfachRundschreibenProps {
  */
 export function PostfachRundschreibenEmail(p: PostfachRundschreibenProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={p.titel} fusszeile={POSTFACH_MAIL_TEXT.fuss}>
+    <EmailLayout fuss={{ art: 'postfach' }} previewText={p.titel}>
       <Text style={mutedText}>{POSTFACH_MAIL_TEXT.vonTeam}</Text>
       <Text style={h1}>{p.titel}</Text>
       <Text style={{ ...bodyText, whiteSpace: 'pre-wrap' }}>{p.text}</Text>

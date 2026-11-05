@@ -6,8 +6,11 @@ import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
  * Die Mails des Widerrufs (Nr. 200, Register N39). Sätze kurz, geduzt, ohne
- * Fachwörter. Name, Adresse und Nachricht der Kundin stehen NIE im Betreff
- * (sendRaw schreibt den Betreff ins Log).
+ * Fachwörter; sie sagen „Rücktritt“ (Register N43, Wortliste). Wörtlich bleiben
+ * bis zur Entscheidung der Anwältin nur der Betreff der Eingangsbestätigung samt
+ * Vorschautext (§ 13a FAGG, N43 (1)) und „Vertrag widerrufen“ als Einstieg.
+ * Name, Adresse und Nachricht der Kundin stehen NIE im Betreff (sendRaw
+ * schreibt den Betreff ins Log).
  */
 
 export interface WiderrufEingangProps {
@@ -20,21 +23,20 @@ export interface WiderrufEingangProps {
   naechsteSchritte: readonly string[]
   /** Der Hof als Vertragspartner, nur wenn der Widerruf über den signierten Link kam. */
   hofName: string | null
-  marke: string
 }
 
 /** Eingangsbestätigung (§ 13a FAGG): Inhalt, Datum und Uhrzeit, die nächsten Schritte. */
 export function WiderrufEingangEmail(p: WiderrufEingangProps) {
   return (
-    <EmailLayout previewText="Dein Widerruf ist eingegangen" fusszeile={`Versandt von ${p.marke}.`}>
-      <Text style={h1}>Dein Widerruf ist eingegangen</Text>
-      <Text style={bodyText}>Wir haben deinen Widerruf am {p.eingegangenAm} erhalten. Diese E-Mail ist deine Eingangsbestätigung.</Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText="Dein Widerruf ist eingegangen">
+      <Text style={h1}>Dein Rücktritt ist eingegangen</Text>
+      <Text style={bodyText}>{`Wir haben deinen Rücktritt am ${p.eingegangenAm} erhalten. Diese E-Mail ist deine Eingangsbestätigung.`}</Text>
       {p.bestellnummer && <BetragsZeile links="Bestellnummer" rechts={p.bestellnummer} />}
       {p.hofName && <BetragsZeile umbrechen links="Vertragspartner" rechts={p.hofName} />}
       <BetragsZeile umbrechen links="Eingegangen" rechts={p.eingegangenAm} />
       <Trenner />
       <Text style={bodyText}>
-        <strong>Widerrufen:</strong>
+        <strong>Dein Rücktritt gilt für:</strong>
       </Text>
       {p.umfang.map((zeile, i) => (
         <Text key={i} style={kleinText}>
@@ -56,7 +58,7 @@ export function WiderrufEingangEmail(p: WiderrufEingangProps) {
 
 export interface WiderrufHofProps {
   bestellnummer: string
-  /** Die widerrufenen Artikel bzw. „Die ganze Bestellung“. */
+  /** Die Artikel des Rücktritts bzw. „Die ganze Bestellung“. */
   umfang: string[]
   eingegangenAm: string
   bestellungUrl: string
@@ -66,10 +68,10 @@ export interface WiderrufHofProps {
 /** An den Hof: ein Widerruf nach der Abholung — prüfen, erstatten oder mit Grund ablehnen. */
 export function WiderrufHofEmail(p: WiderrufHofProps) {
   return (
-    <EmailLayout previewText={`Widerruf zu Bestellung ${p.bestellnummer}`}>
-      <Text style={h1}>Eine Kundin hat widerrufen</Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Rücktritt zu Bestellung ${p.bestellnummer}`}>
+      <Text style={h1}>Eine Kundin ist zurückgetreten</Text>
       <Text style={bodyText}>
-        Zur Bestellung <strong>{p.bestellnummer}</strong> ist am {p.eingegangenAm} ein Widerruf eingegangen. Bitte prüf die Rückgabe und erstatte –
+        Zur Bestellung <strong>{p.bestellnummer}</strong> ist am {p.eingegangenAm} ein Rücktritt eingegangen. Bitte prüf die Rückgabe und erstatte –
         oder lehne mit Grund ab.
       </Text>
       {p.umfang.map((zeile, i) => (
@@ -98,18 +100,25 @@ export interface WiderrufErgebnisProps {
   teilweise?: boolean
 }
 
+/** Überschrift und Betreff des Ergebnisses — eine Quelle für Vorlage und src/lib/email.ts. */
+export const WIDERRUF_ERGEBNIS_TITEL = {
+  abgelehnt: 'Dein Rücktritt wurde abgelehnt',
+  teilweise: 'Dein Rücktritt ist zum Teil erledigt',
+  erledigt: 'Dein Rücktritt ist erledigt',
+} as const
+
 /** Das Ergebnis an die Kundin: erstattet (mit Betrag) oder abgelehnt (mit Grund). */
 export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
   const abgelehnt = p.grund !== null
   const teilweise = !abgelehnt && p.vorAbholung === true && p.teilweise === true
-  const titel = abgelehnt ? 'Dein Widerruf wurde abgelehnt' : teilweise ? 'Dein Widerruf ist zum Teil erledigt' : 'Dein Widerruf ist erledigt'
+  const titel = abgelehnt ? WIDERRUF_ERGEBNIS_TITEL.abgelehnt : teilweise ? WIDERRUF_ERGEBNIS_TITEL.teilweise : WIDERRUF_ERGEBNIS_TITEL.erledigt
   return (
-    <EmailLayout previewText={titel}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={titel}>
       <Text style={h1}>{titel}</Text>
       {abgelehnt ? (
         <>
           <Text style={bodyText}>
-            {p.hofName} hat deinen Widerruf zur Bestellung <strong>{p.bestellnummer}</strong>
+            {p.hofName} hat deinen Rücktritt zur Bestellung <strong>{p.bestellnummer}</strong>
             {p.teilweise ? ' für die übrigen Artikel' : ''} abgelehnt. Der Grund:
           </Text>
           <Text style={bodyText}>{p.grund}</Text>
@@ -119,11 +128,11 @@ export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
         <>
           {teilweise ? (
             <Text style={bodyText}>
-              Einen Teil der widerrufenen Artikel haben wir aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen. Die übrigen prüft der Hof.
+              Einen Teil der Artikel, von denen du zurückgetreten bist, haben wir aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen. Die übrigen prüft der Hof.
             </Text>
           ) : p.vorAbholung ? (
             <Text style={bodyText}>
-              Die widerrufenen Artikel sind aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen.
+              Die Artikel, von denen du zurückgetreten bist, sind aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen.
             </Text>
           ) : (
             <Text style={bodyText}>

@@ -21,7 +21,7 @@ export interface RegistrierungHinweisProps {
  */
 export function RegistrierungHinweisEmail({ weg, anmelden, passwortZuruecksetzen }: RegistrierungHinweisProps) {
   return (
-    <EmailLayout previewText={`Zu deiner E-Mail-Adresse gibt es schon ein Konto bei ${MARKE}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Zu deiner E-Mail-Adresse gibt es schon ein Konto bei ${MARKE}`}>
       <Text style={h1}>Zu deiner Adresse gibt es schon ein Konto</Text>
       <Text style={bodyText}>
         Hallo,

@@ -26,16 +26,21 @@ export interface OrderConfirmedProps {
    * Gebühr älterer Bestellungen zieht die Monatsabrechnung nicht ein.
    */
   barOhneGebuehr?: boolean
-  dashboardUrl: string
+  /** Bar (heute) oder Karte bei Abholung (alte Bestellungen, E5) — nur für Überschrift und Vorschau. */
+  zahlart?: 'bar' | 'karte'
+  /** Zu Heute im Hofbereich (Wortliste N42 c: „Heute“, nie „Dashboard“). */
+  heuteUrl: string
 }
 
 export function OrderConfirmedEmail(p: OrderConfirmedProps) {
   const anrufen = telefonLink(p.customerPhone)
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const kassieren = p.barZuKassieren ?? p.total
+  // Papier und Mail sagen dasselbe wie der Bildschirm (V57): „Bar-Bestellung bestätigt“.
+  const titel = p.zahlart === 'karte' ? 'Bestellung bestätigt (Karte bei Abholung)' : 'Bar-Bestellung bestätigt'
   return (
-    <EmailLayout previewText={`Vor-Ort-Bestellung ${p.orderNumber} bestätigt – ${p.customerName}`}>
-      <Text style={h1}>Vor-Ort-Bestellung bestätigt</Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${titel}: ${p.orderNumber} – ${p.customerName}`}>
+      <Text style={h1}>{titel}</Text>
       <Text style={bodyText}>
         Hallo {p.farmerName},<br />
         <strong>{p.customerName}</strong> hat ihre Bestellung per E-Mail bestätigt
@@ -89,7 +94,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
         )}
       </Text>
 
-      <Link href={p.dashboardUrl} style={ctaButton}>Im Dashboard ansehen →</Link>
+      <Link href={p.heuteUrl} style={ctaButton}>Bei Heute ansehen →</Link>
     </EmailLayout>
   )
 }

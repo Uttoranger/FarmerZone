@@ -35,7 +35,7 @@ const knopfOrange: React.CSSProperties = {
 export function NeueAnmeldungEmail({ hof, name, geraet, wann, link }: NeueAnmeldungProps): React.JSX.Element {
   const text = NEUE_ANMELDUNG_MAIL
   return (
-    <EmailLayout previewText={`${text.betreff(hof)} · ${geraet}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${text.betreff(hof)} · ${geraet}`}>
       <Text style={h1}>{text.betreff(hof)}</Text>
       <Text style={bodyText}>
         {text.anrede(name)}

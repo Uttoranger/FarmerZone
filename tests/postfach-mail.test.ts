@@ -9,8 +9,9 @@
  *    der App".
  *  - Antwort des Teams: Betreff „Antwort vom …: <Titel>", der Text in der Mail.
  *  - Der Fuß beider Mails nennt das Team (POSTFACH_MAIL_TEXT.fuss), nie „im
- *    Auftrag eines Hofes" — Gegenprobe: ohne `fusszeile` schreibt das Layout
- *    weiter den Satz der Mails im Namen eines Hofs.
+ *    Auftrag eines Hofes" — Gegenprobe: mit der Fuß-Art `hof` schreibt das
+ *    Layout den Satz der Mails im Namen eines Hofs (seit Nr. 232 wählt jede
+ *    Vorlage ihre Art, `fuss` ist Pflicht).
  *  - Fremdtext bleibt Text: Markup im Text kommt maskiert an.
  *  - Seit Nr. 159 baut email.ts die Mail nur; verschickt (mit Post-Sperre Z3)
  *    der Worker der Warteschlange (tests/mail-warteschlange.test.ts).
@@ -120,10 +121,10 @@ describe('bauePostfachMail', () => {
     expect(mail.html).not.toContain(HOF_FUSS)
   })
 
-  it('Gegenprobe: ohne eigenen Fuß schreibt das Layout weiter den Satz der Mails im Namen eines Hofs', () => {
+  it('Gegenprobe: mit der Fuß-Art „hof“ schreibt das Layout den Satz der Mails im Namen eines Hofs', () => {
     // Der Inhalt als weiteres Argument von createElement — ohne dass TypeScript `children` in den Props verlangt.
-    const layout = EmailLayout as ComponentType<{ previewText: string; children?: ReactNode }>
-    const html = renderToStaticMarkup(createElement(layout, { previewText: 'Erfunden' }, 'Erfundener Inhalt.'))
+    const layout = EmailLayout as ComponentType<{ previewText: string; fuss: { art: 'hof' }; children?: ReactNode }>
+    const html = renderToStaticMarkup(createElement(layout, { previewText: 'Erfunden', fuss: { art: 'hof' } }, 'Erfundener Inhalt.'))
     expect(html).toContain(`Versandt von ${MARKE} ${HOF_FUSS}.`)
     expect(html).not.toContain(POSTFACH_MAIL_TEXT.fuss)
   })

@@ -14,7 +14,7 @@ export interface BestellungVerfallenProps {
  */
 export function BestellungVerfallenEmail(p: BestellungVerfallenProps) {
   return (
-    <EmailLayout previewText="Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde">
+    <EmailLayout fuss={{ art: 'hof' }} previewText="Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde">
       <Text style={h1}>Bestellung verfallen</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />

@@ -20,7 +20,7 @@ export interface BetreiberAntwortProps {
  */
 export function BetreiberAntwortEmail(p: BetreiberAntwortProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={ZUSTELLUNG_MAIL_TEXT.antwortBetreff(p.hofName, p.titel)} fusszeile={ZUSTELLUNG_MAIL_TEXT.fuss}>
+    <EmailLayout fuss={{ art: 'betrieb' }} previewText={ZUSTELLUNG_MAIL_TEXT.antwortBetreff(p.hofName, p.titel)}>
       <Text style={h1}>{ZUSTELLUNG_MAIL_TEXT.antwortTitel}</Text>
       <Text style={mutedText}>{`${p.hofName} · ${ZUSTELLUNG_MAIL_TEXT.antwortZu}: ${p.titel}`}</Text>
       <div style={highlightBox}>

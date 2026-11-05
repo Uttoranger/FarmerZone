@@ -18,7 +18,7 @@ export interface ZahlungZuSpaetProps {
  */
 export function ZahlungZuSpaetEmail(p: ZahlungZuSpaetProps) {
   return (
-    <EmailLayout previewText="Deine Zahlung kam zu spät – das Geld ist zurück">
+    <EmailLayout fuss={{ art: 'hof' }} previewText="Deine Zahlung kam zu spät – das Geld ist zurück">
       <Text style={h1}>Zahlung kam zu spät</Text>
       <Text style={bodyText}>
         Hallo {p.customerName},<br />

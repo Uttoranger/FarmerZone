@@ -10,7 +10,10 @@
  *
  * Beweist:
  *  - Die Mail verspricht keine 48 Stunden mehr.
- *  - Sie sagt „spätestens zwei Stunden" — passend zur Konstante.
+ *  - Seit V87 (Lauf 30, Nr. 232) nennt sie auch keine Dauer mehr: Die Frist
+ *    steht mit Tag und Uhrzeit aus fristVon da; der Satz „… nach spätestens
+ *    zwei Stunden wieder frei“ nannte sie doppelt und unvollständig (der
+ *    Bestellschluss kann früher liegen). Ohne Frist bleibt ein Satz ohne Dauer.
  */
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
@@ -18,7 +21,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { OnsiteConfirmationEmail } from '@/emails/onsite-confirmation'
 import { BESTAETIGUNGSFRIST_BAR_MINUTEN } from '@/lib/fristen'
 
-function mailText(): string {
+function mailText(bestaetigenBis?: string): string {
   const html = renderToStaticMarkup(
     createElement(OnsiteConfirmationEmail, {
       orderNumber: 'FZ-TEST-1',
@@ -30,6 +33,7 @@ function mailText(): string {
       items: [{ name: 'Eier', betrag: 4.5 }],
       total: 4.5,
       confirmationUrl: 'http://localhost:3000/hof-beispiel/bestaetigen/token',
+      bestaetigenBis,
     })
   )
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
@@ -44,9 +48,15 @@ describe('Mail „Bitte bestätige" — Frist', () => {
     expect(mailText()).not.toContain('48 Stunden')
   })
 
-  it('nennt die Freigabe nach spätestens zwei Stunden', () => {
-    expect(mailText()).toContain(
-      'Bitte bestätige bald: Unbestätigte Bestellungen geben wir nach spätestens zwei Stunden wieder frei.'
-    )
+  it('nennt keine Dauer (V87) — mit Frist steht sie mit Tag und Uhrzeit da, nur einmal', () => {
+    const text = mailText('Samstag, 10. Oktober, 11:12 Uhr')
+    expect(text).toContain('Bitte bestätige bis Samstag, 10. Oktober, 11:12 Uhr.')
+    expect(text).not.toMatch(/zwei Stunden|Bitte bestätige bald/)
+  })
+
+  it('ohne Frist ein Satz ohne Dauer — nie eine erfundene', () => {
+    const text = mailText()
+    expect(text).toContain('Bitte bestätige bald – sonst geben wir die Ware wieder frei.')
+    expect(text).not.toMatch(/zwei Stunden|Stunde/)
   })
 })
