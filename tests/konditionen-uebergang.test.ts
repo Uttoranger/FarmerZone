@@ -192,11 +192,13 @@ describe('Die Seiten zeigen den Satz', () => {
   })
 
   it('Admin-Freischaltung — der Hinweis kommt aus konditionen.ts und steht im Freischalten-Dialog', () => {
-    // Seit Nr. 22f steht die Rückfrage in der AdminShell in einer eigenen Datei.
+    // Seit Nr. 22f steht die Rückfrage in der AdminShell in einer eigenen Datei. Seit Nr. 229 je Modell:
+    // konditionenDerzeit gibt vor dem Stichtag KONDITIONEN_DERZEIT (geprüft in tests/gebuehr-texte.test.ts),
+    // ab dem Stichtag den Satz nach N38 (tests/admin-gebuehr-wort.test.ts).
     const quelle = lies('src/components/admin/hof-aktion-dialog.tsx')
-    expect(quelle).toMatch(/import \{[^}]*KONDITIONEN_DERZEIT[^}]*\} from '@\/lib\/konditionen'/)
+    expect(quelle).toMatch(/import \{[^}]*konditionenDerzeit[^}]*\} from '@\/lib\/konditionen'/)
     // Zwischen dem Zweig „Freischalten" und dem Zweig „Zurücknehmen" des Dialogs.
-    const hinweis = quelle.indexOf('{KONDITIONEN_DERZEIT}')
+    const hinweis = quelle.indexOf('{konditionenDerzeit(gebuehrModell)}')
     expect(hinweis).toBeGreaterThan(quelle.indexOf("art === 'approve' ? ("))
     expect(hinweis).toBeLessThan(quelle.indexOf('Die Hofseite von'))
     // Die Gründungsplatz-Zusage bleibt im Dialog — seit Nr. 116 fertig vom Server (freischaltHinweis, mit den

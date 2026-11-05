@@ -3,6 +3,10 @@ import { permanentRedirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeHeute } from '@/server/queries/admin-heute'
+import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { gebuehrWortFuerZeitraum, hofpreisModellAb, type GebuehrWort } from '@/lib/plattformgebuehr'
+import { umsatzfenster } from '@/lib/umsatz'
 import { STRIPE_MARKE, TESTBETRIEB, UMGEBUNG } from '@/lib/umgebung-server'
 import { ablaufZeilen, istMailWarnArt } from '@/lib/betrieb'
 import {
@@ -59,14 +63,18 @@ export default async function AdminHeutePage({
   const jetzt = new Date()
   const mitBetrieb = UMGEBUNG.vercelProduktion
   let roh: Awaited<ReturnType<typeof ladeHeute>> | null = null
+  let gebuehrWort: GebuehrWort | null = null
   try {
-    roh = await ladeHeute(jetzt, { mitBetrieb })
+    const [heute, einstellung] = await Promise.all([ladeHeute(jetzt, { mitBetrieb }), lesePlattformEinstellung()])
+    roh = heute
+    // Das Wort der Geld-Kachel (V63): über dieselbe Woche wie die Summe (umsatzfenster, seit Montag in Wien) gegen den Stichtag.
+    gebuehrWort = gebuehrWortFuerZeitraum(umsatzfenster('woche', jetzt).aktuell.von, jetzt, hofpreisModellAb(hofpreisEinstellungAus(einstellung)))
   } catch (err) {
     // Nur der Bereich — keine Hofnamen, keine Adressen.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'heute' } })
   }
 
-  if (!roh) {
+  if (!roh || !gebuehrWort) {
     return (
       <div className={ADMIN_RAHMEN}>
         <AdminFehler titel={HEUTE_TEXT.titel} satz={HEUTE_TEXT.fehler} nochmal="/admin" />
@@ -111,6 +119,7 @@ export default async function AdminHeutePage({
       dienste: { laufen: dienste.filter((d) => d.art === 'laeuft').length, von: dienste.length, ansehen: dienste.filter((d) => d.art === 'tun').map((d) => d.dienst), testbetrieb: TESTBETRIEB },
       hoefe: roh.hoefe,
       geldAbgleichOk: roh.laeufe.get('geld-abgleich')?.ok === true,
+      gebuehrWort,
     },
     aufgaben
   )
@@ -145,7 +154,7 @@ export default async function AdminHeutePage({
             </Karte>
           </div>
           <div className="hidden min-w-0 flex-col gap-4 md:gap-5 lg:flex">
-            <Karte titel={HEUTE_TEXT.laeuft} zusatz={puenktlich}>
+            <Karte titel={HEUTE_TEXT.laeuft} zusatz={`${HEUTE_TEXT.laeuftZusatz} · ${puenktlich}`}>
               {laeuft}
             </Karte>
             <Karte titel={HEUTE_TEXT.kommt} zusatz={HEUTE_TEXT.kommtZusatz}>

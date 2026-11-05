@@ -298,8 +298,12 @@ const FESTE_LISTE: Fest[] = [
     grund: `${BISHER}: Das Recht hoefe_freischalten schützt setServiceFeeAction (alter Satz); die Karte „Plattformgebühr“ schützt das Recht geld (speichereHofPlattformgebuehr) — git grep, Bericht 221`,
   },
   { datei: 'src/lib/admin-hoefe.ts', text: /^Servicegebühr pro Hof änderbar \(Standard$/, grund: `${BISHER}: SERVICEGEBUEHR_NUR_NEUE beschreibt den Satz des alten Modells (Dialog „Servicegebühr“, A1)` },
-  { datei: 'src/components/admin/servicegebuehr-dialog.tsx', text: /^Servicegebühr( gespeichert)?$/, grund: `${BISHER}: Dialog des alten Satzes (Farm.serviceFee*, A1); ab dem Stichtag zeigt die Akte den Knopf nicht (Nr. 229)` },
-  { datei: 'src/components/admin/servicegebuehr-dialog.tsx', text: /^SERVICEGEBUEHR_NUR_NEUE · /, grund: `${BISHER}: im Dialog des alten Satzes (Farm.serviceFee*, A1)` },
+  { datei: 'src/components/admin/servicegebuehr-dialog.tsx', text: /^Servicegebühr( gespeichert)?$/, grund: `${BISHER}: Dialog des alten Satzes (Farm.serviceFee*, A1); Knopf nach A1 nur vor dem Stichtag (Nr. 229)` },
+  {
+    datei: 'src/components/admin/servicegebuehr-dialog.tsx',
+    text: /^SERVICEGEBUEHR_NUR_NEUE · \{SERVICEGEBUEHR_NUR_NEUE\} \{SERVICEGEBUEHR_ADMIN_ERKLAERUNG\}$/,
+    grund: `${BISHER}: im Dialog des alten Satzes (Farm.serviceFee*, A1); Knopf nach A1 nur vor dem Stichtag (Nr. 229)`,
+  },
   // Schon bedingt
   { datei: 'src/components/checkout/kasse-teile.tsx', text: 'Was ist die Servicegebühr?', grund: `${BISHER}: Zweig ohne hofpreis (hofpreis ? Plattformgebühr : Servicegebühr)` },
   {
@@ -332,6 +336,12 @@ const FESTE_LISTE: Fest[] = [
     datei: 'src/app/intern/bausteine/bausteine-vorschau.tsx',
     text: 'inkl. Servicegebühr (5 %) € 2,50',
     grund: 'Vorschau unter /intern/bausteine (nur Entwicklung): Beispielwert der Fassung „bisher“ von KaufZusammenfassung (Nr. 219)',
+  },
+  { datei: 'src/components/admin/hof-akte-ansicht.tsx', text: /^Servicegebühr …$/, grund: `${BISHER}: Knopf des alten Satzes, nach A1 nur mit servicegebuehrKnopfSichtbar (vor dem Stichtag; Nr. 229)` },
+  {
+    datei: 'src/components/admin/hof-akte-ansicht.tsx',
+    text: /^SERVICEGEBUEHR_NUR_NEUE · \{alterSatz && <> \{SERVICEGEBUEHR_NUR_NEUE\}<\/>\}$/,
+    grund: `${BISHER}: Satz zum Knopf des alten Satzes, nur mit alterSatz (servicegebuehrKnopfSichtbar, A1; Nr. 229)`,
   },
 ]
 
