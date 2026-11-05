@@ -53,7 +53,7 @@ import {
   type TarifZustand,
 } from '@/lib/konditionen'
 import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
-import { barMoeglich, bestellGebuehr, einzugFuer, satzText, type GebuehrLage, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { barMoeglich, bestellGebuehr, einzugFuer, satzText, type GebuehrEinzug, type GebuehrLage } from '@/lib/plattformgebuehr'
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
@@ -337,9 +337,12 @@ export const BAR_KARTE_TEXT = {
   beschreibung: 'Kundinnen können bei der Abholung auch bar zahlen – zusätzlich zur Online-Zahlung.',
   aktiv: 'Aktiv',
   brauchtLastschrift: 'Braucht Lastschrift',
+  pausiert: 'Pausiert',
   lastschriftSatz:
     'Barzahlung gibt es, sobald du die Lastschrift für die Monatsabrechnung eingerichtet hast. ' +
     'Darüber ziehen wir einmal im Monat die Plattformgebühr aus Barbestellungen ein.',
+  /** Eine Monatsabrechnung sperrt bar (Nr. 198) — eine Lastschrift hilft da nicht, auch wenn eine fehlt. */
+  pausiertSatz: 'Barzahlung ist pausiert, solange eine Monatsabrechnung offen ist. Was zu tun ist, steht unter „Deine Konditionen“.',
   gruendungSatz: (bis: string): string =>
     `Bis ${bis} zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.`,
   einrichten: LASTSCHRIFT_TEXT.einrichten,
@@ -348,24 +351,38 @@ export const BAR_KARTE_TEXT = {
 } as const
 
 /**
+ * Der letzte Tag, an dem die Bargebühr noch erlassen ist: der Wiener Kalendertag
+ * vor `einzugAb` (der Einzug beginnt um Mitternacht in Wien). Nur für die
+ * Anzeige — `formatDatumLang` schreibt den Tag in Wiener Zeit.
+ */
+function letzterErlassenerTag(einzugAb: Date): Date {
+  return new Date(einzugAb.getTime() - 1)
+}
+
+/**
  * Was die Karte „Bar bei Abholung“ sagt — keine neue Regel: Ob bar geht,
  * entscheidet `barMoeglich` (dieselbe Quelle wie Kasse und /api/checkout).
- * Geht es nicht (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und
- * keine da — oder eine Monatsabrechnung sperrt), heißt die Marke „Braucht
- * Lastschrift“ mit dem Weg dorthin (N42 g). Ein Gründungshof, dessen
- * Bargebühr noch erlassen ist (`einzugFuer` → `erlassen`), liest bis zu
- * seinem Tag den Gründungssatz. Im Modell „bisher“ kein Satz.
+ * Geht es nicht, weil eine Monatsabrechnung sperrt (`barGesperrt`), heißt die
+ * Marke „Pausiert“ — eine Lastschrift höbe die Sperre nicht auf. Sonst
+ * (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und keine da) heißt sie
+ * „Braucht Lastschrift“ mit dem Weg dorthin (N42 g). Ist die Bargebühr noch
+ * erlassen (`einzugFuer` → `erlassen`), nennt der Satz den letzten erlassenen
+ * Tag aus der Lage (`einzugAb`, Vortag in Wien) — als Gründungshof nur, wenn
+ * `Farm.einzugAb` leer ist (dann kommt der Tag aus der Gründung), sonst neutral.
+ * Im Modell „bisher“ kein Satz.
  */
-export function barKarte(lage: GebuehrLage, gruendungBis: Date | null, jetzt: Date): BarKarte {
+export function barKarte(lage: GebuehrLage, jetzt: Date, hof: { einzugAb: Date | null }): BarKarte {
   const T = BAR_KARTE_TEXT
-  if (!barMoeglich(lage, jetzt)) return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true }
-  const erlassen = lage.modell === 'hofpreis' && einzugFuer(lage, 'ONSITE_CASH', jetzt) === 'erlassen'
-  return {
-    marke: T.aktiv,
-    ton: 'fertig',
-    satz: erlassen && gruendungBis ? T.gruendungSatz(formatDatumLang(gruendungBis)) : null,
-    lastschrift: false,
+  if (!barMoeglich(lage, jetzt)) {
+    if (lage.modell === 'hofpreis' && lage.barGesperrt) return { marke: T.pausiert, ton: 'offen', satz: T.pausiertSatz, lastschrift: false }
+    return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true }
   }
+  let satz: string | null = null
+  if (lage.modell === 'hofpreis' && einzugFuer(lage, 'ONSITE_CASH', jetzt) === 'erlassen') {
+    const bis = formatDatumLang(letzterErlassenerTag(lage.einzugAb))
+    satz = hof.einzugAb === null ? T.gruendungSatz(bis) : LASTSCHRIFT_TEXT.erlassen(bis)
+  }
+  return { marke: T.aktiv, ton: 'fertig', satz, lastschrift: false }
 }
 
 export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
@@ -442,17 +459,18 @@ function keineGebuehrGrund(hof: KonditionenHof, jetzt: Date): string | null {
 
 /**
  * Das Rechenbeispiel für eine Bestellung über € 20, heute bestellt, mit den
- * gespeicherten Sätzen dieses Hofs. `preis` ist die Preisanzeige des Hofs
- * (`preisAnzeigeFuer`, N38): null im Modell „bisher“ — dann die Servicegebühr
- * über berechneServicegebuehr (E4, B1) —, sonst sein Satz der Plattformgebühr,
- * gerechnet über bestellGebuehr wie Kasse und /api/checkout (Nr. 224). Die
+ * gespeicherten Sätzen dieses Hofs. `lage` ist die Gebührenlage des Hofs
+ * (`ladeGebuehrLage`, N38): im Modell „bisher“ die Servicegebühr über
+ * berechneServicegebuehr (E4, B1), sonst sein Satz der Plattformgebühr,
+ * gerechnet über bestellGebuehr wie Kasse und /api/checkout, und bar nach
+ * `einzugFuer` (Nr. 224). Die
  * Provision über calcPlatformFeeAmount wie im Checkout — keine zweite Rechnung.
  */
-export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date, preis: PreisAnzeige): Rechenbeispiel {
+export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date, lage: GebuehrLage): Rechenbeispiel {
   const waren = RECHENBEISPIEL_WARENPREIS_CENTS
   const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
   const titel = `Rechenbeispiel: eine Bestellung über ${euro(waren)}`
-  if (preis) return rechenbeispielHofpreis(waren, provision, preis.hundertstel, titel)
+  if (lage.modell === 'hofpreis') return rechenbeispielHofpreis(waren, provision, lage, jetzt, titel)
 
   const online = berechneServicegebuehr(waren, hof, jetzt, 'ONLINE').gebuehrCents
   const bar = berechneServicegebuehr(waren, hof, jetzt, 'ONSITE_CASH').gebuehrCents
@@ -507,10 +525,20 @@ export const RECHENBEISPIEL_GEBUEHR_IM_PREIS = `${PLATTFORMGEBUEHR_BEZEICHNUNG} 
 /**
  * Das Beispiel im Hofpreis-Modell (N38): Die Kundin zahlt den Endpreis
  * (Warenpreis + Gebühr je Stück, aufgerundet), online behält Stripe die Gebühr
- * ein, bar holt sie die Monatsabrechnung — online und bar dieselbe Rechnung.
+ * ein. Bar entscheidet `einzugFuer` (dieselbe Quelle wie /api/checkout), wohin
+ * die kassierte Gebühr geht: `erlassen` — sie bleibt beim Hof, ihm bleibt der
+ * ganze Betrag; `sepa` — die Monatsabrechnung holt sie per Lastschrift;
+ * `ueberweisung` — per Rechnung; null — bar geht gerade nicht (Sperre bzw.
+ * Lastschrift fehlt), der Satz sagt warum.
  */
-function rechenbeispielHofpreis(waren: number, provision: number, hundertstel: number, titel: string): Rechenbeispiel {
-  const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: waren, menge: 1 }], hundertstel)
+function rechenbeispielHofpreis(
+  waren: number,
+  provision: number,
+  lage: Extract<GebuehrLage, { modell: 'hofpreis' }>,
+  jetzt: Date,
+  titel: string
+): Rechenbeispiel {
+  const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: waren, menge: 1 }], lage.hundertstel)
   const gebuehrZeile: RechenZeile = { label: RECHENBEISPIEL_GEBUEHR_IM_PREIS, betrag: `+ ${euro(gebuehrCents)}` }
   const onlineZeilen: RechenZeile[] = [
     { label: 'Warenpreis', betrag: euro(waren) },
@@ -519,9 +547,10 @@ function rechenbeispielHofpreis(waren: number, provision: number, hundertstel: n
   ]
   if (provision > 0) onlineZeilen.push({ label: 'Provision', betrag: `− ${euro(provision)}` })
   onlineZeilen.push({ label: 'Deine Auszahlung', betrag: euro(waren - provision), summe: true })
+  const einzug = einzugFuer(lage, 'ONSITE_CASH', jetzt)
   return {
     titel,
-    satz: `${PLATTFORMGEBUEHR_BEZEICHNUNG} ${satzText(hundertstel)} % je Stück, aufgerundet – steckt im Preis, den die Kundin zahlt`,
+    satz: `${PLATTFORMGEBUEHR_BEZEICHNUNG} ${satzText(lage.hundertstel)} % je Stück, aufgerundet – steckt im Preis, den die Kundin zahlt`,
     mitProvision: provision > 0,
     online: {
       titel: 'Online bezahlt',
@@ -534,11 +563,19 @@ function rechenbeispielHofpreis(waren: number, provision: number, hundertstel: n
         { label: 'Warenpreis', betrag: euro(waren) },
         gebuehrZeile,
         { label: 'Du kassierst („Bar zu kassieren“)', betrag: euro(gesamtCents), summe: true },
-        { label: 'Dir bleibt', betrag: euro(waren), summe: true },
+        { label: 'Dir bleibt', betrag: euro(einzug === 'erlassen' ? gesamtCents : waren), summe: true },
       ],
-      satz: BAR_GEBUEHR_SEPA_SATZ,
+      satz: barSatzHofpreis(lage, einzug),
     },
   }
+}
+
+/** Der Satz unter der Bar-Spalte im Hofpreis-Modell — nur bestehende Texte, gewählt nach `einzugFuer`. */
+function barSatzHofpreis(lage: Extract<GebuehrLage, { modell: 'hofpreis' }>, einzug: GebuehrEinzug | null): string {
+  if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(formatDatumLang(letzterErlassenerTag(lage.einzugAb)))
+  if (einzug === 'ueberweisung') return LASTSCHRIFT_TEXT.mandatFrei
+  if (einzug === null) return lage.barGesperrt ? BAR_KARTE_TEXT.pausiertSatz : LASTSCHRIFT_TEXT.mandatPflicht
+  return BAR_GEBUEHR_SEPA_SATZ
 }
 
 // ─── Konditionen, Fassung 2: Stand, Tarif-Karten, Vergleich (Nr. 61) ────────

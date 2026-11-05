@@ -27,7 +27,7 @@ import {
   type TarifKarteAnzeige,
   type VergleichZeile,
 } from '@/lib/hof-einstellungen'
-import type { PreisAnzeige } from '@/lib/plattformgebuehr'
+import type { GebuehrLage } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 
 /**
@@ -48,30 +48,30 @@ import { cn } from '@/lib/utils'
 export function KonditionenAnsicht({
   hof,
   jetzt,
-  preis,
-  stichtag,
+  gebuehr,
   abzeichen = null,
 }: {
   hof: KonditionenHof
   jetzt: Date
   /**
-   * Die Preisanzeige des Hofs (`preisAnzeigeFuer`, N38): null im Modell
-   * „bisher“, sonst sein Satz der Plattformgebühr. Sie wählt das Wort der
-   * Gebühr in Kopf, Rechenbeispiel und Abrechnung (V62, Nr. 224).
+   * Die Gebührenlage des Hofs (`ladeGebuehrLage`, N38) und der Stichtag
+   * „Hofpreis-Modell ab“. Die Lage wählt das Wort der Gebühr in Kopf,
+   * Rechenbeispiel und Abrechnung (V62, Nr. 224) und bar den Einzugsweg; ab
+   * dem Stichtag nennt der Fuß ihn als Stand (`konditionenStand`). null, wenn
+   * das Lesen scheiterte: dann fehlen Kopfsatz, Rechenbeispiel, Abrechnung und
+   * Stand — nie stillschweigend die Fassung „bisher“.
    */
-  preis: PreisAnzeige
-  /** Der Stichtag „Hofpreis-Modell ab“ — ab ihm nennt der Fuß ihn als Stand (`konditionenStand`). */
-  stichtag: Date
+  gebuehr: { lage: GebuehrLage; stichtag: Date } | null
   /** Der Schalter „Abzeichen zeigen“ im Block „Dein Stand“ (Register K2, Nr. 116) — nur für Gründungshöfe, sonst null. */
   abzeichen?: React.ReactNode
 }): React.JSX.Element {
-  const modell = preis ? 'hofpreis' : 'bisher'
-  const beispiel = konditionenRechenbeispiel(hof, jetzt, preis)
+  const modell = gebuehr?.lage.modell ?? null
+  const beispiel = gebuehr ? konditionenRechenbeispiel(hof, jetzt, gebuehr.lage) : null
   const seite = baueKonditionenSeite(hof, jetzt)
 
   return (
     <div>
-      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel.mitProvision ? undefined : vollerWarenpreis(modell)} />
+      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel && modell && !beispiel.mitProvision ? vollerWarenpreis(modell) : undefined} />
 
       <div className="flex flex-col gap-5 md:gap-6">
         {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
@@ -97,28 +97,32 @@ export function KonditionenAnsicht({
 
         {seite.vergleich && <Vergleich zeilen={seite.vergleich} />}
 
-        <section aria-labelledby="beispiel-titel" className={cn(KARTE, 'p-5 md:p-6')}>
-          <h2 id="beispiel-titel" className="font-heading text-lg font-semibold text-foreground">
-            {beispiel.titel}
-          </h2>
-          {beispiel.satz && <p className="mt-1 text-[13px] text-muted-foreground">{beispiel.satz}</p>}
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <RechenKarte seite={beispiel.online} />
-            <RechenKarte seite={beispiel.bar} />
-          </div>
-        </section>
+        {beispiel && (
+          <section aria-labelledby="beispiel-titel" className={cn(KARTE, 'p-5 md:p-6')}>
+            <h2 id="beispiel-titel" className="font-heading text-lg font-semibold text-foreground">
+              {beispiel.titel}
+            </h2>
+            {beispiel.satz && <p className="mt-1 text-[13px] text-muted-foreground">{beispiel.satz}</p>}
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <RechenKarte seite={beispiel.online} />
+              <RechenKarte seite={beispiel.bar} />
+            </div>
+          </section>
+        )}
 
-        <section aria-labelledby="abrechnung-titel">
-          <h2 id="abrechnung-titel" className={cn(KICKER, 'mb-2.5')}>
-            So rechnen wir ab
-          </h2>
-          <p className="text-[14px] leading-relaxed text-foreground md:text-[13.5px]">
-            <Teile teile={monatsabrechnungTeile(modell)} />
-          </p>
-        </section>
+        {modell && (
+          <section aria-labelledby="abrechnung-titel">
+            <h2 id="abrechnung-titel" className={cn(KICKER, 'mb-2.5')}>
+              So rechnen wir ab
+            </h2>
+            <p className="text-[14px] leading-relaxed text-foreground md:text-[13.5px]">
+              <Teile teile={monatsabrechnungTeile(modell)} />
+            </p>
+          </section>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[13px] text-muted-foreground">
-          <p>Stand: {konditionenStand(modell, stichtag)}</p>
+          {gebuehr && <p>Stand: {konditionenStand(gebuehr.lage.modell, gebuehr.stichtag)}</p>}
           <Link
             href="/konditionen"
             className={cn('inline-flex min-h-11 items-center rounded-sm font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}

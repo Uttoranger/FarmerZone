@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { BAR_KARTE_TEXT, ONLINE_AUS_SATZ, ONLINE_AUS_TITEL, barKarte, zahlungHinweis, type BarKarte } from '@/lib/hof-einstellungen'
 import { HOF_FUER_GEBUEHR_LAGE, ladeGebuehrLage } from '@/server/queries/plattform-einstellung'
-import { ladeGruendungBis } from '@/server/queries/admin'
 import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_TITEL, neuEinrichtenSatz } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
@@ -78,13 +77,12 @@ export default async function PaymentsPage({
     stripeKontoDa: farm.stripeAccountId !== null,
   })
   const neuEinrichten = hinweis === 'neu-einrichten'
-  // Ob bar geht, sagt barMoeglich (keine neue Regel); das Gründungs-Ende nur für den Satz des Gründungshofs.
+  // Ob bar geht, sagt barMoeglich (keine neue Regel); der Tag im Satz kommt aus derselben Lage (einzugAb).
   // Scheitert das Lesen, steht die Karte ohne Marke da (kein falsches „Aktiv“), der Rest der Seite bleibt.
   const jetzt = new Date()
   let bar: BarKarte | null = null
   try {
-    const [lage, gruendungBis] = await Promise.all([ladeGebuehrLage(farm, jetzt), ladeGruendungBis({ id: farm.id })])
-    bar = barKarte(lage, gruendungBis, jetzt)
+    bar = barKarte(await ladeGebuehrLage(farm, jetzt), jetzt, farm)
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'zahlung', teil: 'bar' } })
   }
