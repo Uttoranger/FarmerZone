@@ -4,9 +4,10 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Camera, Check, Loader2, X } from 'lucide-react'
 import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
-import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, mitgeschicktSatz } from '@/lib/hof-hilfe'
+import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz, seiteName } from '@/lib/hof-hilfe'
+import { geraetName } from '@/lib/geraete'
 import { stufenText } from '@/components/shared/image-upload'
-import { HONIGTOPF_STIL, type MeldungFormular } from '@/components/shared/use-meldung-formular'
+import { HONIGTOPF_STIL, type Kontext, type MeldungFormular } from '@/components/shared/use-meldung-formular'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,10 @@ export const MELDUNG_ANSICHT_TEXT = {
   worum: 'Worum geht es?',
   fehlernummer: 'Fehlernummer',
   optional: '(optional)',
+  fehlernummerHinweis: 'Manche Fehlermeldungen enden auf ein Kürzel in eckigen Klammern – das hilft uns, die Stelle zu finden.',
+  mitgeschicktTitel: 'Das schicken wir automatisch mit',
+  seite: 'Seite',
+  geraet: 'Gerät',
   email: 'Deine E-Mail',
   emailZusatz: '· nur für unsere Antwort, optional',
   bildschirmfoto: 'Bildschirmfoto hinzufügen',
@@ -49,6 +54,36 @@ const RAHMEN_KNOPF = cn(
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border-[1.5px] border-foreground bg-card px-[18px] text-[15px] font-semibold text-foreground hover:bg-muted',
   FOKUS_RAHMEN
 )
+
+/**
+ * „Das schicken wir automatisch mit“ (Board s2-/w2-meldungen, Nacharbeit 225):
+ * im Hofbereich eine Karte mit Seite und Gerät statt des Satzes (Seite als Name des
+ * Navigationspunkts aus src/lib/hof-hilfe.ts, Gerät als `geraetName`). Ohne
+ * Kontext (vor dem Einhängen) steht ein Strich; der Satz ohne IP und Cookies
+ * bleibt darunter — er sagt, was NICHT mitgeht.
+ */
+function MitgeschicktKarte({ kontext, kennung }: { kontext: Kontext; kennung: string }): React.JSX.Element {
+  const T = MELDUNG_ANSICHT_TEXT
+  const zeilen: { name: string; wert: string }[] = [
+    ...(kennung.trim() ? [{ name: T.fehlernummer, wert: kennung.trim() }] : []),
+    { name: T.seite, wert: seiteName(kontext.seiteUrl) },
+    { name: T.geraet, wert: kontext.userAgent.trim() === '' ? '–' : geraetName(kontext.userAgent) },
+  ]
+  return (
+    <div data-slot="meldung-mitgeschickt" className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-3.5 py-3">
+      <p className="text-[13px] font-bold tracking-[0.52px] text-muted-foreground uppercase">{T.mitgeschicktTitel}</p>
+      <dl className="flex flex-col">
+        {zeilen.map((z, i) => (
+          <div key={z.name} className={cn('flex min-h-10 items-center justify-between gap-3 py-1.5 text-[15px]', i > 0 && 'border-t border-border')}>
+            <dt className="text-foreground">{z.name}</dt>
+            <dd className="min-w-0 truncate text-right text-foreground">{z.wert}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="pt-1 text-[13px] leading-normal text-muted-foreground">{OHNE_IP_UND_COOKIES}</p>
+    </div>
+  )
+}
 
 /**
  * Die Darstellung von „Problem melden" mit Ton je Welt (Register N42 b, V51; Board
@@ -196,8 +231,12 @@ export function MeldungFormularAnsicht({
             value={f.kennung}
             onChange={(e) => f.setKennung(e.target.value)}
             maxLength={MELDUNG_KENNUNG_MAX}
+            aria-describedby="meldung-kennung-hinweis"
             className={cn(FELD, 'h-12 sm:w-56')}
           />
+          <p id="meldung-kennung-hinweis" className="text-[13px] leading-normal text-muted-foreground">
+            {T.fehlernummerHinweis}
+          </p>
         </div>
 
         {/* Bildschirmfoto nur für angemeldete Höfe (der Upload-Weg braucht eine Hof-Sitzung); die Datei-Felder stehen außerhalb der Fallunterscheidung (PR 135). */}
@@ -249,7 +288,12 @@ export function MeldungFormularAnsicht({
           </div>
         )}
 
-        <p className="text-[13px] leading-normal text-muted-foreground">{mitgeschicktSatz(f.kennung, alsHof)}</p>
+        {/* Der Hof sieht, was mitgeht, als Karte (Board s2-/w2-meldungen); die Kundin den Satz (Board s3-problem-melden). */}
+        {alsHof ? (
+          <MitgeschicktKarte kontext={f.kontext} kennung={f.kennung} />
+        ) : (
+          <p className="text-[13px] leading-normal text-muted-foreground">{mitgeschicktSatz(f.kennung, alsHof)}</p>
+        )}
 
         <div className="flex gap-2.5 md:justify-end">
           <Link href={abbrechenHref} className={cn(RAHMEN_KNOPF, 'hidden md:inline-flex')}>

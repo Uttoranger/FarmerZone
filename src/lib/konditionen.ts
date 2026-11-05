@@ -25,7 +25,7 @@
  * eine Falle. Wiener Tage kommen aus wiener-tag.ts, Cent → Euro aus format.ts.
  */
 import type { Tarif } from '@prisma/client'
-import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl, plural } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { MARKE } from '@/lib/marke'
 // Nur der Typ — zur Laufzeit bindet diese Datei plattformgebuehr.ts nicht ein (sonst ein Ring über servicegebuehr.ts).
@@ -618,10 +618,15 @@ export const TARIF_ZEILE = {
 export type TarifZeileDaten = {
   zustand: Exclude<TarifZustand, 'hofladen'>
   titel: string
-  /** Unterzeile in der Seitenleiste. */
+  /** Unterzeile in der Seitenleiste (beim Gründungshof liest sie nur noch die Übersicht der Einstellungen, `konditionenZeile`). */
   zeile: string
   /** Unterzeile im Mehr-Blatt (am Handy). */
   zeileHandy: string
+  /**
+   * Nur Gründungshof: „noch 11 Monate (bis 31. Jänner 2028)“ — die Unterzeile in Seitenleiste und Mehr-Blatt statt
+   * `zeile`/`zeileHandy` (Boards w1-/s1-mehr-neu, Nr. 233). Reine Anzeige aus dem Datum und heute.
+   */
+  restzeit?: string
   /** Nur Hoftor: „n von 3" und der Anteil für den Balken (0 bis 1) — Anzeige, keine Sperre (O8 baut Gate 8). */
   grenze?: { wert: string; anteil: number }
   /** Nur Hoftor: „Tarife vergleichen". */
@@ -639,8 +644,20 @@ export function baueTarifZeile(hof: TarifHof & { produkteImShop: number }, jetzt
       return { zustand: stand.zustand, titel: t.titel, zeile: t.zeile, zeileHandy: `${t.zeile} · ${t.handy}` }
     }
     case 'gruendungshof': {
-      const zeile = `${TARIF_ZEILE.gruendungshof.zeile} ${formatDatumLang(stand.bis)}`
-      return { zustand: stand.zustand, titel: TARIF_ZEILE.gruendungshof.titel, zeile, zeileHandy: zeile }
+      const datum = formatDatumLang(stand.bis)
+      const zeile = `${TARIF_ZEILE.gruendungshof.zeile} ${datum}`
+      // Nur Anzeige (Boards w1-/s1-mehr-neu): angefangene Monate bis einschließlich des Wiener Tags `bis` — keine Frist
+      // und keine Geldregel; ob die Zusage gilt, entscheidet allein ermittleStand. Weil `bis` nie vor heute liegt,
+      // steht hier mindestens „noch 1 Monat“ (am 3. März bis 31. Jänner: 10 volle Monate und ein angefangener = 11).
+      // monatsAbstand/monatsschluesselInWien aus servicegebuehr.ts darf diese Datei nicht holen (Ring, wiener-tag.ts),
+      // deshalb hier nur der Monatsschritt über den Wiener Kalendertag; die Mehrzahl über plural() aus format.ts.
+      // Ein Wiener Kalendertag (JJJJ-MM-TT) als Zahl der Monate seit Jahr 0.
+      const monatsZahl = (kalendertag: string) => parseInt(kalendertag.slice(0, 4), 10) * 12 + parseInt(kalendertag.slice(5, 7), 10)
+      const heute = kalendertagInWien(jetzt)
+      const bisTag = kalendertagInWien(stand.bis)
+      const monate = monatsZahl(bisTag) - monatsZahl(heute) + (bisTag.slice(8) >= heute.slice(8) ? 1 : 0)
+      const restzeit = `noch ${monate} ${plural(monate, 'Monat', 'Monate')} (bis ${datum})`
+      return { zustand: stand.zustand, titel: TARIF_ZEILE.gruendungshof.titel, zeile, zeileHandy: zeile, restzeit }
     }
     case 'hoftor': {
       const t = TARIF_ZEILE.hoftor

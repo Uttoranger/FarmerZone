@@ -297,7 +297,8 @@ describe('5. Maße', () => {
 
   it('die Beschriftung der Unterleiste ist 12 px — die Leiste bleibt 68 px hoch', () => {
     const leiste = quelle('src/components/ui/bottom-nav.tsx')
-    expect(leiste.match(/text-\[12px\] leading-none/g)).toHaveLength(2)
+    // Eintrag, erhobener Mittelknopf mit Wort (Kunde) und seit Nr. 233 der flache Mittelknopf (Hof „Neu“).
+    expect(leiste.match(/text-\[12px\] leading-none/g)).toHaveLength(3)
     expect(leiste).not.toContain('text-[10.5px]')
     expect(leiste).toMatch(/flex h-\[68px\] items-stretch/)
   })

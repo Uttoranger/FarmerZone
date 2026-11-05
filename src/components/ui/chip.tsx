@@ -22,7 +22,7 @@ export function Chip({
       data-slot="chip"
       title={title}
       className={cn(
-        'inline-flex max-w-full items-center rounded-full bg-muted px-2.5 py-0.5 text-[11.5px] text-muted-foreground',
+        'inline-flex max-w-full items-center rounded-full bg-muted px-2.5 py-0.5 text-[12px] text-muted-foreground',
         className
       )}
     >

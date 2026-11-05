@@ -30,7 +30,8 @@ vi.mock('@/components/ui/sheet', () => {
   return {
     Sheet: ({ children }: Kinder) => createElement(Fragment, null, children),
     SheetTrigger: ({ children }: Kinder) => createElement('button', { type: 'button' }, children),
-    SheetBlatt: ({ children }: Kinder) => createElement('section', { 'data-blatt': '' }, children),
+    // Der feste Kopf (Prop `kopf`, UI-Runde 4) steht vor dem Inhalt wie im echten Blatt.
+    SheetBlatt: ({ children, kopf }: Kinder & { kopf?: ReactNode }) => createElement('section', { 'data-blatt': '' }, kopf, children),
     SheetTitle: ({ children }: Kinder) => createElement('h2', null, children),
     SheetClose: ({ children }: Kinder) => createElement('button', { type: 'button' }, children),
     // Seit Nr. 220 tragen die Blätter der HofShell den Kopf aus dem Baustein (Titel und ein Schließen-Element).
@@ -118,6 +119,29 @@ describe('baueTarifZeile — die Zeile je Zustand', () => {
     expect(zeile?.zeileHandy).toBe(zeile?.zeile)
   })
 
+  it('Gründungshof: die Restzeit „noch N Monate (bis …)“ aus Datum und heute — angefangene Monate, wie im Board (Nr. 233)', () => {
+    const rest = (bis: string, heute: string): string =>
+      normal(baueTarifZeile({ ...ohne, gruendungBis: new Date(bis) }, new Date(heute))?.restzeit ?? '')
+    // Board w1-/s1-mehr-neu: am 3. März 2027 bis 31. Jänner 2028.
+    expect(rest('2028-01-31T00:00:00.000Z', '2027-03-03T10:00:00.000Z')).toBe('noch 11 Monate (bis 31. Jänner 2028)')
+    expect(rest('2027-12-31T00:00:00.000Z', '2026-11-05T10:00:00.000Z')).toBe('noch 14 Monate (bis 31. Dezember 2027)')
+    // Genau ein Monat bis zum Tag (einschließlich des Tags) ist schon ein angefangener zweiter; am letzten Tag „noch 1 Monat“.
+    expect(rest('2027-04-03T00:00:00.000Z', '2027-03-03T10:00:00.000Z')).toBe('noch 2 Monate (bis 3. April 2027)')
+    expect(rest('2027-04-02T00:00:00.000Z', '2027-03-03T10:00:00.000Z')).toBe('noch 1 Monat (bis 2. April 2027)')
+    expect(rest('2027-03-03T00:00:00.000Z', '2027-03-03T21:00:00.000Z')).toBe('noch 1 Monat (bis 3. März 2027)')
+    // Wiener Tag: um 0:30 Uhr in Wien ist in UTC noch gestern — gezählt wird der Wiener Tag.
+    expect(rest('2027-04-01T00:00:00.000Z', '2027-02-28T23:30:00.000Z')).toBe('noch 2 Monate (bis 1. April 2027)')
+    // Die Übersicht der Einstellungen liest weiter `zeile` — dort ändert sich nichts.
+    expect(normal(baueTarifZeile({ ...ohne, gruendungBis: BIS_SILVESTER_2027 }, VOR_STICHTAG)?.zeile ?? '')).toBe('ohne Grundgebühr bis 31. Dezember 2027')
+  })
+
+  it('nur der Gründungshof hat eine Restzeit — Startphase und Hoftor nicht', () => {
+    expect(baueTarifZeile(ohne, VOR_STICHTAG)?.restzeit).toBeUndefined()
+    expect(baueTarifZeile({ ...ohne, produkteImShop: 3 }, NACH_STICHTAG)?.restzeit).toBeUndefined()
+    // Gegenprobe: abgelaufene Zusage — kein Gründungshof mehr, also auch keine Restzeit.
+    expect(baueTarifZeile({ ...ohne, gruendungBis: new Date('2026-10-01T00:00:00.000Z') }, VOR_STICHTAG)?.restzeit).toBeUndefined()
+  })
+
   it('Hoftor: „Produkte im Shop n von 3" und „Tarife vergleichen" — die Zahl ist Anzeige, keine Sperre', () => {
     const zeile = baueTarifZeile({ ...ohne, produkteImShop: 3 }, NACH_STICHTAG)
     expect(zeile).toMatchObject({ zustand: 'hoftor', titel: 'Hoftor · kostenlos', zeile: 'Produkte im Shop', hinweis: 'Tarife vergleichen' })
@@ -139,7 +163,7 @@ describe('baueTarifZeile — die Zeile je Zustand', () => {
     ]
     const texte = [
       ...Object.values(TARIF_ZEILE).flatMap((z) => Object.values(z)),
-      ...zeilen.flatMap((z) => [z?.titel, z?.zeile, z?.zeileHandy, z?.hinweis, z?.grenze?.wert]),
+      ...zeilen.flatMap((z) => [z?.titel, z?.zeile, z?.zeileHandy, z?.restzeit, z?.hinweis, z?.grenze?.wert]),
     ].filter((t): t is string => typeof t === 'string')
     expect(texte.length).toBeGreaterThan(10)
     for (const text of texte) {
@@ -190,8 +214,8 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     expect(link).toBeDefined()
     expect(link).toContain(`href="${EINSTELLUNG_KONDITIONEN.href}"`)
     expect(link).toContain(zeile?.titel)
-    // Das Datum bricht nicht um (V13, Nr. 220): die Zeile mit geschützten Leerzeichen.
-    expect(link).toContain(datumOhneUmbruch(zeile?.zeile ?? ''))
+    // Das Datum bricht nicht um (V13, Nr. 220): die Zeile mit geschützten Leerzeichen; beim Gründungshof die Restzeit.
+    expect(link).toContain(datumOhneUmbruch(zeile?.restzeit ?? zeile?.zeile ?? ''))
     if (zeile?.zeileHandy !== zeile?.zeile) expect(link).not.toContain(datumOhneUmbruch(zeile?.zeileHandy ?? ''))
     // Unten: nach „Verkauf und Kunden", vor den Einstellungen und der Konto-Zeile.
     expect(leiste.indexOf('data-slot="tarif-zeile"')).toBeGreaterThan(leiste.indexOf(VERKAUF_UND_KUNDEN_TITEL))
@@ -202,8 +226,9 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     const html = shell(zeile)
     const mehr = html.slice(html.indexOf('<h2>Mehr</h2>'))
     const link = tarifLink(mehr)
-    expect(link).toContain(zeile?.titel)
-    expect(link).toContain(datumOhneUmbruch(zeile?.zeileHandy ?? ''))
+    // Beim Gründungshof trägt das Abzeichen den Titel (siehe unten); dort steht die Restzeit.
+    if (zeile?.zustand !== 'gruendungshof') expect(link).toContain(zeile?.titel)
+    expect(link).toContain(datumOhneUmbruch(zeile?.restzeit ?? zeile?.zeileHandy ?? ''))
     expect(mehr).toContain(`role="group" aria-label="${DEIN_TARIF_TITEL}"`)
     expect(mehr.indexOf(`>${DEIN_TARIF_TITEL}<`)).toBeLessThan(mehr.indexOf('data-slot="tarif-zeile"'))
     expect(mehr.indexOf('data-slot="tarif-zeile"')).toBeLessThan(mehr.indexOf(`>${VERKAUF_UND_KUNDEN_TITEL}<`))
@@ -215,6 +240,36 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     // Gegenprobe: die gebaute Zeile selbst trägt vor dem Jahr ein normales Leerzeichen — erst die Shell schützt es.
     expect(ZEILEN.gruendungshof?.zeile).toContain('Dezember 2027')
     expect(html).not.toContain('Dezember 2027')
+  })
+
+  it('Gründungshof im Mehr-Blatt: das Abzeichen statt Kästchen und Titel (Board s1-mehr-neu, Nr. 233); in der Seitenleiste das Kästchen', () => {
+    const html = shell(ZEILEN.gruendungshof)
+    const imBlatt = tarifLink(html.slice(html.indexOf('<h2>Mehr</h2>'))) ?? ''
+    expect(imBlatt).toContain('bg-abzeichen-grund')
+    expect(imBlatt).not.toContain('lucide-sparkle')
+    // Gegenprobe: die Seitenleiste zeigt Kästchen und Titel, kein Abzeichen; die Startphase im Blatt auch nicht.
+    const inLeiste = tarifLink(abschnitt(html, '<aside', '</aside>')) ?? ''
+    expect(inLeiste).not.toContain('bg-abzeichen-grund')
+    expect(inLeiste).toContain('lucide-sparkle')
+    const start = shell(ZEILEN.startphase)
+    expect(tarifLink(start.slice(start.indexOf('<h2>Mehr</h2>')))).not.toContain('bg-abzeichen-grund')
+  })
+
+  it('Gründungshof: „noch N Monate (bis …)“ statt „ohne Grundgebühr bis …“; im Blatt sichtbar „· Konditionen und Tarif“ (Boards w1-/s1-mehr-neu)', () => {
+    const html = shell(ZEILEN.gruendungshof)
+    const inLeiste = tarifLink(abschnitt(html, '<aside', '</aside>')) ?? ''
+    const imBlatt = tarifLink(html.slice(html.indexOf('<h2>Mehr</h2>'))) ?? ''
+    const rest = datumOhneUmbruch(ZEILEN.gruendungshof?.restzeit ?? '')
+    expect(rest).toMatch(/^noch \d+ Monate? \(bis /)
+    expect(inLeiste).toContain(`>${rest}<`)
+    expect(imBlatt).toContain(`>${rest} · ${EINSTELLUNG_KONDITIONEN.label}<`)
+    // Im Blatt steht das Ziel sichtbar — kein doppelter Zusatz für den Screenreader; in der Seitenleiste bleibt er.
+    expect(imBlatt).not.toContain('class="sr-only"')
+    expect(inLeiste).toContain(`<span class="sr-only">, ${EINSTELLUNG_KONDITIONEN.label}</span>`)
+    // Gegenprobe: der alte Wortlaut steht in keiner der beiden Zeilen mehr, die Startphase hat kein sichtbares Ziel.
+    expect(inLeiste + imBlatt).not.toContain('ohne Grundgebühr')
+    const start = shell(ZEILEN.startphase)
+    expect(tarifLink(start.slice(start.indexOf('<h2>Mehr</h2>')))).not.toContain(` · ${EINSTELLUNG_KONDITIONEN.label}`)
   })
 
   it('Startphase am Handy mit „du musst nichts tun", in der Seitenleiste ohne', () => {
@@ -230,16 +285,30 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     expect(link).toMatch(/<span aria-hidden="true"[^>]*><span[^>]*style="width:100%"/)
   })
 
-  it('Symbol je Zustand: Spross für Startphase und Hoftor, Stern für den Gründungshof', () => {
+  it('Symbol je Zustand: Spross für Startphase und Hoftor, beim Gründungshof das Funkeln (Board w1-mehr-neu, Nr. 233)', () => {
     expect(tarifLink(shell(ZEILEN.startphase))).toContain('lucide-sprout')
     expect(tarifLink(shell(ZEILEN.hoftor))).toContain('lucide-sprout')
-    expect(tarifLink(shell(ZEILEN.gruendungshof))).toContain('lucide-star')
+    expect(tarifLink(shell(ZEILEN.gruendungshof))).toContain('lucide-sparkle')
+    expect(tarifLink(shell(ZEILEN.gruendungshof))).not.toContain('lucide-star')
+  })
+
+  it('das Funkeln ist gefüllt wie „✦“ im Board, der Spross bleibt ein Umriss (UI-Runde 4)', () => {
+    const funkeln = tarifLink(shell(ZEILEN.gruendungshof))?.match(/<svg[^>]*lucide-sparkle[^>]*>/)?.[0] ?? ''
+    expect(funkeln).toContain('fill="currentColor"')
+    const spross = tarifLink(shell(ZEILEN.startphase))?.match(/<svg[^>]*lucide-sprout[^>]*>/)?.[0] ?? ''
+    expect(spross).toContain('fill="none"')
+  })
+
+  it('in der Seitenleiste Zeilenhöhe 1,4 ohne Abstand wie im Board (Karte 73 px), der Balken bei Hoftor behält den Abstand', () => {
+    expect(tarifLink(shell(ZEILEN.gruendungshof))).toMatch(/class="flex min-w-0 flex-1 flex-col leading-\[1\.4\]"/)
+    expect(tarifLink(shell(ZEILEN.hoftor))).toMatch(/class="flex min-w-0 flex-1 flex-col gap-0\.5"/)
   })
 
   it('ein Link mit ≥ 44 px und sichtbarem Fokus; der Screenreader hört auch, wohin', () => {
     const link = tarifLink(shell(ZEILEN.startphase)) ?? ''
     const klassen = link.match(/^<a [^>]*class="([^"]*)"/)?.[1].split(' ') ?? []
-    for (const k of ['min-h-11', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
+    // 56 px wie im Board w1-mehr-neu (Nr. 233; vorher 44 px) — mehr als das Mindestmaß.
+    for (const k of ['min-h-14', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
     expect(link).toContain(`<span class="sr-only">, ${EINSTELLUNG_KONDITIONEN.label}</span>`)
     for (const svg of link.match(/<svg[^>]*>/g) ?? []) expect(svg).toContain('aria-hidden="true"')
   })

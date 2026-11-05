@@ -185,6 +185,15 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
     expect(ergebnis.serverHtml).not.toContain('<button')
     // Im Browser ist es dunkel: Der Knopf bietet den hellen Modus an.
     expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
+    // Das Symbol ist auch im Dunkeln der Mond des Boards (Nr. 233, UI-Runde 3), keine Sonne.
+    expect(ergebnis.container.querySelector('button svg[data-symbol="mond"]')).not.toBeNull()
+    expect(ergebnis.container.querySelector('button .lucide-sun')).toBeNull()
+  })
+
+  it('ThemeUmschalter hell: derselbe Mond, nur die Beschriftung sagt, was der Tipp tut (Nr. 233)', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalter), { imBrowser: () => localStorage.setItem('theme', 'light') })
+    expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Dunkelmodus einschalten')
+    expect(ergebnis.container.querySelector('button svg[data-symbol="mond"]')).not.toBeNull()
   })
 
   // Fund aus Nr. 135 (damals an ThemeUmschalterZeile, die seit Nr. 220 der Pille und der Wahl gewichen ist): Die

@@ -46,7 +46,7 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
   return {
     ...echt,
     SheetBlatt: (props: Parameters<typeof echt.SheetBlatt>[0]) =>
-      blatt.inline ? createElement('div', { 'data-slot': 'sheet-blatt-inline' }, props.children as ReactNode) : createElement(echt.SheetBlatt, props),
+      blatt.inline ? createElement('div', { 'data-slot': 'sheet-blatt-inline' }, props.kopf, props.children as ReactNode) : createElement(echt.SheetBlatt, props),
   }
 })
 

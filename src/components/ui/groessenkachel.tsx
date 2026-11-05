@@ -89,16 +89,16 @@ export function Groessenkachel({
       <span className="truncate text-[13px] font-semibold" title={name}>
         {name}
       </span>
-      {hinweis && <span className="truncate text-[11.5px] text-muted-foreground">{hinweis}</span>}
+      {hinweis && <span className="truncate text-[12px] text-muted-foreground">{hinweis}</span>}
       {/* Preis und Grundpreis brechen nie in sich um; wird es eng, rutscht der Grundpreis in die nächste Zeile. */}
       <span className="mt-1 flex flex-wrap items-baseline justify-between gap-x-2">
         <span className={cn('font-semibold whitespace-nowrap tabular-nums', zustand === 'ausverkauft' && 'line-through decoration-1')}>
           {preis}
         </span>
-        {grundpreis && <span className="text-[11px] whitespace-nowrap text-status-fertig tabular-nums">{grundpreis}</span>}
+        {grundpreis && <span className="text-[12px] whitespace-nowrap text-status-fertig tabular-nums">{grundpreis}</span>}
       </span>
       {vorrat && (
-        <span className={cn('text-[11px]', zustand === 'knapp' ? 'font-semibold text-status-offen' : 'text-muted-foreground')}>
+        <span className={cn('text-[12px]', zustand === 'knapp' ? 'font-semibold text-status-offen' : 'text-muted-foreground')}>
           {vorrat}
         </span>
       )}

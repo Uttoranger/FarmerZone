@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { ChevronRight, Sprout, Star, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Sparkle, Sprout, type LucideIcon } from 'lucide-react'
 import type { TarifZeileDaten } from '@/lib/konditionen'
+import { Abzeichen } from '@/components/ui/abzeichen'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -17,11 +18,20 @@ import { cn } from '@/lib/utils'
  * Link. ProgressBar passt hier nicht — sie kündigt sich als eigene
  * Fortschrittsanzeige mit Beschriftung an, mitten in einem Link eine zweite
  * Ansage für dieselbe Zahl.
+ *
+ * Seit Nr. 233 nach w1-/s1-mehr-neu: in der Seitenleiste ein grün getöntes
+ * Kästchen (28 px, beim Gründungshof das Funkeln), Titel 14 px fett, Zeile
+ * 13 px; im Mehr-Blatt steht beim Gründungshof das Abzeichen „Gründungshof“
+ * statt Kästchen und Titel. Der Wortlaut bleibt der vom Server (offen: E-012).
+ * UI-Runde 3: beim Gründungshof die Restzeit vom Server (`restzeit`), im Blatt
+ * mit dem Ziel „· Konditionen und Tarif“ dahinter.
+ * UI-Runde 4: das Funkeln gefüllt wie das Zeichen „✦“ im Board, in der
+ * Seitenleiste Zeilenhöhe 1,4 ohne Abstand (Karte 73 px statt 80 px wie im Board).
  */
 const SYMBOL: Record<TarifZeileDaten['zustand'], LucideIcon> = {
   startphase: Sprout,
   hoftor: Sprout,
-  gruendungshof: Star,
+  gruendungshof: Sparkle,
 }
 
 export function TarifZeile({
@@ -38,7 +48,13 @@ export function TarifZeile({
 }): React.JSX.Element {
   const Symbol = SYMBOL[daten.zustand]
   const blatt = ort === 'blatt'
-  const unterzeile = blatt ? daten.zeileHandy : daten.zeile
+  // Beim Gründungshof die Restzeit „noch 11 Monate (bis …)“ an beiden Orten (Boards w1-/s1-mehr-neu).
+  const unterzeile = daten.restzeit ?? (blatt ? daten.zeileHandy : daten.zeile)
+  // Im Blatt trägt das Abzeichen den Titel (Board s1-mehr-neu); vorgelesen wird „Gründungshof“ wie der Titel.
+  const mitAbzeichen = blatt && daten.zustand === 'gruendungshof'
+  // Dort steht das Ziel sichtbar hinter der Zeile („· Konditionen und Tarif“, Board s1-mehr-neu) — dann ohne den
+  // unsichtbaren Zusatz, sonst hörte der Screenreader es doppelt.
+  const zielSichtbar = mitAbzeichen
 
   return (
     <Link
@@ -47,16 +63,30 @@ export function TarifZeile({
       data-slot="tarif-zeile"
       data-zustand={daten.zustand}
       className={cn(
-        'flex min-h-11 items-center gap-[11px] border border-border bg-card text-foreground transition-colors duration-[250ms] hover:bg-muted',
-        blatt ? 'rounded-2xl px-3.5 py-3' : 'rounded-xl px-3 py-2.5',
+        'flex min-h-14 items-center gap-2.5 border border-border bg-card text-[13px] text-foreground transition-colors duration-[250ms] hover:bg-muted',
+        // Rundung in Pixeln wie im Board (12 bzw. 16 px) — die Stufen xl/2xl wachsen im neuen Design mit --radius.
+        blatt ? 'rounded-[16px] px-3 py-2' : 'rounded-[12px] px-2.5 py-2',
         FOKUS_RAHMEN
       )}
     >
-      <span className="flex size-8 shrink-0 items-center justify-center self-start rounded-[10px] bg-status-fertig/12 text-status-fertig">
-        <Symbol className="size-[17px]" strokeWidth={1.8} aria-hidden="true" />
-      </span>
-      <span className={cn('flex min-w-0 flex-1 flex-col gap-1', blatt ? 'text-[12.5px]' : 'text-[12px]')}>
-        <span className={cn('font-semibold', blatt ? 'text-[14.5px]' : 'text-[13.5px]')}>{daten.titel}</span>
+      {!mitAbzeichen && (
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-zustand-laeuft-grund text-zustand-laeuft">
+          {/* Das Funkeln gefüllt in der Schriftfarbe des Kästchens (Board „✦“); der Spross bleibt ein Umriss. */}
+          <Symbol
+            className={daten.zustand === 'gruendungshof' ? 'size-3.5' : 'size-4'}
+            strokeWidth={daten.zustand === 'gruendungshof' ? 1.5 : 1.9}
+            fill={daten.zustand === 'gruendungshof' ? 'currentColor' : 'none'}
+            aria-hidden="true"
+          />
+        </span>
+      )}
+      {/* In der Seitenleiste ohne Abstand und mit Zeilenhöhe 1,4 wie im Board w1-mehr-neu; der Balken bei Hoftor behält 2 px. */}
+      <span className={cn('flex min-w-0 flex-1 flex-col', blatt || daten.grenze ? 'gap-0.5' : 'leading-[1.4]')}>
+        {mitAbzeichen ? (
+          <Abzeichen className="h-6 self-start" />
+        ) : (
+          <span className={cn('font-bold', blatt ? 'text-[15px]' : 'text-[14px]')}>{daten.titel}</span>
+        )}
         {daten.grenze ? (
           <>
             <span className="flex items-baseline justify-between gap-2 text-muted-foreground">
@@ -71,13 +101,13 @@ export function TarifZeile({
             </span>
           </>
         ) : (
-          <span className="text-muted-foreground">{unterzeile}</span>
+          <span className="text-muted-foreground">{zielSichtbar ? `${unterzeile} · ${ziel.label}` : unterzeile}</span>
         )}
         {daten.hinweis && <span className="font-semibold text-brand-text">{daten.hinweis}</span>}
       </span>
       {/* Wohin der Link führt — sichtbar zeigt nur der Pfeil, dass es weitergeht (wie PersonZeile). */}
-      <span className="sr-only">{`, ${ziel.label}`}</span>
-      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
+      {!zielSichtbar && <span className="sr-only">{`, ${ziel.label}`}</span>}
+      <ChevronRight className="size-[18px] shrink-0 text-foreground" strokeWidth={2} aria-hidden="true" />
     </Link>
   )
 }
