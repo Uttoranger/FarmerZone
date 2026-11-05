@@ -53,13 +53,13 @@ Alle PRs ohne Migration, CI (ci, integration) grün. Die Vorschau-Links stehen i
 | 230 Admin Teil 2 | #459 | integration/lauf30 | 1 | Abgleich-Abweichung je Modell (Abfrage) |
 | 231 Rechtstexte, Fehlerseiten | #458 | integration/lauf30 | 0 | siehe Recht |
 | 232 E-Mails | #455 | integration/lauf30 | 0 | siehe Recht |
-| Sammel 30 | (Sammel-PR) | main | – | – |
+| Sammel 30 | #464 | main | – | – |
 
 ## Merge-Reihenfolge
 
 **Gestapelte PRs per Merge-Commit mergen, nicht per Squash.**
 
-1. #449 (Doku), dann der Sammel-PR `integration/lauf30` → main. Der Sammel-PR enthält alle Nummern.
+1. #449 (Doku), dann der Sammel-PR #464 (`integration/lauf30` → main). Der Sammel-PR enthält alle Nummern.
 2. Die Einzel-PRs #450–#463 sind dann mit gemergt. Sie dienen der Abnahme je Bereich und lassen sich danach schließen.
 
 Wer lieber einzeln mergt, nimmt diese Reihenfolge, jede Basis zuerst: #449 → #450 → #451 → #452 → #454 → #456 → #453 → #455 → #458 → #457 → #459 → #462 → #460 → #461 → #463.
