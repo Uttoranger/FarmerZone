@@ -231,12 +231,13 @@ export function ProduktdetailKunde({
           </Link>
 
           {/* ── Bild und Angaben ── */}
-          <section aria-labelledby="produkt-titel" className="flex flex-col gap-3 md:flex-row md:items-start md:gap-6">
-            {/* Rahmen wie die Vorschau „Auf der Produktseite“ im Produktdialog (Bild-Baustein, Register N17): am Handy
-                390 : 200, im Browser 300 × 300. Im Dunkeln gedämpft (Freigabe Lauf 31), damit kein heller Fleck bleibt. */}
+          <section aria-labelledby="produkt-titel" className="flex flex-col gap-3">
+            {/* Das Bild als Band über der ganzen Spalte, Titel und Texte darunter (Board w1-/s1-produkt): am Handy
+                390 : 200 wie die Vorschau „Auf der Produktseite“ (Bild-Baustein, Register N17), ab 768 px 160 px hoch.
+                Im Dunkeln gedämpft (Freigabe Lauf 31), damit kein heller Fleck bleibt. */}
             <div
               className={cn(
-                'relative aspect-[390/200] w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-muted md:aspect-auto md:size-[300px]',
+                'relative aspect-[390/200] w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-muted md:aspect-auto md:h-[160px]',
                 bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE
               )}
             >
@@ -246,10 +247,10 @@ export function ProduktdetailKunde({
                   alt={produkt.imageUrl ? produkt.name : ''}
                   fill
                   priority
-                  sizes="(min-width: 768px) 300px, 100vw"
+                  sizes="(min-width: 1024px) 680px, 100vw"
                   // Die Kategorie-Illustration geht nachts in der Fläche auf — ihr Crème-Grund leuchtete sonst (ILLUSTRATION_BILD).
                   className={cn(
-                    produkt.imageUrl ? 'object-cover' : cn('object-contain p-6', ILLUSTRATION_BILD),
+                    produkt.imageUrl ? 'object-cover' : cn('object-contain p-6 md:p-4', ILLUSTRATION_BILD),
                     ausverkauft && 'grayscale'
                   )}
                   // Ausschnitt nur am echten Foto (Register N17); ausverkauft ohne Filter des Hofs, sonst überschriebe er grayscale.
@@ -376,7 +377,6 @@ export function ProduktdetailKunde({
             )}
 
             {preisSatz && <p className="text-[13px] text-muted-foreground">{preisSatz}</p>}
-            <FutterVerantwortung saetze={verantwortung} className="text-[13px]" />
 
             {kaufbar && nochMoeglich === 0 && (
               <p className="text-[13px] text-muted-foreground">Alles, was der Hof davon hat, liegt schon in deinem Warenkorb.</p>
@@ -410,6 +410,9 @@ export function ProduktdetailKunde({
           {/* Ausverkauft ohne andere Größe zeigt das Board weder Kennzeichnung noch „Gleich mit abholen“ (Bild 3):
               Gekauft wird hier nichts, die Karte darüber führt zum Angebot. */}
           {!ausverkauftKarte && <Kennzeichnung zeilen={produktAngaben(produkt, farm)} bestaetigtAm={produkt.futter?.bestaetigtAm ?? null} />}
+          {/* Bei jedem Futter der Verantwortungs-Hinweis (E10a) — unter der Kennzeichnung, wo das Board seinen Futter-Satz zeigt
+              (w1-/s1-produkt Bild 2); der Wortlaut ist der aus E10a (futterVerantwortung, „Register vor Board“). */}
+          <FutterVerantwortung saetze={verantwortung} className="text-[13px]" />
 
           {!ausverkauftKarte && (
             <GleichMitAbholen
@@ -480,6 +483,7 @@ export function ProduktdetailKunde({
           produkte={produkte}
           kasseHref={kasse}
           kasseUmriss
+          mitFutterHinweis={false}
           className="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
       </div>

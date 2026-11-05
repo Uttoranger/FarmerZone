@@ -303,7 +303,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 ## src/components/produktdetail
 
 - src/components/produktdetail/produktdetail-kunde.tsx · ProduktdetailKunde · Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4; Aufbau seit Nr. 235 nach den Boards w1-/s1-produkt). · genutzt
-- src/components/produktdetail/produktdetail-teile.tsx · GleichMitAbholen, Kennzeichnung · Teile der Produktseite (Nachtlauf Nr. 11, Aufbau seit Nr. 235): „Kennzeichnung" und „Gleich mit abholen". · genutzt
+- src/components/produktdetail/produktdetail-teile.tsx · GleichMitAbholen, Kennzeichnung, ohneDoppelteGehalte · Teile der Produktseite (Nachtlauf Nr. 11, Aufbau seit Nr. 235): „Kennzeichnung" und „Gleich mit abholen". · genutzt
 
 ## src/components/produkte
 

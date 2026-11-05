@@ -54,8 +54,8 @@ export type SeitenspalteHof = {
   pickupSlots: PublicPickupSlot[]
 }
 
-/** Die Karte der Boards: Fläche, Rand, Radius 16, Polster 12/14 px. */
-export const SPALTEN_KARTE = 'flex flex-col gap-2 rounded-2xl border border-border bg-card px-3.5 py-3'
+/** Die Karte der Boards: Fläche, Rand, Radius 16, Polster 12/14 px, 6 px zwischen Überzeile und Zeilen. */
+export const SPALTEN_KARTE = 'flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3.5 py-3'
 /** Die leise Überzeile in Großbuchstaben (13 px fett) — Überschrift jeder Karte und der Abschnitte der Hofseite. */
 export const UEBERZEILE = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
 /**
@@ -96,6 +96,7 @@ export function HofseiteSeitenspalte({
   produkte = [],
   kasseHref,
   kasseUmriss = false,
+  mitFutterHinweis = true,
   className,
 }: {
   hof: SeitenspalteHof
@@ -119,6 +120,12 @@ export function HofseiteSeitenspalte({
    * die eine Hauptaktion (Boards s1/w1-produkt); auf der Hofseite bleibt „Zur Kasse" grün.
    */
   kasseUmriss?: boolean
+  /**
+   * Der Verantwortungs-Hinweis zu Futter im Korb (E10a) im Mini-Warenkorb — auf der Hofseite ja. Die Produktseite
+   * schaltet ihn ab: Dort stünde er neben jedem Produkt (auch Brennholz) und läse sich wie ein Satz über dieses
+   * Produkt. Sie zeigt den Hinweis zum eigenen Futter unter der Kennzeichnung; zum Korb sagen ihn Korb-Blatt und Kasse.
+   */
+  mitFutterHinweis?: boolean
   className?: string
 }): React.JSX.Element {
   const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 2, new Date(jetzt)), [hof.pickupSlots, jetzt])
@@ -127,10 +134,13 @@ export function HofseiteSeitenspalte({
   return (
     <aside
       aria-label="Abholung, Zahlung und Anfahrt"
-      // Bleibt beim Scrollen stehen (Board w1-produkt Bild 2); ist sie höher als das Fenster, scrollt sie selbst.
-      className={cn('flex flex-col gap-3 lg:sticky lg:top-[5.25rem] lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto', className)}
+      // Bleibt beim Scrollen stehen, ab „Dein Warenkorb“ oben (Boards w1-hofseite Bild 2, w1-produkt Bild 2); ist sie höher
+      // als das Fenster, scrollt sie selbst. Sie klebt nur, solange das Raster darunter weitergeht — am Seitenende schiebt
+      // der Fuß sie hoch. Darum ab lg engere Zeilen (wie im Board, 15 px auf etwa 20 px) und 12 px unter dem Kopf: So
+      // passt sie mit Mini-Warenkorb und Futter-Hinweis bei 1440 × 900 ganz zwischen Kopf und Fuß.
+      className={cn('flex flex-col gap-3 lg:sticky lg:top-[4.75rem] lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:leading-snug', className)}
     >
-      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} kasseUmriss={kasseUmriss} />}
+      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} mitFutterHinweis={mitFutterHinweis} kasseHref={kasseHref} kasseUmriss={kasseUmriss} />}
 
       {/* Mit Kaufsperre (Pause, keine Abholzeit, ausgebucht) keine Termine: Ankündigen, was man nicht
           buchen kann, wäre ein leeres Versprechen — auch ein heute noch laufendes Fenster nicht. */}
@@ -245,6 +255,7 @@ function MiniWarenkorb({
   sperre,
   gebuehrKorb,
   produkte,
+  mitFutterHinweis,
   kasseHref,
   kasseUmriss,
 }: {
@@ -252,6 +263,7 @@ function MiniWarenkorb({
   sperre: KaufSperre
   gebuehrKorb: string | null
   produkte: readonly (FutterAbgabe & { id: string })[]
+  mitFutterHinweis: boolean
   kasseHref?: string
   kasseUmriss: boolean
 }): ReactNode {
@@ -289,7 +301,7 @@ function MiniWarenkorb({
             {mitAnzahl(anzahl, 'Produkt', 'Produkte')} · <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
             {gebuehrKorb && <> · {gebuehrKorb}</>}
           </p>
-          <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
+          {mitFutterHinweis && <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />}
           {sperre !== null || stopp !== null ? (
             <KaufGrund sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} stopp={stopp} kurz />
           ) : (

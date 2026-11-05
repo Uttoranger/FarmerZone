@@ -295,11 +295,13 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(seite({ beitraege: LISTE, suche: 'reiter=produkte' })).not.toContain('id="aktuell"')
   })
 
-  it('Kopf: Abschnitt mit Überschrift „Aktuell vom Hof" und der Zahl', () => {
+  it('Kopf: Abschnitt mit Überschrift „Aktuell vom Hof", ohne Zahl daneben (Board w1-/s1-hofseite, Nr. 235)', () => {
     const html = seite({ beitraege: LISTE })
     expect(html).toMatch(/<section[^>]*id="aktuell"[^>]*aria-labelledby="aktuell-titel"/)
     expect(html).toMatch(/<h2[^>]*id="aktuell-titel"[^>]*>Aktuell vom Hof<\/h2>/)
-    expect(html).toContain('>3 Beiträge<')
+    expect(html).not.toContain('3 Beiträge')
+    // Gegenprobe: alle drei Beiträge stehen da — nur die Zahl fehlt.
+    expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(3)
   })
 
   it('unter lg steht er im Quelltext nach den Knöpfen und dem Reiter, vor Fotos und Produkten (N5)', () => {
@@ -319,10 +321,11 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
   it('höchstens fünf, der neueste zuerst — „Aktuell" steht genau einmal, am neuesten (F8)', () => {
     const sechs = [NEU, MITTE, ALT, ...[4, 5, 6].map((n) => beitrag(`status${n}`, `Beitrag ${n}`, 'ANNOUNCEMENT', `2026-09-1${n}T08:00:00.000Z`))]
     const html = seite({ beitraege: sechs })
-    expect(html).toContain('>5 Beiträge<')
+    expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(5)
     expect(html).not.toContain('Beitrag 6')
     expect(html.match(/Aktuell ·/g)).toHaveLength(1)
-    const folge = ['Aktuell · vor 2 Stunden', NEU.title, MITTE.title, 'vor 3 Tagen', ALT.title, 'vor 12 Tagen']
+    // Die Zeit steht seit Nr. 235 in der Zeile des Titels, hinter ihm (Board w1-hofseite: die Karte bleibt zweizeilig).
+    const folge = [NEU.title, 'Aktuell · vor 2 Stunden', MITTE.title, 'vor 3 Tagen', ALT.title, 'vor 12 Tagen']
     expect(reihenfolge(html, [...folge].reverse())).toEqual(folge)
   })
 
@@ -353,9 +356,10 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(teil).toContain('href="/hof-test/produkt/p_honig"')
   })
 
-  it('kein „+" in der Vorschau des Hofs und bei Pause — wie bei allen Kaufwegen; der Abschnitt bleibt', () => {
+  it('kein „+" in der Vorschau des Hofs und bei Pause — wie bei allen Kaufwegen', () => {
     const vorschau = seite({ beitraege: LISTE, ansicht: { art: 'vorschau', kaufen: false } })
-    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true } })
+    // Bei Pause steht der Abschnitt nur für einen geteilten Beitrag (siehe unten).
+    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true }, suche: 'beitrag=statusneu' })
     for (const html of [vorschau, pausiert]) {
       expect(html).toContain('Dazu im Hofladen')
       expect(html).not.toContain('aria-label="Karotten in den Korb"')
@@ -371,7 +375,19 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(html).not.toContain('Dieser Beitrag ist nicht mehr aktuell.')
     // Die Karte trägt die normale Zeit (Abweichung 1: kein „Geteilt").
     expect(html).not.toMatch(/Aktuell ·|Geteilt/)
-    expect(html).toContain('>3 Beiträge<')
+    // Der geteilte als Karte, der älteste als Zeile — der neueste steht als Link „Neuester: …“ darunter.
+    expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(2)
+  })
+
+  it('bei Pause kein „Aktuell vom Hof": die Übersicht geht von der Pause-Karte zu den Produkten (Board Bild 4) — ein geteilter Beitrag steht trotzdem', () => {
+    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true } })
+    expect(pausiert).not.toContain('id="aktuell"')
+    expect(pausiert).not.toContain(NEU.title)
+    // Gegenproben: ohne Pause steht der Abschnitt, mit Pause und ?beitrag= der geteilte Beitrag oben.
+    expect(seite({ beitraege: LISTE })).toContain('id="aktuell"')
+    const geteilt = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true }, suche: 'beitrag=statusmitte' })
+    expect(geteilt).toContain('id="aktuell"')
+    expect(reihenfolge(geteilt, [NEU.title, MITTE.title])).toEqual([MITTE.title, NEU.title])
   })
 
   it('?beitrag= abgelaufen, gelöscht, fremd oder unbekannt: die normale Übersicht mit dem Satz darüber', () => {

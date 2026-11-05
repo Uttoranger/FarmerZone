@@ -23,12 +23,31 @@ import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/component
  */
 
 /**
+ * Die Zeilen der Kennzeichnung ohne Doppel: „Gehalte" (die Rohwerte aus den Zahlenfeldern, freiwillig) entfällt,
+ * wenn „Analytische Bestandteile" (Pflichtangabe, Text des Hofs) schon jeden dieser Werte nennt — die Seite zeigte
+ * sonst dieselben Zahlen zweimal (Bewertung r2). Weicht ein Wert ab oder fehlt er dort, bleiben beide stehen: Dann
+ * sagen die Zeilen Verschiedenes. Die Pflichtzeilen selbst (kennzeichnungsZeilen, src/lib/bereiche-anzeige.ts)
+ * bleiben alle — nur Anzeige, die Daten ändern sich nicht.
+ */
+export function ohneDoppelteGehalte(zeilen: readonly Angabe[]): readonly Angabe[] {
+  const analytisch = zeilen.find((z) => z.titel === 'Analytische Bestandteile')
+  const gehalte = zeilen.find((z) => z.titel === 'Gehalte')
+  if (!analytisch || !gehalte) return zeilen
+  // Leerraum zählt nicht („11 %" wie „11%"); die Werte stehen in „Gehalte" mit „ · " getrennt.
+  const ohneLeer = (text: string) => text.replace(/\s+/g, '')
+  const text = ohneLeer(analytisch.wert)
+  const alleGenannt = gehalte.wert.split(' · ').every((wert) => text.includes(ohneLeer(wert)))
+  return alleGenannt ? zeilen.filter((z) => z !== gehalte) : zeilen
+}
+
+/**
  * „Kennzeichnung" als offene Karte mit zwei Spalten (Board w1-/s1-produkt Bild 2, seit Nr. 235;
  * vorher zugeklappt): Die Angaben müssen vor dem Kauf einsehbar sein — das Board zeigt sie
  * ohne Klick. Links die Bezeichnung leise, rechts der Wert.
  */
 export function Kennzeichnung({ zeilen, bestaetigtAm }: { zeilen: readonly Angabe[]; bestaetigtAm: string | null }): React.JSX.Element | null {
   if (zeilen.length === 0) return null
+  const gezeigt = ohneDoppelteGehalte(zeilen)
   return (
     <section aria-labelledby="kennzeichnung-titel" className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-3.5 py-3">
       <h2 id="kennzeichnung-titel" className="text-[16px] font-bold text-foreground">
@@ -37,7 +56,7 @@ export function Kennzeichnung({ zeilen, bestaetigtAm }: { zeilen: readonly Angab
       {/* Zwei Spalten in jeder Breite (Board s1-produkt Bild 2): am Handy höchstens 8,5 rem für die Bezeichnung,
           ein langes Wort bricht dort um, statt den Wert zu verdrängen. */}
       <dl className="grid grid-cols-[fit-content(8.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-[14px] sm:grid-cols-[auto_minmax(0,1fr)]">
-        {zeilen.map((z) => (
+        {gezeigt.map((z) => (
           <div key={z.titel} className="contents">
             <dt className="break-words hyphens-auto text-muted-foreground">{z.titel}</dt>
             <dd className="break-words whitespace-pre-line text-foreground">{z.wert}</dd>

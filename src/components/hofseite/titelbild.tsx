@@ -194,9 +194,15 @@ export function Titelbild({
           />
         </div>
       ) : (
-        // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code. Sein helles
-        // Ende leuchtete im Dunkeln als Fleck — darum dort deutlich gedämpft.
-        <div className="absolute inset-0 dark:brightness-[0.5] dark:saturate-[0.75]" style={{ background: verlauf }} />
+        // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code. Im Hellen nur als
+        // Hauch über der Fläche `muted`: Das Board zeigt ohne Foto eine blasse Fläche (crème bis hellgrün), der
+        // volle Verlauf stünde als kräftiger dunkler Block über dem Namen. Im Dunkeln voll, aber gedämpft — sein
+        // helles Ende leuchtete dort sonst als Fleck.
+        <div
+          data-verlauf=""
+          className="absolute inset-0 opacity-[0.14] dark:opacity-100 dark:brightness-[0.5] dark:saturate-[0.75]"
+          style={{ background: verlauf }}
+        />
       )}
       {children}
     </div>

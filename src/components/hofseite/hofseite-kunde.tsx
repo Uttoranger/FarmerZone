@@ -203,12 +203,11 @@ export function HofseiteKunde({
 
   // „Aktuell vom Hof“ (Register F8, Nr. 128): nur in der Übersicht. `?beitrag=`
   // ist eine Systemgrenze — dieselbe Prüfung wie in page.tsx, die den Beitrag lädt.
-  const { anordnung, nichtMehrAktuell } = ordneBeitraege(
-    gezeigteBeitraege,
-    leseBeitragKennung(suche.get(BEITRAG_PARAMETER)),
-    beitraegeFehler
-  )
-  const mitAktuell = offen === 'uebersicht' && anordnung !== null
+  const beitragKennung = leseBeitragKennung(suche.get(BEITRAG_PARAMETER))
+  const { anordnung, nichtMehrAktuell } = ordneBeitraege(gezeigteBeitraege, beitragKennung, beitraegeFehler)
+  // Bei Pause geht die Übersicht von der Pause-Karte direkt zu den Produkten (Board w1-/s1-hofseite Bild 4) —
+  // ein geteilter Link auf einen Beitrag (`?beitrag=`) zeigt ihn trotzdem: Wer ihn öffnet, will genau ihn lesen.
+  const mitAktuell = offen === 'uebersicht' && anordnung !== null && (sperre !== 'pause' || beitragKennung !== null)
   const mitHinweis = offen === 'uebersicht' && nichtMehrAktuell
 
   // Ein alter Link `?reiter=beitraege` springt einmal zu „Aktuell vom Hof“ —
@@ -463,7 +462,7 @@ export function HofseiteKunde({
       */}
       <div
         className={cn(
-          'mx-auto flex max-w-[1152px] flex-col gap-3 px-4 pt-4 pb-12 md:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-x-16 lg:gap-y-3',
+          'mx-auto flex max-w-[1152px] flex-col gap-3 px-4 pt-4 pb-12 md:px-6 lg:grid lg:pb-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-x-16 lg:gap-y-3',
           zeigeUeberUns && 'lg:grid-rows-[auto_1fr]'
         )}
       >

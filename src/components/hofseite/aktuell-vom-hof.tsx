@@ -19,7 +19,7 @@ import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { textlinkKlassen } from '@/components/ui/textlink'
 
 /*
  * „Aktuell vom Hof“ — die aktiven Beiträge oben in der Übersicht der Hofseite
@@ -28,10 +28,10 @@ import { StatusBadge } from '@/components/ui/status-badge'
  * src/lib/hofseite-kunde.ts (ordneBeitraege, beitragProdukte); hier wird nur
  * angezeigt und auf- und zugeklappt.
  *
- * - Der Beitrag oben als Karte (Rahmen in Akzentfarbe): Anlass, Zeit, Titel,
- *   zwei Zeilen Text, das Foto klein (am Handy 76 px rechts, ab lg 250 px
- *   links). „Weiterlesen“ klappt an Ort und Stelle auf: der ganze Text, das
- *   Foto groß, alle Produkte.
+ * - Der Beitrag oben als kurze Karte (seit Nr. 235 nach Board w1-/s1-hofseite):
+ *   Titel fett, eine Zeile Text, das Foto klein (am Handy 76 px rechts, ab lg
+ *   250 px links). Der Textlink „Weiterlesen“ klappt an Ort und Stelle auf: der
+ *   ganze Text, das Foto groß, alle Produkte.
  * - „Dazu im Hofladen“: höchstens drei verknüpfte Produkte; das „+“ legt über
  *   GENAU den Weg der Produktkarten in den Korb (`onInDenKorb` = ProductGrid,
  *   `inDenKorb`). Zugeklappt am Handy nur das erste mit „· n Produkte“.
@@ -67,19 +67,16 @@ export function AktuellVomHof({
   neuesterHref: string
   onNeuester: (e: { preventDefault: () => void }) => void
 }): React.JSX.Element {
-  const { karte, karteIstNeuester, neuester, zeilen, anzahl } = anordnung
+  const { karte, karteIstNeuester, neuester, zeilen } = anordnung
   return (
     // scroll-mt: Kopfzeile und Reiterleiste kleben oben — ein Sprung hierher endet darunter.
     // data-abschnitt: Ziel einer Markierung aus Mein Hof (vorschau-im-rahmen.tsx), wie die übrigen Abschnitte.
     <section id={AKTUELL_ANKER} data-abschnitt={AKTUELL_ANKER} aria-labelledby="aktuell-titel" className="flex scroll-mt-32 flex-col gap-2.5 lg:gap-3">
-      <div className="flex flex-wrap items-baseline gap-x-2 lg:gap-x-2.5">
-        {/* tabIndex -1: Nach „Neuester: …“ geht der Fokus hierher — der Link verschwindet mit dem Wechsel. */}
-        {/* Leise Überzeile wie alle Abschnitte der Hofseite (Board w1-hofseite, Nr. 235). */}
-        <h2 id="aktuell-titel" tabIndex={-1} className="mt-1 text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase outline-none">
-          {T.titel}
-        </h2>
-        <span className="text-[13px] text-muted-foreground">{T.anzahl(anzahl)}</span>
-      </div>
+      {/* tabIndex -1: Nach „Neuester: …“ geht der Fokus hierher — der Link verschwindet mit dem Wechsel.
+          Leise Überzeile wie alle Abschnitte der Hofseite, ohne Zahl daneben (Board w1-/s1-hofseite, Nr. 235). */}
+      <h2 id="aktuell-titel" tabIndex={-1} className="mt-1 text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase outline-none">
+        {T.titel}
+      </h2>
 
       {/* key: Wechselt der Beitrag oben, beginnt die Karte zugeklappt. */}
       <BeitragKarte key={karte.id} beitrag={karte} neuester={karteIstNeuester} jetzt={jetzt} {...weg} />
@@ -114,7 +111,13 @@ export function AktuellVomHof({
   )
 }
 
-/** Der Beitrag oben: kurz (zwei Zeilen, Register N5), „Weiterlesen“ klappt ihn auf. */
+/**
+ * Der Beitrag oben, kurz wie im Board w1-/s1-hofseite (Register N5, Ergänzung Nr. 128: „Die Karte bleibt kurz
+ * (zwei Zeilen Text)“): der Titel fett und eine Zeile Text, dahinter (am Handy darunter) der Textlink
+ * „Weiterlesen“, der die Karte an Ort und Stelle aufklappt. Ohne Marke des Anlasses (das Board zeigt keine).
+ * Die Zeit steht leise in der Zeile des Titels: Register F8 verlangt „Aktuell“ am neuesten („Register vor
+ * Board“) — so bleibt die Karte bei zwei Zeilen.
+ */
 function BeitragKarte({
   beitrag,
   neuester,
@@ -126,7 +129,6 @@ function BeitragKarte({
   jetzt: string
 }) {
   const [offen, setOffen] = useState(false)
-  const anlass = BEITRAG_ANLASS[beitrag.anlass]
   // Kennungen je Beitrag: Mehrere Beiträge auf einer Seite dürfen sich keine teilen.
   const titelId = `beitrag-titel-${beitrag.id}`
   const inhaltId = `beitrag-inhalt-${beitrag.id}`
@@ -134,7 +136,7 @@ function BeitragKarte({
   const produkte = beitragProdukte(beitrag.linkedProductIds, weg.produkte)
 
   return (
-    <article aria-labelledby={titelId} className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-3 lg:gap-3 lg:p-3.5">
+    <article aria-labelledby={titelId} className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card px-3.5 py-3">
       <div className="flex gap-5">
         {beitrag.photoUrl && !offen && (
           // Ab lg links, 250 px — am Handy steht das Foto klein rechts neben dem Titel. Aufgeklappt steht es groß beim Text.
@@ -142,65 +144,52 @@ function BeitragKarte({
             <Image src={beitrag.photoUrl} alt={beitrag.title} fill sizes="250px" className="object-cover" style={bildStil(beitrag.fotoAusschnitt)} />
           </span>
         )}
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-x-2.5 gap-y-1 lg:justify-start">
-            <StatusBadge status="fertig" symbol={anlass.symbol}>
-              {anlass.wort}
-            </StatusBadge>
-            <span className="text-[12.5px] text-muted-foreground lg:text-[13px]">{beitragZeitText(neuester, beitrag.publishedAt, jetzt)}</span>
-          </div>
-
-          <div id={inhaltId} className="flex flex-col gap-2.5">
-            <div className="flex items-start gap-3">
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <h3 id={titelId} className="font-heading text-[18px] leading-tight font-semibold break-words text-foreground lg:text-[22px]">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex items-start gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <h3 id={titelId} className="min-w-0 text-[15px] leading-snug font-bold break-words text-foreground">
                   {beitrag.title}
                 </h3>
+                <span className="text-[13px] text-muted-foreground">{beitragZeitText(neuester, beitrag.publishedAt, jetzt)}</span>
+              </div>
+              {/* Zugeklappt eine Zeile Text; ab lg steht „Weiterlesen“ in derselben Zeile dahinter (Board w1-hofseite). */}
+              <div className={cn('flex flex-col items-start gap-1', !offen && 'lg:flex-row lg:items-baseline lg:gap-1.5')}>
                 <p
-                  className={cn(
-                    'text-[13.5px] leading-normal break-words text-muted-foreground lg:text-[14.5px]',
-                    offen ? 'whitespace-pre-wrap' : 'line-clamp-2'
-                  )}
+                  id={inhaltId}
+                  className={cn('min-w-0 text-[14px] leading-normal break-words text-muted-foreground', offen ? 'whitespace-pre-wrap' : 'line-clamp-1')}
                 >
                   {stripStatusVariables(beitrag.body)}
                 </p>
+                <button
+                  type="button"
+                  aria-expanded={offen}
+                  aria-controls={produkte.length > 0 ? `${inhaltId} ${produkteId}` : inhaltId}
+                  onClick={() => setOffen(!offen)}
+                  // Ein Textlink im Satz (unterstrichen, Trefferfläche 44 px über ::before) — die Karte bleibt so flach wie im Board.
+                  className={cn(textlinkKlassen({ form: 'im-satz' }), 'shrink-0 text-[14px]')}
+                >
+                  {offen ? T.weniger : T.weiterlesen}
+                </button>
               </div>
-              {beitrag.photoUrl && !offen && (
-                <span className="relative size-[76px] shrink-0 overflow-hidden rounded-xl bg-muted lg:hidden">
-                  <Image
-                    src={beitrag.photoUrl}
-                    alt={beitrag.title}
-                    fill
-                    sizes="76px"
-                    className="object-cover"
-                    style={bildStil(beitrag.fotoAusschnitt)}
-                  />
-                </span>
-              )}
             </div>
-            {beitrag.photoUrl && offen && (
-              // Aufgeklappt groß, am Handy wie am Computer (Freigabe 128 Punkt 3); ab lg so breit wie die Zeilen darunter.
-              <FotoGross src={beitrag.photoUrl} titel={beitrag.title} ausschnitt={beitrag.fotoAusschnitt} className="lg:max-w-[520px]" />
+            {beitrag.photoUrl && !offen && (
+              <span className="relative size-[76px] shrink-0 overflow-hidden rounded-xl bg-muted lg:hidden">
+                <Image
+                  src={beitrag.photoUrl}
+                  alt={beitrag.title}
+                  fill
+                  sizes="76px"
+                  className="object-cover"
+                  style={bildStil(beitrag.fotoAusschnitt)}
+                />
+              </span>
             )}
           </div>
-
-          <button
-            type="button"
-            aria-expanded={offen}
-            aria-controls={produkte.length > 0 ? `${inhaltId} ${produkteId}` : inhaltId}
-            onClick={() => setOffen(!offen)}
-            className={cn(
-              '-my-1.5 inline-flex min-h-11 items-center gap-1 self-start rounded-md text-[13.5px] font-semibold text-brand-text lg:text-[14px]',
-              FOKUS_RAHMEN
-            )}
-          >
-            {offen ? T.weniger : T.weiterlesen}
-            <ChevronDown
-              className={cn('size-4 transition-transform duration-[250ms] motion-reduce:transition-none', offen && 'rotate-180')}
-              strokeWidth={1.7}
-              aria-hidden="true"
-            />
-          </button>
+          {beitrag.photoUrl && offen && (
+            // Aufgeklappt groß, am Handy wie am Computer (Freigabe 128 Punkt 3); ab lg so breit wie die Zeilen darunter.
+            <FotoGross src={beitrag.photoUrl} titel={beitrag.title} ausschnitt={beitrag.fotoAusschnitt} className="mt-1.5 lg:max-w-[520px]" />
+          )}
         </div>
       </div>
 

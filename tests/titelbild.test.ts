@@ -467,6 +467,16 @@ describe('Titelbild', () => {
     expect(k).not.toContain('h-[220px]')
   })
 
+  it('ohne Foto im Hellen nur ein Hauch des Verlaufs über `muted` (Board: blasse Fläche), im Dunkeln voll und gedämpft (Nr. 235, UI-Runde 3)', () => {
+    const html = zeige(null)
+    const verlauf = tag(html, /data-verlauf=""/)
+    expect(verlauf).toContain('linear-gradient(1deg, red, blue)')
+    expect(klassen(verlauf)).toEqual(expect.arrayContaining(['opacity-[0.14]', 'dark:opacity-100', 'dark:brightness-[0.5]']))
+    expect(klassen(rahmen(html))).toContain('bg-muted')
+    // Gegenprobe: Mit Foto gibt es keine Verlaufsfläche.
+    expect(zeige('/foto.jpg')).not.toContain('data-verlauf')
+  })
+
   it('im Reiter Produkte flach (Board w1-hofseite Bild 3: ab 768 px 90 px) — mit Foto bleiben die Höhen aus N13', () => {
     const flach = (foto: string | null) => {
       buehne.beginneRender()
