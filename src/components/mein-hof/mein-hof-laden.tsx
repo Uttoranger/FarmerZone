@@ -3,14 +3,22 @@ import { cn } from '@/lib/utils'
 
 /**
  * Der Kopf von Mein Hof am Handy als Skelett (Nr. 143) — dieselben Maße wie
- * MeinHofKopf: Streifen 76 px, Zustandszeile mit Platz für zwei Satzzeilen
+ * MeinHofKopf: Titelzeile 56 px (Register N3, Ergänzung 5.11.2026), Zustandszeile mit Platz für zwei Satzzeilen
  * (70 px), Reiter 48 px. Für /farm-page (hier) und /products/loading.tsx, damit
  * die Reiter beim Laden dort stehen, wo sie danach stehen.
  */
 export function MeinHofKopfLaden({ aktiv }: { aktiv: 'produkte' | 'hofseite' }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="h-[76px] rounded-2xl bg-muted" />
+      {/* Titelzeile: „Mein Hof“ mit Schild, darunter Hofname und Stand, rechts zwei Symbole */}
+      <div className="flex min-h-14 items-center gap-2">
+        <div className="flex-1">
+          <div className="h-5 w-32 rounded bg-border" />
+          <div className="mt-2 h-3 w-52 rounded bg-muted" />
+        </div>
+        <div className="size-11 rounded-full bg-muted" />
+        <div className="size-11 rounded-full bg-muted" />
+      </div>
       <div className="flex min-h-[70px] items-center gap-3 rounded-[14px] border border-border bg-card py-2 pr-2 pl-3.5">
         <div className="size-[9px] shrink-0 rounded-full bg-border" />
         <div className="flex-1">

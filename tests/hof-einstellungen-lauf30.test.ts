@@ -5,7 +5,7 @@
  *  - „Bar bei Abholung“ auf /settings/payments: Marke „offen“ genau dann, wenn
  *    `barMoeglich` nein sagt — keine neue Regel (Gegenprobe über dieselben
  *    Lagen); „Lastschrift einrichten“ nur, wenn keine Sperre der Grund ist
- *    (gesperrt: „Pausiert“ mit dem Weg zu „Deine Konditionen“). Ist die
+ *    (gesperrt: „Bar gesperrt“ mit dem Weg zu „Deine Konditionen“). Ist die
  *    Bargebühr erlassen, nennt der Satz den Einzugstag `einzugAb` aus der Lage
  *    (Runde 1: nie `gruendungBis` daneben; Runde 2: derselbe Tag wie die Karte
  *    „Barzahlung“, Beweis unten am gerenderten „Deine Konditionen“);
@@ -117,9 +117,9 @@ describe('Bar bei Abholung: Marke aus barMoeglich (N42 g, V71)', () => {
     expect(barKarte({ modell: 'bisher' }, NACH, OHNE_EINTRAG)).toEqual({ marke: 'Aktiv', ton: 'fertig', satz: null, lastschrift: false, zuKonditionen: false })
   })
 
-  it('gesperrter Hof mit Lastschrift: „Pausiert“ mit eigenem Satz und dem Weg zu „Deine Konditionen“, kein „Lastschrift einrichten“', () => {
+  it('gesperrter Hof mit Lastschrift: „Bar gesperrt“ mit eigenem Satz und dem Weg zu „Deine Konditionen“, kein „Lastschrift einrichten“', () => {
     const karte = barKarte(lage({ sepaMandatAm: STICHTAG, barGesperrt: true }), NACH, OHNE_EINTRAG)
-    expect(karte).toEqual({ marke: 'Pausiert', ton: 'offen', satz: BAR_KARTE_TEXT.pausiertSatz, lastschrift: false, zuKonditionen: true })
+    expect(karte).toEqual({ marke: 'Bar gesperrt', ton: 'offen', satz: BAR_KARTE_TEXT.gesperrtSatz, lastschrift: false, zuKonditionen: true })
     expect(BAR_KARTE_TEXT.einrichtenHref).toBe('/settings/konditionen#barzahlung')
     expect(karte.satz).not.toContain('sobald du die Lastschrift')
   })
@@ -187,9 +187,9 @@ describe('Rechenbeispiel im Hofpreis-Modell', () => {
     expect(b.satz).not.toContain('SEPA')
   })
 
-  it('bar geht gerade nicht: ohne Lastschrift bei Pflicht der Pflicht-Satz, bei Sperre der Satz der Pause', () => {
+  it('bar geht gerade nicht: ohne Lastschrift bei Pflicht der Pflicht-Satz, bei Sperre der Satz der Sperre', () => {
     expect(bar(lage()).satz).toBe(LASTSCHRIFT_TEXT.mandatPflicht)
-    expect(bar(lage({ sepaMandatAm: STICHTAG, barGesperrt: true })).satz).toBe(BAR_KARTE_TEXT.pausiertSatz)
+    expect(bar(lage({ sepaMandatAm: STICHTAG, barGesperrt: true })).satz).toBe(BAR_KARTE_TEXT.gesperrtSatz)
     // Das Beispiel steht auf „Deine Konditionen“ selbst — kein Verweis auf die eigene Seite.
     expect(bar(lage({ sepaMandatAm: STICHTAG, barGesperrt: true })).satz).not.toContain('Konditionen')
     expect(bar(lage()).zeilen['Dir bleibt']).toBe('€ 20,00')

@@ -1,48 +1,44 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import type { MeinHofReiterAlleId } from '@/lib/bauern-navigation'
 import { PRODUKTE_HREF } from '@/lib/bauern-navigation'
-import { titelbildVerlauf, zustandsZeile, type ZustandsKnopfArt, type ZustandsZeile } from '@/lib/mein-hof'
+import { datumLang } from '@/lib/heute'
+import { MEIN_HOF_KOPF_TEXT, kopfSchild, schildTon, zustandsZeile, type ZustandsKnopfArt, type ZustandsZeile } from '@/lib/mein-hof'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
 import type { MeinHofZustand } from '@/server/mein-hof-zustand'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
-import { Hofbild } from '@/components/mein-hof/seitenkopf'
 import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
 import { PausierenBlatt } from '@/components/mein-hof/pausieren-blatt'
 import { KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
 /*
  * Der Kopf von Mein Hof am Handy — EIN Baustein für Produkte, Hofseite und
- * Beiträge (Nachtlauf Nr. 143, Register N3, Ergänzung 22.10.2026; Board
- * system-h1-mein-hof-v3): auf /farm-page unter lg (in seitenkopf.tsx), auf
- * /products unter md. Oben das Titelbild als 76 px hoher Streifen mit Logo,
- * Name, Teilen (nur öffentlich) und Kundenansicht, darunter die Zustandszeile
- * mit dem nächsten Schritt, darunter die Reiter. Beide Seiten stecken ihn in
- * dieselbe Hülle (MEIN_HOF_KOPF_HUELLE) — so stehen die Reiter auf allen drei
- * Reitern an derselben Stelle. Ab lg bleibt die kompakte Zeile in seitenkopf.tsx.
+ * Beiträge (Nachtlauf Nr. 143, Register N3, Ergänzung 22.10.2026): auf
+ * /farm-page unter lg (in seitenkopf.tsx), auf /products unter md. Oben die
+ * Titelzeile nach Board s1-mein-hof (Register N3, Ergänzung 5.11.2026: „Mein
+ * Hof“ mit Schild statt des Titelbild-Streifens), darunter Hofname und Stand,
+ * rechts Teilen (nur öffentlich) und Kundenansicht als Symbole; darunter die
+ * Zustandszeile mit dem nächsten Schritt, darunter die Reiter. Beide Seiten
+ * stecken ihn in dieselbe Hülle (MEIN_HOF_KOPF_HUELLE) — so stehen die Reiter
+ * auf allen drei Reitern an derselben Stelle. Ab lg bleibt die kompakte Zeile in
+ * seitenkopf.tsx. Das Titelbild selbst bearbeitet der Hof weiter in der Liste
+ * „Bearbeiten“ (Zeile „Titelbild und Logo“).
  *
- * Adresse und „Kopieren“ stehen hier nicht mehr: Den Link gibt „Teilen“ über das
- * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof).
+ * Adresse und „Kopieren“ stehen hier nicht: Den Link gibt „Teilen“ über das
+ * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof). Das Postfach
+ * des Boards in dieser Zeile gehört der HofShell (eigene Nummer).
  */
 
 /** Die Hülle um den Kopf — dieselbe auf /farm-page und /products (tests/mein-hof-kopf.test.ts). */
 export const MEIN_HOF_KOPF_HUELLE = 'mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none'
 
-/*
- * Der Schleier über dem Titelbild: das theme-feste Dunkel (`primary-foreground` ist im
- * neuen Design in beiden Themes dasselbe dunkle Braun) mit Deckkraft, nach links
- * dunkler. Schrift und Knöpfe darauf in `accent-foreground` (theme-festes Hell).
- * Gerechnet gegen ein weißes Foto (schlimmster Fall): Name bis 55 % der Breite
- * mindestens 7,3:1, Knöpfe auf ihrer eigenen Fläche (60 % über 40 %) mindestens
- * 7,6:1 (Bericht 143).
- */
-const SCHLEIER = 'bg-linear-to-r from-primary-foreground/90 via-primary-foreground/75 via-55% to-primary-foreground/40'
-const STREIFEN_KNOPF = cn(
-  'inline-flex h-11 shrink-0 items-center justify-center rounded-full border border-accent-foreground/25 bg-primary-foreground/60 text-accent-foreground transition-colors duration-[250ms] hover:bg-primary-foreground/80',
+/** Teilen und Kundenansicht als Symbol, 44 px — wie im Board; das Wort trägt der Screenreader. */
+const SYMBOL_KNOPF = cn(
+  'inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
 )
 
@@ -79,33 +75,34 @@ export function MeinHofKopf({
   hof,
   zustand,
   aktiv,
+  jetzt,
 }: {
   hof: MeinHofKopfDaten
   /** Aus ladeMeinHofZustand; null ohne Daten — dann steht keine Zustandszeile da. */
   zustand: MeinHofZustand | null
   aktiv: MeinHofReiterAlleId
+  /** Der Zeitpunkt der Seite — für „Stand …“ (Wiener Datum, wie auf Heute). */
+  jetzt: Date
 }): React.JSX.Element {
   const zeile = zustand ? zustandsZeile(zustand) : null
+  const schild = kopfSchild(hof.zustand)
 
   return (
     <div className="flex flex-col gap-2.5" data-mein-hof-kopf="">
-      <div className="relative h-[76px] shrink-0 overflow-hidden rounded-2xl">
-        {/* Bildersatz, folgt dem Modus bewusst nicht; mittig ausgeschnitten. */}
-        {hof.titelbildUrl ? (
-          <Image src={hof.titelbildUrl} alt="" fill sizes="(min-width: 768px) 720px, 100vw" className="object-cover object-center" />
-        ) : (
-          <div className="absolute inset-0" style={{ background: titelbildVerlauf(hof.bannerValue) }} />
-        )}
-        <div aria-hidden="true" className={cn('absolute inset-0', SCHLEIER)} />
-        <div className="absolute inset-0 flex items-center gap-2.5 pr-2.5 pl-3">
-          <Hofbild hof={hof} klasse="size-11 text-sm ring-2 ring-primary-foreground/55" />
-          {/* Kein h1: Die Überschrift gehört der Seite darunter. */}
-          <p className="line-clamp-2 min-w-0 flex-1 font-heading text-lg leading-tight font-semibold break-words text-accent-foreground" title={hof.name}>
-            {hof.name}
+      <div className="flex min-h-14 items-center gap-0.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {/* Kein h1: Die Überschrift der Seite (sr-only) steht darunter im Reiter. */}
+            <p className="font-heading text-[22px] leading-tight font-semibold text-foreground">{MEIN_HOF_KOPF_TEXT.titel}</p>
+            {schild && <StatusBadge status={schildTon(schild.farbe)}>{schild.text}</StatusBadge>}
+          </div>
+          {/* Nie gekürzt: Ein langer Hofname bricht um, das Datum bleibt lesbar. */}
+          <p className="mt-0.5 text-[13px] leading-snug break-words text-muted-foreground">
+            {MEIN_HOF_KOPF_TEXT.unterzeile(hof.name, datumLang(jetzt))}
           </p>
-          {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} label="Teilen" nurSymbol className={cn(STREIFEN_KNOPF, 'w-11')} />}
-          <KundenansichtKnopf slug={hof.slug} className={cn(STREIFEN_KNOPF, 'gap-1.5 px-3 text-[13px] font-semibold whitespace-nowrap')} />
         </div>
+        {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} label="Teilen" nurSymbol className={SYMBOL_KNOPF} />}
+        <KundenansichtKnopf slug={hof.slug} nurSymbol className={SYMBOL_KNOPF} />
       </div>
 
       {zeile && (
