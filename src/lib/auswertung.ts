@@ -15,7 +15,8 @@
  *
  * Geld in ganzen Cent (CODING_STANDARDS §2), Tage und Monate in Wiener Zeit.
  */
-import { GEZAEHLTE_TOEPFE, topfVonBestellung, type BestellungFuerFinanzen, type EinnahmenTopf } from '@/lib/finanzen'
+import { GEZAEHLTE_TOEPFE, gebuehrWortFuerMonat, topfVonBestellung, type BestellungFuerFinanzen, type EinnahmenTopf } from '@/lib/finanzen'
+import { gebuehrModellFuer, gebuehrenMehrzahl, hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { istVorOrtZahlung, monatsgrenzenWien, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
 import type { GezeigteSummen } from '@/lib/testzahlung'
 import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib/konditionen'
@@ -169,6 +170,42 @@ export function servicegebuehrenSaetze(jetzt: Date): { erklaerung: string; bar: 
     erklaerung: SERVICEGEBUEHREN_ERKLAERUNG,
     bar: vorBarStichtag(jetzt) ? BAR_OHNE_GEBUEHR_SATZ : barGebuehrSepaSatz(jetzt),
   }
+}
+
+/**
+ * Was die Plattformgebühr für den Hof heißt (N38, Board s2/w2-auswertung) — ohne Zahl
+ * und ohne Datum: Der Satz eines Hofs kann vom Standard abweichen, die Karte kennt ihn nicht.
+ */
+export const PLATTFORMGEBUEHR_KARTE_ERKLAERUNG = 'Sie wird je Stück aufgerundet und steckt im Preis der Kundin; online behält Stripe sie gleich ein.'
+
+/** Bar im Hofpreis-Modell (N38, N44): monatlich per Lastschrift, Gründungshöfe erst nach ihrer Gründungszeit. */
+export const PLATTFORMGEBUEHR_KARTE_BAR =
+  'Die Gebühr aus Barverkäufen ziehen wir einmal im Monat per Lastschrift ein – als Gründungshof erst nach deiner Gründungszeit.'
+
+/** Titel und Sätze der Gebühren-Karte der Auswertung. */
+export type GebuehrenKarteText = {
+  /** „Servicegebühren dieses Monats“, „Plattformgebühren dieses Monats“ oder „Gebühren dieses Monats“. */
+  titel: string
+  erklaerung: string
+  bar: string | null
+  /** Steht die Zeile „Bar bei Abholung“ auch ohne Barbestellung da? Nur, wo bar eine Gebühr trägt. */
+  barZeile: boolean
+}
+
+/**
+ * Die Gebühren-Karte des laufenden Monats (V62, V63; Lauf 30, Nr. 225): Das Wort kommt
+ * über `gebuehrWortFuerMonat` aus den Bestellzeitpunkten des Monats und dem Stichtag
+ * „Hofpreis-Modell ab“ (`gebuehrWortFuerZeitraum` — ganz davor „Servicegebühr“, ganz
+ * danach „Plattformgebühr“, über den Stichtag „Gebühren“), die Sätze aus dem Modell, das
+ * jetzt gilt (`gebuehrModellFuer`) — keine zweite Datumsregel. Vor dem Stichtag bleibt
+ * alles wie bisher (`servicegebuehrenSaetze`).
+ */
+export function gebuehrenKarteText(monat: Monatsschluessel, einstellung: HofpreisEinstellung | null, jetzt: Date): GebuehrenKarteText {
+  const titel = `${gebuehrenMehrzahl(gebuehrWortFuerMonat(monat, hofpreisModellAb(einstellung)))} dieses Monats`
+  if (gebuehrModellFuer(einstellung, jetzt) === 'hofpreis') {
+    return { titel, erklaerung: PLATTFORMGEBUEHR_KARTE_ERKLAERUNG, bar: PLATTFORMGEBUEHR_KARTE_BAR, barZeile: true }
+  }
+  return { titel, ...servicegebuehrenSaetze(jetzt), barZeile: !vorBarStichtag(jetzt) }
 }
 
 // ─── Teilen-Wirkung ─────────────────────────────────────────────────────────

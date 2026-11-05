@@ -74,8 +74,9 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
           titel="Noch keine Kunden"
           satz="Sobald jemand bei dir bestellt, taucht er hier auf. Eine vollständige Hofseite hilft dabei."
           ausweg={
+            // Board s2/w2-kunden Bild 5: der Ausweg sagt, was hilft — die Hofseite liegt in Mein Hof.
             <Link href="/farm-page" className={KNOPF_RAHMEN}>
-              Zu Mein Hof
+              Hofseite vervollständigen
             </Link>
           }
         />
@@ -113,7 +114,7 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                   setSuche(wert)
                   schreibeAdresse(kundenAdresse({ ...ansicht, suche: wert }))
                 }}
-                placeholder="Name, Telefon oder E-Mail"
+                placeholder="Kundin suchen"
                 className={cn(
                   'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:h-9 md:text-[13px]',
                   FOKUS_RAHMEN

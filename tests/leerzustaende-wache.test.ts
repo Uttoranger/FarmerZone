@@ -233,7 +233,8 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/lib/hoefe-anzeige.ts', text: /^Höfe haben noch keinen Kartenpunkt – (du findest sie in der Liste\.|Nr\.)$/, art: 'C', grund: 'Hinweis auf der Karte (mehrere Höfe fehlen dort); die Liste ist da, kein Leerzustand' },
   // Seit Nr. 122 (Register N23) EIN Hinweis für beide Reiter von Region (ohneStandortHinweis), über Liste und Karte.
   { datei: 'src/lib/region.ts', text: /^(hat|haben) noch keinen Standort auf der Karte und (fehlt|fehlen) hier\.$/, art: 'C', grund: 'Hinweis über Liste und Karte von Region (Höfe ohne Standort fehlen dort); die Liste ist da, kein Leerzustand' },
-  { datei: 'src/app/(hof)/status/new/status-new-client.tsx', text: 'Noch keine Abonnenten', art: 'C', grund: 'Zählzeile des Kanals „Per E-Mail an Abonnenten“ (der Schalter bleibt gesperrt), kein Leerzustand' },
+  // Seit Nr. 225 (Lauf 30) steht die Zählzeile als Text in src/lib/beitrag-anlass.ts (BEITRAG_ABLAUF_TEXT).
+  { datei: 'src/lib/beitrag-anlass.ts', text: 'Noch keine Abonnentinnen', art: 'C', grund: 'Zählzeile des Kanals „Per E-Mail an Abonnentinnen“ (der Schalter bleibt gesperrt), kein Leerzustand' },
   { datei: 'src/emails/order-cancelled.tsx', text: 'Da noch keine Zahlung erfolgt ist, entstehen dir keine Kosten.', art: 'C', grund: 'Satz in der Stornomail, kein Leerzustand' },
   { datei: 'src/components/teilen/teilen-fenster.tsx', text: /^Noch keine Produkte im Shop/, art: 'C', grund: 'Hinweissatz in der Karte des Teilen-Fensters, kein Leerzustand; die Datei gehört zu Nr. 76' },
 ]

@@ -22,7 +22,7 @@ import { enterTaste } from '@/lib/feld-attribute'
 import { FREIWILLIG } from '@/lib/profil-meldungen'
 import { NETZ_SATZ } from '@/lib/netz'
 import { cn } from '@/lib/utils'
-import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
+import { BEITRAG_ABLAUF_TEXT, BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
@@ -79,8 +79,8 @@ function Stepper({ step }: { step: number }) {
                 className={cn(
                   'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shrink-0',
                   isDone || isActive
-                    ? 'bg-accent border-accent text-accent-foreground'
-                    : 'border-border bg-card text-muted-foreground',
+                    ? 'bg-foreground border-foreground text-background'
+                    : 'border-input bg-card text-muted-foreground',
                 )}
               >
                 {isDone ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : num}
@@ -88,14 +88,14 @@ function Stepper({ step }: { step: number }) {
               <span
                 className={cn(
                   'text-[11px] font-medium leading-none',
-                  isActive ? 'text-foreground' : isDone ? 'text-status-fertig' : 'text-muted-foreground',
+                  isActive ? 'font-bold text-foreground' : isDone ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
                 {label}
               </span>
             </div>
             {!isLast && (
-              <div className={cn('flex-1 h-0.5 mt-3.5 mx-1', isDone ? 'bg-accent/50' : 'bg-border')} />
+              <div className={cn('flex-1 h-0.5 mt-3.5 mx-1', isDone ? 'bg-foreground/50' : 'bg-border')} />
             )}
           </div>
         )
@@ -214,7 +214,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
         }
       }
       const parts: string[] = []
-      if (showOnFarmPage) parts.push('auf der Hof-Seite')
+      if (showOnFarmPage) parts.push(BEITRAG_ABLAUF_TEXT.veroeffentlichtHofseite)
       if (sendEmail && !emailBlocked && (res.emailCount ?? 0) > 0)
         parts.push(mailVersandMeldung(res.emailCount ?? 0))
       toast.success(`Beitrag veröffentlicht${parts.length ? ' — ' + parts.join(', ') : ''}`)
@@ -238,7 +238,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               <p className="text-sm text-muted-foreground mt-0.5">Inhalt erstellen</p>
             </div>
 
-            {/* Anlass — A6: active = soft-green fill + dark green border + check */}
+            {/* Anlass — gewählt in umgekehrter Textfarbe wie der gewählte Filter-Chip (Board w2-beitraege, V51: im Hofbereich nie grün). */}
             <div className="mb-5">
               <label className="block text-sm font-medium text-foreground mb-2">Anlass</label>
               <div className="grid grid-cols-2 gap-2">
@@ -252,13 +252,13 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                       'relative flex min-h-11 items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all text-left',
                       FOKUS_RAHMEN,
                       anlass === opt.value
-                        ? 'bg-accent/15 border-accent text-foreground'
-                        : 'border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40',
+                        ? 'bg-foreground border-foreground text-background'
+                        : 'border-input text-foreground hover:bg-muted/40',
                     )}
                   >
                     <opt.symbol className="size-5" aria-hidden="true" />
                     <span className="flex-1">{opt.wort}</span>
-                    {anlass === opt.value && <Check className="size-4 shrink-0 text-status-fertig" aria-hidden="true" />}
+                    {anlass === opt.value && <Check className="size-4 shrink-0" aria-hidden="true" />}
                   </button>
                 ))}
               </div>
@@ -328,8 +328,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               <FeldFehlerSatz feldId="status-body" text={fieldErrors.body ? 'Bitte schreib eine Nachricht – sie ist der Inhalt deines Beitrags.' : null} />
               <p className="text-xs text-muted-foreground mt-1">
                 Tipp:{' '}
-                <code className="bg-muted px-1 rounded">{'{Vorname}'}</code> wird automatisch
-                ersetzt. Auf der Hof-Seite steht die Anrede ohne Namen.
+                <code className="bg-muted px-1 rounded">{'{Vorname}'}</code> {BEITRAG_ABLAUF_TEXT.anredeTipp}
               </p>
             </div>
 
@@ -475,20 +474,20 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             <div className="space-y-3 mb-5">
               <ChannelCard
                 icon={<Home className="size-5" aria-hidden="true" />}
-                title="Auf meiner Hof-Seite anzeigen"
-                subtitle="Alle Besucher sehen es · für 7 Tage prominent"
+                title={BEITRAG_ABLAUF_TEXT.hofseiteTitel}
+                subtitle={BEITRAG_ABLAUF_TEXT.hofseiteSatz}
                 checked={showOnFarmPage}
                 onChange={setShowOnFarmPage}
               />
               <ChannelCard
                 icon={<Mail className="size-5" aria-hidden="true" />}
-                title="Per E-Mail an Abonnenten"
+                title={BEITRAG_ABLAUF_TEXT.mailTitel}
                 subtitle={
                   emailBlocked
-                    ? `Du hast vor ${recentEmailDaysAgo} Tagen bereits E-Mails versendet (Limit: 1× pro ${MAILABSTAND_TAGE} Tage)`
+                    ? BEITRAG_ABLAUF_TEXT.mailGesperrt(recentEmailDaysAgo ?? 0, MAILABSTAND_TAGE)
                     : emailCount > 0
-                      ? `${emailCount} ${emailCount === 1 ? 'Kunde hat' : 'Kunden haben'} E-Mail-Updates abonniert`
-                      : 'Noch keine Abonnenten'
+                      ? BEITRAG_ABLAUF_TEXT.mailAbonniert(emailCount, MAILABSTAND_TAGE)
+                      : BEITRAG_ABLAUF_TEXT.mailKeine
                 }
                 checked={sendEmail && !emailBlocked}
                 onChange={emailBlocked ? undefined : setSendEmail}
@@ -497,8 +496,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             </div>
 
             <div className="bg-muted rounded-xl p-4 mb-5 text-sm text-muted-foreground">
-              Nur Kunden, die selbst angehakt haben, dass sie informiert werden möchten, bekommen
-              E-Mail oder WhatsApp.
+              {BEITRAG_ABLAUF_TEXT.zustimmung}
             </div>
 
             {/* A2: orange CTA */}
@@ -523,9 +521,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 ← Zurück
               </button>
               <h1 className="font-heading text-xl font-semibold text-foreground">
-                Vorschau & Versand
+                {BEITRAG_ABLAUF_TEXT.vorschauSchritt}
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Überprüfen und absenden</p>
             </div>
 
             {/* Preview card */}
@@ -565,7 +562,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               {showOnFarmPage && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
-                  Auf Hof-Seite für 7 Tage anzeigen
+                  {BEITRAG_ABLAUF_TEXT.hofseiteZusammenfassung}
                 </div>
               )}
               {sendEmail && !emailBlocked && emailCount > 0 && (
@@ -628,14 +625,14 @@ function ChannelCard({
       className={cn(
         'w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all',
         FOKUS_RAHMEN,
-        checked && !disabled ? 'border-accent bg-accent/10' : 'border-border hover:border-border/80',
+        checked && !disabled ? 'border-zustand-tun bg-zustand-tun-grund' : 'border-input hover:bg-muted/40',
         disabled && 'opacity-50 cursor-not-allowed',
       )}
     >
       <div
         className={cn(
           'size-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5',
-          checked && !disabled ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground',
+          checked && !disabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
         )}
       >
         {icon}
@@ -647,10 +644,10 @@ function ChannelCard({
       <div
         className={cn(
           'size-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-1 transition-colors',
-          checked && !disabled ? 'bg-accent border-accent' : 'border-border',
+          checked && !disabled ? 'bg-primary border-primary' : 'border-input',
         )}
       >
-        {checked && !disabled && <CheckCircle className="size-3.5 text-accent-foreground" aria-hidden="true" />}
+        {checked && !disabled && <CheckCircle className="size-3.5 text-primary-foreground" aria-hidden="true" />}
       </div>
     </button>
   )

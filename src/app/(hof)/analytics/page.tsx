@@ -7,8 +7,9 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
 import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswertung'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
-import { auswertungSummen, grenzeStand, servicegebuehrenSaetze, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
+import { auswertungSummen, gebuehrenKarteText, grenzeStand, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
 import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
@@ -22,7 +23,7 @@ import {
   GrenzeKarte,
   KanaeleKarte,
   KennzahlenReihe,
-  ServicegebuehrenKarte,
+  GebuehrenKarte,
   TeilenWirkungKarte,
   TopProdukteKarte,
   UmsatzKarte,
@@ -39,8 +40,9 @@ export const dynamic = 'force-dynamic'
  * Auswertung in der HofShell (Nachtlauf Nr. 22c, Gate 8; Mockup
  * web-h5-auswertung-abrechnung-teilen-wirkung): Kennzahlen, Teilen-Wirkung
  * und Umsatz für den gewählten Zeitraum (Woche · Monat · Jahr in der
- * Adresse), daneben die Servicegebühren DIESES Monats — bis zum SEPA-Start
- * ohne Lastschrift (Register B1, K1). Darunter wie bisher Kanäle,
+ * Adresse), daneben die Gebühren DIESES Monats — bis zum SEPA-Start
+ * ohne Lastschrift (Register B1, K1); ihr Wort je Stichtag „Hofpreis-Modell ab“
+ * (V62, V63; Nr. 225). Darunter wie bisher Kanäle,
  * Top-Produkte und die Jahresgrenze. Alles nur für den eigenen Hof (farmId
  * aus der Sitzung), nur lesend.
  */
@@ -102,7 +104,7 @@ export default async function AnalyticsPage({
           balken={daten.umsatz.balken}
           vergleichLabel={daten.umsatz.vergleichLabel}
         />
-        <ServicegebuehrenKarte monat={daten.gebuehren} saetze={servicegebuehrenSaetze(jetzt)} />
+        <GebuehrenKarte monat={daten.gebuehren} text={gebuehrenKarteText(daten.gebuehren.monat, daten.hofpreis, jetzt)} />
       </div>
       {daten.umsatz.einsicht && <EinsichtZeile text={daten.umsatz.einsicht} />}
       {(daten.umsatz.kanaele.length > 0 || daten.umsatz.topProdukte.length > 0) && (
@@ -142,13 +144,15 @@ export default async function AnalyticsPage({
  * Abfragen selbst mit (src/lib/umgebung-server.ts).
  */
 async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number, pf: Periodenfenster, jetzt: Date) {
-  const [umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, testzahlungenHinweis] = await Promise.all([
+  const [umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, testzahlungenHinweis, hofpreis] = await Promise.all([
     getUmsatzAuswertung(farmId, periode, zurueck, jetzt),
     getYtdRevenue(farmId, jetzt),
     getKennzahlen(farmId, pf),
     getTeilenWirkung(farmId, teilenZeitraumAus(pf)),
     getServicegebuehrenMonat(farmId, jetzt),
     testzahlungenHinweisFuerHof(farmId, auswertungSummen(pf, jetzt)),
+    // Der Stichtag für das Wort der Gebühr; scheitert das Lesen, gilt die Vorgabe (ladeHofpreisEinstellung meldet selbst).
+    ladeHofpreisEinstellung(),
   ])
-  return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis }
+  return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis, hofpreis }
 }
