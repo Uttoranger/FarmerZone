@@ -1,8 +1,7 @@
 import Link from 'next/link'
-import { Undo2 } from 'lucide-react'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import type { HofWiderruf } from '@/server/widerruf'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { PflichtKarte } from '@/components/heute/pflicht-karte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -14,8 +13,8 @@ import { cn } from '@/lib/utils'
 export function WiderrufHeuteKarte({ widerrufe }: { widerrufe: readonly HofWiderruf[] }): React.JSX.Element | null {
   if (widerrufe.length === 0) return null
   return (
-    <Hinweiskarte ton="orange" symbol={Undo2} titel={WIDERRUF_TEXT.hofKarteTitel}>
-      <p className="text-[12.5px]">{WIDERRUF_TEXT.hofKarteSatz(widerrufe.length)}</p>
+    <PflichtKarte titel={WIDERRUF_TEXT.hofKarteTitel}>
+      <p>{WIDERRUF_TEXT.hofKarteSatz(widerrufe.length)}</p>
       <ul className="mt-1 flex flex-col">
         {widerrufe.map((w) => (
           <li key={w.id}>
@@ -29,6 +28,6 @@ export function WiderrufHeuteKarte({ widerrufe }: { widerrufe: readonly HofWider
           </li>
         ))}
       </ul>
-    </Hinweiskarte>
+    </PflichtKarte>
   )
 }

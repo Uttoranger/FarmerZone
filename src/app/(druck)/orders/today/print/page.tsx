@@ -37,7 +37,7 @@ function PacklistenBetrag({
         {kassieren !== null ? `Bar zu kassieren ${formatEuro(centsAlsEuro(kassieren))}` : formatEuro(centsAlsEuro(summen.gesamtCents))}
       </span>
       {gebuehrZeile && (
-        <span className="block text-xs text-primary-foreground/70">
+        <span className="block text-sm text-primary-foreground/70">
           inkl. {formatEuro(centsAlsEuro(summen.gebuehrCents))} {gebuehrZeile}
         </span>
       )}
@@ -105,10 +105,11 @@ export default async function PrintPacklistPage() {
           <ArrowLeft className="size-4" aria-hidden="true" />
           Zurück
         </Link>
-        <PrintButton />
+        <PrintButton zweit={orders.length === 0} />
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 py-6 md:px-12 md:py-12">
+      {/* Blatt wie im Board w2-druck: Inhalt rund 650 px breit. */}
+      <div className="mx-auto max-w-[746px] px-4 py-6 md:px-12 md:py-12">
         {/* Kopf */}
         <div className="mb-4">
           <div className="text-sm font-semibold text-primary-foreground/70">{farm.name}</div>
@@ -124,8 +125,8 @@ export default async function PrintPacklistPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {/* Gesamt vorbereiten */}
-            <section className="overflow-hidden rounded-lg border border-primary-foreground">
-              <h2 className="border-b border-primary-foreground/20 px-3 py-2 text-xs font-bold tracking-wide text-primary-foreground uppercase">
+            <section className="overflow-hidden rounded-md border border-primary-foreground">
+              <h2 className="border-b border-primary-foreground/20 px-3 py-2 text-[13px] font-bold tracking-wide text-primary-foreground uppercase">
                 Gesamt vorbereiten
               </h2>
               {packListEntries.map(([name, entry], i) => (
@@ -145,8 +146,8 @@ export default async function PrintPacklistPage() {
             </section>
 
             {/* Pro Kunde */}
-            <section className="overflow-hidden rounded-lg border border-primary-foreground">
-              <h2 className="border-b border-primary-foreground/20 px-3 py-2 text-xs font-bold tracking-wide text-primary-foreground uppercase">
+            <section className="overflow-hidden rounded-md border border-primary-foreground">
+              <h2 className="border-b border-primary-foreground/20 px-3 py-2 text-[13px] font-bold tracking-wide text-primary-foreground uppercase">
                 Pro Kunde ({orders.length})
               </h2>
               {orders.map((order, i) => {
@@ -158,7 +159,7 @@ export default async function PrintPacklistPage() {
                   >
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="min-w-0 font-semibold break-words text-primary-foreground">{order.customerName}</span>
-                      <span className="shrink-0 text-xs text-primary-foreground/70">
+                      <span className="shrink-0 text-sm text-primary-foreground/70">
                         {order.orderNumber} · {order.pickupTimeStart}–{order.pickupTimeEnd} Uhr
                       </span>
                     </div>
@@ -172,8 +173,9 @@ export default async function PrintPacklistPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="mt-1 flex items-end justify-between gap-3">
-                      <span className="text-xs text-primary-foreground/70">
+                    {/* Zahlart links, Betrag rechts in derselben Zeile (Board w2-druck); ein Zusatz darunter rechts. */}
+                    <div className="mt-1 flex items-start justify-between gap-3">
+                      <span className="text-sm text-primary-foreground/80">
                         {zahlartText(order.paymentMethod, order.paymentStatus)}
                         {/* Nur was der Hof wissen muss: Die Kundin hat noch nicht bestätigt (V57: „Wartet auf Kunde“). */}
                         {order.status === 'PENDING_CONFIRMATION' ? ` · ${marke.text}` : ''}
@@ -184,14 +186,16 @@ export default async function PrintPacklistPage() {
                 )
               })}
             </section>
-            {preisHinweis && <p className="text-xs text-primary-foreground/70">{preisHinweis}</p>}
+            {preisHinweis && <p className="text-sm text-primary-foreground/70">{preisHinweis}</p>}
           </div>
         )}
 
-        {/* Fuß */}
-        <div className="mt-4 text-xs text-primary-foreground/70">
-          Gedruckt am {datumLang(jetzt)}, {uhrzeitInWien(jetzt)} Uhr · {MARKE}
-        </div>
+        {/* Fuß — nur auf einer Packliste mit Bestellungen (Board s2-druck Bild 3: der Leerzustand ohne Fuß). */}
+        {orders.length > 0 && (
+          <div className="mt-4 text-sm text-primary-foreground/70">
+            Gedruckt am {datumLang(jetzt)}, {uhrzeitInWien(jetzt)} Uhr · {MARKE}
+          </div>
+        )}
       </div>
     </div>
   )

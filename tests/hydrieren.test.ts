@@ -447,7 +447,7 @@ describe('Hydrieren – Teile mit der Breite und der Adresse des Browsers', () =
   it('StartbildschirmKarte: im Server-HTML nichts, im Browser die Anleitung — in der installierten App nicht', async () => {
     const imBrowser = await pruefeHydrieren(createElement(StartbildschirmKarte))
     expect(imBrowser.serverHtml).toBe('')
-    expect(imBrowser.container.textContent).toContain(STARTBILDSCHIRM_KARTE.titel)
+    expect(imBrowser.container.textContent).toContain(STARTBILDSCHIRM_KARTE.titel.split(': ')[0])
     await raeumeHydrierenAuf()
 
     fenster.standalone = true

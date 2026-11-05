@@ -101,8 +101,8 @@ describe('hatHandlung: Abschnitt „Braucht dich" oder „Im Shop"', () => {
       })
     )
     const zeilen = html.slice(html.indexOf('</table>'))
-    const braucht = zeilen.indexOf('>Braucht dich<')
-    const shop = zeilen.indexOf('>Im Shop<')
+    const braucht = zeilen.indexOf('>Braucht dich ·')
+    const shop = zeilen.indexOf('>Im Shop ·')
     if (braucht >= 0) return { braucht: zeilen.slice(braucht, shop > braucht ? shop : undefined), imShop: shop > braucht ? zeilen.slice(shop) : '' }
     return { braucht: '', imShop: shop >= 0 ? zeilen.slice(shop) : '' }
   }

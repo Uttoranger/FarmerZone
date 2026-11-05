@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogMitte, DialogTitle } from '@/components/ui/dialog'
-import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,13 @@ export type Hauptaktion = {
  * Handy ein Blatt von unten mit der Hauptaktion über die volle Breite und
  * „Abbrechen" als Textknopf darunter (DESIGN_SYSTEM „Dialoge und Blätter").
  * Solange die Aktion läuft, schließt nichts — ein zweiter Tipp landet nicht.
+ *
+ * Mit `mitte` (Boards s1-/w1-bestellung, Lauf 31) steht „Abbrechen“ in beiden
+ * Breiten oben rechts neben dem Titel — im Dialog wie im Blatt (abgedunkelter
+ * Schleier, die Seite bleibt lesbar) —, und der Fokus startet dort: Eine
+ * Rückfrage vor Storno, „Nicht abgeholt“ oder „Artikel fehlt“ beginnt nie auf
+ * der Aktion selbst. `nebenaktion` steht unter der Hauptaktion (Blatt) bzw.
+ * links daneben (Dialog), etwa „Ganze Bestellung stornieren …“.
  */
 export function BestellDialog({
   offen,
@@ -35,6 +42,7 @@ export function BestellDialog({
   breite = 'schmal',
   mitte = false,
   hauptaktion,
+  nebenaktion,
   children,
 }: {
   /**
@@ -49,6 +57,8 @@ export function BestellDialog({
   unterzeile?: string
   breite?: 'schmal' | 'breit'
   hauptaktion: Hauptaktion
+  /** Ein zweiter Weg als Textknopf (nur mit `mitte`). */
+  nebenaktion?: ReactNode
   children: ReactNode
 }): React.JSX.Element {
   const breit = useMindestbreite(768)
@@ -74,10 +84,13 @@ export function BestellDialog({
   if (breit && mitte) {
     return (
       <Dialog open={offen} onOpenChange={wechsel}>
-        <DialogMitte titel={titel} schliessen="Abbrechen" className="gap-4">
+        <DialogMitte titel={titel} schliessen="Abbrechen" className="gap-4" initialFocus={abbrechenZuerst}>
           {unterzeile && <DialogDescription className="-mt-2 text-[13px] break-words text-muted-foreground">{unterzeile}</DialogDescription>}
           {children}
-          <div className="flex flex-wrap justify-end gap-2.5">{hauptKnopf}</div>
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
+            {nebenaktion && <span className="mr-auto">{nebenaktion}</span>}
+            {hauptKnopf}
+          </div>
         </DialogMitte>
       </Dialog>
     )
@@ -108,6 +121,22 @@ export function BestellDialog({
     )
   }
 
+  if (mitte) {
+    return (
+      <Sheet open={offen} onOpenChange={wechsel}>
+        <SheetBlatt schleier="abgedunkelt" initialFocus={abbrechenZuerst}>
+          <div className="min-w-0">
+            <SheetKopf titel={titel} schliessen="Abbrechen" />
+            {unterzeile && <SheetDescription className="mt-1 text-[13px] break-words">{unterzeile}</SheetDescription>}
+          </div>
+          {children}
+          {hauptKnopf}
+          {nebenaktion && <div className="flex justify-center">{nebenaktion}</div>}
+        </SheetBlatt>
+      </Sheet>
+    )
+  }
+
   return (
     <Sheet open={offen} onOpenChange={wechsel}>
       <SheetBlatt>
@@ -126,6 +155,12 @@ export function BestellDialog({
       </SheetBlatt>
     </Sheet>
   )
+}
+
+/** Der Startfokus der Rückfragen mit `mitte`: das eine „Abbrechen“ oben rechts (Dialog bzw. Blatt). */
+function abbrechenZuerst(): HTMLElement | true {
+  const knopf = document.querySelector<HTMLElement>('[data-slot="dialog-mitte"] [data-slot="dialog-close"], [data-slot="sheet-kopf"] [data-slot="sheet-close"]')
+  return knopf ?? true
 }
 
 /** Fehler einer Aktion — inline im Dialog, orange (Register O1: kein Fehler-Token). */

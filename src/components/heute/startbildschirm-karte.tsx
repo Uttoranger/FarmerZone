@@ -1,11 +1,12 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
-import { Smartphone } from 'lucide-react'
+import { useId, useState, useSyncExternalStore } from 'react'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { cn } from '@/lib/utils'
 import { STARTBILDSCHIRM_KARTE, laeuftAlsApp } from '@/lib/startbildschirm'
 
 /*
- * Die Karte „auf den Startbildschirm legen" — ganz unten auf Heute, nur im
+ * Die Karte „auf den Startbildschirm legen" — zuletzt in der Seitenspalte von Heute (Board w1-heute), nur im
  * Browser, nicht in der installierten App (Register N1, Nachtlauf Nr. 41).
  * Texte und Regel: src/lib/startbildschirm.ts.
  *
@@ -39,15 +40,39 @@ function aufDemServer(): null {
   return null
 }
 
-/** Der Inhalt der Karte — ohne Entscheidung, ob sie erscheint. */
+/**
+ * Der Inhalt der Karte — ohne Entscheidung, ob sie erscheint. Nach Board
+ * s1-/w1-heute: Titel „Mit einem Tipp in deinem Hof“, darunter der Satz
+ * „Leg … auf den Startbildschirm.“ und der Umriss-Knopf „So geht’s“ über die
+ * volle Breite, der die Anleitung für iPhone und Android aufklappt. Titel und
+ * Satz sind die zwei Hälften von STARTBILDSCHIRM_KARTE.titel (Text bleibt in
+ * src/lib/startbildschirm.ts); die Anleitung steht im HTML, nur verborgen.
+ */
 export function StartbildschirmAnleitung(): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const anleitungId = useId()
+  const trenner = STARTBILDSCHIRM_KARTE.titel.indexOf(': ')
+  const titel = trenner > 0 ? STARTBILDSCHIRM_KARTE.titel.slice(0, trenner) : STARTBILDSCHIRM_KARTE.titel
+  const satz = trenner > 0 ? `${STARTBILDSCHIRM_KARTE.titel.slice(trenner + 2)}.` : null
   return (
-    <section aria-labelledby="heute-startbildschirm" className="rounded-2xl border border-border bg-card p-[18px]">
-      <h2 id="heute-startbildschirm" className="flex items-start gap-2.5 text-[15px] leading-snug font-semibold">
-        <Smartphone className="mt-px size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-        {STARTBILDSCHIRM_KARTE.titel}
+    <section aria-labelledby="heute-startbildschirm" className="flex flex-col gap-1 rounded-2xl border border-border bg-card p-[18px]">
+      <h2 id="heute-startbildschirm" className="text-[15px] leading-snug font-semibold">
+        {titel}
       </h2>
-      <dl className="mt-3 grid gap-3 md:grid-cols-2 md:gap-5">
+      {satz && <p className="text-[13.5px] leading-snug text-muted-foreground">{satz}</p>}
+      <button
+        type="button"
+        aria-expanded={offen}
+        aria-controls={anleitungId}
+        onClick={() => setOffen((alt) => !alt)}
+        className={cn(
+          'mt-2.5 inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+          FOKUS_RAHMEN
+        )}
+      >
+        So geht’s
+      </button>
+      <dl id={anleitungId} hidden={!offen} className="mt-3 grid gap-3">
         {STARTBILDSCHIRM_KARTE.anleitungen.map((anleitung) => (
           <div key={anleitung.geraet}>
             <dt className="text-[13px] font-semibold">{anleitung.geraet}</dt>

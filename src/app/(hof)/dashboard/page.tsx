@@ -6,7 +6,7 @@ import * as Sentry from '@sentry/nextjs'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser, ladeDeinenBeitrag } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
-import { ladeFaedenHof } from '@/server/queries/postfach'
+import { ladeFaedenHof, zaehleUngelesenHof } from '@/server/queries/postfach'
 import { heutePostfach } from '@/lib/postfach'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
@@ -75,8 +75,9 @@ export const metadata: Metadata = {
  * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
  * zuletzt in der Hauptspalte, nach Packliste und „Braucht dich" (freigabe.md
  * §12 Nr. 45, Register N11). „Zu tun" ist EINE Liste statt
- * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten
- * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
+ * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten von
+ * oben (Board w1-heute, Lauf 31: Kopf, Karten und Zahlen nur in der
+ * Hauptspalte, die Seitenspalte 360 px rechts daneben) — bei 1024 px neben der
  * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
  * Raster darunter; „Zu tun" geht dort über beide Spalten.
  */
@@ -96,7 +97,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
   // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
   // (Nachtlauf Nr. 31); der Cookie ebenso.
-  const [heute, cookieJar, faeden, deinBeitrag, sperrKarte, widerrufe] = await Promise.all([
+  const [heute, cookieJar, faeden, deinBeitrag, sperrKarte, widerrufe, ungelesen] = await Promise.all([
     getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
     cookies(),
     // Postfach (Register N12, Nr. 87): Ein Ladefehler nimmt nur die Karte weg, nie Heute — gemeldet ohne Nachrichtentext.
@@ -119,6 +120,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       Sentry.captureException(err, { tags: { bereich: 'widerruf', seite: 'heute' }, extra: { farmId: farm.id } })
       return []
     }),
+    // Zähler am Postfach im Kopf (Handy, Board s1-heute) — derselbe Zähler wie in der Navigation; ein Fehler nimmt nur die Zahl weg.
+    zaehleUngelesenHof(farm.id).catch(() => 0),
   ])
   const postfach = heutePostfach(faeden, jetzt)
   // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.
@@ -176,7 +179,6 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       <Packliste
         zeilen={heute.abholungen}
         stand={packlistenStand(heute.abholungen)}
-        naechsteAbholung={heute.naechsteAbholung}
         leer={{ naechsteAbholung: naechstes ? naechsteAbholungSatz(naechstes.fenster, naechstes.anzahl, heuteTag) : null }}
       />
     ),
@@ -213,40 +215,46 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
-      <div className="flex flex-col gap-4 md:gap-5">
-        {/* Reihenfolge nach Board s1-heute: Titel und Datum zuerst, dann die Pflicht- und Stripe-Karten,
-            dann die Marke „Abholung heute", die Zahlen und die Hauptspalte. */}
-        <HeuteKopf datum={datumLang(jetzt)} />
-        {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
-        {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
-        {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
-        <WiderrufHeuteKarte widerrufe={widerrufe} />
-        {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
-        {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
-        {hofEmailFehlt(farm) && <HofEmailKarte />}
-        {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
-        {zeige(aufbau.oben)}
-        {heute.abholfensterHeute && (
-          <AbholungHeuteMarke text={abholungHeuteText(heuteTag, heute.abholfensterHeute)} />
-        )}
-        <Kennzahlen
-          bestellungen={heute.zahlen.bestellungen}
-          zuPacken={heute.zahlen.zuPacken}
-          umsatzHeuteCent={heute.zahlen.umsatzHeuteCent}
-        />
-        <div className="flex flex-col gap-4 md:gap-5 xl:flex-row xl:items-start xl:gap-6">
-          <div className="flex min-w-0 flex-1 flex-col gap-4 md:gap-5">{zeige(aufbau.haupt)}</div>
-          <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:w-[360px] xl:shrink-0 xl:grid-cols-1">{zeige(aufbau.seite)}</div>
+      {/* Ab 1280 px zwei Spalten von oben (Board w1-heute): links Kopf, Karten, Zahlen und die Hauptspalte,
+          rechts die Seitenspalte auf der Höhe der Marke „Abholung heute“. Darunter steht alles untereinander,
+          die Seitenspalte als Raster unter der Hauptspalte. */}
+      <div className="flex flex-col gap-4 md:gap-5 xl:flex-row xl:items-start xl:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 md:gap-5">
+          {/* Reihenfolge nach Board s1-heute: Titel und Datum zuerst, dann die Pflicht- und Stripe-Karten,
+              dann die Marke „Abholung heute", die Zahlen und die Hauptspalte. */}
+          <HeuteKopf datum={datumLang(jetzt)} hofName={heute.wartetAufFreigabe ? farm.name : null} postfach={ungelesen} />
+          {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
+          {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
+          {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
+          <WiderrufHeuteKarte widerrufe={widerrufe} />
+          {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
+          {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
+          {hofEmailFehlt(farm) && <HofEmailKarte />}
+          {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
+          {zeige(aufbau.oben)}
+          {heute.abholfensterHeute && (
+            <AbholungHeuteMarke text={abholungHeuteText(heuteTag, heute.abholfensterHeute)} />
+          )}
+          <Kennzahlen
+            bestellungen={heute.zahlen.bestellungen}
+            zuPacken={heute.zahlen.zuPacken}
+            umsatzHeuteCent={heute.zahlen.umsatzHeuteCent}
+          />
+          {zeige(aufbau.haupt)}
         </div>
-        {zuTunZeigen === 'zeile' && (
-          <p className="text-center">
-            <ErsteSchritteSchalter richtung="ein" />
-          </p>
-        )}
-        {/* Ganz unten (Register N1): die Karte „auf den Startbildschirm legen" —
-            nur im Browser, nicht in der installierten App; das entscheidet die
-            Karte selbst nach dem Mounten. */}
-        <StartbildschirmKarte />
+        <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:mt-[76px] xl:w-[360px] xl:shrink-0 xl:grid-cols-1">
+          {zeige(aufbau.seite)}
+          {zuTunZeigen === 'zeile' && (
+            <p className="text-center md:col-span-2 xl:col-span-1">
+              <ErsteSchritteSchalter richtung="ein" />
+            </p>
+          )}
+          {/* Zuletzt (Register N1, Board w1-heute: unten in der Seitenspalte): die Karte „auf den Startbildschirm
+              legen" — nur im Browser, nicht in der installierten App; das entscheidet die Karte selbst nach dem Mounten. */}
+          <div className="min-w-0 md:col-span-2 xl:col-span-1">
+            <StartbildschirmKarte />
+          </div>
+        </div>
       </div>
 
       {freischaltMomentMoeglich(heute.hof, jetzt) && (

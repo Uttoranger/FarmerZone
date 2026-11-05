@@ -89,7 +89,7 @@ export function WiederDaMoment({
       {schliessenLabel}
     </button>
   )
-  const fussnote = hinweis ? <p className="text-center text-[11.5px] leading-normal text-muted-foreground">{hinweis}</p> : null
+  const fussnote = hinweis ? <p className="text-center text-xs leading-normal text-muted-foreground">{hinweis}</p> : null
 
   if (breit) {
     return (

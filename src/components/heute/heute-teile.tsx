@@ -1,20 +1,9 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import {
-  Check,
-  ChevronRight,
-  Clock,
-  CreditCard,
-  Megaphone,
-  MessageCircle,
-  PackageX,
-  Printer,
-  Sprout,
-  Tags,
-  type LucideIcon,
-} from 'lucide-react'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { Check, ChevronRight, Inbox, MessageCircle, Printer, Sprout } from 'lucide-react'
 import { Marke } from '@/components/ui/marke'
+import { Zaehler } from '@/components/ui/zaehler'
+import { PFLICHT_KNOPF, PFLICHT_KNOPF_RAHMEN, PflichtKarte } from '@/components/heute/pflicht-karte'
 import { POSTFACH_HREF, POSTFACH_TEXT, weitereText, type HeuteNachricht } from '@/lib/postfach'
 import { markiereGelesenFormular } from '@/server/actions/postfach'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
@@ -31,9 +20,7 @@ import {
   kennzahlBreiteEm,
   mitTrennstellen,
   PACK_MARKE,
-  naechsteAbholungText,
   type BrauchtDichEintrag,
-  type NaechsteAbholung,
   type NaechstesFenster,
   type PacklistenZeile,
   type WochenBalken,
@@ -147,12 +134,32 @@ export function PostfachKarte({ nachricht, weitere }: { nachricht: HeuteNachrich
  * Titel und Wiener Datum — ganz oben, vor jeder Pflicht- und Stripe-Karte
  * (Board s1-heute, Bild 3–5). Die Marke „Abholung heute" steht getrennt
  * darunter (AbholungHeuteMarke), nach den Karten und vor den Zahlen.
+ *
+ * Am Handy (Board s1-heute) eine feste Leiste oben: „Heute“, das Datum
+ * darunter und rechts das Postfach mit dem Zähler der ungelesenen
+ * Nachrichten — die Seitenleiste mit dem Postfach gibt es dort nicht. Ab
+ * 768 px die freistehende Überschrift; das Postfach steht in der Seitenleiste.
+ * Wartet der Hof auf die Freischaltung, steht sein Name vor dem Datum
+ * (Board Bild 4: „Hof am Moos · Mittwoch, 3. März 2027“).
  */
-export function HeuteKopf({ datum }: { datum: string }): React.JSX.Element {
+export function HeuteKopf({ datum, hofName = null, postfach = 0 }: { datum: string; hofName?: string | null; postfach?: number }): React.JSX.Element {
   return (
-    <div className="min-w-0">
-      <h1 className="font-heading text-[27px] font-semibold md:text-[30px]">Heute</h1>
-      <p className={cn('mt-0.5 text-sm', LEISE)}>{datum}</p>
+    <div className="sticky top-0 z-30 -mx-4 -mt-5 flex min-w-0 items-center gap-3 border-b border-border bg-card px-4 py-2 md:static md:mx-0 md:mt-0 md:border-0 md:bg-transparent md:p-0">
+      <div className="min-w-0 flex-1">
+        <h1 className="font-heading text-[22px] leading-tight font-semibold md:text-[30px]">Heute</h1>
+        <p className={cn('text-[13px] md:mt-0.5 md:text-sm', LEISE)}>
+          {hofName && <>{hofName} · </>}
+          {datum}
+        </p>
+      </div>
+      <Link
+        href={POSTFACH_HREF}
+        aria-label="Postfach"
+        className={cn('relative inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted md:hidden', FOKUS_RAHMEN)}
+      >
+        <Inbox className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+        <Zaehler anzahl={postfach} wofuer="ungelesene Nachrichten" klein className="absolute top-0.5 right-0" />
+      </Link>
     </div>
   )
 }
@@ -244,18 +251,16 @@ export function Kennzahlen({
 export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.JSX.Element {
   const { titel, satz } = onlinePausiertHinweis(barMoeglich)
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={CreditCard}
+    <PflichtKarte
       titel={titel}
-      aktion={
-        <Link href="/settings/payments" className={KNOPF_ORANGE}>
+      knoepfe={
+        <Link href="/settings/payments" className={PFLICHT_KNOPF}>
           Bei Stripe ergänzen
         </Link>
       }
     >
-      <p className="text-[12.5px]">{satz}</p>
-    </Hinweiskarte>
+      <p>{satz}</p>
+    </PflichtKarte>
   )
 }
 
@@ -266,18 +271,16 @@ export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.
  */
 export function TeamSperreKarte({ grund }: { grund: string | null }): React.JSX.Element {
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={MessageCircle}
+    <PflichtKarte
       titel={SPERRE_KARTE_TITEL}
-      aktion={
-        <Link href={POSTFACH_HREF} className={KNOPF_ORANGE}>
+      knoepfe={
+        <Link href={POSTFACH_HREF} className={PFLICHT_KNOPF}>
           Zum Postfach
         </Link>
       }
     >
-      <p className="text-[12.5px]">{sperreKarteSatz(grund)}</p>
-    </Hinweiskarte>
+      <p>{sperreKarteSatz(grund)}</p>
+    </PflichtKarte>
   )
 }
 
@@ -290,18 +293,17 @@ export function TeamSperreKarte({ grund }: { grund: string | null }): React.JSX.
  */
 export function StripeEinrichtenHinweis(): React.JSX.Element {
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={CreditCard}
+    <PflichtKarte
       titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}
-      aktion={
-        <Link href="/settings/payments" className={KNOPF_ORANGE}>
+      knoepfe={
+        // Board s1-heute Bild 4: ein Weg in die Einstellungen, kein Auftrag mit Frist — Umriss statt Orange.
+        <Link href="/settings/payments" className={PFLICHT_KNOPF_RAHMEN}>
           Jetzt einrichten
         </Link>
       }
     >
-      <p className="text-[12.5px]">{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</p>
-    </Hinweiskarte>
+      <p>{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</p>
+    </PflichtKarte>
   )
 }
 
@@ -387,7 +389,9 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
  * (/orders/today/print, abholWhere). Nach Board s1-heute steht der Kopf über
  * der Karte („Packliste · 2 zu packen · 1 wartet", rechts Drucken), die
  * Zeilen in der Karte, „Alle Bestellungen ansehen →" darunter. Zeilen führen
- * in die Bestellung; dort wird gepackt und übergeben (keine Knöpfe hier).
+ * in die Bestellung; dort wird gepackt und übergeben (keine Knöpfe hier). Die
+ * nächste Abholung steht nur in der Seitenspalte („Nächste Abholung“), nicht
+ * noch einmal als Zeile unter der Liste (Board s1-/w1-heute, Lauf 31).
  *
  * Leer: mit Abholzeit eine Karte mit HEUTE_NIEMAND und der nächsten Abholung
  * samt ihrer Zahl (V40) — es gibt nichts zu tun, also kein Knopf; ohne
@@ -396,14 +400,11 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
 export function Packliste({
   zeilen,
   stand,
-  naechsteAbholung,
   leer,
 }: {
   zeilen: PacklistenZeile[]
   /** „2 zu packen · 1 wartet" (packlistenStand). */
   stand: string
-  /** Der nächste Abholtag mit offenen Bestellungen — ohne ihn entfällt die Zeile. */
-  naechsteAbholung: NaechsteAbholung | null
   /** Für den Leerzustand: der Satz zur nächsten Abholung (naechsteAbholungSatz), null = keine Abholzeit eingetragen. */
   leer: { naechsteAbholung: string | null }
 }): React.JSX.Element {
@@ -466,15 +467,6 @@ export function Packliste({
               </Link>
             </div>
           )}
-          {naechsteAbholung && (
-            <Link
-              href="/orders"
-              className={cn('flex min-h-11 items-center gap-2 border-t border-border bg-muted/40 px-4 py-2.5 text-[13px] transition-colors hover:bg-muted md:px-[18px]', LEISE, FOKUS_RAHMEN_INNEN)}
-            >
-              <span className="flex-1">{naechsteAbholungText(naechsteAbholung)}</span>
-              <ChevronRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-            </Link>
-          )}
         </div>
       )}
       {zeilen.length > 0 && (
@@ -487,13 +479,6 @@ export function Packliste({
 }
 
 // ─── Braucht dich ───────────────────────────────────────────────────────────
-
-const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
-  ueberfaellig: Clock,
-  ausverkauft: PackageX,
-  'ohne-kategorie': Tags,
-  status: Megaphone,
-}
 
 /**
  * „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts),
@@ -515,21 +500,18 @@ export function BrauchtDichKarte({ eintraege, packlisteLeer }: { eintraege: Brau
       ) : (
         <ul className={cn(KARTE, 'overflow-hidden')}>
           {eintraege.map((eintrag) => {
-            const Symbol = BRAUCHT_DICH_SYMBOL[eintrag.art]
             return (
               <li key={`${eintrag.art}-${eintrag.href}-${eintrag.text}`} className="border-t border-border first:border-t-0">
                 <Link
                   href={eintrag.href}
                   className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/12 text-status-offen">
-                    <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm break-words">{eintrag.text}</span>
+                  {/* Board s1-heute Bild 2: Titel fett, ohne Symbol im Kästchen davor. */}
+                  <span className="min-w-0 flex-1 text-[14.5px] font-semibold break-words">{eintrag.text}</span>
                   <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
                 </Link>
                 {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
-                  <ul className="pr-4 pb-2 pl-16">
+                  <ul className="pr-4 pb-2 pl-4 md:pl-[18px]">
                     {eintrag.unterpunkte.map((u) => (
                       <li key={`${u.href}-${u.text}`}>
                         <Link
@@ -583,8 +565,8 @@ export function NaechsteAbholungKarte({ fenster, tag, anzahl }: { fenster: Naech
 }
 
 /**
- * Umsatz diese Woche (Mo–So, gemeinsame Umsatzregel): Summe, Tagesbalken mit
- * dem heutigen Tag in Orange, Vergleich mit der Vorwoche bis jetzt. Die
+ * Umsatz diese Woche (Mo–So, gemeinsame Umsatzregel): Summe, Tagesbalken in
+ * Grün (heute fett beschriftet), Vergleich mit der Vorwoche bis jetzt. Die
  * Balken sind Anschauung (aria-hidden); die Werte stehen als Liste für den
  * Screenreader daneben. Nach Board s1-heute der Betrag groß unter dem Kopf.
  */
@@ -610,13 +592,14 @@ export function WocheKarte({
           {balken.map((b) => (
             <div
               key={b.label}
-              className={cn('flex-1 rounded-t-md rounded-b-sm', b.heute ? 'bg-primary' : b.cent > 0 ? 'bg-accent/45' : 'bg-border')}
+              // Board s1-heute: alle Tage mit Umsatz grün (heute ohne eigene Farbe, der Tag steht fett darunter).
+              className={cn('flex-1 rounded-t-md rounded-b-sm', b.cent > 0 ? 'bg-accent' : 'bg-border')}
               // Höhe ist Messwert, keine Farbe: mindestens ein Strich, damit leere Tage sichtbar bleiben.
               style={{ height: b.hoeheProzent > 0 ? `${b.hoeheProzent}%` : '3px' }}
             />
           ))}
         </div>
-        <div className="mt-1.5 flex gap-2 text-center text-[11px]">
+        <div className="mt-1.5 flex gap-2 text-center text-xs">
           {balken.map((b) => (
             <span key={b.label} className={cn('flex-1', b.heute ? 'font-semibold text-foreground' : LEISE)}>
               {b.label}
@@ -632,7 +615,7 @@ export function WocheKarte({
           </li>
         ))}
       </ul>
-      <p className={cn('text-[12.5px]', LEISE)}>{vergleich}</p>
+      <p className={cn('text-[13px]', LEISE)}>{vergleich}</p>
       <Link href="/analytics" className={cn(TEXTLINK, 'self-start underline underline-offset-2')}>
         Auswertung →
       </Link>
@@ -669,15 +652,16 @@ export function ZuTunKarte({
         </h2>
         <span className="ml-auto shrink-0">{ausblenden}</span>
       </div>
-      {wartetAufFreigabe && <p className={cn('pr-2 text-[12.5px] leading-relaxed', LEISE)}>{ERSTE_SCHRITTE_WARTET}</p>}
+      {wartetAufFreigabe && <p className={cn('pr-2 text-[13px] leading-relaxed', LEISE)}>{ERSTE_SCHRITTE_WARTET}</p>}
       <ul className="flex flex-col">
         {aufgaben.map((aufgabe) => (
           <li key={aufgabe.id} className="pb-1">
-            <Link href={aufgabe.href} className={cn(TEXTLINK, 'underline underline-offset-2 break-words')}>
+            {/* Über die volle Breite: Ein kurzer Titel („Logo“) wäre sonst schmaler als 44 px (Messung Gate A, Lauf 31). */}
+            <Link href={aufgabe.href} className={cn(TEXTLINK, 'flex w-full underline underline-offset-2 break-words')}>
               {aufgabe.titel}
             </Link>
             {/* Der Satz bleibt sichtbar: „Titelbild" oder „Fotos" allein sagten nicht, was zu tun ist. */}
-            <p className={cn('-mt-1.5 pr-2 text-[12.5px] leading-snug break-words', LEISE)}>{aufgabe.satz}</p>
+            <p className={cn('-mt-1.5 pr-2 text-[13px] leading-snug break-words', LEISE)}>{aufgabe.satz}</p>
           </li>
         ))}
       </ul>
