@@ -8,14 +8,14 @@ import { KARTE, KICKER } from '@/components/hof-bestellungen/stil'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import {
   DEIN_STAND_TITEL,
-  KONDITIONEN_STAND,
   KONDITIONEN_UEBERGANG,
   KOSTENLOS,
-  MONATSABRECHNUNG_TEILE,
   TARIFE_TITEL,
   VERGLEICH_SATZ,
   VERGLEICH_TEXT,
-  VOLLER_WARENPREIS,
+  konditionenStand,
+  monatsabrechnungTeile,
+  vollerWarenpreis,
   type DeinStand,
   type TextTeil,
 } from '@/lib/konditionen'
@@ -27,6 +27,7 @@ import {
   type TarifKarteAnzeige,
   type VergleichZeile,
 } from '@/lib/hof-einstellungen'
+import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 
 /**
@@ -47,19 +48,30 @@ import { cn } from '@/lib/utils'
 export function KonditionenAnsicht({
   hof,
   jetzt,
+  preis,
+  stichtag,
   abzeichen = null,
 }: {
   hof: KonditionenHof
   jetzt: Date
+  /**
+   * Die Preisanzeige des Hofs (`preisAnzeigeFuer`, N38): null im Modell
+   * „bisher“, sonst sein Satz der Plattformgebühr. Sie wählt das Wort der
+   * Gebühr in Kopf, Rechenbeispiel und Abrechnung (V62, Nr. 224).
+   */
+  preis: PreisAnzeige
+  /** Der Stichtag „Hofpreis-Modell ab“ — ab ihm nennt der Fuß ihn als Stand (`konditionenStand`). */
+  stichtag: Date
   /** Der Schalter „Abzeichen zeigen“ im Block „Dein Stand“ (Register K2, Nr. 116) — nur für Gründungshöfe, sonst null. */
   abzeichen?: React.ReactNode
 }): React.JSX.Element {
-  const beispiel = konditionenRechenbeispiel(hof, jetzt)
+  const modell = preis ? 'hofpreis' : 'bisher'
+  const beispiel = konditionenRechenbeispiel(hof, jetzt, preis)
   const seite = baueKonditionenSeite(hof, jetzt)
 
   return (
     <div>
-      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel.mitProvision ? undefined : VOLLER_WARENPREIS} />
+      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel.mitProvision ? undefined : vollerWarenpreis(modell)} />
 
       <div className="flex flex-col gap-5 md:gap-6">
         {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
@@ -101,12 +113,12 @@ export function KonditionenAnsicht({
             So rechnen wir ab
           </h2>
           <p className="text-[14px] leading-relaxed text-foreground md:text-[13.5px]">
-            <Teile teile={MONATSABRECHNUNG_TEILE} />
+            <Teile teile={monatsabrechnungTeile(modell)} />
           </p>
         </section>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[13px] text-muted-foreground">
-          <p>Stand: {KONDITIONEN_STAND}</p>
+          <p>Stand: {konditionenStand(modell, stichtag)}</p>
           <Link
             href="/konditionen"
             className={cn('inline-flex min-h-11 items-center rounded-sm font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}

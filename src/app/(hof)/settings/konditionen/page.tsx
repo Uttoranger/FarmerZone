@@ -12,6 +12,9 @@ import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellung
 import { MARKE } from '@/lib/marke'
 import { Barzahlung, type BarzahlungAnzeige } from '@/components/hof-einstellungen/barzahlung'
 import { ladeBarzahlung } from '@/server/queries/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { hofpreisModellAb, preisAnzeigeFuer, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { prisma } from '@/lib/prisma'
 
 export const metadata: Metadata = { title: `Konditionen — ${MARKE}` }
 
@@ -28,13 +31,24 @@ export const dynamic = 'force-dynamic'
 export default async function KonditionenEinstellungenPage(): Promise<React.JSX.Element> {
   const { userId, farmId } = await verlangeHofDerSitzung()
 
+  const jetzt = new Date()
   let hof: KonditionenHof | null = null
   let abzeichen: { zeigen: boolean } | null = null
+  let preis: PreisAnzeige = null
+  let stichtag = hofpreisModellAb(null)
   let gefunden = true
   try {
-    const [geladen, schalter] = await Promise.all([ladeKonditionenHof(userId), ladeAbzeichenSchalter(userId)])
+    const [geladen, schalter, einstellung, satz] = await Promise.all([
+      ladeKonditionenHof(userId),
+      ladeAbzeichenSchalter(userId),
+      ladeHofpreisEinstellung(),
+      // Nur der Satz der Plattformgebühr (N38) — er wählt Wort und Rechnung des Beispiels.
+      prisma.farm.findUnique({ where: { id: farmId }, select: { plattformgebuehrProzent: true } }),
+    ])
     hof = geladen
     abzeichen = schalter
+    stichtag = hofpreisModellAb(einstellung)
+    preis = preisAnzeigeFuer({ plattformgebuehrProzent: satz?.plattformgebuehrProzent ?? null }, einstellung, jetzt)
     gefunden = hof !== null
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'konditionen' } })
@@ -44,7 +58,7 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
   // Barzahlung und Monatsabrechnungen (Nr. 198): ein eigener Teil — scheitert er, bleibt der Rest der Seite.
   let barzahlung: BarzahlungAnzeige | null = null
   try {
-    barzahlung = await ladeBarzahlung(farmId, new Date())
+    barzahlung = await ladeBarzahlung(farmId, jetzt)
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'konditionen', teil: 'barzahlung' } })
   }
@@ -54,7 +68,9 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
       {hof ? (
         <KonditionenAnsicht
           hof={hof}
-          jetzt={new Date()}
+          jetzt={jetzt}
+          preis={preis}
+          stichtag={stichtag}
           // Nur für Gründungshöfe (Register K2, Nr. 116): der Schalter im Block „Dein Stand“.
           abzeichen={abzeichen ? <AbzeichenSchalter anfangsAn={abzeichen.zeigen} /> : null}
         />

@@ -333,6 +333,10 @@ const FESTE_LISTE: Fest[] = [
     text: 'inkl. Servicegebühr (5 %) € 2,50',
     grund: 'Vorschau unter /intern/bausteine (nur Entwicklung): Beispielwert der Fassung „bisher“ von KaufZusammenfassung (Nr. 219)',
   },
+  { datei: 'src/lib/hof-einstellungen.ts', text: 'Für deinen Hof ist derzeit keine Servicegebühr eingestellt.', grund: `${BISHER}: keineGebuehrGrund, nur im Zweig ohne Preisanzeige von konditionenRechenbeispiel (Nr. 224)` },
+  { datei: 'src/lib/hof-einstellungen.ts', text: 'Für deinen Hof gilt die Servicegebühr ab', grund: `${BISHER}: keineGebuehrGrund, nur im Zweig ohne Preisanzeige von konditionenRechenbeispiel (Nr. 224)` },
+  { datei: 'src/lib/hof-einstellungen.ts', text: 'Servicegebühr (Kunde)', grund: `${BISHER}: Zeilen des Rechenbeispiels online und bar ohne Preisanzeige; mit ihr rechenbeispielHofpreis (Nr. 224)` },
+  { datei: 'src/lib/hof-einstellungen.ts', text: 'Servicegebühr', grund: `${BISHER}: Satz des Rechenbeispiels ohne Preisanzeige (Farm.serviceFee*); mit ihr rechenbeispielHofpreis (Nr. 224)` },
 ]
 
 /**

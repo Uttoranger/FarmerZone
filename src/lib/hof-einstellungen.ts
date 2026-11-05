@@ -27,13 +27,16 @@ import type { WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
 import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
 import {
+  BAR_GEBUEHR_SEPA_SATZ,
   BAR_OHNE_GEBUEHR_SATZ,
   HOFTOR_ABHOLZEITEN_JE_WOCHE,
   HOFTOR_PRODUKTE,
   IM_MONAT,
+  LASTSCHRIFT_TEXT,
   OHNE_WAHL_SATZ,
   ONLINE_GEBUEHR_ABGETRENNT_SATZ,
   ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
+  PLATTFORMGEBUEHR_BEZEICHNUNG,
   PREIS_BEDINGUNGEN,
   START_TARIF,
   TARIFE,
@@ -50,6 +53,7 @@ import {
   type TarifZustand,
 } from '@/lib/konditionen'
 import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
+import { barMoeglich, bestellGebuehr, einzugFuer, satzText, type GebuehrLage, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
@@ -93,6 +97,37 @@ export const TON_TEXT: Record<EinstellungTon, string> = {
 
 export const EINSTELLUNGEN_TITEL = 'Einstellungen'
 export const EINSTELLUNGEN_SATZ = 'Alles rund um deinen Hof an einem Ort.'
+
+/**
+ * Der Bereich mit der Pause (Farm.isPaused): Zeile der Übersicht, Titel von
+ * /settings/pause und der Verweis beim Stilllegen heißen gleich (Boards
+ * s1-/w1-einstellungen, s2-konto-hof, V8; Nr. 224). Die Aktion in Mein Hof
+ * bleibt „Pausieren“.
+ */
+export const URLAUB_UND_PAUSE = 'Urlaub und Pause'
+
+/** Seite und Knopf mit den Angaben des Hofs (Register N42 c, V43, V49; Board s2-hofdaten-zahlung). */
+export const HOFDATEN_TEXT = {
+  titel: 'Hofdaten',
+  satz: 'Informationen, die auf deiner öffentlichen Hofseite sichtbar sind.',
+  speichern: 'Hofdaten speichern',
+  gespeichert: 'Hofdaten gespeichert',
+} as const
+
+/**
+ * Konto und Sicherheit (Board s2-/w2-konto-hof; N42 c „Anmelde-Adresse“,
+ * N42 d „Hof“ statt „Hofladen“, V55). Der Verweis auf die Pause nimmt
+ * `URLAUB_UND_PAUSE`.
+ */
+export const KONTO_TEXT = {
+  anmeldeAdresseTitel: 'Anmelde-Adresse',
+  anmeldeAdresse: 'Deine Anmelde-Adresse:',
+  anmeldeAdresseAendern: 'Um sie zu ändern,',
+  passwortTitel: 'Passwort ändern',
+  stilllegenSatz: 'Deinen Hof dauerhaft schließen.',
+  nurVoruebergehend: 'Nur vorübergehend zusperren? Dann nutze lieber',
+  nurHofSchliessen: 'Nur den Hof schließen, dein Konto aber behalten? Dann nutze oben',
+} as const
 
 export type EinstellungenDaten = {
   name: string
@@ -217,7 +252,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'urlaubsmodus',
-      titel: 'Urlaubsmodus',
+      titel: URLAUB_UND_PAUSE,
       zeile: d.isPaused ? 'An · Kunden können gerade nicht bestellen' : 'Aus · du nimmst Bestellungen an',
       ton: d.isPaused ? 'offen' : 'neutral',
       href: '/settings/pause',
@@ -265,6 +300,53 @@ export function zahlungHinweis(d: {
   }
   if (!d.onlineAn) return 'einschalten'
   return d.rueckmeldung === 'success' ? 'geschafft' : null
+}
+
+/** Die Karte „Bar bei Abholung“ auf /settings/payments (Board s2-/w2-hofdaten-zahlung, V46, V61, V71). */
+export type BarKarte = {
+  /** Die Marke mit Wort — nie nur die Farbe. */
+  marke: string
+  ton: 'fertig' | 'offen'
+  /** Ein Satz unter der Beschreibung, oder null. */
+  satz: string | null
+  /** „Lastschrift einrichten“ zeigen (Weg auf „Deine Konditionen“, dort richtet Stripe sie ein). */
+  lastschrift: boolean
+}
+
+export const BAR_KARTE_TEXT = {
+  titel: 'Bar bei Abholung',
+  beschreibung: 'Kundinnen können bei der Abholung auch bar zahlen – zusätzlich zur Online-Zahlung.',
+  aktiv: 'Aktiv',
+  brauchtLastschrift: 'Braucht Lastschrift',
+  lastschriftSatz:
+    'Barzahlung gibt es, sobald du die Lastschrift für die Monatsabrechnung eingerichtet hast. ' +
+    'Darüber ziehen wir einmal im Monat die Plattformgebühr aus Barbestellungen ein.',
+  gruendungSatz: (bis: string): string =>
+    `Bis ${bis} zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.`,
+  einrichten: LASTSCHRIFT_TEXT.einrichten,
+  /** Dort steht die Karte „Barzahlung“ mit Stripes Formular (Nr. 198). */
+  einrichtenHref: '/settings/konditionen#barzahlung',
+} as const
+
+/**
+ * Was die Karte „Bar bei Abholung“ sagt — keine neue Regel: Ob bar geht,
+ * entscheidet `barMoeglich` (dieselbe Quelle wie Kasse und /api/checkout).
+ * Geht es nicht (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und
+ * keine da — oder eine Monatsabrechnung sperrt), heißt die Marke „Braucht
+ * Lastschrift“ mit dem Weg dorthin (N42 g). Ein Gründungshof, dessen
+ * Bargebühr noch erlassen ist (`einzugFuer` → `erlassen`), liest bis zu
+ * seinem Tag den Gründungssatz. Im Modell „bisher“ kein Satz.
+ */
+export function barKarte(lage: GebuehrLage, gruendungBis: Date | null, jetzt: Date): BarKarte {
+  const T = BAR_KARTE_TEXT
+  if (!barMoeglich(lage, jetzt)) return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true }
+  const erlassen = lage.modell === 'hofpreis' && einzugFuer(lage, 'ONSITE_CASH', jetzt) === 'erlassen'
+  return {
+    marke: T.aktiv,
+    ton: 'fertig',
+    satz: erlassen && gruendungBis ? T.gruendungSatz(formatDatumLang(gruendungBis)) : null,
+    lastschrift: false,
+  }
 }
 
 export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
@@ -341,15 +423,20 @@ function keineGebuehrGrund(hof: KonditionenHof, jetzt: Date): string | null {
 
 /**
  * Das Rechenbeispiel für eine Bestellung über € 20, heute bestellt, mit den
- * gespeicherten Sätzen dieses Hofs. Gebühr nur über berechneServicegebuehr
- * (E4, B1), Provision über calcPlatformFeeAmount wie im Checkout — keine
- * zweite Rechnung.
+ * gespeicherten Sätzen dieses Hofs. `preis` ist die Preisanzeige des Hofs
+ * (`preisAnzeigeFuer`, N38): null im Modell „bisher“ — dann die Servicegebühr
+ * über berechneServicegebuehr (E4, B1) —, sonst sein Satz der Plattformgebühr,
+ * gerechnet über bestellGebuehr wie Kasse und /api/checkout (Nr. 224). Die
+ * Provision über calcPlatformFeeAmount wie im Checkout — keine zweite Rechnung.
  */
-export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rechenbeispiel {
+export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date, preis: PreisAnzeige): Rechenbeispiel {
   const waren = RECHENBEISPIEL_WARENPREIS_CENTS
+  const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
+  const titel = `Rechenbeispiel: eine Bestellung über ${euro(waren)}`
+  if (preis) return rechenbeispielHofpreis(waren, provision, preis.hundertstel, titel)
+
   const online = berechneServicegebuehr(waren, hof, jetzt, 'ONLINE').gebuehrCents
   const bar = berechneServicegebuehr(waren, hof, jetzt, 'ONSITE_CASH').gebuehrCents
-  const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
   const grund = keineGebuehrGrund(hof, jetzt)
   const prozent = Number(hof.serviceFeePercent.toString())
 
@@ -362,7 +449,7 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
   onlineZeilen.push({ label: 'Deine Auszahlung', betrag: euro(waren - provision), summe: true })
 
   return {
-    titel: `Rechenbeispiel: eine Bestellung über ${euro(waren)}`,
+    titel,
     satz:
       grund === null && Number.isFinite(prozent)
         ? `Servicegebühr ${formatZahl(prozent)} %, mind. ${euro(hof.serviceFeeMinCents)} – zahlt der Kunde`
@@ -391,6 +478,46 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
         : bar > 0
           ? (barGebuehrSepaSatz(jetzt) ?? '')
           : (grund ?? ''),
+    },
+  }
+}
+
+/** Die Zeile der Plattformgebühr im Rechenbeispiel: Sie steckt im Preis, den die Kundin sieht (N38). */
+export const RECHENBEISPIEL_GEBUEHR_IM_PREIS = `${PLATTFORMGEBUEHR_BEZEICHNUNG} (im Preis)`
+
+/**
+ * Das Beispiel im Hofpreis-Modell (N38): Die Kundin zahlt den Endpreis
+ * (Warenpreis + Gebühr je Stück, aufgerundet), online behält Stripe die Gebühr
+ * ein, bar holt sie die Monatsabrechnung — online und bar dieselbe Rechnung.
+ */
+function rechenbeispielHofpreis(waren: number, provision: number, hundertstel: number, titel: string): Rechenbeispiel {
+  const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: waren, menge: 1 }], hundertstel)
+  const gebuehrZeile: RechenZeile = { label: RECHENBEISPIEL_GEBUEHR_IM_PREIS, betrag: `+ ${euro(gebuehrCents)}` }
+  const onlineZeilen: RechenZeile[] = [
+    { label: 'Warenpreis', betrag: euro(waren) },
+    gebuehrZeile,
+    { label: 'Kunde zahlt', betrag: euro(gesamtCents), summe: true },
+  ]
+  if (provision > 0) onlineZeilen.push({ label: 'Provision', betrag: `− ${euro(provision)}` })
+  onlineZeilen.push({ label: 'Deine Auszahlung', betrag: euro(waren - provision), summe: true })
+  return {
+    titel,
+    satz: `${PLATTFORMGEBUEHR_BEZEICHNUNG} ${satzText(hundertstel)} % je Stück, aufgerundet – steckt im Preis, den die Kundin zahlt`,
+    mitProvision: provision > 0,
+    online: {
+      titel: 'Online bezahlt',
+      zeilen: onlineZeilen,
+      satz: provision > 0 ? ONLINE_GEBUEHR_MIT_PROVISION_SATZ : ONLINE_GEBUEHR_ABGETRENNT_SATZ,
+    },
+    bar: {
+      titel: 'Bar bei Abholung',
+      zeilen: [
+        { label: 'Warenpreis', betrag: euro(waren) },
+        gebuehrZeile,
+        { label: 'Du kassierst („Bar zu kassieren“)', betrag: euro(gesamtCents), summe: true },
+        { label: 'Dir bleibt', betrag: euro(waren), summe: true },
+      ],
+      satz: BAR_GEBUEHR_SEPA_SATZ,
     },
   }
 }

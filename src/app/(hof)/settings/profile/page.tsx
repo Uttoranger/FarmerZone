@@ -6,14 +6,15 @@ import { ProfileForm } from '@/components/settings/profile-form'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
+import { HOFDATEN_TEXT } from '@/lib/hof-einstellungen'
 
-/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
-const TITEL = 'Hof-Profil'
+/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise („Hofdaten“, N42 c). */
+const TITEL = HOFDATEN_TEXT.titel
 
 export const metadata: Metadata = { title: `${TITEL} — ${MARKE}` }
 
 /*
- * Hof-Profil in der HofShell (Nachtlauf Nr. 22d): gleiches Formular, gleiche
+ * Hofdaten (bis Nr. 224 „Hof-Profil“, Register N42 c) in der HofShell (Nachtlauf Nr. 22d): gleiches Formular, gleiche
  * Action (updateProfile mit Zod und Besitzprüfung), nur Kopf und Rahmen neu.
  * Seit Nr. 44 am Handy mit festem Kopf (UnterseitenKopf); nach dem Speichern
  * geht es zurück zur Übersicht (Register N1).
@@ -28,7 +29,7 @@ export default async function ProfileSettingsPage(): Promise<React.JSX.Element> 
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel={TITEL} satz="Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind." />
+      <UnterseitenKopf titel={TITEL} satz={HOFDATEN_TEXT.satz} />
       <div data-app-palette="neu">
         <ProfileForm farm={farm} />
       </div>
