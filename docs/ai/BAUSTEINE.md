@@ -245,15 +245,14 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/hofseite/bildansicht.tsx · BildansichtEbene, fotoAlt, useBildansicht, type Bildansicht, type BildansichtFoto · Die Bildansicht der Hofseite (Lightbox) — eine eigene Ebene über der Seite, kein Base-UI-Dialog. · genutzt
 - src/components/hofseite/hofseite-fotos.tsx · HofseiteFotos · „Fotos" in der Übersicht der Hofseite (Mockups web-k2-hofseite, mobil-k2-hofseite-fotos-mosaik): Kacheln, jede ein Knopf, der die Bildansicht öffnet — kein Bild liegt in einem Link (sonst sprang ein … · genutzt
 - src/components/hofseite/hofseite-kunde.tsx · HofseiteKunde, type HofseiteHof · Die Hofseite für Kundinnen im neuen Design (Nachtlauf Nr. 10, Gate 4). Mockups: web-k2-hofseite (Übersicht), web-k2-alle-produkte-nach-kategorie (Reiter Produkte), mobil-k2-hofseite, … · genutzt
-- src/components/hofseite/hofseite-seitenspalte.tsx · HofseiteSeitenspalte, type SeitenspalteHof · Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt): Mini-Warenkorb, Nächste Abholung, Abholzeiten, Zahlung & Kontakt mit dem Gebührenhinweis und Anfahrt. · genutzt
+- src/components/hofseite/hofseite-seitenspalte.tsx · HofseiteSeitenspalte, PFEIL_LINK, SPALTEN_KARTE, TELEFON_IN_DER_BESTAETIGUNG, UEBERZEILE, ohneKommaNachTag, zahlungsSatz, type SeitenspalteHof · Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt; Aufbau seit Nr. 235 nach den Boards w1-/s1-hofseite und w1-/s1-produkt): Mini-Warenkorb, Nächste Abholung, Abholzeiten, Zahlung & … · genutzt
 - src/components/hofseite/kauf-grund.tsx · KaufGrund · Der Grund an der Stelle von „Zur Kasse“ — EINE Quelle für das Korb-Blatt (farm/cart-sheet.tsx) und den Mini-Warenkorb der Seitenspalte (Nr. 205, Morgenbericht 26). · genutzt
-- src/components/hofseite/kauf-sperre-hinweis.tsx · KaufSperreHinweis · Die Hinweiskarte zur Kaufsperre (Register N24) — EINE Komponente für Hofseite, Produktseite, Mini-Warenkorb und Kasse, an der Stelle, an der vorher nur die Pause-Karte stand: - Pause: die orange … · genutzt
+- src/components/hofseite/kauf-sperre-hinweis.tsx · KaufSperreHinweis, PAUSE_ANSEHEN_SAETZE, PAUSIERT_GERADE · Der Zustand bei Pause in der Wortform der Boards w1-/s1-hofseite: „<Hof> pausiert gerade." als Titel der Karte und klein in der Hofzeile („Braunau am Inn · pausiert gerade"). · genutzt
 - src/components/hofseite/produkt-abschnitte.tsx · ProduktAbschnitte, SPRUNGZIEL_UNTER_LEISTE · Wie weit ein Sprungziel unter dem klebenden Block stehen bleibt. · genutzt
-- src/components/hofseite/produkt-karte.tsx · ProduktKarte · Eine Produktkarte der Hofseite (Mockups web-k2-alle-produkte-nach-kategorie und mobil-k2-produkte): am Handy eine Zeile mit Bild, Name, Preis und Plus-Knopf, ab 768 px eine Kachel mit Bild oben und … · genutzt
+- src/components/hofseite/produkt-karte.tsx · FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PRODUKT_LISTE, ProduktKarte · Die Liste der Produktkarten (Boards s1-/w1-hofseite): am Handy EINE Karte mit Zeilen und Trennlinien, ab 768 px drei Kacheln nebeneinander. · genutzt
 - src/components/hofseite/teilen-besuch.tsx · TeilenBesuchMelden · Kam die Kundin über einen geteilten Link (`?k=wa` …)? · genutzt
 - src/components/hofseite/testhof-hinweis.tsx · TesthofHinweis · Oben auf Hofseite, Produktseite und Kasse eines Testhofs (Register N21, Nr. 207): die ruhige Hinweiskarte im neutralen Ton (nie orange oder grün — der Hinweis bewertet nichts), Text aus … · genutzt
 - src/components/hofseite/titelbild.tsx · Titelbild, TitelbildBilder · Das Titelbild der Hofseite (Register N6, Nachtlauf Nr. 72; am Computer Register N13, Nr. 89), aus hofseite-kunde.tsx herausgelöst. · genutzt
-- src/components/hofseite/use-hofzeile-klebt.ts · useHofzeileKlebt · Klebt der Block der Hofzeile schon unter dem Seitenkopf (Nr. 195)? · genutzt
 
 ## src/components/karte
 
@@ -303,8 +302,8 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/produktdetail
 
-- src/components/produktdetail/produktdetail-kunde.tsx · ProduktdetailKunde · Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4). Mockups: web-k2-futter-groesse-waehlen, web-k2-brennmaterial-brennholz, mobil-k2-futter-groesse-waehlen, … · genutzt
-- src/components/produktdetail/produktdetail-teile.tsx · GleichMitAbholen, Kennzeichnung · Teile der Produktseite (Nachtlauf Nr. 11): das Akkordeon „Kennzeichnung" und „Gleich mit abholen". · genutzt
+- src/components/produktdetail/produktdetail-kunde.tsx · ProduktdetailKunde · Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4; Aufbau seit Nr. 235 nach den Boards w1-/s1-produkt). · genutzt
+- src/components/produktdetail/produktdetail-teile.tsx · GleichMitAbholen, Kennzeichnung, ohneDoppelteGehalte · Teile der Produktseite (Nachtlauf Nr. 11, Aufbau seit Nr. 235): „Kennzeichnung" und „Gleich mit abholen". · genutzt
 
 ## src/components/produkte
 

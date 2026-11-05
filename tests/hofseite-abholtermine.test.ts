@@ -34,7 +34,7 @@ const HOF: SeitenspalteHof = {
 
 function spalte(hof: SeitenspalteHof = HOF, sperre: KaufSperre = null): string {
   return renderToStaticMarkup(
-    createElement(HofseiteSeitenspalte, { hof, sperre, zahlungsarten: [], gebuehrKurz: null, gebuehrKorb: null, mitKorb: false, jetzt: JETZT })
+    createElement(HofseiteSeitenspalte, { hof, sperre, zahlungsarten: [], gebuehrHinweis: null, gebuehrKorb: null, mitKorb: false, jetzt: JETZT })
   )
 }
 
@@ -50,7 +50,8 @@ describe('Nächste Abholung: Termine als Text mit Datum', () => {
     const abschnitt = naechsteAbholung(spalte())
     expect(abschnitt).toContain('Heute · Mi, 22. Juli')
     expect(abschnitt).toContain('Sa, 25. Juli')
-    expect(abschnitt).toContain('Mi, 29. Juli')
+    // Zwei Termine wie im Board w1-hofseite (seit Nr. 235) — der dritte nicht mehr.
+    expect(abschnitt).not.toContain('Mi, 29. Juli')
     expect(abschnitt).toContain('15–18 Uhr')
     expect(abschnitt).toContain('Deinen Abholtermin wählst du beim Bestellen.')
   })
@@ -64,7 +65,7 @@ describe('Nächste Abholung: Termine als Text mit Datum', () => {
       /\bborder\b|border-accent|bg-accent|rounded-xl|<button|<a\b/
     )
     // Und die Zeilen sind wirklich da (Gegenprobe zum leeren Fund).
-    expect((zeilen.match(/<li/g) ?? []).length).toBe(3)
+    expect((zeilen.match(/<li/g) ?? []).length).toBe(2)
   })
 
   it('mit Kaufsperre (Pause, keine Abholzeit, ausgebucht — N24) keine Termine — Ankündigen, was man nicht buchen kann, wäre ein leeres Versprechen', () => {
