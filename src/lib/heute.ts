@@ -11,7 +11,7 @@ import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
-import { mitAnzahl } from '@/lib/format'
+import { formatTagKurz, mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
@@ -132,6 +132,25 @@ export function naechsteAbholungText(a: NaechsteAbholung): string {
 
 // ─── Heute abholen ──────────────────────────────────────────────────────────
 
+/**
+ * Ein Abholtag mit Wochentag und Datum (V9, Boards s1-heute, s1-bestellungen):
+ * „Heute, Mi 3. März", „Morgen, Do 4. März", sonst „Sa, 6. März" — „Heute“ und
+ * „Morgen“ stehen nur zusätzlich, nie statt des Datums (DESIGN_SYSTEM
+ * „Komponenten“). Nach „Heute, “ ohne zweites Komma, sonst stünden drei
+ * hintereinander. Das Datum kommt aus formatTagKurz, kein eigenes Format.
+ */
+export function abholTagMitDatum(heuteKalendertag: string, kalendertag: string): string {
+  const kurz = formatTagKurz(kalendertag)
+  const vorsatz =
+    kalendertag === heuteKalendertag ? 'Heute' : kalendertag === tagVersetzt(heuteKalendertag, 1) ? 'Morgen' : kalendertag === tagVersetzt(heuteKalendertag, -1) ? 'Gestern' : null
+  return vorsatz ? `${vorsatz}, ${kurz.replace(', ', ' ')}` : kurz
+}
+
+/** Die grüne Marke unter dem Kopf von Heute: „Abholung heute, Mi 3. März, 15–18 Uhr" (Board s1-heute). */
+export function abholungHeuteText(heuteKalendertag: string, zeit: string): string {
+  return `Abholung ${abholTagMitDatum(heuteKalendertag, heuteKalendertag).replace('Heute', 'heute')}, ${zeit}`
+}
+
 /** „Anna Beispiel" → „Anna B." — genug zum Erkennen, mehr steht auf dem Handy nicht offen herum. */
 export function kurzname(name: string): string {
   const teile = name.trim().split(/\s+/).filter(Boolean)
@@ -140,11 +159,15 @@ export function kurzname(name: string): string {
   return `${teile[0]} ${teile[teile.length - 1][0].toUpperCase()}.`
 }
 
-/** „2× Eier, 1× Bauernbrot +2" — die ersten Positionen, der Rest als Zahl. */
+/**
+ * „2× Eier · 1× Heumilch" bzw. ab drei Positionen „3 Positionen" (Board s1-heute):
+ * In der schmalen Zeile der Packliste wäre eine gekürzte Aufzählung mit „+2"
+ * schwerer zu lesen als die Zahl. Der Punkt trennt, weil Produktnamen selbst
+ * Kommas tragen („Futterhafer, Big Bag").
+ */
 export function positionenKurz(items: readonly { productName: string; quantity: number }[], hoechstens = 2): string {
-  const gezeigt = items.slice(0, hoechstens).map((i) => `${i.quantity}× ${i.productName}`)
-  const rest = items.length - gezeigt.length
-  return rest > 0 ? `${gezeigt.join(', ')} +${rest}` : gezeigt.join(', ')
+  if (items.length > hoechstens) return `${items.length} Positionen`
+  return items.map((i) => `${i.quantity}× ${i.productName}`).join(' · ')
 }
 
 export type AbholChip = 'bereit' | 'vorbereiten' | 'wartet'
@@ -160,10 +183,11 @@ export function abholChip(status: string): AbholChip {
   return 'vorbereiten'
 }
 
+// Klein, weil es hinter den Positionen im Satz steht („3 Positionen · bar", Board s1-heute).
 const ZAHLART_KURZ: Record<string, string> = {
-  ONLINE: 'Online',
-  ONSITE_CASH: 'Bar vor Ort',
-  ONSITE_CARD: 'Karte vor Ort',
+  ONLINE: 'online',
+  ONSITE_CASH: 'bar',
+  ONSITE_CARD: 'Karte',
 }
 
 export type HeutigeAbholung = {
@@ -412,9 +436,21 @@ export function packliste(bestellungen: readonly PacklistenBestellung[]): Packli
 
 export type PacklistenZahlen = { bestellungen: number; zuPacken: number }
 
-/** „Heute abholen" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
+/**
+ * „Heute abholen" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt.
+ * „Noch zu packen" zählt nur bestätigte bzw. bezahlte, noch nicht gepackte Bestellungen
+ * (V40, N41 e): „Wartet auf Kunde" (Bestätigung offen) und „Gepackt" zählen nicht.
+ */
 export function packlistenZahlen(zeilen: readonly PacklistenZeile[]): PacklistenZahlen {
   return { bestellungen: zeilen.length, zuPacken: zeilen.filter((z) => z.chip === 'vorbereiten').length }
+}
+
+/** „2 zu packen · 1 wartet" hinter „Packliste" (Board s1-heute) — nur, was es gibt; gepackt steht in den Zeilen. */
+export function packlistenStand(zeilen: readonly PacklistenZeile[]): string {
+  const zuPacken = zeilen.filter((z) => z.chip === 'vorbereiten').length
+  const wartet = zeilen.filter((z) => z.chip === 'wartet').length
+  const teile = [zuPacken > 0 ? `${zuPacken} zu packen` : null, wartet > 0 ? `${wartet} wartet` : null].filter((t) => t !== null)
+  return teile.length > 0 ? teile.join(' · ') : 'alles gepackt'
 }
 
 // ─── Kennzahlen (freigabe.md §12 Nr. 45) ────────────────────────────────────
@@ -445,6 +481,28 @@ export const KENNZAHL_TEXT = {
 
 /** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
 export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
+
+/**
+ * Der Satz unter HEUTE_NIEMAND: das nächste Abholfenster mit Datum und seiner
+ * Zahl in derselben Zeile (V40, Boards s1-heute, s1-bestellungen):
+ * „Nächste Abholung: Sa, 6. März, 9–12 Uhr · 2 Bestellungen". Ohne Bestellung
+ * nur das Fenster.
+ */
+export function naechsteAbholungSatz(fenster: NaechstesFenster, anzahl: number, heuteKalendertag: string): string {
+  const wann = `${abholTagMitDatum(heuteKalendertag, fenster.tag)}, ${fenster.zeit}`
+  return anzahl > 0 ? `Nächste Abholung: ${wann} · ${mitAnzahl(anzahl, 'Bestellung', 'Bestellungen')}` : `Nächste Abholung: ${wann}`
+}
+
+/** Die leere Packliste auf Papier (Board s2-druck, Bild 3). */
+export const HEUTE_KEINE_ABHOLUNG_PAPIER = 'Heute keine Bestellungen zur Abholung.'
+
+/** Auf der leeren Packliste (Papier, Board s2-druck): „Die nächste Abholung ist Sa, 6. März, 9–12 Uhr.“ */
+export function naechsteAbholungPapier(fenster: NaechstesFenster, heuteKalendertag: string): string {
+  const tag = abholTagMitDatum(heuteKalendertag, fenster.tag)
+  // Mitten im Satz klein: „ist heute, Mi 3. März, …“; Wochentage bleiben groß.
+  const imSatz = /^(Heute|Morgen),/.test(tag) ? tag[0].toLowerCase() + tag.slice(1) : tag
+  return `Die nächste Abholung ist ${imSatz}, ${fenster.zeit}.`
+}
 
 /** Die eine Zeile unter dem Abholfenster in „Nächste Abholung“, solange nichts bestellt ist (Register N9, eine Zeile ohne Aktion). */
 export const HEUTE_KEINE_BESTELLUNGEN = 'Noch keine Bestellungen'
@@ -633,6 +691,9 @@ export function abholungText(fenster: NaechstesFenster | null): string {
   const tag = fenster.name === 'Heute' || fenster.name === 'Morgen' ? fenster.name.toLowerCase() : fenster.name
   return `Abholung ${tag}, ${fenster.zeit}`
 }
+
+/** Der Satz unter „Diese Woche bei dir: …" in der Teilen-Karte (Board s1-heute, Bild 2). */
+export const TEILEN_KARTE_SATZ = 'Erzähl es deiner Kundschaft – mit einem Tipp per WhatsApp oder E-Mail.'
 
 /** „Eier, Erdäpfel, Heu – Abholung Samstag, 9–12 Uhr" — was es gibt und wann man es holt. */
 export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster | null): string {

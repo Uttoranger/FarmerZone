@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
+import { barFristSatz, getBestellungenSeite, getHofBestellDetail, naechstesFensterMitZahl } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import { MARKE } from '@/lib/marke'
+import { naechsteAbholungSatz } from '@/lib/heute'
+import { wienKalendertag } from '@/lib/kalender'
 
 export const metadata: Metadata = {
   title: `Bestellungen — ${MARKE}`,
@@ -51,6 +53,11 @@ export default async function OrdersPage({
   const seite = await getBestellungenSeite(farm.id, filter, jetzt)
   const erste = seite.gruppen[0]?.bestellungen[0]
   const detail = erste ? await getHofBestellDetail(farm, erste.id, jetzt) : null
+  const barFrist = detail ? await barFristSatz(farm.id, detail, jetzt) : null
 
-  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="liste" />
+  // „Heute abholen" leer (Board s1-bestellungen, Bild 2): die nächste Abholung samt ihrer Zahl, wie auf Heute.
+  const naechstes = filter === 'heute' && seite.gruppen.length === 0 && seite.hatBestellungen ? await naechstesFensterMitZahl(farm.id, jetzt) : null
+  const naechsteAbholung = naechstes ? naechsteAbholungSatz(naechstes.fenster, naechstes.anzahl, wienKalendertag(jetzt)) : null
+
+  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="liste" hofName={farm.name} barFrist={barFrist} naechsteAbholung={naechsteAbholung} />
 }

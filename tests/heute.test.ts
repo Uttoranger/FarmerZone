@@ -176,15 +176,17 @@ describe('Heute abholen — Zeilen', () => {
     expect(kurzname('   ')).toBe('Kunde')
   })
 
-  it('positionenKurz: zwei Positionen, der Rest als Zahl', () => {
+  it('positionenKurz: bis zwei Positionen mit Punkt getrennt, ab drei nur die Zahl (Board s1-heute)', () => {
     const items = [
       { productName: 'Eier', quantity: 2 },
-      { productName: 'Bauernbrot', quantity: 1 },
+      { productName: 'Futterhafer, Big Bag', quantity: 1 },
       { productName: 'Butter', quantity: 1 },
       { productName: 'Honig', quantity: 3 },
     ]
-    expect(positionenKurz(items)).toBe('2× Eier, 1× Bauernbrot +2')
-    expect(positionenKurz(items.slice(0, 2))).toBe('2× Eier, 1× Bauernbrot')
+    expect(positionenKurz(items)).toBe('4 Positionen')
+    expect(positionenKurz(items.slice(0, 3))).toBe('3 Positionen')
+    // Der Punkt trennt, weil Produktnamen selbst Kommas tragen.
+    expect(positionenKurz(items.slice(0, 2))).toBe('2× Eier · 1× Futterhafer, Big Bag')
     expect(positionenKurz([])).toBe('')
   })
 
@@ -223,10 +225,10 @@ describe('Heute abholen — Zeilen', () => {
       uhrzeit: '09:00–18:00',
       kunde: 'Frida T.',
       positionen: '10× Eier',
-      zahlart: 'Bar vor Ort',
+      zahlart: 'bar',
       chip: 'vorbereiten',
     })
-    expect(zeilen[1].zahlart).toBe('Online')
+    expect(zeilen[1].zahlart).toBe('online')
     expect(zeilen[1].chip).toBe('wartet')
     expect(zeilen[2].chip).toBe('bereit')
   })

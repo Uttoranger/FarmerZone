@@ -47,6 +47,7 @@ vi.mock('next/link', () => ({
 }))
 
 import {
+  abholungHeuteText,
   brauchtDichAnzeige,
   HEUTE_ABHOLEN,
   KENNZAHL_TEXT,
@@ -59,6 +60,7 @@ import {
   kennzahlBreiteEm,
   mitTrennstellen,
   naechstesAbholfenster,
+  naechsteAbholungSatz,
   onlinePausiertDaten,
   stripeEinrichtenHinweis,
   packliste,
@@ -80,6 +82,7 @@ import {
   merkeFreischaltGesehen,
 } from '@/lib/freischalt-moment'
 import {
+  AbholungHeuteMarke,
   BrauchtDichKarte,
   HeuteKopf,
   Kennzahlen,
@@ -93,7 +96,6 @@ import {
 } from '@/components/heute/heute-teile'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
-import { LEISE } from '@/components/hof-bestellungen/stil'
 import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, ersteSchritte, ersteSchritteDaten, zuTun, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 
@@ -611,7 +613,7 @@ const zeile = (z: Partial<PacklistenZeile> & Pick<PacklistenZeile, 'id' | 'chip'
   uhrzeit: '15:00–18:00',
   kunde: 'Anna T.',
   positionen: '10× Eier, 1× Bauernbrot',
-  zahlart: 'Bar vor Ort',
+  zahlart: 'bar',
   gesamtCents: 1030,
   ...z,
 })
@@ -621,13 +623,14 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const h = html(
       createElement(Packliste, {
         zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' }), zeile({ id: 'o2', chip: 'bereit', gesamtCents: 2190 })],
-        zuPacken: 1,
+        stand: '1 zu packen',
         naechsteAbholung: null,
-        leer: { abholfenster: null },
+        leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr · 2 Bestellungen' },
       })
     )
+    // Board s1-heute: der Kopf über der Karte mit dem Stand.
     expect(h).toContain('Packliste für heute')
-    expect(h).toContain('1 offen')
+    expect(h).toContain(' · 1 zu packen')
     expect(h).toContain('href="/orders/o1"')
     expect(h).toContain('Zum Packen')
     expect(h).toContain('Gepackt')
@@ -637,36 +640,42 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(h).toContain('Alle Bestellungen ansehen')
   })
 
-  it('Packliste leer: Satz mit Ausweg, ohne Druckknopf', () => {
-    const ohneFenster = html(createElement(Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: null } }))
-    expect(ohneFenster).toContain('Heute holt niemand etwas ab.')
+  it('Packliste leer: ohne Abholzeit „Noch keine Abholzeiten" mit Knopf, mit Abholzeit die nächste Abholung samt Zahl — beide ohne Druckknopf (Board s1-heute, Bild 3 und 4)', () => {
+    const ohneFenster = html(createElement(Packliste, { zeilen: [], stand: '', naechsteAbholung: null, leer: { naechsteAbholung: null } }))
+    expect(ohneFenster).toContain(ABHOLZEITEN_FEHLEN.titel)
     expect(ohneFenster).toContain('href="/settings/pickup-slots"')
     expect(ohneFenster).not.toContain('/orders/today/print')
+    const satz = naechsteAbholungSatz({ tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' }, 3, '2026-10-06')
+    expect(satz).toBe('Nächste Abholung: Do, 8.\u00a0Okt, 15–18 Uhr · 3 Bestellungen')
     const mitFenster = html(
       createElement(Packliste, {
         zeilen: [],
-        zuPacken: 0,
+        stand: '',
         naechsteAbholung: { tag: '2026-10-08', name: 'Donnerstag', anzahl: 3 },
-        leer: { abholfenster: { tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' } },
+        leer: { naechsteAbholung: satz },
       })
     )
-    expect(mitFenster).toContain('Nächste Abholung: Donnerstag, 15–18 Uhr')
-    expect(mitFenster).toContain('Donnerstag: 3 Bestellungen')
-    expect(mitFenster).toContain('href="/orders"')
+    expect(mitFenster).toContain('Heute holt niemand etwas ab.')
+    expect(mitFenster).toContain('Nächste Abholung: Do, 8.\u00a0Okt, 15–18 Uhr · 3 Bestellungen')
+    // Nichts zu tun: kein Knopf, kein Druck.
+    expect(mitFenster).not.toContain('href="/settings/pickup-slots"')
+    expect(mitFenster).not.toContain('/orders/today/print')
   })
 
   it('lange Namen: eine Zeile mit Auslassung, voller Text im title', () => {
     const lang = 'K'.repeat(80)
-    const h = html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten', kunde: lang })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } }))
+    const h = html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten', kunde: lang })], stand: '1 zu packen', naechsteAbholung: null, leer: { naechsteAbholung: null } }))
     expect(h).toContain(`title="${lang}"`)
     expect(h).toContain('truncate')
   })
 
   it('Kopf und Kennzahlen: Abholung heute als Marke, Betrag über formatEuro, offen orange', () => {
-    const kopf = html(createElement(HeuteKopf, { datum: 'Dienstag, 6. Oktober 2026', abholungHeute: '15–18 Uhr' }))
+    const kopf = html(createElement(HeuteKopf, { datum: 'Dienstag, 6. Oktober 2026' }))
     expect(kopf).toContain('<h1')
-    expect(kopf).toContain('Abholung heute, 15–18 Uhr')
-    expect(html(createElement(HeuteKopf, { datum: 'Dienstag', abholungHeute: null }))).not.toContain('Abholung heute')
+    expect(kopf).not.toContain('Abholung heute')
+    // Die Marke mit Wochentag und Datum (V9), getrennt vom Kopf (Board s1-heute).
+    expect(abholungHeuteText('2026-10-06', '15–18 Uhr')).toBe('Abholung heute, Di 6.\u00a0Okt, 15–18 Uhr')
+    expect(html(createElement(AbholungHeuteMarke, { text: abholungHeuteText('2026-10-06', '15–18 Uhr') }))).toContain('Abholung heute, Di 6.\u00a0Okt, 15–18 Uhr')
     const zahlen = html(createElement(Kennzahlen, { bestellungen: 8, zuPacken: 5, umsatzHeuteCent: 18640 }))
     expect(zahlen).toContain('Noch zu packen')
     expect(zahlen).toContain('€ 186,40')
@@ -783,11 +792,14 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
   })
 
   it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich', () => {
-    const abholung = html(createElement(NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 8 }))
-    expect(abholung).toMatch(/Heute, <span[^>]*>15–18 Uhr<\/span>/)
+    const abholung = html(
+      createElement(NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, tag: 'Heute, Di 6. Okt', anzahl: 8 })
+    )
+    // Mit Wochentag und Datum (V9, Board s1-heute).
+    expect(abholung).toMatch(/Heute, Di 6\. Okt, <span[^>]*>15–18 Uhr<\/span>/)
     expect(abholung).toContain('8 Bestellungen')
     // Ohne Abholzeit nur der Titel als Zeile; Satz und Knopf stehen allein in der Packliste (tests/leerzustaende.test.ts).
-    const ohneFenster = html(createElement(NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))
+    const ohneFenster = html(createElement(NaechsteAbholungKarte, { fenster: null, tag: null, anzahl: 0 }))
     expect(ohneFenster).toContain('Noch keine Abholzeiten')
     expect(ohneFenster).not.toContain('href=')
 
@@ -802,23 +814,20 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   })
 
-  it('Braucht dich ohne Eintrag bei leerer Packliste: eine leise Zeile „Nichts braucht dich heute." — gedämpft, keine Karte, keine Überschrift, kein Link (N11)', () => {
+  it('Braucht dich ohne Eintrag bei leerer Packliste: Kopf „Braucht dich" und die eine Zeile „Nichts braucht dich heute." in einer Karte — ohne Liste und ohne Link (N11, Board s1-heute Bild 3)', () => {
     const leer = html(createElement(BrauchtDichKarte, { eintraege: [], packlisteLeer: true }))
     expect(leer).toContain('Nichts braucht dich heute.')
     expect(leer).not.toContain('Alles erledigt.')
-    // Gedämpft wie „Zu tun einblenden": die leise Schrift der Hofbereich-Bausteine (LEISE), halbfett-leicht (font-medium).
-    expect(leer).toMatch(new RegExp(`<p class="[^"]*\\b${LEISE}\\b[^"]*">Nichts braucht dich heute\\.</p>`))
-    expect(leer).toMatch(/<p class="[^"]*\bfont-medium\b/)
-    // Die Karte erkennt man am Abschnitt mit Überschrift, an der Liste und am Rahmen
-    // auf der Kartenfläche (Gegenprobe unten: dort kommt jedes dieser Merkmale vor).
-    expect(leer).not.toMatch(/<section|<h2|<ul|<a /)
-    expect(leer).not.toMatch(/bg-card|border/)
+    expect(leer).toMatch(/<h2[^>]*>Braucht dich<\/h2>/)
+    expect(leer).toMatch(/<p class="[^"]*\bbg-card\b[^"]*">Nichts braucht dich heute\.<\/p>/)
+    // Nichts zu tun: keine Liste, kein Link (Gegenprobe unten: dort kommen beide vor).
+    expect(leer).not.toMatch(/<ul|<a /)
   })
 
   it('Braucht dich mit Einträgen: die Karte mit Überschrift und Zeilen mit Ziel — die leise Zeile fehlt dann (N11)', () => {
     const gefuellt = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', href: '/products?edit=p1' }], packlisteLeer: false }))
     expect(gefuellt).toMatch(/<section[^>]*aria-labelledby="heute-braucht-dich"/)
-    expect(gefuellt).toMatch(/<h2[^>]*>Braucht dich<\/h2>/)
+    expect(gefuellt).toMatch(/<h2[^>]*>Braucht dich · 1<\/h2>/)
     expect(gefuellt).toContain('Eier ist ausverkauft')
     expect(gefuellt).toContain('href="/products?edit=p1"')
     expect(gefuellt).toMatch(/<ul/)
@@ -834,7 +843,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   it('Packliste mit Bestellungen, aber ohne aktive Abholzeit: Satz und Knopf unter der Liste — mit Abholzeit nicht', () => {
     const ohneAbholzeit = html(
-      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })
+      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', naechsteAbholung: null, leer: { naechsteAbholung: null } })
     )
     expect(ohneAbholzeit).toContain('href="/orders/o1"')
     expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.satz)
@@ -843,9 +852,9 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const mitAbholzeit = html(
       createElement(Packliste, {
         zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })],
-        zuPacken: 1,
+        stand: '1 zu packen',
         naechsteAbholung: null,
-        leer: { abholfenster: { tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' } },
+        leer: { naechsteAbholung: 'Nächste Abholung: Do, 8. Okt, 15–18 Uhr' },
       })
     )
     expect(mitAbholzeit).not.toContain(ABHOLZEITEN_FEHLEN.satz)
@@ -856,8 +865,8 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const alle = [
       html(createElement(StripeHinweis, { barMoeglich: true })),
       html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x' })),
-      html(createElement(HeuteKopf, { datum: 'x', abholungHeute: '15–18 Uhr' })),
-      html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })),
+      html(createElement(HeuteKopf, { datum: 'x' })),
+      html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', naechsteAbholung: null, leer: { naechsteAbholung: null } })),
       html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: false, ausblenden: null })),
     ].join('')
     const symbole = alle.match(/<svg[^>]*>/g) ?? []
@@ -910,8 +919,8 @@ describe('„Zu tun" — EINE Karte statt Erste Schritte und „Deine Hofseite" 
         ausblenden: createElement('button', { type: 'button' }, 'Ausblenden'),
       })
     )
-    expect(h).toMatch(/<h2[^>]*>Zu tun<\/h2>/)
-    expect(h).toContain('2 offen')
+    // Board s1-heute: „Zu tun · 2" als Kopf.
+    expect(h).toMatch(/<h2[^>]*>Zu tun · 2<\/h2>/)
     expect([...h.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1])).toEqual(['/settings/appearance', '/settings/appearance'])
     expect(h).toContain('Farbverlauf — ein eigenes Foto wirkt persönlicher')
     expect(h).toContain('Noch keine Fotos')

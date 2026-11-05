@@ -19,8 +19,9 @@ import type { HofBestellDetail } from '@/server/queries/orders'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
-import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
+import { centsAlsEuro } from '@/lib/servicegebuehr'
+import { gebuehrBezeichnungFuer, gebuehrErstattungOffenHinweisFuer } from '@/lib/plattformgebuehr'
+import { betragSatz, modellDerBestellung } from '@/lib/hof-bestellungen'
 import { formatEuro } from '@/lib/format'
 import { PROBLEM_MELDEN, PROBLEM_MELDEN_HOF } from '@/lib/fehlerseite'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -31,7 +32,7 @@ import { ArtikelFehltDialog } from './artikel-fehlt-dialog'
 import { WiderrufKarte } from './widerruf-karte'
 import type { HofWiderruf } from '@/server/widerruf'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN, TEXT_ORANGE } from './stil'
+import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE, TEXT_GRUEN, TEXT_ORANGE } from './stil'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
 
@@ -51,8 +52,11 @@ export function BestellDetail({
   bestellung,
   zurueckSuche,
   widerrufe = [],
+  barFrist = null,
 }: {
   bestellung: HofBestellDetail
+  /** Bar-Bestellung mit „Bestätigung offen“: bis wann die Kundin bestätigt (bestaetigungOffenSatz, aus fristVon). */
+  barFrist?: string | null
   /** Offene Widerrufe dieser Bestellung (Nr. 200) — Knöpfe „Rückgabe erhalten – erstatten …“ und „Ablehnen …“. */
   widerrufe?: readonly HofWiderruf[]
   /** Der gewählte Filter der Liste (`?filter=…` oder leer) — der Rückweg führt mit ihm zurück. */
@@ -180,6 +184,7 @@ export function BestellDetail({
           </div>
 
           <Betrag bestellung={bestellung} />
+          {barFrist && <p className="rounded-xl border border-border bg-background px-3.5 py-2.5 text-[13px]">{barFrist}</p>}
 
           <section aria-labelledby={`packliste-${bestellung.id}`}>
             <div className="flex items-baseline gap-2">
@@ -220,14 +225,14 @@ export function BestellDetail({
 
           {zumPacken && (
             <p className={cn('text-[12.5px]', LEISE)}>
-              Bestellnummer {bestellung.nummer} nur zum Abgleich – bitte zusätzlich den Namen prüfen.
+              Bestellnummer {bestellung.nummer} – nur zum Abgleich, prüf bei der Abholung den Namen.
             </p>
           )}
 
           {(hauptaktion || aktionen.artikelFehlt || aktionen.nichtAbgeholt || aktionen.stornieren) && (
             <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
               {hauptaktion && (
-                <button type="button" onClick={hauptaktion.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'w-full rounded-[14px] sm:w-auto sm:rounded-full')}>
+                <button type="button" onClick={hauptaktion.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(KNOPF_ORANGE, 'w-full rounded-[14px] sm:w-auto sm:rounded-full')}>
                   {hauptaktion.text}
                 </button>
               )}
@@ -265,7 +270,7 @@ export function BestellDetail({
             </button>
           )}
           {aktionen.nichtAbgeholt && (
-            <p className={cn('text-[12.5px]', LEISE)}>„Nicht abgeholt“ kostet dich nichts – die Gebühr entfällt automatisch.</p>
+            <p className={cn('text-[12.5px]', LEISE)}>„Nicht abgeholt“ kostet dich nichts.</p>
           )}
           <div aria-live="polite">
             <DialogFehler text={offen ? null : fehler} />
@@ -285,6 +290,7 @@ export function BestellDetail({
           onStornoWaehlen={() => setOffen('storno')}
         />
         <BestellDialog
+          mitte
           offen={offen === 'nichtAbgeholt'}
           onOffenChange={(o) => setOffen(o ? 'nichtAbgeholt' : null)}
           titel="Nicht abgeholt?"
@@ -305,10 +311,11 @@ export function BestellDetail({
           </div>
         </BestellDialog>
         <BestellDialog
+          mitte
           offen={offen === 'dochNicht'}
           onOffenChange={(o) => setOffen(o ? 'dochNicht' : null)}
           titel="Doch nicht gepackt?"
-          hauptaktion={{ text: 'Zurück zum Packen', onClick: () => rueckweg('dochNicht'), ton: 'gruen', laeuft }}
+          hauptaktion={{ text: 'Zurück zum Packen', onClick: () => rueckweg('dochNicht'), ton: 'haupt', laeuft }}
         >
           <p className="text-[13.5px]">{kunde.vorname} hat schon die E-Mail „bereit zur Abholung“ bekommen.</p>
           <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[14px]">
@@ -318,10 +325,11 @@ export function BestellDetail({
           <DialogFehler text={offen === 'dochNicht' ? fehler : null} />
         </BestellDialog>
         <BestellDialog
+          mitte
           offen={offen === 'abholungZurueck'}
           onOffenChange={(o) => setOffen(o ? 'abholungZurueck' : null)}
           titel="Abholung rückgängig?"
-          hauptaktion={{ text: 'Abholung rückgängig', onClick: () => rueckweg('abholungZurueck'), ton: 'gruen', laeuft }}
+          hauptaktion={{ text: 'Abholung rückgängig', onClick: () => rueckweg('abholungZurueck'), ton: 'haupt', laeuft }}
         >
           <p className="text-[13.5px]">Die Bestellung steht wieder auf „Gepackt“. Es geht keine E-Mail raus.</p>
           <DialogFehler text={offen === 'abholungZurueck' ? fehler : null} />
@@ -345,21 +353,17 @@ function Haken({ an }: { an: boolean }): React.JSX.Element {
   )
 }
 
-/** Das Gebührenwort aus den Konstanten (Register N8) — im Hofpreis-Modell „Plattformgebühr“, sonst „Servicegebühr“. */
+/** Das Wort der Gebühr dieser Bestellung (V62/V63) — über den Helfer je Modell, nie ein festes Wort. */
 function gebuehrWortFuer(betrag: { hofpreis: boolean }): string {
-  return betrag.hofpreis ? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG
+  return gebuehrBezeichnungFuer(modellDerBestellung(betrag))
 }
 
 /** „Bar zu kassieren" groß (vor Ort) bzw. „Online bezahlt" — dazu, wie sich der Betrag zusammensetzt. */
 function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Element {
   const { betrag, status, vorOrt } = bestellung
   const beendet = status === 'CANCELLED' || status === 'NOT_PICKED_UP'
-  // Hofpreis-Modell (N38): Die Plattformgebühr ist Teil des Preises — der Hof sieht, was ihm bleibt und was die Kundin zahlt.
-  const zusammensetzung = betrag.hofpreis
-    ? `Du bekommst ${euro(betrag.warenCents)} · die Kundin zahlt ${euro(betrag.gesamtCents)}`
-    : betrag.gebuehrCents > 0
-      ? `Warenpreis ${euro(betrag.warenCents)} + ${SERVICEGEBUEHR_BEZEICHNUNG} ${euro(betrag.gebuehrCents)}`
-      : `Warenpreis ${euro(betrag.warenCents)}`
+  // Was beim Hof bleibt und wie sich der Betrag zusammensetzt — Wort je Modell (betragSatz, Helfer aus 221).
+  const zusammensetzung = betragSatz(betrag, vorOrt)
   const gebuehrWort = gebuehrWortFuer(betrag)
 
   if (beendet) {
@@ -373,7 +377,7 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
         {bestellung.stornoGrund && <p className="mt-1 text-[12.5px] break-words">Grund: {bestellung.stornoGrund}</p>}
         {betrag.gebuehrErstattungOffen && (
           <p className="mt-1.5 text-[12.5px] font-medium text-status-offen">
-            {GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS}{' '}
+            {gebuehrErstattungOffenHinweisFuer(modellDerBestellung(betrag))}{' '}
             <Link href={PROBLEM_MELDEN_HOF} className={cn('inline-flex min-h-11 items-center underline underline-offset-2', FOKUS_RAHMEN)}>
               {PROBLEM_MELDEN}
             </Link>
@@ -389,10 +393,7 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
       <div className="rounded-xl border border-primary/45 bg-primary/10 px-3.5 py-3">
         <p className="text-xs font-semibold tracking-wide text-status-offen uppercase">{kassiert ? 'Bar kassiert' : 'Bar zu kassieren'}</p>
         <p className="font-heading text-[30px] leading-tight font-semibold tabular-nums">{euro(betrag.gesamtCents)}</p>
-        <p className="text-[12.5px]">
-          {zusammensetzung}
-          {betrag.gebuehrFuerAbrechnung ? ' – die Gebühr holt die Monatsabrechnung.' : ''}
-        </p>
+        <p className="text-[12.5px]">{zusammensetzung}</p>
       </div>
     )
   }
@@ -401,10 +402,7 @@ function Betrag({ bestellung }: { bestellung: HofBestellDetail }): React.JSX.Ele
     <div className="rounded-xl border border-accent/45 bg-accent/10 px-3.5 py-3">
       <p className="text-xs font-semibold tracking-wide text-status-fertig uppercase">{bestellung.zahlart}</p>
       <p className="font-heading text-[26px] leading-tight font-semibold tabular-nums">{euro(betrag.gesamtCents)}</p>
-      <p className="text-[12.5px]">
-        {zusammensetzung}
-        {betrag.gebuehrCents > 0 ? ' – die Gebühr ist online einbehalten.' : ''}
-      </p>
+      <p className="text-[12.5px]">{zusammensetzung}</p>
       {betrag.erstattetCents > 0 && (
         <p className="mt-1 text-[12.5px]">Für fehlende Artikel schon erstattet: {euro(betrag.erstattetCents)}</p>
       )}

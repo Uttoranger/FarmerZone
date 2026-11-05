@@ -11,6 +11,7 @@ import { heutePostfach } from '@/lib/postfach'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
 import {
+  AbholungHeuteMarke,
   BrauchtDichKarte,
   HeuteKopf,
   Kennzahlen,
@@ -37,7 +38,20 @@ import { hofEmailFehlt } from '@/lib/hof-kontakt'
 import { agbFassung } from '@/lib/rechtstexte/agb-datei'
 import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
-import { beitragBlock, datumLang, entferneBeitragErinnerung, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
+import {
+  abholTagMitDatum,
+  abholungHeuteText,
+  beitragBlock,
+  datumLang,
+  entferneBeitragErinnerung,
+  heuteAufbau,
+  naechsteAbholungSatz,
+  packlistenStand,
+  teilenSatz,
+  vergleichText,
+  type HeuteBlock,
+} from '@/lib/heute'
+import { wienKalendertag } from '@/lib/kalender'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
@@ -140,6 +154,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     ? await Promise.all([getTeilenFensterDaten(farm.id, jetzt), getTeilenWirkung(farm.id, letzteTage(jetzt, 7))])
     : [null, null]
   const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
+  // Tage immer mit Wochentag und Datum (V9): „Heute, Mi 3. März", „Sa, 6. März".
+  const heuteTag = wienKalendertag(jetzt)
+  const naechstes = heute.naechstesFenster
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
     postfach: postfach && <PostfachKarte nachricht={postfach.nachricht} weitere={postfach.weitere} />,
@@ -158,9 +175,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     packliste: (
       <Packliste
         zeilen={heute.abholungen}
-        zuPacken={heute.zahlen.zuPacken}
+        stand={packlistenStand(heute.abholungen)}
         naechsteAbholung={heute.naechsteAbholung}
-        leer={{ abholfenster: heute.naechstesFenster?.fenster ?? null }}
+        leer={{ naechsteAbholung: naechstes ? naechsteAbholungSatz(naechstes.fenster, naechstes.anzahl, heuteTag) : null }}
       />
     ),
     'braucht-dich': <BrauchtDichKarte eintraege={brauchtDichEintraege} packlisteLeer={heute.abholungen.length === 0} />,
@@ -172,7 +189,11 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       />
     ),
     'naechste-abholung': (
-      <NaechsteAbholungKarte fenster={heute.naechstesFenster?.fenster ?? null} anzahl={heute.naechstesFenster?.anzahl ?? 0} />
+      <NaechsteAbholungKarte
+        fenster={naechstes?.fenster ?? null}
+        tag={naechstes ? abholTagMitDatum(heuteTag, naechstes.fenster.tag) : null}
+        anzahl={naechstes?.anzahl ?? 0}
+      />
     ),
     woche: (
       <WocheKarte
@@ -193,6 +214,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
       <div className="flex flex-col gap-4 md:gap-5">
+        {/* Reihenfolge nach Board s1-heute: Titel und Datum zuerst, dann die Pflicht- und Stripe-Karten,
+            dann die Marke „Abholung heute", die Zahlen und die Hauptspalte. */}
+        <HeuteKopf datum={datumLang(jetzt)} />
         {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
         {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
         {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
@@ -202,7 +226,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         {hofEmailFehlt(farm) && <HofEmailKarte />}
         {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
         {zeige(aufbau.oben)}
-        <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />
+        {heute.abholfensterHeute && (
+          <AbholungHeuteMarke text={abholungHeuteText(heuteTag, heute.abholfensterHeute)} />
+        )}
         <Kennzahlen
           bestellungen={heute.zahlen.bestellungen}
           zuPacken={heute.zahlen.zuPacken}

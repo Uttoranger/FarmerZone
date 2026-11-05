@@ -311,11 +311,6 @@ const FESTE_LISTE: Fest[] = [
   { datei: 'src/emails/order-confirmed.tsx', text: 'Servicegebühr', grund: `${BISHER}: Rückfall nur ohne gebuehrWort im Auftrag; email.ts setzt es aus der Bestellung` },
   { datei: 'src/lib/email.ts', text: /^SERVICEGEBUEHR_BEZEICHNUNG · return imHofpreis\(order\) \? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG$/, grund: `${BISHER}: gebuehrWort(order), Zweig ohne Hofpreis` },
   { datei: 'src/lib/artikel-fehlt.ts', text: /^SERVICEGEBUEHR_BEZEICHNUNG · gebuehrWort: hofpreis \? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG,$/, grund: `${BISHER}: Zweig ohne Hofpreis` },
-  {
-    datei: 'src/components/hof-bestellungen/bestell-detail.tsx',
-    text: /^SERVICEGEBUEHR_BEZEICHNUNG · (return betrag\.hofpreis \? PLATTFORMGEBUEHR_BEZEICHNUNG : SERVICEGEBUEHR_BEZEICHNUNG|\? `Warenpreis \$\{euro\(betrag\.warenCents\)\} \+ \$\{SERVICEGEBUEHR_BEZEICHNUNG\})/,
-    grund: `${BISHER}: gebuehrWortFuer und die Zusammensetzung — beide im Zweig ohne betrag.hofpreis`,
-  },
   // kasse.ts: Zahlungsschritt, Gebührenzeile und Fortsetzen — jeweils nach `if (hof.preisAnzeige)` bzw. im Zweig ohne hofpreis
   {
     datei: 'src/lib/kasse.ts',

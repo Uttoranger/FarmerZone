@@ -1,11 +1,13 @@
-import type { OrderStatus, Prisma } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'
 import { gebuehrFuerMonatsabrechnungJeModell, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { stornoBetraege, type StornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltRechnung, type ArtikelFehltErgebnis } from '@/lib/artikel-fehlt'
 import {
   abholungKurz,
+  bestaetigungOffenSatz,
   bestellAktionen,
   bestellKopfzeile,
   bestellMarke,
@@ -17,7 +19,8 @@ import {
   type BestellAktionen,
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
-import { zeitpunktFuerMail } from '@/lib/fristen'
+import { fristVon, tagInWorten, uhrzeitInWien, zeitpunktFuerMail } from '@/lib/fristen'
+import { abholWhere, naechstesAbholfenster, wienerTag, type NaechstesFenster } from '@/lib/heute'
 import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
 import type { MarkeArt } from '@/lib/marke-art'
@@ -109,11 +112,12 @@ export async function getOrderDetail(farmId: string, orderId: string) {
 
 /**
  * Offen = alles, was nicht abgeholt, storniert oder verfallen (nicht abgeholt) ist —
- * auch „Bestätigung offen“ (Register N41 e). EINE Quelle für die Zahl an
- * „Bestellungen“ in Unterleiste und Seitenleiste der HofShell und für den Chip
- * „Noch offen · n“; exportiert, damit Tests und Seiten keine zweite Liste führen.
+ * auch „Bestätigung offen“ (Register N41 e). Die Liste liegt Prisma-frei in
+ * src/lib/bestellstatus-offen.ts (dort liest sie auch der Chip „Noch offen · n“);
+ * hier unter demselben Namen weitergereicht, damit Aufrufer und Tests der Abfrage
+ * keine zweite Liste führen.
  */
-export const OPEN_STATUSES = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const satisfies readonly OrderStatus[]
+export { OPEN_STATUSES }
 
 export async function getOpenOrdersCount(farmId: string): Promise<number> {
   return prisma.order.count({
@@ -356,4 +360,41 @@ export async function getHofBestellDetail(
           })
         : null,
   }
+}
+
+// ─── Kleine Leser der Hof-Bestellseiten (Nr. 222; vorher in src/app/(hof)/orders/) ───
+
+/**
+ * Bis wann die Kundin eine Bar-Bestellung bestätigen muss — der Satz für die
+ * Bestellung im Hofbereich (V87: die Frist kommt immer aus fristVon, nie als
+ * eigene Zahl). Nur bei „Bestätigung offen“; sonst null, ohne Abfrage. Liest
+ * die vier Felder der Frist nach ID UND Hof (eine fremde ID findet nichts) —
+ * die Bestellung selbst bleibt die aus getHofBestellDetail.
+ */
+export async function barFristSatz(farmId: string, detail: HofBestellDetail, jetzt: Date): Promise<string | null> {
+  if (detail.status !== 'PENDING_CONFIRMATION' || !detail.vorOrt) return null
+  const frist = await prisma.order.findFirst({
+    where: { id: detail.id, farmId },
+    select: { paymentMethod: true, createdAt: true, pickupDate: true, pickupTimeStart: true },
+  })
+  if (!frist) return null
+  const bis = fristVon(frist)
+  return bestaetigungOffenSatz(detail.kunde.vorname, `${tagInWorten(bis, jetzt)}, ${uhrzeitInWien(bis)} Uhr`)
+}
+
+/**
+ * Das nächste Abholfenster laut Abholzeiten samt der Zahl seiner Bestellungen —
+ * für die leeren Zustände von „Heute abholen" (Bestellungen) und der Packliste
+ * auf Papier (Boards s1-bestellungen, s2-druck). Gezählt über abholWhere,
+ * dieselbe Bedingung wie die Packliste; ohne aktive Abholzeit null.
+ */
+export async function naechstesFensterMitZahl(farmId: string, jetzt: Date): Promise<{ fenster: NaechstesFenster; anzahl: number } | null> {
+  const slots = await prisma.pickupSlot.findMany({
+    where: { farmId, isActive: true },
+    select: { dayOfWeek: true, startTime: true, endTime: true },
+  })
+  const fenster = naechstesAbholfenster(slots, jetzt)
+  if (!fenster) return null
+  const anzahl = await prisma.order.count({ where: abholWhere(farmId, wienerTag(fenster.tag)) })
+  return { fenster, anzahl }
 }

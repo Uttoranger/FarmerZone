@@ -357,12 +357,14 @@ describe('gebuehrFuerMonatsabrechnung — die Frage hinter jedem Hof-Satz zur Mo
   })
 
   it('die Bestellansicht des Hofs fragt sie (Satz „die Gebühr holt die Monatsabrechnung")', () => {
-    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toMatch(
+    // Der Satz steht seit Lauf 30 (Nr. 222) in betragSatz (src/lib/hof-bestellungen.ts); die Bestellansicht ruft ihn.
+    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toContain('betragSatz(betrag, vorOrt)')
+    expect(lies('src/lib/hof-bestellungen.ts')).toMatch(
       /betrag\.gebuehrFuerAbrechnung \? ' – die Gebühr holt die Monatsabrechnung\.'/
     )
     expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung(JeModell)?\(\{/)
     // Gegenprobe: die alte Bedingung (jede Gebühr > 0, auch bar vor dem Stichtag) ist weg.
-    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).not.toContain(
+    expect(lies('src/lib/hof-bestellungen.ts')).not.toContain(
       "betrag.gebuehrCents > 0 ? ' – die Gebühr holt"
     )
   })
