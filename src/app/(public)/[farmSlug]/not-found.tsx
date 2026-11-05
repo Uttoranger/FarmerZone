@@ -31,7 +31,9 @@ export const metadata: Metadata = {
  * Startseite, sondern die Hofübersicht — wer einen Hof sucht, sucht einen Hof.
  *
  * Seit Nr. 54 in der KundeShell, dieselbe Ansicht wie die 404 des Hauses
- * (Mockups fehler-404-*), nur mit den Hof-Texten und der Hofübersicht zuerst.
+ * (Mockups fehler-404-*), nur mit den Hof-Texten und der Hofübersicht zuerst;
+ * seit Nr. 231 ohne Suchfeld (Boards s3/w3-fehlerseiten: nur die 404 des
+ * Hauses sucht).
  */
 export default function HofNichtGefunden() {
   return (
@@ -41,7 +43,6 @@ export default function HofNichtGefunden() {
         text={HOF_NICHT_GEFUNDEN_TEXT}
         haupt={{ href: '/hoefe', text: HOEFE_ENTDECKEN }}
         neben={{ href: '/', text: ZUR_STARTSEITE }}
-        suchfeldId="hof-nicht-gefunden-suche"
       />
     </KundeShellMitSitzung>
   )

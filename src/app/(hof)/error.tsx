@@ -13,7 +13,9 @@ import { HOF_FEHLER_TEXT, ZU_HEUTE } from '@/lib/fehlerseite'
  * einzigen Weg zur Startseite der Kundinnen.
  *
  * Fehlernummer, „Nochmal versuchen" (reset), „Zu Heute" und „Problem melden"
- * in den Briefkasten des Hofbereichs; Texte aus src/lib/fehlerseite.ts.
+ * in den Briefkasten des Hofbereichs; Texte aus src/lib/fehlerseite.ts. Seit
+ * Nr. 231 ist „Nochmal versuchen" hier orange (Board w3-fehlerseiten Bild 5,
+ * V51: Hauptknopf im Hofbereich orange).
  * Gemeldet wird wie in src/app/error.tsx: Ein Fehler, den eine React-
  * Fehlergrenze gefangen hat, erreicht den Client-SDK nicht von selbst, und
  * diese Grenze fängt ihn jetzt vor der im Wurzelsegment. Der Filter aus
@@ -43,6 +45,7 @@ export default function HofFehler({
       text={HOF_FEHLER_TEXT}
       meldenPfad="/fehler-melden"
       imLayout
+      welt="hof"
     />
   )
 }
