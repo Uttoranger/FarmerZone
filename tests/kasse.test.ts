@@ -37,8 +37,8 @@ import {
   zahlungsGebuehrText,
   gebuehrZeile,
   kaufknopfZeile,
-  positionMengeVorn,
 } from '@/lib/kasse'
+import { positionMengeVorn } from '@/lib/format'
 import { checkoutZahlungsBetragSchema } from '@/schemas/checkout'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { BAR_OHNE_GEBUEHR_BIS_TEXT, BAR_OHNE_GEBUEHR_ZAHLART, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
@@ -499,7 +499,7 @@ describe('bestaetigungMitStatus — Rückleitung, wenn die Zahlung schon durch i
   })
 })
 
-describe('positionMengeVorn (Boards der Kaufstrecke, Lauf 31: Menge vorn)', () => {
+describe('positionMengeVorn (Boards der Kaufstrecke, Lauf 31: „Anzahl × Name, Gebinde“, src/lib/format.ts)', () => {
   it('Stück und ohne Einheit: „3 × Name“', () => {
     expect(positionMengeVorn({ name: 'Bergkäse, 250 g', quantity: 3, unit: 'STUECK', unitSize: 1 })).toBe('3 × Bergkäse, 250 g')
     expect(positionMengeVorn({ name: 'Honig', quantity: 2, unit: null })).toBe('2 × Honig')
@@ -510,11 +510,12 @@ describe('positionMengeVorn (Boards der Kaufstrecke, Lauf 31: Menge vorn)', () =
     expect(positionMengeVorn({ name: 'Rindfleisch-Paket', quantity: 2, unit: 'KG', unitSize: 5 })).toBe('2 × Rindfleisch-Paket, 5 kg')
   })
 
-  it('Maßeinheit ohne Gebinde: die Menge der Einheit vorn', () => {
-    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: 1 })).toBe('4 L Heumilch frisch')
+  it('Maßeinheit ohne Gebinde: dieselbe Form wie das Board, eine Einheit als Gebinde („4 × Heumilch frisch, 1 L“)', () => {
+    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: 1 })).toBe('4 × Heumilch frisch, 1 L')
+    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: null })).toBe('4 × Heumilch frisch, 1 L')
   })
 
   it('Gegenprobe: ein ungültiges Gebinde (0) zählt wie keins', () => {
-    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: 0 })).toBe('4 L Heumilch frisch')
+    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: 0 })).toBe('4 × Heumilch frisch, 1 L')
   })
 })

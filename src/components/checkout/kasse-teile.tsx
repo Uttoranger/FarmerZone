@@ -3,7 +3,7 @@ import Link from 'next/link'
 import type { UseFormRegisterReturn } from 'react-hook-form'
 import { AlertCircle, Info, TimerReset } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatEuro } from '@/lib/format'
+import { formatEuro, positionMengeVorn } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
 import { mitEndpreis, type PreisAnzeige } from '@/lib/plattformgebuehr'
@@ -14,7 +14,6 @@ import {
   KONTAKT_HINWEIS,
   PREISE_INKL_UST,
   RESERVIERUNG_MINUTEN,
-  positionMengeVorn,
   zahlungAbgelehntText,
   type AbholKachel,
   type KassenBetraege,

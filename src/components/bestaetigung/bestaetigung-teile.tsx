@@ -192,7 +192,11 @@ export function StatusSchritte({ schritte }: { schritte: readonly BestellSchritt
  * Positionen, Servicegebühr als eigene Zeile und Gesamt — alles aus dem
  * Snapshot der Bestellung (bestellSummen), angezeigt über formatEuro.
  * `zahlung` ist die Zeile aus zahlungsAnzeige („Online · Bezahlt",
- * „Bar bei Abholung · Noch offen") — nie pauschal „bezahlt".
+ * „Bar bei Abholung · Noch offen") — nie pauschal „bezahlt". Dahinter
+ * „inkl. <Gebühr>“ (Boards s1-/w1-bestaetigung: „… · inkl. Plattformgebühr“).
+ * `summeInZahlzeile` (Bestellseite, Board s1-/w1-bestellung-link Bild 1): keine
+ * eigene Zeile „Gesamt“ — derselbe Betrag steht in der Zahlzeile
+ * („Online · Bezahlt · € 19,12 inkl. Plattformgebühr“). Nur Anzeige.
  */
 export function BestellPositionen({
   positionen,
@@ -200,6 +204,7 @@ export function BestellPositionen({
   zahlung,
   fuss,
   titel = 'Deine Bestellung',
+  summeInZahlzeile = false,
 }: {
   /** `fehlt`: Der Hof hat die Position als fehlend gemeldet (E14) — sie ist nicht mehr im Betrag. */
   positionen: ReadonlyArray<{ text: string; betragCents: number; fehlt?: boolean }>
@@ -215,9 +220,16 @@ export function BestellPositionen({
   fuss?: ReactNode
   /** Die kleine Überschrift über der Karte: „Deine Bestellung“ (Bestätigung), „Positionen“ (Bestellseite). */
   titel?: string
+  /** Gesamt in der Zahlzeile statt in einer eigenen fetten Zeile (Bestellseite). */
+  summeInZahlzeile?: boolean
 }): React.JSX.Element {
   const s = bestellSummen(summen)
   const entfallen = gebuehrEntfallen(summen)
+  const gesamt = formatEuro(centsAlsEuro(s.gesamtCents))
+  // „inkl. <Gebühr>“ nur, solange die Gebühr gilt: Ist sie entfallen bzw. erstattet, sagt das die eigene Zeile darüber.
+  const inkl = s.gebuehrCents > 0 && !entfallen ? `inkl. ${gebuehrBezeichnungFuer(summen)}` : null
+  const betragZeile = summeInZahlzeile ? [gesamt, inkl].filter(Boolean).join(' ') : inkl
+  const zahlzeile = [zahlung, betragZeile].filter(Boolean).join(' · ')
   return (
     // Board: die kleine Überschrift über der Karte, darin die Zeilen, „Gesamt“ und darunter Zahlart und Gebühr leise.
     <section aria-label={titel} className="flex flex-col gap-2">
@@ -255,10 +267,12 @@ export function BestellPositionen({
           </li>
         )}
       </ul>
-      <p className="text-[16px] leading-normal font-bold">
-        Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(s.gesamtCents))}</span>
-      </p>
-      <p className="text-[13px] leading-normal text-muted-foreground">{zahlung}</p>
+      {!summeInZahlzeile && (
+        <p className="text-[16px] leading-normal font-bold">
+          Gesamt <span className="whitespace-nowrap tabular-nums">{gesamt}</span>
+        </p>
+      )}
+      <p className="text-[13px] leading-normal text-muted-foreground">{zahlzeile}</p>
       {s.gebuehrCents > 0 && <p className="mt-1 text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
       {fuss && <div className="mt-2">{fuss}</div>}
       </div>

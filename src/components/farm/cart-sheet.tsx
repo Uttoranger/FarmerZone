@@ -2,7 +2,7 @@
 
 /** Der Warenkorb der Hofseite als Blatt — am Handy von unten, ab 768 px von rechts (Boards s1-/w1-korb, Nr. 227). */
 
-import { useState, type ComponentProps } from 'react'
+import { useRef, useState, type ComponentProps } from 'react'
 import type { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
@@ -73,6 +73,37 @@ export function mengeFehlerNach(ergebnis: KorbErgebnis): MengeFehler | null {
   return { text: korbFehlerText(ergebnis, 'menge'), nochmal: ergebnis.nochmal === true }
 }
 
+/**
+ * Welche Antwort auf „−“/„+“ noch zählt (Befund pruefer, UI-Runde 3): Tippt man schnell zweimal, kommen die Antworten
+ * des Servers in beliebiger Reihenfolge zurück — die Karte darf nur sagen, was der LETZTE Aufruf ergab, sonst stünde
+ * „Keine Verbindung“ unter einer Menge, die längst gespeichert ist. Entfernen und Schließen verwerfen alles, was noch
+ * unterwegs ist. Ein Zähler, kein Zustand: Er ändert nichts an der Anzeige und gehört deshalb in eine Ref.
+ */
+export function neueMengenFolge(): { beginnen: () => () => boolean; verwerfen: () => void } {
+  let zaehler = 0
+  return {
+    // Gibt zurück, ob dieser Aufruf bei seiner Antwort noch der letzte ist.
+    beginnen() {
+      zaehler += 1
+      const eigener = zaehler
+      return () => eigener === zaehler
+    },
+    verwerfen() {
+      zaehler += 1
+    },
+  }
+}
+
+/**
+ * Der Startfokus des Blatts (Board w1-korb, Bild 1–3): auf „Schließen“ im Kopf — dem ersten Bedienelement, auch wenn
+ * davor der Hinweis nach dem Abgleich steht. Nach einem Tipp (`touch`) bleibt es bei Base UI: dann bekommt das Blatt
+ * selbst den Fokus, ohne sichtbaren Rahmen. Findet sich der Knopf nicht, gilt die Vorgabe (`true`: erstes Element).
+ */
+export function korbStartfokus(blatt: Pick<HTMLElement, 'querySelector'> | null, art: string): HTMLElement | true | null {
+  if (art === 'touch') return blatt as HTMLElement | null
+  return blatt?.querySelector<HTMLElement>('[data-slot="sheet-close"]') ?? true
+}
+
 /** Ein Mengen-Knopf in der Pille: 44 × 44 px, das Zeichen in der Mitte (Board s1-/w1-korb). */
 const MENGEN_KNOPF = cn(
   'flex size-11 items-center justify-center rounded-full text-status-fertig transition-colors hover:bg-muted',
@@ -104,18 +135,35 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
   // Ohne Hofpreis-Modell bleibt die Summe aus dem Korb wie bisher.
   const gesamt = anzeige ? centsAlsEuro(summeCents) : total
   const leer = items.length === 0
-  // Die letzte gescheiterte Menge samt Wiederholung (N29) — der nächste Tipp auf „−“/„+“ räumt sie weg.
+  // Die letzte gescheiterte Menge samt Wiederholung (N29) — der nächste Tipp auf „−“/„+“ räumt sie weg, ebenso
+  // Entfernen und Schließen (die Karte gehörte zu einer Zeile bzw. einem Blatt, das es so nicht mehr gibt).
   const [mengeFehler, setMengeFehler] = useState<(MengeFehler & { wiederholen: () => void }) | null>(null)
+  const folge = useRef(neueMengenFolge())
+  const blattRef = useRef<HTMLDivElement>(null)
   function mengeSetzen(productId: string, menge: number) {
     setMengeFehler(null)
+    const nochLetzter = folge.current.beginnen()
     void onUpdateQuantity(productId, menge).then((ergebnis) => {
+      if (!nochLetzter()) return
       const fehler = mengeFehlerNach(ergebnis)
       if (fehler) setMengeFehler({ ...fehler, wiederholen: () => mengeSetzen(productId, menge) })
     })
   }
+  function entfernen(productId: string) {
+    folge.current.verwerfen()
+    setMengeFehler(null)
+    onRemoveItem(productId)
+  }
+  function offenAendern(offen: boolean) {
+    if (!offen) {
+      folge.current.verwerfen()
+      setMengeFehler(null)
+    }
+    onOpenChange(offen)
+  }
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetBlatt seite="rechts">
+    <Sheet open={open} onOpenChange={offenAendern}>
+      <SheetBlatt seite="rechts" ref={blattRef} initialFocus={(art) => korbStartfokus(blattRef.current, art)}>
         {/* Board s1-/w1-korb (Lauf 31): unter dem Kopf keine eigene Linie — die Zeilen tragen ihre Linie oben,
             so trennt sie auch Hinweis und erste Position; leer steht gar keine. */}
         <SheetKopf
@@ -149,10 +197,12 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               // Board s1-/w1-korb Bild 3 (Runde 2): ein schmaler Kasten, links bündig — Titel fett in der Grundschrift, darunter
               // der Satz —, „Zum Angebot“ über die volle Breite UNTER dem Kasten. Den Kasten zeichnet ::before über die ersten
               // zwei Zeilen des Rasters, der Ausweg steht in der dritten außerhalb. Das Symbol bleibt (Register N9: Symbol,
-              // Satz, Aktion), klein links im Kasten.
+              // Satz, Aktion), klein links im Kasten. `self-stretch` am Kasten (UI-Runde 3): Das Raster zentriert seine
+              // Kinder (`items-center`) — ohne Inhalt fiel der Kasten sonst auf 0 px zusammen und lag als Linie quer durch
+              // Symbol und Text.
               className={cn(
                 'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0 rounded-none border-0 bg-transparent p-0 text-left',
-                "before:col-span-2 before:col-start-1 before:row-span-2 before:row-start-1 before:rounded-[16px] before:border before:border-border before:bg-card before:content-['']",
+                "before:col-span-2 before:col-start-1 before:row-span-2 before:row-start-1 before:self-stretch before:rounded-[16px] before:border before:border-border before:bg-card before:content-['']",
                 '[&>span]:col-start-1 [&>span]:row-span-2 [&>span]:row-start-1 [&>span]:ml-3.5 [&>span]:size-9 [&>span>svg]:size-5',
                 '[&>p:first-of-type]:col-start-2 [&>p:first-of-type]:row-start-1 [&>p:first-of-type]:self-end [&>p:first-of-type]:pt-3 [&>p:first-of-type]:pr-3.5 [&>p:first-of-type]:font-sans [&>p:first-of-type]:text-[15px] [&>p:first-of-type]:font-bold',
                 '[&>p:nth-of-type(2)]:col-start-2 [&>p:nth-of-type(2)]:row-start-2 [&>p:nth-of-type(2)]:max-w-none [&>p:nth-of-type(2)]:self-start [&>p:nth-of-type(2)]:pr-3.5 [&>p:nth-of-type(2)]:pb-3 [&>p:nth-of-type(2)]:text-[13.5px]',
@@ -161,7 +211,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               ausweg={
                 <Link
                   href={`/${farmSlug}`}
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => offenAendern(false)}
                   className={cn(VOLLE_BREITE, 'border-[1.5px] border-foreground bg-card px-4 text-foreground hover:bg-muted')}
                 >
                   {KORB_LEER.zumHof}
@@ -231,7 +281,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                   </span>
                   <button
                     type="button"
-                    onClick={() => onRemoveItem(item.productId)}
+                    onClick={() => entfernen(item.productId)}
                     aria-label={`${item.name} aus dem Warenkorb nehmen`}
                     className={cn('-mr-3 flex size-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted', FOKUS_RAHMEN)}
                   >
@@ -264,7 +314,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
             ) : (
               <Link
                 href={kasseHref ?? `/${farmSlug}/checkout`}
-                onClick={() => onOpenChange(false)}
+                onClick={() => offenAendern(false)}
                 className={cn(VOLLE_BREITE, 'bg-accent text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90')}
               >
                 Zur Kasse

@@ -17,7 +17,8 @@ import {
   korbLeeren,
   neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
-import { positionMengeVorn, zahlungFortsetzenPfad } from '@/lib/kasse'
+import { zahlungFortsetzenPfad } from '@/lib/kasse'
+import { positionMengeVorn } from '@/lib/format'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
@@ -58,11 +59,15 @@ export const metadata: Metadata = {
   referrer: 'no-referrer',
 }
 
-/** Die Spalte der Seite: 896 px wie im Board w1-bestaetigung (ab 768 px Karten paarweise), am Handy mit 16 px Rand. */
-const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:px-4 md:pt-8'
+/**
+ * Die Spalte der Seite: 896 px wie im Board w1-bestaetigung (ab 768 px Karten paarweise), am Handy mit 16 px Rand und
+ * 12 px zwischen den Karten (s1-bestaetigung Bild 2, UI-Runde 3). Im Browser steht die Hauptaktion fest unten außerhalb
+ * des Flusses — ohne Polster unten bleiben bis zur Linie des Seitenfußes rund 25 px wie im Board.
+ */
+const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-3 px-4 pt-6 pb-12 md:gap-4 md:px-4 md:pt-8 md:pb-0'
 
-/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen, Erzähl's weiter · Neuigkeiten). */
-const PAAR = 'grid items-start gap-4 md:grid-cols-2'
+/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen, Erzähl's weiter · Neuigkeiten), am Handy 12 px. */
+const PAAR = 'grid items-start gap-3 md:grid-cols-2 md:gap-4'
 
 /*
  * Neues Design (Nr. 13): KundeShell ohne Unterleiste — eine Fokus-Seite mit

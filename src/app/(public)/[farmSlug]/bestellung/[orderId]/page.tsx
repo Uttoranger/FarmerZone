@@ -4,7 +4,7 @@ import { bestellLinkGilt, bestellSignatur, widerrufPfad } from '@/lib/bestell-li
 import { widerrufMoeglich } from '@/lib/widerruf'
 import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
 import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
-import { positionMengeVorn } from '@/lib/kasse'
+import { positionMengeVorn } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { cn } from '@/lib/utils'
 import { Marke } from '@/components/ui/marke'
@@ -44,8 +44,12 @@ export const metadata = {
   robots: { index: false, follow: false },
 }
 
-/** Die Spalte der Seite: wie die Bestätigungsseite (Board w1-bestellung-link), am Handy mit 16 px Rand. */
-const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8'
+/**
+ * Die Spalte der Seite: wie die Bestätigungsseite (Board w1-bestellung-link), am Handy mit 16 px Rand. Im Browser kein
+ * Polster unten: Bis zur Linie des Seitenfußes bleiben so rund 20 px wie im Board (UI-Runde 3), der Fuß bringt sein
+ * eigenes Polster mit. Die Abstände zwischen den Karten bleiben 16 px wie im Skeleton (loading.tsx, Nr. 227).
+ */
+const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8 md:pb-0'
 
 /** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen). */
 const PAAR = 'grid items-start gap-4 md:grid-cols-2'
@@ -199,8 +203,15 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {/* Dieselben Zeilen wie auf der Bestätigungsseite — aus dem Snapshot der Bestellung. */}
-        <BestellPositionen titel="Positionen" positionen={positionen} summen={order} zahlung={`${zahlung.art} · ${zahlung.zustand}`} />
+        {/* Dieselben Zeilen wie auf der Bestätigungsseite — aus dem Snapshot der Bestellung. Board s1-/w1-bestellung-link
+            Bild 1: kein eigenes „Gesamt“, derselbe Betrag steht in der Zahlzeile („… · € 19,12 inkl. Plattformgebühr“). */}
+        <BestellPositionen
+          titel="Positionen"
+          positionen={positionen}
+          summen={order}
+          zahlung={`${zahlung.art} · ${zahlung.zustand}`}
+          summeInZahlzeile
+        />
 
         <Link href={`/${order.farm.slug}`} className={KNOPF_BREIT_RAHMEN}>
           Zum Hof

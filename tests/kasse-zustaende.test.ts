@@ -283,3 +283,36 @@ describe('Positionen auf Bestätigung und Bestellseite: kein „Servicegebühr�
     expect(positionen(null)).toContain('Servicegebühr')
   })
 })
+
+describe('Positionen: Zahlzeile wie in den Boards (UI-Runde 3, nur Anzeige derselben Werte)', () => {
+  const summen = { totalAmount: '9.80', serviceFeeCents: 60, serviceFeeRefundedAt: null as Date | null, paymentMethod: 'ONLINE', gebuehrModell: 'hofpreis' }
+  const positionen = (teil: { summeInZahlzeile?: boolean; serviceFeeRefundedAt?: Date | null } = {}): string =>
+    renderToStaticMarkup(
+      createElement(BestellPositionen, {
+        positionen: [{ text: '2 × Freilandeier', betragCents: 980 }],
+        summen: { ...summen, serviceFeeRefundedAt: teil.serviceFeeRefundedAt ?? null },
+        zahlung: 'Online · Bezahlt',
+        summeInZahlzeile: teil.summeInZahlzeile,
+      })
+    ).replace(/<!-- -->/g, '')
+
+  it('Bestätigung (s1-/w1-bestaetigung): „Gesamt“ fett, darunter „Zahlung · inkl. Plattformgebühr“', () => {
+    const html = positionen()
+    expect(html).toMatch(/Gesamt <span[^>]*>€\s10,40<\/span>/)
+    expect(html).toContain('>Online · Bezahlt · inkl. Plattformgebühr</p>')
+  })
+
+  it('Bestellseite (s1-/w1-bestellung-link Bild 1): kein eigenes „Gesamt“, derselbe Betrag in der Zahlzeile', () => {
+    const html = positionen({ summeInZahlzeile: true })
+    expect(html).not.toContain('Gesamt')
+    expect(html).toMatch(/>Online · Bezahlt · €\s10,40 inkl\. Plattformgebühr<\/p>/)
+    // Die Gebühr bleibt eine eigene Zeile (N38).
+    expect(html).toMatch(/Plattformgebühr · <span[^>]*>€\s0,60<\/span>/)
+  })
+
+  it('Gegenprobe: entfallene Gebühr — kein „inkl.“, die eigene Zeile sagt es', () => {
+    const html = positionen({ summeInZahlzeile: true, serviceFeeRefundedAt: new Date('2026-11-01T10:00:00Z') })
+    expect(html).not.toContain('inkl.')
+    expect(html).toContain('(erstattet)')
+  })
+})

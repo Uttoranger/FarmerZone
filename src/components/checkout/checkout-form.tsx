@@ -14,7 +14,7 @@ import {
   leseZahlungsBetrag,
   type KasseFormularDaten as CheckoutFormData,
 } from '@/lib/kasse-pruefung'
-import { formatEuro } from '@/lib/format'
+import { formatEuro, positionMengeVorn } from '@/lib/format'
 import { BAR_NICHT_MOEGLICH_SATZ, INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
@@ -51,7 +51,6 @@ import {
   kassenZahlarten,
   mindestbestellwertGrund,
   mindestbestellwertKarte,
-  positionMengeVorn,
   MINDESTBESTELLWERT_AUSWEG,
   CODE_BAR_NICHT_MOEGLICH,
   kassenZahlweg,
@@ -852,8 +851,9 @@ export function CheckoutForm({
               </Feld>
             </div>
             {/* Die Kasse hat keinen Seitenfuß: Der Weg zur Datenschutzerklärung steht dort, wo Daten eingegeben werden —
-                unter den Feldern (Board w1-kasse). Neuer Tab, damit die Eingaben stehen bleiben. */}
-            <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'self-start underline')}>
+                unter den Feldern (Board w1-kasse). Neuer Tab, damit die Eingaben stehen bleiben. In normaler Stärke wie im
+                Board s1-/w1-kasse Bild 2 (UI-Runde 3): ein Hinweis neben den Feldern, kein Knopf. */}
+            <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'self-start font-normal underline')}>
               {KASSE_DATENSCHUTZ_LINK}
               <span className="sr-only"> (öffnet in neuem Tab)</span>
             </Link>

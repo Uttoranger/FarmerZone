@@ -12,6 +12,10 @@
  *  - N29 (Lücke aus Nr. 235): Scheitert „−“/„+“ am Netz, sagt das Blatt den N29-Satz mit „Nochmal“; eine Ablehnung des
  *    Servers den geglätteten Satz ohne „Nochmal“; eine stehende Menge nichts (Gegenprobe). Der Quelltext verwirft das
  *    Ergebnis von `onUpdateQuantity` nicht mehr.
+ *  - UI-Runde 3: Nur die Antwort des LETZTEN Aufrufs zählt (`neueMengenFolge`, eine Ref); Entfernen und Schließen
+ *    verwerfen, was noch unterwegs ist, und räumen die N29-Karte weg. Der leere Kasten streckt sich über seine zwei
+ *    Zeilen (`before:self-stretch`, sonst eine Linie durch Symbol und Text). Der Startfokus liegt auf „Schließen“
+ *    (`korbStartfokus`), nach einem Tipp auf dem Blatt selbst.
  *
  * Das Blatt rendert sein Fenster beim Server-Rendern nicht (Portal): `SheetBlatt` und `SheetKopf` stehen an Ort und
  * Stelle (per vi.mock ersetzte Teilkomponenten, TESTING_GUIDELINES §1); der Kopf zeigt seinen Titel und vermerkt,
@@ -39,7 +43,7 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
   }
 })
 
-import { CartSheet, KORB_GEAENDERT_TITEL, mengeFehlerNach } from '@/components/farm/cart-sheet'
+import { CartSheet, KORB_GEAENDERT_TITEL, korbStartfokus, mengeFehlerNach, neueMengenFolge } from '@/components/farm/cart-sheet'
 import { NETZ_SATZ } from '@/lib/netz'
 import { KORB_LEER } from '@/lib/use-cart'
 import type { CartItem } from '@/lib/use-cart'
@@ -103,7 +107,7 @@ describe('Korb-Blatt (Boards s1-/w1-korb)', () => {
 
   it('der Quelltext nimmt die Bausteine aus Nr. 219, nicht mehr SheetContent mit Kreuz', () => {
     const quelle = readFileSync(join(__dirname, '..', 'src/components/farm/cart-sheet.tsx'), 'utf8')
-    expect(quelle).toMatch(/<SheetBlatt seite="rechts">/)
+    expect(quelle).toMatch(/<SheetBlatt seite="rechts"[ >]/)
     expect(quelle).toMatch(/<SheetKopf\b/)
     expect(quelle).not.toMatch(/<SheetContent\b/)
   })
@@ -115,6 +119,8 @@ describe('Korb-Blatt (Boards s1-/w1-korb)', () => {
     expect(leer).toContain('grid')
     expect(leer).toContain('text-left')
     expect(leer).toContain('before:row-span-2')
+    // UI-Runde 3: Das Raster zentriert seine Kinder — ohne `self-stretch` fiel der Kasten auf 0 px zusammen (eine Linie).
+    expect(leer).toContain('before:self-stretch')
     expect(leer).toContain('[&>p:first-of-type]:font-sans')
     expect(leer).toContain('[&>div]:row-start-3')
     // Register N9: Symbol, Satz, Aktion — das Symbol steht weiter im Kasten.
@@ -145,5 +151,74 @@ describe('Korb-Blatt: Menge ohne Netz (Register N29)', () => {
     expect(quelle).toMatch(/onUpdateQuantity\(productId, menge\)\.then\(/)
     expect(quelle).not.toMatch(/onClick=\{\(\) => onUpdateQuantity\(/)
     expect(quelle).toMatch(/<SpeicherFehler text=\{mengeFehler\.text\} nochmal=\{mengeFehler\.nochmal\}/)
+  })
+})
+
+describe('Korb-Blatt: nur die letzte Antwort zählt, Entfernen und Schließen räumen auf (UI-Runde 3)', () => {
+  it('zwei schnelle Tipps: die Antwort des ersten zählt nicht mehr, die des zweiten schon', () => {
+    const folge = neueMengenFolge()
+    const erster = folge.beginnen()
+    const zweiter = folge.beginnen()
+    expect(erster()).toBe(false)
+    expect(zweiter()).toBe(true)
+  })
+
+  it('Entfernen bzw. Schließen verwirft die Antwort, die noch unterwegs ist', () => {
+    const folge = neueMengenFolge()
+    const unterwegs = folge.beginnen()
+    folge.verwerfen()
+    expect(unterwegs()).toBe(false)
+    // Gegenprobe: Ein neuer Tipp danach zählt wieder.
+    expect(folge.beginnen()()).toBe(true)
+  })
+
+  it('der Quelltext prüft vor der Karte, ob der Aufruf noch der letzte ist, und hält den Zähler in einer Ref', () => {
+    const quelle = readFileSync(join(__dirname, '..', 'src/components/farm/cart-sheet.tsx'), 'utf8')
+    expect(quelle).toMatch(/const folge = useRef\(neueMengenFolge\(\)\)/)
+    expect(quelle).toMatch(/\.then\(\(ergebnis\) => \{\s*if \(!nochLetzter\(\)\) return/)
+  })
+
+  it('Entfernen und Schließen löschen die N29-Karte (Quelltext: jeder Weg läuft über entfernen bzw. offenAendern)', () => {
+    const quelle = readFileSync(join(__dirname, '..', 'src/components/farm/cart-sheet.tsx'), 'utf8')
+    for (const name of ['entfernen', 'offenAendern']) {
+      const rumpf = quelle.slice(quelle.indexOf(`function ${name}(`), quelle.indexOf('\n  }', quelle.indexOf(`function ${name}(`)))
+      expect(rumpf, name).toContain('folge.current.verwerfen()')
+      expect(rumpf, name).toContain('setMengeFehler(null)')
+    }
+    expect(quelle).toContain('<Sheet open={open} onOpenChange={offenAendern}>')
+    expect(quelle).toContain('onClick={() => entfernen(item.productId)}')
+    // Gegenprobe: Kein Weg schließt oder entfernt mehr an den beiden Helfern vorbei.
+    expect(quelle).not.toMatch(/onClick=\{\(\) => onOpenChange\(/)
+    expect(quelle).not.toMatch(/onClick=\{\(\) => onRemoveItem\(/)
+  })
+})
+
+describe('Korb-Blatt: Startfokus auf „Schließen“ (Board w1-korb, UI-Runde 3)', () => {
+  const schliessen = { id: 'schliessen' } as unknown as HTMLElement
+  const blatt = {
+    querySelector: (wahl: string) => (wahl === '[data-slot="sheet-close"]' ? schliessen : null),
+  } as unknown as HTMLElement
+
+  it('mit Maus oder Tastatur geöffnet: der Fokus liegt auf „Schließen“', () => {
+    expect(korbStartfokus(blatt, 'keyboard')).toBe(schliessen)
+    expect(korbStartfokus(blatt, 'mouse')).toBe(schliessen)
+  })
+
+  it('nach einem Tipp: das Blatt selbst (wie die Vorgabe von Base UI, kein Rahmen am Knopf)', () => {
+    expect(korbStartfokus(blatt, 'touch')).toBe(blatt)
+  })
+
+  it('Gegenprobe: ohne Knopf bzw. ohne Blatt die Vorgabe (erstes Element)', () => {
+    const ohne = { querySelector: () => null } as unknown as HTMLElement
+    expect(korbStartfokus(ohne, 'keyboard')).toBe(true)
+    expect(korbStartfokus(null, 'keyboard')).toBe(true)
+  })
+
+  it('das Blatt gibt den Startfokus weiter, und „Schließen“ im echten SheetKopf trägt data-slot="sheet-close"', () => {
+    const quelle = readFileSync(join(__dirname, '..', 'src/components/farm/cart-sheet.tsx'), 'utf8')
+    expect(quelle).toContain('<SheetBlatt seite="rechts" ref={blattRef} initialFocus={(art) => korbStartfokus(blattRef.current, art)}>')
+    const sheet = readFileSync(join(__dirname, '..', 'src/components/ui/sheet.tsx'), 'utf8')
+    const kopf = sheet.slice(sheet.indexOf('function SheetKopf('))
+    expect(kopf).toMatch(/<SheetPrimitive\.Close\s+data-slot="sheet-close"/)
   })
 })
