@@ -12,6 +12,7 @@ import {
   FARM_ARCHIVED_EXPLANATION,
   farmArchiveBlockedMessage,
 } from '@/lib/farm-archive'
+import { KONTO_TEXT, URLAUB_UND_PAUSE } from '@/lib/hof-einstellungen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -99,15 +100,15 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
             <PowerOff className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
             <CardTitle>{FARM_ARCHIVE_TITLE}</CardTitle>
           </div>
-          <CardDescription>Deinen Hofladen dauerhaft schließen.</CardDescription>
+          <CardDescription>{KONTO_TEXT.stilllegenSatz}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">{FARM_ARCHIVE_EXPLANATION}</p>
 
           <p className="text-sm text-muted-foreground">
-            Nur vorübergehend zusperren? Dann nutze lieber{' '}
+            {KONTO_TEXT.nurVoruebergehend}{' '}
             <Link href="/settings/pause" className="font-medium text-brand-text underline underline-offset-2">
-              Urlaubsmodus
+              {URLAUB_UND_PAUSE}
             </Link>{' '}
             — dabei bleibt deine Hofseite mit einem Hinweis sichtbar.
           </p>

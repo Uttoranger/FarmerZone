@@ -416,10 +416,11 @@ describe('Hof-Profil: „Mein Hof → Hofseite" ist ein Link (seit Nr. 50, vorhe
     expect(html).not.toContain('/settings/appearance')
   })
 
-  it('ohne laufende Suche ist „Profil speichern" frei', () => {
+  // Seit Nr. 224 heißt der Knopf „Hofdaten speichern“ (Register N42 c, V43/V49).
+  it('ohne laufende Suche ist „Hofdaten speichern" frei', () => {
     const html = renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
     const knopf = html.match(/<button[^>]*type="submit"[^>]*>([^<]*)<\/button>/)
-    expect(knopf?.[1]).toBe('Profil speichern')
+    expect(knopf?.[1]).toBe('Hofdaten speichern')
     expect(knopf?.[0]).not.toMatch(/\sdisabled=/)
   })
 })
