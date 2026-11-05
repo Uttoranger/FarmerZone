@@ -37,3 +37,6 @@ Vom Dirigenten geführt (freigabe.md §35 mit den Präzisierungen). Rechner: **4
 - 236: UI-Runde 2 → a0e567cd; r2 pruefer-ui korb 3/3/3/3, kasse 4/4/3/3, bestaetigung 3/3/3/3, bestellung-link 4/4/3/3, meine-bestellungen 3/3/3/3 (Fokus im Web falsch aufgenommen – Auftrag der Nachaufnahme korrigiert); UI-Runde 3 → 46387ed7; Nachprüfung: Blocker N29 je Position → Korrektur läuft.
 - 235: UI-Runde 2 → 9828d6d6 (N5 vor Board bestätigt); Nachprüfung: Blocker Logo eckig gegen Freigabe Nr. 98 → d02a3813; r2 pruefer-ui hofseite 2/2/3/3, produkt 3/3/2/2 (Shell- und ui/-Teile anderer Nummern); UI-Runde 3 → 571bd91f (E10a-Haftungssatz bleibt, F8, Kennzeichnung Pflichtzeilen).
 - Befund für den Morgenbericht (nicht von 236, Logik seit main): Bestätigung Bar mit gesetztem serviceFeeRefundedAt zeigt „Plattformgebühr (entfällt)“ durchgestrichen, „Gesamt“ zählt den Betrag mit.
+- GitHub nahm um ~23:55 keine Pushes an („fatal error in commit_refs“, Lesen ging); Wiederholung im Hintergrund alle 2 min, beim dritten Versuch gelungen.
+- 236: N29-Korrektur je Position → 630f578b (voller Lauf 679/12802); gepusht, PR #468 gegen docs/lauf31 (ohne dritte Nachaufnahme; Schluss-Durchgang Gate A zählt).
+- 237 und 238 laufen (vom Zwischenstand). 235: Nachprüfung UI-Runde 3 mit 3 Blockern gegen das Register (E10a Futter-Satz, F8 Pause, N5 zwei Zeilen) → Korrektur läuft.
