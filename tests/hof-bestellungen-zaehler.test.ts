@@ -35,9 +35,14 @@ function alleZeilen(): { farmId: string; status: string; pickupDate: Date }[] {
   return Object.values(OrderStatus).flatMap((status) => TAGE.map((pickupDate) => ({ farmId: 'hof-1', status, pickupDate })))
 }
 
-function chipZahl(zeilen: readonly { status: string; pickupDate: Date }[]): number {
-  const chip = filterChips(zeilen, JETZT).find((c) => c.filter === 'offen')
-  return Number(chip?.text.split(' · ')[1])
+// Liest die Zahl am Chip „Noch offen“. Fehlt der Chip oder steht keine Zahl da, schlägt der Test hier an —
+// sonst bestünde jede Gegenprobe mit „not.toBe“ still über NaN.
+function chipZahl(zeilen: readonly { status: string; pickupDate: Date }[], chips: typeof filterChips = filterChips): number {
+  const chip = chips(zeilen, JETZT).find((c) => c.filter === 'offen')
+  expect(chip).toBeDefined()
+  const zahl = Number(chip?.text.split(' · ')[1])
+  expect(Number.isFinite(zahl)).toBe(true)
+  return zahl
 }
 
 beforeEach(() => {
@@ -93,8 +98,7 @@ describe('Chip „Noch offen · n“ und Navigation zählen dasselbe (N41 e)', (
     }))
     try {
       const { filterChips: chipsMitZweiterListe } = await import('@/lib/hof-bestellungen')
-      const chip = chipsMitZweiterListe(m.zeilen, JETZT).find((c) => c.filter === 'offen')
-      expect(Number(chip?.text.split(' · ')[1])).not.toBe(await getOpenOrdersCount('hof-1'))
+      expect(chipZahl(m.zeilen, chipsMitZweiterListe)).not.toBe(await getOpenOrdersCount('hof-1'))
       expect(chipZahl(m.zeilen)).toBe(await getOpenOrdersCount('hof-1'))
     } finally {
       vi.doUnmock('@/lib/bestellstatus-offen')
