@@ -249,7 +249,8 @@ describe('am Quelltext', () => {
     expect(VORSCHAU_KAUF_HINWEIS).not.toMatch(/shop/i)
     // Anker, Korb-Knopf, Sheet.
     expect(raster).toContain('if (!mitKorb || !isHydrated) return')
-    expect(raster).toMatch(/\{mitKorb && isHydrated && count > 0 &&/)
+    expect(raster).toMatch(/const korbLeiste = mitKorb && isHydrated && count > 0 &&/)
+    expect(raster).toMatch(/\{korbLeiste && \(/)
     expect(raster).toMatch(/\{mitKorb && \(\s*<CartSheet/)
   })
 })

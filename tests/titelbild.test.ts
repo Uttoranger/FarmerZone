@@ -455,13 +455,16 @@ describe('Titelbild', () => {
     return zeige('/foto.jpg')
   }
 
-  // Feste Höhen, auch ohne Foto: Nach dem Laden springt nichts (Register N13).
-  it.each([
-    ['mit Foto', '/foto.jpg'],
-    ['ohne Foto', null],
-  ])('der Rahmen wird mit der Breite höher: 220 px am Handy, 300 ab 768, 360 ab 1 280, 420 ab 1 536 (%s)', (_name, foto) => {
-    const k = klassen(rahmen(zeige(foto)))
-    expect(k).toEqual(expect.arrayContaining(['h-[220px]', 'md:h-[300px]', 'xl:h-[360px]', '2xl:h-[420px]', 'w-full', 'overflow-hidden']))
+  // Feste Höhen: Nach dem Laden springt nichts (Register N13).
+  it('mit Foto wird der Rahmen mit der Breite höher: 220 px am Handy, 300 ab 768, 360 ab 1 280, 420 ab 1 536', () => {
+    const k = klassen(rahmen(zeige('/foto.jpg')))
+    expect(k).toEqual(expect.arrayContaining(['h-[220px]', 'md:h-[300px]', 'xl:h-[360px]', '2xl:h-[420px]', 'w-full', 'overflow-hidden', 'rounded-2xl']))
+  })
+
+  it('ohne Foto die ruhige Fläche der Boards w1-/s1-hofseite: 98 px, ab 768 px 170 px (Nr. 235) — Gegenprobe: keine Foto-Höhen', () => {
+    const k = klassen(rahmen(zeige(null)))
+    expect(k).toEqual(expect.arrayContaining(['h-[98px]', 'md:h-[170px]', 'w-full', 'overflow-hidden', 'rounded-2xl']))
+    expect(k).not.toContain('h-[220px]')
   })
 
   it('vor dem Laden (auf dem Server) füllt das Foto die Fläche: Querformat springt nie', () => {

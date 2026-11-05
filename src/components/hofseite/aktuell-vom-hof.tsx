@@ -74,7 +74,8 @@ export function AktuellVomHof({
     <section id={AKTUELL_ANKER} data-abschnitt={AKTUELL_ANKER} aria-labelledby="aktuell-titel" className="flex scroll-mt-32 flex-col gap-2.5 lg:gap-3">
       <div className="flex flex-wrap items-baseline gap-x-2 lg:gap-x-2.5">
         {/* tabIndex -1: Nach „Neuester: …“ geht der Fokus hierher — der Link verschwindet mit dem Wechsel. */}
-        <h2 id="aktuell-titel" tabIndex={-1} className="font-heading text-[19px] font-semibold text-foreground outline-none lg:text-[21px]">
+        {/* Leise Überzeile wie alle Abschnitte der Hofseite (Board w1-hofseite, Nr. 235). */}
+        <h2 id="aktuell-titel" tabIndex={-1} className="mt-1 text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase outline-none">
           {T.titel}
         </h2>
         <span className="text-[13px] text-muted-foreground">{T.anzahl(anzahl)}</span>
@@ -133,7 +134,7 @@ function BeitragKarte({
   const produkte = beitragProdukte(beitrag.linkedProductIds, weg.produkte)
 
   return (
-    <article aria-labelledby={titelId} className="flex flex-col gap-2.5 rounded-2xl border border-accent bg-card p-3.5 lg:gap-3 lg:p-[18px]">
+    <article aria-labelledby={titelId} className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-3 lg:gap-3 lg:p-3.5">
       <div className="flex gap-5">
         {beitrag.photoUrl && !offen && (
           // Ab lg links, 250 px — am Handy steht das Foto klein rechts neben dem Titel. Aufgeklappt steht es groß beim Text.

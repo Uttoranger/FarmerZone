@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
  * das Bild geladen ist: Ab 768 px steht das ganze Foto mittig in voller Höhe,
  * wenn es weniger als 1,5-mal so breit wie hoch ist (Quadrat, Hochformat, 4:3);
  * ein Querformat ab 3:2 füllt die Fläche mit Fokuspunkt, wie vor N6. Unter
- * 768 px bleibt es immer beim Beschnitt — dort steht der Name auf dem Bild. Der
+ * 768 px bleibt es immer beim Beschnitt. Der
  * Wechsel nach dem Laden blendet weich über: `object-fit` lässt sich nicht
  * überblenden, darum liegt das scharfe Foto in zwei Lagen (füllend und ganz), und
  * beim Wechsel blenden die ganze Lage und die Kopie ein, während die füllende
@@ -167,25 +167,31 @@ export function Titelbild({
   return (
     <div
       data-abschnitt="titelbild"
-      className="relative h-[220px] w-full overflow-hidden bg-muted md:h-[300px] xl:h-[360px] 2xl:h-[420px]"
+      className={cn(
+        // Seit Nr. 235 steht der Rahmen in der Inhaltsspalte (Board w1-hofseite): gerundet und gerahmt
+        // wie eine Karte, der Name steht darunter, nicht mehr auf dem Bild. Mit Foto die Höhen aus
+        // Register N13; ohne Foto die ruhige Fläche der Boards (98 px am Handy, 170 px ab 768).
+        'relative w-full overflow-hidden rounded-2xl border border-border bg-muted',
+        foto ? 'h-[220px] md:h-[300px] xl:h-[360px] 2xl:h-[420px]' : 'h-[98px] md:h-[170px]'
+      )}
     >
       {foto ? (
-        <TitelbildBilder
-          foto={foto}
-          ausschnitt={ausschnitt}
-          darstellung={titelbildDarstellung(masse, ausschnitt.darstellung)}
-          beimLaden={beimLaden}
-          hofName={hofName}
-        />
+        // Im Dunkeln leicht gedämpft (Freigabe Lauf 31, Maßstab Punkt 4) — über die Hülle: Der Filter des
+        // Hofs steht inline am Bild und bliebe sonst die einzige Angabe.
+        <div className="absolute inset-0 dark:brightness-[0.82]">
+          <TitelbildBilder
+            foto={foto}
+            ausschnitt={ausschnitt}
+            darstellung={titelbildDarstellung(masse, ausschnitt.darstellung)}
+            beimLaden={beimLaden}
+            hofName={hofName}
+          />
+        </div>
       ) : (
-        // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code.
-        <div className="absolute inset-0" style={{ background: verlauf }} />
+        // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code. Sein helles
+        // Ende leuchtete im Dunkeln als Fleck — darum dort deutlich gedämpft.
+        <div className="absolute inset-0 dark:brightness-[0.5] dark:saturate-[0.75]" style={{ background: verlauf }} />
       )}
-      {/* Am Handy steht der Name auf dem Bild: dunkler Schleier, theme-fest (DESIGN_SYSTEM, Bild-Overlays). */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-linear-to-t from-primary-foreground/75 via-primary-foreground/10 to-transparent md:hidden"
-      />
       {children}
     </div>
   )

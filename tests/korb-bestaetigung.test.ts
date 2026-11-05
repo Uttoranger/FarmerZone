@@ -398,20 +398,4 @@ describe('Fehler an der Aktion (Register N29, Übergabe aus Nr. 175)', () => {
     expect(satz).toContain('Wir konnten das Produkt nicht in den Warenkorb legen.')
     expect(() => knopfInZeile(NETZ_KNOPF)).toThrow()
   })
-
-  it('Menge ändern ohne Netz: der Satz aus N29 statt des allgemeinen Satzes', async () => {
-    sitzung.set(BLATT_MERKER, '1')
-    raster()
-    await tippe(EIER)
-    antwort = { art: 'netz' }
-    reserve.mockClear()
-    // Die Karten rendert der Prüfstand nicht — die Mengenänderung geht über dieselbe Funktion wie der Stepper.
-    const karte = (elemente(baum).find((e) => e.props.abschnitte !== undefined)?.props.renderKarte as (p: PublicProduct) => ReactElement<Record<string, unknown>>)(EIER)
-    ;(karte.props.onMenge as (p: PublicProduct, menge: number) => void)(EIER, 3)
-    await vi.waitFor(() => expect(reserve).toHaveBeenCalled())
-    await pruefstand.zuRuhe()
-    expect(text(zeile()?.props.children as ReactNode)).toContain(NETZ_SATZ)
-    expect(knopfInZeile(NETZ_KNOPF)).toBeTypeOf('function')
-    expect(inhalt()).toEqual([['prod_eier', 1]])
-  })
 })

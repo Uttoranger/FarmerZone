@@ -230,8 +230,8 @@ describe('Zustände der Produktkarten — knapp, ausverkauft, kein „Merken"', 
 describe('Zahlung und Gebühr', () => {
   it('E5: online und bar bei Abholung, nie Karte bei Abholung', () => {
     const html = seite()
-    expect(html).toContain('Online bezahlen')
-    expect(html).toContain('Bar bei Abholung')
+    // Ein Satz in „Zahlung & Kontakt“ (Board w1-hofseite, Nr. 235).
+    expect(html).toContain('Online bezahlen oder bar bei Abholung.')
     expect(html).not.toMatch(/Karte bei Abholung|Vor Ort \(Bar &amp; Karte\)|Online \(Karte\)/)
   })
 
@@ -421,7 +421,8 @@ describe('Leer, pausiert, lange Namen', () => {
   it('pausiert: Hinweis mit dem Text des Hofs, keine Termine, kein Kaufknopf', () => {
     const html = seite({ farm: { ...HOF, isPaused: true, pauseMessage: 'Wir sind im Urlaub.' }, suche: 'reiter=produkte' })
     expect(html).toContain('Hof Test pausiert gerade.')
-    expect(html).toContain('Wir sind im Urlaub.')
+    // Board w1-/s1-hofseite Bild 4: die Nachricht in Anführungszeichen und was noch geht.
+    expect(html).toContain('„Wir sind im Urlaub.“ Du kannst dir das Angebot ansehen. Dein Warenkorb bleibt gespeichert.')
     expect(html).not.toContain('Nächste Abholung')
     expect(html).not.toMatch(/in den Korb legen/)
   })
@@ -512,30 +513,36 @@ describe('Mini-Warenkorb rechnet in Cent, nicht in Fließkomma', () => {
 describe('Gebührenhinweis bei Mindestgebühr 0', () => {
   it('kein „mind. € 0,00"', () => {
     const html = seite({ farm: { ...HOF, serviceFeeMinCents: 0 } })
-    expect(html).toContain('Preise zzgl. 5 % Servicegebühr – im Warenkorb')
+    expect(html).toContain('Preise zzgl. 5 % Servicegebühr – einmal pro Bestellung')
     expect(html).not.toContain('mind. € 0,00')
   })
 })
 
-describe('Stepper der Produktkarte endet am Bestand', () => {
+describe('„In den Korb“ der Produktkarte endet am Bestand (seit Nr. 235 ohne Mengenfeld)', () => {
   const karte = (stock: number, imKorb: number) => {
     const p = { ...HOF.products[4]!, stock }
     return renderToStaticMarkup(
       createElement(ProduktKarte, {
         produkt: p, zustand: kartenZustand(p, null), imKorb, wirdHinzugefuegt: false,
-        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
+        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {},
       })
     )
   }
-  const plus = (html: string) => html.match(/<button[^>]*aria-label="Menge Karotten: eins mehr"[^>]*>/)?.[0] ?? ''
+  const knopf = (html: string) => html.match(/<button[^>]*aria-label="Karotten in den Korb legen[^"]*"[^>]*>/)?.[0] ?? ''
 
-  // Base UI sperrt über aria-disabled (die Klasse „disabled:…" zählt nicht).
-  it('alles im Korb, was da ist: „+" ist gesperrt', () => {
-    expect(plus(karte(3, 3))).toContain('aria-disabled="true"')
+  it('alles im Korb, was da ist: der Knopf ist gesperrt und sagt, wie viel im Korb liegt', () => {
+    expect(knopf(karte(3, 3))).toContain('disabled=""')
+    expect(knopf(karte(3, 3))).toContain('3 im Warenkorb')
   })
 
-  it('Gegenprobe: unter dem Bestand geht „+"', () => {
-    expect(plus(karte(20, 3))).toContain('aria-disabled="false"')
+  it('Gegenprobe: unter dem Bestand geht er, auch mit Ware im Korb', () => {
+    expect(knopf(karte(20, 3))).not.toContain('disabled=""')
+    expect(knopf(karte(20, 0))).not.toContain('disabled=""')
+  })
+
+  it('kein Mengenfeld auf der Karte — die Menge ändert man im Warenkorb (Board s1-/w1-hofseite)', () => {
+    expect(karte(20, 3)).not.toContain('<input')
+    expect(karte(20, 3)).not.toContain('data-slot="stepper"')
   })
 })
 
@@ -646,17 +653,18 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(quelle('src/components/hofseite/hofseite-kunde.tsx').match(/<HofseiteFotos\b/g)).toHaveLength(1)
   })
 
-  it('ohne Produkte kein Schaufenster: die Übersicht bleibt, wie sie war — rechte Spalte, Über uns, Fotos', () => {
+  it('ohne Produkte kein Schaufenster: dieselbe Reihenfolge — Fotos, rechte Spalte, Über uns (Nr. 235)', () => {
     const html = seite({ farm: { ...HOF, products: [], farmPhotos: FOTOS } })
     expect(html).not.toContain('Alle Produkte (')
     expect(html).toContain('Gerade keine Produkte')
+    expect(html.indexOf('id="fotos"')).toBeLessThan(html.indexOf('<aside'))
     expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="ueber-uns"'))
-    expect(html.indexOf('id="ueber-uns"')).toBeLessThan(html.indexOf('id="fotos"'))
   })
 
-  it('im Reiter Produkte bleibt die Reihenfolge, wie sie war', () => {
+  it('im Reiter Produkte steht die Spalte nach den Produkten und nur ab lg (rechts, Board w1-hofseite Bild 3)', () => {
     const html = seite({ suche: 'reiter=produkte' })
-    expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="produkte"'))
+    expect(html.indexOf('<aside')).toBeGreaterThan(html.indexOf('id="produkte"'))
+    expect(html.match(/<aside[^>]*class="[^"]*"/)?.[0]).toMatch(/\bhidden\b.*\blg:flex\b/)
   })
 
   it('nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter Produkte, ohne Scrollen — der Link verschwindet mit dem Wechsel', () => {
@@ -715,7 +723,7 @@ describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 
     const html = renderToStaticMarkup(
       createElement(ProduktKarte, {
         produkt: p, zustand: kartenZustand(p, null), imKorb: 0, wirdHinzugefuegt: false,
-        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
+        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {},
       })
     )
     expect(html).toContain('href="/hof-test/produkt/p_karotten"')

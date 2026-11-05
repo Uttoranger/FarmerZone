@@ -69,7 +69,7 @@ import { HofseiteKunde } from '@/components/hofseite/hofseite-kunde'
 import { AngabenZumHof } from '@/components/checkout/angaben-zum-hof'
 import { KassenAbschluss } from '@/components/checkout/checkout-form'
 import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
-import { KONTAKT_NACH_DEM_KAUF } from '@/lib/hofseite-kunde'
+import { TELEFON_IN_DER_BESTAETIGUNG } from '@/components/hofseite/hofseite-seitenspalte'
 import { KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import type { PublicFarm, PublicProduct } from '@/server/queries/farm'
 import { publicProduct } from './fabrik/public-product'
@@ -142,8 +142,9 @@ describe('Hofseite: kein Anruf, kein tel:-Link, statt der Nummer der Hinweis', (
   it('in „Zahlung & Kontakt" steht der Hinweis auf die Bestellbestätigung — Gegenprobe: Anfahrt und Zahlarten bleiben', () => {
     const html = hofseite()
     const karte = html.slice(html.indexOf('id="zahlung-kontakt"'), html.indexOf('id="anfahrt"'))
-    expect(karte).toContain(KONTAKT_NACH_DEM_KAUF)
-    expect(karte).toContain('Bar bei Abholung')
+    // Seit Nr. 235 ein Satz (Board w1-hofseite): Zahlarten, dann der Weg zur Nummer.
+    expect(karte).toContain(TELEFON_IN_DER_BESTAETIGUNG)
+    expect(karte).toContain('Online bezahlen oder bar bei Abholung.')
     expect(html).toContain('Anfahrt')
   })
 
