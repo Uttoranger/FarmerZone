@@ -155,21 +155,42 @@ describe('Korb-Blatt: Menge ohne Netz (Register N29)', () => {
 })
 
 describe('Korb-Blatt: nur die letzte Antwort zählt, Entfernen und Schließen räumen auf (UI-Runde 3)', () => {
-  it('zwei schnelle Tipps: die Antwort des ersten zählt nicht mehr, die des zweiten schon', () => {
+  it('zwei schnelle Tipps auf dieselbe Position: die Antwort des ersten zählt nicht mehr, die des zweiten schon', () => {
     const folge = neueMengenFolge()
-    const erster = folge.beginnen()
-    const zweiter = folge.beginnen()
+    const erster = folge.beginnen('a')
+    const zweiter = folge.beginnen('a')
     expect(erster()).toBe(false)
     expect(zweiter()).toBe(true)
   })
 
-  it('Entfernen bzw. Schließen verwirft die Antwort, die noch unterwegs ist', () => {
+  it('A scheitert, B danach gestartet: die Antwort für A zählt weiter (Karte für A bleibt)', () => {
     const folge = neueMengenFolge()
-    const unterwegs = folge.beginnen()
-    folge.verwerfen()
-    expect(unterwegs()).toBe(false)
+    const a = folge.beginnen('a')
+    folge.beginnen('b')
+    folge.verwerfen('b') // B entfernt
+    expect(a()).toBe(true)
+  })
+
+  it('neuere Antwort für A ersetzt die ältere, auch wenn B dazwischen lief', () => {
+    const folge = neueMengenFolge()
+    const alt = folge.beginnen('a')
+    folge.beginnen('b')
+    const neu = folge.beginnen('a')
+    expect(alt()).toBe(false)
+    expect(neu()).toBe(true)
+  })
+
+  it('Entfernen verwirft nur die entfernte Position, Schließen alle', () => {
+    const folge = neueMengenFolge()
+    const a = folge.beginnen('a')
+    const b = folge.beginnen('b')
+    folge.verwerfen('a')
+    expect(a()).toBe(false)
+    expect(b()).toBe(true)
+    folge.alleVerwerfen()
+    expect(b()).toBe(false)
     // Gegenprobe: Ein neuer Tipp danach zählt wieder.
-    expect(folge.beginnen()()).toBe(true)
+    expect(folge.beginnen('b')()).toBe(true)
   })
 
   it('der Quelltext prüft vor der Karte, ob der Aufruf noch der letzte ist, und hält den Zähler in einer Ref', () => {
@@ -182,8 +203,8 @@ describe('Korb-Blatt: nur die letzte Antwort zählt, Entfernen und Schließen r�
     const quelle = readFileSync(join(__dirname, '..', 'src/components/farm/cart-sheet.tsx'), 'utf8')
     for (const name of ['entfernen', 'offenAendern']) {
       const rumpf = quelle.slice(quelle.indexOf(`function ${name}(`), quelle.indexOf('\n  }', quelle.indexOf(`function ${name}(`)))
-      expect(rumpf, name).toContain('folge.current.verwerfen()')
-      expect(rumpf, name).toContain('setMengeFehler(null)')
+      expect(rumpf, name).toContain(name === 'entfernen' ? 'folge.current.verwerfen(productId)' : 'folge.current.alleVerwerfen()')
+      expect(rumpf, name).toContain('setMengeFehler(')
     }
     expect(quelle).toContain('<Sheet open={open} onOpenChange={offenAendern}>')
     expect(quelle).toContain('onClick={() => entfernen(item.productId)}')

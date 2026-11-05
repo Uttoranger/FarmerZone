@@ -122,7 +122,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           // „Artikel fehlt" (E14): die Position steht da, ist aber nicht mehr im Betrag.
           fehltSeit: true,
           // Einheit nur zur Anzeige gejoint — dieselbe Schreibweise wie auf
-          // der Bestätigungsseite (positionMengeVorn, src/lib/kasse.ts).
+          // der Bestätigungsseite (positionMengeVorn, src/lib/format.ts).
           product: { select: { unit: true, unitSize: true } },
         },
       },

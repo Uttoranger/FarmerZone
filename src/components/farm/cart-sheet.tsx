@@ -74,22 +74,35 @@ export function mengeFehlerNach(ergebnis: KorbErgebnis): MengeFehler | null {
 }
 
 /**
- * Welche Antwort auf „−“/„+“ noch zählt (Befund pruefer, UI-Runde 3): Tippt man schnell zweimal, kommen die Antworten
- * des Servers in beliebiger Reihenfolge zurück — die Karte darf nur sagen, was der LETZTE Aufruf ergab, sonst stünde
- * „Keine Verbindung“ unter einer Menge, die längst gespeichert ist. Entfernen und Schließen verwerfen alles, was noch
- * unterwegs ist. Ein Zähler, kein Zustand: Er ändert nichts an der Anzeige und gehört deshalb in eine Ref.
+ * Welche Antwort auf „−“/„+“ noch zählt (Befund pruefer, UI-Runde 3; Register N29 je Position): Tippt man schnell zweimal
+ * auf DIESELBE Position, kommen die Antworten des Servers in beliebiger Reihenfolge zurück — die Karte darf nur sagen,
+ * was der LETZTE Aufruf dieser Position ergab, sonst stünde „Keine Verbindung“ unter einer Menge, die längst gespeichert
+ * ist. Der Zähler läuft je `productId`: Ein Tipp auf B darf die Fehlerkarte von A nicht verschlucken. Entfernen verwirft
+ * nur die entfernte Position, Schließen alles, was noch unterwegs ist. Kein Zustand, nur ein Zähler: Ref statt State.
  */
-export function neueMengenFolge(): { beginnen: () => () => boolean; verwerfen: () => void } {
-  let zaehler = 0
+export function neueMengenFolge(): {
+  beginnen: (productId: string) => () => boolean
+  verwerfen: (productId: string) => void
+  alleVerwerfen: () => void
+} {
+  const zaehler = new Map<string, number>()
+  const weiter = (productId: string) => {
+    const neu = (zaehler.get(productId) ?? 0) + 1
+    zaehler.set(productId, neu)
+    return neu
+  }
   return {
-    // Gibt zurück, ob dieser Aufruf bei seiner Antwort noch der letzte ist.
-    beginnen() {
-      zaehler += 1
-      const eigener = zaehler
-      return () => eigener === zaehler
+    // Gibt zurück, ob dieser Aufruf bei seiner Antwort für seine Position noch der letzte ist.
+    beginnen(productId) {
+      const eigener = weiter(productId)
+      return () => zaehler.get(productId) === eigener
     },
-    verwerfen() {
-      zaehler += 1
+    verwerfen(productId) {
+      weiter(productId)
+    },
+    // Alles Unterwegs wird ungültig: Zähler weiterzählen statt löschen, sonst begänne eine Position wieder bei 1.
+    alleVerwerfen() {
+      for (const id of [...zaehler.keys()]) weiter(id)
     },
   }
 }
@@ -99,8 +112,8 @@ export function neueMengenFolge(): { beginnen: () => () => boolean; verwerfen: (
  * davor der Hinweis nach dem Abgleich steht. Nach einem Tipp (`touch`) bleibt es bei Base UI: dann bekommt das Blatt
  * selbst den Fokus, ohne sichtbaren Rahmen. Findet sich der Knopf nicht, gilt die Vorgabe (`true`: erstes Element).
  */
-export function korbStartfokus(blatt: Pick<HTMLElement, 'querySelector'> | null, art: string): HTMLElement | true | null {
-  if (art === 'touch') return blatt as HTMLElement | null
+export function korbStartfokus(blatt: HTMLElement | null, art: string): HTMLElement | true | null {
+  if (art === 'touch') return blatt
   return blatt?.querySelector<HTMLElement>('[data-slot="sheet-close"]') ?? true
 }
 
@@ -137,26 +150,27 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
   const leer = items.length === 0
   // Die letzte gescheiterte Menge samt Wiederholung (N29) — der nächste Tipp auf „−“/„+“ räumt sie weg, ebenso
   // Entfernen und Schließen (die Karte gehörte zu einer Zeile bzw. einem Blatt, das es so nicht mehr gibt).
-  const [mengeFehler, setMengeFehler] = useState<(MengeFehler & { wiederholen: () => void }) | null>(null)
+  const [mengeFehler, setMengeFehler] = useState<(MengeFehler & { productId: string; wiederholen: () => void }) | null>(null)
   const folge = useRef(neueMengenFolge())
   const blattRef = useRef<HTMLDivElement>(null)
   function mengeSetzen(productId: string, menge: number) {
-    setMengeFehler(null)
-    const nochLetzter = folge.current.beginnen()
+    // Nur die Karte DIESER Position räumt der Tipp weg; die einer anderen bleibt stehen.
+    setMengeFehler((alt) => (alt?.productId === productId ? null : alt))
+    const nochLetzter = folge.current.beginnen(productId)
     void onUpdateQuantity(productId, menge).then((ergebnis) => {
       if (!nochLetzter()) return
       const fehler = mengeFehlerNach(ergebnis)
-      if (fehler) setMengeFehler({ ...fehler, wiederholen: () => mengeSetzen(productId, menge) })
+      if (fehler) setMengeFehler({ ...fehler, productId, wiederholen: () => mengeSetzen(productId, menge) })
     })
   }
   function entfernen(productId: string) {
-    folge.current.verwerfen()
-    setMengeFehler(null)
+    folge.current.verwerfen(productId)
+    setMengeFehler((alt) => (alt?.productId === productId ? null : alt))
     onRemoveItem(productId)
   }
   function offenAendern(offen: boolean) {
     if (!offen) {
-      folge.current.verwerfen()
+      folge.current.alleVerwerfen()
       setMengeFehler(null)
     }
     onOpenChange(offen)
