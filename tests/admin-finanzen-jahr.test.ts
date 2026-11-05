@@ -13,8 +13,10 @@
  *    Hinweis, solange es kein Vorjahr gibt.
  *  - Kosten im Jahr: Posten, Summe, Anteile; Auszahlungen und Entfallene Gebühren
  *    sagen ehrlich, dass sie nichts zeigen.
+ *  - Das Wort der Gebühr (V63, Nr. 230): ein Jahr ganz nach dem Stichtag ohne
+ *    „Servicegebühr“; über den Stichtag „Gebühren“ mit Legende und Wort je Zeile.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -56,6 +58,12 @@ vi.mock('@/server/queries/geld', () => ({
   })),
 }))
 vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: vi.fn(async () => []) }))
+// Der Stichtag „Hofpreis-Modell ab“ (V63): ohne Zeile die Vorgabe (1. Februar 2027) — 2025 und 2026 sind dann ganz „bisher“.
+const hofpreis = vi.hoisted(() => ({ einstellung: { hofpreisModellAb: null as Date | null } }))
+vi.mock('@/server/queries/plattform-einstellung', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/queries/plattform-einstellung')>()),
+  ladeHofpreisEinstellung: async () => hofpreis.einstellung,
+}))
 vi.mock('@/lib/prisma', async () => ({ prisma: (await import('./finanzen-jahr-daten')).prismaAttrappe }))
 // Stichtag der Live-Schaltung: derselbe wie in den Zeilen; die Abfrage nimmt ihn sonst aus der Umgebung.
 vi.mock('@/lib/umgebung-server', async (importOriginal) => ({
@@ -138,7 +146,7 @@ describe('ohne zeitraum bleibt es der Monat', () => {
   it('Monatsansicht von Geld (Nr. 191), mit dem Umschalter im Kopf (Monat gewählt)', async () => {
     const html = await seite({})
     expect(html).toContain('Abgleich mit Stripe')
-    expect(html).not.toContain('nach Monaten')
+    expect(html).not.toContain('und Kosten je Monat')
     expect(linkMit(html, '/admin/geld?monat=2026-10')).toContain('aria-current="page"')
     expect(links(html)).toContain('/admin/geld?zeitraum=jahr&jahr=2026')
   })
@@ -185,7 +193,8 @@ describe('die Seite im Jahr (2026, laufend)', () => {
 
   it('das Diagramm ist ein Bild mit Beschriftung; die Tabelle darunter ist seine Textfassung (neuester Monat oben, jede Zeile ein Link)', async () => {
     const html = await seite({ zeitraum: 'jahr', jahr: '2026' })
-    expect(html).toContain('2026 nach Monaten')
+    // Seit Nr. 230 heißt die Überschrift wie das Diagramm, mit dem Wort der Gebühr (Board w3-admin-geld Bild 4).
+    expect(html).toMatch(/<h2[^>]*>Servicegebühren und Kosten je Monat 2026<\/h2>/)
     expect(html).toContain('role="img"')
     expect(html).toContain('aria-label="Servicegebühren und Kosten je Monat 2026"')
     expect(html).toMatch(/aria-describedby="[^"]+"/)
@@ -227,7 +236,7 @@ describe('die Seite im Jahr (2026, laufend)', () => {
   it('Gegenprobe: ein ungültiges oder fremdes Jahr zeigt das laufende', async () => {
     for (const jahr of ['abc', '2099', '2019', '26']) {
       const html = await seite({ zeitraum: 'jahr', jahr })
-      expect(html, jahr).toContain('2026 nach Monaten')
+      expect(html, jahr).toContain('Servicegebühren und Kosten je Monat 2026')
     }
   })
 })
@@ -235,7 +244,7 @@ describe('die Seite im Jahr (2026, laufend)', () => {
 describe('das vergangene und das erste Jahr (2025)', () => {
   it('ganzes Jahr: keine Hochrechnung, vor ist da, zurück nicht, der Vergleich ist aus mit Hinweis', async () => {
     const html = await seite({ zeitraum: 'jahr', jahr: '2025' })
-    expect(html).toContain('2025 nach Monaten')
+    expect(html).toContain('Servicegebühren und Kosten je Monat 2025')
     expect(html).not.toContain('Bis Jahresende')
     expect(html).toContain('Jän–Dez')
     expect(html).toContain('im ganzen Jahr')
@@ -266,14 +275,50 @@ describe('Kosten im Jahr', () => {
     expect(html).toContain(formatEuro(centsAlsEuro(rechnung.kostenCents)))
     expect(html).toContain('100 %')
     // Die Übersicht ist in diesem Reiter nicht da.
-    expect(html).not.toContain('nach Monaten')
+    expect(html).not.toContain('und Kosten je Monat')
   })
 
   it('Auszahlungen und Entfallene Gebühren zeigen wie im Monat ihren Leerzustand', async () => {
     for (const reiter of ['auszahlungen', 'entfallen']) {
       const html = await seite({ zeitraum: 'jahr', jahr: '2026', reiter })
       expect(html, reiter).toContain(FINANZEN_REITER_OHNE_INHALT)
-      expect(html, reiter).not.toContain('nach Monaten')
+      expect(html, reiter).not.toContain('und Kosten je Monat')
     }
+  })
+})
+
+describe('das Wort der Gebühr im Jahr (V63, Nr. 230)', () => {
+  beforeEach(() => {
+    hofpreis.einstellung = { hofpreisModellAb: null }
+  })
+
+  it('ein Jahr ganz nach dem Stichtag: kein „Servicegebühr“ — Kennzahl, Überschrift, Spalte und Legende sagen „Plattformgebühren“', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2025-12-31T23:00:00Z') } // 1. Jänner 2026, Wiener Mitternacht
+    const html = await seite({ zeitraum: 'jahr', jahr: '2026' })
+    expect(html).not.toContain('Servicegebühr')
+    expect(html).toContain('Plattformgebühren 2026')
+    expect(html).toMatch(/<h2[^>]*>Plattformgebühren und Kosten je Monat 2026<\/h2>/)
+    expect(html).toContain('aria-label="Plattformgebühren und Kosten je Monat 2026"')
+    expect(html).not.toContain('(altes Modell)')
+  })
+
+  it('über den Stichtag: „Gebühren“, die Legende sagt bis wann welches Wort, jede Zeile nennt ihr Wort', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-05-31T22:00:00Z') } // 1. Juni 2026
+    const html = (await seite({ zeitraum: 'jahr', jahr: '2026' })).replaceAll('\u00a0', ' ')
+    expect(html).toContain('Gebühren 2026')
+    expect(html).toMatch(/<h2[^>]*>Gebühren und Kosten je Monat 2026<\/h2>/)
+    expect(html).toContain('Gebühren (bis Mai Servicegebühr, ab Juni Plattformgebühr)')
+    const tabelle = html.slice(html.indexOf('<table'))
+    const zeile = (monat: string): string => tabelle.slice(tabelle.indexOf(monat), tabelle.indexOf('</tr>', tabelle.indexOf(monat)))
+    expect(zeile('Mai 2026')).toContain('Servicegebühr (altes Modell)')
+    expect(zeile('Juni 2026')).toContain('Plattformgebühr')
+    expect(zeile('Juni 2026')).not.toContain('Servicegebühr')
+  })
+
+  it('Gegenprobe: ganz vor dem Stichtag (Vorgabe 2027) bleibt es die Servicegebühr, ohne Wort je Zeile', async () => {
+    const html = await seite({ zeitraum: 'jahr', jahr: '2026' })
+    expect(html).toContain('Servicegebühren 2026')
+    expect(html).not.toContain('Plattformgebühren')
+    expect(html).not.toContain('(altes Modell)')
   })
 })

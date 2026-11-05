@@ -10,6 +10,7 @@
  *    gleicht den Kennzahlen der Seite).
  *  - Das Jahr aus der Adresse ist Fremdtext: Unsinn ist das laufende Jahr.
  *  - Keine Personendaten, nur GET.
+ *  - Das Wort der Gebühr in der Kopfzeile wie in der Jahresansicht (V63, Nr. 230).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -42,6 +43,12 @@ vi.mock('@/server/actions/finanzen', () => ({
   kostenpostenLoeschen: vi.fn(),
 }))
 vi.mock('@/server/queries/admin', () => ({ ladeHoefeFuerGruendung: vi.fn(async () => []) }))
+// Der Stichtag „Hofpreis-Modell ab“ (V63): ohne Zeile die Vorgabe (1. Februar 2027).
+const hofpreis = vi.hoisted(() => ({ einstellung: { hofpreisModellAb: null as Date | null } }))
+vi.mock('@/server/queries/plattform-einstellung', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/queries/plattform-einstellung')>()),
+  ladeHofpreisEinstellung: async () => hofpreis.einstellung,
+}))
 
 import * as route from '@/app/admin/finanzen/export/route'
 // Seit Nr. 191 zeigt /admin/geld das Jahr (/admin/finanzen leitet dorthin weiter).
@@ -66,6 +73,7 @@ async function ruf(abfrage?: string): Promise<Response> {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  hofpreis.einstellung = { hofpreisModellAb: null }
   wache.verlangeAdminAktion.mockResolvedValue({ ok: true, userId: 'admin_1' })
 })
 
@@ -147,5 +155,21 @@ describe('mit Admin', () => {
     expect(Object.keys(auswahl).sort()).toEqual(
       ['createdAt', 'paymentMethod', 'paymentStatus', 'platformFeeAmount', 'serviceFeeCents', 'serviceFeeRefundedAt', 'status'].sort()
     )
+  })
+})
+
+describe('das Wort der Gebühr in der Kopfzeile (V63, Nr. 230)', () => {
+  it('ein Jahr ganz nach dem Stichtag: „Plattformgebühren (€)“, kein „Servicegebühr“ in der Datei', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2025-12-31T23:00:00Z') } // 1. Jänner 2026, Wiener Mitternacht
+    const csv = await (await ruf('?jahr=2026')).text()
+    expect(csv.split('\r\n')[0]).toBe('Monat;Plattformgebühren (€);Kosten (€);Ergebnis (€);Bestellungen')
+    expect(csv).not.toContain('Servicegebühr')
+  })
+
+  it('über den Stichtag „Gebühren (€)“; Gegenprobe ganz davor „Servicegebühren (€)“', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-05-31T22:00:00Z') }
+    expect((await (await ruf('?jahr=2026')).text()).split('\r\n')[0]).toContain('Monat;Gebühren (€);')
+    hofpreis.einstellung = { hofpreisModellAb: null }
+    expect((await (await ruf('?jahr=2026')).text()).split('\r\n')[0]).toContain('Monat;Servicegebühren (€);')
   })
 })

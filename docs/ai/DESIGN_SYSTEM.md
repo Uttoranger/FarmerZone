@@ -776,6 +776,12 @@ Boards s1-/w1-startseite, -hoefe, -hofseite, -produkt, t-o-fuer-hoefe. Was hier 
 - **Höfe:** Regel-Zeile „… – Testhöfe nie.“; die Zeile „n von m Höfen brauchen Blick“ nennt die Testhöfe nur, solange eine Liste darunter steht (`hoefeListeZeile`); ohne Treffer mit Suche „Suche löschen“ (Filter bleibt), sonst „Alle Höfe zeigen“. Laden: `HoefeListeLaden` (`hoefe-laden.tsx`) mit echtem Seitenkopf, Platzhaltern für Suche und Filter, fünf Karten zu 76 px und `role="status"` „Höfe werden geladen …“.
 - **Heute:** Protokoll-Zeile links leise „Wann · Wer“, rechts was getan wurde (`protokollWannWer`, auch in der Klappkarte); „Läuft von selbst“ mit „heute · n von m pünktlich“. In der Akte sagt „Zustand“ bei wartenden Höfen „was Kundinnen erleben würden“.
 
+### Admin › Geld und Jahresansicht mit dem Wort der Gebühr (V63, Register N32; seit Nr. 230)
+
+- **Monat:** Kachel, Abgleich-Satz („Betrag, <Wort> und Erstattung gleich“) und Regel-Zeile nehmen `gebuehrWortFuerMonat(monat, hofpreisModellAb(einstellung))`; die Kachel schreibt „online € … · bar € …“, das Ergebnis „gedeckt“ bzw. „noch nicht gedeckt“ (Board w3-admin-geld). Die Karte „Plattformgebühr · Monatsabrechnung“ bleibt immer „Plattformgebühr“ — sie zeigt nur Einzüge des Hofpreis-Modells.
+- **Jahr und CSV:** Kennzahl, Überschrift des Diagramms („<Wort>en und Kosten je Monat <Jahr>“), Spalte, Legende und Kopfzeile der CSV nehmen `gebuehrWortFuerJahr`. Liegt der Stichtag im Jahr, sagt die Legende „Gebühren (bis <Monat> Servicegebühr, ab <Monat> Plattformgebühr)“ und jede Zeile der Tabelle ihr Wort, die alte Gebühr mit „(altes Modell)“ (`jahrGebuehrTexte` in `src/app/admin/geld/texte.ts`). Ganz vor oder ganz nach dem Stichtag steht das Wort nur im Kopf.
+- **Rendertests:** „kein ‚Servicegebühr‘ nach dem Stichtag“ für Geld (Monat), Jahresansicht und CSV; Stichtag-Karte nach Erreichen ohne „Vorher bleibt alles wie heute.“.
+
 ### Infoseiten (/impressum, /konditionen, seit Nr. 54)
 
 - **/agb (seit Nr. 90, Register O4):** Rechtstext aus `src/lib/rechtstexte/agb.ts` (Wort für Wort `docs/recht/agb.md`, der Test `agb-text` vergleicht jede Zeile), Verzeichnis mit Sprüngen, Stand-Vermerk („Entwurf“ bis Fassung 1.0), Druckknopf (`print:hidden` für Kopf, Knopf und Verzeichnis); Sätze der Einbindung (Registrierung, Kasse, Mail, Fußzeile, /hoefe) aus `src/lib/rechtstexte/agb-einbindung.ts`. Rechtstext ist von den Textwachen ausgenommen (Wortliste, Fachwort, „Problem melden“).
