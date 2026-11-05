@@ -25,7 +25,12 @@ vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => createElement('img', { alt }),
 }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null, ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
+// Seit Nr. 226 (/fuer-hoefe) und Nr. 231 (/konditionen) lesen die Seiten den Stichtag „Hofpreis-Modell ab“ —
+// hier weit weg, also Modell „bisher“ (Zusammenführung im Sammel-PR Lauf 30).
+vi.mock('@/server/queries/plattform-einstellung', () => ({
+  gruendungFuerSeiten: async () => null,
+  ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: new Date('2099-01-01T00:00:00Z') }),
+}))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
@@ -42,6 +47,9 @@ import {
 } from '@/lib/konditionen'
 import { FUER_HOEFE_FRAGEN, FUER_HOEFE_SCHRITTE, FUER_HOEFE_VORTEILE, REGISTRIEREN_SCHRITTE } from '@/lib/fuer-hoefe'
 import { GRUENDUNGS_AUFNAHME_SCHRITTE } from '@/lib/gruendungshof'
+
+/** Seit Nr. 231 asynchron (Stichtag „Hofpreis-Modell ab“) — einmal aufgelöst, dann gerendert. */
+const KONDITIONEN_SEITE = await KonditionenPage()
 
 const WURZEL = process.cwd()
 const lies = (datei: string): string => readFileSync(join(WURZEL, datei), 'utf8')
@@ -189,7 +197,7 @@ const BAR_OPTION_FUER_HOEFE =
 
 describe('/fuer-hoefe, /konditionen und Registrieren nennen Stripe als Teil des Starts', () => {
   const fuerHoefe = renderToStaticMarkup(FUER_HOEFE_SEITE)
-  const konditionen = renderToStaticMarkup(createElement(KonditionenPage))
+  const konditionen = renderToStaticMarkup(KONDITIONEN_SEITE)
 
   it.each([
     ['/fuer-hoefe', fuerHoefe],

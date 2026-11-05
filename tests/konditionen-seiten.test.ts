@@ -23,8 +23,12 @@ vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => createElement('img', { alt }),
 }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-// Seit Nr. 226 dazu der Stichtag „Hofpreis-Modell ab“ — ohne Zeile die Vorgabe (BAR_SERVICEGEBUEHR_AB), wie im Betrieb beim Lesefehler.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null, ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
+// Seit Nr. 226 (/fuer-hoefe) und Nr. 231 (/konditionen) lesen die Seiten den Stichtag „Hofpreis-Modell ab“ —
+// hier weit weg, also Modell „bisher“ (Zusammenführung im Sammel-PR Lauf 30).
+vi.mock('@/server/queries/plattform-einstellung', () => ({
+  gruendungFuerSeiten: async () => null,
+  ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: new Date('2099-01-01T00:00:00Z') }),
+}))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
@@ -33,6 +37,9 @@ import KonditionenPage, { revalidate as konditionenRevalidate } from '@/app/(pub
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
 import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT, TARIFE, servicegebuehrZahltKunde, vorBarStichtag } from '@/lib/konditionen'
 import { FUER_HOEFE_FRAGEN } from '@/lib/fuer-hoefe'
+
+/** Seit Nr. 231 asynchron (Stichtag „Hofpreis-Modell ab“) — einmal aufgelöst, dann gerendert. */
+const KONDITIONEN_SEITE = await KonditionenPage()
 
 /** Die Seite ist seit Nr. 93 asynchron (Zahlen der Gründungshöfe) — einmal aufgelöst, dann gerendert. */
 const FUER_HOEFE_SEITE = await FuerHoefePage()
@@ -97,7 +104,7 @@ describe('Quelltext — eine Quelle für Preise', () => {
 })
 
 describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
-  const konditionen = renderToStaticMarkup(createElement(KonditionenPage))
+  const konditionen = renderToStaticMarkup(KONDITIONEN_SEITE)
   const fuerHoefe = renderToStaticMarkup(FUER_HOEFE_SEITE)
 
   it.each([

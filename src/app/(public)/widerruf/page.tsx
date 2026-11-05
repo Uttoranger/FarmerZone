@@ -6,9 +6,11 @@ import { hofSichtbar } from '@/lib/hof-sichtbar'
 import { formatPosition } from '@/lib/format'
 import { MARKE } from '@/lib/marke'
 import { HOF_KONTAKT_FELDER, hofKontaktEmail } from '@/lib/hof-kontakt'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { WIDERRUF_TEXT, ausnahmeHinweis, belehrungHof, belehrungMitHof, widerrufMoeglich, type BelehrungHof } from '@/lib/widerruf'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { cn } from '@/lib/utils'
 import { WiderrufFormular, type WiderrufBestellAnsicht } from './widerruf-formular'
 
 // Private Seite (signierter Link) — nie in Suchmaschinen, und die Adresse mit
@@ -21,10 +23,15 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+/** Wen die Kundin anrufen kann, wenn der Rücktritt hier nicht mehr geht — nur mit gültigem Link und sichtbarem Hof. */
+type HofAnruf = { name: string; telefon: string; href: string | null }
+
 /*
- * /widerruf (Nr. 200, Register N39, § 13a FAGG): der Widerruf online, ohne
+ * /widerruf (Nr. 200, Register N39, § 13a FAGG): der Rücktritt online, ohne
  * Anmeldung, in zwei Schritten („Vertrag widerrufen“ → Zusammenfassung →
- * „Widerruf bestätigen“).
+ * „Widerruf bestätigen“). Seit Nr. 231 nach den Boards s3/w3-widerruf: Titel
+ * „Rücktrittsrecht“, Sätze mit „Rücktritt“ (N43); die zwei Knöpfe und der
+ * Einstieg bleiben wörtlich nach N39, ebenso die Belehrung (N43 (1), (2)).
  *  - Mit signiertem Link (?bestellung=…&sig=…, Zweck `widerruf`): die
  *    Bestellung gekürzt, die Positionen zum Ankreuzen mit dem Hinweis je
  *    Kategorie bzw. — hat der Hof „verdirbt schnell“ angegeben — mit dieser
@@ -46,6 +53,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
   let ansicht: WiderrufBestellAnsicht | null = null
   let hofAngaben: BelehrungHof | null = null
   let nichtMehr = false
+  let anruf: HofAnruf | null = null
   if (bestellung !== null || sig !== null) {
     // Signatur ZUERST — eine falsche löst keine Abfrage aus.
     if (!bestellung || !sig || !widerrufLinkGilt(bestellung, sig)) notFound()
@@ -86,6 +94,10 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
     })
     if (!order) notFound()
     nichtMehr = !widerrufMoeglich(order, new Date())
+    const telefon = order.farm.phone.trim()
+    if (nichtMehr && telefon && hofSichtbar(order.farm)) {
+      anruf = { name: order.farm.name, telefon: formatiereTelefon(telefon), href: telefonLink(telefon) }
+    }
     // Nur mit gültigem Link (oben geprüft): die Angaben des Hofs DIESER Bestellung.
     hofAngaben = belehrungHof(order.farm, hofKontaktEmail(order.farm), hofSichtbar(order.farm))
     ansicht = {
@@ -114,7 +126,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
         </div>
 
         {nichtMehr ? (
-          <Hinweiskarte ton="orange">{WIDERRUF_TEXT.nichtMehr}</Hinweiskarte>
+          <NichtMehrKarte anruf={anruf} />
         ) : (
           <WiderrufFormular bestellung={ansicht} />
         )}
@@ -122,6 +134,24 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
         <BelehrungAbschnitt hof={hofAngaben} />
       </div>
     </KundeShellMitSitzung>
+  )
+}
+
+/** Die Karte „Von dieser Bestellung kannst du hier nicht mehr zurücktreten.“ (Board w3-widerruf Bild 5). */
+function NichtMehrKarte({ anruf }: { anruf: HofAnruf | null }): React.JSX.Element {
+  return (
+    <section aria-labelledby="nicht-mehr-titel" className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+      {/* Orange als Zustand „offen“ (text-status-offen hält 4,5:1 in beiden Themes), kein Fehler der Kundin. */}
+      <h2 id="nicht-mehr-titel" className="font-heading text-[18px] leading-snug font-semibold text-status-offen">
+        {WIDERRUF_TEXT.nichtMehrTitel}
+      </h2>
+      <p className="text-[14.5px] leading-normal text-foreground">{WIDERRUF_TEXT.nichtMehrSatz(anruf)}</p>
+      {anruf?.href && (
+        <a href={anruf.href} className={cn(KNOPF_RAHMEN, 'w-full border-[1.5px] border-accent font-semibold')}>
+          {WIDERRUF_TEXT.anrufen(anruf.name)}
+        </a>
+      )}
+    </section>
   )
 }
 
