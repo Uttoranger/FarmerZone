@@ -4,7 +4,7 @@ import { MEINE_MELDUNGEN_HREF, NEUE_MELDUNG_HREF, type MeldungZeile } from '@/li
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 
 /*
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
  * falls es eine gibt — der Antwort des Betreibers.
  *
  * Meldungstext und Antwort sind Fremdtext: React setzt sie als Text, nie als
- * Markup. Genau ein grüner Knopf „+ Neue Meldung" (Mockup); im Leerzustand
+ * Markup. „+ Neue Meldung" als Umriss (Board s2/w2-meldungen, Nr. 225); im Leerzustand
  * führt zusätzlich ein Umriss-Knopf dorthin.
  */
 
@@ -24,7 +24,8 @@ export function MeineMeldungen({ zeilen }: { zeilen: MeldungZeile[] | null }): R
     <div className="flex flex-col gap-3.5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Meine Meldungen</h1>
-        <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_GRUEN, 'w-full rounded-[14px] sm:w-auto sm:rounded-full')}>
+        {/* Board s2/w2-meldungen: Umriss-Pille mit Feldrand (V51: im Hofbereich kein grüner Knopf). */}
+        <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full rounded-[14px] border-input bg-card font-semibold sm:w-auto sm:rounded-full')}>
           <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
           Neue Meldung
         </Link>
