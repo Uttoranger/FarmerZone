@@ -402,12 +402,26 @@ export const STARTSEITE_FRAGEN: readonly Frage[] = [
 ]
 
 /**
- * Die Fragen, wie die Startseite sie zeigt: vor dem Stichtag mit der
- * Bar-Ausnahme in „Wie bezahle ich?" (Register B1), danach unverändert.
- * `jetzt` von der Seite (Server-Uhr, revalidiert).
+ * „Wie bezahle ich?" ab dem Stichtag „Hofpreis-Modell ab“ (V62, N38; Board
+ * w1-startseite): Die Gebühr steckt im Endpreis, online und bar gleich — keine
+ * eigene Zeile, keine Bar-Ausnahme. Der Satz aus derselben Quelle wie das
+ * Beispiel (Standardsatz über `satzHundertstel`).
  */
-export function startseitenFragen(jetzt: Date): readonly Frage[] {
-  return STARTSEITE_FRAGEN.map((f) =>
-    f.frage === 'Wie bezahle ich?' ? { ...f, antwort: mitBarAusnahme(f.antwort, jetzt, BAR_OHNE_GEBUEHR_HINWEIS) } : f
-  )
+export const WIE_BEZAHLE_ICH_HOFPREIS =
+  'Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Die Preise sind ' +
+  `Endpreise: Darin stecken ${satzText(satzHundertstel({ plattformgebuehrProzent: null }))} % ${PLATTFORMGEBUEHR_BEZEICHNUNG}, ` +
+  'online und bar gleich.'
+
+/**
+ * Die Fragen, wie die Startseite sie zeigt — „Wie bezahle ich?" je Modell:
+ * im Modell „bisher“ vor dem Bar-Stichtag mit der Bar-Ausnahme (Register B1),
+ * danach wie in STARTSEITE_FRAGEN; im Hofpreis-Modell `WIE_BEZAHLE_ICH_HOFPREIS`.
+ * `jetzt` von der Seite (Server-Uhr, revalidiert), `modell` aus `gebuehrModellFuer`.
+ */
+export function startseitenFragen(jetzt: Date, modell: GebuehrModell): readonly Frage[] {
+  return STARTSEITE_FRAGEN.map((f) => {
+    if (f.frage !== 'Wie bezahle ich?') return f
+    if (modell === 'hofpreis') return { ...f, antwort: WIE_BEZAHLE_ICH_HOFPREIS }
+    return { ...f, antwort: mitBarAusnahme(f.antwort, jetzt, BAR_OHNE_GEBUEHR_HINWEIS) }
+  })
 }

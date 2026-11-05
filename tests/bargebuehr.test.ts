@@ -479,12 +479,13 @@ describe('Texte — ehrlich, aus einer Quelle', () => {
   })
 
   it('/fuer-hoefe „Wie kommt das Geld zu mir?" nennt sie vor dem Stichtag, danach nicht', () => {
-    const geld = (jetzt: Date) => fuerHoefeFragen(jetzt).find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort
+    // Seit Nr. 226 hängt der Grundsatz je Modell an (gebuehrGrundsatz); im Modell „bisher“ samt Bar-Ausnahme (B1).
+    const geld = (jetzt: Date) => fuerHoefeFragen(jetzt, 'bisher').find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort
     expect(geld(LANGE_VORHER)).toContain(BAR_OHNE_GEBUEHR_SATZ)
     expect(geld(GENAU)).not.toContain(BAR_OHNE_GEBUEHR_SATZ)
-    expect(geld(GENAU)).toBe(FUER_HOEFE_FRAGEN.find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort)
-    // Die übrigen Fragen bleiben unverändert.
-    expect(fuerHoefeFragen(LANGE_VORHER).filter((f) => f.antwort.includes(BAR_OHNE_GEBUEHR_SATZ))).toHaveLength(1)
+    expect(geld(GENAU)).toBe(`${FUER_HOEFE_FRAGEN.find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort} ${SERVICEGEBUEHR_ZAHLT_KUNDE}`)
+    // Die übrigen Fragen nennen die Bar-Ausnahme nicht.
+    expect(fuerHoefeFragen(LANGE_VORHER, 'bisher').filter((f) => f.antwort.includes(BAR_OHNE_GEBUEHR_SATZ))).toHaveLength(1)
   })
 
   it('mitBarAusnahme hängt nur vor dem Stichtag an', () => {
@@ -512,7 +513,7 @@ describe('Texte — ehrlich, aus einer Quelle', () => {
   })
 
   it('Startseite „Wie bezahle ich?" nennt die Bar-Ausnahme nur vor dem Stichtag', () => {
-    const zahlen = (jetzt: Date) => startseitenFragen(jetzt).find((f) => f.frage === 'Wie bezahle ich?')?.antwort
+    const zahlen = (jetzt: Date) => startseitenFragen(jetzt, 'bisher').find((f) => f.frage === 'Wie bezahle ich?')?.antwort
     expect(zahlen(LANGE_VORHER)).toContain(BAR_OHNE_GEBUEHR_HINWEIS)
     expect(zahlen(GENAU)).not.toContain(BAR_OHNE_GEBUEHR_HINWEIS)
     expect(zahlen(GENAU)).toBe(STARTSEITE_FRAGEN.find((f) => f.frage === 'Wie bezahle ich?')?.antwort)

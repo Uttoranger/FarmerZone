@@ -328,6 +328,15 @@ const FESTE_LISTE: Fest[] = [
     text: 'inkl. Servicegebühr (5 %) € 2,50',
     grund: 'Vorschau unter /intern/bausteine (nur Entwicklung): Beispielwert der Fassung „bisher“ von KaufZusammenfassung (Nr. 219)',
   },
+  { datei: 'src/lib/hofseite-kunde.ts', text: /^% Servicegebühr/, grund: `${BISHER}: gebuehrHinweis — Seiten rufen gebuehrHinweisFuerHof, das mit hof.preisAnzeige (Hofpreis-Modell) plattformgebuehrHinweis nimmt (Nr. 226)` },
+  { datei: 'src/lib/hofseite-kunde.ts', text: 'zzgl. Servicegebühr', grund: `${BISHER}: Korb-Zusatz in gebuehrHinweis, nur ohne hof.preisAnzeige über gebuehrHinweisFuerHof (Nr. 226)` },
+  { datei: 'src/lib/hofseite-kunde.ts', text: 'zzgl. Servicegebühr bei Online-Zahlung', grund: `${BISHER}: GEBUEHR_KORB_NUR_ONLINE, nur in gebuehrHinweis (Bar-Ausnahme B1) gelesen (Nr. 226)` },
+  { datei: 'src/lib/startseite.ts', text: /^% Servicegebühr, mindestens/, grund: `${BISHER}: „Wie bezahle ich?“ in STARTSEITE_FRAGEN — startseitenFragen(jetzt, modell) nimmt im Hofpreis-Modell WIE_BEZAHLE_ICH_HOFPREIS (Nr. 226)` },
+  {
+    datei: 'src/components/startseite/startseite-abschnitte.tsx',
+    text: /^SERVICEGEBUEHR_BEZEICHNUNG · (Für dich kommen \{rechnung\.prozent\} %|<Zeile name=\{`\$\{SERVICEGEBUEHR_BEZEICHNUNG\} · )/,
+    grund: `${BISHER}: SoFunktionierts im Zweig ohne rechnung.modell — beispielRechnung(jetzt, …, modell) setzt im Hofpreis-Modell modell und satz (Nr. 226)`,
+  },
 ]
 
 /**
@@ -340,11 +349,6 @@ const NACHARBEIT: Fest[] = [
     datei: 'src/lib/kasse.ts',
     text: '+ Servicegebühr',
     grund: 'SERVICEGEBUEHR_ZUSATZ: in src/ ungenutzt (ein Leser würde über RUECKFALL_WERTE rot), aber von tests/kasse-formular.test.ts geprüft — streichen oder je Modell, eigener Auftrag',
-  },
-  {
-    datei: 'src/components/fuer-hoefe/fuer-hoefe-abschnitte.tsx',
-    text: /^servicegebuehrZahltKunde · .*\{servicegebuehrZahltKunde\(jetzt\)\}/,
-    grund: 'Preise-Abschnitt von /fuer-hoefe: src/components/fuer-hoefe/** steht in keiner Grenze (226 hat nur src/app/(public)/fuer-hoefe/**) — gebuehrGrundsatz(modell, …), eigener Auftrag',
   },
 ]
 
