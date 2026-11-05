@@ -904,7 +904,11 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - „Bar gesperrt“ statt „Pausiert“, weil „Pausiert“ der Hofzustand ist (Urlaub und Pause). Der Hofzustand „Pausiert“ bleibt unberührt.
   - Das Wort steht in der Wortliste (N8, DESIGN_SYSTEM „Wortliste“).
   - Umsetzung: Nacharbeit zu Lauf 30 (Marke auf /settings/payments und alle anderen Stellen dieses Zustands); keine Migration.
-- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 8):** Die Geld-Kachel in Admin › Heute bleibt, wie sie ist (sie zählt nach Abholung).
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 8):** ~~Die Geld-Kachel in Admin › Heute bleibt, wie sie ist (sie zählt nach Abholung).~~ **Ersetzt durch** die folgende Ergänzung (zweite Fassung, 5.11.2026).
+- **Ergänzung (uttoranger, 5.11.2026, zweite Fassung; über die Schaltzentrale; Rückfragen Lauf 30, Punkt 8):** Geld-Kachel in Admin › Heute:
+  - Zählt nach `createdAt` der Bestellung, wie es die Freigabe von Lauf 30 nennt (freigabe.md §34, „Gebühr“: maßgeblich ist createdAt, wie `gebuehrModell`).
+  - Ändert nur die Anzeige, keine Geldberechnung.
+  - Umsetzung: geplant in Lauf 31, Nr. 240; nicht in der Nacharbeit zu Lauf 30.
 - **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 9):** `setServiceFeeAction`:
   - Bleibt aufrufbar; nach A1 zeigt die Akte den Knopf ab dem Stichtag nur nicht mehr.
   - Im Hofpreis-Modell rechnet die Kasse nicht mit `Farm.serviceFee*`.
@@ -936,10 +940,10 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Ohne Gebührenbetrag beim Fehlbetrag, weil die Gebühr je Stück aufgerundet wird und jede Zahl dort nur ungefähr stimmt.
   - Im PR unter „Offen für Recht“ (Preisangabe).
 - **Umsetzung:** Nr. 219–232 (freigabe.md §34).
-- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 4):** Produkt-Formular im Web:
-  - Wird eine eigene Seite mit Vorschau rechts wie im Board w1-produkt-neu, statt eines Dialogs.
-  - Ausnahme von N41 d (zentrierter Dialog höchstens 560 px).
-  - Eigene Nummer, nicht in der Nacharbeit zu Lauf 30 gebaut.
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 4):** ~~Produkt-Formular im Web: wird eine eigene Seite mit Vorschau rechts wie im Board w1-produkt-neu, statt eines Dialogs; Ausnahme von N41 d; eigene Nummer.~~ **Ersetzt durch** die folgende Ergänzung (zweite Fassung, 5.11.2026).
+- **Ergänzung (uttoranger, 5.11.2026, zweite Fassung; über die Schaltzentrale; Rückfragen Lauf 30, Punkt 4):** Produkt-Formular im Web:
+  - Bleibt ein Dialog nach N41 d (zentriert, höchstens 560 px).
+  - Keine eigene Seite mit Vorschau rechts, keine Ausnahme von N41 d, keine eigene Nummer dafür. Das Board w1-produkt-neu gilt hier nicht.
 
 ### N42 · Redesign Welle 2 (3.11.2026; Projekt E-015)
 - **Verweis:** ergänzt N8 (Wortliste).
