@@ -38,7 +38,7 @@ describe('Vorwahl des Anlasses', () => {
 
   it('Gegenprobe: ohne `anlass` gilt die Vorlage, ohne beides „Frisches Produkt“', () => {
     const prefill = { anlass: 'ANNOUNCEMENT', title: 'Erfundener Titel', body: 'Erfundener Text.', photoUrl: null }
-    expect(gewaehlt(assistent({ prefill }))).toBe('Mitteilung')
+    expect(gewaehlt(assistent({ prefill }))).toBe('Hinweis')
     expect(gewaehlt(assistent())).toBe('Frisches Produkt')
   })
 })

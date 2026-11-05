@@ -66,10 +66,11 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
         <EmptyState
           symbol={Printer}
           titel="Das Plakat gibt es, sobald dein Hof online ist"
-          satz="Solange Kunden deine Hofseite nicht sehen können, würde der Code ins Leere führen."
+          satz="Solange Kundinnen deine Hofseite nicht sehen können, würde der Code ins Leere führen."
           ausweg={
+            // Board s2/w2-whatsapp-plakat Bild 4: der Ausweg sagt, was zu tun ist — in Mein Hof wird die Hofseite eingerichtet.
             <Link href="/farm-page" className={KNOPF_ORANGE}>
-              Zu Mein Hof
+              Hofseite einrichten
             </Link>
           }
         />

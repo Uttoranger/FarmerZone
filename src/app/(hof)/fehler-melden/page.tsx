@@ -6,10 +6,10 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { getMeldungenFuerHof } from '@/server/queries/meldung'
 import { generateFormToken } from '@/lib/form-token'
 import { KENNUNG_PARAMETER, PROBLEM_MELDEN, bereinigeKennung } from '@/lib/fehlerseite'
-import { meldungenStand } from '@/lib/hof-hilfe'
+import { MEINE_MELDUNGEN_HREF, PROBLEM_MELDEN_SATZ_HOF, meldungenStand } from '@/lib/hof-hilfe'
 import { supportMailto } from '@/lib/support'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { MeldungAbgeben } from '@/components/hof-hilfe/meldung-abgeben'
+import { MeldungForm } from '@/components/shared/meldung-form'
 import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 import { MELDEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
 import { MARKE } from '@/lib/marke'
@@ -20,9 +20,8 @@ export const dynamic = 'force-dynamic'
 
 /*
  * „Problem melden" — Meldung abgeben in der HofShell (Nachtlauf
- * Nr. 22e; Mockups web-h6-meldung-abgeben, mobil-h6-meldung-abgeben). Nur für
- * Höfe: Kundinnen melden auf /problem-melden, das unverändert beim
- * Bestandsformular bleibt.
+ * Nr. 22e; seit Nr. 225 nach Board s2/w2-meldungen mit dem gemeinsamen Baustein
+ * in Orange). Nur für Höfe: Kundinnen melden auf /problem-melden (grün).
  *
  * Die Fehlernummer aus der Adresse geht nur geprüft ins Formular
  * (bereinigeKennung, wie /problem-melden). Die Seitenspalte zählt die eigenen
@@ -66,10 +65,9 @@ export default async function FehlerMeldenPage({
           <h1 className="sr-only font-heading text-2xl font-semibold text-foreground md:not-sr-only md:text-[26px]">
             {PROBLEM_MELDEN}
           </h1>
-          <p className="text-sm leading-normal text-muted-foreground">
-            Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.
-          </p>
-          <MeldungAbgeben formToken={generateFormToken('meldung')} hofName={farm.name} kennungVorbelegt={kennung} />
+          <p className="text-sm leading-normal text-muted-foreground">{PROBLEM_MELDEN_SATZ_HOF}</p>
+          {/* Der gemeinsame Baustein in Orange (V51, Board s2/w2-meldungen); „Abbrechen" führt ab 768 px zur Übersicht der eigenen Meldungen. */}
+          <MeldungForm formToken={generateFormToken('meldung')} alsHof welt="hof" abbrechenHref={MEINE_MELDUNGEN_HREF} kennungVorbelegt={kennung} />
         </div>
         <div className="hidden min-w-0 flex-1 lg:block">
           <HilfeSeitenspalte stand={stand} mailto={mailto} />

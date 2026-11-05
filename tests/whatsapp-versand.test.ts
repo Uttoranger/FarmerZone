@@ -110,7 +110,6 @@ const UNEHRLICH = /Gesendet|versendet|automatisch gespeichert/
  */
 const ERLAUBTE_SAETZE: readonly { datei: string; satz: string; grund: string }[] = [
   { datei: 'status/new/status-new-client.tsx', satz: 'E-Mails werden automatisch versendet', grund: 'Die App verschickt die Mails beim Veröffentlichen selbst.' },
-  { datei: 'status/new/status-new-client.tsx', satz: 'E-Mails versendet', grund: 'Zahl der Mails, die die App verschickt hat (Ergebnis und Mailabstand).' },
   { datei: 'status/new/status-new-client.tsx', satz: 'Wird versendet…', grund: 'Knopf, solange die App veröffentlicht und die Mails verschickt.' },
 ]
 

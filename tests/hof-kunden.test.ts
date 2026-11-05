@@ -524,7 +524,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('4 Personen · 1 Stammkunde')
     expect(html).toMatch(/href="\/customers\?filter=stammkunden"[^>]*>Stammkunden<span[^>]*>· 1</)
     expect(html).toContain('aria-current="page"')
-    expect(html).toContain('placeholder="Name, Telefon oder E-Mail"')
+    expect(html).toContain('placeholder="Kundin suchen"')
     expect(html).toContain('Kundin suchen')
     expect(html).toMatch(/<button[^>]*>[\s\S]*?Sortieren[\s\S]*?<\/button>/)
     expect(html).toContain('href="/customers/aaaaaaaaaaaaaaaa"')

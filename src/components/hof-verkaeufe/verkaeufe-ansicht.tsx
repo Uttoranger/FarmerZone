@@ -105,35 +105,6 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
           Meldung samt Komponente verloren. */}
       <StripeAuszahlungen bereit={stripeReady} />
 
-      {vorlagen.length > 0 && (
-        <section aria-labelledby="verkaeufe-wiederholen" className="flex flex-col gap-2.5">
-          <h2 id="verkaeufe-wiederholen" className={KICKER}>
-            Wiederholen
-          </h2>
-          <ul className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            {vorlagen.map((v) => (
-              <li key={v.id} className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setDialog({ offen: true, verkauf: null, vorlage: v })}
-                  title={v.productName}
-                  className={cn(KARTE, 'flex min-h-[60px] w-full items-start gap-2.5 p-3 text-left transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
-                >
-                  <KanalSymbol kanal={v.channel} className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0">
-                    <span className="sr-only">Noch einmal eintragen: </span>
-                    <span className="block truncate text-sm font-semibold text-foreground">{v.productName}</span>
-                    <span className={cn('block truncate text-[12.5px]', LEISE)}>
-                      {kanalText(v.channel)} · {formatEuro(v.totalAmount)}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       <section aria-labelledby="verkaeufe-liste" className="flex flex-col gap-2.5">
         <h2 id="verkaeufe-liste" className={KICKER}>
           Letzte Verkäufe
@@ -163,6 +134,36 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
           </ul>
         )}
       </section>
+
+      {/* Board s2/w2-verkaeufe: „Noch einmal eintragen" unter der Liste. */}
+      {vorlagen.length > 0 && (
+        <section aria-labelledby="verkaeufe-wiederholen" className="flex flex-col gap-2.5">
+          <h2 id="verkaeufe-wiederholen" className={KICKER}>
+            Noch einmal eintragen
+          </h2>
+          <ul className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {vorlagen.map((v) => (
+              <li key={v.id} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setDialog({ offen: true, verkauf: null, vorlage: v })}
+                  title={v.productName}
+                  className={cn(KARTE, 'flex min-h-[60px] w-full items-start gap-2.5 p-3 text-left transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+                >
+                  <KanalSymbol kanal={v.channel} className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="sr-only">Noch einmal eintragen: </span>
+                    <span className="block truncate text-sm font-semibold text-foreground">{v.productName}</span>
+                    <span className={cn('block truncate text-[12.5px]', LEISE)}>
+                      {kanalText(v.channel)} · {formatEuro(v.totalAmount)}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <VerkaufDialog
         offen={dialog.offen}

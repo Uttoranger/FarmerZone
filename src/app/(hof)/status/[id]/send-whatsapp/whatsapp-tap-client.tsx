@@ -183,6 +183,8 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
       <ul className="flex flex-col gap-2">
         {stand.personen.map((person) => {
           const link = person.geoeffnet ? null : buildWaUrl(person)
+          // Board s2/w2-whatsapp-plakat (V51): nur die nächste offene Person trägt den orangen Hauptknopf, die übrigen sind Umrisse.
+          const naechste = stand.personen.find((p) => !p.geoeffnet)?.id === person.id
           return (
             <li
               key={person.id}
@@ -238,13 +240,16 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
                       rueckkehr.current = { id: person.id, verlassen: false }
                     }}
                     className={cn(
-                      'flex items-center gap-1.5 min-h-11 px-4 rounded-full bg-accent text-accent-foreground text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0',
+                      'flex items-center gap-1.5 min-h-11 px-4 rounded-full text-sm font-semibold transition-colors shrink-0',
+                      naechste
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        : 'border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted',
                       FOKUS_RAHMEN
                     )}
                   >
                     <MessageSquare className="size-3.5" aria-hidden="true" />
-                    Tippen
-                    <span className="sr-only">: Nachricht an {person.name} in WhatsApp öffnen</span>
+                    Öffnen
+                    <span className="sr-only"> – Nachricht an {person.name} in WhatsApp</span>
                   </a>
                 )
               )}

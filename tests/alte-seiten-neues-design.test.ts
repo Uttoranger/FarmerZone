@@ -334,7 +334,8 @@ describe('Problem melden — das Beispiel im Textfeld kommt aus dem Mockup', () 
   })
 
   it('das Textfeld nimmt das Beispiel der gewählten Art', () => {
-    expect(lies('src/components/shared/meldung-form.tsx')).toMatch(/placeholder=\{MELDUNG_TEXT_BEISPIEL\[art\]\}/)
+    // Seit Nr. 225 zeichnet der gemeinsame Baustein das Feld für beide Welten.
+    expect(lies('src/components/ui/meldung-formular-ansicht.tsx')).toMatch(/placeholder=\{MELDUNG_TEXT_BEISPIEL\[f\.art\]\}/)
   })
 })
 
@@ -353,14 +354,13 @@ describe('mitgeschicktSatz — was unter „Problem melden" automatisch mitgeht'
   it('eine Quelle: beide Meldeformulare und der Briefkasten schreiben den Satz nicht selbst', () => {
     for (const datei of [
       'src/components/shared/meldung-form.tsx',
-      'src/components/hof-hilfe/meldung-abgeben.tsx',
+      'src/components/ui/meldung-formular-ansicht.tsx',
       'src/components/admin/briefkasten-teile.tsx',
     ]) {
       expect(lies(datei), datei).not.toMatch(/Keine IP-Adresse|automatisch mit\./)
     }
-    expect(lies('src/components/shared/meldung-form.tsx')).toMatch(/mitgeschicktSatz\(kennung, alsHof\)/)
-    // „Meldung abgeben" ist immer ein Hof — am Handy derselbe Satz, mit Fehlernummer, sobald eine dasteht.
-    expect(lies('src/components/hof-hilfe/meldung-abgeben.tsx')).toMatch(/\{mitgeschicktSatz\(kennung, true\)\}/)
+    // Seit Nr. 225 zeichnet der gemeinsame Baustein beide Formulare — der Satz kommt dort aus der Quelle, ein Hof mit „dein Hof".
+    expect(lies('src/components/ui/meldung-formular-ansicht.tsx')).toMatch(/mitgeschicktSatz\(f\.kennung, alsHof\)/)
     expect(mitgeschicktSatz('', true)).toBe(`Mitgeschickt: Seite, Gerät und dein Hof. ${OHNE_IP_UND_COOKIES}`)
     expect(OHNE_IP_UND_COOKIES).toBe('Keine IP-Adresse, keine Cookies.')
   })

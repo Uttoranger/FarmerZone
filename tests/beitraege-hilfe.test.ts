@@ -52,7 +52,7 @@ import {
   seiteKurz,
 } from '@/lib/hof-hilfe'
 import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
-import { MeldungAbgeben } from '@/components/hof-hilfe/meldung-abgeben'
+import { MeldungForm } from '@/components/shared/meldung-form'
 import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -215,28 +215,32 @@ describe('Hilfe und Meine Meldungen unter (hof)', () => {
     }
   })
 
-  it('/problem-melden (Kundinnen) bleibt beim Bestandsformular', () => {
+  it('/problem-melden (Kundinnen) nimmt den gemeinsamen Baustein in Grün (Nr. 225, V52)', () => {
     const seite = quelle('src/app/(public)/problem-melden/page.tsx')
     expect(seite).toContain('<MeldungForm')
-    expect(seite).not.toContain('hof-hilfe')
+    expect(seite).toContain('welt="kunde"')
+    expect(seite).not.toContain('components/hof-hilfe')
   })
 
   it('/fehler-melden nimmt die Fehlernummer aus der Adresse nur geprüft', () => {
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
     expect(seite).toContain('bereinigeKennung(')
     expect(seite).toContain('generateFormToken(\'meldung\')')
-    expect(seite).toContain('<MeldungAbgeben')
+    expect(seite).toContain('<MeldungForm')
+    expect(seite).toContain('welt="hof"')
   })
 
   it('das neue Formular und das Bestandsformular teilen dieselbe Logik', () => {
+    // Seit Nr. 225 dieselbe Komponente für beide Welten: sie ruft den Hook und gibt ihn an den Baustein.
     expect(quelle('src/components/shared/meldung-form.tsx')).toContain('useMeldungFormular(')
-    expect(quelle('src/components/hof-hilfe/meldung-abgeben.tsx')).toContain('useMeldungFormular(')
+    expect(quelle('src/components/shared/meldung-form.tsx')).toContain('<MeldungFormularAnsicht')
+    expect(gibt('src/components/hof-hilfe/meldung-abgeben.tsx')).toBe(false)
   })
 
   it('die Datei-Felder stehen außerhalb der Fallunterscheidung (PR 135)', () => {
-    const text = quelle('src/components/hof-hilfe/meldung-abgeben.tsx')
-    expect(text.match(/\{upload\.fileInput\}/g)).toHaveLength(1)
-    expect(text.indexOf('{upload.fileInput}')).toBeLessThan(text.indexOf('{screenshotUrl ?'))
+    const text = quelle('src/components/ui/meldung-formular-ansicht.tsx')
+    expect(text.match(/f\.upload\.fileInput\}/g)).toHaveLength(1)
+    expect(text.indexOf('f.upload.fileInput}')).toBeLessThan(text.indexOf('(f.screenshotUrl ?'))
   })
 })
 
@@ -359,11 +363,16 @@ describe('Meine Meldungen (gerendert)', () => {
 })
 
 describe('Meldung abgeben (gerendert)', () => {
-  const html = renderToStaticMarkup(createElement(MeldungAbgeben, { formToken: 't', hofName: 'Hof Test', kennungVorbelegt: '' }))
+  const html = renderToStaticMarkup(
+    createElement(MeldungForm, { formToken: 't', alsHof: true, welt: 'hof', abbrechenHref: MEINE_MELDUNGEN_HREF, kennungVorbelegt: '' })
+  )
 
-  it('drei Arten als Knöpfe mit aria-pressed, Fehler vorgewählt', () => {
-    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1)
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(2)
+  it('drei Arten als Optionsfelder, Fehler vorgewählt; Ton der Welt Hof (orange, V51)', () => {
+    expect(html.match(/type="radio"/g)).toHaveLength(3)
+    expect(html.match(/checked=""/g)).toHaveLength(1)
+    expect(html).toContain('data-welt="hof"')
+    expect(html).toContain('bg-primary')
+    expect(html).not.toContain('bg-accent text-accent-foreground')
     expect(html).toContain('Etwas funktioniert nicht')
     expect(html).toContain('Was ist passiert?')
   })
@@ -373,7 +382,7 @@ describe('Meldung abgeben (gerendert)', () => {
     expect(html).toContain('Absenden')
     expect(html).toContain(`href="${MEINE_MELDUNGEN_HREF}"`)
     expect(html).toContain('name="website"')
-    expect(html).toContain('Das schicken wir automatisch mit')
+    expect(html).toContain('Mitgeschickt: Seite, Gerät und dein Hof.')
     expect(html).toContain('Keine IP-Adresse, keine Cookies.')
     expect(html).toContain('Bildschirmfoto hinzufügen')
   })
@@ -401,7 +410,7 @@ describe('Tokens statt Farbwerte (neue und umgezogene Dateien)', () => {
     'src/components/mein-hof/beitraege-reiter.tsx',
     'src/components/mein-hof/beitrag-zeile.tsx',
     'src/components/hof-hilfe/meine-meldungen.tsx',
-    'src/components/hof-hilfe/meldung-abgeben.tsx',
+    'src/components/shared/meldung-form.tsx',
     'src/components/hof-hilfe/hilfe-seitenspalte.tsx',
     'src/components/hof-hilfe/hilfe-laden.tsx',
     'src/components/hofbereich/unterseiten-kopf.tsx',

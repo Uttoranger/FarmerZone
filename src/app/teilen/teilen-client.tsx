@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, ImageIcon } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, ImageIcon } from 'lucide-react'
 import {
   ladeFotoHoch,
   stufenText,
@@ -17,6 +17,15 @@ import { updateFarmBannerAction } from '@/server/actions/appearance'
 import { addFarmPhotoAction } from '@/server/actions/farm-photos'
 import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 import { MARKE } from '@/lib/marke'
+import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { cn } from '@/lib/utils'
+
+/** Rückweg und Ausweg (Board s2/w2-teilen): dieselbe Startseite des Hofbereichs, dasselbe Wort. */
+const HEUTE_HREF = '/dashboard'
+const ZU_HEUTE = 'Zu Heute'
+const TEILEN_FEHLER_TITEL = 'Die Fotos sind nicht hochgeladen – sie liegen noch hier.'
+const TEILEN_FEHLER_AUSWEG = 'Du kannst sie auch später unter Mein Hof › Hofseite hochladen.'
 
 type Ziel = 'banner' | 'gallery'
 
@@ -140,7 +149,7 @@ export function TeilenClient({
     setErgebnisse(ausgang)
     if (ausgang.every((e) => e.ok) && 'caches' in window) {
       // Erst jetzt leeren: Ein gescheitertes Foto bleibt liegen und kann
-      // über „Nochmal versuchen" ohne erneutes Teilen hochgeladen werden.
+      // über „Nochmal" ohne erneutes Teilen hochgeladen werden.
       await leereGeteilteFotos(window.caches)
     }
   }
@@ -150,6 +159,14 @@ export function TeilenClient({
   return (
     <main data-design="neu" className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-md">
+        {/* Board s2/w2-teilen: der Rückweg heißt „Zu Heute“ wie der Ausweg (die Seite steht ohne Shell). */}
+        <Link
+          href={HEUTE_HREF}
+          className={cn('-ml-2 mb-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-sm font-semibold text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
+        >
+          <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
+          {ZU_HEUTE}
+        </Link>
         <h1 className="font-heading text-2xl font-semibold text-foreground mb-1">
           Geteilte Fotos
         </h1>
@@ -166,15 +183,14 @@ export function TeilenClient({
             <ImageIcon className="size-6 text-muted-foreground mb-3" aria-hidden="true" />
             <p className="text-sm leading-relaxed text-foreground">
               Gerade wurde nichts geteilt. So geht’s: {MARKE} über das Browser-Menü als
-              App installieren, dann in der Galerie ein Foto wählen und über „Teilen“ an
-              {MARKE} schicken — das funktioniert auch mit Cloud-Fotos, bei denen der
-              Datei-Picker scheitert.
+              App installieren, dann in der Galerie ein Foto wählen und über „Teilen“ an{' '}
+              {MARKE} schicken – das funktioniert auch mit Cloud-Fotos.
             </p>
             <Link
-              href="/dashboard"
-              className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
+              href={HEUTE_HREF}
+              className={cn('mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
             >
-              Zur Übersicht
+              {ZU_HEUTE}
             </Link>
           </div>
         )}
@@ -200,7 +216,7 @@ export function TeilenClient({
             {/* Zielauswahl — bei mehreren Fotos ist nur die Galerie sinnvoll */}
             {mehrere ? (
               <p className="text-xs text-muted-foreground mb-4">
-                {fotos.length} Fotos — sie gehen in die Hofgalerie.
+                {fotos.length} Fotos – sie gehen in die Hofgalerie.
               </p>
             ) : (
               <div className="flex gap-2 mb-4" role="radiogroup" aria-label="Wohin damit?">
@@ -228,35 +244,34 @@ export function TeilenClient({
               </div>
             )}
 
-            {/* Fehlgeschlagene aus dem letzten Lauf */}
-            {ergebnisse && (
-              <ul className="mb-4 space-y-1">
-                {ergebnisse
-                  .filter((e) => !e.ok)
-                  .map((e, i) => (
-                    <li key={i} className="text-sm leading-relaxed text-destructive">
-                      {e.meldung}
-                    </li>
-                  ))}
-              </ul>
-            )}
-
+            {/* Fehlgeschlagene aus dem letzten Lauf: orange Karte mit „Nochmal“ (V17, Board s2/w2-teilen Bild 3) — die Fotos bleiben in der Ablage. */}
+            {ergebnisse && !laeuft ? (
+              <HinweiskarteFehler titel={TEILEN_FEHLER_TITEL} nochmal={hochladen} laeuft={laeuft}>
+                <ul className="space-y-1">
+                  {ergebnisse
+                    .filter((e) => !e.ok)
+                    .map((e, i) => (
+                      <li key={i}>{e.meldung}</li>
+                    ))}
+                </ul>
+                <p className="mt-1">{TEILEN_FEHLER_AUSWEG}</p>
+              </HinweiskarteFehler>
+            ) : (
             <button
               type="button"
               onClick={hochladen}
               disabled={laeuft}
-              className="w-full min-h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              className={cn('w-full min-h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60', FOKUS_RAHMEN)}
             >
               {laeuft && laufend
                 ? fotos.length > 1
                   ? `Foto ${laufend.index + 1} von ${fotos.length} — ${stufenText(laufend)}`
                   : stufenText(laufend)
-                : ergebnisse
-                  ? 'Nochmal versuchen'
-                  : wirksamesZiel === 'banner'
-                    ? 'Als Titelbild übernehmen'
-                    : 'In die Hofgalerie laden'}
+                : wirksamesZiel === 'banner'
+                  ? 'Als Titelbild übernehmen'
+                  : 'In die Hofgalerie laden'}
             </button>
+            )}
           </div>
         )}
 

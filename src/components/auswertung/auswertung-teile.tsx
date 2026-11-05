@@ -6,8 +6,8 @@ import { LadePunkt } from '@/components/ui/lade-punkt'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
-import { centsAlsEuro, einheitLabel, formatEuro, formatZahl } from '@/lib/format'
-import { UMSATZ_LEER, zahlartZeile, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
+import { centsAlsEuro, einheitLabel, formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
+import { UMSATZ_LEER, zahlartZeile, type GebuehrenKarteText, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
 import { UMSATZ_TEXT, type Balken, type KanalAnteil, type Periode, type TopProdukt, type Vergleichssatz } from '@/lib/umsatz'
 import { AUSWERTUNG_MAX_ZURUECK, auswertungHref } from '@/schemas/auswertung'
 import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
@@ -286,7 +286,7 @@ function BalkenDiagramm({ balken, zeitraum, vergleichLabel }: { balken: Balken[]
   )
 }
 
-// ─── Servicegebühren dieses Monats ──────────────────────────────────────────
+// ─── Gebühren dieses Monats ─────────────────────────────────────────────────
 
 function Zeile({ titel, wert, stark = false }: { titel: string; wert: string; stark?: boolean }): React.JSX.Element {
   return (
@@ -298,36 +298,31 @@ function Zeile({ titel, wert, stark = false }: { titel: string; wert: string; st
 }
 
 /**
- * „Servicegebühren dieses Monats" statt der Monatsabrechnung (Gate 8): bis
- * zum SEPA-Start (Register B1, K1) gibt es keine Lastschrift — die Karte
- * zeigt nur, was an Gebühren an den Bestellungen dieses Monats gespeichert
- * ist, und sagt, wer sie zahlt. Nur lesend.
+ * Die Gebühren dieses Monats statt der Monatsabrechnung (Gate 8): bis zum SEPA-Start
+ * (Register B1, K1) gibt es keine Lastschrift — die Karte zeigt nur, was an Gebühren an
+ * den Bestellungen dieses Monats gespeichert ist, und sagt, wer sie zahlt. Nur lesend.
+ * Titel und Sätze kommen je Modell aus `gebuehrenKarteText` (V62, V63; Nr. 225): ab dem
+ * Stichtag „Plattformgebühr“, davor „Servicegebühr“ — nie ein Wort im Quelltext.
  */
-export function ServicegebuehrenKarte({
-  monat,
-  saetze,
-}: {
-  monat: ServicegebuehrenDiesesMonats
-  saetze: { erklaerung: string; bar: string | null }
-}): React.JSX.Element {
+export function GebuehrenKarte({ monat, text }: { monat: ServicegebuehrenDiesesMonats; text: GebuehrenKarteText }): React.JSX.Element {
   return (
     <section aria-labelledby="auswertung-gebuehren" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
       <div>
         <h2 id="auswertung-gebuehren" className="font-heading text-lg font-semibold text-foreground">
-          Servicegebühren dieses Monats
+          {text.titel}
         </h2>
         <p className={cn('text-xs leading-normal', LEISE)}>{monat.bezeichnung}</p>
       </div>
       <dl className="flex flex-col gap-2">
-        <Zeile titel={`Online bezahlt (${monat.onlineAnzahl} ${monat.onlineAnzahl === 1 ? 'Bestellung' : 'Bestellungen'})`} wert={euro(monat.onlineCents)} />
-        {(monat.vorOrtAnzahl > 0 || saetze.bar === null) && (
-          <Zeile titel={`Vor Ort bezahlt (${monat.vorOrtAnzahl} ${monat.vorOrtAnzahl === 1 ? 'Bestellung' : 'Bestellungen'})`} wert={euro(monat.vorOrtCents)} />
+        <Zeile titel={`Online bezahlt (${mitAnzahl(monat.onlineAnzahl, 'Bestellung', 'Bestellungen')})`} wert={euro(monat.onlineCents)} />
+        {(monat.vorOrtAnzahl > 0 || text.barZeile) && (
+          <Zeile titel={`Bar bei Abholung (${mitAnzahl(monat.vorOrtAnzahl, 'Bestellung', 'Bestellungen')})`} wert={euro(monat.vorOrtCents)} />
         )}
         <div aria-hidden="true" className="h-px bg-border" />
         <Zeile titel="Zusammen" wert={euro(monat.summeCents)} stark />
       </dl>
-      <p className={cn('text-xs leading-normal', LEISE)}>{saetze.erklaerung}</p>
-      {saetze.bar && <p className={cn('text-xs leading-normal', LEISE)}>{saetze.bar}</p>}
+      <p className={cn('text-xs leading-normal', LEISE)}>{text.erklaerung}</p>
+      {text.bar && <p className={cn('text-xs leading-normal', LEISE)}>{text.bar}</p>}
       <p className={cn('text-xs leading-normal', LEISE)}>Gezählt sind bezahlte bzw. abgeholte Bestellungen – stornierte und erstattete nicht.</p>
     </section>
   )
