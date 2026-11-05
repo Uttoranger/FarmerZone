@@ -7,12 +7,13 @@
  *    der ersten; bei einer Abweisung entfällt die wartende Änderung und es gilt
  *    der Stand des Servers; bei einem Fehler bleibt der Stand; gleicher Wert →
  *    keine Anfrage.
- *  - `VorratFeld` (Tabelle) nutzt dieselbe Schleife: zwei Aufrufe aus demselben
- *    Render laufen nacheinander (TESTING_GUIDELINES §2, Hook nach `await`).
- *  - Das Vorrat-Blatt: „Dazu" ändert nur das Feld; „Speichern" ruft setzeVorrat
- *    mit `vorher` und dem neuen Wert; GEAENDERT lässt das Blatt offen;
- *    „Ausverkauft" speichert 0; mit `wiederDa` kommt der Moment erst nach dem
- *    Schließen; solange gespeichert wird, schließt nichts.
+ *  - Das Vorrat-Blatt (seit Lauf 30, Boards s1/w1-produkte Bild 2, auch aus der
+ *    Tabelle; das Feld `VorratFeld` der Tabelle gibt es nicht mehr): der Stepper
+ *    ändert nur das Feld; „Speichern" ruft setzeVorrat mit `vorher` und dem neuen
+ *    Wert; GEAENDERT lässt das Blatt offen; 0 speichert „Ausverkauft"; mit
+ *    `wiederDa` kommt der Moment erst nach dem Schließen; solange gespeichert
+ *    wird, schließt nichts; am Handy das Blatt, ab 768 px DialogMitte, beide mit
+ *    genau einem „Abbrechen" oben.
  *
  * Ohne DOM (TESTING_GUIDELINES §1) spielt ein kleiner Prüfstand die Hooks von
  * React nach (Vorbild tests/use-cart.test.ts): Zustand je Aufrufstelle,
@@ -127,12 +128,17 @@ vi.mock('next/navigation', () => ({ useRouter: () => router }))
 const setzeVorrat = vi.hoisted(() => vi.fn())
 vi.mock('@/server/actions/products', () => ({ setzeVorrat }))
 
+// Die Breite des Fensters: am Handy das Blatt, ab 768 px der Dialog (useMindestbreite liest matchMedia).
+const fenster = vi.hoisted(() => ({ breit: false }))
+vi.mock('@/lib/use-mindestbreite', () => ({ useMindestbreite: () => fenster.breit }))
+
 import { SPEICHERN_GING_NICHT, erzeugeVorratSchleife, type VorratMeldungen } from '@/components/produkte/use-vorrat-setzen'
 import { NETZ_SATZ } from '@/lib/netz'
 import { VorratBlatt } from '@/components/produkte/vorrat-blatt'
-import { VorratFeld } from '@/components/produkte/vorrat-feld'
 import { Stepper } from '@/components/ui/stepper'
-import { Sheet, SheetClose } from '@/components/ui/sheet'
+import { Sheet, SheetKopf } from '@/components/ui/sheet'
+import { Dialog, DialogMitte } from '@/components/ui/dialog'
+import { VORRAT_NULL_SATZ, vorratFrage, vorratTitel } from '@/lib/produkte-hof'
 import type { ProductData } from '@/server/queries/products'
 
 /** Eine Antwort, die der Test selbst auslöst — so liegt eine zweite Änderung sicher mitten in der Anfrage. */
@@ -297,45 +303,28 @@ function produkt(teil: Partial<ProductData> = {}): ProductData {
   }
 }
 
-describe('VorratFeld — dieselbe Schleife, zwei Aufrufe aus demselben Render', () => {
-  it('die zweite Änderung wartet und geht mit dem bestätigten Stand der ersten los', async () => {
-    const erste = offeneAntwort()
-    setzeVorrat.mockReturnValueOnce(erste.promise).mockResolvedValueOnce({ ok: true, vorrat: 7, wiederDa: false })
-    pruefstand.starte(() => VorratFeld({ productId: 'p1', name: 'Karotten', stock: 3, onWiederDa: vi.fn() }))
-
-    const bestaetigt = element(Stepper).onWertBestaetigt as (wert: number) => void
-    bestaetigt(5)
-    bestaetigt(7)
-    erste.gib({ ok: true, vorrat: 5, wiederDa: false })
-    await pruefstand.zuRuhe()
-
-    expect(setzeVorrat.mock.calls.map((c) => c[0])).toEqual([
-      { productId: 'p1', vorher: 3, neu: 5 },
-      { productId: 'p1', vorher: 5, neu: 7 },
-    ])
-  })
-})
-
 describe('Vorrat-Blatt', () => {
+  beforeEach(() => {
+    fenster.breit = false
+  })
+
   function oeffne(teil: Partial<ProductData> = {}) {
     const onSchliessen = vi.fn()
     const onWiederDa = vi.fn()
-    pruefstand.starte(() =>
-      VorratBlatt({ produkt: produkt(teil), offen: true, bild: null, onSchliessen, onWiederDa, fokusZiel: () => null })
-    )
+    pruefstand.starte(() => VorratBlatt({ produkt: produkt(teil), offen: true, onSchliessen, onWiederDa, fokusZiel: () => null }))
     return { onSchliessen, onWiederDa }
   }
+  const tippe = (wert: number) => (element(Stepper).onWertChange as (w: number) => void)(wert)
 
-  it('„Dazu" ändert nur das Feld; „Speichern" setzt den neuen Wert mit vorher und schließt', async () => {
+  it('der Stepper ändert nur das Feld; „Speichern" setzt den neuen Wert mit vorher und schließt', async () => {
     setzeVorrat.mockResolvedValueOnce({ ok: true, vorrat: 28, wiederDa: false })
     const { onSchliessen } = oeffne()
     expect(element(Stepper).wert).toBe(3)
 
-    drueck('+25')
+    tippe(28)
     await pruefstand.zuRuhe()
     expect(element(Stepper).wert).toBe(28)
     expect(setzeVorrat).not.toHaveBeenCalled()
-    expect(text(pruefstand.baum())).toContain('vorher 3 kg')
 
     drueck('Speichern')
     await pruefstand.zuRuhe()
@@ -343,11 +332,20 @@ describe('Vorrat-Blatt', () => {
     expect(onSchliessen).toHaveBeenCalledTimes(1)
   })
 
+  it('nach dem Board: Frage in der Einheit des Vorrats und der Satz zu 0 — Gegenprobe: Gebinde zählt Pakete', () => {
+    oeffne()
+    expect(text(pruefstand.baum())).toContain(vorratFrage('KG', null))
+    expect(text(pruefstand.baum())).toContain(VORRAT_NULL_SATZ)
+    expect(vorratFrage('KG', null)).toBe('Wie viele kg hast du gerade?')
+    expect(vorratFrage('STUECK', 10)).toBe('Wie viele Pakete à 10 Stück hast du gerade?')
+    expect(vorratTitel('Freilandeier')).toBe('Vorrat: Freilandeier')
+  })
+
   it('GEAENDERT lässt das Blatt offen und zeigt den Stand des Servers mit dem Satz', async () => {
     setzeVorrat.mockResolvedValueOnce({ error: 'Inzwischen hat jemand bestellt. Jetzt: 1 kg.', code: 'GEAENDERT', vorrat: 1 })
     const { onSchliessen } = oeffne()
 
-    drueck('+5')
+    tippe(8)
     await pruefstand.zuRuhe()
     drueck('Speichern')
     await pruefstand.zuRuhe()
@@ -359,20 +357,21 @@ describe('Vorrat-Blatt', () => {
     expect(router.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('„Speichern" grün wie im Board (Token accent), „Ausverkauft" als Umriss', () => {
+  it('„Speichern" ist der orange Hauptknopf (N42 a), nicht grün; kein „Ausverkauft"-Knopf mehr', () => {
     oeffne()
-    const speichern = String(knopf('Speichern').className)
-    expect(speichern).toContain('bg-accent')
-    expect(speichern).toContain('text-accent-foreground')
-    expect(knopf('Ausverkauft').variant).toBe('outline')
-    expect(String(knopf('Ausverkauft').className)).not.toContain('bg-accent')
+    const speichern = knopf('Speichern')
+    expect(speichern.variant).toBeUndefined()
+    expect(String(speichern.className)).not.toContain('bg-accent')
+    expect(() => knopf('Ausverkauft')).toThrow()
   })
 
-  it('„Ausverkauft" speichert sofort 0', async () => {
+  it('0 im Feld speichert „Ausverkauft"', async () => {
     setzeVorrat.mockResolvedValueOnce({ ok: true, vorrat: 0, wiederDa: false })
     const { onSchliessen } = oeffne({ stock: 12 })
 
-    drueck('Ausverkauft')
+    tippe(0)
+    await pruefstand.zuRuhe()
+    drueck('Speichern')
     await pruefstand.zuRuhe()
 
     expect(setzeVorrat).toHaveBeenCalledExactlyOnceWith({ productId: 'p1', vorher: 12, neu: 0 })
@@ -383,7 +382,7 @@ describe('Vorrat-Blatt', () => {
     setzeVorrat.mockResolvedValueOnce({ ok: true, vorrat: 10, wiederDa: true })
     const { onSchliessen, onWiederDa } = oeffne({ stock: 0 })
 
-    drueck('+10')
+    tippe(10)
     await pruefstand.zuRuhe()
     drueck('Speichern')
     await pruefstand.zuRuhe()
@@ -394,25 +393,52 @@ describe('Vorrat-Blatt', () => {
     expect(onWiederDa).toHaveBeenCalledExactlyOnceWith(10)
   })
 
-  it('solange gespeichert wird, schließen weder Escape noch „Abbrechen"; danach schon', async () => {
+  it('solange gespeichert wird, schließt „Abbrechen" bzw. Escape nicht; danach schon', async () => {
     const antwort = offeneAntwort()
     setzeVorrat.mockReturnValueOnce(antwort.promise)
     const { onSchliessen } = oeffne()
 
-    drueck('+5')
+    tippe(8)
     await pruefstand.zuRuhe()
     drueck('Speichern')
     await pruefstand.zuRuhe()
     expect(text(pruefstand.baum())).toContain('Speichert …')
-    expect(element(SheetClose).disabled).toBe(true)
+    expect(knopf('Speichert …').disabled).toBe(true)
     ;(element(Sheet).onOpenChange as (offen: boolean) => void)(false)
     expect(onSchliessen).not.toHaveBeenCalled()
 
     antwort.gib({ error: SPEICHERN_GING_NICHT })
     await pruefstand.zuRuhe()
     expect(text(pruefstand.baum())).toContain(SPEICHERN_GING_NICHT)
-    expect(element(SheetClose).disabled).toBe(false)
     ;(element(Sheet).onOpenChange as (offen: boolean) => void)(false)
     expect(onSchliessen).toHaveBeenCalledTimes(1)
+  })
+
+  it('zwei Tipps auf „Speichern" aus demselben Render schicken den Wert einmal (Hook nach await, §2)', async () => {
+    const erste = offeneAntwort()
+    setzeVorrat.mockReturnValueOnce(erste.promise)
+    oeffne()
+    tippe(5)
+    await pruefstand.zuRuhe()
+
+    const speichern = knopf('Speichern').onClick as () => void
+    speichern()
+    speichern()
+    erste.gib({ ok: true, vorrat: 5, wiederDa: false })
+    await pruefstand.zuRuhe()
+
+    expect(setzeVorrat.mock.calls.map((c) => c[0])).toEqual([{ productId: 'p1', vorher: 3, neu: 5 }])
+  })
+
+  it('am Handy das Blatt mit Kopf „Vorrat: …" und genau einem „Abbrechen"; ab 768 px DialogMitte (N41 d)', () => {
+    oeffne()
+    expect(element(SheetKopf)).toMatchObject({ titel: 'Vorrat: Karotten', schliessen: 'Abbrechen' })
+    expect(() => element(DialogMitte)).toThrow()
+
+    fenster.breit = true
+    oeffne()
+    expect(element(DialogMitte)).toMatchObject({ titel: 'Vorrat: Karotten', schliessen: 'Abbrechen' })
+    expect(typeof element(Dialog).onOpenChange).toBe('function')
+    expect(() => element(SheetKopf)).toThrow()
   })
 })

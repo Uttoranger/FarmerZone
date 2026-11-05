@@ -114,7 +114,7 @@ export type VorratSetzen = {
 
 /**
  * Der Vorrat eines Produkts setzen — EINE Logik für das Feld der Tabelle
- * (`VorratFeld`) und das Vorrat-Blatt der Karten-Zeilen (`VorratBlatt`).
+ * (seit Lauf 30 nur noch `VorratBlatt`, aus Tabelle und Karten-Zeilen geöffnet).
  * `onWiederDa`: Der Server hat 0 → mehr als 0 bestätigt; ob und wann der
  * Moment kommt, entscheidet der Aufrufer.
  */

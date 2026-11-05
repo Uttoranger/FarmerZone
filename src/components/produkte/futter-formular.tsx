@@ -2,11 +2,20 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { istNetzFehler } from '@/lib/netz'
 import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeFutterFamilieAn } from '@/server/actions/produktfamilie'
-import type { ProduktAngelegt } from '@/lib/produkte-hof'
+import {
+  hofpreisZeile,
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  vorschauGebuehrSatz,
+  type ProduktAngelegt,
+  type SpeicherFehlerAnzeige,
+} from '@/lib/produkte-hof'
+import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { FUTTER_KATEGORIEN, futterFamilieSchema, type FutterFamilieEingabe } from '@/schemas/produktfamilie'
 import {
   FUTTERMITTELART_ERKLAERUNG,
@@ -52,7 +61,6 @@ import { futterSchild } from '@/lib/produktdetail'
 import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { FutterSchild } from '@/components/produkte/futter-schild'
 import { zusammensetzungVorbelegung } from '@/components/products/produkt-abschnitte'
-import { cn } from '@/lib/utils'
 import {
   AbholhinweisWahl,
   Abschnitt,
@@ -62,6 +70,7 @@ import {
   FamilienDialog,
   Feld,
   FeldFehler,
+  FormularMeldung,
   RuecktrittAbschnitt,
   SperrZeile,
   Wahl,
@@ -138,11 +147,14 @@ export function FutterFormular({
   onClose,
   registrierung,
   onAngelegt,
+  preisAnzeige = null,
 }: {
   onClose: () => void
   registrierung: HofRegistrierung
   /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet die Ansicht. */
   onAngelegt?: (angelegt: ProduktAngelegt) => void
+  /** N38: im Hofpreis-Modell der Satz des Hofs — dann „Du bekommst … · die Kundin zahlt …" und Endpreise in der Vorschau. */
+  preisAnzeige?: PreisAnzeige
 }): React.JSX.Element {
   const naechster = useRef(0)
   const neuerSchluessel = () => `z${naechster.current++}`
@@ -164,6 +176,7 @@ export function FutterFormular({
   )
   const [versucht, setVersucht] = useState(false)
   const [speichert, setSpeichert] = useState(false)
+  const [speicherFehler, setSpeicherFehler] = useState<SpeicherFehlerAnzeige | null>(null)
 
   const eingabe: FutterFamilieEingabe = {
     name,
@@ -252,8 +265,9 @@ export function FutterFormular({
 
   async function speichern() {
     setVersucht(true)
+    setSpeicherFehler(null)
     if (!pruefung.success) {
-      toast.error('Bitte prüfe die markierten Felder.')
+      // Die Karte „Bitte prüfe die markierten Felder." steht über den Feldern (V17), der Fokus springt.
       springeZuFeld(Object.keys(fehlerJeFeld(pruefung.error.issues))[0])
       return
     }
@@ -261,14 +275,15 @@ export function FutterFormular({
     try {
       const ergebnis = await legeFutterFamilieAn(eingabe)
       if ('error' in ergebnis) {
-        toast.error(ergebnis.error)
+        setSpeicherFehler(speicherFehlerAusAntwort(ergebnis.error))
         return
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
       onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), kaufbar: ergebnis.kaufbar })
-    } catch {
-      toast.error('Wir konnten das Futter nicht speichern. Bitte versuch es noch einmal.')
+    } catch (e) {
+      // Anlegen: ein zweiter Versuch legte womöglich doppelt an — darum ohne „Nochmal" (speicherFehlerNachWurf).
+      setSpeicherFehler(speicherFehlerNachWurf(istNetzFehler(e), false, 'Wir konnten das Futter nicht speichern. Bitte versuch es noch einmal.'))
     } finally {
       setSpeichert(false)
     }
@@ -284,6 +299,7 @@ export function FutterFormular({
       speichernText="Futter speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
+      meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
       <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Bergwiesen-Heu 5 kg-Sack“.">
         <input
@@ -421,6 +437,12 @@ export function FutterFormular({
                   </div>
                 </div>
 
+                {/* N38 (Board s1/w1-produkt-neu, Bild 2): was der Hof bekommt und was die Kundin zahlt. */}
+                {z.price !== null && hofpreisZeile(z.price, preisAnzeige) && (
+                  <p className="text-[12.5px] text-muted-foreground" aria-live="polite">
+                    {hofpreisZeile(z.price, preisAnzeige)}
+                  </p>
+                )}
                 {sperren[i] && <SperrZeile grund={sperren[i].grund} />}
               </li>
             )
@@ -588,31 +610,50 @@ export function FutterFormular({
         <FutterRegistrierungen registrierung={registrierung} />
       </Abschnitt>
 
-      <KaeuferVorschau name={name} zeilen={zeilen} sperren={sperren.map(Boolean)} category={category} registrierung={registrierung} />
+      <KaeuferVorschau
+        name={name}
+        zeilen={zeilen}
+        sperren={sperren.map(Boolean)}
+        category={category}
+        registrierung={registrierung}
+        preisAnzeige={preisAnzeige}
+      />
     </FamilienDialog>
   )
 }
 
 /**
- * „So sehen Käufer dein Futter" (Mockup web-h2-neues-futter): Name, ab-Kilopreis,
- * Zahl der Größen, Schild nach E9 und die Größen, die online gehen.
+ * „So sehen Kunden dein Futter" (Mockup web-h2-neues-futter; Board s1/w1-produkt-neu, Bild 2/3):
+ * Name, ab-Kilopreis, Zahl der Größen, Schild nach E9 und die Größen, die online gehen. Exportiert
+ * für den Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag" (tests/produkte-gebuehr-wort.test.ts).
+ *
+ * Je Stichtag (V62): Im Hofpreis-Modell sind die Preise der Kundin Endpreise (`endpreisEuro`,
+ * dieselbe Rechnung wie /api/checkout) — die Größen, der ab-Kilopreis und darunter „Preise inkl.
+ * Plattformgebühr (6 %)". Im Modell „bisher" der Preis des Hofs und der Satz von heute.
  */
-function KaeuferVorschau({
+export function KaeuferVorschau({
   name,
-  zeilen,
+  zeilen: eingetragen,
   sperren,
   category,
   registrierung,
+  preisAnzeige = null,
 }: {
   name: string
-  zeilen: Zeile[]
+  zeilen: readonly Pick<Zeile, 'schluessel' | 'unit' | 'nettoMenge' | 'price'>[]
   sperren: boolean[]
   category: (typeof FUTTER_KATEGORIEN)[number]
   registrierung: HofRegistrierung
+  preisAnzeige?: PreisAnzeige
 }): React.JSX.Element {
+  // Was die Kundin sieht: im Hofpreis-Modell der Endpreis je Größe, sonst der Preis des Hofs.
+  const zeilen = useMemo(
+    () => eingetragen.map((z) => (z.price === null || !preisAnzeige ? z : { ...z, price: endpreisEuro(z.price, preisAnzeige) })),
+    [eingetragen, preisAnzeige]
+  )
   const sichtbar = useMemo(() => zeilen.filter((z, i) => !sperren[i] && z.price !== null && z.nettoMenge !== null), [zeilen, sperren])
   // Nur Anzeige: der günstigste Kilopreis als Vergleich (CODING_STANDARDS, Ausnahme Grundpreis).
-  const guenstigste = sichtbar.reduce<Zeile | null>((best, z) => {
+  const guenstigste = sichtbar.reduce<(typeof sichtbar)[number] | null>((best, z) => {
     if (z.price === null || z.nettoMenge === null) return best
     if (!best || best.price === null || best.nettoMenge === null) return z
     return z.price / z.nettoMenge < best.price / best.nettoMenge ? z : best
@@ -644,7 +685,7 @@ function KaeuferVorschau({
           ))}
         </ul>
       )}
-      <p className={cn('text-xs text-muted-foreground')}>Die Servicegebühr zahlt die Kundin zusätzlich. Du bekommst genau deinen Preis.</p>
+      <p className="text-xs text-muted-foreground">{vorschauGebuehrSatz(preisAnzeige)}</p>
       <p className="text-xs text-muted-foreground">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
     </section>
   )
