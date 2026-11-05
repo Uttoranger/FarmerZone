@@ -161,8 +161,14 @@ describe('Zähler „Bestellungen“ (N41 e): eine Quelle', () => {
     expect(quelle('src/server/hofbereich.ts')).toContain('getOpenOrdersCount(hof.id)')
     expect(quelle('src/app/(hof)/layout.tsx')).toContain('zahlen={{ bestellungen: offeneBestellungen,')
     expect(quelle('src/app/(auth)/onboarding/page.tsx')).toContain('getOpenOrdersCount(hof.id)')
-    // Gegenprobe: Die Liste steht nur einmal im Quelltext.
-    expect(quelle('src/server/queries/orders.ts').match(/'PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'/g)).toHaveLength(1)
+    // Gegenprobe: Die Liste steht nur einmal im Quelltext — Prisma-frei in src/lib/bestellstatus-offen.ts (Nr. 222);
+    // die Abfrage reicht sie weiter, der Chip in hof-bestellungen.ts nimmt sie von dort.
+    const LISTE = /'PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'/g
+    expect(quelle('src/lib/bestellstatus-offen.ts').match(LISTE)).toHaveLength(1)
+    expect(quelle('src/server/queries/orders.ts').match(LISTE)).toBeNull()
+    expect(quelle('src/lib/hof-bestellungen.ts').match(LISTE)).toBeNull()
+    expect(quelle('src/server/queries/orders.ts')).toContain("import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'")
+    expect(quelle('src/lib/hof-bestellungen.ts')).toContain("import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'")
   })
 
   it('dieselbe Zahl in Unterleiste und Seitenleiste', () => {

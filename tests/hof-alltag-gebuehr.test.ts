@@ -47,7 +47,7 @@ vi.mock('@/server/actions/orders', () => ({
 vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: async () => ({ userId: 'u1', farmId: 'farm_1' }) }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: async () => ({ id: 'farm_1', name: 'Hof Test' }) }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: async () => {} }))
-vi.mock('@/server/queries/orders', () => ({ getOrderDetail: async () => m.bestellung }))
+vi.mock('@/server/queries/orders', () => ({ getOrderDetail: async () => m.bestellung, naechstesFensterMitZahl: async () => null }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     farm: { findUnique: async () => ({ id: 'farm_1', name: 'Hof Test', address: 'Musterweg 1', postalCode: '4900', city: 'Musterdorf', phone: null }) },

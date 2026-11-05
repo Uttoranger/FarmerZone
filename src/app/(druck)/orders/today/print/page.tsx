@@ -12,7 +12,7 @@ import { uhrzeitInWien } from '@/lib/fristen'
 import { HEUTE_KEINE_ABHOLUNG_PAPIER, abholtage, abholWhere, datumLang, naechsteAbholungPapier } from '@/lib/heute'
 import { wienKalendertag } from '@/lib/kalender'
 import { druckGebuehrZeile, druckPreisHinweis, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
-import { naechstesFensterMitZahl } from '@/app/(hof)/orders/naechste-abholung'
+import { naechstesFensterMitZahl } from '@/server/queries/orders'
 import { MARKE } from '@/lib/marke'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 

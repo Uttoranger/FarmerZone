@@ -7,7 +7,6 @@ import {
   CreditCard,
   Megaphone,
   MessageCircle,
-  PackageOpen,
   PackageX,
   Printer,
   Sprout,
@@ -18,7 +17,6 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { Marke } from '@/components/ui/marke'
 import { POSTFACH_HREF, POSTFACH_TEXT, weitereText, type HeuteNachricht } from '@/lib/postfach'
 import { markiereGelesenFormular } from '@/server/actions/postfach'
-import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
@@ -393,7 +391,7 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
  *
  * Leer: mit Abholzeit eine Karte mit HEUTE_NIEMAND und der nächsten Abholung
  * samt ihrer Zahl (V40) — es gibt nichts zu tun, also kein Knopf; ohne
- * Abholzeit der Leerzustand ABHOLZEITEN_FEHLEN mit dem Knopf.
+ * Abholzeit dieselbe Karte mit ABHOLZEITEN_FEHLEN und dem Knopf (Board Bild 4).
  */
 export function Packliste({
   zeilen,
@@ -441,17 +439,16 @@ export function Packliste({
             <p className={cn('text-[13.5px]', LEISE)}>{leer.naechsteAbholung}</p>
           </div>
         ) : (
-          <EmptyState
-            symbol={PackageOpen}
-            titel={ABHOLZEITEN_FEHLEN.titel}
-            satz={ABHOLZEITEN_FEHLEN.satz}
-            ausweg={
-              <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
-                {ABHOLZEITEN_FEHLEN.aktion.text}
-              </Link>
-            }
-            className="rounded-2xl py-8"
-          />
+          // Board s1-heute Bild 4: eine Karte wie „Heute holt niemand etwas ab.“ — Titel, Satz, oranger Knopf
+          // über die volle Breite, ohne Symbol und ohne gestrichelten Rand (das Board zeigt den Zustand, es geht
+          // dem allgemeinen EmptyState vor).
+          <div className={cn(KARTE, 'flex flex-col gap-2 px-3.5 py-3')}>
+            <p className="text-base font-semibold">{ABHOLZEITEN_FEHLEN.titel}</p>
+            <p className={cn('text-sm', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
+            <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'h-auto min-h-[52px] w-full rounded-[14px] text-base font-bold')}>
+              {ABHOLZEITEN_FEHLEN.aktion.text}
+            </Link>
+          </div>
         )
       ) : (
         <div className={cn(KARTE, 'overflow-hidden')}>

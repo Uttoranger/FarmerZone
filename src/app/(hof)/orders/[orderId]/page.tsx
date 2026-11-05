@@ -2,13 +2,12 @@ import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
+import { barFristSatz, getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import { MARKE } from '@/lib/marke'
-import { barFristSatz } from '../bar-frist'
 
 export const metadata: Metadata = {
   title: `Bestellung — ${MARKE}`,

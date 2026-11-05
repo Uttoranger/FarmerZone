@@ -19,21 +19,18 @@ import { GEBUEHR_MODELL_HOFPREIS, gebuehrBezeichnungFuer, istHofpreisBestellung 
 import { INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
-// Nur der Typ (beim Übersetzen gelöscht): Zur Laufzeit zöge die Abfrage Prisma in jedes Bündel,
-// das diese Datei erreicht — auch in Client-Bauteile (admin/bestellungen/bestellung-aktionen.tsx
-// über admin-bestellung.ts).
-import type * as Bestellabfragen from '@/server/queries/orders'
+// Prisma-frei: Diese Datei erreicht auch Client-Bauteile (admin/bestellungen/bestellung-aktionen.tsx
+// über admin-bestellung.ts); die Abfrage-Datei reicht dieselbe Liste nur weiter.
+import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'
 
 /**
  * Offen = alles außer abgeholt, storniert, nicht abgeholt — auch „Bestätigung offen“
- * (Register N41 e). Die EINE Liste ist `OPEN_STATUSES` (src/server/queries/orders.ts):
- * Danach zählen die Navigation (getOpenOrdersCount) und hier Kopf und Chip
- * „Noch offen · n“. Der Typ ist genau der von `OPEN_STATUSES` — fehlt ein Status, kommt einer
- * dazu oder ändert sich die Reihenfolge dort, scheitert der Typecheck an dieser Zeile;
+ * (Register N41 e). Die EINE Liste ist `OPEN_STATUSES` (src/lib/bestellstatus-offen.ts):
+ * Danach zählen die Navigation (getOpenOrdersCount) und hier Kopf und Chip „Noch offen · n“.
+ * OFFEN_STATUS ist dieselbe Liste als Text-Liste (Status kommen hier als string an);
  * tests/hof-bestellungen-zaehler.test.ts prüft, dass Chip und Navigation dieselbe Zahl liefern.
  */
-const OFFENE: typeof Bestellabfragen.OPEN_STATUSES = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
-export const OFFEN_STATUS: readonly string[] = OFFENE
+export const OFFEN_STATUS: readonly string[] = OPEN_STATUSES
 const PACKEN_STATUS: readonly string[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION']
 /** Durch — dieselben Status, die Heute aus der Packliste nimmt (ABHOLUNG_ERLEDIGT). */
 const ERLEDIGT_STATUS: readonly string[] = ABHOLUNG_ERLEDIGT
