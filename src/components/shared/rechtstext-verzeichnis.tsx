@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
+/*
+ * Das Inhaltsverzeichnis der Rechtsseiten (Nr. 231): die Sprünge, gruppiert,
+ * mit dem gewählten Sprung grün und fett. Gezeichnet in der Vorlage
+ * (rechtstext-vorlage.tsx) zweimal — am Handy im aufklappbaren „Inhalt“, ab
+ * 1024 px in der Spalte.
+ */
+
 /** Ein Sprung im Verzeichnis: Sprungmarke, Text und — bei nummerierten Punkten — die Nummer. */
 export type VerzeichnisEintrag = { anker: string; text: string; nummer?: number }
 
