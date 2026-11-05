@@ -11,7 +11,8 @@
  *  - Fokus und 44 px: jedes Bedienelement in Kopf, Seitenleiste und den
  *    Blättern „Mehr“ und „Neu“ trägt den sichtbaren Fokus und mindestens 44 px.
  *  - HofShell (Boards s1-/w1-mehr-neu, V13): Seitenleiste mit Marke,
- *    „+ Neu ▾“, „Konto · <Name>“ mit Sonne/Mond und „Abmelden“ darunter;
+ *    „+ Neu ▾“ (Zeichen statt Symbole), Menü „Neu“ mit 66 px Abstand und
+ *    über der Zeile „Heute“, „Konto · <Name>“ mit dem Mond und „Abmelden“ darunter;
  *    Mehr-Blatt Postfach · Dein Tarif · Verkauf und Kunden · Konto und Hilfe
  *    (Person, …, Darstellung Hell/Dunkel, Abmelden) ohne Symbole; Neu-Blatt mit
  *    Kopf „Was legst du an? · Abbrechen“.
@@ -282,7 +283,26 @@ describe('HofShell: Seitenleiste (V13, Board w1-mehr-neu)', () => {
     expect(leiste.slice(leiste.lastIndexOf('<button', neu), neu)).toMatch(/rounded-full[^"]*bg-primary|bg-primary[^"]*rounded-full/)
   })
 
-  it('unten „Konto · <Name>“ als Link auf Konto und Sicherheit, daneben Sonne/Mond, „Abmelden“ darunter', () => {
+  it('„+ Neu ▾“ mit den Zeichen des Boards: „+“ und „▾“ stumm, der Name bleibt „Neu“ (UI-Runde 3)', () => {
+    const leiste = seitenleiste()
+    const neu = leiste.indexOf('>Neu<')
+    const knopf = leiste.slice(leiste.lastIndexOf('<button', neu), leiste.indexOf('</button>', neu))
+    expect(knopf).toContain('<span aria-hidden="true">+</span><span>Neu</span><span aria-hidden="true">▾</span>')
+    // Gegenprobe: keine Symbole mehr im Knopf (vorher Plus und Winkel).
+    expect(knopf).not.toMatch(/lucide-(plus|chevron-down)/)
+  })
+
+  it('Menü „Neu“ wie Board Bild 3: Einträge 64 px mit 2 px Abstand, deckt die Zeile „Heute“ ganz (Quelltext, offen nur im Browser)', () => {
+    const shell = quelle('src/components/shells/hof-shell.tsx')
+    expect(shell).toMatch(/const NEU_MENUE_EINTRAG = 'min-h-16 /)
+    expect(shell).toContain("const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'")
+    const inhalt = shell.slice(shell.indexOf('<DropdownMenuContent'), shell.indexOf('>', shell.indexOf('<DropdownMenuContent')))
+    // 2 px unter dem Knopf (mb-1 = 4 px vor „Heute“), 1 px links und 14 px rund: kein Rand und keine Ecke schaut hervor.
+    for (const teil of ['sideOffset={2}', 'alignOffset={-1}', 'rounded-[14px]', 'container={menueZiel}']) expect(inhalt, teil).toContain(teil)
+    expect(shell).toMatch(/DropdownMenuTrigger[\s\S]{0,200}'mt-1\.5 mb-1 /)
+  })
+
+  it('unten „Konto · <Name>“ als Link auf Konto und Sicherheit, daneben der Mond, „Abmelden“ darunter', () => {
     const leiste = seitenleiste()
     const konto = leiste.indexOf(`>${KONTO_KURZ} · Max Mustermann<`)
     expect(konto).toBeGreaterThan(-1)

@@ -34,7 +34,7 @@ export function ListGruppe({
  * Schalter). Mit `href` ist die ganze Zeile ein Link und trägt den Pfeil;
  * ohne ist sie nur Anzeige. Mindestens 50 px hoch (Touch-Ziel ≥ 44 px);
  * `gross` ist die Zeile der Blätter „Mehr“ (Board s1-mehr-neu, Nr. 233):
- * 56 px, Titel 15 px fett, Unterzeile 13 px.
+ * 56 px, Titel 15 px fett, Unterzeile 13 px, Pfeil 18 px kräftig in der Schriftfarbe.
  *
  * Titel und Unterzeile kürzen auf eine Zeile; ein Text als Titel steht
  * zusätzlich vollständig im `title` (lange Hof- und Personennamen).
@@ -72,7 +72,14 @@ export function ListRow({
         {untertitel && <span className={cn('mt-0.5 block truncate text-muted-foreground', gross ? 'text-[13px]' : 'text-[12.5px]')}>{untertitel}</span>}
       </span>
       {ende}
-      {href && <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />}
+      {/* Im Mehr-Blatt der Pfeil des Boards s1-mehr-neu: 18 px, Strich 2, in der Schriftfarbe (UI-Runde 3 der Nr. 233). */}
+      {href && (
+        <ChevronRight
+          className={cn('shrink-0', gross ? 'size-[18px] text-foreground' : 'size-4 text-muted-foreground')}
+          strokeWidth={gross ? 2 : 1.7}
+          aria-hidden="true"
+        />
+      )}
     </>
   )
   const zeile = cn('flex w-full items-center text-left text-foreground', gross ? 'min-h-14 gap-2.5 px-3 py-1.5' : 'min-h-[50px] gap-3 px-3.5 py-2')

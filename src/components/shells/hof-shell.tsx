@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarCheck, ChevronDown, ChevronRight, Home, Menu, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
+import { CalendarCheck, ChevronRight, Home, Menu, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
@@ -218,15 +218,17 @@ export function PersonZeile({
         </span>
         <span className="block truncate text-[13px] text-muted-foreground">{konto.label}</span>
       </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+      {/* Pfeil wie die Zeilen im Blatt (Board s1-mehr-neu): 18 px, Strich 2, in der Schriftfarbe. */}
+      <ChevronRight className="size-[18px] shrink-0 text-foreground" strokeWidth={2} aria-hidden="true" />
     </Link>
   )
 }
 
 /**
  * Die Konto-Zeile unten in der Seitenleiste (V13, Board w1-mehr-neu):
- * „Konto · <Name>“ als Link auf „Konto und Sicherheit“, rechts daneben Sonne
- * bzw. Mond als runder Knopf (44 px); „Abmelden“ steht darunter.
+ * „Konto · <Name>“ als Link auf „Konto und Sicherheit“, rechts daneben der
+ * Mond als runder Knopf (44 px, in beiden Themes wie im Board); „Abmelden“
+ * steht darunter.
  */
 function KontoZeile({ name }: { name: string }) {
   const anzeige = name.trim() || 'Dein Konto'
@@ -266,8 +268,14 @@ function NeuInhalt({ punkt, blatt = false }: { punkt: HofNeuPunkt; blatt?: boole
   )
 }
 
-/** Ein Eintrag im Menü „Neu“ am Computer: 52 px hoch wie im Board w1-mehr-neu (Bild 3). */
-const NEU_MENUE_EINTRAG = 'min-h-[52px] px-3.5 py-1.5'
+/**
+ * Ein Eintrag im Menü „Neu“ am Computer: 64 px hoch und 2 px Abstand — im Board w1-mehr-neu (Bild 3) stehen die
+ * Einträge 66 px auseinander (UI-Runde 3; vorher 52 px ohne Abstand).
+ */
+const NEU_MENUE_EINTRAG = 'min-h-16 px-3.5 py-1.5'
+
+/** Die Gruppen des Menüs „Neu“ mit dem Abstand des Boards (2 px) zwischen den Einträgen. */
+const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'
 
 /** Die Blätter am Handy lassen oben den Kopf der Seite sichtbar (Board s1-mehr-neu: höchstens 86 % der Höhe). */
 const BLATT_HOEHE = 'max-h-[86dvh] gap-2.5 px-4'
@@ -319,7 +327,14 @@ export function HofShell({
   const menueZiel = useRef<HTMLDivElement>(null)
 
   // Das Datum der Tarif-Zeile bricht nie um (V13): „31. Jänner 2028“ bleibt beisammen.
-  const tarif = tarifZeile ? { ...tarifZeile, zeile: datumOhneUmbruch(tarifZeile.zeile), zeileHandy: datumOhneUmbruch(tarifZeile.zeileHandy) } : null
+  const tarif = tarifZeile
+    ? {
+        ...tarifZeile,
+        zeile: datumOhneUmbruch(tarifZeile.zeile),
+        zeileHandy: datumOhneUmbruch(tarifZeile.zeileHandy),
+        restzeit: tarifZeile.restzeit === undefined ? undefined : datumOhneUmbruch(tarifZeile.restzeit),
+      }
+    : null
 
   // Hauptpunkte ohne Platz in der Leiste stehen ganz oben im Blatt — seit Nr. 87 das Postfach (Register N12).
   const hauptImMehr = nav.mehr.filter((p) => nav.haupt.some((h) => h.id === p.id))
@@ -353,7 +368,7 @@ export function HofShell({
             </Link>
             <Hofkarte hofName={hofName} hofSlug={hofSlug} />
 
-            {/* „+ Neu ▾“ als orange Pille (N42 a); das Menü öffnet direkt am Knopf (N41 d). */}
+            {/* „+ Neu ▾“ als orange Pille (N42 a) mit den Zeichen des Boards; das Menü öffnet direkt am Knopf (N41 d). */}
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
@@ -361,13 +376,17 @@ export function HofShell({
                   FOKUS_RAHMEN
                 )}
               >
-                <Plus className="size-4 shrink-0" strokeWidth={2.6} aria-hidden="true" />
+                {/* Zeichen statt Symbole wie im Board w1-mehr-neu; der Name bleibt „Neu“. Auch offen „▾“ wie im Board
+                    (Bild 3) — der Zustand steht in aria-expanded. */}
+                <span aria-hidden="true">+</span>
                 <span>{HOF_NEU_KNOPF}</span>
-                {/* Auch offen „▾“ wie im Board (Bild 3) — der Zustand steht in aria-expanded. */}
-                <ChevronDown className="size-3.5 shrink-0" strokeWidth={2.6} aria-hidden="true" />
+                <span aria-hidden="true">▾</span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-80" container={menueZiel}>
-                <DropdownMenuGroup>
+              {/* Das Menü deckt die getönte Zeile „Heute“ ganz ab (Board Bild 3): 2 px unter dem Knopf, also 2 px über der
+                  Zeile (mb-1 = 4 px), 1 px links von ihr und mit der Rundung des Boards (14 px) — so schaut weder oben ein
+                  Streifen noch an der runden Ecke ein Stück der Zeile (Rundung 10 px) hervor. */}
+              <DropdownMenuContent className={cn('w-80 rounded-[14px]', NEU_MENUE_GRUPPE)} sideOffset={2} alignOffset={-1} container={menueZiel}>
+                <DropdownMenuGroup className={NEU_MENUE_GRUPPE}>
                   <DropdownMenuLabel className="px-3.5 pt-1.5 pb-0.5 font-heading text-[17px] font-semibold text-foreground">{HOF_NEU_TITEL}</DropdownMenuLabel>
                   {neuAnlegen.map((punkt) => (
                     <DropdownMenuLinkItem key={punkt.id} className={NEU_MENUE_EINTRAG} render={<Link href={punkt.href} />}>
@@ -375,8 +394,8 @@ export function HofShell({
                     </DropdownMenuLinkItem>
                   ))}
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
+                <DropdownMenuSeparator className="mx-2 my-1" />
+                <DropdownMenuGroup className={NEU_MENUE_GRUPPE}>
                   {/* Im Web trennt nur die Linie (Board w1-mehr-neu, Bild 3); der Name der Gruppe bleibt für den Screenreader. */}
                   <DropdownMenuLabel className="sr-only">{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
                   {neuAnderes.map((punkt) => (

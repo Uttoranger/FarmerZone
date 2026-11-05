@@ -11,6 +11,8 @@ import { useMenueZiel } from "@/components/ui/menue-ziel"
  * Tastatur — Enter oder Leertaste öffnet, Pfeile wandern, Esc schließt —,
  * Fokusführung und aria-Attribute kommen von Base UI. Hier nur Namen und
  * Aussehen; die Farben sind Tokens (bg-popover, border-border, bg-muted).
+ * Dazu nimmt `DropdownMenuContent` den Fokuswächtern des offenen Menüs das
+ * `aria-hidden` (`waechterFreigeben`, Axe „aria-hidden-focus“, Nr. 233).
  */
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props): React.JSX.Element {
@@ -25,6 +27,69 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props): React.JSX
   return <MenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
+/** Das Merkmal, mit dem Base UI seine Fokuswächter kennzeichnet (unsichtbare `<span tabindex="0">`). */
+export const FOKUS_WAECHTER = "data-base-ui-focus-guard"
+
+/** Was `waechterFreigeben` von einem Kind braucht — ein Element, im Test eine Attrappe. */
+export type WaechterKind = { hasAttribute(name: string): boolean; removeAttribute(name: string): void }
+/** Ein Elternelement, dessen direkte Kinder Wächter sein können. */
+export type WaechterOrt = { readonly children: ArrayLike<WaechterKind> }
+
+/**
+ * Nimmt den Fokuswächtern unter `orte` (nur direkte Kinder) das `aria-hidden` und gibt zurück, wie viele es waren.
+ *
+ * Warum (Axe „aria-hidden-focus“, 6 Knoten bei offenem Menü „Neu“, Nr. 233 UI-Runde 3): Base UI legt um Knopf, Portal
+ * und Popup eines offenen Menüs je zwei Wächter — `<span tabindex="0" aria-hidden="true">`, die einen Tab sofort an
+ * die richtige Stelle weiterreichen (aus dem Menü zurück hinter den Knopf). Fokussierbar und zugleich versteckt ist
+ * genau, was Axe verbietet; hinter dem Menü ist sonst nichts versteckt. Ohne `aria-hidden` sind sie leere Stellen
+ * ohne Inhalt, die den Fokus gleich weitergeben — so macht es Base UI in Safari selbst. Die Tab-Folge bleibt.
+ * Andere Teile mit `aria-hidden` (Symbole, Pfeile) bleiben, wie sie sind.
+ */
+export function waechterFreigeben(orte: readonly (WaechterOrt | null | undefined)[]): number {
+  let anzahl = 0
+  for (const ort of orte) {
+    if (!ort) continue
+    for (const kind of Array.from(ort.children)) {
+      if (kind.hasAttribute(FOKUS_WAECHTER) && kind.hasAttribute("aria-hidden")) {
+        kind.removeAttribute("aria-hidden")
+        anzahl += 1
+      }
+    }
+  }
+  return anzahl
+}
+
+/**
+ * Wo die Wächter eines offenen Menüs liegen: neben dem Popup (im Positionierer) und neben seinem Knopf — dort stehen
+ * auch die Wächter des Portals, denn sie entstehen an der Stelle des Menüs im Baum, nicht am Zielort. Den Knopf
+ * findet `aria-controls` mit der ID des Popups. Die Wächter eines Dialogs ringsum gehören nicht dazu.
+ */
+function waechterOrte(popup: HTMLElement): (HTMLElement | null)[] {
+  const knopf = popup.id ? popup.ownerDocument.querySelector<HTMLElement>(`[aria-controls="${CSS.escape(popup.id)}"]`) : null
+  return [popup.parentElement, knopf?.parentElement ?? null]
+}
+
+/**
+ * Hält die Wächter eines Menüs frei, solange sein Popup steht: einmal beim Einhängen und danach bei jedem neuen Kind
+ * an diesen Orten — die Wächter des Portals kommen erst einen Durchgang nach dem Popup.
+ */
+function useWaechterFrei(): (popup: HTMLDivElement | null) => void {
+  const beobachter = React.useRef<MutationObserver | null>(null)
+  return React.useCallback((popup: HTMLDivElement | null) => {
+    beobachter.current?.disconnect()
+    beobachter.current = null
+    if (!popup) return
+    const orte = waechterOrte(popup)
+    const freigeben = () => {
+      waechterFreigeben(orte)
+    }
+    freigeben()
+    const neu = new MutationObserver(freigeben)
+    for (const ort of orte) if (ort) neu.observe(ort, { childList: true })
+    beobachter.current = neu
+  }, [])
+}
+
 /**
  * `container` (Nr. 132): Wohin das Portal das Menü hängt. Ohne Angabe nimmt
  * es den Zielort der Shell aus dem Kontext (`MenueZielAnbieter`, ein Element
@@ -37,16 +102,19 @@ function DropdownMenuContent({
   side = "bottom",
   align = "start",
   sideOffset = 6,
+  alignOffset,
   container,
   ...props
 }: MenuPrimitive.Popup.Props &
-  Pick<MenuPrimitive.Positioner.Props, "side" | "align" | "sideOffset"> &
+  Pick<MenuPrimitive.Positioner.Props, "side" | "align" | "sideOffset" | "alignOffset"> &
   Pick<MenuPrimitive.Portal.Props, "container">): React.JSX.Element {
   const menueZiel = useMenueZiel()
+  const waechterFrei = useWaechterFrei()
   return (
     <DropdownMenuPortal container={container === undefined ? (menueZiel ?? undefined) : container}>
-      <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} className="z-50 outline-none">
+      <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} alignOffset={alignOffset} className="z-50 outline-none">
         <MenuPrimitive.Popup
+          ref={waechterFrei}
           data-slot="dropdown-menu-content"
           className={cn(
             "min-w-48 origin-(--transform-origin) rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none transition-[opacity,transform] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0",

@@ -23,6 +23,8 @@ import { cn } from '@/lib/utils'
  * Kästchen (28 px, beim Gründungshof das Funkeln), Titel 14 px fett, Zeile
  * 13 px; im Mehr-Blatt steht beim Gründungshof das Abzeichen „Gründungshof“
  * statt Kästchen und Titel. Der Wortlaut bleibt der vom Server (offen: E-012).
+ * UI-Runde 3: beim Gründungshof die Restzeit vom Server (`restzeit`), im Blatt
+ * mit dem Ziel „· Konditionen und Tarif“ dahinter.
  */
 const SYMBOL: Record<TarifZeileDaten['zustand'], LucideIcon> = {
   startphase: Sprout,
@@ -44,9 +46,13 @@ export function TarifZeile({
 }): React.JSX.Element {
   const Symbol = SYMBOL[daten.zustand]
   const blatt = ort === 'blatt'
-  const unterzeile = blatt ? daten.zeileHandy : daten.zeile
+  // Beim Gründungshof die Restzeit „noch 11 Monate (bis …)“ an beiden Orten (Boards w1-/s1-mehr-neu).
+  const unterzeile = daten.restzeit ?? (blatt ? daten.zeileHandy : daten.zeile)
   // Im Blatt trägt das Abzeichen den Titel (Board s1-mehr-neu); vorgelesen wird „Gründungshof“ wie der Titel.
   const mitAbzeichen = blatt && daten.zustand === 'gruendungshof'
+  // Dort steht das Ziel sichtbar hinter der Zeile („· Konditionen und Tarif“, Board s1-mehr-neu) — dann ohne den
+  // unsichtbaren Zusatz, sonst hörte der Screenreader es doppelt.
+  const zielSichtbar = mitAbzeichen
 
   return (
     <Link
@@ -86,12 +92,12 @@ export function TarifZeile({
             </span>
           </>
         ) : (
-          <span className="text-muted-foreground">{unterzeile}</span>
+          <span className="text-muted-foreground">{zielSichtbar ? `${unterzeile} · ${ziel.label}` : unterzeile}</span>
         )}
         {daten.hinweis && <span className="font-semibold text-brand-text">{daten.hinweis}</span>}
       </span>
       {/* Wohin der Link führt — sichtbar zeigt nur der Pfeil, dass es weitergeht (wie PersonZeile). */}
-      <span className="sr-only">{`, ${ziel.label}`}</span>
+      {!zielSichtbar && <span className="sr-only">{`, ${ziel.label}`}</span>}
       <ChevronRight className="size-[18px] shrink-0 text-foreground" strokeWidth={2} aria-hidden="true" />
     </Link>
   )
