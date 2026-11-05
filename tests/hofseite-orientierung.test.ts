@@ -168,12 +168,15 @@ describe('2. Hofzeile, Reiter und Chips: EIN klebender Block unter dem Kopf', ()
     expect(zeile).toContain('aria-label="Zurück zu allen Höfen"')
     expect(zeile).toContain('href="/hoefe"')
     expect(zeile).toMatch(/class="truncate [^"]*" title="Hof Test">Hof Test</)
-    expect(zeile).toContain('Musterdorf · Nimmt Bestellungen an')
+    // Nach dem Ort klein weiter wie im Board s1-hofseite („Braunau am Inn · nimmt Bestellungen an").
+    expect(zeile).toContain('Musterdorf · nimmt Bestellungen an')
     expect(zeile.match(/size-11/g)).toHaveLength(2)
   })
 
-  it('der Zustand kommt aus der Kaufsperre — pausiert heißt „Pausiert" (Gegenprobe zum offenen Hof)', () => {
-    expect(element(seite({ sperre: 'pause' }), 'data-hofzeile', 'Hofseite teilen')).toContain('Musterdorf · Pausiert')
+  it('der Zustand kommt aus der Kaufsperre — pausiert heißt „pausiert gerade" (Board Bild 4; Gegenprobe zum offenen Hof)', () => {
+    const pausiert = element(seite({ sperre: 'pause' }), 'data-hofzeile', 'Hofseite teilen')
+    expect(pausiert).toContain('Musterdorf · pausiert gerade')
+    expect(pausiert).not.toContain('nimmt Bestellungen an')
     expect(hofZeileZustand('keine-abholzeit')).toBe('Noch nicht bestellbar')
     expect(hofZeileZustand('ausgebucht')).toBe('Gerade ausgebucht')
     expect(hofZeileUnterzeile('  ', null)).toBe('Nimmt Bestellungen an')

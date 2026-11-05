@@ -3,6 +3,12 @@ import { kaufSperreHinweis, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { kundenPausenText } from '@/lib/shop-pause'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 
+/**
+ * Der Zustand bei Pause in der Wortform der Boards w1-/s1-hofseite: „<Hof> pausiert gerade." als Titel
+ * der Karte und klein in der Hofzeile („Braunau am Inn · pausiert gerade"). EINE Quelle für beide.
+ */
+export const PAUSIERT_GERADE = 'pausiert gerade'
+
 /** Was bei einer Pause noch geht (Board w1-/s1-hofseite Bild 4) — nur auf Hof- und Produktseite. */
 export const PAUSE_ANSEHEN_SAETZE = 'Du kannst dir das Angebot ansehen. Dein Warenkorb bleibt gespeichert.'
 
@@ -42,7 +48,7 @@ export function KaufSperreHinweis({
 }): React.JSX.Element | null {
   if (sperre === null) return null
   if (sperre === 'pause' && (hofseite || kurz)) {
-    const titel = `${hofName} pausiert gerade.`
+    const titel = `${hofName} ${PAUSIERT_GERADE}.`
     // Im Mini-Warenkorb nur der Titel auf der getönten Fläche (Board w1-hofseite Bild 4).
     if (kurz) return <p className="rounded-xl bg-zustand-tun-grund px-3 py-2.5 text-[14px] font-bold text-zustand-tun">{titel}</p>
     const eigene = pauseMessage?.trim()
@@ -57,7 +63,7 @@ export function KaufSperreHinweis({
   }
   if (sperre === 'pause') {
     return (
-      <Hinweiskarte ton="orange" symbol={PauseCircle} titel={`${hofName} pausiert gerade.`}>
+      <Hinweiskarte ton="orange" symbol={PauseCircle} titel={`${hofName} ${PAUSIERT_GERADE}.`}>
         {!kurz && <span className="break-words">{kundenPausenText(pauseMessage)}</span>}
       </Hinweiskarte>
     )

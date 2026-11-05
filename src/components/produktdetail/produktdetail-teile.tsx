@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { AusverkauftMarke } from '@/components/ui/marke'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/hofseite/produkt-karte'
 
 /*
  * Teile der Produktseite (Nachtlauf Nr. 11, Aufbau seit Nr. 235): „Kennzeichnung"
@@ -33,10 +34,12 @@ export function Kennzeichnung({ zeilen, bestaetigtAm }: { zeilen: readonly Angab
       <h2 id="kennzeichnung-titel" className="text-[16px] font-bold text-foreground">
         Kennzeichnung
       </h2>
-      <dl className="grid grid-cols-1 gap-x-3 gap-y-1 text-[14px] sm:grid-cols-[auto_minmax(0,1fr)]">
+      {/* Zwei Spalten in jeder Breite (Board s1-produkt Bild 2): am Handy höchstens 8,5 rem für die Bezeichnung,
+          ein langes Wort bricht dort um, statt den Wert zu verdrängen. */}
+      <dl className="grid grid-cols-[fit-content(8.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-[14px] sm:grid-cols-[auto_minmax(0,1fr)]">
         {zeilen.map((z) => (
           <div key={z.titel} className="contents">
-            <dt className="text-muted-foreground max-sm:mt-1">{z.titel}</dt>
+            <dt className="break-words hyphens-auto text-muted-foreground">{z.titel}</dt>
             <dd className="break-words whitespace-pre-line text-foreground">{z.wert}</dd>
           </div>
         ))}
@@ -90,14 +93,14 @@ export function GleichMitAbholen({
           return (
             <li key={p.id} className="flex items-center gap-3 px-2.5 py-2">
               <Link href={link(p.id)} title={p.name} className={cn('flex min-w-0 flex-1 items-center gap-3 rounded-xl', FOKUS_RAHMEN)}>
-                <span className="relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted dark:brightness-[0.85]">
+                <span className={cn('relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted', bild && !p.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE)}>
                   {bild && (
                     <Image
                       src={bild}
                       alt=""
                       fill
                       sizes="56px"
-                      className={p.imageUrl ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.65] dark:saturate-[0.8]'}
+                      className={p.imageUrl ? 'object-cover' : cn('object-contain p-1', ILLUSTRATION_BILD)}
                     />
                   )}
                 </span>

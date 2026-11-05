@@ -150,6 +150,7 @@ export function Titelbild({
   verlauf,
   ausschnitt,
   hofName,
+  flach = false,
   children,
 }: {
   /** Das hochgeladene Foto (`titelbildFoto`), sonst null — dann steht der Verlauf. */
@@ -160,6 +161,11 @@ export function Titelbild({
   ausschnitt: BildAusschnitt
   /** Der Name des Hofs für den Alt-Text des Fotos (Nr. 117). */
   hofName?: string
+  /**
+   * Im Reiter Produkte die flache Fläche (Board w1-hofseite Bild 3: etwa halb so hoch, ab 768 px 90 px) —
+   * nur ohne Foto; ein Foto behält die Höhen aus Register N13.
+   */
+  flach?: boolean
   children?: ReactNode
 }): React.JSX.Element {
   const { masse, beimLaden } = useBildmasse(foto)
@@ -172,7 +178,7 @@ export function Titelbild({
         // wie eine Karte, der Name steht darunter, nicht mehr auf dem Bild. Mit Foto die Höhen aus
         // Register N13; ohne Foto die ruhige Fläche der Boards (98 px am Handy, 170 px ab 768).
         'relative w-full overflow-hidden rounded-2xl border border-border bg-muted',
-        foto ? 'h-[220px] md:h-[300px] xl:h-[360px] 2xl:h-[420px]' : 'h-[98px] md:h-[170px]'
+        foto ? 'h-[220px] md:h-[300px] xl:h-[360px] 2xl:h-[420px]' : flach ? 'h-[98px] md:h-[90px]' : 'h-[98px] md:h-[170px]'
       )}
     >
       {foto ? (

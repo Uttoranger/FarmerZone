@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Check, ChevronLeft, ChevronRight, Clock, MapPin, Share2, Sprout } from 'lucide-react'
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, MapPin, Share2, Sprout } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -48,8 +48,8 @@ import { ProductGrid, useBereichWunsch, type InDenKorb } from '@/components/farm
 import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { textlinkKlassen } from '@/components/ui/textlink'
-import { HofseiteSeitenspalte, SPALTEN_KARTE, UEBERZEILE } from '@/components/hofseite/hofseite-seitenspalte'
-import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
+import { HofseiteSeitenspalte, PFEIL_LINK, SPALTEN_KARTE, UEBERZEILE } from '@/components/hofseite/hofseite-seitenspalte'
+import { KaufSperreHinweis, PAUSIERT_GERADE } from '@/components/hofseite/kauf-sperre-hinweis'
 import { useBestellstopp } from '@/components/notbremse-band'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
 import { Titelbild } from '@/components/hofseite/titelbild'
@@ -110,6 +110,24 @@ const KOPF_KNOPF = cn(
   'inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-input bg-card px-3.5 text-[14px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
 )
+/**
+ * Der Zustand klein in der Hofzeile, wie das Board ihn schreibt: „Braunau am Inn · nimmt Bestellungen an",
+ * bei Pause „· pausiert gerade" (das Wort der Pause-Karte). Nur die Darstellung des Satzes aus `hofZeileUnterzeile`
+ * (src/lib/hofseite-orientierung.ts): nach dem Ort klein weiter; ohne Ort bleibt der Anfang groß.
+ */
+function hofzeileKlein(ort: string, sperre: KaufSperre, bestellstopp: boolean): string {
+  const zeile = hofZeileUnterzeile(ort, sperre, bestellstopp)
+  const trenner = zeile.indexOf(' · ')
+  if (trenner < 0) return zeile
+  // Die Pause geht der Notbremse vor (hofZeileZustand) — dann das Wort der Pause-Karte.
+  if (sperre === 'pause') return `${zeile.slice(0, trenner + 3)}${PAUSIERT_GERADE}`
+  const zustand = zeile.slice(trenner + 3)
+  // Klein weiter nur, wo der Zustand mit Verb oder Adverb beginnt („nimmt …", „noch nicht …", „gerade …"); „Bestellen
+  // geht gerade nicht" (Notbremse) und „Bestellen ist … nicht möglich" (gesperrt) beginnen mit einem Hauptwort.
+  const klein = sperre === 'keine-abholzeit' || sperre === 'ausgebucht' || (sperre === null && !bestellstopp)
+  return klein ? `${zeile.slice(0, trenner + 3)}${zustand.charAt(0).toLocaleLowerCase('de')}${zustand.slice(1)}` : zeile
+}
+
 /** „Alle Produkte (n)" unter dem Schaufenster am Handy — über die volle Breite, darum Radius 14 statt Pille (DESIGN_SYSTEM). */
 const ALLE_PRODUKTE_KNOPF = cn(
   'flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[14px] border border-input bg-card px-4 text-[14px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
@@ -300,7 +318,7 @@ export function HofseiteKunde({
             {farm.name}
           </span>
         )}
-        <span className="truncate text-[12px] text-muted-foreground">{hofZeileUnterzeile(farm.city, sperre, bestellstopp)}</span>
+        <span className="truncate text-[12px] text-muted-foreground">{hofzeileKlein(farm.city, sperre, bestellstopp)}</span>
       </div>
       <button
         type="button"
@@ -450,13 +468,20 @@ export function HofseiteKunde({
           {/* ── Titelbild und Kopf — im Reiter Produkte am Handy nicht (Board s1-hofseite Bild 3) ── */}
           <div className={cn('flex flex-col gap-3', nameAlsTitel && 'max-md:hidden')}>
             {/* Hochformat ab md ganz statt beschnitten (Register N6, Nr. 72): entscheidet titelbild.tsx. */}
-            <Titelbild foto={foto} verlauf={titelbildVerlauf(farm.bannerValue)} ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)} hofName={farm.name} />
+            <Titelbild
+              foto={foto}
+              verlauf={titelbildVerlauf(farm.bannerValue)}
+              ausschnitt={titelbildAusschnitt(farm.bannerAusschnitt, farm.bannerFocusY)}
+              hofName={farm.name}
+              flach={offen === 'produkte'}
+            />
 
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex min-w-0 items-center gap-3">
-                  {/* Das Logo steht rund (Register N17, Bild-Baustein „Logo") — ohne Logo die Initialen auf der grünen Tönung. */}
-                  <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-card bg-zustand-laeuft-grund font-heading text-[18px] font-semibold text-zustand-laeuft">
+                  {/* Das Hof-Zeichen als abgerundetes Quadrat (Board w1-/s1-hofseite; Radius 14 bei 56 px) — mit Logo
+                      und ohne (dann die Initialen auf der grünen Tönung). Der Ausschnitt des Logos (N17) gilt unverändert. */}
+                  <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border-[3px] border-card bg-zustand-laeuft-grund font-heading text-[18px] font-semibold text-zustand-laeuft">
                     {farm.logoUrl ? (
                       // Das Logo bekommt keinen Filter (Register N17).
                       <Image src={farm.logoUrl} alt={`${farm.name} – Logo`} fill sizes="56px" className="object-cover" style={bildStil(farm.logoAusschnitt, { filter: false })} />
@@ -551,16 +576,20 @@ export function HofseiteKunde({
           ) : null}
 
           {offen === 'uebersicht' && produkte.length > 0 ? (
-            <div className="-mb-1 flex items-center justify-between gap-3">
+            <div className="-mb-1 flex min-h-11 items-center justify-between gap-3">
               <h2 className={cn(UEBERZEILE, 'mt-1')}>Produkte</h2>
-              <Link
-                href={reiterAdresse(pfad, suche.toString(), 'produkte')}
-                onNavigate={zeigeReiter('produkte', { fokusAufReiter: true })}
-                prefetch={false}
-                className={textlinkKlassen()}
-              >
-                Alle ansehen <span aria-hidden="true">&nbsp;→</span>
-              </Link>
+              {/* Bei Pause ohne „Alle ansehen" (Board Bild 4): am Handy führt „Alle Produkte (n)" weiter, im Browser der Reiter. */}
+              {!pause && (
+                <Link
+                  href={reiterAdresse(pfad, suche.toString(), 'produkte')}
+                  onNavigate={zeigeReiter('produkte', { fokusAufReiter: true })}
+                  prefetch={false}
+                  className={cn(textlinkKlassen(), PFEIL_LINK)}
+                >
+                  Alle ansehen
+                  <ArrowRight className="size-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                </Link>
+              )}
             </div>
           ) : null}
 

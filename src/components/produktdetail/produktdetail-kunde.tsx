@@ -51,6 +51,7 @@ import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-band'
 import { sperreMitBestellstopp } from '@/lib/notbremse'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/hofseite/produkt-karte'
 import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
 import { raummassErklaeren } from '@/lib/verkaufsgroessen'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
@@ -233,7 +234,12 @@ export function ProduktdetailKunde({
           <section aria-labelledby="produkt-titel" className="flex flex-col gap-3 md:flex-row md:items-start md:gap-6">
             {/* Rahmen wie die Vorschau „Auf der Produktseite“ im Produktdialog (Bild-Baustein, Register N17): am Handy
                 390 : 200, im Browser 300 × 300. Im Dunkeln gedämpft (Freigabe Lauf 31), damit kein heller Fleck bleibt. */}
-            <div className="relative aspect-[390/200] w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-muted md:aspect-auto md:size-[300px] dark:brightness-[0.85]">
+            <div
+              className={cn(
+                'relative aspect-[390/200] w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-muted md:aspect-auto md:size-[300px]',
+                bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE
+              )}
+            >
               {bild ? (
                 <Image
                   src={bild}
@@ -241,9 +247,9 @@ export function ProduktdetailKunde({
                   fill
                   priority
                   sizes="(min-width: 768px) 300px, 100vw"
-                  // Die Kategorie-Illustration wird nachts stärker gedämpft — ihr Crème-Grund leuchtete sonst (CODING_STANDARDS §7).
+                  // Die Kategorie-Illustration geht nachts in der Fläche auf — ihr Crème-Grund leuchtete sonst (ILLUSTRATION_BILD).
                   className={cn(
-                    produkt.imageUrl ? 'object-cover' : 'object-contain p-6 dark:brightness-[0.65] dark:saturate-[0.8]',
+                    produkt.imageUrl ? 'object-cover' : cn('object-contain p-6', ILLUSTRATION_BILD),
                     ausverkauft && 'grayscale'
                   )}
                   // Ausschnitt nur am echten Foto (Register N17); ausverkauft ohne Filter des Hofs, sonst überschriebe er grayscale.

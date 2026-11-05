@@ -27,6 +27,11 @@ const SPY_STREIFEN = '-30% 0px -60% 0px'
 /** Wie lange nach einem angetippten Chip sein Ziel gilt — das Ende eines weichen Scrollens lässt sich nicht überall abfragen. */
 const SPRUNG_SPERRE_MS = 1000
 
+/** Wie viele der drei Spalten ein Abschnitt ab 768 px nimmt — als ganze Klassen, Tailwind liest keine zusammengesetzten. */
+const ABSCHNITT_SPALTEN = { 1: 'md:col-span-1', 2: 'md:col-span-2', 3: 'md:col-span-3' } as const
+/** Die Kacheln darin: so viele Spalten wie der Abschnitt breit ist, jede Kachel so breit wie in jedem anderen Abschnitt. */
+const LISTE_SPALTEN = { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' } as const
+
 const CHIP = cn(
   "relative inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[15px] whitespace-nowrap transition-colors duration-[250ms]",
   FOKUS_RAHMEN
@@ -72,6 +77,7 @@ export function ProduktAbschnitte<P extends { id: string }>({
   const sprungZiel = useRef<string | null>(null)
   const sprungTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chipReihe = useRef<HTMLUListElement>(null)
+  const chipLeiste = useRef<HTMLElement>(null)
 
   function sperreAuf(anker: string) {
     sprungZiel.current = anker
@@ -101,19 +107,26 @@ export function ProduktAbschnitte<P extends { id: string }>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Den markierten Chip beim Scrollen nachführen.
+  // Den markierten Chip beim Scrollen nachführen. Solange die Chip-Reihe selbst zu sehen ist, steht man am
+  // Anfang der Liste und sieht alle Abschnitte: dann „Alle" (Board s1-/w1-hofseite Bild 3) — sonst markierte
+  // der Streifen schon beim Öffnen den ersten Abschnitt, der zufällig darin liegt.
   useEffect(() => {
     const ids = reihenfolgeText.split(' ')
     const sichtbare = new Set<string>()
+    let reiheZuSehen = chipLeiste.current !== null
+    const neu = () =>
+      setAktiv((bisher) =>
+        sprungZiel.current === null && reiheZuSehen
+          ? ALLE_ANKER
+          : naechsterAktiverReiter({ sichtbare: [...sichtbare], reihenfolge: ids, bisher, gesperrtAuf: sprungZiel.current })
+      )
     const beobachter = new IntersectionObserver(
       (eintraege) => {
         for (const e of eintraege) {
           if (e.isIntersecting) sichtbare.add(e.target.id)
           else sichtbare.delete(e.target.id)
         }
-        setAktiv((bisher) =>
-          naechsterAktiverReiter({ sichtbare: [...sichtbare], reihenfolge: ids, bisher, gesperrtAuf: sprungZiel.current })
-        )
+        neu()
       },
       { rootMargin: SPY_STREIFEN }
     )
@@ -121,7 +134,19 @@ export function ProduktAbschnitte<P extends { id: string }>({
       const el = document.getElementById(id)
       if (el) beobachter.observe(el)
     }
-    return () => beobachter.disconnect()
+    // Die Reihe zählt erst ganz verschwunden als „weg" (ganzes Fenster, ohne Streifen).
+    const reihe = chipLeiste.current
+    const reihenBeobachter = reihe
+      ? new IntersectionObserver(([e]) => {
+          reiheZuSehen = e?.isIntersecting ?? false
+          neu()
+        })
+      : null
+    if (reihe) reihenBeobachter?.observe(reihe)
+    return () => {
+      beobachter.disconnect()
+      reihenBeobachter?.disconnect()
+    }
   }, [reihenfolgeText])
 
   // Am Handy scrollt die Reihe seitlich: Der markierte Chip rückt in den sichtbaren Teil,
@@ -154,7 +179,7 @@ export function ProduktAbschnitte<P extends { id: string }>({
   return (
     <div id={ALLE_ANKER} className={cn('flex flex-col gap-3', SPRUNGZIEL_UNTER_LEISTE)}>
       {abschnitte.length > 1 && (
-        <nav aria-label="Zu einer Kategorie springen" className="-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0">
+        <nav ref={chipLeiste} aria-label="Zu einer Kategorie springen" className="-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0">
           <ul ref={chipReihe} className="flex gap-2 md:flex-wrap">
             {chips.map((chip) => {
               const gewaehlt = aktiv === chip.anker
@@ -182,18 +207,31 @@ export function ProduktAbschnitte<P extends { id: string }>({
         </nav>
       )}
 
-      {abschnitte.map((a) => (
-        <section key={a.anker} id={a.anker} aria-labelledby={`${a.anker}-titel`} className={cn('flex flex-col gap-2.5', SPRUNGZIEL_UNTER_LEISTE)}>
-          <h2 id={`${a.anker}-titel`} className={cn(UEBERZEILE, 'mt-1')}>
-            {a.titel} · {mitAnzahl(a.produkte.length, 'Produkt', 'Produkte')}
-          </h2>
-          <ul className={PRODUKT_LISTE}>
-            {a.produkte.map((p) => (
-              <li key={p.id}>{renderKarte(p)}</li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {/* Ab 768 px ein Raster aus drei Spalten: Jeder Abschnitt nimmt so viele Spalten, wie er Produkte hat
+          (höchstens drei) — kleine Abschnitte stehen so nebeneinander („Futter · 1 Produkt" neben
+          „Brennmaterial · 1 Produkt", Board w1-hofseite Bild 3) statt je eine Zeile mit leerer Fläche daneben. */}
+      <div className="flex flex-col gap-3 md:grid md:grid-cols-3 md:gap-x-3">
+        {abschnitte.map((a) => {
+          const spalten = Math.max(1, Math.min(a.produkte.length, 3)) as 1 | 2 | 3
+          return (
+            <section
+              key={a.anker}
+              id={a.anker}
+              aria-labelledby={`${a.anker}-titel`}
+              className={cn('flex min-w-0 flex-col gap-2.5', ABSCHNITT_SPALTEN[spalten], SPRUNGZIEL_UNTER_LEISTE)}
+            >
+              <h2 id={`${a.anker}-titel`} className={cn(UEBERZEILE, 'mt-1')}>
+                {a.titel} · {mitAnzahl(a.produkte.length, 'Produkt', 'Produkte')}
+              </h2>
+              <ul className={cn(PRODUKT_LISTE, LISTE_SPALTEN[spalten])}>
+                {a.produkte.map((p) => (
+                  <li key={p.id}>{renderKarte(p)}</li>
+                ))}
+              </ul>
+            </section>
+          )
+        })}
+      </div>
 
       {gebuehrHinweis && <p className="text-[13px] text-muted-foreground">{gebuehrHinweis}</p>}
     </div>

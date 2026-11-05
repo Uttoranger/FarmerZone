@@ -467,6 +467,16 @@ describe('Titelbild', () => {
     expect(k).not.toContain('h-[220px]')
   })
 
+  it('im Reiter Produkte flach (Board w1-hofseite Bild 3: ab 768 px 90 px) — mit Foto bleiben die Höhen aus N13', () => {
+    const flach = (foto: string | null) => {
+      buehne.beginneRender()
+      return klassen(rahmen(renderToStaticMarkup(createElement(Titelbild, { foto, verlauf: 'linear-gradient(1deg, red, blue)', ausschnitt: titelbildAusschnitt(null, 50), flach: true }))))
+    }
+    expect(flach(null)).toEqual(expect.arrayContaining(['h-[98px]', 'md:h-[90px]']))
+    expect(flach(null)).not.toContain('md:h-[170px]')
+    expect(flach('/foto.jpg')).toEqual(expect.arrayContaining(['h-[220px]', 'md:h-[300px]']))
+  })
+
   it('vor dem Laden (auf dem Server) füllt das Foto die Fläche: Querformat springt nie', () => {
     const html = zeige('/foto.jpg')
     expect(klassen(fuellend(html))).not.toContain('md:opacity-0')

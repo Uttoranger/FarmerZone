@@ -62,6 +62,7 @@ vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(),
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
+import { ohneKommaNachTag } from '@/components/hofseite/hofseite-seitenspalte'
 import { kartenZustand, kaufSperre } from '@/lib/bereiche-anzeige'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
@@ -747,5 +748,65 @@ describe('Hofseite eines Testhofs (Register N21, Nr. 119)', () => {
     const html = seite()
     expect(html).not.toContain(TESTHOF_HINWEIS)
     expect(html).not.toContain('data-ton="neutral"')
+  })
+})
+
+describe('Nr. 235, UI-Runde 2 — Abweichungen aus der Bewertung r1', () => {
+  /** Das öffnende Tag eines Elements mit dieser Kennung. */
+  const tagMit = (html: string, merkmal: string) => html.match(new RegExp(`<[a-z]+[^>]*${merkmal}[^>]*>`))?.[0] ?? ''
+
+  it('Reiter Produkte: kleine Abschnitte stehen ab 768 px nebeneinander — je Produkt eine der drei Spalten', () => {
+    const html = seite({ suche: 'reiter=produkte' })
+    // Jeder Abschnitt des Testhofs hat ein Produkt: eine Spalte, darin eine Kachel so breit wie überall.
+    for (const anker of ['kategorie-eier', 'kategorie-brennmaterial']) {
+      expect(tagMit(html, `id="${anker}"`)).toContain('md:col-span-1')
+    }
+    expect(html).toMatch(/class="[^"]*md:grid md:grid-cols-3 md:gap-x-3[^"]*"/)
+    expect(html).toContain('md:grid-cols-1')
+  })
+
+  it('Gegenprobe: ein Abschnitt mit drei Produkten nimmt die ganze Zeile', () => {
+    const farm = publicFarm({
+      products: [produkt('e1', 'Eier S', 'EIER'), produkt('e2', 'Eier M', 'EIER'), produkt('e3', 'Eier L', 'EIER'), produkt('h1', 'Honig', 'HONIG')],
+    })
+    const html = seite({ farm, suche: 'reiter=produkte' })
+    expect(tagMit(html, 'id="kategorie-eier"')).toContain('md:col-span-3')
+    expect(tagMit(html, 'id="kategorie-honig"')).toContain('md:col-span-1')
+  })
+
+  it('bei Pause kein „Alle ansehen" (Board Bild 4) — „Alle Produkte (n)" am Handy bleibt (Register N5)', () => {
+    const pausiert = seite({ farm: { ...HOF, isPaused: true } })
+    expect(pausiert).not.toContain('Alle ansehen')
+    expect(pausiert).toContain('Alle Produkte (5)')
+    // Gegenprobe: offen steht der Link da — unterstrichen, mit dem Pfeil als Symbol.
+    const offen = seite()
+    expect(offen).toMatch(/<a[^>]*class="[^"]*underline decoration-\[1\.5px\][^"]*"[^>]*>Alle ansehen<svg[^>]*lucide-arrow-right/)
+  })
+
+  it('das Hof-Zeichen ist ein abgerundetes Quadrat (Board), kein Kreis', () => {
+    const zeichen = tagMit(seite(), 'size-14 shrink-0 items-center justify-center overflow-hidden')
+    expect(zeichen).toContain('rounded-[14px]')
+    expect(zeichen).not.toContain('rounded-full')
+  })
+
+  it('Abholzeiten ohne Komma nach dem Wochentag („Mittwoch 15–18 Uhr") — nur die Darstellung', () => {
+    expect(ohneKommaNachTag('Mittwoch, 15–18 Uhr')).toBe('Mittwoch 15–18 Uhr')
+    expect(ohneKommaNachTag('Samstag, 9–12 · 14–16 Uhr')).toBe('Samstag 9–12 · 14–16 Uhr')
+    // Gegenprobe: ohne Uhrzeit nach dem Komma bleibt die Zeile, wie sie ist.
+    expect(ohneKommaNachTag('Nach Vereinbarung, bitte anrufen')).toBe('Nach Vereinbarung, bitte anrufen')
+  })
+
+  it('Illustrationen gehen im Dunkeln in der Fläche auf (kein heller Fleck), Fotos bleiben leicht gedämpft', () => {
+    const farm = publicFarm({
+      products: [
+        publicProduct({ id: 'i1', name: 'Milch', category: 'MILCH', stock: 9, categoryImageUrl: '/categories/milch.webp' }),
+        publicProduct({ id: 'f1', name: 'Käse', category: 'MILCH', stock: 9, imageUrl: '/foto/kaese.jpg' }),
+      ],
+    })
+    const html = seite({ farm })
+    // Die Hülle entscheidet (next/image ist hier ein schlichtes <img>; die Mischung am Bild steht in ILLUSTRATION_BILD).
+    expect(html).toMatch(/<span class="[^"]*dark:brightness-\[1\.6\][^"]*"><img src="\/categories\/milch\.webp"/)
+    expect(html).toMatch(/<span class="[^"]*dark:brightness-\[0\.85\][^"]*"><img src="\/foto\/kaese\.jpg"/)
+    expect(html).not.toMatch(/dark:brightness-\[1\.6\][^"]*"><img src="\/foto/)
   })
 })

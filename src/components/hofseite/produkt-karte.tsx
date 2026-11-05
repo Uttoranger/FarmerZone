@@ -26,6 +26,19 @@ import { AusverkauftMarke } from '@/components/ui/marke'
 export const PRODUKT_LISTE =
   'flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card md:grid md:grid-cols-3 md:gap-3 md:divide-y-0 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent'
 
+/**
+ * Die Kategorie-Illustration im Dunkeln (Freigabe Lauf 31, Maßstab Punkt 4: keine hellen Flecken). Ihr Crème-Grund
+ * leuchtete mit `brightness` allein noch als hellgraues Quadrat auf der dunklen Karte. Darum wird das Bild im Dunkeln
+ * mit der Fläche der Hülle (`bg-muted`) multipliziert: Der Grund wird zur Fläche, die Zeichnung bleibt als dunkle,
+ * gedämpfte Form; die Hülle hellt das Ergebnis danach etwas auf, damit die Form lesbar bleibt (der Filter der Hülle
+ * trennt die Mischung vom Rest der Seite). Am Tag unverändert. EINE Quelle für Hofseite und Produktseite.
+ * Fotos des Hofs bekommen das nicht — sie bleiben leicht gedämpft (`FOTO_HUELLE`).
+ */
+export const ILLUSTRATION_HUELLE = 'dark:brightness-[1.6]'
+export const ILLUSTRATION_BILD = 'dark:mix-blend-multiply'
+/** Ein Foto des Hofs im Dunkeln: leicht gedämpft über die Hülle — der Inline-Filter des Hofs bleibt am Bild. */
+export const FOTO_HUELLE = 'dark:brightness-[0.85]'
+
 /** Was der Preis braucht; null = kein gültiger Preis (nur in der Vorschau des Produktdialogs). */
 type PreisAngabe = Pick<PublicProduct, 'price' | 'unit' | 'unitSize' | 'futter'> | null
 
@@ -184,9 +197,14 @@ function KartenAufbau({
   const bildUndName = (
     <>
       {/* Im Dunkeln gedämpft (Freigabe Lauf 31, Maßstab Punkt 4): kein heller Fleck auf der dunklen Karte —
-          die Illustration mit ihrem Crème-Grund stärker, das Foto leicht (über die Hülle, der Inline-Filter des
-          Hofs bleibt am Bild). Gerahmt statt Schatten (CODING_STANDARDS §7). */}
-      <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted md:h-24 md:w-full md:rounded-[10px] dark:brightness-[0.85]">
+          die Illustration über ILLUSTRATION_HUELLE/-BILD, das Foto leicht (FOTO_HUELLE). Gerahmt statt Schatten
+          (CODING_STANDARDS §7). */}
+      <span
+        className={cn(
+          'relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted md:h-24 md:w-full md:rounded-[10px]',
+          bild && !istFoto ? ILLUSTRATION_HUELLE : FOTO_HUELLE
+        )}
+      >
         {bild ? (
           <Image
             src={bild}
@@ -195,7 +213,7 @@ function KartenAufbau({
             fill
             sizes="(min-width: 1280px) 220px, (min-width: 768px) 30vw, 56px"
             className={cn(
-              istFoto ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.65] dark:saturate-[0.8]',
+              istFoto ? 'object-cover' : cn('object-contain p-1', ILLUSTRATION_BILD),
               ausgegraut && 'grayscale'
             )}
             // Ausgegraut ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.

@@ -5,7 +5,7 @@ import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { Info } from 'lucide-react'
+import { ArrowRight, Info } from 'lucide-react'
 import type { PublicPickupSlot } from '@/server/queries/farm'
 import { abholtagZeile, abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -58,8 +58,22 @@ export type SeitenspalteHof = {
 export const SPALTEN_KARTE = 'flex flex-col gap-2 rounded-2xl border border-border bg-card px-3.5 py-3'
 /** Die leise Überzeile in Großbuchstaben (13 px fett) — Überschrift jeder Karte und der Abschnitte der Hofseite. */
 export const UEBERZEILE = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
+/**
+ * Ein Textlink mit Pfeil wie im Board („Alle ansehen →", „Route planen →"): unterstrichen und der Pfeil als
+ * kräftiges Symbol statt des schmalen Zeichens. Ergänzt `textlinkKlassen()` (ui/textlink.tsx), ändert ihn nicht.
+ */
+export const PFEIL_LINK = 'w-fit gap-1 underline decoration-[1.5px] underline-offset-4'
+
 /** Steht in „Zahlung & Kontakt“ statt der Nummer (Nr. 60): Telefon und E-Mail kommen mit der Bestellung. */
 export const TELEFON_IN_DER_BESTAETIGUNG = 'Die Telefonnummer des Hofs steht in deiner Bestellbestätigung.'
+
+/**
+ * „Mittwoch 15–18 Uhr" wie im Board: nur die Darstellung der Zeile aus `abholzeitenJeWochentag`
+ * (src/lib/pickup-days.ts, „Mittwoch, 15–18 Uhr") — das Komma nach dem Wochentag fällt weg.
+ */
+export function ohneKommaNachTag(zeile: string): string {
+  return zeile.replace(/^([^\d,]+), (?=\d)/, '$1 ')
+}
 
 /** „Online bezahlen oder bar bei Abholung." — die Zahlarten des Hofs als ein Satz (Board w1-hofseite). */
 export function zahlungsSatz(zahlungsarten: readonly Zahlungsart[]): string | null {
@@ -145,7 +159,7 @@ export function HofseiteSeitenspalte({
           </h2>
           <ul className="flex flex-col text-[15px] text-foreground">
             {zeiten.map((zeile) => (
-              <li key={zeile}>{zeile}</li>
+              <li key={zeile}>{ohneKommaNachTag(zeile)}</li>
             ))}
           </ul>
         </section>
@@ -209,9 +223,10 @@ function AnfahrtKarte({
         href={buildMapsUrl(hof.address, hof.postalCode, hof.city)}
         target="_blank"
         rel="noopener noreferrer"
-        className={textlinkKlassen()}
+        className={cn(textlinkKlassen(), PFEIL_LINK)}
       >
-        Route planen <span aria-hidden="true">&nbsp;→</span>
+        Route planen
+        <ArrowRight className="size-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
       </a>
     </section>
   )
