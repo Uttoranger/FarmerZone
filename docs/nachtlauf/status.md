@@ -258,19 +258,19 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 217 | Kleinigkeiten aus Lauf 28 | gemergt (#447) | `nacht/2026-11-02/217-kleinigkeiten` | #445 | `docs/lauf29` | 1 Runde (zwei Mocks übersehen); Grenze src/lib/widerruf.ts | 2.11.2026 |
 | 218 | Rücktritts-Angaben auch im Familien-Formular (214-Nacharbeit) | gemergt (#447) | `nacht/2026-11-02/218-familie-ruecktritt` | #443 | `docs/lauf29` | 0 Runden; Grenze ruecktritt-felder.tsx und ein Satz ARCHITECTURE; Bilder entfallen | 2.11.2026 |
 | Sammel 29 | Sammel-PR Lauf 29 | gemergt (#447) | `integration/lauf29` | (Sammel-PR) | main | 211, 216, 218, 217, 215 per `--no-ff`; Konflikte nur DEVELOPMENT.md; voller Lauf 660 Dateien, 12209 Tests; Integration ganz 94 Dateien, 776 Tests; Regel 3 grün (keine neue Migration); Morgenbericht morgenbericht-2026-11-02-lauf29.md | 2.11.2026 |
-| 219 | Bausteine und Wortliste | offen | – | – | `docs/lauf30` | – | – |
-| 220 | Shells und Navigation: Kunde, Hof, Admin | offen | – | – | `integration/lauf30` (Zwischenstand nach 219) | – | – |
-| 221 | Gebühren-Texte und Gründungszeit 12 Monate | offen | – | – | `integration/lauf30` (Zwischenstand nach 219) | – | – |
-| 222 | Hof-Alltag: Heute, Bestellungen, Bestellung, Druck | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 223 | Produkte und Produkt-Formulare | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 224 | Mein Hof, Einstellungen, Region | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 225 | Hof-Werkzeuge: Auswertung, Kunden, Verkäufe, Postfach, Beiträge, Problem melden | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 226 | Kundschaft: Finden – Startseite, Höfe, Hofseite, Produktseite, Für Höfe | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 227 | Kauf: Warenkorb, Kasse, Bestätigung, Bestellung ansehen, Meine Bestellungen; Sperrzone Kasse | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 228 | Anmelden und Konto | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 229 | Admin Teil 1: Heute, Höfe, Akte, Freischalten, Bestellungen | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 230 | Admin Teil 2: Postfach, Startseite, Geld, Betrieb, Einstellungen, Zugang | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 231 | Rechtstexte, Rücktrittsrecht, Fehlerseiten | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| 232 | E-Mails: Fuß-Arten, Reply-To, Texte | offen | – | – | `integration/lauf30` (Zwischenstand nach 219–221) | – | – |
-| Sammel 30 | Sammel-PR Lauf 30 | offen | `integration/lauf30` | – | main | – | – |
-| Regel-Inventur 30 | Regel-Inventur (G4, nur lesen; Ergebnis im Morgenbericht unter „Regelvorschläge“) | offen | – | – | – | – | – |
+| 219 | Bausteine und Wortliste | fertig | `nacht/2026-11-04/219-bausteine-wortliste` | #450 | `docs/lauf30` | 1 Runde (N39-Ausnahme je Eigenschaft); Offen-Ordner; Lesart 221.ts | 5.11.2026 |
+| 220 | Shells und Navigation: Kunde, Hof, Admin | fertig | `nacht/2026-11-04/220-shells-navigation` | #451 | `integration/lauf30` (nach 219) | 0 Runden; vier ui/-Punkte Nacharbeit; Admin-Bilder hinter Passkey | 5.11.2026 |
+| 221 | Gebühren-Texte und Gründungszeit 12 Monate | fertig | `nacht/2026-11-04/221-gebuehr-gruendung` | #452 | `integration/lauf30` (nach 219) | 1 Runde (Wache zählt Rückfälle); Integration ganz; Projektleitung: Monate = 12 speichern, festschreiben | 5.11.2026 |
+| 222 | Hof-Alltag: Heute, Bestellungen, Bestellung, Druck | fertig | `nacht/2026-11-04/222-hof-alltag` | #456 | `integration/lauf30` (nach 219–221) | 2 Runden (Begründungen, eine Statusliste `bestellstatus-offen.ts`, Regel Nr. 45 zurück); Fragen: Nr. 45 und Pflichtkarten, „Gepackt“/„Abholbereit“ | 5.11.2026 |
+| 223 | Produkte und Produkt-Formulare | fertig | `nacht/2026-11-04/223-produkte` | #460 | `integration/lauf30` (nach 219–221) | 1 Runde (N25 vor Board, Vorrat 0 neutral); Frage: N25 an Board anpassen? | 5.11.2026 |
+| 224 | Mein Hof, Einstellungen, Region | fertig | `nacht/2026-11-04/224-mein-hof` | #462 | `integration/lauf30` (nach 219–221) | 2 Runden (Rechenbeispiel bar, Datum aus einzugAb, Fehlerfall, ein Tag für den Erlass); Wort „Pausiert“ offen | 5.11.2026 |
+| 225 | Hof-Werkzeuge: Auswertung, Kunden, Verkäufe, Postfach, Beiträge, Problem melden | fertig | `nacht/2026-11-04/225-hof-werkzeuge` | #461 | `integration/lauf30` (nach 219–221) | 0 Runden; 9 Sollte (u. a. Gründungshof-Satz in der Auswertung) | 5.11.2026 |
+| 226 | Kundschaft: Finden – Startseite, Höfe, Hofseite, Produktseite, Für Höfe | fertig | `nacht/2026-11-04/226-finden` | #453 | `integration/lauf30` (nach 219–221) | 0 Runden; Hofkarten der Startseite (Pause, Preise) offen | 5.11.2026 |
+| 227 | Kauf: Warenkorb, Kasse, Bestätigung, Bestellung ansehen, Meine Bestellungen; Sperrzone Kasse | fertig | `nacht/2026-11-04/227-kauf` | #454 | `integration/lauf30` (nach 219–221) | 0 Runden; Offen für Recht: Preisangabe im Korb, Rücktritt/N39; Container-Neustart | 5.11.2026 |
+| 228 | Anmelden und Konto | fertig | `nacht/2026-11-04/228-anmelden` | #463 | `integration/lauf30` (nach 219–221) | 0 Runden; N42 e Balken je Stand nur auf /onboarding (Layout außerhalb jeder Grenze) | 5.11.2026 |
+| 229 | Admin Teil 1: Heute, Höfe, Akte, Freischalten, Bestellungen | fertig | `nacht/2026-11-04/229-admin-1` | #457 | `integration/lauf30` (nach 219–221) | 0 Runden; Fragen: Wort der Geld-Kachel (Abholung vs. createdAt), setServiceFeeAction; Admin-Bilder hinter Passkey | 5.11.2026 |
+| 230 | Admin Teil 2: Postfach, Startseite, Geld, Betrieb, Einstellungen, Zugang | fertig | `nacht/2026-11-04/230-admin-2` | #459 | `integration/lauf30` (nach 219–221) | 1 Runde (kein neutrales Wort; geld-abgleich in NACHARBEIT); Admin-Bilder hinter Passkey | 5.11.2026 |
+| 231 | Rechtstexte, Rücktrittsrecht, Fehlerseiten | fertig | `nacht/2026-11-04/231-rechtstexte` | #458 | `integration/lauf30` (nach 219–221) | 0 Runden; Offen für Recht: Konditionen-Abschnitt (Wortlaut aus 221 weicht leicht ab), N39, Datenschutz, AGB 1.0 | 5.11.2026 |
+| 232 | E-Mails: Fuß-Arten, Reply-To, Texte | fertig | `nacht/2026-11-04/232-mails` | #455 | `integration/lauf30` (nach 219–221) | 0 Runden; Offen für Recht: Fuß/Anbieterzeile (ECG, MedienG), Betreff Eingangsbestätigung | 5.11.2026 |
+| Sammel 30 | Sammel-PR Lauf 30 | fertig | `integration/lauf30` | (Sammel-PR) | main | #449 + 219–232 per `--no-ff`; nach jedem Merge voller Lauf; zuletzt 678 Dateien, 12764 Tests; Integration ganz 94 Dateien, 777 Tests; Regel 3 grün (keine neue Migration); Morgenbericht morgenbericht-2026-11-05-lauf30-neustart.md | 5.11.2026 |
+| Regel-Inventur 30 | Regel-Inventur (G4, nur lesen; Ergebnis im Morgenbericht unter „Regelvorschläge“) | fertig | – | – | – | 16 Vorschläge im Morgenbericht (5 offen aus früheren Läufen) | 4.11.2026 |
