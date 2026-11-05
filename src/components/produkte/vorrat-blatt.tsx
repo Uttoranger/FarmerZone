@@ -6,10 +6,18 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogMitte } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetKopf } from '@/components/ui/sheet'
 import { Stepper } from '@/components/ui/stepper'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useVorratSetzen } from '@/components/produkte/use-vorrat-setzen'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
 import { bestandLabel, formatZahl, hofVorratText } from '@/lib/format'
-import { VORRAT_NULL_SATZ, vorratFrage, vorratTitel } from '@/lib/produkte-hof'
+import {
+  VORRAT_AUSVERKAUFT_KNOPF,
+  VORRAT_DAZU,
+  VORRAT_DAZU_TITEL,
+  VORRAT_NULL_SATZ,
+  vorratFrage,
+  vorratTitel,
+} from '@/lib/produkte-hof'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { cn } from '@/lib/utils'
 import type { ProductData } from '@/server/queries/products'
@@ -28,8 +36,10 @@ import type { ProductData } from '@/server/queries/products'
  * Griff, oben Titel und genau ein „Abbrechen", „Speichern" orange über die
  * volle Breite; ab 768 px DialogMitte (≤ 560 px) mit „Abbrechen" oben und
  * „Speichern" am Ende. Inhalt nach dem Board: Frage in der Einheit des Vorrats,
- * Stepper, der Satz zu 0. Das Feld nimmt `inputMode="numeric"` — der Vorrat
- * ist eine ganze Zahl.
+ * Stepper, der Satz zu 0. Dazu „Dazu +5 +10 +25 +50" und „Ausverkauft", die
+ * das Board nicht zeigt: Register N25 nennt beide wörtlich, und bei Widerspruch
+ * gilt das Register (Entscheidung im Nachtlauf 30, Nr. 223, Runde 1). Das Feld
+ * nimmt `inputMode="numeric"` — der Vorrat ist eine ganze Zahl.
  */
 export function VorratBlatt({
   produkt,
@@ -63,8 +73,8 @@ export function VorratBlatt({
   // Die Einheit neben der großen Zahl: der Text ohne die Zahl davor („Pakete", „Paket", „kg").
   const einheit = vorratText(anzeige).slice(formatZahl(anzeige).length + 1)
 
-  async function speichern(): Promise<void> {
-    const ausgang = await senden(anzeige)
+  async function speichern(ziel: number): Promise<void> {
+    const ausgang = await senden(ziel)
     // Abgewiesen (inzwischen bestellt) oder Fehler: Das Blatt bleibt offen, der Satz steht darin.
     if (ausgang.art === 'ok' || ausgang.art === 'unveraendert') onSchliessen()
     // Der gedrückte Knopf war während der Anfrage gesperrt und hat den Fokus an body verloren:
@@ -109,6 +119,23 @@ export function VorratBlatt({
         {/* Hat inzwischen jemand bestellt, zeigt das Feld den Stand des Servers — „vorher" sagt, wovon es ausgeht. */}
         {bestaetigt !== produkt.stock && <p className="text-[12.5px] text-muted-foreground">vorher {vorratText(bestaetigt)}</p>}
       </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-[12.5px] text-muted-foreground">{VORRAT_DAZU_TITEL}</p>
+        <div className="grid grid-cols-4 gap-2">
+          {VORRAT_DAZU.map((n) => (
+            <button
+              key={n}
+              type="button"
+              disabled={laeuft}
+              // Nur das Feld; gespeichert wird erst mit „Speichern".
+              onClick={() => setAnzeige(Math.min(anzeige + n, max))}
+              className={cn('h-11 rounded-xl border border-input text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50', FOKUS_RAHMEN)}
+            >
+              {`+${n}`}
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="text-[13.5px] leading-normal text-muted-foreground">{VORRAT_NULL_SATZ}</p>
       {/* Ständig vorhanden, damit der Screenreader die Meldung ansagt, sobald sie kommt. */}
       <p aria-live="polite" className={cn('text-sm leading-snug font-semibold text-status-offen', !fehler && 'sr-only')}>
@@ -119,8 +146,14 @@ export function VorratBlatt({
 
   // Hauptknopf im Hofbereich orange (N42 a) — der Grundbaustein in seiner Standardfarbe.
   const speichernKnopf = (klassen: string) => (
-    <Button type="button" disabled={laeuft} aria-busy={laeuft || undefined} onClick={() => void speichern()} className={klassen}>
+    <Button type="button" disabled={laeuft} aria-busy={laeuft || undefined} onClick={() => void speichern(anzeige)} className={klassen}>
       {laeuft ? 'Speichert …' : 'Speichern'}
+    </Button>
+  )
+  // „Ausverkauft" als Umriss neben bzw. über der Hauptaktion: speichert sofort 0.
+  const ausverkauftKnopf = (klassen: string) => (
+    <Button type="button" variant="outline" disabled={laeuft} onClick={() => void speichern(0)} className={klassen}>
+      {VORRAT_AUSVERKAUFT_KNOPF}
     </Button>
   )
 
@@ -129,7 +162,10 @@ export function VorratBlatt({
       <Dialog open={offen} onOpenChange={wechsel} onOpenChangeComplete={fertig}>
         <DialogMitte titel={vorratTitel(produkt.name)} schliessen="Abbrechen" initialFocus={frage} finalFocus={() => fokusZiel() ?? true} className="gap-4">
           {inhalt}
-          <div className="flex justify-end">{speichernKnopf('h-11 min-w-[120px] rounded-full px-5 text-[15px] font-semibold')}</div>
+          <div className="flex justify-end gap-2">
+            {ausverkauftKnopf('h-11 rounded-full px-5 text-[15px] font-semibold')}
+            {speichernKnopf('h-11 min-w-[120px] rounded-full px-5 text-[15px] font-semibold')}
+          </div>
         </DialogMitte>
       </Dialog>
     )
@@ -140,7 +176,10 @@ export function VorratBlatt({
       <SheetBlatt initialFocus={frage} finalFocus={() => fokusZiel() ?? true} className="gap-4">
         <SheetKopf titel={vorratTitel(produkt.name)} schliessen="Abbrechen" className="break-words" />
         {inhalt}
-        {speichernKnopf('h-12 w-full rounded-[14px] text-[15px] font-semibold')}
+        <div className="flex flex-col gap-2">
+          {ausverkauftKnopf('h-12 w-full rounded-[14px] text-[15px] font-semibold')}
+          {speichernKnopf('h-12 w-full rounded-[14px] text-[15px] font-semibold')}
+        </div>
       </SheetBlatt>
     </Sheet>
   )

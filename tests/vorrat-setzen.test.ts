@@ -8,11 +8,12 @@
  *    der Stand des Servers; bei einem Fehler bleibt der Stand; gleicher Wert →
  *    keine Anfrage.
  *  - Das Vorrat-Blatt (seit Lauf 30, Boards s1/w1-produkte Bild 2, auch aus der
- *    Tabelle; das Feld `VorratFeld` der Tabelle gibt es nicht mehr): der Stepper
- *    ändert nur das Feld; „Speichern" ruft setzeVorrat mit `vorher` und dem neuen
- *    Wert; GEAENDERT lässt das Blatt offen; 0 speichert „Ausverkauft"; mit
- *    `wiederDa` kommt der Moment erst nach dem Schließen; solange gespeichert
- *    wird, schließt nichts; am Handy das Blatt, ab 768 px DialogMitte, beide mit
+ *    Tabelle; das Feld `VorratFeld` der Tabelle gibt es nicht mehr): Stepper und
+ *    „Dazu" (Register N25) ändern nur das Feld; „Speichern" ruft setzeVorrat mit
+ *    `vorher` und dem neuen Wert; „Ausverkauft" (N25) setzt sofort 0; GEAENDERT
+ *    lässt das Blatt offen; mit `wiederDa` kommt der Moment erst nach dem
+ *    Schließen; solange gespeichert wird, schließt „Abbrechen" nicht und alle
+ *    Knöpfe sind gesperrt; am Handy das Blatt, ab 768 px DialogMitte, beide mit
  *    genau einem „Abbrechen" oben.
  *
  * Ohne DOM (TESTING_GUIDELINES §1) spielt ein kleiner Prüfstand die Hooks von
@@ -138,7 +139,7 @@ import { VorratBlatt } from '@/components/produkte/vorrat-blatt'
 import { Stepper } from '@/components/ui/stepper'
 import { Sheet, SheetKopf } from '@/components/ui/sheet'
 import { Dialog, DialogMitte } from '@/components/ui/dialog'
-import { VORRAT_NULL_SATZ, vorratFrage, vorratTitel } from '@/lib/produkte-hof'
+import { VORRAT_DAZU, VORRAT_NULL_SATZ, vorratFrage, vorratTitel } from '@/lib/produkte-hof'
 import type { ProductData } from '@/server/queries/products'
 
 /** Eine Antwort, die der Test selbst auslöst — so liegt eine zweite Änderung sicher mitten in der Anfrage. */
@@ -358,12 +359,47 @@ describe('Vorrat-Blatt', () => {
     expect(router.refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('„Speichern" ist der orange Hauptknopf (N42 a), nicht grün; kein „Ausverkauft"-Knopf mehr', () => {
+  it('„Dazu +5 +10 +25 +50" ändert nur das Feld (N25); gespeichert wird erst mit „Speichern"', async () => {
+    setzeVorrat.mockResolvedValueOnce({ ok: true, vorrat: 18, wiederDa: false })
+    const { onSchliessen } = oeffne()
+    expect(VORRAT_DAZU).toEqual([5, 10, 25, 50])
+    for (const n of VORRAT_DAZU) expect(() => knopf(`+${n}`)).not.toThrow()
+
+    drueck('+5')
+    await pruefstand.zuRuhe()
+    drueck('+10')
+    await pruefstand.zuRuhe()
+    expect(element(Stepper).wert).toBe(18)
+    expect(setzeVorrat).not.toHaveBeenCalled()
+
+    drueck('Speichern')
+    await pruefstand.zuRuhe()
+    expect(setzeVorrat).toHaveBeenCalledExactlyOnceWith({ productId: 'p1', vorher: 3, neu: 18 })
+    expect(onSchliessen).toHaveBeenCalledTimes(1)
+  })
+
+  it('„Speichern" ist der orange Hauptknopf (N42 a), nicht grün; „Ausverkauft" als Umriss (N25)', () => {
     oeffne()
     const speichern = knopf('Speichern')
     expect(speichern.variant).toBeUndefined()
     expect(String(speichern.className)).not.toContain('bg-accent')
-    expect(() => knopf('Ausverkauft')).toThrow()
+    expect(knopf('Ausverkauft').variant).toBe('outline')
+
+    fenster.breit = true
+    oeffne()
+    expect(knopf('Ausverkauft').variant).toBe('outline')
+    expect(knopf('Speichern').variant).toBeUndefined()
+  })
+
+  it('„Ausverkauft" setzt sofort 0 (N25) — ohne den Stepper anzufassen', async () => {
+    setzeVorrat.mockResolvedValueOnce({ ok: true, vorrat: 0, wiederDa: false })
+    const { onSchliessen } = oeffne({ stock: 12 })
+
+    drueck('Ausverkauft')
+    await pruefstand.zuRuhe()
+
+    expect(setzeVorrat).toHaveBeenCalledExactlyOnceWith({ productId: 'p1', vorher: 12, neu: 0 })
+    expect(onSchliessen).toHaveBeenCalledTimes(1)
   })
 
   it('0 im Feld speichert „Ausverkauft"', async () => {
@@ -394,10 +430,14 @@ describe('Vorrat-Blatt', () => {
     expect(onWiederDa).toHaveBeenCalledExactlyOnceWith(10)
   })
 
-  it('solange gespeichert wird, schließt „Abbrechen" bzw. Escape nicht; danach schon', async () => {
+  it('solange gespeichert wird, schließt „Abbrechen" bzw. Escape nicht, alle Knöpfe sind gesperrt; danach schon', async () => {
     const antwort = offeneAntwort()
     setzeVorrat.mockReturnValueOnce(antwort.promise)
     const { onSchliessen } = oeffne()
+    // „Abbrechen" ist allein das Schließen-Element des Kopfs: Es gibt keinen eigenen Knopf mit
+    // onClick daneben, der an onOpenChange vorbei schließen könnte.
+    expect(element(SheetKopf).schliessen).toBe('Abbrechen')
+    expect(() => knopf('Abbrechen')).toThrow()
 
     tippe(8)
     await pruefstand.zuRuhe()
@@ -405,6 +445,9 @@ describe('Vorrat-Blatt', () => {
     await pruefstand.zuRuhe()
     expect(text(pruefstand.baum())).toContain('Speichert …')
     expect(knopf('Speichert …').disabled).toBe(true)
+    expect(knopf('Ausverkauft').disabled).toBe(true)
+    for (const n of VORRAT_DAZU) expect(knopf(`+${n}`).disabled).toBe(true)
+    // „Abbrechen", Escape und Tipp daneben laufen alle über onOpenChange(false) — wirkungslos.
     ;(element(Sheet).onOpenChange as (offen: boolean) => void)(false)
     expect(onSchliessen).not.toHaveBeenCalled()
 

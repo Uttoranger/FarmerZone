@@ -177,10 +177,11 @@ export function Feld({
  * Der orange Rand jedes Felds mit Fehler im Formular (V17; Board s1/w1-produkt-neu, Bild 5): 2 px
  * `status-offen` über `aria-invalid` — für alle Felder darunter, auch DezimalFeld und Textarea, deren
  * Grundbausteine sonst rot zeichnen. Wie FELD_FEHLER_RAHMEN (ui/feld-fehler.tsx), nur für einen
- * ganzen Teilbaum; wichtig (`!`), weil die Grundbausteine dieselbe Spezifität tragen.
+ * ganzen Teilbaum; wichtig (`!`), weil die Grundbausteine dieselbe Spezifität tragen. Den Fokusring
+ * nimmt `ring-0!` nur ohne Fokus: Mit der Tastatur darauf zeigt das Feld ihn wieder (WCAG 2.4.7).
  */
 export const FELD_FEHLER_IM_FORMULAR =
-  '[&_[aria-invalid=true]]:border-2! [&_[aria-invalid=true]]:border-status-offen! [&_[aria-invalid=true]]:ring-0!'
+  '[&_[aria-invalid=true]]:border-2! [&_[aria-invalid=true]]:border-status-offen! [&_[aria-invalid=true]]:ring-0! [&_[aria-invalid=true]:focus-visible]:ring-2! [&_[aria-invalid=true]:focus-visible]:ring-ring!'
 
 /**
  * Die eine orange Karte über den Feldern (V17; Board s1/w1-produkt-neu, Bild 5 und 6): ein

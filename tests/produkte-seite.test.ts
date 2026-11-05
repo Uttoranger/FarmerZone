@@ -590,6 +590,10 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     for (const marke of ['Im Shop', 'Nur noch 3 kg', 'Ausverkauft', 'Nicht im Shop']) expect(html).toContain(`>${marke}<`)
     expect(html).not.toMatch(/Entw(?:u|ü)rf/)
     expect(html).toContain('aria-label="Vorrat Karotten: 3 kg. Ändern"')
+    // Auch bei 0 der neutrale Feldrand (Boards s1/w1-produkte, V19: „Ausverkauft" neutral) — kein Orange.
+    const knopfBeiNull = html.match(/<button[^>]*data-vorrat-knopf="p3"[^>]*>/)?.[0] ?? ''
+    expect(knopfBeiNull).toContain('border-input')
+    expect(knopfBeiNull).not.toContain('status-offen')
     expect(html).toContain('role="switch"')
     expect(html).toContain('aria-label="Freilandeier sichtbar"')
     // Die Sätze unter Tabelle und Zeilen sind entfallen; der Satz zu 0 steht im Blatt (VORRAT_NULL_SATZ).
@@ -709,9 +713,9 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(leererFilter).toContain(PRODUKTE_KEIN_TREFFER.filterKnopf)
   })
 
-  it('hofpreisTeile rechnet über endpreisEuro (je Stück aufgerundet) — „ab" für mehrere Größen, bisher null', () => {
+  it('hofpreisTeile rechnet über endpreisEuro (je Stück aufgerundet) — bisher null', () => {
     expect(hofpreisTeile(7.5, { hundertstel: 600 })).toEqual({ bekommst: 'Du bekommst € 7,50', zahlt: 'die Kundin zahlt € 7,95' })
-    expect(hofpreisTeile(12, { hundertstel: 600 }, true)).toEqual({ bekommst: 'Du bekommst ab € 12,00', zahlt: 'die Kundin zahlt ab € 12,72' })
+    expect(hofpreisTeile(12, { hundertstel: 600 })).toEqual({ bekommst: 'Du bekommst € 12,00', zahlt: 'die Kundin zahlt € 12,72' })
     expect(hofpreisZeile(95, { hundertstel: 600 })).toBe('Du bekommst € 95,00 · die Kundin zahlt € 100,70')
     expect(hofpreisTeile(7.5, null)).toBeNull()
   })

@@ -58,15 +58,13 @@ export function produktStatus(p: { isAvailable: boolean; stock: number; unit: st
  * (`anzeige` gesetzt, preisAnzeigeFuer). Gerechnet wird nichts Neues: Der
  * Endpreis kommt aus `endpreisEuro` (je Stück aufgerundet, wie /api/checkout).
  * Im Modell „bisher" null — dann zahlt die Kundin die Servicegebühr erst in der
- * Kasse dazu, und die Zeile zeigt den Preis wie bisher. `ab` für den kleinsten
- * Preis mehrerer Größen.
+ * Kasse dazu, und die Zeile zeigt den Preis wie bisher.
  */
-export function hofpreisTeile(preis: number, anzeige: PreisAnzeige, ab = false): { bekommst: string; zahlt: string } | null {
+export function hofpreisTeile(preis: number, anzeige: PreisAnzeige): { bekommst: string; zahlt: string } | null {
   if (!anzeige || !Number.isFinite(preis) || preis < 0) return null
-  const vor = ab ? 'ab ' : ''
   return {
-    bekommst: `Du bekommst ${vor}${formatEuro(preis)}`,
-    zahlt: `die Kundin zahlt ${vor}${formatEuro(endpreisEuro(preis, anzeige))}`,
+    bekommst: `Du bekommst ${formatEuro(preis)}`,
+    zahlt: `die Kundin zahlt ${formatEuro(endpreisEuro(preis, anzeige))}`,
   }
 }
 
@@ -343,6 +341,15 @@ export function gespeichertTexte(name: string, fenster: NaechstesFenster | null)
 
 /** Der Satz im Blatt bzw. Dialog unter dem Stepper — ersetzt die Sätze unter Tabelle und Zeilen. */
 export const VORRAT_NULL_SATZ = 'Bei 0 steht „Ausverkauft“, das Produkt bleibt sichtbar.'
+
+/**
+ * „Dazu +5 +10 +25 +50" und „Ausverkauft" im Blatt bzw. Dialog (Register N25 nennt beide wörtlich;
+ * die Boards s1/w1-produkte zeigen sie nicht — bei Widerspruch gilt das Register). „Dazu" setzt nur
+ * das Feld, gespeichert wird erst mit „Speichern"; „Ausverkauft" speichert sofort 0.
+ */
+export const VORRAT_DAZU = [5, 10, 25, 50] as const
+export const VORRAT_DAZU_TITEL = 'Dazu'
+export const VORRAT_AUSVERKAUFT_KNOPF = 'Ausverkauft'
 
 /** Der Titel: „Vorrat: Freilandeier". */
 export function vorratTitel(name: string): string {
