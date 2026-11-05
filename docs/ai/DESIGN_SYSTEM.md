@@ -612,6 +612,18 @@ Boards s1-/w1-mehr-neu, s3-/w3-admin-shell, Köpfe und Unterleisten der s1–s3-
 - **Zustände:** Laden je Route in der Form der Seite (`EinstellungenLaden`, `EinstellungenUnterseiteLaden`, `KonditionenLaden`); Ladefehler von Übersicht und Konditionen als orange Hinweiskarte „Wir konnten deine Einstellungen gerade nicht laden." mit „Noch einmal versuchen" (`EinstellungenFehler`). Leer gibt es in der Übersicht nicht (die neun Bereiche stehen immer da, ihr Stand sagt, was fehlt).
 - **Teilen-Hinweise** (`/settings/teilen`, seit Nr. 30; kein eigenes Mockup — steht in der Übersicht an der Stelle von „Benachrichtigungen", grauer Punkt, Zeile „An · …"/„Aus · …"): Kopf `UnterseitenKopf`, dann EINE Karte, die ganz der Schalter ist (`role="switch"`, fester Name „Teilen-Hinweise zeigen", Zustand in `aria-checked`, der Satz darunter nur `aria-describedby`; 44 px, Schiene `bg-accent`/`bg-border` wie „Sichtbar" in der Produkttabelle, `FOKUS_RAHMEN`). Darunter die Karte „Wann wir fragen" mit den drei Anlässen. Speichern sofort, Toast; scheitert es, springt der Schalter zurück.
 
+### Mein Hof, Einstellungen, Region nach den Boards November 2026 (Nr. 224, Lauf 30)
+
+Boards s1-/w1-mein-hof, -einstellungen, -region, s2-/w2-hofdaten-zahlung, -konto-hof, t-f-konditionen (nur Gebautes). Was hier steht, geht den älteren Sätzen der Abschnitte „Mein Hof“, „Einstellungen“ und „Region“ vor.
+
+- **Übersicht:** zwei Gruppen „Dein Hof“ und „Konto“ (Konditionen und Tarif, Konto und Sicherheit) aus `einstellungenGruppen`, je eine Karte mit Linien zwischen den Zeilen, ab 1024 px nebeneinander; Zeile mindestens 56 px, der Punkt (12 px) VOR dem Titel, seine Bedeutung als `sr-only` (`TON_TEXT`). Der Bereich der Pause heißt überall „Urlaub und Pause“ (`URLAUB_UND_PAUSE`: Zeile, Titel von /settings/pause, Verweis beim Stilllegen); die Aktion in Mein Hof bleibt „Pausieren“.
+- **Hofdaten** (N42 c): Seite, Knopf und Toast aus `HOFDATEN_TEXT` („Hofdaten“, „Hofdaten speichern“, „Hofdaten gespeichert“ — `useNachSpeichern` nimmt dafür den dritten Parameter `titel`).
+- **Konto und Sicherheit:** Karte „Anmelde-Adresse“, „Passwort ändern“; beim Stilllegen „Deinen Hof dauerhaft schließen.“ und „Nur den Hof schließen …“ — nie „Hofladen“ (N42 d, `KONTO_TEXT`).
+- **Zahlung, „Bar bei Abholung“:** Marke und Satz aus `barKarte(lage, gruendungBis, jetzt)` — keine neue Regel: Sagt `barMoeglich` nein, heißt die Marke „Braucht Lastschrift“ (orange) mit dem Umriss-Knopf „Lastschrift einrichten“ auf `/settings/konditionen#barzahlung` (dort richtet Stripe sie ein); ein Gründungshof mit erlassener Bargebühr liest „Bis <Tag> zahlst du als Gründungshof …“; sonst „Aktiv“. Scheitert das Lesen der Lage, steht die Karte ohne Marke da.
+- **Deine Konditionen je Modell (V62):** Die Seite bekommt `preis` (`preisAnzeigeFuer`, frisch gelesen wie „Barzahlung“) und `stichtag`; Kopf `vollerWarenpreis(modell)`, Abrechnung `monatsabrechnungTeile(modell)`, Fuß `konditionenStand(modell, stichtag)`. Das Rechenbeispiel rechnet im Hofpreis-Modell über `bestellGebuehr` mit dem Satz des Hofs (Zeile „Plattformgebühr (im Preis)“), sonst wie bisher. Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag“: `tests/hof-einstellungen-lauf30.test.ts`.
+- **Mein Hof ab lg:** Der Stand über der Liste heißt wie unter lg „Noch n Punkte offen“ bzw. „Hofseite vollständig“ mit „x von y“ statt Prozent (`punkteOffenTitel`, `HOFSEITE_VOLLSTAENDIG` in `lib/mein-hof.ts`).
+- **Region:** gebauter Stand, Karte technisch unverändert.
+
 ### Problem melden (/fehler-melden, /meldungen, seit Nr. 22e)
 
 - **In der HofShell** (Routengruppe `(hof)`), nur für Höfe; `/problem-melden` (Kundinnen) steht seit Nr. 54 in der KundeShell (unten). Der Punkt „Problem melden" führt nach `/meldungen` und leuchtet auf beiden Seiten.
