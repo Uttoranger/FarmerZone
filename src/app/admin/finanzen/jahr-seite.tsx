@@ -17,7 +17,7 @@ import { FINANZEN_REITER_OHNE_INHALT, FINANZEN_SEITE, finanzenAdresse, finanzenR
 import { finanzenJahrAus } from '@/schemas/admin-reiter'
 import { hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
-import { jahrGebuehrTexte } from '../geld/texte'
+import { GELD_TEXT, jahrGebuehrTexte } from '../geld/texte'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
@@ -62,7 +62,8 @@ export async function ladeJahrSeite({
   if (!daten) {
     return (
       <div className={ADMIN_RAHMEN}>
-        <AdminFehler titel="Geld" satz="Wir konnten die Zahlen gerade nicht laden." nochmal="/admin/geld?zeitraum=jahr" />
+        {/* Derselbe Fehler wie im Monat (Board w3-admin-geld Bild 6) — eine Quelle in geld/texte.ts. */}
+        <AdminFehler titel={GELD_TEXT.titel} satz={GELD_TEXT.fehler} nochmal="/admin/geld?zeitraum=jahr" />
       </div>
     )
   }
