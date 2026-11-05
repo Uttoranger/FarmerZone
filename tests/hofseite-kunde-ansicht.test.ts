@@ -783,10 +783,10 @@ describe('Nr. 235, UI-Runde 2 — Abweichungen aus der Bewertung r1', () => {
     expect(offen).toMatch(/<a[^>]*class="[^"]*underline decoration-\[1\.5px\][^"]*"[^>]*>Alle ansehen<svg[^>]*lucide-arrow-right/)
   })
 
-  it('das Hof-Zeichen ist ein abgerundetes Quadrat (Board), kein Kreis', () => {
+  it('das Hof-Zeichen ist rund (Freigabe Nr. 98, Register vor Board), kein abgerundetes Quadrat', () => {
     const zeichen = tagMit(seite(), 'size-14 shrink-0 items-center justify-center overflow-hidden')
-    expect(zeichen).toContain('rounded-[14px]')
-    expect(zeichen).not.toContain('rounded-full')
+    expect(zeichen).toContain('rounded-full')
+    expect(zeichen).not.toContain('rounded-[14px]')
   })
 
   it('Abholzeiten ohne Komma nach dem Wochentag („Mittwoch 15–18 Uhr") — nur die Darstellung', () => {

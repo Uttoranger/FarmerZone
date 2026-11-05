@@ -10,7 +10,7 @@
  *  - Hofzeile: „Musterdorf · Bestellen geht gerade nicht“ statt „nimmt Bestellungen an“;
  *  - „Bestellen“/„Jetzt bestellen“ fehlt, „Anfahrt“ bleibt;
  *  - die Produktkarten ruhen („In den Korb“ fehlt), die Produkte bleiben sichtbar;
- *  - eine Sperre des Hofs geht vor („Pausiert“ bleibt „Pausiert“).
+ *  - eine Sperre des Hofs geht vor („pausiert gerade“ bleibt es), auch ohne Ort („Pausiert gerade“).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'

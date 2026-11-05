@@ -28,6 +28,8 @@ const SPY_STREIFEN = '-30% 0px -60% 0px'
 const SPRUNG_SPERRE_MS = 1000
 
 /** Wie viele der drei Spalten ein Abschnitt ab 768 px nimmt — als ganze Klassen, Tailwind liest keine zusammengesetzten. */
+/** Produkte je Abschnitt → Spaltenzahl (0 Produkte zählt wie 1, mehr als 3 wie 3). */
+const SPALTEN_ZAHL: Readonly<Record<number, 1 | 2 | 3>> = { 0: 1, 1: 1, 2: 2, 3: 3 }
 const ABSCHNITT_SPALTEN = { 1: 'md:col-span-1', 2: 'md:col-span-2', 3: 'md:col-span-3' } as const
 /** Die Kacheln darin: so viele Spalten wie der Abschnitt breit ist, jede Kachel so breit wie in jedem anderen Abschnitt. */
 const LISTE_SPALTEN = { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' } as const
@@ -212,7 +214,7 @@ export function ProduktAbschnitte<P extends { id: string }>({
           „Brennmaterial · 1 Produkt", Board w1-hofseite Bild 3) statt je eine Zeile mit leerer Fläche daneben. */}
       <div className="flex flex-col gap-3 md:grid md:grid-cols-3 md:gap-x-3">
         {abschnitte.map((a) => {
-          const spalten = Math.max(1, Math.min(a.produkte.length, 3)) as 1 | 2 | 3
+          const spalten = SPALTEN_ZAHL[Math.min(a.produkte.length, 3)] ?? 1
           return (
             <section
               key={a.anker}

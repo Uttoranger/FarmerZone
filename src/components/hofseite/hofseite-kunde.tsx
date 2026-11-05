@@ -118,9 +118,12 @@ const KOPF_KNOPF = cn(
 function hofzeileKlein(ort: string, sperre: KaufSperre, bestellstopp: boolean): string {
   const zeile = hofZeileUnterzeile(ort, sperre, bestellstopp)
   const trenner = zeile.indexOf(' · ')
+  // Die Pause geht der Notbremse vor (hofZeileZustand) — dann das Wort der Pause-Karte, auch ohne Ort
+  // (dann steht es am Anfang und beginnt groß).
+  if (sperre === 'pause') {
+    return trenner < 0 ? `${PAUSIERT_GERADE.charAt(0).toLocaleUpperCase('de')}${PAUSIERT_GERADE.slice(1)}` : `${zeile.slice(0, trenner + 3)}${PAUSIERT_GERADE}`
+  }
   if (trenner < 0) return zeile
-  // Die Pause geht der Notbremse vor (hofZeileZustand) — dann das Wort der Pause-Karte.
-  if (sperre === 'pause') return `${zeile.slice(0, trenner + 3)}${PAUSIERT_GERADE}`
   const zustand = zeile.slice(trenner + 3)
   // Klein weiter nur, wo der Zustand mit Verb oder Adverb beginnt („nimmt …", „noch nicht …", „gerade …"); „Bestellen
   // geht gerade nicht" (Notbremse) und „Bestellen ist … nicht möglich" (gesperrt) beginnen mit einem Hauptwort.
@@ -479,9 +482,9 @@ export function HofseiteKunde({
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
               <div className="flex min-w-0 flex-col gap-1">
                 <div className="flex min-w-0 items-center gap-3">
-                  {/* Das Hof-Zeichen als abgerundetes Quadrat (Board w1-/s1-hofseite; Radius 14 bei 56 px) — mit Logo
-                      und ohne (dann die Initialen auf der grünen Tönung). Der Ausschnitt des Logos (N17) gilt unverändert. */}
-                  <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border-[3px] border-card bg-zustand-laeuft-grund font-heading text-[18px] font-semibold text-zustand-laeuft">
+                  {/* Das Hof-Zeichen ist rund (Freigabe §19 Nr. 98: „Register vor Board“ — das Board zeigt ein abgerundetes
+                      Quadrat) — mit Logo und ohne (dann die Initialen auf der grünen Tönung). Der Ausschnitt des Logos (N17) gilt unverändert. */}
+                  <span className="relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-card bg-zustand-laeuft-grund font-heading text-[18px] font-semibold text-zustand-laeuft">
                     {farm.logoUrl ? (
                       // Das Logo bekommt keinen Filter (Register N17).
                       <Image src={farm.logoUrl} alt={`${farm.name} – Logo`} fill sizes="56px" className="object-cover" style={bildStil(farm.logoAusschnitt, { filter: false })} />
