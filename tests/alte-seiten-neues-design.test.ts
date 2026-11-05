@@ -52,9 +52,16 @@ describe('Shell je Seite (Nr. 54)', () => {
   const KUNDE_SHELL = /<KundeShellMitSitzung>/
   const FOKUS_SHELL = /<KundeFokusShell\b/
 
-  it.each([
+  it('die Bestellseite steht in der KundeShell ohne Unterleiste, am Handy mit der Titelzeile (Board s1-bestellung-link, Lauf 31)', () => {
+    const text = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
     // Gültiger Link und ruhige Seite bei falscher Signatur — beide in derselben Shell.
-    ['src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx', 2],
+    expect(anzahl(text, /<KundeShellMitSitzung unterleiste=\{false\} handyTitel=\{HANDY_TITEL\}/)).toBe(2)
+    // Gegenprobe: keine Shell mit Unterleiste und kein alter Kopf.
+    expect(anzahl(text, KUNDE_SHELL)).toBe(0)
+    expect(text).not.toMatch(/<KundenKopf\b/)
+  })
+
+  it.each([
     ['src/app/(public)/impressum/page.tsx', 1],
     ['src/app/(public)/konditionen/page.tsx', 1],
     ['src/app/(public)/agb/page.tsx', 1],

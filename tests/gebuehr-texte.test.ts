@@ -49,7 +49,7 @@ import {
   vollerWarenpreis,
 } from '@/lib/konditionen'
 import { GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS, SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
-import { mindestbestellwertGrund } from '@/lib/kasse'
+import { mindestbestellwertGrund, mindestbestellwertKarte } from '@/lib/kasse'
 import { HOFPREIS_STICHTAG_TEXT, hofpreisStichtagSatz } from '@/lib/plattform-einstellung'
 import { ADMIN_BESTELLUNG_TEXT } from '@/lib/admin-bestellung'
 import { FINANZEN_CSV, FINANZEN_JAHR_TEXT, csvMonateKopf, einnahmenLabels, gebuehrWortFuerJahr, gebuehrWortFuerMonat, kostendeckungSatz } from '@/lib/finanzen'
@@ -135,6 +135,18 @@ describe('mindestbestellwertHinweis (A3) — ohne Gebühr beim Fehlbetrag', () =
     expect(mindestbestellwertGrund(hof, 1000, 600)).toBeNull()
     expect(mindestbestellwertGrund({ ...hof, preisAnzeige: null }, 680, 600)).toBeNull()
     expect(MINDESTBESTELLWERT_SATZ).toBe('Mindestbestellwert 10 € bei diesem Hof')
+  })
+
+  it('mindestbestellwertKarte (Board s1-/w1-kasse Bild 5, Lauf 31): Titel der Satz des Hofs, darunter der Fehlbetrag und die Bitte; dieselbe Bedingung wie der Grund', () => {
+    const hof = { serviceFeePercent: 5, serviceFeeMinCents: 50, serviceFeeActiveFrom: null, preisAnzeige: { hundertstel: 600 } }
+    const karte = mindestbestellwertKarte(hof, 680, 600)
+    expect(lang(karte?.titel ?? '')).toBe('Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60).')
+    expect(lang(karte?.satz ?? '')).toBe('Dir fehlen noch Waren für € 3,20. Leg noch etwas dazu.')
+    // Grenzen: ab 10 € Warenwert, ohne Hofpreis-Modell oder ohne Satz keine Karte — Gegenprobe knapp darunter.
+    expect(mindestbestellwertKarte(hof, 1000, 600)).toBeNull()
+    expect(mindestbestellwertKarte(hof, 999, 600)?.satz).toContain('€ 0,01')
+    expect(mindestbestellwertKarte({ ...hof, preisAnzeige: null }, 680, 600)).toBeNull()
+    expect(mindestbestellwertKarte(hof, 680)).toBeNull()
   })
 })
 

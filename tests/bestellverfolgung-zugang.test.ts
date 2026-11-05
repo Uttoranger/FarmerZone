@@ -243,7 +243,8 @@ describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', 
     const html = await seite('order-1', bestellSignatur('order-1'))
     expect(html).toContain('HM-2611-A4F2')
     expect(html).toContain('Abholbereit')
-    expect(html).toContain('Dein Paket wartet')
+    // Seit Lauf 31 (Board s1-/w1-bestellung-link) ohne den Satz unter der Nummer: Stand und Termin tragen Schild und Abholkarte.
+    expect(html).not.toContain('Dein Paket wartet')
     expect(html).toContain('Bergkäse')
     // Seit Nr. 227 (Board s1-/w1-bestellung-link): „In den Kalender“ in der Abholkarte.
     expect(html).toContain('In den Kalender')
@@ -378,11 +379,12 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     const text = await seite('order-1', bestellSignatur('order-1'))
     expect(text).toContain('€ 12,34')
     expect(text).toContain('€ 3,21')
-    // Betrag direkt hinter seiner Bezeichnung: die Gebühr und die Summe mit Zahlart und Stand.
-    expect(text).toContain(`${SERVICEGEBUEHR_BEZEICHNUNG}€ 0,49`)
-    // Seit Nr. 227 (Board): „Gesamt“ mit der Summe, Zahlart und Stand in der Zeile darunter.
-    expect(text).toContain('Gesamt€ 16,04')
-    expect(text).toContain('Online · Bezahlt')
+    // Betrag direkt hinter seiner Bezeichnung (seit Lauf 31 „· € …“ wie im Board): die Gebühr und die Summe.
+    expect(text).toContain(`${SERVICEGEBUEHR_BEZEICHNUNG} · € 0,49`)
+    // Seit Nr. 236 UI-Runde 3 (Board s1-/w1-bestellung-link Bild 1): die Summe in der Zahlzeile, kein eigenes „Gesamt“ —
+    // derselbe Betrag wie vorher.
+    expect(text).toContain(`Online · Bezahlt · € 16,04 inkl. ${SERVICEGEBUEHR_BEZEICHNUNG}`)
+    expect(text).not.toContain('Gesamt')
     // Keine zweite, abweichende Summe (früher „Zwischensumme" und „Gesamt").
     expect(text).not.toContain('Zwischensumme')
     expect(text.match(/€ \d+,\d{2}/g)).toEqual(['€ 12,34', '€ 3,21', '€ 0,49', '€ 16,04'])
@@ -399,7 +401,7 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     expect(text).toContain('€ 12,34')
     expect(text).toContain('€ 3,21')
     // 1500 + 49 Cent — nicht 1555 + 49 aus den Zeilen.
-    expect(text).toContain('Gesamt€ 15,49')
+    expect(text).toContain('· € 15,49 inkl.')
     expect(text).not.toContain('€ 16,04')
   })
 
@@ -416,7 +418,7 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     expect(text).toContain('fehlt leider')
     expect(text).toContain('nicht berechnet')
     expect(text).not.toContain('€ 3,21')
-    expect(text).toContain('Gesamt€ 12,83')
+    expect(text).toContain('· € 12,83 inkl.')
   })
 })
 

@@ -3,9 +3,9 @@ import Link from 'next/link'
 import type { UseFormRegisterReturn } from 'react-hook-form'
 import { AlertCircle, Info, TimerReset } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatEuro, formatPosition } from '@/lib/format'
+import { formatEuro, positionMengeVorn } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
-import { PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ, PREISE_INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
 import { mitEndpreis, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import type { RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
 import { RuecktrittHinweis } from '@/components/shared/ruecktritt-hinweis'
@@ -21,6 +21,7 @@ import {
   type ReservierungsStand,
 } from '@/lib/kasse'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { TREFFER_44 } from '@/components/ui/button'
 import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 
@@ -36,8 +37,11 @@ import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
  * (data-design="neu") steht — nur Tokens, in beiden Themes.
  */
 
-/** Karte: Radius 16 px, Fläche --surface mit Rahmen --border. */
-export const KARTE = 'rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]'
+/**
+ * Karte: Radius 16 px, Fläche --surface mit Rahmen --border. Fest in Pixeln: Im neuen Design ist `--radius` 16 px,
+ * `rounded-2xl` wären dort 29 px — fast eine Pille (Bewertung Lauf 31, Boards s1-/w1-kasse: 16 px).
+ */
+export const KARTE = 'rounded-[16px] border border-border bg-card px-4 py-4 md:px-[18px]'
 
 /**
  * Ein Abschnitt der Kasse ohne Karte (Boards s1-/w1-kasse, Nr. 227): „Abholung wählen“, „Deine Daten“ und
@@ -62,7 +66,7 @@ export const FELD_LABEL = 'mb-1.5 block text-[15px] font-semibold text-foregroun
  * die Abschnitte stehen seit Nr. 227 ohne Karte auf dem Grund. 16 px am Handy (kein Zoom).
  */
 export const FELD = cn(
-  'h-12 w-full min-w-0 rounded-xl border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-2 aria-[invalid=true]:border-status-offen md:text-[15px]',
+  'h-12 w-full min-w-0 rounded-[12px] border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-2 aria-[invalid=true]:border-status-offen md:text-[15px]',
   FOKUS_RAHMEN
 )
 
@@ -74,6 +78,12 @@ export const KNOPF_GRUEN = cn(
   'inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-[14px] bg-accent px-[18px] text-base font-bold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
   FOKUS_RAHMEN
 )
+
+/**
+ * Der Hauptknopf im Browser (Board w1-kasse): links unter dem Formular, rechts bündig und so breit wie sein Text.
+ * Am Handy bleibt er die volle Breite der festen Leiste.
+ */
+export const KNOPF_GRUEN_IM_BROWSER = 'lg:w-auto lg:self-end lg:px-6'
 
 /** Textknopf bzw. -link in grüner Schrift; Trefferfläche 44 px. */
 export const TEXTLINK = cn(
@@ -102,18 +112,40 @@ export function FeldFehler({ id, children }: { id: string; children: ReactNode }
  * am Korb) — mit `uebersichtZuletzt` (Formular seit Nr. 82, Mockup
  * mobil-k3-kasse-glatt) wie im Quelltext nach Bezahlen. Unten Platz für die
  * feste Leiste am Handy.
+ *
+ * Mit `kopf` (Formular, Lauf 31, Board w1-kasse): ab 768 px die h1 „Bestellen bei <Hof>“ über dem Inhalt, und ab
+ * 1024 px teilt `KassenAbschluss` sich auf — Übersicht und Angaben zum Hof rechts, Zusammenfassung, Gewährleistung
+ * und Kaufknopf links unter „Bezahlen“ (`ABSCHLUSS_RECHTS`, `ABSCHLUSS_LINKS`). Die Reihenfolge im Quelltext bleibt
+ * Übersicht → Angaben → Zusammenfassung → Gewährleistung → Knopf (Nr. 60, 210, 211): Die Hülle der Übersicht ist ab
+ * 1024 px `display: contents`, ihre zwei Gruppen stehen direkt im Raster.
  */
 export function KassenRaster({
   korb,
   uebersicht,
   uebersichtZuletzt = false,
+  kopf,
   children,
 }: {
   korb: ReactNode
   uebersicht: ReactNode
   uebersichtZuletzt?: boolean
+  /** Die h1 der Seite ab 768 px; am Handy steht sie im Kopf der Fokus-Shell. */
+  kopf?: ReactNode
   children: ReactNode
 }): React.JSX.Element {
+  if (kopf !== undefined) {
+    return (
+      // lg:grid-rows-[auto_auto_auto_1fr]: Kopf, Korb, Abschnitte, Abschluss. Die rechte Spalte (Zeile 2 bis 4) ist
+      // meist länger als Korb und Abschnitte; den Überhang nimmt die letzte, flexible Zeile — unter dem Korb klafft
+      // keine Lücke.
+      <div className="mx-auto grid max-w-[1200px] gap-4 px-4 pt-4 pb-44 md:px-6 md:pt-6 md:pb-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_auto_auto_1fr] lg:gap-x-7">
+        <div className="hidden min-w-0 md:block lg:col-start-1 lg:row-start-1">{kopf}</div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2">{korb}</div>
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-start-3">{children}</div>
+        <div className="min-w-0 lg:contents">{uebersicht}</div>
+      </div>
+    )
+  }
   return (
     // Im Quelltext steht die Übersicht mit der Hauptaktion ZULETZT: Die
     // Tastatur kommt erst durch die Angaben, dann zum Knopf. Ohne
@@ -137,6 +169,15 @@ export function KassenRaster({
     </div>
   )
 }
+
+/** Ab 1024 px die rechte Spalte des Formulars: Übersicht und Angaben zum Hof, klebend (KassenRaster mit `kopf`). */
+export const ABSCHLUSS_RECHTS = 'flex min-w-0 flex-col gap-3.5 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-3 lg:row-start-2 lg:self-start'
+
+/**
+ * Ab 1024 px links unter „Bezahlen“ nach einer Linie (Board w1-kasse): Zusammenfassung, Gewährleistung, Knopf und
+ * Sätze — der Knopf rechts bündig. Am Handy die Folge über und in der festen Leiste.
+ */
+export const ABSCHLUSS_LINKS = 'flex min-w-0 flex-col gap-3.5 lg:col-start-1 lg:row-start-4 lg:self-start lg:border-t lg:border-border lg:pt-5'
 
 export type KorbPosition = {
   productId: string
@@ -177,8 +218,13 @@ export function KorbKarte({
         </h2>
         {aendernHref && (
           // Sichtbar nur „Ändern“ (Board w1-kasse); der Name sagt, was geändert wird, und beginnt mit dem sichtbaren Wort nicht —
-          // er enthält es (WCAG 2.5.3, Groß-/Kleinschreibung zählt nicht).
-          <Link href={aendernHref} aria-label="Warenkorb ändern" className={cn(TEXTLINK, 'shrink-0 text-[15px] underline')}>
+          // er enthält es (WCAG 2.5.3, Groß-/Kleinschreibung zählt nicht). Der Fokus liegt eng um das Wort wie im Board
+          // (Radius 3 px), die 44 px Trefferfläche kommt über ::before (TREFFER_44).
+          <Link
+            href={aendernHref}
+            aria-label="Warenkorb ändern"
+            className={cn(TREFFER_44, 'shrink-0 rounded-[3px] text-[15px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)}
+          >
             Ändern
           </Link>
         )}
@@ -188,15 +234,14 @@ export function KorbKarte({
           // Nur Anzeige: Endpreis je Stück und Grundpreis aus dem Endpreis (N38); die Zeilensumme kommt aus kassenBetraege.
           const p = mitEndpreis(roh, anzeige ?? null)
           return (
-          // Eine Zeile je Position wie im Board (Name und Menge in der einen Schreibweise `formatPosition`, der Betrag
-          // rechts), ohne Vorschaubild; darunter leise Grundpreis und der Hinweis zum Rücktritt (Nr. 214) — beide
-          // bleiben vor dem Kaufknopf.
-          <li key={p.productId} className="py-1.5">
-            <p className="flex items-baseline gap-2 text-[15px] leading-snug">
-              <span className="line-clamp-2 min-w-0 flex-1 break-words" title={p.name}>
-                {formatPosition({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize })}
-              </span>
-              <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}</span>
+          // Eine Zeile je Position wie im Board, Menge vorn (`positionMengeVorn`), ohne Vorschaubild; darunter leise
+          // Grundpreis und der Hinweis zum Rücktritt (Nr. 214) — beide bleiben vor dem Kaufknopf.
+          <li key={p.productId} className="py-0.5">
+            {/* Boards s1-/w1-kasse (Lauf 31): der Betrag hinter der Position — „3 × Bergkäse, 250 g · € 19,74“. */}
+            <p className="line-clamp-2 text-[15px] leading-normal break-words" title={p.name}>
+              {positionMengeVorn({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize })}
+              {' · '}
+              <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}</span>
             </p>
             <GrundpreisZeile price={p.price} unit={p.unit} unitSize={p.unitSize} className="text-[12px]" />
             {p.ruecktritt && <RuecktrittHinweis angabe={p.ruecktritt} className="mt-0.5 text-[12px]" />}
@@ -204,7 +249,6 @@ export function KorbKarte({
           )
         })}
       </ul>
-      {anzeige && <p className={cn(HINWEIS, 'mt-1')}>{PREISE_INKL_PLATTFORMGEBUEHR}</p>}
     </section>
   )
 }
@@ -303,11 +347,15 @@ export function UebersichtKarte({
   gebuehrErklaerung = SERVICEGEBUEHR_HINWEIS,
   gebuehrEntfaellt = false,
   hofpreis = false,
+  mitErklaerung = true,
   reservierung,
   fehler,
+  positionen,
   children,
 }: {
   betraege: Pick<KassenBetraege, 'warenCents' | 'gebuehrCents' | 'gesamtCents'>
+  /** Die Positionen als Zeilen über „Ware“ (Board s1-/w1-kasse Bild 5: unter dem Mindestbestellwert steht nur die Übersicht). */
+  positionen?: readonly string[]
   /** Titel der Gebührenzeile — „Servicegebühr (5 %)" (`gebuehrZeile`), im Zahlungsschritt `zahlungsGebuehrText`. */
   gebuehrText: string
   /** Was der (i)-Knopf aufklappt. */
@@ -316,6 +364,11 @@ export function UebersichtKarte({
   gebuehrEntfaellt?: boolean
   /** N38: Hofpreis-Modell — „Ware · Plattformgebühr (6 %) · Gesamt“, der Satz steht offen unter der Summe. */
   hofpreis?: boolean
+  /**
+   * Der (i)-Knopf an der Gebührenzeile (N10). `false` unter dem Mindestbestellwert (Board s1-/w1-kasse Bild 5: dort ohne
+   * Knopf) — das gibt es nur im Hofpreis-Modell, und dort steht der Satz zur Gebühr ohnehin offen unter der Summe.
+   */
+  mitErklaerung?: boolean
   reservierung?: ReactNode
   /** Ein Fehler der Anfrage — inline an der Karte, kein Modal. */
   fehler?: ReactNode
@@ -331,6 +384,15 @@ export function UebersichtKarte({
         Übersicht
       </h2>
       {reservierung}
+      {positionen && positionen.length > 0 && (
+        <ul className="flex flex-col gap-1 text-[15px]">
+          {positionen.map((zeile, i) => (
+            <li key={i} className="break-words">
+              {zeile}
+            </li>
+          ))}
+        </ul>
+      )}
       <dl className="flex flex-col gap-2 text-[15px]">
         <div className="flex items-baseline gap-2">
           <dt>{hofpreis ? 'Ware' : 'Warenpreis'}</dt>
@@ -341,6 +403,7 @@ export function UebersichtKarte({
             <dt className="flex min-w-0 items-center">
               <span className="min-w-0 break-words">{gebuehrText}</span>
               {/* Tippfläche 44 px, die Zeile bleibt durch den negativen Rand so hoch wie der Text. */}
+              {mitErklaerung && (
               <button
                 type="button"
                 aria-label={hofpreis ? `Was ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG}?` : 'Was ist die Servicegebühr?'}
@@ -352,14 +415,16 @@ export function UebersichtKarte({
                   FOKUS_RAHMEN
                 )}
               >
-                <Info className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                {/* Der Kreis mit „i“ in der Größe des Boards (22 px, Strich 2). */}
+                <Info className="size-[22px]" strokeWidth={2} aria-hidden="true" />
               </button>
+              )}
             </dt>
             <dd className={cn('ml-auto shrink-0 tabular-nums', betraege.gebuehrCents === 0 && 'text-muted-foreground')}>{gebuehr}</dd>
           </div>
         )}
       </dl>
-      {gebuehr && (
+      {gebuehr && mitErklaerung && (
         <p id={erklaerungId} hidden={!erklaerungOffen} className={HINWEIS}>
           {gebuehrErklaerung}
         </p>
@@ -387,7 +452,9 @@ export function AktionsLeiste({ children }: { children: ReactNode }): React.JSX.
       data-feste-leiste
       // Der Kaufknopf: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
       data-unten-fest=""
-      className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0"
+      // Lauf 31 (Board s1-kasse): am Handy knapp — 10 px oben, 6 px zwischen Knopf und Sätzen, 12 px unten; die Sätze
+      // laufen als ein Absatz in 12 px (`KaufknopfSaetze`). Vorher nahm die Leiste rund 40 % der Höhe.
+      className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-1.5 border-t border-border bg-card px-4 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:static md:z-auto md:gap-2 md:border-0 md:bg-transparent md:p-0"
     >
       {children}
     </div>
@@ -402,6 +469,21 @@ export function AktionsLeiste({ children }: { children: ReactNode }): React.JSX.
 export function ZahlungAbgelehnt({ bisUhrzeit }: { bisUhrzeit: string | null }): React.JSX.Element {
   const { titel, text } = zahlungAbgelehntText(bisUhrzeit)
   return <HinweiskarteFehler titel={titel}>{text}</HinweiskarteFehler>
+}
+
+/**
+ * Die Karte im Bedeutungs-Paar „tun“ für einen Hinweis, bei dem nichts schiefgegangen ist (Mindestbestellwert in der
+ * Kasse, Abgleich im Korb-Blatt): dieselbe Fläche, Schrift und Radien wie `HinweiskarteFehler`, aber `role="status"`
+ * statt `alert` — der Screenreader liest sie leise vor. Eine Quelle für beide Stellen, bis `HinweiskarteFehler` eine
+ * wählbare `role` bekommt (Bedarf an ui/, Bericht 236).
+ */
+export function HinweiskarteStatus({ titel, children }: { titel: string; children?: ReactNode }): React.JSX.Element {
+  return (
+    <div role="status" className="flex flex-col gap-1.5 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun">
+      <p className="text-[15px] font-bold">{titel}</p>
+      {children}
+    </div>
+  )
 }
 
 /** Der Satz unter der E-Mail — der Weg zur Bestellung ist der Link in der Bestätigung. */
@@ -438,9 +520,11 @@ export function ZahlartWahl({
           // grünem Rand (2 px), ohne Tönung.
           <label
             key={z.wert}
-            className="flex min-h-[72px] min-w-0 cursor-pointer items-start gap-3 rounded-2xl border border-border bg-card px-3.5 py-3.5 has-[:checked]:border-2 has-[:checked]:border-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid"
+            // Gewählt: Rand und Punkt in `status-fertig` — hell das Grün der Kundenaktion, dunkel das helle Mint der
+            // Boards (s1-/w1-kasse-dunkel); `accent` läge dort mit 1,9 : 1 kaum über der Fläche.
+            className="flex min-h-[72px] min-w-0 cursor-pointer items-start gap-3 rounded-[16px] border border-border bg-card px-3.5 py-3.5 has-[:checked]:border-2 has-[:checked]:border-status-fertig has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid"
           >
-            <input type="radio" value={z.wert} {...feld} className="mt-0.5 size-[22px] shrink-0 cursor-pointer accent-accent outline-none" />
+            <input type="radio" value={z.wert} {...feld} className="mt-0.5 size-[22px] shrink-0 cursor-pointer accent-status-fertig outline-none" />
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="text-[15px] font-semibold">{z.titel}</span>
               <span className="text-[13px] leading-snug text-muted-foreground">{z.zusatz}</span>
@@ -482,13 +566,13 @@ export function AbholWahl({
           <label
             key={k.key}
             className={cn(
-              'flex min-h-[64px] min-w-0 items-center gap-3 rounded-2xl border px-3.5 py-2.5 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid',
+              'flex min-h-[64px] min-w-0 items-center gap-3 rounded-[16px] border px-3.5 py-2.5 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid',
               k.ausgebucht
                 ? 'cursor-not-allowed border-dashed border-border bg-muted text-muted-foreground'
-                : 'cursor-pointer border-border bg-card has-[:checked]:border-2 has-[:checked]:border-accent'
+                : 'cursor-pointer border-border bg-card has-[:checked]:border-2 has-[:checked]:border-status-fertig'
             )}
           >
-            <input type="radio" value={k.key} {...feld} disabled={k.ausgebucht} className="size-[22px] shrink-0 cursor-pointer accent-accent outline-none disabled:cursor-not-allowed" />
+            <input type="radio" value={k.key} {...feld} disabled={k.ausgebucht} className="size-[22px] shrink-0 cursor-pointer accent-status-fertig outline-none disabled:cursor-not-allowed" />
             <span className="flex min-w-0 flex-col">
               {/* Jeder Termin mit Datum (Nr. 46): „Heute"/„Morgen" nur zusätzlich, nie statt des Datums. */}
               <span className="text-[15px] font-semibold break-words">

@@ -70,6 +70,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hof-test/checkout',
   useSearchParams: () => new URLSearchParams(),
 }))
+// Seit Lauf 31 trägt der Kopf der Fokus-Shell im Browser die Bildmarke (next/image); der Prüfstand setzt `window`
+// auf globalThis ohne `location`, an dem next/image beim Rendern liest — darum ein schlichtes <img>.
+vi.mock('next/image', () => ({ default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }) }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
@@ -292,13 +295,15 @@ describe('Formular: der Abholtermin einmal im Bar-Formular', () => {
     expect(html.indexOf('Wähl noch, wann du abholst')).toBeGreaterThan(html.indexOf('Zahlungspflichtig bestellen'))
   })
 
-  it('bar mit Termin unter dem Mindestbestellwert: der Grund bleibt unter dem Knopf', () => {
+  it('bar mit Termin unter dem Mindestbestellwert: kein Kaufknopf, nur die Karte mit dem Satz des Hofs (Board Bild 5, Lauf 31)', () => {
     const html = kasse({ ...HOF, preisAnzeige: { hundertstel: 600 } }, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' }, 1)
-    // Nr. 227 (Register N41 a, A3): der Hinweis mit dem Satz des Hofs statt MINDESTBESTELLWERT_SATZ — 1 × € 4,90, es fehlen € 5,10.
-    const grund = mindestbestellwertHinweis(1000 - 490, 600)
+    // Nr. 227 (Register N41 a, A3): der Satz des Hofs statt MINDESTBESTELLWERT_SATZ — 1 × € 4,90, es fehlen € 5,10.
     expect(html).not.toContain(MINDESTBESTELLWERT_SATZ)
-    expect(html.indexOf(grund)).toBeGreaterThan(html.indexOf('Zahlungspflichtig bestellen'))
-    expect(anzahl(html, TERMIN)).toBe(1)
+    expect(html).toContain(mindestbestellwertHinweis(0, 600))
+    expect(html).toContain('Dir fehlen noch Waren für € 5,10.')
+    // Kein Formular: weder Knopf noch Termin noch die Sätze unter dem Knopf.
+    expect(html).not.toContain('Zahlungspflichtig bestellen')
+    expect(anzahl(html, TERMIN)).toBe(0)
   })
 
   it('online mit Termin: unverändert — Termin oben und in der Zeile unter „Weiter zur Zahlung“ (Register N10)', () => {

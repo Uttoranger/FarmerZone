@@ -173,7 +173,8 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('die Kasse: Kopf-Platzhalter in den Maßen der Fokus-Shell', () => {
     // Die Fokus-Shell hat wirklich 56 px / ab md 64 px (Nr. 177) — und keine 52 px mehr (Gegenprobe zum alten Stand).
     const fokusShell = liesDatei('src/components/shells/kunde-shell.tsx').split('export function KundeFokusShell(')[1]
-    expect(fokusShell).toMatch(/flex h-14 max-w-\[1200px\][^"]*md:h-16/)
+    // Seit Lauf 31 über die volle Breite (Boards w1-kasse, w1-bestellung-link).
+    expect(fokusShell).toMatch(/flex h-14 items-center[^"]*md:h-16/)
     expect(fokusShell).not.toMatch(/h-\[52px\]/)
     expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).not.toMatch(/h-\[52px\]/)
     expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).toContain('data-design="neu"')

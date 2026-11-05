@@ -94,13 +94,13 @@ export type StripeZahlungProps = {
  * (`bg-accent-foreground`, wie Stripes Zahlungsfeld): Schwarze Schrift auf dunkler Karte wäre
  * unlesbar, eine Umfärbung der Grafik verboten (DESIGN_SYSTEM, „Amtliche Grafiken: unverändert, farbig, nicht zuklappbar“).
  */
-export function GewaehrleistungsMitteilung({ karte = false }: { karte?: boolean }): React.JSX.Element {
+export function GewaehrleistungsMitteilung({ karte = false, className }: { karte?: boolean; className?: string }): React.JSX.Element {
   const g = GEWAEHRLEISTUNG_MITTEILUNG
   return (
     <section
       aria-label={g.ueberschrift}
       data-gewaehrleistung=""
-      className={cn('flex flex-col gap-2', karte ? KARTE : 'border-t border-border pt-3')}
+      className={cn('flex flex-col gap-2', karte ? KARTE : 'border-t border-border pt-3', className)}
     >
       <h3 className="text-sm font-semibold text-foreground">{g.ueberschrift}</h3>
       {/* eslint-disable-next-line @next/next/no-img-element -- amtliche Grafik (Anhang II FAGG): unverändert ausliefern, keine Bildoptimierung */}

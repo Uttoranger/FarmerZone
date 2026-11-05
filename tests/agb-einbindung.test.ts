@@ -165,7 +165,9 @@ describe('Seitenfuß: Impressum, Datenschutz, AGB, Problem melden', () => {
     const fuss = renderToStaticMarkup(createElement(KundeFuss))
     expect(fuss).toContain(`href="${AGB_PFAD}"`)
     const klassen = (markup: string) => markup.match(/<footer[^>]*class="([^"]*)"/)?.[1].split(/\s+/) ?? []
-    expect(klassen(fuss)).toContain('border-t')
+    // Lauf 31: die Linie am Handy am Fuß selbst, im Browser an der Spalte des Inhalts darin (Boards w1-bestaetigung u. a.).
+    expect(klassen(fuss)).toContain('max-md:border-t')
+    expect(fuss).toMatch(/class="[^"]*\bmd:border-t\b[^"]*"/)
     expect(klassen(fuss)).not.toContain('hidden')
     expect(klassen(fuss)).not.toContain('md:hidden')
     // Gegenprobe: Der Fuß der Startseite ist ab md verborgen und führt die AGB nicht — sie hängen allein am Seitenfuß.
