@@ -291,7 +291,8 @@ describe('4. Korb: Fehlertexte und das erste Blatt einer Sitzung (Register N29, 
 describe('5. Maße', () => {
   it('der Kopf der KundeFokusShell ist 56 px hoch wie der der KundeShell (vorher 52)', () => {
     const fokus = quelle('src/components/shells/kunde-shell.tsx').split('export function KundeFokusShell(')[1]
-    expect(fokus).toMatch(/<div className="mx-auto flex h-14 max-w-\[1200px\][^"]*md:h-16/)
+    // Seit Lauf 31 über die volle Breite (Boards w1-kasse, w1-bestellung-link): Marke links, Rückweg rechts.
+    expect(fokus).toMatch(/<div className="flex h-14 items-center[^"]*md:h-16/)
     expect(fokus).not.toContain('h-[52px]')
   })
 

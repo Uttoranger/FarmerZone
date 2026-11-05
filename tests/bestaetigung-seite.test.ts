@@ -306,7 +306,10 @@ describe('„Hof teilen" teilt die öffentliche Hofseite', () => {
 })
 
 describe('Neuigkeiten per E-Mail auf der Bestätigungsseite (Register N2, Nr. 46)', () => {
-  it('bar offen: die Karte steht da — mit Kennung, gültiger Signatur, Hofname und der Adresse der Bestellung', async () => {
+  it('bar offen: keine Karte (Board s1-/w1-bestaetigung Bild 3, Lauf 31) — bar bestätigt: die Karte mit Kennung, gültiger Signatur, Hofname und der Adresse der Bestellung', async () => {
+    expect(await seite()).not.toContain('data-neuigkeiten')
+    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    neuigkeitenProps.length = 0
     const html = await seite()
     expect(html).toContain('data-neuigkeiten="karte"')
     expect(neuigkeitenProps).toEqual([{ orderId: 'order-1', sig: GUELTIG, hofName: 'Hof Test', email: 'erika@example.org' }])

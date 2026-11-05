@@ -71,7 +71,7 @@ export function FristHinweis({ titel, satz, children }: { titel: string; satz: s
     <section
       aria-label={titel}
       data-frist-hinweis=""
-      className="flex flex-col gap-2 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun"
+      className="flex flex-col gap-2 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun"
     >
       <p className="text-[15px] font-bold">{titel}</p>
       {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
@@ -163,8 +163,10 @@ export function StatusSchritte({ schritte }: { schritte: readonly BestellSchritt
             aria-current={s.stand === 'naechster' ? 'step' : undefined}
             className="flex min-w-0 flex-col gap-1.5"
           >
-            <span aria-hidden="true" className={cn('h-1.5 rounded-full', s.stand === 'erledigt' ? 'bg-accent' : 'bg-border')} />
-            <span className={cn('truncate text-[12.5px]', s.stand === 'erledigt' ? 'font-bold text-foreground' : 'text-muted-foreground')}>
+            {/* Erledigt in `status-fertig`: hell das Grün, dunkel das helle Mint der Boards (s1-/w1-bestaetigung-dunkel) —
+                `accent` läge im Dunkeln kaum über dem Grund (Bewertung Lauf 31). */}
+            <span aria-hidden="true" className={cn('h-1.5 rounded-full', s.stand === 'erledigt' ? 'bg-status-fertig' : 'bg-border')} />
+            <span className={cn('truncate text-[13px]', s.stand === 'erledigt' ? 'font-bold text-status-fertig' : 'text-muted-foreground')}>
               {s.titel}
               <span className="sr-only">
                 : {SCHRITT_VORGELESEN[s.stand]}
@@ -213,38 +215,42 @@ export function BestellPositionen({
     <section aria-label={titel} className="flex flex-col gap-2">
       <h2 className={ETIKETT}>{titel}</h2>
       <div className={cn(KARTE, 'flex flex-col gap-2')}>
-      <ul className="flex flex-col gap-1.5">
+      {/* Boards s1-/w1-bestaetigung (Lauf 31): je Position eine Zeile mit dem Betrag dahinter („2 × Bergkäse, 250 g ·
+          € 13,16“), „Gesamt € …“ fett in einer Zeile. Die Gebühr bleibt eine eigene Zeile (E4): Die Zeilen tragen den
+          Warenpreis aus dem Snapshot — Endpreise je Zeile wären eine neue Rechnung. */}
+      <ul className="flex flex-col gap-1">
         {positionen.map((p, i) => (
-          <li key={i} className="flex items-baseline gap-2 text-[15px]">
-            <span className="min-w-0 flex-1 break-words">
-              {p.text}
-              {p.fehlt && <span className="text-foreground"> · fehlt leider</span>}
-            </span>
+          <li key={i} className="text-[15px] break-words">
+            {p.text}
             {p.fehlt ? (
-              <span className="shrink-0 text-[12.5px] text-muted-foreground">nicht berechnet</span>
+              <>
+                <span className="text-foreground"> · fehlt leider</span>
+                <span className="text-[13px] text-muted-foreground"> · nicht berechnet</span>
+              </>
             ) : (
-              <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(p.betragCents))}</span>
+              <>
+                {' · '}
+                <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(p.betragCents))}</span>
+              </>
             )}
           </li>
         ))}
         {s.gebuehrCents > 0 && (
-          <li className="flex items-baseline gap-2 text-[15px]">
-            <span className="min-w-0 flex-1">
-              {gebuehrBezeichnungFuer(summen)}
-              {entfallen && <span className="text-[12px]"> ({summen.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'})</span>}
-            </span>
-            <span className={cn('shrink-0 tabular-nums', entfallen && 'text-muted-foreground line-through')}>
+          <li className="text-[15px]">
+            {gebuehrBezeichnungFuer(summen)}
+            {entfallen && <span className="text-[13px]"> ({summen.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'})</span>}
+            {' · '}
+            <span className={cn('whitespace-nowrap tabular-nums', entfallen && 'text-muted-foreground line-through')}>
               {formatEuro(centsAlsEuro(s.gebuehrCents))}
             </span>
           </li>
         )}
       </ul>
-      <p className="flex items-baseline gap-2 text-[16px] font-bold">
-        <span className="min-w-0 flex-1">Gesamt</span>
-        <span className="shrink-0 tabular-nums">{formatEuro(centsAlsEuro(s.gesamtCents))}</span>
+      <p className="text-[16px] font-bold">
+        Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(s.gesamtCents))}</span>
       </p>
       <p className="text-[13px] leading-normal text-muted-foreground">{zahlung}</p>
-      {s.gebuehrCents > 0 && <p className="text-[12.5px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
+      {s.gebuehrCents > 0 && <p className="text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
       {fuss}
       </div>
     </section>
@@ -262,9 +268,10 @@ export function Hauptaktion({ haupt, neben }: { haupt: { href: string; text: str
   return (
     <div
       data-unten-fest=""
-      className="sticky bottom-0 z-30 -mx-4 -mb-12 mt-2 flex flex-col gap-1 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:static md:z-auto md:mx-0 md:mb-0 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:bg-transparent md:px-0 md:pt-4 md:pb-0 print:hidden"
+      // Ab 768 px klebt sie wie im Board w1-bestaetigung ebenfalls unten (Lauf 31): über einer Linie, rechts bündig.
+      className="sticky bottom-0 z-30 -mx-4 -mb-12 mt-2 flex flex-col gap-1 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:mx-0 md:mb-0 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:bg-background md:px-0 md:pt-4 md:pb-5 print:hidden"
     >
-      <Link href={haupt.href} className={cn(KNOPF_BREIT_GRUEN, 'md:w-auto md:rounded-full md:px-5')}>
+      <Link href={haupt.href} className={cn(KNOPF_BREIT_GRUEN, 'md:w-auto md:px-5')}>
         {haupt.text}
       </Link>
       {neben && (

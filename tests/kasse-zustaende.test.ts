@@ -65,6 +65,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hof-test/checkout',
   useSearchParams: () => new URLSearchParams(),
 }))
+// Seit Lauf 31 trägt der Kopf der Fokus-Shell im Browser die Bildmarke (next/image); der Prüfstand setzt `window`
+// auf globalThis ohne `location`, an dem next/image beim Rendern liest — darum ein schlichtes <img>.
+vi.mock('next/image', () => ({ default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }) }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
@@ -173,19 +176,23 @@ describe('Formular: bar, online, Mindestbestellwert, Betrieb', () => {
     const html = kasse(HOF, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONLINE' })
     for (const id of ['kasse-abholung', 'kasse-daten', 'kasse-bezahlen']) {
       const tag = html.match(new RegExp(`<section aria-labelledby="${id}"[^>]*>`))?.[0] ?? ''
-      expect(tag, id).not.toContain('rounded-2xl border')
+      expect(tag, id).not.toContain('border-border bg-card')
     }
     expect(html).toContain('Bezahlen · Wie möchtest du bezahlen?')
-    // Gegenprobe: Korb und Übersicht bleiben Karten.
-    expect(html.match(/<section aria-labelledby="kasse-korb"[^>]*>/)?.[0]).toContain('rounded-2xl border')
+    // Gegenprobe: Korb und Übersicht bleiben Karten (Radius 16 px fest, Lauf 31).
+    expect(html.match(/<section aria-labelledby="kasse-korb"[^>]*>/)?.[0]).toContain('rounded-[16px] border border-border bg-card')
   })
 
-  it('Mindestbestellwert (Hofpreis-Modell): der Hinweis mit dem Satz des Hofs unter dem gesperrten Knopf', () => {
+  it('Mindestbestellwert (Hofpreis-Modell, Board Bild 5, Lauf 31): die Karte mit dem Satz des Hofs, „Zurück zum Angebot“ und die Übersicht — kein Formular, kein Kaufknopf', () => {
     const html = kasse({ ...HOF, preisAnzeige: { hundertstel: 600 } }, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' }, { menge: 1 })
-    const hinweis = mindestbestellwertHinweis(1000 - 490, 600)
-    expect(hinweis).toContain('Mindestbestellwert: Waren für 10 €')
-    expect(html.indexOf(hinweis)).toBeGreaterThan(html.indexOf('Zahlungspflichtig bestellen'))
-    expect(kaufknopf(html)).toMatch(/\bdisabled=""/)
+    const titel = mindestbestellwertHinweis(0, 600)
+    expect(titel).toContain('Mindestbestellwert: Waren für 10 €')
+    inReihenfolge(html, [titel, 'Dir fehlen noch Waren für € 5,10. Leg noch etwas dazu.', 'Zurück zum Angebot', 'Übersicht', 'Gesamt'])
+    expect(html).toMatch(/<div role="status" class="[^"]*bg-zustand-tun-grund/)
+    expect(html).toContain('href="/hof-test#warenkorb"')
+    expect(kaufknopf(html)).toBe('')
+    expect(html).not.toContain('Abholung wählen')
+    expect(html).not.toContain('data-feste-leiste')
     expect(html).not.toContain(MINDESTBESTELLWERT_SATZ)
     // Gegenprobe: ab 10 € Warenwert kein Hinweis, der Knopf frei.
     const genug = kasse({ ...HOF, preisAnzeige: { hundertstel: 600 } }, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' }, { menge: 3 })

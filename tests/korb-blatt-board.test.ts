@@ -71,13 +71,14 @@ describe('Korb-Blatt (Boards s1-/w1-korb)', () => {
     expect(html).not.toContain('Warenkorb · ')
   })
 
-  it('nach dem Abgleich: eine orange Karte mit Titel und Satz, vorgelesen als Status', () => {
+  it('nach dem Abgleich: eine Karte im Paar „tun“ mit Titel und Satz, vorgelesen als Status (Lauf 31)', () => {
     const satz = 'Bergkäse ist gerade ausverkauft – wir haben ihn herausgenommen.'
     const html = blatt({ hinweis: satz })
     const karte = html.indexOf(KORB_GEAENDERT_TITEL)
     expect(karte).toBeGreaterThan(-1)
     expect(html.indexOf(satz)).toBeGreaterThan(karte)
-    expect(html.slice(0, karte)).toContain('<div role="status"><div data-slot="hinweiskarte" data-ton="orange"')
+    // Titel und Satz in der Schrift des Bedeutungs-Paars „tun“ auf seiner Fläche (Board s1-/w1-korb Bild 2).
+    expect(html.slice(0, karte)).toMatch(/<div role="status" class="[^"]*\bbg-zustand-tun-grund\b[^"]*\btext-zustand-tun\b[^"]*"><p[^>]*>$/)
   })
 
   it('Gegenprobe: ohne Satz keine Karte', () => {

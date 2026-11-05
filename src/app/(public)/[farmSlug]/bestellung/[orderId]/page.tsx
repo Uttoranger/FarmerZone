@@ -27,13 +27,10 @@ import { hofSichtbar } from '@/lib/hof-sichtbar'
  * oder einen stillgelegten Hof. Wer Links durchprobiert, erfährt so nicht
  * einmal, OB eine Bestellung existiert.
  *
- * Neues Design seit Nr. 54: KundeShell MIT Unterleiste — die Bestellseite ist
- * keine Fokus-Seite (DESIGN_SYSTEM „Fokus-Seiten ohne Unterleiste" nennt sie
- * nicht), sie hat keine feste Aktionsleiste, und von hier geht es zu den
- * Höfen oder zu „Meine Bestellungen" weiter. Die Bausteine (Karte,
- * Positionen, Knöpfe) sind die der Bestätigungsseite: dieselbe Bestellung
- * sieht an beiden Stellen gleich aus. Zugang, Abfrage und ICS-Link sind
- * unverändert.
+ * Neues Design seit Nr. 54, seit Lauf 31 nach dem Board s1-/w1-bestellung-link: KundeShell OHNE Unterleiste, am
+ * Handy mit der Titelzeile „Deine Bestellung“ — keine feste Aktionsleiste; von hier geht es über die Links im Inhalt
+ * zum Hof. Die Bausteine (Karte, Positionen, Knöpfe) sind die der Bestätigungsseite: dieselbe Bestellung sieht an
+ * beiden Stellen gleich aus. Zugang, Abfrage und ICS-Link sind unverändert.
  */
 
 interface Props {
@@ -53,13 +50,19 @@ const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12
 /** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen). */
 const PAAR = 'grid items-start gap-4 md:grid-cols-2'
 
+/**
+ * Lauf 31 (Board s1-bestellung-link): am Handy die Titelzeile „Deine Bestellung“ und keine Unterleiste — die Seite
+ * kommt aus einer Mail, ihre Wege hinaus sind die Links im Inhalt. Im Browser der Seitenfuß in der Spalte der Seite.
+ */
+const HANDY_TITEL = 'Deine Bestellung'
+
 function LinkUngueltig() {
   return (
-    <KundeShellMitSitzung>
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL} fussSpalte="md:max-w-[600px]">
       {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
           Ausweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
       {/* Board s1-/w1-bestellung-link Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zur Hofübersicht. */}
-      <div className="mx-auto w-full max-w-[592px] px-4 pt-6 pb-12 md:pt-10">
+      <div className="mx-auto w-full max-w-[552px] px-4 pt-6 pb-12 md:pt-10">
         <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
           <h1 className="font-heading text-[24px] leading-tight font-semibold text-foreground md:text-[26px]">
             {BESTELLSEITE_LINK_UNGUELTIG.titel}
@@ -153,13 +156,14 @@ export default async function BestellungPage({ params, searchParams }: Props) {
   }))
 
   return (
-    <KundeShellMitSitzung>
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL} fussSpalte="md:max-w-[944px]">
       {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer
           Mail. Die Wege hinaus sind echte Links: zum Hof und über die Shell. */}
       <div className={SPALTE}>
         {/* Board s1-/w1-bestellung-link (Nr. 227): „Deine Bestellung bei <Hof>“ als grüner Link darüber, die
             Bestellnummer als h1 mit dem Schild des Status (Art aus bestellStatusAnzeige, Register G5 — dieselbe wie
-            die Liste, storniert rot), darunter der Satz an die Kundin. */}
+            die Liste, storniert rot). Den Satz an die Kundin zeigt das Board hier nicht (Lauf 31): Termin und Stand stehen
+            in Schild und Abholkarte. */}
         <div className="flex flex-col gap-1">
           <Textlink href={`/${order.farm.slug}`} className="self-start text-[14px] font-medium break-words underline">
             Deine Bestellung bei {order.farm.name}
@@ -172,7 +176,6 @@ export default async function BestellungPage({ params, searchParams }: Props) {
               {status.marke}
             </Marke>
           </div>
-          <p className="text-[14px] leading-normal text-muted-foreground">{status.satz}</p>
         </div>
 
         {/* Abholung und „Hof erreichen“ — bei stornierten Bestellungen entfallen beide: ein Termin samt

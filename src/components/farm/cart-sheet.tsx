@@ -11,7 +11,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Sheet, SheetBlatt, SheetKopf } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { BildPlatzhalter } from '@/components/ui/bild-platzhalter'
 import { textlinkKlassen } from '@/components/ui/textlink'
 import { cn } from '@/lib/utils'
@@ -91,8 +90,9 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetBlatt seite="rechts">
+        {/* Board s1-/w1-korb (Lauf 31): unter dem Kopf keine eigene Linie — die Zeilen tragen ihre Linie oben,
+            so trennt sie auch Hinweis und erste Position; leer steht gar keine. */}
         <SheetKopf
-          className="border-b border-border pb-3"
           titel={
             // Leer ohne Hofnamen (Board Bild 3): Ein Korb ohne Ware gehört noch zu keinem Hof.
             leer ? (
@@ -105,12 +105,12 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
           }
         />
 
-        {/* Wie korbHinweis in der Kasse: orange Karte, als Status vorgelesen, kein Toast. */}
+        {/* Wie korbHinweis in der Kasse, als Status vorgelesen, kein Toast. Board s1-/w1-korb Bild 2 (Lauf 31): Titel und
+            Satz in der Schrift des Bedeutungs-Paars „tun“ auf seiner Fläche (≥ 4,5 : 1 in beiden Themes), Radius 16 px. */}
         {hinweis && (
-          <div role="status">
-            <Hinweiskarte ton="orange" titel={KORB_GEAENDERT_TITEL}>
-              {hinweis}
-            </Hinweiskarte>
+          <div role="status" className="flex flex-col gap-1.5 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun">
+            <p className="text-[15px] font-bold">{KORB_GEAENDERT_TITEL}</p>
+            <p className="text-[14px] leading-normal">{hinweis}</p>
           </div>
         )}
 
@@ -122,7 +122,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               titel={KORB_LEER.titel}
               satz={KORB_LEER.satz}
               // Board Bild 3: der Ausweg über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
-              className="items-stretch border-solid py-6 [&>span]:self-center"
+              className="items-stretch rounded-[16px] border-solid py-6 [&>span]:self-center"
               ausweg={
                 <Link
                   href={`/${farmSlug}`}
@@ -138,15 +138,16 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
             </Link>
           </div>
         ) : (
-          <ul className="flex flex-col divide-y divide-border">
+          <ul className="flex flex-col divide-y divide-border border-t border-border">
             {angezeigt.map((item) => (
-              <li key={item.productId} className="flex gap-3 py-3.5 first:pt-1">
-                {/* 48 px: der Browser holt eine kleine Fassung, nicht das Original (bis 2.400 px). Ohne Foto die ruhige Fläche (V15). */}
-                <div className="relative size-12 shrink-0 overflow-hidden rounded-xl">
+              <li key={item.productId} className="flex gap-3 py-3.5">
+                {/* 48 px: der Browser holt eine kleine Fassung, nicht das Original (bis 2.400 px). Ohne Foto die ruhige Fläche (V15).
+                    Radius 12 px fest (Board): `rounded-xl` wären im neuen Design 22 px — bei 48 px fast ein Kreis. */}
+                <div className="relative size-12 shrink-0 overflow-hidden rounded-[12px]">
                   {item.imageUrl ? (
                     <Image src={item.imageUrl} alt="" fill sizes="48px" className="object-cover" />
                   ) : (
-                    <BildPlatzhalter className="size-12 rounded-xl" />
+                    <BildPlatzhalter className="size-12 rounded-[12px]" />
                   )}
                 </div>
 

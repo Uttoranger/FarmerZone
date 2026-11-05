@@ -195,7 +195,8 @@ describe('Bestätigungsseite — Zugang nur mit Signatur', () => {
   it('mit gültiger Signatur: die Bestellung — Gegenprobe, sonst bewiese ein leerer Fund nichts', async () => {
     const text = await seite({ sig: GUELTIG })
 
-    expect(text).toContain('HT-0210-A4F2')
+    // Bar offen nennt die Seite die Nummer nicht (Board s1-/w1-bestaetigung Bild 3, Lauf 31) — die Positionen beweisen es.
+    expect(text).toContain('Bergkäse')
     expect(text).toContain('Bergkäse')
     expect(text).toContain('max@example.org')
     expect(text).not.toContain('Deine Bestellung ist eingegangen')
@@ -241,7 +242,7 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
   it('bar noch nicht bestätigt: keine Karte — erst, wenn die Bestellung steht', async () => {
     datenbank(steht({ status: 'PENDING_CONFIRMATION' }))
     const text = await seite({ sig: GUELTIG })
-    expect(text).toContain('HT-0210-A4F2')
+    expect(text).toContain('Bergkäse')
     expect(text).not.toContain('Hof erreichen')
     expect(text).not.toContain(KONTAKT.phone)
     expect(text).not.toContain(ANZEIGE)

@@ -302,10 +302,12 @@ describe('KundeShell', () => {
     const html = kunde(sitzung)
     // `print:hidden` (nur beim Drucken) ist erlaubt; am Bildschirm ist der Seitenfuß nie verborgen.
     const klassen = abschnitt(html, '<footer', '>').match(/class="([^"]*)"/)?.[1].split(/\s+/) ?? []
-    expect(klassen).toContain('border-t')
+    // Lauf 31: die Linie am Handy am Fuß selbst, im Browser an der Spalte des Inhalts darin.
+    expect(klassen).toContain('max-md:border-t')
     expect(klassen).not.toContain('hidden')
     expect(klassen).not.toContain('md:hidden')
     const fuss = abschnitt(html, '<footer', '</footer>')
+    expect(fuss).toMatch(/class="[^"]*\bmd:border-t\b[^"]*"/)
     expect(fuss.match(new RegExp(`text-brand-text">${MARKE}</span>`, 'g'))).toHaveLength(1)
     const wege = abschnitt(fuss, 'aria-label="Mehr entdecken"', '</nav>')
     expect(linkTag(wege, '/fuer-hoefe')).toBeDefined()

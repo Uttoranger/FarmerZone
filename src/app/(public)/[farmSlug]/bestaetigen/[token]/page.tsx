@@ -103,7 +103,8 @@ export default async function BarBestaetigenSeite({ params }: Props) {
     // Board s1-/w1-bestellung-link Bild 3: eine Karte mit Uhr, Überschrift, Satz (die Frist aus fristVon) und dem
     // Weg zurück zum Hof als Knopf mit Rand — die Seite hat dann keine Hauptaktion mehr.
     return (
-      <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name}>
+      // Board s1-bestellung-link Bild 3: am Handy ohne Pfeil (der Weg zurück steht in der Karte), die Karte 520 px.
+      <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name} ohnePfeilAmHandy schmal>
         <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
           {ansicht === 'verfallen' ? (
             <Clock className="size-7 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
@@ -198,15 +199,36 @@ const SPALTE = 'mx-auto flex w-full max-w-[704px] flex-col gap-3 px-4 pt-5 pb-8 
  * führt NIE durch den Verlauf — davor steht das Mailprogramm —, sondern als
  * Link zum Hof.
  */
-function Rahmen({ hofSlug, hofName, aktion, children }: { hofSlug: string; hofName: string; aktion?: ReactNode; children: ReactNode }) {
+function Rahmen({
+  hofSlug,
+  hofName,
+  aktion,
+  ohnePfeilAmHandy = false,
+  schmal = false,
+  children,
+}: {
+  hofSlug: string
+  hofName: string
+  aktion?: ReactNode
+  ohnePfeilAmHandy?: boolean
+  /** Nur eine Karte (verfallen, storniert): 520 px wie im Board w1-bestellung-link Bild 3. */
+  schmal?: boolean
+  children: ReactNode
+}) {
   return (
     <KundeFokusShell
       titel={TITEL}
       zurueck={{ href: `/${hofSlug}`, label: `Zurück zu ${hofName}` }}
+      // Board s1-bestellung-link Bild 2: unter „Bestätigen“ die Zeile mit dem Weg zurück; im Browser der Textlink rechts.
+      unterzeile={ohnePfeilAmHandy ? undefined : `Zurück zu ${hofName}`}
+      ohnePfeilAmHandy={ohnePfeilAmHandy}
+      // Board w1-bestellung-link Bild 2: die Knöpfe unten am Fenster, über einer Linie in der Breite der Spalte.
+      aktionKlebtImBrowser
+      spalte={schmal ? 'max-w-[552px]' : 'max-w-[704px]'}
       // Die Leiste der Shell ist im Browser so breit wie ihr Kopf; die Knöpfe stehen in der Spalte der Seite.
       aktion={aktion && <div className="mx-auto w-full max-w-[672px]">{aktion}</div>}
     >
-      <div className={SPALTE}>{children}</div>
+      <div className={cn(SPALTE, schmal && 'max-w-[552px]')}>{children}</div>
     </KundeFokusShell>
   )
 }

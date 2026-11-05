@@ -36,7 +36,8 @@ export function BarBestaetigenKnoepfe({ token }: { token: string }) {
         <Button
           type="submit"
           disabled={laeuft}
-          className="h-[52px] w-full rounded-[14px] bg-accent px-[18px] text-base font-semibold text-accent-foreground hover:bg-accent-hover md:w-auto md:rounded-full md:px-5"
+          // Abgerundetes Rechteck auch im Browser (Board w1-bestellung-link Bild 2), keine Pille.
+          className="h-[52px] w-full rounded-[14px] bg-accent px-[18px] text-base font-semibold text-accent-foreground hover:bg-accent-hover md:w-auto md:px-5"
         >
           {bestaetigtLaeuft ? 'Wird bestätigt …' : 'Ja, ich hole verbindlich ab'}
         </Button>
@@ -54,7 +55,7 @@ export function BarBestaetigenKnoepfe({ token }: { token: string }) {
           type="submit"
           variant="ghost"
           disabled={laeuft}
-          className="h-11 rounded-full px-[18px] text-[15px] font-semibold text-foreground"
+          className="h-11 rounded-[14px] px-[18px] text-[15px] font-semibold text-foreground"
         >
           {storniertLaeuft ? 'Wird storniert …' : 'Doch nicht – Bestellung stornieren'}
         </Button>

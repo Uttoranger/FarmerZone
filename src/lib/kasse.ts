@@ -105,7 +105,7 @@ export type KassenZahlart = {
  * genügt": Der Weg braucht zwei Schritte, den Link in der Mail und den Knopf dahinter
  * (Register N10, Ergänzung Freigabe Lauf 13, Nr. 85).
  */
-const BAR_BESTAETIGEN = 'Du bestätigst per E-Mail.'
+const BAR_BESTAETIGEN = 'Du bestätigst per E-Mail, dann packt der Hof.'
 
 /**
  * Die Zahlarten, die die Kasse anbietet — aus derselben Regel wie die rechte
@@ -253,6 +253,24 @@ export function mindestbestellwertGrund(hof: KassenHof, warenCents: number, hund
   if (mindestbestellwertErreicht(warenCents)) return null
   return hundertstel === undefined ? MINDESTBESTELLWERT_SATZ : mindestbestellwertHinweis(MINDESTBESTELLWERT_CENTS - warenCents, hundertstel)
 }
+
+/**
+ * Die Karte über der Übersicht, solange der Mindestbestellwert fehlt (Boards s1-/w1-kasse Bild 5, Lauf 31): oben der
+ * Satz des Hofs (A3) als Titel, darunter, was fehlt, und die Bitte. Nur Worte zu Beträgen, die feststehen — dieselbe
+ * Bedingung und derselbe Fehlbetrag wie `mindestbestellwertGrund`. Den Fehlbetrag „mit Gebühr“ des Boards nennt die
+ * Karte nicht: Er wäre eine neue Rechnung (Bericht 236).
+ */
+export function mindestbestellwertKarte(hof: KassenHof, warenCents: number, hundertstel?: number): { titel: string; satz: string } | null {
+  if (!hof.preisAnzeige || hundertstel === undefined) return null
+  if (mindestbestellwertErreicht(warenCents)) return null
+  return {
+    titel: mindestbestellwertHinweis(0, hundertstel),
+    satz: `Dir fehlen noch Waren für ${formatEuro(centsAlsEuro(MINDESTBESTELLWERT_CENTS - warenCents))}. Leg noch etwas dazu.`,
+  }
+}
+
+/** Der Ausweg der Karte: zurück zum Angebot des Hofs (Board s1-/w1-kasse Bild 5). */
+export const MINDESTBESTELLWERT_AUSWEG = 'Zurück zum Angebot'
 
 /** Was /api/checkout an Stripe gab (checkoutZahlungsBetragSchema in src/schemas/checkout.ts). */
 export type ZahlungsBetrag = { amountCents: number; serviceFeeCents: number }
@@ -581,7 +599,7 @@ export function bestellschlussHeute(kacheln: readonly AbholKachel[]): string | n
 export const PREISE_INKL_UST = 'Preise inkl. USt'
 
 /** Der Link bei „Deine Daten" zur Datenschutzerklärung — die Kasse hat keinen Seitenfuß. */
-export const KASSE_DATENSCHUTZ_LINK = 'Was passiert damit?'
+export const KASSE_DATENSCHUTZ_LINK = 'Wie wir deine Daten verwenden (Datenschutz)'
 
 /** Nach dem Zeitlimit: kein Vorwurf, und die Zusage, die der Idempotenz-Schlüssel hält. */
 export const KASSE_ZEITLIMIT_SATZ = 'Dauert länger als sonst – nichts wird doppelt bestellt.'

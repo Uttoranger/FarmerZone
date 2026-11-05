@@ -84,7 +84,8 @@ function BestellungEingegangen() {
   // Kein ClearCartOnMount (Nr. 202, Audit Phase 3 Punkt 12): Ohne Signatur kennt die
   // Seite den Stand nicht — ein alter Link oder ein Lesezeichen leert keinen neuen Korb.
   return (
-    <KundeShellMitSitzung unterleiste={false}>
+    // Board s1-bestaetigung Bild 4: am Handy die Titelzeile „Bestellung“ statt Marke und Knopf.
+    <KundeShellMitSitzung unterleiste={false} handyTitel="Bestellung" fussSpalte="md:max-w-[608px]">
       {/* Board s1-/w1-bestaetigung Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zu den Höfen. */}
       <div className={cn(SPALTE, 'max-w-[592px]')}>
         <div className={cn(KARTE, 'flex flex-col gap-3')}>
@@ -245,7 +246,9 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         : { haupt: { href: bestellungHref, text: 'Bestellung ansehen' }, neben: { href: `/${farmSlug}`, text: 'Weiter einkaufen' } }
 
   return (
-    <KundeShellMitSitzung unterleiste={false}>
+    // Boards s1-/w1-bestaetigung (Lauf 31): am Handy die Titelzeile „Bestellung bei <Hof>“, im Browser der Seitenfuß in
+    // der Spalte der Seite (896 px Inhalt).
+    <KundeShellMitSitzung unterleiste={false} handyTitel={`Bestellung bei ${order.farm.name}`} fussSpalte="md:max-w-[944px]">
       {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
       {korbLeeren(zustand) && <ClearCartOnMount />}
       <div className={SPALTE}>
@@ -284,8 +287,10 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           positionen={positionen}
           summen={order}
           zahlung={`${zahlung.art} · ${zahlung.zustand}`}
+          // Bar offen nennt die Karte mit der Frist Termin und Adresse schon (Board Bild 3: keine Zeile darunter).
           fuss={
-            !bloecke.abholkarte && (
+            !bloecke.abholkarte &&
+            !bloecke.fristHinweis && (
               <p className="text-[12px] leading-normal break-words text-muted-foreground">
                 Bestellnummer {order.orderNumber} · Abholung: {abholZeit} · {adresse}
               </p>
@@ -293,14 +298,16 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           }
         />
 
-        {(bloecke.teilen || neuigkeiten) && (
+        {/* Bar offen zeigt das Board nach der Bestellung nichts mehr (s1-/w1-bestaetigung Bild 3, Lauf 31): Die Karte
+            der Neuigkeiten kommt, sobald die Bestellung bestätigt ist — die Seite, auf die der Link der Mail führt. */}
+        {(bloecke.teilen || (neuigkeiten && !bloecke.fristHinweis)) && (
           <div className={PAAR}>
             {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
             {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
             {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
                 Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
                 Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
-            {neuigkeiten && (
+            {neuigkeiten && !bloecke.fristHinweis && (
               <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={customerEmail ?? undefined} />
             )}
           </div>
