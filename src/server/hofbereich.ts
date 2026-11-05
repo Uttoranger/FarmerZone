@@ -104,11 +104,12 @@ export async function verlangeHofDerSitzung(): Promise<{ userId: string; farmId:
  * derselben Zählung wie „Hof einrichten“ (`ladeEinrichtenHof` → `einrichtenStand`
  * → `warteStand`) — keine zweite Liste von Schritten. Nur für Höfe ohne
  * Freigabe: Ein freigeschalteter Hof bezahlt dafür keine Abfrage. Die E-Mail
- * frisch aus der Datenbank (S3), nie aus der Sitzung.
+ * kommt aus der Datenbank (dieselbe Abfrage wie der Bestätigungsstand, S3);
+ * die der Sitzung gilt nur, wenn das Konto dort fehlt.
  */
 async function ladeWarteStand(userId: string, person: { name: string; email: string }): Promise<WarteStand> {
   const [hof, bestaetigung] = await Promise.all([ladeEinrichtenHof(userId), ladeBestaetigungsStand(userId)])
-  return warteStand(einrichtenStand({ personName: person.name, email: person.email, hof, emailOffen: bestaetigung?.offen ?? false }))
+  return warteStand(einrichtenStand({ personName: person.name, email: bestaetigung?.email ?? person.email, hof, emailOffen: bestaetigung?.offen ?? false }))
 }
 
 export async function ladeHofbereich(): Promise<Hofbereich> {
@@ -122,10 +123,18 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
 
   // Unabhängig voneinander, also nebeneinander (Nachtlauf Nr. 31) — vorher
   // vier Rundreisen zur Datenbank hintereinander vor jeder Hof-Seite.
-  const [offeneBestellungen, ungelesenPostfach, bannerState, { isAdmin, zuEntscheiden }, tarifZeile] = await Promise.all([
+  const [offeneBestellungen, ungelesenPostfach, balken, { isAdmin, zuEntscheiden }, tarifZeile] = await Promise.all([
     getOpenOrdersCount(hof.id),
     zaehleUngelesenHof(hof.id),
-    getFarmBannerState(userId),
+    // Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht „wartet auf Freigabe“. Der Stand der
+    // Schritte läuft gleich hinter dem Banner-Stand im selben Durchgang mit (keine zweite Rundreise
+    // danach) und nur bei „wartet“ — ein freigeschalteter Hof wartet nie auf ihn.
+    getFarmBannerState(userId).then(async (banner): Promise<Hofbereich['balken']> => {
+      if (banner?.archivedAt != null) return { art: 'stillgelegt' }
+      if (banner == null || banner.approvedAt != null) return null
+      const stand = await ladeWarteStand(userId, { name: session.user.name ?? '', email: session.user.email ?? '' })
+      return { art: 'wartet', farmId: banner.id, farmName: banner.name, country: banner.country, stand }
+    }),
     // Menüpunkt „Admin" nur für den Betreiber — frisch aus der DB, nicht aus der Sitzung.
     isAdminUser(userId).then(async (admin) => ({
       isAdmin: admin,
@@ -134,21 +143,6 @@ export async function ladeHofbereich(): Promise<Hofbereich> {
     })),
     ladeTarifZeile(hof.id, new Date()),
   ])
-
-  // Reihenfolge wie bei der Server-Prüfung: stillgelegt sticht „wartet auf Freigabe".
-  // Der Stand der Schritte erst danach und nur bei „wartet“ — ein freigeschalteter Hof wartet nie auf ihn.
-  const balken: Hofbereich['balken'] =
-    bannerState?.archivedAt != null
-      ? { art: 'stillgelegt' }
-      : bannerState != null && bannerState.approvedAt == null
-        ? {
-            art: 'wartet',
-            farmId: bannerState.id,
-            farmName: bannerState.name,
-            country: bannerState.country,
-            stand: await ladeWarteStand(userId, { name: session.user.name ?? '', email: session.user.email ?? '' }),
-          }
-        : null
 
   return { hof, personName: session.user.name ?? '', offeneBestellungen, ungelesenPostfach, balken, isAdmin, zuEntscheiden, tarifZeile }
 }

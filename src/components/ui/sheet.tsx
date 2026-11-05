@@ -94,6 +94,13 @@ function SheetContent({
 }
 
 /**
+ * Der Schleier der Boards von Lauf 30 (w1-korb, s1-mehr-neu): hell die
+ * Textfarbe zu 55 %, dunkel der Schleier des Blatts; abgedunkelt, nicht
+ * verwischt — die Seite darunter bleibt erkennbar.
+ */
+const BLATT_SCHLEIER = "bg-foreground/55 supports-backdrop-filter:backdrop-blur-none"
+
+/**
  * Blatt mit Griff: die Handy-Form eines Dialogs (docs/ai/DESIGN_SYSTEM.md,
  * „Dialoge und Blätter") — von unten, oben rund (22 px), ein Griff als
  * Zeichen, dass es ein Blatt ist. Kein Kreuz: Geschlossen wird mit
@@ -113,13 +120,6 @@ function SheetContent({
  * 24 px. Den Kopf mit Titel und dem einen Schließen-Element bringt SheetKopf.
  * Ohne `seite` bleibt alles, wie es war.
  */
-/**
- * Der Schleier der Boards von Lauf 30 (w1-korb, s1-mehr-neu): hell die
- * Textfarbe zu 55 %, dunkel der Schleier des Blatts; abgedunkelt, nicht
- * verwischt — die Seite darunter bleibt erkennbar.
- */
-const BLATT_SCHLEIER = "bg-foreground/55 supports-backdrop-filter:backdrop-blur-none"
-
 function SheetBlatt({
   className,
   children,
@@ -130,7 +130,7 @@ function SheetBlatt({
   /** „unten": Blatt von unten (Standard). „rechts": ab 768 px von rechts, volle Höhe, max. 448 px. */
   seite?: "unten" | "rechts"
   /** „abgedunkelt": der Schleier der Boards von Lauf 30 (dunkelt ab, verwischt nicht; Board s1-mehr-neu); rechts gilt er immer. */
-  schleier?: "leicht" | "abgedunkelt"
+  schleier?: "abgedunkelt"
 }) {
   const rechts = seite === "rechts"
   return (

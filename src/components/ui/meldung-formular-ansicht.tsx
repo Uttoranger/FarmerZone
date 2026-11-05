@@ -4,8 +4,7 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Camera, Check, Loader2, X } from 'lucide-react'
 import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
-import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz } from '@/lib/hof-hilfe'
-import { hofAktiverPunkt, hofNavigation } from '@/lib/bauern-navigation'
+import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, geraetKurz, mitgeschicktSatz, seiteKurz } from '@/lib/hof-hilfe'
 import { stufenText } from '@/components/shared/image-upload'
 import { HONIGTOPF_STIL, type Kontext, type MeldungFormular } from '@/components/shared/use-meldung-formular'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -30,7 +29,6 @@ export const MELDUNG_ANSICHT_TEXT = {
   mitgeschicktTitel: 'Das schicken wir automatisch mit',
   seite: 'Seite',
   geraet: 'Gerät',
-  hof: 'Hof',
   email: 'Deine E-Mail',
   emailZusatz: '· nur für unsere Antwort, optional',
   bildschirmfoto: 'Bildschirmfoto hinzufügen',
@@ -57,70 +55,18 @@ const RAHMEN_KNOPF = cn(
 )
 
 /**
- * Der Name der Seite, von der die Meldung kommt — im Hofbereich der Name ihres
- * Punkts in der Navigation („Bestellungen“), sonst nur der Pfad (nie Abfrage
- * oder Anker: Suchwörter bleiben beim Gerät). Leer, solange der Browser den
- * Kontext noch nicht kennt (Server-Rendern).
- */
-function seiteName(seiteUrl: string): string {
-  if (!seiteUrl) return ''
-  let pfad: string
-  try {
-    pfad = new URL(seiteUrl).pathname
-  } catch {
-    // Keine gültige Adresse: nichts zeigen statt Rohtext — mitgeschickt wird sie trotzdem (useMeldungFormular).
-    return ''
-  }
-  const id = hofAktiverPunkt(pfad)
-  if (!id) return pfad
-  const nav = hofNavigation({ isAdmin: true })
-  return [...nav.haupt, ...nav.verkaufUndKunden, ...nav.unten].find((p) => p.id === id)?.label ?? pfad
-}
-
-/** System und Browser in zwei Wörtern („Android · Chrome“) — nur Anzeige; mit geht der volle User-Agent. */
-export function geraetKurz(userAgent: string): string {
-  const ua = userAgent
-  const system = /Android/i.test(ua)
-    ? 'Android'
-    : /iPhone/i.test(ua)
-      ? 'iPhone'
-      : /iPad/i.test(ua)
-        ? 'iPad'
-        : /Windows/i.test(ua)
-          ? 'Windows'
-          : /Mac OS X|Macintosh/i.test(ua)
-            ? 'Mac'
-            : /Linux/i.test(ua)
-              ? 'Linux'
-              : ''
-  // Reihenfolge zählt: Edge und Samsung nennen auch „Chrome“, Chrome nennt auch „Safari“.
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /SamsungBrowser/.test(ua)
-      ? 'Samsung Internet'
-      : /Firefox|FxiOS/.test(ua)
-        ? 'Firefox'
-        : /Chrome|CriOS/.test(ua)
-          ? 'Chrome'
-          : /Safari/.test(ua)
-            ? 'Safari'
-            : ''
-  return [system, browser].filter((t) => t !== '').join(' · ')
-}
-
-/**
  * „Das schicken wir automatisch mit“ (Board s2-/w2-meldungen, Nacharbeit 225):
- * im Hofbereich eine Karte mit Seite, Gerät und Hof statt des Satzes. Ohne
+ * im Hofbereich eine Karte mit Seite und Gerät statt des Satzes (Seite und
+ * Gerät in Worten aus src/lib/hof-hilfe.ts, eine Quelle mit dem Admin). Ohne
  * Kontext (vor dem Einhängen) steht ein Strich; der Satz ohne IP und Cookies
  * bleibt darunter — er sagt, was NICHT mitgeht.
  */
-function MitgeschicktKarte({ kontext, kennung, hofName }: { kontext: Kontext; kennung: string; hofName?: string }): React.JSX.Element {
+function MitgeschicktKarte({ kontext, kennung }: { kontext: Kontext; kennung: string }): React.JSX.Element {
   const T = MELDUNG_ANSICHT_TEXT
   const zeilen: { name: string; wert: string }[] = [
     ...(kennung.trim() ? [{ name: T.fehlernummer, wert: kennung.trim() }] : []),
-    { name: T.seite, wert: seiteName(kontext.seiteUrl) || '–' },
-    { name: T.geraet, wert: geraetKurz(kontext.userAgent) || '–' },
-    ...(hofName ? [{ name: T.hof, wert: hofName }] : []),
+    { name: T.seite, wert: seiteKurz(kontext.seiteUrl) },
+    { name: T.geraet, wert: geraetKurz(kontext.userAgent) },
   ]
   return (
     <div data-slot="meldung-mitgeschickt" className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-3.5 py-3">
@@ -159,7 +105,6 @@ export function MeldungFormularAnsicht({
   abbrechenHref,
   titel,
   satz,
-  hofName,
   className,
 }: {
   formular: MeldungFormular
@@ -171,8 +116,6 @@ export function MeldungFormularAnsicht({
   /** Überschrift in der Karte (h1), wenn die Seite keine eigene trägt. */
   titel?: string
   satz?: string
-  /** Der Name des Hofs für die Karte „Das schicken wir automatisch mit“ (nur Hof); ohne ihn fehlt die Zeile „Hof“. */
-  hofName?: string
   className?: string
 }): React.JSX.Element {
   const f = formular
@@ -346,7 +289,7 @@ export function MeldungFormularAnsicht({
 
         {/* Der Hof sieht, was mitgeht, als Karte (Board s2-/w2-meldungen); die Kundin den Satz (Board s3-problem-melden). */}
         {alsHof ? (
-          <MitgeschicktKarte kontext={f.kontext} kennung={f.kennung} hofName={hofName} />
+          <MitgeschicktKarte kontext={f.kontext} kennung={f.kennung} />
         ) : (
           <p className="text-[13px] leading-normal text-muted-foreground">{mitgeschicktSatz(f.kennung, alsHof)}</p>
         )}

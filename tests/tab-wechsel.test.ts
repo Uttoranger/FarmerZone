@@ -239,7 +239,7 @@ describe('ladeHofbereich — der Balken „wartet“ trägt den Stand der Schrit
     const { balken } = await ladeHofbereich()
     expect(balken).toMatchObject({ art: 'wartet', stand: 'einrichten' })
     expect(ladeEinrichtenHof).toHaveBeenCalledWith('nutzer-1')
-    // Die E-Mail-Bestätigung frisch aus der Datenbank, nie aus der Sitzung (S3).
+    // Die E-Mail-Bestätigung kommt aus der Datenbank, nicht aus der Sitzung (S3).
     expect(ladeBestaetigungsStand).toHaveBeenCalledWith('nutzer-1')
     expect(warteBalkenText(balken?.art === 'wartet' ? balken.stand : null).titel).toBe(FARM_SETUP_OWNER_BANNER)
   })
@@ -249,6 +249,17 @@ describe('ladeHofbereich — der Balken „wartet“ trägt den Stand der Schrit
     const { balken } = await ladeHofbereich()
     expect(balken).toMatchObject({ art: 'wartet', stand: 'pruefung' })
     expect(warteBalkenText(balken?.art === 'wartet' ? balken.stand : null).titel).toBe(FARM_PENDING_OWNER_BANNER)
+  })
+
+  it('der Stand läuft im selben Durchgang mit — er wartet nicht auf die anderen Abfragen', async () => {
+    wartenderHof(false)
+    let frei: (n: number) => void = () => {}
+    vi.mocked(getOpenOrdersCount).mockReturnValue(new Promise<number>((r) => (frei = r)))
+    const lauf = ladeHofbereich()
+    // Die Zählung hängt noch, die Schritte sind trotzdem schon angefragt.
+    await vi.waitFor(() => expect(ladeEinrichtenHof).toHaveBeenCalledWith('nutzer-1'))
+    frei(0)
+    await expect(lauf).resolves.toMatchObject({ balken: { art: 'wartet', stand: 'einrichten' } })
   })
 
   it('Gegenprobe: ein freigeschalteter Hof lädt die Schritte nie (keine Abfrage für den Balken)', async () => {
