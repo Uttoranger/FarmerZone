@@ -3,7 +3,7 @@
 import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { HOFPREIS_STICHTAG_TEXT, pruefeHofpreisStichtag } from '@/lib/plattform-einstellung'
+import { HOFPREIS_STICHTAG_TEXT, hofpreisStichtagSatz, pruefeHofpreisStichtag } from '@/lib/plattform-einstellung'
 import { speichereHofpreisStichtag } from '@/server/actions/plattform-einstellung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -66,8 +66,9 @@ export function HofpreisStichtag({
       <h2 id={`${feldId}-titel`} className="font-heading text-lg font-semibold text-foreground">
         {TEXT.titel}
       </h2>
+      {/* Nach dem Stichtag „Seit diesem Tag gilt …“ ohne „Vorher bleibt alles wie heute.“ (V62, Board s3/w3-admin-einstellungen Bild 4). */}
       <p id={satzId} className="text-[13px] leading-snug text-muted-foreground">
-        {TEXT.satz}
+        {hofpreisStichtagSatz(daten.erreicht)}
       </p>
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-end"
