@@ -58,6 +58,7 @@ import {
   kaufknopfZeile,
   reservierungsStand,
   zahlungsGebuehrText,
+  type TitelSatz,
   type ZahlungsBetrag,
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
@@ -91,6 +92,7 @@ import {
   KARTEN_TITEL,
   KNOPF_GRUEN,
   KNOPF_GRUEN_IM_BROWSER,
+  HinweiskarteStatus,
   KassenRaster,
   TEXTLINK,
   KontaktHinweis,
@@ -819,8 +821,9 @@ export function CheckoutForm({
                   className={FELD}
                 />
                 <FeldZaehler control={form.control} name="customerPhone" max={TELEFON_MAX} />
-                {/* Am Handy unter dem Feld (Board s1-kasse Bild 2), im Browser ohne Hilfetexte (w1-kasse). */}
-                <p id="customerPhone-hinweis" className={cn(HINWEIS, 'mt-1.5 md:hidden')}>
+                {/* Am Handy unter dem Feld (Board s1-kasse Bild 2), im Browser ohne sichtbare Hilfe (w1-kasse) — dort `sr-only`
+                    statt `hidden`, damit `aria-describedby` nicht auf einen verborgenen Satz zeigt. */}
+                <p id="customerPhone-hinweis" className={cn(HINWEIS, 'mt-1.5 md:sr-only')}>
                   Nur für Rückfragen des Hofs.
                 </p>
               </Feld>
@@ -962,7 +965,7 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
 
 /**
  * Unter dem Mindestbestellwert (Boards s1-/w1-kasse Bild 5, Lauf 31): eine Spalte, auch im Browser — oben die Karte im
- * Bedeutungs-Paar „tun“ (Fläche und Schrift wie `HinweiskarteFehler`, aber `role="status"`: nichts ist schiefgegangen)
+ * Bedeutungs-Paar „tun“ (`HinweiskarteStatus`: wie `HinweiskarteFehler`, aber `role="status"`)
  * mit dem Satz des Hofs, was fehlt, und „Zurück zum Angebot“ mit Rand über die volle Breite; darunter die Übersicht.
  * Kein Formular und keine feste Leiste: Es gibt nichts zu bestellen, bis genug im Korb liegt.
  */
@@ -971,14 +974,13 @@ export function KasseUnterMindestwert({
   hofSlug,
   uebersicht,
 }: {
-  karte: { titel: string; satz: string }
+  karte: TitelSatz
   hofSlug: string
   uebersicht: React.ReactNode
 }): React.JSX.Element {
   return (
     <div className="mx-auto flex w-full max-w-[592px] flex-col gap-3 px-4 pt-4 pb-10 md:pt-8">
-      <div role="status" className="flex flex-col gap-1.5 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun">
-        <p className="text-[15px] font-bold">{karte.titel}</p>
+      <HinweiskarteStatus titel={karte.titel}>
         <p className="text-[14px] leading-normal">{karte.satz}</p>
         <Link
           href={`/${hofSlug}#${WARENKORB_ANKER}`}
@@ -989,7 +991,7 @@ export function KasseUnterMindestwert({
         >
           {MINDESTBESTELLWERT_AUSWEG}
         </Link>
-      </div>
+      </HinweiskarteStatus>
       {uebersicht}
     </div>
   )

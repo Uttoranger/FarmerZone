@@ -23,6 +23,7 @@ import { KaufGrund } from '@/components/hofseite/kauf-grund'
 import { useBestellstopp } from '@/components/notbremse-band'
 import { KORB_LEER, type CartItem } from '@/lib/use-cart'
 import { EmptyState } from '@/components/ui/empty-state'
+import { HinweiskarteStatus } from '@/components/checkout/kasse-teile'
 import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
 
 // Der Titel der Hinweiskarte nach dem Abgleich (Board s1-/w1-korb, Bild 2) — darunter der Satz, was passiert ist.
@@ -108,10 +109,9 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
         {/* Wie korbHinweis in der Kasse, als Status vorgelesen, kein Toast. Board s1-/w1-korb Bild 2 (Lauf 31): Titel und
             Satz in der Schrift des Bedeutungs-Paars „tun“ auf seiner Fläche (≥ 4,5 : 1 in beiden Themes), Radius 16 px. */}
         {hinweis && (
-          <div role="status" className="flex flex-col gap-1.5 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun">
-            <p className="text-[15px] font-bold">{KORB_GEAENDERT_TITEL}</p>
+          <HinweiskarteStatus titel={KORB_GEAENDERT_TITEL}>
             <p className="text-[14px] leading-normal">{hinweis}</p>
-          </div>
+          </HinweiskarteStatus>
         )}
 
         {leer ? (

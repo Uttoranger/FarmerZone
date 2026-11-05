@@ -458,6 +458,21 @@ export function ZahlungAbgelehnt({ bisUhrzeit }: { bisUhrzeit: string | null }):
   return <HinweiskarteFehler titel={titel}>{text}</HinweiskarteFehler>
 }
 
+/**
+ * Die Karte im Bedeutungs-Paar „tun“ für einen Hinweis, bei dem nichts schiefgegangen ist (Mindestbestellwert in der
+ * Kasse, Abgleich im Korb-Blatt): dieselbe Fläche, Schrift und Radien wie `HinweiskarteFehler`, aber `role="status"`
+ * statt `alert` — der Screenreader liest sie leise vor. Eine Quelle für beide Stellen, bis `HinweiskarteFehler` eine
+ * wählbare `role` bekommt (Bedarf an ui/, Bericht 236).
+ */
+export function HinweiskarteStatus({ titel, children }: { titel: string; children?: ReactNode }): React.JSX.Element {
+  return (
+    <div role="status" className="flex flex-col gap-1.5 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun">
+      <p className="text-[15px] font-bold">{titel}</p>
+      {children}
+    </div>
+  )
+}
+
 /** Der Satz unter der E-Mail — der Weg zur Bestellung ist der Link in der Bestätigung. */
 export function KontaktHinweis(): React.JSX.Element {
   return <p className={cn(HINWEIS, 'mt-1.5')}>{KONTAKT_HINWEIS}</p>

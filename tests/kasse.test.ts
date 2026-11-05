@@ -116,12 +116,12 @@ describe('Kasse glätten (N10, Nr. 82): jede Zahlart mit eigener Erklärung', ()
   })
 
   it('Bar trägt seinen Vorteil selbst — das Datum aus dem Stichtag, nie getippt', () => {
-    expect(zusatz('ONSITE_CASH', true)).toBe(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail, dann packt der Hof.`)
+    expect(zusatz('ONSITE_CASH', true)).toBe(`${BAR_OHNE_GEBUEHR_ZAHLART} Du bestätigst per E-Mail.`)
     expect(zusatz('ONSITE_CASH', true)).toContain(`Ohne Servicegebühr bis ${BAR_OHNE_GEBUEHR_BIS_TEXT}.`)
   })
 
   it('ist bar nicht günstiger, steht kein Vorteil da — nur die Bestätigung per E-Mail', () => {
-    expect(zusatz('ONSITE_CASH', false)).toBe('Du bestätigst per E-Mail, dann packt der Hof.')
+    expect(zusatz('ONSITE_CASH', false)).toBe('Du bestätigst per E-Mail.')
     expect(kassenZahlarten(HOF_ALLES)).toEqual(kassenZahlarten(HOF_ALLES, false))
   })
 
