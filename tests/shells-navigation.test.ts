@@ -312,7 +312,10 @@ describe('HofShell: Seitenleiste (V13, Board w1-mehr-neu)', () => {
     const menue = shell.slice(shell.indexOf('const wechsleMenue ='), shell.indexOf('}\n', shell.indexOf('const wechsleMenue =')) + 2)
     expect(menue).toMatch(/if \(auf && fensterBreit\(\) === false\) \{\s+setOffen\('neu'\)/)
     // Dieselbe Grenze wie die Klassen md:…
-    expect(shell).toContain("window.matchMedia('(min-width: 768px)').matches")
+    expect(shell).toContain("const MD_ABFRAGE = '(min-width: 48rem)'")
+    expect(shell).toContain('window.matchMedia(MD_ABFRAGE).matches')
+    // Gegenprobe: keine Grenze in px, sonst fiele sie bei größerer Browserschrift anders als `md:`.
+    expect(shell).not.toContain("min-width: 768px")
   })
 
   it('die Marke sitzt wie im Board: sichtbar 32 px mit 4 px darunter, Tippfläche 44 px über ::before (UI-Runde 4)', () => {

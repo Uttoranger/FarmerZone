@@ -277,12 +277,17 @@ const NEU_MENUE_EINTRAG = 'min-h-16 px-3.5 py-1.5'
 const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'
 
 /**
- * Ab 768 px (md) gilt die Seitenleiste, darunter die Unterleiste — dieselbe Grenze wie die Klassen md:…
+ * Ab 48rem (md, bei 16 px Grundschrift 768 px) gilt die Seitenleiste, darunter die Unterleiste. In `rem`,
+ * genau wie Tailwinds `md:` – mit `px` fiele die Grenze bei größerer Browserschrift anders als die Klassen
+ * (Knopf sichtbar, Menü in der noch verborgenen Seitenleiste).
  * null, wo es kein Fenster zum Fragen gibt (Server, Test): dann bleibt jeder Knopf bei seiner eigenen Form.
  */
+/** Dieselbe Grenze wie Tailwinds `md:` (48rem). */
+const MD_ABFRAGE = '(min-width: 48rem)'
+
 function fensterBreit(): boolean | null {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
-  return window.matchMedia('(min-width: 768px)').matches
+  return window.matchMedia(MD_ABFRAGE).matches
 }
 
 /** Die Blätter am Handy lassen oben den Kopf der Seite sichtbar (Board s1-mehr-neu: höchstens 86 % der Höhe). */
@@ -340,7 +345,7 @@ export function HofShell({
 
   // Ab 768 px gibt es Blätter und Leiste nicht — ein offenes Blatt ließe den Schleier allein stehen.
   useEffect(() => {
-    const breit = window.matchMedia('(min-width: 768px)')
+    const breit = window.matchMedia(MD_ABFRAGE)
     const beiWechsel = () => {
       if (breit.matches) setOffen(null)
       else setMenueOffen(false)
