@@ -26,6 +26,7 @@ import { GRUND_NICHT_BESTAETIGT, GRUND_ZAHLUNG_VERFALLEN, fristVon, uhrzeitInWie
 import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
 import { NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
 import { NeuigkeitenKarte } from '@/components/bestaetigung/neuigkeiten-karte'
+import { PACK_MARKE } from '@/lib/heute'
 
 type Bestellung = Parameters<typeof bestaetigungsZustand>[0]
 
@@ -114,7 +115,7 @@ describe('bestellSchritte — die Schritte aus dem echten Bestellstatus', () => 
     expect(schritte?.map((s) => `${s.titel}:${s.stand}`)).toEqual([
       'Bestellt:erledigt',
       'Bestätigt:naechster',
-      'Gepackt:offen',
+      'Abholbereit:offen',
       'Abgeholt:offen',
     ])
     // Zwei Stunden ab 10:12 Uhr, vor dem Bestellschluss um 15:00 Uhr.
@@ -129,17 +130,27 @@ describe('bestellSchritte — die Schritte aus dem echten Bestellstatus', () => 
     expect(staende(basis({ status: 'CONFIRMED' }))).toEqual([
       'Bestellt:erledigt',
       'Bestätigt:erledigt',
-      'Gepackt:naechster',
+      'Abholbereit:naechster',
       'Abgeholt:offen',
     ])
-    expect(staende(basis({ status: 'IN_PREPARATION' }))?.[2]).toBe('Gepackt:naechster')
+    expect(staende(basis({ status: 'IN_PREPARATION' }))?.[2]).toBe('Abholbereit:naechster')
     expect(staende(basis({ status: 'READY' }))).toEqual([
       'Bestellt:erledigt',
       'Bestätigt:erledigt',
-      'Gepackt:erledigt',
+      'Abholbereit:erledigt',
       'Abgeholt:naechster',
     ])
     expect(staende(basis({ status: 'PICKED_UP' }))?.every((s) => s.endsWith(':erledigt'))).toBe(true)
+  })
+
+  it('der dritte Schritt heißt für die Kundin „Abholbereit“, nie „Gepackt“ (Register N9, Ergänzung 5.11.2026) — die Kennung bleibt', () => {
+    for (const status of ['CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP'] as const) {
+      const schritte = bestellSchritte(basis({ status }), JETZT) ?? []
+      expect(schritte[2]).toMatchObject({ id: 'gepackt', titel: 'Abholbereit' })
+      expect(schritte.map((s) => s.titel)).not.toContain('Gepackt')
+    }
+    // Gegenprobe: Der Hof behält „Gepackt“ (Marke der Packliste).
+    expect(PACK_MARKE.bereit.text).toBe('Gepackt')
   })
 
   it('online: der zweite Schritt heißt „Bezahlt" und zählt nur mit Zahlung aus der Datenbank', () => {
