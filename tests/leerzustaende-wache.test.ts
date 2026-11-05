@@ -260,7 +260,7 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
  * neuer Leerzustand gehört nicht hierher.
  */
 const ALTLAST_IM_AUFRUF: Array<{ datei: string; text: string }> = [
-  { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Benachrichtigungen abonniert.' },
+  { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Neuigkeiten abonniert.' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', text: 'Noch keine Höfe zum Vergleichen' },
   { datei: 'src/components/hof-bestellungen/bestellungen-ansicht.tsx', text: 'Noch keine Bestellungen' },
   { datei: 'src/components/hof-hilfe/meine-meldungen.tsx', text: 'Noch keine Meldungen' },

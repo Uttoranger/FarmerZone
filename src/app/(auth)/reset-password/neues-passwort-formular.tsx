@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { CircleAlert, Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { validatePassword } from '@/lib/password-rules'
+import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { resetPasswordSchema } from '@/schemas/reset-password'
 import { cn } from '@/lib/utils'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -70,10 +71,10 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         setTokenVerbraucht(true)
         return
       }
-      toast.success('Passwort geändert — du kannst dich jetzt anmelden.')
+      toast.success('Passwort geändert – du kannst dich jetzt anmelden.')
       router.push('/login')
     } catch {
-      setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
+      setFehler('Verbindung fehlgeschlagen – bitte erneut versuchen.')
     } finally {
       setLaedt(false)
     }
@@ -92,7 +93,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
             </Link>
           }
         >
-          Bitte fordere einen neuen Link an.
+          {`Ein Link gilt ${PASSWORT_LINK_DAUER_TEXT} und einmal. Bitte fordere einen neuen Link an.`}
         </Hinweiskarte>
       </div>
     )
@@ -142,7 +143,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         />
         {confirmHasError && (
           <p id={wiederholungFehlerId} role="alert" aria-live="polite" className={FEHLER_TEXT}>
-            Passwörter stimmen nicht überein.
+            Die Passwörter stimmen nicht überein.
           </p>
         )}
       </div>
