@@ -12,7 +12,8 @@ import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellung
 import { MARKE } from '@/lib/marke'
 import { Barzahlung, type BarzahlungAnzeige } from '@/components/hof-einstellungen/barzahlung'
 import { ladeBarzahlung } from '@/server/queries/plattformgebuehr'
-import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { hofpreisModellAb, preisAnzeigeFuer, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { prisma } from '@/lib/prisma'
 
@@ -38,15 +39,17 @@ export default async function KonditionenEinstellungenPage(): Promise<React.JSX.
   let stichtag = hofpreisModellAb(null)
   let gefunden = true
   try {
-    const [geladen, schalter, einstellung, satz] = await Promise.all([
+    // Frisch gelesen wie „Barzahlung“ darunter (ladeBarzahlung): Wort und Rechnung wechseln am Stichtag zusammen.
+    const [geladen, schalter, zeile, satz] = await Promise.all([
       ladeKonditionenHof(userId),
       ladeAbzeichenSchalter(userId),
-      ladeHofpreisEinstellung(),
+      lesePlattformEinstellung(),
       // Nur der Satz der Plattformgebühr (N38) — er wählt Wort und Rechnung des Beispiels.
       prisma.farm.findUnique({ where: { id: farmId }, select: { plattformgebuehrProzent: true } }),
     ])
     hof = geladen
     abzeichen = schalter
+    const einstellung = hofpreisEinstellungAus(zeile)
     stichtag = hofpreisModellAb(einstellung)
     preis = preisAnzeigeFuer({ plattformgebuehrProzent: satz?.plattformgebuehrProzent ?? null }, einstellung, jetzt)
     gefunden = hof !== null

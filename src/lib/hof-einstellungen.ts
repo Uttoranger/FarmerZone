@@ -267,6 +267,25 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
   ]
 }
 
+/** Eine Gruppe der Übersicht: Überschrift und ihre Bereiche, in der Reihenfolge von `einstellungenBereiche`. */
+export type EinstellungGruppe = { id: 'hof' | 'konto'; titel: string; bereiche: EinstellungBereich[] }
+
+/** Was in die Gruppe „Konto“ gehört (Boards s1-/w1-einstellungen); alles andere steht unter „Dein Hof“. */
+const KONTO_BEREICHE: readonly EinstellungBereichId[] = ['konditionen', 'konto']
+
+/**
+ * Die Bereiche in zwei Gruppen wie die Boards s1-/w1-einstellungen: „Dein
+ * Hof“ und „Konto“ (Nr. 224). Reihenfolge und Inhalt bleiben aus
+ * `einstellungenBereiche`; eine leere Gruppe steht nicht da.
+ */
+export function einstellungenGruppen(bereiche: readonly EinstellungBereich[]): EinstellungGruppe[] {
+  const gruppen: EinstellungGruppe[] = [
+    { id: 'hof', titel: 'Dein Hof', bereiche: bereiche.filter((b) => !KONTO_BEREICHE.includes(b.id)) },
+    { id: 'konto', titel: 'Konto', bereiche: bereiche.filter((b) => KONTO_BEREICHE.includes(b.id)) },
+  ]
+  return gruppen.filter((g) => g.bereiche.length > 0)
+}
+
 // ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
 
 /** Welche EINE Hinweiskarte oben auf /settings/payments steht. */

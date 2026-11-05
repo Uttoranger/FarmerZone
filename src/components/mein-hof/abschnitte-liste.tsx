@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, Check, ChevronRight } from 'lucide-react'
 import { zeilenNachOrt, zeilenWieAufDerHofseite, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
-import { schildTon } from '@/lib/mein-hof'
+import { HOFSEITE_VOLLSTAENDIG, punkteOffenTitel, schildTon } from '@/lib/mein-hof'
 import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { FarmSettings } from '@/server/queries/farm'
@@ -52,10 +52,6 @@ type Props = {
   aktuell?: AktuellZeile
 }
 
-/** „Noch 3 Punkte offen", „Noch 1 Punkt offen". */
-function offenTitel(n: number): string {
-  return n === 1 ? 'Noch 1 Punkt offen' : `Noch ${n} Punkte offen`
-}
 
 /**
  * Eine Zeile als Knopf. Der Wert steht in einer Zeile (gekürzt, ganz im title),
@@ -154,7 +150,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           <span aria-hidden="true" className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <Check className="size-3" strokeWidth={2.6} />
           </span>
-          <span className="font-semibold text-foreground">Hofseite vollständig</span>
+          <span className="font-semibold text-foreground">{HOFSEITE_VOLLSTAENDIG}</span>
           <span className="text-[13px] text-muted-foreground">
             · {fortschritt.erledigt} von {fortschritt.gesamt}
           </span>
@@ -164,7 +160,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           <div className="flex flex-col gap-2.5 px-3.5 pt-3.5 pb-3">
             <div className="flex items-baseline gap-2.5">
               <h2 id="bearbeiten-stand" className="flex-1 font-heading text-[17px] font-semibold text-foreground">
-                {offenTitel(offeneZeilen.length)}
+                {punkteOffenTitel(offeneZeilen.length)}
               </h2>
               <p className="shrink-0 text-[13px] font-semibold text-muted-foreground tabular-nums">
                 {fortschritt.erledigt} von {fortschritt.gesamt}
