@@ -100,7 +100,7 @@ describe('Korb-Blatt: Grund statt „Zur Kasse“ (Nr. 205)', () => {
         items: [posten],
         total: 3,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { hofName: 'Musterdorf', pauseMessage: null, sperre },
       })

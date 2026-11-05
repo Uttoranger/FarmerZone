@@ -8,7 +8,7 @@
  * für die Servicegebühr, dieselben Abholfenster, dieselbe Frist.
  */
 import { abholSchluessel, angeboteneAbholfenster, type AbholSlot } from '@/lib/abholfenster'
-import { formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
+import { einheitLabel, formatEuro, formatMenge, formatTagKurz, formatZahl, gebindeGroesse } from '@/lib/format'
 import type { OrderStatus, PaymentStatus } from '@prisma/client'
 import { istVerwaist, uhrzeitInWien, type FristBestellung } from '@/lib/fristen'
 import { tagVersetzt } from '@/lib/kalender'
@@ -271,6 +271,26 @@ export function mindestbestellwertKarte(hof: KassenHof, warenCents: number, hund
   const titel = mindestbestellwertHinweis(0, hundertstel)
   const fehlbetrag = mindestbestellwertHinweis(MINDESTBESTELLWERT_CENTS - warenCents, hundertstel).slice(titel.length).trim()
   return { titel, satz: `${fehlbetrag} Leg noch etwas dazu.` }
+}
+
+/**
+ * Eine Position mit der Menge vorn, wie in den Boards der Kaufstrecke (s1-/w1-kasse, s1-/w1-bestaetigung,
+ * s1-/w1-bestellung-link, Lauf 31: „2 × Bergkäse, 250 g“) — nur Anzeige, ohne Betrag:
+ *   Stück (oder ohne Einheit):  „3 × Bergkäse“
+ *   mit Gebinde:                „1 × Bio-Freilandeier, 6 Pakete“
+ *   sonst die Menge der Einheit: „4 L Heumilch frisch“, „2 Ballen Heu“
+ * Mails, Hofbereich und Admin behalten `formatPosition` (Name vorn); dort ist nichts geändert.
+ */
+export function positionMengeVorn(p: {
+  name: string
+  quantity: number
+  unit?: string | null
+  unitSize?: number | { toString(): string } | null
+}): string {
+  const gebinde = gebindeGroesse(p.unitSize)
+  if (p.unit && gebinde && gebinde !== 1) return `${formatZahl(p.quantity)} × ${p.name}, ${formatZahl(gebinde)} ${einheitLabel(p.unit, gebinde)}`
+  if (!p.unit || p.unit === 'STUECK') return `${formatZahl(p.quantity)} × ${p.name}`
+  return `${formatMenge(p.quantity, p.unit)} ${p.name}`
 }
 
 /** Der Ausweg der Karte: zurück zum Angebot des Hofs (Board s1-/w1-kasse Bild 5). */

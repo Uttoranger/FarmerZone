@@ -41,21 +41,28 @@ export function BestaetigungKopf({
   kopf,
   kicker,
   ohneSatz = false,
+  satzLeise = false,
 }: {
   kopf: BestaetigungsKopf
   kicker?: string
   ohneSatz?: boolean
+  /** Der Satz gedämpft (Board s1-/w1-bestaetigung Bild 4: „Danke – alle Details stehen in deiner E-Mail.“). */
+  satzLeise?: boolean
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
       {kicker && (
-        <p className={cn(ETIKETT, 'break-words')} title={kicker}>
+        // Am Handy nennt die Titelzeile der Shell schon „Bestellung bei <Hof>“ (Board s1-bestaetigung) — der Kicker
+        // stünde doppelt da; er erscheint erst ab 768 px (w1-bestaetigung).
+        <p className={cn(ETIKETT, 'hidden break-words md:block')} title={kicker}>
           {kicker}
         </p>
       )}
       <h1 className="font-heading text-[26px] leading-tight font-semibold text-balance break-words md:text-[28px]">{kopf.titel}</h1>
       {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
-      {!ohneSatz && <p className="text-[15px] leading-normal [overflow-wrap:anywhere] text-foreground">{kopf.satz}</p>}
+      {!ohneSatz && (
+        <p className={cn('text-[15px] leading-normal [overflow-wrap:anywhere]', satzLeise ? 'text-muted-foreground' : 'text-foreground')}>{kopf.satz}</p>
+      )}
     </div>
   )
 }
@@ -112,7 +119,8 @@ export function AbholKarte({
         Abholung
       </h2>
       <p className="text-[17px] font-semibold break-words">{abholZeit}</p>
-      <p className="text-[14px] leading-normal break-words text-muted-foreground">
+      {/* In der Textfarbe wie in den Boards (s1-/w1-bestaetigung, s1-/w1-bestellung-link Bild 1). */}
+      <p className="text-[14px] leading-normal break-words text-foreground">
         {hofName} · {adresse}
       </p>
       <p className="mt-1 self-start rounded-lg border border-dashed border-input px-2.5 py-1 text-[14px] break-words">
@@ -163,10 +171,10 @@ export function StatusSchritte({ schritte }: { schritte: readonly BestellSchritt
             aria-current={s.stand === 'naechster' ? 'step' : undefined}
             className="flex min-w-0 flex-col gap-1.5"
           >
-            {/* Erledigt in `status-fertig`: hell das Grün, dunkel das helle Mint der Boards (s1-/w1-bestaetigung-dunkel) —
-                `accent` läge im Dunkeln kaum über dem Grund (Bewertung Lauf 31). */}
+            {/* Erledigt: der Balken in `status-fertig` (hell das Grün, dunkel das helle Mint der Boards; `accent` läge im
+                Dunkeln kaum über dem Grund), das Wort fett in der Textfarbe (Boards s1-/w1-bestaetigung, Runde 2). */}
             <span aria-hidden="true" className={cn('h-1.5 rounded-full', s.stand === 'erledigt' ? 'bg-status-fertig' : 'bg-border')} />
-            <span className={cn('truncate text-[13px]', s.stand === 'erledigt' ? 'font-bold text-status-fertig' : 'text-muted-foreground')}>
+            <span className={cn('truncate text-[13px]', s.stand === 'erledigt' ? 'font-bold text-foreground' : 'text-muted-foreground')}>
               {s.titel}
               <span className="sr-only">
                 : {SCHRITT_VORGELESEN[s.stand]}
@@ -214,13 +222,14 @@ export function BestellPositionen({
     // Board: die kleine Überschrift über der Karte, darin die Zeilen, „Gesamt“ und darunter Zahlart und Gebühr leise.
     <section aria-label={titel} className="flex flex-col gap-2">
       <h2 className={ETIKETT}>{titel}</h2>
-      <div className={cn(KARTE, 'flex flex-col gap-2')}>
+      <div className={cn(KARTE, 'flex flex-col')}>
       {/* Boards s1-/w1-bestaetigung (Lauf 31): je Position eine Zeile mit dem Betrag dahinter („2 × Bergkäse, 250 g ·
-          € 13,16“), „Gesamt € …“ fett in einer Zeile. Die Gebühr bleibt eine eigene Zeile (E4): Die Zeilen tragen den
-          Warenpreis aus dem Snapshot — Endpreise je Zeile wären eine neue Rechnung. */}
-      <ul className="flex flex-col gap-1">
+          € 13,16“, Menge vorn), dicht untereinander, „Gesamt € …“ fett in einer Zeile. Die Gebühr bleibt eine eigene
+          Zeile (DESIGN_SYSTEM „Bestellseite“): Die Zeilen tragen den Warenpreis aus dem Snapshot — Endpreise je Zeile
+          wären eine neue Rechnung. */}
+      <ul className="flex flex-col">
         {positionen.map((p, i) => (
-          <li key={i} className="text-[15px] break-words">
+          <li key={i} className="text-[15px] leading-normal break-words">
             {p.text}
             {p.fehlt ? (
               <>
@@ -236,7 +245,7 @@ export function BestellPositionen({
           </li>
         ))}
         {s.gebuehrCents > 0 && (
-          <li className="text-[15px]">
+          <li className="text-[15px] leading-normal">
             {gebuehrBezeichnungFuer(summen)}
             {entfallen && <span className="text-[13px]"> ({summen.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'})</span>}
             {' · '}
@@ -246,12 +255,12 @@ export function BestellPositionen({
           </li>
         )}
       </ul>
-      <p className="text-[16px] font-bold">
+      <p className="text-[16px] leading-normal font-bold">
         Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(s.gesamtCents))}</span>
       </p>
       <p className="text-[13px] leading-normal text-muted-foreground">{zahlung}</p>
-      {s.gebuehrCents > 0 && <p className="text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
-      {fuss}
+      {s.gebuehrCents > 0 && <p className="mt-1 text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
+      {fuss && <div className="mt-2">{fuss}</div>}
       </div>
     </section>
   )
@@ -259,29 +268,32 @@ export function BestellPositionen({
 
 /**
  * Die eine Hauptaktion unten (Boards s1-/w1-bestaetigung): am Handy eine Leiste, die beim Scrollen unten klebt, mit
- * dem grünen Knopf über die volle Breite und dem leisen Nebenweg darunter; ab 768 px unter einer Linie rechts
- * bündig (Nebenweg, dann Knopf). Sie klebt nur innerhalb der Spalte (`sticky`, nicht `fixed`): Am Ende der Seite
- * gibt sie den Seitenfuß frei, statt ihn zu verdecken. `data-unten-fest`: Der Cookie-Hinweis steht darüber, nie
- * darauf (src/lib/cookie-hinweis.ts).
+ * dem grünen Knopf über die volle Breite und dem leisen Nebenweg darunter (`sticky` in der Spalte: Am Ende der Seite
+ * gibt sie den Seitenfuß frei). Ab 768 px steht sie fest am unteren Fensterrand wie im Board w1-bestaetigung (Bild 1–3,
+ * Runde 2) — auch bei kurzer Seite —, über einer Linie, rechts bündig (Nebenweg, dann Knopf); die Seite hält dafür
+ * unter dem Seitenfuß Platz frei (`KundeShell platzFuerLeiste`). `data-unten-fest`: Der Cookie-Hinweis steht darüber,
+ * nie darauf (src/lib/cookie-hinweis.ts).
  */
 export function Hauptaktion({ haupt, neben }: { haupt: { href: string; text: string }; neben?: { href: string; text: string } }): React.JSX.Element {
   return (
     <div
       data-unten-fest=""
-      // Ab 768 px klebt sie wie im Board w1-bestaetigung ebenfalls unten (Lauf 31): über einer Linie, rechts bündig.
-      className="sticky bottom-0 z-30 -mx-4 -mb-12 mt-2 flex flex-col gap-1 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:mx-0 md:mb-0 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:bg-background md:px-0 md:pt-4 md:pb-5 print:hidden"
+      className="sticky bottom-0 z-30 -mx-4 -mb-12 mt-2 border-t border-border bg-card px-4 pt-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:fixed md:inset-x-0 md:mx-0 md:mb-0 md:mt-0 md:border-0 md:bg-background md:px-4 md:pt-0 md:pb-5 print:hidden"
     >
-      <Link href={haupt.href} className={cn(KNOPF_BREIT_GRUEN, 'md:w-auto md:px-5')}>
-        {haupt.text}
-      </Link>
-      {neben && (
-        <Link
-          href={neben.href}
-          className={cn('inline-flex min-h-11 items-center justify-center rounded-full px-3 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
-        >
-          {neben.text}
+      {/* Ab 768 px: die Linie 40 px breiter als die Spalte des Inhalts (896 px), die Knöpfe bündig mit ihr. */}
+      <div className="flex flex-col gap-1 md:mx-auto md:max-w-[976px] md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:border-t md:border-border md:px-10 md:pt-4">
+        <Link href={haupt.href} className={cn(KNOPF_BREIT_GRUEN, 'md:w-auto md:px-5')}>
+          {haupt.text}
         </Link>
-      )}
+        {neben && (
+          <Link
+            href={neben.href}
+            className={cn('inline-flex min-h-11 items-center justify-center rounded-full px-3 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+          >
+            {neben.text}
+          </Link>
+        )}
+      </div>
     </div>
   )
 }

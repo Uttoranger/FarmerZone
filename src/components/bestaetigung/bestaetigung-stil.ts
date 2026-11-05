@@ -9,10 +9,11 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
  */
 
 /**
- * Karte: Radius 16 px, Fläche --surface mit Rahmen --border. Fest in Pixeln: Im neuen Design ist `--radius` 16 px,
- * `rounded-2xl` wären dort 29 px (Bewertung Lauf 31).
+ * Karte: Radius 16 px, Fläche --surface mit Rahmen --border, innen 14 px wie in den Boards (s1-/w1-bestaetigung,
+ * s1-/w1-bestellung-link; Bewertung Lauf 31, Runde 2). Fest in Pixeln: Im neuen Design ist `--radius` 16 px,
+ * `rounded-2xl` wären dort 29 px.
  */
-export const KARTE = 'rounded-[16px] border border-border bg-card px-4 py-4 md:px-[18px]'
+export const KARTE = 'rounded-[16px] border border-border bg-card p-3.5'
 
 /** Kleine Überschrift in Großbuchstaben („ABHOLUNG“, „HOF ERREICHEN“, „DEINE BESTELLUNG“). */
 export const ETIKETT = 'text-[12px] font-bold tracking-[1px] text-muted-foreground uppercase'

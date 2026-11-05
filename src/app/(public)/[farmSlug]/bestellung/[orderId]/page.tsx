@@ -4,7 +4,7 @@ import { bestellLinkGilt, bestellSignatur, widerrufPfad } from '@/lib/bestell-li
 import { widerrufMoeglich } from '@/lib/widerruf'
 import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
 import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
-import { formatPosition } from '@/lib/format'
+import { positionMengeVorn } from '@/lib/kasse'
 import { alsCents } from '@/lib/order-totals'
 import { cn } from '@/lib/utils'
 import { Marke } from '@/components/ui/marke'
@@ -118,7 +118,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           // „Artikel fehlt" (E14): die Position steht da, ist aber nicht mehr im Betrag.
           fehltSeit: true,
           // Einheit nur zur Anzeige gejoint — dieselbe Schreibweise wie auf
-          // der Bestätigungsseite (formatPosition, src/lib/format.ts).
+          // der Bestätigungsseite (positionMengeVorn, src/lib/kasse.ts).
           product: { select: { unit: true, unitSize: true } },
         },
       },
@@ -143,7 +143,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
   const adresse = `${order.farm.address}, ${order.farm.postalCode} ${order.farm.city}`
 
   const positionen = order.items.map((item) => ({
-    text: formatPosition({
+    // Menge vorn wie im Board („2 × Bergkäse, 250 g · € 13,16“, s1-/w1-bestellung-link Bild 1).
+    text: positionMengeVorn({
       name: item.productName,
       quantity: item.quantity,
       unit: item.product?.unit ?? null,

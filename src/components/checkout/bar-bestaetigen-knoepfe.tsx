@@ -55,7 +55,7 @@ export function BarBestaetigenKnoepfe({ token }: { token: string }) {
           type="submit"
           variant="ghost"
           disabled={laeuft}
-          className="h-11 rounded-[14px] px-[18px] text-[15px] font-semibold text-foreground"
+          className="h-11 rounded-[14px] px-[18px] text-base font-semibold text-foreground"
         >
           {storniertLaeuft ? 'Wird storniert …' : 'Doch nicht – Bestellung stornieren'}
         </Button>

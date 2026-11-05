@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Clock, LinkIcon, XCircle } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
-import { formatEuro, formatPosition } from '@/lib/format'
+import { formatEuro } from '@/lib/format'
+import { positionMengeVorn } from '@/lib/kasse'
 import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tokenKandidaten } from '@/lib/bar-bestaetigung'
 import { fristVon } from '@/lib/fristen'
@@ -142,30 +143,33 @@ export default async function BarBestaetigenSeite({ params }: Props) {
         <p className="text-[15px] leading-normal text-foreground">{barBestaetigenSatz(bis, jetzt)}</p>
       </div>
 
-      <div className={cn(KARTE, 'flex flex-col gap-1.5')}>
-        {order.items.map((item, i) => {
-          const name = formatPosition({
-            name: item.productName,
-            quantity: item.quantity,
-            unit: item.product?.unit ?? null,
-            unitSize: item.product?.unitSize ?? null,
-          })
-          return (
-            <Zeile key={i} titel={name}>
-              {/* Nur Anzeige eines gespeicherten Betrags — gerechnet wird damit nicht. */}
-              {formatEuro(Number(item.totalPrice))}
-            </Zeile>
-          )
-        })}
-        {summen.gebuehrCents > 0 && (
-          <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
-        )}
-        <p className="text-[13px] leading-normal text-muted-foreground">{zahlungsAnzeige(order.paymentMethod, 'PENDING').art}</p>
-        <div className="flex items-baseline gap-2 text-[16px] font-bold text-foreground">
-          <span>Gesamt</span>
-          <span className="grow" />
-          <span className="tabular-nums">{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
-        </div>
+      {/* Board s1-/w1-bestellung-link Bild 2 (Lauf 31): einspaltig, je Position „3 × Bergkäse, 250 g · € 19,74“, darunter
+          leise die Zahlart und „Gesamt € …“ fett in einer Zeile — wie die Positionen der Bestätigung. Die Gebühr bleibt eine
+          eigene Zeile (DESIGN_SYSTEM „Bestellseite“): Die Zeilen tragen den Warenpreis aus dem Snapshot. */}
+      <div className={cn(KARTE, 'flex flex-col')}>
+        <ul className="flex flex-col">
+          {order.items.map((item, i) => {
+            const name = positionMengeVorn({
+              name: item.productName,
+              quantity: item.quantity,
+              unit: item.product?.unit ?? null,
+              unitSize: item.product?.unitSize ?? null,
+            })
+            return (
+              <Zeile key={i} titel={name}>
+                {/* Nur Anzeige eines gespeicherten Betrags — gerechnet wird damit nicht. */}
+                {formatEuro(Number(item.totalPrice))}
+              </Zeile>
+            )
+          })}
+          {summen.gebuehrCents > 0 && (
+            <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
+          )}
+        </ul>
+        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{zahlungsAnzeige(order.paymentMethod, 'PENDING').art}</p>
+        <p className="mt-0.5 text-[17px] font-bold text-foreground">
+          Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
+        </p>
       </div>
       {/* Mit Wochentag und Datum (V9). */}
       <p className="text-[14px] leading-normal break-words text-foreground">
@@ -175,16 +179,14 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   )
 }
 
-/** Eine Zeile der Karte: leiser Name links, Betrag rechts. Lange Namen höchstens zwei Zeilen. */
+/** Eine Zeile der Karte: die Position, dahinter „· € …“ (Board s1-/w1-bestellung-link Bild 2). Lange Namen umbrechen. */
 function Zeile({ titel, children }: { titel: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2 text-[15px] text-foreground">
-      <span className="line-clamp-2 min-w-0 break-words" title={titel}>
-        {titel}
-      </span>
-      <span className="grow" />
-      <span className="shrink-0 tabular-nums">{children}</span>
-    </div>
+    <li className="text-[15px] leading-normal break-words text-foreground">
+      {titel}
+      {' · '}
+      <span className="whitespace-nowrap tabular-nums">{children}</span>
+    </li>
   )
 }
 
@@ -218,7 +220,8 @@ function Rahmen({
   return (
     <KundeFokusShell
       titel={TITEL}
-      zurueck={{ href: `/${hofSlug}`, label: `Zurück zu ${hofName}` }}
+      // Im Browser „← Zurück zum Hof“ wie im Board (w1-bestellung-link Bild 2 und 3); den Hof nennt am Handy die Unterzeile.
+      zurueck={{ href: `/${hofSlug}`, label: 'Zurück zum Hof' }}
       // Board s1-bestellung-link Bild 2: unter „Bestätigen“ die Zeile mit dem Weg zurück; im Browser der Textlink rechts.
       unterzeile={ohnePfeilAmHandy ? undefined : `Zurück zu ${hofName}`}
       ohnePfeilAmHandy={ohnePfeilAmHandy}

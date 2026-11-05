@@ -2,7 +2,7 @@
 
 /** Der Warenkorb der Hofseite als Blatt — am Handy von unten, ab 768 px von rechts (Boards s1-/w1-korb, Nr. 227). */
 
-import type { ComponentProps } from 'react'
+import { useState, type ComponentProps } from 'react'
 import type { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
@@ -21,7 +21,9 @@ import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufGrund } from '@/components/hofseite/kauf-grund'
 import { useBestellstopp } from '@/components/notbremse-band'
-import { KORB_LEER, type CartItem } from '@/lib/use-cart'
+import { KORB_LEER, type CartItem, type KorbErgebnis } from '@/lib/use-cart'
+import { korbFehlerText } from '@/lib/hofseite-orientierung'
+import { SpeicherFehler } from '@/components/shared/formular-meldungen'
 import { EmptyState } from '@/components/ui/empty-state'
 import { HinweiskarteStatus } from '@/components/checkout/kasse-teile'
 import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
@@ -38,7 +40,8 @@ type Props = {
   farmSlug: string
   /** Adresse von „Zur Kasse" — die Produktseite gibt `?kaeufer=betrieb` mit (Nr. 29); sonst die Kasse des Hofs. */
   kasseHref?: string
-  onUpdateQuantity: (productId: string, qty: number) => void
+  /** Das Ergebnis zählt (Register N29): Scheitert die Menge, sagt es das Blatt — am Netz mit „Nochmal“. */
+  onUpdateQuantity: (productId: string, qty: number) => Promise<KorbErgebnis>
   onRemoveItem: (productId: string) => void
   /** „zzgl. Servicegebühr" neben der Summe — null, wenn der Hof gerade gebührenfrei ist. */
   gebuehrKorb?: string | null
@@ -55,6 +58,19 @@ type Props = {
    * sich der Korb ändert. Die Produktseite gleicht nicht ab und gibt ihn nicht mit.
    */
   hinweis?: string | null
+}
+
+/** Der Satz im Blatt, wenn eine Menge scheitert — null, wenn sie stand. */
+export type MengeFehler = { text: string; nochmal: boolean }
+
+/**
+ * Was das Blatt nach „−“ bzw. „+“ sagt (Register N29, Lücke aus Nr. 235): nichts, wenn die Menge stand; sonst der Satz
+ * wie an der Zeile der Hofseite (`korbFehlerText`, nie der rohe Text des Servers) — am Netz der N29-Satz mit „Nochmal“.
+ * Die Menge im Blatt bleibt dann, wie sie war (useCart setzt sie erst nach der Zusage des Servers).
+ */
+export function mengeFehlerNach(ergebnis: KorbErgebnis): MengeFehler | null {
+  if (ergebnis.ok) return null
+  return { text: korbFehlerText(ergebnis, 'menge'), nochmal: ergebnis.nochmal === true }
 }
 
 /** Ein Mengen-Knopf in der Pille: 44 × 44 px, das Zeichen in der Mitte (Board s1-/w1-korb). */
@@ -88,6 +104,15 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
   // Ohne Hofpreis-Modell bleibt die Summe aus dem Korb wie bisher.
   const gesamt = anzeige ? centsAlsEuro(summeCents) : total
   const leer = items.length === 0
+  // Die letzte gescheiterte Menge samt Wiederholung (N29) — der nächste Tipp auf „−“/„+“ räumt sie weg.
+  const [mengeFehler, setMengeFehler] = useState<(MengeFehler & { wiederholen: () => void }) | null>(null)
+  function mengeSetzen(productId: string, menge: number) {
+    setMengeFehler(null)
+    void onUpdateQuantity(productId, menge).then((ergebnis) => {
+      const fehler = mengeFehlerNach(ergebnis)
+      if (fehler) setMengeFehler({ ...fehler, wiederholen: () => mengeSetzen(productId, menge) })
+    })
+  }
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetBlatt seite="rechts">
@@ -121,8 +146,18 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               symbol={ShoppingBasket}
               titel={KORB_LEER.titel}
               satz={KORB_LEER.satz}
-              // Board Bild 3: der Ausweg über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
-              className="items-stretch rounded-[16px] border-solid py-6 [&>span]:self-center"
+              // Board s1-/w1-korb Bild 3 (Runde 2): ein schmaler Kasten, links bündig — Titel fett in der Grundschrift, darunter
+              // der Satz —, „Zum Angebot“ über die volle Breite UNTER dem Kasten. Den Kasten zeichnet ::before über die ersten
+              // zwei Zeilen des Rasters, der Ausweg steht in der dritten außerhalb. Das Symbol bleibt (Register N9: Symbol,
+              // Satz, Aktion), klein links im Kasten.
+              className={cn(
+                'grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0 rounded-none border-0 bg-transparent p-0 text-left',
+                "before:col-span-2 before:col-start-1 before:row-span-2 before:row-start-1 before:rounded-[16px] before:border before:border-border before:bg-card before:content-['']",
+                '[&>span]:col-start-1 [&>span]:row-span-2 [&>span]:row-start-1 [&>span]:ml-3.5 [&>span]:size-9 [&>span>svg]:size-5',
+                '[&>p:first-of-type]:col-start-2 [&>p:first-of-type]:row-start-1 [&>p:first-of-type]:self-end [&>p:first-of-type]:pt-3 [&>p:first-of-type]:pr-3.5 [&>p:first-of-type]:font-sans [&>p:first-of-type]:text-[15px] [&>p:first-of-type]:font-bold',
+                '[&>p:nth-of-type(2)]:col-start-2 [&>p:nth-of-type(2)]:row-start-2 [&>p:nth-of-type(2)]:max-w-none [&>p:nth-of-type(2)]:self-start [&>p:nth-of-type(2)]:pr-3.5 [&>p:nth-of-type(2)]:pb-3 [&>p:nth-of-type(2)]:text-[13.5px]',
+                '[&>div]:col-span-2 [&>div]:row-start-3 [&>div]:mt-2.5'
+              )}
               ausweg={
                 <Link
                   href={`/${farmSlug}`}
@@ -168,7 +203,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                     <div className="mt-1.5 inline-flex items-center rounded-full border-[1.5px] border-accent bg-card">
                       <button
                         type="button"
-                        onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
+                        onClick={() => mengeSetzen(item.productId, item.quantity - 1)}
                         aria-label={`${item.name}: eins weniger`}
                         className={MENGEN_KNOPF}
                       >
@@ -179,7 +214,7 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                       </span>
                       <button
                         type="button"
-                        onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                        onClick={() => mengeSetzen(item.productId, item.quantity + 1)}
                         aria-label={`${item.name}: eins mehr`}
                         className={MENGEN_KNOPF}
                       >
@@ -206,6 +241,11 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Am Ort der Aktion, kein Toast (DESIGN_SYSTEM „Zustände“): die orange Karte mit dem Satz, am Netz „Nochmal“. */}
+        {!leer && mengeFehler && (
+          <SpeicherFehler text={mengeFehler.text} nochmal={mengeFehler.nochmal} onNochmal={mengeFehler.wiederholen} />
         )}
 
         {!leer && (

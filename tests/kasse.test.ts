@@ -37,6 +37,7 @@ import {
   zahlungsGebuehrText,
   gebuehrZeile,
   kaufknopfZeile,
+  positionMengeVorn,
 } from '@/lib/kasse'
 import { checkoutZahlungsBetragSchema } from '@/schemas/checkout'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
@@ -495,5 +496,25 @@ describe('bestaetigungMitStatus — Rückleitung, wenn die Zahlung schon durch i
 
   it('bleibt auf der eigenen Seite, auch bei einem fremden Ziel', () => {
     expect(bestaetigungMitStatus('https://fremd.example/x?sig=1', HIER, 'processing')).toBe('/x?sig=1&redirect_status=processing')
+  })
+})
+
+describe('positionMengeVorn (Boards der Kaufstrecke, Lauf 31: Menge vorn)', () => {
+  it('Stück und ohne Einheit: „3 × Name“', () => {
+    expect(positionMengeVorn({ name: 'Bergkäse, 250 g', quantity: 3, unit: 'STUECK', unitSize: 1 })).toBe('3 × Bergkäse, 250 g')
+    expect(positionMengeVorn({ name: 'Honig', quantity: 2, unit: null })).toBe('2 × Honig')
+  })
+
+  it('mit Gebinde: Anzahl × Name, dahinter das Gebinde', () => {
+    expect(positionMengeVorn({ name: 'Bio-Freilandeier', quantity: 1, unit: 'PAKET', unitSize: 6 })).toBe('1 × Bio-Freilandeier, 6 Pakete')
+    expect(positionMengeVorn({ name: 'Rindfleisch-Paket', quantity: 2, unit: 'KG', unitSize: 5 })).toBe('2 × Rindfleisch-Paket, 5 kg')
+  })
+
+  it('Maßeinheit ohne Gebinde: die Menge der Einheit vorn', () => {
+    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: 1 })).toBe('4 L Heumilch frisch')
+  })
+
+  it('Gegenprobe: ein ungültiges Gebinde (0) zählt wie keins', () => {
+    expect(positionMengeVorn({ name: 'Heumilch frisch', quantity: 4, unit: 'LITER', unitSize: 0 })).toBe('4 L Heumilch frisch')
   })
 })

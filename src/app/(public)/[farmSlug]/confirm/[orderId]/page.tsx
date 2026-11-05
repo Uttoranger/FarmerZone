@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { formatPosition } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { bestellLinkGilt, bestellungPfad, kalenderPfad } from '@/lib/bestell-link'
 import { widerrufPfad } from '@/lib/bestell-link'
@@ -18,7 +17,7 @@ import {
   korbLeeren,
   neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
-import { zahlungFortsetzenPfad } from '@/lib/kasse'
+import { positionMengeVorn, zahlungFortsetzenPfad } from '@/lib/kasse'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
@@ -96,6 +95,7 @@ function BestellungEingegangen() {
               titel: 'Deine Bestellung ist eingegangen',
               satz: 'Danke – alle Details stehen in deiner E-Mail.',
             }}
+            satzLeise
           />
           <Link href="/hoefe" className={KNOPF_BREIT_RAHMEN}>
             Höfe entdecken
@@ -224,7 +224,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   const bestellungHref = bestellungPfad(farmSlug, order.id)
 
   const positionen = order.items.map((item) => ({
-    text: formatPosition({
+    // Menge vorn wie im Board („2 × Bergkäse, 250 g · € 13,16“, s1-/w1-bestaetigung).
+    text: positionMengeVorn({
       name: item.productName,
       quantity: item.quantity,
       unit: item.product?.unit ?? null,
@@ -248,7 +249,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   return (
     // Boards s1-/w1-bestaetigung (Lauf 31): am Handy die Titelzeile „Bestellung bei <Hof>“, im Browser der Seitenfuß in
     // der Spalte der Seite (896 px Inhalt).
-    <KundeShellMitSitzung unterleiste={false} handyTitel={`Bestellung bei ${order.farm.name}`} fussSpalte="md:max-w-[944px]">
+    // Ab 768 px steht die Hauptaktion fest unten (w1-bestaetigung, Runde 2): Der Seitenfuß hält darunter Platz frei.
+    <KundeShellMitSitzung unterleiste={false} handyTitel={`Bestellung bei ${order.farm.name}`} fussSpalte="md:max-w-[944px]" platzFuerLeiste>
       {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
       {korbLeeren(zustand) && <ClearCartOnMount />}
       <div className={SPALTE}>

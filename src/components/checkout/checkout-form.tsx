@@ -14,7 +14,7 @@ import {
   leseZahlungsBetrag,
   type KasseFormularDaten as CheckoutFormData,
 } from '@/lib/kasse-pruefung'
-import { formatEuro, formatPosition } from '@/lib/format'
+import { formatEuro } from '@/lib/format'
 import { BAR_NICHT_MOEGLICH_SATZ, INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
@@ -51,6 +51,7 @@ import {
   kassenZahlarten,
   mindestbestellwertGrund,
   mindestbestellwertKarte,
+  positionMengeVorn,
   MINDESTBESTELLWERT_AUSWEG,
   CODE_BAR_NICHT_MOEGLICH,
   kassenZahlweg,
@@ -546,7 +547,8 @@ export function CheckoutForm({
 
   // h1InSeiteAbMd: Nur das Formular setzt ab 768 px seine h1 selbst („Bestellen bei <Hof>“, Board w1-kasse);
   // Skelett, leerer Korb und Zahlungsschritt behalten den Titel im Kopf.
-  const fokusShell = (titel: string, inhalt: React.ReactNode, h1InSeiteAbMd = false) => {
+  // `spalte`: die Breite der Zeile „Vertrag widerrufen“ am Ende — so breit wie der Inhalt der Ansicht (Board w1-kasse Bild 5).
+  const fokusShell = (titel: string, inhalt: React.ReactNode, h1InSeiteAbMd = false, spalte?: string) => {
     const zurueck = kassenZurueck({ farmSlug: farm.slug, schritt, bestellungAngelegt })
     return (
       <KundeFokusShell
@@ -554,6 +556,7 @@ export function CheckoutForm({
         // Board s1-kasse: unter „Bestellen“ die Zeile „bei Hof Müller“ statt des Hofnamens rechts.
         unterzeile={`bei ${farm.name}`}
         h1InSeiteAbMd={h1InSeiteAbMd}
+        spalte={spalte}
         zurueck={
           zurueck.art === 'link'
             ? { href: zurueck.href, label: zurueck.label }
@@ -620,6 +623,7 @@ export function CheckoutForm({
       <KasseUnterMindestwert
         karte={mindestKarte}
         hofSlug={farm.slug}
+        hofName={farm.name}
         uebersicht={
           <UebersichtKarte
             betraege={betraege}
@@ -627,10 +631,14 @@ export function CheckoutForm({
             gebuehrErklaerung={gebuehr.erklaerung}
             gebuehrEntfaellt={gebuehr.entfaellt}
             hofpreis={farm.preisAnzeige !== null}
-            positionen={korbPositionen.map((p) => formatPosition({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize }))}
+            mitErklaerung={false}
+            positionen={korbPositionen.map((p) => positionMengeVorn({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize }))}
           />
         }
-      />
+      />,
+      // Board w1-kasse Bild 5: im Browser die h1 „Bestellen bei <Hof>“ über der Karte, im Kopf nur Marke und „← Zurück zum Hof“.
+      true,
+      KASSE_SCHMAL
     )
   }
 
@@ -828,16 +836,17 @@ export function CheckoutForm({
                 </p>
               </Feld>
               <Feld id="customerNote" label="Notiz an den Hof (freiwillig)" fehler={fehlerAm.customerNote?.message}>
-                {/* Zwei Zeilen hoch wie im Board (s1-kasse, 66 px); wächst mit dem Text (field-sizing),
+                {/* Am Handy zwei Zeilen hoch wie im Board (s1-kasse, 66 px), ab 768 px einzeilig wie die anderen Felder
+                    (w1-kasse, 48 px; Register N10 „Notiz einzeilig und wächst“). Wächst mit dem Text (field-sizing),
                     wo der Browser das nicht kann, lässt sie sich größer ziehen. */}
                 <textarea
                   id="customerNote"
                   {...form.register('customerNote')}
-                  rows={2}
+                  rows={1}
                   aria-invalid={fehlerAm.customerNote ? true : undefined}
                   aria-describedby={fehlerAm.customerNote ? 'customerNote-fehler' : undefined}
                   placeholder="z. B. komme später"
-                  className={cn(FELD, 'field-sizing-content h-auto max-h-40 min-h-[66px] resize-y py-2.5 leading-[1.4] supports-[field-sizing:content]:resize-none')}
+                  className={cn(FELD, 'field-sizing-content h-auto max-h-40 min-h-[66px] resize-y py-2.5 leading-[1.4] supports-[field-sizing:content]:resize-none md:min-h-12 md:py-3')}
                 />
                 <FeldZaehler control={form.control} name="customerNote" max={NOTIZ_MAX} />
               </Feld>
@@ -969,17 +978,26 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
  * mit dem Satz des Hofs, was fehlt, und „Zurück zum Angebot“ mit Rand über die volle Breite; darunter die Übersicht.
  * Kein Formular und keine feste Leiste: Es gibt nichts zu bestellen, bis genug im Korb liegt.
  */
+/** Die Spalte der Kasse unter dem Mindestbestellwert (Board w1-kasse Bild 5: 560 px Inhalt, mit Rand 592 px). */
+const KASSE_SCHMAL = 'max-w-[592px]'
+
 export function KasseUnterMindestwert({
   karte,
   hofSlug,
+  hofName,
   uebersicht,
 }: {
   karte: TitelSatz
   hofSlug: string
+  hofName: string
   uebersicht: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="mx-auto flex w-full max-w-[592px] flex-col gap-3 px-4 pt-4 pb-10 md:pt-8">
+    <div className={cn('mx-auto flex w-full flex-col gap-3 px-4 pt-4 pb-6 md:pt-8', KASSE_SCHMAL)}>
+      {/* Die eine h1 der Seite ab 768 px (KundeFokusShell `h1InSeiteAbMd`); am Handy steht „Bestellen“ im Kopf. */}
+      <h1 className="hidden font-heading text-[28px] leading-tight font-semibold break-words text-foreground md:mb-1 md:block">
+        Bestellen bei {hofName}
+      </h1>
       <HinweiskarteStatus titel={karte.titel}>
         <p className="text-[14px] leading-normal">{karte.satz}</p>
         <Link

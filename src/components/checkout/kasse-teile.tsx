@@ -3,7 +3,7 @@ import Link from 'next/link'
 import type { UseFormRegisterReturn } from 'react-hook-form'
 import { AlertCircle, Info, TimerReset } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatEuro, formatPosition } from '@/lib/format'
+import { formatEuro } from '@/lib/format'
 import { SERVICEGEBUEHR_HINWEIS, centsAlsEuro } from '@/lib/servicegebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
 import { mitEndpreis, type PreisAnzeige } from '@/lib/plattformgebuehr'
@@ -14,6 +14,7 @@ import {
   KONTAKT_HINWEIS,
   PREISE_INKL_UST,
   RESERVIERUNG_MINUTEN,
+  positionMengeVorn,
   zahlungAbgelehntText,
   type AbholKachel,
   type KassenBetraege,
@@ -21,6 +22,7 @@ import {
   type ReservierungsStand,
 } from '@/lib/kasse'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { TREFFER_44 } from '@/components/ui/button'
 import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 
@@ -217,8 +219,13 @@ export function KorbKarte({
         </h2>
         {aendernHref && (
           // Sichtbar nur „Ändern“ (Board w1-kasse); der Name sagt, was geändert wird, und beginnt mit dem sichtbaren Wort nicht —
-          // er enthält es (WCAG 2.5.3, Groß-/Kleinschreibung zählt nicht).
-          <Link href={aendernHref} aria-label="Warenkorb ändern" className={cn(TEXTLINK, 'shrink-0 text-[15px] underline')}>
+          // er enthält es (WCAG 2.5.3, Groß-/Kleinschreibung zählt nicht). Der Fokus liegt eng um das Wort wie im Board
+          // (Radius 3 px), die 44 px Trefferfläche kommt über ::before (TREFFER_44).
+          <Link
+            href={aendernHref}
+            aria-label="Warenkorb ändern"
+            className={cn(TREFFER_44, 'shrink-0 rounded-[3px] text-[15px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)}
+          >
             Ändern
           </Link>
         )}
@@ -228,13 +235,12 @@ export function KorbKarte({
           // Nur Anzeige: Endpreis je Stück und Grundpreis aus dem Endpreis (N38); die Zeilensumme kommt aus kassenBetraege.
           const p = mitEndpreis(roh, anzeige ?? null)
           return (
-          // Eine Zeile je Position wie im Board (Name und Menge in der einen Schreibweise `formatPosition`, der Betrag
-          // rechts), ohne Vorschaubild; darunter leise Grundpreis und der Hinweis zum Rücktritt (Nr. 214) — beide
-          // bleiben vor dem Kaufknopf.
-          <li key={p.productId} className="py-1.5">
+          // Eine Zeile je Position wie im Board, Menge vorn (`positionMengeVorn`), ohne Vorschaubild; darunter leise
+          // Grundpreis und der Hinweis zum Rücktritt (Nr. 214) — beide bleiben vor dem Kaufknopf.
+          <li key={p.productId} className="py-0.5">
             {/* Boards s1-/w1-kasse (Lauf 31): der Betrag hinter der Position — „3 × Bergkäse, 250 g · € 19,74“. */}
-            <p className="line-clamp-2 text-[15px] leading-snug break-words" title={p.name}>
-              {formatPosition({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize })}
+            <p className="line-clamp-2 text-[15px] leading-normal break-words" title={p.name}>
+              {positionMengeVorn({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize })}
               {' · '}
               <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}</span>
             </p>
@@ -342,6 +348,7 @@ export function UebersichtKarte({
   gebuehrErklaerung = SERVICEGEBUEHR_HINWEIS,
   gebuehrEntfaellt = false,
   hofpreis = false,
+  mitErklaerung = true,
   reservierung,
   fehler,
   positionen,
@@ -358,6 +365,11 @@ export function UebersichtKarte({
   gebuehrEntfaellt?: boolean
   /** N38: Hofpreis-Modell — „Ware · Plattformgebühr (6 %) · Gesamt“, der Satz steht offen unter der Summe. */
   hofpreis?: boolean
+  /**
+   * Der (i)-Knopf an der Gebührenzeile (N10). `false` unter dem Mindestbestellwert (Board s1-/w1-kasse Bild 5: dort ohne
+   * Knopf) — das gibt es nur im Hofpreis-Modell, und dort steht der Satz zur Gebühr ohnehin offen unter der Summe.
+   */
+  mitErklaerung?: boolean
   reservierung?: ReactNode
   /** Ein Fehler der Anfrage — inline an der Karte, kein Modal. */
   fehler?: ReactNode
@@ -392,6 +404,7 @@ export function UebersichtKarte({
             <dt className="flex min-w-0 items-center">
               <span className="min-w-0 break-words">{gebuehrText}</span>
               {/* Tippfläche 44 px, die Zeile bleibt durch den negativen Rand so hoch wie der Text. */}
+              {mitErklaerung && (
               <button
                 type="button"
                 aria-label={hofpreis ? `Was ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG}?` : 'Was ist die Servicegebühr?'}
@@ -406,12 +419,13 @@ export function UebersichtKarte({
                 {/* Der Kreis mit „i“ in der Größe des Boards (22 px, Strich 2). */}
                 <Info className="size-[22px]" strokeWidth={2} aria-hidden="true" />
               </button>
+              )}
             </dt>
             <dd className={cn('ml-auto shrink-0 tabular-nums', betraege.gebuehrCents === 0 && 'text-muted-foreground')}>{gebuehr}</dd>
           </div>
         )}
       </dl>
-      {gebuehr && (
+      {gebuehr && mitErklaerung && (
         <p id={erklaerungId} hidden={!erklaerungOffen} className={HINWEIS}>
           {gebuehrErklaerung}
         </p>

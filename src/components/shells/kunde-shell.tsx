@@ -16,6 +16,7 @@ import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { SUCHTEXT_PARAMETER } from '@/lib/suchtext-parameter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { TREFFER_44 } from '@/components/ui/button'
 import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
@@ -177,10 +178,15 @@ export type KundeShellProps = {
    * so breit wie der Inhalt der Seite, z. B. `md:max-w-[928px]`. Ohne Angabe 1200 px.
    */
   fussSpalte?: string
+  /**
+   * Die Seite hat auch im Browser eine feste Leiste unten (Bestätigung, `Hauptaktion`; Board w1-bestaetigung): Der
+   * Seitenfuß hält dann auch ab 768 px darunter Platz frei, damit die Leiste ihn am Ende der Seite nicht verdeckt.
+   */
+  platzFuerLeiste?: boolean
   children: ReactNode
 }
 
-export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fussSpalte, children }: KundeShellProps): React.JSX.Element {
+export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fussSpalte, platzFuerLeiste = false, children }: KundeShellProps): React.JSX.Element {
   const pathname = usePathname()
   const nav = kundenNavigation({ sitzung })
   const korb = useWarenkorbKopf()
@@ -306,7 +312,7 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
       {/* Der Seitenfuß auf jeder Seite der Shell, am Handy samt Hell/Dunkel (im
           Browser im Kopf). Unten hält er Platz für die Unterleiste bzw. die
           feste Leiste einer Fokus-Seite frei — vorher tat das der Inhalt. */}
-      <KundeFuss className="pb-28 md:pb-0 print:pb-0" spalte={fussSpalte} />
+      <KundeFuss className={cn('pb-28 print:pb-0', !platzFuerLeiste && 'md:pb-0')} spalte={fussSpalte} />
 
       {unterleiste && (
         // In der Vorschau im Rahmen ohne Wirkung — keine Klicks nach außen (VorschauLeisteSperre).
@@ -389,8 +395,8 @@ export type KundeFokusShellProps = {
   /** Die eine feste Leiste unten (Hauptaktion); am Handy fest, im Browser unter dem Inhalt. */
   aktion?: ReactNode
   /**
-   * Die Leiste klebt auch im Browser am unteren Rand (Board w1-bestellung-link Bild 2: die Knöpfe unten am
-   * Fenster, über einer Linie) — `sticky`, nicht `fixed`: Am Ende der Seite gibt sie den Inhalt frei.
+   * Die Leiste steht auch im Browser fest am unteren Fensterrand (Board w1-bestellung-link Bild 2: die Knöpfe unten
+   * am Fenster, über einer Linie) — auch bei kurzer Seite, nicht mitten im Bild. Der Inhalt hält darunter Platz frei.
    */
   aktionKlebtImBrowser?: boolean
   /** Breite der Zeile „Vertrag widerrufen“ am Ende — so breit wie die Spalte der Seite (Board w1-bestellung-link). */
@@ -398,13 +404,18 @@ export type KundeFokusShellProps = {
   children: ReactNode
 }
 
+/** Die Spalte einer Fokus-Seite ohne eigene Angabe — so breit wie die zweispaltige Kasse. */
+const FOKUS_SPALTE = 'max-w-[1200px]'
+
 /** Der runde Zurück-Pfeil am Handy und der Textlink „← Zurück …“ im Browser — dasselbe Ziel. */
 function FokusZurueck({ zurueck, form }: { zurueck: KundeFokusShellProps['zurueck']; form: 'pfeil' | 'text' }): React.JSX.Element {
   const klasse =
     form === 'pfeil'
       ? cn('flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)
-      : cn(
-          'inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-[15px] font-semibold whitespace-nowrap text-status-fertig underline underline-offset-4',
+      : // Der Fokus liegt eng um „← Zurück …“ wie in den Boards (Radius 3 px); die 44 px Trefferfläche kommt über ::before.
+        cn(
+          TREFFER_44,
+          'inline-flex shrink-0 items-center gap-1.5 rounded-[3px] text-[15px] font-semibold whitespace-nowrap text-status-fertig underline underline-offset-4',
           FOKUS_RAHMEN
         )
   const inhalt =
@@ -446,7 +457,7 @@ export function KundeFokusShell({
   rechts,
   aktion,
   aktionKlebtImBrowser = false,
-  spalte = 'max-w-[1200px]',
+  spalte = FOKUS_SPALTE,
   children,
 }: KundeFokusShellProps): React.JSX.Element {
   return (
@@ -492,15 +503,17 @@ export function KundeFokusShell({
       {/* Notbremse (Register N34, Nr. 189): das Band unter dem Kopf, solange neue Bestellungen angehalten sind. */}
       <NotbremseBand />
 
-      <main id={INHALT_ID} tabIndex={-1} className={cn('outline-none', aktion && 'pb-28 md:pb-0')}>
+      <main id={INHALT_ID} tabIndex={-1} className={cn('outline-none', aktion && (aktionKlebtImBrowser ? 'pb-28' : 'pb-28 md:pb-0'))}>
         {children}
         {/* Nr. 200 (N39): Auch Fokus-Seiten ohne Seitenfuß tragen den Weg zum Widerruf — eine Zeile am Ende, als grüner
             Textlink mit Unterstrich wie die übrigen Links der Boards (w1-bestellung-link, Lauf 31). */}
-        <p className={cn('mx-auto px-4 pt-2 pb-4 md:px-6 print:hidden', spalte)}>
+        {/* Links bündig mit dem Inhalt darüber: dieselbe Spalte und derselbe Rand (16 px, in der breiten Kasse ab 768 px 24 px). */}
+        <p className={cn('mx-auto px-4 pt-2 pb-4 print:hidden', spalte === FOKUS_SPALTE && 'md:px-6', spalte)}>
           <Link
             href={WIDERRUF_PFAD}
             className={cn(
-              'inline-flex min-h-11 items-center rounded-md px-1 text-[14px] text-status-fertig underline underline-offset-4',
+              TREFFER_44,
+              'inline-flex items-center rounded-[3px] text-[14px] text-status-fertig underline underline-offset-4',
               FOKUS_RAHMEN
             )}
           >
@@ -516,8 +529,8 @@ export function KundeFokusShell({
           className={cn(
             'fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] print:hidden',
             aktionKlebtImBrowser
-              ? // Die Linie zieht die Aktion selbst in der Breite ihrer Spalte (Board w1-bestellung-link Bild 2).
-                'md:sticky md:border-0 md:bg-background md:pt-0 md:pb-5'
+              ? // Fest wie am Handy; die Linie zieht die Aktion selbst in der Breite ihrer Spalte (Board w1-bestellung-link Bild 2).
+                'md:border-0 md:bg-background md:pt-0 md:pb-5'
               : 'md:static md:border-0 md:bg-transparent md:pt-6 md:pb-10'
           )}
         >

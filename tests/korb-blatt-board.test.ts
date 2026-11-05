@@ -7,6 +7,11 @@
  *  - Nach dem Abgleich steht oben EINE orange Karte mit Titel „Dein Warenkorb hat sich geändert.“ und dem Satz,
  *    vorgelesen als Status; ohne Satz keine Karte (Gegenprobe).
  *  - Unten Gesamt, „Inkl. Plattformgebühr · Reservierung gilt … Minuten.“ und „Zur Kasse“ grün über die volle Breite.
+ *  - Leer (Bild 3, Runde 2): der Kasten links bündig mit Titel in der Grundschrift, „Zum Angebot“ in der Zeile darunter,
+ *    das Symbol bleibt (Register N9).
+ *  - N29 (Lücke aus Nr. 235): Scheitert „−“/„+“ am Netz, sagt das Blatt den N29-Satz mit „Nochmal“; eine Ablehnung des
+ *    Servers den geglätteten Satz ohne „Nochmal“; eine stehende Menge nichts (Gegenprobe). Der Quelltext verwirft das
+ *    Ergebnis von `onUpdateQuantity` nicht mehr.
  *
  * Das Blatt rendert sein Fenster beim Server-Rendern nicht (Portal): `SheetBlatt` und `SheetKopf` stehen an Ort und
  * Stelle (per vi.mock ersetzte Teilkomponenten, TESTING_GUIDELINES §1); der Kopf zeigt seinen Titel und vermerkt,
@@ -34,7 +39,9 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
   }
 })
 
-import { CartSheet, KORB_GEAENDERT_TITEL } from '@/components/farm/cart-sheet'
+import { CartSheet, KORB_GEAENDERT_TITEL, mengeFehlerNach } from '@/components/farm/cart-sheet'
+import { NETZ_SATZ } from '@/lib/netz'
+import { KORB_LEER } from '@/lib/use-cart'
 import type { CartItem } from '@/lib/use-cart'
 
 const MILCH: CartItem = { productId: 'p1', name: 'Heumilch frisch', price: 1.4, unit: 'LITER', unitSize: 1, imageUrl: null, quantity: 4 }
@@ -48,7 +55,7 @@ function blatt(teil: { items?: CartItem[]; hinweis?: string | null; gebuehrKorb?
       items,
       total: 5.6,
       farmSlug: 'hof-test',
-      onUpdateQuantity: () => {},
+      onUpdateQuantity: async () => ({ ok: true }),
       onRemoveItem: () => {},
       gebuehrKorb: teil.gebuehrKorb ?? 'inkl. Plattformgebühr',
       kaufSperre: { sperre: null, hofName: 'Hof Test', pauseMessage: null },
@@ -99,5 +106,44 @@ describe('Korb-Blatt (Boards s1-/w1-korb)', () => {
     expect(quelle).toMatch(/<SheetBlatt seite="rechts">/)
     expect(quelle).toMatch(/<SheetKopf\b/)
     expect(quelle).not.toMatch(/<SheetContent\b/)
+  })
+
+  it('leer (Bild 3, Runde 2): Kasten links bündig, Titel in der Grundschrift, „Zum Angebot“ in der dritten Zeile darunter', () => {
+    const html = blatt({ items: [] })
+    // renderToStaticMarkup maskiert & und > in Attributen.
+    const leer = (html.match(/<div data-slot="empty-state" class="([^"]*)"/)?.[1] ?? '').replace(/&amp;/g, '&').replace(/&gt;/g, '>')
+    expect(leer).toContain('grid')
+    expect(leer).toContain('text-left')
+    expect(leer).toContain('before:row-span-2')
+    expect(leer).toContain('[&>p:first-of-type]:font-sans')
+    expect(leer).toContain('[&>div]:row-start-3')
+    // Register N9: Symbol, Satz, Aktion — das Symbol steht weiter im Kasten.
+    expect(html).toMatch(/data-slot="empty-state"[^>]*><span[^>]*><svg/)
+    expect(html).toContain(KORB_LEER.titel)
+    expect(html).toContain(KORB_LEER.zumHof)
+  })
+})
+
+describe('Korb-Blatt: Menge ohne Netz (Register N29)', () => {
+  it('am Netz gescheitert: der N29-Satz mit „Nochmal“', () => {
+    expect(mengeFehlerNach({ ok: false, error: NETZ_SATZ, nochmal: true })).toEqual({ text: NETZ_SATZ, nochmal: true })
+  })
+
+  it('vom Server abgelehnt: ein verständlicher Satz, kein „Nochmal“, nie der rohe Text', () => {
+    const fehler = mengeFehlerNach({ ok: false, error: 'Serverfehler bei der Reservierung' })
+    expect(fehler?.nochmal).toBe(false)
+    expect(fehler?.text).not.toContain('Serverfehler')
+    expect(fehler?.text).not.toBe(NETZ_SATZ)
+  })
+
+  it('Gegenprobe: Menge stand — kein Satz', () => {
+    expect(mengeFehlerNach({ ok: true })).toBeNull()
+  })
+
+  it('der Quelltext wertet das Ergebnis von onUpdateQuantity aus und zeigt den Satz am Ort (SpeicherFehler)', () => {
+    const quelle = readFileSync(join(__dirname, '..', 'src/components/farm/cart-sheet.tsx'), 'utf8')
+    expect(quelle).toMatch(/onUpdateQuantity\(productId, menge\)\.then\(/)
+    expect(quelle).not.toMatch(/onClick=\{\(\) => onUpdateQuantity\(/)
+    expect(quelle).toMatch(/<SpeicherFehler text=\{mengeFehler\.text\} nochmal=\{mengeFehler\.nochmal\}/)
   })
 })

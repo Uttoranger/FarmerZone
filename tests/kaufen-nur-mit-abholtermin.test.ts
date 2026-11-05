@@ -452,7 +452,7 @@ describe('Korb-Blatt (unter 1024 px der einzige Weg zur Kasse): statt „Zur Kas
         items,
         total: 9,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { sperre, hofName: 'Hof Test', pauseMessage: null },
       })
