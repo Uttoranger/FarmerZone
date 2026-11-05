@@ -80,10 +80,12 @@ const ZUSTAND: Record<'wartet' | 'verkauft' | 'testhof', HofZustand> = {
 
 const AKTE: HofAkteAnsichtDaten = {
   kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich', agb: 'noch nicht zugestimmt' },
-  aktivitaet: { bestellungen: 0, bestellungenZeile: '0 storniert · 0 nicht abgeholt', umsatzCents: 0, servicegebuehrCents: 0, zuletztAngemeldet: 'noch nie', anmeldung: null, antwortzeit: 'noch keine Antwort' },
+  aktivitaet: { bestellungen: 0, bestellungenZeile: '0 storniert · 0 nicht abgeholt', umsatzCents: 0, servicegebuehrCents: 0, gebuehrZeile: 'Servicegebühr € 0,00', zuletztAngemeldet: 'noch nie', anmeldung: null, antwortzeit: 'noch keine Antwort' },
   zustand: [],
   sperre: { gesperrt: false, grund: null, seit: null },
   protokoll: [],
+  // Vor dem Stichtag „Hofpreis-Modell ab“: Knopf und Satz der Servicegebühr gibt es (A1); danach tests/admin-gebuehr-wort.test.ts.
+  gebuehrModell: 'bisher',
 }
 
 /** Die Akte eines Hofs (Nr. 187) — Freischalten, Gründung, Testhof und Servicegebühr stehen seitdem hier. */
@@ -182,7 +184,7 @@ describe('Gründungshof bis (Nr. 62, Register K2)', () => {
   it('der Freischalt-Dialog nennt die Zusage K2 mit dem Standard-Ende — ohne „dauerhaft" und ohne Prozent', () => {
     const hinweis = freischaltHinweis(wartend, imRennen(3), GRUENDUNG_EINSTELLUNG_STANDARD, JETZT)
     const html = renderToStaticMarkup(
-      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true, approvedAt: null, freischaltHinweis: hinweis }), art: 'approve' }, onClose: () => {} })
+      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true, approvedAt: null, freischaltHinweis: hinweis }), art: 'approve' }, gebuehrModell: 'bisher', onClose: () => {} })
     )
     expect(html).toContain('Gründungshof Nr. 4')
     expect(html).toContain(gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD))
@@ -193,7 +195,7 @@ describe('Gründungshof bis (Nr. 62, Register K2)', () => {
   it('Gegenprobe: alle Plätze vergeben — keine Zusage im Freischalt-Dialog', () => {
     const hinweis = freischaltHinweis(wartend, imRennen(12), GRUENDUNG_EINSTELLUNG_STANDARD, JETZT)
     const html = renderToStaticMarkup(
-      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true, approvedAt: null, freischaltHinweis: hinweis }), art: 'approve' }, onClose: () => {} })
+      createElement(HofAktionDialog, { aktion: { hof: hof({ stripeBereit: true, approvedAt: null, freischaltHinweis: hinweis }), art: 'approve' }, gebuehrModell: 'bisher', onClose: () => {} })
     )
     expect(html).toContain('Alle 12 Gründungsplätze sind vergeben')
     expect(html).not.toContain(gruendungsKonditionenText(GRUENDUNG_BIS_STANDARD))
@@ -270,6 +272,22 @@ describe('Liste im Regelbetrieb (Nr. 187, Mockup admin-hoefe-neu)', () => {
     const ruhig = liste([zeile({ ...online, id: 'a', name: 'Hof Müller' })])
     expect(ruhig).toContain('Gerade braucht kein Hof deinen Blick.')
     expect(ruhig).toContain('Alle Höfe zeigen')
+    // Board w3-admin-hoefe Bild 4: leer ohne den Hinweis auf die Testhöfe (Nr. 229).
+    expect(ruhig).toContain('0 von 1 Hof brauchen Blick<')
+  })
+
+  it('Suche ohne Treffer: „Suche löschen“ behält den Filter (Board w3-admin-hoefe Bild 5, Nr. 229); Gegenprobe ohne Suche „Alle Höfe zeigen“', () => {
+    adresse.parameter = 'filter=alle&suche=gibtsnicht'
+    const html = liste([zeile({ ...online, id: 'a', name: 'Hof Müller' })])
+    expect(html).toContain('Kein Hof passt')
+    expect(html).toMatch(/<a href="\/admin\/hoefe\?filter=alle"[^>]*>Suche löschen<\/a>/)
+    expect(html).not.toContain('Alle Höfe zeigen')
+    adresse.parameter = 'filter=gesperrt'
+    expect(liste([zeile({ ...online, id: 'a', name: 'Hof Müller' })])).toMatch(/<a href="\/admin\/hoefe\?filter=alle"[^>]*>Alle Höfe zeigen<\/a>/)
+  })
+
+  it('die Regel-Zeile nach dem Board: „… – Testhöfe nie.“ (Nr. 229)', () => {
+    expect(liste([zeile({ ...online, id: 'a', name: 'Hof Müller' })])).toContain('etwas Unvollständiges haben – Testhöfe nie.')
   })
 })
 

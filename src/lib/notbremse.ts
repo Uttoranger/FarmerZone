@@ -162,7 +162,7 @@ export const NOTBREMSE_ADMIN_TEXT = {
   grund: 'Grund (nur für dich und das Protokoll)',
   kundschaft: 'Satz für die Kundschaft',
   soSiehtEs: 'So sieht es die Kundschaft',
-  soSiehtEsSatz: '– als Band über jeder Hofseite und in der Kasse, „In den Warenkorb“ ist aus.',
+  soSiehtEsSatz: '– als Band über jeder Hofseite und in der Kasse, „In den Korb“ ist aus.',
   bis: 'Bis spätestens',
   bisHinweis: 'Wiener Zeit, höchstens 72 Stunden ab jetzt.',
   anhalten: 'Mit Passkey anhalten',

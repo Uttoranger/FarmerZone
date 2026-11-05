@@ -10,6 +10,7 @@ import {
   HOEFE_LISTE_TEXT,
   filtereHoefeListe,
   hoefeListeAdresse,
+  hoefeListeZeile,
   zaehleHoefeListe,
   type HoefeListenZeile,
 } from '@/lib/admin-hoefe-liste'
@@ -20,7 +21,6 @@ import { hoefeListeAus } from '@/schemas/admin-hoefe'
 import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import type { GruendungAnzeige } from '@/lib/gruendungshof'
 import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
-import { mitAnzahl } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -111,9 +111,7 @@ export function HoefeAnsicht({ zeilen }: { zeilen: HoefeListenZeile[] }): React.
       </FilterChipReihe>
 
       <p className={cn('text-[13px]', LEISE)} aria-live="polite">
-        {filter === 'braucht-blick'
-          ? `${liste.length} von ${mitAnzahl(zahlen.alle, 'Hof', 'Höfen')} brauchen Blick · Testhöfe nur unter „Testhöfe“`
-          : mitAnzahl(liste.length, 'Hof', 'Höfe')}
+        {hoefeListeZeile(filter, liste.length, zahlen.alle)}
       </p>
 
       {zahlen.alle === 0 ? (
@@ -129,16 +127,30 @@ export function HoefeAnsicht({ zeilen }: { zeilen: HoefeListenZeile[] }): React.
           titel={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlick : HOEFE_LISTE_TEXT.keinTreffer}
           satz={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlickSatz : HOEFE_LISTE_TEXT.keinTrefferSatz}
           ausweg={
-            <Link
-              href={hoefeListeAdresse({ filter: 'alle', suche: '' })}
-              className={KNOPF_RAHMEN}
-              onNavigate={(e) => {
-                e.preventDefault()
-                waehle({ filter: 'alle', suche: '' })
-              }}
-            >
-              Alle Höfe zeigen
-            </Link>
+            // Mit Suche führt „Suche löschen“ zurück (Board, Bild 5) und behält den Filter; ohne Suche „Alle Höfe zeigen“.
+            suche.trim() !== '' ? (
+              <Link
+                href={hoefeListeAdresse({ filter, suche: '' })}
+                className={KNOPF_RAHMEN}
+                onNavigate={(e) => {
+                  e.preventDefault()
+                  waehle({ suche: '' })
+                }}
+              >
+                {HOEFE_LISTE_TEXT.sucheLoeschen}
+              </Link>
+            ) : (
+              <Link
+                href={hoefeListeAdresse({ filter: 'alle', suche: '' })}
+                className={KNOPF_RAHMEN}
+                onNavigate={(e) => {
+                  e.preventDefault()
+                  waehle({ filter: 'alle', suche: '' })
+                }}
+              >
+                {HOEFE_LISTE_TEXT.alleZeigen}
+              </Link>
+            )
           }
         />
       ) : (

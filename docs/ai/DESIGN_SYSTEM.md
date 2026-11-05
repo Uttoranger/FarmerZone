@@ -767,6 +767,15 @@ Boards s1-/w1-startseite, -hoefe, -hofseite, -produkt, t-o-fuer-hoefe. Was hier 
 - **/fuer-hoefe je Modell:** Preise mit `gebuehrGrundsatz(modell, jetzt)`, Fragen über `fuerHoefeFragen(jetzt, modell)`; der Vorteil „Voller Preis für dich“ nennt keine Gebühr („Du bekommst deinen vollen Warenpreis.“). Kein Willkommens-Versprechen (Willkommenszeit offen), Tarife nur wie gebaut.
 - **„Zur Kasse“ auf der Produktseite** als Umriss (`HofseiteSeitenspalte kasseUmriss`, Rand `input`, Fläche `card`): „In den Korb · €“ ist dort die eine grüne Aktion. Auf der Hofseite bleibt „Zur Kasse“ grün.
 
+### Admin Teil 1 nach den Boards November 2026 (Heute, Höfe, Akte, Freischalten, Bestellungen; Nr. 229, Lauf 30)
+
+- **Gebühren-Wort im Admin:** Die Geld-Kachel in Heute nimmt `gebuehrWortFuerZeitraum(umsatzfenster('woche', jetzt).aktuell.von, jetzt, Stichtag)` — dieselbe Woche wie die Summe; die Aktivität der Akte das Wort der 30 Tage (`aktivitaetSeit`, `aktivitaetGebuehrZeile`); das Bestell-Detail „inkl. € … <Wort>“ und die Gebühren-Zeile über `ADMIN_BESTELLUNG_TEXT.inklGebuehr(betrag, gebuehrZeile(bestellung))` aus `Order.gebuehrModell`. Wort und Modell bestimmt die Server-Seite einmal (`lesePlattformEinstellung`), Client-Teile bekommen sie als Prop — nie ein Datum im Browser.
+- **Knopf „Servicegebühr …“ nach A1 (N38-Ergänzung):** nur im Modell „bisher“ (`servicegebuehrKnopfSichtbar`), samt Satz `SERVICEGEBUEHR_NUR_NEUE` und Dialog; ab dem Stichtag ist die Karte „Plattformgebühr“ der eine Weg zum Satz. Kein Umbenennen in „Plattformgebühr …“ (anderes Feld).
+- **Freischalt-Dialog:** „Derzeit gilt …“ über `konditionenDerzeit(gebuehrModell)`; `HofAktionDialog` verlangt das Modell als Prop.
+- **Bestellungen, Liste und Detail:** Unter 768 px ersetzt das Detail die Liste, mit „‹ Zur Liste“ (Chevron, 44 px); von 768 bis 1023 px stehen beide gestapelt, das gewählte Detail oben; ab 1024 px nebeneinander.
+- **Höfe:** Regel-Zeile „… – Testhöfe nie.“; die Zeile „n von m Höfen brauchen Blick“ nennt die Testhöfe nur, solange eine Liste darunter steht (`hoefeListeZeile`); ohne Treffer mit Suche „Suche löschen“ (Filter bleibt), sonst „Alle Höfe zeigen“. Laden: `HoefeListeLaden` (`hoefe-laden.tsx`) mit echtem Seitenkopf, Platzhaltern für Suche und Filter, fünf Karten zu 76 px und `role="status"` „Höfe werden geladen …“.
+- **Heute:** Protokoll-Zeile links leise „Wann · Wer“, rechts was getan wurde (`protokollWannWer`, auch in der Klappkarte); „Läuft von selbst“ mit „heute · n von m pünktlich“. In der Akte sagt „Zustand“ bei wartenden Höfen „was Kundinnen erleben würden“.
+
 ### Infoseiten (/impressum, /konditionen, seit Nr. 54)
 
 - **/agb (seit Nr. 90, Register O4):** Rechtstext aus `src/lib/rechtstexte/agb.ts` (Wort für Wort `docs/recht/agb.md`, der Test `agb-text` vergleicht jede Zeile), Verzeichnis mit Sprüngen, Stand-Vermerk („Entwurf“ bis Fassung 1.0), Druckknopf (`print:hidden` für Kopf, Knopf und Verzeichnis); Sätze der Einbindung (Registrierung, Kasse, Mail, Fußzeile, /hoefe) aus `src/lib/rechtstexte/agb-einbindung.ts`. Rechtstext ist von den Textwachen ausgenommen (Wortliste, Fachwort, „Problem melden“).

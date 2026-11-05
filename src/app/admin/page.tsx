@@ -3,6 +3,10 @@ import { permanentRedirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeHeute } from '@/server/queries/admin-heute'
+import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { gebuehrWortFuerZeitraum, hofpreisModellAb, type GebuehrWort } from '@/lib/plattformgebuehr'
+import { umsatzfenster } from '@/lib/umsatz'
 import { STRIPE_MARKE, TESTBETRIEB, UMGEBUNG } from '@/lib/umgebung-server'
 import { ablaufZeilen, istMailWarnArt } from '@/lib/betrieb'
 import {
@@ -23,7 +27,7 @@ import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { HeuteBrauchtDich, type BrauchtDichEintrag } from '@/components/admin/heute-braucht-dich'
 import { HeuteLage } from '@/components/admin/heute-lage'
-import { HeuteKommt, HeuteLaeuft, HeuteProtokoll } from '@/components/admin/heute-karten'
+import { HeuteKommt, HeuteLaeuft, HeuteProtokoll, protokollWannWer } from '@/components/admin/heute-karten'
 import { HeuteRoutine } from '@/components/admin/heute-routine'
 import { NotbremseAnhalten } from '@/components/admin/heute-notbremse'
 import { MARKE } from '@/lib/marke'
@@ -59,14 +63,18 @@ export default async function AdminHeutePage({
   const jetzt = new Date()
   const mitBetrieb = UMGEBUNG.vercelProduktion
   let roh: Awaited<ReturnType<typeof ladeHeute>> | null = null
+  let gebuehrWort: GebuehrWort | null = null
   try {
-    roh = await ladeHeute(jetzt, { mitBetrieb })
+    const [heute, einstellung] = await Promise.all([ladeHeute(jetzt, { mitBetrieb }), lesePlattformEinstellung()])
+    roh = heute
+    // Das Wort der Geld-Kachel (V63): über dieselbe Woche wie die Summe (umsatzfenster, seit Montag in Wien) gegen den Stichtag.
+    gebuehrWort = gebuehrWortFuerZeitraum(umsatzfenster('woche', jetzt).aktuell.von, jetzt, hofpreisModellAb(hofpreisEinstellungAus(einstellung)))
   } catch (err) {
     // Nur der Bereich — keine Hofnamen, keine Adressen.
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'heute' } })
   }
 
-  if (!roh) {
+  if (!roh || !gebuehrWort) {
     return (
       <div className={ADMIN_RAHMEN}>
         <AdminFehler titel={HEUTE_TEXT.titel} satz={HEUTE_TEXT.fehler} nochmal="/admin" />
@@ -111,6 +119,7 @@ export default async function AdminHeutePage({
       dienste: { laufen: dienste.filter((d) => d.art === 'laeuft').length, von: dienste.length, ansehen: dienste.filter((d) => d.art === 'tun').map((d) => d.dienst), testbetrieb: TESTBETRIEB },
       hoefe: roh.hoefe,
       geldAbgleichOk: roh.laeufe.get('geld-abgleich')?.ok === true,
+      gebuehrWort,
     },
     aufgaben
   )
@@ -145,7 +154,7 @@ export default async function AdminHeutePage({
             </Karte>
           </div>
           <div className="hidden min-w-0 flex-col gap-4 md:gap-5 lg:flex">
-            <Karte titel={HEUTE_TEXT.laeuft} zusatz={puenktlich}>
+            <Karte titel={HEUTE_TEXT.laeuft} zusatz={`${HEUTE_TEXT.laeuftZusatz} · ${puenktlich}`}>
               {laeuft}
             </Karte>
             <Karte titel={HEUTE_TEXT.kommt} zusatz={HEUTE_TEXT.kommtZusatz}>
@@ -167,7 +176,7 @@ export default async function AdminHeutePage({
           <Klappkarte titel={HEUTE_TEXT.routine} zeile={HEUTE_TEXT.routineZusatz}>
             <HeuteRoutine schluessel={schluessel} kopf />
           </Klappkarte>
-          <Klappkarte titel={HEUTE_TEXT.protokoll} zeile={protokoll[0] ? `${protokoll[0].text} · ${protokoll[0].wann}` : HEUTE_TEXT.protokollLeer}>
+          <Klappkarte titel={HEUTE_TEXT.protokoll} zeile={protokoll[0] ? protokollWannWer(protokoll[0]) : HEUTE_TEXT.protokollLeer}>
             {protokollInhalt}
           </Klappkarte>
         </div>

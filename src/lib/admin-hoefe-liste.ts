@@ -13,6 +13,7 @@
  * Zeile kommt fertig als Text, Zahl und Wahrheitswert vom Server.
  */
 import { zuletztText } from '@/lib/betrieb'
+import { mitAnzahl } from '@/lib/format'
 import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
 import { freischaltSperre, FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT, FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT, FREISCHALTUNG_PRODUKT_OFFEN_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
@@ -26,6 +27,11 @@ export const AKTIVITAET_TAGE = 30
 
 const TAG_MS = 86_400_000
 const STUNDE_MS = 3_600_000
+
+/** Der Anfang der 30 Tage — derselbe Zeitraum wie die Zahlen der Akte (`ladeHofAkte`: createdAt ab hier); für das Wort der Gebühr (V63). */
+export function aktivitaetSeit(jetzt: Date): Date {
+  return new Date(jetzt.getTime() - AKTIVITAET_TAGE * TAG_MS)
+}
 
 // ─── Zustand ────────────────────────────────────────────────────────────────
 
@@ -229,18 +235,32 @@ export function hoefeListeAdresse(ansicht: { filter: HoefeListeFilter; suche: st
   return q ? `${ADMIN_HOEFE_HREF}?${q}` : ADMIN_HOEFE_HREF
 }
 
+/**
+ * Die Zeile über der Liste: unter „Braucht Blick“ „1 von 5 Höfen brauchen
+ * Blick“, mit dem Hinweis auf die Testhöfe nur, solange eine Liste darunter
+ * steht (Board s3/w3-admin-hoefe, Bild 1 und 4); sonst die Zahl der Treffer.
+ */
+export function hoefeListeZeile(filter: HoefeListeFilter, treffer: number, alle: number): string {
+  if (filter !== 'braucht-blick') return mitAnzahl(treffer, 'Hof', 'Höfe')
+  const zeile = `${treffer} von ${mitAnzahl(alle, 'Hof', 'Höfen')} brauchen Blick`
+  return treffer > 0 ? `${zeile} · Testhöfe nur unter „Testhöfe“` : zeile
+}
+
 export const HOEFE_LISTE_TEXT = {
   titel: 'Höfe',
   satz: 'Wer wartet, wer Hilfe braucht, wer läuft – und zu jedem Hof die Akte.',
   tabelle: 'Höfe, wer Blick braucht zuerst',
-  regel:
-    '„Braucht Blick“ zeigt Höfe, die warten, still sind oder etwas Unvollständiges haben – dieselben Regeln wie die Aufgaben in Heute. Gründungsplätze und Testhöfe stehen in der Akte jedes Hofs.',
+  // Wortlaut Board s3/w3-admin-hoefe (Lauf 30, Nr. 229); die Regeln selbst sind dieselben wie die Aufgaben in Heute (hofSignale).
+  regel: '„Braucht Blick“ zeigt Höfe, die warten, still sind oder etwas Unvollständiges haben – Testhöfe nie.',
   keinerBrauchtBlick: 'Gerade braucht kein Hof deinen Blick.',
   keinerBrauchtBlickSatz: 'Alle Höfe laufen. Unter „Alle“ stehen sie mit ihrer Akte.',
   leerTitel: 'Noch kein Hof angemeldet',
   leerSatz: 'Sobald sich ein Hof registriert, steht er hier mit „Prüfen“.',
   keinTreffer: 'Kein Hof passt',
   keinTrefferSatz: 'Mit diesem Filter oder dieser Suche gibt es keinen Hof.',
+  alleZeigen: 'Alle Höfe zeigen',
+  laden: 'Höfe werden geladen …',
+  sucheLoeschen: 'Suche löschen',
   pruefen: 'Prüfen',
   akte: 'Akte',
 } as const

@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { approveFarmAction, revokeFarmApprovalAction, rejectFarmAction } from '@/server/actions/admin'
-import { KONDITIONEN_DERZEIT } from '@/lib/konditionen'
+import { konditionenDerzeit } from '@/lib/konditionen'
+import type { GebuehrModell } from '@/lib/plattformgebuehr'
 import type { AdminHofZeile } from '@/lib/admin-hoefe'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -28,12 +29,17 @@ const KNOPF: Record<HofAktion['art'], string> = {
  * 768 px Dialog, darunter Blatt (BestellDialog). Die Wirkung bleibt in den
  * bestehenden Actions: Freischalten prüft E-Mail und Stripe selbst, Ablehnen
  * seine vier Guards. Ein Fehler steht inline im Dialog, der Erfolg als Toast.
+ * „Derzeit gilt …“ nach dem Modell, das die Seite auf dem Server bestimmt
+ * (gebuehrModellFuer) — ab dem Stichtag der Satz nach N38 (Board
+ * w3-admin-freischalten), davor der Übergang K1.
  */
 export function HofAktionDialog({
   aktion,
+  gebuehrModell,
   onClose,
 }: {
   aktion: HofAktion | null
+  gebuehrModell: GebuehrModell
   onClose: () => void
 }): React.JSX.Element {
   const [laeuft, startTransition] = useTransition()
@@ -103,7 +109,7 @@ export function HofAktionDialog({
             {hof?.freischaltHinweis && <Hinweiskarte ton={hof.freischaltHinweis.ton}>{hof.freischaltHinweis.text}</Hinweiskarte>}
             {/* Nur ein Hinweis (Register K1): Was öffentlich gilt, steht neben
                 der Gründungsplatz-Zusage, die bis zur Abrechnung (Gate 8) bleibt. */}
-            <p className="text-[12.5px]">{KONDITIONEN_DERZEIT}</p>
+            <p className="text-[12.5px]">{konditionenDerzeit(gebuehrModell)}</p>
           </>
         ) : art === 'revoke' ? (
           <p>
