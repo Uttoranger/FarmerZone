@@ -259,6 +259,7 @@ export const HOEFE_LISTE_TEXT = {
   keinTreffer: 'Kein Hof passt',
   keinTrefferSatz: 'Mit diesem Filter oder dieser Suche gibt es keinen Hof.',
   alleZeigen: 'Alle Höfe zeigen',
+  laden: 'Höfe werden geladen …',
   sucheLoeschen: 'Suche löschen',
   pruefen: 'Prüfen',
   akte: 'Akte',

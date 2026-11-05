@@ -51,17 +51,22 @@ export function HeuteKommt({ eintraege }: { eintraege: readonly KommtEintrag[] }
   )
 }
 
+/** Je Eintrag links leise „Wann · Wer“, rechts was getan wurde (Board w3-admin-heute; Wer nur Du/Team/System, N33). */
 export function HeuteProtokoll({ zeilen }: { zeilen: readonly ProtokollZeile[] }): React.JSX.Element {
   if (zeilen.length === 0) return <p className={cn('text-[13.5px]', LEISE)}>{HEUTE_TEXT.protokollLeer}</p>
   return (
     <ul>
       {zeilen.map((z, i) => (
         <li key={i} className={ZEILE}>
-          <span className="w-14 shrink-0 text-[12.5px] font-semibold text-foreground">{z.wer}</span>
-          <span className="min-w-0 flex-1 text-[13.5px] text-foreground">{z.text}</span>
-          <span className={cn('shrink-0 text-[12.5px]', LEISE)}>{z.wann}</span>
+          <span className={cn('shrink-0 text-[13.5px]', LEISE)}>{protokollWannWer(z)}</span>
+          <span className="min-w-0 flex-1 text-right text-[13.5px] break-words text-foreground">{z.text}</span>
         </li>
       ))}
     </ul>
   )
+}
+
+/** „heute, 08:31 · Du“ — dieselbe Zeile in der Karte und in der Klappkarte am Handy. */
+export function protokollWannWer(z: Pick<ProtokollZeile, 'wann' | 'wer'>): string {
+  return `${z.wann} · ${z.wer}`
 }

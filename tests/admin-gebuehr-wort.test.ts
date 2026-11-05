@@ -208,3 +208,33 @@ describe('Bestell-Detail: das Wort der Bestellung (V63, gebuehrBezeichnungFuer)'
     expect(html).toContain('hidden md:flex')
   })
 })
+
+describe('Notbremse-Satz nennt den Knopf wie die Hofseite (V21, Board w3-admin-heute Bild 4; Nr. 229)', () => {
+  it('„In den Korb“ ist aus — nie „In den Warenkorb“', async () => {
+    const { NOTBREMSE_ADMIN_TEXT } = await import('@/lib/notbremse')
+    expect(NOTBREMSE_ADMIN_TEXT.soSiehtEsSatz).toContain('„In den Korb“ ist aus.')
+    expect(NOTBREMSE_ADMIN_TEXT.soSiehtEsSatz).not.toContain('Warenkorb')
+  })
+})
+
+describe('Board-Abgleich Akte und Heute (Nr. 229)', () => {
+  it('ein wartender Hof: „was Kundinnen erleben würden“; Gegenprobe verkauft: „was Kundinnen erleben“', () => {
+    const daten = (modell: GebuehrModell): AkteDaten => ({
+      kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich', agb: '' },
+      aktivitaet: { bestellungen: 0, bestellungenZeile: '', umsatzCents: 0, servicegebuehrCents: 0, gebuehrZeile: aktivitaetGebuehrZeile('Plattformgebühr', 0), zuletztAngemeldet: '', anmeldung: null, antwortzeit: '' },
+      zustand: [],
+      sperre: { gesperrt: false, grund: null, seit: null },
+      protokoll: [],
+      gebuehrModell: modell,
+    })
+    const wartend = renderToStaticMarkup(createElement(HofAkteAnsicht, { hof: HOF, zustand: { id: 'wartet', text: 'Wartet', ton: 'offen' }, akte: daten('hofpreis') }))
+    expect(wartend).toContain('was Kundinnen erleben würden')
+    expect(akte('hofpreis', 'Plattformgebühr')).not.toContain('erleben würden')
+  })
+
+  it('Protokoll in Heute: links „Wann · Wer“, rechts was getan wurde', async () => {
+    const { HeuteProtokoll } = await import('@/components/admin/heute-karten')
+    const html = renderToStaticMarkup(createElement(HeuteProtokoll, { zeilen: [{ wer: 'Du', text: 'Hof freigeschaltet', wann: 'heute, 08:31' }] }))
+    expect(html).toMatch(/>heute, 08:31 · Du<\/span><span[^>]*>Hof freigeschaltet</)
+  })
+})

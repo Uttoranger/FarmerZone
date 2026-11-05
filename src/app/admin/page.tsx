@@ -27,7 +27,7 @@ import { ADMIN_RAHMEN, AdminFehler } from '@/components/admin/admin-teile'
 import { Seitenkopf } from '@/components/admin/seitenkopf'
 import { HeuteBrauchtDich, type BrauchtDichEintrag } from '@/components/admin/heute-braucht-dich'
 import { HeuteLage } from '@/components/admin/heute-lage'
-import { HeuteKommt, HeuteLaeuft, HeuteProtokoll } from '@/components/admin/heute-karten'
+import { HeuteKommt, HeuteLaeuft, HeuteProtokoll, protokollWannWer } from '@/components/admin/heute-karten'
 import { HeuteRoutine } from '@/components/admin/heute-routine'
 import { NotbremseAnhalten } from '@/components/admin/heute-notbremse'
 import { MARKE } from '@/lib/marke'
@@ -176,7 +176,7 @@ export default async function AdminHeutePage({
           <Klappkarte titel={HEUTE_TEXT.routine} zeile={HEUTE_TEXT.routineZusatz}>
             <HeuteRoutine schluessel={schluessel} kopf />
           </Klappkarte>
-          <Klappkarte titel={HEUTE_TEXT.protokoll} zeile={protokoll[0] ? `${protokoll[0].text} · ${protokoll[0].wann}` : HEUTE_TEXT.protokollLeer}>
+          <Klappkarte titel={HEUTE_TEXT.protokoll} zeile={protokoll[0] ? protokollWannWer(protokoll[0]) : HEUTE_TEXT.protokollLeer}>
             {protokollInhalt}
           </Klappkarte>
         </div>

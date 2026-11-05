@@ -146,7 +146,8 @@ export function HofAkteAnsicht({
           </dl>
         </Abschnitt>
 
-        <Abschnitt titel="Zustand" satz="was Kundinnen erleben">
+        {/* Ein wartender Hof ist noch nicht sichtbar — der Satz sagt, was Kundinnen erleben würden (Board w3-admin-akte Bild 3). */}
+        <Abschnitt titel="Zustand" satz={wartet ? 'was Kundinnen erleben würden' : 'was Kundinnen erleben'}>
           <dl className="flex flex-col text-[14px] [&>div+div]:border-t [&>div+div]:border-border">
             {akte.zustand.map((z) => (
               <div key={z.titel} className="flex items-center gap-3 py-2">

@@ -1,6 +1,6 @@
-import { HoefeLaden } from '@/components/admin/admin-laden'
+import { HoefeListeLaden } from '@/components/admin/hoefe-laden'
 
-/** Ladeansicht von /admin/hoefe (seit Nr. 193; vorher stand sie unter /admin) — in der Form der Höfe-Liste. */
+/** Ladeansicht von /admin/hoefe (seit Nr. 193 unter /admin/hoefe; seit Nr. 229 nach Board w3-admin-hoefe Bild 6). */
 export default function Laden(): React.JSX.Element {
-  return <HoefeLaden />
+  return <HoefeListeLaden />
 }
