@@ -113,10 +113,11 @@ describe('/agb', () => {
     }
   })
 
-  it('das Inhaltsverzeichnis springt zu jedem Punkt und zum Anhang — kein Sprung geht ins Leere', () => {
+  it('das Inhaltsverzeichnis springt zu „Kurz erklärt“, jedem Punkt und zum Anhang — kein Sprung geht ins Leere', () => {
     const nav = html.slice(html.indexOf('<nav'), html.indexOf('</nav>'))
     const sprünge = sprungmarken(nav)
-    expect(sprünge).toEqual([...Array.from({ length: 29 }, (_, i) => `punkt-${i + 1}`), 'anhang'])
+    // Seit Nr. 231 (Vorlage der Rechtsseiten, Board w3-rechtstexte): zuerst „Kurz erklärt“.
+    expect(sprünge).toEqual(['kurz-erklaert', ...Array.from({ length: 29 }, (_, i) => `punkt-${i + 1}`), 'anhang'])
     const kennungen = alleKennungen(html)
     for (const ziel of sprungmarken(html)) expect(kennungen.has(ziel), ziel).toBe(true)
     // Die Gruppen des Verzeichnisses sind die vier Teile.
