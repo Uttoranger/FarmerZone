@@ -23,3 +23,4 @@ Vom Dirigenten geführt (freigabe.md §35 mit den Präzisierungen). Rechner: **4
 - G4 Mein Hof fertig (148 Fassungen, alle erreichbar). Voller Lauf auf 7cd8cb2f grün (679 Dateien, 12772 Tests); Push von docs/lauf31 bis 7985eb4a (danach nur Zeitbuch-Zeilen).
 - pruefer-ui: startseite 2/2/2/2 · hoefe 2/2/2/2 · hofseite 2/2/2/2 · produkt 2/2/2/2 · mein-hof 2/2/2/2 · einstellungen 2/2/3/2 · region 2/2/2/2 · hofdaten-zahlung 2/2/2/2 · konto-hof 2/2/2/2 · auswertung 2/2/3/3 · kunden 2/2/2/2.
 - 235 gestartet (dritter Umsetzer der Welle 1). G6 System gestartet.
+- G5, G6, G7 fertig; pruefer-ui für alle 49 Boards ohne Admin (je ein frischer Unteragent). Gate A fertig: docs/nachtlauf/berichte/abnahme-lauf31.md (Tabelle, Messung, Mängel je Board, Befunde außerhalb der Optik). Admin: Beleg-Bild /login/admin → /admin/einrichten („Admin-Zugang absichern“), 12 Boards nicht abgenommen.
