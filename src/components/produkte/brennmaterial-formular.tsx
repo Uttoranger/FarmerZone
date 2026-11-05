@@ -2,11 +2,20 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { istNetzFehler } from '@/lib/netz'
+import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeBrennmaterialFamilieAn } from '@/server/actions/produktfamilie'
-import type { ProduktAngelegt } from '@/lib/produkte-hof'
+import {
+  hofpreisZeile,
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  vorschauGebuehrSatz,
+  type ProduktAngelegt,
+  type SpeicherFehlerAnzeige,
+} from '@/lib/produkte-hof'
 import { BRENN_ARTEN, brennmaterialFamilieSchema, type BrennmaterialFamilieEingabe } from '@/schemas/produktfamilie'
 import { TROCKNUNG_VALUES, UNTERKATEGORIE_LABEL, type TrocknungValue } from '@/lib/taxonomie'
 import {
@@ -42,6 +51,7 @@ import {
   FamilienDialog,
   Feld,
   FeldFehler,
+  FormularMeldung,
   RuecktrittAbschnitt,
   Wahl,
   feldId,
@@ -79,10 +89,13 @@ function startZeilen(art: BrennArt, schluessel: (i: number) => string): Zeile[] 
 export function BrennmaterialFormular({
   onClose,
   onAngelegt,
+  preisAnzeige = null,
 }: {
   onClose: () => void
   /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet die Ansicht. */
   onAngelegt?: (angelegt: ProduktAngelegt) => void
+  /** N38: im Hofpreis-Modell der Satz des Hofs — dann „Du bekommst … · die Kundin zahlt …" und Endpreise in der Vorschau. */
+  preisAnzeige?: PreisAnzeige
 }): React.JSX.Element {
   const naechster = useRef(100)
   const neuerSchluessel = () => `z${naechster.current++}`
@@ -104,6 +117,7 @@ export function BrennmaterialFormular({
   const [zeilen, setZeilen] = useState<Zeile[]>(() => startZeilen('BRENNHOLZ_SCHEIT', (i) => `s${i}`))
   const [versucht, setVersucht] = useState(false)
   const [speichert, setSpeichert] = useState(false)
+  const [speicherFehler, setSpeicherFehler] = useState<SpeicherFehlerAnzeige | null>(null)
 
   const eingabe: BrennmaterialFamilieEingabe = {
     name,
@@ -151,8 +165,9 @@ export function BrennmaterialFormular({
 
   async function speichern() {
     setVersucht(true)
+    setSpeicherFehler(null)
     if (!pruefung.success) {
-      toast.error('Bitte prüfe die markierten Felder.')
+      // Die Karte „Bitte prüfe die markierten Felder." steht über den Feldern (V17), der Fokus springt.
       springeZuFeld(Object.keys(fehlerJeFeld(pruefung.error.issues))[0])
       return
     }
@@ -160,14 +175,15 @@ export function BrennmaterialFormular({
     try {
       const ergebnis = await legeBrennmaterialFamilieAn(eingabe)
       if ('error' in ergebnis) {
-        toast.error(ergebnis.error)
+        setSpeicherFehler(speicherFehlerAusAntwort(ergebnis.error))
         return
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
       onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), kaufbar: ergebnis.kaufbar })
-    } catch {
-      toast.error('Wir konnten das Brennmaterial nicht speichern. Bitte versuch es noch einmal.')
+    } catch (e) {
+      // Anlegen: ein zweiter Versuch legte womöglich doppelt an — darum ohne „Nochmal" (speicherFehlerNachWurf).
+      setSpeicherFehler(speicherFehlerNachWurf(istNetzFehler(e), false, 'Wir konnten das Brennmaterial nicht speichern. Bitte versuch es noch einmal.'))
     } finally {
       setSpeichert(false)
     }
@@ -194,6 +210,7 @@ export function BrennmaterialFormular({
       speichernText="Speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
+      meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
       <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Buche, ofenfertig Raummeter“.">
         <input
@@ -425,6 +442,12 @@ export function BrennmaterialFormular({
                     {fehler[`${pfad}.stock`] && <FeldFehler>{fehler[`${pfad}.stock`]}</FeldFehler>}
                   </div>
                 </div>
+                {/* N38 (Board s1/w1-produkt-neu, Bild 4): was der Hof bekommt und was die Kundin zahlt. */}
+                {z.price !== null && hofpreisZeile(z.price, preisAnzeige) && (
+                  <p className="text-[12.5px] text-muted-foreground" aria-live="polite">
+                    {hofpreisZeile(z.price, preisAnzeige)}
+                  </p>
+                )}
               </li>
             )
           })}
@@ -456,11 +479,13 @@ export function BrennmaterialFormular({
               .filter((z) => z.price !== null)
               .map((z) => (
                 <li key={z.schluessel} className="rounded-full border border-border bg-card px-2.5 py-1 text-xs break-words text-foreground tabular-nums">
-                  {z.bezeichnung || EINHEIT_WAHL[z.unit]} · {formatEuro(z.price ?? 0)}
+                  {/* Was die Kundin sieht: im Hofpreis-Modell der Endpreis (endpreisEuro, wie /api/checkout). */}
+                  {z.bezeichnung || EINHEIT_WAHL[z.unit]} · {formatEuro(endpreisEuro(z.price ?? 0, preisAnzeige))}
                 </li>
               ))}
           </ul>
         )}
+        <p className="text-xs text-muted-foreground">{vorschauGebuehrSatz(preisAnzeige)}</p>
       </section>
     </FamilienDialog>
   )
