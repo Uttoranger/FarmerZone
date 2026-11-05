@@ -4,10 +4,10 @@
  *
  * Beweist (je mit Gegenprobe):
  *  - Hofseite (Vorgabe): Liegt Futter im Korb, steht der Satz aus E10a unter der Summe.
- *  - Produktseite (`mitFutterHinweis={false}`): kein Satz im Mini-Warenkorb — er läse sich dort wie ein Satz
- *    über das Produkt der Seite (auch Brennholz). Summe und „Zur Kasse“ bleiben.
+ *  - Der Satz hängt allein am Korb (E10a „bei jedem Futter“), nicht an der Seite: Auch der Mini-Warenkorb der
+ *    Produktseite zeigt ihn, sobald Futter im Korb liegt — es ist dieselbe Komponente.
  *  - Ohne Futter im Korb nie ein Satz.
- *  - Die Produktseite schaltet ihn ab (Quelltext), die Hofseite nicht.
+ *  - Keine Seite schaltet ihn ab (Quelltext).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -42,7 +42,7 @@ const PRODUKTE = [
 ]
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
-function spalte(mitFutterHinweis?: boolean): string {
+function spalte(): string {
   return renderToStaticMarkup(
     createElement(HofseiteSeitenspalte, {
       hof: HOF,
@@ -53,7 +53,6 @@ function spalte(mitFutterHinweis?: boolean): string {
       mitKorb: true,
       jetzt: '2026-11-05T08:00:00.000Z',
       produkte: PRODUKTE,
-      ...(mitFutterHinweis === undefined ? {} : { mitFutterHinweis }),
     })
   )
 }
@@ -66,22 +65,15 @@ describe('Futter-Hinweis im Mini-Warenkorb (E10a)', () => {
     expect(html.indexOf('1 Produkt')).toBeLessThan(html.indexOf(KUNDEN_VERANTWORTUNG))
   })
 
-  it('Produktseite: ohne den Satz — Summe und „Zur Kasse“ bleiben (Gegenprobe oben: derselbe Korb mit Satz)', () => {
-    korb.produktId = 'p_heu'
-    const html = spalte(false)
-    expect(html).not.toContain(KUNDEN_VERANTWORTUNG)
-    expect(html).toContain('1 Produkt')
-    expect(html).toContain('Zur Kasse')
-  })
-
   it('ohne Futter im Korb nie ein Satz', () => {
     korb.produktId = 'p_holz'
     expect(spalte()).not.toContain(KUNDEN_VERANTWORTUNG)
     expect(spalte()).toContain('Zur Kasse')
   })
 
-  it('die Produktseite schaltet ihn ab, die Hofseite nicht (Quelltext)', () => {
-    expect(quelle('src/components/produktdetail/produktdetail-kunde.tsx')).toContain('mitFutterHinweis={false}')
+  it('keine Seite schaltet den Satz ab (Quelltext)', () => {
+    expect(quelle('src/components/produktdetail/produktdetail-kunde.tsx')).not.toContain('mitFutterHinweis')
     expect(quelle('src/components/hofseite/hofseite-kunde.tsx')).not.toContain('mitFutterHinweis')
+    expect(quelle('src/components/hofseite/hofseite-seitenspalte.tsx')).not.toContain('mitFutterHinweis')
   })
 })

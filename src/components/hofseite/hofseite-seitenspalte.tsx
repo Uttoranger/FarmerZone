@@ -96,7 +96,6 @@ export function HofseiteSeitenspalte({
   produkte = [],
   kasseHref,
   kasseUmriss = false,
-  mitFutterHinweis = true,
   className,
 }: {
   hof: SeitenspalteHof
@@ -125,7 +124,6 @@ export function HofseiteSeitenspalte({
    * schaltet ihn ab: Dort stünde er neben jedem Produkt (auch Brennholz) und läse sich wie ein Satz über dieses
    * Produkt. Sie zeigt den Hinweis zum eigenen Futter unter der Kennzeichnung; zum Korb sagen ihn Korb-Blatt und Kasse.
    */
-  mitFutterHinweis?: boolean
   className?: string
 }): React.JSX.Element {
   const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 2, new Date(jetzt)), [hof.pickupSlots, jetzt])
@@ -140,7 +138,7 @@ export function HofseiteSeitenspalte({
       // passt sie mit Mini-Warenkorb und Futter-Hinweis bei 1440 × 900 ganz zwischen Kopf und Fuß.
       className={cn('flex flex-col gap-3 lg:sticky lg:top-[4.75rem] lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:leading-snug', className)}
     >
-      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} mitFutterHinweis={mitFutterHinweis} kasseHref={kasseHref} kasseUmriss={kasseUmriss} />}
+      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} kasseUmriss={kasseUmriss} />}
 
       {/* Mit Kaufsperre (Pause, keine Abholzeit, ausgebucht) keine Termine: Ankündigen, was man nicht
           buchen kann, wäre ein leeres Versprechen — auch ein heute noch laufendes Fenster nicht. */}
@@ -255,7 +253,6 @@ function MiniWarenkorb({
   sperre,
   gebuehrKorb,
   produkte,
-  mitFutterHinweis,
   kasseHref,
   kasseUmriss,
 }: {
@@ -263,7 +260,6 @@ function MiniWarenkorb({
   sperre: KaufSperre
   gebuehrKorb: string | null
   produkte: readonly (FutterAbgabe & { id: string })[]
-  mitFutterHinweis: boolean
   kasseHref?: string
   kasseUmriss: boolean
 }): ReactNode {
@@ -301,7 +297,7 @@ function MiniWarenkorb({
             {mitAnzahl(anzahl, 'Produkt', 'Produkte')} · <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
             {gebuehrKorb && <> · {gebuehrKorb}</>}
           </p>
-          {mitFutterHinweis && <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />}
+          <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
           {sperre !== null || stopp !== null ? (
             <KaufGrund sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} stopp={stopp} kurz />
           ) : (

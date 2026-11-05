@@ -205,9 +205,9 @@ export function HofseiteKunde({
   // ist eine Systemgrenze — dieselbe Prüfung wie in page.tsx, die den Beitrag lädt.
   const beitragKennung = leseBeitragKennung(suche.get(BEITRAG_PARAMETER))
   const { anordnung, nichtMehrAktuell } = ordneBeitraege(gezeigteBeitraege, beitragKennung, beitraegeFehler)
-  // Bei Pause geht die Übersicht von der Pause-Karte direkt zu den Produkten (Board w1-/s1-hofseite Bild 4) —
-  // ein geteilter Link auf einen Beitrag (`?beitrag=`) zeigt ihn trotzdem: Wer ihn öffnet, will genau ihn lesen.
-  const mitAktuell = offen === 'uebersicht' && anordnung !== null && (sperre !== 'pause' || beitragKennung !== null)
+  // Auch bei Pause: Das Register (F8) nennt keine Ausnahme — „Register vor Board“: Das Board w1-/s1-hofseite
+  // Bild 4 zeigt bei Pause keinen Abschnitt, gilt aber nicht gegen F8.
+  const mitAktuell = offen === 'uebersicht' && anordnung !== null
   const mitHinweis = offen === 'uebersicht' && nichtMehrAktuell
 
   // Ein alter Link `?reiter=beitraege` springt einmal zu „Aktuell vom Hof“ —

@@ -113,7 +113,7 @@ export function AktuellVomHof({
 
 /**
  * Der Beitrag oben, kurz wie im Board w1-/s1-hofseite (Register N5, Ergänzung Nr. 128: „Die Karte bleibt kurz
- * (zwei Zeilen Text)“): der Titel fett und eine Zeile Text, dahinter (am Handy darunter) der Textlink
+ * (zwei Zeilen Text)“): der Titel fett und zwei Zeilen Text, dahinter (am Handy darunter) der Textlink
  * „Weiterlesen“, der die Karte an Ort und Stelle aufklappt. Ohne Marke des Anlasses (das Board zeigt keine).
  * Die Zeit steht leise in der Zeile des Titels: Register F8 verlangt „Aktuell“ am neuesten („Register vor
  * Board“) — so bleibt die Karte bei zwei Zeilen.
@@ -153,11 +153,11 @@ function BeitragKarte({
                 </h3>
                 <span className="text-[13px] text-muted-foreground">{beitragZeitText(neuester, beitrag.publishedAt, jetzt)}</span>
               </div>
-              {/* Zugeklappt eine Zeile Text; ab lg steht „Weiterlesen“ in derselben Zeile dahinter (Board w1-hofseite). */}
+              {/* Zugeklappt zwei Zeilen Text; ab lg steht „Weiterlesen“ in derselben Zeile dahinter (Board w1-hofseite). */}
               <div className={cn('flex flex-col items-start gap-1', !offen && 'lg:flex-row lg:items-baseline lg:gap-1.5')}>
                 <p
                   id={inhaltId}
-                  className={cn('min-w-0 text-[14px] leading-normal break-words text-muted-foreground', offen ? 'whitespace-pre-wrap' : 'line-clamp-1')}
+                  className={cn('min-w-0 text-[14px] leading-normal break-words text-muted-foreground', offen ? 'whitespace-pre-wrap' : 'line-clamp-2')}
                 >
                   {stripStatusVariables(beitrag.body)}
                 </p>

@@ -358,7 +358,6 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
 
   it('kein „+" in der Vorschau des Hofs und bei Pause — wie bei allen Kaufwegen', () => {
     const vorschau = seite({ beitraege: LISTE, ansicht: { art: 'vorschau', kaufen: false } })
-    // Bei Pause steht der Abschnitt nur für einen geteilten Beitrag (siehe unten).
     const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true }, suche: 'beitrag=statusneu' })
     for (const html of [vorschau, pausiert]) {
       expect(html).toContain('Dazu im Hofladen')
@@ -379,14 +378,12 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(2)
   })
 
-  it('bei Pause kein „Aktuell vom Hof": die Übersicht geht von der Pause-Karte zu den Produkten (Board Bild 4) — ein geteilter Beitrag steht trotzdem', () => {
+  it('bei Pause bleibt „Aktuell vom Hof": das Register (F8) nennt keine Ausnahme — „Register vor Board“ zu Board Bild 4', () => {
     const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true } })
-    expect(pausiert).not.toContain('id="aktuell"')
-    expect(pausiert).not.toContain(NEU.title)
-    // Gegenproben: ohne Pause steht der Abschnitt, mit Pause und ?beitrag= der geteilte Beitrag oben.
-    expect(seite({ beitraege: LISTE })).toContain('id="aktuell"')
+    expect(pausiert).toContain('id="aktuell"')
+    expect(pausiert).toContain(NEU.title)
+    // Gegenprobe: mit geteiltem Beitrag steht auch bei Pause dieser oben.
     const geteilt = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true }, suche: 'beitrag=statusmitte' })
-    expect(geteilt).toContain('id="aktuell"')
     expect(reihenfolge(geteilt, [NEU.title, MITTE.title])).toEqual([MITTE.title, NEU.title])
   })
 

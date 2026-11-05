@@ -412,7 +412,7 @@ export function ProduktdetailKunde({
           {!ausverkauftKarte && <Kennzeichnung zeilen={produktAngaben(produkt, farm)} bestaetigtAm={produkt.futter?.bestaetigtAm ?? null} />}
           {/* Bei jedem Futter der Verantwortungs-Hinweis (E10a) — unter der Kennzeichnung, wo das Board seinen Futter-Satz zeigt
               (w1-/s1-produkt Bild 2); der Wortlaut ist der aus E10a (futterVerantwortung, „Register vor Board“). */}
-          <FutterVerantwortung saetze={verantwortung} className="text-[13px]" />
+          {!ausverkauftKarte && <FutterVerantwortung saetze={verantwortung} className="text-[13px]" />}
 
           {!ausverkauftKarte && (
             <GleichMitAbholen
@@ -483,7 +483,6 @@ export function ProduktdetailKunde({
           produkte={produkte}
           kasseHref={kasse}
           kasseUmriss
-          mitFutterHinweis={false}
           className="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
       </div>
