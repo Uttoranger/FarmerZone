@@ -178,10 +178,10 @@ export default async function PaymentsPage({
             {bar && <StatusBadge status={bar.ton}>{bar.marke}</StatusBadge>}
           </div>
           {bar?.satz && <p className="mt-3 text-[13.5px] leading-snug text-foreground">{bar.satz}</p>}
-          {bar?.lastschrift && (
+          {(bar?.lastschrift || bar?.zuKonditionen) && (
             <div className="mt-4">
               <Link href={BAR_KARTE_TEXT.einrichtenHref} className={KNOPF_RAHMEN}>
-                {BAR_KARTE_TEXT.einrichten}
+                {bar.lastschrift ? BAR_KARTE_TEXT.einrichten : BAR_KARTE_TEXT.zuKonditionen}
               </Link>
             </div>
           )}

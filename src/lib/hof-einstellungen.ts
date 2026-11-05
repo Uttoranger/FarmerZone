@@ -330,6 +330,8 @@ export type BarKarte = {
   satz: string | null
   /** „Lastschrift einrichten“ zeigen (Weg auf „Deine Konditionen“, dort richtet Stripe sie ein). */
   lastschrift: boolean
+  /** Bei „Pausiert“ der Weg zur offenen Monatsabrechnung auf „Deine Konditionen“. */
+  zuKonditionen: boolean
 }
 
 export const BAR_KARTE_TEXT = {
@@ -342,7 +344,9 @@ export const BAR_KARTE_TEXT = {
     'Barzahlung gibt es, sobald du die Lastschrift für die Monatsabrechnung eingerichtet hast. ' +
     'Darüber ziehen wir einmal im Monat die Plattformgebühr aus Barbestellungen ein.',
   /** Eine Monatsabrechnung sperrt bar (Nr. 198) — eine Lastschrift hilft da nicht, auch wenn eine fehlt. */
-  pausiertSatz: 'Barzahlung ist pausiert, solange eine Monatsabrechnung offen ist. Was zu tun ist, steht unter „Deine Konditionen“.',
+  pausiertSatz: 'Barzahlung ist pausiert, solange eine Monatsabrechnung offen ist.',
+  /** Der Weg bei „Pausiert“ — dort stehen Barzahlung und Monatsabrechnungen (Nr. 198). */
+  zuKonditionen: 'Zu „Deine Konditionen“',
   gruendungSatz: (bis: string): string =>
     `Bis ${bis} zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.`,
   einrichten: LASTSCHRIFT_TEXT.einrichten,
@@ -351,38 +355,30 @@ export const BAR_KARTE_TEXT = {
 } as const
 
 /**
- * Der letzte Tag, an dem die Bargebühr noch erlassen ist: der Wiener Kalendertag
- * vor `einzugAb` (der Einzug beginnt um Mitternacht in Wien). Nur für die
- * Anzeige — `formatDatumLang` schreibt den Tag in Wiener Zeit.
- */
-function letzterErlassenerTag(einzugAb: Date): Date {
-  return new Date(einzugAb.getTime() - 1)
-}
-
-/**
  * Was die Karte „Bar bei Abholung“ sagt — keine neue Regel: Ob bar geht,
  * entscheidet `barMoeglich` (dieselbe Quelle wie Kasse und /api/checkout).
  * Geht es nicht, weil eine Monatsabrechnung sperrt (`barGesperrt`), heißt die
  * Marke „Pausiert“ — eine Lastschrift höbe die Sperre nicht auf. Sonst
  * (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und keine da) heißt sie
  * „Braucht Lastschrift“ mit dem Weg dorthin (N42 g). Ist die Bargebühr noch
- * erlassen (`einzugFuer` → `erlassen`), nennt der Satz den letzten erlassenen
- * Tag aus der Lage (`einzugAb`, Vortag in Wien) — als Gründungshof nur, wenn
+ * erlassen (`einzugFuer` → `erlassen`), nennt der Satz den Einzugstag aus der
+ * Lage (`einzugAb`, wie die Karte „Barzahlung“) — als Gründungshof nur, wenn
  * `Farm.einzugAb` leer ist (dann kommt der Tag aus der Gründung), sonst neutral.
  * Im Modell „bisher“ kein Satz.
  */
 export function barKarte(lage: GebuehrLage, jetzt: Date, hof: { einzugAb: Date | null }): BarKarte {
   const T = BAR_KARTE_TEXT
   if (!barMoeglich(lage, jetzt)) {
-    if (lage.modell === 'hofpreis' && lage.barGesperrt) return { marke: T.pausiert, ton: 'offen', satz: T.pausiertSatz, lastschrift: false }
-    return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true }
+    if (lage.modell === 'hofpreis' && lage.barGesperrt) return { marke: T.pausiert, ton: 'offen', satz: T.pausiertSatz, lastschrift: false, zuKonditionen: true }
+    return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true, zuKonditionen: false }
   }
   let satz: string | null = null
   if (lage.modell === 'hofpreis' && einzugFuer(lage, 'ONSITE_CASH', jetzt) === 'erlassen') {
-    const bis = formatDatumLang(letzterErlassenerTag(lage.einzugAb))
+    // Derselbe Tag wie die Karte „Barzahlung“ (ladeBarzahlung: formatDatumLang(einzugAb)) — eine Quelle.
+    const bis = formatDatumLang(lage.einzugAb)
     satz = hof.einzugAb === null ? T.gruendungSatz(bis) : LASTSCHRIFT_TEXT.erlassen(bis)
   }
-  return { marke: T.aktiv, ton: 'fertig', satz, lastschrift: false }
+  return { marke: T.aktiv, ton: 'fertig', satz, lastschrift: false, zuKonditionen: false }
 }
 
 export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
@@ -572,7 +568,8 @@ function rechenbeispielHofpreis(
 
 /** Der Satz unter der Bar-Spalte im Hofpreis-Modell — nur bestehende Texte, gewählt nach `einzugFuer`. */
 function barSatzHofpreis(lage: Extract<GebuehrLage, { modell: 'hofpreis' }>, einzug: GebuehrEinzug | null): string {
-  if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(formatDatumLang(letzterErlassenerTag(lage.einzugAb)))
+  // Tag wie die Karte „Barzahlung“ darunter (formatDatumLang(einzugAb)), nie ein anderer.
+  if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(formatDatumLang(lage.einzugAb))
   if (einzug === 'ueberweisung') return LASTSCHRIFT_TEXT.mandatFrei
   if (einzug === null) return lage.barGesperrt ? BAR_KARTE_TEXT.pausiertSatz : LASTSCHRIFT_TEXT.mandatPflicht
   return BAR_GEBUEHR_SEPA_SATZ

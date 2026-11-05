@@ -5,8 +5,10 @@
  *  - „Bar bei Abholung“ auf /settings/payments: Marke „offen“ genau dann, wenn
  *    `barMoeglich` nein sagt — keine neue Regel (Gegenprobe über dieselben
  *    Lagen); „Lastschrift einrichten“ nur, wenn keine Sperre der Grund ist
- *    (gesperrt: „Pausiert“). Ist die Bargebühr erlassen, nennt der Satz den
- *    Vortag von `einzugAb` aus der Lage (Runde 1: nie `gruendungBis` daneben);
+ *    (gesperrt: „Pausiert“ mit dem Weg zu „Deine Konditionen“). Ist die
+ *    Bargebühr erlassen, nennt der Satz den Einzugstag `einzugAb` aus der Lage
+ *    (Runde 1: nie `gruendungBis` daneben; Runde 2: derselbe Tag wie die Karte
+ *    „Barzahlung“, Beweis unten am gerenderten „Deine Konditionen“);
  *    „Gründungshof“ nur, wenn Farm.einzugAb leer ist; im Modell „bisher“ kein Satz.
  *  - Das Rechenbeispiel von „Deine Konditionen“ rechnet im Hofpreis-Modell über
  *    `bestellGebuehr` (wie Kasse und /api/checkout), sagt „Plattformgebühr“ und
@@ -34,6 +36,8 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock('@/server/actions/farm-archive', () => ({ archiveFarm: vi.fn(), reactivateFarm: vi.fn() }))
+vi.mock('@/server/actions/lastschrift', () => ({ starteLastschrift: vi.fn(), oeffneRechnung: vi.fn() }))
+vi.mock('@/lib/stripe-client', () => ({ getStripePromise: vi.fn() }))
 
 import {
   BAR_KARTE_TEXT,
@@ -50,6 +54,8 @@ import { BAR_GEBUEHR_SEPA_SATZ, BAR_SERVICEGEBUEHR_AB, LASTSCHRIFT_TEXT } from '
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
 import { ArchiveFarmCard } from '@/app/(hof)/settings/account/archive-farm-card'
+import { Barzahlung, type BarzahlungAnzeige } from '@/components/hof-einstellungen/barzahlung'
+import { formatDatumLang } from '@/lib/format'
 
 const STICHTAG = new Date('2027-02-01T00:00:00+01:00')
 const NACH = new Date('2027-03-03T10:00:00+01:00')
@@ -86,21 +92,21 @@ const EINZUG_EINGETRAGEN = new Date('2027-06-01T00:00:00+02:00')
 describe('Bar bei Abholung: Marke aus barMoeglich (N42 g, V71)', () => {
   it('ohne Lastschrift bei Pflicht und fälligem Einzug: „Braucht Lastschrift“ mit dem Weg „Lastschrift einrichten“', () => {
     const karte = barKarte(lage(), NACH, OHNE_EINTRAG)
-    expect(karte).toEqual({ marke: 'Braucht Lastschrift', ton: 'offen', satz: BAR_KARTE_TEXT.lastschriftSatz, lastschrift: true })
+    expect(karte).toEqual({ marke: 'Braucht Lastschrift', ton: 'offen', satz: BAR_KARTE_TEXT.lastschriftSatz, lastschrift: true, zuKonditionen: false })
     expect(BAR_KARTE_TEXT.einrichten).toBe('Lastschrift einrichten')
   })
 
-  it('Gründungshof vor seinem Einzug: „Aktiv“ und der Satz mit dem letzten erlassenen Tag aus der Lage', () => {
+  it('Gründungshof vor seinem Einzug: „Aktiv“ und der Satz mit dem Einzugstag aus der Lage', () => {
     const karte = barKarte(lage({ einzugAb: EINZUG_NACH_GRUENDUNG }), NACH, OHNE_EINTRAG)
     expect(karte.marke).toBe('Aktiv')
     expect(karte.lastschrift).toBe(false)
-    expect(normal(karte.satz)).toBe('Bis 31. Jänner 2028 zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.')
+    expect(normal(karte.satz)).toBe('Bis 1. Februar 2028 zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.')
   })
 
-  it('Farm.einzugAb eingetragen: der Tag ist der Vortag dieses Einzugs in Wien, ohne „Gründungshof“ (nie gruendungBis)', () => {
+  it('Farm.einzugAb eingetragen (Sommerzeit): der Tag ist dieser Einzugstag in Wien, ohne „Gründungshof“ (nie gruendungBis)', () => {
     const karte = barKarte(lage({ einzugAb: EINZUG_EINGETRAGEN }), NACH, { einzugAb: EINZUG_EINGETRAGEN })
     expect(karte.marke).toBe('Aktiv')
-    expect(normal(karte.satz)).toBe('Bis 31. Mai 2027 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
+    expect(normal(karte.satz)).toBe('Bis 1. Juni 2027 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
     // Gegenprobe: Ab dem eingetragenen Tag ist nichts mehr erlassen — kein Satz.
     expect(barKarte(lage({ einzugAb: EINZUG_EINGETRAGEN, sepaMandatAm: STICHTAG }), EINZUG_EINGETRAGEN, { einzugAb: EINZUG_EINGETRAGEN }).satz).toBeNull()
   })
@@ -108,12 +114,13 @@ describe('Bar bei Abholung: Marke aus barMoeglich (N42 g, V71)', () => {
   it('mit Lastschrift oder ohne Pflicht: „Aktiv“ ohne Knopf; im Modell „bisher“ ohne Satz', () => {
     expect(barKarte(lage({ sepaMandatAm: STICHTAG }), NACH, OHNE_EINTRAG)).toMatchObject({ marke: 'Aktiv', lastschrift: false, satz: null })
     expect(barKarte(lage({ barMandatPflicht: false }), NACH, OHNE_EINTRAG)).toMatchObject({ marke: 'Aktiv', lastschrift: false })
-    expect(barKarte({ modell: 'bisher' }, NACH, OHNE_EINTRAG)).toEqual({ marke: 'Aktiv', ton: 'fertig', satz: null, lastschrift: false })
+    expect(barKarte({ modell: 'bisher' }, NACH, OHNE_EINTRAG)).toEqual({ marke: 'Aktiv', ton: 'fertig', satz: null, lastschrift: false, zuKonditionen: false })
   })
 
-  it('gesperrter Hof mit Lastschrift: „Pausiert“ mit eigenem Satz, kein „Lastschrift einrichten“', () => {
+  it('gesperrter Hof mit Lastschrift: „Pausiert“ mit eigenem Satz und dem Weg zu „Deine Konditionen“, kein „Lastschrift einrichten“', () => {
     const karte = barKarte(lage({ sepaMandatAm: STICHTAG, barGesperrt: true }), NACH, OHNE_EINTRAG)
-    expect(karte).toEqual({ marke: 'Pausiert', ton: 'offen', satz: BAR_KARTE_TEXT.pausiertSatz, lastschrift: false })
+    expect(karte).toEqual({ marke: 'Pausiert', ton: 'offen', satz: BAR_KARTE_TEXT.pausiertSatz, lastschrift: false, zuKonditionen: true })
+    expect(BAR_KARTE_TEXT.einrichtenHref).toBe('/settings/konditionen#barzahlung')
     expect(karte.satz).not.toContain('sobald du die Lastschrift')
   })
 
@@ -132,6 +139,7 @@ describe('Bar bei Abholung: Marke aus barMoeglich (N42 g, V71)', () => {
       const gesperrt = l.modell === 'hofpreis' && l.barGesperrt === true
       expect(karte.ton === 'offen', JSON.stringify(l)).toBe(!barMoeglich(l, NACH))
       expect(karte.lastschrift, JSON.stringify(l)).toBe(!barMoeglich(l, NACH) && !gesperrt)
+      expect(karte.zuKonditionen, JSON.stringify(l)).toBe(!barMoeglich(l, NACH) && gesperrt)
     }
     // Gegenprobe: Die Lagen decken beide Antworten ab.
     expect(new Set(lagen.map((l) => barMoeglich(l, NACH))).size).toBe(2)
@@ -168,7 +176,7 @@ describe('Rechenbeispiel im Hofpreis-Modell', () => {
     const b = bar(lage({ einzugAb: EINZUG_NACH_GRUENDUNG }))
     expect(b.zeilen['Du kassierst („Bar zu kassieren“)']).toBe('€ 21,20')
     expect(b.zeilen['Dir bleibt']).toBe('€ 21,20')
-    expect(b.satz).toBe('Bis 31. Jänner 2028 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
+    expect(b.satz).toBe('Bis 1. Februar 2028 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
     expect(b.satz).not.toContain('SEPA')
   })
 
@@ -182,6 +190,8 @@ describe('Rechenbeispiel im Hofpreis-Modell', () => {
   it('bar geht gerade nicht: ohne Lastschrift bei Pflicht der Pflicht-Satz, bei Sperre der Satz der Pause', () => {
     expect(bar(lage()).satz).toBe(LASTSCHRIFT_TEXT.mandatPflicht)
     expect(bar(lage({ sepaMandatAm: STICHTAG, barGesperrt: true })).satz).toBe(BAR_KARTE_TEXT.pausiertSatz)
+    // Das Beispiel steht auf „Deine Konditionen“ selbst — kein Verweis auf die eigene Seite.
+    expect(bar(lage({ sepaMandatAm: STICHTAG, barGesperrt: true })).satz).not.toContain('Konditionen')
     expect(bar(lage()).zeilen['Dir bleibt']).toBe('€ 20,00')
   })
 
@@ -213,6 +223,29 @@ describe('„Deine Konditionen“ gerendert: kein „Servicegebühr“ nach dem 
     // Gegenprobe: Mit Lage stehen die Teile da.
     const mit = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: NACH, gebuehr: { lage: lage(), stichtag: STICHTAG } }))
     for (const teil of ['Rechenbeispiel', 'So rechnen wir ab', 'Stand:']) expect(mit).toContain(teil)
+  })
+})
+
+describe('„Deine Konditionen“: Rechenbeispiel und Karte „Barzahlung“ nennen denselben Tag (Runde 2)', () => {
+  /** Die Karte bekommt den Tag als Text aus ladeBarzahlung: formatDatumLang(einzugAbFuer(…)) — hier derselbe Einzug. */
+  function karte(einzugAb: Date): BarzahlungAnzeige {
+    return { satzText: '6', einzugAbText: formatDatumLang(einzugAb), einzugBegonnen: false, mandat: false, mandatPflicht: true, bank: null, letzte4: null, abrechnungen: [] }
+  }
+  const tage = (markup: string): string[] => [...normal(markup).matchAll(/Bis ([^<]+?) behältst du/g)].map((m) => m[1])
+
+  it.each([
+    ['Winterzeit, Gründungshof', EINZUG_NACH_GRUENDUNG, '1. Februar 2028'],
+    ['Sommerzeit, eingetragener Einzug', EINZUG_EINGETRAGEN, '1. Juni 2027'],
+  ])('%s', (_fall, einzugAb, tag) => {
+    const seite =
+      html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: NACH, gebuehr: { lage: lage({ einzugAb }), stichtag: STICHTAG } })) +
+      html(createElement(Barzahlung, { daten: karte(einzugAb) }))
+    const genannt = tage(seite)
+    // Zwei Stellen: die Bar-Spalte des Rechenbeispiels und die Karte „Barzahlung“.
+    expect(genannt).toHaveLength(2)
+    expect(new Set(genannt)).toEqual(new Set([tag]))
+    // Gegenprobe: Der Vortag (die alte Rechnung des Beispiels) steht nirgends.
+    expect(normal(seite)).not.toContain(formatDatumLang(new Date(einzugAb.getTime() - 1)).replace(/\u00a0/g, ' '))
   })
 })
 
