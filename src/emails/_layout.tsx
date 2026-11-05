@@ -95,20 +95,20 @@ const footerText: React.CSSProperties = {
  * „E-Mails“). Jede Vorlage wählt ihre Art selbst (Pflicht-Prop, Liste in
  * tests/mail-vorschau.test.ts):
  *  - `hof`: Bestellmails an die Kundin — der Vertrag besteht mit dem Hof.
- *  - `agrilo`: Konto, Code, Passwort, Sicherheit, Freischaltung, Lastschrift,
+ *  - `plattform`: Konto, Code, Passwort, Sicherheit, Freischaltung, Lastschrift,
  *    Team und alle Mails an den Hof — kein Hof löst sie aus.
  *  - `betrieb`: Mails an das Team (Betrieb), intern und ohne Anbieterzeile.
  *  - `postfach`: Nachrichten vom Team an einen Hof (Register N12).
  *  - `beitrag`: Neuigkeiten eines Hofs an seine Abonnentinnen.
  */
-export type MailFuss = { art: 'hof' } | { art: 'agrilo' } | { art: 'betrieb' } | { art: 'postfach' } | { art: 'beitrag'; hof: string }
+export type MailFuss = { art: 'hof' } | { art: 'plattform' } | { art: 'betrieb' } | { art: 'postfach' } | { art: 'beitrag'; hof: string }
 
 export type MailFussArt = MailFuss['art']
 
 /** Die Sätze des Fußes — eine Quelle für Vorlagen und Tests. Betrieb und Postfach behalten ihren Satz aus zustellung.ts bzw. postfach.ts. */
 export const MAIL_FUSS_TEXT = {
   hof: `Versandt von ${MARKE} im Auftrag eines Hofes.`,
-  agrilo: `Versandt von ${MARKE}.`,
+  plattform: `Versandt von ${MARKE}.`,
   betrieb: ZUSTELLUNG_MAIL_TEXT.fuss,
   postfach: POSTFACH_MAIL_TEXT.fuss,
   /** Ohne Anschrift des Hofs: Ob sie in den Fuß gehört, prüft das Recht (ECG § 6, MedienG § 24/25). */

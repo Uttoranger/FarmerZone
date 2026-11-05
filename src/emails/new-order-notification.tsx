@@ -30,7 +30,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const anrufen = telefonLink(p.customerPhone)
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
       <Text style={h1}>
         {p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}
       </Text>

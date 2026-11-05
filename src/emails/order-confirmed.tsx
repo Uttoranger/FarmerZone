@@ -39,7 +39,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
   // Papier und Mail sagen dasselbe wie der Bildschirm (V57): „Bar-Bestellung bestätigt“.
   const titel = p.zahlart === 'karte' ? 'Bestellung bestätigt (Karte bei Abholung)' : 'Bar-Bestellung bestätigt'
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`${titel}: ${p.orderNumber} – ${p.customerName}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${titel}: ${p.orderNumber} – ${p.customerName}`}>
       <Text style={h1}>{titel}</Text>
       <Text style={bodyText}>
         Hallo {p.farmerName},<br />

@@ -28,7 +28,7 @@ export interface WiderrufEingangProps {
 /** Eingangsbestätigung (§ 13a FAGG): Inhalt, Datum und Uhrzeit, die nächsten Schritte. */
 export function WiderrufEingangEmail(p: WiderrufEingangProps) {
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText="Dein Widerruf ist eingegangen">
+    <EmailLayout fuss={{ art: 'plattform' }} previewText="Dein Widerruf ist eingegangen">
       <Text style={h1}>Dein Rücktritt ist eingegangen</Text>
       <Text style={bodyText}>{`Wir haben deinen Rücktritt am ${p.eingegangenAm} erhalten. Diese E-Mail ist deine Eingangsbestätigung.`}</Text>
       {p.bestellnummer && <BetragsZeile links="Bestellnummer" rechts={p.bestellnummer} />}
@@ -68,7 +68,7 @@ export interface WiderrufHofProps {
 /** An den Hof: ein Widerruf nach der Abholung — prüfen, erstatten oder mit Grund ablehnen. */
 export function WiderrufHofEmail(p: WiderrufHofProps) {
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`Rücktritt zu Bestellung ${p.bestellnummer}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Rücktritt zu Bestellung ${p.bestellnummer}`}>
       <Text style={h1}>Eine Kundin ist zurückgetreten</Text>
       <Text style={bodyText}>
         Zur Bestellung <strong>{p.bestellnummer}</strong> ist am {p.eingegangenAm} ein Rücktritt eingegangen. Bitte prüf die Rückgabe und erstatte –

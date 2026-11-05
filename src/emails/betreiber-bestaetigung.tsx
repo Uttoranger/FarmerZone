@@ -18,7 +18,7 @@ export interface BetreiberBestaetigungProps {
  */
 export function BetreiberBestaetigungEmail({ url }: BetreiberBestaetigungProps): React.JSX.Element {
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText={ZUSTELLUNG_MAIL_TEXT.bestaetigungTitel}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={ZUSTELLUNG_MAIL_TEXT.bestaetigungTitel}>
       <Text style={h1}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungTitel}</Text>
       <Text style={bodyText}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungSatz}</Text>
       <KnopfReihe>

@@ -11,9 +11,9 @@
  *
  * Beweist je Mail:
  *  - den Fuß ihrer Art: „im Auftrag eines Hofes“ nur in Bestellmails an die
- *    Kundin, „Versandt von Agrilo.“ bei Konto, Code, Sicherheit, Team und allen
+ *    Kundin, „Versandt von <Marke>.“ bei Konto, Code, Sicherheit, Team und allen
  *    Mails an den Hof, Betriebs-Mails und Postfach ihren eigenen Satz, Beiträge
- *    „Im Auftrag von <Hof> · versandt von Agrilo“; die Anbieterzeile mit dem
+ *    „Im Auftrag von <Hof> · versandt von <Marke>“; die Anbieterzeile mit dem
  *    Link auf das Impressum überall außer in Betriebs-Mails;
  *  - jeder Knopf ist mindestens 44 px hoch (Rand + Abstand + Zeilenhöhe);
  *  - kein „zwei Stunden“, kein „Dashboard“, kein „Vor-Ort“; nach dem Stichtag
@@ -101,6 +101,9 @@ afterAll(() => {
 
 /** Mi, 3. März 2027, 07:40 in Wien — der Tag der Beispielwelt. */
 const JETZT = new Date('2027-03-03T06:40:00.000Z')
+
+/** Ein Code für die Vorschau entsteht erst zur Laufzeit — nie als Ziffernfolge im Test (tests/code-testwerte-wache.test.ts). */
+const beispielCode = (ziffern: readonly number[]): string => ziffern.join('')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -226,7 +229,7 @@ const FAELLE: Fall[] = [
   {
     name: 'widerruf-eingang',
     art: 'widerruf-eingang',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: async () => {
       await email.sendWiderrufEingang(BESTELLUNG.customerEmail, {
         bestellnummer: BESTELLUNG.orderNumber,
@@ -259,51 +262,51 @@ const FAELLE: Fall[] = [
     },
   },
   // Codes und Links (s3/w3-mail-zugang)
-  { name: 'anmeldecode', art: 'anmeldecode', fuss: 'agrilo', rendere: async () => (await email.sendAnmeldeCodeEmail('maria.huber@example.org', '615204'), ausResend()) },
-  { name: 'bestellcode', art: 'bestellcode', fuss: 'agrilo', rendere: async () => (await email.sendBestellCodeEmail('anna.berger@example.org', '730254'), ausResend()) },
-  { name: 'passwort-link', art: 'passwort-link', fuss: 'agrilo', rendere: async () => (await email.sendPasswordResetEmail(ANMELDE_ADRESSE, `${PRODUKTION_ADRESSE}/reset-password?token=platzhalter`), ausResend()) },
-  { name: 'email-bestaetigung', art: 'email-bestaetigung', fuss: 'agrilo', rendere: async () => (await email.sendEmailBestaetigung('kontakt@hof-am-moos.example.org', `${PRODUKTION_ADRESSE}/verify?token=platzhalter`), ausResend()) },
+  { name: 'anmeldecode', art: 'anmeldecode', fuss: 'plattform', rendere: async () => (await email.sendAnmeldeCodeEmail('maria.huber@example.org', beispielCode([6, 1, 5, 2, 0, 4])), ausResend()) },
+  { name: 'bestellcode', art: 'bestellcode', fuss: 'plattform', rendere: async () => (await email.sendBestellCodeEmail('anna.berger@example.org', beispielCode([7, 3, 0, 2, 5, 4])), ausResend()) },
+  { name: 'passwort-link', art: 'passwort-link', fuss: 'plattform', rendere: async () => (await email.sendPasswordResetEmail(ANMELDE_ADRESSE, `${PRODUKTION_ADRESSE}/reset-password?token=platzhalter`), ausResend()) },
+  { name: 'email-bestaetigung', art: 'email-bestaetigung', fuss: 'plattform', rendere: async () => (await email.sendEmailBestaetigung('kontakt@hof-am-moos.example.org', `${PRODUKTION_ADRESSE}/verify?token=platzhalter`), ausResend()) },
   // Sicherheit (s3/w3-mail-sicherheit)
   {
     name: 'neue-anmeldung',
     art: 'neue-anmeldung',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: async () => {
       await email.sendNeueAnmeldungEmail(ANMELDE_ADRESSE, { hof: true, name: 'Franz Müller', geraet: 'Windows · Edge', zeitpunkt: new Date('2027-03-02T20:14:00.000Z'), link: `${PRODUKTION_ADRESSE}/sicherheit/nicht-ich?t=platzhalter` })
       return ausResend()
     },
   },
-  { name: 'zu-viele-versuche-code', art: 'zu-viele-versuche', fuss: 'agrilo', rendere: async () => (await email.sendZuVieleVersucheEmail('anna.berger@example.org', 'code', new Date('2027-03-03T08:15:00.000Z')), ausResend()) },
-  { name: 'zu-viele-versuche-passwort', art: 'zu-viele-versuche', fuss: 'agrilo', rendere: async () => (await email.sendZuVieleVersucheEmail(ANMELDE_ADRESSE, 'passwort', new Date('2027-03-03T08:15:00.000Z')), ausResend()) },
-  { name: 'email-aendern-link', art: 'email-aendern-link', fuss: 'agrilo', rendere: async () => (await email.sendEmailAendernLink('franz.mueller@neu.example.org', { hof: HOF.name, link: `${PRODUKTION_ADRESSE}/konto/adresse?t=platzhalter` }), ausResend()) },
+  { name: 'zu-viele-versuche-code', art: 'zu-viele-versuche', fuss: 'plattform', rendere: async () => (await email.sendZuVieleVersucheEmail('anna.berger@example.org', 'code', new Date('2027-03-03T08:15:00.000Z')), ausResend()) },
+  { name: 'zu-viele-versuche-passwort', art: 'zu-viele-versuche', fuss: 'plattform', rendere: async () => (await email.sendZuVieleVersucheEmail(ANMELDE_ADRESSE, 'passwort', new Date('2027-03-03T08:15:00.000Z')), ausResend()) },
+  { name: 'email-aendern-link', art: 'email-aendern-link', fuss: 'plattform', rendere: async () => (await email.sendEmailAendernLink('franz.mueller@neu.example.org', { hof: HOF.name, link: `${PRODUKTION_ADRESSE}/konto/adresse?t=platzhalter` }), ausResend()) },
   {
     name: 'email-geaendert-hinweis',
     art: 'email-geaendert-hinweis',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: async () => (await email.sendEmailGeaendertHinweis(ANMELDE_ADRESSE, { hof: HOF.name, zeitpunkt: JETZT, link: `${PRODUKTION_ADRESSE}/sicherheit/nicht-ich?t=platzhalter` }), ausResend()),
   },
   {
     name: 'registrierungs-hinweis',
     art: 'registrierungs-hinweis',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: async () => (await email.sendRegistrierungsHinweis(ANMELDE_ADRESSE, { weg: 'passwort', anmelden: `${PRODUKTION_ADRESSE}/login`, passwortZuruecksetzen: `${PRODUKTION_ADRESSE}/forgot-password` }), ausResend()),
   },
   // Admin-Konto und Team (s3/w3-mail-team)
-  { name: 'admin-sicherheit-einrichtungscode', art: 'admin-sicherheit', fuss: 'agrilo', rendere: async () => (await email.sendAdminSicherheitEmail('jonas.pichler@example.org', 'einrichtungscode', { geraet: 'Laptop · Chrome', zeitpunkt: JETZT, code: '482917' }), ausResend()) },
-  { name: 'admin-sicherheit-passkey', art: 'admin-sicherheit', fuss: 'agrilo', rendere: async () => (await email.sendAdminSicherheitEmail('clara.wimmer@example.org', 'passkey-hinzugefuegt', { geraet: 'Laptop · Chrome', zeitpunkt: JETZT }), ausResend()) },
+  { name: 'admin-sicherheit-einrichtungscode', art: 'admin-sicherheit', fuss: 'plattform', rendere: async () => (await email.sendAdminSicherheitEmail('jonas.pichler@example.org', 'einrichtungscode', { geraet: 'Laptop · Chrome', zeitpunkt: JETZT, code: beispielCode([4, 8, 2, 9, 1, 7]) }), ausResend()) },
+  { name: 'admin-sicherheit-passkey', art: 'admin-sicherheit', fuss: 'plattform', rendere: async () => (await email.sendAdminSicherheitEmail('clara.wimmer@example.org', 'passkey-hinzugefuegt', { geraet: 'Laptop · Chrome', zeitpunkt: JETZT }), ausResend()) },
   {
     name: 'team-recht-geaendert',
     art: 'team-recht-geaendert',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: async () => (await email.sendTeamRechtGeaendert('jonas.pichler@example.org', { anlass: 'eingeladen', name: 'Jonas Pichler', rechte: ['Höfe freischalten und betreuen', 'Bestellungen und Erstattungen', 'Startseite'] }), ausResend()),
   },
-  { name: 'betreiber-bestaetigung', art: 'betreiber-bestaetigung', fuss: 'agrilo', rendere: async () => (await email.sendBetreiberBestaetigung('jonas.pichler@example.org', 'platzhalter'), ausResend()) },
+  { name: 'betreiber-bestaetigung', art: 'betreiber-bestaetigung', fuss: 'plattform', rendere: async () => (await email.sendBetreiberBestaetigung('jonas.pichler@example.org', 'platzhalter'), ausResend()) },
   { name: 'betreiber-testmail', art: 'betreiber-testmail', fuss: 'betrieb', rendere: () => ausRenderer('betreiber-testmail', { empfaengerId: 'support' }) },
   // Neuigkeiten (s3/w3-mail-neuigkeiten)
   {
     name: 'abo-bestaetigung',
     art: 'abo-bestaetigung',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: () => {
       db.customerFarmSubscription.findUnique.mockResolvedValue({ customerEmail: 'maria.huber@example.org', emailOptInAngefragtAm: JETZT, emailOptInBestaetigtAm: null, farm: { name: HOF.name } })
       return ausRenderer('abo-bestaetigung', { aboId: 'cabo00000000000000000001' })
@@ -336,12 +339,12 @@ const FAELLE: Fall[] = [
     },
   },
   // Bestellungen an den Hof (s3/w3-mail-hof-bestellung)
-  { name: 'bestellung-bezahlt-hof', art: 'bestellung-bezahlt-hof', fuss: 'agrilo', rendere: () => (bestellung(), ausRenderer('bestellung-bezahlt-hof', { orderId: BESTELLUNG.id })) },
-  { name: 'bar-bestaetigt-hof', art: 'bar-bestaetigt-hof', fuss: 'agrilo', rendere: () => (bestellung({ ...BAR, gebuehrEinzug: 'erlassen' }), ausRenderer('bar-bestaetigt-hof', { orderId: BAR.id })) },
+  { name: 'bestellung-bezahlt-hof', art: 'bestellung-bezahlt-hof', fuss: 'plattform', rendere: () => (bestellung(), ausRenderer('bestellung-bezahlt-hof', { orderId: BESTELLUNG.id })) },
+  { name: 'bar-bestaetigt-hof', art: 'bar-bestaetigt-hof', fuss: 'plattform', rendere: () => (bestellung({ ...BAR, gebuehrEinzug: 'erlassen' }), ausRenderer('bar-bestaetigt-hof', { orderId: BAR.id })) },
   {
     name: 'widerruf-hof',
     art: 'widerruf-hof',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: () => {
       db.widerruf.findUnique.mockResolvedValue(WIDERRUF)
       bestellung()
@@ -352,7 +355,7 @@ const FAELLE: Fall[] = [
   {
     name: 'freischaltung',
     art: 'freischaltung',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: () => {
       db.farm.findUnique.mockResolvedValue({ name: 'Hof am Moos', slug: 'hof-am-moos', approvedAt: JETZT, owner: { email: 'kontakt@hof-am-moos.example.org' } })
       return ausRenderer('freischaltung', { farmId: 'chofammoos00000000000001' })
@@ -361,7 +364,7 @@ const FAELLE: Fall[] = [
   {
     name: 'plattformgebuehr-ankuendigung',
     art: 'plattformgebuehr-ankuendigung',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: () => {
       vi.mocked(ankuendigungDaten).mockResolvedValue({ an: ANMELDE_ADRESSE, datum: '1. Februar 2028', text: ankuendigungText({ datum: '1. Februar 2028', satz: '6', mandatNoetig: true }), archiviert: false })
       return ausRenderer('plattformgebuehr-ankuendigung', { farmId: HOF.id })
@@ -370,7 +373,7 @@ const FAELLE: Fall[] = [
   {
     name: 'lastschrift-gescheitert',
     art: 'lastschrift-gescheitert',
-    fuss: 'agrilo',
+    fuss: 'plattform',
     rendere: () => {
       db.monatsabrechnung.findUnique.mockResolvedValue({ stand: 'gescheitert', monat: new Date('2028-04-01T00:00:00.000Z'), farm: { archivedAt: null, geschlossenAm: null, barSperreNachTagen: 14, owner: { email: 'kontakt@hof-am-moos.example.org' } } })
       return ausRenderer('lastschrift-gescheitert', { monatsabrechnungId: 'cabrechnung0000000000001' })
@@ -495,7 +498,7 @@ function text(html: string): string {
 
 const ALLE_FUESSE = (hof: string): Record<MailFussArt, string> => ({
   hof: MAIL_FUSS_TEXT.hof,
-  agrilo: MAIL_FUSS_TEXT.agrilo,
+  plattform: MAIL_FUSS_TEXT.plattform,
   betrieb: MAIL_FUSS_TEXT.betrieb,
   postfach: MAIL_FUSS_TEXT.postfach,
   beitrag: MAIL_FUSS_TEXT.beitrag(hof),
@@ -656,42 +659,42 @@ describe('Gebühren-Wort in den Kunden-Mails (V63)', () => {
 
 /** Die Fuß-Art je Vorlage in der Reihenfolge ihrer EmailLayout-Aufrufe — die Liste aus dem Auftrag (Nr. 232, Punkt 1). */
 const FUSS_JE_VORLAGE: Record<string, MailFussArt[]> = {
-  'abo-bestaetigung.tsx': ['agrilo'],
-  'admin-sicherheit.tsx': ['agrilo', 'agrilo'],
-  'anmeldecode.tsx': ['agrilo'],
+  'abo-bestaetigung.tsx': ['plattform'],
+  'admin-sicherheit.tsx': ['plattform', 'plattform'],
+  'anmeldecode.tsx': ['plattform'],
   'artikel-fehlt.tsx': ['hof'],
   'bestellung-verfallen.tsx': ['hof'],
   'betreiber-antwort.tsx': ['betrieb'],
-  'betreiber-bestaetigung.tsx': ['agrilo'],
+  'betreiber-bestaetigung.tsx': ['plattform'],
   'betreiber-testmail.tsx': ['betrieb'],
   'betrieb-warnung.tsx': ['betrieb'],
   'briefkasten-zusammenfassung.tsx': ['betrieb'],
-  'email-aendern.tsx': ['agrilo', 'agrilo'],
-  'email-bestaetigung.tsx': ['agrilo'],
+  'email-aendern.tsx': ['plattform', 'plattform'],
+  'email-bestaetigung.tsx': ['plattform'],
   'erstattung-offen.tsx': ['betrieb'],
-  'freischaltung.tsx': ['agrilo'],
-  'lastschrift-gescheitert.tsx': ['agrilo'],
+  'freischaltung.tsx': ['plattform'],
+  'lastschrift-gescheitert.tsx': ['plattform'],
   'meldung-notification.tsx': ['betrieb'],
-  'neue-anmeldung.tsx': ['agrilo'],
+  'neue-anmeldung.tsx': ['plattform'],
   'new-farm-notification.tsx': ['betrieb'],
-  'new-order-notification.tsx': ['agrilo'],
+  'new-order-notification.tsx': ['plattform'],
   'onsite-confirmation.tsx': ['hof'],
   'order-cancelled.tsx': ['hof'],
   'order-confirmation.tsx': ['hof'],
-  'order-confirmed.tsx': ['agrilo'],
+  'order-confirmed.tsx': ['plattform'],
   'order-not-ready.tsx': ['hof'],
-  'password-reset.tsx': ['agrilo'],
+  'password-reset.tsx': ['plattform'],
   'pickup-reminder.tsx': ['hof'],
-  'plattformgebuehr-ankuendigung.tsx': ['agrilo'],
+  'plattformgebuehr-ankuendigung.tsx': ['plattform'],
   'postfach-antwort.tsx': ['postfach'],
   'postfach-rundschreiben.tsx': ['postfach'],
-  'registrierung-hinweis.tsx': ['agrilo'],
+  'registrierung-hinweis.tsx': ['plattform'],
   'status-update.tsx': ['beitrag'],
-  'team-recht-geaendert.tsx': ['agrilo'],
-  // Eingangsbestätigung und Mail an den Hof: Agrilo; das Ergebnis an die Kundin gehört zur Bestellung.
-  'widerruf.tsx': ['agrilo', 'agrilo', 'hof'],
+  'team-recht-geaendert.tsx': ['plattform'],
+  // Eingangsbestätigung und Mail an den Hof: die Plattform; das Ergebnis an die Kundin gehört zur Bestellung.
+  'widerruf.tsx': ['plattform', 'plattform', 'hof'],
   'zahlung-zu-spaet.tsx': ['hof'],
-  'zu-viele-versuche.tsx': ['agrilo'],
+  'zu-viele-versuche.tsx': ['plattform'],
 }
 
 /** Ohne EmailLayout: das Layout selbst und ein Teil der Bestätigungsmails. */

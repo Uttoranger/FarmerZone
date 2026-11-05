@@ -17,7 +17,7 @@ export interface FreischaltungProps {
  */
 export function FreischaltungEmail({ farmName, farmUrl }: FreischaltungProps) {
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`${farmName} ist jetzt öffentlich erreichbar`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${farmName} ist jetzt öffentlich erreichbar`}>
       <Text style={h1}>Dein Hof ist freigeschaltet</Text>
       <Text style={bodyText}>
         <strong>{farmName}</strong> ist ab sofort öffentlich erreichbar — Kundinnen können

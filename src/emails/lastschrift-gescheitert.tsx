@@ -13,7 +13,7 @@ export interface LastschriftGescheitertProps {
 /** Die Lastschrift der Monatsabrechnung ist gescheitert (Register N38, Nr. 198). */
 export function LastschriftGescheitertEmail({ text, monat, konditionenUrl }: LastschriftGescheitertProps) {
   return (
-    <EmailLayout fuss={{ art: 'agrilo' }} previewText={`Lastschrift für ${monat} hat nicht geklappt`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Lastschrift für ${monat} hat nicht geklappt`}>
       <Text style={h1}>Lastschrift für {monat} hat nicht geklappt</Text>
       <Text style={bodyText}>{text}</Text>
       <Link href={konditionenUrl} style={ctaButton}>
