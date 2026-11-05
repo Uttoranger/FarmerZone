@@ -324,7 +324,7 @@ function Zusammenfassung({
   const zeilen: [string, string][] = [
     [WIDERRUF_TEXT.bestellung, bestellung ? WIDERRUF_TEXT.bestellungBei(bestellung.bestellnummer, bestellung.hof) : nummer],
     [WIDERRUF_TEXT.was, umfangZeilen.join(', ')],
-    ...(name.trim() ? ([[WIDERRUF_TEXT.name, name]] as [string, string][]) : []),
+    ...(name.trim() ? ([[WIDERRUF_TEXT.nameZeile, name]] as [string, string][]) : []),
     // Mit Link geht die Bestätigung an die Adresse der Bestellung — die Seite kennt und zeigt sie nicht.
     ...(!bestellung && email ? ([[WIDERRUF_TEXT.eingangsbestaetigungAn, email]] as [string, string][]) : []),
   ]

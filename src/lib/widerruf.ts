@@ -263,6 +263,8 @@ export const WIDERRUF_TEXT = {
   hof: 'Hof',
   bestellungBei: (nummer: string, hof: string) => `${nummer} bei ${hof}`,
   was: 'Was',
+  // In der Zusammenfassung kurz „Name“ (Board w3-widerruf Bild 3); das Feld heißt „Dein Name“.
+  nameZeile: 'Name',
   eingangsbestaetigungAn: 'Eingangsbestätigung an',
   // Kasse (Freigabe 200 Punkt 8): neben dem Kaufknopf, nicht bei „Betrieb“.
   kasseSatz: [
