@@ -205,7 +205,7 @@ export function alsWiderrufStand(roh: string): WiderrufStand {
   return (WIDERRUF_STAENDE as readonly string[]).includes(roh) ? (roh as WiderrufStand) : 'eingegangen'
 }
 
-/** Der Anker der Liste „Widerrufe ohne Bestellung“ in Admin › Bestellungen (Ziel der Aufgabe). */
+/** Der Anker der Liste „Rücktritte ohne Bestellung“ in Admin › Bestellungen (Ziel der Aufgabe). */
 export const WIDERRUF_OHNE_BESTELLUNG_ANKER = 'widerrufe-ohne-bestellung'
 
 /**
