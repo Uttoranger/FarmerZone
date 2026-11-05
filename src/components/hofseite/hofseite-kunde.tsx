@@ -47,7 +47,8 @@ import { teileHof } from '@/components/shared/hof-teilen'
 import { ProductGrid, useBereichWunsch, type InDenKorb } from '@/components/farm/product-grid'
 import { AktuellVomHof } from '@/components/hofseite/aktuell-vom-hof'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
-import { GRUENER_TEXTLINK, HofseiteSeitenspalte, SPALTEN_KARTE, UEBERZEILE } from '@/components/hofseite/hofseite-seitenspalte'
+import { textlinkKlassen } from '@/components/ui/textlink'
+import { HofseiteSeitenspalte, SPALTEN_KARTE, UEBERZEILE } from '@/components/hofseite/hofseite-seitenspalte'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { useBestellstopp } from '@/components/notbremse-band'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
@@ -556,7 +557,7 @@ export function HofseiteKunde({
                 href={reiterAdresse(pfad, suche.toString(), 'produkte')}
                 onNavigate={zeigeReiter('produkte', { fokusAufReiter: true })}
                 prefetch={false}
-                className={GRUENER_TEXTLINK}
+                className={textlinkKlassen()}
               >
                 Alle ansehen <span aria-hidden="true">&nbsp;→</span>
               </Link>

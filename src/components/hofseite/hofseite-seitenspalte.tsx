@@ -17,6 +17,7 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
+import { textlinkKlassen } from '@/components/ui/textlink'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-registrierung'
@@ -57,12 +58,6 @@ export type SeitenspalteHof = {
 export const SPALTEN_KARTE = 'flex flex-col gap-2 rounded-2xl border border-border bg-card px-3.5 py-3'
 /** Die leise Überzeile in Großbuchstaben (13 px fett) — Überschrift jeder Karte und der Abschnitte der Hofseite. */
 export const UEBERZEILE = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
-/** Grüner Textlink mit 44 px Höhe („Route planen →", „Alle ansehen →"). */
-export const GRUENER_TEXTLINK = cn(
-  'inline-flex min-h-11 w-fit items-center rounded-md text-[15px] font-semibold text-brand-text underline underline-offset-4',
-  FOKUS_RAHMEN
-)
-
 /** Steht in „Zahlung & Kontakt“ statt der Nummer (Nr. 60): Telefon und E-Mail kommen mit der Bestellung. */
 export const TELEFON_IN_DER_BESTAETIGUNG = 'Die Telefonnummer des Hofs steht in deiner Bestellbestätigung.'
 
@@ -214,7 +209,7 @@ function AnfahrtKarte({
         href={buildMapsUrl(hof.address, hof.postalCode, hof.city)}
         target="_blank"
         rel="noopener noreferrer"
-        className={GRUENER_TEXTLINK}
+        className={textlinkKlassen()}
       >
         Route planen <span aria-hidden="true">&nbsp;→</span>
       </a>
