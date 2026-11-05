@@ -82,11 +82,21 @@ describe('Quelltext: DropdownMenuContent hält die Wächter frei', () => {
   it('das Popup trägt den Ref, der beim Einhängen freigibt und auf neue Kinder hört', () => {
     const popup = quelle.slice(quelle.indexOf('<MenuPrimitive.Popup'), quelle.indexOf('/>', quelle.indexOf('<MenuPrimitive.Popup')))
     expect(popup).toContain('ref={waechterFrei}')
-    expect(quelle).toContain('const waechterFrei = useWaechterFrei()')
+    expect(quelle).toContain('const waechterFrei = useWaechterFrei(ref)')
     expect(quelle).toMatch(/new MutationObserver\(freigeben\)/)
     expect(quelle).toMatch(/observe\(ort, \{ childList: true \}\)/)
     // Orte: der Positionierer (Eltern des Popups) und die Eltern des Knopfs, gefunden über aria-controls.
     expect(quelle).toMatch(/\[aria-controls="\$\{CSS\.escape\(popup\.id\)\}"\]/)
     expect(quelle).toContain('return [popup.parentElement, knopf?.parentElement ?? null]')
+  })
+
+  it('ein Ref des Aufrufers überschreibt den Wächter-Ref nicht, er bekommt dasselbe Element mit (Nachprüfung UI-Runde 3)', () => {
+    const popup = quelle.slice(quelle.indexOf('<MenuPrimitive.Popup'), quelle.indexOf('/>', quelle.indexOf('<MenuPrimitive.Popup')))
+    // Der Wächter-Ref steht HINTER {...props} — ein ref in props könnte ihn sonst ersetzen.
+    expect(popup.indexOf('{...props}')).toBeGreaterThan(-1)
+    expect(popup.indexOf('ref={waechterFrei}')).toBeGreaterThan(popup.indexOf('{...props}'))
+    // ref kommt aus den props heraus und wird im Hook bedient.
+    expect(quelle).toMatch(/container,\s+ref,\s+\.\.\.props\s+\}/)
+    expect(quelle).toContain('setzeRef(fremd, popup)')
   })
 })

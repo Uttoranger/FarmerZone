@@ -26,7 +26,6 @@ import {
   HOF_NEU_TITEL,
   VERKAUF_UND_KUNDEN_TITEL,
   ABMELDEN_LABEL,
-  BLATT_KOPF_KLEBT,
   hofAriaAktuell,
   hofHandyAriaAktuell,
   hofMehrAktiv,
@@ -277,6 +276,15 @@ const NEU_MENUE_EINTRAG = 'min-h-16 px-3.5 py-1.5'
 /** Die Gruppen des Menüs „Neu“ mit dem Abstand des Boards (2 px) zwischen den Einträgen. */
 const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'
 
+/**
+ * Ab 768 px (md) gilt die Seitenleiste, darunter die Unterleiste — dieselbe Grenze wie die Klassen md:…
+ * null, wo es kein Fenster zum Fragen gibt (Server, Test): dann bleibt jeder Knopf bei seiner eigenen Form.
+ */
+function fensterBreit(): boolean | null {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
+  return window.matchMedia('(min-width: 768px)').matches
+}
+
 /** Die Blätter am Handy lassen oben den Kopf der Seite sichtbar (Board s1-mehr-neu: höchstens 86 % der Höhe). */
 const BLATT_HOEHE = 'max-h-[86dvh] gap-2.5 px-4'
 
@@ -300,15 +308,34 @@ export function HofShell({
 
   // Höchstens ein Blatt offen: „Neu" oder „Mehr" (Muster aus farmer-nav.tsx).
   const [offen, setOffen] = useState<'neu' | 'mehr' | null>(null)
+  // Das Menü „Neu“ in der Seitenleiste — gesteuert, damit der Knopf der Unterleiste es öffnen kann (unten).
+  const [menueOffen, setMenueOffen] = useState(false)
   const schliessen = () => setOffen(null)
-  const wechsle = (welches: 'neu' | 'mehr') => (auf: boolean) =>
+  const wechsle = (welches: 'neu' | 'mehr') => (auf: boolean) => {
+    // Ab 768 px ist „Neu“ das Menü am Knopf der Seitenleiste (Board w1-mehr-neu, Bild 3), nie das Blatt über die ganze
+    // Breite. Der Knopf der Unterleiste ist dort versteckt, ein Skript oder Vorleser erreicht ihn aber noch (die
+    // Aufnahme von UI-Runde 2 klickte ihn) — er öffnet dann das Menü der Seitenleiste.
+    if (auf && welches === 'neu' && fensterBreit() === true) {
+      setMenueOffen(true)
+      return
+    }
     setOffen((jetzt) => (auf ? welches : jetzt === welches ? null : jetzt))
+  }
+  // Umgekehrt unter 768 px: Der Knopf der Seitenleiste ist versteckt, „Neu“ ist dort das Blatt.
+  const wechsleMenue = (auf: boolean) => {
+    if (auf && fensterBreit() === false) {
+      setOffen('neu')
+      return
+    }
+    setMenueOffen(auf)
+  }
 
   // Seitenwechsel schließt jedes Blatt.
   const [letzterPfad, setLetzterPfad] = useState(pathname)
   if (pathname !== letzterPfad) {
     setLetzterPfad(pathname)
     setOffen(null)
+    setMenueOffen(false)
   }
 
   // Ab 768 px gibt es Blätter und Leiste nicht — ein offenes Blatt ließe den Schleier allein stehen.
@@ -316,6 +343,7 @@ export function HofShell({
     const breit = window.matchMedia('(min-width: 768px)')
     const beiWechsel = () => {
       if (breit.matches) setOffen(null)
+      else setMenueOffen(false)
     }
     breit.addEventListener('change', beiWechsel)
     return () => breit.removeEventListener('change', beiWechsel)
@@ -363,13 +391,22 @@ export function HofShell({
               „Admin“ und auf kleineren Fenstern — und beginnt dann oben mit der Marke, nie angeschnitten. */}
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-1.5 pb-2">
             {/* Die Marke oben (Board w1-mehr-neu) führt nach Heute, die Startseite des Hofbereichs. */}
-            <Link href={hauptPunktHref('heute')} aria-label={`${MARKE} – ${HEUTE_LABEL}`} className={cn('mb-0.5 inline-flex min-h-11 shrink-0 items-center self-start rounded-md px-1', FOKUS_RAHMEN)}>
+            {/* Sichtbar 32 px hoch mit 4 px darunter wie im Board (die Hofkarte beginnt 42 px unter dem Rand); die
+                Tippfläche bleibt 44 px über ::before. */}
+            <Link
+              href={hauptPunktHref('heute')}
+              aria-label={`${MARKE} – ${HEUTE_LABEL}`}
+              className={cn(
+                "relative mb-1 inline-flex min-h-8 shrink-0 items-center self-start rounded-md px-1 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-['']",
+                FOKUS_RAHMEN
+              )}
+            >
               <Wortmarke priority={false} />
             </Link>
             <Hofkarte hofName={hofName} hofSlug={hofSlug} />
 
             {/* „+ Neu ▾“ als orange Pille (N42 a) mit den Zeichen des Boards; das Menü öffnet direkt am Knopf (N41 d). */}
-            <DropdownMenu>
+            <DropdownMenu open={menueOffen} onOpenChange={wechsleMenue}>
               <DropdownMenuTrigger
                 className={cn(
                   'mt-1.5 mb-1 flex min-h-11 w-full shrink-0 items-center justify-center gap-1 rounded-full bg-primary px-4 text-[15px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
@@ -385,7 +422,8 @@ export function HofShell({
               {/* Das Menü deckt die getönte Zeile „Heute“ ganz ab (Board Bild 3): 2 px unter dem Knopf, also 2 px über der
                   Zeile (mb-1 = 4 px), 1 px links von ihr und mit der Rundung des Boards (14 px) — so schaut weder oben ein
                   Streifen noch an der runden Ecke ein Stück der Zeile (Rundung 10 px) hervor. */}
-              <DropdownMenuContent className={cn('w-80 rounded-[14px]', NEU_MENUE_GRUPPE)} sideOffset={2} alignOffset={-1} container={menueZiel}>
+              {/* 334 px breit: Das Board zeichnet 320 px Inhalt plus 6 px Polster und 1 px Rand je Seite (UI-Runde 4). */}
+              <DropdownMenuContent className={cn('w-[334px] rounded-[14px]', NEU_MENUE_GRUPPE)} sideOffset={2} alignOffset={-1} container={menueZiel}>
                 <DropdownMenuGroup className={NEU_MENUE_GRUPPE}>
                   <DropdownMenuLabel className="px-3.5 pt-1.5 pb-0.5 font-heading text-[17px] font-semibold text-foreground">{HOF_NEU_TITEL}</DropdownMenuLabel>
                   {neuAnlegen.map((punkt) => (
@@ -457,7 +495,7 @@ export function HofShell({
             </nav>
           </div>
           {/* Ziel des Menüs „Neu": in der Landmarke, aber außerhalb des scrollenden Kastens darüber —
-              dessen overflow schnitte das 288 px breite Menü an der 264 px breiten Leiste ab. */}
+              dessen overflow schnitte das 334 px breite Menü an der 264 px breiten Leiste ab. */}
           <div ref={menueZiel} data-menue-ziel="" />
         </aside>
       </MenueZielAnbieter>
@@ -502,8 +540,7 @@ export function HofShell({
                     </span>
                     <span className="max-w-full truncate px-0.5">{HOF_NEU_KNOPF}</span>
                   </SheetTrigger>
-                  <SheetBlatt className={BLATT_HOEHE} schleier="abgedunkelt">
-                    <SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} className={BLATT_KOPF_KLEBT} />
+                  <SheetBlatt className={BLATT_HOEHE} schleier="abgedunkelt" kopf={<SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} />}>
                     {[neuAnlegen, neuAnderes].map((gruppe, i) => (
                       <div key={i} className="flex flex-col gap-2">
                         {i > 0 && <BlattUeberschrift>{HOF_NEU_ANDERES_TITEL}</BlattUeberschrift>}
@@ -513,8 +550,9 @@ export function HofShell({
                               <Link
                                 href={punkt.href}
                                 onClick={schliessen}
+                                // 74 px wie im Board s1-mehr-neu (Bild 3, UI-Runde 4; vorher 60 px).
                                 className={cn(
-                                  'flex min-h-[60px] items-center rounded-[14px] border border-input bg-card px-3.5 py-1.5 transition-colors duration-[250ms] hover:bg-muted',
+                                  'flex min-h-[74px] items-center rounded-[14px] border border-input bg-card px-3.5 py-1.5 transition-colors duration-[250ms] hover:bg-muted',
                                   FOKUS_RAHMEN
                                 )}
                               >
@@ -543,8 +581,8 @@ export function HofShell({
                 </span>
                 <span>{HOF_MEHR_TITEL}</span>
               </SheetTrigger>
-              <SheetBlatt className={BLATT_HOEHE} schleier="abgedunkelt">
-                <SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} className={BLATT_KOPF_KLEBT} />
+              {/* Griff und Kopf stehen fest, nur die Gruppen scrollen darunter (Board s1-mehr-neu, Bild 2). */}
+              <SheetBlatt className={BLATT_HOEHE} schleier="abgedunkelt" kopf={<SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} />}>
                 {hauptImMehr.length > 0 && (
                   <ListGruppe className={BLATT_GRUPPE}>
                     {hauptImMehr.map((punkt) => {

@@ -69,25 +69,38 @@ function waechterOrte(popup: HTMLElement): (HTMLElement | null)[] {
   return [popup.parentElement, knopf?.parentElement ?? null]
 }
 
+/** Einen Ref des Aufrufers bedienen — Funktion oder Objekt, wie React es erlaubt. */
+function setzeRef<T>(ref: React.Ref<T> | undefined, wert: T | null): void {
+  if (typeof ref === "function") ref(wert)
+  else if (ref) ref.current = wert
+}
+
 /**
  * Hält die Wächter eines Menüs frei, solange sein Popup steht: einmal beim Einhängen und danach bei jedem neuen Kind
  * an diesen Orten — die Wächter des Portals kommen erst einen Durchgang nach dem Popup.
+ *
+ * `fremd` ist der Ref, den ein Aufrufer an `DropdownMenuContent` gibt: Er bekommt dasselbe Element mit — vorher
+ * überschrieb er den Wächter-Ref (stand in `props` hinter `ref=`) und die Wächter blieben versteckt.
  */
-function useWaechterFrei(): (popup: HTMLDivElement | null) => void {
+function useWaechterFrei(fremd?: React.Ref<HTMLDivElement>): (popup: HTMLDivElement | null) => void {
   const beobachter = React.useRef<MutationObserver | null>(null)
-  return React.useCallback((popup: HTMLDivElement | null) => {
-    beobachter.current?.disconnect()
-    beobachter.current = null
-    if (!popup) return
-    const orte = waechterOrte(popup)
-    const freigeben = () => {
-      waechterFreigeben(orte)
-    }
-    freigeben()
-    const neu = new MutationObserver(freigeben)
-    for (const ort of orte) if (ort) neu.observe(ort, { childList: true })
-    beobachter.current = neu
-  }, [])
+  return React.useCallback(
+    (popup: HTMLDivElement | null) => {
+      setzeRef(fremd, popup)
+      beobachter.current?.disconnect()
+      beobachter.current = null
+      if (!popup) return
+      const orte = waechterOrte(popup)
+      const freigeben = () => {
+        waechterFreigeben(orte)
+      }
+      freigeben()
+      const neu = new MutationObserver(freigeben)
+      for (const ort of orte) if (ort) neu.observe(ort, { childList: true })
+      beobachter.current = neu
+    },
+    [fremd]
+  )
 }
 
 /**
@@ -104,23 +117,25 @@ function DropdownMenuContent({
   sideOffset = 6,
   alignOffset,
   container,
+  ref,
   ...props
 }: MenuPrimitive.Popup.Props &
   Pick<MenuPrimitive.Positioner.Props, "side" | "align" | "sideOffset" | "alignOffset"> &
   Pick<MenuPrimitive.Portal.Props, "container">): React.JSX.Element {
   const menueZiel = useMenueZiel()
-  const waechterFrei = useWaechterFrei()
+  const waechterFrei = useWaechterFrei(ref)
   return (
     <DropdownMenuPortal container={container === undefined ? (menueZiel ?? undefined) : container}>
       <MenuPrimitive.Positioner side={side} align={align} sideOffset={sideOffset} alignOffset={alignOffset} className="z-50 outline-none">
         <MenuPrimitive.Popup
-          ref={waechterFrei}
           data-slot="dropdown-menu-content"
           className={cn(
             "min-w-48 origin-(--transform-origin) rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg outline-none transition-[opacity,transform] duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0",
             className
           )}
           {...props}
+          // Nach den props: Der Ref des Aufrufers steckt in useWaechterFrei(ref), nichts überschreibt den Wächter-Ref.
+          ref={waechterFrei}
         />
       </MenuPrimitive.Positioner>
     </DropdownMenuPortal>

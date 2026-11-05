@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils'
  * statt Kästchen und Titel. Der Wortlaut bleibt der vom Server (offen: E-012).
  * UI-Runde 3: beim Gründungshof die Restzeit vom Server (`restzeit`), im Blatt
  * mit dem Ziel „· Konditionen und Tarif“ dahinter.
+ * UI-Runde 4: das Funkeln gefüllt wie das Zeichen „✦“ im Board, in der
+ * Seitenleiste Zeilenhöhe 1,4 ohne Abstand (Karte 73 px statt 80 px wie im Board).
  */
 const SYMBOL: Record<TarifZeileDaten['zustand'], LucideIcon> = {
   startphase: Sprout,
@@ -69,10 +71,17 @@ export function TarifZeile({
     >
       {!mitAbzeichen && (
         <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-zustand-laeuft-grund text-zustand-laeuft">
-          <Symbol className="size-4" strokeWidth={1.9} aria-hidden="true" />
+          {/* Das Funkeln gefüllt in der Schriftfarbe des Kästchens (Board „✦“); der Spross bleibt ein Umriss. */}
+          <Symbol
+            className={daten.zustand === 'gruendungshof' ? 'size-3.5' : 'size-4'}
+            strokeWidth={daten.zustand === 'gruendungshof' ? 1.5 : 1.9}
+            fill={daten.zustand === 'gruendungshof' ? 'currentColor' : 'none'}
+            aria-hidden="true"
+          />
         </span>
       )}
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      {/* In der Seitenleiste ohne Abstand und mit Zeilenhöhe 1,4 wie im Board w1-mehr-neu; der Balken bei Hoftor behält 2 px. */}
+      <span className={cn('flex min-w-0 flex-1 flex-col', blatt || daten.grenze ? 'gap-0.5' : 'leading-[1.4]')}>
         {mitAbzeichen ? (
           <Abzeichen className="h-6 self-start" />
         ) : (

@@ -119,18 +119,25 @@ const BLATT_SCHLEIER = "bg-foreground/55 supports-backdrop-filter:backdrop-blur-
  * volle Höhe, höchstens 448 px breit, ohne Griff und ohne Rundung, Polster
  * 24 px. Den Kopf mit Titel und dem einen Schließen-Element bringt SheetKopf.
  * Ohne `seite` bleibt alles, wie es war.
+ *
+ * `kopf` (Nr. 233, Board s1-mehr-neu): Griff und Kopf stehen fest, nur der
+ * Inhalt darunter scrollt — beim Scrollen scheint nichts über dem Kopf durch,
+ * und der Griff bleibt stehen. Ohne `kopf` scrollt das ganze Blatt wie bisher.
  */
 function SheetBlatt({
   className,
   children,
   seite = "unten",
   schleier,
+  kopf,
   ...props
 }: SheetPrimitive.Popup.Props & {
   /** „unten": Blatt von unten (Standard). „rechts": ab 768 px von rechts, volle Höhe, max. 448 px. */
   seite?: "unten" | "rechts"
   /** „abgedunkelt": der Schleier der Boards von Lauf 30 (dunkelt ab, verwischt nicht; Board s1-mehr-neu); rechts gilt er immer. */
   schleier?: "abgedunkelt"
+  /** Der feste Kopf (meist SheetKopf): steht mit dem Griff still, der Inhalt scrollt darunter. */
+  kopf?: React.ReactNode
 }) {
   const rechts = seite === "rechts"
   return (
@@ -145,12 +152,29 @@ function SheetBlatt({
             "fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-2rem)] flex-col gap-3 overflow-y-auto *:shrink-0 rounded-t-[22px] border-t border-border bg-popover px-[18px] pt-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-out data-ending-style:translate-y-10 data-ending-style:opacity-0 data-starting-style:translate-y-10 data-starting-style:opacity-0",
             rechts &&
               "md:top-0 md:left-auto md:h-dvh md:max-h-none md:w-full md:max-w-[448px] md:gap-2.5 md:rounded-none md:border-t-0 md:border-l md:p-6 md:data-ending-style:translate-x-10 md:data-ending-style:translate-y-0 md:data-starting-style:translate-x-10 md:data-starting-style:translate-y-0",
-            className
+            className,
+            // Mit festem Kopf scrollt nicht das Blatt, sondern nur der Körper darunter.
+            kopf !== undefined && "overflow-hidden"
           )}
           {...props}
         >
           <div data-slot="sheet-griff" aria-hidden="true" className={cn("h-1 w-10 shrink-0 self-center rounded-full bg-muted-foreground/40", rechts && "md:hidden")} />
-          {children}
+          {kopf === undefined ? (
+            children
+          ) : (
+            <>
+              {kopf}
+              {/* Der Körper schrumpft als Einziger (shrink! gegen *:shrink-0 des Blatts) und scrollt; seine Kinder
+                  behalten ihre Höhe. 4 px Rand ringsum mit Gegenrand, damit der Fokusrahmen (2 px Abstand, 2 px breit)
+                  am Rand des scrollenden Kastens nicht abgeschnitten wird. */}
+              <div
+                data-slot="sheet-koerper"
+                className="-mx-1 -my-1 flex min-h-0 shrink! flex-col gap-[inherit] overflow-y-auto overscroll-contain p-1 *:shrink-0"
+              >
+                {children}
+              </div>
+            </>
+          )}
         </SheetPrimitive.Popup>
       </MenueZielAnbieter>
     </SheetPortal>

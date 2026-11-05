@@ -51,7 +51,7 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
   const echt = await importOriginal<typeof import('@/components/ui/sheet')>()
   return {
     ...echt,
-    SheetBlatt: (props: Parameters<typeof echt.SheetBlatt>[0]) => createElement('div', { 'data-slot': 'sheet-blatt-inline' }, props.children as ReactNode),
+    SheetBlatt: (props: Parameters<typeof echt.SheetBlatt>[0]) => createElement('div', { 'data-slot': 'sheet-blatt-inline' }, props.kopf, props.children as ReactNode),
   }
 })
 
@@ -298,8 +298,29 @@ describe('HofShell: Seitenleiste (V13, Board w1-mehr-neu)', () => {
     expect(shell).toContain("const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'")
     const inhalt = shell.slice(shell.indexOf('<DropdownMenuContent'), shell.indexOf('>', shell.indexOf('<DropdownMenuContent')))
     // 2 px unter dem Knopf (mb-1 = 4 px vor „Heute“), 1 px links und 14 px rund: kein Rand und keine Ecke schaut hervor.
-    for (const teil of ['sideOffset={2}', 'alignOffset={-1}', 'rounded-[14px]', 'container={menueZiel}']) expect(inhalt, teil).toContain(teil)
+    for (const teil of ['sideOffset={2}', 'alignOffset={-1}', 'rounded-[14px]', 'container={menueZiel}', 'w-[334px]']) expect(inhalt, teil).toContain(teil)
     expect(shell).toMatch(/DropdownMenuTrigger[\s\S]{0,200}'mt-1\.5 mb-1 /)
+  })
+
+  it('ab 768 px ist „Neu“ immer das Menü am Knopf: auch der versteckte Knopf der Unterleiste öffnet es, nie das Blatt (UI-Runde 4)', () => {
+    const shell = quelle('src/components/shells/hof-shell.tsx')
+    // Das Menü ist gesteuert, damit der Knopf der Unterleiste es öffnen kann.
+    expect(shell).toContain('<DropdownMenu open={menueOffen} onOpenChange={wechsleMenue}>')
+    const wechsle = shell.slice(shell.indexOf('const wechsle ='), shell.indexOf('const wechsleMenue ='))
+    expect(wechsle).toMatch(/if \(auf && welches === 'neu' && fensterBreit\(\) === true\) \{\s+setMenueOffen\(true\)\s+return/)
+    // Gegenrichtung unter 768 px: der versteckte Knopf der Seitenleiste öffnet das Blatt.
+    const menue = shell.slice(shell.indexOf('const wechsleMenue ='), shell.indexOf('}\n', shell.indexOf('const wechsleMenue =')) + 2)
+    expect(menue).toMatch(/if \(auf && fensterBreit\(\) === false\) \{\s+setOffen\('neu'\)/)
+    // Dieselbe Grenze wie die Klassen md:…
+    expect(shell).toContain("window.matchMedia('(min-width: 768px)').matches")
+  })
+
+  it('die Marke sitzt wie im Board: sichtbar 32 px mit 4 px darunter, Tippfläche 44 px über ::before (UI-Runde 4)', () => {
+    const leiste = seitenleiste()
+    const marke = leiste.match(new RegExp(`<a [^>]*aria-label="${MARKE} – [^"]*"[^>]*>`))?.[0] ?? ''
+    for (const k of ['relative', 'mb-1', 'min-h-8', 'before:absolute', 'before:-inset-y-1.5']) expect(marke, k).toContain(k)
+    // 32 + 2 × 6 = 44 px Trefferfläche.
+    expect(marke).not.toContain('min-h-11')
   })
 
   it('unten „Konto · <Name>“ als Link auf Konto und Sicherheit, daneben der Mond, „Abmelden“ darunter', () => {
@@ -369,6 +390,22 @@ describe('HofShell: Blatt „Neu“ (Board s1-mehr-neu, Bild 3)', () => {
     expect(erste).toBeGreaterThan(abbrechen)
     expect(anderes).toBeGreaterThan(erste)
     expect(neu.indexOf('>Verkauf eintragen<')).toBeGreaterThan(anderes)
+  })
+
+  it('Auswahlkarten 74 px hoch wie im Board (UI-Runde 4; vorher 60 px)', () => {
+    const { neu } = blaetter(hof())
+    const karte = neu.match(/<a [^>]*href="[^"]*"[^>]*>(?=<span class="min-w-0"><span[^>]*>Lebensmittel<)/)?.[0] ?? ''
+    expect(karte).toContain('min-h-[74px]')
+    expect(karte).not.toContain('min-h-[60px]')
+  })
+})
+
+describe('Blätter „Mehr“ und „Neu“: Griff und Kopf stehen, der Inhalt scrollt darunter (Board s1-mehr-neu, Bild 2, UI-Runde 4)', () => {
+  it('die HofShell gibt beiden Blättern den Kopf als `kopf`, nicht mehr als klebende Zeile im scrollenden Blatt', () => {
+    const shell = quelle('src/components/shells/hof-shell.tsx')
+    expect(shell).toContain('kopf={<SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} />}')
+    expect(shell).toContain('kopf={<SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} />}')
+    expect(shell).not.toContain('BLATT_KOPF_KLEBT')
   })
 })
 

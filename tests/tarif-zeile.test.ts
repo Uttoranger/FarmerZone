@@ -30,7 +30,8 @@ vi.mock('@/components/ui/sheet', () => {
   return {
     Sheet: ({ children }: Kinder) => createElement(Fragment, null, children),
     SheetTrigger: ({ children }: Kinder) => createElement('button', { type: 'button' }, children),
-    SheetBlatt: ({ children }: Kinder) => createElement('section', { 'data-blatt': '' }, children),
+    // Der feste Kopf (Prop `kopf`, UI-Runde 4) steht vor dem Inhalt wie im echten Blatt.
+    SheetBlatt: ({ children, kopf }: Kinder & { kopf?: ReactNode }) => createElement('section', { 'data-blatt': '' }, kopf, children),
     SheetTitle: ({ children }: Kinder) => createElement('h2', null, children),
     SheetClose: ({ children }: Kinder) => createElement('button', { type: 'button' }, children),
     // Seit Nr. 220 tragen die Blätter der HofShell den Kopf aus dem Baustein (Titel und ein Schließen-Element).
@@ -289,6 +290,18 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     expect(tarifLink(shell(ZEILEN.hoftor))).toContain('lucide-sprout')
     expect(tarifLink(shell(ZEILEN.gruendungshof))).toContain('lucide-sparkle')
     expect(tarifLink(shell(ZEILEN.gruendungshof))).not.toContain('lucide-star')
+  })
+
+  it('das Funkeln ist gefüllt wie „✦“ im Board, der Spross bleibt ein Umriss (UI-Runde 4)', () => {
+    const funkeln = tarifLink(shell(ZEILEN.gruendungshof))?.match(/<svg[^>]*lucide-sparkle[^>]*>/)?.[0] ?? ''
+    expect(funkeln).toContain('fill="currentColor"')
+    const spross = tarifLink(shell(ZEILEN.startphase))?.match(/<svg[^>]*lucide-sprout[^>]*>/)?.[0] ?? ''
+    expect(spross).toContain('fill="none"')
+  })
+
+  it('in der Seitenleiste Zeilenhöhe 1,4 ohne Abstand wie im Board (Karte 73 px), der Balken bei Hoftor behält den Abstand', () => {
+    expect(tarifLink(shell(ZEILEN.gruendungshof))).toMatch(/class="flex min-w-0 flex-1 flex-col leading-\[1\.4\]"/)
+    expect(tarifLink(shell(ZEILEN.hoftor))).toMatch(/class="flex min-w-0 flex-1 flex-col gap-0\.5"/)
   })
 
   it('ein Link mit ≥ 44 px und sichtbarem Fokus; der Screenreader hört auch, wohin', () => {

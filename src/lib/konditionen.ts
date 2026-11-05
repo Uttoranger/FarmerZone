@@ -25,7 +25,7 @@
  * eine Falle. Wiener Tage kommen aus wiener-tag.ts, Cent → Euro aus format.ts.
  */
 import type { Tarif } from '@prisma/client'
-import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl, plural } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { MARKE } from '@/lib/marke'
 // Nur der Typ — zur Laufzeit bindet diese Datei plattformgebuehr.ts nicht ein (sonst ein Ring über servicegebuehr.ts).
@@ -649,10 +649,14 @@ export function baueTarifZeile(hof: TarifHof & { produkteImShop: number }, jetzt
       // Nur Anzeige (Boards w1-/s1-mehr-neu): angefangene Monate bis einschließlich des Wiener Tags `bis` — keine Frist
       // und keine Geldregel; ob die Zusage gilt, entscheidet allein ermittleStand. Weil `bis` nie vor heute liegt,
       // steht hier mindestens „noch 1 Monat“ (am 3. März bis 31. Jänner: 10 volle Monate und ein angefangener = 11).
-      const [jahrHeute, monatHeute, tagHeute] = kalendertagInWien(jetzt).split('-').map((teil) => parseInt(teil, 10))
-      const [jahrBis, monatBis, tagBis] = kalendertagInWien(stand.bis).split('-').map((teil) => parseInt(teil, 10))
-      const monate = (jahrBis - jahrHeute) * 12 + (monatBis - monatHeute) + (tagBis >= tagHeute ? 1 : 0)
-      const restzeit = `noch ${monate} ${monate === 1 ? 'Monat' : 'Monate'} (bis ${datum})`
+      // monatsAbstand/monatsschluesselInWien aus servicegebuehr.ts darf diese Datei nicht holen (Ring, wiener-tag.ts),
+      // deshalb hier nur der Monatsschritt über den Wiener Kalendertag; die Mehrzahl über plural() aus format.ts.
+      // Ein Wiener Kalendertag (JJJJ-MM-TT) als Zahl der Monate seit Jahr 0.
+      const monatsZahl = (kalendertag: string) => parseInt(kalendertag.slice(0, 4), 10) * 12 + parseInt(kalendertag.slice(5, 7), 10)
+      const heute = kalendertagInWien(jetzt)
+      const bisTag = kalendertagInWien(stand.bis)
+      const monate = monatsZahl(bisTag) - monatsZahl(heute) + (bisTag.slice(8) >= heute.slice(8) ? 1 : 0)
+      const restzeit = `noch ${monate} ${plural(monate, 'Monat', 'Monate')} (bis ${datum})`
       return { zustand: stand.zustand, titel: TARIF_ZEILE.gruendungshof.titel, zeile, zeileHandy: zeile, restzeit }
     }
     case 'hoftor': {
