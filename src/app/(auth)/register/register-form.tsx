@@ -5,7 +5,7 @@ import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Mail } from 'lucide-react'
 import { registerFarmer } from '@/server/actions/register'
-import { passwortStaerke } from '@/lib/password-rules'
+import { validatePassword } from '@/lib/password-rules'
 import { schreibeHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
 import { KONDITIONEN_UEBERGANG } from '@/lib/konditionen'
 import { REGISTRIEREN_SCHRITTE } from '@/lib/fuer-hoefe'
@@ -23,6 +23,7 @@ import { SchonDabei } from '@/components/shared/schon-dabei'
 import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
 import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
+import { PasswortAnforderungen, PASSWORT_ANFORDERUNGEN_SATZ } from '@/components/anmelden/passwort-anforderungen'
 import { PostfachHinweis } from './postfach-hinweis'
 
 /**
@@ -58,7 +59,7 @@ const KNOPF_ORANGE = cn(
  * danach zeigt das Formular „Schau in dein Postfach" (PostfachHinweis) und
  * meldet NICHT selbst an — eine scheiternde Anmeldung verriete, dass es die
  * Adresse schon gab (Register F6 „19b"). Neu im Formular (Nr. 15): Hofname mit der
- * künftigen Adresse, Passwortstärke, ein Satz mit Links zu AGB und
+ * künftigen Adresse, Passwort-Regeln zum Abhaken (seit Lauf 30 statt der Stärke-Balken), ein Satz mit Links zu AGB und
  * Konditionen (ohne Zustimmungs-Haken, siehe registrierenFormularSchema und
  * Register O4). Den Hof
  * selbst legt weiter Einrichten an; der Name wartet bis dahin im
@@ -81,7 +82,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
   })
   const { errors, isSubmitting } = form.formState
   const [hofname, name, email, password] = useWatch({ control: form.control, name: ['hofname', 'name', 'email', 'password'] })
-  const staerke = passwortStaerke(password)
+  const passwortGueltig = validatePassword(password).valid
 
   async function absenden(werte: RegistrierenFormular) {
     setFehler('')
@@ -118,9 +119,11 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
           <PostfachHinweis email={gesendetAn} />
         ) : (
           <>
+            {/* Die Fokus-Shell trägt die h1 „Hof registrieren“; die Karte wiederholt den Titel als h2 (Board w2-registrieren). */}
+            <h2 className="mb-2 font-heading text-[22px] leading-tight font-semibold">Hof registrieren</h2>
             {/* Der Übergang aus konditionen.ts (Register K1) statt eines Tarifs, der heute gälte. */}
             <p className="mb-5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
-            {/* Der voraussichtliche Gründungsplatz (Register K2-Ergänzung) — die Seite rendert ihn, ohne Platz nichts. */}
+            {/* Der Satz der Gründungsaktion ohne Platznummer (Lauf 30) — die Seite rendert ihn, ohne Aktion nichts. */}
             {gruendungSatz}
 
             <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-4">
@@ -203,32 +206,16 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                   id={feldId('password')}
                   autoComplete="new-password"
                   aria-invalid={errors.password ? true : undefined}
-                  aria-describedby={beschreibung(`${id}-staerke`, !!errors.password && fehlerId('password'))}
+                  aria-describedby={beschreibung(`${id}-passwort-satz`, `${id}-regeln`, !!errors.password && fehlerId('password'))}
                   feld={FELD}
                   {...form.register('password')}
                 />
-                {/* Vier Balken: orange, solange das Passwort nicht reicht, grün, sobald der Server es nimmt. */}
-                <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
-                  {[1, 2, 3, 4].map((stufe) => (
-                    <span
-                      key={stufe}
-                      className={cn(
-                        'h-1 rounded-full',
-                        stufe > staerke.balken ? 'bg-border' : staerke.gueltig ? 'bg-accent' : 'bg-primary'
-                      )}
-                    />
-                  ))}
-                </div>
-                <p
-                  id={`${id}-staerke`}
-                  className={cn(
-                    'mt-1.5 text-[12.5px]',
-                    staerke.balken === 0 ? 'text-muted-foreground' : staerke.gueltig ? 'text-status-fertig' : 'text-status-offen'
-                  )}
-                >
-                  {staerke.text}
+                {/* Die Regeln haken sich beim Tippen ab (Board w2-registrieren) — wie beim neuen Passwort. */}
+                <p id={`${id}-passwort-satz`} className="mt-1.5 text-[12.5px] text-muted-foreground">
+                  {PASSWORT_ANFORDERUNGEN_SATZ}
                 </p>
-                {errors.password && !staerke.gueltig && (
+                <PasswortAnforderungen passwort={password} id={`${id}-regeln`} className="mt-1" />
+                {errors.password && !passwortGueltig && (
                   <FeldFehler id={fehlerId('password')}>
                     {password.length === 0 ? 'Bitte wähle ein Passwort.' : 'Das Passwort reicht noch nicht – darüber steht, was fehlt.'}
                   </FeldFehler>
@@ -259,7 +246,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
 
       <aside aria-labelledby={`${id}-weiter`} className="flex flex-col gap-5 lg:pt-4">
         <h2 id={`${id}-weiter`} className="text-[12px] font-bold tracking-[1.6px] text-muted-foreground uppercase">
-          So geht es weiter
+          So geht’s weiter
         </h2>
         <StartSchritte schritte={REGISTRIEREN_SCHRITTE} />
         {/* „Rückruf anfordern" (Mockup) braucht die Tabelle RueckrufAnfrage —

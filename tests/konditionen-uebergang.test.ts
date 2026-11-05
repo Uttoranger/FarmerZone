@@ -183,6 +183,7 @@ describe('Die Seiten zeigen den Satz', () => {
           },
         }),
         vorname: 'Max',
+        gebuehrModell: 'bisher',
         person: { name: 'Max Mustermann', email: 'max@example.com' },
         tarif: null,
         freigeschaltet: false,

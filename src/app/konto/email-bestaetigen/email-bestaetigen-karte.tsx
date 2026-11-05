@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Check, MailCheck, TriangleAlert } from 'lucide-react'
+import { Check, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EMAIL_BESTAETIGEN_TEXT as T } from '@/lib/konto-anfragen'
 import { EMAIL_MAX } from '@/lib/eingabegrenzen'
@@ -14,7 +14,11 @@ import { FELD, FELD_LABEL, KNOPF_GRUEN } from '@/components/hof-bestellungen/sti
  * Die Karte der Seite /konto/email-bestaetigen (Nr. 190): vorher Feld und
  * Knopf, nachher „Die neue Adresse gilt“. Zustände ohne eigenes Mockup nach
  * DESIGN_SYSTEM (wie „Das war ich nicht“). Texte aus src/lib/konto-anfragen.ts.
+ * Seit Lauf 30 nach Board s2/w2-systemseiten: Karte auf der Fläche, das
+ * Ergebnis als grüne Karte — die Farbe der KundeShell (V52).
  */
+const KARTE = 'flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 md:p-6'
+const KARTE_GRUEN = 'flex flex-col gap-4 rounded-2xl border border-accent/45 bg-accent/12 p-5 md:p-6'
 
 const TITEL = 'font-heading text-[26px] leading-tight font-semibold outline-none'
 const SATZ = 'text-[14.5px] leading-relaxed text-muted-foreground'
@@ -54,7 +58,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
 
   if (stand === 'fertig') {
     return (
-      <section aria-labelledby="email-bestaetigen-titel" className="flex flex-col gap-4">
+      <section aria-labelledby="email-bestaetigen-titel" className={KARTE_GRUEN}>
         <span className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-foreground">
           <Check className="size-5" strokeWidth={2.2} aria-hidden="true" />
         </span>
@@ -62,7 +66,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
           {T.fertigTitel}
         </h1>
         <p className={SATZ}>{T.fertigSatz}</p>
-        <Link href="/login" className={cn(KNOPF_GRUEN, 'self-start')}>
+        <Link href="/login" className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-xl')}>
           {T.zurAnmeldung}
         </Link>
       </section>
@@ -71,7 +75,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
 
   if (stand === 'ungueltig') {
     return (
-      <section aria-labelledby="email-bestaetigen-titel" className="flex flex-col gap-4">
+      <section aria-labelledby="email-bestaetigen-titel" className={KARTE}>
         <span className="flex size-11 items-center justify-center rounded-full bg-muted text-foreground">
           <TriangleAlert className="size-5" strokeWidth={1.8} aria-hidden="true" />
         </span>
@@ -87,10 +91,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
   }
 
   return (
-    <section aria-labelledby="email-bestaetigen-titel" className="flex flex-col gap-4">
-      <span className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-foreground">
-        <MailCheck className="size-5" strokeWidth={1.8} aria-hidden="true" />
-      </span>
+    <section aria-labelledby="email-bestaetigen-titel" className={KARTE}>
       <h1 id="email-bestaetigen-titel" className={TITEL}>
         {T.titel}
       </h1>
@@ -120,7 +121,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
             </p>
           )}
         </div>
-        <button type="submit" disabled={laeuft || adresse.trim() === ''} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'self-start')}>
+        <button type="submit" disabled={laeuft || adresse.trim() === ''} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-xl')}>
           {laeuft ? 'Einen Moment …' : T.knopf}
         </button>
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">{T.vorab}</p>

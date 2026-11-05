@@ -29,6 +29,7 @@ function seite(hof: EinrichtenDaten['hof']): string {
       person,
       tarif: null,
       freigeschaltet: hof?.freigeschaltet ?? false,
+      gebuehrModell: 'bisher',
     })
   )
 }
@@ -132,6 +133,7 @@ describe('EinrichtenSeite — E-Mail noch nicht bestätigt (S3, Nr. 17b)', () =>
         person,
         tarif: null,
         freigeschaltet: false,
+        gebuehrModell: 'bisher',
         emailBestaetigung,
       })
     )
@@ -154,5 +156,77 @@ describe('EinrichtenSeite — E-Mail noch nicht bestätigt (S3, Nr. 17b)', () =>
     const html = mitHinweis(null)
     expect(html).not.toContain('Bestätige deine E-Mail')
     expect(html).not.toContain('E-Mail erneut senden')
+  })
+})
+
+describe('EinrichtenSeite — Lauf 30 (Nr. 228, Boards s2/w2-registrieren)', () => {
+  const FERTIG = { ...HOF, hofseite: { erledigt: 11, gesamt: 11, fehlend: [] }, produkte: 3, stripeBereit: true }
+  const WARTEN = { farmId: 'farm_test', farmName: 'Hof Test', country: 'AT' }
+
+  function mit(optionen: { hof?: EinrichtenDaten['hof']; kopf?: boolean; modell?: 'bisher' | 'hofpreis' }): string {
+    const hof = optionen.hof ?? HOF
+    return renderToStaticMarkup(
+      createElement(EinrichtenSeite, {
+        stand: einrichtenStand({ personName: person.name, email: person.email, hof }),
+        vorname: 'Max',
+        person,
+        tarif: null,
+        freigeschaltet: false,
+        gebuehrModell: optionen.modell ?? 'bisher',
+        kopf: optionen.kopf === false ? null : { hofName: 'Hof Test', warten: WARTEN },
+      })
+    )
+  }
+  const anzahl = (html: string, muster: RegExp): number => html.match(muster)?.length ?? 0
+
+  it('in der HofShell genau eine h1 „Hof einrichten“, der Gruß „Willkommen“ ist h2', () => {
+    const html = mit({})
+    expect(anzahl(html, /<h1[ >]/g)).toBe(1)
+    expect(html).toMatch(/<h1[^>]*>Hof einrichten<\/h1>/)
+    expect(html).toMatch(/<h2[^>]*>Willkommen, Max<\/h2>/)
+  })
+
+  it('ohne Kopf (Fokus-Shell trägt die h1): keine h1 in der Seite, „Willkommen“ bleibt h2', () => {
+    const html = mit({ hof: null, kopf: false })
+    expect(anzahl(html, /<h1[ >]/g)).toBe(0)
+    expect(html).toMatch(/<h2[^>]*>Willkommen, Max<\/h2>/)
+  })
+
+  it('Balken je Stand: Schritte offen → „Richte deinen Hof fertig ein“, alles erledigt → „wird noch geprüft“', () => {
+    expect(mit({})).toContain('Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht')
+    expect(mit({})).not.toContain('wird noch geprüft')
+    const fertig = mit({ hof: FERTIG })
+    expect(fertig).toContain('Dein Hof wird noch geprüft – Kundinnen sehen ihn noch nicht')
+    expect(fertig).not.toContain('Richte deinen Hof fertig ein')
+  })
+
+  it('freigeschaltet bzw. ohne Warten kein Balken', () => {
+    const html = renderToStaticMarkup(
+      createElement(EinrichtenSeite, {
+        stand: einrichtenStand({ personName: person.name, email: person.email, hof: { ...FERTIG, freigeschaltet: true } }),
+        vorname: 'Max',
+        person,
+        tarif: null,
+        freigeschaltet: true,
+        gebuehrModell: 'bisher',
+        kopf: { hofName: 'Hof Test', warten: null },
+      })
+    )
+    expect(html).not.toContain('Kundinnen sehen ihn noch nicht')
+  })
+
+  it('der Stand jedes Schritts steht in Worten sichtbar daneben', () => {
+    const html = mit({})
+    for (const wort of ['erledigt', 'offen', 'kommt später', 'für Barbestellungen']) expect(html).toContain(`>${wort}</span>`)
+  })
+
+  it('kein „Servicegebühr“ nach dem Stichtag: die Tarif-Karte nennt die Plattformgebühr (N38)', () => {
+    const html = mit({ modell: 'hofpreis' })
+    expect(html).not.toContain('Servicegebühr')
+    expect(html).toContain('Die Plattformgebühr (6 %) steckt im Preis, den die Kundin zahlt – online wie bar.')
+  })
+
+  it('Gegenprobe: vor dem Stichtag sagt die Tarif-Karte „Servicegebühr“ wie bisher', () => {
+    expect(mit({ modell: 'bisher' })).toContain('Servicegebühr')
   })
 })

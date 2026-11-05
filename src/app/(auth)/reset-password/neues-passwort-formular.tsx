@@ -4,7 +4,7 @@ import { useId, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Check, CircleAlert, Loader2 } from 'lucide-react'
+import { CircleAlert, Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { validatePassword } from '@/lib/password-rules'
 import { resetPasswordSchema } from '@/schemas/reset-password'
@@ -13,6 +13,7 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/anmelden/stil'
+import { PasswortAnforderungen } from '@/components/anmelden/passwort-anforderungen'
 
 /**
  * „Neues Passwort wählen" — das Formular (seit Nr. 54 in der Fokus-Shell, die
@@ -46,7 +47,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
   // Token war beim Absenden ungültig/abgelaufen → wie ein kaputter Link behandeln
   const [tokenVerbraucht, setTokenVerbraucht] = useState(false)
 
-  const { valid: pwValid, checks } = validatePassword(password)
+  const { valid: pwValid } = validatePassword(password)
   const pwHasError = passwordTouched && !pwValid
   const confirmHasError = password.length > 0 && passwordConfirm.length > 0 && password !== passwordConfirm
   const canSubmit = !laedt && pwValid && password === passwordConfirm
@@ -116,26 +117,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
           onBlur={() => setPasswordTouched(true)}
         />
 
-        <ul id={listeId} aria-label="Passwort-Anforderungen" aria-live="polite" className="mt-0.5 flex flex-col gap-1">
-          {checks.map((check) => (
-            <li
-              key={check.id}
-              className={cn(
-                'flex items-center gap-1.5 text-[12.5px] transition-colors duration-150',
-                check.passed ? 'text-status-fertig' : 'text-muted-foreground'
-              )}
-            >
-              {check.passed ? (
-                <Check className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
-              ) : (
-                <span className="flex size-3.5 shrink-0 items-center justify-center" aria-hidden="true">
-                  <span className="block size-1.5 rounded-full bg-current opacity-60" />
-                </span>
-              )}
-              {check.label}
-            </li>
-          ))}
-        </ul>
+        <PasswortAnforderungen passwort={password} id={listeId} className="mt-0.5" />
 
         {pwHasError && (
           <p role="alert" aria-live="polite" className={cn(FEHLER_TEXT, 'mt-0.5')}>
