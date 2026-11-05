@@ -89,7 +89,7 @@ export default async function FarmPageOwnerRoute({
         slug={farm.slug}
         kopf={
           <div className={MEIN_HOF_KOPF_HUELLE}>
-            <MeinHofSeitenkopf hof={kopf} aktiv="beitraege" zustand={zustand} />
+            <MeinHofSeitenkopf hof={kopf} aktiv="beitraege" zustand={zustand} jetzt={jetzt} />
           </div>
         }
       >
@@ -140,7 +140,7 @@ export default async function FarmPageOwnerRoute({
         slug={farm.slug}
         kopf={
           <div className={MEIN_HOF_KOPF_HUELLE}>
-            <MeinHofSeitenkopf hof={kopf} aktiv="hofseite" zustand={zustand} />
+            <MeinHofSeitenkopf hof={kopf} aktiv="hofseite" zustand={zustand} jetzt={jetzt} />
           </div>
         }
       >

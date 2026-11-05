@@ -109,7 +109,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       Sentry.captureException(err, { tags: { bereich: 'dein-beitrag', seite: 'heute' }, extra: { farmId: farm.id } })
       return null
     }),
-    // Barzahlung pausiert nach offener Plattformgebühr (Register N38, Nr. 198): ein Ladefehler nimmt nur die Karte weg.
+    // Barzahlung gesperrt nach offener Plattformgebühr (Register N38, Nr. 198): ein Ladefehler nimmt nur die Karte weg.
     ladeSperrKarte(farm.id, jetzt).catch((err: unknown) => {
       Sentry.captureException(err, { tags: { bereich: 'monatsabrechnung', seite: 'heute' }, extra: { farmId: farm.id } })
       return null

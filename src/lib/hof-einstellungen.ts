@@ -330,7 +330,7 @@ export type BarKarte = {
   satz: string | null
   /** „Lastschrift einrichten“ zeigen (Weg auf „Deine Konditionen“, dort richtet Stripe sie ein). */
   lastschrift: boolean
-  /** Bei „Pausiert“ der Weg zur offenen Monatsabrechnung auf „Deine Konditionen“. */
+  /** Bei „Bar gesperrt“ der Weg zur offenen Monatsabrechnung auf „Deine Konditionen“. */
   zuKonditionen: boolean
 }
 
@@ -339,13 +339,17 @@ export const BAR_KARTE_TEXT = {
   beschreibung: 'Kundinnen können bei der Abholung auch bar zahlen – zusätzlich zur Online-Zahlung.',
   aktiv: 'Aktiv',
   brauchtLastschrift: 'Braucht Lastschrift',
-  pausiert: 'Pausiert',
+  /**
+   * Eine offene Monatsabrechnung sperrt bar (Nr. 198). Nie „Pausiert“: Das Wort gehört dem
+   * Hofzustand (Urlaub und Pause) — Register N38, Ergänzung 5.11.2026 (Rückfragen Lauf 30, Punkt 5).
+   */
+  gesperrt: 'Bar gesperrt',
   lastschriftSatz:
     'Barzahlung gibt es, sobald du die Lastschrift für die Monatsabrechnung eingerichtet hast. ' +
     'Darüber ziehen wir einmal im Monat die Plattformgebühr aus Barbestellungen ein.',
   /** Eine Monatsabrechnung sperrt bar (Nr. 198) — eine Lastschrift hilft da nicht, auch wenn eine fehlt. */
-  pausiertSatz: 'Barzahlung ist pausiert, solange eine Monatsabrechnung offen ist.',
-  /** Der Weg bei „Pausiert“ — dort stehen Barzahlung und Monatsabrechnungen (Nr. 198). */
+  gesperrtSatz: 'Barzahlung ist gesperrt, solange eine Monatsabrechnung offen ist.',
+  /** Der Weg bei „Bar gesperrt“ — dort stehen Barzahlung und Monatsabrechnungen (Nr. 198). */
   zuKonditionen: 'Zu „Deine Konditionen“',
   gruendungSatz: (bis: string): string =>
     `Bis ${bis} zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.`,
@@ -358,7 +362,7 @@ export const BAR_KARTE_TEXT = {
  * Was die Karte „Bar bei Abholung“ sagt — keine neue Regel: Ob bar geht,
  * entscheidet `barMoeglich` (dieselbe Quelle wie Kasse und /api/checkout).
  * Geht es nicht, weil eine Monatsabrechnung sperrt (`barGesperrt`), heißt die
- * Marke „Pausiert“ — eine Lastschrift höbe die Sperre nicht auf. Sonst
+ * Marke „Bar gesperrt“ — eine Lastschrift höbe die Sperre nicht auf. Sonst
  * (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und keine da) heißt sie
  * „Braucht Lastschrift“ mit dem Weg dorthin (N42 g). Ist die Bargebühr noch
  * erlassen (`einzugFuer` → `erlassen`), nennt der Satz den Einzugstag aus der
@@ -369,7 +373,7 @@ export const BAR_KARTE_TEXT = {
 export function barKarte(lage: GebuehrLage, jetzt: Date, hof: { einzugAb: Date | null }): BarKarte {
   const T = BAR_KARTE_TEXT
   if (!barMoeglich(lage, jetzt)) {
-    if (lage.modell === 'hofpreis' && lage.barGesperrt) return { marke: T.pausiert, ton: 'offen', satz: T.pausiertSatz, lastschrift: false, zuKonditionen: true }
+    if (lage.modell === 'hofpreis' && lage.barGesperrt) return { marke: T.gesperrt, ton: 'offen', satz: T.gesperrtSatz, lastschrift: false, zuKonditionen: true }
     return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true, zuKonditionen: false }
   }
   let satz: string | null = null
@@ -571,7 +575,7 @@ function barSatzHofpreis(lage: Extract<GebuehrLage, { modell: 'hofpreis' }>, ein
   // Tag wie die Karte „Barzahlung“ darunter (formatDatumLang(einzugAb)), nie ein anderer.
   if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(formatDatumLang(lage.einzugAb))
   if (einzug === 'ueberweisung') return LASTSCHRIFT_TEXT.mandatFrei
-  if (einzug === null) return lage.barGesperrt ? BAR_KARTE_TEXT.pausiertSatz : LASTSCHRIFT_TEXT.mandatPflicht
+  if (einzug === null) return lage.barGesperrt ? BAR_KARTE_TEXT.gesperrtSatz : LASTSCHRIFT_TEXT.mandatPflicht
   return BAR_GEBUEHR_SEPA_SATZ
 }
 

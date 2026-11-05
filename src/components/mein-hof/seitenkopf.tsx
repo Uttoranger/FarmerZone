@@ -23,8 +23,9 @@ import { cn } from '@/lib/utils'
  * Reiter Hofseite | Beiträge als Links (?reiter=, E12).
  *
  * Unter lg seit Nr. 143 der Kopf am Handy (mein-hof-kopf.tsx, Register N3,
- * Ergänzung 22.10.2026: Titelbild-Streifen, Zustandszeile, Reiter — derselbe
- * wie auf /products unter md), ab lg die kompakte Zeile wie bisher. Seit
+ * Ergänzung 22.10.2026; seit der Ergänzung 5.11.2026 Titel „Mein Hof“ mit
+ * Schild statt Titelbild-Streifen, dann Zustandszeile und Reiter — derselbe wie
+ * auf /products unter md), ab lg die kompakte Zeile wie bisher. Seit
  * Nr. 22e der einzige Kopf von Mein Hof (der Bestandskopf fiel mit der
  * Umleitung von /status weg).
  *
@@ -43,7 +44,7 @@ const KNOPF = cn(
   FOKUS_RAHMEN
 )
 
-/** Logo oder Initialen, rund — auch für den Kopf am Handy (mein-hof-kopf.tsx). */
+/** Logo oder Initialen, rund — für die kompakte Zeile ab lg. */
 export function Hofbild({ hof, klasse }: { hof: MeinHofKopfDaten; klasse: string }): React.JSX.Element {
   return hof.logoUrl ? (
     // Rund geschnitten im Kasten: Mit Zoom ragte das Logo sonst über den Kreis; ohne Filter (Register N17, Nr. 98).
@@ -102,11 +103,14 @@ export function MeinHofSeitenkopf({
   hof,
   aktiv,
   zustand,
+  jetzt,
 }: {
   hof: MeinHofKopfDaten | null
   aktiv: MeinHofReiterId
   /** Für die Zustandszeile am Handy (ladeMeinHofZustand); ab lg zeigt die Zeile weiter das Schild. */
   zustand: MeinHofZustand | null
+  /** Der Zeitpunkt der Seite — für „Stand …“ im Kopf am Handy. */
+  jetzt: Date
 }): React.JSX.Element | null {
   if (!hof) return null
 
@@ -115,7 +119,7 @@ export function MeinHofSeitenkopf({
     <header className="print:hidden lg:mb-6">
       {/* ===== Unter lg: der Kopf am Handy, mit den Reitern ===== */}
       <div className="lg:hidden">
-        <MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} />
+        <MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} />
       </div>
 
       {/* ===== Ab lg: kompakte Zeile ===== */}

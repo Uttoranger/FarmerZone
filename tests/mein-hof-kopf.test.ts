@@ -6,13 +6,15 @@
  * Beweist:
  *  - EIN Baustein auf allen drei Reitern: /farm-page (unter lg, in seitenkopf.tsx)
  *    und /products (unter md) in derselben Hülle — die Reiter stehen an derselben Stelle.
- *  - Streifen mit Logo, Name (kein h1), Teilen als runder Knopf mit `aria-label`
- *    (nur öffentlich) und „Kundenansicht"; keine Adresse, kein „Kopieren" unter lg.
+ *  - Titelzeile nach Board s1-mein-hof (Register N3, Ergänzung 5.11.2026): „Mein Hof"
+ *    (kein h1) mit Schild nur bei öffentlicher Hofseite, darunter „<Hof> · Stand <Datum
+ *    in Wien>"; Teilen (nur öffentlich) und Kundenansicht als Symbole mit Namen für den
+ *    Screenreader; kein Titelbild-Streifen, keine Adresse, kein „Kopieren" unter lg.
  *  - Zustandszeile: Punkt aria-hidden, Titel trägt die Bedeutung, der Knopf macht
  *    den nächsten Schritt — Pausieren/Fortsetzen an derselben Stelle (derselbe Knopf),
  *    „Eintragen"/„Abholzeiten" nach /settings/pickup-slots, „Produkte" nach /products;
  *    stillgelegt/wartet ohne Zeile.
- *  - Der Schleier über dem Titelbild nimmt nur Tokens, theme-fest.
+ *  - Der Kopf nimmt nur Tokens (kein Farbliteral).
  *  - Blatt „Bestellungen pausieren?" nach DESIGN_SYSTEM (kein Kreuz, Hauptaktion
  *    volle Breite, „Abbrechen" als Textknopf), Vorschau = echte Hinweiskarte,
  *    Meldungen aus EINER Quelle; der Zähler zählt getrimmt — auch in PauseClient.
@@ -53,9 +55,6 @@ const HOF: MeinHofKopfDaten = {
   adresse: { anzeige: 'agrilo.at/testhof-a', url: 'https://agrilo.at/testhof-a' },
   logoUrl: null,
   logoAusschnitt: null,
-  titelbildUrl: null,
-  bannerValue: null,
-  bannerFocusY: 50,
   zustand: { art: 'sichtbar', schild: { text: 'Öffentlich', farbe: 'gruen' }, oeffentlich: true },
 }
 const ZUSTAND: MeinHofZustand = {
@@ -67,8 +66,11 @@ const ZUSTAND: MeinHofZustand = {
   kaufbar: true,
 }
 
+/** Mittwoch, 3. März 2027, 23:30 in Wien — in UTC noch Dienstag: Das Datum muss das Wiener sein. */
+const JETZT = new Date('2027-03-03T22:30:00Z')
+
 const kopf = (zustand: MeinHofZustand | null = ZUSTAND, hof: MeinHofKopfDaten = HOF, aktiv: 'produkte' | 'hofseite' | 'beitraege' = 'produkte') =>
-  renderToStaticMarkup(createElement(MeinHofKopf, { hof, zustand, aktiv }))
+  renderToStaticMarkup(createElement(MeinHofKopf, { hof, zustand, aktiv, jetzt: JETZT }))
 
 describe('ein Kopf, eine Hülle (Reiter an derselben Stelle)', () => {
   it('/farm-page (beide Reiter) und /products stecken den Kopf in dieselbe Hülle', () => {
@@ -88,31 +90,62 @@ describe('ein Kopf, eine Hülle (Reiter an derselben Stelle)', () => {
   it('die Ladeansichten nehmen denselben Kopf in derselben Hülle', () => {
     expect(quelle('src/app/(hof)/products/loading.tsx')).toMatch(/<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, 'md:hidden'\)\}>\s*<MeinHofKopfLaden aktiv="produkte" \/>/)
     expect(quelle('src/components/mein-hof/mein-hof-laden.tsx')).toMatch(/<div className=\{MEIN_HOF_KOPF_HUELLE\}>[\s\S]*?<MeinHofKopfLaden aktiv="hofseite" \/>/)
-    // Gleiche Höhen wie der Kopf: Streifen 76 px, Zustandszeile mindestens 70 px (zwei Satzzeilen), Reiter 48 px.
+    // Gleiche Höhen wie der Kopf: Titelzeile 56 px, Zustandszeile mindestens 70 px (zwei Satzzeilen), Reiter 48 px.
     const laden = quelle('src/components/mein-hof/mein-hof-laden.tsx')
     const echt = quelle('src/components/mein-hof/mein-hof-kopf.tsx')
-    for (const mass of ['h-[76px]', 'min-h-[70px]']) {
+    for (const mass of ['min-h-14', 'min-h-[70px]']) {
       expect(laden, mass).toContain(mass)
       expect(echt, mass).toContain(mass)
     }
   })
 })
 
-describe('Streifen', () => {
-  it('Logo, Name ohne h1, Teilen als runder Knopf mit aria-label, Kundenansicht — keine Adresse, kein Kopieren', () => {
-    const html = kopf()
+describe('Titelzeile (Board s1-mein-hof statt Titelbild-Streifen)', () => {
+  const titelzeile = (html: string) => html.slice(0, html.indexOf('min-h-[70px]') === -1 ? html.indexOf('<nav') : html.indexOf('min-h-[70px]'))
+
+  it('„Mein Hof" ohne h1, Schild „Öffentlich", darunter Hofname und Stand mit dem Wiener Datum', () => {
+    const html = titelzeile(kopf())
     expect(html).not.toContain('<h1')
-    expect(html).toMatch(/<p class="[^"]*line-clamp-2[^"]*" title="Testhof A">Testhof A<\/p>/)
-    expect(html).toMatch(/<button type="button" class="[^"]*\bw-11\b[^"]*" aria-label="Teilen"><svg[^>]*aria-hidden="true"/)
-    expect(html).toContain('Kundenansicht')
-    expect(html).not.toContain('agrilo.at/testhof-a')
-    expect(html).not.toMatch(/Kopieren|kopieren/)
+    expect(html).toMatch(/<p class="[^"]*\bfont-heading\b[^"]*">Mein Hof<\/p>/)
+    expect(html).toMatch(/data-slot="status-badge" data-status="fertig"[^>]*>[\s\S]*?Öffentlich/)
+    // Tag, Monat und Jahr mit geschütztem Leerzeichen — die Zeile bricht nicht zwischen „3.“ und „März“.
+    expect(html).toContain('>Testhof A · Stand Mittwoch, 3.\u00a0März\u00a02027</p>')
+    // Gegenprobe: in UTC wäre es noch Dienstag.
+    expect(html).not.toContain('Dienstag')
   })
 
-  it('nicht öffentlich: kein Teilen, Kundenansicht bleibt', () => {
+  it('kein Titelbild-Streifen mehr: kein Bild, kein Logo, kein Schleier — das Titelbild bleibt in der Liste „Bearbeiten"', () => {
+    const html = kopf(ZUSTAND, { ...HOF, logoUrl: '/logo.webp' })
+    expect(html).not.toContain('<img')
+    expect(html).not.toContain('h-[76px]')
+    const text = quelle('src/components/mein-hof/mein-hof-kopf.tsx')
+    expect(text).not.toMatch(/next\/image|titelbildVerlauf|Hofbild|from-primary-foreground/)
+    // Gegenprobe: die Zeile „Titelbild" der Liste „Bearbeiten" gibt es weiter.
+    expect(quelle('src/lib/hofseite-fortschritt.ts')).toContain("titelbild: 'Titelbild'")
+  })
+
+  it('pausiert: Schild „Pausiert" (orange) neben dem Titel', () => {
+    const html = titelzeile(kopf({ ...ZUSTAND, zustand: 'pausiert', sperre: 'pause' }, { ...HOF, zustand: { art: 'pausiert', schild: { text: 'Pausiert', farbe: 'bernstein' }, oeffentlich: true } }))
+    expect(html).toMatch(/data-slot="status-badge" data-status="offen"[^>]*>[\s\S]*?Pausiert/)
+  })
+
+  it('nicht öffentlich: kein Schild (das sagen Zustandszeile bzw. Balken), kein Teilen, Kundenansicht bleibt', () => {
     const html = kopf(ZUSTAND, { ...HOF, zustand: { art: 'aus', schild: { text: 'Noch nicht freigegeben', farbe: 'grau' }, oeffentlich: false } })
+    const zeile = titelzeile(kopf({ ...ZUSTAND, zustand: 'aus' }, { ...HOF, zustand: { art: 'aus', schild: { text: 'Noch nicht freigegeben', farbe: 'grau' }, oeffentlich: false } }))
+    expect(zeile).not.toContain('data-slot="status-badge"')
+    expect(zeile).not.toContain('Noch nicht freigegeben')
     expect(html).not.toContain('aria-label="Teilen"')
     expect(html).toContain('Kundenansicht')
+  })
+
+  it('Teilen und Kundenansicht als Symbole (44 px) mit Namen für den Screenreader; keine Adresse, kein Kopieren', () => {
+    const html = titelzeile(kopf())
+    expect(html).toMatch(/<button type="button" class="[^"]*\bsize-11\b[^"]*" aria-label="Teilen"><svg[^>]*aria-hidden="true"/)
+    // Ohne Kundenansicht drumherum (der Kopf allein): Link in einen neuen Tab, das Wort nur für den Screenreader.
+    expect(html).toMatch(/<a href="\/testhof-a\?vorschau=1"[^>]*class="[^"]*\bsize-11\b[^"]*"><svg[^>]*aria-hidden="true"[\s\S]*?<span class="sr-only">Kundenansicht<\/span>/)
+    expect(html).not.toMatch(/>Kundenansicht<svg|<\/svg>Kundenansicht/)
+    expect(html).not.toContain('agrilo.at/testhof-a')
+    expect(html).not.toMatch(/Kopieren|kopieren/)
   })
 
   it('HofTeilenKnopf: die Variante mit Symbol trägt das Wort nur als aria-label', () => {
@@ -124,10 +157,8 @@ describe('Streifen', () => {
     expect(wort).not.toContain('aria-label')
   })
 
-  it('Schleier und Schrift nur aus Tokens, theme-fest (primary-foreground / accent-foreground)', () => {
+  it('der Kopf nimmt nur Tokens', () => {
     const text = quelle('src/components/mein-hof/mein-hof-kopf.tsx')
-    expect(text).toContain("'bg-linear-to-r from-primary-foreground/90 via-primary-foreground/75 via-55% to-primary-foreground/40'")
-    expect(text).toMatch(/text-accent-foreground/)
     expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|oklch)\(|\b(bg|text|from|to|via)-(black|white)\b/)
     // Gegenprobe: die Suche findet ein Farbliteral.
     expect('from-[#080c09]/90').toMatch(/#[0-9a-fA-F]{3,8}\b/)

@@ -10,14 +10,14 @@ import { POSTFACH_HREF } from '@/lib/postfach'
 import { oeffneRechnung } from '@/server/actions/lastschrift'
 
 /**
- * Hof › Heute: Barzahlung pausiert, weil die Plattformgebühr eines Monats
+ * Hof › Heute: Barzahlung gesperrt („Bar gesperrt“), weil die Plattformgebühr eines Monats
  * offen oder zurückgebucht ist (Register N38, Nr. 198). „Jetzt bezahlen“
  * öffnet die gehostete Rechnung von Stripe — die Adresse holt der Server erst
  * beim Klick. Nach `invoice.paid` verschwindet die Karte von selbst.
  *
  * Zurückgebucht: Die Rechnung ist schon bezahlt, ein Knopf „Jetzt bezahlen“
  * liefe ins Leere. Dann ein Satz ohne Fachbegriff und der Weg ins Postfach —
- * das Team klärt die Rückbuchung und hebt die Pause auf.
+ * das Team klärt die Rückbuchung und hebt die Sperre auf.
  */
 export function LastschriftSperreKarte({
   abrechnungId,

@@ -212,14 +212,11 @@ describe('Kopf und Reiter (neues Design)', () => {
     adresse: { anzeige: 'agrilo.at/hof-test', url: 'https://agrilo.at/hof-test' },
     logoUrl: null,
     logoAusschnitt: null,
-    titelbildUrl: null,
-    bannerValue: null,
-    bannerFocusY: 50,
     zustand: { art: 'sichtbar', schild: { text: 'Öffentlich', farbe: 'gruen' }, oeffentlich: true },
   }
 
   const rendere = (aktiv: 'hofseite' | 'beitraege', k: MeinHofKopfDaten = kopf) =>
-    renderToStaticMarkup(createElement(MeinHofSeitenkopf, { hof: k, aktiv, zustand: null }))
+    renderToStaticMarkup(createElement(MeinHofSeitenkopf, { hof: k, aktiv, zustand: null, jetzt: new Date('2026-10-06T10:00:00Z') }))
 
   it('Reiter als Links mit aria-current, ohne Zahl hinter „Beiträge" (E12, Nr. 143)', () => {
     const html = rendere('beitraege')

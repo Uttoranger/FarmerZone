@@ -60,7 +60,7 @@ export default async function ProductsPage(): Promise<React.JSX.Element> {
       slug={farm.slug}
       kopf={
         <div className={cn(MEIN_HOF_KOPF_HUELLE, 'md:hidden')}>
-          <MeinHofKopf hof={kopf} zustand={zustand} aktiv="produkte" />
+          <MeinHofKopf hof={kopf} zustand={zustand} aktiv="produkte" jetzt={jetzt} />
         </div>
       }
     >

@@ -245,12 +245,14 @@ describe('Online bezahlt', () => {
 })
 
 describe('Status aus der Datenbank', () => {
-  it('abholbereit: „Gepackt" erledigt, „Abgeholt" ist dran', async () => {
+  it('abholbereit: „Abholbereit" erledigt, „Abgeholt" ist dran — die Kundin liest nie „Gepackt"', async () => {
     findUnique.mockResolvedValue(bestellung({ status: 'READY' }) as never)
     const html = await seite()
     expect(text(html)).toContain('Deine Bestellung liegt bereit')
     expect(html).toMatch(/data-schritt="gepackt"[^>]*data-stand="erledigt"/)
     expect(html).toMatch(/data-schritt="abgeholt"[^>]*data-stand="naechster"/)
+    expect(text(html)).toContain('Abholbereit')
+    expect(text(html)).not.toContain('Gepackt')
   })
 
   it('Zahlung wird geprüft: Abholkarte ohne „In den Kalender" — der Termin steht erst mit der Zahlung', async () => {

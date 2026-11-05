@@ -15,14 +15,32 @@ import { useMeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
  * Ohne Kundenansicht darum herum (der Kopf allein, etwa in einer Vorschau)
  * bleibt es der Link in einen neuen Tab — nie ein Knopf ohne Wirkung.
  */
-export function KundenansichtKnopf({ slug, className }: { slug: string; className: string }): React.JSX.Element {
+export function KundenansichtKnopf({
+  slug,
+  className,
+  nurSymbol = false,
+}: {
+  slug: string
+  className: string
+  /** Nur das Auge, das Wort für den Screenreader (Kopf am Handy, Board s1-mein-hof). */
+  nurSymbol?: boolean
+}): React.JSX.Element {
   const steuerung = useMeinHofAnsicht()
 
   if (!steuerung) {
     return (
       <a href={vorschauLink(slug)} target="_blank" rel="noopener noreferrer" className={className}>
-        {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
-        <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+        {nurSymbol ? (
+          <>
+            <Eye className="size-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+            <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.kundenansicht}</span>
+          </>
+        ) : (
+          <>
+            {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
+            <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+          </>
+        )}
         <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>
       </a>
     )
@@ -30,8 +48,8 @@ export function KundenansichtKnopf({ slug, className }: { slug: string; classNam
 
   return (
     <button type="button" onClick={() => steuerung.zeigeKundin(null)} className={className}>
-      <Eye className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-      {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
+      <Eye className={nurSymbol ? 'size-5 shrink-0' : 'size-4 shrink-0'} strokeWidth={1.7} aria-hidden="true" />
+      {nurSymbol ? <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.kundenansicht}</span> : MEIN_HOF_ANSICHT_TEXT.kundenansicht}
     </button>
   )
 }

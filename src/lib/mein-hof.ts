@@ -18,7 +18,7 @@ export const HOFSEITE_HREF = '/farm-page'
 /**
  * Ersatz-Titelbild, wenn ein Hof noch kein Foto hochgeladen hat. Bildersatz,
  * kein Anstrich — die Verläufe folgen dem Modus bewusst nicht. Eine Quelle für
- * die Hofseite (farm-page-view.tsx) und den Streifen im Kopf.
+ * die Hofseite und den Baustein Titelbild in Mein Hof.
  */
 export const TITELBILD_VERLAEUFE: Record<string, string> = {
   tannengruen: 'linear-gradient(135deg, #1F4732 0%, #3D7B58 60%, #E8F0E8 100%)',
@@ -34,7 +34,7 @@ export function titelbildVerlauf(bannerValue: string | null | undefined): string
 
 /**
  * Das hochgeladene Titelbild, sonst null (dann gilt der Verlauf). Eine Stelle
- * für Hofseite und Streifen — `bannerValue` kann laut Schema auch eine
+ * für Hofseite und Bild-Bausteine — `bannerValue` kann laut Schema auch eine
  * Foto-URL tragen, maßgeblich ist aber nur PHOTO mit `bannerUrl`.
  */
 export function titelbildFoto(hof: { bannerType: string; bannerUrl: string | null }): string | null {
@@ -111,6 +111,33 @@ export function hofAdresse(appUrl: string, slug: string): { anzeige: string; url
     // Kein gültiger Ursprung (z. B. leer) — dann steht die Adresse eben roh da.
   }
   return { anzeige: `${host}/${slug}`, url }
+}
+
+// ─── Titelzeile im Kopf am Handy (Register N3, Ergänzung 5.11.2026; Board s1-mein-hof) ──
+
+/** Die Wörter der Titelzeile — EINE Quelle für den Kopf am Handy (mein-hof-kopf.tsx). */
+export const MEIN_HOF_KOPF_TEXT = {
+  titel: 'Mein Hof',
+  /**
+   * „Hof Probe · Stand Mittwoch, 3. März 2027“ — das Datum aus `datumLang` (Wien), wie auf Heute.
+   * Tag, Monat und Jahr bleiben mit geschützten Leerzeichen beisammen (wie im Board): Am Handy
+   * bricht die Zeile sonst zwischen „5.“ und „November“.
+   */
+  unterzeile: (hofName: string, datum: string): string => `${hofName} · Stand ${datum.replace(/(\d{1,2}\.) (\S+) (\d{4})$/u, '$1\u00a0$2\u00a0$3')}`,
+} as const
+
+/**
+ * Das Schild neben „Mein Hof“ am Handy: nur, wenn die Hofseite öffentlich ist
+ * („Öffentlich“, „Pausiert“). Ist sie es nicht, sagt das schon die Zustandszeile
+ * („Noch nicht freigegeben“) bzw. der Balken über jeder Seite („wartet“,
+ * stillgelegt) — ein Schild daneben wäre die zweite Fassung desselben Zustands
+ * (Board s1-produkte, Bild 3: neuer Hof ohne Schild). Ab lg bleibt das Schild der
+ * kompakten Zeile, wie es ist. Bei „Pausiert“ stehen Schild und Zustandszeile mit
+ * demselben Wort untereinander, wie im Board (Bild 4): Das Schild sagt, wie die Seite
+ * für Kundinnen dasteht, die Zeile bringt den Knopf „Fortsetzen“.
+ */
+export function kopfSchild(zustand: HofZustand): HofZustand['schild'] {
+  return zustand.oeffentlich ? zustand.schild : null
 }
 
 // ─── Zustandszeile im Kopf am Handy (Register N3, Ergänzung 22.10.2026; Nr. 143) ──

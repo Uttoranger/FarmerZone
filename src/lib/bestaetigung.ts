@@ -114,7 +114,10 @@ function fristKurz(frist: Date, jetzt: Date): string {
 
 /**
  * Die Schritte einer Bestellung: Bestellt → Bezahlt (online) bzw. Bestätigt
- * (vor Ort) → Gepackt → Abgeholt. Storniert oder nicht abgeholt gibt es keine
+ * (vor Ort) → Abholbereit → Abgeholt. Den dritten Schritt liest die Kundin, darum
+ * „Abholbereit“ wie in Meine Bestellungen und den Mails; der Hof sagt dazu „Gepackt“
+ * (Register N9, Ergänzung 5.11.2026; bewusst anders als die Boards s1-/w1-bestaetigung).
+ * Die Kennung `gepackt` bleibt. Storniert oder nicht abgeholt gibt es keine
  * Schritte (null): Ein halb gefüllter Fortschritt täuschte vor, es ginge
  * weiter. Der erste offene Schritt ist „naechster" — das ist, worauf die
  * Kundin gerade wartet.
@@ -147,7 +150,7 @@ export function bestellSchritte(order: SchrittBestellung, jetzt: Date): BestellS
     },
     {
       id: 'gepackt',
-      titel: 'Gepackt',
+      titel: 'Abholbereit',
       zusatz: gepackt ? '' : `bis ${order.pickupTimeStart} Uhr`,
       erledigt: gepackt,
     },

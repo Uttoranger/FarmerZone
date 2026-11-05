@@ -277,11 +277,12 @@ export const LASTSCHRIFT_TEXT = {
   rechnung: 'Rechnung (PDF)',
   bezahlen: 'Jetzt bezahlen',
   rechnungFehlt: 'Die Rechnung lässt sich gerade nicht öffnen. Versuch es bitte gleich noch einmal.',
-  heuteTitel: 'Barzahlung ist pausiert',
+  /** Dasselbe Wort wie die Marke „Bar gesperrt“ (Register N38, Ergänzung 5.11.2026) — nie „pausiert“, das ist der Hofzustand. */
+  heuteTitel: 'Barzahlung ist gesperrt',
   heuteSatz: (monat: string): string =>
     `Die Plattformgebühr für ${monat} ist noch offen. Bis sie bezahlt ist, nehmen wir bei dir keine Barbestellungen an – laufende Bestellungen bleiben.`,
   /** Nach einer Rückbuchung ist die Rechnung bezahlt — es gibt nichts zu bezahlen, das Team klärt es. */
-  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist pausiert – das Team meldet sich bei dir.`,
+  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist gesperrt – das Team meldet sich bei dir.`,
   zumPostfach: 'Zum Postfach',
 } as const
 
