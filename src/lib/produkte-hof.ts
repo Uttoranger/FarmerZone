@@ -358,9 +358,10 @@ export function vorratTitel(name: string): string {
 export function vorratFrage(unit: string, unitSize: number | null): string {
   const zwei = hofVorratText(2, unit, unitSize)
   const einheit = zwei.slice(formatZahl(2).length + 1)
-  // Ohne Gebinde sagt formatGebinde „je kg" — dann steht nichts dahinter.
+  // Ohne Gebinde sagt formatGebinde „je kg" — dann steht nichts dahinter; ebenso, wenn das Gebinde
+  // schon in Paketen zählt („6 Pakete"), sonst hieße es „Pakete à 6 Pakete".
   const paket = formatGebinde(unit, unitSize)
-  const gebinde = paket.startsWith('je ') ? '' : ` à ${paket}`
+  const gebinde = paket.startsWith('je ') || paket.endsWith(` ${einheit}`) ? '' : ` à ${paket}`
   return `Wie viele ${einheit}${gebinde} hast du gerade?`
 }
 

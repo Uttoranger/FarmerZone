@@ -81,6 +81,9 @@ import {
   hofpreisTeile,
   hofpreisZeile,
   keinTrefferSatz,
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  SPEICHERN_FEHLER,
   wiederDaMomentMoeglich,
   wiederDaTexte,
   zaehleProdukteFilter,
@@ -95,6 +98,7 @@ import { NICHT_IM_SHOP, SPEICHERN_NICHT_IM_SHOP } from '@/lib/produkt-sichtbarke
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import { vorratSetzenSchema } from '@/schemas/vorrat'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
+import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import { formatGebinde, hofVorratText } from '@/lib/format'
 import { LOW_STOCK_THRESHOLD } from '@/lib/dashboard-hints'
 import { leseAuftrag, auftragsSchluessel, ohneAuftrag } from '@/lib/url-auftrag'
@@ -192,6 +196,25 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
     // Gegenprobe: Die Suche schlägt bei beiden Formen an, nicht beim Filterwert der Adresse.
     expect('Entwurf Entwürfe').toMatch(/Entw(?:u|ü)rf/)
     expect('?filter=entwuerfe').not.toMatch(/Entw(?:u|ü)rf/)
+  })
+})
+
+describe('Speicherfehler als Karte (V17; Board s1/w1-produkt-neu, Bild 6)', () => {
+  it('am Netz beim Bearbeiten „Nochmal" mit dem Satz des Boards', () => {
+    expect(speicherFehlerNachWurf(true, true, 'x')).toEqual({ titel: SPEICHERN_FEHLER.titel, satz: SPEICHERN_FEHLER.netz, nochmal: true })
+  })
+
+  it('am Netz beim Anlegen kein „Nochmal": der Server kann schon gespeichert haben (NETZ_SATZ_UNSICHER)', () => {
+    expect(speicherFehlerNachWurf(true, false, 'x')).toEqual({ titel: SPEICHERN_FEHLER.unsicherTitel, satz: NETZ_SATZ_UNSICHER, nochmal: false })
+  })
+
+  it('ohne Netzfehler der Satz des Formulars, ohne Knopf; eine Antwort des Servers steht wörtlich da', () => {
+    expect(speicherFehlerNachWurf(false, true, 'Wir konnten das Produkt nicht speichern.')).toEqual({
+      titel: SPEICHERN_FEHLER.titel,
+      satz: 'Wir konnten das Produkt nicht speichern.',
+      nochmal: false,
+    })
+    expect(speicherFehlerAusAntwort('Produkt nicht gefunden.')).toEqual({ titel: SPEICHERN_FEHLER.titel, satz: 'Produkt nicht gefunden.', nochmal: false })
   })
 })
 

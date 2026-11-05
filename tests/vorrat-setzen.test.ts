@@ -338,6 +338,7 @@ describe('Vorrat-Blatt', () => {
     expect(text(pruefstand.baum())).toContain(VORRAT_NULL_SATZ)
     expect(vorratFrage('KG', null)).toBe('Wie viele kg hast du gerade?')
     expect(vorratFrage('STUECK', 10)).toBe('Wie viele Pakete à 10 Stück hast du gerade?')
+    expect(vorratFrage('PAKET', 6)).toBe('Wie viele Pakete hast du gerade?')
     expect(vorratTitel('Freilandeier')).toBe('Vorrat: Freilandeier')
   })
 

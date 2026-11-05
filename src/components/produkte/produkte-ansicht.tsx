@@ -368,7 +368,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                 }}
                 placeholder="Name des Produkts"
                 className={cn(
-                  'h-12 w-full rounded-xl border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground md:h-11 md:text-sm',
+                  'h-12 w-full rounded-[10px] border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground md:h-11 md:text-sm',
                   FOKUS_RAHMEN
                 )}
               />
@@ -679,7 +679,7 @@ function ProduktZeile({
       <ProduktBild product={product} className="size-12 rounded-[10px]" />
       <div className="flex min-w-0 flex-1 flex-col items-start gap-[3px]">
         <NamenKnopf product={product} onOeffnen={onOeffnen} />
-        <p className="line-clamp-2 max-w-full text-[12.5px] text-muted-foreground">
+        <p className="line-clamp-3 max-w-full text-[12.5px] text-muted-foreground">
           {formatGebinde(product.unit, product.unitSize)} · {preis}
         </p>
         <RuecktrittHinweis angabe={product} />
@@ -705,7 +705,7 @@ function VorratKnopf({ product, onVorrat, klein }: { product: ProductData; onVor
       onClick={onVorrat}
       aria-label={`Vorrat ${product.name}: ${vorrat}. Ändern`}
       className={cn(
-        'flex shrink-0 flex-col items-center justify-center gap-px rounded-xl border bg-background px-2.5 text-foreground hover:bg-muted',
+        'flex shrink-0 flex-col items-center justify-center gap-px rounded-[10px] border bg-background px-2.5 text-foreground hover:bg-muted',
         klein ? 'min-h-11 min-w-11' : 'min-h-12 min-w-20',
         // Bei 0 trägt der Rahmen den Ton „offen" (Board: Ausverkauft, Rahmen orange).
         product.stock <= 0 ? 'border-status-offen' : 'border-input',
