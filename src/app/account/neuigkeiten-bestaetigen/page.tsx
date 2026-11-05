@@ -58,8 +58,9 @@ export default async function NeuigkeitenBestaetigenPage({
             </p>
           </div>
         </div>
+        {/* Knopf „Zu <Hof>“ (Wortliste N42 c, Board s2-neuigkeiten Bild 3). */}
         <Link href={`/${stand.hofSlug}`} className={cn(KNOPF_GRUEN, 'h-12 w-full')}>
-          Zum Hof
+          Zu {stand.hofName}
         </Link>
       </section>
     )

@@ -1,6 +1,6 @@
 import { Clock } from 'lucide-react'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { FARM_PENDING_OWNER_BANNER, FARM_PENDING_OWNER_HINT, freischaltungsMailto } from '@/lib/farm-approval'
+import { freischaltungsMailto, warteBalkenText, type WarteStand } from '@/lib/farm-approval'
 import { DE_VORBEREITUNG_HINWEIS, type Land } from '@/lib/laender'
 
 /**
@@ -19,17 +19,23 @@ import { DE_VORBEREITUNG_HINWEIS, type Land } from '@/lib/laender'
  * ausgerechnet dann, wenn der Hof die Einladung „richte schon alles ein"
  * befolgt hat. Der Balken bleibt, solange der Hof wartet, und genau das
  * verlangt D-2: der BESTEHENDE Hinweis wird ergänzt, kein zweiter Balken.
+ *
+ * Titel und Satz je Stand der Schritte wie HofBalken (`warteBalkenText`,
+ * Register N42 e); ohne `stand` der Titel „wird noch geprüft".
  */
 export function PendingApprovalBanner({
   farmId,
   farmName,
   land = 'AT',
+  stand = null,
 }: {
   farmId: string
   farmName: string
   land?: Land
+  stand?: WarteStand | null
 }) {
   const mailto = freischaltungsMailto(SUPPORT_EMAIL, farmName, farmId)
+  const text = warteBalkenText(stand)
 
   return (
     <div className="mx-4 mt-3 print:hidden">
@@ -37,8 +43,8 @@ export function PendingApprovalBanner({
         <div className="flex items-start gap-2">
           <Clock className="size-4 shrink-0 mt-0.5 text-sky-700 dark:text-sky-300" aria-hidden="true" />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-sky-900 dark:text-sky-100">{FARM_PENDING_OWNER_BANNER}</p>
-            <p className="mt-1 text-xs leading-relaxed text-sky-800 dark:text-sky-200">{FARM_PENDING_OWNER_HINT}</p>
+            <p className="text-sm font-medium text-sky-900 dark:text-sky-100">{text.titel}</p>
+            <p className="mt-1 text-xs leading-relaxed text-sky-800 dark:text-sky-200">{text.hinweis}</p>
             {land === 'DE' && (
               <p className="mt-1 text-xs leading-relaxed text-sky-800 dark:text-sky-200">{DE_VORBEREITUNG_HINWEIS}</p>
             )}
@@ -50,7 +56,7 @@ export function PendingApprovalBanner({
               <a href={mailto} className="font-medium underline underline-offset-2 break-words">
                 Frage zur Freischaltung stellen
               </a>{' '}
-              — die Hof-ID ist in der Nachricht schon eingetragen.
+              – die Hof-ID ist in der Nachricht schon eingetragen.
             </p>
           </div>
         </div>

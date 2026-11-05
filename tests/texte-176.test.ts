@@ -75,7 +75,7 @@ describe('Startseite: Überschrift ohne Standort', () => {
 describe('Onboarding', () => {
   it('der Satz zur Sichtbarkeit steht auch unter md (kein hidden md:block)', () => {
     const text = quelle('src/components/einrichten/einrichten-seite.tsx')
-    const stelle = text.slice(text.indexOf('Kunden sehen deinen Hof erst nach der Freischaltung') - 200, text.indexOf('Kunden sehen deinen Hof erst nach der Freischaltung'))
+    const stelle = text.slice(text.indexOf('Kundinnen sehen deinen Hof erst nach der Freischaltung') - 200, text.indexOf('Kundinnen sehen deinen Hof erst nach der Freischaltung'))
     expect(stelle).toContain('<p className=')
     expect(stelle).not.toMatch(/hidden|md:block/)
   })

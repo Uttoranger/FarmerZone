@@ -17,12 +17,12 @@ export default async function UnsubscribePage({ searchParams }: Props): Promise<
       {token ? (
         <UnsubscribeClient token={token} />
       ) : (
-        <AbmeldenKarte symbol={Unlink} titel="Ungültiger Link">
+        <AbmeldenKarte symbol={Unlink} titel="Link ungültig">
           <p className="text-[13.5px] leading-normal text-muted-foreground">
             Dieser Abmelde-Link ist nicht gültig oder wurde bereits verwendet.
           </p>
           <Link href="/account/profile" className={TEXTLINK}>
-            Abonnements selbst verwalten
+            Abonnements verwalten
           </Link>
         </AbmeldenKarte>
       )}
