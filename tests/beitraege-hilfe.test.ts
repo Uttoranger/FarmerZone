@@ -50,6 +50,7 @@ import {
   meldungZeilen,
   meldungenStand,
   seiteKurz,
+  seiteName,
 } from '@/lib/hof-hilfe'
 import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
 import { MeldungForm } from '@/components/shared/meldung-form'
@@ -317,6 +318,10 @@ describe('Meldungen: Ton, Zähler, Zeilen', () => {
     expect(geraetKurz('')).toBe('–')
     expect(seiteKurz('http://localhost:3000/orders?filter=heute')).toBe('/orders?filter=heute')
     expect(seiteKurz('')).toBe('–')
+    expect(seiteName('http://localhost:3000/orders?filter=heute')).toBe('Bestellungen')
+    expect(seiteName('/dashboard#oben')).toBe('Heute')
+    expect(seiteName('http://localhost:3000/unbekannt/x?a=1#b')).toBe('/unbekannt/x')
+    expect(seiteName('')).toBe('–')
   })
 
   it('das Textfeld fragt passend zur Art', () => {

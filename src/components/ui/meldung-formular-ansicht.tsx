@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Camera, Check, Loader2, X } from 'lucide-react'
 import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
-import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, geraetKurz, mitgeschicktSatz, seiteKurz } from '@/lib/hof-hilfe'
+import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz, seiteName } from '@/lib/hof-hilfe'
+import { geraetName } from '@/lib/geraete'
 import { stufenText } from '@/components/shared/image-upload'
 import { HONIGTOPF_STIL, type Kontext, type MeldungFormular } from '@/components/shared/use-meldung-formular'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -56,8 +57,8 @@ const RAHMEN_KNOPF = cn(
 
 /**
  * „Das schicken wir automatisch mit“ (Board s2-/w2-meldungen, Nacharbeit 225):
- * im Hofbereich eine Karte mit Seite und Gerät statt des Satzes (Seite und
- * Gerät in Worten aus src/lib/hof-hilfe.ts, eine Quelle mit dem Admin). Ohne
+ * im Hofbereich eine Karte mit Seite und Gerät statt des Satzes (Seite als Name des
+ * Navigationspunkts aus src/lib/hof-hilfe.ts, Gerät als `geraetName`). Ohne
  * Kontext (vor dem Einhängen) steht ein Strich; der Satz ohne IP und Cookies
  * bleibt darunter — er sagt, was NICHT mitgeht.
  */
@@ -65,8 +66,8 @@ function MitgeschicktKarte({ kontext, kennung }: { kontext: Kontext; kennung: st
   const T = MELDUNG_ANSICHT_TEXT
   const zeilen: { name: string; wert: string }[] = [
     ...(kennung.trim() ? [{ name: T.fehlernummer, wert: kennung.trim() }] : []),
-    { name: T.seite, wert: seiteKurz(kontext.seiteUrl) },
-    { name: T.geraet, wert: geraetKurz(kontext.userAgent) },
+    { name: T.seite, wert: seiteName(kontext.seiteUrl) },
+    { name: T.geraet, wert: kontext.userAgent.trim() === '' ? '–' : geraetName(kontext.userAgent) },
   ]
   return (
     <div data-slot="meldung-mitgeschickt" className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-3.5 py-3">
