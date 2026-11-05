@@ -81,6 +81,7 @@ import { KaufZusammenfassung } from '@/components/checkout/kauf-zusammenfassung'
 import { ReservierungsHinweis, UebersichtKarte } from '@/components/checkout/kasse-teile'
 import { abholKacheln, abholSatz, reservierungsStand, zahlungAbgelehntText, ZAHLWEG_ONLINE } from '@/lib/kasse'
 import { MINDESTBESTELLWERT_SATZ } from '@/lib/konditionen'
+import { mindestbestellwertHinweis } from '@/lib/plattformgebuehr'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
 import type { PublicFarm } from '@/server/queries/farm'
 import { publicFarm } from './fabrik/public-farm'
@@ -293,7 +294,10 @@ describe('Formular: der Abholtermin einmal im Bar-Formular', () => {
 
   it('bar mit Termin unter dem Mindestbestellwert: der Grund bleibt unter dem Knopf', () => {
     const html = kasse({ ...HOF, preisAnzeige: { hundertstel: 600 } }, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' }, 1)
-    expect(html.indexOf(MINDESTBESTELLWERT_SATZ)).toBeGreaterThan(html.indexOf('Zahlungspflichtig bestellen'))
+    // Nr. 227 (Register N41 a, A3): der Hinweis mit dem Satz des Hofs statt MINDESTBESTELLWERT_SATZ — 1 × € 4,90, es fehlen € 5,10.
+    const grund = mindestbestellwertHinweis(1000 - 490, 600)
+    expect(html).not.toContain(MINDESTBESTELLWERT_SATZ)
+    expect(html.indexOf(grund)).toBeGreaterThan(html.indexOf('Zahlungspflichtig bestellen'))
     expect(anzahl(html, TERMIN)).toBe(1)
   })
 

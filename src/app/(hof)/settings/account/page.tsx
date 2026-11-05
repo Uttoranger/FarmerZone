@@ -12,6 +12,7 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { EINSTELLUNG_KONTO } from '@/lib/bauern-navigation'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { KONTO_TEXT } from '@/lib/hof-einstellungen'
 import { PasswordForm } from './password-form'
 import { ArchiveFarmCard } from './archive-farm-card'
 import { DarstellungKarte } from './darstellung-karte'
@@ -84,15 +85,15 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Mail className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-              <CardTitle>E-Mail-Adresse</CardTitle>
+              <CardTitle>{KONTO_TEXT.anmeldeAdresseTitel}</CardTitle>
             </div>
             <CardDescription>
-              Deine aktuelle Login-E-Mail: <strong className="break-all text-foreground">{session.user.email}</strong>
+              {KONTO_TEXT.anmeldeAdresse} <strong className="break-all text-foreground">{session.user.email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Um deine E-Mail-Adresse zu ändern,{' '}
+              {KONTO_TEXT.anmeldeAdresseAendern}{' '}
               <a href={emailChangeMailto} className={TEXTLINK}>
                 schreib dem {MARKE}-Support
               </a>
@@ -105,7 +106,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Shield className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-              <CardTitle>Passwort</CardTitle>
+              <CardTitle>{KONTO_TEXT.passwortTitel}</CardTitle>
             </div>
             <CardDescription>Passwort für dein {MARKE}-Konto</CardDescription>
           </CardHeader>
@@ -135,8 +136,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
             Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.
           </p>
           <p className="mt-2">
-            Du willst nur deinen Hofladen schließen, dein Konto aber behalten? Dann nutze oben &bdquo;Hof
-            stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
+            {KONTO_TEXT.nurHofSchliessen} &bdquo;Hof stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
           </p>
         </Hinweiskarte>
       </div>

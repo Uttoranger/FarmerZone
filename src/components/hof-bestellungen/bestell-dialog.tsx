@@ -1,18 +1,21 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogMitte, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { cn } from '@/lib/utils'
-import { KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from './stil'
+import { KNOPF_GRUEN, KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from './stil'
 
 export type Hauptaktion = {
   text: string
   onClick: () => void
-  /** grün = Hauptaktion, orange = zerstörend (Orange-Umriss). */
-  ton: 'gruen' | 'orange'
+  /**
+   * haupt = Hauptaktion im Hofbereich (orange gefüllt, N42 a; Bestellungen seit Lauf 30),
+   * gruen = Hauptaktion im Bestand (Admin), orange = zerstörend (Orange-Umriss).
+   */
+  ton: 'haupt' | 'gruen' | 'orange'
   laeuft?: boolean
   gesperrt?: boolean
 }
@@ -30,9 +33,16 @@ export function BestellDialog({
   titel,
   unterzeile,
   breite = 'schmal',
+  mitte = false,
   hauptaktion,
   children,
 }: {
+  /**
+   * Ab 768 px der zentrierte Dialog nach N41 d (DialogMitte, höchstens 560 px, oben rechts
+   * genau ein „Abbrechen“; Boards w1-bestellung). Ohne `mitte` bleibt der Bestand
+   * (DialogContent) — die übrigen Aufrufer (Admin) stellen ihre Nummern um.
+   */
+  mitte?: boolean
   offen: boolean
   onOffenChange: (offen: boolean) => void
   titel: string
@@ -52,11 +62,26 @@ export function BestellDialog({
       onClick={hauptaktion.onClick}
       disabled={laeuft || hauptaktion.gesperrt}
       aria-busy={laeuft || undefined}
-      className={cn(hauptaktion.ton === 'gruen' ? KNOPF_GRUEN : KNOPF_ORANGE_RAHMEN, !breit && 'w-full rounded-[14px]')}
+      className={cn(
+        hauptaktion.ton === 'haupt' ? KNOPF_ORANGE : hauptaktion.ton === 'gruen' ? KNOPF_GRUEN : KNOPF_ORANGE_RAHMEN,
+        !breit && 'w-full rounded-[14px]'
+      )}
     >
       {laeuft ? 'Einen Moment …' : hauptaktion.text}
     </button>
   )
+
+  if (breit && mitte) {
+    return (
+      <Dialog open={offen} onOpenChange={wechsel}>
+        <DialogMitte titel={titel} schliessen="Abbrechen" className="gap-4">
+          {unterzeile && <DialogDescription className="-mt-2 text-[13px] break-words text-muted-foreground">{unterzeile}</DialogDescription>}
+          {children}
+          <div className="flex flex-wrap justify-end gap-2.5">{hauptKnopf}</div>
+        </DialogMitte>
+      </Dialog>
+    )
+  }
 
   if (breit) {
     return (

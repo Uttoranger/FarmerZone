@@ -2,19 +2,26 @@
 
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Check, Info, Loader2, LogOut, ShieldAlert, TriangleAlert } from 'lucide-react'
+import { Check, Info, Loader2, LogOut, TriangleAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GERAETE_TEXT, NICHT_ICH_TEXT } from '@/lib/geraete'
 import { meldungLinkMitKennung } from '@/lib/fehlerseite'
 import { meldeAllesAbNichtIch } from '@/server/actions/geraete'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
+import { KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
 
 /*
  * Die Seite „Das war ich nicht" nach Mockup system-h1-angemeldete-geraete
  * (Schritte 5 und 6): vorher Knopf, nachher „Alle Geräte sind abgemeldet".
  * Texte aus src/lib/geraete.ts. Abgemeldet wird nur über den Knopf (POST).
+ *
+ * Seit Lauf 30 (Boards s2/w2-systemseiten, V52, N42 b): Die Seite steht in der
+ * KundeShell und nimmt deren Farbe — grün, auch wenn ein Hof den Link öffnet
+ * (vorher Knopf und Schild orange). Karte auf der Fläche; das Ergebnis als
+ * grüne Karte. Fehler bleiben orange (V17).
  */
+const KARTE = 'flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 md:p-6'
+const KARTE_GRUEN = 'flex flex-col gap-4 rounded-2xl border border-accent/45 bg-accent/12 p-5 md:p-6'
 
 const TITEL = 'font-heading text-[26px] leading-tight font-semibold outline-none'
 const SATZ = 'text-[14.5px] leading-relaxed text-muted-foreground'
@@ -62,7 +69,7 @@ export function NichtIchKarte({
 
   if (stand !== 'offen' && stand !== 'ungueltig') {
     return (
-      <section aria-labelledby="nicht-ich-titel" className="flex flex-col gap-4">
+      <section aria-labelledby="nicht-ich-titel" className={KARTE_GRUEN}>
         <span className="flex size-11 items-center justify-center rounded-full bg-accent text-accent-foreground">
           <Check className="size-5" strokeWidth={2.2} aria-hidden="true" />
         </span>
@@ -71,7 +78,7 @@ export function NichtIchKarte({
         </h1>
         {/* Admin mit Passkey (Register N20): kein Link für ein neues Passwort, eigener Satz. */}
         <p className={SATZ}>{stand.passkey ? NICHT_ICH_TEXT.fertigPasskey : stand.passwortMail ? NICHT_ICH_TEXT.fertigSatz : NICHT_ICH_TEXT.fertigOhneMail}</p>
-        <div className="flex gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] leading-relaxed text-muted-foreground">
+        <div className="flex gap-2.5 text-[13px] leading-relaxed text-muted-foreground">
           <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
           <p>
             {NICHT_ICH_TEXT.fertigHinweis} „
@@ -88,10 +95,7 @@ export function NichtIchKarte({
   if (stand === 'ungueltig' || token === null) return <NichtIchUngueltig ueberschrift={ueberschrift} />
 
   return (
-    <section aria-labelledby="nicht-ich-titel" className="flex flex-col gap-4">
-      <span className="flex size-11 items-center justify-center rounded-xl border border-primary/45 bg-primary/12 text-status-offen">
-        <ShieldAlert className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      </span>
+    <section aria-labelledby="nicht-ich-titel" className={KARTE}>
       <h1 id="nicht-ich-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
         {NICHT_ICH_TEXT.titel}
       </h1>
@@ -107,7 +111,7 @@ export function NichtIchKarte({
           {fehler}
         </p>
       )}
-      <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_ORANGE, 'h-12 w-full disabled:opacity-60')}>
+      <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px] disabled:opacity-60')}>
         {laeuft ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />}
         {laeuft ? GERAETE_TEXT.einenMoment : NICHT_ICH_TEXT.knopf}
       </button>
@@ -121,8 +125,8 @@ export function NichtIchKarte({
 
 function NichtIchUngueltig({ ueberschrift }: { ueberschrift?: React.Ref<HTMLHeadingElement> }): React.JSX.Element {
   return (
-    <section aria-labelledby="nicht-ich-titel" className="flex flex-col gap-4">
-      <TriangleAlert className="size-8 text-status-offen" strokeWidth={1.6} aria-hidden="true" />
+    <section aria-labelledby="nicht-ich-titel" className={KARTE}>
+      <TriangleAlert className="size-8 text-muted-foreground" strokeWidth={1.6} aria-hidden="true" />
       <h1 id="nicht-ich-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
         {NICHT_ICH_TEXT.ungueltigTitel}
       </h1>

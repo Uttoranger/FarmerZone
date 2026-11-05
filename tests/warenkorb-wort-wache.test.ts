@@ -70,6 +70,7 @@ const BESTAND: { datei: string; text: RegExp; grund: string }[] = [
   { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: /^Im Korb$/, grund: 'Aufschrift desselben Knopfs, wenn alles im Warenkorb liegt' },
   { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: /^In den Korb$/, grund: 'Aufschrift desselben Knopfs' },
   { datei: 'src/lib/hofseite-kunde.ts', text: /^in den Korb$/, grund: 'Name des Plus-Knopfs in „Aktuell vom Hof“ (aria-label, Vorlage mit dem Produktnamen)' },
+  { datei: 'src/lib/notbremse.ts', text: /^– als Band über jeder Hofseite und in der Kasse, „In den Korb“ ist aus\.$/, grund: 'zitiert den Knopf „In den Korb“ im Notbremse-Dialog des Admins (V21, Board w3-admin-heute Bild 4; Nr. 229)' },
 ]
 
 function alleFunde(): Fund[] {

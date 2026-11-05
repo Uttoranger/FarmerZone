@@ -326,10 +326,10 @@ export function VerkaufFormular({
           </button>
         </fieldset>
 
-        {/* Was? — freiwillig */}
+        {/* Was hast du verkauft? — optional (Board s2/w2-verkaeufe) */}
         <fieldset className="min-w-0">
           <legend className="mb-2 text-sm font-semibold text-foreground">
-            Was? <span className="font-normal text-muted-foreground">— freiwillig</span>
+            Was hast du verkauft? <span className="font-normal text-muted-foreground">(optional)</span>
           </legend>
           <div className="flex flex-wrap gap-2">
             {chips.map((p) => {

@@ -1,0 +1,99 @@
+# Zeitbuch Lauf 30 (4.11.2026, Cloud-Sitzung Linux)
+
+Vom Dirigenten geführt (freigabe.md §34). Rechner: **4 Kerne**, 15 GB (Cloud-Container). Typecheck mit `NODE_OPTIONS=--max-old-space-size=6144`.
+
+## Dirigent
+
+- Start auf `docs/lauf30` (aus origin/docs/lauf30, Spitze f179cabc; darunter 6ce5aa98 Mockups, Basis main 056a321e). Auftragsdatei docs/nachtlauf/auftrag-lauf30.md ganz gelesen (859 Zeilen, endet mit Hinweis 10).
+- Mockup-Prüfung: 304 Namen gleich der Soll-Liste (aus der Freigabe per Skript gezogen), LISTE.txt gleich; Skripte nur support.js und text/x-dc; externe Verweise nur Google Fonts; Adressen nur beispiel.at (mit Subdomains) und agrilo.at.
+- Postgres 16 im Container gestartet (localhost).
+- agent-browser: `pnpm add -g agent-browser` und `pnpm add -g agent-browser@0.39.1` von der Rechteprüfung der Sitzung abgelehnt („Code from External“) → **STOPP nach Hinweis 6**. Keine Nummer gestartet, keine Regel-Inventur.
+- Stripe: Produktion Kasse `testbetrieb: true` (Vercel, lesend).
+- Stand-Lauf auf f179cabc (eigener Worktree): `pnpm install --frozen-lockfile` grün, `prisma generate`, Telefonnummern-Wache grün (12 Tests), dann voller Lauf.
+- Alte Worktrees aus Lauf 29 entfernt (alle sauber, PRs gemergt).
+- Doku-Umsetzer (Sonnet): Commit 51f59f2c – Freigabe §34 und Ergänzung byte-gleich (diff), Mockup-Index, N41–N44, Warteschlange, Status; Doku-Wachen grün.
+- Morgenbericht und Zeitbuch; voller Lauf auf dem Doku-Stand vor dem Push.
+
+## Dirigent (Neustart 4.11.2026)
+
+- 20:01 agent-browser 0.39.1 vorhanden (`/opt/node22/bin/agent-browser`); env-manager: `has_init_script: true`, `session_mode: new`. Bild einer lokalen Seite (python http.server, localhost:4599) gelungen.
+- `git fetch origin main docs/lauf30`: main unverändert 056a321e; #449 offen (Spitze d89e38d5) → Lauf stapelt auf `origin/docs/lauf30`.
+- Postgres 16 gestartet (localhost).
+- Stand: `pnpm install --frozen-lockfile` grün (14 s); `prisma generate`; Typecheck grün (72 s); Lint 0 Fehler, 2 Warnungen (67 s); voller Lauf 660 Dateien, 12209 Tests grün (3 Worker, 212 s, n=1).
+- Regel-Inventur 30 (Sonnet, nur lesen): 16 Vorschläge.
+- 20:10 Umsetzer 219 (Opus) gestartet von docs/lauf30; 20:52 fertig: 871e884 (voller Lauf 661 Dateien, 12281 Tests, 2 Worker; erster voller Lauf rot nur an ladeansichten, behoben). Bilder 20 Stück (Vorschau /intern/bausteine nur mit lokal ausgesetzter Admin-Wache, nicht committet).
+- Entscheidung: Rücktritts-Wörter in admin-aufgaben.ts stellt 221 um (Datei in 221-Grenze); WIDERRUF_ADMIN_TEXT in widerruf.ts stellt 231 um (Datei in 231-Grenze, nur Wörter, N43 (1)/(2) bleiben).
+- tester und pruefer (gezielt) für 219 gleichzeitig gestartet.
+- 219 tester gezielt grün (typecheck; 9 Wachen 263 Tests; related 149 Dateien 2659 Tests). pruefer gezielt: 2 Blocker (Ausnahme „Vertrag widerrufen“ deckt auch den Titel; Lesart 221.ts) → Runde 1 für Blocker 1 und zwei Sollte in wortliste.test.ts; Lesart 221.ts vom Dirigenten entschieden (Datei bleibt, nötig für grüne Wache, 221 löscht sie).
+- 219 Runde 1 → 61d0dae (voller Lauf 661 Dateien, 12282 Tests); Nachprüfung pruefer ohne Befund. → #450 gegen docs/lauf30.
+- Zwischenstand integration/lauf30 = docs/lauf30 + 219 (9bd25a9, Baum gleich 61d0dae, daher kein zweiter voller Lauf), gepusht.
+- Welle 2: 220 und 221 gestartet vom Zwischenstand.
+- Aufträge Welle 3 vorbereitet (Lesemappe je Nummer, Abweichungs-Sätze per Skript). Entscheidungen: anlass-woerter-wache → 225; WIDERRUF_ADMIN_TEXT → 231; admin-Komponenten je Seite getrennt 229/230.
+- CI #450 (219): ci und integration grün (21:13).
+- 221: 76d76b2 (voller Lauf 664 Dateien, 12328 Tests, 1 Worker; Integration ganz 94 Dateien, 776 Tests; Regel 3 ohne Unterschied). tester und pruefer (voll) gestartet. Grenz-Erweiterungen für Nacharbeit-Dateien: fuer-hoefe.ts/startseite-Frage → 226, geld-abgleich.ts → 230, wochenlage.ts → 232; kasse.ts SERVICEGEBUEHR_ZUSATZ bleibt Nacharbeit.
+- 221 pruefer voll: 1 Blocker (Wort-Parameter fallen ohne Wort auf Servicegebühr zurück, Wache sieht es nicht) → Runde 1 gestartet. 220: 4575a05 (voller Lauf 662 Dateien, 12313 Tests, 1 Worker); tester und pruefer gezielt gestartet.
+- 221 tester gezielt grün (related 430 Dateien, 8396 Tests; Geld-Tests unverändert; prisma/ unverändert).
+- 220 pruefer gezielt: keine Blocker, 4 Sollte (Nacharbeit; OFFEN_STATUS in hof-bestellungen.ts geht an 222).
+- 220 tester gezielt grün (related 322 Dateien, 5870 Tests; Wachen 108). → #451 gegen integration/lauf30. Lokal in den Zwischenstand gemergt (Baum gleich 220), Push nach dem PR von 221.
+- 221 Runde 1 → 4b80159 (voller Lauf 664 Dateien, 12332 Tests, 2 Worker; Integration berührte Bereiche 7 Dateien, 47 Tests). Nachprüfung pruefer gestartet. fuer-hoefe-abschnitte.tsx → 226.
+- 221 Nachprüfung: keine Blocker; 3 Sollte (FESTE_LISTE-Muster zu weit für servicegebuehr-dialog und kasse.ts, Kommentargrenze Komponenten) → Nacharbeit, Dialog-Eintrag an 229.
+- Zwischenstand + 221 (cab6ef3; Konflikt nur DEVELOPMENT.md, beide Einträge behalten; BAUSTEINE.md mit pnpm bausteine neu). Voller Lauf gestartet.
+- Zwischenstand cab6ef3: voller Lauf 665 Dateien, 12363 Tests (3 Worker, n=1); Integration ganz 94 Dateien, 776 Tests (408 s). Gepusht. Welle 3: 227, 222, 226 gestartet.
+- 226: 56b0fad (voller Lauf 666 Dateien, 12372 Tests, 2 Worker); tester und pruefer gezielt gestartet. 232 gestartet (freier Platz). Offen aus 226: Hofkarten der Startseite (pausiert, Preise) brauchen startseite.ts → Nacharbeit.
+- 226 tester gezielt grün (related 53 Dateien, 962 Tests; Wachen 65); pruefer gezielt: keine Blocker, 5 Sollte (Nacharbeit).
+- 222: fdc8b01 (voller Lauf 667 Dateien, 12383 Tests, 2 Worker; Integration 5 Dateien, 67 Tests). 231 gestartet.
+- 222 pruefer gezielt (nach Fristablauf nachgefordert): 2 Blocker (Begründungen der Mockup-Abweichungen fehlen im Bericht; zweite typgebundene Statusliste gegen N41 e) → Runde 1 mit Grenz-Erweiterung src/lib/<neu> + orders.ts Weitergabe; Prisma-Leser nach server/queries (Sollte).
+- 222 tester gezielt grün (related 314 Dateien, 5563 Tests; Geld-Tests nur Parameter/Fundort; server/api/prisma unverändert).
+- Container-Neustart (~23:47): Umsetzer 227 (WIP 555bb89 + 15 offene Dateien), 232 (61 offene Dateien, kein Commit), 231 (nichts), 222 Runde 1 (nichts) unterbrochen. Postgres neu gestartet.
+- Nach dem Neustart: 227 und 232 als Fortsetzung auf dem Stand im Worktree neu gestartet; 222 Runde 1 neu; 231 wartet auf freien Platz (höchstens drei Umsetzer).
+- 227: 7277fb8 (voller Lauf 667 Dateien, 12379 Tests, 1 Worker; Integration 7 Dateien, 50 Tests). tester und pruefer (voll) gestartet; 231 gestartet.
+- 227 tester gezielt grün (related 56 Dateien, 1114 Tests; Kasse/Gebühr 18 Dateien, 340 Tests); einzig kaufknopf-saetze.test.ts geändert (Mindestbestellwert-Erwartung auf A3, wie erlaubt).
+- 227 pruefer voll: keine Blocker, 5 Sollte (Hauptaktion bei 'keine', ETIKETT doppelt, Einzelpreis in KorbKarte → Offen für Recht, KORB_GEAENDERT_TITEL, Betrag in Meine Bestellungen). → PR.
+- 232: f69b135 (voller Lauf 666 Dateien, 12609 Tests, 1 Worker; Integration ganz 94 Dateien, 776 Tests; 90 Mail-Bilder). tester und pruefer (voll) gestartet; 229 gestartet.
+- 222 Runde 1 → b6dc39e (voller Lauf 667 Dateien, 12385 Tests, 1 Worker; Integration 3 Dateien, 33 Tests); neue Datei src/lib/bestellstatus-offen.ts, Leser nach server/queries/orders.ts. Nachprüfung gestartet; 230 gestartet.
+- 222 Nachprüfung: Blocker 2 behoben; Blocker 1 teilweise – neue Regel zu Pflichtkarten widerspricht Freigabe Nr. 45 → Runde 2 (Regel raus, Verhalten wie vor 222, Rückfrage im Bericht).
+- 232 tester gezielt grün (related 284 Dateien, 5097 Tests; Wachen 349); pruefer voll: keine Blocker, 5 Sollte (im PR-Text). → PR.
+- 222 Runde 2 → c48ea6d (voller Lauf 667 Dateien, 12385 Tests, 2 Worker); Dirigent prüft den Rundendiff: Regel zurück auf den Stand vor 222 (Nr. 45), Code der Pflichtkarten unverändert, Rückfrage im Bericht. → PR.
+- 230: d624ee2 (voller Lauf 666 Dateien, 12381 Tests, 2 Worker; Integration 3 Dateien, 16 Tests). tester und pruefer gezielt gestartet; 224 gestartet.
+- 230 tester gezielt grün (related 17 Dateien, 350 Tests; 226 Tests gezielt). pruefer: 1 Blocker (neutrales Wort „Gebühr“ in geld-abgleich.ts gegen V62/V63) → Runde 1: zurücknehmen, NACHARBEIT-Liste (braucht gebuehrModell in der Abfrage).
+- 229: 7c9c043 (voller Lauf 666 Dateien, 12381 Tests, 2 Worker; Integration 3 Dateien, 17 Tests); außerhalb der Grenze: admin-bestellungen.ts (+gebuehrModell im select), notbremse.ts (V21) – vom Dirigenten angenommen, je eigener Commit. Hinweis „Widerrufe“-Mehrzahl an 231. 223 gestartet.
+- Hinweis: Mit 223 liefen kurz vier Umsetzer gleichzeitig (224, 231, 230 Runde 1, 223) – Abweichung von „höchstens drei“; 225 und 228 starten erst, wenn zwei fertig sind.
+- 229 tester gezielt grün (related 308 Dateien, 5311 Tests; 104 gezielt); pruefer voll: keine Blocker, 6 Sollte (Nacharbeit; Entscheidung Wort der Geld-Kachel Abholung vs. createdAt). → PR.
+- Fehler des Dirigenten: Hinweis „Widerrufe“ ging an den alten 231-Umsetzer (vor dem Neustart), der dadurch wieder lief; gestoppt, neuer 231-Umsetzer über den uncommitteten Stand informiert.
+- 231: a4fadde (voller Lauf 667 Dateien, 12382 Tests, 1 Worker; erster Lauf Exit 144 ohne Ausgabe, vermutlich durch den kurz geweckten alten Umsetzer; Integration widerruf 12 Tests). tester und pruefer (voll) gestartet.
+- 231 pruefer voll: keine Blocker; Sollte: Offen für Recht vollständig in den PR-Text (Dirigent); Altlast aus 221: Konditionen-Wortlaut (konditionen.ts ~472–481) weicht von Auftrag Z. 354 ab (Klammer, „Agrilo zieht“/„wir ziehen“) → Morgenbericht.
+- 230 Runde 1 → 3dde366 (voller Lauf 666 Dateien, 12381 Tests, 2 Worker; dritter Versuch grün – zweiter rot an Zeitgrenze mail-wege-wache 5 s unter Last (4,9 s allein), Nacharbeit). Nachprüfung gestartet; 225 gestartet.
+- 231 tester grün (typecheck, lint 0 Fehler, related 322 Dateien 5651 Tests, Wachen 75; Rechtsdateien gegen main ohne Diff). → PR.
+- 230 Nachprüfung: keine Blocker. → PR.
+- 224: d53001d (voller Lauf 666 Dateien, 12373 Tests, 1 Worker; Integration 4 Dateien, 22 Tests). tester und pruefer gezielt gestartet; 228 gestartet.
+- Sammelstand: + 227 (86158c65, Baum gleich 227) · + 222 (da749975, Konflikt nur DEVELOPMENT.md, beide behalten; BAUSTEINE.md neu) – voller Lauf gestartet.
+- 224 pruefer gezielt: 3 Blocker (Rechenbeispiel bar bei Gründungshof/Überweisung, Datum Gründungssatz vs. einzugAb, Fehlerfall Konditionen-Seite) → Runde 1.
+- Hinweis: Mit 224 Runde 1 laufen wieder vier Umsetzer gleichzeitig (223, 225, 228, 224 R1) – Abweichung von „höchstens drei“.
+- 224 tester: rot in hof-einstellungen-lauf30.test.ts (8 Tests) – lief gleichzeitig mit der Runde 1 im selben Worktree auf uncommitteten Änderungen (Signatur geändert, Test noch nicht nachgezogen); Ergebnis nicht verwertbar, Runde 1 prüft mit vollem Lauf.
+- Voller Lauf nach + 222: 669 Dateien, 1 rot (mail-wege-wache: Zeitgrenze 5 s unter Last, allein grün 2,4 s), 12400 grün – wiederholt mit dem nächsten Merge.
+- Voller Lauf nach + 226 (099583ad): 670 Dateien, 4 rot (bild-format Laufzeit 587/948 ms > 500, geld-fliesskomma-Gegenprobe 30-s-Zeitgrenze, password-reset 5-s-Zeitgrenze) – alle zeitbedingt bei Last 12–15 auf 4 Kernen; einzeln geld-fliesskomma und password-reset grün, bild-format auch einzeln unter Last rot. Sammel-Merges pausiert bis die Umsetzer fertig sind; volle Läufe dann auf ruhigem Rechner.
+- 223: fb58e314 (voller Lauf 666 Dateien, 12375 Tests, 1 Worker; keine Integration nötig). tester und pruefer gezielt gestartet.
+- 223 pruefer gezielt: 2 Blocker (N25 verlangt „Dazu“ und „Ausverkauft“ im Vorrat-Blatt – Register vor Board; Vorrat-0 orange statt neutral). Runde 1 erst nach dem tester (Lehre aus 224).
+- 223 tester gezielt grün (related 39 Dateien, 722 Tests; Wachen 90; server/prisma unberührt). Runde 1 gestartet (N25 vor Board, Vorrat-0 neutral).
+- 224 Runde 1 → 0e9370de (voller Lauf 667 Dateien, 12382 Tests, 1 Worker; Integration 3 Dateien, 16 Tests). Nachprüfung gestartet.
+- 224 Nachprüfung: Runde-1-Blocker behoben; neuer Blocker: Einzugstag vs. Vortag an zwei Stellen derselben Seite → Runde 2 (eine Quelle: Einzugstag wie bestehende Karte).
+- 225: 35168a00 (voller Lauf 665 Dateien, 12364 Tests, 2 Worker; Integration 2 Dateien, 18 Tests). tester und pruefer gezielt gestartet.
+- 225 pruefer gezielt: keine Blocker, 9 Sollte (u. a. Gründungshof-Satz in der Auswertung für alle Höfe; Doku-Sätze zu Problem melden als Regel statt offen).
+- 223 Runde 1 → 3a0143be (voller Lauf 666 Dateien, 12377 Tests, 1 Worker, 825 s). Nachprüfung gestartet.
+- 223 Nachprüfung: keine Blocker. → PR.
+- 225 tester gezielt grün (related 315 Dateien, 5588 Tests; Wachen 87). → PR. 228: 766be039 (voller Lauf 665 Dateien, 12380 Tests, 1 Worker; Integration 4 Dateien, 57 Tests). tester und pruefer gestartet.
+- 228 pruefer gezielt: 1 Blocker (N42 e Balken je Stand nur auf /onboarding; übrige Hof-Seiten brauchen (hof)/layout.tsx und server/hofbereich.ts – außerhalb jeder Grenze). Entscheidung Dirigent: keine Grenz-Erweiterung auf das Layout aller Hof-Seiten in dieser Nacht; als offen im PR und Morgenbericht, N42 e nicht vollständig.
+- 224 Runde 2 → fa7c0fd5 (voller Lauf 667 Dateien, 12384 Tests, 1 Worker; Integration 2 Dateien, 11 Tests); Dirigent prüft den Rundendiff: eine Quelle (Einzugstag), Test für denselben Tag in beiden Karten. → PR.
+- 228 tester gezielt grün (related 372 Dateien, 7113 Tests; Auth/Wachen 207; server/api/prisma unberührt). → PR.
+- Alle 14 Nummern als PR offen (#450–#463). Sammelstand auf ruhigem Rechner: + 226 erneut voll (670 Dateien, 12410 Tests grün) · + 232 (764c7b94; Konflikt DEVELOPMENT.md; 671 Dateien, 12656 Tests) · + 231 (4c4a6dd4; Konflikte DEVELOPMENT.md und drei Tests – 226 und 231 mockten beide ladeHofpreisEinstellung, zu einem Mock zusammengeführt (Stichtag 2099, Modell „bisher“); 673 Dateien, 12675 Tests).
+- + 229 (c1295ae8; Konflikte DEVELOPMENT.md, DESIGN_SYSTEM.md (je eigener Abschnitt) und gebuehr-wort-wache FESTE_LISTE (beide Anhänge behalten); 674 Dateien, 12693 Tests).
+- + 230 (48d93bc5; Konflikt NACHARBEIT der gebuehr-wort-wache: Eintrag fuer-hoefe-abschnitte (von 226 behoben) entfällt, geld-abgleich (230) bleibt; 675 Dateien, 12711 Tests).
+- + 224 (7119d7e5; Konflikte DEVELOPMENT.md, BAUSTEINE.md (neu erzeugt), FESTE_LISTE (beide Anhänge); 677 Dateien, 12732 Tests).
+- + 223 (3c9cae5a; Konflikt DEVELOPMENT.md; 678 Dateien, 12746 Tests).
+- + 225 (2a4f5689; Konflikte DEVELOPMENT.md, BAUSTEINE.md, DESIGN_SYSTEM.md; 678 Dateien, 12747 Tests).
+- + 228 (b8fb6dfd; Konflikt DEVELOPMENT.md; 678 Dateien, 12764 Tests).
+- Integration ganz auf dem Sammelstand b8fb6dfd: 94 Dateien, 777 Tests (400 s). Regel 3 auf frischer Wegwerf-DB `farmerzone_r30`: `migrate deploy` aller Migrationen, `migrate diff --exit-code` „No difference detected“; keine neue Migration im Lauf.
+- Beide Offen-Ordner (tests/wortliste-offen, tests/gebuehr-wort-offen) im Sammelstand leer und entfernt. Gegen main kein Diff in prisma/, src/app/api, Impressum, agb.ts, docs/recht, infoseite-stil.ts.
+- CI (ci, integration) grün auf #450–#463; Vorschauen gebaut.
+- Merge-Reihenfolge in den Sammelstand: docs/lauf30 → 219 → 220 → 221 (Zwischenstand) → 227 → 222 → 226 → 232 → 231 → 229 → 230 → 224 → 223 → 225 → 228.
+- Ein Container-Neustart (siehe oben); Umsetzer auf dem gesicherten Stand fortgesetzt.

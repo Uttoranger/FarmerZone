@@ -273,3 +273,38 @@ describe('Stripe live ohne Hofpreis-Modell (Nr. 201, N40): Aufgabe und Betriebsl
     expect(vi.mocked(lesePlattformEinstellung)).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag“ für Heute (Lauf 30, Nr. 229; V63):
+ * Die Geld-Kachel nimmt das Wort der Woche — gebuehrWortFuerZeitraum(Wochenbeginn, jetzt,
+ * Stichtag). Gegenprobe: vor dem Stichtag steht „Servicegebühr“ (erster Fall oben), über
+ * den Stichtag hinweg „Gebühren“.
+ */
+describe('Gebühren-Wort der Geld-Kachel (Nr. 229, V63)', () => {
+  const mitStichtag = (stichtag: Date | null) =>
+    vi.mocked(lesePlattformEinstellung).mockResolvedValue({ hofpreisModellAb: stichtag ? stichtag.toISOString() : null } as Awaited<ReturnType<typeof lesePlattformEinstellung>>)
+
+  it('ganz nach dem Stichtag: „Plattformgebühr € 92,00“ und nirgends „Servicegebühr“', async () => {
+    mitStichtag(new Date('2026-10-01T00:00:00.000Z'))
+    const html = await seite()
+    expect(html).toMatch(/Plattformgebühr € 92,00/)
+    expect(html).not.toContain('Servicegebühr')
+  })
+
+  it('der Stichtag mitten in der Woche: „Gebühren € 92,00“', async () => {
+    mitStichtag(new Date(JETZT.getTime() - STUNDE))
+    const html = await seite()
+    expect(html).toMatch(/Gebühren € 92,00/)
+    expect(html).not.toContain('Servicegebühr')
+  })
+
+  it('Gegenprobe: ohne Stichtag in der Zeile (Vorgabe 1.2.2027) bleibt „Servicegebühr € 92,00“', async () => {
+    mitStichtag(null)
+    expect(await seite()).toMatch(/Servicegebühr € 92,00/)
+  })
+
+  it('„Läuft von selbst“ trägt „heute · n von m pünktlich“ (Board w3-admin-heute)', async () => {
+    mitStichtag(null)
+    expect(await seite()).toMatch(/heute · \d+ von \d+ pünktlich/)
+  })
+})

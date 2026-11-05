@@ -29,5 +29,29 @@ export const BEITRAG_ANLASS: Record<BeitragAnlass, { wort: string; symbol: Lucid
   FRESH_PRODUCT: { wort: 'Frisches Produkt', symbol: Leaf },
   NEW_SEASON: { wort: 'Neue Saison', symbol: CalendarDays },
   PROMOTION: { wort: 'Aktion', symbol: Tag },
-  ANNOUNCEMENT: { wort: 'Mitteilung', symbol: MessageCircle },
+  // Register N42 c (Lauf 30, Nr. 225): das Etikett heißt „Hinweis“ – „Mitteilung“ steht in der Wortliste unter „nicht“; das Enum bleibt.
+  ANNOUNCEMENT: { wort: 'Hinweis', symbol: MessageCircle },
 }
+
+/**
+ * Sätze im Ablauf „Neuer Beitrag“ (Boards s2/w2-beitraege, Lauf 30, Nr. 225), die
+ * der Lauf geändert hat — Wortliste N42 c („Hofseite“ zusammen, „Neuigkeiten“ statt
+ * „E-Mail-Updates“, „die Kundin“ in Sätzen). Die Zahl der Tage zwischen zwei Mails
+ * kommt als Parameter aus `MAILABSTAND_TAGE` (beitrag-mailabstand.ts).
+ */
+export const BEITRAG_ABLAUF_TEXT = {
+  vorschauSchritt: 'Überprüfen und absenden',
+  anredeTipp: 'wird automatisch ersetzt. Auf der Hofseite steht die Anrede ohne Namen.',
+  hofseiteTitel: 'Auf meiner Hofseite anzeigen',
+  hofseiteSatz: 'Alle Besucher sehen es · für 7 Tage oben',
+  mailTitel: 'Per E-Mail an Abonnentinnen',
+  mailAbonniert: (anzahl: number, tage: number): string =>
+    `${anzahl} ${anzahl === 1 ? 'Kundin bekommt' : 'Kundinnen bekommen'} deine Neuigkeiten per E-Mail · einmal in ${tage} Tagen möglich`,
+  mailGesperrt: (vorTagen: number, tage: number): string =>
+    `Die letzte E-Mail ging vor ${vorTagen} ${vorTagen === 1 ? 'Tag' : 'Tagen'} raus · einmal in ${tage} Tagen möglich`,
+  mailKeine: 'Noch keine Abonnentinnen',
+  zustimmung:
+    'Nur Kundinnen, die selbst zugestimmt haben, bekommen E-Mail oder WhatsApp. WhatsApp verschickst du nach dem Veröffentlichen selbst – mit einem Tipp je Person.',
+  hofseiteZusammenfassung: 'Auf deiner Hofseite für 7 Tage oben',
+  veroeffentlichtHofseite: 'auf der Hofseite',
+} as const

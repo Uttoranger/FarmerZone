@@ -177,7 +177,7 @@ export const POSTFACH_TEXT = {
   ungelesenSr: 'ungelesen',
   /** Wofür die Zahl an „Postfach" zählt (Screenreader, HofShell). */
   zaehler: 'ungelesene Nachrichten',
-  erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Du kannst auf jede Nachricht antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „${PROBLEM_MELDEN}“.`,
+  erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Auf die meisten Nachrichten kannst du antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „${PROBLEM_MELDEN}“.`,
   antwortFeld: 'Antwort an das Team …',
   antwortBeschriftung: 'Deine Antwort',
   antwortHinweis: `Deine Antwort geht nur an das ${MARKE_TEAM}.`,
@@ -760,7 +760,8 @@ export const EINGANG_TEXT = {
     'Freischalten stellt den Hof online, vergibt den Gründungsplatz, solange einer frei ist, und schickt ihm die Zusage. Ablehnen löscht den wartenden Hof samt Konto – das geht nur ohne Bestellungen. Die Aufgabe verschwindet aus dem Eingang, sobald du entschieden hast.',
   erstattungKopf: (nummer: string) => `Erstattung offen – Bestellung ${nummer}`,
   offenSeit: (hof: string, datum: string) => `${hof} · offen seit ${datum}`,
-  bezahlt: 'Online bezahlt (Waren und Servicegebühr)',
+  // Ohne Wort des Modells (V62, Nr. 225): der Eingang kennt das Modell der Bestellung nicht, „Gebühr“ stimmt für beide.
+  bezahlt: 'Online bezahlt (Waren und Gebühr)',
   schonErstattet: 'Davon schon erstattet',
   /** Der Eingang rechnet nicht nach: Was offen ist und was zu tun ist, steht nur in der Mail (Betreff = erstattungKopf). */
   erstattungMail: (betreff: string) =>

@@ -89,6 +89,8 @@ const DETAIL_FELDER = {
   status: true,
   totalAmount: true,
   serviceFeeCents: true,
+  // Das Modell der Bestellung (null = bisher): Wort der Gebühr im Detail über gebuehrBezeichnungFuer (V63, Nr. 229).
+  gebuehrModell: true,
   erstattetCents: true,
   pickupDate: true,
   pickupTimeStart: true,

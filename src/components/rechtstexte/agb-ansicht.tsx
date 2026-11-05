@@ -1,7 +1,4 @@
-import { Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK } from '@/components/shared/infoseite-stil'
 import { AgbStuecke } from '@/components/rechtstexte/agb-stuecke'
@@ -16,7 +13,7 @@ import {
   type AgbPunkt,
   type AgbTeil,
 } from '@/lib/rechtstexte/agb'
-import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
+import { RECHTSTEXT_TEXT, type RechtstextVerzeichnisDaten } from '@/components/shared/rechtstext-vorlage'
 
 /*
  * Die Teile der Seite /agb (Register O4), gezeichnet aus den Daten in
@@ -24,9 +21,15 @@ import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
  * Fließtext leise, Überschriften in Fraunces, Links grün und unterstrichen.
  * Jede Überschrift trägt eine Sprungmarke und einen Abstand nach oben
  * (scroll-mt), damit die klebende Kopfzeile sie beim Springen nicht verdeckt.
+ * Seit Nr. 231 steht die Seite in der Vorlage der Rechtsseiten
+ * (src/components/shared/rechtstext-vorlage.tsx); das Verzeichnis zeichnet
+ * die Vorlage, hier stehen nur seine Sprünge (`agbVerzeichnis`).
  */
 
 const STUECKE = { linkKlasse: INFOSEITE_LINK } as const
+
+/** Die Sprungmarke von „Kurz erklärt“ — Überschrift und Verzeichnis nehmen dieselbe. */
+const KURZ_ERKLAERT_ANKER = 'kurz-erklaert'
 
 function Block({ block }: { block: AgbBlock }): React.JSX.Element {
   switch (block.art) {
@@ -140,14 +143,14 @@ export function AnhangAbschnitt(): React.JSX.Element {
 
 /**
  * „Kurz erklärt": die Einleitung über den AGB, ausdrücklich kein Teil von
- * ihnen. Eine grüne Hinweiskarte, damit sie sich vom Vertragstext abhebt.
+ * ihnen. Eine Karte auf der Fläche, damit sie sich vom Vertragstext abhebt
+ * (seit Nr. 231 nach Board w3-rechtstexte Bild 1 statt der grünen Hinweiskarte).
  */
 export function KurzErklaert(): React.JSX.Element {
   return (
-    <section aria-labelledby="kurz-erklaert">
-      <Hinweiskarte ton="gruen" symbol={Info}>
-        <h2 id="kurz-erklaert" className="scroll-mt-20 font-heading text-[16px] font-semibold">
-          {AGB_KURZ_ERKLAERT.titel} <span className="font-sans text-[13.5px] font-normal">({AGB_KURZ_ERKLAERT.zusatz})</span>
+    <section aria-labelledby={KURZ_ERKLAERT_ANKER} className="rounded-2xl border border-border bg-card px-4 py-3.5 text-[14px] text-foreground">
+        <h2 id={KURZ_ERKLAERT_ANKER} className="scroll-mt-20 font-heading text-[16px] font-semibold text-foreground">
+          {AGB_KURZ_ERKLAERT.titel} <span className="font-sans text-[12.5px] font-normal text-muted-foreground">({AGB_KURZ_ERKLAERT.zusatz})</span>
         </h2>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-muted-foreground">
           {AGB_KURZ_ERKLAERT.punkte.map((stuecke, i) => (
@@ -156,46 +159,28 @@ export function KurzErklaert(): React.JSX.Element {
             </li>
           ))}
         </ul>
-      </Hinweiskarte>
     </section>
   )
 }
 
-const VERZEICHNIS_LINK = cn(
-  'flex min-h-11 items-baseline gap-2 rounded-md py-2.5 text-[14px] leading-snug text-foreground hover:text-brand-text',
-  FOKUS_RAHMEN
-)
-
 /**
- * Das Inhaltsverzeichnis: ein Sprung je Punkt, nach Teilen gruppiert, und der
- * Anhang. Auf dem Papier fehlt es (print:hidden) — dort steht der Text fortlaufend.
+ * Das Inhaltsverzeichnis der AGB für die Vorlage der Rechtsseiten
+ * (`RechtstextVorlage`, Nr. 231): zuerst „Kurz erklärt“, dann ein Sprung je
+ * Punkt, nach Teilen gruppiert, zuletzt der Anhang. Nur der Rahmen — Titel
+ * und Nummern kommen unverändert aus src/lib/rechtstexte/agb.ts.
  */
-export function InhaltsVerzeichnis(): React.JSX.Element {
-  return (
-    <nav aria-labelledby="agb-inhalt" className="print:hidden">
-      <h2 id="agb-inhalt" className={INFOSEITE_ABSCHNITT}>
-        {AGB_SEITE_TEXT.inhalt}
-      </h2>
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card px-4 py-3.5">
-        {AGB_TEILE.map((teil) => (
-          <div key={teil.id}>
-            <p className="text-[13px] font-semibold text-foreground">{teil.titel}</p>
-            <ol role="list" className="list-none sm:columns-2 sm:gap-x-8">
-              {teil.punkte.map((punkt) => (
-                <li key={punkt.nummer} className="break-inside-avoid">
-                  <a href={`#${agbAnker(punkt.nummer)}`} className={VERZEICHNIS_LINK}>
-                    <span className="w-6 shrink-0 text-right text-muted-foreground tabular-nums">{punkt.nummer}.</span>
-                    <span>{punkt.titel}</span>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </div>
-        ))}
-        <a href={`#${AGB_ANHANG_ANKER}`} className={cn(VERZEICHNIS_LINK, 'font-semibold')}>
-          {AGB_ANHANG.titel}
-        </a>
-      </div>
-    </nav>
-  )
+export function agbVerzeichnis(): RechtstextVerzeichnisDaten {
+  const punkte = AGB_TEILE.reduce((summe, teil) => summe + teil.punkte.length, 0)
+  return {
+    kennung: 'agb-inhalt',
+    zusammenfassung: RECHTSTEXT_TEXT.teileUndPunkte(AGB_TEILE.length, punkte, true),
+    gruppen: [
+      { eintraege: [{ anker: KURZ_ERKLAERT_ANKER, text: AGB_KURZ_ERKLAERT.titel }] },
+      ...AGB_TEILE.map((teil) => ({
+        titel: teil.titel,
+        eintraege: teil.punkte.map((punkt) => ({ anker: agbAnker(punkt.nummer), text: punkt.titel, nummer: punkt.nummer })),
+      })),
+      { eintraege: [{ anker: AGB_ANHANG_ANKER, text: AGB_ANHANG.titel }], betont: true },
+    ],
+  }
 }

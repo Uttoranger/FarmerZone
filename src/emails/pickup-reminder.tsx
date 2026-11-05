@@ -32,7 +32,7 @@ export interface OrderReadyProps {
 export function OrderReadyEmail(p: OrderReadyProps) {
   const anrufen = telefonLink(p.farmPhone)
   return (
-    <EmailLayout previewText={`Deine Bestellung bei ${p.farmName} liegt bereit`}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Deine Bestellung bei ${p.farmName} liegt bereit`}>
       <Text style={h1}>Deine Bestellung liegt bereit</Text>
       <Text style={bodyText}>
         Deine Bestellung <strong>{p.orderNumber}</strong> liegt bei {p.farmName} für dich bereit –{' '}

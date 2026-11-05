@@ -26,7 +26,12 @@ vi.mock('next/image', () => ({
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => '/register' }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
+// Seit Nr. 226 (/fuer-hoefe) und Nr. 231 (/konditionen) lesen die Seiten den Stichtag „Hofpreis-Modell ab“ —
+// hier weit weg, also Modell „bisher“ (Zusammenführung im Sammel-PR Lauf 30).
+vi.mock('@/server/queries/plattform-einstellung', () => ({
+  gruendungFuerSeiten: async () => null,
+  ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: new Date('2099-01-01T00:00:00Z') }),
+}))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
@@ -50,6 +55,9 @@ import {
   TARIFE_AB_TEXT,
 } from '@/lib/konditionen'
 import { FUER_HOEFE_SCHRITTE, REGISTRIEREN_SCHRITTE } from '@/lib/fuer-hoefe'
+
+/** Seit Nr. 231 asynchron (Stichtag „Hofpreis-Modell ab“) — einmal aufgelöst, dann gerendert. */
+const KONDITIONEN_SEITE = await KonditionenPage()
 
 const WORTLAUT =
   'In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027. ' +
@@ -155,7 +163,7 @@ describe('Die Seiten zeigen den Satz', () => {
   })
 
   it('/konditionen — über den Tarifen, Metadaten mit dem Datum', () => {
-    const html = renderToStaticMarkup(createElement(KonditionenPage))
+    const html = renderToStaticMarkup(KONDITIONEN_SEITE)
     expect(html).toContain(satz)
     expect(html.indexOf(satz)).toBeLessThan(html.indexOf('Hoftor'))
     expect(konditionenMeta.description).toContain(TARIFE_AB_TEXT)
@@ -183,6 +191,7 @@ describe('Die Seiten zeigen den Satz', () => {
           },
         }),
         vorname: 'Max',
+        gebuehrModell: 'bisher',
         person: { name: 'Max Mustermann', email: 'max@example.com' },
         tarif: null,
         freigeschaltet: false,
@@ -192,11 +201,13 @@ describe('Die Seiten zeigen den Satz', () => {
   })
 
   it('Admin-Freischaltung — der Hinweis kommt aus konditionen.ts und steht im Freischalten-Dialog', () => {
-    // Seit Nr. 22f steht die Rückfrage in der AdminShell in einer eigenen Datei.
+    // Seit Nr. 22f steht die Rückfrage in der AdminShell in einer eigenen Datei. Seit Nr. 229 je Modell:
+    // konditionenDerzeit gibt vor dem Stichtag KONDITIONEN_DERZEIT (geprüft in tests/gebuehr-texte.test.ts),
+    // ab dem Stichtag den Satz nach N38 (tests/admin-gebuehr-wort.test.ts).
     const quelle = lies('src/components/admin/hof-aktion-dialog.tsx')
-    expect(quelle).toMatch(/import \{[^}]*KONDITIONEN_DERZEIT[^}]*\} from '@\/lib\/konditionen'/)
+    expect(quelle).toMatch(/import \{[^}]*konditionenDerzeit[^}]*\} from '@\/lib\/konditionen'/)
     // Zwischen dem Zweig „Freischalten" und dem Zweig „Zurücknehmen" des Dialogs.
-    const hinweis = quelle.indexOf('{KONDITIONEN_DERZEIT}')
+    const hinweis = quelle.indexOf('{konditionenDerzeit(gebuehrModell)}')
     expect(hinweis).toBeGreaterThan(quelle.indexOf("art === 'approve' ? ("))
     expect(hinweis).toBeLessThan(quelle.indexOf('Die Hofseite von'))
     // Die Gründungsplatz-Zusage bleibt im Dialog — seit Nr. 116 fertig vom Server (freischaltHinweis, mit den

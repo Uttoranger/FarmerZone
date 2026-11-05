@@ -46,9 +46,9 @@ import { umfeldLink, umfeldUmleitung } from '@/schemas/umfeld-filter'
 import UmfeldUmleitung from '@/app/(hof)/analytics/umfeld/page'
 import { RegionKopf } from '@/components/region/region-kopf'
 import { FutterKaufenAnsicht } from '@/components/region/futter-kaufen-ansicht'
-import { KennzahlenReihe, ServicegebuehrenKarte, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
+import { GebuehrenKarte, KennzahlenReihe, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
 import { baueFutterKaufen } from '@/lib/futter-kaufen'
-import { kennzahlen, servicegebuehrenSaetze, teilenKarte } from '@/lib/auswertung'
+import { PLATTFORMGEBUEHR_KARTE_BAR, PLATTFORMGEBUEHR_KARTE_ERKLAERUNG, gebuehrenKarteText, kennzahlen, teilenKarte } from '@/lib/auswertung'
 import { UMSATZ_TEXT } from '@/lib/umsatz'
 import { KENNZAHL_TEXT } from '@/lib/heute'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
@@ -141,10 +141,11 @@ describe('Routen und Navigation', () => {
     }
   })
 
-  it('Servicegebühren: keine Zahl, kein Datum, kein SEPA-Abschnitt im Quelltext der Karte', () => {
+  it('Gebühren-Karte: keine Zahl, kein Datum, kein SEPA-Abschnitt und kein Gebühren-Wort im Quelltext der Karte', () => {
     const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
-    const karte = teile.slice(teile.indexOf('export function ServicegebuehrenKarte'), teile.indexOf('// ─── Kanäle'))
-    expect(karte).not.toMatch(/2027|Februar|Lastschrift|SEPA|\d+ ?%/)
+    const karte = teile.slice(teile.indexOf('export function GebuehrenKarte'), teile.indexOf('// ─── Kanäle'))
+    expect(karte).toContain('{text.titel}')
+    expect(karte).not.toMatch(/2027|Februar|Lastschrift|SEPA|\d+ ?%|Servicegebühr|Plattformgebühr/)
   })
 })
 
@@ -245,15 +246,35 @@ describe('Karten im neuen Design', () => {
   it('Servicegebühren dieses Monats vor dem Stichtag: Summe, Bar-Ausnahme, keine Lastschrift', () => {
     const jetzt = new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 30 * 24 * 3600 * 1000)
     const html = renderToStaticMarkup(
-      createElement(ServicegebuehrenKarte, {
+      createElement(GebuehrenKarte, {
         monat: { monat: '2027-01', onlineCents: 153, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 153, bezeichnung: 'Jänner 2027' },
-        saetze: servicegebuehrenSaetze(jetzt),
+        text: gebuehrenKarteText('2027-01', { hofpreisModellAb: null }, jetzt),
       })
     )
     expect(html).toContain('Servicegebühren dieses Monats')
     expect(html).toContain('€ 1,53')
     expect(html).toContain(BAR_OHNE_GEBUEHR_SATZ)
-    expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt/)
+    expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt|Bar bei Abholung/)
+  })
+
+  // Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag“ (V62, V63; Lauf 30, Nr. 225): die Auswertung im Hofpreis-Modell.
+  it('Gebühren-Karte nach dem Stichtag: „Plattformgebühren dieses Monats“, nirgends „Servicegebühr“, Bar-Zeile mit Lastschrift', () => {
+    const stichtag = new Date('2027-02-01T00:00:00+01:00')
+    const jetzt = new Date('2027-03-03T10:00:00+01:00')
+    const html = renderToStaticMarkup(
+      createElement(GebuehrenKarte, {
+        monat: { monat: '2027-03', onlineCents: 4982, onlineAnzahl: 22, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 4982, bezeichnung: 'März 2027' },
+        text: gebuehrenKarteText('2027-03', { hofpreisModellAb: stichtag }, jetzt),
+      })
+    )
+    expect(html).toContain('Plattformgebühren dieses Monats')
+    expect(html).toContain('Bar bei Abholung (0 Bestellungen)')
+    expect(html).toContain(PLATTFORMGEBUEHR_KARTE_ERKLAERUNG)
+    expect(html).toContain(PLATTFORMGEBUEHR_KARTE_BAR)
+    expect(html).not.toMatch(/Servicegebühr/)
+    // Gegenprobe: im Monat des Stichtags (beide Modelle) heißt es „Gebühren“, davor wieder „Servicegebühren“.
+    expect(gebuehrenKarteText('2027-02', { hofpreisModellAb: new Date('2027-02-15T00:00:00+01:00') }, jetzt).titel).toBe('Gebühren dieses Monats')
+    expect(gebuehrenKarteText('2027-01', { hofpreisModellAb: stichtag }, new Date('2027-01-20T10:00:00+01:00')).titel).toBe('Servicegebühren dieses Monats')
   })
 
   it(`Kennzahl „Über ${MARKE}" zählt die abgeholten Bestellungen — kein „Warenumsatz" mehr (Nr. 53)`, () => {

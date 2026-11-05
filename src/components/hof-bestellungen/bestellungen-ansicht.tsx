@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarCheck, ChevronRight, Inbox, PartyPopper, Printer } from 'lucide-react'
+import { CalendarCheck, Inbox, PartyPopper, Printer } from 'lucide-react'
 import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/server/queries/orders'
 import type { HofWiderruf } from '@/server/widerruf'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
@@ -37,8 +37,17 @@ export function BestellungenAnsicht({
   detail,
   modus,
   widerrufe,
+  hofName,
+  barFrist = null,
+  naechsteAbholung = null,
 }: {
   seite: BestellungenSeite
+  /** Ohne Bestellungen steht der Hofname unter der Überschrift (Board s1-bestellungen, Bild 3). */
+  hofName: string
+  /** „Lukas hat noch nicht bestätigt …“ (bestaetigungOffenSatz, V87) für die gewählte Bestellung. */
+  barFrist?: string | null
+  /** „Heute abholen" leer: „Nächste Abholung: … · 2 Bestellungen" (naechsteAbholungSatz). */
+  naechsteAbholung?: string | null
   filter: HofBestellFilter
   detail: HofBestellDetail | null
   /** Offene Widerrufe der gewählten Bestellung (Nr. 200) — nur die Detailseite lädt sie. */
@@ -54,8 +63,9 @@ export function BestellungenAnsicht({
           <div className="flex items-end gap-3">
             <div className="min-w-0">
               <h1 className="font-heading text-2xl font-semibold md:text-[26px]">Bestellungen</h1>
-              <p className={cn('text-[13px] leading-normal', LEISE)}>{seite.kopfzeile}</p>
+              <p className={cn('text-[13px] leading-normal', LEISE)}>{seite.hatBestellungen ? seite.kopfzeile : hofName}</p>
             </div>
+            {seite.hatBestellungen && (
             <Link
               href="/orders/today/print"
               target="_blank"
@@ -67,6 +77,7 @@ export function BestellungenAnsicht({
                 Packliste drucken
               </span>
             </Link>
+            )}
           </div>
           <FilterChipReihe beschriftung="Bestellungen filtern">
             {seite.chips.map((chip) => (
@@ -80,11 +91,11 @@ export function BestellungenAnsicht({
         {/* In der Bestellung unter 1024 px kein Abstand oben: Dort beginnt die feste Leiste des Rückwegs am oberen Rand. */}
         <LadeInhalt className={cn('lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6', modus === 'liste' && 'mt-4')}>
           <div className={cn('lg:w-[320px] lg:shrink-0 xl:w-[420px] 2xl:w-[520px]', modus === 'detail' && 'hidden lg:block')}>
-            <BestellListe seite={seite} filter={filter} gewaehlt={detail?.id ?? null} nurBreit={modus === 'liste'} suche={suche} />
+            <BestellListe seite={seite} filter={filter} gewaehlt={detail?.id ?? null} nurBreit={modus === 'liste'} suche={suche} naechsteAbholung={naechsteAbholung} />
           </div>
           <div className={cn('min-w-0 flex-1', modus === 'liste' && 'hidden lg:block')}>
             {detail ? (
-              <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} widerrufe={widerrufe} />
+              <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} widerrufe={widerrufe} barFrist={barFrist} />
             ) : (
               seite.gruppen.length > 0 && (
                 <p className={cn(KARTE, 'px-5 py-8 text-center text-[13.5px]', LEISE)}>Wähle links eine Bestellung.</p>
@@ -103,15 +114,17 @@ function BestellListe({
   gewaehlt,
   nurBreit,
   suche,
+  naechsteAbholung,
 }: {
   seite: BestellungenSeite
   filter: HofBestellFilter
+  naechsteAbholung: string | null
   gewaehlt: string | null
   /** Auf /orders steht die gewählte Bestellung nur ab 1024 px daneben — am Handy ist nichts gewählt. */
   nurBreit: boolean
   suche: string
 }): React.JSX.Element {
-  if (seite.gruppen.length === 0) return <LeereListe seite={seite} filter={filter} />
+  if (seite.gruppen.length === 0) return <LeereListe seite={seite} filter={filter} naechsteAbholung={naechsteAbholung} />
   return (
     <div className="flex flex-col gap-5">
       {seite.gruppen.map((gruppe) => (
@@ -130,6 +143,11 @@ function BestellListe({
   )
 }
 
+/**
+ * Eine Zeile der Liste (Board s1-bestellungen): links Kundin, Positionen und Zahlart
+ * untereinander, rechts Betrag (was die Kundin zahlt) und die Marke als Schild.
+ * Die Bestellnummer steht in der Bestellung selbst.
+ */
 function ListenZeile({
   eintrag,
   href,
@@ -156,31 +174,31 @@ function ListenZeile({
       )}
     >
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-baseline gap-1.5">
-          <span className="truncate text-sm font-semibold">{eintrag.kunde}</span>
-          <span className={cn('shrink-0 text-[12.5px] font-medium', LEISE)}>· {eintrag.nummer}</span>
-        </span>
+        <span className="block truncate text-sm font-semibold">{eintrag.kunde}</span>
         <span className={cn('mt-0.5 block truncate text-[12.5px]', LEISE)}>{eintrag.positionen || 'Alle Artikel fehlen'}</span>
+        <span className={cn('block truncate text-[12.5px]', LEISE)}>{eintrag.zahlart}</span>
       </span>
-      <span className="flex shrink-0 flex-col items-end gap-1">
+      <span className="flex shrink-0 flex-col items-end gap-1.5">
         <span className="text-sm font-semibold tabular-nums">{formatEuro(centsAlsEuro(eintrag.gesamtCents))}</span>
-        <span className={cn('hidden text-[11.5px] sm:block lg:hidden xl:block', LEISE)}>{eintrag.zahlart}</span>
-        {/* Schmale Spalte (Handy, Liste neben der Bestellung bei 1024 px): Marke unter dem Betrag. */}
-        <Marke art={eintrag.marke.art} className="sm:hidden lg:inline-flex xl:hidden">
+        <Marke art={eintrag.marke.art} form="schild">
           {eintrag.marke.text}
         </Marke>
       </span>
-      <Marke art={eintrag.marke.art} className="hidden shrink-0 sm:inline-flex lg:hidden xl:inline-flex">
-        {eintrag.marke.text}
-      </Marke>
-      <ChevronRight className={cn('size-4 shrink-0 lg:hidden', LEISE)} strokeWidth={1.7} aria-hidden="true" />
       {/* Ohne Skelett auf /orders/[orderId] ist dieser Punkt die Rückmeldung, bis die Bestellung da ist (Nr. 127). */}
       <LadePunkt />
     </Link>
   )
 }
 
-function LeereListe({ seite, filter }: { seite: BestellungenSeite; filter: HofBestellFilter }): React.JSX.Element {
+function LeereListe({
+  seite,
+  filter,
+  naechsteAbholung,
+}: {
+  seite: BestellungenSeite
+  filter: HofBestellFilter
+  naechsteAbholung: string | null
+}): React.JSX.Element {
   if (!seite.hatBestellungen) {
     return (
       <EmptyState
@@ -215,6 +233,15 @@ function LeereListe({ seite, filter }: { seite: BestellungenSeite; filter: HofBe
       Noch offene ansehen
     </Link>
   )
+  if (filter === 'heute' && naechsteAbholung) {
+    // Board s1-bestellungen, Bild 2: dieselbe Karte wie die leere Packliste auf Heute — nichts zu tun, kein Knopf.
+    return (
+      <div className={cn(KARTE, 'flex flex-col gap-1 px-4 py-3.5 md:px-[18px]')}>
+        <p className="text-[15px] font-semibold">{HEUTE_NIEMAND}</p>
+        <p className={cn('text-[13.5px]', LEISE)}>{naechsteAbholung}</p>
+      </div>
+    )
+  }
   if (filter === 'heute') {
     return <EmptyState symbol={CalendarCheck} titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." ausweg={ausweg} />
   }

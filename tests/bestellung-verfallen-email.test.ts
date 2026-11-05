@@ -53,7 +53,7 @@ describe('baueBestellungVerfallen', () => {
       customerName: 'Erika Mustermann',
       customerEmail: 'kundin@example.com',
       orderNumber: 'TST-0101-AAAA',
-      farm: { name: 'Hof Test' },
+      farm: { name: 'Hof Test', email: '' },
     })
 
     expect(sendMock).toHaveBeenCalledOnce()

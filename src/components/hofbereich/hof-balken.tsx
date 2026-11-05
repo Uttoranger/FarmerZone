@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Clock, PowerOff } from 'lucide-react'
 import { FARM_ARCHIVED_OWNER_BANNER } from '@/lib/farm-archive'
-import { FARM_PENDING_OWNER_BANNER, FARM_PENDING_OWNER_HINT, freischaltungsMailto } from '@/lib/farm-approval'
+import { freischaltungsMailto, warteBalkenText, type WarteStand } from '@/lib/farm-approval'
 import { DE_VORBEREITUNG_HINWEIS, alsLand } from '@/lib/laender'
 import { SUPPORT_EMAIL } from '@/lib/support'
 import type { Hofbereich } from '@/server/hofbereich'
@@ -15,8 +15,13 @@ import { cn } from '@/lib/utils'
  * Design als orange Hinweiskarte: Beides ist „Offenes beim Hof", kein Alarm.
  * Nicht schließbar, weil es der Zustand des Hofs ist, kein Tipp. Welcher
  * Balken gilt, entscheidet der Lader (stillgelegt sticht „wartet").
+ *
+ * Seit Lauf 30 (N42 e) hängt der Titel von „wartet" am Stand der Schritte
+ * (`warteStand`, src/lib/einrichten.ts): Wer ihn kennt, gibt `stand` mit
+ * (Einrichten); das Layout des Hofbereichs lädt die Schritte nicht und zeigt
+ * ohne Stand den Titel „wird noch geprüft" wie bisher.
  */
-export function HofBalken({ balken }: { balken: Hofbereich['balken'] }): React.JSX.Element | null {
+export function HofBalken({ balken, stand = null }: { balken: Hofbereich['balken']; stand?: WarteStand | null }): React.JSX.Element | null {
   if (!balken) return null
 
   if (balken.art === 'stillgelegt') {
@@ -44,22 +49,44 @@ export function HofBalken({ balken }: { balken: Hofbereich['balken'] }): React.J
 
   return (
     <div className="px-4 pt-4 md:px-8 print:hidden">
-      <Hinweiskarte ton="orange" symbol={Clock} titel={FARM_PENDING_OWNER_BANNER}>
-        <p className="text-muted-foreground">{FARM_PENDING_OWNER_HINT}</p>
-        {alsLand(balken.country) === 'DE' && <p className="mt-1 text-muted-foreground">{DE_VORBEREITUNG_HINWEIS}</p>}
-        <p className="mt-2 text-muted-foreground">
-          Deine Hof-ID: <span className="font-mono font-medium break-all text-foreground">{balken.farmId}</span>
-        </p>
-        <p className="mt-1 text-muted-foreground">
-          <a
-            href={freischaltungsMailto(SUPPORT_EMAIL, balken.farmName, balken.farmId)}
-            className={cn('font-semibold break-words text-foreground underline underline-offset-2', FOKUS_RAHMEN)}
-          >
-            Frage zur Freischaltung stellen
-          </a>{' '}
-          — die Hof-ID ist in der Nachricht schon eingetragen.
-        </p>
-      </Hinweiskarte>
+      <WarteBalken farmId={balken.farmId} farmName={balken.farmName} country={balken.country} stand={stand} />
     </div>
+  )
+}
+
+/**
+ * Die Karte „wartet auf Freigabe" ohne den Rand der Seite — für Seiten, die
+ * den Balken selbst in ihren Kopf setzen (Einrichten, Board w2-registrieren:
+ * unter dem Titel). Titel und Satz je Stand aus `warteBalkenText`.
+ */
+export function WarteBalken({
+  farmId,
+  farmName,
+  country,
+  stand,
+}: {
+  farmId: string
+  farmName: string
+  country: string
+  stand: WarteStand | null
+}): React.JSX.Element {
+  const text = warteBalkenText(stand)
+  return (
+    <Hinweiskarte ton="orange" symbol={Clock} titel={text.titel}>
+      <p className="text-muted-foreground">{text.hinweis}</p>
+      {alsLand(country) === 'DE' && <p className="mt-1 text-muted-foreground">{DE_VORBEREITUNG_HINWEIS}</p>}
+      <p className="mt-2 text-muted-foreground">
+        Deine Hof-ID: <span className="font-mono font-medium break-all text-foreground">{farmId}</span>
+      </p>
+      <p className="mt-1 text-muted-foreground">
+        <a
+          href={freischaltungsMailto(SUPPORT_EMAIL, farmName, farmId)}
+          className={cn('font-semibold break-words text-foreground underline underline-offset-2', FOKUS_RAHMEN)}
+        >
+          Frage zur Freischaltung stellen
+        </a>{' '}
+        – die Hof-ID ist in der Nachricht schon eingetragen.
+      </p>
+    </Hinweiskarte>
   )
 }

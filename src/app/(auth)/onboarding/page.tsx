@@ -9,6 +9,9 @@ import { getOpenOrdersCount } from '@/server/queries/orders'
 import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { ladeTarifZeile } from '@/server/hofbereich'
+import { getFarmBannerState } from '@/server/queries/farm'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { gebuehrModellFuer } from '@/lib/plattformgebuehr'
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
@@ -34,6 +37,9 @@ export const dynamic = 'force-dynamic'
  *    bestehenden Seiten (Mein Hof, Produkte, Zahlung). Produkte und
  *    Abholzeiten legt der Hof dort an, nicht mehr im Assistenten — dort gelten
  *    alle Regeln (Kategorie-Pflicht, Abholzeiten-Prüfung).
+ *  - seit Lauf 30 (Nr. 228, Boards s2/w2-registrieren) mit Hof die h1 „Hof
+ *    einrichten“ und der Warte-Balken je Stand der Schritte (N42 e) — die
+ *    HofShell trägt hier keinen Balken aus dem Layout, die Seite setzt ihn.
  *
  * Nur Höfe: Andere Rollen schickt die Seite wie das Bauern-Layout zur
  * Anmeldung — sonst legte ein Kundenkonto hier einen Hof an, den es danach
@@ -45,10 +51,12 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
   const rolle = (session.user as typeof session.user & { role?: string }).role
   if (rolle !== 'FARMER') redirect('/login')
 
-  const [hof, bestaetigung] = await Promise.all([
+  const jetzt = new Date()
+  const [hof, bestaetigung, hofpreis] = await Promise.all([
     ladeEinrichtenHof(session.user.id),
     // S3 (Nr. 17b): frisch aus der Datenbank, nie session.user.emailVerified.
     ladeBestaetigungsStand(session.user.id),
+    ladeHofpreisEinstellung(),
   ])
   const emailOffen = bestaetigung?.offen ?? false
   const person = { name: session.user.name ?? '', email: session.user.email ?? '' }
@@ -56,8 +64,13 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
   // Nr. 207 (§ 104 JN, P2B): Zustimmung zur aktuellen AGB-Fassung — erst mit Hof, nie ein Lockout.
   const fassung = agbFassung()
   const agb = hof && brauchtAgbZustimmung(hof, fassung) ? { fassung, geaendert: hof.agbFassung !== null } : null
+  // Ohne Hof gibt es keinen Balken; stillgelegt zeigt Einrichten wie bisher keinen.
+  const banner = hof && !hof.freigeschaltet ? await getFarmBannerState(session.user.id) : null
+  const warten = banner && banner.archivedAt === null && banner.approvedAt === null ? { farmId: banner.id, farmName: banner.name, country: banner.country } : null
   const inhalt = (
     <EinrichtenSeite
+      gebuehrModell={gebuehrModellFuer(hofpreis, jetzt)}
+      kopf={hof ? { hofName: hof.name, warten } : null}
       stand={stand}
       vorname={vorname(person.name)}
       person={person}
@@ -84,7 +97,7 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
   const [offeneBestellungen, isAdmin, tarifZeile] = await Promise.all([
     getOpenOrdersCount(hof.id),
     isAdminUser(session.user.id),
-    ladeTarifZeile(hof.id, new Date()),
+    ladeTarifZeile(hof.id, jetzt),
   ])
   const zuEntscheiden = isAdmin ? await zaehleZuEntscheiden() : 0
   return (

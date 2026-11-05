@@ -40,7 +40,7 @@ import { ADMIN_BESTELLUNG_GRUND_FEHLT, bestellFilterAus } from '@/schemas/admin-
 import { mailSucheAus } from '@/schemas/betrieb-mails'
 import { cancelOrder } from '@/server/actions/orders'
 import { markiereErstattungErledigt, notfallStorno, ordneWiderrufZu, zeigeKundinAdresse } from '@/server/actions/admin-bestellung'
-import { ladeBestellListe } from '@/server/queries/admin-bestellungen'
+import { ladeBestellDetail, ladeBestellListe } from '@/server/queries/admin-bestellungen'
 import { artenZu, erstelleHof, erstelleHofMitAnmeldung, erstelleProdukt, intKennung, machePasskeyAdmin, raeumeAuf } from './setup/basis'
 
 const erstatten = vi.mocked(stripe.refunds.create)
@@ -111,6 +111,20 @@ const erstattungsArt = (aufruf: unknown[]): unknown => {
   const [p] = aufruf as [Record<string, unknown>]
   return { reverse_transfer: p.reverse_transfer, refund_application_fee: p.refund_application_fee }
 }
+
+describe('Detail: das Modell der Gebühr aus der Zeile (Nr. 229, V63)', () => {
+  it('ladeBestellDetail liefert Order.gebuehrModell — null im Modell „bisher“, „hofpreis“ danach', async () => {
+    const { farm } = await erstelleHof({ name: 'Testhof Gebuehrwort' })
+    const produkt = await erstelleProdukt(farm.id, { stock: BESTAND })
+    const bisher = await bezahlteBestellung(farm.id, produkt.id)
+    const hofpreis = await bezahlteBestellung(farm.id, produkt.id)
+    await prisma.order.update({ where: { id: hofpreis.id }, data: { gebuehrModell: 'hofpreis' } })
+    const jetzt = new Date()
+
+    expect((await ladeBestellDetail(bisher.id, jetzt))?.gebuehrModell).toBeNull()
+    expect((await ladeBestellDetail(hofpreis.id, jetzt))?.gebuehrModell).toBe('hofpreis')
+  })
+})
 
 describe('Suche nach Nummer und Adresse', () => {
   it('Nummer und ganze Adresse finden die Bestellung, eine Teiladresse nichts', async () => {

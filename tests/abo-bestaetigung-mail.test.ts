@@ -5,7 +5,7 @@
  *    dem Knopf, nennt die Gültigkeit und den Satz „ignorier diese Mail" — und
  *    enthält keine Werbung und keinen Abmeldelink (sie ist keine Werbemail).
  *  - Jede werbliche Mail (Beitrag per Mail) trägt den Abmeldelink, im Text und
- *    unten unter „Benachrichtigungen verwalten".
+ *    unten unter „Neuigkeiten verwalten" (Wortliste N42 c, Nr. 232).
  *  - Seit Nr. 47 trägt sie dazu die Kopfzeilen List-Unsubscribe und
  *    List-Unsubscribe-Post (Ein-Klick, RFC 8058) — und NUR sie: keine
  *    Transaktionsmail (Bestätigung, Anmeldecode, Bestellung) bekommt sie.
@@ -94,12 +94,12 @@ const BEITRAG = {
 }
 
 describe('Werbliche Mail (Beitrag per Mail)', () => {
-  it('trägt den Abmeldelink — im Text und unten unter „Benachrichtigungen verwalten"', async () => {
+  it('trägt den Abmeldelink — im Text und unten unter „Neuigkeiten verwalten"', async () => {
     const html = (await email.baueBeitragMail(BEITRAG)).html
     const seite = `${appUrl}/account/unsubscribe?token=${ABMELDE_TOKEN}`
     expect(html.split(`href="${seite}"`).length - 1).toBe(2)
     expect(html).toContain('Abmelden')
-    expect(html).toContain('Benachrichtigungen verwalten')
+    expect(html).toContain('Neuigkeiten verwalten')
   })
 
   it('trägt List-Unsubscribe mit der Ein-Klick-Adresse und List-Unsubscribe-Post (RFC 8058)', async () => {

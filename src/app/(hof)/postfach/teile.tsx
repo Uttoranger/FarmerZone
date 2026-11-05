@@ -83,13 +83,13 @@ export function PostfachZeile({ zeile }: { zeile: FadenZeile }): React.JSX.Eleme
   )
 }
 
-/** Der Knopf zum Link einer Nachricht — 44 px Trefferfläche (Mockup 36 px, Regel „Tippflächen ≥ 44 px"). */
+/** Der Knopf zum Link einer Nachricht — 44 px, Umriss-Pille wie im Board s2/w2-postfach (V51: im Hofbereich kein grüner Knopf). */
 function LinkKnopf({ href }: { href: string }): React.JSX.Element {
   return (
     <Link
       href={href}
       className={cn(
-        'mt-2 inline-flex min-h-11 items-center rounded-xl bg-accent px-3.5 text-[13.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+        'mt-2 inline-flex min-h-11 items-center rounded-full border border-input bg-card px-4 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
         FOKUS_RAHMEN
       )}
     >

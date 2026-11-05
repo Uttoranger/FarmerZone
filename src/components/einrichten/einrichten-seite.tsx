@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Check, Mail, MailCheck } from 'lucide-react'
-import type { EinrichtenSchritt, EinrichtenStand } from '@/lib/einrichten'
-import { KONDITIONEN_UEBERGANG, PRO_MONAT, VOLLER_WARENPREIS, tarifKarte, type TarifId } from '@/lib/konditionen'
+import { warteStand, type EinrichtenSchritt, type EinrichtenStand } from '@/lib/einrichten'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, tarifKarte, vollerWarenpreis, type TarifId } from '@/lib/konditionen'
+import type { GebuehrModell } from '@/lib/plattformgebuehr'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -9,12 +10,19 @@ import { HofAnlegenFormular } from '@/components/einrichten/hof-anlegen-formular
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { ErneutSendenKnopf } from '@/components/email-bestaetigung/erneut-senden'
 import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
+import { WarteBalken } from '@/components/hofbereich/hof-balken'
+import { textlinkKlassen } from '@/components/ui/textlink'
 
 /*
  * „Hof einrichten" (/onboarding, Gate 5 Nr. 15) nach den Mockups
  * web-h1-einrichten und mobil-h1-einrichten: Kopf, Fortschritt, sechs
  * Schritte als Karten, rechts Tarif und Hilfe. Was ein Schritt sagt und
  * wohin er führt, entscheidet src/lib/einrichten.ts — hier wird gezeichnet.
+ *
+ * Seit Lauf 30 (Boards s2/w2-registrieren): EINE h1 je Seite — in der HofShell
+ * „Hof einrichten“ mit dem Hofnamen und dem Warte-Balken darunter, in der
+ * Fokus-Shell trägt die Shell die h1; der Gruß „Willkommen“ ist immer h2.
+ * Der Stand steht in Worten neben jedem Schritt, die Schritte als eine Liste.
  */
 
 const KNOPF_BASIS = cn(
@@ -57,31 +65,33 @@ function SchrittKarte({ schritt, person }: { schritt: EinrichtenSchritt; person:
   const offen = schritt.zustand === 'offen'
   const leise = schritt.zustand === 'gesperrt' || schritt.zustand === 'wartet' || schritt.zustand === 'hinweis'
   const aktion = schritt.aktion
+  // Der Hinweis (Lastschrift) nennt statt eines Stands, wofür er gilt (Board: „für Barbestellungen“).
+  const standWort = schritt.zustand === 'hinweis' ? schritt.textKurz : ZUSTAND_TEXT[schritt.zustand]
   return (
-    <li
-      aria-current={offen && aktion?.art === 'formular' ? 'step' : undefined}
-      className={cn('rounded-2xl border bg-card p-4 md:px-5', offen ? 'border-primary/60' : 'border-border')}
-    >
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <Zeichen schritt={schritt} />
-          <div className="min-w-0 flex-1">
-            <h3 className={cn('text-[15px] font-semibold', leise && 'text-muted-foreground')}>
-              <span className="md:hidden">{schritt.titelKurz}</span>
-              <span className="hidden md:inline">{schritt.titel}</span>
-              <span className="sr-only"> ({ZUSTAND_TEXT[schritt.zustand]})</span>
+    <li aria-current={offen && aktion?.art === 'formular' ? 'step' : undefined} className="p-4 md:px-5">
+      <div className="flex items-start gap-3">
+        <Zeichen schritt={schritt} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className={cn('min-w-0 text-[15px] font-semibold', leise && schritt.zustand !== 'hinweis' && 'text-muted-foreground')}>
+              {schritt.titel}
             </h3>
-            <p className="text-[13px] leading-snug break-words text-muted-foreground">
-              <span className="md:hidden">{schritt.textKurz}</span>
-              <span className="hidden md:inline">{schritt.text}</span>
-            </p>
+            {/* Der Stand in Worten, nicht nur als Farbe (Board: „erledigt“, „offen“, „kommt später“). */}
+            <span className="shrink-0 text-[12.5px] text-muted-foreground">{standWort}</span>
           </div>
+          <p className="mt-0.5 text-[13px] leading-snug break-words text-muted-foreground">{schritt.text}</p>
+          {aktion?.art === 'link' && (
+            <Link
+              href={aktion.href}
+              className={cn(
+                aktion.primaer ? KNOPF_ORANGE : schritt.zustand === 'hinweis' ? textlinkKlassen({ ton: 'gruen' }) : KNOPF_UMRISS,
+                'mt-2.5'
+              )}
+            >
+              {aktion.label}
+            </Link>
+          )}
         </div>
-        {aktion?.art === 'link' && (
-          <Link href={aktion.href} className={cn(aktion.primaer ? KNOPF_ORANGE : KNOPF_UMRISS, 'w-full md:w-auto')}>
-            {aktion.label}
-          </Link>
-        )}
       </div>
       {aktion?.art === 'formular' && <HofAnlegenFormular personName={person.name} />}
     </li>
@@ -92,63 +102,51 @@ function Fortschritt({ stand, freigeschaltet }: { stand: EinrichtenStand; freige
   const prozent = Math.round((stand.erledigt / stand.gesamt) * 100)
   return (
     <section aria-labelledby="einrichten-stand" className="rounded-2xl border border-border bg-card p-4 md:px-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="einrichten-stand" className="font-heading text-[17px] font-semibold md:text-lg">
-          <span className="md:hidden">{stand.ueberschriftKurz}</span>
-          <span className="hidden md:inline">{stand.ueberschrift}</span>
-        </h2>
-        <span className="shrink-0 text-[15px] font-semibold text-status-fertig">
-          {stand.erledigt} von {stand.gesamt}
-        </span>
-      </div>
+      <h2 id="einrichten-stand" className="font-heading text-[17px] font-semibold md:text-lg">
+        {stand.ueberschrift}
+      </h2>
       <div
         role="progressbar"
         aria-labelledby="einrichten-stand"
         aria-valuemin={0}
         aria-valuemax={stand.gesamt}
         aria-valuenow={stand.erledigt}
-        aria-valuetext={`${stand.erledigt} von ${stand.gesamt} Schritten erledigt`}
+        aria-valuetext={stand.ueberschrift}
         className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted"
       >
         <div className="h-full rounded-full bg-accent" style={{ width: `${prozent}%` }} />
       </div>
       {!freigeschaltet && (
         <p className="mt-3 text-[13px] text-muted-foreground">
-          Profil und Produkte kannst du in Ruhe vorbereiten. Kunden sehen deinen Hof erst nach der Freischaltung.
+          Profil und Produkte kannst du in Ruhe vorbereiten. Kundinnen sehen deinen Hof erst nach der Freischaltung.
         </p>
       )}
     </section>
   )
 }
 
-function TarifKarte({ tarif }: { tarif: TarifId | null }) {
+function TarifKarte({ tarif, gebuehrModell }: { tarif: TarifId | null; gebuehrModell: GebuehrModell }) {
   const karte = tarifKarte(tarif)
   return (
     <section aria-labelledby="einrichten-tarif" className="rounded-2xl border border-border bg-card p-4 md:p-5">
-      <h2 id="einrichten-tarif" className="text-[12px] font-bold tracking-[1.6px] text-muted-foreground uppercase">
+      <h2 id="einrichten-tarif" className="font-heading text-[17px] font-semibold">
         {karte.titel}
       </h2>
-      <ul className="mt-2 flex flex-col gap-1.5">
+      <ul className="mt-2 flex flex-col divide-y divide-border">
         {karte.tarife.map((t) => (
-          <li key={t.id} className="flex items-baseline justify-between gap-3">
-            <span className="font-heading text-lg font-semibold">{t.name}</span>
-            <span>
-              <span className="font-heading text-lg font-semibold">{t.preis}</span>{' '}
-              <span className="text-[12.5px] text-muted-foreground">{PRO_MONAT}</span>
+          <li key={t.id} className="flex items-baseline justify-between gap-3 py-2.5">
+            <span className="text-[14px]">{t.name}</span>
+            <span className="text-[14px]">
+              {t.preis} <span className="text-muted-foreground">{PRO_MONAT}</span>
             </span>
           </li>
         ))}
       </ul>
       {/* Die Preise gelten erst ab dem Stichtag (Register K1). */}
       <p className="mt-2 text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
-      <p className="mt-2 text-[13px] text-foreground">{VOLLER_WARENPREIS}</p>
-      <Link
-        href="/konditionen"
-        className={cn(
-          'mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-full text-[14px] font-semibold text-status-fertig hover:underline',
-          FOKUS_RAHMEN
-        )}
-      >
+      {/* Das Wort der Gebühr je Modell (N38, Nr. 221): ab dem Stichtag die Plattformgebühr. */}
+      <p className="mt-2 text-[13px] text-muted-foreground">{vollerWarenpreis(gebuehrModell)}</p>
+      <Link href="/konditionen" className={cn(textlinkKlassen({ ton: 'gruen' }), 'mt-1')}>
         Konditionen ansehen
       </Link>
     </section>
@@ -158,7 +156,7 @@ function TarifKarte({ tarif }: { tarif: TarifId | null }) {
 function HilfeKarte() {
   return (
     <section aria-labelledby="einrichten-hilfe" className="rounded-2xl border border-border bg-card p-4 md:p-5">
-      <h2 id="einrichten-hilfe" className="text-[12px] font-bold tracking-[1.6px] text-muted-foreground uppercase">
+      <h2 id="einrichten-hilfe" className="font-heading text-[17px] font-semibold">
         Hilfe
       </h2>
       {/* „Rückruf anfordern" (Mockup) braucht RueckrufAnfrage — nicht freigegeben. */}
@@ -202,6 +200,8 @@ export function EinrichtenSeite({
   person,
   tarif,
   freigeschaltet,
+  gebuehrModell,
+  kopf = null,
   emailBestaetigung = null,
   agb = null,
 }: {
@@ -210,6 +210,14 @@ export function EinrichtenSeite({
   person: { name: string; email: string }
   tarif: TarifId | null
   freigeschaltet: boolean
+  /** Modell der Gebühr heute (gebuehrModellFuer) — das Wort in der Tarif-Karte (N38). */
+  gebuehrModell: GebuehrModell
+  /**
+   * Nur in der HofShell: Titel „Hof einrichten“ als h1 mit dem Hofnamen und,
+   * solange der Hof nicht freigeschaltet ist, der Warte-Balken (N42 e). Ohne
+   * Kopf trägt die Fokus-Shell die h1.
+   */
+  kopf?: { hofName: string; warten: { farmId: string; farmName: string; country: string } | null } | null
   /** Nur wenn die Bestätigung aussteht (bestaetigungOffen, frisch aus der Datenbank). */
   emailBestaetigung?: { email: string; warteSekunden: number } | null
   /** Nr. 207: Der Hof hat der aktuellen AGB-Fassung noch nicht zugestimmt — die Karte „AGB bestätigen“ (ohne Hof: null). */
@@ -217,12 +225,23 @@ export function EinrichtenSeite({
 }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-5 pb-12 md:px-8 md:pt-8">
-      <header className="mb-5">
-        <h1 className="font-heading text-[24px] leading-tight font-semibold break-words md:text-[28px]">
+      {kopf && (
+        <header className="mb-4">
+          <h1 className="font-heading text-[24px] leading-tight font-semibold break-words md:text-[28px]">Hof einrichten</h1>
+          <p className="mt-0.5 text-[14px] break-words text-muted-foreground">{kopf.hofName}</p>
+          {kopf.warten && (
+            <div className="mt-4 print:hidden">
+              <WarteBalken {...kopf.warten} stand={warteStand(stand)} />
+            </div>
+          )}
+        </header>
+      )}
+      <div className="mb-5">
+        <h2 className="font-heading text-[20px] leading-tight font-semibold break-words md:text-[22px]">
           {vorname ? `Willkommen, ${vorname}` : 'Willkommen'}
-        </h1>
+        </h2>
         <p className="mt-0.5 text-[14px] text-muted-foreground">So wird dein Hof startklar</p>
-      </header>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-7">
         <div className="flex min-w-0 flex-col gap-3">
           {emailBestaetigung && <EmailBestaetigenHinweis {...emailBestaetigung} />}
@@ -232,7 +251,7 @@ export function EinrichtenSeite({
             <h2 id="einrichten-schritte" className="sr-only">
               Schritte
             </h2>
-            <ol className="flex flex-col gap-3">
+            <ol className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
               {stand.schritte.map((s) => (
                 <SchrittKarte key={s.id} schritt={s} person={person} />
               ))}
@@ -240,7 +259,7 @@ export function EinrichtenSeite({
           </section>
         </div>
         <div className="flex flex-col gap-4">
-          <TarifKarte tarif={tarif} />
+          <TarifKarte tarif={tarif} gebuehrModell={gebuehrModell} />
           <HilfeKarte />
         </div>
       </div>

@@ -18,7 +18,7 @@ export interface BriefkastenZusammenfassungProps {
 /** Wochenlage an den Betreiber (Register N32, Nr. 192): die Zahlen der Woche, darunter der Stand des Postfachs (Register N14). */
 export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungProps) {
   return (
-    <EmailLayout previewText={p.offenZeile}>
+    <EmailLayout fuss={{ art: 'betrieb' }} previewText={p.offenZeile}>
       <Text style={h1}>{p.lage ? 'Wochenlage' : 'Postfach — Wochenstand'}</Text>
       {p.lage && (
         <div style={highlightBox}>

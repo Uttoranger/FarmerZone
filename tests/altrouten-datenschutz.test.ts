@@ -162,8 +162,11 @@ describe('Datenschutzerklärung — Fakten wie gebaut', () => {
   })
 
   it('Abschnitt 8 stuft die weiteren Cookies nicht als technisch notwendig ein', () => {
-    const t = text()
-    const abschnitt = t.slice(t.indexOf('8. Cookies'), t.indexOf('9.', t.indexOf('8. Cookies')))
+    // Seit Nr. 231 steht der Titel auch im Inhaltsverzeichnis — gesucht wird ab der Überschrift selbst.
+    const markup = html()
+    const start = markup.indexOf('id="cookies"')
+    const abschnitt = markup.slice(start, markup.indexOf('<h2', start)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    expect(start).toBeGreaterThan(-1)
     expect(abschnitt).toContain('Abschnitt 2')
     expect(abschnitt).not.toMatch(/ausschließlich technisch notwendige/)
   })

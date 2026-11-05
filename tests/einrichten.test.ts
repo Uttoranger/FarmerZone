@@ -3,7 +3,8 @@
  * werden, was erledigt ist, wohin sie führen.
  */
 import { describe, expect, it } from 'vitest'
-import { einrichtenStand, vorname, type EinrichtenDaten } from '@/lib/einrichten'
+import { einrichtenStand, vorname, warteStand, type EinrichtenDaten } from '@/lib/einrichten'
+import { FARM_PENDING_OWNER_BANNER, FARM_PENDING_OWNER_HINT, warteBalkenText } from '@/lib/farm-approval'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ } from '@/lib/konditionen'
 
 const OHNE_HOF: EinrichtenDaten = { personName: 'Max Mustermann', email: 'max@example.com', hof: null }
@@ -52,7 +53,7 @@ describe('einrichtenStand — ohne Hof', () => {
     const stand = einrichtenStand(OHNE_HOF)
     expect(stand.erledigt).toBe(1)
     expect(stand.gesamt).toBe(5)
-    expect(stand.ueberschrift).toBe('Noch 4 Schritte bis zum ersten Verkauf')
+    expect(stand.ueberschrift).toBe('1 von 5 Schritten erledigt')
   })
 })
 
@@ -60,7 +61,7 @@ describe('einrichtenStand — mit Hof', () => {
   it('Hofseite: Stand aus „Mein Hof", Link dorthin, solange etwas fehlt', () => {
     const s = schritt(mitHof(), 'hofseite')
     expect(s.zustand).toBe('offen')
-    expect(s.text).toBe('7 von 11 fertig – es fehlen Logo, Über uns, Fotos und Titelbild')
+    expect(s.text).toBe('7 von 11 – es fehlen Logo, Über uns, Fotos und Titelbild')
     expect(s.textKurz).toBe('7 von 11 fertig')
     expect(s.aktion).toEqual({ art: 'link', href: '/farm-page', label: 'Weiter', primaer: false })
   })
@@ -124,17 +125,26 @@ describe('einrichtenStand — mit Hof', () => {
     expect(schritt(mitHof({ freigeschaltet: true }), 'freischaltung').zustand).toBe('erledigt')
   })
 
-  it('alles erledigt: „Alles erledigt" — auch ohne SEPA-Mandat', () => {
+  it('alles erledigt: „5 von 5 Schritten erledigt" — auch ohne SEPA-Mandat', () => {
     const stand = einrichtenStand(
       mitHof({ hofseite: { erledigt: 11, gesamt: 11, fehlend: [] }, produkte: 3, stripeBereit: true, freigeschaltet: true })
     )
     expect(stand.erledigt).toBe(stand.gesamt)
-    expect(stand.ueberschrift).toBe('Alles erledigt – dein Hof ist startklar')
+    expect(stand.ueberschrift).toBe('5 von 5 Schritten erledigt')
   })
 
-  it('ein offener Schritt heißt „ein Schritt"', () => {
+  it('am Handy dieselbe Zeile in Worten (Board s2-registrieren)', () => {
     const stand = einrichtenStand(mitHof({ hofseite: { erledigt: 11, gesamt: 11, fehlend: [] }, produkte: 3, stripeBereit: true }))
-    expect(stand.ueberschriftKurz).toBe('Noch ein Schritt')
+    expect(stand.ueberschriftKurz).toBe('4 von 5 Schritten erledigt')
+  })
+
+  it('Freischaltung als letzter offener Schritt: „Alles ist eingerichtet“; mit unfertiger Hofseite nicht (Lauf 30)', () => {
+    const fertig = mitHof({ hofseite: { erledigt: 11, gesamt: 11, fehlend: [] }, produkte: 3, stripeBereit: true })
+    expect(schritt(fertig, 'freischaltung')).toMatchObject({ zustand: 'wartet', text: expect.stringMatching(/^Alles ist eingerichtet\./) })
+    // Gegenprobe: `wartet` gilt auch bei unfertiger Hofseite — dann nie „Alles ist eingerichtet“.
+    const halb = mitHof({ produkte: 3, stripeBereit: true })
+    expect(schritt(halb, 'freischaltung').zustand).toBe('wartet')
+    expect(schritt(halb, 'freischaltung').text).not.toContain('Alles ist eingerichtet')
   })
 
   it('Konto zeigt Hofname und Adresse', () => {
@@ -173,5 +183,45 @@ describe('einrichtenStand — E-Mail noch nicht bestätigt (S3, Nr. 17b)', () =>
 
   it('ein freigeschalteter Hof bleibt erledigt', () => {
     expect(schritt({ ...mitHof({ freigeschaltet: true }), emailOffen: true }, 'freischaltung').zustand).toBe('erledigt')
+  })
+})
+
+describe('warteStand — welcher Warte-Balken gilt (Register N42 e)', () => {
+  it('Schritte offen: „einrichten“ — auch wenn die Freischaltung schon beim Team wartet', () => {
+    expect(warteStand(einrichtenStand(mitHof()))).toBe('einrichten')
+    expect(warteStand(einrichtenStand(mitHof({ produkte: 3, stripeBereit: true })))).toBe('einrichten')
+  })
+
+  it('gesperrte Freischaltung (E-Mail offen, keine Abholzeit) heißt ebenfalls „einrichten“', () => {
+    const sonstFertig = { hofseite: { erledigt: 11, gesamt: 11, fehlend: [] }, produkte: 3, stripeBereit: true }
+    expect(warteStand(einrichtenStand({ ...mitHof(sonstFertig), emailOffen: true }))).toBe('einrichten')
+    expect(warteStand(einrichtenStand(mitHof({ ...sonstFertig, abholzeitAktiv: false })))).toBe('einrichten')
+  })
+
+  it('alles erledigt, nur die Prüfung offen: „pruefung“ — der Lastschrift-Hinweis zählt nicht', () => {
+    const fertig = mitHof({ hofseite: { erledigt: 11, gesamt: 11, fehlend: [] }, produkte: 3, stripeBereit: true, sepaMandat: false })
+    expect(warteStand(einrichtenStand(fertig))).toBe('pruefung')
+  })
+})
+
+describe('warteBalkenText — Titel und Satz je Stand (Register N42 e, V59)', () => {
+  it('einrichten: „Richte deinen Hof fertig ein – …“ mit Halbgeviertstrich und dem Rat zum Einrichten', () => {
+    expect(warteBalkenText('einrichten')).toEqual({ titel: 'Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht', hinweis: FARM_PENDING_OWNER_HINT })
+    expect(FARM_PENDING_OWNER_HINT).toContain('deine Hofdaten')
+  })
+
+  it('pruefung: „Dein Hof wird noch geprüft – …“ ohne „Du kannst schon alles einrichten“', () => {
+    const text = warteBalkenText('pruefung')
+    expect(text.titel).toBe('Dein Hof wird noch geprüft – Kundinnen sehen ihn noch nicht')
+    expect(text.hinweis).not.toContain('Du kannst schon alles einrichten')
+  })
+
+  it('ohne Stand (Layout ohne Schritte): der Titel „wird noch geprüft“ mit dem vollen Satz', () => {
+    expect(warteBalkenText(null)).toEqual({ titel: FARM_PENDING_OWNER_BANNER, hinweis: FARM_PENDING_OWNER_HINT })
+  })
+
+  it('kein Geviertstrich mehr in den Titeln (Gegenprobe: das Muster trifft den alten Wortlaut)', () => {
+    for (const stand of ['einrichten', 'pruefung', null] as const) expect(warteBalkenText(stand).titel).not.toContain('—')
+    expect('Dein Hof wird noch geprüft — Kundinnen sehen ihn noch nicht').toContain('—')
   })
 })

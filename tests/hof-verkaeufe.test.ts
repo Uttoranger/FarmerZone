@@ -421,7 +421,7 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('€ 19,99')
     expect(html).toContain('€ 44,30')
     expect(html).toContain(formatEuro(1234.5))
-    expect(html).toContain('Wiederholen')
+    expect(html).toContain('Noch einmal eintragen')
     expect(html).toContain('href="/orders/o1"')
     expect(html).toContain('Online')
     expect(html).toContain(`title="${LANG}"`)
@@ -483,7 +483,7 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props({ zeilen: [], weekTotal: 0, weekOnline: 0, weekBar: 0, ytdTotal: 0 })))
     expect(html).toContain('Noch keine Verkäufe')
     expect(html.match(/Verkauf eintragen/g)?.length).toBe(2)
-    expect(html).not.toContain('Wiederholen')
+    expect(html).not.toContain('Noch einmal eintragen')
   })
 
   it('Fehler: orange Hinweiskarte mit „Noch einmal versuchen" statt 500', () => {

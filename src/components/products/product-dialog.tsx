@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Camera, Crop, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles, Plus } from 'lucide-react'
+import { Crop, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles, Plus } from 'lucide-react'
 import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
 import { enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
@@ -31,8 +31,9 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
+  FormMessage as UiFormMessage,
 } from '@/components/ui/form'
+import { FotoHinzufuegen } from '@/components/ui/bild-platzhalter'
 import {
   Accordion,
   AccordionItem,
@@ -54,7 +55,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createProduct, updateProduct, pruefeDualUse } from '@/server/actions/products'
-import type { ProduktAngelegt } from '@/lib/produkte-hof'
+import {
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  type ProduktAngelegt,
+  type SpeicherFehlerAnzeige,
+} from '@/lib/produkte-hof'
 import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
@@ -101,7 +107,8 @@ import {
   formatBestand,
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
-import { AbholhinweisWahl } from '@/components/produkte/familien-teile'
+import { AbholhinweisWahl, FELD_FEHLER_IM_FORMULAR, FormularMeldung } from '@/components/produkte/familien-teile'
+import { istNetzFehler } from '@/lib/netz'
 import { LebensmittelVorschau } from './lebensmittel-vorschau'
 import { produktBereich } from '@/lib/produkte-hof'
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
@@ -163,6 +170,15 @@ import {
  * (feste Pakete, im Shop verfügbar, saisonal). Der ganze Kasten ist klickbar,
  * das Touch-Ziel damit deutlich über 44 px.
  */
+/**
+ * Der Feldfehler im Produktdialog (V17; Board s1/w1-produkt-neu, Bild 5): orange, 14 px halbfett,
+ * mit role="alert" — wie FeldMitFehler und die Formulare mit Verkaufsgrößen. Der Grundbaustein
+ * (ui/form.tsx) zeichnet rot; hier nur die Gestalt, Text und Verbindung zum Feld bleiben seine.
+ */
+function FormMessage({ className, ...props }: React.ComponentProps<typeof UiFormMessage>): React.JSX.Element {
+  return <UiFormMessage role="alert" className={cn('text-[14px] leading-snug font-semibold text-status-offen', className)} {...props} />
+}
+
 function SchalterZeile({
   id,
   titel,
@@ -419,6 +435,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   const [ausschnittOffen, setAusschnittOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
   // Geschrieben wird nach einer Wahl im Baustein und bei jedem neuen Foto: Dessen alter Ausschnitt gehörte zum alten.
   const [ausschnittSpeichern, setAusschnittSpeichern] = useState(false)
+  // Die orange Karte über den Abschnitten (V17): nach einem Versuch mit markierten Feldern bzw. ein Speicherfehler.
+  const [pruefenKarte, setPruefenKarte] = useState(false)
+  const [speicherFehler, setSpeicherFehler] = useState<SpeicherFehlerAnzeige | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg und warum das gewählte Foto kam — nur für die
   // Sentry-Meldung; der Upload läuft hier erst beim Absenden, also bis dahin merken.
@@ -524,6 +543,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       setFestePakete(isEdit && product.unitSize != null)
       setSaisonal(isEdit && product.seasonStart != null && product.seasonEnd != null)
       setBestandBasis(isEdit ? product.stock : null)
+      setPruefenKarte(false)
+      setSpeicherFehler(null)
       // „Brennmaterial" im Neu-Menü: Es gibt genau eine Kategorie dafür.
       if (!isEdit && vorwahl === 'brennmaterial') kategorieSetzen('BRENNHOLZ', null)
     } else {
@@ -786,7 +807,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
     const treffer = erstesFehlerfeld(errors)
     if (!treffer) return
     abschnittOeffnen(treffer.abschnitt)
-    toast.error('Bitte prüfe die markierten Felder.')
+    // Statt eines Toasts die Karte über den Abschnitten (Board s1/w1-produkt-neu, Bild 5).
+    setSpeicherFehler(null)
+    setPruefenKarte(true)
     // Erst nach dem Aufklappen scrollen — ein zugeklappter Abschnitt hat keine
     // Höhe, und die Öffnung braucht eine Animation lang.
     window.setTimeout(() => {
@@ -831,6 +854,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       bestaetigungVerlangen(FUTTER_BESTAETIGUNG_NEU)
       return
     }
+    setPruefenKarte(false)
+    setSpeicherFehler(null)
     setIsSubmitting(true)
     try {
       let imageUrl = data.imageUrl ?? ''
@@ -871,7 +896,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             lesen: gewaehlteLesung.current,
           })
           const { text } = bildFehlerMeldung(e)
-          toast.error(text)
+          // Das Produkt ist nicht gespeichert: Karte am Formular wie jeder Speicherfehler (V17).
+          setSpeicherFehler(speicherFehlerAusAntwort(text))
           return
         } finally {
           setUploadFortschritt(null)
@@ -890,7 +916,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           bestaetigungVerlangen(ergebnis.error)
           return
         }
-        toast.error(ergebnis.error)
+        // Ein Fehler ohne Feld steht als orange Karte am Formular, nie als Toast (V17).
+        setSpeicherFehler(speicherFehlerAusAntwort(ergebnis.error))
         if ('code' in ergebnis && ergebnis.code === 'GEAENDERT' && ergebnis.vorrat !== undefined) {
           // Das Feld zeigt jetzt den echten Stand; der Hof prüft und speichert erneut.
           setBestandBasis(ergebnis.vorrat)
@@ -916,7 +943,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       onClose()
       if (ergebnis.angelegt) onAngelegt?.({ anlass: ergebnis.angelegt.id, name: payload.name, kaufbar: ergebnis.angelegt.kaufbar })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')
+      // Am Netz mit „Nochmal" nur beim Bearbeiten: Anlegen könnte der Server schon ausgeführt haben (speicherFehlerNachWurf).
+      setSpeicherFehler(speicherFehlerNachWurf(istNetzFehler(e), isEdit, 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -927,12 +955,12 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
     const fehler = fehlerhafteAbschnitte.has(abschnitt)
     return (
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className={cn(fehler && 'text-destructive')}>
+        <span className={cn(fehler && 'text-status-offen')}>
           {ABSCHNITT_TITEL[abschnitt]}
           {pflicht && ' *'}
         </span>
         {zu && (
-          <span className={cn('truncate text-xs font-normal', fehler ? 'text-destructive' : 'text-muted-foreground')}>
+          <span className={cn('truncate text-xs', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
             {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
           </span>
         )}
@@ -972,10 +1000,17 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             ref={formRef}
             onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             onKeyDown={weiterMitEnter}
-            className="flex flex-col flex-1 min-h-0"
+            // Feldfehler orange (V17): Rand am Feld, Beschriftung bleibt in der Textfarbe.
+            className={cn('flex min-h-0 flex-1 flex-col [&_[data-slot=form-label][data-error=true]]:text-foreground!', FELD_FEHLER_IM_FORMULAR)}
           >
             {/* Scrollbarer Inhalt — pb-8, damit die letzte Karte nie unter dem Fuß liegt */}
             <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-8">
+              <FormularMeldung
+                pruefen={pruefenKarte && fehlerhafteAbschnitte.size > 0}
+                fehler={speicherFehler}
+                onNochmal={() => formRef.current?.requestSubmit()}
+                laeuft={isSubmitting}
+              />
               <Accordion
                 multiple
                 value={offen}
@@ -1052,24 +1087,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                             </button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={fotoQuellen.oeffnen}
-                            disabled={isSubmitting || pruefeFoto}
-                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50 disabled:opacity-60"
-                          >
-                            <Camera className="h-7 w-7 text-brand-text" aria-hidden />
-                            <span className="text-sm font-medium text-foreground">
-                              {pruefeFoto
-                                ? 'Foto wird geprüft …'
-                                : selectedFile
-                                  ? 'Foto ausgewählt — tippen zum Ersetzen'
-                                  : 'Foto hinzufügen'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              Freiwillig — ohne Foto zeigen wir ein Bild zur Kategorie.
-                            </span>
-                          </button>
+                          // „Foto hinzufügen" (V15; Board s1/w1-produkt-neu, Bild 1): die Fläche des
+                          // Bild-Platzhalters als Knopf; er öffnet dieselben zwei Wege wie bisher (useFotoQuellen).
+                          <FotoHinzufuegen onClick={fotoQuellen.oeffnen} disabled={isSubmitting || pruefeFoto}>
+                            {pruefeFoto ? 'Foto wird geprüft …' : selectedFile ? 'Foto ausgewählt — tippen zum Ersetzen' : undefined}
+                          </FotoHinzufuegen>
                         )}
                       </div>
 
@@ -1351,8 +1373,12 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                       />
 
                       {/* Live-Vorschau: was Kundinnen aus Preis und Gebinde lesen werden */}
+                      {/* Im Hofpreis-Modell als grün getönte Zeile wie im Board (s1/w1-produkt-neu, Bild 1). */}
                       {preisVorschau && (
-                        <p className="text-xs text-muted-foreground -mt-1" aria-live="polite">
+                        <p
+                          className={cn('text-xs -mt-1', preisAnzeige ? 'mt-0 rounded-xl bg-accent/10 px-3 py-2.5 text-[13px] text-foreground' : 'text-muted-foreground')}
+                          aria-live="polite"
+                        >
                           {preisVorschau}
                         </p>
                       )}

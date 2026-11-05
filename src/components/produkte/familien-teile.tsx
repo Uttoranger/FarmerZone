@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils'
 import { EuroCentFeld, KeinRuecktrittHaken } from '@/components/products/ruecktritt-felder'
 import { FREIWILLIG } from '@/lib/profil-meldungen'
 import { RUECKTRITT_TEXT, type RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
+import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { FORMULAR_PRUEFEN, type SpeicherFehlerAnzeige } from '@/lib/produkte-hof'
 
 /*
  * Bausteine der beiden Formulare mit Verkaufsgrößen (Futter, Brennmaterial;
@@ -34,6 +36,7 @@ export function FamilienDialog({
   speichernText,
   speichert,
   onSpeichern,
+  meldung,
   children,
 }: {
   open: boolean
@@ -45,6 +48,8 @@ export function FamilienDialog({
   speichernText: string
   speichert: boolean
   onSpeichern: () => void
+  /** Die orange Karte über den Feldern (V17): „Bitte prüfe die markierten Felder." oder ein Speicherfehler. */
+  meldung?: React.ReactNode
   children: React.ReactNode
 }): React.JSX.Element {
   return (
@@ -63,10 +68,13 @@ export function FamilienDialog({
             e.preventDefault()
             onSpeichern()
           }}
-          className="flex min-h-0 flex-1 flex-col"
+          className={cn('flex min-h-0 flex-1 flex-col', FELD_FEHLER_IM_FORMULAR)}
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 sm:px-6">
-            <div className="flex flex-col gap-6">{children}</div>
+            <div className="flex flex-col gap-6">
+              {meldung}
+              {children}
+            </div>
           </div>
           <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6">
             {hinweis && (
@@ -165,9 +173,48 @@ export function Feld({
   )
 }
 
+/**
+ * Der orange Rand jedes Felds mit Fehler im Formular (V17; Board s1/w1-produkt-neu, Bild 5): 2 px
+ * `status-offen` über `aria-invalid` — für alle Felder darunter, auch DezimalFeld und Textarea, deren
+ * Grundbausteine sonst rot zeichnen. Wie FELD_FEHLER_RAHMEN (ui/feld-fehler.tsx), nur für einen
+ * ganzen Teilbaum; wichtig (`!`), weil die Grundbausteine dieselbe Spezifität tragen. Den Fokusring
+ * nimmt `ring-0!` nur ohne Fokus: Mit der Tastatur darauf zeigt das Feld ihn wieder (WCAG 2.4.7).
+ */
+export const FELD_FEHLER_IM_FORMULAR =
+  '[&_[aria-invalid=true]]:border-2! [&_[aria-invalid=true]]:border-status-offen! [&_[aria-invalid=true]]:ring-0! [&_[aria-invalid=true]:focus-visible]:ring-2! [&_[aria-invalid=true]:focus-visible]:ring-ring!'
+
+/**
+ * Die eine orange Karte über den Feldern (V17; Board s1/w1-produkt-neu, Bild 5 und 6): ein
+ * Speicherfehler (mit „Nochmal", wo er wiederholbar ist) geht vor „Bitte prüfe die markierten
+ * Felder." — beides nie als Toast. Ohne Anlass nichts.
+ */
+export function FormularMeldung({
+  pruefen,
+  fehler,
+  onNochmal,
+  laeuft,
+}: {
+  /** Nach einem Versuch mit markierten Feldern. */
+  pruefen: boolean
+  fehler: SpeicherFehlerAnzeige | null
+  onNochmal?: () => void
+  laeuft?: boolean
+}): React.JSX.Element | null {
+  if (fehler) {
+    return (
+      <HinweiskarteFehler titel={fehler.titel} nochmal={fehler.nochmal ? onNochmal : undefined} laeuft={laeuft}>
+        {fehler.satz}
+      </HinweiskarteFehler>
+    )
+  }
+  if (pruefen) return <HinweiskarteFehler titel={FORMULAR_PRUEFEN} />
+  return null
+}
+
+/** Der Satz unter dem Feld: orange, 14 px halbfett, mit role="alert" (V17, wie FeldMitFehler). */
 export function FeldFehler({ id, children }: { id?: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <p id={id} role="alert" className="text-xs font-medium text-status-offen">
+    <p id={id} role="alert" className="text-[14px] leading-snug font-semibold text-status-offen">
       {children}
     </p>
   )

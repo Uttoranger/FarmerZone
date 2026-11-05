@@ -59,12 +59,43 @@ export function fehlerKicker(fehlernummer?: string): string {
   return kennung === '' ? 'Fehler 500' : `Fehler 500 · Nr. ${kennung}`
 }
 
+/** Der Kicker über der Überschrift jeder 404. */
+export const NICHT_GEFUNDEN_KICKER = 'Fehler 404'
+
+/** Das Suchfeld der 404 des Hauses (nur dort, Board s3/w3-fehlerseiten Bild 1). */
+export const SUCHE_TEXT = { beschriftung: 'Hof oder Produkt suchen', platzhalter: 'Hof oder Produkt suchen …' } as const
+
 /** Die Knopfbeschriftungen — auch sie gibt es mehrfach. */
 export const ZU_HEUTE = 'Zu Heute'
+/**
+ * Der Weg zurück zum Hof auf der 404 eines Produkts. Ohne Namen: Eine
+ * not-found-Datei kennt nur die Adresse, nicht den Hof (Board „Zu Hof Müller“
+ * zeigt Beispieldaten), und ob es den Hof noch gibt, verrät der Link nicht.
+ */
+export const ZUM_HOF = 'Zum Hof'
 export const ZUR_STARTSEITE = 'Zur Startseite'
 export const HOEFE_ENTDECKEN = 'Höfe entdecken'
 export const NOCHMAL_VERSUCHEN = 'Nochmal versuchen'
 export const PROBLEM_MELDEN = 'Problem melden'
+
+// ─── Der gemeinsame Aufbau (Lauf 30, Nr. 231; Boards s3/w3-fehlerseiten) ─────
+//
+// Jede Fehlerseite hat denselben Aufbau: Kreis mit Zeichen, Kicker, h1, Satz,
+// ein Hauptknopf und ein Umriss (die 500 dazu „Problem melden“). Gezeichnet
+// wird er EINMAL (`FehlerseiteAufbau`, src/components/shared/fehler-ansicht.tsx);
+// hier steht, was je Fall verschieden ist: das Zeichen und die Welt.
+
+/** Welche Welt die Seite trägt: Kundschaft grün, Hofbereich orange (N42 a, V51). */
+export type FehlerWelt = 'kunde' | 'hof'
+
+/** Das Zeichen im Kreis: die 404 zeigt einen Weg (Kompass), die 500 eine Warnung. */
+export type FehlerZeichen = 'weg' | 'warnung'
+
+/** Der Ton des Kreises je Zeichen — 404 ruhig grün, 500 orange, in beiden Welten gleich (Board). */
+export const FEHLER_KREIS_TON: Record<FehlerZeichen, 'gruen' | 'orange'> = { weg: 'gruen', warnung: 'orange' }
+
+/** Der Ton des Hauptknopfs je Welt: „Nochmal versuchen“ ist bei der Kundschaft grün, im Hofbereich orange. */
+export const FEHLER_KNOPF_TON: Record<FehlerWelt, 'gruen' | 'orange'> = { kunde: 'gruen', hof: 'orange' }
 
 /** Der Name des Parameters, über den die Fehlernummer in den Briefkasten kommt. */
 export const KENNUNG_PARAMETER = 'kennung'

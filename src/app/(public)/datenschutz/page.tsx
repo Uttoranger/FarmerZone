@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK, INFOSEITE_SPALTE, INFOSEITE_TITEL } from '@/components/shared/infoseite-stil'
+import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK } from '@/components/shared/infoseite-stil'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
+import { RECHTSTEXT_TEXT, RechtstextVorlage, type RechtstextVerzeichnisDaten } from '@/components/shared/rechtstext-vorlage'
 import { ANMELDECODE_GUELTIG_SEKUNDEN, ANMELDECODE_LAENGE } from '@/lib/anmeldecode'
 import { BESTELLUNGEN_ANSICHT_SEKUNDEN, BESTELLUNGEN_COOKIE, BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
 import { SITZUNGEN_NACH_ABLAUF_TAGE } from '@/lib/betrieb'
@@ -18,10 +19,46 @@ const GERAETE_COOKIE_TAGE = GERAETE_COOKIE_MAX_ALTER_SEKUNDEN / 86_400
 const BESTELLUNGEN_MINUTEN = BESTELLUNGEN_ANSICHT_SEKUNDEN / 60
 const ANMELDECODE_MINUTEN = ANMELDECODE_GUELTIG_SEKUNDEN / 60
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** Wann die Erklärung zuletzt geändert wurde — Stand-Zeile unter dem Titel und Fuß. */
+const DATENSCHUTZ_STAND = 'Oktober 2026'
+
+/*
+ * Die Abschnitte mit ihren Sprungmarken (seit Nr. 231, Vorlage der
+ * Rechtsseiten): Überschrift und Verzeichnis nehmen denselben Eintrag. Die
+ * Titel sind der Wortlaut der Erklärung, unverändert (N43 (4)); neu ist nur
+ * der Rahmen — Verzeichnis, Sprungmarken, Stand-Zeile.
+ */
+const ABSCHNITTE = [
+  { anker: 'verantwortliche-stelle', text: '1. Verantwortliche Stelle' },
+  { anker: 'daten', text: '2. Welche Daten wir verarbeiten' },
+  { anker: 'zweck', text: '3. Zweck der Datenverarbeitung' },
+  { anker: 'dienstleister', text: '4. Externe Dienstleister' },
+  { anker: 'speicherdauer', text: '5. Speicherdauer' },
+  { anker: 'rechte', text: '6. Deine Rechte (Art. 15–22 DSGVO)' },
+  { anker: 'beschwerderecht', text: '7. Beschwerderecht' },
+  { anker: 'cookies', text: '8. Cookies' },
+  { anker: 'neuigkeiten', text: '9. Newsletter und Neuigkeiten von Höfen' },
+  { anker: 'kunden-konto', text: '10. Kunden-Konto (Anmeldung mit Code)' },
+  { anker: 'standortsuche', text: 'Standortsuche und Kartendarstellung' },
+  { anker: 'umkreissuche', text: 'Umkreissuche auf der Hofübersicht' },
+  { anker: 'meldungen', text: 'Fehler- und Wunschmeldungen' },
+  { anker: 'postfach', text: 'Postfach' },
+] as const
+
+type Abschnitt = (typeof ABSCHNITTE)[number]
+
+const VERZEICHNIS: RechtstextVerzeichnisDaten = {
+  kennung: 'datenschutz-inhalt',
+  zusammenfassung: RECHTSTEXT_TEXT.abschnitte(ABSCHNITTE.length),
+  gruppen: [{ eintraege: ABSCHNITTE }],
+}
+
+function Section({ abschnitt, children }: { abschnitt: Abschnitt; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 className={INFOSEITE_ABSCHNITT}>{title}</h2>
+    <section aria-labelledby={abschnitt.anker}>
+      <h2 id={abschnitt.anker} className={`${INFOSEITE_ABSCHNITT} scroll-mt-20`}>
+        {abschnitt.text}
+      </h2>
       <div className="space-y-2 text-muted-foreground">{children}</div>
     </section>
   )
@@ -30,291 +67,288 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function DatenschutzPage() {
   return (
     <KundeShellMitSitzung>
-      <div className={INFOSEITE_SPALTE}>
-        <h1 className={`${INFOSEITE_TITEL} mb-2`}>Datenschutzerklärung</h1>
-        <p className="text-sm text-muted-foreground mb-8">Gemäß DSGVO / DSG Österreich</p>
+      <RechtstextVorlage
+        titel="Datenschutzerklärung"
+        stand={`Gemäß DSGVO / DSG Österreich · ${RECHTSTEXT_TEXT.stand(DATENSCHUTZ_STAND)}`}
+        drucken
+        verzeichnis={VERZEICHNIS}
+        fussStand={DATENSCHUTZ_STAND}
+      >
 
-        <div className="space-y-8 text-sm leading-relaxed">
-
-          <Section title="1. Verantwortliche Stelle">
-            <p>
-              Verantwortlich für die Datenverarbeitung auf dieser Plattform ist der Betreiber von{' '}
-              {MARKE} (Kontaktdaten siehe Impressum).
-            </p>
-            <p>
-              Kontakt für Datenschutzanfragen:{' '}
-              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className={INFOSEITE_LINK}>
-                {DATENSCHUTZ_EMAIL}
-              </a>
-            </p>
-          </Section>
-
-          <Section title="2. Welche Daten wir verarbeiten">
-            <p><strong className="text-foreground">Bei einer Bestellung:</strong></p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Name, E-Mail-Adresse, Telefonnummer</li>
-              <li>Bestellte Produkte, Menge, Gesamtbetrag</li>
-              <li>Gewählter Abholtermin und Zahlungsart</li>
-              <li>Optionale Notiz an den Hof</li>
-            </ul>
-            {/* Nr. 200 (N39): nur die Fakten des Widerrufs online — Zweck, Daten, Frist. */}
-            <p className="mt-3"><strong className="text-foreground">Bei einem Widerruf:</strong></p>
-            <p>
-              Widerrufst du einen Kauf über {WIDERRUF_PFAD}, speichern wir deinen Namen, deine E-Mail-Adresse,
-              die Bestellung (bzw. die Bestellnummer, die du angibst) und deine Nachricht. Zweck: den Widerruf an
-              den Hof weiterzuleiten, dir den Eingang zu bestätigen und die Erstattung abzuwickeln. Wir bewahren
-              diese Daten so lange auf wie die Daten der Bestellung.
-            </p>
-            <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
-            <p>
-              Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.{' '}
-              {MARKE} speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
-              Bestätigungs-ID.
-            </p>
-            <p className="mt-3"><strong className="text-foreground">Technisch notwendige Daten:</strong></p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Session-Cookies (für Warenkorbfunktion, technisch notwendig)</li>
-              <li>Server-Logs (IP-Adresse, Zeitstempel) für Betrieb und Sicherheit</li>
-              <li>
-                Meldest du dich an, speichern wir zur Sitzung deine IP-Adresse. Sie gehört zur
-                Sitzung: Abgelaufene Sitzungen löschen wir {SITZUNGEN_NACH_ABLAUF_TAGE} Tage nach ihrem
-                Ablauf.
-              </li>
-            </ul>
-            <p className="mt-3"><strong className="text-foreground">Weitere Cookies:</strong></p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>
-                Cookie zur Wiedererkennung des Geräts (<span className="whitespace-nowrap">{GERAETE_COOKIE}</span>, {GERAETE_COOKIE_TAGE} Tage):
-                nur bei Hof- und Betreiber-Konten. Es enthält eine zufällige Kennung und dient dazu,
-                dir eine E-Mail zu schicken, wenn sich jemand auf einem neuen Gerät anmeldet.
-              </li>
-              <li>
-                Cookie für „Bestellungen finden“ (<span className="whitespace-nowrap">{BESTELLUNGEN_COOKIE}</span>, {BESTELLUNGEN_MINUTEN} Minuten,
-                nur für die Seite {BESTELLUNGEN_PFAD}): Es merkt sich, dass du deine E-Mail-Adresse mit
-                dem Code bestätigt hast, solange die Liste deiner Bestellungen offen ist.
-              </li>
-            </ul>
-          </Section>
-
-          <Section title="3. Zweck der Datenverarbeitung">
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Abwicklung und Bestätigung von Bestellungen</li>
-              <li>Kommunikation zwischen Hofbetreiber und Kunden (E-Mail-Bestätigungen)</li>
-              <li>Erfüllung steuerrechtlicher Aufbewahrungspflichten</li>
-              <li>Betrieb und Sicherheit der Plattform</li>
-            </ul>
-            <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung) und lit. c (rechtliche Verpflichtung).</p>
-          </Section>
-
-          <Section title="4. Externe Dienstleister">
-            <div className="space-y-3">
-              <div>
-                <p className="font-medium text-foreground">Stripe (Zahlungsabwicklung)</p>
-                <p>Stripe Payments Europe Ltd., 1 Grand Canal Street Lower, Dublin 2, Irland.<br/>
-                Stripe verarbeitet Zahlungsdaten als eigenständiger Verantwortlicher gemäß seinem Datenschutz-Rahmenwerk.</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Resend (E-Mail-Versand)</p>
-                <p>Resend Inc., USA — für transaktionale E-Mails (Bestellbestätigung, Abholhinweis).</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Supabase (Datenbank)</p>
-                <p>Supabase Inc. — Bestelldaten werden in einer PostgreSQL-Datenbank auf europäischen Servern gespeichert.</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Vercel (Hosting)</p>
-                <p>Vercel Inc., USA — Hosting der Webanwendung. Angemessenes Schutzniveau durch Standardvertragsklauseln.</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Sentry (Fehlerdiagnose)</p>
-                <p>Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung,
-                gespeichert auf Servern in der EU. Vor dem Versand werden personenbezogene Inhalte
-                (E-Mail-Adressen, Telefonnummern, Cookies, Zugangsdaten) automatisch entfernt;
-                übermittelt wird, was technisch schiefging, nicht wer betroffen war.</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Cloudflare (DNS und E-Mail-Empfang)</p>
-                <p>Cloudflare, Inc., USA — DNS der Domain und Empfang der E-Mails an unsere
-                Kontaktadressen (Weiterleitung an den Betreiber).</p>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Vercel Web Analytics (Reichweitenmessung)</p>
-                <p>Vercel Inc., USA — cookielose Zählung von Seitenaufrufen ohne Wiedererkennung:
-                Es werden keine Cookies gesetzt, keine Kennungen auf dem Gerät gespeichert und
-                keine Profile über den Tag hinaus gebildet.</p>
-              </div>
-            </div>
-          </Section>
-
-          <Section title="5. Speicherdauer">
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Bestelldaten: 7 Jahre (steuerrechtliche Aufbewahrungspflicht gemäß § 132 BAO)</li>
-              <li>Server-Logs: 30 Tage</li>
-              <li>Warenkorbdaten im Browser (localStorage): bis zur Löschung durch den Nutzer</li>
-            </ul>
-          </Section>
-
-          <Section title="6. Deine Rechte (Art. 15–22 DSGVO)">
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong className="text-foreground">Auskunft:</strong> Du kannst jederzeit Auskunft über gespeicherte Daten verlangen.</li>
-              <li><strong className="text-foreground">Berichtigung:</strong> Unrichtige Daten werden auf Anfrage korrigiert.</li>
-              <li><strong className="text-foreground">Löschung:</strong> Du kannst die Löschung deiner Daten verlangen, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</li>
-              <li><strong className="text-foreground">Einschränkung:</strong> Du kannst die Verarbeitung einschränken lassen.</li>
-              <li><strong className="text-foreground">Widerspruch:</strong> Du kannst der Verarbeitung widersprechen, wenn sie auf berechtigtem Interesse beruht.</li>
-              <li><strong className="text-foreground">Datenübertragbarkeit:</strong> Auf Anfrage erhältst du deine Daten in maschinenlesbarem Format.</li>
-            </ul>
-            <p className="mt-3">
-              Anfragen richten an:{' '}
-              <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className={INFOSEITE_LINK}>
-                {DATENSCHUTZ_EMAIL}
-              </a>
-            </p>
-          </Section>
-
-          <Section title="7. Beschwerderecht">
-            <p>
-              Du hast das Recht, bei der Österreichischen Datenschutzbehörde Beschwerde einzulegen:{' '}
-              <a
-                href="https://www.dsb.gv.at"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={INFOSEITE_LINK}
-              >
-                www.dsb.gv.at
-              </a>
-            </p>
-          </Section>
-
-          <Section title="8. Cookies">
-            <p>
-              Für Warenkorbfunktion und Session-Verwaltung verwenden wir technisch notwendige
-              Cookies und localStorage-Einträge. Es werden keine Tracking-Cookies oder
-              Werbe-Cookies eingesetzt. Die weiteren Cookies stehen mit Zweck und Dauer in
-              Abschnitt 2.
-            </p>
-          </Section>
-
-          <Section title="9. Newsletter und Neuigkeiten von Höfen">
-            <p>
-              Beim Abschluss einer Bestellung kannst du optional zustimmen, dass du vom jeweiligen
-              Hof über frische Produkte und Neuigkeiten informiert wirst — per E-Mail und/oder
-              WhatsApp.
-            </p>
-            <p>
-              Diese Einwilligung ist freiwillig und hat keinen Einfluss auf deine Bestellung. Du
-              kannst sie jederzeit widerrufen:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Über den Abmelde-Link in jeder Nachricht</li>
-              <li>
-                In deinem{' '}
-                <Link href="/account/profile" className={INFOSEITE_LINK}>
-                  Kunden-Profil
-                </Link>{' '}
-                unter „Mein Konto&ldquo;
-              </li>
-            </ul>
-            <p>
-              Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (ausdrückliche Einwilligung).
-              Gespeichert werden ausschließlich deine E-Mail-Adresse, ggf. Telefonnummer und
-              die erteilten Einwilligungen.
-            </p>
-          </Section>
-
-          <Section title="10. Kunden-Konto (Anmeldung mit Code)">
-            <p>
-              Du kannst dich mit einem Code, den wir dir per E-Mail schicken, in dein Kunden-Konto
-              einloggen, um deine Benachrichtigungs-Einstellungen zu verwalten. Der Code hat{' '}
-              {ANMELDECODE_LAENGE} Stellen und gilt {ANMELDECODE_MINUTEN} Minuten. Dabei wird deine
-              E-Mail-Adresse gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7 Tage).
-            </p>
-            <p>
-              Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter{' '}
-              <Link href="/account/profile" className={INFOSEITE_LINK}>
-                Mein Konto → Konto löschen
-              </Link>{' '}
-              vollständig löschen. Bestelldaten werden aus steuerrechtlichen Gründen weiterhin
-              aufbewahrt (§ 132 BAO, 7 Jahre).
-            </p>
-          </Section>
-
-          <Section title="Standortsuche und Kartendarstellung">
-            <p>
-              Sucht ein Hof im Hofprofil seinen Standort, wird die eingegebene Hofadresse
-              (Straße, PLZ, Ort) zur Standortsuche an Nominatim (OpenStreetMap Foundation,
-              nominatim.openstreetmap.org) übermittelt; schiebt er den Kartenpunkt, wird
-              umgekehrt dieser Punkt zur Ermittlung der Adresse dorthin übermittelt — es
-              handelt sich jeweils um die Betriebsadresse bzw. den Betriebsstandort des
-              Hofes, nicht um Daten von Besucherinnen. Die
-              Kartenkacheln der Minikarte werden von OpenStreetMap geladen; dabei wird die
-              IP-Adresse des eingeloggten Betreibers an OpenStreetMap übertragen. Auf der
-              öffentlichen Hofübersicht wird eine Karte erst geladen, wenn du dort die
-              Kartenansicht öffnest — dann wird deine IP-Adresse zum Abruf der Kacheln an
-              OpenStreetMap übertragen; darüber hinaus werden keine Daten über dich
-              weitergegeben.
-            </p>
-          </Section>
-
-          <Section title="Umkreissuche auf der Hofübersicht">
-            <p>
-              Tippst du auf der Hofübersicht „In meiner Nähe“, fragt dein Browser deinen
-              Standort ab — und behält ihn: Er wird <strong className="font-medium">nicht an uns
-              und an niemanden sonst übertragen</strong>. Die Entfernungen zu den Höfen rechnet
-              dein Gerät selbst aus den Hofkoordinaten, die mit der Seite ohnehin geladen
-              wurden. Wir speichern deinen Standort nicht, weder auf dem Gerät noch bei uns;
-              schließt du die Seite, ist er fort.
-            </p>
-            <p className="mt-3">
-              Sendest du eine Suche ab, geht dein Suchtext an unseren Server und von dort an
-              Nominatim (OpenStreetMap Foundation), um zu prüfen, ob es ein Ort ist, und
-              daraus einen Kartenpunkt zu machen — deine IP-Adresse erreicht Nominatim dabei
-              nicht, und ein gemessener Standort wird nie übermittelt. Die Suche startet
-              erst, wenn du sie absendest; die Eingabe speichern wir nicht.
-            </p>
-          </Section>
-
-          <Section title="Fehler- und Wunschmeldungen">
-            <p>
-              Über &bdquo;Problem melden&ldquo; kannst du uns Fehler, Wünsche und Fragen
-              zur Plattform schicken. Gespeichert werden dein Text, die Art der Meldung, die
-              Adresse der Seite, von der du gemeldet hast, Browser-Kennung (User-Agent) und
-              Bildschirmgröße sowie der Zeitpunkt — keine IP-Adresse, keine Cookies. Bei
-              eingeloggten Höfen wird die Meldung dem Hof zugeordnet; Höfe können freiwillig ein
-              Bildschirmfoto anhängen. Als Kundin kannst du freiwillig eine E-Mail-Adresse
-              angeben, ausschließlich für Rückfragen — ohne sie bleibt die Meldung anonym.
-            </p>
-            <p>
-              Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am Betrieb und
-              an der Verbesserung der Plattform), für die freiwillige E-Mail-Adresse lit. a
-              (Einwilligung). Erledigte Meldungen werden 90 Tage nach ihrer Bearbeitung samt
-              Bildschirmfoto gelöscht.
-            </p>
-          </Section>
-
-          {/* Zusagen nach Register N12 und AGB 20.2 (Fassung 0.9); Mail-Regel aus Nr. 87.
-              Ändert sich eine davon, ändert sich dieser Abschnitt mit. */}
-          <Section title="Postfach">
-            <p>
-              Wir schreiben Höfen über das Postfach in der App, zum Beispiel zur Abrechnung oder zu
-              Änderungen der AGB. Der Hof kann jede Nachricht beantworten. Gespeichert werden der
-              Text der Nachricht und der Antwort, der Zeitpunkt und ob der Hof die Nachricht
-              gelesen hat.
-            </p>
-            <p>
-              Die Nachrichten bleiben gespeichert, solange das Hofkonto besteht, und werden mit dem
-              Hof gelöscht. Wir durchsuchen das Postfach nicht nach Inhalten; wir lesen nur, was
-              ein Hof uns schreibt. Betrifft eine Nachricht den Betrieb des Hofs, können wir sie
-              zusätzlich per E-Mail an die Adresse des Hofkontos schicken. Werbung für Dritte
-              schicken wir nie.
-            </p>
-            <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung).</p>
-          </Section>
-
-          <p className="text-xs text-muted-foreground pt-4 border-t border-border">
-            Stand: Oktober 2026
+        <Section abschnitt={ABSCHNITTE[0]}>
+          <p>
+            Verantwortlich für die Datenverarbeitung auf dieser Plattform ist der Betreiber von{' '}
+            {MARKE} (Kontaktdaten siehe Impressum).
           </p>
-        </div>
-      </div>
+          <p>
+            Kontakt für Datenschutzanfragen:{' '}
+            <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className={INFOSEITE_LINK}>
+              {DATENSCHUTZ_EMAIL}
+            </a>
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[1]}>
+          <p><strong className="text-foreground">Bei einer Bestellung:</strong></p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Name, E-Mail-Adresse, Telefonnummer</li>
+            <li>Bestellte Produkte, Menge, Gesamtbetrag</li>
+            <li>Gewählter Abholtermin und Zahlungsart</li>
+            <li>Optionale Notiz an den Hof</li>
+          </ul>
+          {/* Nr. 200 (N39): nur die Fakten des Widerrufs online — Zweck, Daten, Frist. */}
+          <p className="mt-3"><strong className="text-foreground">Bei einem Widerruf:</strong></p>
+          <p>
+            Widerrufst du einen Kauf über {WIDERRUF_PFAD}, speichern wir deinen Namen, deine E-Mail-Adresse,
+            die Bestellung (bzw. die Bestellnummer, die du angibst) und deine Nachricht. Zweck: den Widerruf an
+            den Hof weiterzuleiten, dir den Eingang zu bestätigen und die Erstattung abzuwickeln. Wir bewahren
+            diese Daten so lange auf wie die Daten der Bestellung.
+          </p>
+          <p className="mt-3"><strong className="text-foreground">Zahlungsdaten:</strong></p>
+          <p>
+            Kreditkarten- und Bankdaten werden ausschließlich von Stripe verarbeitet und gespeichert.{' '}
+            {MARKE} speichert keine vollständigen Zahlungsdaten — nur eine anonymisierte
+            Bestätigungs-ID.
+          </p>
+          <p className="mt-3"><strong className="text-foreground">Technisch notwendige Daten:</strong></p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Session-Cookies (für Warenkorbfunktion, technisch notwendig)</li>
+            <li>Server-Logs (IP-Adresse, Zeitstempel) für Betrieb und Sicherheit</li>
+            <li>
+              Meldest du dich an, speichern wir zur Sitzung deine IP-Adresse. Sie gehört zur
+              Sitzung: Abgelaufene Sitzungen löschen wir {SITZUNGEN_NACH_ABLAUF_TAGE} Tage nach ihrem
+              Ablauf.
+            </li>
+          </ul>
+          <p className="mt-3"><strong className="text-foreground">Weitere Cookies:</strong></p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>
+              Cookie zur Wiedererkennung des Geräts (<span className="whitespace-nowrap">{GERAETE_COOKIE}</span>, {GERAETE_COOKIE_TAGE} Tage):
+              nur bei Hof- und Betreiber-Konten. Es enthält eine zufällige Kennung und dient dazu,
+              dir eine E-Mail zu schicken, wenn sich jemand auf einem neuen Gerät anmeldet.
+            </li>
+            <li>
+              Cookie für „Bestellungen finden“ (<span className="whitespace-nowrap">{BESTELLUNGEN_COOKIE}</span>, {BESTELLUNGEN_MINUTEN} Minuten,
+              nur für die Seite {BESTELLUNGEN_PFAD}): Es merkt sich, dass du deine E-Mail-Adresse mit
+              dem Code bestätigt hast, solange die Liste deiner Bestellungen offen ist.
+            </li>
+          </ul>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[2]}>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Abwicklung und Bestätigung von Bestellungen</li>
+            <li>Kommunikation zwischen Hofbetreiber und Kunden (E-Mail-Bestätigungen)</li>
+            <li>Erfüllung steuerrechtlicher Aufbewahrungspflichten</li>
+            <li>Betrieb und Sicherheit der Plattform</li>
+          </ul>
+          <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung) und lit. c (rechtliche Verpflichtung).</p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[3]}>
+          <div className="space-y-3">
+            <div>
+              <p className="font-medium text-foreground">Stripe (Zahlungsabwicklung)</p>
+              <p>Stripe Payments Europe Ltd., 1 Grand Canal Street Lower, Dublin 2, Irland.<br/>
+              Stripe verarbeitet Zahlungsdaten als eigenständiger Verantwortlicher gemäß seinem Datenschutz-Rahmenwerk.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Resend (E-Mail-Versand)</p>
+              <p>Resend Inc., USA — für transaktionale E-Mails (Bestellbestätigung, Abholhinweis).</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Supabase (Datenbank)</p>
+              <p>Supabase Inc. — Bestelldaten werden in einer PostgreSQL-Datenbank auf europäischen Servern gespeichert.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Vercel (Hosting)</p>
+              <p>Vercel Inc., USA — Hosting der Webanwendung. Angemessenes Schutzniveau durch Standardvertragsklauseln.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Sentry (Fehlerdiagnose)</p>
+              <p>Functional Software, Inc. (Sentry), USA — technische Fehlerberichte der Anwendung,
+              gespeichert auf Servern in der EU. Vor dem Versand werden personenbezogene Inhalte
+              (E-Mail-Adressen, Telefonnummern, Cookies, Zugangsdaten) automatisch entfernt;
+              übermittelt wird, was technisch schiefging, nicht wer betroffen war.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Cloudflare (DNS und E-Mail-Empfang)</p>
+              <p>Cloudflare, Inc., USA — DNS der Domain und Empfang der E-Mails an unsere
+              Kontaktadressen (Weiterleitung an den Betreiber).</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Vercel Web Analytics (Reichweitenmessung)</p>
+              <p>Vercel Inc., USA — cookielose Zählung von Seitenaufrufen ohne Wiedererkennung:
+              Es werden keine Cookies gesetzt, keine Kennungen auf dem Gerät gespeichert und
+              keine Profile über den Tag hinaus gebildet.</p>
+            </div>
+          </div>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[4]}>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Bestelldaten: 7 Jahre (steuerrechtliche Aufbewahrungspflicht gemäß § 132 BAO)</li>
+            <li>Server-Logs: 30 Tage</li>
+            <li>Warenkorbdaten im Browser (localStorage): bis zur Löschung durch den Nutzer</li>
+          </ul>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[5]}>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li><strong className="text-foreground">Auskunft:</strong> Du kannst jederzeit Auskunft über gespeicherte Daten verlangen.</li>
+            <li><strong className="text-foreground">Berichtigung:</strong> Unrichtige Daten werden auf Anfrage korrigiert.</li>
+            <li><strong className="text-foreground">Löschung:</strong> Du kannst die Löschung deiner Daten verlangen, soweit keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</li>
+            <li><strong className="text-foreground">Einschränkung:</strong> Du kannst die Verarbeitung einschränken lassen.</li>
+            <li><strong className="text-foreground">Widerspruch:</strong> Du kannst der Verarbeitung widersprechen, wenn sie auf berechtigtem Interesse beruht.</li>
+            <li><strong className="text-foreground">Datenübertragbarkeit:</strong> Auf Anfrage erhältst du deine Daten in maschinenlesbarem Format.</li>
+          </ul>
+          <p className="mt-3">
+            Anfragen richten an:{' '}
+            <a href={`mailto:${DATENSCHUTZ_EMAIL}`} className={INFOSEITE_LINK}>
+              {DATENSCHUTZ_EMAIL}
+            </a>
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[6]}>
+          <p>
+            Du hast das Recht, bei der Österreichischen Datenschutzbehörde Beschwerde einzulegen:{' '}
+            <a
+              href="https://www.dsb.gv.at"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={INFOSEITE_LINK}
+            >
+              www.dsb.gv.at
+            </a>
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[7]}>
+          <p>
+            Für Warenkorbfunktion und Session-Verwaltung verwenden wir technisch notwendige
+            Cookies und localStorage-Einträge. Es werden keine Tracking-Cookies oder
+            Werbe-Cookies eingesetzt. Die weiteren Cookies stehen mit Zweck und Dauer in
+            Abschnitt 2.
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[8]}>
+          <p>
+            Beim Abschluss einer Bestellung kannst du optional zustimmen, dass du vom jeweiligen
+            Hof über frische Produkte und Neuigkeiten informiert wirst — per E-Mail und/oder
+            WhatsApp.
+          </p>
+          <p>
+            Diese Einwilligung ist freiwillig und hat keinen Einfluss auf deine Bestellung. Du
+            kannst sie jederzeit widerrufen:
+          </p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Über den Abmelde-Link in jeder Nachricht</li>
+            <li>
+              In deinem{' '}
+              <Link href="/account/profile" className={INFOSEITE_LINK}>
+                Kunden-Profil
+              </Link>{' '}
+              unter „Mein Konto&ldquo;
+            </li>
+          </ul>
+          <p>
+            Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (ausdrückliche Einwilligung).
+            Gespeichert werden ausschließlich deine E-Mail-Adresse, ggf. Telefonnummer und
+            die erteilten Einwilligungen.
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[9]}>
+          <p>
+            Du kannst dich mit einem Code, den wir dir per E-Mail schicken, in dein Kunden-Konto
+            einloggen, um deine Benachrichtigungs-Einstellungen zu verwalten. Der Code hat{' '}
+            {ANMELDECODE_LAENGE} Stellen und gilt {ANMELDECODE_MINUTEN} Minuten. Dabei wird deine
+            E-Mail-Adresse gespeichert sowie ein temporärer Sitzungs-Cookie gesetzt (gültig 7 Tage).
+          </p>
+          <p>
+            Du kannst dein Konto und alle gespeicherten Einwilligungen jederzeit unter{' '}
+            <Link href="/account/profile" className={INFOSEITE_LINK}>
+              Mein Konto → Konto löschen
+            </Link>{' '}
+            vollständig löschen. Bestelldaten werden aus steuerrechtlichen Gründen weiterhin
+            aufbewahrt (§ 132 BAO, 7 Jahre).
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[10]}>
+          <p>
+            Sucht ein Hof im Hofprofil seinen Standort, wird die eingegebene Hofadresse
+            (Straße, PLZ, Ort) zur Standortsuche an Nominatim (OpenStreetMap Foundation,
+            nominatim.openstreetmap.org) übermittelt; schiebt er den Kartenpunkt, wird
+            umgekehrt dieser Punkt zur Ermittlung der Adresse dorthin übermittelt — es
+            handelt sich jeweils um die Betriebsadresse bzw. den Betriebsstandort des
+            Hofes, nicht um Daten von Besucherinnen. Die
+            Kartenkacheln der Minikarte werden von OpenStreetMap geladen; dabei wird die
+            IP-Adresse des eingeloggten Betreibers an OpenStreetMap übertragen. Auf der
+            öffentlichen Hofübersicht wird eine Karte erst geladen, wenn du dort die
+            Kartenansicht öffnest — dann wird deine IP-Adresse zum Abruf der Kacheln an
+            OpenStreetMap übertragen; darüber hinaus werden keine Daten über dich
+            weitergegeben.
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[11]}>
+          <p>
+            Tippst du auf der Hofübersicht „In meiner Nähe“, fragt dein Browser deinen
+            Standort ab — und behält ihn: Er wird <strong className="font-medium">nicht an uns
+            und an niemanden sonst übertragen</strong>. Die Entfernungen zu den Höfen rechnet
+            dein Gerät selbst aus den Hofkoordinaten, die mit der Seite ohnehin geladen
+            wurden. Wir speichern deinen Standort nicht, weder auf dem Gerät noch bei uns;
+            schließt du die Seite, ist er fort.
+          </p>
+          <p className="mt-3">
+            Sendest du eine Suche ab, geht dein Suchtext an unseren Server und von dort an
+            Nominatim (OpenStreetMap Foundation), um zu prüfen, ob es ein Ort ist, und
+            daraus einen Kartenpunkt zu machen — deine IP-Adresse erreicht Nominatim dabei
+            nicht, und ein gemessener Standort wird nie übermittelt. Die Suche startet
+            erst, wenn du sie absendest; die Eingabe speichern wir nicht.
+          </p>
+        </Section>
+
+        <Section abschnitt={ABSCHNITTE[12]}>
+          <p>
+            Über &bdquo;Problem melden&ldquo; kannst du uns Fehler, Wünsche und Fragen
+            zur Plattform schicken. Gespeichert werden dein Text, die Art der Meldung, die
+            Adresse der Seite, von der du gemeldet hast, Browser-Kennung (User-Agent) und
+            Bildschirmgröße sowie der Zeitpunkt — keine IP-Adresse, keine Cookies. Bei
+            eingeloggten Höfen wird die Meldung dem Hof zugeordnet; Höfe können freiwillig ein
+            Bildschirmfoto anhängen. Als Kundin kannst du freiwillig eine E-Mail-Adresse
+            angeben, ausschließlich für Rückfragen — ohne sie bleibt die Meldung anonym.
+          </p>
+          <p>
+            Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am Betrieb und
+            an der Verbesserung der Plattform), für die freiwillige E-Mail-Adresse lit. a
+            (Einwilligung). Erledigte Meldungen werden 90 Tage nach ihrer Bearbeitung samt
+            Bildschirmfoto gelöscht.
+          </p>
+        </Section>
+
+        {/* Zusagen nach Register N12 und AGB 20.2 (Fassung 0.9); Mail-Regel aus Nr. 87.
+            Ändert sich eine davon, ändert sich dieser Abschnitt mit. */}
+        <Section abschnitt={ABSCHNITTE[13]}>
+          <p>
+            Wir schreiben Höfen über das Postfach in der App, zum Beispiel zur Abrechnung oder zu
+            Änderungen der AGB. Der Hof kann jede Nachricht beantworten. Gespeichert werden der
+            Text der Nachricht und der Antwort, der Zeitpunkt und ob der Hof die Nachricht
+            gelesen hat.
+          </p>
+          <p>
+            Die Nachrichten bleiben gespeichert, solange das Hofkonto besteht, und werden mit dem
+            Hof gelöscht. Wir durchsuchen das Postfach nicht nach Inhalten; wir lesen nur, was
+            ein Hof uns schreibt. Betrifft eine Nachricht den Betrieb des Hofs, können wir sie
+            zusätzlich per E-Mail an die Adresse des Hofkontos schicken. Werbung für Dritte
+            schicken wir nie.
+          </p>
+          <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung).</p>
+        </Section>
+      </RechtstextVorlage>
     </KundeShellMitSitzung>
   )
 }

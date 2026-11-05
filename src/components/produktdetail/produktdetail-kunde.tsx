@@ -446,6 +446,7 @@ export function ProduktdetailKunde({
           jetzt={jetzt}
           produkte={produkte}
           kasseHref={kasse}
+          kasseUmriss
           className="hidden lg:col-start-2 lg:row-start-1 lg:flex"
         />
       </div>

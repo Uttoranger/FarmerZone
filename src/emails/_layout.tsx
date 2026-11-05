@@ -1,6 +1,9 @@
 import * as React from 'react'
 import { Html, Head, Body, Container, Section, Text, Hr, Preview, Row, Column, Link } from '@react-email/components'
 import { MARKE } from '@/lib/marke'
+import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
+import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
+import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
 
 /**
  * Die Mail-Palette — die EINZIGE Stelle mit Farbwerten unter src/emails/
@@ -87,18 +90,69 @@ const footerText: React.CSSProperties = {
   textAlign: 'center' as const,
 }
 
+/**
+ * Wer die Mail schickt — der Satz unter der Karte (V68, V79; Auftrag Lauf 30,
+ * „E-Mails“). Jede Vorlage wählt ihre Art selbst (Pflicht-Prop, Liste in
+ * tests/mail-vorschau.test.ts):
+ *  - `hof`: Bestellmails an die Kundin — der Vertrag besteht mit dem Hof.
+ *  - `plattform`: Konto, Code, Passwort, Sicherheit, Freischaltung, Lastschrift,
+ *    Team und alle Mails an den Hof — kein Hof löst sie aus.
+ *  - `betrieb`: Mails an das Team (Betrieb), intern und ohne Anbieterzeile.
+ *  - `postfach`: Nachrichten vom Team an einen Hof (Register N12).
+ *  - `beitrag`: Neuigkeiten eines Hofs an seine Abonnentinnen.
+ */
+export type MailFuss = { art: 'hof' } | { art: 'plattform' } | { art: 'betrieb' } | { art: 'postfach' } | { art: 'beitrag'; hof: string }
+
+export type MailFussArt = MailFuss['art']
+
+/** Die Sätze des Fußes — eine Quelle für Vorlagen und Tests. Betrieb und Postfach behalten ihren Satz aus zustellung.ts bzw. postfach.ts. */
+export const MAIL_FUSS_TEXT = {
+  hof: `Versandt von ${MARKE} im Auftrag eines Hofes.`,
+  plattform: `Versandt von ${MARKE}.`,
+  betrieb: ZUSTELLUNG_MAIL_TEXT.fuss,
+  postfach: POSTFACH_MAIL_TEXT.fuss,
+  /** Ohne Anschrift des Hofs: Ob sie in den Fuß gehört, prüft das Recht (ECG § 6, MedienG § 24/25). */
+  beitrag: (hof: string) => `Im Auftrag von ${hof} · versandt von ${MARKE}`,
+  /** Der Link unter dem Fuß: in Beitrags-Mails die Neuigkeiten (Wortliste N42 c), sonst die Benachrichtigungen. */
+  verwalten: 'Benachrichtigungen verwalten',
+  verwaltenBeitrag: 'Neuigkeiten verwalten',
+} as const
+
+/** Der Satz unter der Karte für diese Art. */
+export function fussSatz(fuss: MailFuss): string {
+  if (fuss.art === 'beitrag') return MAIL_FUSS_TEXT.beitrag(fuss.hof)
+  return MAIL_FUSS_TEXT[fuss.art]
+}
+
+/** Die Seite, auf die die Anbieterzeile zeigt. Betreiberdaten stehen nur dort (A001), nie im Code — das Repo ist öffentlich. */
+const IMPRESSUM_PFAD = '/impressum'
+
+/**
+ * Die Anbieterzeile unter dem Fuß (V68): Name und Link auf das Impressum der
+ * echten Seite — auch in Mails aus der Vorschau, denn gelesen wird die Mail
+ * außerhalb unseres Servers. Betriebs-Mails tragen sie nicht (intern).
+ */
+export function Anbieterzeile(): React.JSX.Element {
+  return (
+    <Text style={{ ...footerText, marginTop: '4px' }}>
+      {`${MARKE} · `}
+      <a href={`${PRODUKTION_ADRESSE}${IMPRESSUM_PFAD}`} style={{ color: MAIL_FARBE.textLeise }}>
+        {`${PRODUKTION_HOST}${IMPRESSUM_PFAD}`}
+      </a>
+    </Text>
+  )
+}
+
 interface EmailLayoutProps {
   previewText: string
   children: React.ReactNode
+  /** Der Link „… verwalten“ unter dem Fuß; in Beitrags-Mails der Abmelde-Link (Register S11, unverändert). */
   manageUrl?: string
-  /**
-   * Der Satz unter der Karte. Ohne ihn der Satz der Mails im Namen eines Hofs;
-   * Mails des Teams (Postfach, Register N12) nennen das Team als Absender.
-   */
-  fusszeile?: string
+  /** Wer die Mail schickt — Pflicht, damit jede Vorlage ihre Art selbst wählt. */
+  fuss: MailFuss
 }
 
-export function EmailLayout({ previewText, children, manageUrl, fusszeile }: EmailLayoutProps): React.JSX.Element {
+export function EmailLayout({ previewText, children, manageUrl, fuss }: EmailLayoutProps): React.JSX.Element {
   return (
     <Html lang="de">
       <Head>
@@ -116,11 +170,12 @@ export function EmailLayout({ previewText, children, manageUrl, fusszeile }: Ema
             <Section style={content}>{children}</Section>
           </Section>
           <Section style={{ padding: '16px 24px 0' }}>
-            <Text style={footerText}>{fusszeile ?? `Versandt von ${MARKE} im Auftrag eines Hofes.`}</Text>
+            <Text style={footerText}>{fussSatz(fuss)}</Text>
+            {fuss.art !== 'betrieb' && <Anbieterzeile />}
             {manageUrl && (
               <Text style={{ ...footerText, marginTop: '6px' }}>
                 <a href={manageUrl} style={{ color: MAIL_FARBE.textLeise }}>
-                  Benachrichtigungen verwalten
+                  {fuss.art === 'beitrag' ? MAIL_FUSS_TEXT.verwaltenBeitrag : MAIL_FUSS_TEXT.verwalten}
                 </a>
               </Text>
             )}
@@ -209,7 +264,11 @@ export const totalRow: React.CSSProperties = {
   marginTop: '4px',
 }
 
-/** Der grüne Knopf — die Hauptaktion einer Mail (Pille wie im Mockup). */
+/**
+ * Der grüne Knopf — die Hauptaktion einer Mail (Pille wie im Mockup). Mindestens
+ * 44 px hoch (V78): 13 + 16 + 13 px und 1 px Rand oben und unten; die Zeilenhöhe
+ * steht fest, damit kein Mailprogramm den Knopf mit seiner eigenen kleiner macht.
+ */
 export const ctaButton: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.gruen,
   border: `1px solid ${MAIL_FARBE.gruen}`,
@@ -218,7 +277,8 @@ export const ctaButton: React.CSSProperties = {
   display: 'inline-block',
   fontSize: '14px',
   fontWeight: '600',
-  padding: '11px 18px',
+  lineHeight: '16px',
+  padding: '13px 18px',
   textDecoration: 'none',
   textAlign: 'center' as const,
   margin: '16px 0',

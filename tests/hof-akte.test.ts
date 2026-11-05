@@ -111,7 +111,7 @@ describe('hofAkteAnsicht — kein Date, keine volle Anmelde-E-Mail', () => {
     nachrichten: [],
     protokoll: [{ id: 'p1', wann: JETZT, wer: null, art: 'hof_gesperrt', grund: 'Beschwerden klären', mitPasskey: true }],
   }
-  const ansicht = hofAkteAnsicht(roh, { anmeldungGekuerzt: 'h•••@example.com', emailBestaetigt: 'ja', stripeBereit: true, onlineAn: true, ich: 'u1' }, JETZT)
+  const ansicht = hofAkteAnsicht(roh, { anmeldungGekuerzt: 'h•••@example.com', emailBestaetigt: 'ja', stripeBereit: true, onlineAn: true, ich: 'u1', gebuehrWort: 'Servicegebühr', gebuehrModell: 'bisher' }, JETZT)
 
   it('Werte als Text und Cent; „Hof-E-Mail fehlt“ bei leerem Feld (Nr. 212); Gerät gekürzt', () => {
     expect(ansicht.kontakt).toMatchObject({ anmeldung: 'h•••@example.com', hofEmail: 'Hof-E-Mail fehlt', ort: '1234 Musterort · Österreich' })
@@ -160,10 +160,11 @@ describe('Akte und Dialog', () => {
         zustand: gesperrt ? { id: 'gesperrt', text: 'Gesperrt', ton: 'offen' } : { id: 'verkauft', text: 'Verkauft', ton: 'fertig' },
         akte: {
           kontakt: { telefon: '–', anmeldung: 'h•••@example.com', emailBestaetigt: 'ja', hofEmail: 'wie Anmeldung', ort: '1234 Musterort · Österreich', agb: 'Fassung 0.9 · 31.10.2026, 14:05 Uhr' },
-          aktivitaet: { bestellungen: 0, bestellungenZeile: '', umsatzCents: 0, servicegebuehrCents: 0, zuletztAngemeldet: 'noch nie', anmeldung: null, antwortzeit: '' },
+          aktivitaet: { bestellungen: 0, bestellungenZeile: '', umsatzCents: 0, servicegebuehrCents: 0, gebuehrZeile: 'Servicegebühr € 0,00', zuletztAngemeldet: 'noch nie', anmeldung: null, antwortzeit: '' },
           zustand: [],
           sperre: { gesperrt, grund: gesperrt ? 'Beschwerden klären' : null, seit: gesperrt ? 'heute 08:00' : null },
           protokoll: [{ id: 'p1', wann: 'heute 08:00', wer: 'Du', text: 'Vorübergehend gesperrt', grund: 'Beschwerden klären', mitPasskey: true }],
+          gebuehrModell: 'bisher',
         },
       })
     )

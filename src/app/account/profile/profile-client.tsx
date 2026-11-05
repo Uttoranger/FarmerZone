@@ -4,7 +4,7 @@ import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Mail, MessageCircle, Trash2, BellOff, ExternalLink, LogOut, ShieldCheck } from 'lucide-react'
+import { Mail, MessageCircle, Trash2, BellOff, LogOut, ShieldCheck } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
@@ -14,15 +14,9 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
 import { AngemeldeteGeraete } from '@/components/konto/angemeldete-geraete'
 import type { GeraeteZeile } from '@/lib/geraete'
-import { Button } from '@/components/ui/button'
 import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Dialog, DialogMitte } from '@/components/ui/dialog'
+import { textlinkKlassen } from '@/components/ui/textlink'
 
 /*
  * „Mein Konto" der freiwilligen Kunden-Anmeldung — seit Nr. 14 im neuen Design
@@ -31,6 +25,10 @@ import {
  * Seit Nr. 178 (Register S18) dazu die angemeldeten Geräte mit „Überall
  * abmelden" (Baustein AngemeldeteGeraete, `fuerKundin`).
  * Zerstörendes steht orange umrandet, nie grün (DESIGN_SYSTEM, „Dialoge").
+ * Seit Lauf 30 (Boards s2/w2-kundenkonto): im Browser zwei Spalten
+ * (Abonnements | Geräte und Konto), „Neuigkeiten“ statt „Benachrichtigungen“
+ * (Wortliste N42 c), der Lösch-Dialog zentriert mit genau einem
+ * Schließen-Element (DialogMitte, N41 d).
  */
 
 interface SubscriptionRow {
@@ -135,13 +133,10 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-8 px-4 pt-6 pb-12 md:pt-10">
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-8 px-4 pt-6 pb-12 md:pt-10 lg:max-w-[1000px]">
       {/* Kopf */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-heading text-[26px] leading-tight font-semibold md:text-[30px]">Mein Konto</h1>
-          <p className="mt-0.5 text-[13.5px] break-words text-muted-foreground [overflow-wrap:anywhere]">{user.email}</p>
-        </div>
+        <h1 className="min-w-0 font-heading text-[26px] leading-tight font-semibold md:text-[30px]">Mein Konto</h1>
         <button type="button" onClick={handleLogout} className={KNOPF_RAHMEN}>
           <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />
           Abmelden
@@ -155,111 +150,108 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
         </Link>
       )}
 
-      {/* Abonnements */}
-      <section aria-labelledby="abos-titel" className="flex flex-col gap-3">
-        <h2 id="abos-titel" className={ETIKETT}>
-          Meine Abonnements
-        </h2>
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+        {/* Abonnements */}
+        <section aria-labelledby="abos-titel" className="flex flex-col gap-3">
+          <h2 id="abos-titel" className={ETIKETT}>
+            Meine Abonnements
+          </h2>
 
-        {subs.length === 0 ? (
-          <EmptyState
-            symbol={BellOff}
-            titel="Du hast noch keine Benachrichtigungen abonniert."
-            satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
-            ausweg={
-              <Link href="/hoefe" className={KNOPF_GRUEN}>
-                Höfe entdecken
-              </Link>
-            }
-          />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {subs.map((sub) => (
-              <li key={sub.farmId} className={cn(KARTE, 'transition-opacity', isPending && 'opacity-70')}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate font-semibold" title={sub.farmName}>
-                    {sub.farmName}
-                  </p>
-                  <Link
-                    href={`/${sub.farmSlug}`}
-                    target="_blank"
-                    aria-label={`Hofseite von ${sub.farmName} öffnen (neuer Tab)`}
-                    className={cn(
-                      'flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
-                      FOKUS_RAHMEN
-                    )}
-                  >
-                    <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  </Link>
-                </div>
+          {subs.length === 0 ? (
+            <EmptyState
+              symbol={BellOff}
+              titel="Du hast noch keine Neuigkeiten abonniert."
+              satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
+              ausweg={
+                <Link href="/hoefe" className={KNOPF_GRUEN}>
+                  Höfe entdecken
+                </Link>
+              }
+            />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {subs.map((sub) => (
+                <li key={sub.farmId} className={cn(KARTE, 'transition-opacity', isPending && 'opacity-70')}>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate font-semibold" title={sub.farmName}>
+                      {sub.farmName}
+                    </p>
+                    <Link
+                      href={`/${sub.farmSlug}`}
+                      target="_blank"
+                      aria-label={`Hofseite von ${sub.farmName} öffnen (neuer Tab)`}
+                      className={cn(textlinkKlassen({ ton: 'gruen' }), 'shrink-0 text-[13.5px] underline')}
+                    >
+                      Hofseite
+                    </Link>
+                  </div>
 
-                <div className="flex flex-col">
-                  <ToggleRow
-                    icon={Mail}
-                    label="E-Mail-Neuigkeiten"
-                    hof={sub.farmName}
-                    active={sub.optInEmail || sub.emailWartet}
-                    hinweis={sub.emailWartet ? ABO_TEXT.schalterWartet : undefined}
-                    onToggle={() => toggleEmail(sub.farmId)}
-                  />
-                  <ToggleRow
-                    icon={MessageCircle}
-                    label="WhatsApp-Neuigkeiten"
-                    hof={sub.farmName}
-                    active={sub.optInWhatsApp}
-                    disabled={!sub.customerPhone}
-                    disabledNote="Keine Telefonnummer hinterlegt"
-                    onToggle={() => toggleWhatsApp(sub.farmId)}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Angemeldete Geräte (S18): je Gerät abmelden, „Überall abmelden" */}
-      {geraete.length > 0 && (
-        <section aria-label="Angemeldete Geräte" className="flex flex-col gap-3">
-          <AngemeldeteGeraete zeilen={geraete} fuerKundin />
+                  <div className="flex flex-col">
+                    <ToggleRow
+                      icon={Mail}
+                      label="E-Mail-Neuigkeiten"
+                      hof={sub.farmName}
+                      active={sub.optInEmail || sub.emailWartet}
+                      hinweis={sub.emailWartet ? ABO_TEXT.schalterWartet : undefined}
+                      onToggle={() => toggleEmail(sub.farmId)}
+                    />
+                    <ToggleRow
+                      icon={MessageCircle}
+                      label="WhatsApp-Neuigkeiten"
+                      hof={sub.farmName}
+                      active={sub.optInWhatsApp}
+                      disabled={!sub.customerPhone}
+                      disabledNote="Keine Telefonnummer hinterlegt – gib sie bei deiner nächsten Bestellung an."
+                      onToggle={() => toggleWhatsApp(sub.farmId)}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
-      )}
 
-      {/* Konto löschen */}
-      <section aria-labelledby="konto-titel" className="flex flex-col gap-3">
-        <h2 id="konto-titel" className={ETIKETT}>
-          Konto
-        </h2>
-        <div className={cn(KARTE, 'flex flex-col items-start gap-2')}>
-          <button type="button" onClick={() => setDeleteDialogOpen(true)} className={KNOPF_ZERSTOEREND}>
-            <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            Konto und alle Abos löschen (DSGVO)
-          </button>
-          <p className="text-[12.5px] leading-normal text-muted-foreground">
-            Deine Bestellungen bleiben aus steuerlichen Gründen gespeichert.
-          </p>
+        <div className="flex flex-col gap-8 lg:gap-6">
+          {/* Angemeldete Geräte (S18): je Gerät abmelden, „Überall abmelden" */}
+          {geraete.length > 0 && (
+            <section aria-label="Angemeldete Geräte" className="flex flex-col gap-3">
+              <AngemeldeteGeraete zeilen={geraete} fuerKundin />
+            </section>
+          )}
+
+          {/* Konto löschen */}
+          <section aria-labelledby="konto-titel" className="flex flex-col gap-3">
+            <h2 id="konto-titel" className={ETIKETT}>
+              Konto
+            </h2>
+            <div className={cn(KARTE, 'flex flex-col items-start gap-2')}>
+              <p className="text-[13.5px] break-words [overflow-wrap:anywhere]">
+                Angemeldet als <strong className="font-semibold">{user.email}</strong>
+              </p>
+              <button type="button" onClick={() => setDeleteDialogOpen(true)} className={cn(KNOPF_ZERSTOEREND, 'w-full')}>
+                <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                Konto und alle Neuigkeiten-Abos löschen (DSGVO)
+              </button>
+              <p className="text-[12.5px] leading-normal text-muted-foreground">
+                Deine Bestellungen bleiben aus steuerlichen Gründen gespeichert.
+              </p>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
       {/* Löschen bestätigen */}
-      <Dialog open={deleteDialogOpen} onOpenChange={(o) => !o && setDeleteDialogOpen(false)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Konto wirklich löschen?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Dein Konto und alle Benachrichtigungs-Abonnements werden gelöscht. Bestehende
-            Bestellungen bleiben aus steuerlichen Gründen erhalten.
+      {/* Genau ein Schließen-Element („Abbrechen“ rechts oben, N41 d); während gelöscht wird, bleibt der Dialog offen. */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(o) => !o && !isDeleting && setDeleteDialogOpen(false)}>
+        <DialogMitte titel="Konto wirklich löschen?" schliessen="Abbrechen">
+          <p className="text-[14px] text-muted-foreground">
+            Dein Konto und alle Neuigkeiten-Abos werden gelöscht. Bestehende Bestellungen bleiben aus steuerlichen Gründen
+            erhalten.
           </p>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
-              Abbrechen
-            </Button>
-            <button type="button" onClick={handleDeleteAccount} disabled={isDeleting} className={cn(KNOPF_ZERSTOEREND, 'disabled:opacity-60')}>
-              {isDeleting ? 'Lösche…' : 'Konto löschen'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
+          <button type="button" onClick={handleDeleteAccount} disabled={isDeleting} className={cn(KNOPF_ZERSTOEREND, 'mt-1 self-start disabled:opacity-60')}>
+            {isDeleting ? 'Lösche…' : 'Konto löschen'}
+          </button>
+        </DialogMitte>
       </Dialog>
     </div>
   )
@@ -293,6 +285,8 @@ function ToggleRow({
         <div className="min-w-0">
           <span className={cn('text-[14px]', disabled ? 'text-muted-foreground' : 'text-foreground')}>{label}</span>
           {disabled && disabledNote && <p className="text-[12px] text-muted-foreground">{disabledNote}</p>}
+          {/* Der Stand in Worten, nicht nur als Schalterfarbe (Board s2-kundenkonto). */}
+          {!disabled && !hinweis && <p className="text-[12px] text-muted-foreground">{active ? 'an' : 'aus'}</p>}
           {hinweis && (
             <p id={hinweisId} className="text-[12px] text-status-offen">
               {hinweis}

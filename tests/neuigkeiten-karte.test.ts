@@ -39,7 +39,8 @@ describe('NeuigkeitenKarte', () => {
 
   it('Outline statt Grün: die Hauptaktion der Seite bleibt „Bestellung ansehen"', () => {
     const knopf = html.match(/<button[^>]*>/)?.[0] ?? ''
-    expect(knopf).toContain('border-border')
+    // Seit Nr. 227 der Rand in der Textfarbe (Board s1-/w1-bestaetigung: Knopf mit Rand über die volle Breite).
+    expect(knopf).toContain('border-foreground')
     expect(knopf).not.toContain('bg-accent')
     // Gegenprobe: ein grüner Knopf fiele auf.
     expect('<button class="bg-accent text-accent-foreground">').toContain('bg-accent')

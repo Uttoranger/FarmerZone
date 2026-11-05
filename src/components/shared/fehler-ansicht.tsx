@@ -1,7 +1,9 @@
 'use client'
 
-import { TriangleAlert } from 'lucide-react'
+import { Compass, TriangleAlert } from 'lucide-react'
 import {
+  FEHLER_KNOPF_TON,
+  FEHLER_KREIS_TON,
   FEHLER_TEXT,
   FEHLER_TITEL,
   NOCHMAL_VERSUCHEN,
@@ -9,25 +11,86 @@ import {
   ZUR_STARTSEITE,
   fehlerKicker,
   meldungLinkMitKennung,
+  type FehlerWelt,
+  type FehlerZeichen,
 } from '@/lib/fehlerseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
-const PILLE = cn('inline-flex h-12 w-full items-center justify-center rounded-full px-5 text-[15px] font-semibold transition-opacity duration-[250ms]', FOKUS_RAHMEN)
+/*
+ * Der gemeinsame Aufbau aller Fehlerseiten (Lauf 30, Nr. 231; Boards
+ * s3/w3-fehlerseiten): Kreis mit Zeichen, Kicker, h1, Satz, darunter die Wege
+ * übereinander — ein Hauptknopf und ein Umriss, gleich breit (höchstens
+ * 340 px), 48 px hoch, Ecken 12 px (Knöpfe über die volle Breite, DESIGN_SYSTEM
+ * „Typografie und Form“). Was je Fall verschieden ist, kommt aus
+ * src/lib/fehlerseite.ts. Die 404 (NichtGefundenAnsicht) und die 500
+ * (FehlerAnsicht) zeichnen beide hierüber.
+ */
+
+const KREIS: Record<'gruen' | 'orange', string> = {
+  gruen: 'bg-zustand-laeuft-grund text-status-fertig',
+  orange: 'bg-zustand-tun-grund text-status-offen',
+}
+
+const WEG = cn('inline-flex h-12 w-full items-center justify-center rounded-xl px-5 text-[15px] font-semibold transition-opacity duration-[250ms]', FOKUS_RAHMEN)
+
+/** Der Hauptknopf je Ton — grün in der Kundenwelt, orange im Hofbereich. */
+export const FEHLER_HAUPT: Record<'gruen' | 'orange', string> = {
+  gruen: cn(WEG, 'bg-accent text-accent-foreground hover:opacity-90'),
+  orange: cn(WEG, 'bg-primary text-primary-foreground hover:opacity-90'),
+}
+
+/** Der zweite Weg als Umriss auf der Fläche. */
+export const FEHLER_UMRISS = cn(WEG, 'border border-border bg-card text-foreground hover:bg-muted')
+
+export function FehlerseiteAufbau({
+  zeichen,
+  kicker,
+  titel,
+  text,
+  children,
+}: {
+  zeichen: FehlerZeichen
+  kicker: string
+  titel: string
+  text: string
+  /** Die Wege zurück, in ihrer Reihenfolge. */
+  children: React.ReactNode
+}): React.JSX.Element {
+  const Zeichen = zeichen === 'weg' ? Compass : TriangleAlert
+  return (
+    <div className="flex w-full max-w-[420px] flex-col items-center gap-3 text-center">
+      <span className={cn('flex size-[72px] items-center justify-center rounded-full', KREIS[FEHLER_KREIS_TON[zeichen]])} aria-hidden="true">
+        <Zeichen className="size-8" strokeWidth={1.5} aria-hidden="true" />
+      </span>
+      {/* Bei der 500 trägt der Kicker die Fehlernummer — zum Vorlesen und
+          Abtippen da, nicht zum Verstehen. Kein Fehlertext, kein Stapel, kein
+          Dateiname: Das wäre für den Menschen ohne Wert und für uns eine
+          offene Flanke. */}
+      <p className="text-[12.5px] font-bold tracking-[1.6px] text-muted-foreground uppercase">{kicker}</p>
+      <h1 className="font-heading text-[24px] leading-tight font-semibold text-balance break-words text-foreground md:text-[28px]">{titel}</h1>
+      <p className="text-[15px] leading-normal text-muted-foreground">{text}</p>
+      <div className="mt-2 flex w-full max-w-[340px] flex-col gap-2.5">{children}</div>
+    </div>
+  )
+}
 
 /**
- * Die 500 — einmal gebaut, von beiden Fehlergrenzen benutzt.
+ * Die 500 — einmal gebaut, von allen Fehlergrenzen benutzt.
  *
  * `src/app/error.tsx` fängt einen Fehler innerhalb des Root-Layouts,
- * `src/app/global-error.tsx` einen im Root-Layout selbst. Zwei Dateien mit
- * demselben Aufbau laufen auseinander, sobald jemand einen Satz ändert;
- * deshalb steht er hier einmal.
+ * `src/app/global-error.tsx` einen im Root-Layout selbst,
+ * `src/app/(hof)/error.tsx` einen im Hofbereich unter dessen Layout. Mehrere
+ * Dateien mit demselben Aufbau laufen auseinander, sobald jemand einen Satz
+ * ändert; deshalb steht er hier einmal.
  *
  * ZWEI BEWUSSTE ENTSCHEIDUNGEN:
  *
  * 1. Keine Kundenkopfzeile. Diese Ansicht erscheint, WEIL etwas gescheitert
  *    ist — war die Kopfzeile selbst die Ursache, risse sie die Fehlerseite mit
  *    und der Mensch sähe gar nichts mehr. Der Weg nach Hause steht als Knopf.
+ *    (Das Board w3-fehlerseiten zeigt die 500 der Kundschaft in der Shell;
+ *    die Entscheidung bleibt, Bericht 231.)
  * 2. Gewöhnliche `<a>` statt `<Link>`. Ein Vollaufbau ist hier das Richtige:
  *    Er lässt den zerbrochenen Baum zurück, statt ihn mitzunehmen — und in
  *    global-error gibt es den Router-Kontext ohnehin nicht verlässlich.
@@ -39,6 +102,7 @@ export function FehlerAnsicht({
   text = FEHLER_TEXT,
   meldenPfad = '/problem-melden',
   imLayout = false,
+  welt = 'kunde',
 }: {
   /** `error.digest` — die einzige technische Angabe, die der Mensch sieht. */
   fehlernummer?: string
@@ -52,6 +116,8 @@ export function FehlerAnsicht({
   meldenPfad?: '/problem-melden' | '/fehler-melden'
   /** Unter einem Layout mit Unterleiste: nicht die volle Bildschirmhöhe. */
   imLayout?: boolean
+  /** Die Welt: im Hofbereich ist der Hauptknopf orange (V51). */
+  welt?: FehlerWelt
 }) {
   return (
     <div
@@ -61,36 +127,24 @@ export function FehlerAnsicht({
         imLayout ? 'min-h-[70dvh] py-12' : 'min-h-dvh py-16'
       )}
     >
-      <div className="flex w-full max-w-sm flex-col items-center gap-3.5 text-center">
-        <span className="flex size-[76px] items-center justify-center rounded-full border border-border bg-card" aria-hidden="true">
-          <TriangleAlert className="size-[34px] text-status-fertig" strokeWidth={1.5} aria-hidden="true" />
-        </span>
-        {/* Die Fehlernummer ist zum Vorlesen und Abtippen da — nicht zum
-            Verstehen. Kein Fehlertext, kein Stapel, kein Dateiname: Das wäre
-            für den Menschen ohne Wert und für uns eine offene Flanke. */}
-        <p className="text-[12.5px] font-bold tracking-[1.6px] text-muted-foreground uppercase">{fehlerKicker(fehlernummer)}</p>
-        <h1 className="font-heading text-[24px] leading-tight font-semibold text-balance">{FEHLER_TITEL}</h1>
-        <p className="text-[15px] leading-normal text-muted-foreground">{text}</p>
-
-        <div className="mt-2 flex w-full flex-col gap-2.5">
-          <button type="button" onClick={nochmal} className={cn(PILLE, 'bg-primary text-primary-foreground hover:opacity-90')}>
-            {NOCHMAL_VERSUCHEN}
-          </button>
-          {/* Absichtlich ein <a>, kein <Link>: Hier ist der
-              Vollaufbau das Ziel, nicht der Umweg: <Link> navigiert im selben,
-              gerade zerbrochenen Baum weiter, und in global-error gibt es den
-              Router-Kontext ohnehin nicht verlässlich. */}
-          <a href={ziel.href} className={cn(PILLE, 'border border-border text-foreground hover:bg-muted')}>
-            {ziel.text}
-          </a>
-          <a
-            href={meldungLinkMitKennung(fehlernummer, meldenPfad)}
-            className={cn('inline-flex min-h-11 items-center justify-center rounded-full px-4 text-[14px] font-semibold text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}
-          >
-            {PROBLEM_MELDEN}
-          </a>
-        </div>
-      </div>
+      <FehlerseiteAufbau zeichen="warnung" kicker={fehlerKicker(fehlernummer)} titel={FEHLER_TITEL} text={text}>
+        <button type="button" onClick={nochmal} className={FEHLER_HAUPT[FEHLER_KNOPF_TON[welt]]}>
+          {NOCHMAL_VERSUCHEN}
+        </button>
+        {/* Absichtlich ein <a>, kein <Link>: Hier ist der
+            Vollaufbau das Ziel, nicht der Umweg: <Link> navigiert im selben,
+            gerade zerbrochenen Baum weiter, und in global-error gibt es den
+            Router-Kontext ohnehin nicht verlässlich. */}
+        <a href={ziel.href} className={FEHLER_UMRISS}>
+          {ziel.text}
+        </a>
+        <a
+          href={meldungLinkMitKennung(fehlernummer, meldenPfad)}
+          className={cn('inline-flex min-h-11 items-center justify-center rounded-full px-4 text-[14px] font-semibold text-foreground underline-offset-4 hover:underline', FOKUS_RAHMEN)}
+        >
+          {PROBLEM_MELDEN}
+        </a>
+      </FehlerseiteAufbau>
     </div>
   )
 }

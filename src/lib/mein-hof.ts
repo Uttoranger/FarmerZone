@@ -189,3 +189,15 @@ export function zustandsZeile({
     knopf: { art: 'pausieren', text: t.nimmtAn.knopf },
   }
 }
+
+/** Der Stand der Hofseite ohne offenen Punkt — in der Liste unter lg und im Editor ab lg. */
+export const HOFSEITE_VOLLSTAENDIG = 'Hofseite vollständig'
+
+/**
+ * „Noch 3 Punkte offen“, „Noch 1 Punkt offen“ — der Stand statt Prozent
+ * (Boards s1-/w1-mein-hof), unter lg in `AbschnitteListe`, seit Nr. 224 auch
+ * im Editor ab lg. Gezählt werden nur die gezählten offenen Zeilen.
+ */
+export function punkteOffenTitel(n: number): string {
+  return n === 1 ? 'Noch 1 Punkt offen' : `Noch ${n} Punkte offen`
+}

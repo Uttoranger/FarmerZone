@@ -19,7 +19,7 @@
  *    steht im Formular, auch eine gescheiterte Anfrage (Runde 2).
  *  - Tab-Titel und Seitentitel der Unterseiten haben eine Schreibweise.
  *  - Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link.
- *  - Mehr-Blatt: „Angemeldet …" ist ein Link auf „Konto und Sicherheit".
+ *  - Mehr-Blatt: die Person ist ein Link auf „Konto und Sicherheit" (Name, Ziel als Unterzeile).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
@@ -58,7 +58,7 @@ import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
 import { ProfileForm } from '@/components/settings/profile-form'
 import { PersonZeile } from '@/components/shells/hof-shell'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { EINSTELLUNG_KONTO, GESPEICHERT_TEXT, RUECKWEG_PRAEFIX, elternseite } from '@/lib/bauern-navigation'
 import type { FarmSettings } from '@/server/queries/farm'
@@ -416,10 +416,11 @@ describe('Hof-Profil: „Mein Hof → Hofseite" ist ein Link (seit Nr. 50, vorhe
     expect(html).not.toContain('/settings/appearance')
   })
 
-  it('ohne laufende Suche ist „Profil speichern" frei', () => {
+  // Seit Nr. 224 heißt der Knopf „Hofdaten speichern“ (Register N42 c, V43/V49).
+  it('ohne laufende Suche ist „Hofdaten speichern" frei', () => {
     const html = renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
     const knopf = html.match(/<button[^>]*type="submit"[^>]*>([^<]*)<\/button>/)
-    expect(knopf?.[1]).toBe('Profil speichern')
+    expect(knopf?.[1]).toBe('Hofdaten speichern')
     expect(knopf?.[0]).not.toMatch(/\sdisabled=/)
   })
 })
@@ -437,29 +438,29 @@ describe('Tab-Titel und Seitentitel der Unterseiten', () => {
   })
 })
 
-describe('Mehr-Blatt: „Angemeldet …" führt zu Konto und Sicherheit', () => {
-  it('mit Ziel ein Link (≥ 44 px, Fokus) — der Screenreader hört auch, wohin', () => {
+describe('Mehr-Blatt: die Person führt zu Konto und Sicherheit (seit Nr. 220: Name und Ziel als Unterzeile, Board s1-mehr-neu)', () => {
+  it('ein Link (≥ 44 px, Fokus innen wie die Zeilen der Gruppe) mit Name und sichtbarem Ziel', () => {
     const html = renderToStaticMarkup(createElement(PersonZeile, { name: 'Max Mustermann', konto: EINSTELLUNG_KONTO }))
     expect(html).toMatch(/^<a href="\/settings\/account"/)
     const klassen = html.match(/^<a href="\/settings\/account" class="([^"]*)"/)?.[1].split(' ') ?? []
-    for (const k of ['min-h-11', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
-    expect(html).toContain('Angemeldet')
+    for (const k of ['min-h-[60px]', ...FOKUS_RAHMEN_INNEN.split(' ')]) expect(klassen, k).toContain(k)
     expect(html).toContain('Max Mustermann')
-    expect(html).toContain('<span class="sr-only">, Konto und Sicherheit</span>')
+    expect(html).toContain(`>${EINSTELLUNG_KONTO.label}</span>`)
     expect(html).toMatch(/lucide-chevron-right[^>]*aria-hidden="true"|aria-hidden="true"[^>]*lucide-chevron-right/)
   })
 
-  it('Gegenprobe: ohne Ziel (Seitenleiste) bleibt die Zeile Anzeige', () => {
-    const html = renderToStaticMarkup(createElement(PersonZeile, { name: 'Max Mustermann' }))
-    expect(html).not.toContain('<a ')
-    expect(html).toContain('Angemeldet')
+  it('Gegenprobe: ohne Namen steht „Dein Konto“, das Ziel bleibt', () => {
+    const html = renderToStaticMarkup(createElement(PersonZeile, { name: '  ', konto: EINSTELLUNG_KONTO }))
+    expect(html).toContain('Dein Konto')
+    expect(html).toMatch(/^<a href="\/settings\/account"/)
   })
 
-  it('in der HofShell trägt nur das Mehr-Blatt das Ziel', () => {
+  it('in der HofShell steht die Person im Mehr-Blatt; die Seitenleiste zeigt „Konto · <Name>“ (V13)', () => {
     const shell = quelle('src/components/shells/hof-shell.tsx')
-    const mehr = shell.slice(shell.indexOf('<SheetTitle className="font-heading text-2xl font-semibold">Mehr</SheetTitle>'))
+    const mehr = shell.slice(shell.indexOf('<SheetKopf titel={HOF_MEHR_TITEL}'))
     expect(mehr).toContain('<PersonZeile name={personName} konto={EINSTELLUNG_KONTO} onNavigate={schliessen} />')
     const leiste = shell.slice(shell.indexOf('<aside'), shell.indexOf('</aside>'))
-    expect(leiste).toContain('<PersonZeile name={personName} />')
+    expect(leiste).toContain('<KontoZeile name={personName} />')
+    expect(leiste).not.toContain('<PersonZeile')
   })
 })

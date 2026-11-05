@@ -1,6 +1,6 @@
 /**
  * Wache (Nr. 134, Register F8/G4): Die vier Wörter, mit denen ein Beitrag seinen
- * Anlass nennt („Frisches Produkt“, „Neue Saison“, „Aktion“, „Mitteilung“), stehen
+ * Anlass nennt („Frisches Produkt“, „Neue Saison“, „Aktion“, „Hinweis“), stehen
  * in `src/` als ganzes Zeichenketten-Literal nur in `src/lib/beitrag-anlass.ts`
  * (BEITRAG_ANLASS). Vorher standen sie viermal daneben — im Assistenten „Neuer
  * Beitrag“, in der Mail an Abonnentinnen, im Teilen-Bild und im Bild der Route
@@ -12,6 +12,11 @@
  *
  * Gegenprobe: Text-Attrappen mit jeder Schreibweise schlagen an, Kommentar, längerer
  * Satz, Vorlage mit Platzhalter und Bezeichner nicht.
+ *
+ * Seit Register N42 c (Lauf 30, Nr. 225) heißt das Etikett von ANNOUNCEMENT „Hinweis“
+ * statt „Mitteilung“. „Hinweis“ steht als ganzes Wort auch in anderem Sinn da (kein
+ * Anlass eines Beitrags) — solche Texte stehen je Datei und Text mit Grund in
+ * ANDERER_SINN; ein Eintrag ohne Fundstelle fällt auf.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
@@ -21,7 +26,13 @@ import { BEITRAG_ANLASS } from '@/lib/beitrag-anlass'
 
 const WURZEL = process.cwd()
 const QUELLE = 'src/lib/beitrag-anlass.ts'
-const WOERTER = ['Frisches Produkt', 'Neue Saison', 'Aktion', 'Mitteilung']
+const WOERTER = ['Frisches Produkt', 'Neue Saison', 'Aktion', 'Hinweis']
+
+/** Ganze Literale mit einem der Wörter, die keinen Anlass meinen — je Datei und Wort, mit Grund. */
+const ANDERER_SINN: { datei: string; wort: string; grund: string }[] = [
+  { datei: 'src/components/startseite/bloecke/hinweisband.tsx', wort: 'Hinweis', grund: 'Bereichsname des Hinweisbands der Startseite, kein Beitrag' },
+  { datei: 'src/lib/widerruf.ts', wort: 'Hinweis', grund: 'Überschrift auf der Seite Rücktrittsrecht, kein Beitrag' },
+]
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {
@@ -59,14 +70,22 @@ describe('Anlass-Wörter — eine Quelle (BEITRAG_ANLASS)', () => {
   it('stehen in src/ als ganzes Literal nur in src/lib/beitrag-anlass.ts', { timeout: 30_000 }, () => {
     // Liest und parst jede Datei unter src/ (TESTING_GUIDELINES: Zeitgrenze 30_000 an genau diesem it).
     const verstoesse: string[] = []
+    const genutzt = new Set<string>()
     for (const pfad of quelldateien(join(WURZEL, 'src'))) {
       const name = relative(WURZEL, pfad).split(sep).join('/')
       if (name === QUELLE) continue
       const text = readFileSync(pfad, 'utf8')
       if (!WOERTER.some((wort) => text.includes(wort))) continue
-      for (const fund of findeAnlassWoerter(text, WOERTER)) verstoesse.push(`${name}:${fund}`)
+      for (const fund of findeAnlassWoerter(text, WOERTER)) {
+        const wort = fund.slice(fund.indexOf(' ') + 1)
+        const ausnahme = ANDERER_SINN.find((a) => a.datei === name && a.wort === wort)
+        if (ausnahme) genutzt.add(`${ausnahme.datei} ${ausnahme.wort}`)
+        else verstoesse.push(`${name}:${fund}`)
+      }
     }
     expect(verstoesse).toEqual([])
+    // Ein Eintrag ohne Fundstelle fällt auf — die Liste schrumpft mit dem Code.
+    expect(ANDERER_SINN.filter((a) => !genutzt.has(`${a.datei} ${a.wort}`))).toEqual([])
   })
 
   it('Gegenprobe: schlägt an bei Zeichenkette, Vorlage, Attribut und JSX-Text — nicht bei Kommentar, Satz, Platzhalter oder Bezeichner', () => {
@@ -74,12 +93,12 @@ describe('Anlass-Wörter — eine Quelle (BEITRAG_ANLASS)', () => {
       "const a = 'Frisches Produkt'",
       'const b = "Neue Saison"',
       'const c = `Aktion`',
-      'const d = <Feld label="Mitteilung" />',
+      'const d = <Feld label="Hinweis" />',
       'const e = <span>Aktion</span>',
       // Das alles zählt nicht:
       "// 'Aktion' im Kommentar",
-      '/** Mitteilung, Aktion */',
-      "const f = 'Unterschrift (nur bei Mitteilung auf Papier):'",
+      '/** Hinweis, Aktion */',
+      "const f = 'Unterschrift (nur bei Hinweis auf Papier):'",
       'const g = `${n} Aktion`',
       'const Aktion = 1',
       "const h = 'Aktionen'",
@@ -88,7 +107,7 @@ describe('Anlass-Wörter — eine Quelle (BEITRAG_ANLASS)', () => {
       '1 Frisches Produkt',
       '2 Neue Saison',
       '3 Aktion',
-      '4 Mitteilung',
+      '4 Hinweis',
       '5 Aktion',
     ])
   })

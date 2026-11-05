@@ -98,8 +98,9 @@ describe('Bedeutung je Blickwinkel — eine Farbquelle, zwei Lesarten', () => {
 
     expect(bestellMarke('PAID').art).toBe('tun')
     expect(bestellStatusAnzeige('PAID', '').art).toBe('laeuft')
-    // Wartet auf die Kundin: Für den Hof ist nichts zu tun, die Kundin muss bestätigen.
-    expect(bestellMarke('PENDING_CONFIRMATION').art).toBe('erledigt')
+    // Wartet auf die Kundin: am Bildschirm des Hofs „Bestätigung offen“ orange wie im Board s1-bestellungen (V22) —
+    // noch nicht fertig; die Packliste sagt „Wartet auf Kunde“ und bleibt erledigt (PACK_MARKE, papierMarke).
+    expect(bestellMarke('PENDING_CONFIRMATION')).toEqual({ text: 'Bestätigung offen', art: 'tun' })
     expect(bestellStatusAnzeige('PENDING_CONFIRMATION', '').art).toBe('tun')
   })
 

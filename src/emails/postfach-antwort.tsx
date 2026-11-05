@@ -19,7 +19,7 @@ export interface PostfachAntwortProps {
  */
 export function PostfachAntwortEmail(p: PostfachAntwortProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={POSTFACH_MAIL_TEXT.antwortBetreff(p.titel)} fusszeile={POSTFACH_MAIL_TEXT.fuss}>
+    <EmailLayout fuss={{ art: 'postfach' }} previewText={POSTFACH_MAIL_TEXT.antwortBetreff(p.titel)}>
       <Text style={h1}>{POSTFACH_MAIL_TEXT.antwortTitel}</Text>
       <Text style={mutedText}>{`${POSTFACH_MAIL_TEXT.zu}: ${p.titel}`}</Text>
       <div style={highlightBox}>

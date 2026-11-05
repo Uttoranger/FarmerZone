@@ -1,14 +1,13 @@
 import Link from 'next/link'
-import { ChevronRight, Clock, ReceiptText, TriangleAlert } from 'lucide-react'
+import { ReceiptText } from 'lucide-react'
 import type { BestellEintrag } from '@/lib/bestellungen-finden'
-import { BESTELLUNGEN_ANSICHT_SEKUNDEN, BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
+import { BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
 import { cn } from '@/lib/utils'
 import { beendeBestellAnsicht } from '@/server/actions/bestellungen-finden'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
-import { Marke } from '@/components/ui/marke'
-import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
+import { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { BestellungenFindenFormular } from '@/components/bestellungen/bestellungen-finden-formular'
 
 /*
@@ -20,53 +19,66 @@ import { BestellungenFindenFormular } from '@/components/bestellungen/bestellung
  * die Gestalt. Jede Bestellung führt nur über ihren signierten Link weiter.
  */
 
-const MINUTEN = BESTELLUNGEN_ANSICHT_SEKUNDEN / 60
+/** Die Spalte: 520 px wie im Board w1-meine-bestellungen (eine Spalte, auch im Browser), am Handy 16 px Rand. */
+const SEITE = 'mx-auto flex w-full max-w-[552px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8'
+const TITEL = 'font-heading text-[26px] leading-tight font-semibold md:text-[28px]'
+/** Knopf mit Rand in Inhaltsbreite (Board s1-/w1-meine-bestellungen: 44 px, Radius 12 px, Feldrand). */
+const KNOPF_KLEIN_RAHMEN = cn(
+  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-input bg-card px-3.5 text-[14px] font-bold text-foreground hover:bg-muted',
+  FOKUS_RAHMEN
+)
 
-/** Die Spalte: 1200 px wie die Kopfzeile, am Handy 16 px Rand. */
-const SEITE = 'mx-auto w-full max-w-[1200px] px-4 pt-6 pb-12 md:px-6 md:pt-7'
-const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
-const TITEL = 'font-heading text-[26px] leading-tight font-semibold md:text-[30px]'
-
-/** Ohne bewiesene Adresse: Einleitung und das Formular E-Mail → Code. */
+/** Ohne bewiesene Adresse: Einleitung und das Formular E-Mail → Code; abgelaufen die orange Karte darüber (Board Bild 6). */
 export function BestellungenFinden({ abgelaufen }: { abgelaufen: boolean }): React.JSX.Element {
   return (
-    <div className={cn(SEITE, 'flex max-w-[480px] flex-col gap-4 md:max-w-[520px] md:pt-10')}>
+    <div className={SEITE}>
       <div className="flex flex-col gap-1.5">
         <h1 className={TITEL}>Meine Bestellungen</h1>
-        <p className="text-[13.5px] leading-normal text-muted-foreground">
-          Hier findest du alle Bestellungen zu deiner E-Mail-Adresse – ohne Konto, nur für diesen Besuch.
-        </p>
+        {!abgelaufen && (
+          <p className="text-[15px] leading-normal text-foreground">
+            Hier findest du alle Bestellungen zu deiner E-Mail-Adresse – ohne Konto, nur für diesen Besuch.
+          </p>
+        )}
       </div>
       {abgelaufen && (
-        <Hinweiskarte ton="orange" symbol={Clock} titel="Deine Ansicht ist abgelaufen">
-          Zu deiner Sicherheit bleibt die Liste nur {MINUTEN} Minuten offen. Lass dir einfach einen neuen Code schicken.
-        </Hinweiskarte>
+        // Farben aus dem Paar „tun“ (≥ 4,5:1 in beiden Themes), wie die Hinweiskarte für Fehler — hier ein Zustand, kein Fehler.
+        <section
+          aria-labelledby="abgelaufen-titel"
+          className="flex flex-col gap-1 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun"
+        >
+          <h2 id="abgelaufen-titel" className="text-[15px] font-bold">
+            Deine Ansicht ist abgelaufen
+          </h2>
+          <p className="text-[14px] leading-normal">Sie gilt nur für einen Besuch. Hol dir einfach einen neuen Code.</p>
+        </section>
       )}
       <section aria-label="Bestellungen finden" className={KARTE}>
         <BestellungenFindenFormular />
       </section>
-      <p className="text-[12.5px] leading-normal text-muted-foreground">
-        Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.
-      </p>
+      {!abgelaufen && (
+        <p className="text-[13px] leading-normal text-muted-foreground">
+          Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.
+        </p>
+      )}
     </div>
   )
 }
 
-/** Die Karte rechts (Web) bzw. unten (Handy): für welche Adresse, wie lange, und Abmelden. */
+/**
+ * Für welche Adresse die Liste gilt, und „Ansicht beenden“ (V26, Board s1-/w1-meine-bestellungen): eine
+ * flache Karte oben, im Browser in einer Zeile, am Handy die Adresse unter dem Wort. Die Ansicht gilt
+ * `BESTELLUNGEN_ANSICHT_SEKUNDEN` lang auf diesem Gerät (Cookie) — der Knopf beendet sie sofort.
+ */
 function AnsichtKarte({ email }: { email: string }): React.JSX.Element {
   return (
-    <section aria-labelledby="ansicht-titel" className={cn(KARTE, 'flex flex-col gap-3')}>
-      <h2 id="ansicht-titel" className="font-heading text-lg font-semibold">
-        Deine Adresse
-      </h2>
-      <p className="text-[13.5px] font-medium break-words [overflow-wrap:anywhere]">{email}</p>
-      <p className="text-[12.5px] leading-normal text-muted-foreground">
-        Bestätigt mit dem Code aus deiner E-Mail. Die Liste bleibt {MINUTEN} Minuten auf diesem Gerät offen – ein Konto
-        legen wir dafür nicht an.
+    <section aria-label="Deine Adresse" className={cn(KARTE, 'flex items-center gap-3 py-2.5')}>
+      <p className="min-w-0 flex-1 text-[14px] leading-snug">
+        Deine Adresse:
+        <span className="max-md:block md:ml-1 font-bold break-words [overflow-wrap:anywhere]">{email}</span>
       </p>
       <form action={beendeBestellAnsicht}>
-        <button type="submit" className={KNOPF_RAHMEN}>
-          Abmelden
+        <button type="submit" className={KNOPF_KLEIN_RAHMEN}>
+          Ansicht beenden
         </button>
       </form>
     </section>
@@ -74,35 +86,29 @@ function AnsichtKarte({ email }: { email: string }): React.JSX.Element {
 }
 
 function LaufendeKarte({ eintrag }: { eintrag: BestellEintrag }): React.JSX.Element {
+  const zeile = `${eintrag.marke} · ${eintrag.wann} · ${eintrag.bestellnummer}`
   return (
-    <li className={cn(KARTE, 'flex flex-col gap-3', eintrag.art === 'laeuft' && 'border-accent')}>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <Marke art={eintrag.art}>{eintrag.marke}</Marke>
-        <span className="min-w-0 truncate text-[13px] text-muted-foreground" title={`${eintrag.bestellnummer} · ${eintrag.hofName}`}>
-          {eintrag.bestellnummer} · {eintrag.hofName}
-        </span>
-      </div>
-      <div className="min-w-0">
-        <p className="text-[16px] font-semibold md:text-[17px]">{eintrag.wann}</p>
-        <p className="text-[12.5px] leading-normal text-muted-foreground md:text-[13px]">
-          {eintrag.artikel} · {eintrag.betrag} · {eintrag.zahlung}
+    <li className={cn(KARTE, 'flex items-center gap-3 py-3')}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-bold" title={eintrag.hofName}>
+          {eintrag.hofName}
+        </p>
+        <p className="text-[13px] leading-snug break-words text-muted-foreground" title={zeile}>
+          {zeile}
         </p>
       </div>
-      <div>
-        <Link href={eintrag.link} className={KNOPF_RAHMEN}>
-          Bestellung ansehen
-          <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          <span className="sr-only">
-            {' '}
-            bei {eintrag.hofName}, {eintrag.wann}
-          </span>
-        </Link>
-      </div>
+      <Link href={eintrag.link} className={KNOPF_KLEIN_RAHMEN}>
+        Bestellung ansehen
+        <span className="sr-only">
+          {' '}
+          bei {eintrag.hofName}, {eintrag.wann}
+        </span>
+      </Link>
     </li>
   )
 }
 
-/** Mit bewiesener Adresse: laufende oben, frühere darunter — oder der Leerzustand. */
+/** Mit bewiesener Adresse: laufende oben („Aktuell“), frühere darunter („Früher“) — oder der Leerzustand. */
 export function BestellungenListe({
   email,
   laufend,
@@ -114,87 +120,87 @@ export function BestellungenListe({
 }): React.JSX.Element {
   const leer = laufend.length === 0 && frueher.length === 0
   return (
-    <div className={cn(SEITE, 'flex flex-col gap-7 lg:flex-row lg:items-start')}>
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <h1 className={TITEL}>Meine Bestellungen</h1>
+    <div className={SEITE}>
+      <h1 className={TITEL}>Meine Bestellungen</h1>
+      <AnsichtKarte email={email} />
 
-        {leer && (
-          <EmptyState
-            symbol={ReceiptText}
-            titel="Keine Bestellungen gefunden"
-            satz="Unter dieser Adresse haben wir keine Bestellung gefunden. Vielleicht hast du mit einer anderen E-Mail-Adresse bestellt?"
-            ausweg={
-              <>
-                <Link href="/hoefe" className={KNOPF_GRUEN}>
-                  Höfe entdecken
-                </Link>
-                <form action={beendeBestellAnsicht}>
-                  <button type="submit" className={KNOPF_RAHMEN}>
-                    Andere E-Mail-Adresse
-                  </button>
-                </form>
-              </>
-            }
-          />
-        )}
+      {leer && (
+        <EmptyState
+          symbol={ReceiptText}
+          titel="Keine Bestellungen gefunden"
+          satz="Zu dieser Adresse gibt es bei uns keine Bestellung. Vielleicht hast du mit einer anderen bestellt?"
+          // Board Bild 4: die Wege über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
+          className="items-stretch border-solid py-6 [&>span]:self-center"
+          ausweg={
+            <div className="flex w-full flex-col gap-1">
+              <Link href="/hoefe" className={KNOPF_BREIT_GRUEN}>
+                Höfe entdecken
+              </Link>
+              <form action={beendeBestellAnsicht}>
+                <button
+                  type="submit"
+                  className={cn('inline-flex min-h-11 w-full items-center justify-center rounded-full px-3 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+                >
+                  Andere E-Mail-Adresse
+                </button>
+              </form>
+            </div>
+          }
+        />
+      )}
 
-        {laufend.length > 0 && (
-          <section aria-labelledby="aktuell-titel" className="flex flex-col gap-3">
-            <h2 id="aktuell-titel" className={ETIKETT}>
-              Aktuell
-            </h2>
-            <ul className="flex flex-col gap-3">
-              {laufend.map((eintrag) => (
-                <LaufendeKarte key={eintrag.id} eintrag={eintrag} />
-              ))}
-            </ul>
-          </section>
-        )}
+      {laufend.length > 0 && (
+        <section aria-labelledby="aktuell-titel" className="flex flex-col gap-2">
+          <h2 id="aktuell-titel" className={ETIKETT}>
+            Aktuell
+          </h2>
+          <ul className="flex flex-col gap-2.5">
+            {laufend.map((eintrag) => (
+              <LaufendeKarte key={eintrag.id} eintrag={eintrag} />
+            ))}
+          </ul>
+        </section>
+      )}
 
-        {frueher.length > 0 && (
-          <section aria-labelledby="frueher-titel" className="flex flex-col gap-3">
-            <h2 id="frueher-titel" className={ETIKETT}>
-              Früher
-            </h2>
-            <ListGruppe>
-              {frueher.map((eintrag) => (
-                <ListRow
-                  key={eintrag.id}
-                  href={eintrag.link}
-                  titel={eintrag.hofName}
-                  untertitel={`${eintrag.marke} · ${eintrag.wann} · ${eintrag.bestellnummer}`}
-                  ende={<span className="shrink-0 text-[14px] font-semibold">{eintrag.betrag}</span>}
-                />
-              ))}
-            </ListGruppe>
-          </section>
-        )}
-      </div>
-
-      <div className="w-full shrink-0 lg:mt-[58px] lg:w-[360px]">
-        <AnsichtKarte email={email} />
-      </div>
+      {frueher.length > 0 && (
+        <section aria-labelledby="frueher-titel" className="flex flex-col gap-2">
+          <h2 id="frueher-titel" className={ETIKETT}>
+            Früher
+          </h2>
+          <ListGruppe>
+            {frueher.map((eintrag) => (
+              <ListRow
+                key={eintrag.id}
+                href={eintrag.link}
+                titel={eintrag.hofName}
+                untertitel={`${eintrag.marke} · ${eintrag.wann} · ${eintrag.bestellnummer}`}
+              />
+            ))}
+          </ListGruppe>
+        </section>
+      )}
     </div>
   )
 }
 
-/** Die Liste ließ sich nicht laden — inline, mit Ausweg (DESIGN_SYSTEM, „Zustände"). */
-export function BestellungenFehler(): React.JSX.Element {
+/**
+ * Die Liste ließ sich nicht laden — inline an der Karte, mit Ausweg (DESIGN_SYSTEM, „Zustände“; Board Bild 5:
+ * eine Karte mit kräftigem Rand, Satz und „Noch einmal versuchen“). Mit Adresse steht „Ansicht beenden“ darüber.
+ */
+export function BestellungenFehler({ email }: { email?: string }): React.JSX.Element {
   return (
-    <div className={cn(SEITE, 'flex max-w-[640px] flex-col gap-4')}>
+    <div className={SEITE}>
       <h1 className={TITEL}>Meine Bestellungen</h1>
-      <Hinweiskarte
-        ton="orange"
-        symbol={TriangleAlert}
-        titel="Wir konnten deine Bestellungen gerade nicht laden"
-        aktion={
-          <Link href={BESTELLUNGEN_PFAD} className={KNOPF_RAHMEN}>
-            Noch einmal versuchen
-          </Link>
-        }
-      >
-        Probier es in einem Moment noch einmal. Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.
-      </Hinweiskarte>
+      {email && <AnsichtKarte email={email} />}
+      <section role="alert" aria-labelledby="fehler-titel" className="flex flex-col gap-1.5 rounded-2xl border-[1.5px] border-input bg-card px-4 py-4">
+        <h2 id="fehler-titel" className="text-[16px] font-bold">
+          Wir konnten deine Bestellungen gerade nicht laden
+        </h2>
+        <p className="text-[14px] leading-normal text-muted-foreground">Prüf den Empfang und versuch es noch einmal.</p>
+        <Link href={BESTELLUNGEN_PFAD} className={cn(KNOPF_BREIT_RAHMEN, 'mt-1')}>
+          Noch einmal versuchen
+        </Link>
+      </section>
     </div>
   )
 }

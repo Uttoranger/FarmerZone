@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { frischOderBestaetigen, verlangeAdminAktion } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
 import { aktuellerFinanzMonat, getFinanzenJahr } from '@/server/queries/finanzen'
-import { jahrAlsCsv } from '@/lib/finanzen'
+import { gebuehrWortFuerJahr, jahrAlsCsv } from '@/lib/finanzen'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { finanzenJahrAus } from '@/schemas/admin-reiter'
 
 /*
@@ -35,7 +37,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const daten = await getFinanzenJahr(finanzenJahrAus(request.nextUrl.searchParams.get('jahr') ?? undefined, laufendesJahr), jetzt)
   await protokolliere({ wer: wache.userId, art: 'finanzen_export', bezugArt: 'monat', bezugId: String(daten.jahr), mitPasskey: true })
 
-  return new NextResponse(jahrAlsCsv(daten.rechnung), {
+  // Das Wort der Gebühr in der Kopfzeile wie in der Jahresansicht (V63); der Stichtag fällt beim Fehler auf die Vorgabe zurück.
+  const wort = gebuehrWortFuerJahr(daten.jahr, hofpreisModellAb(await ladeHofpreisEinstellung()))
+  return new NextResponse(jahrAlsCsv(daten.rechnung, wort), {
     status: 200,
     headers: {
       ...KOPF,

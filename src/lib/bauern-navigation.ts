@@ -193,6 +193,52 @@ export const UNTEN: readonly NavPunkt[] = [
 
 export const ABMELDEN_LABEL = 'Abmelden'
 
+// ─── Wörter der HofShell (Nr. 220, Boards s1-/w1-mehr-neu) ─────────────────
+
+/** Die Adresse eines Hauptpunkts — für die Marke oben in der Seitenleiste (führt nach Heute). */
+export function hauptPunktHref(id: NavPunktId): string {
+  return hauptPunkt(id).href
+}
+
+/** Der Name der Startseite des Hofbereichs (Wortliste „Heute“, N42 c) — im Namen der Marke in der Seitenleiste. */
+export const HEUTE_LABEL = hauptPunkt('heute').label
+
+/** Der Textlink in der Hofkarte der Seitenleiste. */
+export const HOFSEITE_ANSEHEN = 'Hofseite ansehen'
+
+/**
+ * Der Kopf eines Blatts der Shells bleibt beim Scrollen oben stehen (Board
+ * s1-mehr-neu, Bild 2: „Mehr · Schließen“ über der gescrollten Liste).
+ */
+export const BLATT_KOPF_KLEBT = 'sticky top-0 z-10 bg-popover'
+
+/** Titel und das eine Schließen-Element des Blatts „Mehr“. */
+export const HOF_MEHR_TITEL = 'Mehr'
+export const HOF_MEHR_SCHLIESSEN = 'Schließen'
+
+/** Das eine Schließen-Element des Blatts „Neu“ (oben rechts neben „Was legst du an?“). */
+export const HOF_NEU_ABBRECHEN = 'Abbrechen'
+
+/** Die Gruppe mit Person, Einstellungen, Problem melden, Admin, Darstellung und Abmelden im Mehr-Blatt. */
+export const KONTO_UND_HILFE_TITEL = 'Konto und Hilfe'
+
+/** „Konto · <Name>“ unten in der Seitenleiste (V13). */
+export const KONTO_KURZ = 'Konto'
+
+/** Die Unterzeile von Postfach im Mehr-Blatt: „1 neue Nachricht“, „3 neue Nachrichten“. */
+export function postfachUnterzeile(anzahl: number): string {
+  return anzahl === 1 ? '1 neue Nachricht' : `${anzahl} neue Nachrichten`
+}
+
+/**
+ * Ein Datum wie „31. Jänner 2028“ bricht nicht um (V13, Tarif-Zeile): Die
+ * Leerzeichen zwischen Tag, Monat und Jahr werden geschützt. Der übrige Text
+ * bleibt, wie er ist; die Zeile selbst baut `baueTarifZeile` (konditionen.ts).
+ */
+export function datumOhneUmbruch(text: string): string {
+  return text.replace(/(\d{1,2}\.)[ \u00a0]([A-Za-zÄÖÜäöüß]+)[ \u00a0](\d{4})/g, '$1\u00a0$2\u00a0$3')
+}
+
 const ALLE: readonly NavPunkt[] = [...HAUPT, ...VERKAUF_UND_KUNDEN, ...UNTEN]
 
 /** Wie weit `pfad` unter `ziel` liegt — die Länge des passenden Ziels, sonst -1. */

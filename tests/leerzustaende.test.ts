@@ -62,8 +62,8 @@ const alsKnopf = (text: string) => new RegExp(`<button type="button"[^>]*>${mask
 
 describe('Heute — keine Abholzeiten', () => {
   it('Satz und Knopf stehen auf der Seite genau einmal — in der Packliste; die Karte sagt es in einer Zeile', () => {
-    const packliste = html(createElement(heute.Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: null } }))
-    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))
+    const packliste = html(createElement(heute.Packliste, { zeilen: [], stand: '', naechsteAbholung: null, leer: { naechsteAbholung: null } }))
+    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, tag: null, anzahl: 0 }))
     // So stehen die beiden Blöcke auf /dashboard untereinander (app/(hof)/dashboard/page.tsx).
     const seite = packliste + karte
     expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.satz)).toBe(1)
@@ -80,14 +80,14 @@ describe('Heute — keine Abholzeiten', () => {
   })
 
   it('Gegenprobe: mit Abholfenster steht in der Karte kein EmptyState, in der leeren Packliste der Weg ins Fenster', () => {
-    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 0 }))
+    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, tag: 'Heute, Di 6. Okt', anzahl: 0 }))
     expect(anzahlEmptyStates(karte)).toBe(0)
     // Die eine Zeile ohne Aktion bleibt eine Zeile (N9, Art B).
     expect(karte).toContain('Noch keine Bestellungen')
     const packliste = html(
-      createElement(heute.Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' } } })
+      createElement(heute.Packliste, { zeilen: [], stand: '', naechsteAbholung: null, leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr' } })
     )
-    expect(packliste).toContain('Nächste Abholung: Heute, 15–18 Uhr.')
+    expect(packliste).toContain('Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr')
     expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.satz)
     expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.aktion.text)
   })

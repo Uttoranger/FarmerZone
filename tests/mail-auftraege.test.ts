@@ -34,6 +34,8 @@ vi.mock('server-only', () => ({}))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
 vi.mock('@/server/queries/postfach', () => ({ ladeBetreiberEmpfaenger: vi.fn(), zaehleOffenImEingang: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({ zaehleFuerWochenlauf: vi.fn() }))
+// Der Stichtag „Hofpreis-Modell ab“ für das Gebühren-Wort der Wochenlage (V63); ohne Zeile gilt die Vorgabe.
+vi.mock('@/server/queries/plattform-einstellung', () => ({ ladeHofpreisEinstellung: vi.fn(async () => ({ hofpreisModellAb: null })) }))
 vi.mock('@/server/beitrag-vorname', () => ({ vornamenAusBestellungen: vi.fn(async () => new Map()), vornameFuer: () => '', setzeVorname: (t: string) => t }))
 
 import { SUPPORT_EMAIL } from '@/lib/support'
@@ -55,6 +57,7 @@ import { beitragAuftraege, gesendeteBeitragsMails } from '@/server/mail-arten/be
 import { widerrufErgebnisAuftrag, widerrufHofAuftrag } from '@/server/mail-arten/widerruf'
 import { ladeBetreiberEmpfaenger, zaehleOffenImEingang } from '@/server/queries/postfach'
 import { zaehleFuerWochenlauf } from '@/server/queries/meldung'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import type { StapelMail } from '@/lib/email'
 
 const BESTELLUNG = { id: 'cbestellung0000000000001', farmId: 'chof00000000000000000001' }
@@ -203,7 +206,7 @@ describe('Renderer: frisch geladen, Vorlage aus email.ts, heutige Adresse', () =
   it.each([
     ['bestellung-bestaetigung', 'erika@example.org', 'Deine Bestellung bei Hof Beispiel'],
     ['bestellung-bezahlt-hof', 'hof@example.org', 'Neue Bestellung für'],
-    ['bar-bestaetigt-hof', 'hof@example.org', 'Neue Vor-Ort-Bestellung'],
+    ['bar-bestaetigt-hof', 'hof@example.org', 'HT-2410-TEST bestätigt'],
     ['abholbereit', 'erika@example.org', 'bereit zur Abholung'],
     ['nicht-abholbereit', 'erika@example.org', 'Kurzes Update'],
     ['verfallen', 'erika@example.org', 'verfallen'],
@@ -323,6 +326,28 @@ describe('Renderer: frisch geladen, Vorlage aus email.ts, heutige Adresse', () =
     expect(db.farm.count).toHaveBeenCalledWith({ where: expect.objectContaining({ istTesthof: false }) })
     vi.mocked(zaehleOffenImEingang).mockResolvedValue({ antworten: 0, meldungen: 0, hoefe: 0, erstattungen: 0, gesamt: 0 })
     expect(alsMail(await rendere('wochenbericht', { empfaengerId: 'support', geloeschtAnzahl: '0' })).html).toContain('Wochenlage')
+  })
+
+  it('Wochenlage nach dem Stichtag: „Plattformgebühr“, kein „Servicegebühr“ (V63) — Gegenprobe davor', async () => {
+    vi.mocked(zaehleFuerWochenlauf).mockResolvedValue({ neu: 0, liegenGeblieben: 0, offen: 0, neueste: [] })
+    vi.mocked(zaehleOffenImEingang).mockResolvedValue({ antworten: 0, meldungen: 0, hoefe: 0, erstattungen: 0, gesamt: 0 })
+    db.order.aggregate.mockResolvedValue({ _count: { _all: 0 }, _sum: { totalAmount: null } })
+    db.order.findMany.mockResolvedValue([])
+    db.farm.count.mockResolvedValue(0)
+    db.meldung.count.mockResolvedValue(0)
+    db.kostenposten.findMany.mockResolvedValue([])
+    const lage = async () => alsMail(await rendere('wochenbericht', { empfaengerId: 'support', geloeschtAnzahl: '0' })).html
+    vi.useFakeTimers({ toFake: ['Date'], now: JETZT })
+    try {
+      vi.mocked(ladeHofpreisEinstellung).mockResolvedValueOnce({ hofpreisModellAb: new Date('2026-10-01T00:00:00.000Z') })
+      const danach = await lage()
+      expect(danach).toContain('Plattformgebühr')
+      expect(danach).not.toContain('Servicegebühr')
+      vi.mocked(ladeHofpreisEinstellung).mockResolvedValueOnce({ hofpreisModellAb: new Date('2027-03-01T00:00:00.000Z') })
+      expect(await lage()).toContain('Servicegebühr')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Freischaltung: nur solange der Hof freigeschaltet ist', async () => {

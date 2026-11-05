@@ -14,7 +14,6 @@ import {
   kleinText,
   textLink,
 } from './_layout'
-import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -36,11 +35,16 @@ export interface OrderConfirmationProps {
   zahlart: MailZahlart
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
   items: Array<{ name: string; betrag: number }>
-  /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
-  serviceFee?: number
+  /**
+   * Die Gebührenzeile im Modell „bisher“ (N38): Wort und Erklärsatz der
+   * Bestellung (gebuehrWort, gebuehrHinweisFuer in src/lib/email.ts) und der
+   * Betrag in Euro aus dem Snapshot. Fehlt sie, gibt es keine Zeile — im
+   * Hofpreis-Modell steckt die Gebühr in den Preisen (`plattformgebuehr`).
+   */
+  gebuehrZeile?: { wort: string; betrag: number; hinweis: string }
   /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
   plattformgebuehr?: number
-  /** Was die Kundin zahlt bzw. gezahlt hat: Warenpreis + Servicegebühr. */
+  /** Was die Kundin zahlt bzw. gezahlt hat: Warenpreis + Gebühr. */
   total: number
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
@@ -74,14 +78,14 @@ const GESAMT_LABEL: Record<MailZahlart, string> = {
  */
 export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Element {
   const anrufen = telefonLink(p.farmPhone)
-  const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const gebuehr = p.gebuehrZeile && p.gebuehrZeile.betrag > 0 ? p.gebuehrZeile : null
   const satz =
     p.zahlart === 'online'
       ? `Deine Zahlung ist angekommen – ${p.farmName} packt deine Sachen.`
       : `Deine Bestellung ist bestätigt – ${p.farmName} packt deine Sachen.`
 
   return (
-    <EmailLayout previewText={`Bestellung ${p.orderNumber} – Abholung ${p.pickupDate}, ${p.pickupTime} Uhr`} manageUrl={p.manageUrl}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Bestellung ${p.orderNumber} – Abholung ${p.pickupDate}, ${p.pickupTime} Uhr`} manageUrl={p.manageUrl}>
       <Text style={h1}>Danke für deine Bestellung!</Text>
       <Text style={bodyText}>{`${satz} Nenn bei der Abholung einfach deine Bestellnummer:`}</Text>
 
@@ -93,7 +97,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
-      {mitGebuehr && <BetragsZeile links={SERVICEGEBUEHR_BEZEICHNUNG} rechts={formatEuro(p.serviceFee ?? 0)} />}
+      {gebuehr && <BetragsZeile links={gebuehr.wort} rechts={formatEuro(gebuehr.betrag)} />}
       <BetragsZeile stark links={GESAMT_LABEL[p.zahlart]} rechts={formatEuro(p.total)} />
 
       <KnopfReihe>
@@ -122,7 +126,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
 
       {p.zahlart === 'bar' && <Text style={kleinText}>{`Bring bitte ${formatEuro(p.total)} in bar mit.`}</Text>}
       {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
-      {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
+      {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
       {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
       {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. Mit Belehrung steht er unter ihr. */}
       {p.widerrufUrl && !p.belehrung && (

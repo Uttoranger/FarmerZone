@@ -36,18 +36,18 @@ export function PasswortVergessenFormular(): React.JSX.Element {
         redirectTo: '/reset-password',
       })
       if (error?.status === 429) {
-        setFehler('Zu viele Versuche — bitte kurz warten.')
+        setFehler('Zu viele Versuche – bitte kurz warten.')
         return
       }
       if (error && !error.status) {
-        setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
+        setFehler('Verbindung fehlgeschlagen – bitte erneut versuchen.')
         return
       }
       // Erfolg UND „Konto existiert nicht"-artige Antworten bekommen dieselbe
       // neutrale Meldung — keine Konto-Enumeration über diese Seite
       setGesendet(true)
     } catch {
-      setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
+      setFehler('Verbindung fehlgeschlagen – bitte erneut versuchen.')
     } finally {
       setLaedt(false)
     }
@@ -57,6 +57,8 @@ export function PasswortVergessenFormular(): React.JSX.Element {
     return (
       <div className="flex flex-col items-center gap-3 py-2 text-center">
         <MailCheck className="size-8 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
+        {/* Überschrift nach Board w2-passwort Bild 2; die Antwort bleibt für jede Adresse gleich. */}
+        <h2 className="font-heading text-[22px] leading-tight font-semibold text-foreground">Schau in deine E-Mails</h2>
         <p role="status" aria-live="polite" className="text-[14.5px] leading-normal text-foreground">
           Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt.
         </p>
@@ -78,7 +80,7 @@ export function PasswortVergessenFormular(): React.JSX.Element {
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={emailId} className={FELD_LABEL}>
-            E-Mail-Adresse
+            E-Mail
           </label>
           <input
             id={emailId}

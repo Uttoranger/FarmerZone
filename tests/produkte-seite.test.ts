@@ -76,7 +76,14 @@ import {
   PRODUKTE_LEER,
   produkteKopfzeile,
   sichtbareProdukteFilter,
-  VORRAT_HINWEIS_ZEILEN,
+  PRODUKTE_KEIN_TREFFER,
+  VORRAT_NULL_SATZ,
+  hofpreisTeile,
+  hofpreisZeile,
+  keinTrefferSatz,
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  SPEICHERN_FEHLER,
   wiederDaMomentMoeglich,
   wiederDaTexte,
   zaehleProdukteFilter,
@@ -91,6 +98,7 @@ import { NICHT_IM_SHOP, SPEICHERN_NICHT_IM_SHOP } from '@/lib/produkt-sichtbarke
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import { vorratSetzenSchema } from '@/schemas/vorrat'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
+import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import { formatGebinde, hofVorratText } from '@/lib/format'
 import { LOW_STOCK_THRESHOLD } from '@/lib/dashboard-hints'
 import { leseAuftrag, auftragsSchluessel, ohneAuftrag } from '@/lib/url-auftrag'
@@ -151,11 +159,11 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
     expect(produktStatus({ isAvailable: true, stock: 1, unit: 'STUECK', unitSize: null }).text).toBe('Nur noch 1 Stück')
     expect(produktStatus({ isAvailable: true, stock: LOW_STOCK_THRESHOLD, unit: 'BALLEN', unitSize: null }).text).toBe('Nur noch 5 Ballen')
     // Gegenprobe: über der Grenze kein „Nur noch".
-    expect(produktStatus({ isAvailable: true, stock: LOW_STOCK_THRESHOLD + 1, unit: 'KG', unitSize: null }).text).toBe('Sichtbar')
+    expect(produktStatus({ isAvailable: true, stock: LOW_STOCK_THRESHOLD + 1, unit: 'KG', unitSize: null }).text).toBe('Im Shop')
   })
 
-  it('Sichtbar (grün), Nur noch N (orange), Ausverkauft und Nicht im Shop (neutral)', () => {
-    expect(produktStatus(p({ stock: 24 }))).toEqual({ text: 'Sichtbar', ton: 'fertig' })
+  it('Im Shop (grün, Boards s1/w1-produkte), Nur noch N (orange), Ausverkauft und Nicht im Shop (neutral)', () => {
+    expect(produktStatus(p({ stock: 24 }))).toEqual({ text: 'Im Shop', ton: 'fertig' })
     expect(produktStatus(p({ stock: 3 }))).toEqual({ text: 'Nur noch 3 kg', ton: 'offen' })
     expect(produktStatus(p({ stock: 0 }))).toEqual({ text: 'Ausverkauft', ton: 'neutral' })
     expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Nicht im Shop', ton: 'neutral' })
@@ -176,7 +184,7 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
       'src/lib/produkte-hof.ts',
       'src/lib/produkt-sichtbarkeit.ts',
       'src/components/produkte/produkte-ansicht.tsx',
-      'src/components/produkte/vorrat-feld.tsx',
+      'src/components/produkte/vorrat-blatt.tsx',
       'src/components/produkte/wieder-da-moment.tsx',
       'src/components/products/product-dialog.tsx',
       'src/components/products/produkt-abschnitte.ts',
@@ -188,6 +196,25 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
     // Gegenprobe: Die Suche schlägt bei beiden Formen an, nicht beim Filterwert der Adresse.
     expect('Entwurf Entwürfe').toMatch(/Entw(?:u|ü)rf/)
     expect('?filter=entwuerfe').not.toMatch(/Entw(?:u|ü)rf/)
+  })
+})
+
+describe('Speicherfehler als Karte (V17; Board s1/w1-produkt-neu, Bild 6)', () => {
+  it('am Netz beim Bearbeiten „Nochmal" mit dem Satz des Boards', () => {
+    expect(speicherFehlerNachWurf(true, true, 'x')).toEqual({ titel: SPEICHERN_FEHLER.titel, satz: SPEICHERN_FEHLER.netz, nochmal: true })
+  })
+
+  it('am Netz beim Anlegen kein „Nochmal": der Server kann schon gespeichert haben (NETZ_SATZ_UNSICHER)', () => {
+    expect(speicherFehlerNachWurf(true, false, 'x')).toEqual({ titel: SPEICHERN_FEHLER.unsicherTitel, satz: NETZ_SATZ_UNSICHER, nochmal: false })
+  })
+
+  it('ohne Netzfehler der Satz des Formulars, ohne Knopf; eine Antwort des Servers steht wörtlich da', () => {
+    expect(speicherFehlerNachWurf(false, true, 'Wir konnten das Produkt nicht speichern.')).toEqual({
+      titel: SPEICHERN_FEHLER.titel,
+      satz: 'Wir konnten das Produkt nicht speichern.',
+      nochmal: false,
+    })
+    expect(speicherFehlerAusAntwort('Produkt nicht gefunden.')).toEqual({ titel: SPEICHERN_FEHLER.titel, satz: 'Produkt nicht gefunden.', nochmal: false })
   })
 })
 
@@ -325,12 +352,12 @@ describe('produkteAbschnitte — „Braucht dich" zuerst (N25)', () => {
 
 describe('Kopfzeile und Gebinde', () => {
   it('„6 Produkte · 5 sichtbar" zählt isAvailable, nicht den Bestand', () => {
-    expect(produkteKopfzeile([p(), p({ stock: 0 }), p({ isAvailable: false })])).toBe('3 Produkte · 2 sichtbar')
-    expect(produkteKopfzeile([p()])).toBe('1 Produkt · 1 sichtbar')
+    expect(produkteKopfzeile([p(), p({ stock: 0 }), p({ isAvailable: false })])).toBe('Produkte · 3 · 2 sichtbar')
+    expect(produkteKopfzeile([p()])).toBe('Produkte · 1 · 1 sichtbar')
     // Ohne Produkte sagt der EmptyState darunter alles; eine Kopfzeile mit demselben Satz stünde doppelt da.
     expect(produkteKopfzeile([])).toBeNull()
     // Auch der Fall, in dem alles ausgeblendet ist (aus der Bestandsliste übernommen).
-    expect(produkteKopfzeile([p({ isAvailable: false }), p({ isAvailable: false })])).toBe('2 Produkte · 0 sichtbar')
+    expect(produkteKopfzeile([p({ isAvailable: false }), p({ isAvailable: false })])).toBe('Produkte · 2 · 0 sichtbar')
   })
 
   it('Gebinde: „10 Stück", „500 g", ohne Gebinde „je kg"', () => {
@@ -542,7 +569,7 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     produkt('p4', { name: lang, category: 'HEU_STROH', isAvailable: false }),
   ]
 
-  async function rendere(produkte: ProductData[], suche = ''): Promise<string> {
+  async function rendere(produkte: ProductData[], suche = '', preisAnzeige: { hundertstel: number } | null = null): Promise<string> {
     navigation.suche = suche
     const { ProdukteAnsicht } = await import('@/components/produkte/produkte-ansicht')
     return renderToStaticMarkup(
@@ -552,19 +579,26 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
         registrierung: { betriebsnummer: null, betriebsstatus: null },
         hof: { name: 'Hof Test', slug: 'hof-test', sichtbar: true, teilenMomenteAus: false },
         naechstesFenster: null,
+        preisAnzeige,
       })
     )
   }
 
-  it('gefüllt: Kopfzeile, vier Marken, Vorrat-Stepper, Schalter „Sichtbar", Hinweis unter der Tabelle', async () => {
+  it('gefüllt: Kopfzeile über der Tabelle, vier Schilder, Vorrat als Knopf, Schalter „Im Shop" (Board w1-produkte)', async () => {
     const html = await rendere(liste)
-    expect(html).toContain('4 Produkte · 3 sichtbar')
-    for (const marke of ['Sichtbar', 'Nur noch 3 kg', 'Ausverkauft', 'Nicht im Shop']) expect(html).toContain(`>${marke}<`)
+    expect(html).toContain('Produkte · 4 · 3 sichtbar')
+    for (const marke of ['Im Shop', 'Nur noch 3 kg', 'Ausverkauft', 'Nicht im Shop']) expect(html).toContain(`>${marke}<`)
     expect(html).not.toMatch(/Entw(?:u|ü)rf/)
-    expect(html).toContain('aria-label="Vorrat Karotten"')
+    expect(html).toContain('aria-label="Vorrat Karotten: 3 kg. Ändern"')
+    // Auch bei 0 der neutrale Feldrand (Boards s1/w1-produkte, V19: „Ausverkauft" neutral) — kein Orange.
+    const knopfBeiNull = html.match(/<button[^>]*data-vorrat-knopf="p3"[^>]*>/)?.[0] ?? ''
+    expect(knopfBeiNull).toContain('border-input')
+    expect(knopfBeiNull).not.toContain('status-offen')
     expect(html).toContain('role="switch"')
     expect(html).toContain('aria-label="Freilandeier sichtbar"')
-    expect(html).toContain('Vorrat direkt hier ändern.')
+    // Die Sätze unter Tabelle und Zeilen sind entfallen; der Satz zu 0 steht im Blatt (VORRAT_NULL_SATZ).
+    expect(html).not.toContain('Vorrat direkt hier ändern.')
+    expect(html).not.toContain(VORRAT_NULL_SATZ)
     expect(html).toContain('Neues Produkt')
     // „Alle" ist der gewählte Filter; die Chips sind echte Links.
     expect(html).toMatch(/<a[^>]*href="\/products"[^>]*aria-current="page"/)
@@ -578,28 +612,49 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     return { tabelle: html.slice(0, ende), zeilen: html.slice(ende) }
   }
 
-  it('Zeilen unter 1024 px: Schild nur bei Ausnahmen, kein „Sichtbar"; die Tabelle behält „Sichtbar" und den Stepper', async () => {
+  it('Zeilen unter 1024 px: Schild nur bei Ausnahmen, kein „Im Shop"; die Tabelle zeigt „Im Shop" als Schild', async () => {
     const { tabelle, zeilen } = teile(await rendere(liste))
     // Im Filter „Alle" steht das Ausgeblendete nur als Zeile „Nicht im Shop · 1".
     for (const marke of ['Nur noch 3 kg', 'Ausverkauft']) expect(zeilen).toContain(`>${marke}<`)
-    expect(zeilen).not.toContain('>Sichtbar<')
+    // Als Schild (Marke) nicht — die Überschrift „Im Shop · n" des Abschnitts bleibt.
+    const imShopSchild = /data-slot="marke"[^>]*><span[^>]*>Im Shop</
+    expect(zeilen).not.toMatch(imShopSchild)
     expect(zeilen).toContain('Braucht dich')
     expect(zeilen).toContain('Nicht im Shop · 1')
     expect(zeilen).toContain('href="/products?filter=entwuerfe"')
     // Gegenprobe aus der Komponente, die das Merkmal trägt: die Tabelle.
-    expect(tabelle).toContain('>Sichtbar<')
-    expect(tabelle).toContain('aria-label="Vorrat Karotten"')
+    expect(tabelle).toMatch(imShopSchild)
     expect(tabelle).toContain('role="switch"')
   })
 
-  it('der Vorrat ist ein Knopf mit Zahl und Einheit — Stepper nur in der Tabelle', async () => {
+  it('„Ausverkauft" ist neutral (V19), als Schild — nie Orange', async () => {
+    const html = await rendere(liste)
+    const ausverkauft = html.match(/<span[^>]*data-art="([a-z]+)"[^>]*data-form="schild"[^>]*><span[^>]*>Ausverkauft<\/span>/)
+    expect(ausverkauft?.[1]).toBe('erledigt')
+    // Gegenprobe: „Nur noch …" ist orange (tun).
+    expect(html).toMatch(/data-art="tun"[^>]*data-form="schild"[^>]*><span[^>]*>Nur noch 3 kg</)
+  })
+
+  it('der Vorrat ist ein Knopf mit Zahl und Einheit — in Zeilen und Tabelle, kein Stepper in der Liste', async () => {
     const { tabelle, zeilen } = teile(await rendere(liste))
     expect(zeilen).toContain('aria-label="Vorrat Karotten: 3 kg. Ändern"')
     expect(zeilen).toContain('aria-label="Vorrat Freilandeier: 24 Pakete. Ändern"')
     expect(zeilen).toContain('aria-label="Vorrat Blütenhonig: 0 Pakete. Ändern"')
     expect(zeilen).not.toContain('data-slot="stepper"')
-    expect(tabelle).toContain('data-slot="stepper"')
-    expect(tabelle).not.toContain('. Ändern"')
+    expect(tabelle).not.toContain('data-slot="stepper"')
+    expect(tabelle).toContain('aria-label="Vorrat Karotten: 3 kg. Ändern"')
+  })
+
+  it('Preis je Modell (N38): im Hofpreis-Modell „Du bekommst … · die Kundin zahlt …", sonst der Preis wie bisher', async () => {
+    const hofpreis = await rendere(liste, '', { hundertstel: 600 })
+    // € 4,50 × 6 % = 0,27 → € 4,77 (Board s1-produkte, Freilandeier).
+    expect(hofpreis).toContain('Du bekommst € 4,50')
+    expect(hofpreis).toContain('die Kundin zahlt € 4,77')
+    expect(hofpreis).toContain('Du bekommst € 4,50 · die Kundin zahlt € 4,77')
+    // Gegenprobe: im Modell „bisher" kein Satz dazu.
+    const bisher = await rendere(liste)
+    expect(bisher).not.toContain('Du bekommst')
+    expect(bisher).toContain('€ 4,50')
   })
 
   it('„Nicht im Shop" filtert: einfache Liste, das Schild steht dann an der Zeile', async () => {
@@ -609,16 +664,14 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(zeilen).not.toContain('Braucht dich')
   })
 
-  it('unter 1024 px ein eigener Satz zum Vorrat, die Tabelle behält VORRAT_HINWEIS; die Lupe sucht', async () => {
+  it('unter md sucht die Lupe', async () => {
     const html = await rendere(liste)
-    expect(html).toContain(VORRAT_HINWEIS_ZEILEN)
-    expect(html).toContain('Vorrat direkt hier ändern.')
     expect(html).toMatch(/<button[^>]*aria-label="Produkt suchen"[^>]*aria-expanded="false"/)
     // Steht schon eine Suche in der Adresse, ist das Feld offen.
     expect(await rendere(liste, 'karotten')).toMatch(/<button[^>]*aria-label="Produkt suchen"[^>]*aria-expanded="true"/)
   })
 
-  it('die Suche steht im DOM hinter den Filtern: ab md wie vorher rechts, unter md sichtbar oben — der Fokus folgt der Lupe', async () => {
+  it('die Suche steht hinter den Filtern, mit sichtbarer Beschriftung (Board) — in DOM und Bild dieselbe Reihenfolge', async () => {
     const html = await rendere(liste, 'karotten')
     const filter = html.indexOf('aria-label="Produkte filtern"')
     const lupe = html.indexOf('aria-label="Produkt suchen"')
@@ -626,9 +679,9 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(filter).toBeGreaterThan(0)
     expect(lupe).toBeGreaterThan(filter)
     expect(feld).toBeGreaterThan(lupe)
-    // Sichtbar nach oben nur unter md; ab md bleibt die Reihenfolge des DOM (WCAG 2.4.3).
-    expect(html).toMatch(/<label class="[^"]*max-md:order-first[^"]*">/)
-    expect(html).not.toContain('md:order-last')
+    expect(html).toMatch(/<label[^>]*><span[^>]*>Produkt suchen<\/span><input/)
+    expect(html).toContain('placeholder="Name des Produkts"')
+    expect(html).not.toContain('order-first')
   })
 
   it('lange Namen: höchstens zwei Zeilen, der volle Name im title', async () => {
@@ -644,21 +697,34 @@ describe('Ansicht /products — vier Zustände, lange Namen, Tokens', () => {
     expect(html).not.toContain('Vorrat Karotten')
   })
 
-  it('leer: EmptyState mit Ausweg „Neues Produkt"; kein Treffer: Ausweg „Alle Produkte zeigen"', async () => {
+  it('leer: EmptyState mit Ausweg „Erstes Produkt anlegen"; kein Treffer: Satz mit dem Wort und „Suche zurücksetzen"', async () => {
     const leer = await rendere([])
     expect(leer.split(PRODUKTE_LEER.titel).length - 1).toBe(1)
     expect(leer).toContain(PRODUKTE_LEER.satz)
-    expect(leer).toContain('Neues Produkt')
-    const keinTreffer = await rendere(liste, 'gibtesnicht')
-    expect(keinTreffer).toContain('Kein Produkt passt')
-    expect(keinTreffer).toContain('Alle Produkte zeigen')
+    expect(leer).toContain(PRODUKTE_LEER.knopf)
+    const keinTreffer = await rendere(liste, 'Kürbis')
+    expect(keinTreffer).toContain(PRODUKTE_KEIN_TREFFER.titel)
+    expect(keinTreffer).toContain('Prüf die Schreibweise oder leg „Kürbis“ als neues Produkt an.')
+    expect(keinTreffer).toContain(PRODUKTE_KEIN_TREFFER.sucheKnopf)
+    // Gegenprobe: ohne Suche (leerer Filter) der Satz zum Filter und „Alle Produkte zeigen".
+    expect(keinTrefferSatz('  ')).toBe(PRODUKTE_KEIN_TREFFER.filterSatz)
+    navigation.filter = 'brennmaterial'
+    const leererFilter = await rendere(liste)
+    expect(leererFilter).toContain(PRODUKTE_KEIN_TREFFER.filterKnopf)
+  })
+
+  it('hofpreisTeile rechnet über endpreisEuro (je Stück aufgerundet) — bisher null', () => {
+    expect(hofpreisTeile(7.5, { hundertstel: 600 })).toEqual({ bekommst: 'Du bekommst € 7,50', zahlt: 'die Kundin zahlt € 7,95' })
+    expect(hofpreisTeile(12, { hundertstel: 600 })).toEqual({ bekommst: 'Du bekommst € 12,00', zahlt: 'die Kundin zahlt € 12,72' })
+    expect(hofpreisZeile(95, { hundertstel: 600 })).toBe('Du bekommst € 95,00 · die Kundin zahlt € 100,70')
+    expect(hofpreisTeile(7.5, null)).toBeNull()
   })
 
   it('Symbole sind aria-hidden, Farben nur über Tokens', async () => {
     const html = await rendere(liste)
     for (const svg of html.match(/<svg[^>]*>/g) ?? []) expect(svg).toContain('aria-hidden="true"')
     expect((html.match(/<svg/g) ?? []).length).toBeGreaterThan(0)
-    for (const datei of ['produkte-ansicht.tsx', 'vorrat-feld.tsx', 'was-legst-du-an.tsx', 'wieder-da-moment.tsx']) {
+    for (const datei of ['produkte-ansicht.tsx', 'vorrat-blatt.tsx', 'was-legst-du-an.tsx', 'wieder-da-moment.tsx']) {
       const text = quelle(`src/components/produkte/${datei}`)
       expect(text, datei).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|\b(?:bg|text|border)-(?:white|black|amber|red|green|slate)\b/)
     }

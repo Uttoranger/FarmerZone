@@ -8,8 +8,9 @@ import { useUhr } from '@/components/hoefe/use-uhr'
 /**
  * Die Abholzeile (Register N22, Board system-k1-entdecken-v2): EINE Zeile, die
  * in Liste, Karussell und Pin-Vorschau gleich aussieht — „Abholung heute
- * 15:00–18:00" in Grün (es geht), „Macht gerade Pause – …" in Orange, „Noch
- * nicht bestellbar" grau. Zustandsfarben, nie Knopffarben.
+ * 15:00–18:00" in Grün (es geht), „Macht gerade Pause – …" leise und halbfett
+ * (V18, Boards s1/w1-hoefe: ein pausierter Hof steht neutral da, nicht als
+ * Aufgabe), „Noch nicht bestellbar" grau. Zustandsfarben, nie Knopffarben.
  *
  * Gerechnet wird mit der Uhr des Browsers (useUhr): beim Hydrieren der
  * Zeitpunkt des Servers, danach die eigene Uhr, auf die Minute — eine bis zu
@@ -36,7 +37,7 @@ export function Abholzeile({
   const uhr = useUhr(jetzt)
   const lage = abholLage(fenster, isPaused, uhr)
   if (lage.art === 'pause') {
-    return <p className={cn('text-[13px] font-semibold text-status-offen', className)}>{ABHOLZEILE_TEXT.pause}</p>
+    return <p data-abholung="pause" className={cn('text-[13px] font-semibold text-muted-foreground', className)}>{ABHOLZEILE_TEXT.pause}</p>
   }
   const text = bestellbar ? abholzeileText(lage) : null
   if (!text) {

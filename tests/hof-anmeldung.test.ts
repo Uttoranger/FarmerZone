@@ -44,7 +44,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
 }))
 vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null, ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
 
 import { FuerHoefeBandInhalt } from '@/components/startseite/startseite-abschnitte'
 import { FuerHoefeEinstieg, FuerHoefeSchluss } from '@/components/fuer-hoefe/fuer-hoefe-abschnitte'

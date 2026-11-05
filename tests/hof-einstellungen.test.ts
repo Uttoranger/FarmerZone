@@ -398,7 +398,7 @@ describe('einstellungenBereiche', () => {
 
 describe('konditionenRechenbeispiel', () => {
   it('online: Gebühr nach E4 auf den Warenpreis, die Auszahlung bleibt der volle Warenpreis', () => {
-    const r = konditionenRechenbeispiel(hof(), VOR_STICHTAG)
+    const r = konditionenRechenbeispiel(hof(), VOR_STICHTAG, { modell: 'bisher' })
     expect(RECHENBEISPIEL_WARENPREIS_CENTS).toBe(2000)
     expect(r.satz).toBe(`Servicegebühr 5 %, mind. ${formatEuro(0.5)} – zahlt der Kunde`)
     expect(r.online.zeilen.map((z) => z.betrag)).toEqual([formatEuro(20), `+ ${formatEuro(1)}`, formatEuro(21), formatEuro(20)])
@@ -406,35 +406,35 @@ describe('konditionenRechenbeispiel', () => {
   })
 
   it('bar vor dem SEPA-Start ohne Gebühr (B1), mit dem Satz aus konditionen.ts', () => {
-    const r = konditionenRechenbeispiel(hof(), new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1))
+    const r = konditionenRechenbeispiel(hof(), new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1), { modell: 'bisher' })
     expect(r.bar.zeilen.map((z) => z.betrag)).toEqual([formatEuro(20), `+ ${formatEuro(0)}`, formatEuro(20), formatEuro(20)])
     expect(r.bar.satz).toBe(BAR_OHNE_GEBUEHR_SATZ)
   })
 
   it('bar ab dem Stichtag mit Gebühr, die die Monatsabrechnung holt', () => {
-    const r = konditionenRechenbeispiel(hof(), BAR_SERVICEGEBUEHR_AB)
+    const r = konditionenRechenbeispiel(hof(), BAR_SERVICEGEBUEHR_AB, { modell: 'bisher' })
     expect(r.bar.zeilen.map((z) => z.betrag)).toEqual([formatEuro(20), `+ ${formatEuro(1)}`, formatEuro(21), formatEuro(20)])
     expect(r.bar.satz).toBe(BAR_GEBUEHR_SEPA_SATZ)
   })
 
   it('Hof ohne eingeschaltete Gebühr: kein Satz mit Prozent, ehrlicher Grund statt Versprechen', () => {
-    const r = konditionenRechenbeispiel(hof({ serviceFeeActiveFrom: null }), VOR_STICHTAG)
+    const r = konditionenRechenbeispiel(hof({ serviceFeeActiveFrom: null }), VOR_STICHTAG, { modell: 'bisher' })
     expect(r.satz).toBeNull()
     expect(r.online.zeilen[1].betrag).toBe(`+ ${formatEuro(0)}`)
     expect(r.online.satz).toBe('Für deinen Hof ist derzeit keine Servicegebühr eingestellt.')
-    const spaeter = konditionenRechenbeispiel(hof({ serviceFeeActiveFrom: new Date('2027-03-01T00:00:00Z') }), VOR_STICHTAG)
+    const spaeter = konditionenRechenbeispiel(hof({ serviceFeeActiveFrom: new Date('2027-03-01T00:00:00Z') }), VOR_STICHTAG, { modell: 'bisher' })
     expect(spaeter.online.satz).toContain('März 2027')
   })
 
   it('eigener Satz des Hofs zählt (z. B. 4,9 %), Mindestgebühr greift', () => {
-    const r = konditionenRechenbeispiel(hof({ serviceFeePercent: '4.9', serviceFeeMinCents: 120 }), VOR_STICHTAG)
+    const r = konditionenRechenbeispiel(hof({ serviceFeePercent: '4.9', serviceFeeMinCents: 120 }), VOR_STICHTAG, { modell: 'bisher' })
     expect(r.satz).toContain('4,9 %')
     expect(r.online.zeilen[1].betrag).toBe(`+ ${formatEuro(1.2)}`)
   })
 
   it('eine Provision steht als eigene Zeile da und geht von der Auszahlung ab — im Pilot 0, dann keine Zeile', () => {
-    expect(konditionenRechenbeispiel(hof(), VOR_STICHTAG).online.zeilen.map((z) => z.label)).not.toContain('Provision')
-    const r = konditionenRechenbeispiel(hof({ platformFeePercent: '3' }), VOR_STICHTAG)
+    expect(konditionenRechenbeispiel(hof(), VOR_STICHTAG, { modell: 'bisher' }).online.zeilen.map((z) => z.label)).not.toContain('Provision')
+    const r = konditionenRechenbeispiel(hof({ platformFeePercent: '3' }), VOR_STICHTAG, { modell: 'bisher' })
     expect(r.online.zeilen.find((z) => z.label === 'Provision')?.betrag).toBe(`− ${formatEuro(0.6)}`)
     expect(r.online.zeilen.at(-1)?.betrag).toBe(formatEuro(19.4))
     // Mit Provision bleibt der Warenpreis nicht unberührt — der Satz sagt das.
@@ -449,7 +449,7 @@ describe('Sätze der Konditionen aus konditionen.ts', () => {
     expect(barGebuehrSepaSatz(new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1))).toBeNull()
     expect(barGebuehrSepaSatz(BAR_SERVICEGEBUEHR_AB)).toBe(BAR_GEBUEHR_SEPA_SATZ)
     // Vor dem Stichtag sagt das Rechenbeispiel nie „holt per SEPA".
-    expect(konditionenRechenbeispiel(hof(), VOR_STICHTAG).bar.satz).not.toContain('SEPA')
+    expect(konditionenRechenbeispiel(hof(), VOR_STICHTAG, { modell: 'bisher' }).bar.satz).not.toContain('SEPA')
   })
 
   it('kein Satz steht als Literal in hof-einstellungen.ts', () => {
@@ -577,7 +577,7 @@ describe('baueKonditionenSeite — Stand, Karten, Vergleich (Nr. 61)', () => {
 })
 
 describe('Konditionen gerendert', () => {
-  const markup = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: VOR_STICHTAG }))
+  const markup = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: VOR_STICHTAG, gebuehr: { lage: { modell: 'bisher' }, stichtag: BAR_SERVICEGEBUEHR_AB } }))
   /** Ohne Tags und mit normalen Leerzeichen — für Sätze, in denen die Seite Teile hervorhebt. */
   const text = (h: string): string => h.replace(/<[^>]+>/g, '').replace(/\u00a0/g, ' ').replace(/&quot;/g, '"')
 
@@ -624,7 +624,7 @@ describe('Konditionen gerendert', () => {
   })
 
   it('nach dem Stichtag: kein „Dein Stand" und kein Vergleich, der Übergang K1 bleibt als Hinweis', () => {
-    const nachher = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: NACH_STICHTAG }))
+    const nachher = html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: NACH_STICHTAG, gebuehr: { lage: { modell: 'bisher' }, stichtag: BAR_SERVICEGEBUEHR_AB } }))
     expect(nachher).not.toContain('Dein Stand')
     expect(nachher).not.toContain(VERGLEICH_TEXT.titel)
     expect(nachher).toContain(KONDITIONEN_UEBERGANG)
@@ -632,7 +632,7 @@ describe('Konditionen gerendert', () => {
   })
 
   it('Gründungshof: „Dein Stand" zeigt die Zusage mit Datum, darunter den Übergang K1 — vor den Tarifen, ohne Preis', () => {
-    const gruender = html(createElement(KonditionenAnsicht, { hof: hof({ gruendungBis: BIS_SILVESTER_2027 }), jetzt: VOR_STICHTAG }))
+    const gruender = html(createElement(KonditionenAnsicht, { hof: hof({ gruendungBis: BIS_SILVESTER_2027 }), jetzt: VOR_STICHTAG, gebuehr: { lage: { modell: 'bisher' }, stichtag: BAR_SERVICEGEBUEHR_AB } }))
     expect(gruender).toContain('Dein Stand')
     expect(gruender).toMatch(/<h2[^>]*>Gründungshof<\/h2>/)
     const stand = text(gruender.slice(gruender.indexOf('Dein Stand'), gruender.indexOf('id="tarife-titel"')))
@@ -644,7 +644,7 @@ describe('Konditionen gerendert', () => {
 
   it('kein „Dein Tarif", solange der Hof keinen gewählt hat; mit Tarif steht er da', () => {
     expect(markup).not.toContain('Dein Tarif')
-    expect(html(createElement(KonditionenAnsicht, { hof: hof({ tarif: 'HOFLADEN' }), jetzt: VOR_STICHTAG }))).toContain('Dein Tarif')
+    expect(html(createElement(KonditionenAnsicht, { hof: hof({ tarif: 'HOFLADEN' }), jetzt: VOR_STICHTAG, gebuehr: { lage: { modell: 'bisher' }, stichtag: BAR_SERVICEGEBUEHR_AB } }))).toContain('Dein Tarif')
   })
 
   it('verspricht nichts aus dem Mockup, was nicht gilt (Live gehen nach Stripe, Mail bei Satzänderung, Gründungshof)', () => {

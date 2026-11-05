@@ -22,7 +22,7 @@ export interface ErstattungOffenProps {
  */
 export function ErstattungOffenEmail(p: ErstattungOffenProps) {
   return (
-    <EmailLayout previewText={`Erstattung offen${p.bestellnummer ? ` – Bestellung ${p.bestellnummer}` : ''}`}>
+    <EmailLayout fuss={{ art: 'betrieb' }} previewText={`Erstattung offen${p.bestellnummer ? ` – Bestellung ${p.bestellnummer}` : ''}`}>
       <Text style={h1}>Erstattung offen</Text>
       <Text style={bodyText}>{p.was}</Text>
 

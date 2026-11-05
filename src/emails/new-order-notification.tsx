@@ -22,14 +22,15 @@ export interface NewOrderNotificationProps {
   customerTotal?: number
   paymentLabel: string
   isOnline: boolean
-  dashboardUrl: string
+  /** Zu Heute im Hofbereich (Wortliste N42 c: „Heute“, nie „Dashboard“). */
+  heuteUrl: string
 }
 
 export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const anrufen = telefonLink(p.customerPhone)
   return (
-    <EmailLayout previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
       <Text style={h1}>
         {p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}
       </Text>
@@ -78,7 +79,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
         {anrufen ? <Link href={anrufen} style={textLink}>{formatiereTelefon(p.customerPhone)}</Link> : p.customerPhone}
       </Text>
 
-      <Link href={p.dashboardUrl} style={ctaButton}>Im Dashboard ansehen →</Link>
+      <Link href={p.heuteUrl} style={ctaButton}>Bei Heute ansehen →</Link>
     </EmailLayout>
   )
 }

@@ -22,7 +22,7 @@ export interface EmailBestaetigungProps {
  */
 export function EmailBestaetigungEmail({ url, stunden }: EmailBestaetigungProps) {
   return (
-    <EmailLayout previewText={`Bestätige deine E-Mail-Adresse – der Link gilt ${stunden} Stunden`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Bestätige deine E-Mail-Adresse – der Link gilt ${stunden} Stunden`}>
       <Text style={h1}>Bestätige deine E-Mail-Adresse</Text>
       <Text style={bodyText}>
         Hallo,

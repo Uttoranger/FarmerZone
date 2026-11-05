@@ -28,6 +28,8 @@ import type { Tarif } from '@prisma/client'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { MARKE } from '@/lib/marke'
+// Nur der Typ — zur Laufzeit bindet diese Datei plattformgebuehr.ts nicht ein (sonst ein Ring über servicegebuehr.ts).
+import type { GebuehrModell } from '@/lib/plattformgebuehr'
 
 /**
  * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
@@ -226,6 +228,21 @@ export function inklPlattformgebuehrSatz(betrag: string): string {
 /** Der Grund am ausgeschalteten Bestellknopf und die Meldung von /api/checkout (400). */
 export const MINDESTBESTELLWERT_SATZ = `Mindestbestellwert ${formatZahl(centsAlsEuro(MINDESTBESTELLWERT_CENTS))} € bei diesem Hof`
 
+/** „10 €“ — der Mindestbestellwert als Wort im Satz, wie in `MINDESTBESTELLWERT_SATZ`. */
+export const MINDESTBESTELLWERT_TEXT = `${formatZahl(centsAlsEuro(MINDESTBESTELLWERT_CENTS))} €`
+
+/**
+ * Der Wortlaut des Mindestbestellwert-Hinweises in der Kasse (Register N41 a,
+ * Antwort A3): „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab
+ * € 10,60). Dir fehlen noch Waren für € X.“ Die Beträge rechnet
+ * `mindestbestellwertHinweis` (plattformgebuehr.ts) mit dem Satz des Hofs —
+ * nie ein Literal. Ohne Fehlbetrag entfällt der zweite Satz.
+ */
+export function mindestbestellwertHinweisText(abCents: number, fehlendCents: number): string {
+  const satz = `Mindestbestellwert: Waren für ${MINDESTBESTELLWERT_TEXT} (mit ${PLATTFORMGEBUEHR_BEZEICHNUNG} ab ${formatEuro(centsAlsEuro(abCents))}).`
+  return fehlendCents > 0 ? `${satz} Dir fehlen noch Waren für ${formatEuro(centsAlsEuro(fehlendCents))}.` : satz
+}
+
 /**
  * Neutral, wenn bar bei diesem Hof gerade nicht geht (kein Mandat, N38) —
  * /api/checkout antwortet damit (409), die Kasse bietet dann nur online an.
@@ -406,17 +423,108 @@ export type TextTeil = { text: string; betont?: boolean }
  * Grundgebühr nur nach aktiver Wahl von Hofladen (E6-Ergänzung, Nr. 61) —
  * „Deine Konditionen" hebt das hervor, darum in Teilen.
  */
-export const MONATSABRECHNUNG_TEILE: readonly TextTeil[] = [
+const MONATSABRECHNUNG_GRUNDGEBUEHR: readonly TextTeil[] = [
   { text: `Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab: die Grundgebühr – ` },
   { text: `nur wenn du ${tarifText('HOFLADEN').name} gewählt hast`, betont: true },
+]
+
+export const MONATSABRECHNUNG_TEILE: readonly TextTeil[] = [
+  ...MONATSABRECHNUNG_GRUNDGEBUEHR,
   { text: ' – und die Servicegebühren aus Barbestellungen. Bei Online-Zahlungen ist die Servicegebühr schon beim Bezahlen erledigt.' },
 ]
 
 /** Derselbe Satz am Stück — für /konditionen. */
 export const MONATSABRECHNUNG_TEXT = MONATSABRECHNUNG_TEILE.map((teil) => teil.text).join('')
 
-/** Wann der Text dieser Seite zuletzt geändert wurde. */
+/** Wann der Text dieser Seite zuletzt geändert wurde — die Fassung vor dem Stichtag (`konditionenStand`). */
 export const KONDITIONEN_STAND = 'Oktober 2026'
+
+// ─── Gebühren-Texte je Modell (V62, V63; Lauf 30, Nr. 221) ───────────────────
+//
+// Ab dem Stichtag „Hofpreis-Modell ab“ heißt es überall „Plattformgebühr“
+// (N38). Jede Funktion hier nimmt das MODELL (`gebuehrModellFuer` in
+// plattformgebuehr.ts) statt eines Datums — so gibt es keine zweite
+// Datumsregel. Die festen Sätze darüber (SERVICEGEBUEHR_ZAHLT_KUNDE,
+// VOLLER_WARENPREIS, MONATSABRECHNUNG_TEILE, KONDITIONEN_DERZEIT,
+// KONDITIONEN_STAND) sind die Fassung „bisher“; Seiten mit Stichtag nehmen
+// die Funktionen. Nur der Typ wird eingebunden — ein Ring zur Laufzeit
+// entsteht so nicht.
+
+/** Über dem Abschnitt „Plattformgebühr und Abrechnung“, bis die Projektleitung sie entfernt (wie AGB 0.9). */
+export const KONDITIONEN_ENTWURF = 'Entwurf – die Anwältin prüft den Wortlaut'
+
+/** Ein Abschnitt der Konditionen-Seite: Überschrift, Kennzeichnung (null = keine) und Absätze. */
+export type KonditionenAbschnitt = { titel: string; entwurf: string | null; absaetze: readonly string[] }
+
+/**
+ * Der Abschnitt zur Gebühr auf /konditionen (V62; Wortlaut nach Board
+ * w3-rechtstexte Bild 6 und dem Auftrag Lauf 30). Vor dem Stichtag der
+ * bisherige (Servicegebühr, Bar-Ausnahme B1, Monatsabrechnung), ab dem
+ * Stichtag „Plattformgebühr und Abrechnung“ mit Entwurf-Kennzeichnung.
+ * `satz` ist der Satz eines bestimmten Hofs („6,5“); ohne ihn steht der
+ * Standard mit dem Hinweis, dass ein eingetragener Satz vorgeht.
+ */
+export function konditionenGebuehrAbschnitt(modell: GebuehrModell, jetzt: Date, satz?: string): KonditionenAbschnitt {
+  if (modell === 'bisher') {
+    return { titel: 'Servicegebühr und Abrechnung', entwurf: null, absaetze: [servicegebuehrZahltKunde(jetzt), MONATSABRECHNUNG_TEXT] }
+  }
+  const prozent = satz ?? formatZahl(PLATTFORMGEBUEHR_PROZENT)
+  const standard = satz === undefined ? ' (Standard; ist für deinen Hof ein anderer Satz eingetragen, gilt dieser)' : ''
+  return {
+    titel: `${PLATTFORMGEBUEHR_BEZEICHNUNG} und Abrechnung`,
+    entwurf: KONDITIONEN_ENTWURF,
+    absaetze: [
+      `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} beträgt ${prozent} % vom Warenpreis, je Stück auf den Cent aufgerundet${standard}. ` +
+        `Sie steckt im Preis, den Kundinnen sehen – online und bar gleich. Mindestbestellwert ${MINDESTBESTELLWERT_TEXT} Warenwert je Bestellung.`,
+      'Online behält Stripe die Gebühr gleich bei der Zahlung ein – der Hof ist dabei Händler. ' +
+        'Bar ziehen wir sie einmal im Monat per SEPA-Lastschrift ein, fällig erst mit „Abgeholt“; dafür richtest du eine Lastschrift ein. ' +
+        'Gründungshöfe zahlen sie bar erst nach ihrer Gründungszeit und brauchen bis dahin keine Lastschrift.',
+    ],
+  }
+}
+
+/** Die Stand-Zeile der Konditionen: vor dem Stichtag `KONDITIONEN_STAND`, ab dann der Stichtag selbst (Board w3-rechtstexte). */
+export function konditionenStand(modell: GebuehrModell, stichtag: Date): string {
+  return modell === 'hofpreis' ? formatDatumLang(stichtag) : KONDITIONEN_STAND
+}
+
+/**
+ * „Derzeit gilt: …“ im Freischalt-Dialog des Admins — ab dem Stichtag nach
+ * N38 (Wortlaut Board w3-admin-freischalten), davor `KONDITIONEN_DERZEIT`.
+ */
+export function konditionenDerzeit(modell: GebuehrModell): string {
+  if (modell === 'bisher') return KONDITIONEN_DERZEIT
+  const hofladen = tarifText('HOFLADEN')
+  return (
+    `Derzeit gilt: ${PLATTFORMGEBUEHR_BEZEICHNUNG} ${formatZahl(PLATTFORMGEBUEHR_PROZENT)} % im Hofpreis, online und bar gleich; ` +
+    `${tarifText('HOFTOR').name} ${KOSTENLOS}, ${hofladen.name} ${hofladen.preis} ${IM_MONAT}. ${BESTANDSHOEFE_SATZ}`
+  )
+}
+
+/**
+ * Der Grundsatz im Preise-Abschnitt (/fuer-hoefe) und auf der Tarif-Karte —
+ * vor dem Stichtag `servicegebuehrZahltKunde`, ab dann die Plattformgebühr im
+ * Preis (N38: der Hof reicht nur weiter, was die Kundin zahlt).
+ */
+export function gebuehrGrundsatz(modell: GebuehrModell, jetzt: Date): string {
+  if (modell === 'bisher') return servicegebuehrZahltKunde(jetzt)
+  return `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} von ${formatZahl(PLATTFORMGEBUEHR_PROZENT)} % steckt im Preis, den die Kundin zahlt – online wie bar. Du bekommst den vollen Warenpreis.`
+}
+
+/** Die Kurzfassung für Karten (Einrichten, „Deine Konditionen“) — Wortlaut Board w2-registrieren; davor `VOLLER_WARENPREIS`. */
+export function vollerWarenpreis(modell: GebuehrModell): string {
+  if (modell === 'bisher') return VOLLER_WARENPREIS
+  return `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} (${formatZahl(PLATTFORMGEBUEHR_PROZENT)} %) steckt im Preis, den die Kundin zahlt – online wie bar.`
+}
+
+/** Die Monatsabrechnung in Teilen — ab dem Stichtag mit der Plattformgebühr; davor `MONATSABRECHNUNG_TEILE`. */
+export function monatsabrechnungTeile(modell: GebuehrModell): readonly TextTeil[] {
+  if (modell === 'bisher') return MONATSABRECHNUNG_TEILE
+  return [
+    ...MONATSABRECHNUNG_GRUNDGEBUEHR,
+    { text: ` – und die ${PLATTFORMGEBUEHR_BEZEICHNUNG} aus Barbestellungen. Bei Online-Zahlungen behält Stripe sie schon beim Bezahlen ein.` },
+  ]
+}
 
 /**
  * Was die Karte „Tarif" auf Einrichten zeigt: ohne gewählten Tarif

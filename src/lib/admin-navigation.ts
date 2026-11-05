@@ -98,6 +98,8 @@ export const ADMIN_MEHR_TEXT = {
   bereiche: 'Weitere Bereiche',
   konto: 'Konto',
   neuerTab: '(öffnet in neuem Tab)',
+  /** Über den Einträgen des Konto-Menüs der Plakette (Board w3-admin-shell, Bild 4). */
+  angemeldetAls: 'Angemeldet als',
 } as const
 
 /** „← Zu meinem Hof" ab 1024 px, darunter „← Mein Hof" — nur, wenn das Konto einen Hof hat (kontoHatHof). */

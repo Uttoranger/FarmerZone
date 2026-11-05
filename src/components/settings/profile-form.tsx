@@ -46,6 +46,7 @@ import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/ein
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
+import { HOFDATEN_TEXT } from '@/lib/hof-einstellungen'
 import { HOFSEITE_HREF, HOFSEITE_WEG } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 
@@ -163,7 +164,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         setSpeicherFehler(satz)
         return
       }
-      nachSpeichern('Profil gespeichert')
+      nachSpeichern(HOFDATEN_TEXT.gespeichert, undefined, HOFDATEN_TEXT.gespeichert)
     })
   }
 
@@ -485,7 +486,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         disabled={isPending || sucheLaeuft}
         className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 font-semibold"
       >
-        {isPending ? <Loader2 className="size-4 animate-spin" /> : sucheLaeuft ? 'Suche läuft noch …' : 'Profil speichern'}
+        {isPending ? <Loader2 className="size-4 animate-spin" /> : sucheLaeuft ? 'Suche läuft noch …' : HOFDATEN_TEXT.speichern}
       </Button>
     </form>
   )

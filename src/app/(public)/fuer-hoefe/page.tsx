@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
-import { SERVICEGEBUEHR_SATZ_TEXT, STARTPHASE_SATZ, TARIFE_AB_SATZ } from '@/lib/konditionen'
+import { STARTPHASE_SATZ, TARIFE_AB_SATZ } from '@/lib/konditionen'
+import { gebuehrModellFuer } from '@/lib/plattformgebuehr'
 import { STARTSEITE_VORSCHAUBILD } from '@/lib/vorschaubild'
 import { OG_LOCALE } from '@/lib/json-ld'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
@@ -14,13 +15,14 @@ import {
   FuerHoefeVorteile,
 } from '@/components/fuer-hoefe/fuer-hoefe-abschnitte'
 import { MARKE } from '@/lib/marke'
-import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
+import { gruendungFuerSeiten, ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 
 const SEITEN_TITEL = `Für Höfe — ${MARKE}`
 const SEITEN_BESCHREIBUNG =
   `Dein Hofladen, online: Kunden bestellen vorab, du packst nach Liste und übergibst zur Abholzeit. ` +
   // Kein Tarif als sofort gültig (Register K1): erst kostenlos, die Tarife ab dem Stichtag.
-  `${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`
+  // Der letzte Satz gilt in beiden Modellen (V62) — die Metadaten bauen ohne Einstellung.
+  `${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} Du bekommst den vollen Warenpreis.`
 
 export const metadata: Metadata = {
   title: SEITEN_TITEL,
@@ -51,17 +53,20 @@ export const revalidate = 300
  */
 export default async function FuerHoefePage(): Promise<React.JSX.Element> {
   // Einmal je Bau bzw. Revalidierung (revalidate oben): Danach entscheidet sich,
-  // ob die Bar-Ausnahme bis zum Stichtag (Register B1) noch dasteht.
+  // ob die Bar-Ausnahme bis zum Stichtag (Register B1) noch dasteht und welches
+  // Gebühren-Modell gilt. ladeHofpreisEinstellung wirft nie (Rückfall auf die Vorgabe).
   const jetzt = new Date()
-  const gruendung = await gruendungFuerSeiten(jetzt)
+  const [gruendung, einstellung] = await Promise.all([gruendungFuerSeiten(jetzt), ladeHofpreisEinstellung()])
+  // Das Wort der Gebühr je Stichtag „Hofpreis-Modell ab“ (V62, N38) — einmal je Bau, wie `jetzt`.
+  const modell = gebuehrModellFuer(einstellung, jetzt)
   return (
     <KundeShellMitSitzung>
       <FuerHoefeEinstieg gruendung={gruendung} />
       <FuerHoefeVorteile />
       <FuerHoefeSchritte />
-      <FuerHoefePreise jetzt={jetzt} gruendung={gruendung} />
+      <FuerHoefePreise jetzt={jetzt} modell={modell} gruendung={gruendung} />
       <FuerHoefeFutter />
-      <FuerHoefeFragen jetzt={jetzt} />
+      <FuerHoefeFragen jetzt={jetzt} modell={modell} />
       <FuerHoefeSchluss />
       <StartseiteFuss jahr={jetzt.getFullYear()} />
     </KundeShellMitSitzung>

@@ -35,7 +35,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
 vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: vi.fn() }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: vi.fn(), ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
 
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
 import { KEINE_GRUENDUNG_SEITEN, type GruendungSeiten } from '@/lib/gruendungshof'
@@ -164,7 +164,7 @@ describe('/fuer-hoefe', () => {
   })
 
   it('Preise mit Zahlen: die Angebotszeile vor den Karten, der Gründungspreis nur in der Hofladen-Karte', () => {
-    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, gruendung: ZEIGEN }))
+    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, modell: 'bisher', gruendung: ZEIGEN }))
     expect(preise.indexOf('Gründungshöfe zahlen bis')).toBeLessThan(preise.indexOf('Hoftor'))
     const hofladen = preise.slice(preise.indexOf('>Hofladen<'))
     expect(hofladen).toContain('€ 0')
@@ -173,7 +173,7 @@ describe('/fuer-hoefe', () => {
   })
 
   it('Preise ohne `zeigen`: keine Angebotszeile, der Hofladen mit seinem Preis', () => {
-    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, gruendung: AUS }))
+    const preise = html(createElement(FuerHoefePreise, { jetzt: JETZT, modell: 'bisher', gruendung: AUS }))
     expect(preise).not.toContain('Gründungshöfe zahlen')
     expect(preise).not.toContain('dann €')
     expect(preise.slice(preise.indexOf('>Hofladen<'))).toContain('€ 19')
@@ -189,17 +189,25 @@ describe('/fuer-hoefe', () => {
 })
 
 describe('/register', () => {
-  it('der Satz über dem Formular — aus der Seite in das Formular gereicht', async () => {
+  // Lauf 30 (Boards s2/w2-registrieren): der allgemeine Satz der Aktion, ohne Platznummer —
+  // den Platz vergibt das Team erst bei der Freischaltung (V65), kein Versprechen (V45/V53).
+  it('der Satz der Aktion über dem Formular — ohne „voraussichtlich“ und ohne Platznummer', async () => {
     vi.mocked(gruendungFuerSeiten).mockResolvedValue(ZEIGEN)
     const seite = html(await RegisterPage())
-    expect(seite).toContain('Du wärst voraussichtlich <b class="font-semibold text-foreground">Gründungshof Nr. 8</b>')
-    expect(seite.indexOf('Gründungshof Nr. 8')).toBeLessThan(seite.indexOf('<form'))
+    expect(seite).toContain('Gründungshöfe zahlen bis 31. Dezember 2027 keine Grundgebühr')
+    expect(seite.indexOf('Gründungshöfe zahlen')).toBeLessThan(seite.indexOf('<form'))
+    expect(seite).not.toContain('voraussichtlich')
+    expect(seite).not.toContain('Gründungshof Nr.')
   })
 
-  it('ohne Platz: kein Satz, das Formular wie vorher', async () => {
+  it('Gegenprobe: der alte Satz trägt die Platznummer, die die Seite nicht mehr zeigt', () => {
+    expect(html(createElement(RegistrierenSatz, { gruendung: ZEIGEN }))).toContain('Gründungshof Nr. 8')
+  })
+
+  it('ohne Aktion (Bausteine aus): kein Satz, das Formular wie vorher', async () => {
     vi.mocked(gruendungFuerSeiten).mockResolvedValue(AUS)
     const seite = html(await RegisterPage())
-    expect(seite).not.toContain('voraussichtlich')
+    expect(seite).not.toContain('Gründungshöfe zahlen')
     expect(seite).toContain('<form')
   })
 })

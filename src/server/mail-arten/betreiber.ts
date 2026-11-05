@@ -3,7 +3,8 @@ import { SUPPORT_EMAIL } from '@/lib/support'
 import { kurznummer } from '@/lib/meldung'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import { POSTFACH_TEXT } from '@/lib/postfach'
-import { wochenlageZeilen } from '@/lib/wochenlage'
+import { wochenlageGebuehrWort, wochenlageZeilen } from '@/lib/wochenlage'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
 import type { StapelMail } from '@/lib/email'
 import type { ZustellArt } from '@/lib/zustellung'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
@@ -191,8 +192,10 @@ export async function rendereWochenbericht(bezug: Record<string, string>): Promi
   const [{ zaehleFuerWochenlauf }, { zaehleOffenImEingang }] = await Promise.all([import('@/server/queries/meldung'), import('@/server/queries/postfach')])
   const jetzt = new Date()
   const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(jetzt), zaehleOffenImEingang()])
-  const { ladeWochenlage } = await import('@/server/queries/wochenlage')
-  const lage = wochenlageZeilen(await ladeWochenlage(jetzt, eingang.gesamt, zaehler.liegenGeblieben))
+  const [{ ladeWochenlage }, { ladeHofpreisEinstellung }] = await Promise.all([import('@/server/queries/wochenlage'), import('@/server/queries/plattform-einstellung')])
+  // Das Gebühren-Wort der Woche nach dem Stichtag „Hofpreis-Modell ab“ (V63); scheitert das Lesen, gilt die Vorgabe (ladeHofpreisEinstellung meldet es).
+  const [zahlen, hofpreis] = await Promise.all([ladeWochenlage(jetzt, eingang.gesamt, zaehler.liegenGeblieben), ladeHofpreisEinstellung()])
+  const lage = wochenlageZeilen(zahlen, wochenlageGebuehrWort(jetzt, hofpreisModellAb(hofpreis)))
   const { baueBriefkastenZusammenfassung } = await import('@/lib/email')
   // Die jüngsten Meldungen nennt die Wochenlage nicht: Ihr Text ist Fremdtext, die Mail trägt nur Zahlen.
   return baueBriefkastenZusammenfassung({ ...zaehler, neueste: [], geloescht: Number.parseInt(geloeschtAnzahl, 10), eingang, lage }, an)

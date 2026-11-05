@@ -30,9 +30,11 @@ import {
   monatsschluessel,
   monatsschluesselInWien,
   zerlegeMonat,
+  SERVICEGEBUEHR_BEZEICHNUNG,
   type Monatsschluessel,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
+import { gebuehrWortFuerZeitraum, gebuehrenMehrzahl, type GebuehrWort } from '@/lib/plattformgebuehr'
 import { istTestzahlung } from '@/lib/testzahlung'
 import type { KennzahlDaten, UnterreiterDaten } from '@/lib/admin-seiten'
 import {
@@ -468,9 +470,31 @@ export function monatOhneJahr(monat: Monatsschluessel): string {
   return MONAT_KURZ[Number(monat.slice(5, 7)) - 1] ?? monat
 }
 
-export const EINNAHMEN_ONLINE_LABEL = 'Servicegebühr, online'
-export const EINNAHMEN_VOR_ORT_LABEL = 'Servicegebühr, vor Ort bezahlt'
 export const EINNAHMEN_PROVISION_LABEL = 'Provision'
+
+// ─── Das Wort der Gebühr (V62, V63; Lauf 30, Nr. 221) ────────────────────────
+//
+// Ab dem Stichtag „Hofpreis-Modell ab“ heißt es „Plattformgebühr“, davor
+// „Servicegebühr“, über beide Seiten „Gebühren“ (gebuehrWortFuerZeitraum).
+// Die Texte unten nehmen das Wort als Parameter; ohne ihn steht die Fassung
+// „bisher“, bis die Seiten (Nr. 230) es setzen. Der Stichtag ist
+// `hofpreisModellAb(einstellung)` — diese Datei kennt die Einstellung nicht.
+
+/** Das Wort der Gebühr eines Monats — Monatsgrenzen in Wien wie die Summen. */
+export function gebuehrWortFuerMonat(monat: Monatsschluessel, stichtag: Date): GebuehrWort {
+  const { von, bis } = monatsgrenzenWienFuer(monat)
+  return gebuehrWortFuerZeitraum(von, bis, stichtag)
+}
+
+/** Das Wort der Gebühr eines Jahres (Jänner bis Dezember in Wien) — Kennzahl, Diagramm, CSV. */
+export function gebuehrWortFuerJahr(jahr: number, stichtag: Date): GebuehrWort {
+  return gebuehrWortFuerZeitraum(monatsgrenzenWienFuer(monatsschluessel(jahr, 1)).von, monatsgrenzenWienFuer(monatsschluessel(jahr, 12)).bis, stichtag)
+}
+
+/** Die Beschriftungen der Einnahmen eines Monats mit dem Wort der Gebühr. */
+export function einnahmenLabels(wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG): { online: string; vorOrt: string; provision: string } {
+  return { online: `${wort}, online`, vorOrt: `${wort}, vor Ort bezahlt`, provision: EINNAHMEN_PROVISION_LABEL }
+}
 
 /**
  * Warum dieser Satz auf der Seite steht: „eingezogen" ist ein BRUTTO. Die
@@ -494,22 +518,26 @@ export const FINANZEN_FUSSZEILE =
  *  - keine Kosten eingetragen → auffordern, statt „0 Bestellungen genügen".
  *  - sonst die Schwelle und der Stand des Monats.
  */
-export function kostendeckungSatz(stand: {
-  schnittCents: number
-  brauchtBestellungen: number | null
-  /** Der Monat im Klartext, z. B. „September 2026". */
-  bezeichnung: string
-  /** Gezählte Bestellungen des Monats. */
-  bestellungen: number
-}): string {
+export function kostendeckungSatz(
+  stand: {
+    schnittCents: number
+    brauchtBestellungen: number | null
+    /** Der Monat im Klartext, z. B. „September 2026". */
+    bezeichnung: string
+    /** Gezählte Bestellungen des Monats. */
+    bestellungen: number
+  },
+  /** Das Wort der Gebühr des Monats (`gebuehrWortFuerMonat`); ohne die Fassung „bisher“. */
+  wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG
+): string {
   if (stand.brauchtBestellungen === null) {
-    return 'Sobald die ersten Bestellungen mit Servicegebühr da sind, steht hier, wie viele es im Monat braucht.'
+    return `Sobald die ersten Bestellungen mit ${wort} da sind, steht hier, wie viele es im Monat braucht.`
   }
   if (stand.brauchtBestellungen === 0) {
     return `Für ${stand.bezeichnung} sind keine Kosten eingetragen. Trag deine laufenden Kosten ein, dann steht hier die Schwelle.`
   }
   return (
-    `Bei durchschnittlich ${formatEuro(centsAlsEuro(stand.schnittCents))} Servicegebühr je ` +
+    `Bei durchschnittlich ${formatEuro(centsAlsEuro(stand.schnittCents))} ${wort} je ` +
     `Bestellung brauchst du rund ${stand.brauchtBestellungen} Bestellungen im Monat, damit die ` +
     `Kosten gedeckt sind. Im ${stand.bezeichnung} waren es ${stand.bestellungen}.`
   )
@@ -799,7 +827,8 @@ export function ergebnisText(cents: number, stellen: 0 | 2 = 2): string {
 }
 
 export const FINANZEN_JAHR_TEXT = {
-  umschalter: 'Zeitraum der Finanzen',
+  // Wortliste N42 c: „Geld“, nie „Finanzen“ (Board w3-admin-geld: „Zeitraum“).
+  umschalter: 'Zeitraum',
   monat: 'Monat',
   jahr: 'Jahr',
   jahrWaehlen: 'Jahr wählen',
@@ -813,7 +842,8 @@ export const FINANZEN_JAHR_TEXT = {
       ? `Was die Plattform ${jahr} einnimmt und was sie kostet — von Jänner bis heute, Testzahlungen zählen nicht.`
       : `Was die Plattform ${jahr} eingenommen hat und was sie gekostet hat — Testzahlungen zählen nicht.`,
   diagrammTitel: (jahr: number) => `${jahr} nach Monaten`,
-  diagrammBeschriftung: (jahr: number) => `Servicegebühren und Kosten je Monat ${jahr}`,
+  /** `wort` aus `gebuehrWortFuerJahr`; ohne die Fassung „bisher“. */
+  diagrammBeschriftung: (jahr: number, wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG) => `${gebuehrenMehrzahl(wort)} und Kosten je Monat ${jahr}`,
   monatFuerMonat: 'Monat für Monat',
   kostenImJahr: 'Kosten im Jahr',
   summe: (jahr: number) => `Summe ${jahr}`,
@@ -821,9 +851,11 @@ export const FINANZEN_JAHR_TEXT = {
   vergleichAb: (jahr: number) => `ab ${jahr}`,
   vergleichSpalte: 'Vorjahr',
   nochOffen: 'noch offen',
-  legendeServicegebuehren: 'Servicegebühren',
+  /** Fassung „bisher“ — Seiten mit Stichtag nehmen `legendeGebuehren`. */
+  legendeServicegebuehren: gebuehrenMehrzahl(SERVICEGEBUEHR_BEZEICHNUNG),
+  legendeGebuehren: (wort: GebuehrWort) => gebuehrenMehrzahl(wort),
   legendeKosten: 'Kosten',
-  legendeVorjahr: (vorjahr: number) => `Servicegebühren ${vorjahr}`,
+  legendeVorjahr: (vorjahr: number, wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG) => `${gebuehrenMehrzahl(wort)} ${vorjahr}`,
   leerTitel: 'Für dieses Jahr gibt es keine Zahlen',
   leer: 'Sobald Bestellungen eingehen oder Kosten eingetragen sind, stehen hier die Monate nebeneinander.',
   einmaligZusatz: 'einmalig',
@@ -875,7 +907,12 @@ export function finanzenJahrUnterreiter(jahr: number, anzahlPosten: number): Unt
  * laufenden Jahr „Bis Jahresende ≈" als Hinweis. Der Ton des Ergebnisses ist
  * grün nur bei einem Plus, orange bei einem Minus — kein Rot (Register O1).
  */
-export function jahrKennzahlen(rechnung: JahrRechnung, laufendesJahr: number): KennzahlDaten[] {
+export function jahrKennzahlen(
+  rechnung: JahrRechnung,
+  laufendesJahr: number,
+  /** Das Wort der Gebühr des Jahres (`gebuehrWortFuerJahr`); ohne die Fassung „bisher“. */
+  wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG
+): KennzahlDaten[] {
   const { jahr } = rechnung
   const text = FINANZEN_JAHR_TEXT
   const spanne = rechnung.zaehltBis === null ? null : monatsSpanne(monatsschluessel(jahr, 1), rechnung.zaehltBis)
@@ -885,7 +922,7 @@ export function jahrKennzahlen(rechnung: JahrRechnung, laufendesJahr: number): K
   const kennzahlen: KennzahlDaten[] = [
     {
       id: 'servicegebuehren',
-      titel: `Servicegebühren ${jahr}`,
+      titel: `${gebuehrenMehrzahl(wort)} ${jahr}`,
       titelKurz: 'Gebühren',
       wert: euro(rechnung.servicegebuehrenCents),
       satz: [spanne, mitAnzahl(rechnung.bestellungen, 'Bestellung', 'Bestellungen')].filter((s) => s !== null).join(' · '),
@@ -970,8 +1007,14 @@ export function jahrMonateFuerAnzeige(rechnung: JahrRechnung, vorjahr: JahrRechn
 
 // ─── CSV für die Steuerberatung ──────────────────────────────────────────────
 
+/** Die Kopfzeile der Monate in der CSV — mit dem Wort der Gebühr des Jahres. */
+export function csvMonateKopf(wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG): readonly string[] {
+  return ['Monat', `${gebuehrenMehrzahl(wort)} (€)`, 'Kosten (€)', 'Ergebnis (€)', 'Bestellungen']
+}
+
 export const FINANZEN_CSV = {
-  monate: ['Monat', 'Servicegebühren (€)', 'Kosten (€)', 'Ergebnis (€)', 'Bestellungen'],
+  /** Fassung „bisher“ — `jahrAlsCsv` nimmt `csvMonateKopf(wort)`. */
+  monate: csvMonateKopf(),
   posten: ['Kostenposten', 'Rhythmus', 'Betrag (€)', 'Monate im Jahr', 'Im Jahr (€)'],
 } as const
 
@@ -996,10 +1039,14 @@ export function csvFeld(text: string): string {
  * Kostenposten (Betriebsdaten der Plattform); keine Hof- und keine
  * Kundinnendaten.
  */
-export function jahrAlsCsv(rechnung: JahrRechnung): string {
+export function jahrAlsCsv(
+  rechnung: JahrRechnung,
+  /** Das Wort der Gebühr des Jahres (`gebuehrWortFuerJahr`); ohne die Fassung „bisher“. */
+  wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG
+): string {
   // Textfelder gehen durch csvFeld, Zahlen nie: ein Minus vor einem Betrag ist keine Formel.
   const zeilen: string[][] = []
-  zeilen.push(FINANZEN_CSV.monate.map(csvFeld))
+  zeilen.push(csvMonateKopf(wort).map(csvFeld))
   for (const m of rechnung.monate) {
     const name = csvFeld(monatsgrenzenWienFuer(m.monat).bezeichnung)
     zeilen.push(

@@ -26,18 +26,47 @@
 /** Server-Antwort (HTTP 409) beim Versuch, bei einem nicht freigeschalteten Hof zu bestellen oder zu reservieren. */
 export const FARM_NOT_APPROVED_MESSAGE = 'Dieser Hof ist noch nicht freigeschaltet.'
 
-/** Balken auf jeder Farmer-Seite, solange der Hof auf die Freigabe wartet. */
-export const FARM_PENDING_OWNER_BANNER =
-  'Dein Hof wird noch geprüft — Kundinnen sehen ihn noch nicht'
+/**
+ * Der Balken über den Seiten des Hofbereichs, solange der Hof auf die Freigabe
+ * wartet — je Stand ein Titel (Register N42 e, V59; Board w2-registrieren
+ * Bild 5 und 6). Halbgeviertstrich mit Leerzeichen, wie überall in Sätzen.
+ * Welcher Stand gilt, sagt `warteStand` aus den Schritten von src/lib/einrichten.ts
+ * — keine zweite Zählung.
+ */
+export const FARM_SETUP_OWNER_BANNER = 'Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht'
 
-/** Erklärung unter dem Balken: was der Bauer jetzt schon tun kann. */
+/** Titel, sobald alle Schritte erledigt sind und die Freischaltung beim Team liegt. */
+export const FARM_PENDING_OWNER_BANNER = 'Dein Hof wird noch geprüft – Kundinnen sehen ihn noch nicht'
+
+/** Erklärung unter dem Balken, solange noch etwas einzurichten ist (Wortliste: „Hofdaten“, N42 c). */
 export const FARM_PENDING_OWNER_HINT =
-  'Du kannst schon alles einrichten: Produkte, Fotos, Abholzeiten und dein Profil. ' +
+  'Du kannst schon alles einrichten: Produkte, Fotos, Abholzeiten und deine Hofdaten. ' +
   'Sobald dein Hof freigeschaltet ist, bekommst du eine E-Mail und er ist sofort öffentlich erreichbar.'
+
+/** Erklärung, wenn alles eingerichtet ist — „Du kannst schon alles einrichten“ wäre dann ein leerer Rat. */
+export const FARM_PENDING_OWNER_HINT_FERTIG =
+  'Sobald dein Hof freigeschaltet ist, bekommst du eine E-Mail und er ist sofort öffentlich erreichbar.'
+
+/**
+ * Der Stand des Warte-Balkens: `einrichten` (Schritte offen), `pruefung` (alles
+ * erledigt, das Team prüft) oder null — der Aufrufer kennt die Schritte nicht.
+ */
+export type WarteStand = 'einrichten' | 'pruefung'
+
+/**
+ * Titel und Satz des Warte-Balkens je Stand. Ohne Stand (null) bleibt es beim
+ * Titel „wird noch geprüft“ mit dem vollen Satz wie vor Lauf 30: Wer die
+ * Schritte nicht geladen hat, sagt nicht, was noch fehlt.
+ */
+export function warteBalkenText(stand: WarteStand | null): { titel: string; hinweis: string } {
+  if (stand === 'einrichten') return { titel: FARM_SETUP_OWNER_BANNER, hinweis: FARM_PENDING_OWNER_HINT }
+  if (stand === 'pruefung') return { titel: FARM_PENDING_OWNER_BANNER, hinweis: FARM_PENDING_OWNER_HINT_FERTIG }
+  return { titel: FARM_PENDING_OWNER_BANNER, hinweis: FARM_PENDING_OWNER_HINT }
+}
 
 /** Hinweis nach der Registrierung, bevor der Hof eingerichtet ist. */
 export const FARM_PENDING_AFTER_SIGNUP =
-  'Dein Hof wird kurz geprüft. Du bekommst eine E-Mail, sobald er freigeschaltet ist — ' +
+  'Dein Hof wird kurz geprüft. Du bekommst eine E-Mail, sobald er freigeschaltet ist – ' +
   'bis dahin kannst du alles in Ruhe einrichten.'
 
 // === ABLEHNEN & LÖSCHEN ===

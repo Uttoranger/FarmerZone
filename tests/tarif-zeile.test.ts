@@ -33,11 +33,14 @@ vi.mock('@/components/ui/sheet', () => {
     SheetBlatt: ({ children }: Kinder) => createElement('section', { 'data-blatt': '' }, children),
     SheetTitle: ({ children }: Kinder) => createElement('h2', null, children),
     SheetClose: ({ children }: Kinder) => createElement('button', { type: 'button' }, children),
+    // Seit Nr. 220 tragen die Blätter der HofShell den Kopf aus dem Baustein (Titel und ein Schließen-Element).
+    SheetKopf: ({ titel, schliessen }: { titel: ReactNode; schliessen?: string }) =>
+      createElement(Fragment, null, createElement('h2', null, titel), createElement('button', { type: 'button' }, schliessen)),
   }
 })
 
 import { TARIFE, TARIFE_AB, TARIF_ZEILE, baueTarifZeile, bestimmeTarifZustand, type TarifZeileDaten } from '@/lib/konditionen'
-import { DEIN_TARIF_TITEL, EINSTELLUNG_KONDITIONEN, VERKAUF_UND_KUNDEN_TITEL } from '@/lib/bauern-navigation'
+import { DEIN_TARIF_TITEL, EINSTELLUNG_KONDITIONEN, VERKAUF_UND_KUNDEN_TITEL, datumOhneUmbruch } from '@/lib/bauern-navigation'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HofShell } from '@/components/shells/hof-shell'
 
@@ -187,11 +190,12 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     expect(link).toBeDefined()
     expect(link).toContain(`href="${EINSTELLUNG_KONDITIONEN.href}"`)
     expect(link).toContain(zeile?.titel)
-    expect(link).toContain(zeile?.zeile)
-    if (zeile?.zeileHandy !== zeile?.zeile) expect(link).not.toContain(zeile?.zeileHandy)
-    // Unten: nach „Verkauf und Kunden", vor der Person und den Einstellungen.
+    // Das Datum bricht nicht um (V13, Nr. 220): die Zeile mit geschützten Leerzeichen.
+    expect(link).toContain(datumOhneUmbruch(zeile?.zeile ?? ''))
+    if (zeile?.zeileHandy !== zeile?.zeile) expect(link).not.toContain(datumOhneUmbruch(zeile?.zeileHandy ?? ''))
+    // Unten: nach „Verkauf und Kunden", vor den Einstellungen und der Konto-Zeile.
     expect(leiste.indexOf('data-slot="tarif-zeile"')).toBeGreaterThan(leiste.indexOf(VERKAUF_UND_KUNDEN_TITEL))
-    expect(leiste.indexOf('data-slot="tarif-zeile"')).toBeLessThan(leiste.indexOf('Angemeldet'))
+    expect(leiste.indexOf('data-slot="tarif-zeile"')).toBeLessThan(leiste.indexOf('>Einstellungen<'))
   })
 
   it.each(Object.entries(ZEILEN))('%s: oben im Mehr-Blatt als Gruppe „Dein Tarif", mit der Unterzeile fürs Handy', (_zustand, zeile) => {
@@ -199,10 +203,18 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     const mehr = html.slice(html.indexOf('<h2>Mehr</h2>'))
     const link = tarifLink(mehr)
     expect(link).toContain(zeile?.titel)
-    expect(link).toContain(zeile?.zeileHandy)
+    expect(link).toContain(datumOhneUmbruch(zeile?.zeileHandy ?? ''))
     expect(mehr).toContain(`role="group" aria-label="${DEIN_TARIF_TITEL}"`)
     expect(mehr.indexOf(`>${DEIN_TARIF_TITEL}<`)).toBeLessThan(mehr.indexOf('data-slot="tarif-zeile"'))
     expect(mehr.indexOf('data-slot="tarif-zeile"')).toBeLessThan(mehr.indexOf(`>${VERKAUF_UND_KUNDEN_TITEL}<`))
+  })
+
+  it('Gründungshof: „31. Dezember 2027“ bleibt beisammen — Seitenleiste und Mehr-Blatt (V13)', () => {
+    const html = shell(ZEILEN.gruendungshof)
+    expect(html).toContain('31.\u00a0Dezember\u00a02027')
+    // Gegenprobe: die gebaute Zeile selbst trägt vor dem Jahr ein normales Leerzeichen — erst die Shell schützt es.
+    expect(ZEILEN.gruendungshof?.zeile).toContain('Dezember 2027')
+    expect(html).not.toContain('Dezember 2027')
   })
 
   it('Startphase am Handy mit „du musst nichts tun", in der Seitenleiste ohne', () => {

@@ -3,45 +3,32 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { GRUENDUNGS_AUFNAHME_SCHRITTE, GRUENDUNG_TEXT } from '@/lib/gruendungshof'
-import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
-import {
-  KONDITIONEN_STAND,
-  KONDITIONEN_UEBERGANG,
-  MONATSABRECHNUNG_TEXT,
-  PRO_MONAT,
-  SERVICEGEBUEHR_SATZ_TEXT,
-  STARTPHASE_SATZ,
-  TARIFE,
-  TARIFE_AB_SATZ,
-  servicegebuehrZahltKunde,
-} from '@/lib/konditionen'
+import { gruendungFuerSeiten, ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, TARIFE_AB_SATZ, konditionenGebuehrAbschnitt, konditionenStand } from '@/lib/konditionen'
+import { gebuehrModellFuer, hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 import { KARTE, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
 import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
-import {
-  INFOSEITE_ABSCHNITT,
-  INFOSEITE_KICKER,
-  INFOSEITE_LINK,
-  INFOSEITE_SPALTE,
-  INFOSEITE_STAND,
-  INFOSEITE_TEXT,
-  INFOSEITE_TITEL,
-} from '@/components/shared/infoseite-stil'
+import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK } from '@/components/shared/infoseite-stil'
+import { EntwurfMarke, RechtstextVorlage } from '@/components/shared/rechtstext-vorlage'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { MARKE } from '@/lib/marke'
 
+// Ohne Gebühren-Satz (Nr. 231): Welche Gebühr gilt, hängt vom Stichtag „Hofpreis-Modell ab“
+// ab — die Beschreibung entsteht beim Bauen und stünde danach falsch in Suchmaschinen.
 export const metadata: Metadata = {
   title: `Konditionen für Höfe — ${MARKE}`,
   alternates: { canonical: '/konditionen' },
   description:
-    `Was ${MARKE} kostet: ${STARTPHASE_SATZ} ${TARIFE_AB_SATZ} ` +
+    `Was ${MARKE} kostet: ${TARIFE_AB_SATZ} ` +
     `${TARIFE.map((t) => `${t.name} ${t.preis} ${PRO_MONAT}`).join(', ')}. ` +
-    `Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde.`,
+    'Gebühr, Abrechnung und Aufnahme für Höfe.',
 }
 
-// Statisch, aber stündlich neu gebaut (Register F6, 19a): Ob die Bar-Ausnahme
-// bis zum Stichtag (B1) dasteht, entscheidet sich je Bau. Ohne revalidate
-// stünde der Satz nach dem Stichtag bis zum nächsten Deploy da.
+// Statisch, aber stündlich neu gebaut (Register F6, 19a): Welche Fassung dasteht
+// (bis zum Stichtag „Hofpreis-Modell ab“ die Servicegebühr, ab dann die
+// Plattformgebühr; davor auch die Bar-Ausnahme B1), entscheidet sich je Bau.
+// Ohne revalidate stünde nach dem Stichtag bis zum nächsten Deploy die alte da.
 export const revalidate = 3600
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent(`Mein Hof auf ${MARKE}`)}`
@@ -57,9 +44,9 @@ async function AktionAbschnitt({ jetzt }: { jetzt: Date }): Promise<React.JSX.El
   if (!gruendung.aktionLaeuft) return null
   const aktion = GRUENDUNG_TEXT.aktion(gruendung)
   return (
-    <section>
-      <h2 className={INFOSEITE_ABSCHNITT}>{aktion.titel}</h2>
-      <ul className="flex list-disc flex-col gap-1.5 pl-5">
+    <section className={cn(KARTE, 'px-4 py-3.5 text-foreground')}>
+      <h2 className={cn(INFOSEITE_ABSCHNITT, 'mb-2 text-[16px]')}>{aktion.titel}</h2>
+      <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[14px]">
         {aktion.saetze.map((satz) => (
           <li key={satz}>{satz}</li>
         ))}
@@ -71,79 +58,96 @@ async function AktionAbschnitt({ jetzt }: { jetzt: Date }): Promise<React.JSX.El
 // Der Startseiten-CTA verspricht das Gründungshof-Angebot — bisher konnte man
 // es nirgends nachlesen. Diese Seite ist die Nachlese-Stelle.
 //
-// Aufbau bewusst wie das Impressum (gleiche Spalte, gleiche Abschnitts-
-// Typografie aus infoseite-stil.ts): eine Seite über Geld soll aussehen wie
-// die anderen verbindlichen Seiten, nicht wie Werbung. Seit Nr. 54 in der
-// KundeShell (KundeShellMitSitzung: die Seite bleibt statisch).
+// Seit Nr. 231 in der Vorlage der Rechtsseiten (V62, Boards s3/w3-rechtstexte
+// Bild 5 und 6): Kicker, Titel, Stand-Zeile, Tarife als zwei Karten, Aktion,
+// Gebühr, Aufnahme, Fuß „Stand: …“ — ohne Verzeichnis und ohne Druckknopf,
+// wie das Board. Eine Seite über Geld soll aussehen wie die anderen
+// verbindlichen Seiten, nicht wie Werbung.
+//
+// Die Gebühr je Modell (N38, V62): bis zum Stichtag „Hofpreis-Modell ab“ der
+// Abschnitt „Servicegebühr und Abrechnung“ (Fassung „bisher“), ab dann
+// „Plattformgebühr und Abrechnung“ mit der Kennzeichnung „Entwurf – die
+// Anwältin prüft den Wortlaut“ darüber — beides aus konditionenGebuehrAbschnitt.
+// Der Übergang (K1, KONDITIONEN_UEBERGANG) steht nur im Modell „bisher“: Ab
+// dem Stichtag wäre er falsch (Board-Notiz w3-rechtstexte, Go-live-Risiko).
 //
 // ALLE Preise kommen aus src/lib/konditionen.ts — derselben Quelle wie
 // /fuer-hoefe (Nr. 15, E6 = Tarife: „damit nichts Widersprüchliches live
 // geht"). Steht hier eine Zahl im Text, ist das ein Fehler
-// (tests/konditionen-seiten.test.ts). Bis Nr. 15 stand hier das
-// Gründungshof-Angebot.
-export default function KonditionenPage() {
-  // Je Bau bzw. stündlicher Revalidierung (oben): Danach entscheidet sich, ob die Bar-Ausnahme bis zum Stichtag (B1) dasteht.
+// (tests/konditionen-seiten.test.ts).
+export default async function KonditionenPage(): Promise<React.JSX.Element> {
+  // Je Bau bzw. stündlicher Revalidierung (oben): Danach entscheiden sich Modell und Bar-Ausnahme.
   const jetzt = new Date()
+  const einstellung = await ladeHofpreisEinstellung()
+  const modell = gebuehrModellFuer(einstellung, jetzt)
+  const gebuehr = konditionenGebuehrAbschnitt(modell, jetzt)
+  const stand = konditionenStand(modell, hofpreisModellAb(einstellung))
   return (
     <KundeShellMitSitzung>
-      <div className={INFOSEITE_SPALTE}>
-        <p className={INFOSEITE_KICKER}>Was es kostet</p>
-        <h1 className={cn(INFOSEITE_TITEL, 'mb-8')}>Konditionen für Höfe</h1>
+      <RechtstextVorlage kicker="Was es kostet" titel="Konditionen für Höfe" stand={`Stand ${stand}`} fussStand={stand}>
+        <section aria-labelledby="tarife">
+          <h2 id="tarife" className="sr-only">
+            Tarife
+          </h2>
+          {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
+          {modell === 'bisher' && <p className="mb-3 font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>}
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {TARIFE.map((tarif) => (
+              <li key={tarif.id} className={cn(KARTE, 'px-4 py-3.5 text-foreground')}>
+                <p className="flex items-baseline justify-between gap-3">
+                  <strong className="font-heading text-[16px] font-semibold">{tarif.name}</strong>
+                  <span className="text-[15px] font-semibold whitespace-nowrap">
+                    {tarif.grundgebuehrCents > 0 ? `${tarif.preis} ${PRO_MONAT}` : tarif.preis}
+                  </span>
+                </p>
+                <p className="text-[13px] text-muted-foreground">{tarif.zusatz}</p>
+                <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-5 text-[13.5px]">
+                  {tarif.leistungen.map((leistung) => (
+                    <li key={leistung}>{leistung}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-        <div className={INFOSEITE_TEXT}>
-          <section>
-            <h2 className={INFOSEITE_ABSCHNITT}>Tarife</h2>
-            {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
-            <p className="mb-3 font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>
-            <ul className="flex flex-col gap-3">
-              {TARIFE.map((tarif) => (
-                <li key={tarif.id} className={cn(KARTE, 'px-4 py-3.5')}>
-                  <p className="text-foreground">
-                    <strong className="font-heading text-[16px] font-semibold">{tarif.name}</strong> · {tarif.preis} {PRO_MONAT}
-                  </p>
-                  <p>{tarif.zusatz}</p>
-                  <p>{tarif.leistungen.join(' · ')}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
+        <Suspense fallback={null}>
+          <AktionAbschnitt jetzt={jetzt} />
+        </Suspense>
 
-          <Suspense fallback={null}>
-            <AktionAbschnitt jetzt={jetzt} />
-          </Suspense>
+        <section aria-labelledby="gebuehr">
+          {gebuehr.entwurf && <EntwurfMarke className="mb-1.5 block">{gebuehr.entwurf}</EntwurfMarke>}
+          <h2 id="gebuehr" className={INFOSEITE_ABSCHNITT}>
+            {gebuehr.titel}
+          </h2>
+          <div className="flex flex-col gap-3">
+            {gebuehr.absaetze.map((absatz) => (
+              <p key={absatz}>{absatz}</p>
+            ))}
+          </div>
+        </section>
 
-          <section>
-            <h2 className={INFOSEITE_ABSCHNITT}>Servicegebühr und Abrechnung</h2>
-            <p>{servicegebuehrZahltKunde(jetzt)}</p>
-            <p className="mt-3">{MONATSABRECHNUNG_TEXT}</p>
-          </section>
-
-          <section>
-            <h2 className={INFOSEITE_ABSCHNITT}>So läuft die Aufnahme</h2>
-            {/* Dieselben orangen Ringe wie auf /fuer-hoefe — Schritte der Hofwelt. */}
-            <div className="text-foreground">
-              <StartSchritte schritte={GRUENDUNGS_AUFNAHME_SCHRITTE} />
-            </div>
-          </section>
-
-          <section>
-            <h2 className={INFOSEITE_ABSCHNITT}>Loslegen</h2>
-            {/* Orange: Registrieren ist eine Hof-Aktion (DESIGN_SYSTEM „Farbrollen"),
-                der eine Hauptknopf dieser Seite. Die Registrierung ist offen —
-                der Weg führt direkt in die App, nicht ins Mail-Programm. */}
+        <section aria-labelledby="aufnahme">
+          <h2 id="aufnahme" className={INFOSEITE_ABSCHNITT}>
+            So läuft die Aufnahme
+          </h2>
+          {/* Dieselben orangen Ringe wie auf /fuer-hoefe — Schritte der Hofwelt. */}
+          <div className="text-foreground">
+            <StartSchritte schritte={GRUENDUNGS_AUFNAHME_SCHRITTE} />
+          </div>
+          {/* Orange: Registrieren ist eine Hof-Aktion (DESIGN_SYSTEM „Farbrollen"),
+              der eine Hauptknopf dieser Seite. Die Registrierung ist offen —
+              der Weg führt direkt in die App, nicht ins Mail-Programm. */}
+          <div className="mt-5 flex flex-col items-start gap-2">
             <Link href="/register" className={KNOPF_ORANGE}>
               Hof registrieren
             </Link>
-            <p className="mt-3">
-              <a href={CTA_MAILTO} className={cn(INFOSEITE_LINK, 'inline-flex min-h-11 items-center')}>
-                Fragen vorab? Schreib uns.
-              </a>
-            </p>
-          </section>
-
-          <p className={INFOSEITE_STAND}>Stand: {KONDITIONEN_STAND}</p>
-        </div>
-      </div>
+            <a href={CTA_MAILTO} className={cn(INFOSEITE_LINK, 'inline-flex min-h-11 items-center')}>
+              Fragen vorab? Schreib uns.
+            </a>
+          </div>
+        </section>
+      </RechtstextVorlage>
     </KundeShellMitSitzung>
   )
 }

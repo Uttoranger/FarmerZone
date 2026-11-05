@@ -160,9 +160,11 @@ describe('Bar, wartet auf Bestätigung', () => {
     const t = text(await seite())
     expect(t).toContain('Fast geschafft – bitte bestätige per E-Mail')
     expect(t).toContain('erika@example.org')
-    // 10:12 Uhr bestellt + zwei Stunden, vor dem Abholbeginn 15:00 Uhr.
-    expect(t).toContain('Bestätigen bis heute, 12:12 Uhr')
-    expect(t).toContain('Danach geben wir die Ware wieder frei')
+    // 10:12 Uhr bestellt + zwei Stunden, vor dem Abholbeginn 15:00 Uhr — seit Nr. 227 mit Wochentag und Datum (V9),
+    // im Wortlaut des Boards s1-/w1-bestaetigung (Bild 3), samt Satz an die Kundin und Termin in derselben Karte.
+    expect(t).toMatch(/Bitte bis heute, Mo, 5\.\sOkt, 12:12 Uhr bestätigen/)
+    expect(t).toContain('Erst nach deiner Bestätigung packt der Hof.')
+    expect(t).toMatch(/Abholung: heute, Mo, 5\.\sOkt, 15:00–18:00 Uhr\./)
   })
 
   it('der Schritt „Bestätigt" ist dran, nicht erledigt', async () => {

@@ -14,6 +14,10 @@ import { UNBEKANNTES_GERAET, geraeteTeile } from '@/lib/geraete'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 
 export const MEINE_MELDUNGEN_HREF = '/meldungen'
+
+/** Der Satz unter „Problem melden“ je Welt — Kundschaft auf /problem-melden, Hof auf /fehler-melden (Boards s3-problem-melden, s2-meldungen). */
+export const PROBLEM_MELDEN_SATZ_KUNDE = 'Danke, dass du Bescheid gibst. Wir schauen uns das an.'
+export const PROBLEM_MELDEN_SATZ_HOF = 'Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.'
 export const NEUE_MELDUNG_HREF = '/fehler-melden'
 
 /** Art als Marke wie im Mockup: Fehler orange (etwas klemmt), Wunsch grün, Frage neutral. */

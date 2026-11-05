@@ -4,12 +4,19 @@ import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, Compass, ReceiptText, Search, ShoppingBasket, UserRound, type LucideIcon } from 'lucide-react'
-import { kundenAriaAktuell, kundenNavigation, type KundenNavId, type KundenSitzung } from '@/lib/kunden-navigation'
+import {
+  warenkorbKopfText,
+  kundenAriaAktuell,
+  kundenHandyAriaAktuell,
+  kundenNavigation,
+  type KundenNavId,
+  type KundenSitzung,
+} from '@/lib/kunden-navigation'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { SUCHTEXT_PARAMETER } from '@/lib/suchtext-parameter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
@@ -60,12 +67,37 @@ const SYMBOL: Partial<Record<KundenNavId, LucideIcon>> = {
   bestellungen: ReceiptText,
 }
 
+/**
+ * Ein Link der Kopfzeile (Boards w1-startseite, w1-hofseite; V12): 15 px in
+ * der Textfarbe, der aktive grün, fett und unterstrichen. Zwischen 768 und
+ * 1023 px enger und 14 px, damit vier Links mit Kurznamen in eine Zeile passen.
+ */
 const TEXTLINK = cn(
-  'relative inline-flex min-h-11 items-center rounded-lg px-1 text-[14px] whitespace-nowrap text-muted-foreground transition-colors duration-[250ms] hover:text-foreground aria-[current]:font-semibold aria-[current]:text-foreground',
+  'relative inline-flex min-h-11 items-center rounded-lg px-1.5 text-[14px] font-medium whitespace-nowrap text-foreground underline-offset-[6px] transition-colors duration-[250ms] hover:text-brand-text lg:px-3 lg:text-[15px] aria-[current]:font-bold aria-[current]:text-brand-text aria-[current]:underline',
   FOKUS_RAHMEN
 )
 
-/** Der Warenkorb in der Kopfzeile: Symbol mit Anzahl, führt zum Hof, der den Korb gleich öffnet. */
+/** Umriss-Pille mit 44 px (V12): „Anmelden“, „Mein Hof“, „Warenkorb · n“ — der Rand ist der Feldrand (≥ 3:1). */
+const KOPF_PILLE = cn(
+  'inline-flex h-11 shrink-0 items-center rounded-full border border-input px-4 text-[14px] font-semibold whitespace-nowrap text-foreground transition-colors duration-[250ms] hover:bg-muted',
+  FOKUS_RAHMEN
+)
+
+/**
+ * „Warenkorb · n“ im Browser-Kopf (N41 c, V12) — nur bei gefülltem Warenkorb;
+ * leer steht dort nichts. Führt zum Hof, der den Korb gleich öffnet. Der Name
+ * beginnt mit dem sichtbaren Text, „Artikel“ sagt nur der Screenreader.
+ */
+function WarenkorbPille({ anzahl, href, className }: { anzahl: number; href: string; className?: string }) {
+  return (
+    <Link href={href} className={cn(KOPF_PILLE, className)}>
+      {warenkorbKopfText(anzahl)}
+      <span className="sr-only"> Artikel</span>
+    </Link>
+  )
+}
+
+/** Der Warenkorb im Kopf am Handy (Fokus-Seiten ohne Unterleiste): Symbol mit Anzahl — für die Pille fehlt dort der Platz. */
 function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
   return (
     <Link
@@ -113,11 +145,6 @@ function VorschauLeisteSperre(): React.JSX.Element {
   )
 }
 
-/** Der Knopf rechts im Kopf: Pille mit 44 px Höhe — auch am Handy gut zu treffen und zu lesen. */
-const KOPF_KNOPF = cn(
-  'inline-flex h-11 shrink-0 items-center rounded-full border border-border px-4 text-[14px] font-semibold whitespace-nowrap text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
 
 export type KundeShellProps = {
   /**
@@ -157,9 +184,10 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
     // data-scroll-rand: Der Fokus scrollt nie unter Kopf und Unterleiste (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
     <div data-design="neu" data-scroll-rand={unterleiste ? 'kunde' : 'kunde-ohne-leiste'} className={cn('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE)}>
       <SprungLink />
-      <header className="sticky top-0 z-40 border-b border-border bg-background print:hidden">
-        <div className={cn(KUNDE_KOPF_ZEILE, 'mx-auto flex max-w-[1200px] items-center gap-3 px-4 md:gap-3 md:px-6 lg:gap-[22px]')}>
-          <Link href="/" aria-label={`${MARKE} – zur Startseite`} className={cn('rounded-md', FOKUS_RAHMEN)}>
+      {/* Der Kopf auf der Fläche (bg-card) mit Linie unten wie im Board w1-startseite; die Seite darunter steht auf dem Grund. */}
+      <header className="sticky top-0 z-40 border-b border-border bg-card print:hidden">
+        <div className={cn(KUNDE_KOPF_ZEILE, 'mx-auto flex max-w-[1200px] items-center gap-3 px-4 md:gap-3 md:px-6 lg:gap-5')}>
+          <Link href="/" aria-label={`${MARKE} – zur Startseite`} className={cn('inline-flex min-h-11 min-w-0 items-center rounded-md', FOKUS_RAHMEN)}>
             <Wortmarke wortKlasse={korbAmHandy ? 'max-[359px]:hidden' : undefined} />
           </Link>
 
@@ -186,10 +214,10 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
             </form>
           )}
 
-          <span className="flex-1" />
-
-          <nav aria-label="Hauptnavigation" className="hidden md:block">
-            <ul className="flex items-center gap-4 lg:gap-[22px]">
+          {/* Die Links stehen gleich nach Marke (und Suche), rechts nur Warenkorb, Hell/Dunkel und der Knopf (V12). */}
+          <span className="flex-1 md:hidden" />
+          <nav aria-label="Hauptnavigation" className="hidden min-w-0 flex-1 md:block">
+            <ul className="flex items-center gap-0.5 lg:gap-1">
               {nav.web.map((punkt) => (
                 <li key={punkt.id}>
                   <Link href={punkt.href} aria-current={kundenAriaAktuell(pathname, punkt, aktiv)} className={TEXTLINK}>
@@ -212,14 +240,20 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
 
           <div className="flex items-center gap-1 md:gap-2">
             {korb && (
-              <span className={unterleiste ? 'hidden md:block' : undefined}>
-                <WarenkorbKopf anzahl={korb.anzahl} href={korb.href} />
-              </span>
+              <>
+                {/* Am Handy steht der Warenkorb in der Unterleiste; nur Fokus-Seiten ohne sie zeigen ihn oben als Symbol. */}
+                {!unterleiste && (
+                  <span className="md:hidden">
+                    <WarenkorbKopf anzahl={korb.anzahl} href={korb.href} />
+                  </span>
+                )}
+                <WarenkorbPille anzahl={korb.anzahl} href={korb.href} className="hidden md:inline-flex" />
+              </>
             )}
             {/* Am Handy steht Hell/Dunkel am Seitenfuß — oben rechts gehört der Platz dem Knopf. */}
-            <ThemeUmschalter className={cn('hidden rounded-full text-foreground hover:bg-muted md:inline-flex', FOKUS_RAHMEN)} />
+            <ThemeUmschalter className="hidden rounded-full border border-input text-foreground hover:bg-muted md:inline-flex" />
             {nav.knopf && (
-              <Link href={nav.knopf.href} aria-current={kundenAriaAktuell(pathname, nav.knopf, aktiv)} className={KOPF_KNOPF}>
+              <Link href={nav.knopf.href} aria-current={kundenAriaAktuell(pathname, nav.knopf, aktiv)} className={KOPF_PILLE}>
                 {nav.knopf.label}
               </Link>
             )}
@@ -259,22 +293,27 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
             {nav.handy.map((platz) => {
               if (platz.art === 'warenkorb') {
                 // Leer gibt es keinen Korb, aber einen Ausweg: zu den Höfen (DESIGN_SYSTEM, „Leerzustand mit Ausweg").
+                // Das Wort „Warenkorb“ unter dem Kreis wie „Neu“ im Hofbereich (V10, Board s1-startseite):
+                // Kreis und Wort sind EIN Link, der Name beginnt mit dem Wort (WCAG 2.5.3).
                 return (
                   <BottomNavMitte key="warenkorb">
                     <Link
                       href={korb?.href ?? '/hoefe'}
-                      aria-label={korb ? `Warenkorb öffnen, ${korb.anzahl} Artikel` : 'Warenkorb ist leer – Höfe entdecken'}
-                      className={mittelknopfKlassen('gruen')}
+                      aria-label={korb ? `${warenkorbKopfText(korb.anzahl)} Artikel – öffnen` : 'Warenkorb ist leer – Höfe entdecken'}
+                      className={mittelknopfMitWortKlassen()}
                     >
-                      <ShoppingBasket className="size-6" strokeWidth={1.7} aria-hidden="true" />
-                      {korb && (
-                        <Zaehler
-                          anzahl={korb.anzahl}
-                          wofuer="Artikel im Warenkorb"
-                          ton="orange"
-                          className="absolute -top-1 -right-1 ring-2 ring-card"
-                        />
-                      )}
+                      <span className={cn(mittelkreisKlassen('gruen'), 'relative')}>
+                        <ShoppingBasket className="size-6" strokeWidth={1.7} aria-hidden="true" />
+                        {korb && (
+                          <Zaehler
+                            anzahl={korb.anzahl}
+                            wofuer="Artikel im Warenkorb"
+                            ton="orange"
+                            className="absolute -top-1 -right-1 ring-2 ring-card"
+                          />
+                        )}
+                      </span>
+                      <span>{platz.wort}</span>
                     </Link>
                   </BottomNavMitte>
                 )
@@ -287,7 +326,7 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, children }: Kun
                   href={punkt.href}
                   label={punkt.kurz ?? punkt.label}
                   symbol={Symbol}
-                  aktuell={kundenAriaAktuell(pathname, punkt, aktiv)}
+                  aktuell={kundenHandyAriaAktuell(pathname, punkt, aktiv)}
                 />
               )
             })}

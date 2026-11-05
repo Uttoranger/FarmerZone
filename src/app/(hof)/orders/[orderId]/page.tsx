@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
+import { barFristSatz, getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
@@ -56,11 +56,13 @@ export default async function OrderDetailPage({
   if (!detail) notFound()
 
   const filter = hofBestellFilterAus((await searchParams).filter)
-  const [seite, widerrufe] = await Promise.all([
+  const [seite, widerrufe, barFrist] = await Promise.all([
     getBestellungenSeite(farm.id, filter, jetzt),
     // Nr. 200 (N39): die offenen Widerrufe dieser Bestellung — ein Fehler hier nimmt dem Hof nie die Bestellung.
     ladeOffeneWiderrufe(farm.id, detail.id).catch(() => []),
+    // V87: bis wann die Kundin eine Bar-Bestellung bestätigt (fristVon).
+    barFristSatz(farm.id, detail, jetzt),
   ])
 
-  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="detail" widerrufe={widerrufe} />
+  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="detail" widerrufe={widerrufe} hofName={farm.name} barFrist={barFrist} />
 }

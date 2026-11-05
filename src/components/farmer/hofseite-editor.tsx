@@ -39,7 +39,7 @@ import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { AbschnittInhalt, SOFORT_GESPEICHERT, type AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { schildTon } from '@/lib/mein-hof'
+import { HOFSEITE_VOLLSTAENDIG, punkteOffenTitel, schildTon } from '@/lib/mein-hof'
 import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
@@ -199,10 +199,13 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
         {/* Fortschritt */}
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-baseline justify-between gap-3">
+            {/* „Noch 1 Punkt offen“ statt Prozent (Boards s1-/w1-mein-hof, Nr. 224) — wie die Liste unter lg. */}
             <h2 className="font-heading text-lg font-semibold text-foreground">
-              Deine Hofseite ist zu {fortschritt.erledigt} von {fortschritt.gesamt} fertig
+              {fortschritt.gesamt > fortschritt.erledigt ? punkteOffenTitel(fortschritt.gesamt - fortschritt.erledigt) : HOFSEITE_VOLLSTAENDIG}
             </h2>
-            <p className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">{fortschritt.prozent} %</p>
+            <p className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
+              {fortschritt.erledigt} von {fortschritt.gesamt}
+            </p>
           </div>
           {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
