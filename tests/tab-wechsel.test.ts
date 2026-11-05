@@ -43,6 +43,9 @@ vi.mock('@/server/queries/farm', () => ({ getFarmBannerState: vi.fn() }))
 vi.mock('@/server/queries/admin', () => ({ isAdminUser: vi.fn(), ladeGruendungBis: vi.fn() }))
 vi.mock('@/server/queries/meldung', () => ({ zaehleZuEntscheiden: vi.fn() }))
 vi.mock('@/server/queries/postfach', () => ({ zaehleUngelesenHof: vi.fn() }))
+// Nr. 233 (N42 e): der Stand des Warte-Balkens aus den Daten von „Hof einrichten“.
+vi.mock('@/server/queries/einrichten', () => ({ ladeEinrichtenHof: vi.fn() }))
+vi.mock('@/server/email-bestaetigung', () => ({ ladeBestaetigungsStand: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
@@ -55,6 +58,9 @@ import { isAdminUser, ladeGruendungBis } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { zaehleUngelesenHof } from '@/server/queries/postfach'
 import { ladeHofbereich } from '@/server/hofbereich'
+import { ladeEinrichtenHof } from '@/server/queries/einrichten'
+import { ladeBestaetigungsStand } from '@/server/email-bestaetigung'
+import { FARM_PENDING_OWNER_BANNER, FARM_SETUP_OWNER_BANNER, warteBalkenText } from '@/lib/farm-approval'
 
 const JETZT = new Date('2026-10-07T08:00:00Z')
 
@@ -199,5 +205,64 @@ describe('ladeHofbereich — die Zahlen des Layouts nebeneinander', () => {
     vi.mocked(zaehleZuEntscheiden).mockResolvedValue(4)
 
     await expect(ladeHofbereich()).resolves.toMatchObject({ isAdmin: true, zuEntscheiden: 4 })
+  })
+})
+
+describe('ladeHofbereich — der Balken „wartet“ trägt den Stand der Schritte (N42 e, Nr. 233)', () => {
+  /** Ein Hof ohne Freigabe; die Schritte je nach `fertig` offen oder alle erledigt. */
+  function wartenderHof(fertig: boolean): void {
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: 'nutzer-1', name: 'Erfundene Person', email: 'hof@example.com', role: 'FARMER' },
+    } as never)
+    vi.mocked(getFarmForUser).mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', logoUrl: null } as never)
+    vi.mocked(getOpenOrdersCount).mockResolvedValue(0)
+    vi.mocked(isAdminUser).mockResolvedValue(false)
+    vi.mocked(getFarmBannerState).mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', archivedAt: null, approvedAt: null, country: 'AT' } as never)
+    vi.mocked(ladeBestaetigungsStand).mockResolvedValue({ email: 'hof@example.com', emailVerified: true, pflichtig: false, offen: false })
+    vi.mocked(ladeEinrichtenHof).mockResolvedValue({
+      id: 'hof-1',
+      slug: 'testhof',
+      tarif: null,
+      agbFassung: null,
+      name: 'Testhof',
+      hofseite: fertig ? { erledigt: 5, gesamt: 5, fehlend: [] } : { erledigt: 2, gesamt: 5, fehlend: ['Titelbild'] },
+      produkte: fertig ? 3 : 0,
+      stripeBereit: fertig,
+      abholzeitAktiv: fertig,
+      freigeschaltet: false,
+      sepaMandat: false,
+    } as never)
+  }
+
+  it('Schritte offen: „Richte deinen Hof fertig ein“', async () => {
+    wartenderHof(false)
+    const { balken } = await ladeHofbereich()
+    expect(balken).toMatchObject({ art: 'wartet', stand: 'einrichten' })
+    expect(ladeEinrichtenHof).toHaveBeenCalledWith('nutzer-1')
+    // Die E-Mail-Bestätigung frisch aus der Datenbank, nie aus der Sitzung (S3).
+    expect(ladeBestaetigungsStand).toHaveBeenCalledWith('nutzer-1')
+    expect(warteBalkenText(balken?.art === 'wartet' ? balken.stand : null).titel).toBe(FARM_SETUP_OWNER_BANNER)
+  })
+
+  it('alles erledigt: „Dein Hof wird noch geprüft“', async () => {
+    wartenderHof(true)
+    const { balken } = await ladeHofbereich()
+    expect(balken).toMatchObject({ art: 'wartet', stand: 'pruefung' })
+    expect(warteBalkenText(balken?.art === 'wartet' ? balken.stand : null).titel).toBe(FARM_PENDING_OWNER_BANNER)
+  })
+
+  it('Gegenprobe: ein freigeschalteter Hof lädt die Schritte nie (keine Abfrage für den Balken)', async () => {
+    wartenderHof(true)
+    vi.mocked(getFarmBannerState).mockResolvedValue({ id: 'hof-1', name: 'Testhof', slug: 'testhof', archivedAt: null, approvedAt: new Date(), country: 'AT' } as never)
+    const { balken } = await ladeHofbereich()
+    expect(balken).toBeNull()
+    expect(ladeEinrichtenHof).not.toHaveBeenCalled()
+    expect(ladeBestaetigungsStand).not.toHaveBeenCalled()
+  })
+
+  it('das Layout gibt nur den Balken weiter — den Stand bringt der Lader mit, kein fester Titel', () => {
+    const layout = readFileSync(join(process.cwd(), 'src/app/(hof)/layout.tsx'), 'utf8')
+    expect(layout).toContain('<HofBalken balken={balken} />')
+    expect(readFileSync(join(process.cwd(), 'src/components/hofbereich/hof-balken.tsx'), 'utf8')).toContain('stand={balken.stand}')
   })
 })

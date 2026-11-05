@@ -36,7 +36,7 @@ import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import type { StripeMarke } from '@/lib/testumgebung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { BottomNav, BottomNavLink, bottomNavEintragKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, bottomNavEintragKlassen, bottomNavSymbolKlassen } from '@/components/ui/bottom-nav'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Sheet, SheetBlatt, SheetKopf, SheetTrigger } from '@/components/ui/sheet'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -237,7 +237,7 @@ function AdminLeiste({
       })}
       <Sheet open={offen} onOpenChange={setOffen}>
         <SheetTrigger aria-current={!offen && mehrAktiv ? 'true' : undefined} className={bottomNavEintragKlassen(offen || mehrAktiv)}>
-          <span className="relative">
+          <span className={bottomNavSymbolKlassen(offen || mehrAktiv)}>
             <Menu className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
             {betrieb && mehr.some((r) => r.warnpunkt) && (
               <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="absolute -top-0.5 -right-1 size-2 rounded-full bg-primary" />
@@ -358,7 +358,8 @@ export function AdminShell({
                         )}
                       >
                         {reiter.label}
-                        <Zaehler anzahl={zahl.anzahl} wofuer={zahl.wofuer} />
+                        {/* Getönt wie im Board w3-admin-shell (Nacharbeit 220): Am Reiter ist die Zahl ein Hinweis, kein Alarm. */}
+                        <Zaehler anzahl={zahl.anzahl} wofuer={zahl.wofuer} ton="getoent" />
                         {reiter.warnpunkt && betrieb && (
                           <span role="img" aria-label={warnungenText(betrieb.anzahl)} className="size-2 shrink-0 rounded-full bg-primary" />
                         )}

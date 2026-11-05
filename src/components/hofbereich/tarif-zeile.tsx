@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { ChevronRight, Sprout, Star, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Sparkle, Sprout, type LucideIcon } from 'lucide-react'
 import type { TarifZeileDaten } from '@/lib/konditionen'
+import { Abzeichen } from '@/components/ui/abzeichen'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -17,11 +18,16 @@ import { cn } from '@/lib/utils'
  * Link. ProgressBar passt hier nicht — sie kündigt sich als eigene
  * Fortschrittsanzeige mit Beschriftung an, mitten in einem Link eine zweite
  * Ansage für dieselbe Zahl.
+ *
+ * Seit Nr. 233 nach w1-/s1-mehr-neu: in der Seitenleiste ein grün getöntes
+ * Kästchen (28 px, beim Gründungshof das Funkeln), Titel 14 px fett, Zeile
+ * 13 px; im Mehr-Blatt steht beim Gründungshof das Abzeichen „Gründungshof“
+ * statt Kästchen und Titel. Der Wortlaut bleibt der vom Server (offen: E-012).
  */
 const SYMBOL: Record<TarifZeileDaten['zustand'], LucideIcon> = {
   startphase: Sprout,
   hoftor: Sprout,
-  gruendungshof: Star,
+  gruendungshof: Sparkle,
 }
 
 export function TarifZeile({
@@ -39,6 +45,8 @@ export function TarifZeile({
   const Symbol = SYMBOL[daten.zustand]
   const blatt = ort === 'blatt'
   const unterzeile = blatt ? daten.zeileHandy : daten.zeile
+  // Im Blatt trägt das Abzeichen den Titel (Board s1-mehr-neu); vorgelesen wird „Gründungshof“ wie der Titel.
+  const mitAbzeichen = blatt && daten.zustand === 'gruendungshof'
 
   return (
     <Link
@@ -47,16 +55,23 @@ export function TarifZeile({
       data-slot="tarif-zeile"
       data-zustand={daten.zustand}
       className={cn(
-        'flex min-h-11 items-center gap-[11px] border border-border bg-card text-foreground transition-colors duration-[250ms] hover:bg-muted',
-        blatt ? 'rounded-2xl px-3.5 py-3' : 'rounded-xl px-3 py-2.5',
+        'flex min-h-14 items-center gap-2.5 border border-border bg-card text-[13px] text-foreground transition-colors duration-[250ms] hover:bg-muted',
+        // Rundung in Pixeln wie im Board (12 bzw. 16 px) — die Stufen xl/2xl wachsen im neuen Design mit --radius.
+        blatt ? 'rounded-[16px] px-3 py-2' : 'rounded-[12px] px-2.5 py-2',
         FOKUS_RAHMEN
       )}
     >
-      <span className="flex size-8 shrink-0 items-center justify-center self-start rounded-[10px] bg-status-fertig/12 text-status-fertig">
-        <Symbol className="size-[17px]" strokeWidth={1.8} aria-hidden="true" />
-      </span>
-      <span className={cn('flex min-w-0 flex-1 flex-col gap-1', blatt ? 'text-[12.5px]' : 'text-[12px]')}>
-        <span className={cn('font-semibold', blatt ? 'text-[14.5px]' : 'text-[13.5px]')}>{daten.titel}</span>
+      {!mitAbzeichen && (
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-zustand-laeuft-grund text-zustand-laeuft">
+          <Symbol className="size-4" strokeWidth={1.9} aria-hidden="true" />
+        </span>
+      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        {mitAbzeichen ? (
+          <Abzeichen className="h-6 self-start" />
+        ) : (
+          <span className={cn('font-bold', blatt ? 'text-[15px]' : 'text-[14px]')}>{daten.titel}</span>
+        )}
         {daten.grenze ? (
           <>
             <span className="flex items-baseline justify-between gap-2 text-muted-foreground">
@@ -77,7 +92,7 @@ export function TarifZeile({
       </span>
       {/* Wohin der Link führt — sichtbar zeigt nur der Pfeil, dass es weitergeht (wie PersonZeile). */}
       <span className="sr-only">{`, ${ziel.label}`}</span>
-      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
+      <ChevronRight className="size-[18px] shrink-0 text-foreground" strokeWidth={2} aria-hidden="true" />
     </Link>
   )
 }

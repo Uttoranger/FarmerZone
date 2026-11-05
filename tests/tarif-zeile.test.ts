@@ -217,6 +217,19 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     expect(html).not.toContain('Dezember 2027')
   })
 
+  it('Gründungshof im Mehr-Blatt: das Abzeichen statt Kästchen und Titel (Board s1-mehr-neu, Nr. 233); in der Seitenleiste das Kästchen', () => {
+    const html = shell(ZEILEN.gruendungshof)
+    const imBlatt = tarifLink(html.slice(html.indexOf('<h2>Mehr</h2>'))) ?? ''
+    expect(imBlatt).toContain('bg-abzeichen-grund')
+    expect(imBlatt).not.toContain('lucide-sparkle')
+    // Gegenprobe: die Seitenleiste zeigt Kästchen und Titel, kein Abzeichen; die Startphase im Blatt auch nicht.
+    const inLeiste = tarifLink(abschnitt(html, '<aside', '</aside>')) ?? ''
+    expect(inLeiste).not.toContain('bg-abzeichen-grund')
+    expect(inLeiste).toContain('lucide-sparkle')
+    const start = shell(ZEILEN.startphase)
+    expect(tarifLink(start.slice(start.indexOf('<h2>Mehr</h2>')))).not.toContain('bg-abzeichen-grund')
+  })
+
   it('Startphase am Handy mit „du musst nichts tun", in der Seitenleiste ohne', () => {
     const html = shell(ZEILEN.startphase)
     expect(tarifLink(abschnitt(html, '<aside', '</aside>'))).not.toContain('du musst nichts tun')
@@ -230,16 +243,18 @@ describe('HofShell — die Tarif-Zeile je Zustand', () => {
     expect(link).toMatch(/<span aria-hidden="true"[^>]*><span[^>]*style="width:100%"/)
   })
 
-  it('Symbol je Zustand: Spross für Startphase und Hoftor, Stern für den Gründungshof', () => {
+  it('Symbol je Zustand: Spross für Startphase und Hoftor, beim Gründungshof das Funkeln (Board w1-mehr-neu, Nr. 233)', () => {
     expect(tarifLink(shell(ZEILEN.startphase))).toContain('lucide-sprout')
     expect(tarifLink(shell(ZEILEN.hoftor))).toContain('lucide-sprout')
-    expect(tarifLink(shell(ZEILEN.gruendungshof))).toContain('lucide-star')
+    expect(tarifLink(shell(ZEILEN.gruendungshof))).toContain('lucide-sparkle')
+    expect(tarifLink(shell(ZEILEN.gruendungshof))).not.toContain('lucide-star')
   })
 
   it('ein Link mit ≥ 44 px und sichtbarem Fokus; der Screenreader hört auch, wohin', () => {
     const link = tarifLink(shell(ZEILEN.startphase)) ?? ''
     const klassen = link.match(/^<a [^>]*class="([^"]*)"/)?.[1].split(' ') ?? []
-    for (const k of ['min-h-11', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
+    // 56 px wie im Board w1-mehr-neu (Nr. 233; vorher 44 px) — mehr als das Mindestmaß.
+    for (const k of ['min-h-14', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
     expect(link).toContain(`<span class="sr-only">, ${EINSTELLUNG_KONDITIONEN.label}</span>`)
     for (const svg of link.match(/<svg[^>]*>/g) ?? []) expect(svg).toContain('aria-hidden="true"')
   })

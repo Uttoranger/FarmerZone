@@ -382,7 +382,11 @@ describe('Meldung abgeben (gerendert)', () => {
     expect(html).toContain('Absenden')
     expect(html).toContain(`href="${MEINE_MELDUNGEN_HREF}"`)
     expect(html).toContain('name="website"')
-    expect(html).toContain('Mitgeschickt: Seite, Gerät und dein Hof.')
+    // Seit Nr. 233 (Board s2-meldungen): im Hofbereich die Karte statt des Satzes — Seite und Gerät, ohne IP und Cookies.
+    expect(html).toContain('Das schicken wir automatisch mit')
+    expect(html).toMatch(/<dt[^>]*>Seite<\/dt>/)
+    expect(html).toMatch(/<dt[^>]*>Gerät<\/dt>/)
+    expect(html).not.toContain('Mitgeschickt:')
     expect(html).toContain('Keine IP-Adresse, keine Cookies.')
     expect(html).toContain('Bildschirmfoto hinzufügen')
   })

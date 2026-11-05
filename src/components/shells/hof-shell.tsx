@@ -3,25 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  BarChart3,
-  CalendarCheck,
-  ChevronDown,
-  ChevronRight,
-  Compass,
-  Home,
-  Inbox,
-  LifeBuoy,
-  Menu,
-  Package,
-  Plus,
-  ReceiptText,
-  ShieldCheck,
-  SlidersHorizontal,
-  Tag,
-  Users,
-  type LucideIcon,
-} from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronRight, Home, Menu, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
 import { hofInitialen } from '@/lib/hof-initialen'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
@@ -57,7 +39,16 @@ import type { TarifZeileDaten } from '@/lib/konditionen'
 import { POSTFACH_TEXT } from '@/lib/postfach'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { BottomNav, BottomNavLink, BottomNavMitte, bottomNavEintragKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
+import {
+  BOTTOM_NAV_ZAEHLER,
+  BottomNav,
+  BottomNavLink,
+  BottomNavMitte,
+  bottomNavEintragKlassen,
+  bottomNavSymbolKlassen,
+  mittelflaecheKlassen,
+  mittelknopfFlachKlassen,
+} from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { Zaehler } from '@/components/ui/zaehler'
@@ -103,25 +94,22 @@ import { TarifZeile } from '@/components/hofbereich/tarif-zeile'
  * (Person, Einstellungen, Problem melden, Admin, Darstellung Hell/Dunkel,
  * Abmelden).
  *
+ * Seit Nr. 233 (Nacharbeit 220, Boards w1-/s1-mehr-neu und s1-heute): die
+ * Seitenleiste ohne Symbole, der aktive Eintrag grün getönt, Zeilen 44 px ohne
+ * Abstand — so passt sie ohne Admin ganz in 900 px Höhe und beginnt nie
+ * angeschnitten; in der Unterleiste eine getönte Pille am aktiven Eintrag und
+ * „Neu“ als flache orange Fläche; im Mehr-Blatt Zeilen 56 px, fett.
+ *
  * Die Shell setzt data-design="neu" und damit die Tokens des Design-Systems
  * für das ganze Dokument. Der Hofbereich unter (hof) läuft über diese Shell;
  * nur die Druckansichten und Reste unter (farmer) nutzen noch farmer-nav.tsx.
  */
 
-const SYMBOL: Record<HofNavId, LucideIcon> = {
+/** Symbole nur für die Unterleiste — die Seitenleiste zeigt seit Nr. 233 reine Texteinträge (Board w1-mehr-neu). */
+const SYMBOL: Partial<Record<HofNavId, LucideIcon>> = {
   heute: CalendarCheck,
   bestellungen: ReceiptText,
-  // Ein Eingangsfach: Hier kommt an, was das Team schreibt (Register N12).
-  postfach: Inbox,
-  produkte: Package,
   'mein-hof': Home,
-  kunden: Users,
-  verkaeufe: Tag,
-  auswertung: BarChart3,
-  region: Compass,
-  einstellungen: SlidersHorizontal,
-  hilfe: LifeBuoy,
-  admin: ShieldCheck,
 }
 
 
@@ -166,13 +154,14 @@ function zahlWofuer(punkt: HofNavPunkt): string {
  * (hof-initialen.ts). Grün getönt wie in den Boards w1-mehr-neu und
  * s1-mehr-neu (Paar „läuft“, ≥ 4,5:1 in beiden Modi).
  */
-function Plakette({ name, gross = false }: { name: string; gross?: boolean }) {
+function Plakette({ name, eckig = false }: { name: string; eckig?: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund font-semibold text-zustand-laeuft',
-        gross ? 'size-9 text-[13px]' : 'size-[34px] text-[12px]'
+        'flex shrink-0 items-center justify-center bg-zustand-laeuft-grund text-[13px] font-bold text-zustand-laeuft',
+        // Der Hof trägt in der Seitenleiste ein Kästchen (32 px, Board w1-mehr-neu), die Person einen Kreis (36 px).
+        eckig ? 'size-8 rounded-[9px]' : 'size-9 rounded-full'
       )}
     >
       {hofInitialen(name)}
@@ -187,13 +176,13 @@ function Plakette({ name, gross = false }: { name: string; gross?: boolean }) {
  */
 function Hofkarte({ hofName, hofSlug }: { hofName: string; hofSlug: string }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-[14px] border border-border bg-background px-3 py-2.5">
-      <Plakette name={hofName} gross />
+    <div className="flex min-h-12 items-center gap-2.5 rounded-[12px] border border-border px-2.5 py-0.5">
+      <Plakette name={hofName} eckig />
       <span className="min-w-0">
-        <span className="block truncate text-[13.5px] font-semibold text-foreground" title={hofName}>
+        <span className="block truncate text-[14px] font-bold text-foreground" title={hofName}>
           {hofName}
         </span>
-        <Textlink href={vorschauLink(hofSlug)} form="im-satz" className="text-[12.5px] font-medium">
+        <Textlink href={vorschauLink(hofSlug)} form="im-satz" className="text-[13px] font-medium">
           {HOFSEITE_ANSEHEN}
         </Textlink>
       </span>
@@ -220,14 +209,14 @@ export function PersonZeile({
     <Link
       href={konto.href}
       onClick={onNavigate}
-      className={cn('flex min-h-[60px] w-full items-center gap-3 px-3.5 py-2 text-left transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN_INNEN)}
+      className={cn('flex min-h-[60px] w-full items-center gap-2.5 px-3 py-2 text-left transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN_INNEN)}
     >
       <Plakette name={anzeige} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14.5px] font-semibold text-foreground" title={anzeige}>
+        <span className="block truncate text-[15px] font-bold text-foreground" title={anzeige}>
           {anzeige}
         </span>
-        <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">{konto.label}</span>
+        <span className="block truncate text-[13px] text-muted-foreground">{konto.label}</span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
     </Link>
@@ -245,7 +234,7 @@ function KontoZeile({ name }: { name: string }) {
     <div className="flex items-center gap-1">
       <Link
         href={EINSTELLUNG_KONTO.href}
-        className={cn('flex min-h-11 min-w-0 flex-1 items-center rounded-xl px-3 text-[14px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+        className={cn('flex min-h-11 min-w-0 flex-1 items-center rounded-[10px] px-3 text-[15px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
       >
         <span className="truncate" title={anzeige}>
           {KONTO_KURZ} · {anzeige}
@@ -261,21 +250,30 @@ function KontoZeile({ name }: { name: string }) {
 /** Überschrift einer Gruppe im Mehr-Blatt — leise, Großbuchstaben (die Liste darunter trägt den Namen für den Screenreader). */
 function BlattUeberschrift({ children }: { children: ReactNode }) {
   return (
-    <p aria-hidden="true" className="px-0.5 pt-1.5 text-[11.5px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
+    <p aria-hidden="true" className="px-1 pt-1 text-[13px] font-bold tracking-[0.52px] text-muted-foreground uppercase">
       {children}
     </p>
   )
 }
 
-/** Ein Eintrag im Neu-Menü: Titel und ein Satz — ohne Symbol wie in den Boards s1-/w1-mehr-neu. */
-function NeuInhalt({ punkt }: { punkt: HofNeuPunkt }) {
+/** Ein Eintrag im Neu-Menü: Titel und ein Satz — ohne Symbol wie in den Boards s1-/w1-mehr-neu; im Blatt eine Stufe größer. */
+function NeuInhalt({ punkt, blatt = false }: { punkt: HofNeuPunkt; blatt?: boolean }) {
   return (
     <span className="min-w-0">
-      <span className="block text-[14.5px] font-semibold text-foreground">{punkt.label}</span>
-      <span className="block text-[12.5px] text-muted-foreground">{punkt.satz}</span>
+      <span className={cn('block font-bold text-foreground', blatt ? 'text-[16px]' : 'text-[15px]')}>{punkt.label}</span>
+      <span className={cn('block text-muted-foreground', blatt ? 'text-[14px]' : 'text-[13px]')}>{punkt.satz}</span>
     </span>
   )
 }
+
+/** Ein Eintrag im Menü „Neu“ am Computer: 52 px hoch wie im Board w1-mehr-neu (Bild 3). */
+const NEU_MENUE_EINTRAG = 'min-h-[52px] px-3.5 py-1.5'
+
+/** Die Blätter am Handy lassen oben den Kopf der Seite sichtbar (Board s1-mehr-neu: höchstens 86 % der Höhe). */
+const BLATT_HOEHE = 'max-h-[86dvh] gap-2.5 px-4'
+
+/** Karten im Mehr-Blatt: 16 px Rundung wie im Board (rounded-2xl wäre im neuen Design 29 px). */
+const BLATT_GRUPPE = 'rounded-[16px]'
 
 export function HofShell({
   hofName,
@@ -331,7 +329,7 @@ export function HofShell({
   const untenImMehr = nav.mehr.filter((p) => nav.unten.some((u) => u.id === p.id))
 
   // Eine Zeile im Mehr-Blatt ohne Ziel (Darstellung, Abmelden) — Maße wie ListRow.
-  const blattZeile = 'flex min-h-[54px] w-full items-center gap-3 px-3.5 py-1.5 text-left text-[14.5px] font-medium text-foreground'
+  const blattZeile = 'flex min-h-14 w-full items-center gap-2.5 px-3 py-1.5 text-left text-[15px] font-bold text-foreground'
 
   return (
     // data-scroll-rand: Der Fokus scrollt nie unter Unterleiste und Unterseiten-Kopf (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
@@ -346,9 +344,11 @@ export function HofShell({
           aria-label="Hofbereich"
           className="hidden border-r border-border bg-card md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[264px] md:flex-col print:hidden"
         >
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3.5">
+          {/* Maße wie im Board (Zeilen 44 px ohne Abstand): Ohne Admin passt die Leiste in 900 px Höhe, sie scrollt nur mit
+              „Admin“ und auf kleineren Fenstern — und beginnt dann oben mit der Marke, nie angeschnitten. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-1.5 pb-2">
             {/* Die Marke oben (Board w1-mehr-neu) führt nach Heute, die Startseite des Hofbereichs. */}
-            <Link href={hauptPunktHref('heute')} aria-label={`${MARKE} – ${HEUTE_LABEL}`} className={cn('mb-3 inline-flex min-h-11 items-center self-start rounded-md px-1', FOKUS_RAHMEN)}>
+            <Link href={hauptPunktHref('heute')} aria-label={`${MARKE} – ${HEUTE_LABEL}`} className={cn('mb-0.5 inline-flex min-h-11 shrink-0 items-center self-start rounded-md px-1', FOKUS_RAHMEN)}>
               <Wortmarke priority={false} />
             </Link>
             <Hofkarte hofName={hofName} hofSlug={hofSlug} />
@@ -357,23 +357,20 @@ export function HofShell({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={cn(
-                  'group mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-[14.5px] font-semibold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
+                  'mt-1.5 mb-1 flex min-h-11 w-full shrink-0 items-center justify-center gap-1 rounded-full bg-primary px-4 text-[15px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
                   FOKUS_RAHMEN
                 )}
               >
-                <Plus className="size-4 shrink-0" strokeWidth={2.4} aria-hidden="true" />
+                <Plus className="size-4 shrink-0" strokeWidth={2.6} aria-hidden="true" />
                 <span>{HOF_NEU_KNOPF}</span>
-                <ChevronDown
-                  className="size-3.5 shrink-0 transition-transform group-data-[popup-open]:rotate-180"
-                  strokeWidth={2.4}
-                  aria-hidden="true"
-                />
+                {/* Auch offen „▾“ wie im Board (Bild 3) — der Zustand steht in aria-expanded. */}
+                <ChevronDown className="size-3.5 shrink-0" strokeWidth={2.6} aria-hidden="true" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-72" container={menueZiel}>
+              <DropdownMenuContent className="w-80" container={menueZiel}>
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel className="px-2.5 pt-2 pb-1 font-heading text-[16px] font-semibold text-foreground">{HOF_NEU_TITEL}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="px-3.5 pt-1.5 pb-0.5 font-heading text-[17px] font-semibold text-foreground">{HOF_NEU_TITEL}</DropdownMenuLabel>
                   {neuAnlegen.map((punkt) => (
-                    <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
+                    <DropdownMenuLinkItem key={punkt.id} className={NEU_MENUE_EINTRAG} render={<Link href={punkt.href} />}>
                       <NeuInhalt punkt={punkt} />
                     </DropdownMenuLinkItem>
                   ))}
@@ -383,7 +380,7 @@ export function HofShell({
                   {/* Im Web trennt nur die Linie (Board w1-mehr-neu, Bild 3); der Name der Gruppe bleibt für den Screenreader. */}
                   <DropdownMenuLabel className="sr-only">{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
                   {neuAnderes.map((punkt) => (
-                    <DropdownMenuLinkItem key={punkt.id} render={<Link href={punkt.href} />}>
+                    <DropdownMenuLinkItem key={punkt.id} className={NEU_MENUE_EINTRAG} render={<Link href={punkt.href} />}>
                       <NeuInhalt punkt={punkt} />
                     </DropdownMenuLinkItem>
                   ))}
@@ -391,14 +388,13 @@ export function HofShell({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <nav aria-label="Hauptnavigation" className="mt-3 flex flex-1 flex-col">
+            <nav aria-label="Hauptnavigation" className="flex flex-1 flex-col">
               <SidebarGruppe>
                 {nav.haupt.map((punkt) => (
                   <SidebarEintrag
                     key={punkt.id}
                     href={punkt.href}
                     label={punkt.label}
-                    symbol={SYMBOL[punkt.id]}
                     aktuell={hofAriaAktuell(pathname, punkt)}
                     zahl={zahlFuer(punkt, zahlen)}
                     zahlWofuer={zahlWofuer(punkt)}
@@ -407,33 +403,25 @@ export function HofShell({
               </SidebarGruppe>
               <SidebarGruppe titel={VERKAUF_UND_KUNDEN_TITEL}>
                 {nav.verkaufUndKunden.map((punkt) => (
-                  <SidebarEintrag
-                    key={punkt.id}
-                    href={punkt.href}
-                    label={punkt.label}
-                    symbol={SYMBOL[punkt.id]}
-                    aktuell={hofAriaAktuell(pathname, punkt)}
-                  />
+                  <SidebarEintrag key={punkt.id} href={punkt.href} label={punkt.label} aktuell={hofAriaAktuell(pathname, punkt)} />
                 ))}
               </SidebarGruppe>
 
               {tarif && (
-                <div className="pt-4">
+                <div className="pt-1 pb-3">
                   <TarifZeile daten={tarif} ziel={nav.tarif.ziel} ort="seitenleiste" />
                 </div>
               )}
-              <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
+              <div className="mt-auto flex flex-col border-t border-border pt-0.5">
                 <SidebarGruppe>
                   {nav.unten.map((punkt) => (
                     <SidebarEintrag
                       key={punkt.id}
                       href={punkt.href}
                       label={punkt.label}
-                      symbol={SYMBOL[punkt.id]}
                       aktuell={hofAriaAktuell(pathname, punkt)}
                       zahl={zahlFuer(punkt, zahlen)}
                       zahlWofuer={zahlWofuer(punkt)}
-                      klein
                     />
                   ))}
                 </SidebarGruppe>
@@ -442,7 +430,7 @@ export function HofShell({
                 <button
                   type="button"
                   onClick={abmelden}
-                  className={cn('flex min-h-11 w-full items-center rounded-xl px-3 text-left text-[14px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+                  className={cn('flex min-h-11 w-full items-center rounded-[10px] px-3 text-left text-[15px] font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
                 >
                   {ABMELDEN_LABEL}
                 </button>
@@ -464,7 +452,7 @@ export function HofShell({
       {/* ===== Handy: Unterleiste ===== */}
       {/* Die Blätter „Neu“ und „Mehr“ liegen seit Nr. 220 über der Leiste bis zum unteren Rand (Board s1-mehr-neu);
           geschlossen wird oben im Kopf des Blatts, die Leiste bleibt unter dem Schleier. */}
-      <BottomNav engUnter360>
+      <BottomNav engUnter360 ton="orange">
         {nav.handyLeiste.map((platz) => {
           if (platz.art === 'punkt') {
             const { punkt } = platz
@@ -474,7 +462,8 @@ export function HofShell({
                 href={punkt.href}
                 label={punkt.label}
                 labelKurz={HOF_LEISTE_KURZ[punkt.id]}
-                symbol={SYMBOL[punkt.id]}
+                // Die Leiste führt nur Punkte mit Symbol (Heute, Bestellungen, Mein Hof); der Ersatz greift nie.
+                symbol={SYMBOL[punkt.id] ?? Menu}
                 aktuell={offen ? undefined : hofHandyAriaAktuell(pathname, punkt)}
                 zahl={zahlFuer(punkt, zahlen)}
                 zahlWofuer={zahlWofuer(punkt)}
@@ -485,16 +474,16 @@ export function HofShell({
 
           if (platz.art === 'neu') {
             return (
-              <BottomNavMitte key="neu">
+              <BottomNavMitte key="neu" flach>
                 <Sheet open={offen === 'neu'} onOpenChange={wechsle('neu')}>
-                  {/* Wort unter dem Plus (freigabe.md §12 Nr. 45): Kreis und Wort sind EIN Knopf. */}
-                  <SheetTrigger aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
-                    <span className={mittelkreisKlassen('orange')}>
-                      <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+                  {/* Wort unter dem Plus (freigabe.md §12 Nr. 45): Fläche und Wort sind EIN Knopf; flach in der Leiste seit Nr. 233 (Board s1-heute). */}
+                  <SheetTrigger aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfFlachKlassen()}>
+                    <span className={mittelflaecheKlassen('orange')}>
+                      <Plus className="size-[22px]" strokeWidth={2.4} aria-hidden="true" />
                     </span>
-                    <span>{HOF_NEU_KNOPF}</span>
+                    <span className="max-w-full truncate px-0.5">{HOF_NEU_KNOPF}</span>
                   </SheetTrigger>
-                  <SheetBlatt>
+                  <SheetBlatt className={BLATT_HOEHE} schleier="abgedunkelt">
                     <SheetKopf titel={HOF_NEU_TITEL} schliessen={HOF_NEU_ABBRECHEN} className={BLATT_KOPF_KLEBT} />
                     {[neuAnlegen, neuAnderes].map((gruppe, i) => (
                       <div key={i} className="flex flex-col gap-2">
@@ -506,11 +495,11 @@ export function HofShell({
                                 href={punkt.href}
                                 onClick={schliessen}
                                 className={cn(
-                                  'flex min-h-[64px] items-center rounded-[14px] border border-border bg-card px-3.5 py-2.5 transition-colors duration-[250ms] hover:bg-muted',
+                                  'flex min-h-[60px] items-center rounded-[14px] border border-input bg-card px-3.5 py-1.5 transition-colors duration-[250ms] hover:bg-muted',
                                   FOKUS_RAHMEN
                                 )}
                               >
-                                <NeuInhalt punkt={punkt} />
+                                <NeuInhalt punkt={punkt} blatt />
                               </Link>
                             </li>
                           ))}
@@ -527,22 +516,18 @@ export function HofShell({
           return (
             <Sheet key="mehr" open={offen === 'mehr'} onOpenChange={wechsle('mehr')}>
               <SheetTrigger aria-current={!offen && hofMehrAktiv(pathname) ? 'true' : undefined} className={bottomNavEintragKlassen(mehrAktiv)}>
-                <span className="relative">
-                  <Menu className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+                <span className={bottomNavSymbolKlassen(mehrAktiv)}>
+                  <Menu className="size-[22px]" strokeWidth={1.8} aria-hidden="true" />
                   {postfachImMehr && (
-                    <Zaehler
-                      anzahl={zahlFuer(postfachImMehr, zahlen)}
-                      wofuer={zahlWofuer(postfachImMehr)}
-                      className="absolute -top-1.5 -right-2.5 h-4 min-w-4 px-1 text-[9.5px]"
-                    />
+                    <Zaehler anzahl={zahlFuer(postfachImMehr, zahlen)} wofuer={zahlWofuer(postfachImMehr)} klein className={BOTTOM_NAV_ZAEHLER} />
                   )}
                 </span>
                 <span>{HOF_MEHR_TITEL}</span>
               </SheetTrigger>
-              <SheetBlatt>
+              <SheetBlatt className={BLATT_HOEHE} schleier="abgedunkelt">
                 <SheetKopf titel={HOF_MEHR_TITEL} schliessen={HOF_MEHR_SCHLIESSEN} className={BLATT_KOPF_KLEBT} />
                 {hauptImMehr.length > 0 && (
-                  <ListGruppe>
+                  <ListGruppe className={BLATT_GRUPPE}>
                     {hauptImMehr.map((punkt) => {
                       const zahl = zahlFuer(punkt, zahlen)
                       return (
@@ -555,6 +540,7 @@ export function HofShell({
                           aktuell={hofHandyAriaAktuell(pathname, punkt)}
                           ende={<Zaehler anzahl={zahl} wofuer={zahlWofuer(punkt)} />}
                           onNavigate={schliessen}
+                          gross
                         />
                       )
                     })}
@@ -567,7 +553,7 @@ export function HofShell({
                   </div>
                 )}
                 <BlattUeberschrift>{VERKAUF_UND_KUNDEN_TITEL}</BlattUeberschrift>
-                <ListGruppe beschriftung={VERKAUF_UND_KUNDEN_TITEL}>
+                <ListGruppe beschriftung={VERKAUF_UND_KUNDEN_TITEL} className={BLATT_GRUPPE}>
                   {vukImMehr.map((punkt) => (
                     <ListRow
                       key={punkt.id}
@@ -575,11 +561,12 @@ export function HofShell({
                       href={punkt.href}
                       aktuell={hofHandyAriaAktuell(pathname, punkt)}
                       onNavigate={schliessen}
+                      gross
                     />
                   ))}
                 </ListGruppe>
                 <BlattUeberschrift>{KONTO_UND_HILFE_TITEL}</BlattUeberschrift>
-                <ListGruppe beschriftung={KONTO_UND_HILFE_TITEL}>
+                <ListGruppe beschriftung={KONTO_UND_HILFE_TITEL} className={BLATT_GRUPPE}>
                   <li>
                     <PersonZeile name={personName} konto={EINSTELLUNG_KONTO} onNavigate={schliessen} />
                   </li>
@@ -591,6 +578,7 @@ export function HofShell({
                       aktuell={hofHandyAriaAktuell(pathname, punkt)}
                       ende={<Zaehler anzahl={zahlFuer(punkt, zahlen)} wofuer={zahlWofuer(punkt)} />}
                       onNavigate={schliessen}
+                      gross
                     />
                   ))}
                   <li className={blattZeile}>

@@ -32,7 +32,9 @@ export function ListGruppe({
 /**
  * ListRow: eine Zeile mit Symbol, Titel, Unterzeile und Ende (Betrag, Zähler,
  * Schalter). Mit `href` ist die ganze Zeile ein Link und trägt den Pfeil;
- * ohne ist sie nur Anzeige. Mindestens 50 px hoch (Touch-Ziel ≥ 44 px).
+ * ohne ist sie nur Anzeige. Mindestens 50 px hoch (Touch-Ziel ≥ 44 px);
+ * `gross` ist die Zeile der Blätter „Mehr“ (Board s1-mehr-neu, Nr. 233):
+ * 56 px, Titel 15 px fett, Unterzeile 13 px.
  *
  * Titel und Unterzeile kürzen auf eine Zeile; ein Text als Titel steht
  * zusätzlich vollständig im `title` (lange Hof- und Personennamen).
@@ -45,6 +47,7 @@ export function ListRow({
   href,
   aktuell,
   onNavigate,
+  gross = false,
   className,
 }: {
   titel: ReactNode
@@ -55,22 +58,24 @@ export function ListRow({
   /** aria-current, wenn die Zeile zur offenen Seite führt. */
   aktuell?: 'page' | 'true'
   onNavigate?: () => void
+  /** Zeile im Mehr-Blatt: 56 px, Titel fett 15 px (Board s1-mehr-neu). */
+  gross?: boolean
   className?: string
 }): React.JSX.Element {
   const inhalt = (
     <>
       {Symbol && <Symbol className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14.5px] font-medium" title={typeof titel === 'string' ? titel : undefined}>
+        <span className={cn('block truncate', gross ? 'text-[15px] font-bold' : 'text-[14.5px] font-medium')} title={typeof titel === 'string' ? titel : undefined}>
           {titel}
         </span>
-        {untertitel && <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">{untertitel}</span>}
+        {untertitel && <span className={cn('mt-0.5 block truncate text-muted-foreground', gross ? 'text-[13px]' : 'text-[12.5px]')}>{untertitel}</span>}
       </span>
       {ende}
       {href && <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />}
     </>
   )
-  const zeile = 'flex min-h-[50px] w-full items-center gap-3 px-3.5 py-2 text-left text-foreground'
+  const zeile = cn('flex w-full items-center text-left text-foreground', gross ? 'min-h-14 gap-2.5 px-3 py-1.5' : 'min-h-[50px] gap-3 px-3.5 py-2')
 
   return (
     <li data-slot="list-row" className={className}>

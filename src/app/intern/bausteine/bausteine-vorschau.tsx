@@ -30,7 +30,7 @@ import { AusverkauftMarke, Marke } from '@/components/ui/marke'
 import { MARKE_ARTEN, type MarkeArt } from '@/lib/marke-art'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
-import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, mittelflaecheKlassen, mittelknopfFlachKlassen, mittelknopfKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -499,20 +499,20 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             <MeldungVorschau welt="hof" />
           </Abschnitt>
 
-          <Abschnitt id="sidebar" titel="Sidebar-Gruppe mit Zähler" satz="Die Seitenleiste des Hofbereichs ab 768 px; aktiv in umgekehrter Textfarbe.">
+          <Abschnitt id="sidebar" titel="Sidebar-Gruppe mit Zähler" satz="Die Seitenleiste des Hofbereichs ab 768 px; ohne Symbole, aktiv grün getönt (Board w1-mehr-neu).">
             <div className="w-full max-w-[264px] rounded-2xl border border-border bg-card p-3">
               <SidebarGruppe>
-                <SidebarEintrag href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
-                <SidebarEintrag href="/intern/bausteine#sidebar" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
+                <SidebarEintrag href="/intern/bausteine" label="Heute" aktuell="page" />
+                <SidebarEintrag href="/intern/bausteine#sidebar" label="Bestellungen" zahl={3} zahlWofuer="offene Bestellungen" />
               </SidebarGruppe>
               <SidebarGruppe titel="Verkauf und Kunden">
-                <SidebarEintrag href="/intern/bausteine#sidebar" label="Kunden" symbol={Users} />
-                <SidebarEintrag href="/intern/bausteine#sidebar" label="Auswertung" symbol={BarChart3} />
+                <SidebarEintrag href="/intern/bausteine#sidebar" label="Kunden" />
+                <SidebarEintrag href="/intern/bausteine#sidebar" label="Auswertung" />
               </SidebarGruppe>
             </div>
           </Abschnitt>
 
-          <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht. Im Hofbereich steht das Wort „Neu“ unter dem Plus — Kreis und Wort sind ein Knopf.">
+          <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht. Aktiv eine getönte Pille (grün bzw. orange). Im Hofbereich ist „Neu“ eine flache orange Fläche mit dem Wort darunter — Fläche und Wort sind ein Knopf.">
             <div className="flex flex-col gap-9 pt-6">
               <BottomNav beschriftung="Beispiel: Unterleiste Kunde" className="relative z-0 rounded-2xl border md:block">
                 <BottomNavLink href="/intern/bausteine" label="Entdecken" symbol={Compass} aktuell="page" />
@@ -523,13 +523,13 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 </BottomNavMitte>
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} />
               </BottomNav>
-              <BottomNav beschriftung="Beispiel: Unterleiste Hof" className="relative z-0 rounded-2xl border md:block">
+              <BottomNav beschriftung="Beispiel: Unterleiste Hof" ton="orange" className="relative z-0 rounded-2xl border md:block">
                 <BottomNavLink href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
-                <BottomNavMitte>
-                  <Link href="/intern/bausteine#bottomnav" aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
-                    <span className={mittelkreisKlassen('orange')}>
-                      <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+                <BottomNavMitte flach>
+                  <Link href="/intern/bausteine#bottomnav" aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfFlachKlassen()}>
+                    <span className={mittelflaecheKlassen('orange')}>
+                      <Plus className="size-[22px]" strokeWidth={2.4} aria-hidden="true" />
                     </span>
                     <span>{HOF_NEU_KNOPF}</span>
                   </Link>

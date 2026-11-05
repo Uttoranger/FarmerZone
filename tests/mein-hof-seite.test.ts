@@ -335,11 +335,25 @@ describe('Balken der HofShell', () => {
     expect(still).toContain('href="/settings/account"')
     expect(still).toContain('data-ton="orange"')
     const wartet = renderToStaticMarkup(
-      createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT' } })
+      createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT', stand: 'einrichten' } })
     )
     expect(wartet).toContain('farm_test')
     expect(wartet).toContain('href="mailto:')
     expect(renderToStaticMarkup(createElement(HofBalken, { balken: null }))).toBe('')
+  })
+
+  it('wartet: der Titel folgt dem Stand aus dem Lader (N42 e, Nr. 233) — einrichten und Prüfung, nie fest', async () => {
+    const { HofBalken } = await import('@/components/hofbereich/hof-balken')
+    const { FARM_PENDING_OWNER_BANNER, FARM_SETUP_OWNER_BANNER } = await import('@/lib/farm-approval')
+    const balken = (stand: 'einrichten' | 'pruefung') =>
+      renderToStaticMarkup(createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT', stand } }))
+    const einrichten = balken('einrichten')
+    expect(einrichten).toContain(FARM_SETUP_OWNER_BANNER)
+    expect(einrichten).not.toContain(FARM_PENDING_OWNER_BANNER)
+    // Gegenprobe: alles erledigt, das Team prüft.
+    const pruefung = balken('pruefung')
+    expect(pruefung).toContain(FARM_PENDING_OWNER_BANNER)
+    expect(pruefung).not.toContain(FARM_SETUP_OWNER_BANNER)
   })
 
   it('der Mail-Link trägt Betreff und Hof-ID, Leerzeichen als %20', async () => {

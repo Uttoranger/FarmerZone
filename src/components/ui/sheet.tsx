@@ -113,20 +113,30 @@ function SheetContent({
  * 24 px. Den Kopf mit Titel und dem einen Schließen-Element bringt SheetKopf.
  * Ohne `seite` bleibt alles, wie es war.
  */
+/**
+ * Der Schleier der Boards von Lauf 30 (w1-korb, s1-mehr-neu): hell die
+ * Textfarbe zu 55 %, dunkel der Schleier des Blatts; abgedunkelt, nicht
+ * verwischt — die Seite darunter bleibt erkennbar.
+ */
+const BLATT_SCHLEIER = "bg-foreground/55 supports-backdrop-filter:backdrop-blur-none"
+
 function SheetBlatt({
   className,
   children,
   seite = "unten",
+  schleier,
   ...props
 }: SheetPrimitive.Popup.Props & {
   /** „unten": Blatt von unten (Standard). „rechts": ab 768 px von rechts, volle Höhe, max. 448 px. */
   seite?: "unten" | "rechts"
+  /** „abgedunkelt": der Schleier der Boards von Lauf 30 (dunkelt ab, verwischt nicht; Board s1-mehr-neu); rechts gilt er immer. */
+  schleier?: "leicht" | "abgedunkelt"
 }) {
   const rechts = seite === "rechts"
   return (
     <SheetPortal>
       {/* Rechts wie der zentrierte Dialog: hell die Textfarbe zu 55 % (Board w1-korb), dunkel der Schleier des Blatts. */}
-      <SheetOverlay className={rechts ? "bg-foreground/55 supports-backdrop-filter:backdrop-blur-none" : undefined} />
+      <SheetOverlay className={rechts || schleier === "abgedunkelt" ? BLATT_SCHLEIER : undefined} />
       <MenueZielAnbieter ziel={null}>
         <SheetPrimitive.Popup
           data-slot="sheet-blatt"
