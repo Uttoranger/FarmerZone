@@ -132,7 +132,9 @@ export const MEIN_HOF_KOPF_TEXT = {
  * („Noch nicht freigegeben“) bzw. der Balken über jeder Seite („wartet“,
  * stillgelegt) — ein Schild daneben wäre die zweite Fassung desselben Zustands
  * (Board s1-produkte, Bild 3: neuer Hof ohne Schild). Ab lg bleibt das Schild der
- * kompakten Zeile, wie es ist.
+ * kompakten Zeile, wie es ist. Bei „Pausiert“ stehen Schild und Zustandszeile mit
+ * demselben Wort untereinander, wie im Board (Bild 4): Das Schild sagt, wie die Seite
+ * für Kundinnen dasteht, die Zeile bringt den Knopf „Fortsetzen“.
  */
 export function kopfSchild(zustand: HofZustand): HofZustand['schild'] {
   return zustand.oeffentlich ? zustand.schild : null

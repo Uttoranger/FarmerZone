@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
  * stecken ihn in dieselbe Hülle (MEIN_HOF_KOPF_HUELLE) — so stehen die Reiter
  * auf allen drei Reitern an derselben Stelle. Ab lg bleibt die kompakte Zeile in
  * seitenkopf.tsx. Das Titelbild selbst bearbeitet der Hof weiter in der Liste
- * „Bearbeiten“ (Zeile „Titelbild und Logo“).
+ * „Bearbeiten“ (Zeile „Titelbild“).
  *
  * Adresse und „Kopieren“ stehen hier nicht: Den Link gibt „Teilen“ über das
  * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof). Das Postfach

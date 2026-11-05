@@ -901,6 +901,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 5):** Gesperrte Barzahlung heißt „Bar gesperrt“:
   - Gemeint ist die Sperre durch eine offene Monatsabrechnung (oben „Einzug scheitert“).
   - „Bar gesperrt“ statt „Pausiert“, weil „Pausiert“ der Hofzustand ist (Urlaub und Pause). Der Hofzustand „Pausiert“ bleibt unberührt.
+  - Das Wort steht in der Wortliste (N8, DESIGN_SYSTEM „Wortliste“).
   - Umsetzung: Nacharbeit zu Lauf 30 (Marke auf /settings/payments und alle anderen Stellen dieses Zustands); keine Migration.
 - **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 8):** Die Geld-Kachel in Admin › Heute bleibt, wie sie ist (sie zählt nach Abholung).
 - **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 9):** `setServiceFeeAction`:
