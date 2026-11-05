@@ -127,7 +127,10 @@ export default async function AdminGeldPage({
       id: 'erstattungen',
       titel: 'Erstattungen',
       wert: formatEuro(centsAlsEuro(geld.erstattungen.cents)),
-      satz: `${mitAnzahl(geld.erstattungen.anzahl, 'Bestellung', 'Bestellungen')}${geld.erstattungen.offen > 0 ? ` · ${geld.erstattungen.offen} offen` : ''}`,
+      satz: GELD_TEXT.erstattungenSatz(
+        geld.erstattungen.anzahl > 0 ? mitAnzahl(geld.erstattungen.anzahl, 'Bestellung', 'Bestellungen') : null,
+        geld.erstattungen.offen
+      ),
       ...(geld.erstattungen.offen > 0 ? { ton: 'tun' as const } : {}),
       amHandy: false,
     },

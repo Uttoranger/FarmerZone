@@ -424,7 +424,7 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
     const [a] = ADMIN_AUFGABEN.geld_abweichung(VOLL, JETZT)
     expect(a.bereich).toBe('Geld')
     expect(a.bezug.kennung).toBe('HM-2610-C3D4')
-    expect(a.bezug.text).toBe('HM-2610-C3D4 · Betrag +€ 1,20 · Gebühr −€ 0,50')
+    expect(a.bezug.text).toBe('HM-2610-C3D4 · Betrag +€ 1,20 · Servicegebühr −€ 0,50')
     expect(a.frist.ueberfaellig).toBe(true)
     expect(a.ziel).toBe('/admin/bestellungen?suche=HM-2610-C3D4')
     // Gegenprobe: jünger als 24 h → nicht überfällig.

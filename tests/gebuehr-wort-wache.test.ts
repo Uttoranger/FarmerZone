@@ -351,6 +351,12 @@ const NACHARBEIT: Fest[] = [
     text: /^servicegebuehrZahltKunde · .*\{servicegebuehrZahltKunde\(jetzt\)\}/,
     grund: 'Preise-Abschnitt von /fuer-hoefe: src/components/fuer-hoefe/** steht in keiner Grenze (226 hat nur src/app/(public)/fuer-hoefe/**) — gebuehrGrundsatz(modell, …), eigener Auftrag',
   },
+  {
+    // ABWEICHUNG_FELD_TEXT.gebuehr: das Wort je Bestellung über gebuehrBezeichnungFuer (V62/V63), kein neutrales Wort (Bericht 230, Runde 1).
+    datei: 'src/lib/geld-abgleich.ts',
+    text: 'Servicegebühr',
+    grund: 'braucht gebuehrModell in der Abweichungs-Abfrage (src/server/geld-abgleich.ts, keine Nummer in Lauf 30)',
+  },
 ]
 
 const deckt = (f: Fest, fund: Fund): boolean =>

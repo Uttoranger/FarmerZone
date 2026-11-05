@@ -51,6 +51,7 @@ vi.mock('@/server/queries/geld', () => ({ ladeGeldMonat: abfragen.ladeGeldMonat,
 import AdminGeldPage from '@/app/admin/geld/page'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { formatEuro } from '@/lib/format'
+import { MARKE } from '@/lib/marke'
 import { ergebnisText } from '@/lib/finanzen'
 import { GELD_TEXT } from '@/app/admin/geld/texte'
 import type { FinanzenDaten } from '@/server/queries/finanzen'
@@ -225,14 +226,14 @@ describe('Admin › Geld: das Wort der Gebühr (V63, Nr. 230)', () => {
     expect(html).not.toContain('Servicegebühr')
     expect(html).toMatch(/<span class="hidden md:inline">Plattformgebühr<\/span>/)
     expect(html).toContain('Betrag, Plattformgebühr und Erstattung gleich')
-    expect(html).toContain('als Kosten neben der Plattformgebühr')
+    expect(html).toContain(`${MARKE} behält nur die Plattformgebühr;`)
   })
 
-  it('Gegenprobe: vor dem Stichtag bleibt es die Servicegebühr — derselbe Monat, Stichtag einen Tag später', async () => {
-    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-09-30T22:00:00Z') } // 1. Oktober 2026
+  it('Gegenprobe: Stichtag = Monatsende → Servicegebühr (September 2026, Stichtag 1. Oktober)', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-09-30T22:00:00Z') } // 1. Oktober 2026, Wiener Mitternacht = Ende September
     const html = await seite()
     expect(html).toContain('Betrag, Servicegebühr und Erstattung gleich')
-    expect(html).toContain('als Kosten neben der Servicegebühr')
+    expect(html).toContain(`${MARKE} behält nur die Servicegebühr;`)
     expect(html).not.toContain('Plattformgebühr und Erstattung')
   })
 
@@ -241,7 +242,7 @@ describe('Admin › Geld: das Wort der Gebühr (V63, Nr. 230)', () => {
     const html = await seite()
     expect(html).not.toContain('Servicegebühr')
     expect(html).toContain('Betrag, Gebühren und Erstattung gleich')
-    expect(html).toContain('als Kosten neben den Gebühren')
+    expect(html).toContain(`${MARKE} behält nur die Gebühren;`)
   })
 
   it('Kachel nach Board: „online … · bar …“, Ergebnis „gedeckt“ bzw. „noch nicht gedeckt“', async () => {

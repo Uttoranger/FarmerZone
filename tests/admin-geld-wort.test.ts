@@ -21,8 +21,8 @@ vi.mock('@/components/admin/frisch-bestaetigen', () => ({ useFrischBestaetigt: (
 import { GELD_JAHR_TEXT, GELD_TEXT, jahrGebuehrTexte } from '@/app/admin/geld/texte'
 import { HofpreisStichtag } from '@/app/admin/einstellungen/hofpreis-stichtag'
 import { gebuehrWortFuerJahr, gebuehrWortFuerMonat } from '@/lib/finanzen'
-import { ABWEICHUNG_FELD_TEXT } from '@/lib/geld-abgleich'
 import { monatsschluessel, type Monatsschluessel } from '@/lib/servicegebuehr'
+import { MARKE } from '@/lib/marke'
 
 const MONATE_2027: Monatsschluessel[] = Array.from({ length: 12 }, (_, i) => monatsschluessel(2027, i + 1))
 /** 1. Februar 2027, Wiener Mitternacht — der Stichtag der Vorgabe. */
@@ -71,16 +71,19 @@ describe('jahrGebuehrTexte', () => {
 })
 
 describe('Sätze von Geld mit dem Wort', () => {
-  it('Abgleich und Regel tragen das Wort; „Gebühren“ mit dem Artikel der Mehrzahl', () => {
+  it('Abgleich und Regel tragen das Wort; die kurze Regel-Zeile des Boards', () => {
     expect(GELD_TEXT.abgleichGleich('Plattformgebühr')).toBe('Betrag, Plattformgebühr und Erstattung gleich')
-    expect(GELD_TEXT.regel('Plattformgebühr')).toContain('als Kosten neben der Plattformgebühr.')
-    expect(GELD_TEXT.regel('Gebühren')).toContain('als Kosten neben den Gebühren.')
+    expect(GELD_TEXT.regel('Plattformgebühr')).toBe(
+      `Umsatz geht direkt an die Höfe. ${MARKE} behält nur die Plattformgebühr; Stripe-Gebühren trägt ${MARKE}. Ein Monat lässt sich erst nach seinem Ende abschließen.`
+    )
+    expect(GELD_TEXT.regel('Gebühren')).toContain('behält nur die Gebühren;')
     expect(GELD_TEXT.regel('Plattformgebühr')).not.toContain('Servicegebühr')
   })
 
-  it('die Abweichung „gebuehr“ sagt „Gebühr“ — ohne „Servicegebühr“, in beiden Modellen richtig', () => {
-    expect(ABWEICHUNG_FELD_TEXT.gebuehr).toBe('Gebühr')
-    expect(Object.values(ABWEICHUNG_FELD_TEXT).join(' ')).not.toContain('Servicegebühr')
+  it('Erstattungen-Kachel: „keine offen“ (Board), mit Erstattungen davor die Anzahl; offene als Zahl', () => {
+    expect(GELD_TEXT.erstattungenSatz(null, 0)).toBe('keine offen')
+    expect(GELD_TEXT.erstattungenSatz('5 Bestellungen', 0)).toBe('5 Bestellungen · keine offen')
+    expect(GELD_TEXT.erstattungenSatz('5 Bestellungen', 1)).toBe('5 Bestellungen · 1 offen')
   })
 })
 

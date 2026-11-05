@@ -64,16 +64,9 @@ export const STRIPE_GEBUEHR_ART = 'stripeGebuehrCents'
 export const ABWEICHUNG_FELDER = ['betrag', 'gebuehr', 'erstattung', 'zahlung'] as const
 export type AbweichungFeld = (typeof ABWEICHUNG_FELDER)[number]
 
-/*
- * Die Wörter der Abweichung in Heute (Aufgabe „Abweichung bei Stripe“). `gebuehr`
- * ist application_fee_amount — im Modell „bisher“ die Servicegebühr, im
- * Hofpreis-Modell die Plattformgebühr. Die Abweichung kennt ihre Bestellung nur
- * als Kennung, nicht ihr Modell; darum das Wort, das in beiden stimmt (V63; Lauf 30,
- * Nr. 230, nur Text).
- */
 export const ABWEICHUNG_FELD_TEXT: Record<AbweichungFeld, string> = {
   betrag: 'Betrag',
-  gebuehr: 'Gebühr',
+  gebuehr: 'Servicegebühr',
   erstattung: 'Erstattung',
   zahlung: 'Zahlung fehlt bei Stripe',
 }

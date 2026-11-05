@@ -3,11 +3,6 @@ import { MARKE } from '@/lib/marke'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { GEBUEHREN_WORT, gebuehrenMehrzahl, type GebuehrWort } from '@/lib/plattformgebuehr'
 
-/** „neben der Plattformgebühr“, über den Stichtag „neben den Gebühren“ — das Wort trägt den Artikel mit. */
-function nebenDer(wort: GebuehrWort): string {
-  return wort === GEBUEHREN_WORT ? `den ${wort}` : `der ${wort}`
-}
-
 /*
  * Die Sätze von Admin › Geld (Register N32, N37; Nr. 191; Mockup admin-geld)
  * — eine Quelle für Seite und Tests. „Finanzen“ heißt seit N32 „Geld“.
@@ -37,8 +32,12 @@ export const GELD_TEXT = {
   gedeckt: 'gedeckt',
   nichtGedeckt: 'noch nicht gedeckt',
   abgleichGleich: (wort: GebuehrWort): string => `Betrag, ${wort} und Erstattung gleich`,
+  /** Die Regel-Zeile unter den Kosten (Board w3-admin-geld); „die“ passt zu Einzahl und „Gebühren“. */
   regel: (wort: GebuehrWort): string =>
-    `Die Stripe-Gebühren der Kartenzahlungen trägt bei Destination Charges die Plattform – sie stehen darum als Kosten neben ${nebenDer(wort)}. Der Abgleich liest Zahlungen, Erstattungen und Gebühren der letzten 48 Stunden bei Stripe und vergleicht sie mit den Bestellungen. Weicht etwas ab, steht es als Aufgabe in Heute – mit Bestellnummer und Betrag.`,
+    `Umsatz geht direkt an die Höfe. ${MARKE} behält nur die ${wort}; Stripe-Gebühren trägt ${MARKE}. Ein Monat lässt sich erst nach seinem Ende abschließen.`,
+  /** Die Zeile der Erstattungen-Kachel (Board w3-admin-geld: „keine offen“); ohne Erstattung im Monat nur das. */
+  erstattungenSatz: (bestellungen: string | null, offen: number): string =>
+    [bestellungen, offen > 0 ? `${offen} offen` : 'keine offen'].filter((t) => t !== null).join(' · '),
 } as const
 
 /**
