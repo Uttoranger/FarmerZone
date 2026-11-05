@@ -44,6 +44,7 @@ import {
   bestellungSenden,
   KASSE_DATENSCHUTZ_LINK,
   KASSE_NOCHMAL,
+  KASSE_ZAHLART_UEBERSCHRIFT,
   KASSE_ZEITLIMIT_SATZ,
   weiterBeiEnter,
   kassenBetraege,
@@ -75,6 +76,7 @@ import { KaufZusammenfassung } from './kauf-zusammenfassung'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import {
+  ABSCHNITT,
   AbholWahl,
   AktionsLeiste,
   FELD,
@@ -349,7 +351,9 @@ export function CheckoutForm({
   const zahlweg = kassenZahlweg(zahlarten, paymentMethod)
   const gebuehr = gebuehrZeile(farm, jetzt, zahlweg)
   // N38: Unter dem Mindestbestellwert ruht der Knopf, der Grund steht darunter. Steht die Bestellung, zählt sie.
-  const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents)
+  // Mit dem Satz des Hofs (Register N41 a, A3): „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € …).
+  // Dir fehlen noch Waren für € …“ — nur Anzeige; verbindlich prüft /api/checkout mit MINDESTBESTELLWERT_SATZ.
+  const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents, farm.preisAnzeige?.hundertstel)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const gebuehrTitel = zahlung?.gebuehrText ?? gebuehr.titel
   // Der Zusatz am Gesamtbetrag der Zusammenfassung (Nr. 210): nur Worte zu Beträgen aus `betraege`, nichts gerechnet.
@@ -709,14 +713,12 @@ export function CheckoutForm({
             über den Idempotenz-Schlüssel ohnehin dieselbe Bestellung zurück. */}
         <fieldset disabled={bestellungAngelegt} className="flex min-w-0 flex-col gap-4">
           {/* N10: Korb → Abholung → Deine Daten → (Betrieb) → Bezahlen, jede Karte in voller Breite. */}
-          <section aria-labelledby="kasse-abholung" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-            {/* Die Adresse rechts im Kopf, am Handy unter dem Titel. */}
-            <div className="flex flex-col gap-0.5 md:flex-row md:items-baseline md:justify-between md:gap-4">
-              <h2 id="kasse-abholung" className={KARTEN_TITEL}>
-                Abholung wählen
-              </h2>
-              <p className={cn(HINWEIS, 'min-w-0 text-[13px] break-words md:text-right')}>{hofAdresse(farm)}</p>
-            </div>
+          {/* Boards s1-/w1-kasse (Nr. 227): Abholung, Deine Daten und Bezahlen ohne Karte auf dem Grund. Die Adresse
+              des Hofs steht in „Angaben zum Hof“ und in der Zusammenfassung über dem Knopf. */}
+          <section aria-labelledby="kasse-abholung" className={ABSCHNITT}>
+            <h2 id="kasse-abholung" className={KARTEN_TITEL}>
+              Abholung wählen
+            </h2>
             {/* Mit Kaufsperre nennt die Karte oben den Grund schon — hier nur noch der Weg zum Hof
                 (DESIGN_SYSTEM: Ein Zustand hat eine Fassung, auf der ganzen Seite). */}
             {kacheln.length === 0 ? (
@@ -726,21 +728,13 @@ export function CheckoutForm({
             ) : (
               <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />
             )}
-            {bestellschluss && <p className={HINWEIS}>Bestellschluss für heute: {bestellschluss} Uhr</p>}
+            {bestellschluss && <p className={cn(HINWEIS, '-mt-1 text-[13px]')}>Bestellschluss für heute: {bestellschluss} Uhr.</p>}
           </section>
 
-          <section aria-labelledby="kasse-daten" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 id="kasse-daten" className={KARTEN_TITEL}>
-                Deine Daten
-              </h2>
-              {/* Die Kasse hat keinen Seitenfuß: Der Weg zur Datenschutzerklärung steht dort, wo Daten eingegeben werden.
-                  Neuer Tab, damit die Eingaben stehen bleiben. */}
-              <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'shrink-0')}>
-                {KASSE_DATENSCHUTZ_LINK}
-                <span className="sr-only"> (öffnet in neuem Tab)</span>
-              </Link>
-            </div>
+          <section aria-labelledby="kasse-daten" className={ABSCHNITT}>
+            <h2 id="kasse-daten" className={KARTEN_TITEL}>
+              Deine Daten
+            </h2>
             {/* Ab 768 px zwei Spalten in Lesereihenfolge: E-Mail · Name / Telefon · Notiz. */}
             <div className="grid gap-3.5 md:grid-cols-2 md:items-start md:gap-x-5">
               <Feld id="customerEmail" label="E-Mail" fehler={fehlerAm.customerEmail?.message}>
@@ -792,7 +786,7 @@ export function CheckoutForm({
                 />
                 <FeldZaehler control={form.control} name="customerPhone" max={TELEFON_MAX} />
                 <p id="customerPhone-hinweis" className={cn(HINWEIS, 'mt-1.5')}>
-                  Nur für den Hof, falls bei der Abholung etwas ist.
+                  Nur für Rückfragen des Hofs.
                 </p>
               </Feld>
               <Feld id="customerNote" label="Notiz an den Hof (freiwillig)" fehler={fehlerAm.customerNote?.message}>
@@ -804,18 +798,24 @@ export function CheckoutForm({
                   rows={1}
                   aria-invalid={fehlerAm.customerNote ? true : undefined}
                   aria-describedby={fehlerAm.customerNote ? 'customerNote-fehler' : undefined}
-                  placeholder="z. B. Ich komme erst gegen 17:30"
+                  placeholder="z. B. komme später"
                   className={cn(FELD, 'field-sizing-content h-auto max-h-40 min-h-[46px] resize-y py-2.5 supports-[field-sizing:content]:resize-none')}
                 />
                 <FeldZaehler control={form.control} name="customerNote" max={NOTIZ_MAX} />
               </Feld>
             </div>
+            {/* Die Kasse hat keinen Seitenfuß: Der Weg zur Datenschutzerklärung steht dort, wo Daten eingegeben werden —
+                unter den Feldern (Board w1-kasse). Neuer Tab, damit die Eingaben stehen bleiben. */}
+            <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'self-start underline')}>
+              {KASSE_DATENSCHUTZ_LINK}
+              <span className="sr-only"> (Datenschutz, öffnet in neuem Tab)</span>
+            </Link>
           </section>
 
           {/* Betrieb (Sprint Bereiche 1, Konzept 6.4) — nur, wenn ein Futtermittel
               im Korb liegt, das der Hof nur an landwirtschaftliche Betriebe abgibt. */}
           {betriebAbschnitt && (
-            <section aria-labelledby="kasse-betrieb" className={cn(KARTE, 'flex flex-col gap-3')}>
+            <section aria-labelledby="kasse-betrieb" className={ABSCHNITT}>
               <div>
                 <h2 id="kasse-betrieb" className={KARTEN_TITEL}>
                   Betrieb
@@ -862,9 +862,9 @@ export function CheckoutForm({
             </section>
           )}
 
-          <section aria-labelledby="kasse-bezahlen" className={cn(KARTE, 'flex flex-col gap-3')}>
+          <section aria-labelledby="kasse-bezahlen" className={ABSCHNITT}>
             <h2 id="kasse-bezahlen" className={KARTEN_TITEL}>
-              Bezahlen
+              Bezahlen · {KASSE_ZAHLART_UEBERSCHRIFT}
             </h2>
             {zahlarten.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">

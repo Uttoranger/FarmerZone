@@ -367,7 +367,8 @@ describe('Personendaten nur, solange die Bestellung offen ist (Register S17 Punk
 
   it('bar offen ohne Adresse (Status wechselte zwischen den Abfragen): nie „an null"', () => {
     const kopf = bestaetigungsKopf('bestaetigung-offen', kopfOrder({ status: 'PENDING_CONFIRMATION', paymentMethod: 'ONSITE_CASH' }))
-    expect(kopf.satz).toBe('Wir haben dir einen Link geschickt. Erst mit deiner Bestätigung packt Hof Beispiel deine Bestellung.')
+    // Wortlaut seit Nr. 227 (Board s1-/w1-bestaetigung Bild 3).
+    expect(kopf.satz).toBe('Wir haben dir einen Link geschickt. Erst nach deiner Bestätigung packt der Hof.')
   })
 
   it('Gegenprobe: mit Adresse steht der Satz wie bisher', () => {

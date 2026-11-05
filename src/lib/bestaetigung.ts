@@ -16,6 +16,7 @@ import { GRUND_NICHT_BESTAETIGT, fristVon, istVerwaist, tagInWorten, uhrzeitInWi
 import { kalendertagInWien } from '@/lib/servicegebuehr'
 import { tagVersetzt } from '@/lib/kalender'
 import { bestellStatusAnzeige } from '@/lib/bestellstatus'
+import { formatTagKurz } from '@/lib/format'
 // Zyklus: bestellungen-finden.ts importiert abholZeitText von hier. Die Liste
 // wird deshalb nur im Funktionsrumpf gelesen, nie beim Laden des Moduls.
 import { LAUFENDE_STATUS } from '@/lib/bestellungen-finden'
@@ -252,7 +253,8 @@ export function bestaetigungsKopf(zustand: BestaetigungsZustand | null, order: K
         symbol: 'uhr',
         titel: 'Fast geschafft – bitte bestätige per E-Mail',
         // Ohne Adresse nur, wenn der Status zwischen den Abfragen der Seite wechselte — nie „an null".
-        satz: `Wir haben dir ${order.customerEmail ? `an ${order.customerEmail} ` : ''}einen Link geschickt. Erst mit deiner Bestätigung packt ${order.hofName} deine Bestellung.`,
+        // Wortlaut nach Board s1-/w1-bestaetigung (Nr. 227); die Seite zeigt ihn in der Karte mit der Frist.
+        satz: `Wir haben dir einen Link ${order.customerEmail ? `an ${order.customerEmail} ` : ''}geschickt. Erst nach deiner Bestätigung packt der Hof.`,
       }
     case 'verfallen':
       return {
@@ -365,3 +367,64 @@ export function abholZeitText(
   const tag = tagInWorten(order.pickupDate, jetzt).replace(/^am /, '')
   return `${tag.charAt(0).toUpperCase()}${tag.slice(1)}, ${order.pickupTimeStart}–${order.pickupTimeEnd} Uhr`
 }
+
+// ─── Nr. 227: Tage mit Wochentag und Datum, Frist der Barbestellung ─────────
+
+/**
+ * „heute, Mi, 3. März“, „morgen, Do, 4. März“ bzw. „Sa, 6. März“ — ein Tag auf den Seiten nach dem Kauf
+ * immer mit Wochentag und Datum (V9), „heute“/„morgen“ nur zusätzlich (wie die Kacheln der Kasse,
+ * Nr. 46). Der Wiener Kalendertag (`kalendertagInWien`); `jetzt` bestimmt die Seite einmal.
+ */
+export function tagMitDatum(zeitpunkt: Date, jetzt: Date): string {
+  const tag = kalendertagInWien(zeitpunkt)
+  const heute = kalendertagInWien(jetzt)
+  const datum = formatTagKurz(tag)
+  if (tag === heute) return `heute, ${datum}`
+  if (tag === tagVersetzt(heute, 1)) return `morgen, ${datum}`
+  return datum
+}
+
+/**
+ * Der Abholtermin als Zeile auf Bestätigung und Bestellseite (Boards s1-/w1-bestaetigung,
+ * s1-/w1-bestellung-link): „heute, Mi, 3. März, 15:00–18:00 Uhr“. Ersetzt dort `abholZeitText`, das ohne
+ * Datum („Heute, …“) bleibt, wo die Liste „Meine Bestellungen“ es braucht.
+ */
+export function abholTerminZeile(
+  order: { pickupDate: Date; pickupTimeStart: string; pickupTimeEnd: string },
+  jetzt: Date
+): string {
+  return `${tagMitDatum(order.pickupDate, jetzt)}, ${order.pickupTimeStart}–${order.pickupTimeEnd} Uhr`
+}
+
+/**
+ * Die Frist einer offenen Barbestellung als Satzteil: „heute, Mi, 3. März, 09:40 Uhr“ — der Zeitpunkt aus
+ * `fristVon` (fristen.ts; 2 Stunden ab Bestellung, spätestens Beginn des Abholfensters, V87). Hier wird
+ * nichts gerechnet, nur geschrieben.
+ */
+export function fristZeile(frist: Date, jetzt: Date): string {
+  return `${tagMitDatum(frist, jetzt)}, ${uhrzeitInWien(frist)} Uhr`
+}
+
+/** Der Titel der Karte „Bitte bis … bestätigen“ (Bestätigung, bar offen; Board s1-/w1-bestaetigung Bild 3). */
+export function fristHinweisTitel(frist: Date, jetzt: Date): string {
+  return `Bitte bis ${fristZeile(frist, jetzt)} bestätigen`
+}
+
+/** Der Satz der Bar-Bestätigung unter der Überschrift (Board s1-/w1-bestellung-link Bild 2). */
+export function barBestaetigenSatz(frist: Date, jetzt: Date): string {
+  return `Bitte bestätige bis ${fristZeile(frist, jetzt)} – erst dann packt der Hof für dich.`
+}
+
+/** Bar-Bestätigung verfallen (Board s1-/w1-bestellung-link Bild 3): bis wann bestätigt hätte werden müssen. */
+export function barVerfallenSatz(frist: Date): string {
+  return `Du hast nicht bis ${formatTagKurz(kalendertagInWien(frist))}, ${uhrzeitInWien(frist)} Uhr bestätigt. Der Hof packt nichts, dir entstehen keine Kosten.`
+}
+
+/** Die Bestellseite liest nur (Board s1-/w1-bestellung-link): kein Stornieren, für Änderungen der Hof. */
+export const BESTELLSEITE_OHNE_STORNO = 'Stornieren geht hier nicht. Für Änderungen erreich den Hof.'
+
+/** Ungültiger Link der Bestellseite — derselbe Satz für jeden Fall (Board s1-/w1-bestellung-link Bild 4). */
+export const BESTELLSEITE_LINK_UNGUELTIG = {
+  titel: 'Dieser Link ist nicht gültig',
+  satz: 'Bitte öffne den Link genau so, wie er in deiner E-Mail steht. Alle Bestellungen findest du auch unter „Meine Bestellungen“.',
+} as const

@@ -7,13 +7,14 @@ import { prisma } from '@/lib/prisma'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { bestaetigungsPfad } from '@/lib/bestell-link'
 import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tokenKandidaten } from '@/lib/bar-bestaetigung'
-import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { fristVon } from '@/lib/fristen'
+import { abholTerminZeile, barBestaetigenSatz, barVerfallenSatz } from '@/lib/bestaetigung'
+import { KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { BarBestaetigenKnoepfe } from '@/components/checkout/bar-bestaetigen-knoepfe'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -99,29 +100,28 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   if (ansicht === 'erledigt') redirect(bestaetigungsPfad(order.farm.slug, order.id))
 
   if (ansicht === 'verfallen' || ansicht === 'storniert') {
+    // Board s1-/w1-bestellung-link Bild 3: eine Karte mit Uhr, Überschrift, Satz (die Frist aus fristVon) und dem
+    // Weg zurück zum Hof als Knopf mit Rand — die Seite hat dann keine Hauptaktion mehr.
     return (
       <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name}>
-        <div className="flex flex-col items-center gap-2.5 text-center">
+        <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
           {ansicht === 'verfallen' ? (
-            <Clock className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+            <Clock className="size-7 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
           ) : (
-            <XCircle className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+            <XCircle className="size-7 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
           )}
-          <h2 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">
+          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground md:text-[26px]">
             {ansicht === 'verfallen' ? 'Bestellung verfallen' : 'Bestellung storniert'}
           </h2>
           <p className="text-[15px] leading-normal text-muted-foreground">
             {ansicht === 'verfallen'
-              ? 'Die Bestellung wurde nicht rechtzeitig bestätigt. Wir haben die Ware wieder freigegeben – dir entstehen keine Kosten.'
+              ? barVerfallenSatz(fristVon(order))
               : 'Die Bestellung ist storniert. Die Ware ist wieder frei – dir entstehen keine Kosten.'}
           </p>
+          <Link href={`/${order.farm.slug}`} className={cn(KNOPF_BREIT_RAHMEN, 'mt-1')}>
+            <span className="min-w-0 truncate">Zurück zu {order.farm.name}</span>
+          </Link>
         </div>
-        <Link
-          href={`/${order.farm.slug}`}
-          className="flex h-[54px] w-full items-center justify-center rounded-full bg-accent px-[18px] text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
-        >
-          Neu bestellen
-        </Link>
       </Rahmen>
     )
   }
@@ -131,17 +131,17 @@ export default async function BarBestaetigenSeite({ params }: Props) {
   const adresse = `${order.farm.address}, ${order.farm.postalCode} ${order.farm.city}`
 
   return (
-    <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name}>
-      <div className="flex flex-col items-center gap-2.5 text-center">
-        <h2 className="font-heading text-[22px] font-semibold break-words text-foreground md:text-[28px]">
+    // Board s1-/w1-bestellung-link Bild 2: genau eine Hauptaktion — am Handy die feste Leiste der Fokus-Shell.
+    <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name} aktion={<BarBestaetigenKnoepfe token={token} />}>
+      <div className="flex flex-col gap-1.5">
+        <h2 className="font-heading text-[24px] leading-tight font-semibold break-words text-foreground md:text-[26px]">
           Bestellung bei {order.farm.name} bestätigen
         </h2>
-        <p className="text-[15px] leading-normal text-muted-foreground">
-          Bitte bestätige bis {tagInWorten(bis, jetzt)}, {uhrzeitInWien(bis)} Uhr – erst dann packt der Hof für dich.
-        </p>
+        {/* Die Frist aus fristen.ts (V87: 2 Stunden ab Bestellung, spätestens Beginn des Abholfensters). */}
+        <p className="text-[15px] leading-normal text-foreground">{barBestaetigenSatz(bis, jetzt)}</p>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-[18px] py-4">
+      <div className={cn(KARTE, 'flex flex-col gap-1.5')}>
         {order.items.map((item, i) => {
           const name = formatPosition({
             name: item.productName,
@@ -159,18 +159,17 @@ export default async function BarBestaetigenSeite({ params }: Props) {
         {summen.gebuehrCents > 0 && (
           <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
         )}
-        <div className="h-px bg-border" />
-        <div className="flex items-baseline gap-2 text-[15px] font-semibold text-foreground">
-          <span>{zahlungsAnzeige(order.paymentMethod, 'PENDING').art}</span>
+        <p className="text-[13px] leading-normal text-muted-foreground">{zahlungsAnzeige(order.paymentMethod, 'PENDING').art}</p>
+        <div className="flex items-baseline gap-2 text-[16px] font-bold text-foreground">
+          <span>Gesamt</span>
           <span className="grow" />
-          <span>{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
+          <span className="tabular-nums">{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
         </div>
-        <p className="text-[12.5px] leading-normal break-words text-muted-foreground">
-          Abholung {tagInWorten(order.pickupDate, jetzt)}, {order.pickupTimeStart}–{order.pickupTimeEnd} Uhr · {adresse}
-        </p>
       </div>
-
-      <BarBestaetigenKnoepfe token={token} />
+      {/* Mit Wochentag und Datum (V9). */}
+      <p className="text-[14px] leading-normal break-words text-foreground">
+        Abholung {abholTerminZeile(order, jetzt)} · {adresse}
+      </p>
     </Rahmen>
   )
 }
@@ -178,12 +177,12 @@ export default async function BarBestaetigenSeite({ params }: Props) {
 /** Eine Zeile der Karte: leiser Name links, Betrag rechts. Lange Namen höchstens zwei Zeilen. */
 function Zeile({ titel, children }: { titel: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2 text-[13.5px]">
-      <span className="line-clamp-2 min-w-0 break-words text-muted-foreground" title={titel}>
+    <div className="flex items-baseline gap-2 text-[15px] text-foreground">
+      <span className="line-clamp-2 min-w-0 break-words" title={titel}>
         {titel}
       </span>
       <span className="grow" />
-      <span className="shrink-0 text-foreground">{children}</span>
+      <span className="shrink-0 tabular-nums">{children}</span>
     </div>
   )
 }
@@ -191,17 +190,22 @@ function Zeile({ titel, children }: { titel: string; children: ReactNode }) {
 /** Der Kopf der Seite heißt wie im Mockup mobil — die Shell setzt ihn als h1. */
 const TITEL = 'Bestätigen'
 
-/** Die Spalte der Seite (560 px wie im Mockup). */
-const SPALTE = 'mx-auto flex w-full max-w-[560px] flex-col gap-3 px-4 pt-3.5 pb-8 md:gap-[18px] md:pt-[60px]'
+/** Die Spalte der Seite (Board w1-bestellung-link: 672 px, links bündig). */
+const SPALTE = 'mx-auto flex w-full max-w-[704px] flex-col gap-3 px-4 pt-5 pb-8 md:gap-4 md:pt-8'
 
 /**
  * Kopf und Spalte der Seite: die Fokus-Shell (`data-design="neu"`). Zurück
  * führt NIE durch den Verlauf — davor steht das Mailprogramm —, sondern als
  * Link zum Hof.
  */
-function Rahmen({ hofSlug, hofName, children }: { hofSlug: string; hofName: string; children: ReactNode }) {
+function Rahmen({ hofSlug, hofName, aktion, children }: { hofSlug: string; hofName: string; aktion?: ReactNode; children: ReactNode }) {
   return (
-    <KundeFokusShell titel={TITEL} zurueck={{ href: `/${hofSlug}`, label: `Zurück zu ${hofName}` }}>
+    <KundeFokusShell
+      titel={TITEL}
+      zurueck={{ href: `/${hofSlug}`, label: `Zurück zu ${hofName}` }}
+      // Die Leiste der Shell ist im Browser so breit wie ihr Kopf; die Knöpfe stehen in der Spalte der Seite.
+      aktion={aktion && <div className="mx-auto w-full max-w-[672px]">{aktion}</div>}
+    >
       <div className={SPALTE}>{children}</div>
     </KundeFokusShell>
   )
@@ -215,20 +219,17 @@ function Rahmen({ hofSlug, hofName, children }: { hofSlug: string; hofName: stri
 function LinkUngueltig() {
   return (
     <KundeFokusShell titel={TITEL} zurueck={{ href: '/hoefe', label: 'Zurück zu den Höfen' }}>
-      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-2.5 px-4 pt-10 pb-8 text-center md:pt-[60px]">
-        <LinkIcon className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-        <h2 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">{LINK_UNGUELTIG_TITEL}</h2>
-        {/* Derselbe Satz wie in den Knöpfen — seit Nr. 151 ersetzt ein neu angeforderter Link den alten. */}
-        <p className="text-[15px] leading-normal text-muted-foreground">{LINK_UNGUELTIG_SATZ}</p>
-        <Link
-          href="/hoefe"
-          className={cn(
-            'mt-2 inline-flex h-11 items-center justify-center rounded-full border border-border px-[18px] text-sm font-medium text-foreground hover:bg-muted',
-            FOKUS_RAHMEN
-          )}
-        >
-          Höfe entdecken
-        </Link>
+      {/* Wie „Dieser Link ist nicht gültig“ der Bestellseite (Board s1-/w1-bestellung-link Bild 4): eine Karte. */}
+      <div className="mx-auto w-full max-w-[592px] px-4 pt-6 pb-8 md:pt-10">
+        <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
+          <LinkIcon className="size-7 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground md:text-[26px]">{LINK_UNGUELTIG_TITEL}</h2>
+          {/* Derselbe Satz wie in den Knöpfen — seit Nr. 151 ersetzt ein neu angeforderter Link den alten. */}
+          <p className="text-[15px] leading-normal text-muted-foreground">{LINK_UNGUELTIG_SATZ}</p>
+          <Link href="/hoefe" className={cn(KNOPF_BREIT_RAHMEN, 'mt-1')}>
+            Höfe entdecken
+          </Link>
+        </div>
       </div>
     </KundeFokusShell>
   )

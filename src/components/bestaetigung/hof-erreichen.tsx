@@ -1,62 +1,42 @@
-import { Mail, Phone } from 'lucide-react'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
-import { KARTE, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
+import { textlinkKlassen } from '@/components/ui/textlink'
+import { ETIKETT, KARTE } from '@/components/bestaetigung/bestaetigung-teile'
 
 /*
- * „Hof erreichen" — EINE Karte für Bestätigungsseite und Bestellseite (Nr. 60,
- * Mockups web-k4-bestellung-hof-erreichen und mobil-k4-bestellung-hof-erreichen).
- * Telefon und E-Mail des Hofs gibt es erst nach dem Kauf: Beide Seiten lesen
- * sie erst, nachdem die Signatur geprüft ist (S1) — nie über die Bestellnummer.
+ * „Hof erreichen" — EINE Karte für Bestätigungsseite und Bestellseite (Nr. 60; seit Nr. 227 nach den Boards
+ * s1-/w1-bestaetigung und s1-/w1-bestellung-link): die kleine Überschrift „HOF ERREICHEN“, darunter zwei
+ * grüne Textlinks mit 44 px Trefferfläche (V16) — „<Nummer> anrufen“ (Telefon-Link über telefonLink) und die Adresse (Mail-Link).
+ * Kein eigener Knopf: Beide Seiten haben ihre eine grüne Hauptaktion schon.
+ * Telefon und E-Mail des Hofs gibt es erst nach dem Kauf: Beide Seiten lesen sie erst, nachdem die
+ * Signatur geprüft ist (S1) — nie über die Bestellnummer.
  *
- * Abweichung vom Mockup: „Anrufen" als Rahmen-Knopf statt grün. Beide Seiten
- * haben schon ihre eine grüne Hauptaktion („Bestellung ansehen" bzw. „Termin
- * in den Kalender"). Die E-Mail-Zeile steht wie im Mockup erst ab 768 px; am
- * Handy führt der Knopf „E-Mail" zu ihr.
- *
- * Ohne Nummer bzw. Adresse (die Hof-E-Mail ist im Onboarding freiwillig)
- * entfallen Zeile und Knopf; ohne beides die ganze Karte. Die Nummer steht
- * einheitlich da (N8); lässt sie sich nicht lesen (keine Ziffer, zwei Nummern),
- * bleibt die Eingabe sichtbar, aber ohne „Anrufen“.
+ * Ohne Nummer bzw. Adresse (die Hof-E-Mail ist im Onboarding freiwillig) entfällt die Zeile; ohne beides
+ * die ganze Karte. Die Nummer steht einheitlich da (N8); lässt sie sich nicht lesen (keine Ziffer, zwei
+ * Nummern), bleibt die Eingabe sichtbar, aber ohne Link.
  */
 export function HofErreichen({ telefon, email }: { telefon: string; email: string }): React.JSX.Element | null {
   if (!telefon && !email) return null
   const anrufen = telefonLink(telefon)
   return (
-    <section aria-labelledby="hof-erreichen-titel" className={cn(KARTE, 'flex flex-col gap-2.5')}>
-      <h2 id="hof-erreichen-titel" className="text-[15px] font-semibold">
+    <section aria-labelledby="hof-erreichen-titel" className={cn(KARTE, 'flex min-w-0 flex-col gap-1')}>
+      <h2 id="hof-erreichen-titel" className={ETIKETT}>
         Hof erreichen
       </h2>
-      <p className="text-[14px] leading-normal text-muted-foreground">
-        Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.
-      </p>
-      {telefon && (
-        <p className="flex items-center gap-2.5 text-[15px] text-foreground">
-          <Phone className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          <span className="min-w-0 break-words">{formatiereTelefon(telefon)}</span>
-        </p>
-      )}
+      {telefon &&
+        (anrufen ? (
+          <a href={anrufen} className={cn(textlinkKlassen(), 'self-start underline')}>
+            <span>{formatiereTelefon(telefon)}</span>&nbsp;anrufen
+          </a>
+        ) : (
+          <p className="flex min-h-11 items-center text-[15px] break-words">{formatiereTelefon(telefon)}</p>
+        ))}
       {email && (
-        <p className="hidden items-center gap-2.5 text-[15px] text-foreground md:flex">
-          <Mail className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
-          <span className="min-w-0 [overflow-wrap:anywhere]">{email}</span>
-        </p>
+        // E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen.
+        <a href={`mailto:${email}`} className={cn(textlinkKlassen(), 'min-w-0 self-start underline [overflow-wrap:anywhere]')}>
+          {email}
+        </a>
       )}
-      <div className="flex gap-2">
-        {anrufen && (
-          <a href={anrufen} className={cn(KNOPF_RAHMEN, 'flex-1')}>
-            <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            Anrufen
-          </a>
-        )}
-        {email && (
-          <a href={`mailto:${email}`} className={cn(KNOPF_RAHMEN, 'flex-1')}>
-            <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            E-Mail
-          </a>
-        )}
-      </div>
     </section>
   )
 }

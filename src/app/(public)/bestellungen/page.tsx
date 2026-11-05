@@ -47,7 +47,7 @@ export default async function BestellungenSeite(): Promise<React.JSX.Element> {
     Sentry.captureException(meldung, { tags: { aufgabe: 'bestellungen-finden' } })
     return (
       <KundeShellMitSitzung>
-        <BestellungenFehler />
+        <BestellungenFehler email={zugang.email} />
       </KundeShellMitSitzung>
     )
   }

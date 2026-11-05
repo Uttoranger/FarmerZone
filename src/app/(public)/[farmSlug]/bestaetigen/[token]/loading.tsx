@@ -1,7 +1,7 @@
 /**
  * Ladeansicht der Bar-Bestätigung. Maße aus
  * src/app/(public)/[farmSlug]/bestaetigen/[token]/page.tsx: Kopf der
- * Fokus-Shell (56 px seit Nr. 177, ab md 64 px), Spalte max. 560 px,
+ * Fokus-Shell (56 px seit Nr. 177, ab md 64 px), Spalte max. 672 px links bündig (Nr. 227),
  * Überschrift mit Frist, die Karte mit Positionen und Summe, darunter der
  * große Knopf und der Textknopf. Wer aus der Mail kommt, sieht sofort, dass
  * die Bestellung gleich erscheint — nicht eine leere Seite.
@@ -16,9 +16,9 @@ export default function BarBestaetigenLaden() {
     >
       <div className="h-14 border-b border-border bg-background md:h-16" />
 
-      <main className="mx-auto flex w-full max-w-[560px] flex-col gap-3 px-4 pt-3.5 pb-8 md:gap-[18px] md:pt-[60px]">
+      <main className="mx-auto flex w-full max-w-[704px] flex-col gap-3 px-4 pt-5 pb-8 md:gap-4 md:pt-8">
         {/* Überschrift und Frist */}
-        <div className="flex flex-col items-center gap-2.5">
+        <div className="flex flex-col gap-1.5">
           <div className="h-7 w-72 max-w-full rounded-lg bg-border md:h-8" />
           <div className="h-4 w-80 max-w-full rounded bg-app-chip" />
         </div>
@@ -41,8 +41,8 @@ export default function BarBestaetigenLaden() {
           <div className="h-3 w-64 max-w-full rounded bg-app-chip" />
         </div>
 
-        <div className="h-[54px] w-full rounded-full bg-muted" />
-        <div className="mx-auto h-9 w-56 rounded-full bg-muted" />
+        <div className="h-4 w-72 max-w-full rounded bg-app-chip" />
+        <div className="h-[52px] w-full rounded-[14px] bg-muted md:ml-auto md:w-56 md:rounded-full" />
       </main>
     </div>
   )

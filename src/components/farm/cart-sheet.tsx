@@ -1,21 +1,19 @@
 ﻿'use client'
 
+/** Der Warenkorb der Hofseite als Blatt — am Handy von unten, ab 768 px von rechts (Boards s1-/w1-korb, Nr. 227). */
+
 import type { ComponentProps } from 'react'
 import type { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
-import { Info, Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetKopf } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { BildPlatzhalter } from '@/components/ui/bild-platzhalter'
+import { textlinkKlassen } from '@/components/ui/textlink'
 import { cn } from '@/lib/utils'
 import { centsAlsEuro, formatEuro, formatGrundpreis } from '@/lib/format'
 import { korbBetraege } from '@/lib/hofseite-kunde'
@@ -27,6 +25,10 @@ import { useBestellstopp } from '@/components/notbremse-band'
 import { KORB_LEER, type CartItem } from '@/lib/use-cart'
 import { EmptyState } from '@/components/ui/empty-state'
 import { HOEFE_ENTDECKEN } from '@/lib/fehlerseite'
+
+// Der Titel der Hinweiskarte nach dem Abgleich (Board s1-/w1-korb, Bild 2) — darunter der Satz, was passiert ist.
+// Nacharbeit: gehört zu KORB_LEER nach src/lib/use-cart.ts (Grenze von Nr. 227 ohne diese Datei).
+export const KORB_GEAENDERT_TITEL = 'Dein Warenkorb hat sich geändert.'
 
 type Props = {
   open: boolean
@@ -55,19 +57,22 @@ type Props = {
   hinweis?: string | null
 }
 
-/** Ein runder Mengen-Knopf: sichtbar 28 px, Trefferfläche 44 px. */
+/** Ein Mengen-Knopf in der Pille: 44 × 44 px, das Zeichen in der Mitte (Board s1-/w1-korb). */
 const MENGEN_KNOPF = cn(
-  'flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground',
+  'flex size-11 items-center justify-center rounded-full text-status-fertig transition-colors hover:bg-muted',
   FOKUS_RAHMEN
 )
 
-/** Die Wege aus dem leeren Korb: Pillen mit 44 px. */
-const LEER_WEG = cn('inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm transition-opacity', FOKUS_RAHMEN)
+/** Hauptweg und Ausweg über die volle Breite: Radius 14 px, 52 px hoch (DESIGN_SYSTEM „Typografie und Form“). */
+const VOLLE_BREITE = cn('flex h-[52px] w-full items-center justify-center rounded-[14px] text-base font-semibold', FOKUS_RAHMEN)
 
 /*
- * Der Warenkorb der Hofseite als Blatt von rechts. Seit Nr. 10 steht er nur
- * noch in der Kundenansicht im neuen Design (KundeShell, data-design="neu"):
- * Kaufen ist Grün (accent), Text und Symbole aus den Tokens.
+ * Der Warenkorb der Hofseite (Register N41 d, Boards s1-korb, w1-korb; seit Nr. 227): am Handy ein Blatt
+ * von unten mit Griff, ab 768 px ein Blatt von rechts über die volle Höhe, höchstens 448 px (`SheetBlatt
+ * seite="rechts"`). Oben „Warenkorb · <Hof>“ und genau ein „Schließen“ (`SheetKopf`). Zeilen mit
+ * Grundpreis, Menge −/+ in einer Pille, Betrag und Entfernen; unten Gesamt, „Inkl. Plattformgebühr ·
+ * Reservierung gilt … Minuten.“ und die eine Hauptaktion „Zur Kasse“ (grün). Mit Kaufsperre oder
+ * Notbremse steht dort der Grund (KaufGrund).
  */
 export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHref, onUpdateQuantity, onRemoveItem, gebuehrKorb = null, futterHinweis = [], kaufSperre, hinweis = null }: Props) {
   // Notbremse (Register N34, Nr. 189): wie eine Kaufsperre — Mengen ruhen, statt
@@ -82,91 +87,93 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
   const { zeilenCents, summeCents } = korbBetraege(angezeigt)
   // Ohne Hofpreis-Modell bleibt die Summe aus dem Korb wie bisher.
   const gesamt = anzeige ? centsAlsEuro(summeCents) : total
+  const leer = items.length === 0
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
-        <SheetHeader className="px-5 pt-5 pb-4 border-b border-border/50">
-          <SheetTitle className="flex items-center gap-2">
-            <ShoppingBasket className="size-5 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-            Warenkorb
-          </SheetTitle>
-        </SheetHeader>
+      <SheetBlatt seite="rechts">
+        <SheetKopf
+          className="border-b border-border pb-3"
+          titel={
+            // Leer ohne Hofnamen (Board Bild 3): Ein Korb ohne Ware gehört noch zu keinem Hof.
+            leer ? (
+              'Warenkorb'
+            ) : (
+              <span className="break-words">
+                Warenkorb · <span title={kaufSperre.hofName}>{kaufSperre.hofName}</span>
+              </span>
+            )
+          }
+        />
 
-        {/* Items */}
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
-          {/* Wie korbHinweis in der Kasse: orange Karte, als Status vorgelesen, kein Toast. */}
-          {hinweis && (
-            <div role="status">
-              <Hinweiskarte ton="orange" symbol={Info}>
-                {hinweis}
-              </Hinweiskarte>
-            </div>
-          )}
-          {items.length === 0 ? (
-            // Leer mit Weg weiter (Register N9, Nr. 175): zurück zum Angebot schließt das Blatt, sonst zu den Höfen.
+        {/* Wie korbHinweis in der Kasse: orange Karte, als Status vorgelesen, kein Toast. */}
+        {hinweis && (
+          <div role="status">
+            <Hinweiskarte ton="orange" titel={KORB_GEAENDERT_TITEL}>
+              {hinweis}
+            </Hinweiskarte>
+          </div>
+        )}
+
+        {leer ? (
+          // Leer mit Weg weiter (Register N9, Nr. 175): zurück zum Angebot schließt das Blatt, sonst zu den Höfen.
+          <div className="flex flex-col gap-2">
             <EmptyState
               symbol={ShoppingBasket}
               titel={KORB_LEER.titel}
               satz={KORB_LEER.satz}
-              className="border-0 bg-transparent py-8"
+              // Board Bild 3: der Ausweg über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
+              className="items-stretch border-solid py-6 [&>span]:self-center"
               ausweg={
-                <>
-                  <Link href={`/${farmSlug}`} onClick={() => onOpenChange(false)} className={cn(LEER_WEG, 'bg-accent font-semibold text-accent-foreground hover:opacity-90')}>
-                    {KORB_LEER.zumHof}
-                  </Link>
-                  <Link href="/hoefe" className={cn(LEER_WEG, 'border border-border font-medium text-foreground hover:bg-muted')}>
-                    {HOEFE_ENTDECKEN}
-                  </Link>
-                </>
+                <Link
+                  href={`/${farmSlug}`}
+                  onClick={() => onOpenChange(false)}
+                  className={cn(VOLLE_BREITE, 'border-[1.5px] border-foreground bg-card px-4 text-foreground hover:bg-muted')}
+                >
+                  {KORB_LEER.zumHof}
+                </Link>
               }
             />
-          ) : (
-            angezeigt.map((item) => (
-              <div key={item.productId} className="flex gap-3 items-center">
-                {/* Image */}
-                <div className="relative shrink-0 w-14 h-14 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+            <Link href="/hoefe" className={cn(textlinkKlassen({ ton: 'leise' }), 'justify-center self-center px-3 text-foreground')}>
+              {HOEFE_ENTDECKEN}
+            </Link>
+          </div>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {angezeigt.map((item) => (
+              <li key={item.productId} className="flex gap-3 py-3.5 first:pt-1">
+                {/* 48 px: der Browser holt eine kleine Fassung, nicht das Original (bis 2.400 px). Ohne Foto die ruhige Fläche (V15). */}
+                <div className="relative size-12 shrink-0 overflow-hidden rounded-xl">
                   {item.imageUrl ? (
-                    // 56 px breit: der Browser holt eine kleine Fassung, nicht das Original (bis 2.400 px).
-                    <Image src={item.imageUrl} alt={item.name} fill sizes="56px" className="object-cover" />
+                    <Image src={item.imageUrl} alt="" fill sizes="48px" className="object-cover" />
                   ) : (
-                    <ShoppingBasket className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+                    <BildPlatzhalter className="size-12 rounded-xl" />
                   )}
                 </div>
 
-                {/* Details */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatGrundpreis(item.price, item.unit, item.unitSize)}
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-[15px] font-semibold break-words text-foreground" title={item.name}>
+                    {item.name}
                   </p>
-                  <GrundpreisZeile
-                    price={item.price}
-                    unit={item.unit}
-                    unitSize={item.unitSize}
-                    className="text-[11px] text-muted-foreground"
-                  />
+                  <p className="text-[12.5px] text-muted-foreground">{formatGrundpreis(item.price, item.unit, item.unitSize)}</p>
+                  <GrundpreisZeile price={item.price} unit={item.unit} unitSize={item.unitSize} className="text-[12px] text-muted-foreground" />
                   {/* Mit Kaufsperre lehnt /api/reserve jede neue Menge ab (Nr. 145): Dann steht die Menge nur als
                       Zahl da, Entfernen bleibt — sonst brächte jeder Tipp auf „+“ oder „−“ eine Ablehnung. */}
-                  {/* Menge: sichtbar kleine Kreise, Trefferfläche 44 px */}
                   {ruht ? (
-                    <div className="flex h-11 items-center">
-                      <span className="text-sm font-medium tabular-nums" aria-label={`Menge: ${item.quantity}`}>
-                        {item.quantity}
-                      </span>
-                    </div>
+                    <p className="mt-1.5 flex h-11 items-center text-[15px] font-semibold tabular-nums" aria-label={`Menge: ${item.quantity}`}>
+                      {item.quantity}
+                    </p>
                   ) : (
-                    <div className="-ml-2 flex items-center">
+                    // Menge in EINER Pille mit grünem Rand (Board): − Zahl +, jeder Knopf 44 px.
+                    <div className="mt-1.5 inline-flex items-center rounded-full border-[1.5px] border-accent bg-card">
                       <button
                         type="button"
                         onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)}
                         aria-label={`${item.name}: eins weniger`}
                         className={MENGEN_KNOPF}
                       >
-                        <span className="flex size-7 items-center justify-center rounded-full border border-border">
-                          <Minus className="size-3" aria-hidden="true" />
-                        </span>
+                        <Minus className="size-4" strokeWidth={1.7} aria-hidden="true" />
                       </button>
-                      <span className="w-5 text-center text-sm font-medium tabular-nums" aria-label={`Menge: ${item.quantity}`}>
+                      <span className="w-8 text-center text-[15px] font-semibold tabular-nums" aria-label={`Menge: ${item.quantity}`}>
                         {item.quantity}
                       </span>
                       <button
@@ -175,41 +182,38 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                         aria-label={`${item.name}: eins mehr`}
                         className={MENGEN_KNOPF}
                       >
-                        <span className="flex size-7 items-center justify-center rounded-full border border-border">
-                          <Plus className="size-3" aria-hidden="true" />
-                        </span>
+                        <Plus className="size-4" strokeWidth={1.7} aria-hidden="true" />
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Line total + remove */}
-                <div className="shrink-0 flex flex-col items-end gap-2">
-                  <span className="text-sm font-semibold text-foreground tabular-nums">
+                {/* Betrag oben, Entfernen darunter auf der Höhe der Menge. */}
+                <div className="flex shrink-0 flex-col items-end justify-between">
+                  <span className="text-[15px] font-semibold text-foreground tabular-nums">
                     {formatEuro(centsAlsEuro(zeilenCents.get(item.productId) ?? 0))}
                   </span>
                   <button
                     type="button"
                     onClick={() => onRemoveItem(item.productId)}
                     aria-label={`${item.name} aus dem Warenkorb nehmen`}
-                    className={cn('-mr-3 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground', FOKUS_RAHMEN)}
+                    className={cn('-mr-3 flex size-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted', FOKUS_RAHMEN)}
                   >
-                    <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                    <Trash2 className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
                   </button>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              </li>
+            ))}
+          </ul>
+        )}
 
-        {/* Footer */}
-        {items.length > 0 && (
-          <SheetFooter className="px-5 py-4 border-t border-border/50 flex-col gap-3">
-            <div className="flex justify-between text-base font-semibold text-foreground">
-              <span>Gesamt</span>
-              <span className="tabular-nums">{formatEuro(gesamt)}</span>
+        {!leer && (
+          <div className="flex flex-col gap-3 border-t border-border pt-3.5">
+            <div className="flex items-baseline justify-between gap-3 text-foreground">
+              <span className="text-base font-semibold">Gesamt</span>
+              <span className="text-[22px] font-bold tabular-nums">{formatEuro(gesamt)}</span>
             </div>
-            <p className="text-xs text-muted-foreground -mt-1">
+            <p className="-mt-2 text-[13px] text-muted-foreground">
               {gebuehrKorb ? `${gebuehrKorb[0].toUpperCase()}${gebuehrKorb.slice(1)} · ` : ''}Reservierung gilt {RESERVIERUNG_MINUTEN} Minuten.
             </p>
             <FutterVerantwortung saetze={futterHinweis} />
@@ -220,18 +224,14 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
               <Link
                 href={kasseHref ?? `/${farmSlug}/checkout`}
                 onClick={() => onOpenChange(false)}
-                className={cn(
-                  'flex h-12 w-full items-center justify-center rounded-xl bg-accent text-base font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-                  FOKUS_RAHMEN
-                )}
+                className={cn(VOLLE_BREITE, 'bg-accent text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90')}
               >
                 Zur Kasse
               </Link>
             )}
-          </SheetFooter>
+          </div>
         )}
-      </SheetContent>
+      </SheetBlatt>
     </Sheet>
   )
 }
-

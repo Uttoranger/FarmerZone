@@ -210,11 +210,11 @@ describe('Bestätigungsseite — „Hof erreichen" nur hinter der Signatur (Nr. 
   const steht = (teil: Record<string, unknown> = {}) =>
     bestellung({ status: 'CONFIRMED', farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
 
-  it('Bestellung steht: Satz, Nummer und E-Mail des Hofs', async () => {
+  it('Bestellung steht: Nummer und E-Mail des Hofs', async () => {
     datenbank(steht())
     const text = await seite({ sig: GUELTIG })
+    // Seit Nr. 227 (Board s1-/w1-bestaetigung): Überschrift und zwei Textlinks, ohne den Satz davor.
     expect(text).toContain('Hof erreichen')
-    expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
     expect(text).toContain(ANZEIGE)
     expect(text).toContain(KONTAKT.email)
   })
