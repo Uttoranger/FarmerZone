@@ -111,7 +111,7 @@ export function NichtIchKarte({
           {fehler}
         </p>
       )}
-      <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-xl disabled:opacity-60')}>
+      <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px] disabled:opacity-60')}>
         {laeuft ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />}
         {laeuft ? GERAETE_TEXT.einenMoment : NICHT_ICH_TEXT.knopf}
       </button>

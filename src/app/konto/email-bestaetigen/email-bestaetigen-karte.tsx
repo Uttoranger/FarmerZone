@@ -66,7 +66,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
           {T.fertigTitel}
         </h1>
         <p className={SATZ}>{T.fertigSatz}</p>
-        <Link href="/login" className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-xl')}>
+        <Link href="/login" className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px]')}>
           {T.zurAnmeldung}
         </Link>
       </section>
@@ -121,7 +121,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
             </p>
           )}
         </div>
-        <button type="submit" disabled={laeuft || adresse.trim() === ''} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-xl')}>
+        <button type="submit" disabled={laeuft || adresse.trim() === ''} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px]')}>
           {laeuft ? 'Einen Moment …' : T.knopf}
         </button>
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">{T.vorab}</p>
