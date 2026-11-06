@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
-import { AbmeldenKarte, KARTEN_TEXT, TEXTLINK } from './abmelden-karte'
+import { AbmeldenKarte, KARTEN_TEXT } from './abmelden-karte'
 import { UnsubscribeClient } from './unsubscribe-client'
+import { TEXTLINK } from '@/components/anmelden/stil'
 
 interface Props {
   searchParams: Promise<{ token?: string }>

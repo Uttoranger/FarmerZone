@@ -19,6 +19,7 @@ import { Dialog, DialogDescription, DialogMitte } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { textlinkKlassen } from '@/components/ui/textlink'
+import { KNOPF_GRUEN, KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /*
  * „Mein Konto" der freiwilligen Kunden-Anmeldung — seit Nr. 14 im neuen Design
@@ -61,18 +62,6 @@ interface Props {
 /** Zerstörende Aktion: orange Rahmen, oranger Text (text-status-offen hält 4,5:1 in beiden Themes); volle Breite, 14 px Rundung. */
 const KNOPF_ZERSTOEREND = cn(
   'inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[14px] border border-primary/60 px-4 text-[15px] font-bold text-status-offen transition-colors duration-[250ms] hover:bg-primary/12',
-  FOKUS_RAHMEN
-)
-
-/** „Abbrechen“ neben „Konto löschen“: gleich breit, neutraler Umriss (Board s2-/w2-kundenkonto, Bild 4). */
-const KNOPF_ABBRECHEN = cn(
-  'inline-flex min-h-[50px] items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
-
-/** Grüner Hauptknopf über die volle Breite (Leerzustand, Board s2-kundenkonto Bild 5). */
-const KNOPF_BREIT_GRUEN = cn(
-  'inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] bg-accent px-4 text-[15px] font-bold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
   FOKUS_RAHMEN
 )
 
@@ -200,7 +189,7 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
               satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
               className="items-stretch gap-1.5 px-4 py-4 text-left [&>p]:max-w-none [&>p:first-of-type]:font-sans [&>p:first-of-type]:text-[16px] [&>p:first-of-type]:font-bold [&>span:first-child]:hidden [&>div]:mt-2"
               ausweg={
-                <Link href="/hoefe" className={KNOPF_BREIT_GRUEN}>
+                <Link href="/hoefe" className={KNOPF_GRUEN}>
                   Höfe entdecken
                 </Link>
               }
@@ -286,7 +275,7 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
           >
             <DialogDescription className="text-[15px] leading-normal text-foreground">{loeschenSatz}</DialogDescription>
             <div className="mt-2 grid grid-cols-2 gap-2.5">
-              <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_ABBRECHEN}>
+              <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_UMRISS}>
                 Abbrechen
               </button>
               {loeschenKnopf}
@@ -299,7 +288,7 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
             <SheetTitle className="font-heading text-[21px] leading-tight font-semibold">Konto wirklich löschen?</SheetTitle>
             <SheetDescription className="text-[15px] leading-normal text-foreground">{loeschenSatz}</SheetDescription>
             <div className="mt-1 grid grid-cols-2 gap-2.5">
-              <SheetClose ref={abbrechenRef} disabled={isDeleting} className={KNOPF_ABBRECHEN}>
+              <SheetClose ref={abbrechenRef} disabled={isDeleting} className={KNOPF_UMRISS}>
                 Abbrechen
               </SheetClose>
               {loeschenKnopf}

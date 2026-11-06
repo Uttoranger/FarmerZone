@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE } from '@/components/bestaetigung/bestaetigung-teile'
 
 /*
@@ -11,12 +10,6 @@ import { KARTE } from '@/components/bestaetigung/bestaetigung-teile'
  * (`text-status-offen`). Nur Gestalt; Ablauf und Texte stehen in page.tsx bzw.
  * unsubscribe-client.tsx.
  */
-
-/** Grüner, unterstrichener Textlink mit Trefferfläche 44 px (Board: „Abonnements verwalten“). */
-export const TEXTLINK = cn(
-  'inline-flex min-h-11 items-center self-start rounded-sm text-[15px] font-semibold text-status-fertig underline underline-offset-2',
-  FOKUS_RAHMEN
-)
 
 /** Fließtext der Karte in voller Textfarbe (Board), nicht leise. */
 export const KARTEN_TEXT = 'text-[15px] leading-normal text-foreground'

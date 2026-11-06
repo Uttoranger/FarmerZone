@@ -9,6 +9,7 @@ import { EMAIL_MAX } from '@/lib/eingabegrenzen'
 import { bestaetigeEmailAenderung } from '@/server/actions/konto-anfragen'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FELD, FELD_LABEL, KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /*
  * Die Karte der Seite /konto/email-bestaetigen (Nr. 190): vorher Feld und
@@ -25,10 +26,6 @@ const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border
 
 const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
 const SATZ = 'text-[15px] leading-normal text-foreground'
-const KNOPF_UMRISS = cn(
-  'inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
 
 type Stand = 'offen' | 'ungueltig' | 'fertig'
 

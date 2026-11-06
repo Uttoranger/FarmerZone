@@ -8,6 +8,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { bestaetigeNeuigkeiten } from '@/server/actions/subscriptions'
 import { ABO_TEXT } from '@/lib/abo-bestaetigung'
+import { TEXTLINK } from '@/components/anmelden/stil'
 
 /*
  * Der Link aus der Bestätigungsmail landet hier (/account/neuigkeiten-bestaetigen,
@@ -19,7 +20,6 @@ import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 
 const TITEL = 'font-heading text-[24px] leading-tight font-semibold outline-none'
 const SATZ = 'text-[15px] leading-normal break-words text-muted-foreground [overflow-wrap:anywhere]'
-const TEXTLINK = cn('inline-flex min-h-11 items-center self-start rounded-sm text-[15px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)
 /** Grüner Knopf über die volle Breite: Rechteck mit 14 px Rundung (Board s2-neuigkeiten, Bild 1). */
 const KNOPF_BREIT_GRUEN = cn(
   'inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-accent px-4 text-[15px] font-bold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',

@@ -24,6 +24,7 @@ import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { PasswortAnforderungen, PASSWORT_ANFORDERUNGEN_SATZ } from '@/components/anmelden/passwort-anforderungen'
 import { PostfachHinweis } from './postfach-hinweis'
+import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /**
  * Der Honigtopf steht außerhalb des sichtbaren Bereichs statt auf
@@ -272,10 +273,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
         <p className="text-[14px] text-muted-foreground">Fragen vorab? Schreib uns, wir melden uns.</p>
         <a
           href={`mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Fragen zur Registrierung')}`}
-          className={cn(
-            'inline-flex min-h-[50px] items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground hover:bg-muted',
-            FOKUS_RAHMEN
-          )}
+          className={cn(KNOPF_UMRISS, 'w-auto')}
         >
           E-Mail schreiben
         </a>

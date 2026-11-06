@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { unsubscribeWithToken } from '@/server/actions/subscriptions'
 import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
-import { AbmeldenKarte, KARTEN_TEXT, TEXTLINK } from './abmelden-karte'
+import { AbmeldenKarte, KARTEN_TEXT } from './abmelden-karte'
+import { TEXTLINK } from '@/components/anmelden/stil'
 
 // Seit Nr. 14 im neuen Design; Ablauf unverändert. Texte seit Lauf 30 nach Board s2/w2-abmelden
 // („Neuigkeiten“ statt „Benachrichtigungen“, Wortliste N42 c). Der Name des Hofs fehlt: Die Seite

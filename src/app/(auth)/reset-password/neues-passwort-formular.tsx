@@ -15,6 +15,7 @@ import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
 import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/anmelden/stil'
 import { PasswortAnforderungen } from '@/components/anmelden/passwort-anforderungen'
+import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /**
  * „Neues Passwort wählen" — das Formular (seit Nr. 54 in der Fokus-Shell, die
@@ -99,10 +100,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         <p>{`Ein Link gilt ${PASSWORT_LINK_DAUER_TEXT} und einmal. Bitte fordere einen neuen Link an.`}</p>
         <Link
           href="/forgot-password"
-          className={cn(
-            'mt-2 inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground hover:bg-muted',
-            FOKUS_RAHMEN
-          )}
+          className={cn(KNOPF_UMRISS, 'mt-2')}
         >
           Neuen Link anfordern
         </Link>

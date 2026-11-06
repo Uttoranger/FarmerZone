@@ -26,9 +26,9 @@ import { RECHTSTEXT_TEXT, type RechtstextVerzeichnisDaten } from '@/components/s
  * die Vorlage, hier stehen nur seine Sprünge (`agbVerzeichnis`).
  */
 
-// Links im AGB-Text: die Form der Infoseiten (infoseite-stil bleibt unverändert, A001) und dazu eine Trefferfläche von
-// mindestens 44 px über ::after, ohne die Zeilen auseinanderzuziehen (Messung Abnahme Lauf 31: „Impressum“ 18 px hoch).
-const STUECKE = { linkKlasse: cn(INFOSEITE_LINK, "relative after:absolute after:-inset-x-2.5 after:-inset-y-4 after:content-['']") } as const
+// Links im AGB-Text: die Form der Infoseiten (infoseite-stil bleibt unverändert, A001). Links im Fließtext brauchen keine
+// 44-px-Fläche (WCAG 2.5.8, Ausnahme für Inline-Links); eine ::after-Fläche würde in dichten Absätzen mit den Nachbarzeilen überlappen.
+const STUECKE = { linkKlasse: INFOSEITE_LINK } as const
 
 /** Die Sprungmarke von „Kurz erklärt“ — Überschrift und Verzeichnis nehmen dieselbe. */
 const KURZ_ERKLAERT_ANKER = 'kurz-erklaert'

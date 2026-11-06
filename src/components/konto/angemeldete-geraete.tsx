@@ -9,11 +9,11 @@ import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { KUNDIN_GERAETE_TEXT } from '@/lib/sitzung-dauer'
 import { meldeAlleAnderenAb, meldeGeraetAb, meldeUeberallAb, type AbmeldenAntwort } from '@/server/actions/geraete'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Marke } from '@/components/ui/marke'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /*
  * Baustein „Angemeldete Geräte" (Register E7, Ergänzung Lauf 17; Nr. 114;
@@ -40,12 +40,6 @@ const KNOPF_KLEIN = cn(KNOPF_RAHMEN, 'min-h-11 shrink-0 px-4 text-[13px] font-se
 
 /** Kennzeile über einem Abschnitt von „Mein Konto“ (Board s2-/w2-kundenkonto): 13 px fett, Großbuchstaben, leise. */
 export const KONTO_ETIKETT = 'text-[13px] font-bold tracking-[0.5px] text-muted-foreground uppercase'
-
-/** „Überall abmelden“ der Kundin: neutraler Umriss über die volle Breite (Board s2-/w2-kundenkonto, Bild 3/5). */
-const KNOPF_UEBERALL = cn(
-  'inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted disabled:opacity-60',
-  FOKUS_RAHMEN
-)
 
 export function AngemeldeteGeraete({
   zeilen,
@@ -205,7 +199,7 @@ export function AngemeldeteGeraete({
         </h2>
         <div className="rounded-2xl border border-border bg-card px-4 py-3.5 dark:ring-0">{liste}</div>
         {fehlerZeile}
-        <button type="button" onClick={() => setFrageOffen(true)} disabled={laeuft} className={KNOPF_UEBERALL}>
+        <button type="button" onClick={() => setFrageOffen(true)} disabled={laeuft} className={KNOPF_UMRISS}>
           {knopfText}
         </button>
         <p className="text-[13px] leading-normal text-muted-foreground">{KUNDIN_GERAETE_TEXT.hinweis}</p>

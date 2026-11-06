@@ -1,14 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
-import { ABO_BESTAETIGUNG_GUELTIG_TAGE, ABO_TEXT } from '@/lib/abo-bestaetigung'
+import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { aboTokenSchema } from '@/schemas/abo'
 import { ladeAboBestaetigung } from '@/server/abo-anmeldung'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { AboBestaetigenKarte } from '@/components/abo-bestaetigung/bestaetigen-karte'
 import { MARKE } from '@/lib/marke'
+import { KNOPF_GRUEN, KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
 
 export const metadata: Metadata = {
   title: `${ABO_TEXT.seitenTitel} — ${MARKE}`,
@@ -21,15 +20,10 @@ export const dynamic = 'force-dynamic'
 
 const TITEL = 'font-heading text-[24px] leading-tight font-semibold'
 const SATZ = 'text-[15px] leading-normal break-words text-muted-foreground [overflow-wrap:anywhere]'
-/** Knöpfe über die volle Breite: Rechteck mit 14 px Rundung (Board s2-neuigkeiten). */
-const KNOPF_BREIT = 'inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] px-4 text-[15px] font-bold transition-colors duration-[250ms]'
-const KNOPF_BREIT_GRUEN = cn(KNOPF_BREIT, 'bg-accent text-accent-foreground hover:opacity-90', FOKUS_RAHMEN)
-const KNOPF_BREIT_UMRISS = cn(KNOPF_BREIT, 'border border-foreground/70 bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN)
-const TEXTLINK = cn('inline-flex min-h-11 items-center self-start rounded-sm text-[15px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)
 
 /** Die erste Zeile des Fehlerkastens je Fall; darunter steht der Ausweg (Board s2-neuigkeiten, Bild 4: „Er gilt 7 Tage.“). */
 function fehlerZeile(grund: 'ungueltig' | 'abgelaufen' | 'ueberholt' | 'abo_weg'): string {
-  if (grund === 'abgelaufen') return `Er gilt ${ABO_BESTAETIGUNG_GUELTIG_TAGE} Tage.`
+  if (grund === 'abgelaufen') return ABO_TEXT.abgelaufen.slice(ABO_TEXT.abgelaufen.indexOf('Er gilt'))
   return ABO_TEXT[grund]
 }
 
@@ -65,7 +59,7 @@ export default async function NeuigkeitenBestaetigenPage({
           {ABO_TEXT.schonSatz[0]} <strong className="font-semibold text-foreground">{stand.hofName}</strong> {ABO_TEXT.schonSatz[1]}
         </p>
         {/* Knopf „Zu <Hof>“ (Wortliste N42 c, Board s2-neuigkeiten Bild 3). */}
-        <Link href={`/${stand.hofSlug}`} className={KNOPF_BREIT_GRUEN}>
+        <Link href={`/${stand.hofSlug}`} className={KNOPF_GRUEN}>
           Zu {stand.hofName}
         </Link>
       </section>
@@ -80,7 +74,7 @@ export default async function NeuigkeitenBestaetigenPage({
           {grund === 'abgelaufen' ? ABO_TEXT.abgelaufenTitel : ABO_TEXT.fehlerTitel}
         </h2>
         <HinweiskarteFehler titel={fehlerZeile(grund)}>{grund === 'abo_weg' ? undefined : ABO_TEXT.ausweg}</HinweiskarteFehler>
-        <Link href="/account/profile" className={KNOPF_BREIT_UMRISS}>
+        <Link href="/account/profile" className={KNOPF_UMRISS}>
           Mein Konto
         </Link>
         <Link href="/hoefe" className={TEXTLINK}>

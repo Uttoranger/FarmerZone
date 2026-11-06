@@ -9,6 +9,7 @@ import { meldungLinkMitKennung } from '@/lib/fehlerseite'
 import { meldeAllesAbNichtIch } from '@/server/actions/geraete'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
 
 /*
  * Die Seite „Das war ich nicht" nach Mockup system-h1-angemeldete-geraete
@@ -29,14 +30,6 @@ const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border
 
 const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
 const SATZ = 'text-[15px] leading-normal text-foreground'
-const KNOPF_UMRISS = cn(
-  'inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
-const TEXTLINK = cn(
-  'inline-flex min-h-11 items-center justify-center rounded-full px-3 text-sm font-semibold text-status-fertig hover:underline hover:underline-offset-2',
-  FOKUS_RAHMEN
-)
 
 type Stand = 'offen' | 'ungueltig' | { passwortMail: boolean; passkey?: true }
 

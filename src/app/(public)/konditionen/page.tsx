@@ -135,7 +135,8 @@ export default async function KonditionenPage(): Promise<React.JSX.Element> {
           <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-foreground">
             {GRUENDUNGS_AUFNAHME_SCHRITTE.map((schritt) => (
               <li key={schritt.titel}>
-                <strong className="font-semibold">{schritt.titel}:</strong> {schritt.text}
+                <strong className="block font-semibold">{schritt.titel}</strong>
+                {schritt.text}
               </li>
             ))}
           </ol>
