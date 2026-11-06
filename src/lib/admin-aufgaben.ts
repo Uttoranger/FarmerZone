@@ -811,13 +811,13 @@ export const HEUTE_TEXT = {
  * Bestelldatum seit Montag (Geld-Kachel, A2 Punkt 8), die Zahlen nach der Umsatzregel (abgeholt seit Montag).
  */
 export type HeuteWoche = {
-  /** Bestellwert der Woche nach Bestelldatum (`geldKachelWhere`). */
+  /** Bestellwert der in der Woche eingegangenen Bestellungen (`geldKachelWhere`, Nr. 258). */
   umsatzCents: number
   /** Gebühr derselben Bestellungen (Service- bzw. Plattformgebühr), ohne entfallene. */
   gebuehrCents: number
-  /** Bestellungen der Woche nach der Umsatzregel (abgeholt seit Montag). */
+  /** Dieselben Bestellungen gezählt — „Woche: n“ zählt nach der Regel der Geld-Kachel (N46). */
   anzahl: number
-  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt. */
+  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt, nach derselben Regel. */
   anzahlVorwoche: number
 }
 
