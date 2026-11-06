@@ -43,3 +43,5 @@ main 6ce17420 = c8aadaed7 + nur docs/nachtlauf/berichte/{a005-agb-1-0-stichtag.m
 - 256 startet vom Zwischenstand (Platz von 259). 245 läuft seit ~21:40.
 - 22:31 245 fertig (b91baa50; voller Lauf 696 Dateien, 13033 Tests; Bilder /settings und /intern/bausteine mit dem Prüfwerkzeug). tester grün; pruefer gezielt ohne Blocker (3 Sollte). PR #484 (Basis integration/lauf32). Gemergt (1324b0ff; Konflikt nur DEVELOPMENT.md). Voller Lauf: 698 Dateien, 13105 Tests grün (243 s).
 - 247 startet (Platz von 245). 256 läuft seit ~22:15. Danach 246, 248, 249 (Stunde 11 = 06:59 UTC).
+- 22:50 256 fertig (91f4d0fc; voller Lauf 696 Dateien, 13095 Tests; Integration bestellung-bar-hof 4 grün). Gegenlesen „Geld/Daten“ 6 von 6, keine Blocker; voller Durchgang ohne Blocker (1 Sollte). /api/checkout-Diff: genau ein Aufruf plus zwei Importe. PR #485, gemergt (db44b7f7). Voller Lauf: 699 Dateien, 13117 Tests grün (314 s).
+- 246 läuft (Start ~22:45, /home/user/wt/246), 247 läuft (Start ~22:35). Danach 248, dann 249.
