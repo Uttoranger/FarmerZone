@@ -193,7 +193,7 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
   const TOKEN_ZEILEN = [
     "const token = searchParams.get('token')",
     'const linkUngueltig = !token || !!errorParam',
-    'if (!canSubmit || !token) return',
+    'if (laedt || !token) return',
     'const { error } = await authClient.resetPassword({ newPassword: password, token })',
   ]
   /**

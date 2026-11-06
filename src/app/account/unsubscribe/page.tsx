@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { Unlink } from 'lucide-react'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
-import { AbmeldenKarte, TEXTLINK } from './abmelden-karte'
+import { AbmeldenKarte, KARTEN_TEXT, TEXTLINK } from './abmelden-karte'
 import { UnsubscribeClient } from './unsubscribe-client'
 
 interface Props {
@@ -17,8 +16,8 @@ export default async function UnsubscribePage({ searchParams }: Props): Promise<
       {token ? (
         <UnsubscribeClient token={token} />
       ) : (
-        <AbmeldenKarte symbol={Unlink} titel="Link ungültig">
-          <p className="text-[13.5px] leading-normal text-muted-foreground">
+        <AbmeldenKarte ton="orange" titel="Link ungültig">
+          <p className={KARTEN_TEXT}>
             Dieser Abmelde-Link ist nicht gültig oder wurde bereits verwendet.
           </p>
           <Link href="/account/profile" className={TEXTLINK}>

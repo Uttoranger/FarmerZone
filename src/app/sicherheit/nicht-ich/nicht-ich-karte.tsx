@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Check, Info, Loader2, LogOut, TriangleAlert } from 'lucide-react'
+import { Check, Info, Loader2, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GERAETE_TEXT, NICHT_ICH_TEXT } from '@/lib/geraete'
 import { meldungLinkMitKennung } from '@/lib/fehlerseite'
@@ -19,12 +19,20 @@ import { KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
  * KundeShell und nimmt deren Farbe — grün, auch wenn ein Hof den Link öffnet
  * (vorher Knopf und Schild orange). Karte auf der Fläche; das Ergebnis als
  * grüne Karte. Fehler bleiben orange (V17).
+ * Seit Nr. 239 (Abnahme Lauf 31): Karte 520 px an der linken Kante der
+ * Inhaltsspalte, Polster 18 px, Text in voller Textfarbe; der ungültige Link
+ * ohne Symbol mit der Überschrift in der Warnfarbe und „Zur Anmeldung“ als
+ * Umriss über die volle Breite (Board s2-/w2-systemseiten, Bild 5).
  */
-const KARTE = 'flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 md:p-6'
-const KARTE_GRUEN = 'flex flex-col gap-4 rounded-2xl border border-accent/45 bg-accent/12 p-5 md:p-6'
+const KARTE = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px]'
+const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-accent/45 bg-accent/12 p-[18px]'
 
-const TITEL = 'font-heading text-[26px] leading-tight font-semibold outline-none'
-const SATZ = 'text-[14.5px] leading-relaxed text-muted-foreground'
+const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
+const SATZ = 'text-[15px] leading-normal text-foreground'
+const KNOPF_UMRISS = cn(
+  'inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+  FOKUS_RAHMEN
+)
 const TEXTLINK = cn(
   'inline-flex min-h-11 items-center justify-center rounded-full px-3 text-sm font-semibold text-status-fertig hover:underline hover:underline-offset-2',
   FOKUS_RAHMEN
@@ -111,7 +119,7 @@ export function NichtIchKarte({
           {fehler}
         </p>
       )}
-      <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px] disabled:opacity-60')}>
+      <button type="button" onClick={abmelden} disabled={laeuft} className={cn(KNOPF_GRUEN, 'h-[50px] w-full rounded-[14px] text-[15px] font-bold disabled:opacity-60')}>
         {laeuft ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />}
         {laeuft ? GERAETE_TEXT.einenMoment : NICHT_ICH_TEXT.knopf}
       </button>
@@ -126,12 +134,11 @@ export function NichtIchKarte({
 function NichtIchUngueltig({ ueberschrift }: { ueberschrift?: React.Ref<HTMLHeadingElement> }): React.JSX.Element {
   return (
     <section aria-labelledby="nicht-ich-titel" className={KARTE}>
-      <TriangleAlert className="size-8 text-muted-foreground" strokeWidth={1.6} aria-hidden="true" />
-      <h1 id="nicht-ich-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
+      <h1 id="nicht-ich-titel" ref={ueberschrift} tabIndex={-1} className={cn(TITEL, 'text-status-offen')}>
         {NICHT_ICH_TEXT.ungueltigTitel}
       </h1>
       <p className={SATZ}>{NICHT_ICH_TEXT.ungueltigSatz}</p>
-      <Link href="/login" className={cn(TEXTLINK, 'self-start px-1')}>
+      <Link href="/login" className={KNOPF_UMRISS}>
         {NICHT_ICH_TEXT.zurAnmeldung}
       </Link>
     </section>

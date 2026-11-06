@@ -116,12 +116,12 @@ describe('/login: Hof-Karte mit Passkey', () => {
     expect(html).toContain(`href="${ADMIN_PFAD.anmelden}"`)
   })
 
-  it('das Passwortfeld bekommt die Feldform über `feld` (46 px, 16 px Schrift) wie das E-Mail-Feld', () => {
+  it('das Passwortfeld bekommt die Feldform über `feld` (48 px, 16 px Schrift) wie das E-Mail-Feld', () => {
     const html = renderToStaticMarkup(createElement(HofAnmeldung))
     const passwort = html.match(/<input[^>]*type="password"[^>]*>/)?.[0] ?? ''
     const email = html.match(/<input[^>]*type="email"[^>]*>/)?.[0] ?? ''
-    expect(passwort).toContain('h-[46px]')
+    expect(passwort).toContain('h-12')
     expect(passwort).toContain('text-base')
-    expect(email).toContain('h-[46px]')
+    expect(email).toContain('h-12')
   })
 })

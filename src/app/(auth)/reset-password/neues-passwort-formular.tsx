@@ -1,18 +1,18 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { CircleAlert, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { validatePassword } from '@/lib/password-rules'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { resetPasswordSchema } from '@/schemas/reset-password'
 import { cn } from '@/lib/utils'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
-import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/anmelden/stil'
 import { PasswortAnforderungen } from '@/components/anmelden/passwort-anforderungen'
 
@@ -39,6 +39,8 @@ export function NeuesPasswortFormular(): React.JSX.Element {
   const wiederholungId = useId()
   const listeId = useId()
   const wiederholungFehlerId = useId()
+  const passwortRef = useRef<HTMLInputElement>(null)
+  const wiederholungRef = useRef<HTMLInputElement>(null)
 
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -55,7 +57,17 @@ export function NeuesPasswortFormular(): React.JSX.Element {
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
-    if (!canSubmit || !token) return
+    if (laedt || !token) return
+    // Der Knopf bleibt aktiv (Board s2-passwort, Bild 4); wer zu früh tippt, landet im Feld mit dem Fehler.
+    if (!pwValid) {
+      setPasswordTouched(true)
+      passwortRef.current?.focus()
+      return
+    }
+    if (!canSubmit) {
+      wiederholungRef.current?.focus()
+      return
+    }
     setFehler('')
 
     const parsed = resetPasswordSchema.safeParse({ password, passwordConfirm })
@@ -82,20 +94,19 @@ export function NeuesPasswortFormular(): React.JSX.Element {
 
   if (linkUngueltig || tokenVerbraucht) {
     return (
-      <div role="alert">
-        <Hinweiskarte
-          ton="orange"
-          symbol={CircleAlert}
-          titel="Dieser Link ist ungültig oder abgelaufen."
-          aktion={
-            <Link href="/forgot-password" className={KNOPF_RAHMEN}>
-              Neuen Link anfordern
-            </Link>
-          }
+      // Fehlerkarte im Ton „tun“ ohne Symbol, darunter der Ausweg als Umriss über die volle Breite (Board s2-passwort, Bild 5).
+      <HinweiskarteFehler titel="Dieser Link ist ungültig oder abgelaufen.">
+        <p>{`Ein Link gilt ${PASSWORT_LINK_DAUER_TEXT} und einmal. Bitte fordere einen neuen Link an.`}</p>
+        <Link
+          href="/forgot-password"
+          className={cn(
+            'mt-2 inline-flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground hover:bg-muted',
+            FOKUS_RAHMEN
+          )}
         >
-          {`Ein Link gilt ${PASSWORT_LINK_DAUER_TEXT} und einmal. Bitte fordere einen neuen Link an.`}
-        </Hinweiskarte>
-      </div>
+          Neuen Link anfordern
+        </Link>
+      </HinweiskarteFehler>
     )
   }
 
@@ -106,11 +117,11 @@ export function NeuesPasswortFormular(): React.JSX.Element {
           Neues Passwort
         </label>
         <PasswordInput
+          ref={passwortRef}
           feld={FELD}
           id={passwortId}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Mindestens 8 Zeichen"
           autoComplete="new-password"
           required
           aria-invalid={pwHasError || undefined}
@@ -132,6 +143,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
           Passwort wiederholen
         </label>
         <PasswordInput
+          ref={wiederholungRef}
           feld={FELD}
           id={wiederholungId}
           value={passwordConfirm}
@@ -154,7 +166,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         </p>
       )}
 
-      <button type="submit" disabled={!canSubmit} aria-busy={laedt || undefined} className={cn(KNOPF_ORANGE, 'mt-1')}>
+      <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={cn(KNOPF_ORANGE, 'mt-1')}>
         {laedt ? (
           <>
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
