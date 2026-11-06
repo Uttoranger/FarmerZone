@@ -41,3 +41,5 @@ main 6ce17420 = c8aadaed7 + nur docs/nachtlauf/berichte/{a005-agb-1-0-stichtag.m
 - 22:12 259 Runde 1 (b4a8b3a6): B1–B3 behoben (A005 4b wörtlich, Bau mit CI-Werten grün); pruefer Rundendiff ohne Blocker. Dirigent: O4-Kassen-Vermerk in die Formel aus A005 7c gebracht (e087f702, Doku). Tests danach 688 Dateien, 12968 Tests grün. Gepusht, PR #483 (Basis docs/lauf32, allein mergebar).
 - 259 in den Zwischenstand gemergt (0f158be3; Konflikt nur DEVELOPMENT.md, beide Einträge; pnpm bausteine ohne Änderung). Voller Lauf (n=1, 3 Worker): Typecheck, Lint 0 Fehler, 695 Dateien, 13083 Tests grün (276 s); Integration ganz (localhost:5432/fz_int_zw): 96 Dateien, 785 Tests grün.
 - 256 startet vom Zwischenstand (Platz von 259). 245 läuft seit ~21:40.
+- 22:31 245 fertig (b91baa50; voller Lauf 696 Dateien, 13033 Tests; Bilder /settings und /intern/bausteine mit dem Prüfwerkzeug). tester grün; pruefer gezielt ohne Blocker (3 Sollte). PR #484 (Basis integration/lauf32). Gemergt (1324b0ff; Konflikt nur DEVELOPMENT.md). Voller Lauf: 698 Dateien, 13105 Tests grün (243 s).
+- 247 startet (Platz von 245). 256 läuft seit ~22:15. Danach 246, 248, 249 (Stunde 11 = 06:59 UTC).
