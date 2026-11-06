@@ -64,7 +64,7 @@ export function EntdeckenFilterblatt({
         >
           <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
           <span className="max-sm:sr-only">Filter</span>
-          <Zaehler anzahl={anzahlFilter} wofuer="gesetzt" ton="gruen" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9.5px]" />
+          <Zaehler anzahl={anzahlFilter} wofuer="gesetzt" ton="gruen" klein className="absolute -top-1.5 -right-1.5" />
         </SheetTrigger>
       ) : (
         <SheetTrigger
@@ -116,7 +116,7 @@ export function EntdeckenFilterblatt({
 export function BlattGruppe({ titel, children }: { titel: string; children: ReactNode }): React.JSX.Element {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-[11.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">{titel}</h3>
+      <h3 className="text-[12px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">{titel}</h3>
       {children}
     </section>
   )

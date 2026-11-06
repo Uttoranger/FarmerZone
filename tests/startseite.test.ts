@@ -54,7 +54,8 @@ vi.mock('@/server/queries/farm', () => ({ getOeffentlicheHoefe: async () => [] }
 import { metadata, revalidate } from '@/app/page'
 import {
   BRENNMATERIAL_ADRESSE,
-  FUTTER_ZIELGRUPPEN,
+  FUTTER_KARTE,
+  BRENNMATERIAL_KARTE,
   KARTE_ADRESSE,
   KARTE_KNOPF,
   KARTE_UEBERSCHRIFT,
@@ -173,11 +174,10 @@ describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
     expect(hoefeAdresse(STARTSEITE_CHIPS.find((c) => c.label === 'Brennmaterial')?.filter)).toBe(BRENNMATERIAL_ADRESSE)
   })
 
-  it('die zwei Futter-Zielgruppen: Kleinmengen und Ballen über die Gebinde-Facette', () => {
-    expect(FUTTER_ZIELGRUPPEN.map((g) => g.knopf)).toEqual(['Kleinmengen finden', 'Ballen finden'])
-    const [klein, gross] = FUTTER_ZIELGRUPPEN.map((g) => gelesen(hoefeAdresse(g.filter)))
-    expect(klein).toMatchObject({ bereich: 'FUTTERMITTEL', gebinde: 'KLEIN' })
-    expect(gross).toMatchObject({ bereich: 'FUTTERMITTEL', gebinde: 'GROSS' })
+  it('die kurzen Karten führen in den Bereich Futtermittel bzw. auf Brennholz (Board w1-startseite)', () => {
+    expect(gelesen(FUTTER_KARTE.adresse)).toMatchObject({ bereich: 'FUTTERMITTEL' })
+    expect(BRENNMATERIAL_KARTE.adresse).toBe(BRENNMATERIAL_ADRESSE)
+    expect([FUTTER_KARTE.link, BRENNMATERIAL_KARTE.link]).toEqual(['Futter in deiner Nähe', 'Brennmaterial in deiner Nähe'])
   })
 
   it('die Karte führt in die Kartenansicht', () => {
@@ -187,31 +187,25 @@ describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
   it('keine Adresse trägt einen Standort (ARCHITECTURE §4)', () => {
     const adressen = [
       ...STARTSEITE_CHIPS.map((c) => hoefeAdresse(c.filter)),
-      ...FUTTER_ZIELGRUPPEN.map((g) => hoefeAdresse(g.filter)),
+      FUTTER_KARTE.adresse,
       BRENNMATERIAL_ADRESSE,
       KARTE_ADRESSE,
     ]
     for (const adresse of adressen) expect(adresse).not.toMatch(/[?&](lat|lon|lng|plz|ort|umkreis)=/i)
   })
 
-  it('keine Zusage, die die Plattform nicht hält (Gebinde, Staub, Verladen sind Sache des Hofs)', () => {
-    const texte = FUTTER_ZIELGRUPPEN.flatMap((g) => [g.kicker, g.titel, ...g.punkte]).join(' ')
-    expect(texte).not.toMatch(/staubarm|Frontlader|ab 1 kg/i)
-    expect(texte).toMatch(/je nach Hof/)
-  })
-
-  it('keine Zusage, die es erst mit Gate 6 gibt (Registrierung bei Ballen)', () => {
-    const texte = FUTTER_ZIELGRUPPEN.flatMap((g) => [g.kicker, g.titel, ...g.punkte]).join(' ')
-    expect(texte).not.toMatch(/registriert/i)
+  it('keine Zusage, die die Plattform nicht hält (Staub, Verladen, Registrierung bei Ballen)', () => {
+    const texte = [FUTTER_KARTE, BRENNMATERIAL_KARTE].flatMap((k) => [k.ueberzeile, k.satz, k.link]).join(' ')
+    expect(texte).not.toMatch(/staubarm|Frontlader|ab 1 kg|registriert/i)
     // Gegenprobe: Die Suche findet Wörter in diesen Texten.
     expect(texte).toMatch(/Rundballen/)
   })
 })
 
 describe('waehleStartseitenHoefe', () => {
-  it('zeigt höchstens vier Höfe, in der Reihenfolge der Übersicht', () => {
+  it('zeigt höchstens drei Höfe (eine Reihe im Board w1-startseite), in der Reihenfolge der Übersicht', () => {
     const auswahl = waehleStartseitenHoefe(['a', 'b', 'c', 'd', 'e'].map((slug) => hof({ slug })))
-    expect(auswahl.map((h) => h.slug)).toEqual(['a', 'b', 'c', 'd'])
+    expect(auswahl.map((h) => h.slug)).toEqual(['a', 'b', 'c'])
   })
 
   it('stellt pausierte Höfe ans Ende und sagt es statt einer Abholzeit', () => {
@@ -220,7 +214,8 @@ describe('waehleStartseitenHoefe', () => {
       hof({ slug: 'offen' }),
     ])
     expect(auswahl.map((h) => h.slug)).toEqual(['offen', 'pause'])
-    expect(auswahl[1]).toMatchObject({ abholung: 'Macht gerade Pause', abholungIstTermin: false })
+    expect(auswahl[1]).toMatchObject({ abholung: 'Macht gerade Pause – Bestellen geht bald wieder', abholungIstTermin: false, pausiert: true })
+    expect(auswahl[0].pausiert).toBe(false)
   })
 
   it('PLZ und Ort statt Kilometer, die nächste Abholung, das erste Foto', () => {
@@ -380,7 +375,10 @@ describe('Kopf — Video, Standbild und Suche', () => {
     expect(formular).toContain('role="search"')
     expect(formular).toContain('action="/hoefe"')
     expect(formular).toContain('method="get"')
-    expect(kopf).toMatch(/<input type="search"[^>]*name="q"/)
+    expect(kopf).toMatch(/<input id="startseite-suche" type="search"[^>]*name="q"/)
+    // A1: sichtbare Beschriftung über dem Feld, der Platzhalter nur noch das Beispiel.
+    expect(kopf).toMatch(/<label for="startseite-suche"[^>]*>Hof oder Produkt<\/label>/)
+    expect(kopf).toContain('placeholder="z. B. Eier oder Heu"')
     expect(gelesen('/hoefe?q=Eier').suchtext).toBe('Eier')
   })
 
@@ -512,7 +510,10 @@ describe('Höfe in deiner Nähe — gefüllt, leer, laden, Fehler', () => {
   it('leer: kein nacktes „nichts gefunden" — ein Satz und ein Ausweg', () => {
     const text = abschnitt(createElement(HofKarten, { hoefe: [] }))
     expect(text).toContain('Die ersten Höfe kommen gerade dazu')
-    expect(text).toContain('href="/register"')
+    expect(text).toContain('Schau bald wieder vorbei – oder erzähl einem Hof von Agrilo.')
+    // Board Bild 5: „Für Höfe" statt „Hof registrieren"; die Marke blendet „Oder direkt suchen" aus.
+    expect(text).toMatch(/<a href="\/fuer-hoefe" data-hoefe-leer=""[^>]*>Für Höfe<\/a>/)
+    expect(text).toContain('group-has-[[data-hoefe-leer]]/hoefe:hidden')
     // Gegenprobe: Mit Höfen gibt es den Leerzustand nicht.
     expect(abschnitt(createElement(HofKarten, { hoefe: waehleStartseitenHoefe([hof({ slug: 'a' })]) }))).not.toContain(
       'Die ersten Höfe kommen gerade dazu'
@@ -557,19 +558,19 @@ describe('Abschnitte', () => {
     for (const betrag of ['€ 20,00', '€ 1,00', '€ 21,00', '€ 0,50']) expect(text).toContain(betrag)
   })
 
-  it('Futter: zwei Zielgruppen mit ihren Wegen auf /hoefe', () => {
-    const text = html(createElement(FutterAbschnitt))
-    expect(text).toContain('Für Hase &amp; Meerschwein')
-    expect(text).toContain('Für Pferd, Rind &amp; Schaf')
-    for (const gruppe of FUTTER_ZIELGRUPPEN) expect(text).toContain(`href="${hoefeAdresse(gruppe.filter).replace(/&/g, '&amp;')}"`)
-  })
-
-  it('Brennmaterial: Saison-Marke, erklärte Raummeter, Weg auf /hoefe', () => {
-    const text = html(createElement(BrennmaterialBand))
-    expect(text).toContain('Saison Oktober bis März')
-    expect(text).toContain('Raummeter (ein Kubikmeter geschichtetes Holz)')
-    expect(text).toContain('Schüttraummeter (ein Kubikmeter lose geschüttet)')
-    expect(text).toContain(`href="${BRENNMATERIAL_ADRESSE}"`)
+  it('Futter und Brennmaterial: kurze Karten mit Überschrift, Satz und Textlink (Board w1-startseite)', () => {
+    for (const [element, karte, id] of [
+      [createElement(FutterAbschnitt), FUTTER_KARTE, 'futter'],
+      [createElement(BrennmaterialBand), BRENNMATERIAL_KARTE, 'brennmaterial'],
+    ] as const) {
+      const text = html(element)
+      expect(text).toMatch(new RegExp(`<h2 id="${id}-titel"[^>]*>${karte.ueberzeile}</h2>`))
+      expect(text).toContain(karte.satz)
+      expect(text).toContain(`href="${karte.adresse.replace(/&/g, '&amp;')}"`)
+      expect(text).toContain(karte.link)
+      // Kurz wie im Board: kein Bild, kein Knopf.
+      expect(text).not.toContain('<img')
+    }
   })
 
   it('keine erfundenen Preise: Futter, Brennmaterial und „Für Höfe" nennen keinen Betrag (E6)', () => {

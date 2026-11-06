@@ -11,9 +11,18 @@
  * (ARCHITECTURE §4, „Nie Standort/Koordinaten in die URL").
  */
 import type { ProductCategoryValue } from '@/schemas/product'
+import { MARKE } from '@/lib/marke'
 import { LEERER_HOEFE_FILTER, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
-import { formatiereAbholung, type NaechsteAbholung, type NeuerBeitrag } from '@/lib/hofuebersicht'
+import {
+  ABHOLZEILE_TEXT,
+  VORSCHAU_ZEILEN,
+  formatiereAbholung,
+  waehleVorschauProdukte,
+  type NaechsteAbholung,
+  type NeuerBeitrag,
+  type VorschauProdukt,
+} from '@/lib/hofuebersicht'
 import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   SERVICEGEBUEHR_STANDARD_PROZENT,
@@ -69,52 +78,41 @@ export const KARTE_OEFFNEN = 'Karte öffnen'
 /** „Brennmaterial finden" im Saisonband. */
 export const BRENNMATERIAL_ADRESSE = hoefeAdresse({ kategorien: ['BRENNHOLZ'] })
 
-// ─── Futter vom Hof: zwei Zielgruppen ───────────────────────────────────────
+// ─── Futter und Brennmaterial: zwei kurze Karten ────────────────────────────
 
-export type FutterZielgruppe = {
-  kicker: string
-  titel: string
-  punkte: readonly string[]
-  knopf: string
-  /** Die Hofübersicht im Bereich Futtermittel mit der passenden Gebinde-Facette (Grenze 25 kg). */
-  filter: Partial<HoefeFilter>
-  /** Die Illustration (public/categories/) — die Seite holt den Pfad über product-image.ts. */
-  bild: ProductCategoryValue
+/** Eine kurze Karte unter den Höfen (Board w1-/s1-startseite, Bild 2 und 3): Überzeile, ein Satz, ein Textlink. */
+export type KurzKarte = {
+  /** Die leise Überzeile — sie ist die Überschrift des Abschnitts (h2). */
+  ueberzeile: string
+  satz: string
+  link: string
+  adresse: string
 }
 
 /**
- * Wortlaut aus dem Mockup. „Kleinmengen" und „Ballen" sind die Gebinde-
- * Facette von /hoefe (bis 25 kg | darüber). Neutral statt Mockup: „Sackerl ab
- * 1 kg", „staubarm" und „Verladen mit Frontlader" sind Sache des einzelnen
- * Hofs, die Plattform sagt sie nicht zu — deshalb „je nach Hof". Bewusst NICHT übernommen:
- * „nur registrierte Futtermittelbetriebe" und „Bei Ballen zeigen wir die
- * Registrierung des Hofs gleich mit an" — beides gibt es erst mit Gate 6
- * (Sperre je Gebinde, Schild nach E9); vorher wäre es ein Versprechen, das
- * die Seite nicht hält.
+ * „Futter vom Hof" kurz wie im Board: ein Satz und der Weg in den Bereich
+ * Futtermittel. Die zwei Zielgruppen (Kleinmengen, Ballen) stehen seit Nr. 234
+ * nicht mehr auf der Startseite — die Mengen-Facette bietet /hoefe selbst an.
  */
-export const FUTTER_ZIELGRUPPEN: readonly FutterZielgruppe[] = [
-  {
-    kicker: 'Für Hase & Meerschwein',
-    titel: 'Heu und Einstreu in kleinen Mengen',
-    punkte: ['Kleine Mengen – Gebinde je nach Hof', 'direkt vom Hof aus der Region', 'mit Eiern und Gemüse gleich mitbestellen'],
-    knopf: 'Kleinmengen finden',
-    filter: { bereich: 'FUTTERMITTEL', gebinde: 'KLEIN' },
-    bild: 'HEU_STROH',
-  },
-  {
-    kicker: 'Für Pferd, Rind & Schaf',
-    titel: 'Ballen und Futtergetreide',
-    punkte: ['Kleinballen und Rundballen', 'Verladen am Hof – je nach Hof'],
-    knopf: 'Ballen finden',
-    filter: { bereich: 'FUTTERMITTEL', gebinde: 'GROSS' },
-    bild: 'GETREIDE_KOERNER',
-  },
-]
+export const FUTTER_KARTE: KurzKarte = {
+  ueberzeile: 'Futter vom Hof',
+  satz: 'Heu, Stroh und Futter – vom Sackerl bis zum Rundballen',
+  link: 'Futter in deiner Nähe',
+  adresse: hoefeAdresse({ bereich: 'FUTTERMITTEL' }),
+}
+
+/** „Brennmaterial vom Hof" kurz wie im Board; die Saison-Automatik der Liste bleibt (istBrennmaterialSaison). */
+export const BRENNMATERIAL_KARTE: KurzKarte = {
+  ueberzeile: 'Brennmaterial vom Hof',
+  satz: 'Brennholz und Hackschnitzel aus dem eigenen Wald',
+  link: 'Brennmaterial in deiner Nähe',
+  adresse: BRENNMATERIAL_ADRESSE,
+}
 
 // ─── Höfe in deiner Nähe ────────────────────────────────────────────────────
 
-/** So viele Höfe zeigt die Startseite — eine Reihe im Browser. */
-export const STARTSEITE_HOEFE_DECKEL = 4
+/** So viele Höfe zeigt die Startseite — eine Reihe aus drei Karten im Browser (Board w1-startseite, Bild 1 und 2). */
+export const STARTSEITE_HOEFE_DECKEL = 3
 
 /** So viele Kategorien stehen in der Angebotszeile einer Karte. */
 export const ANGEBOT_DECKEL = 4
@@ -135,6 +133,8 @@ export type StartseitenHofEingabe = {
   gruendungshof?: boolean
   /** Der neueste aktive Beitrag, höchstens 7 Tage alt (Register N22, Nr. 129) — aus derselben Liste, keine zweite Abfrage. */
   neuerBeitrag?: NeuerBeitrag | null
+  /** Die Produktvorschau der Hofliste (in der Reihenfolge der Hofseite) — daraus die drei Preise der Karte (Nr. 234). */
+  produkte?: readonly VorschauProdukt[]
 }
 
 /** Eine Karte unter „Höfe in deiner Nähe" — fertig zum Zeichnen, ohne Decimal und Date. */
@@ -157,6 +157,13 @@ export type StartseitenHof = {
   gruendungshof?: boolean
   /** Für die Marke „Neu · vor …“ am Bild (BeitragMarke, Register N22) — fehlt es (Admin), ohne Marke. */
   neuerBeitrag?: NeuerBeitrag | null
+  /** Pausiert: die Karte ausgegraut und gestrichelt (V18, HofkarteRahmen) — fehlt es (Admin), offen. */
+  pausiert?: boolean
+  /**
+   * Bis zu drei verfügbare Produkte (VORSCHAU_ZEILEN, Auswahl wie auf /hoefe) für die Zeilen
+   * „Name … Preis" (ProduktKurzliste) — fehlt es (Admin), ohne Zeilen. Nur Zahlen und Texte.
+   */
+  produkte?: VorschauProdukt[]
 }
 
 /** Die Lage aus der Liste: nur mit beiden Koordinaten. */
@@ -169,13 +176,24 @@ function ordneOffeneZuerst(hoefe: readonly StartseitenHofEingabe[]): Startseiten
   return [...hoefe.filter((h) => !h.isPaused), ...hoefe.filter((h) => h.isPaused)]
 }
 
+/**
+ * Die drei Produkte einer Hofkarte der Startseite (Nacharbeit 226): dieselbe Auswahl wie die
+ * Hofkarte auf /hoefe (waehleVorschauProdukte — verfügbare zuerst, in der Reihenfolge der
+ * Hofseite), davon nur verfügbare: Ohne Suche gibt es keinen Grund, „derzeit aus" zu zeigen.
+ * Gerechnet wird nichts — der Preis kommt aus der Hofliste (im Hofpreis-Modell der Endpreis).
+ */
+function startseitenProdukte(hof: StartseitenHofEingabe): VorschauProdukt[] {
+  return waehleVorschauProdukte([...(hof.produkte ?? [])], [], undefined, VORSCHAU_ZEILEN).produkte.filter((p) => p.verfuegbar)
+}
+
 function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
   return {
     slug: hof.slug,
     name: hof.name,
     ort: `${hof.postalCode} ${hof.city}`.trim(),
+    // Derselbe Pause-Satz wie die Abholzeile auf /hoefe (Board w1-startseite, Bild 2).
     abholung: hof.isPaused
-      ? 'Macht gerade Pause'
+      ? ABHOLZEILE_TEXT.pause
       : hof.naechsteAbholung
         ? formatiereAbholung(hof.naechsteAbholung)
         : null,
@@ -188,8 +206,27 @@ function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
     lage: leseLage(hof),
     gruendungshof: hof.gruendungshof === true,
     neuerBeitrag: hof.neuerBeitrag ?? null,
+    pausiert: hof.isPaused,
+    produkte: startseitenProdukte(hof),
   }
 }
+
+/**
+ * Der Leerzustand der Hofkarten (Board w1-/s1-startseite, Bild 5) — Textquelle des EmptyState
+ * (DESIGN_SYSTEM, „Leerzustände"), auch für /hoefe ohne einen einzigen Hof. Der Ausweg führt zur
+ * Seite für Höfe statt gleich in die Registrierung: Wer hier landet, ist meist Kundin und erzählt
+ * einem Hof davon.
+ */
+export const HOEFE_LEER = {
+  titel: 'Die ersten Höfe kommen gerade dazu',
+  satz: `Schau bald wieder vorbei – oder erzähl einem Hof von ${MARKE}.`,
+  knopf: 'Für Höfe',
+  adresse: '/fuer-hoefe',
+} as const
+
+/** Die sichtbare Beschriftung des Suchfelds im Kopf und sein Platzhalter (A1, Board w1-/s1-startseite, Bild 1). */
+export const SUCHE_BESCHRIFTUNG = 'Hof oder Produkt'
+export const SUCHE_PLATZHALTER = 'z. B. Eier oder Heu'
 
 /** Wo der Browser merkt, dass die Person das Startvideo angehalten hat (nur „pause" wird gespeichert). */
 export const HERO_VIDEO_SCHLUESSEL = 'fz-startvideo'

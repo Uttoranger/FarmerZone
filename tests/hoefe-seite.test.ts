@@ -58,6 +58,7 @@ import {
   type TrefferHof,
 } from '@/components/hoefe/entdecken-teile'
 import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
+import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
 import type { Ortssuche } from '@/components/hoefe/use-ortssuche'
 import { EntdeckenFilterblatt } from '@/components/hoefe/entdecken-filterblatt'
 import { SUCHFELD_TEXT, abholungReihe, kategorieReihe, leerzustand, standortUngefaehrText } from '@/lib/hoefe-entdecken'
@@ -200,24 +201,26 @@ describe('Hofkarte A', () => {
     expect(voll).toContain('href="/hof-test"')
   })
 
-  it('fehlt ein Produktfoto, steht die Illustration der Kategorie statt eines Anfangsbuchstabens', () => {
-    const voll = karte({ schaufenster: { produkte: [vorschauProdukt('a', 'Freilandeier')], weitere: 0 } })
+  it('die Produkte stehen als Kurzliste „Name … Preis" ohne Vorschaubild und ohne Anfangsbuchstaben (Nr. 234)', () => {
+    const voll = karte({ schaufenster: { produkte: [vorschauProdukt('a', 'Freilandeier', '/eier.jpg')], weitere: 0 } })
     const zeilen = voll.slice(voll.indexOf('Freilandeier'))
-    expect(zeilen).toContain('<img src="/categories/eier.webp" alt=""/>')
+    expect(voll).toMatch(/<li class="flex items-baseline justify-between[^"]*"><span title="Freilandeier"[^>]*>Freilandeier<\/span><span[^>]*>€ 4,20 \/ Stück<\/span><\/li>/)
+    expect(zeilen).not.toContain('<img')
     expect(zeilen).not.toMatch(/>F<\/span>/)
-    // Gegenprobe: mit Foto das Foto.
-    expect(karte({ schaufenster: { produkte: [vorschauProdukt('a', 'Freilandeier', '/eier.jpg')], weitere: 0 } })).toContain('src="/eier.jpg"')
+    // Gegenprobe: Die Pin-Vorschau (HoefeProduktzeilen) zeigt das Foto weiter.
+    expect(html(createElement(HoefeProduktzeilen, { produkte: [vorschauProdukt('a', 'Freilandeier', '/eier.jpg')], weitere: 0 }))).toContain('src="/eier.jpg"')
   })
 
-  // Nr. 127: Dieselbe Quelle wie Produktseite und Teilen-Bild: illustrationPfad(Kategorie, Unterkategorie).
   it('fehlt das Foto, steht die Illustration der UNTERkategorie, wenn es eine gibt — sonst die der Kategorie', () => {
     const mitSorte = vorschauProdukt('k', 'Bergkäse', null, { category: 'MILCH', subcategory: 'KAESE' })
     const ohneSorte = vorschauProdukt('m', 'Milch', null, { category: 'MILCH' })
     expect(illustrationPfad('MILCH', 'KAESE')).not.toBe(illustrationPfad('MILCH'))
-    const html1 = karte({ schaufenster: { produkte: [mitSorte], weitere: 0 } })
+    // Seit Nr. 234 an den Produktzeilen der Pin-Vorschau und des Karussells (HoefeProduktzeilen) — die Hofkarte zeigt keine Bilder mehr.
+    const zeilen = (p: ReturnType<typeof vorschauProdukt>) => html(createElement(HoefeProduktzeilen, { produkte: [p], weitere: 0 }))
+    const html1 = zeilen(mitSorte)
     expect(html1.slice(html1.indexOf('Bergkäse'))).toContain(`<img src="${illustrationPfad('MILCH', 'KAESE')}" alt=""/>`)
     // Gegenprobe: ohne Sorte die Illustration der Kategorie, nicht die der Sorte.
-    const html2 = karte({ schaufenster: { produkte: [ohneSorte], weitere: 0 } })
+    const html2 = zeilen(ohneSorte)
     expect(html2.slice(html2.indexOf('Milch'))).toContain(`<img src="${illustrationPfad('MILCH')}" alt=""/>`)
     expect(html2).not.toContain(illustrationPfad('MILCH', 'KAESE'))
   })
@@ -244,13 +247,14 @@ describe('Hofkarte A', () => {
  * Das Markup der Pin-Vorschau von /hoefe, wie es VOR dem Umbau des Rahmens war (Stand d9c0c2b, Kurzform mit `schaufenster`
  * und `jetzt` im Rahmen), an denselben Testdaten wie unten. Absichtlich ein Schnappschuss, obwohl TESTING_GUIDELINES §1 sie
  * sonst meidet: Auftrag Nr. 133 Punkt 1 verlangt den Beleg, dass der Umbau /hoefe nicht verändert. Ändert jemand die
- * Vorschau gewollt, ersetzt er diesen Text durch das neue Markup — mit Bild im Bericht.
+ * Vorschau gewollt, ersetzt er diesen Text durch das neue Markup — mit Bild im Bericht. Gewollt geändert mit Nr. 234
+ * (Boards w1-/s1-hoefe): Name fett statt Serif, die Entfernung hinter dem Ort, Illustrationen im Dunkeln multipliziert.
  */
 const KURZFORM_VORHER = [
   '<link rel="preload" as="image" href="/categories/eier.webp"/>',
   '<link rel="preload" as="image" href="/categories/brot.webp"/>',
   '<div id="vorschau-1" role="tooltip" style="width:288px" class="overflow-hidden rounded-2xl border border-border bg-card text-left shadow-lg">',
-  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border h-[104px] w-full">',
+  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border dark:brightness-[1.6] h-[104px] w-full">',
   '<span class="relative h-full min-w-0 aspect-square shrink">',
   '<img src="/categories/eier.webp" alt=""/>',
   '</span>',
@@ -259,11 +263,8 @@ const KURZFORM_VORHER = [
   '</span>',
   '</span>',
   '<div class="flex flex-col gap-1 p-3.5">',
-  '<div class="flex items-start gap-2">',
-  '<p class="line-clamp-2 min-w-0 flex-1 font-heading text-[17px] leading-snug font-semibold break-words text-foreground">Hof Test</p>',
-  '<span class="shrink-0 pt-0.5 text-[13px] text-muted-foreground">2,1 km</span>',
-  '</div>',
-  '<p class="truncate text-[13px] text-muted-foreground">1010 Wien</p>',
+  '<p class="line-clamp-2 min-w-0 text-[17px] leading-snug font-bold break-words text-foreground">Hof Test</p>',
+  '<p class="truncate text-[13px] text-muted-foreground">1010 Wien · 2,1 km</p>',
   '<p data-abholung="heute" class="flex items-center gap-1.5 text-[13px] text-status-fertig font-semibold">',
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock size-3.5 shrink-0" aria-hidden="true">',
   '<circle cx="12" cy="12" r="10">',
@@ -281,7 +282,7 @@ const KURZFORM_VORHER = [
   '</div>',
   '<p class="text-xs text-muted-foreground">€ 4,20 / Stück</p>',
   '</div>',
-  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border shrink-0 rounded-lg size-10">',
+  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border dark:brightness-[1.6] shrink-0 rounded-lg size-10">',
   '<span class="relative h-full min-w-0 flex-1">',
   '<img src="/categories/eier.webp" alt=""/>',
   '</span>',
@@ -294,7 +295,7 @@ const KURZFORM_VORHER = [
   '</div>',
   '<p class="text-xs text-muted-foreground">€ 4,20 / Stück</p>',
   '</div>',
-  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border shrink-0 rounded-lg size-10">',
+  '<span data-slot="hof-bildflaeche" class="flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border dark:brightness-[1.6] shrink-0 rounded-lg size-10">',
   '<span class="relative h-full min-w-0 flex-1">',
   '<img src="/categories/eier.webp" alt=""/>',
   '</span>',
@@ -588,7 +589,10 @@ describe('Ein Suchfeld „Ort oder Produkt" plus „Standort nutzen" (Nr. 46)', 
   it('ohne Bezugspunkt: genau ein Eingabefeld, der Knopf „Standort nutzen" und „Nichts wird gespeichert."', () => {
     const suche = html(createElement(HoefeSuche, SUCHE))
     expect((suche.match(/<input\b/g) ?? []).length).toBe(1)
-    expect(suche).toContain('placeholder="Ort oder Produkt"')
+    // Sichtbare Beschriftung statt Platzhalter (Boards w1-/s1-hoefe, Nr. 234): label for= auf das Feld.
+    const feldId = suche.match(/<input id="([^"]+)"/)?.[1]
+    expect(suche).toContain(`<label for="${feldId}" class="mb-1.5 block w-fit text-[14px] font-semibold text-foreground">Ort oder Produkt</label>`)
+    expect(suche).not.toContain('placeholder=')
     expect(suche).toContain('role="combobox"')
     expect(suche).toMatch(/<button type="button"[^>]*>.*Standort nutzen<\/button>/)
     expect(suche).toContain('Nichts wird gespeichert.')
@@ -780,7 +784,7 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
     const liste = suche.slice(suche.indexOf('role="listbox"'), suche.indexOf('{vorschlagsNamen.map('))
     // Über der isolate-Ebene der Karte, unten bis über die Unterleiste, der Rest scrollt.
     expect(liste).toMatch(/kompakt\s*\?[\s\S]*?'absolute top-full left-0 z-\[1000\] max-h-\[calc\(100dvh-var\(--kunde-kopf\)-var\(--kunde-unterleiste\)-4rem\)\][^']*overflow-y-auto[^']*'/)
-    expect(suche).toMatch(/<form role="search" onSubmit=\{absenden\} className=\{cn\('min-w-0 sm:flex-1', kompakt && 'relative'\)\}>/)
+    expect(suche).toMatch(/<form role="search" onSubmit=\{absenden\} className=\{cn\('min-w-0 lg:max-w-\[520px\]', kompakt && 'relative lg:max-w-none'\)\}>/)
     // Gegenprobe: in der Liste bleibt sie im Fluss.
     expect(liste).toMatch(/: 'overflow-hidden'/)
   })

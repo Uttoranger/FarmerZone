@@ -3,24 +3,23 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import { Check, ChevronDown, HandCoins, MapPin } from 'lucide-react'
+import { ArrowRight, ChevronDown, HandCoins, MapPin } from 'lucide-react'
 import {
   BEISPIEL_WARENPREIS_CENTS,
-  BRENNMATERIAL_ADRESSE,
-  FUTTER_ZIELGRUPPEN,
+  BRENNMATERIAL_KARTE,
+  FUTTER_KARTE,
   beispielRechnung,
   startseitenFragen,
   hoefeAdresse,
   type Beispielrechnung,
+  type KurzKarte,
 } from '@/lib/startseite'
 import type { AbschnittArt } from '@/lib/startseite-gestalten'
-import { BRENNMATERIAL_SAISON_TEXT } from '@/lib/brennmaterial-saison'
 import { SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
-import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { textlinkKlassen } from '@/components/ui/textlink'
 import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
@@ -36,8 +35,9 @@ import { gebuehrModellFuer, type GebuehrModell } from '@/lib/plattformgebuehr'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
- * des Mockups (web-k0-startseite, mobil-k0-startseite): Futter vom Hof,
- * Brennmaterial (nur in der Saison), So funktioniert's + Warum direkt vom Hof,
+ * des Mockups (web-k0-startseite, mobil-k0-startseite): Futter vom Hof und
+ * Brennmaterial (nur in der Saison) als kurze Karten (Board w1-startseite,
+ * Nr. 234), So funktioniert's + Warum direkt vom Hof,
  * Für Höfe, Fragen, Fuß. Alles Server-Komponenten ohne eigenes Skript — auch
  * die Fragen: <details> klappt der Browser selbst auf und zu.
  *
@@ -47,11 +47,6 @@ import { gebuehrModellFuer, type GebuehrModell } from '@/lib/plattformgebuehr'
 const CONTAINER = 'mx-auto max-w-[1200px] px-4 md:px-6'
 const H2 = 'font-heading text-[22px] font-semibold text-balance md:text-[32px]'
 
-/** Der grüne Handlungsknopf der Kundenwelt — als Link, denn er führt woanders hin. */
-const KNOPF_GRUEN = cn(
-  'inline-flex h-11 items-center justify-center rounded-full bg-accent px-[18px] text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-  FOKUS_RAHMEN
-)
 const KNOPF_UMRISS = cn(
   'inline-flex h-11 items-center justify-center rounded-full border border-border px-[18px] text-sm font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted md:h-[46px]',
   FOKUS_RAHMEN
@@ -70,86 +65,43 @@ export function Illustration({ src, sizes, className }: { src: string | null; si
   )
 }
 
-export function FutterAbschnitt(): React.JSX.Element {
-  return (
-    <section aria-labelledby="futter-titel" className="pt-5 pb-[52px] md:pb-[72px]">
-      <div className={cn(CONTAINER, 'flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-10')}>
-        <div className="flex flex-col justify-center gap-3.5 lg:w-[360px] lg:shrink-0">
-          <Kicker>Futter vom Hof</Kicker>
-          <h2 id="futter-titel" className={H2}>
-            Heu, Stroh und Futter – vom Sackerl bis zum Rundballen
-          </h2>
-          <p className="text-[13.5px] leading-normal text-muted-foreground md:text-[15px]">
-            Frisch aus der Region statt aus dem Zoohandel. Kleine Mengen für Kleintiere, Ballen für Pferde und Nutztiere
-            – mit Preis pro kg zum Vergleichen.
-          </p>
-        </div>
-        <ul className="grid flex-1 gap-3 sm:grid-cols-2 md:gap-4">
-          {FUTTER_ZIELGRUPPEN.map((gruppe) => (
-            <li key={gruppe.knopf} className="flex flex-col overflow-hidden rounded-[20px] border border-border bg-card">
-              <Illustration
-                src={categoryImagePath(gruppe.bild)}
-                sizes="(min-width: 1024px) 380px, (min-width: 640px) 50vw, 100vw"
-                className="h-[120px] w-full dark:ring-0"
-              />
-              <div className="flex flex-1 flex-col gap-2.5 p-[18px]">
-                <Kicker>{gruppe.kicker}</Kicker>
-                <h3 className="text-lg font-semibold">{gruppe.titel}</h3>
-                <ul className="flex flex-col gap-2">
-                  {gruppe.punkte.map((punkt) => (
-                    <li key={punkt} className="flex items-center gap-2 text-[13.5px] text-foreground">
-                      <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-                      {punkt}
-                    </li>
-                  ))}
-                </ul>
-                <span className="flex-1" />
-                <Link href={hoefeAdresse(gruppe.filter)} className={cn(KNOPF_GRUEN, 'mt-1 self-start')}>
-                  {gruppe.knopf}
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  )
-}
-
 /**
- * Das Brennmaterial-Band — die Seite zeigt es nur in der Saison
- * (istBrennmaterialSaison, Oktober bis März in Wiener Zeit). Raummeter und
- * Schüttraummeter werden beim ersten Vorkommen erklärt (DESIGN_SYSTEM,
- * „Futtermittel und Brennmaterial").
+ * Eine kurze Karte unter den Höfen (Board w1-/s1-startseite, Bild 2 und 3; Nr. 234): die leise
+ * Überzeile als Überschrift, darunter in einer Karte ein Satz und der Textlink mit Pfeil. Ohne
+ * Bild, ohne Knopf — die Hofkarten darüber sind die Hauptsache. `imPaar`: Die Seite stellt Futter
+ * und Brennmaterial nebeneinander (StartseitenInhalt), dann bringt sie den Rahmen der Breite mit.
  */
-export function BrennmaterialBand(): React.JSX.Element {
+function KurzKarteAbschnitt({ karte, id, imPaar = false }: { karte: KurzKarte; id: string; imPaar?: boolean }) {
   return (
-    <section aria-labelledby="brennmaterial-titel" className="pb-[52px] md:pb-[72px]">
-      <div className={CONTAINER}>
-        <div className="flex flex-col gap-4 rounded-[22px] border border-border bg-card p-4 md:flex-row md:items-center md:gap-7 md:px-[26px] md:py-[22px]">
-          <div className="flex items-center gap-3 md:contents">
-            <Illustration src={categoryImagePath('BRENNHOLZ')} sizes="110px" className="size-[70px] shrink-0 rounded-[14px] md:size-[110px]" />
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <Kicker>Brennmaterial vom Hof</Kicker>
-                <StatusBadge status="neutral">{BRENNMATERIAL_SAISON_TEXT}</StatusBadge>
-              </div>
-              <h2 id="brennmaterial-titel" className="font-heading text-lg font-semibold text-balance md:text-2xl">
-                Brennholz und Hackschnitzel aus dem eigenen Wald
-              </h2>
-              <p className="hidden text-sm leading-normal text-muted-foreground md:block">
-                Ofenfertiges Brennholz im Sack oder als Raummeter (ein Kubikmeter geschichtetes Holz), Hackschnitzel für
-                die Hackschnitzelheizung pro Schüttraummeter (ein Kubikmeter lose geschüttet).
-              </p>
-            </div>
-          </div>
-          <Link href={BRENNMATERIAL_ADRESSE} className={cn(KNOPF_GRUEN, 'w-full shrink-0 rounded-[14px] md:w-auto md:rounded-full')}>
-            Brennmaterial finden
+    <section aria-labelledby={`${id}-titel`} className={cn('flex flex-col gap-2', !imPaar && 'pb-8 md:pb-12')}>
+      <div className={cn('flex flex-col gap-2', !imPaar && CONTAINER)}>
+        <Kicker ton="leise" als="h2" id={`${id}-titel`}>
+          {karte.ueberzeile}
+        </Kicker>
+        <div className="flex flex-1 flex-col gap-1 rounded-2xl border border-border bg-card px-4 pt-4 pb-2 dark:ring-1 dark:ring-border">
+          <p className="text-[16px] leading-snug font-semibold text-foreground">{karte.satz}</p>
+          <Link href={karte.adresse} className={cn(textlinkKlassen({ form: 'zeile' }), 'w-fit gap-1 underline')}>
+            {karte.link}
+            <ArrowRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
           </Link>
         </div>
       </div>
     </section>
   )
+}
+
+/** „Futter vom Hof" als kurze Karte (FUTTER_KARTE). */
+export function FutterAbschnitt({ imPaar = false }: { imPaar?: boolean }): React.JSX.Element {
+  return <KurzKarteAbschnitt karte={FUTTER_KARTE} id="futter" imPaar={imPaar} />
+}
+
+/**
+ * „Brennmaterial vom Hof" als kurze Karte (BRENNMATERIAL_KARTE) — die Seite zeigt sie nur in der
+ * Saison (istBrennmaterialSaison, Oktober bis März in Wiener Zeit; die Liste entscheidet das).
+ * Raummeter erklärt erst /hoefe bzw. die Produktseite, wo sie vorkommen.
+ */
+export function BrennmaterialBand({ imPaar = false }: { imPaar?: boolean }): React.JSX.Element {
+  return <KurzKarteAbschnitt karte={BRENNMATERIAL_KARTE} id="brennmaterial" imPaar={imPaar} />
 }
 
 const SCHRITTE = [
@@ -252,7 +204,7 @@ export function SoFunktionierts({ rechnung }: { rechnung: Beispielrechnung }): R
             </div>
           </div>
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-[18px] py-4 dark:ring-1 dark:ring-border">
-            <p className="text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">Beispiel</p>
+            <p className="text-[12px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">Beispiel</p>
             {/* Im Hofpreis-Modell ein Satz statt der Rechnung (Board w1-startseite, Bild 3): keine eigene Gebührenzeile, online und bar gleich. */}
             {rechnung.modell === 'hofpreis' ? (
               <p data-beispiel="hofpreis" className="text-[15px] leading-normal text-foreground">

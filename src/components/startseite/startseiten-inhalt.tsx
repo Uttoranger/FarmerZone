@@ -16,7 +16,7 @@ import { jsonLdSicher, startseiteJsonLd } from '@/lib/json-ld'
 import { MARKE } from '@/lib/marke'
 import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
-import { STARTSEITE_ABSCHNITTE } from '@/components/startseite/startseite-abschnitte'
+import { BrennmaterialBand, FutterAbschnitt, STARTSEITE_ABSCHNITTE } from '@/components/startseite/startseite-abschnitte'
 import { StartseitenBlock } from '@/components/startseite/bloecke/startseiten-block'
 
 /*
@@ -128,6 +128,33 @@ function Eintrag({ eintrag, jetzt }: { eintrag: RenderEintrag; jetzt: Date }) {
   }
 }
 
+/** Die kurzen Karten, die nebeneinander stehen dürfen (Board w1-startseite, Bild 2). */
+const KURZ_ARTEN = new Set<string>(['FUTTER', 'BRENNMATERIAL'])
+
+/**
+ * Die Einträge in Gruppen: Folgen Futter und Brennmaterial in der Liste direkt aufeinander, stehen
+ * sie als Paar nebeneinander (ab 768 px zwei Spalten, darunter untereinander) — die Reihenfolge aus
+ * Admin › Startseite bleibt, nur der Rahmen ist gemeinsam (Nr. 234).
+ */
+export function gruppiereKurzkarten(eintraege: readonly RenderEintrag[]): RenderEintrag[][] {
+  const gruppen: RenderEintrag[][] = []
+  for (const eintrag of eintraege) {
+    const letzte = gruppen.at(-1)
+    if (letzte && letzte.length === 1 && KURZ_ARTEN.has(letzte[0].art) && KURZ_ARTEN.has(eintrag.art)) letzte.push(eintrag)
+    else gruppen.push([eintrag])
+  }
+  return gruppen
+}
+
+/** Futter und Brennmaterial als Paar: EIN Rahmen der Breite, zwei Spalten ab 768 px. */
+function KurzkartenPaar({ eintraege }: { eintraege: RenderEintrag[] }) {
+  return (
+    <div className="mx-auto grid max-w-[1200px] gap-5 px-4 pb-8 md:grid-cols-2 md:gap-4 md:px-6 md:pb-12">
+      {eintraege.map((e) => (e.art === 'FUTTER' ? <FutterAbschnitt key="FUTTER" imPaar /> : <BrennmaterialBand key="BRENNMATERIAL" imPaar />))}
+    </div>
+  )
+}
+
 /** Nur in der Vorschau: oben ein Band, damit niemand die Vorschau für die echte Seite hält — mit Quelle und Tag (Nr. 106). */
 function VorschauBand({ quelle, datum }: { quelle: VorschauQuelle; datum: Date }) {
   return (
@@ -161,9 +188,13 @@ export function StartseitenInhalt({
       {/* Strukturierte Daten (Nr. 117): Organization und WebSite, ohne Suchfeld — /hoefe? sperrt robots.txt. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(startseiteJsonLd(metadatenBasis(UMGEBUNG.appUrl))) }} />
       {band && <VorschauBand quelle={band.quelle} datum={band.datum} />}
-      {eintraege.map((eintrag) => (
-        <Eintrag key={eintrag.art === 'BLOCK' ? eintrag.block.id : eintrag.art} eintrag={eintrag} jetzt={jetzt} />
-      ))}
+      {gruppiereKurzkarten(eintraege).map((gruppe) =>
+        gruppe.length === 2 ? (
+          <KurzkartenPaar key="kurzkarten" eintraege={gruppe} />
+        ) : (
+          <Eintrag key={gruppe[0].art === 'BLOCK' ? gruppe[0].block.id : gruppe[0].art} eintrag={gruppe[0]} jetzt={jetzt} />
+        )
+      )}
     </>
   )
 }
