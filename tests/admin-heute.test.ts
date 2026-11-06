@@ -102,6 +102,8 @@ import AdminHeutePage from '@/app/admin/page'
 import { ladeAdminbereich } from '@/server/adminbereich'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { leseBestellstopp, lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { ladeHeute } from '@/server/queries/admin-heute'
+import { umsatzBestellungWhere, umsatzfenster } from '@/lib/umsatz'
 
 const STUNDE = 60 * 60_000
 
@@ -140,11 +142,12 @@ beforeEach(() => {
     { status: 'READY', _count: { _all: 2 } },
     { status: 'CANCELLED', _count: { _all: 1 } },
   ])
-  // Woche: Warenwert und Zahl in einem Aufruf, die Servicegebühr (ohne entfallene) im zweiten; die Vorwoche über count.
+  // Woche: Warenwert und Servicegebühr (ohne entfallene) nach Bestelldatum (Nr. 240); die Zahl dieser Woche und
+  // der Vorwoche nach Abholung über count — diese Woche endet jetzt, die Vorwoche früher.
   db.order.aggregate.mockImplementation(async (a: { _sum: { serviceFeeCents?: true } }) =>
-    a._sum.serviceFeeCents ? { _sum: { serviceFeeCents: 9200 } } : { _sum: { totalAmount: new Prisma.Decimal('1840.00') }, _count: { _all: 118 } }
+    a._sum.serviceFeeCents ? { _sum: { serviceFeeCents: 9200 } } : { _sum: { totalAmount: new Prisma.Decimal('1840.00') } }
   )
-  db.order.count.mockResolvedValue(108)
+  db.order.count.mockImplementation(async (a: { where: { pickedUpAt?: { lte?: Date } } }) => (a.where.pickedUpAt?.lte?.getTime() === JETZT.getTime() ? 118 : 108))
   db.adminAktion.findMany.mockResolvedValue([{ wann: new Date(JETZT.getTime() - STUNDE), wer: 'ich', art: 'hof_freigeschaltet' }])
   db.user.findUnique.mockResolvedValue({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null })
   db.$queryRaw.mockResolvedValue([])
@@ -306,5 +309,51 @@ describe('Gebühren-Wort der Geld-Kachel (Nr. 229, V63)', () => {
   it('„Läuft von selbst“ trägt „heute · n von m pünktlich“ (Board w3-admin-heute)', async () => {
     mitStichtag(null)
     expect(await seite()).toMatch(/heute · \d+ von \d+ pünktlich/)
+  })
+})
+
+describe('Geld-Kachel nach Bestelldatum (Nr. 240, Register N32 Ergänzung 5.11.2026)', () => {
+  type Bedingung = Record<string, unknown> & { AND?: unknown[] }
+  const geldAbfragen = (): Bedingung[] => db.order.aggregate.mock.calls.map((c) => (c[0] as { where: Bedingung }).where)
+  const zahlAbfragen = (): Bedingung[] => db.order.count.mock.calls.map((c) => (c[0] as { where: Bedingung }).where)
+  const STICHTAG = new Date('2026-10-20T00:00:00.000Z')
+  // Montag, 26.10.2026, 0:00 in Wien (MEZ, seit 25.10.) — der Wochenbeginn zu JETZT.
+  const MONTAG = new Date('2026-10-25T23:00:00.000Z')
+
+  it('Warenwert und Gebühr nach createdAt seit Montag (Wien) bis jetzt, Status und Testzahlungen wie die Umsatzregel', async () => {
+    await ladeHeute(JETZT, { mitBetrieb: false }, STICHTAG)
+
+    expect(geldAbfragen()).toHaveLength(2)
+    for (const where of geldAbfragen()) {
+      expect(where.createdAt).toEqual({ gte: MONTAG, lte: JETZT })
+      expect(where.status).toBe('PICKED_UP')
+      expect(where).not.toHaveProperty('pickedUpAt')
+      expect(where).not.toHaveProperty('farmId')
+      // Die Testzahlungs-Regel als Element von AND, genau wie in umsatzBestellungWhere.
+      expect(where.AND).toEqual(umsatzBestellungWhere('', { von: MONTAG, bis: JETZT }, STICHTAG).AND)
+    }
+    expect(geldAbfragen()[1]?.serviceFeeRefundedAt).toBeNull()
+  })
+
+  it('die Zahl der Kachel „Bestellungen heute“ bleibt nach Abholung (Umsatzregel), diese Woche und Vorwoche', async () => {
+    await ladeHeute(JETZT, { mitBetrieb: false }, STICHTAG)
+
+    const fenster = umsatzfenster('woche', JETZT)
+    const erwartet = [fenster.aktuell, fenster.vergleich].map((f) => {
+      const where = umsatzBestellungWhere('', f, STICHTAG)
+      delete where.farmId
+      return where
+    })
+    expect(zahlAbfragen()).toEqual(erwartet)
+    for (const where of zahlAbfragen()) expect(where).not.toHaveProperty('createdAt')
+  })
+
+  it('Gegenprobe ohne Stichtag: keine Testzahlungs-Bedingung, das Fenster bleibt nach createdAt', async () => {
+    await ladeHeute(JETZT, { mitBetrieb: false }, null)
+
+    for (const where of geldAbfragen()) {
+      expect(where).not.toHaveProperty('AND')
+      expect(where.createdAt).toEqual({ gte: MONTAG, lte: JETZT })
+    }
   })
 })
