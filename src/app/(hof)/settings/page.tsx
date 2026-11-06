@@ -22,11 +22,16 @@ export const dynamic = 'force-dynamic'
 export default async function SettingsPage(): Promise<React.JSX.Element> {
   const { userId } = await verlangeHofDerSitzung()
 
+  const jetzt = new Date()
   let bereiche: EinstellungBereich[] | null = null
+  let hofName = ''
   let gefunden = true
   try {
     const daten = await ladeEinstellungenUebersicht(userId)
-    if (daten) bereiche = einstellungenBereiche(daten, new Date())
+    if (daten) {
+      bereiche = einstellungenBereiche(daten, jetzt)
+      hofName = daten.name
+    }
     else gefunden = false
   } catch (err) {
     // Nur Art und Bereich — keine Personendaten.
@@ -37,7 +42,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={EINSTELLUNGEN_RAHMEN}>
-      {bereiche ? <EinstellungenUebersicht bereiche={bereiche} /> : <EinstellungenFehler titel={EINSTELLUNGEN_TITEL} href="/settings" />}
+      {bereiche ? <EinstellungenUebersicht bereiche={bereiche} hofName={hofName} jetzt={jetzt} /> : <EinstellungenFehler titel={EINSTELLUNGEN_TITEL} href="/settings" />}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { Abholzeile } from '@/components/hoefe/abholzeile'
 import { KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
 import { LEERE_LAGE, nachLeerTipp, nachPinTipp, type AuswahlLage } from '@/lib/hoefe-anzeige'
 import { FUTTER_KARTE_TEXT, type FutterKaufenAnsicht, type FutterPinKarte } from '@/lib/futter-kaufen'
+import { KARTEN_STEUERUNG } from '@/components/karte/karten-masse'
 import { cn } from '@/lib/utils'
 
 /** Ungefähre Höhe der Karte am Pin (Kopf, zwei Zeilen, Abholzeile, Grundpreis, Knopf). */
@@ -34,7 +35,7 @@ export default function FutterKarteAnsicht({ karte, jetzt }: { karte: FutterKauf
   return (
     // `isolate`: eine eigene Stapelebene — sonst lägen Leaflets Ebenen (400)
     // beim Scrollen über der festen Leiste der Shell (z-50).
-    <div ref={rahmen} className="relative isolate overflow-hidden rounded-2xl">
+    <div ref={rahmen} className={cn('relative isolate overflow-hidden rounded-2xl', KARTEN_STEUERUNG)}>
       <HoefeKarte
         hoefe={hoefe}
         lage={lage}

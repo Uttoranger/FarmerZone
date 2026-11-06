@@ -87,7 +87,7 @@ function Stepper({ step }: { step: number }) {
               </div>
               <span
                 className={cn(
-                  'text-[11px] font-medium leading-none',
+                  'text-xs font-medium leading-none',
                   isActive ? 'font-bold text-foreground' : isDone ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
@@ -326,9 +326,9 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 )}
               />
               <FeldFehlerSatz feldId="status-body" text={fieldErrors.body ? 'Bitte schreib eine Nachricht – sie ist der Inhalt deines Beitrags.' : null} />
-              <p className="text-xs text-muted-foreground mt-1">
-                Tipp:{' '}
-                <code className="bg-muted px-1 rounded">{'{Vorname}'}</code> {BEITRAG_ABLAUF_TEXT.anredeTipp}
+              {/* Wie im Board s2-/w2-beitraege: ohne „Tipp:“ und ohne Code-Markierung, 13 px. */}
+              <p className="text-[13px] text-muted-foreground mt-1">
+                {'{Vorname}'} {BEITRAG_ABLAUF_TEXT.anredeTipp}
               </p>
             </div>
 

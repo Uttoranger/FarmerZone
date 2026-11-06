@@ -18,7 +18,7 @@ type Suche = Record<string, string | string[] | undefined>
  * Zeitpunkt bestimmt der Server einmal und reicht ihn als ISO-Text weiter
  * (Abholzeile, Filter „Abholung"). Ohne eigenen Standort der Zustand beider Reiter.
  */
-export async function FutterReiter({ farm, suche }: { farm: { id: string }; suche: Suche }): Promise<React.JSX.Element> {
+export async function FutterReiter({ farm, suche }: { farm: { id: string; name: string }; suche: Suche }): Promise<React.JSX.Element> {
   const filter = leseFutterKaufenFilter(suche)
   const ansicht = leseFutterAnsicht(suche.ansicht)
   const jetzt = new Date()
@@ -32,7 +32,7 @@ export async function FutterReiter({ farm, suche }: { farm: { id: string }; such
   return (
     <div className={REGION_RAHMEN}>
       <div className="flex flex-col gap-4 md:gap-[18px]">
-        <RegionKopf reiter="futter" km={filter.km} ansicht={ansicht} abholung={filter.abholung} ladePunkt />
+        <RegionKopf reiter="futter" km={filter.km} ansicht={ansicht} abholung={filter.abholung} ladePunkt hofName={farm.name} jetzt={jetzt} />
         <LadeInhalt>
           {daten === undefined ? (
             <RegionFehler nochmal={futterKaufenLink(filter, ansicht)} />

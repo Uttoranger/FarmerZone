@@ -18,6 +18,7 @@ type Suche = Record<string, string | string[] | undefined>
  */
 export async function PreiseReiter({ farm, suche }: { farm: { id: string; name: string }; suche: Suche }): Promise<React.JSX.Element> {
   const filter = leseUmfeldFilter(suche)
+  const jetzt = new Date()
   let daten: Awaited<ReturnType<typeof getUmfeld>> | undefined
   try {
     daten = await getUmfeld(farm.id, filter.km)
@@ -50,7 +51,7 @@ export async function PreiseReiter({ farm, suche }: { farm: { id: string; name: 
   return (
     <div className={REGION_RAHMEN}>
       <div className="flex flex-col gap-4 md:gap-[18px]">
-        <RegionKopf reiter="preise" km={filter.km} ansicht={filter.ansicht} ladePunkt />
+        <RegionKopf reiter="preise" km={filter.km} ansicht={filter.ansicht} ladePunkt hofName={farm.name} jetzt={jetzt} />
         <LadeInhalt>{inhalt}</LadeInhalt>
       </div>
     </div>

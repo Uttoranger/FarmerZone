@@ -28,6 +28,9 @@ import { VerkaufDialog } from './verkauf-dialog'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 
+/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
+const KICKER_12 = cn(KICKER, 'text-xs')
+
 /*
  * Verkäufe in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf Nr. 22b) —
  * gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt „Verkäufe", ohne neue
@@ -45,11 +48,13 @@ type Props = {
   produkte: VerkaufProdukt[]
   topProduktIds: string[]
   stripeReady: boolean
+  /** „<Hof> · Stand …“ unter der Überschrift (HofUnterzeile, von der Seite auf dem Server gebaut). */
+  unterzeile?: React.ReactNode
 }
 
 type DialogZustand = { offen: boolean; verkauf: VerkaufDaten | null; vorlage: VerkaufDaten | null }
 
-export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeReady }: Props): React.JSX.Element {
+export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeReady, unterzeile }: Props): React.JSX.Element {
   const [dialog, setDialog] = useState<DialogZustand>({ offen: false, verkauf: null, vorlage: null })
   const [loeschen, setLoeschen] = useState<VerkaufDaten | null>(null)
 
@@ -70,7 +75,11 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Verkäufe</h1>
-          <p className="text-[13px] leading-normal text-muted-foreground">Was du diese Woche eingenommen hast</p>
+          {/* Wie im Board s2-/w2-verkaeufe: unter der Überschrift der Hof (am Handy mit Stand), dann der Satz. */}
+          {unterzeile}
+          <p className={cn('text-[13px] leading-normal text-muted-foreground md:text-sm', unterzeile !== undefined && 'mt-2.5')}>
+            Was du diese Woche eingenommen hast
+          </p>
           {/* Leise, nur wenn der Stichtag Bestellungen dieser Seite betrifft (Register Z4). */}
           {overview.testzahlungenHinweis && (
             <p className={cn('mt-1 text-[12.5px] leading-snug', LEISE)}>{overview.testzahlungenHinweis}</p>
@@ -106,7 +115,7 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
       <StripeAuszahlungen bereit={stripeReady} />
 
       <section aria-labelledby="verkaeufe-liste" className="flex flex-col gap-2.5">
-        <h2 id="verkaeufe-liste" className={KICKER}>
+        <h2 id="verkaeufe-liste" className={KICKER_12}>
           Letzte Verkäufe
         </h2>
         {overview.zeilen.length === 0 ? (
@@ -138,7 +147,7 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
       {/* Board s2/w2-verkaeufe: „Noch einmal eintragen" unter der Liste. */}
       {vorlagen.length > 0 && (
         <section aria-labelledby="verkaeufe-wiederholen" className="flex flex-col gap-2.5">
-          <h2 id="verkaeufe-wiederholen" className={KICKER}>
+          <h2 id="verkaeufe-wiederholen" className={KICKER_12}>
             Noch einmal eintragen
           </h2>
           <ul className="grid grid-cols-2 gap-2 md:grid-cols-4">

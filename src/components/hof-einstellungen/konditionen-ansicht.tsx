@@ -30,6 +30,9 @@ import {
 import type { GebuehrLage } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 
+/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
+const KICKER_12 = cn(KICKER, 'text-xs')
+
 /**
  * „Deine Konditionen" (/settings/konditionen), seit Nr. 61 nach den Mockups
  * web-/mobil-h1-einstellungen-konditionen-v2: oben „Dein Stand" mit dem
@@ -84,7 +87,7 @@ export function KonditionenAnsicht({
         )}
 
         <section aria-labelledby="tarife-titel">
-          <h2 id="tarife-titel" className={KICKER}>
+          <h2 id="tarife-titel" className={KICKER_12}>
             {TARIFE_TITEL}
           </h2>
           {/* Luft oben für die Marken, die auf der Kante der Karten sitzen. */}
@@ -112,7 +115,7 @@ export function KonditionenAnsicht({
 
         {modell && (
           <section aria-labelledby="abrechnung-titel">
-            <h2 id="abrechnung-titel" className={cn(KICKER, 'mb-2.5')}>
+            <h2 id="abrechnung-titel" className={cn(KICKER_12, 'mb-2.5')}>
               So rechnen wir ab
             </h2>
             <p className="text-[14px] leading-relaxed text-foreground md:text-[13.5px]">
@@ -172,7 +175,7 @@ function DeinStandKarte({ stand, zusatz = null }: { stand: DeinStand; zusatz?: R
             <Sprout className="size-5" strokeWidth={1.8} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[1.2px] text-status-fertig uppercase">{DEIN_STAND_TITEL}</p>
+            <p className="text-xs font-semibold tracking-[1.2px] text-status-fertig uppercase">{DEIN_STAND_TITEL}</p>
             <h2 className="font-heading text-[19px] leading-tight font-semibold text-foreground md:text-xl">{stand.titel}</h2>
           </div>
         </div>
@@ -234,7 +237,7 @@ function Vergleich({ zeilen }: { zeilen: readonly VergleichZeile[] }): React.JSX
       </h2>
       <table className="w-full table-fixed text-left text-[14px] md:text-[13.5px]">
         <thead>
-          <tr className="text-[11.5px] tracking-[0.6px] text-muted-foreground uppercase">
+          <tr className="text-xs tracking-[0.6px] text-muted-foreground uppercase">
             <td className="w-2/5 pb-1.5" />
             <th scope="col" className="pb-1.5 font-semibold">
               {VERGLEICH_TEXT.heute}

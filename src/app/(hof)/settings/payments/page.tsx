@@ -130,7 +130,7 @@ export default async function PaymentsPage({
                 Online-Zahlung (Stripe)
               </h2>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                Kundinnen zahlen online mit Karte und weiteren Zahlungsarten.
+                Kundinnen zahlen online mit Karte, Apple Pay, Google Pay oder EPS.
               </p>
             </div>
             <StripeStatus

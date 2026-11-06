@@ -10,7 +10,7 @@ import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
 import { auswertungSummen, gebuehrenKarteText, grenzeStand, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
-import { umsatzfenster, type Periode, type Periodenfenster } from '@/lib/umsatz'
+import { umsatzfenster, zeitraumImSatz, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
 import { REGION_HREF } from '@/lib/bauern-navigation'
@@ -29,6 +29,7 @@ import {
   UmsatzKarte,
   ZeitraumWahl,
 } from '@/components/auswertung/auswertung-teile'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 
@@ -71,7 +72,9 @@ export default async function AnalyticsPage({
   const kopf = (
     <header>
       <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Auswertung</h1>
-      <p className="text-[13px] leading-normal text-muted-foreground">
+      <HofUnterzeile hofName={farm.name} jetzt={jetzt} />
+      {/* Der Einleitungssatz als eigener Absatz unter der Hofzeile (Board w2-auswertung). */}
+      <p className="mt-2.5 text-[13px] leading-normal text-muted-foreground md:text-sm">
         Deine Zahlen – den Markt rundherum findest du unter{' '}
         <Link href={REGION_HREF} className={cn('font-semibold text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}>
           Region
@@ -93,7 +96,7 @@ export default async function AnalyticsPage({
   ) : (
     <>
       <ZeitraumWahl periode={periode} zurueck={zurueck} zeitraum={daten.umsatz.zeitraum} />
-      <KennzahlenReihe k={daten.kennzahlen} zeitraum={daten.umsatz.zeitraum} />
+      <KennzahlenReihe k={daten.kennzahlen} zeitraum={daten.umsatz.zeitraum} satzZeitraum={zeitraumImSatz(pf)} />
       <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={daten.umsatz.zeitraum} />
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <UmsatzKarte

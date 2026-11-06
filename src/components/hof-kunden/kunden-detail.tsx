@@ -14,6 +14,9 @@ import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellunge
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { cn } from '@/lib/utils'
 
+/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
+const KICKER_12 = cn(KICKER, 'text-xs')
+
 /*
  * Eine Kundin des Hofs (/customers/[kundeId], Gate 8 „Code ohne Mockup",
  * Nachtlauf Nr. 22a) — gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt
@@ -103,7 +106,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
             </dl>
 
             <section aria-labelledby="kundin-bestellungen" className="flex flex-col gap-2">
-              <h2 id="kundin-bestellungen" className={KICKER}>
+              <h2 id="kundin-bestellungen" className={KICKER_12}>
                 Letzte Bestellungen
               </h2>
               <ListGruppe>
@@ -147,7 +150,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
           <div className="flex min-w-0 flex-col gap-4">
             <section aria-labelledby="kundin-kontakt" className={cn(KARTE, 'flex flex-col gap-1 p-4 md:px-[18px]')}>
-              <h2 id="kundin-kontakt" className={KICKER}>
+              <h2 id="kundin-kontakt" className={KICKER_12}>
                 Kontakt
               </h2>
               {anrufen ? (
@@ -171,7 +174,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
             {kunde.topProducts.length > 0 && (
               <section aria-labelledby="kundin-lieblinge" className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
-                <h2 id="kundin-lieblinge" className={KICKER}>
+                <h2 id="kundin-lieblinge" className={KICKER_12}>
                   Lieblingsprodukte
                 </h2>
                 <ol className="flex flex-col gap-2">
@@ -192,7 +195,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
             {abo && (
               <section aria-labelledby="kundin-neuigkeiten" className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
-                <h2 id="kundin-neuigkeiten" className={KICKER}>
+                <h2 id="kundin-neuigkeiten" className={KICKER_12}>
                   Neuigkeiten von dir
                 </h2>
                 <dl className="flex flex-col gap-1.5 text-[14px]">

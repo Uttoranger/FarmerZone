@@ -13,6 +13,9 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ReceiptText } from 'lucide-react'
 import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
 
+/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
+const KICKER_12 = cn(KICKER, 'text-xs')
+
 const T = LASTSCHRIFT_TEXT
 
 /** Was die Seite vom Server bekommt — nur Text, Wahrheitswerte und Cent (kein Date, keine IBAN). */
@@ -175,7 +178,7 @@ function RechnungKnopf({ abrechnungId, art }: { abrechnungId: string; art: 'bar'
 function Monatsabrechnungen({ zeilen }: { zeilen: BarzahlungAnzeige['abrechnungen'] }): React.JSX.Element {
   return (
     <section aria-labelledby="abrechnungen-titel" className="flex flex-col gap-2.5">
-      <h2 id="abrechnungen-titel" className={KICKER}>
+      <h2 id="abrechnungen-titel" className={KICKER_12}>
         {T.abrechnungen}
       </h2>
       {zeilen.length === 0 ? (

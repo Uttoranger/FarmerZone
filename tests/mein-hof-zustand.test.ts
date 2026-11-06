@@ -71,6 +71,12 @@ describe('zustandsZeile', () => {
     expect(zustandsZeile(OFFEN)?.knopf?.art).toBe('pausieren')
   })
 
+  it('pausiert mit Nachricht: der Satz zitiert sie wie die Hofseite (Board s1-/w1-mein-hof Bild 4); leer bleibt der Satz allein', () => {
+    const mit = zustandsZeile({ ...OFFEN, zustand: 'pausiert', sperre: 'pause', pauseMessage: '  Wir sind im Urlaub bis 15. März. ' })
+    expect(mit?.satz).toBe('Bestellen kann gerade niemand. „Wir sind im Urlaub bis 15. März.“')
+    expect(zustandsZeile({ ...OFFEN, zustand: 'pausiert', sperre: 'pause', pauseMessage: '   ' })?.satz).toBe('Bestellen kann gerade niemand.')
+  })
+
   it('ohne Abholzeit: „Noch nicht bestellbar“ wie auf /hoefe, Knopf „Eintragen“ — vor „kein Produkt“', () => {
     const zeile = zustandsZeile({ ...OFFEN, sperre: 'keine-abholzeit', naechste: null, kaufbar: false })
     expect(zeile).toEqual({

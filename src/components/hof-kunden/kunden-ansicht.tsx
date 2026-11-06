@@ -51,7 +51,14 @@ function schreibeAdresse(adresse: string) {
   window.history.replaceState(null, '', adresse)
 }
 
-export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
+export function KundenAnsicht({
+  kunden,
+  unterzeile,
+}: {
+  kunden: CustomerSummary[]
+  /** „<Hof> · Stand …“ unter der Überschrift (HofUnterzeile, von der Seite auf dem Server gebaut). */
+  unterzeile?: React.ReactNode
+}): React.JSX.Element {
   const ansicht = kundenAnsichtAus(useSearchParams())
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
@@ -63,7 +70,8 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
     <div className="flex flex-col gap-4 md:gap-[18px]">
       <header className="min-w-0">
         <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Kunden</h1>
-        <p className="text-[13px] leading-normal text-muted-foreground">
+        {unterzeile}
+        <p className={cn('text-[13px] leading-normal text-muted-foreground', unterzeile !== undefined && 'mt-2.5')}>
           {kunden.length > 0 ? kundenKopfzeile(kunden) : 'Alle, die bisher bei dir bestellt haben'}
         </p>
       </header>
@@ -82,8 +90,10 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
         />
       ) : (
         <>
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-            <FilterChipReihe beschriftung="Kunden filtern" className="min-w-0 xl:flex-1">
+          {/* Werkzeugzeile wie im Board s2-/w2-kunden: Chips und „Sortieren“ in einer Zeile, am Handy die Suche
+              darunter, im Web zwischen Chips und „Sortieren“. */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+            <FilterChipReihe beschriftung="Kunden filtern" className="order-1 min-w-0 flex-1">
               {sichtbareKundenFilter(ansicht.filter).map((f) => {
                 const adresse = kundenAdresse({ ...aktuell, filter: f })
                 return (
@@ -102,9 +112,8 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                 )
               })}
             </FilterChipReihe>
-            <label className="relative block md:max-w-[340px] xl:w-[280px] xl:shrink-0">
+            <label className="relative order-3 block w-full xl:order-2 xl:w-[360px] xl:shrink-0">
               <span className="sr-only">Kundin suchen</span>
-              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
               <input
                 type="search"
                 value={suche}
@@ -114,23 +123,25 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                   setSuche(wert)
                   schreibeAdresse(kundenAdresse({ ...ansicht, suche: wert }))
                 }}
-                placeholder="Kundin suchen"
+                placeholder="Name, Telefon oder E-Mail"
                 className={cn(
-                  'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:h-9 md:text-[13px]',
+                  // 48 px, leicht gerundet im Feldrand (Board); nie unter 44 px (WCAG 2.5.8).
+                  'h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]',
                   FOKUS_RAHMEN
                 )}
               />
             </label>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={cn('text-[13px]', LEISE)} aria-live="polite">
-              {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
-            </p>
             {/* Ein Knopf, kein Link: Sortierung und Filter im Blatt sind Seitenzustand;
                 die Adresse bekommt sie trotzdem mit (Neuladen, Teilen). */}
-            <KundenSortieren ansicht={aktuell} zahlen={zahlen} onAdresse={schreibeAdresse} />
+            <div className="order-2 shrink-0 xl:order-3">
+              <KundenSortieren ansicht={aktuell} zahlen={zahlen} onAdresse={schreibeAdresse} />
+            </div>
           </div>
+
+          {/* Die Zahl der Treffer hört nur der Screenreader — das Board zeigt sie nicht, die Chips zählen schon. */}
+          <p className="sr-only" aria-live="polite">
+            {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
+          </p>
 
           {liste.length === 0 ? (
             <EmptyState
@@ -222,7 +233,7 @@ function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string 
     <a
       href={anrufen}
       aria-label={`${kunde.customerName} anrufen`}
-      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
+      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
     >
       <Phone className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
     </a>
@@ -235,7 +246,7 @@ function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string 
  * und kürzt — lange Namen sprengen die Tabelle nie.
  */
 function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
-  const kopf = 'px-2.5 py-2.5 text-left xl:px-3.5 text-[11px] font-semibold tracking-[0.08em] whitespace-nowrap text-muted-foreground uppercase'
+  const kopf = 'px-2.5 py-2.5 text-left xl:px-3.5 text-[13px] font-semibold whitespace-nowrap text-muted-foreground'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
       <table className="w-full text-[13.5px]">
@@ -308,23 +319,22 @@ function Zeilen({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
             >
               <Initialen name={k.customerName} />
               <span className="min-w-0 flex-1">
+                {/* Wie im Board s2-kunden: Name und Marke in einer Zeile, darunter Bestellungen und „Häufig“,
+                    ohne Betrag (den zeigt die Tabelle ab 1024 px und die Kundin-Seite). */}
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="min-w-0 truncate text-[14.5px] font-semibold">{k.customerName}</span>
+                  <span className="min-w-0 truncate text-[15px] font-semibold">{k.customerName}</span>
                   <Neuigkeiten an={k.isSubscribed} />
-                  <span className="ml-auto shrink-0 pl-2 text-[14px] font-semibold tabular-nums">{euro(k.umsatzCents)}</span>
+                  {marke && (
+                    <span className="shrink-0">
+                      <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>
+                    </span>
+                  )}
                 </span>
-                <span className={cn('mt-0.5 block truncate text-[12.5px]', LEISE)}>
+                <span className={cn('mt-0.5 block truncate text-[13px]', LEISE)}>
                   {mitAnzahl(k.orderCount, 'Bestellung', 'Bestellungen')} · {zuletztText(k.daysSinceLastOrder)}
                 </span>
-                {(marke || k.topProducts.length > 0) && (
-                  <span className="mt-1 flex min-w-0 items-center gap-2">
-                    {marke && <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>}
-                    {k.topProducts.length > 0 && (
-                      <span className={cn('min-w-0 truncate text-[12.5px]', LEISE)}>
-                        Häufig: {k.topProducts.slice(0, 2).map((p) => p.name).join(', ')}
-                      </span>
-                    )}
-                  </span>
+                {k.topProducts.length > 0 && (
+                  <span className={cn('block truncate text-[13px]', LEISE)}>Häufig: {k.topProducts.slice(0, 2).map((p) => p.name).join(', ')}</span>
                 )}
               </span>
             </Link>

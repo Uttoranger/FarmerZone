@@ -6,6 +6,7 @@ import { BestellDialog } from '@/components/hof-bestellungen/bestell-dialog'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import {
   KUNDEN_FILTER_LABEL,
+  ZEIGEN_REIHENFOLGE,
   KUNDEN_SORTIERUNG_LABEL,
   SORTIEREN_TEXT,
   ZEIGEN_TEXT,
@@ -18,7 +19,6 @@ import {
   type KundenBlattWahl,
 } from '@/lib/hof-kunden'
 import {
-  KUNDEN_FILTER_WERTE,
   KUNDEN_SORTIERUNG_WERTE,
   type KundenAnsicht,
   type KundenFilter,
@@ -111,7 +111,7 @@ export function SortierFelder({
       <fieldset className="min-w-0">
         <legend className={LEGENDE}>{ZEIGEN_TEXT}</legend>
         <div className="grid grid-cols-2 gap-2">
-          {KUNDEN_FILTER_WERTE.map((f) => (
+          {ZEIGEN_REIHENFOLGE.map((f) => (
             <label key={f} className={cn(wahlKlassen(f === filter), 'min-w-0')}>
               <input
                 type="radio"

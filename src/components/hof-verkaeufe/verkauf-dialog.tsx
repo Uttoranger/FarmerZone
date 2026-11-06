@@ -200,7 +200,7 @@ export function VerkaufFormular({
       else toast.success(antwort.vorrat?.text ?? (bearbeiten ? 'Verkauf gespeichert' : 'Verkauf eingetragen'))
       onFertig()
     } catch {
-      setServerFehler('Wir konnten den Verkauf nicht speichern. Bitte versuch es noch einmal.')
+      setServerFehler('Wir konnten den Verkauf nicht speichern. Deine Angaben sind noch da.')
     } finally {
       setLaeuft(false)
     }
@@ -254,7 +254,8 @@ export function VerkaufFormular({
 
         {/* Der Betrag — groß, mit Komma oder Punkt (DezimalFeld). Der Fokus liegt am Rahmen um Feld und Zeichen. */}
         <div>
-          <label htmlFor="verkauf-betrag" className="sr-only">
+          {/* Sichtbar beschriftet wie im Board s2-/w2-verkaeufe (Felder mit sichtbarer Beschriftung, Lauf 31). */}
+          <label htmlFor="verkauf-betrag" className="mb-1 block text-sm font-semibold text-foreground">
             Betrag in Euro
           </label>
           <div

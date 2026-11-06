@@ -273,7 +273,8 @@ describe('fertig oder fehlt', () => {
   })
 
   it('Abholzeiten: fehlt ohne aktive Fenster', () => {
-    expect(alleZeilen(VOLL).find((z) => z.id === 'abholzeiten')!.wert).toBe('Fr 15–18 · Sa 9–12')
+    // Mit „Uhr“ wie im Board s1-/w1-mein-hof (Lauf 31); das Teilen-Bild bleibt ohne (abholzeitenKurz).
+    expect(alleZeilen(VOLL).find((z) => z.id === 'abholzeiten')!.wert).toBe('Fr 15–18 Uhr · Sa 9–12 Uhr')
     const ohne = alleZeilen({ ...VOLL, abholzeiten: [] }).find((z) => z.id === 'abholzeiten')!
     expect(ohne.fertig).toBe(false)
   })
@@ -413,5 +414,14 @@ describe('abholzeitenKurz', () => {
 
   it('leer bleibt leer', () => {
     expect(abholzeitenKurz([])).toBe('')
+  })
+
+  it('mit „Uhr“ hinter jedem Tag (Mein Hof, Einstellungen); ohne Angabe bleibt es knapp (Teilen-Bild)', () => {
+    const fenster = [
+      { dayOfWeek: 3, startTime: '15:00', endTime: '18:00' },
+      { dayOfWeek: 6, startTime: '09:00', endTime: '12:00' },
+    ]
+    expect(abholzeitenKurz(fenster, { mitUhr: true })).toBe('Mi 15–18 Uhr · Sa 9–12 Uhr')
+    expect(abholzeitenKurz(fenster)).toBe('Mi 15–18 · Sa 9–12')
   })
 })

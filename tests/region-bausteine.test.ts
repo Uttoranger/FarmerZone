@@ -75,13 +75,14 @@ describe('KmWahl — Umkreis mit Zahl je Stufe', () => {
   it('mit Zahl: „25 km 8" je Stufe, gleich hoch, die Beschriftung nennt die Zahl', () => {
     const wanne = html(createElement(KmWahl, { stufen: STUFEN, zahlen: { 10: 3, 25: 8, 50: 19 }, zahlLabel: 'Umkreis, Zahl der Höfe je Stufe' }))
     expect(wanne).toContain('aria-label="Umkreis, Zahl der Höfe je Stufe"')
-    for (const [km, zahl] of [[10, 3], [25, 8], [50, 19]]) expect(wanne).toContain(`>${km} km<span class="text-[11.5px] font-medium">${zahl}</span>`)
+    // Seit Lauf 31 (Nr. 238) 12 px statt 11,5 px: nie unter 12 px.
+    for (const [km, zahl] of [[10, 3], [25, 8], [50, 19]]) expect(wanne).toContain(`>${km} km<span class="text-xs font-medium">${zahl}</span>`)
     expect(wanne.match(/class="relative inline-flex h-9 /g)).toHaveLength(3)
   })
 
   it('eine fehlende Zahl lässt nur die Zahl weg, nicht die Stufe', () => {
     const wanne = html(createElement(KmWahl, { stufen: STUFEN, zahlen: { 25: 8 }, zahlLabel: 'Umkreis, Zahl der Angebote je Stufe' }))
-    expect(wanne.match(/<span class="text-\[11.5px\] font-medium">/g)).toHaveLength(1)
+    expect(wanne.match(/<span class="text-xs font-medium">/g)).toHaveLength(1)
     expect(wanne.match(/<a /g)).toHaveLength(3)
   })
 })

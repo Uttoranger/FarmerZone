@@ -40,13 +40,15 @@ describe('/farm-page', () => {
 
   it('unter lg die Liste „Bearbeiten" (Nr. 50), ab lg der Editor — beide mit denselben Daten', () => {
     expect(seite).toMatch(
-      /<div className="lg:hidden">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<AbschnitteListe fortschritt=\{fortschritt\} hof=\{hof\} einstellungen=\{einstellungen\} auftritt=\{auftritt\} aktuell=\{aktuell\} \/>/
+      /<div className="lg:hidden">[\s\S]*?<AbschnitteListe fortschritt=\{fortschritt\} hof=\{hof\} einstellungen=\{einstellungen\} auftritt=\{auftritt\} aktuell=\{aktuell\} \/>/
     )
     // Die alte Hofseite mit Stiften und die Checkliste sind dort entfallen (Register N4).
     expect(seite).not.toMatch(/FarmPageClient|ChecklisteKompakt|FarmPageView/)
     expect(seite).toContain('<HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />')
-    // Ab lg trägt der Editor-Block die H1 der Seite — nur für Screenreader; sichtbar ist der Hofname im Kopf.
-    expect(seite).toMatch(/<div className="hidden px-8 pb-12 lg:block">[\s\S]*?<h1 className="sr-only">Hofseite bearbeiten<\/h1>\s*<HofseiteEditor/)
+    // Seit Lauf 31 (Nr. 238) trägt der Kopf die sichtbare h1 „Mein Hof“ — keine zweite, unsichtbare h1 im Inhalt.
+    expect(seite).not.toContain('<h1')
+    expect(quelltext('src/components/mein-hof/seitenkopf.tsx')).toMatch(/<h1 className="[^"]*\bfont-heading\b[^"]*">\{MEIN_HOF_KOPF_TEXT\.titel\}<\/h1>/)
+    expect(quelltext('src/components/mein-hof/seitenkopf.tsx')).toContain('<MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} titelAlsH1 />')
   })
 
   it('der Kopf steht genau einmal je Reiter', () => {

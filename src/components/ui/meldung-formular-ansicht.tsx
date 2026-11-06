@@ -30,6 +30,7 @@ export const MELDUNG_ANSICHT_TEXT = {
   mitgeschicktTitel: 'Das schicken wir automatisch mit',
   seite: 'Seite',
   geraet: 'Gerät',
+  hof: 'Hof',
   email: 'Deine E-Mail',
   emailZusatz: '· nur für unsere Antwort, optional',
   bildschirmfoto: 'Bildschirmfoto hinzufügen',
@@ -62,12 +63,14 @@ const RAHMEN_KNOPF = cn(
  * Kontext (vor dem Einhängen) steht ein Strich; der Satz ohne IP und Cookies
  * bleibt darunter — er sagt, was NICHT mitgeht.
  */
-function MitgeschicktKarte({ kontext, kennung }: { kontext: Kontext; kennung: string }): React.JSX.Element {
+function MitgeschicktKarte({ kontext, kennung, hofName }: { kontext: Kontext; kennung: string; hofName?: string }): React.JSX.Element {
   const T = MELDUNG_ANSICHT_TEXT
   const zeilen: { name: string; wert: string }[] = [
     ...(kennung.trim() ? [{ name: T.fehlernummer, wert: kennung.trim() }] : []),
     { name: T.seite, wert: seiteName(kontext.seiteUrl) },
     { name: T.geraet, wert: kontext.userAgent.trim() === '' ? '–' : geraetName(kontext.userAgent) },
+    // Der Hof aus der Sitzung (Board s2-/w2-meldungen): nur, wenn die Seite den Namen gibt.
+    ...(hofName?.trim() ? [{ name: T.hof, wert: hofName.trim() }] : []),
   ]
   return (
     <div data-slot="meldung-mitgeschickt" className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-3.5 py-3">
@@ -106,6 +109,7 @@ export function MeldungFormularAnsicht({
   abbrechenHref,
   titel,
   satz,
+  hofName,
   className,
 }: {
   formular: MeldungFormular
@@ -117,6 +121,8 @@ export function MeldungFormularAnsicht({
   /** Überschrift in der Karte (h1), wenn die Seite keine eigene trägt. */
   titel?: string
   satz?: string
+  /** Name des angemeldeten Hofs für die Zeile „Hof“ in der Karte „Das schicken wir automatisch mit“. */
+  hofName?: string
   className?: string
 }): React.JSX.Element {
   const f = formular
@@ -290,7 +296,7 @@ export function MeldungFormularAnsicht({
 
         {/* Der Hof sieht, was mitgeht, als Karte (Board s2-/w2-meldungen); die Kundin den Satz (Board s3-problem-melden). */}
         {alsHof ? (
-          <MitgeschicktKarte kontext={f.kontext} kennung={f.kennung} />
+          <MitgeschicktKarte kontext={f.kontext} kennung={f.kennung} hofName={hofName} />
         ) : (
           <p className="text-[13px] leading-normal text-muted-foreground">{mitgeschicktSatz(f.kennung, alsHof)}</p>
         )}

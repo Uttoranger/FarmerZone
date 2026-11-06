@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { CircleAlert } from 'lucide-react'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 
@@ -13,16 +12,17 @@ export function EinstellungenFehler({ titel, href }: { titel: string; href: stri
     <div className="flex flex-col gap-4">
       <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">{titel}</h1>
       <Hinweiskarte
-        ton="orange"
-        symbol={CircleAlert}
+        
+        ton="neutral"
         titel="Wir konnten deine Einstellungen gerade nicht laden."
         aktion={
           <Link href={href} className={KNOPF_RAHMEN}>
-            Noch einmal versuchen
+            Neu laden
           </Link>
         }
       >
-        Es ist nichts verloren gegangen. Versuch es bitte gleich noch einmal.
+        {/* Wörtlich nach Board s1-/w1-einstellungen Bild 2. */}
+        Deine Angaben sind nicht verloren. Versuch es noch einmal.
       </Hinweiskarte>
     </div>
   )

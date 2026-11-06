@@ -9,10 +9,10 @@ import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
  */
 
 /** Übersicht und Konditionen: bis 1000 px wie im Mockup, ab 1024 px zwei Spalten. */
-export const EINSTELLUNGEN_RAHMEN = 'mx-auto w-full max-w-[1000px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
+export const EINSTELLUNGEN_RAHMEN = 'w-full max-w-[1000px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
 
 /** Unterseiten: eine Spalte mit Formularen, so breit wie bisher. */
-export const UNTERSEITE_RAHMEN = 'mx-auto w-full max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-8'
+export const UNTERSEITE_RAHMEN = 'w-full max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-8'
 
 export function EinstellungenLaden(): React.JSX.Element {
   return (
