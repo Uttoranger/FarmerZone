@@ -200,6 +200,12 @@ export const MELDUNGEN_PRO_STUNDE = 5
 export const ZU_VIELE_MELDUNGEN =
   'Zu viele Meldungen in kurzer Zeit — bitte versuche es in einer Stunde noch einmal.'
 
+/**
+ * Die Meldung kam nicht an, weil die Anfrage scheiterte (Wurf der Aktion, nicht ihre Ablehnung) — wörtlich wie
+ * Board s3-/w3-problem-melden, Bild 6 (Nr. 242). Vorher fiel /problem-melden dann auf die 500, der Text war weg.
+ */
+export const MELDUNG_NICHT_GESPEICHERT = 'Wir konnten deine Meldung gerade nicht speichern. Dein Text ist noch da – versuch es bitte gleich noch einmal.'
+
 /** Wohin „PR #<nr>" in sprintName zeigt — das Repository ist öffentlich. */
 export const PR_BASIS_URL = 'https://github.com/Uttoranger/FarmerZone/pull/'
 
