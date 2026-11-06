@@ -202,7 +202,8 @@ describe('Nichts unter dem Überstand (V28)', () => {
     const fuss = abschnitt(renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' })), '<footer', '>')
     expect(leiste).toBe(69)
     expect(ueberstand).toBe(20)
-    expect(pbPx(fuss.match(/class="([^"]*)"/)?.[1] ?? '')).toBeGreaterThanOrEqual(leiste + ueberstand)
+    // Seit Nr. 247 (G10) rechnet der Fuß mit den Variablen selbst — samt Home-Indicator, der in festen px fehlte.
+    expect(fuss).toContain('pb-[calc(var(--kunde-unterleiste)+var(--kunde-ueberstand)+1.5rem)]')
   })
 
   it('HofShell: Der Inhalt hält Unterleiste plus erhobenes „Neu“ frei', () => {

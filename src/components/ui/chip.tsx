@@ -92,7 +92,8 @@ export function FilterChip({
         "relative inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-['']",
         aktiv
           ? 'border-foreground bg-foreground font-semibold text-background'
-          : 'border-border bg-card font-medium text-foreground hover:bg-muted',
+          : // Der Feldrand statt der Linie (G11, Liste Lauf 32 hoefe): Im Dunkeln war der Umriss sonst kaum zu sehen.
+            'border-input bg-card font-medium text-foreground hover:bg-muted',
         FOKUS_RAHMEN,
         className
       )}

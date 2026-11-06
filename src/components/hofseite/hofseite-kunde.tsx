@@ -268,7 +268,9 @@ export function HofseiteKunde({
       const anker = reiterAnker.current
       if (anker) {
         // Der Anker ist der Anfang der Inhaltsspalte: Er soll unter dem Kopf und der klebenden Hofzeile stehen.
-        const kopf = document.querySelector('header')?.getBoundingClientRect().height ?? 0
+        // Nur ein klebender Kopf zählt: Am Handy scrollt der Kopf der Shell hier weg (G9, Nr. 247).
+        const kopfZeile = document.querySelector('header')
+        const kopf = kopfZeile && getComputedStyle(kopfZeile).position === 'sticky' ? kopfZeile.getBoundingClientRect().height : 0
         const ziel = anker.getBoundingClientRect().top + window.scrollY - kopf - (klebeBlock?.offsetHeight ?? 0)
         if (window.scrollY > ziel) window.scrollTo({ top: ziel })
       }

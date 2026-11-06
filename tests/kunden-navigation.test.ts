@@ -5,9 +5,11 @@
  *  - Web ohne Sitzung: Höfe entdecken · So funktioniert's · Für Höfe · Meine
  *    Bestellungen, rechts „Anmelden" — seit Nr. 41 (Register N1) auf /login,
  *    nicht mehr auf /account/login.
- *  - Web mit Kundensitzung: nur, was es heute gibt (E8: kein Kundenkonto,
- *    keine „Meine Höfe", kein „Merken") — Höfe entdecken · Meine Bestellungen ·
- *    Mein Konto. Suche und Warenkorb zeichnet die Shell selbst.
+ *  - Web mit Kundensitzung (seit Nr. 247, G9/V12): dieselben vier Links wie
+ *    ohne Sitzung, rechts „Mein Konto" als Pille — kein Suchfeld, kein
+ *    Personen-Symbol mehr; E8 bleibt (keine „Meine Höfe", kein „Merken").
+ *  - Ohne Knopf am Handy nur /login und /register (Q2), weg-scrollender Kopf
+ *    nur auf Hof- und Produktseite (aktiv = entdecken, G9).
  *  - Web mit Hof-Sitzung (N1): dieselben Links wie ohne Sitzung, rechts
  *    „Mein Hof" auf /dashboard statt „Anmelden".
  *  - Handy: Entdecken · Warenkorb · Bestellungen (E8, drei Einträge), in
@@ -22,6 +24,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import {
   SCHON_DABEI,
@@ -30,6 +33,8 @@ import {
   kundenAriaAktuell,
   kundenNavigation,
   kundenSitzung,
+  kopfScrolltWegAmHandy,
+  ohneKopfKnopfAmHandy,
   type KundenSitzung,
 } from '@/lib/kunden-navigation'
 import { BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
@@ -41,27 +46,24 @@ describe('Web', () => {
     const nav = kundenNavigation({ sitzung: 'gast' })
     expect(nav.web.map((p) => p.label)).toEqual(['Höfe entdecken', 'So funktioniert’s', 'Für Höfe', 'Meine Bestellungen'])
     expect(nav.knopf).toEqual({ id: 'anmelden', label: 'Anmelden', href: '/login' })
-    expect(nav.konto).toBeNull()
   })
 
-  it('Kundensitzung: Höfe entdecken · Meine Bestellungen, rechts Mein Konto — kein Knopf', () => {
+  it('Kundensitzung (G9): dieselben vier Links, rechts „Mein Konto" als Knopf', () => {
     const nav = kundenNavigation({ sitzung: 'kunde' })
-    expect(nav.web.map((p) => p.label)).toEqual(['Höfe entdecken', 'Meine Bestellungen'])
-    expect(nav.konto).toEqual({ id: 'konto', label: 'Mein Konto', href: '/account/profile' })
-    expect(nav.knopf).toBeNull()
+    expect(nav.web).toEqual(kundenNavigation({ sitzung: 'gast' }).web)
+    expect(nav.knopf).toEqual({ id: 'konto', label: 'Mein Konto', href: '/account/profile' })
   })
 
   it('Hof-Sitzung (N1): dieselben Links wie ohne Sitzung, rechts „Mein Hof" (→ /dashboard) statt „Anmelden"', () => {
     const hof = kundenNavigation({ sitzung: 'hof' })
     expect(hof.web).toEqual(kundenNavigation({ sitzung: 'gast' }).web)
     expect(hof.knopf).toEqual({ id: 'mein-hof', label: 'Mein Hof', href: '/dashboard' })
-    expect(hof.konto).toBeNull()
   })
 
   it('E8: weder „Meine Höfe" noch „Merken" noch „Neuigkeiten" — in keiner Sitzung', () => {
     for (const sitzung of ALLE) {
       const nav = kundenNavigation({ sitzung })
-      const texte = [...nav.web, nav.knopf, nav.konto, ...nav.handy.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : []))]
+      const texte = [...nav.web, nav.knopf, ...nav.handy.flatMap((p) => (p.art === 'punkt' ? [p.punkt] : []))]
         .flatMap((p) => (p ? [p.label] : []))
       for (const verboten of ['Meine Höfe', 'Merken', 'Neuigkeiten']) {
         expect(texte.join(' ')).not.toContain(verboten)
@@ -72,8 +74,8 @@ describe('Web', () => {
   it('alle Ziele sind Seiten, die es gibt — kein Link ins Leere', () => {
     for (const sitzung of ALLE) {
       const nav = kundenNavigation({ sitzung })
-      for (const p of [...nav.web, nav.knopf, nav.konto]) {
-        if (p) expect(p.href, p.label).toMatch(/^\/(hoefe|bestellungen|fuer-hoefe|login|dashboard|account\/profile|#[a-z-]+)?$/)
+      for (const p of [...nav.web, nav.knopf]) {
+        expect(p.href, p.label).toMatch(/^\/(hoefe|bestellungen|fuer-hoefe|login|dashboard|account\/profile|#[a-z-]+)?$/)
       }
     }
     // Die Ziele der Knöpfe liegen als Seiten im Code.
@@ -90,10 +92,10 @@ describe('Handy', () => {
     }
   })
 
-  /** Alle Ziele, die die Kopfzeile in dieser Sitzung anbietet: Textlinks, Knopf, Konto. */
+  /** Alle Ziele, die die Kopfzeile in dieser Sitzung anbietet: Textlinks und Knopf. */
   function webZiele(sitzung: KundenSitzung): string[] {
     const nav = kundenNavigation({ sitzung })
-    return [...nav.web, nav.knopf, nav.konto].flatMap((p) => (p ? [p.href] : []))
+    return [...nav.web, nav.knopf].map((p) => p.href)
   }
 
   it.each(ALLE)('Web und Handy bekommen dieselben Ziele — jedes Ziel der Leiste steht auch im Kopf (Sitzung: %s)', (sitzung) => {
@@ -146,7 +148,7 @@ describe('aktive Punkte', () => {
   it('mit Kundensitzung leuchtet auf /account/profile das Konto, nicht „Bestellungen"', () => {
     const nav = kundenNavigation({ sitzung: 'kunde' })
     const bestellungen = nav.handy.flatMap((p) => (p.art === 'punkt' && p.punkt.id === 'bestellungen' ? [p.punkt] : []))[0]
-    expect(nav.konto && kundenAriaAktuell('/account/profile', nav.konto)).toBe('page')
+    expect(kundenAriaAktuell('/account/profile', nav.knopf)).toBe('page')
     expect(kundenAriaAktuell('/account/profile', bestellungen)).toBeUndefined()
   })
 
@@ -158,8 +160,8 @@ describe('aktive Punkte', () => {
       expect(kundenAriaAktuell('/login', bestellungen)).toBeUndefined()
     }
     const gast = kundenNavigation({ sitzung: 'gast' })
-    expect(gast.knopf && kundenAriaAktuell('/login', gast.knopf)).toBe('page')
-    expect(gast.knopf && kundenAriaAktuell('/', gast.knopf)).toBeUndefined()
+    expect(kundenAriaAktuell('/login', gast.knopf)).toBe('page')
+    expect(kundenAriaAktuell('/', gast.knopf)).toBeUndefined()
   })
 
   it("aria-current 'page' nur auf genau der Zielseite", () => {
@@ -193,7 +195,7 @@ describe('kopfKnopf — der Knopf der Kopfzeile (Quelle für den Knopf der Kunde
     expect(kopfKnopf('gast')).toEqual(kundenNavigation({ sitzung: 'gast' }).knopf)
     expect(kopfKnopf('hof')).toEqual(kundenNavigation({ sitzung: 'hof' }).knopf)
     // Nachbesserung 1: Eine angemeldete Kundin sieht auch hier „Mein Konto" — nie eine vierte Variante.
-    expect(kopfKnopf('kunde')).toEqual(kundenNavigation({ sitzung: 'kunde' }).konto)
+    expect(kopfKnopf('kunde')).toEqual(kundenNavigation({ sitzung: 'kunde' }).knopf)
     expect(kopfKnopf('kunde')).toEqual({ id: 'konto', label: 'Mein Konto', href: '/account/profile' })
   })
 })
@@ -203,5 +205,29 @@ describe('SCHON_DABEI — „Schon dabei? Anmelden" (N1)', () => {
     const anmelden = kundenNavigation({ sitzung: 'gast' }).knopf
     expect(SCHON_DABEI).toEqual({ frage: 'Schon dabei?', link: anmelden?.label, href: anmelden?.href })
     expect(SCHON_DABEI.href).toBe('/login')
+  })
+})
+
+describe('Kopf am Handy (G9, Liste Lauf 32)', () => {
+  it('auf /login und /register entfällt der Knopf — die Seite ist selbst die Anmeldung (Q2)', () => {
+    expect(ohneKopfKnopfAmHandy('/login')).toBe(true)
+    expect(ohneKopfKnopfAmHandy('/register')).toBe(true)
+  })
+
+  it('Gegenprobe: überall sonst steht er, auch auf Pfaden, die nur so anfangen', () => {
+    for (const pfad of ['/', '/hoefe', '/account/login', '/loginhilfe', '/registrieren', '/hof-test']) {
+      expect(ohneKopfKnopfAmHandy(pfad), pfad).toBe(false)
+    }
+  })
+
+  it('der Kopf scrollt nur auf Hof- und Produktseite weg (aktiv = entdecken), sonst klebt er', () => {
+    expect(kopfScrolltWegAmHandy('entdecken')).toBe(true)
+    expect(kopfScrolltWegAmHandy(undefined)).toBe(false)
+    expect(kopfScrolltWegAmHandy('bestellungen')).toBe(false)
+  })
+
+  it('nur Hof- und Produktseite setzen `aktiv="entdecken"` — sonst schlüge die Regel auf einer fremden Seite an', () => {
+    const treffer = execFileSync('git', ['grep', '-l', 'aktiv="entdecken"', '--', 'src/app'], { encoding: 'utf8' }).trim().split('\n').sort()
+    expect(treffer).toEqual(['src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx'])
   })
 })

@@ -181,10 +181,22 @@ export function mittelknopfKlassen(ton: 'gruen' | 'orange'): string {
  */
 export function mittelknopfMitWortKlassen(): string {
   return cn(
-    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[12px] leading-none group-data-[eng]/leiste:max-[359px]:text-[11px] text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
+    // Halbfett wie die Wörter der Einträge daneben (G10, Board s1-hoefe: alle drei 600) — vorher dünner und damit blasser.
+    'group relative -mt-5 flex shrink-0 flex-col items-center gap-[7px] rounded-2xl text-[12px] leading-none font-semibold group-data-[eng]/leiste:max-[359px]:text-[11px] text-muted-foreground transition-colors duration-[250ms] hover:text-foreground',
     FOKUS_RAHMEN
   )
 }
+
+/**
+ * Der Zähler am erhobenen Mittelknopf (Kunde: Artikel im Warenkorb; G10, Board
+ * s1-hofseite): grün mit hellem Ring — Fläche in der Farbe der Leiste, Rand und
+ * Ziffer im Grün „fertig“ (hell dunkles, dunkel helles Grün), 22 px, oben rechts
+ * über den Kreis hinaus. Vorher orange; Orange heißt „wartet auf dich“ und
+ * gehört dem Hof (N42). Für den `Zaehler` mit `ton="gruen"` (die Klassen hier
+ * überschreiben seine Fläche).
+ */
+export const WARENKORB_ZAEHLER =
+  'absolute -top-1 -right-1.5 h-[22px] min-w-[22px] border-2 border-status-fertig bg-card px-[5px] text-[12px] text-status-fertig'
 
 /** Der Kreis im Mittelknopf mit Wort — Gestalt wie `mittelknopfKlassen`, Hover über den ganzen Knopf. */
 export function mittelkreisKlassen(ton: 'gruen' | 'orange'): string {

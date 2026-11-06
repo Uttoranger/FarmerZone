@@ -3,21 +3,22 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, ChevronLeft, Compass, Handbag, ReceiptText, Search, UserRound, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, Compass, Handbag, ReceiptText, type LucideIcon } from 'lucide-react'
 import {
   warenkorbKopfText,
   kundenAriaAktuell,
   kundenHandyAriaAktuell,
   kundenNavigation,
+  kopfScrolltWegAmHandy,
+  ohneKopfKnopfAmHandy,
   type KundenNavId,
   type KundenSitzung,
 } from '@/lib/kunden-navigation'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
-import { SUCHTEXT_PARAMETER } from '@/lib/suchtext-parameter'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { TREFFER_44 } from '@/components/ui/button'
-import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
+import { BottomNav, BottomNavLink, BottomNavMitte, WARENKORB_ZAEHLER, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
@@ -53,6 +54,13 @@ import { NotbremseBand } from '@/components/notbremse-band'
  * Seit Nr. 120 (Register N22) trägt jede Seite der KundeShell den Seitenfuß
  * (KundeFuss) mit Impressum, Datenschutz, AGB und „Problem melden"; Hell/Dunkel
  * am Handy steht darin. Die KundeFokusShell bleibt ohne Fuß.
+ *
+ * Seit Nr. 247 (Liste Lauf 32, G9/G10): Der Kopf ist in jeder Sitzung derselbe
+ * — vier Links, „Warenkorb · n“, Sonne/Mond, rechts EINE Umriss-Pille
+ * („Anmelden“, „Mein Konto“ oder „Mein Hof“), kein Suchfeld. Am Handy Marke und
+ * Pille; auf /login und /register nur die Marke. Auf Hof- und Produktseite
+ * scrollt der Kopf am Handy weg, dort klebt nur der Kopf des Hofs. Unten das
+ * Wort „Warenkorb“ halbfett wie die Nachbarn, der Zähler grün mit hellem Ring.
  *
  * Seit Nr. 107 (Register N4, Ergänzung): Steht die Hofseite als Vorschau im
  * Rahmen (Kundenansicht von Mein Hof, Vorschau im Editor), zeigt die Shell
@@ -148,10 +156,17 @@ function VorschauLeisteSperre(): React.JSX.Element {
 }
 
 
+/**
+ * Platz unter dem Seitenfuß am Handy (G10, V28): Unterleiste samt Linie und Home-Indicator, der Überstand des
+ * Mittelknopfs und 24 px Luft — aus den Variablen der Shell (src/lib/kunde-shell-masse.ts), nie eigene Zahlen.
+ * Ohne Unterleiste (Produktseite) hält derselbe Platz die feste Leiste der Seite frei.
+ */
+const FUSS_PLATZ_UNTEN = 'pb-[calc(var(--kunde-unterleiste)+var(--kunde-ueberstand)+1.5rem)]'
+
 export type KundeShellProps = {
   /**
    * Wie die Seite die Sitzung sieht (kundenSitzung): ohne Sitzung „Anmelden",
-   * mit Kundensitzung Suche und „Mein Konto", mit Hof-Sitzung „Mein Hof".
+   * mit Kundensitzung „Mein Konto", mit Hof-Sitzung „Mein Hof" (seit Nr. 247 alle drei als Pille).
    */
   sitzung: KundenSitzung
   /**
@@ -195,15 +210,23 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
   const korbAmHandy = korb !== null && !unterleiste
   // Vorschau im Rahmen: erst nach dem Mounten bekannt, vom Server und beim Hydrieren false.
   const imRahmen = useImVorschauRahmen()
+  // G9: Hof- und Produktseite haben am Handy ihren eigenen klebenden Kopf; der Kopf der Shell scrollt dort weg.
+  const kopfScrolltWeg = kopfScrolltWegAmHandy(aktiv)
 
   return (
     // Die Maße als CSS-Variablen (src/lib/kunde-shell-masse.ts): Der Kartenmodus auf
     // /hoefe füllt damit genau den Platz zwischen Kopfzeile und Unterleiste.
     // data-scroll-rand: Der Fokus scrollt nie unter Kopf und Unterleiste (WCAG 2.4.11, scroll-padding in globals.css, Nr. 177).
-    <div data-design="neu" data-scroll-rand={unterleiste ? 'kunde' : 'kunde-ohne-leiste'} className={cn('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE)}>
+    // data-kopf-scrollt: Der Kopf klebt am Handy nicht — scroll-padding in globals.css rechnet dann ohne ihn.
+    <div
+      data-design="neu"
+      data-scroll-rand={unterleiste ? 'kunde' : 'kunde-ohne-leiste'}
+      data-kopf-scrollt={kopfScrolltWeg ? '' : undefined}
+      className={cn('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE)}
+    >
       <SprungLink />
       {/* Der Kopf auf der Fläche (bg-card) mit Linie unten wie im Board w1-startseite; die Seite darunter steht auf dem Grund. */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card print:hidden">
+      <header className={cn('sticky top-0 z-40 border-b border-border bg-card print:hidden', kopfScrolltWeg && 'max-md:relative')}>
         {handyTitel && (
           // Die Titelzeile am Handy (Boards s1-bestaetigung, s1-bestellung-link): kein Logo, kein Knopf — die Seite
           // hat ihre eine Hauptaktion unten, der Weg zurück steht als Link im Inhalt.
@@ -219,30 +242,7 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
             <Wortmarke wortKlasse={korbAmHandy ? 'max-[359px]:hidden' : undefined} />
           </Link>
 
-          {/* Mit Kundensitzung sitzt die Suche im Kopf; am Handy oben in „Entdecken" (DESIGN_SYSTEM). */}
-          {sitzung === 'kunde' && (
-            <form role="search" action="/hoefe" method="get" className="hidden w-[340px] md:block">
-              <label className="relative block">
-                <span className="sr-only">Hof oder Produkt suchen</span>
-                <Search
-                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-                  strokeWidth={1.7}
-                  aria-hidden="true"
-                />
-                <input
-                  type="search"
-                  name={SUCHTEXT_PARAMETER}
-                  placeholder="Hof oder Produkt suchen …"
-                  className={cn(
-                    'h-[38px] w-full rounded-full border border-border bg-card pr-4 pl-10 text-[13.5px] text-foreground placeholder:text-muted-foreground',
-                    FOKUS_RAHMEN
-                  )}
-                />
-              </label>
-            </form>
-          )}
-
-          {/* Die Links stehen gleich nach Marke (und Suche), rechts nur Warenkorb, Hell/Dunkel und der Knopf (V12). */}
+          {/* Die Links stehen gleich nach der Marke, rechts nur Warenkorb, Hell/Dunkel und der Knopf (V12); kein Suchfeld (G9). */}
           <span className="flex-1 md:hidden" />
           <nav aria-label="Hauptnavigation" className="hidden min-w-0 flex-1 md:block">
             <ul className="flex items-center gap-0.5 lg:gap-1">
@@ -280,24 +280,14 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
             )}
             {/* Am Handy steht Hell/Dunkel am Seitenfuß — oben rechts gehört der Platz dem Knopf. */}
             <ThemeUmschalter className="hidden rounded-full border border-input text-foreground hover:bg-muted md:inline-flex" />
-            {nav.knopf && (
-              <Link href={nav.knopf.href} aria-current={kundenAriaAktuell(pathname, nav.knopf, aktiv)} className={KOPF_PILLE}>
-                {nav.knopf.label}
-              </Link>
-            )}
-            {nav.konto && (
-              <Link
-                href={nav.konto.href}
-                aria-label={nav.konto.label}
-                title={nav.konto.label}
-                aria-current={kundenAriaAktuell(pathname, nav.konto, aktiv)}
-                className={cn('flex size-11 items-center justify-center rounded-full', FOKUS_RAHMEN)}
-              >
-                <span className="flex size-8 items-center justify-center rounded-full bg-border text-foreground">
-                  <UserRound className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                </span>
-              </Link>
-            )}
+            {/* EIN Knopf als Umriss-Pille in jeder Sitzung (G9); auf /login und /register am Handy nicht — die Seite ist die Anmeldung. */}
+            <Link
+              href={nav.knopf.href}
+              aria-current={kundenAriaAktuell(pathname, nav.knopf, aktiv)}
+              className={cn(KOPF_PILLE, ohneKopfKnopfAmHandy(pathname) && 'max-md:hidden')}
+            >
+              {nav.knopf.label}
+            </Link>
           </div>
         </div>
       </header>
@@ -311,8 +301,10 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
       </main>
       {/* Der Seitenfuß auf jeder Seite der Shell, am Handy samt Hell/Dunkel (im
           Browser im Kopf). Unten hält er Platz für die Unterleiste bzw. die
-          feste Leiste einer Fokus-Seite frei — vorher tat das der Inhalt. */}
-      <KundeFuss className={cn('pb-28 print:pb-0', !platzFuerLeiste && 'md:pb-0')} spalte={fussSpalte} />
+          feste Leiste einer Fokus-Seite frei — vorher tat das der Inhalt.
+          G10 (V28): aus den Maßen der Shell samt Home-Indicator und 24 px Luft — mit festen 112 px lag
+          „Darstellung“ auf Geräten mit Home-Indicator noch unter dem Warenkorb-Knopf. */}
+      <KundeFuss className={cn(FUSS_PLATZ_UNTEN, 'print:pb-0', platzFuerLeiste ? 'md:pb-28' : 'md:pb-0')} spalte={fussSpalte} />
 
       {unterleiste && (
         // In der Vorschau im Rahmen ohne Wirkung — keine Klicks nach außen (VorschauLeisteSperre).
@@ -333,15 +325,8 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
                       <span className={cn(mittelkreisKlassen('gruen'), 'relative')}>
                         {/* Die Tasche der Boards (s1-startseite, s1-meine-bestellungen), dieselbe wie im Kopf der Fokus-Seiten. */}
                         <Handbag className="size-6" strokeWidth={1.7} aria-hidden="true" />
-                        {korb && (
-                          <Zaehler
-                            anzahl={korb.anzahl}
-                            wofuer="Artikel im Warenkorb"
-                            ton="orange"
-                            // 12 px statt der 11 px des Bausteins (Lauf 31: keine Schrift unter 12 px).
-                            className="absolute -top-1 -right-1 h-5 min-w-5 text-[12px] ring-2 ring-card"
-                          />
-                        )}
+                        {/* G10: grün mit hellem Ring (Board s1-hofseite), Gestalt aus der Unterleiste. */}
+                        {korb && <Zaehler anzahl={korb.anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className={WARENKORB_ZAEHLER} />}
                       </span>
                       <span>{platz.wort}</span>
                     </Link>

@@ -180,8 +180,9 @@ describe('2. Hofzeile, Reiter und Chips: EIN klebender Block unter dem Kopf', ()
     expect(hofZeileUnterzeile('  ', null)).toBe('Nimmt Bestellungen an')
   })
 
-  it('ein einziges `sticky` (am Handy top-14, ab md top-16) — darin nur die Hofzeile (Board s1-hofseite, Nr. 235)', () => {
-    expect(KLEBE_BLOCK).toBe('sticky top-14 z-30 bg-background md:top-16')
+  // Seit Nr. 247 (G9) am Handy ganz oben: Der Kopf der Shell scrollt auf der Hofseite dort weg.
+  it('ein einziges `sticky` (am Handy top-0, ab md top-16) — darin nur die Hofzeile (Board s1-hofseite, Nr. 235)', () => {
+    expect(KLEBE_BLOCK).toBe('sticky top-0 z-30 bg-background md:top-16')
     const html = seite({ suche: 'reiter=produkte' })
     const block = ganzesDiv(html, 'data-klebe-block')
     expect(block).toContain(KLEBE_BLOCK)
@@ -340,17 +341,29 @@ describe('6. scroll-padding: der Fokus rutscht nie unter klebende Köpfe und die
     expect(unten).toBe(`calc(${px(masse('kunde-unterleiste').replace('calc(', '')) + px(masse('kunde-ueberstand'))}px + env(safe-area-inset-bottom))`)
   })
 
-  it('Hofseite: oben Kopf + gemessene Höhe des Blocks; bis zur Messung Hofzeile + Reiter (+ Chips), ab md Reiter', () => {
+  // Seit Nr. 247 (G9) scrollt der Kopf der Shell auf der Hofseite am Handy weg: oben zählt dort nur der Block.
+  it('Hofseite: am Handy oben nur die gemessene Höhe des Blocks; bis zur Messung Hofzeile + Reiter (+ Chips), ab md Kopf + Reiter', () => {
     const handyMedien = '@media (max-width: 767px) {\n    html:has([data-scroll-rand'
-    const kopf = px(masse('kunde-kopf'))
     expect(regel(css, "html:has([data-scroll-rand='kunde']):has([data-klebe-block])", 'scroll-padding-top', handyMedien)).toBe(
-      `calc(${kopf}px + var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX}px))`
+      `var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX}px)`
     )
     expect(regel(css, "html:has([data-scroll-rand='kunde']):has([data-chips-kleben])", 'scroll-padding-top', handyMedien)).toBe(
-      `calc(${kopf}px + var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX + CHIPS_PX}px))`
+      `var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX + CHIPS_PX}px)`
     )
+    // Der Block klebt dazu passend ganz oben, ab md unter dem Kopf.
+    expect(KLEBE_BLOCK).toMatch(/(^| )top-0( |$)/)
+    expect(KLEBE_BLOCK).toMatch(/(^| )md:top-16( |$)/)
     const breit = regel(css, "html:has([data-scroll-rand='kunde']):has([data-klebe-block])", 'scroll-padding-top', '@media (min-width: 768px) {\n    html:has([data-scroll-rand')
     expect(breit).toBe(`calc(${px(masse('kunde-kopf', true))}px + var(${KLEBE_BLOCK_VAR}, ${REITER_PX}px))`)
+  })
+
+  it('Produktseite: Scrollt der Kopf am Handy weg (data-kopf-scrollt), hält oben nichts Platz frei — und die Regel steht vor denen der Hofseite', () => {
+    const handyMedien = '@media (max-width: 767px) {\n    html:has([data-scroll-rand'
+    const wahl = "html:has([data-scroll-rand^='kunde'][data-kopf-scrollt])"
+    expect(regel(css, wahl, 'scroll-padding-top', handyMedien)).toBe('0px')
+    // Gleiche Stärke wie die Regeln der Hofseite: die spätere gewinnt, also muss diese vorher stehen.
+    expect(css.indexOf(wahl)).toBeLessThan(css.indexOf("html:has([data-scroll-rand='kunde']):has([data-klebe-block])"))
+    expect(quelle('src/components/shells/kunde-shell.tsx')).toContain("data-kopf-scrollt={kopfScrolltWeg ? '' : undefined}")
   })
 
   it('die Hofseite misst ihren Block und schreibt die Höhe an die Wurzel', () => {

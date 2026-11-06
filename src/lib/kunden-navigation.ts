@@ -21,6 +21,9 @@
  * Konto" (/account/profile), mit einer Hof-Sitzung „Mein Hof" (/dashboard).
  * Seit Nr. 41 (Register N1) führt „Anmelden" auf /login — die Seite zeigt
  * beide Wege, die Hofkarte vorgewählt — und steht auch am Handy oben rechts.
+ * Seit Nr. 247 (G9, V12) ist der Kopf in jeder Sitzung derselbe: vier Links
+ * und rechts EIN Knopf als Umriss-Pille — auch „Mein Konto" (vorher ein
+ * Personen-Symbol mit Suchfeld und nur zwei Links).
  *
  * Bestehende Kundenseiten nutzen weiter KundenKopf (src/lib/kunden-kopf.ts);
  * für seinen Knopf gilt kopfKnopf aus dieser Quelle — dieselben drei
@@ -141,33 +144,53 @@ const HANDY_LEISTE: readonly KundenLeistenPlatz[] = [
 export type KundenSitzung = 'gast' | 'kunde' | 'hof'
 
 export type KundenNavigation = {
-  /** Die Textlinks der Kopfzeile im Browser, links nach rechts. Suche und Warenkorb zeichnet die Shell. */
+  /** Die Textlinks der Kopfzeile im Browser, links nach rechts — in jeder Sitzung dieselben vier (V12). Den Warenkorb zeichnet die Shell. */
   web: readonly KundenNavPunkt[]
   /**
-   * Der Knopf rechts in der Kopfzeile, am Handy wie im Browser: „Anmelden"
-   * ohne Sitzung, „Mein Hof" mit Hof-Sitzung; mit Kundensitzung keiner.
+   * Der Knopf rechts in der Kopfzeile, am Handy wie im Browser, immer als
+   * Umriss-Pille (G9): „Anmelden" ohne Sitzung, „Mein Konto" mit
+   * Kundensitzung, „Mein Hof" mit Hof-Sitzung.
    */
-  knopf: KundenNavPunkt | null
-  /** Das Konto rechts in der Kopfzeile — nur mit Kundensitzung. */
-  konto: KundenNavPunkt | null
+  knopf: KundenNavPunkt
   /** Die Unterleiste am Handy. */
   handy: readonly KundenLeistenPlatz[]
 }
 
+const WEB_LINKS: readonly KundenNavPunkt[] = [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN]
+
 /**
- * Die Navigation passend zur Sitzung. Eine Hof-Sitzung sieht die Kundenseite
- * wie ohne Sitzung — nur der Knopf führt in den eigenen Bereich statt zur
- * Anmeldung (ein Hof bekäme sonst „Mein Konto" mit den Kunden-Abos).
+ * Die Navigation passend zur Sitzung. Die Links sind in jeder Sitzung
+ * dieselben (V12, G9 seit Nr. 247: auch mit Kundensitzung, ohne Suchfeld im
+ * Kopf — gesucht wird auf /hoefe); nur der Knopf rechts wechselt. Eine
+ * Hof-Sitzung bekommt „Mein Hof" statt „Mein Konto" (ein Hof bekäme sonst das
+ * Konto mit den Kunden-Abos).
  */
 export function kundenNavigation({ sitzung }: { sitzung: KundenSitzung }): KundenNavigation {
-  switch (sitzung) {
-    case 'kunde':
-      return { web: [ENTDECKEN, BESTELLUNGEN], knopf: null, konto: KONTO, handy: HANDY_LEISTE }
-    case 'hof':
-      return { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], knopf: MEIN_HOF, konto: null, handy: HANDY_LEISTE }
-    case 'gast':
-      return { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], knopf: ANMELDEN, konto: null, handy: HANDY_LEISTE }
-  }
+  return { web: WEB_LINKS, knopf: kopfKnopf(sitzung), handy: HANDY_LEISTE }
+}
+
+// Die Anmelde- und die Registrierseite selbst (Liste Lauf 32, Q2).
+const OHNE_KNOPF_AM_HANDY: readonly string[] = [ANMELDEN.href, '/register']
+
+/**
+ * Ob der Knopf rechts oben am Handy entfällt (Liste Lauf 32, Q2 und G9): auf
+ * /login und /register selbst — die Seite IST die Anmeldung, der Knopf führte
+ * im Kreis (Board s2-anmelden: nur die Marke). Im Browser bleibt er stehen
+ * (Board w2-anmelden: „Anmelden" als Pille im vollen Kopf).
+ */
+export function ohneKopfKnopfAmHandy(pfad: string): boolean {
+  return OHNE_KNOPF_AM_HANDY.some((ziel) => pfad === ziel || pfad.startsWith(ziel + '/'))
+}
+
+/**
+ * Ob der Kopf der Shell am Handy wegscrollt statt zu kleben (G9, Liste Lauf 32
+ * hofseite/produkt): Auf Hof- und Produktseite klebt dort nur der Kopf des
+ * Hofs — zwei feste Leisten übereinander waren unruhig. Die Shell erkennt die
+ * beiden Seiten an `aktiv` = `entdecken`: Nur sie setzen den Punkt selbst
+ * (Nr. 177), ihr Pfad sagt ihn nicht — so bleiben die Props der Shell gleich.
+ */
+export function kopfScrolltWegAmHandy(aktiv: KundenNavId | undefined): boolean {
+  return aktiv === ENTDECKEN.id
 }
 
 /**
