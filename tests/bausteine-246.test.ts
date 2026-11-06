@@ -7,7 +7,8 @@
  *  - G6: Feldfehler 14 px halbfett; Zusammenfassung in Einzahl/Mehrzahl; „Nochmal“ klein, linksbündig, in der
  *    Warnfarbe, nie `disabled` (auch nicht, solange es läuft — dann `aria-busy`); ohne Handler kein Knopf; der
  *    Speicherfehler zeichnet denselben Kasten.
- *  - G7: Der Toast steht unten mittig — auch wenn der Aufrufer „oben“ mitgibt (Quelltext, Gegenprobe); Schrift
+ *  - G7: Im Geltungsbereich data-design="neu" steht der Toast unten mittig — auch wenn der Aufrufer „oben“ mitgibt;
+ *    außerhalb bleibt der Bestand (Gegenprobe; das Lesen der Marke prüft tests/hydrieren.test.ts); Schrift
  *    und „Rückgängig“ halten auf dem Balken in beiden Themes 4,5:1 (aus globals.css gerechnet).
  *  - Die Vorschau zeigt die vier Abschnitte.
  */
@@ -27,7 +28,7 @@ vi.mock('next/link', () => ({
 import { EmptyState } from '@/components/ui/empty-state'
 import { HinweiskarteFehler, NOCHMAL_KNOPF } from '@/components/ui/hinweiskarte'
 import { FeldFehlerSatz, FormularPruefen, SpeicherFehler, formularPruefenSatz } from '@/components/shared/formular-meldungen'
-import { TOAST_KLASSEN, TOAST_LAGE } from '@/components/ui/sonner'
+import { TOAST_KLASSEN, TOAST_LAGE, toastEinstellung } from '@/components/ui/sonner'
 import { Vorschau246 } from '@/app/intern/bausteine/vorschau-246'
 
 const WURZEL = process.cwd()
@@ -119,22 +120,29 @@ describe('G6 — Formularfehler und „Nochmal“', () => {
 })
 
 describe('G7 — Meldung (Toast)', () => {
-  const quelle = readFileSync(join(WURZEL, 'src/components/ui/sonner.tsx'), 'utf8')
+  // Die Props, die src/app/layout.tsx heute mitgibt (außerhalb der Grenze von Nr. 246).
+  const LAYOUT = { position: 'top-center', richColors: true } as const
 
-  it('steht unten mittig: Lage und Farbe stehen NACH dem Spread der Aufrufer-Props', () => {
+  it('im Geltungsbereich data-design="neu": unten mittig, ohne richColors, mit den G7-Klassen — auch wenn das Layout „oben“ mitgibt', () => {
+    const layout = readFileSync(join(WURZEL, 'src/app/layout.tsx'), 'utf8')
+    expect(layout).toMatch(/<Toaster[^>]*position="top-center"/)
+    const innen = toastEinstellung(true, LAYOUT, 72)
     expect(TOAST_LAGE).toBe('bottom-center')
-    const spread = quelle.indexOf('{...props}')
-    expect(spread).toBeGreaterThan(-1)
-    expect(quelle.indexOf('position={TOAST_LAGE}')).toBeGreaterThan(spread)
-    expect(quelle.indexOf('richColors={false}')).toBeGreaterThan(spread)
+    expect(innen.position).toBe('bottom-center')
+    expect(innen.richColors).toBe(false)
+    expect(innen.toastOptions?.classNames).toBe(TOAST_KLASSEN)
+    expect(innen.offset).toEqual({ bottom: 72 })
+    expect(innen.style).toBeUndefined()
   })
 
-  it('Gegenprobe: die alte Lage „top-center“ im Layout stünde vor dem Baustein und gewönne nicht', () => {
-    const layout = readFileSync(join(WURZEL, 'src/app/layout.tsx'), 'utf8')
-    // Das Layout (außerhalb von Nr. 246) gibt noch „top-center“ mit — die Reihenfolge im Baustein entscheidet.
-    expect(layout).toMatch(/<Toaster[^>]*position="top-center"/)
-    const umgedreht = quelle.replace('{...props}', '').replace('richColors={false}', 'richColors={false}\n      {...props}')
-    expect(umgedreht.indexOf('{...props}')).toBeGreaterThan(umgedreht.indexOf('position={TOAST_LAGE}'))
+  it('Gegenprobe außerhalb: der Bestand bleibt — Lage und richColors vom Layout, Fläche aus den shadcn-Variablen, ohne G7-Klassen', () => {
+    const aussen = toastEinstellung(false, LAYOUT, 72)
+    expect(aussen.position).toBe('top-center')
+    expect(aussen.richColors).toBe(true)
+    expect(aussen.toastOptions?.classNames).toEqual({ toast: 'cn-toast' })
+    expect(aussen.offset).toBeUndefined()
+    expect(aussen.style).toMatchObject({ '--normal-bg': 'var(--popover)' })
+    expect(JSON.stringify(aussen)).not.toContain('--fz-')
   })
 
   it('der Balken nimmt die Tokens: hell --fz-text, dunkel --fz-border, Schrift --fz-on-accent, „Rückgängig“ --fz-primary', () => {

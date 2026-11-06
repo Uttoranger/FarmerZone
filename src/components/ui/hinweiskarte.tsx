@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NETZ_KNOPF } from '@/lib/netz'
@@ -94,6 +94,8 @@ export function Hinweiskarte({
  * solange der zweite Versuch läuft, meldet er `aria-busy` und schluckt den Tipp. Nie bei Aktionen,
  * die der Server schon ausgeführt haben kann (NETZ_SATZ_UNSICHER, DESIGN_SYSTEM „Zustände"), nie in
  * Verkäufe (doppelte Buchung, D1) und nie beim Anlegen eines Produkts (Abnahme-Grundlage Lauf 32).
+ * Titel und Satz hängen per `aria-describedby` am Knopf: Der Fokus kommt vor der Ansage von
+ * `role="alert"`, und manche Screenreader verschluckten sie sonst — so liest er den Satz mit dem Knopf.
  */
 export function HinweiskarteFehler({
   titel,
@@ -110,14 +112,27 @@ export function HinweiskarteFehler({
   laeuft?: boolean
   className?: string
 }): React.JSX.Element {
+  const kennung = useId()
+  // Nur mit Knopf: ohne „Nochmal" verweist nichts auf Titel und Satz.
+  const titelId = nochmal && titel ? `${kennung}-titel` : undefined
+  const satzId = nochmal && children ? `${kennung}-satz` : undefined
+  const beschreibung = [titelId, satzId].filter(Boolean).join(' ') || undefined
   return (
     <div
       role="alert"
       data-slot="hinweiskarte-fehler"
       className={cn('flex flex-col gap-2 border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun', RUNDUNG.hinweis, className)}
     >
-      {titel && <p className="text-[15px] font-bold">{titel}</p>}
-      {children && <div className={cn('text-[14px] leading-normal', !titel && 'font-semibold')}>{children}</div>}
+      {titel && (
+        <p id={titelId} className="text-[15px] font-bold">
+          {titel}
+        </p>
+      )}
+      {children && (
+        <div id={satzId} className={cn('text-[14px] leading-normal', !titel && 'font-semibold')}>
+          {children}
+        </div>
+      )}
       {nochmal && (
         <button
           type="button"
@@ -127,6 +142,7 @@ export function HinweiskarteFehler({
             if (!laeuft) nochmal()
           }}
           aria-busy={laeuft || undefined}
+          aria-describedby={beschreibung}
           data-slot="nochmal"
           className={cn(NOCHMAL_KNOPF, FOKUS_RAHMEN)}
         >

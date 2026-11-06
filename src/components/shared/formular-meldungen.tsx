@@ -1,6 +1,7 @@
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { cn } from '@/lib/utils'
+import { FORMULAR_PRUEFEN, FORMULAR_PRUEFEN_EIN } from '@/lib/formular-saetze'
 
 /** Die Kennung des Satzes unter einem Feld – Feld und Satz verbindet `aria-describedby`. */
 export function fehlerKennung(feldId: string): string {
@@ -46,16 +47,12 @@ export function FeldFehlerSatz({ feldId, text, className }: { feldId: string; te
 /**
  * Die Zusammenfassung über einem Formular mit Feldfehlern (G6, Nr. 246; Boards s2-hofdaten-zahlung
  * „Bitte prüfe das markierte Feld.", s1-produkt-neu „Bitte prüfe die markierten Felder."): ein Feld
- * in der Einzahl, mehrere in der Mehrzahl. Gezählt wird, was das Schema beim Absenden meldet.
+ * in der Einzahl, mehrere in der Mehrzahl. Gezählt wird, was das Schema beim Absenden meldet. Die Sätze
+ * stehen in src/lib/formular-saetze.ts — eine Quelle mit dem Produktformular.
  */
 export function formularPruefenSatz(anzahl: number): string {
-  return anzahl === 1 ? FORMULAR_PRUEFEN_EIN : FORMULAR_PRUEFEN_MEHR
+  return anzahl === 1 ? FORMULAR_PRUEFEN_EIN : FORMULAR_PRUEFEN
 }
-
-/** Die Zusammenfassung bei genau einem Feldfehler (Liste Lauf 32, G6). */
-export const FORMULAR_PRUEFEN_EIN = 'Bitte prüfe das markierte Feld.'
-/** Die Zusammenfassung bei mehreren Feldfehlern (Board s1-produkt-neu Bild 5). */
-export const FORMULAR_PRUEFEN_MEHR = 'Bitte prüfe die markierten Felder.'
 
 /**
  * Die Zeile über dem Formular, solange Felder markiert sind (G6): Fläche und Schrift aus dem Paar

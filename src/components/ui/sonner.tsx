@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, useSonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
@@ -13,6 +13,11 @@ import { COOKIE_HINWEIS_RAND_PX, UNTEN_FEST_ATTRIBUT, cookieHinweisUnten, leiste
  * Linie, Schrift `--fz-on-accent`; der Knopf `--fz-primary` hält auf beiden Flächen 4,5:1
  * (tests/bausteine-246.test.ts rechnet es aus globals.css nach). Ohne bunte Erfolgs-/Fehlerfarben:
  * Fehler gehören an Feld oder Formular (DESIGN_SYSTEM „Zustände"), der Toast ist nur die Bestätigung.
+ *
+ * Nur im Geltungsbereich data-design="neu" (Runde 1): Der Toaster hängt im Root-Layout, also auf jeder
+ * Route. Das Redesign kommt Route für Route (CLAUDE.md §2, kein Big Bang) — G7 gilt deshalb nur, wenn die
+ * aktuelle Seite die Marke trägt (dieselbe wie in globals.css); ohne sie bleibt der Bestand, mit Lage und
+ * Farben vom Aufrufer (src/app/layout.tsx: oben mittig, richColors).
  */
 
 /** Die Klassen des Balkens und seiner Teile — eine Quelle für Toaster, Vorschau und Test. */
@@ -26,8 +31,48 @@ export const TOAST_KLASSEN = {
   closeButton: "border-[var(--fz-feldrand)]! bg-[var(--fz-text)]! text-[var(--fz-on-accent)]! dark:bg-[var(--fz-border)]!",
 } as const
 
-/** Wo der Balken steht: unten mittig, immer — auch wenn ein Aufrufer noch „oben" mitgibt (G7). */
+/** Wo der Balken im Geltungsbereich steht: unten mittig — auch wenn ein Aufrufer noch „oben" mitgibt (G7). */
 export const TOAST_LAGE = "bottom-center" as const
+
+/** Die Marke des neuen Designs — dieselbe, an der globals.css die Tokens im ganzen Dokument umschaltet. */
+const NEUES_DESIGN = '[data-design="neu"]'
+
+const ohneAbo = () => () => {}
+const liesNeuesDesign = () => document.querySelector(NEUES_DESIGN) !== null
+const vomServer = () => false
+
+/**
+ * Ob die aktuelle Seite im Geltungsbereich data-design="neu" steht. Kein Abo auf das Dokument: Gelesen wird bei
+ * jedem Zeichnen des Toasters, und der zeichnet neu, sobald eine Meldung kommt oder geht — nur dann zählt die
+ * Gestalt. Vom Server und beim Hydrieren `false` (tests/hydrieren.test.ts); dann steht ohnehin keine Meldung.
+ */
+export function useImNeuenDesign(): boolean {
+  return useSyncExternalStore(ohneAbo, liesNeuesDesign, vomServer)
+}
+
+/** Der Bestand außerhalb des Geltungsbereichs (Stand vor Nr. 246): Fläche aus den shadcn-Variablen. */
+const BESTAND_STIL = {
+  "--normal-bg": "var(--popover)",
+  "--normal-text": "var(--popover-foreground)",
+  "--normal-border": "var(--border)",
+  "--border-radius": "var(--radius)",
+} as React.CSSProperties
+
+/**
+ * Was der Toaster außer Theme und Symbolen bekommt. Außerhalb: der Bestand, Lage und richColors vom Aufrufer.
+ * Innen: G7 — Lage und Farbe stehen NACH den Aufrufer-Props, sie legt der Baustein fest, nicht das Layout.
+ */
+export function toastEinstellung(neu: boolean, props: ToasterProps, unten: number): ToasterProps {
+  if (!neu) return { style: BESTAND_STIL, toastOptions: { classNames: { toast: "cn-toast" }, closeButtonAriaLabel: "Schließen" }, ...props }
+  return {
+    toastOptions: { classNames: TOAST_KLASSEN, closeButtonAriaLabel: "Schließen" },
+    ...props,
+    position: TOAST_LAGE,
+    richColors: false,
+    offset: { bottom: unten },
+    mobileOffset: { bottom: unten, left: 12, right: 12 },
+  }
+}
 
 /**
  * Die festen Leisten unten (Unterleiste, Aktionsleiste, Kaufknopf), wie sie gerade im Fenster liegen —
@@ -65,7 +110,8 @@ function useAbstandUnten(aktiv: boolean): number {
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
   const { toasts } = useSonner()
-  const unten = useAbstandUnten(toasts.length > 0)
+  const neu = useImNeuenDesign()
+  const unten = useAbstandUnten(neu && toasts.length > 0)
 
   return (
     <Sonner
@@ -91,17 +137,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           <Loader2Icon className="size-4 animate-spin" />
         ),
       }}
-      toastOptions={{
-        classNames: TOAST_KLASSEN,
-        closeButtonAriaLabel: "Schließen",
-      }}
-      {...props}
-      // Nach dem Spread: Lage und Farbe legt G7 fest, nicht der einzelne Aufrufer (src/app/layout.tsx gibt
-      // noch „top-center" und richColors mit; die Datei liegt außerhalb von Nr. 246).
-      position={TOAST_LAGE}
-      richColors={false}
-      offset={{ bottom: unten }}
-      mobileOffset={{ bottom: unten, left: 12, right: 12 }}
+      {...toastEinstellung(neu, props, unten)}
     />
   )
 }
