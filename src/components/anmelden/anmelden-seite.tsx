@@ -13,8 +13,9 @@ const WEGE: ReadonlyArray<{ art: Anmeldeart; label: string; href: string }> = [
   { art: 'hof', label: 'Ich habe einen Hof', href: '/login' },
 ]
 
+/** Am Handy ohne Karte, im Browser zwei Karten nebeneinander (Boards s2-/w2-anmelden). */
 const KARTE =
-  'min-w-0 flex-1 flex-col gap-3 lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-7 dark:lg:ring-0'
+  'min-w-0 flex-1 flex-col gap-3 lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-5 dark:lg:ring-0'
 
 /**
  * Die Anmeldeseite für Kundinnen (/account/login) und Höfe (/login) — EINE
@@ -31,26 +32,23 @@ const KARTE =
  */
 export function AnmeldenSeite({ aktiv, ziel }: { aktiv: Anmeldeart; ziel: string }): React.JSX.Element {
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-[18px] pt-[22px] pb-10 lg:px-6 lg:pt-[70px]">
-      <div className="lg:text-center">
-        <h1 className="font-heading text-[26px] leading-tight font-semibold lg:text-[34px]">
-          <span className="lg:hidden">Anmelden</span>
-          <span className="hidden lg:inline">Willkommen zurück</span>
-        </h1>
-        <p className="mt-1 hidden text-[15px] leading-normal text-muted-foreground lg:block">
-          Kunden melden sich mit einem Code an, Höfe mit Passwort.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-[944px] px-[18px] pt-[22px] pb-10 lg:px-6 lg:pt-8">
+      {/* Kopf links bündig über den Karten, am Handy wie im Browser (Board s2-anmelden, Bild 1). */}
+      <h1 className="font-heading text-[26px] leading-tight font-semibold lg:text-[28px]">Willkommen zurück</h1>
+      <p className="mt-1.5 text-[15px] leading-normal text-muted-foreground">
+        Kunden melden sich mit einem Code an, Höfe mit Passwort.
+      </p>
 
-      <nav aria-label="Wie meldest du dich an?" className="mt-[22px] lg:hidden">
-        <ul className="flex gap-[3px] rounded-full border border-border bg-background p-[3px]">
+      <nav aria-label="Wie meldest du dich an?" className="mt-[18px] lg:hidden">
+        {/* Schiene getönt, die gewählte Seite hell mit Schatten (Board s2-anmelden). */}
+        <ul className="flex gap-[3px] rounded-full bg-muted p-1">
           {WEGE.map((weg) => (
             <li key={weg.art} className="flex-1">
               <Link
                 href={weg.href}
                 aria-current={weg.art === aktiv ? 'page' : undefined}
                 className={cn(
-                  'flex min-h-11 items-center justify-center rounded-full px-2 text-center text-[13.5px] text-muted-foreground transition-colors duration-[250ms] hover:text-foreground aria-[current=page]:bg-border aria-[current=page]:font-semibold aria-[current=page]:text-foreground',
+                  'flex min-h-11 items-center justify-center rounded-full px-2 text-center text-[14px] font-semibold text-foreground transition-colors duration-[250ms] aria-[current=page]:bg-card aria-[current=page]:shadow-sm dark:aria-[current=page]:ring-1 dark:aria-[current=page]:ring-border',
                   FOKUS_RAHMEN
                 )}
               >
@@ -61,23 +59,26 @@ export function AnmeldenSeite({ aktiv, ziel }: { aktiv: Anmeldeart; ziel: string
         </ul>
       </nav>
 
-      <div className="mt-[22px] flex flex-col gap-[22px] lg:flex-row lg:items-start">
+      <div className="mt-[18px] flex flex-col gap-[22px] lg:mt-5 lg:flex-row lg:items-start lg:gap-4">
         <section aria-labelledby="anmelden-kunde" className={cn(KARTE, aktiv === 'kunde' ? 'flex' : 'hidden lg:flex')}>
-          <Kicker className="hidden lg:block">Ich kaufe ein</Kicker>
-          {/* Am Handy trägt der Umschalter die Überschrift sichtbar — für Screenreader bleibt sie stehen. */}
-          <h2 id="anmelden-kunde" className="sr-only font-heading text-[22px] font-semibold lg:not-sr-only">
-            Mit E-Mail-Code anmelden
-          </h2>
+          <div className="flex flex-col gap-1">
+            <Kicker className="text-[12.5px] tracking-[0.6px]">Ich kaufe ein</Kicker>
+            <h2 id="anmelden-kunde" className="font-heading text-[22px] leading-tight font-semibold">
+              Mit E-Mail-Code anmelden
+            </h2>
+          </div>
           <KundeCodeFormular ziel={ziel} />
         </section>
 
         <section aria-labelledby="anmelden-hof" className={cn(KARTE, aktiv === 'hof' ? 'flex' : 'hidden lg:flex')}>
-          <Kicker ton="orange" className="hidden lg:block">
-            Ich habe einen Hof
-          </Kicker>
-          <h2 id="anmelden-hof" className="sr-only font-heading text-[22px] font-semibold lg:not-sr-only">
-            Hof-Anmeldung
-          </h2>
+          <div className="flex flex-col gap-1">
+            <Kicker ton="orange" className="text-[12.5px] tracking-[0.6px]">
+              Ich habe einen Hof
+            </Kicker>
+            <h2 id="anmelden-hof" className="font-heading text-[22px] leading-tight font-semibold">
+              Hof-Anmeldung
+            </h2>
+          </div>
           <HofAnmeldung />
         </section>
       </div>

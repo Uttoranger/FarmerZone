@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Check, Mail, MailCheck } from 'lucide-react'
+import { Check, Info, Mail, MailCheck } from 'lucide-react'
 import { warteStand, type EinrichtenSchritt, type EinrichtenStand } from '@/lib/einrichten'
 import { KONDITIONEN_UEBERGANG, PRO_MONAT, tarifKarte, vollerWarenpreis, type TarifId } from '@/lib/konditionen'
 import type { GebuehrModell } from '@/lib/plattformgebuehr'
@@ -48,16 +48,19 @@ function Zeichen({ schritt }: { schritt: EinrichtenSchritt }) {
       </span>
     )
   }
+  // Board s2-/w2-registrieren, Bild 5/6: offen und später als leerer Kreis ohne Ziffer, der Hinweis (Lastschrift) als „i“.
+  if (schritt.zustand === 'hinweis') {
+    return (
+      <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-border text-muted-foreground">
+        <Info className="size-4" strokeWidth={2} />
+      </span>
+    )
+  }
   return (
     <span
       aria-hidden="true"
-      className={cn(
-        'flex size-7 shrink-0 items-center justify-center rounded-full border-2 text-[12.5px] font-semibold',
-        schritt.zustand === 'offen' ? 'border-status-offen text-status-offen' : 'border-border text-muted-foreground'
-      )}
-    >
-      {schritt.nummer}
-    </span>
+      className={cn('size-7 shrink-0 rounded-full border-2', schritt.zustand === 'offen' ? 'border-status-offen' : 'border-border')}
+    />
   )
 }
 

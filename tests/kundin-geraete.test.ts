@@ -4,9 +4,9 @@
  *
  * Beweist:
  *  - Unter /account zeigt der Baustein mit `fuerKundin` „Überall abmelden"
- *    (auch wenn nur dieses Gerät angemeldet ist), den Satz zum Abmelden und den
- *    Weg zu „Was wir speichern" — Gegenprobe: für Höfe bleibt „Alle anderen
- *    abmelden" ohne diese Teile.
+ *    (auch wenn nur dieses Gerät angemeldet ist) und den Satz zum Abmelden, seit
+ *    Nr. 239 unter einer Kennzeile und ohne „Was wir speichern" — Gegenprobe:
+ *    für Höfe bleibt „Alle anderen abmelden" ohne diese Teile.
  *  - „Mein Konto" rendert den Baustein mit den Zeilen der Seite; ohne Zeilen
  *    keine Karte. Die Seite lädt nur die Sitzungen des eigenen Kontos.
  *  - Konto und Sicherheit gibt den Satz „Du bleibst 30 Tage angemeldet …" mit.
@@ -55,12 +55,14 @@ beforeEach(() => {
 })
 
 describe('Baustein für Kundinnen', () => {
-  it('„Überall abmelden", der Satz und „Was wir speichern" — auch mit nur diesem Gerät', () => {
+  it('„Überall abmelden" und der Satz — auch mit nur diesem Gerät; Kennzeile statt Kartentitel, ohne „Was wir speichern" (Nr. 239)', () => {
     for (const zeilen of [[DIESES, ANDERES], [DIESES]]) {
       const html = klartext(renderToStaticMarkup(createElement(AngemeldeteGeraete, { zeilen, fuerKundin: true })))
       expect(html).toContain(KUNDIN_GERAETE_TEXT.ueberallAbmelden)
       expect(html).toContain(KUNDIN_GERAETE_TEXT.hinweis)
-      expect(html).toContain('href="/datenschutz"')
+      expect(html).toMatch(new RegExp(`<h2[^>]*>${GERAETE_TEXT.titel}</h2>`))
+      // Board s2-/w2-kundenkonto: kein Link „Was wir speichern“ mehr in der Karte.
+      expect(html).not.toContain('href="/datenschutz"')
       expect(html).not.toContain(GERAETE_TEXT.alleAnderenAbmelden)
     }
   })

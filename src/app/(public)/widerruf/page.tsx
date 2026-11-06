@@ -119,7 +119,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
 
   return (
     <KundeShellMitSitzung>
-      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pt-8 pb-12 md:pt-10 print:pt-0">
+      <div className="mx-auto flex w-full max-w-[1032px] flex-col gap-4 px-4 pt-8 pb-12 *:max-w-[640px] md:pt-10 print:pt-0">
         <div className="flex flex-col gap-1.5 print:hidden">
           <h1 className="font-heading text-[26px] leading-tight font-semibold text-foreground md:text-[28px]">{WIDERRUF_TEXT.titel}</h1>
           <p className="text-[14.5px] leading-normal text-muted-foreground">{WIDERRUF_TEXT.einleitung}</p>
@@ -140,7 +140,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
 /** Die Karte „Von dieser Bestellung kannst du hier nicht mehr zurücktreten.“ (Board w3-widerruf Bild 5). */
 function NichtMehrKarte({ anruf }: { anruf: HofAnruf | null }): React.JSX.Element {
   return (
-    <section aria-labelledby="nicht-mehr-titel" className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+    <section aria-labelledby="nicht-mehr-titel" className="flex flex-col gap-2.5 rounded-[16px] border border-border bg-card px-4 py-4 md:px-[18px]">
       {/* Orange als Zustand „offen“ (text-status-offen hält 4,5:1 in beiden Themes), kein Fehler der Kundin. */}
       <h2 id="nicht-mehr-titel" className="font-heading text-[18px] leading-snug font-semibold text-status-offen">
         {WIDERRUF_TEXT.nichtMehrTitel}
@@ -159,7 +159,7 @@ function NichtMehrKarte({ anruf }: { anruf: HofAnruf | null }): React.JSX.Elemen
 function BelehrungAbschnitt({ hof }: { hof: BelehrungHof | null }): React.JSX.Element {
   const b = belehrungMitHof(hof)
   return (
-    <section aria-labelledby="belehrung-titel" className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px] print:border-0 print:px-0">
+    <section aria-labelledby="belehrung-titel" className="flex flex-col gap-2 rounded-[16px] border border-border bg-card px-4 py-4 md:px-[18px] print:border-0 print:px-0">
       <h2 id="belehrung-titel" className="font-heading text-[18px] font-semibold text-foreground">
         {b.teilA.titel}
       </h2>

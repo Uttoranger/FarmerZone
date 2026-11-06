@@ -3,7 +3,7 @@
 import { useId, useState } from 'react'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Mail } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { registerFarmer } from '@/server/actions/register'
 import { validatePassword } from '@/lib/password-rules'
 import { schreibeHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
@@ -21,10 +21,10 @@ import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { HofAdresseVorschau } from '@/components/shared/hof-adresse-vorschau'
 import { SchonDabei } from '@/components/shared/schon-dabei'
 import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
-import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { PasswortAnforderungen, PASSWORT_ANFORDERUNGEN_SATZ } from '@/components/anmelden/passwort-anforderungen'
 import { PostfachHinweis } from './postfach-hinweis'
+import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /**
  * Der Honigtopf steht außerhalb des sichtbaren Bereichs statt auf
@@ -46,7 +46,7 @@ const HONIGTOPF_STIL: React.CSSProperties = {
 
 /** Der Hauptknopf der Hofwelt — Orange (DESIGN_SYSTEM, „Farbrollen"), volle Breite. */
 const KNOPF_ORANGE = cn(
-  'inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full border border-primary-foreground/30 bg-primary px-[18px] text-[15px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
+  'inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-primary px-[18px] text-[15px] font-bold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
   FOKUS_RAHMEN
 )
 
@@ -112,15 +112,16 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
   const beschreibung = (...ids: (string | false)[]) => ids.filter(Boolean).join(' ') || undefined
 
   return (
-    <div className="mx-auto grid max-w-[1000px] gap-8 px-4 pt-5 pb-12 md:px-6 md:pt-10 lg:grid-cols-[minmax(0,580px)_minmax(0,1fr)] lg:gap-14">
-      {/* Nach dem Absenden nur so hoch wie der Hinweis, nicht so hoch wie die Spalte daneben. */}
-      <div className={cn('rounded-2xl border border-border bg-card p-5 md:p-7', gesendetAn !== null && 'self-start')}>
+    <div className="mx-auto grid max-w-[944px] gap-8 px-4 pt-5 pb-12 md:px-6 md:pt-5 lg:grid-cols-[minmax(0,560px)_minmax(0,320px)] lg:gap-4">
+      {/* Das Formular liegt direkt auf der Seite, ohne Karte (Board s2-/w2-registrieren); nach dem Absenden nur so hoch
+          wie der Hinweis, nicht so hoch wie die Spalte daneben. */}
+      <div className={cn(gesendetAn !== null && 'self-start')}>
         {gesendetAn !== null ? (
           <PostfachHinweis email={gesendetAn} />
         ) : (
           <>
             {/* Die Fokus-Shell trägt die h1 „Hof registrieren“; die Karte wiederholt den Titel als h2 (Board w2-registrieren). */}
-            <h2 className="mb-2 font-heading text-[22px] leading-tight font-semibold">Hof registrieren</h2>
+            <h2 className="mb-2 font-heading text-[24px] leading-tight font-semibold">Hof registrieren</h2>
             {/* Der Übergang aus konditionen.ts (Register K1) statt eines Tarifs, der heute gälte. */}
             <p className="mb-5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
             {/* Der Satz der Gründungsaktion ohne Platznummer (Lauf 30) — die Seite rendert ihn, ohne Aktion nichts. */}
@@ -238,32 +239,44 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                 {isSubmitting ? 'Einen Moment …' : 'Konto erstellen'}
               </button>
               {/* Register N1: Wer schon einen Hof hat, findet hier den Weg zur Anmeldung — auch am Handy, wo der Kopf nur „Anmelden" zeigt. */}
-              <SchonDabei className="-mt-1 text-center" />
+              <SchonDabei className="-mt-1" />
             </form>
           </>
         )}
       </div>
 
-      <aside aria-labelledby={`${id}-weiter`} className="flex flex-col gap-5 lg:pt-4">
-        <h2 id={`${id}-weiter`} className="text-[12px] font-bold tracking-[1.6px] text-muted-foreground uppercase">
+      {/* Seitenspalte als EINE Karte (Board w2-registrieren): Serifen-Titel, die Schritte mit grün getönten Ziffern,
+          „Fragen vorab?“ und „E-Mail schreiben“ darin. StartSchritte (fuer-hoefe) zeichnet orange Ringe für /fuer-hoefe;
+          eine grüne Variante dort wäre Sache jener Nummer — darum die Liste hier aus derselben Quelle. */}
+      <aside aria-labelledby={`${id}-weiter`} className="flex flex-col gap-3 self-start rounded-[16px] border border-border bg-card p-4">
+        <h2 id={`${id}-weiter`} className="font-heading text-[19px] leading-tight font-semibold">
           So geht’s weiter
         </h2>
-        <StartSchritte schritte={REGISTRIEREN_SCHRITTE} />
+        <ol className="flex flex-col gap-3">
+          {REGISTRIEREN_SCHRITTE.map((s, i) => (
+            <li key={s.titel} className="flex gap-2.5">
+              <span
+                aria-hidden="true"
+                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund text-[12.5px] font-bold text-zustand-laeuft"
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-semibold">{s.titel}</span>
+                <span className="block text-[13.5px] leading-snug text-muted-foreground">{s.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
         {/* „Rückruf anfordern" (Mockup) braucht die Tabelle RueckrufAnfrage —
             nicht freigegeben (freigabe.md §2). Bis dahin der Weg per Mail. */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-          <p className="text-[14px]">Fragen vorab? Schreib uns, wir melden uns.</p>
-          <a
-            href={`mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Fragen zur Registrierung')}`}
-            className={cn(
-              'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border px-4 text-[14px] font-medium hover:bg-muted',
-              FOKUS_RAHMEN
-            )}
-          >
-            <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            E-Mail schreiben
-          </a>
-        </div>
+        <p className="text-[14px] text-muted-foreground">Fragen vorab? Schreib uns, wir melden uns.</p>
+        <a
+          href={`mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Fragen zur Registrierung')}`}
+          className={cn(KNOPF_UMRISS, 'w-auto')}
+        >
+          E-Mail schreiben
+        </a>
       </aside>
     </div>
   )

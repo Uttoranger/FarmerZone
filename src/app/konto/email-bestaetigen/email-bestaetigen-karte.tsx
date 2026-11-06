@@ -2,13 +2,14 @@
 
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Check, TriangleAlert } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { EMAIL_BESTAETIGEN_TEXT as T } from '@/lib/konto-anfragen'
 import { EMAIL_MAX } from '@/lib/eingabegrenzen'
 import { bestaetigeEmailAenderung } from '@/server/actions/konto-anfragen'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FELD, FELD_LABEL, KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /*
  * Die Karte der Seite /konto/email-bestaetigen (Nr. 190): vorher Feld und
@@ -16,16 +17,15 @@ import { FELD, FELD_LABEL, KNOPF_GRUEN } from '@/components/hof-bestellungen/sti
  * DESIGN_SYSTEM (wie „Das war ich nicht“). Texte aus src/lib/konto-anfragen.ts.
  * Seit Lauf 30 nach Board s2/w2-systemseiten: Karte auf der Fläche, das
  * Ergebnis als grüne Karte — die Farbe der KundeShell (V52).
+ * Seit Nr. 239 wie „Das war ich nicht“ (Board s2-/w2-systemseiten, Bild 5):
+ * Karte 520 px links in der Inhaltsspalte, Text in voller Textfarbe, der
+ * ungültige Link ohne Symbol mit Warnfarbe und Umriss-Knopf.
  */
-const KARTE = 'flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 md:p-6'
-const KARTE_GRUEN = 'flex flex-col gap-4 rounded-2xl border border-accent/45 bg-accent/12 p-5 md:p-6'
+const KARTE = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px]'
+const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-accent/45 bg-accent/12 p-[18px]'
 
-const TITEL = 'font-heading text-[26px] leading-tight font-semibold outline-none'
-const SATZ = 'text-[14.5px] leading-relaxed text-muted-foreground'
-const TEXTLINK = cn(
-  'inline-flex min-h-11 items-center justify-center rounded-full px-3 text-sm font-semibold text-status-fertig hover:underline hover:underline-offset-2',
-  FOKUS_RAHMEN
-)
+const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
+const SATZ = 'text-[15px] leading-normal text-foreground'
 
 type Stand = 'offen' | 'ungueltig' | 'fertig'
 
@@ -66,7 +66,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
           {T.fertigTitel}
         </h1>
         <p className={SATZ}>{T.fertigSatz}</p>
-        <Link href="/login" className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px]')}>
+        <Link href="/login" className={cn(KNOPF_GRUEN, 'h-[50px] w-full rounded-[14px] text-[15px] font-bold')}>
           {T.zurAnmeldung}
         </Link>
       </section>
@@ -76,14 +76,11 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
   if (stand === 'ungueltig') {
     return (
       <section aria-labelledby="email-bestaetigen-titel" className={KARTE}>
-        <span className="flex size-11 items-center justify-center rounded-full bg-muted text-foreground">
-          <TriangleAlert className="size-5" strokeWidth={1.8} aria-hidden="true" />
-        </span>
-        <h1 id="email-bestaetigen-titel" className={TITEL}>
+        <h1 id="email-bestaetigen-titel" className={cn(TITEL, 'text-status-offen')}>
           {T.ungueltigTitel}
         </h1>
         <p className={SATZ}>{T.ungueltigSatz}</p>
-        <Link href="/login" className={cn(TEXTLINK, 'self-start px-0')}>
+        <Link href="/login" className={KNOPF_UMRISS}>
           {T.zurAnmeldung}
         </Link>
       </section>
@@ -121,7 +118,7 @@ export function EmailBestaetigenKarte({ token }: { token: string | null }): Reac
             </p>
           )}
         </div>
-        <button type="submit" disabled={laeuft || adresse.trim() === ''} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'h-12 w-full rounded-[14px]')}>
+        <button type="submit" disabled={laeuft || adresse.trim() === ''} aria-busy={laeuft || undefined} className={cn(KNOPF_GRUEN, 'h-[50px] w-full rounded-[14px] text-[15px] font-bold')}>
           {laeuft ? 'Einen Moment …' : T.knopf}
         </button>
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">{T.vorab}</p>

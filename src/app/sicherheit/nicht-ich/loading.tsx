@@ -7,7 +7,7 @@ export default function NichtIchLaden(): React.JSX.Element {
   return (
     <div data-design="neu" className="min-h-dvh bg-background">
       <div className="h-14 border-b border-border bg-card md:h-16" />
-      <div className="mx-auto w-full max-w-[480px] animate-pulse px-4 pt-6 pb-12 md:pt-12" aria-busy="true">
+      <div className="mx-auto w-full max-w-[1032px] animate-pulse px-4 pt-4 pb-10 *:max-w-[520px]" aria-busy="true">
         <div className="mb-4 size-10 rounded-xl bg-muted" />
         <div className="mb-3 h-7 w-56 rounded-lg bg-border" />
         <div className="mb-2 h-4 w-full rounded bg-app-trough" />

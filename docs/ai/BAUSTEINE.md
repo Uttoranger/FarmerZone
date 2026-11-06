@@ -75,11 +75,12 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 ## src/components/anmelden
 
 - src/components/anmelden/anmelden-seite.tsx · AnmeldenSeite, type Anmeldeart · Die Anmeldeseite für Kundinnen (/account/login) und Höfe (/login) — EINE Seite mit zwei getrennten Karten, wie im Mockup web-k0-anmelden-kunde-code-hof-passwort: links „Ich kaufe ein" (Code aus der … · genutzt
-- src/components/anmelden/code-feld.tsx · CodeFeld · Das Feld für den 6-stelligen Code: sechs Kästchen wie im Mockup, darunter EIN echtes Eingabefeld über die ganze Fläche (unsichtbar, aber fokussierbar und beschriftet). · genutzt
-- src/components/anmelden/hof-anmeldung.tsx · HofAnmeldung · Die Hof-Anmeldung mit E-Mail und Passwort (rechte Karte im Mockup web-k0-anmelden-kunde-code-hof-passwort). · genutzt
+- src/components/anmelden/code-feld.tsx · CodeFeld · Das Feld für den 6-stelligen Code: EIN sichtbares, beschriftetes Eingabefeld (Boards s2-/w2-kundenkonto, Bild 2: „6-stelliger Code aus der E-Mail“ mit dem Platzhalter „6 Ziffern“; bis Nr. 239 sechs … · genutzt
+- src/components/anmelden/erfolg-kasten.tsx · ErfolgKasten · Der grün getönte Kasten für ein erledigtes Ergebnis (Boards s2-/w2-passwort Bild 2 „Schau in deine E-Mails“, s3-/w3-widerruf Bild 4): Fläche und Schrift aus dem Paar „läuft“ … · genutzt
+- src/components/anmelden/hof-anmeldung.tsx · FALSCHES_PASSWORT, HofAnmeldung · Der Satz bei falschem Passwort, als Titel und zweite Zeile der Hinweiskarte über den Feldern (Board s2-/w2-anmelden, Bild 2). Andere Fälle (zu viele Versuche) bringen ihren eigenen Satz. · genutzt
 - src/components/anmelden/kunde-code-formular.tsx · CodeEingabeSchritt, CodeEmailSchritt, KundeCodeFormular, fokusiereCodeFeld, type CodeEingabeSchrittProps, type CodeEmailSchrittProps, type CodeVariante · Die Kunden-Anmeldung mit Code (E7, Nr. 08): E-Mail eingeben → Code aus der Mail eingeben → angemeldet, weiter zu `ziel`. · genutzt
 - src/components/anmelden/passwort-anforderungen.tsx · PASSWORT_ANFORDERUNGEN_SATZ, PasswortAnforderungen · Der Satz über der Liste beim Registrieren (Board w2-registrieren). · genutzt
-- src/components/anmelden/stil.ts · FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN, KNOPF_ORANGE, TEXTKNOPF · Gemeinsame Klassen der Anmeldeseite (Nr. 08), abgenommen von docs/mockups/web-k0-anmelden-kunde-code-hof-passwort.html und mobil-k0-anmelden-mit-code.html. · genutzt
+- src/components/anmelden/stil.ts · FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN, KNOPF_ORANGE, KNOPF_UMRISS, TEXTKNOPF, TEXTLINK · Gemeinsame Klassen der Anmeldeseite (Nr. 08), seit Nr. 239 (Lauf 31) nach den Boards s2-/w2-anmelden, -kundenkonto und -passwort: Beschriftung in Textfarbe über dem Feld, Feld auf der Fläche mit dem … · genutzt
 
 ## src/components/auswertung
 
@@ -263,7 +264,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/konto
 
-- src/components/konto/angemeldete-geraete.tsx · AngemeldeteGeraete · Baustein „Angemeldete Geräte" (Register E7, Ergänzung Lauf 17; Nr. 114; Mockup system-h1-angemeldete-geraete, Schritte 1–3). Eine Zeile je gültiger Sitzung: Gerät und Browser, „zuletzt" und … · genutzt
+- src/components/konto/angemeldete-geraete.tsx · AngemeldeteGeraete, KONTO_ETIKETT · Baustein „Angemeldete Geräte" (Register E7, Ergänzung Lauf 17; Nr. 114; Mockup system-h1-angemeldete-geraete, Schritte 1–3). Eine Zeile je gültiger Sitzung: Gerät und Browser, „zuletzt" und … · genutzt
 
 ## src/components/mein-hof
 

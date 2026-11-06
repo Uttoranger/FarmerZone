@@ -34,7 +34,7 @@ export default async function EmailBestaetigenSeite({
 
   return (
     <KundeShellMitSitzung unterleiste={false}>
-      <div className="mx-auto w-full max-w-[480px] px-4 pt-6 pb-12 md:pt-12">
+      <div className="mx-auto w-full max-w-[1032px] px-4 pt-4 pb-10">
         <EmailBestaetigenKarte token={token.success && gueltig ? token.data : null} />
       </div>
     </KundeShellMitSitzung>
