@@ -227,7 +227,7 @@ describe('Kopf am Handy (G9, Liste Lauf 32)', () => {
   })
 
   it('nur Hof- und Produktseite setzen `aktiv="entdecken"` — sonst schlüge die Regel auf einer fremden Seite an', () => {
-    const treffer = execFileSync('git', ['grep', '-l', 'aktiv="entdecken"', '--', 'src/app'], { encoding: 'utf8' }).trim().split('\n').sort()
+    const treffer = execFileSync('git', ['grep', '-lE', 'aktiv=("entdecken"|\\{\'entdecken\'\\}|\\{"entdecken"\\})', '--', 'src/app'], { encoding: 'utf8' }).trim().split('\n').sort()
     expect(treffer).toEqual(['src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx'])
   })
 })

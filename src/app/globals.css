@@ -572,7 +572,7 @@
     html:has([data-scroll-rand='hof']):has([data-unterseiten-leiste]) {
       scroll-padding-top: 57px;
     }
-    /* Seit Nr. 247 (G9): Auf Hof- und Produktseite scrollt der Kopf der Shell
+    /* Seit Nr. 247 (G9): Auf der Hofseite scrollt der Kopf der Shell
        am Handy weg (data-kopf-scrollt) — oben klebt dann nichts außer dem
        Block des Hofs. Steht vor den Regeln der Hofseite: gleiche Stärke, die
        spätere gewinnt. */

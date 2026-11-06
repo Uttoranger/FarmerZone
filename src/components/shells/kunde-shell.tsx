@@ -58,8 +58,8 @@ import { NotbremseBand } from '@/components/notbremse-band'
  * Seit Nr. 247 (Liste Lauf 32, G9/G10): Der Kopf ist in jeder Sitzung derselbe
  * — vier Links, „Warenkorb · n“, Sonne/Mond, rechts EINE Umriss-Pille
  * („Anmelden“, „Mein Konto“ oder „Mein Hof“), kein Suchfeld. Am Handy Marke und
- * Pille; auf /login und /register nur die Marke. Auf Hof- und Produktseite
- * scrollt der Kopf am Handy weg, dort klebt nur der Kopf des Hofs. Unten das
+ * Pille; auf /login und /register nur die Marke. Auf der Hofseite
+ * scrollt der Kopf am Handy weg, dort klebt nur der Kopf des Hofs (Produktseite folgt mit Nr. 252). Unten das
  * Wort „Warenkorb“ halbfett wie die Nachbarn, der Zähler grün mit hellem Ring.
  *
  * Seit Nr. 107 (Register N4, Ergänzung): Steht die Hofseite als Vorschau im
@@ -210,8 +210,10 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
   const korbAmHandy = korb !== null && !unterleiste
   // Vorschau im Rahmen: erst nach dem Mounten bekannt, vom Server und beim Hydrieren false.
   const imRahmen = useImVorschauRahmen()
-  // G9: Hof- und Produktseite haben am Handy ihren eigenen klebenden Kopf; der Kopf der Shell scrollt dort weg.
-  const kopfScrolltWeg = kopfScrolltWegAmHandy(aktiv)
+  // G9: Die Hofseite hat am Handy ihren eigenen klebenden Hof-Kopf; der Kopf der Shell scrollt dort weg.
+  // Die Produktseite (unterleiste = false) hat den ihren noch nicht — dort bleibt der Kopf kleben, sonst gäbe es
+  // am Handy keinen Weg mehr zum Korb. Produktseite folgt mit Nr. 252.
+  const kopfScrolltWeg = kopfScrolltWegAmHandy(aktiv) && unterleiste
 
   return (
     // Die Maße als CSS-Variablen (src/lib/kunde-shell-masse.ts): Der Kartenmodus auf

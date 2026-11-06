@@ -307,6 +307,10 @@ describe('KundeShell', () => {
     const sonst = kunde('gast', '/hof-beispiel')
     expect(abschnitt(sonst, '<header', '>')).not.toMatch(/max-md:relative/)
     expect(sonst).not.toContain('data-kopf-scrollt')
+    // Gegenprobe Produktseite (unterleiste = false, aktiv = entdecken): kein eigener Hof-Kopf bis Nr. 252, der Kopf klebt weiter.
+    const produktseite = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', aktiv: 'entdecken', unterleiste: false }))
+    expect(abschnitt(produktseite, '<header', '>')).not.toMatch(/max-md:relative/)
+    expect(produktseite).not.toContain('data-kopf-scrollt')
   })
 
   // Nr. 41: Am Handy braucht „Anmelden" den Platz oben rechts — Hell/Dunkel steht dort am Seitenfuß.
