@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, textLink } from './_layout'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, leiseZeile, textLink, woZeile } from './_layout'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 export interface OrderReadyProps {
@@ -10,6 +10,8 @@ export interface OrderReadyProps {
   farmPhone: string
   farmAddress: string
   farmCity: string
+  /** PLZ des Hofs für die Zeile „Wo“; fehlt sie, steht nur der Ort. */
+  farmPostalCode?: string
   pickupDate: string
   pickupTime: string
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
@@ -34,13 +36,10 @@ export function OrderReadyEmail(p: OrderReadyProps) {
   return (
     <EmailLayout fuss={{ art: 'hof' }} previewText={`Deine Bestellung bei ${p.farmName} liegt bereit`}>
       <Text style={h1}>Deine Bestellung liegt bereit</Text>
-      <Text style={bodyText}>
-        Deine Bestellung <strong>{p.orderNumber}</strong> liegt bei {p.farmName} für dich bereit –{' '}
-        <strong>{`${p.pickupDate}, ${p.pickupTime} Uhr`}</strong>, {`${p.farmAddress}, ${p.farmCity}`}.
-      </Text>
-
+      {/* Board s3/w3-mail-kauf Bild 4: kein Einleitungssatz — Abholung, Ort und die Nummer zum Nennen. */}
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
-      <BetragsZeile links="Bestellnummer" rechts={p.orderNumber} />
+      <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
+      <BestellnummerKasten nummer={p.orderNumber} />
 
       <KnopfReihe>
         <Knopf href={p.routeUrl}>Route planen</Knopf>
@@ -52,7 +51,7 @@ export function OrderReadyEmail(p: OrderReadyProps) {
         )}
       </KnopfReihe>
 
-      <Text style={kleinText}>
+      <Text style={bodyText}>
         Du schaffst es nicht? Gib dem Hof kurz Bescheid:{' '}
         {anrufen ? (
           <Link href={anrufen} style={textLink}>
@@ -66,7 +65,7 @@ export function OrderReadyEmail(p: OrderReadyProps) {
 
       {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
       {p.widerrufUrl && (
-        <Text style={kleinText}>
+        <Text style={leiseZeile}>
           <Link href={p.widerrufUrl} style={textLink}>
             {WIDERRUF_TEXT.knopfWiderrufen}
           </Link>

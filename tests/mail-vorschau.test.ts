@@ -102,6 +102,9 @@ afterAll(() => {
 /** Mi, 3. März 2027, 07:40 in Wien — der Tag der Beispielwelt. */
 const JETZT = new Date('2027-03-03T06:40:00.000Z')
 
+/** Ein Foto für den Beitrag, ohne Netz: eine leere Fläche im Format des Boards (nur Vorschau, nie in der App). */
+const BEISPIEL_FOTO = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="320"><rect width="600" height="320" fill="#E8E4D8"/></svg>')}`
+
 /** Ein Code für die Vorschau entsteht erst zur Laufzeit — nie als Ziffernfolge im Test (tests/code-testwerte-wache.test.ts). */
 const beispielCode = (ziffern: readonly number[]): string => ziffern.join('')
 
@@ -313,6 +316,7 @@ const FAELLE: Fall[] = [
     },
   },
   {
+    // Board Bild 2: Beitrag mit Foto (die Adresse lädt in der Vorschau nicht — es zählt die Stelle im Aufbau).
     name: 'beitrag',
     art: 'beitrag',
     fuss: 'beitrag',
@@ -322,7 +326,7 @@ const FAELLE: Fall[] = [
         title: 'Frischer Bergkäse ab Samstag',
         body: 'Hallo Maria! Unser Bergkäse hat jetzt 8 Monate gereift. Ab Samstag, 6. März, holst du ihn bei uns ab – solange der Laib reicht.',
         anlass: 'FRESH_PRODUCT',
-        photoUrl: null,
+        photoUrl: BEISPIEL_FOTO,
         showOnFarmPage: true,
         farm: { name: HOF.name, slug: HOF.slug },
       })
@@ -330,16 +334,72 @@ const FAELLE: Fall[] = [
     },
   },
   {
+    // Board Bild 3: Beitrag ohne Foto, Anlass Hinweis (Lauf 31, Nr. 241 — vorher nicht prüfbar).
+    name: 'beitrag-ohne-foto',
+    art: 'beitrag',
+    fuss: 'beitrag',
+    rendere: () => {
+      db.customerFarmSubscription.findFirst.mockResolvedValue({ customerEmail: 'maria.huber@example.org', farmId: HOF.id })
+      db.statusPost.findFirst.mockResolvedValue({
+        title: 'Am Samstag Hoffest',
+        body: 'Am Sa, 13. März feiern wir von 10 bis 16 Uhr am Hof: Stallführung, Käseverkostung und Kaffee. Abholung wie immer 9–12 Uhr.',
+        anlass: 'ANNOUNCEMENT',
+        photoUrl: null,
+        showOnFarmPage: true,
+        farm: { name: HOF.name, slug: HOF.slug },
+      })
+      return ausRenderer('beitrag', { postId: 'cbeitrag0000000000000002', aboId: 'cabo00000000000000000001' })
+    },
+  },
+  {
     name: 'bescheid',
     art: 'bescheid',
-    fuss: null,
+    fuss: 'postfach',
     rendere: () => {
-      db.meldung.findUnique.mockResolvedValue({ customerEmail: 'maria.huber@example.org', farmId: null, antwortAnMelder: 'Ab April können Höfe auch Sonntage als Abholzeit anbieten.' })
+      db.meldung.findUnique.mockResolvedValue({
+        customerEmail: 'maria.huber@example.org',
+        farmId: null,
+        antwortAnMelder:
+          'Du hast dir Abholzeiten am Sonntag gewünscht. Wir haben das mit den Höfen besprochen: Ab April können Höfe auch Sonntage als Abholzeit anbieten. Ob dein Hof mitmacht, siehst du auf seiner Seite.\n\nMehrere Kundinnen haben sich das gewünscht – darum diese eine Antwort an alle.',
+      })
       return ausRenderer('bescheid', { meldungId: 'cmeldung0000000000000001' })
     },
   },
   // Bestellungen an den Hof (s3/w3-mail-hof-bestellung)
   { name: 'bestellung-bezahlt-hof', art: 'bestellung-bezahlt-hof', fuss: 'plattform', rendere: () => (bestellung(), ausRenderer('bestellung-bezahlt-hof', { orderId: BESTELLUNG.id })) },
+  {
+    // Board Bild 2 „Neue Bestellung, Bar bei Abholung“: Die Vorlage hat den Zweig ohne Online-Zahlung, aber
+    // keinen Versandweg — der Hof erfährt von einer Barbestellung erst mit „Bar-Bestellung bestätigt“.
+    // Gerendert direkt aus der Vorlage, damit der Zweig prüfbar ist (Lauf 31, Nr. 241).
+    name: 'bestellung-neu-bar-hof',
+    art: 'bestellung-bezahlt-hof',
+    fuss: 'plattform',
+    rendere: async () => {
+      const [{ NewOrderNotificationEmail }, { render }] = await Promise.all([import('@/emails/new-order-notification'), import('@react-email/render')])
+      const html = await render(
+        NewOrderNotificationEmail({
+          farmerName: HOF.ownerName,
+          customerName: BAR.customerName,
+          customerPhone: BAR.customerPhone,
+          orderNumber: BAR.orderNumber,
+          pickupDate: 'Sa, 6. März 2027',
+          pickupTime: '09:00–12:00',
+          items: [
+            { name: 'Bergkäse · 2 × 250 g', quantity: 2, betrag: 13.16 },
+            { name: 'Heumilch frisch · 4 L', quantity: 4, betrag: 5.96 },
+          ],
+          total: 18,
+          serviceFee: 1.12,
+          gebuehrWort: 'Plattformgebühr',
+          customerTotal: 19.12,
+          paymentLabel: 'Bar bei Abholung',
+          isOnline: false,
+          heuteUrl: `${PRODUKTION_ADRESSE}/dashboard`,
+        })
+      )
+      return { betreff: 'Vorschau ohne Versandweg', html }
+    },
+  },
   { name: 'bar-bestaetigt-hof', art: 'bar-bestaetigt-hof', fuss: 'plattform', rendere: () => (bestellung({ ...BAR, gebuehrEinzug: 'erlassen' }), ausRenderer('bar-bestaetigt-hof', { orderId: BAR.id })) },
   {
     name: 'widerruf-hof',
@@ -538,7 +598,7 @@ describe.each(FAELLE.map((f) => [f.name, f] as const))('Mail „%s“', (_name, 
     const mail = await fall.rendere()
     const t = text(mail.html)
     if (fall.fuss === null) {
-      // Ohne EmailLayout (bescheidMailHtml in src/lib/meldung.ts, außerhalb der Mail-Vorlagen): kein Fuß der Vorlagen.
+      // Ohne EmailLayout: kein Fuß der Vorlagen (seit Nr. 241 hat jede Mail-Art ein Layout; der Zweig bleibt für künftige Arten).
       expect(Object.values(ALLE_FUESSE(HOF.name)).filter((s) => t.includes(s))).toEqual([])
       return
     }
@@ -663,6 +723,7 @@ const FUSS_JE_VORLAGE: Record<string, MailFussArt[]> = {
   'admin-sicherheit.tsx': ['plattform', 'plattform'],
   'anmeldecode.tsx': ['plattform'],
   'artikel-fehlt.tsx': ['hof'],
+  'bescheid.tsx': ['postfach'],
   'bestellung-verfallen.tsx': ['hof'],
   'betreiber-antwort.tsx': ['betrieb'],
   'betreiber-bestaetigung.tsx': ['plattform'],
@@ -742,5 +803,40 @@ describe('Recht bleibt wörtlich (N43 (1) und (2), Lauf 30 — gleich dem Stand 
     // Gegenprobe: ohne Käuferart PRIVAT kein Einstieg.
     bestellung({ ...BESTELLUNG, kaeuferArt: 'BETRIEB' })
     expect(text((await ausRenderer('abholbereit', { orderId: BESTELLUNG.id })).html)).not.toContain(WIDERRUF_TEXT.fussLink)
+  })
+})
+
+describe('Storno ohne Erstattung: der Satz folgt der Zahlart (Nr. 241, Runde 1)', () => {
+  const satz = async (zahlart?: 'online' | 'bar' | 'karte') => {
+    const [{ OrderCancelledEmail }, { render }] = await Promise.all([import('@/emails/order-cancelled'), import('@react-email/render')])
+    return text(await render(OrderCancelledEmail({ customerName: 'Eva Steiner', orderNumber: 'HM-0303-7E15', farmName: HOF.name, total: 18, refundAmount: null, zahlart })))
+  }
+
+  it('bar: der Satz des Boards', async () => {
+    expect(await satz('bar')).toContain('Du hättest bar bezahlt – es ist nichts zu erstatten.')
+  })
+
+  it('Karte bei Abholung und ohne Zahlart: neutral, nie „bar“', async () => {
+    for (const t of [await satz('karte'), await satz()]) {
+      expect(t).toContain('Da du vor Ort bezahlst, entstehen dir keine Kosten.')
+      expect(t).not.toContain('bar bezahlt')
+    }
+  })
+
+  it('der Renderer gibt die Zahlart der Bestellung weiter (Karte → neutral)', async () => {
+    bestellung({ ...BAR, paymentMethod: 'ONSITE_CARD' })
+    expect(text((await ausRenderer('storniert', { orderId: BAR.id })).html)).not.toContain('bar bezahlt')
+    bestellung(BAR)
+    expect(text((await ausRenderer('storniert', { orderId: BAR.id })).html)).toContain('Du hättest bar bezahlt')
+  })
+})
+
+describe('Bescheid: die Antwort des Teams steht nur als Text da (Nr. 241, Runde 1)', () => {
+  it('<script> und Zeichen in der Antwort werden maskiert, nie als Markup ausgegeben', async () => {
+    const mail = await email.baueBescheidMail('maria.huber@example.org', '<script>alert(1)</script>\n„Danke" & <b>gut</b>')
+    expect(mail.html).not.toContain('<script>')
+    expect(mail.html).not.toContain('<b>gut</b>')
+    expect(mail.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(mail.html).toContain('&amp; &lt;b&gt;gut&lt;/b&gt;')
   })
 })

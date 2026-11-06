@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, Text } from '@react-email/components'
 import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
-import { EmailLayout, bodyText, ctaButton, h1, mutedText, textLink } from './_layout'
+import { EmailLayout, MAIL_FARBE, Knopf, KnopfReihe, bodyText, h1, leiseZeile, mutedText, textLink } from './_layout'
 
 export interface PostfachRundschreibenProps {
   titel: string
@@ -20,9 +20,14 @@ export interface PostfachRundschreibenProps {
  * wird in der App. Der Text steht nur als Text-Kind da, nie als Markup.
  */
 export function PostfachRundschreibenEmail(p: PostfachRundschreibenProps): React.JSX.Element {
+  const [absender, art] = POSTFACH_MAIL_TEXT.vonTeam.split(' · ')
   return (
     <EmailLayout fuss={{ art: 'postfach' }} previewText={p.titel}>
-      <Text style={mutedText}>{POSTFACH_MAIL_TEXT.vonTeam}</Text>
+      {/* Board s3/w3-mail-hof-konto Bild 4: der Absender fett, die Art leise daneben; Gruß in Fließtext. */}
+      <Text style={{ ...mutedText, margin: '0 0 6px' }}>
+        <strong style={{ color: MAIL_FARBE.text }}>{absender}</strong>
+        {art ? ` · ${art}` : ''}
+      </Text>
       <Text style={h1}>{p.titel}</Text>
       <Text style={{ ...bodyText, whiteSpace: 'pre-wrap' }}>{p.text}</Text>
       {p.linkUrl && (
@@ -32,11 +37,11 @@ export function PostfachRundschreibenEmail(p: PostfachRundschreibenProps): React
           </Link>
         </Text>
       )}
-      <Link href={p.fadenUrl} style={ctaButton}>
-        {POSTFACH_MAIL_TEXT.oeffnen}
-      </Link>
-      <Text style={mutedText}>{POSTFACH_MAIL_TEXT.antwortenInDerApp}</Text>
-      <Text style={mutedText}>{POSTFACH_MAIL_TEXT.gruss}</Text>
+      <KnopfReihe>
+        <Knopf href={p.fadenUrl}>{POSTFACH_MAIL_TEXT.oeffnen}</Knopf>
+      </KnopfReihe>
+      <Text style={leiseZeile}>{POSTFACH_MAIL_TEXT.antwortenInDerApp}</Text>
+      <Text style={{ ...bodyText, margin: '10px 0 0' }}>{POSTFACH_MAIL_TEXT.gruss}</Text>
     </EmailLayout>
   )
 }

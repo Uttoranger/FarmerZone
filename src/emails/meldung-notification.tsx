@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, textLink } from './_layout'
+import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, leiseZeile, textLink } from './_layout'
 
 export interface MeldungNotificationProps {
   kurznummer: string
@@ -15,47 +15,30 @@ export interface MeldungNotificationProps {
   adminUrl: string
 }
 
-/** Nachricht an den Betreiber: eine neue FEHLER-Meldung im Postfach. */
+/**
+ * Nachricht an den Betreiber: eine neue FEHLER-Meldung im Postfach (Board
+ * s3/w3-mail-betrieb Bild 2): Von, Seite, die Meldung als Zitat, der Knopf.
+ * Text, Seite und Gerät sind Fremdtext — React escaped sie.
+ */
 export function MeldungNotificationEmail(p: MeldungNotificationProps) {
+  const seite = [p.seiteUrl || '–', p.userAgent || p.viewport].filter(Boolean).join(' · ')
   return (
     <EmailLayout fuss={{ art: 'betrieb' }} previewText={`Fehlermeldung ${p.kurznummer}${p.farmName ? ` von ${p.farmName}` : ''}`}>
       <Text style={h1}>Neue Fehlermeldung {p.kurznummer}</Text>
-      <Text style={bodyText}>
-        {p.farmName ? <><strong>{p.farmName}</strong> hat</> : 'Eine Kundin hat'} einen Fehler gemeldet.
-        Eingang: {p.createdAt}.
-      </Text>
-
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Meldung</Text>
-        <Text style={{ ...highlightValue, whiteSpace: 'pre-wrap' }}>{p.text}</Text>
-
-        <Text style={{ ...highlightLabel, marginTop: '14px' }}>Kontext</Text>
-        <Text style={mutedText}>
-          {p.seiteUrl || '–'}
-          <br />
-          {p.viewport || '–'} · {p.userAgent || '–'}
+      <BetragsZeile umbrechen links="Von" rechts={p.farmName ?? 'Kundin'} />
+      <BetragsZeile umbrechen links="Seite" rechts={seite} />
+      <Text style={{ ...bodyText, marginTop: '12px', whiteSpace: 'pre-wrap' }}>{`„${p.text}“`}</Text>
+      {p.diagKennung && <Text style={leiseZeile}>{`Kennung: ${p.diagKennung}`}</Text>}
+      {p.screenshotUrl && (
+        <Text style={leiseZeile}>
+          <Link href={p.screenshotUrl} style={textLink}>
+            Screenshot öffnen
+          </Link>
         </Text>
-
-        {p.diagKennung && (
-          <>
-            <Text style={{ ...highlightLabel, marginTop: '14px' }}>Kennung</Text>
-            <Text style={{ ...highlightValue, fontFamily: 'monospace' }}>{p.diagKennung}</Text>
-          </>
-        )}
-
-        {p.screenshotUrl && (
-          <Text style={{ ...mutedText, marginTop: '14px' }}>
-            <Link href={p.screenshotUrl} style={textLink}>Screenshot öffnen</Link>
-          </Text>
-        )}
-      </div>
-
-      <Link href={p.adminUrl} style={ctaButton}>Im Postfach ansehen →</Link>
-
-      <Text style={mutedText}>
-        Wünsche und Fragen kommen nicht per Mail — sie stehen gesammelt im Postfach und in der
-        Wochen-Zusammenfassung.
-      </Text>
+      )}
+      <KnopfReihe>
+        <Knopf href={p.adminUrl}>Im Postfach ansehen →</Knopf>
+      </KnopfReihe>
     </EmailLayout>
   )
 }

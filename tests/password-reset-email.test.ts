@@ -62,6 +62,6 @@ describe('sendPasswordResetEmail', () => {
 
     const call = sendMock.mock.calls[0][0]
     expect(call.html).toContain('1 Stunde')
-    expect(call.html).toContain('ignoriere diese E-Mail')
+    expect(call.html).toContain('ignorier diese Mail')
   })
 })
