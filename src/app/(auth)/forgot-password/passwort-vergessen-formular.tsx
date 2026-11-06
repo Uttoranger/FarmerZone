@@ -2,11 +2,11 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, MailCheck } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
-import { cn } from '@/lib/utils'
-import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_ORANGE, TEXTKNOPF } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE, TEXTLINK } from '@/components/anmelden/stil'
+import { ErfolgKasten } from '@/components/anmelden/erfolg-kasten'
 
 /**
  * „Passwort vergessen?" — das Formular (seit Nr. 54 in der Fokus-Shell, die
@@ -55,26 +55,24 @@ export function PasswortVergessenFormular(): React.JSX.Element {
 
   if (gesendet) {
     return (
-      <div className="flex flex-col items-center gap-3 py-2 text-center">
-        <MailCheck className="size-8 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-        {/* Überschrift nach Board w2-passwort Bild 2; die Antwort bleibt für jede Adresse gleich. */}
-        <h2 className="font-heading text-[22px] leading-tight font-semibold text-foreground">Schau in deine E-Mails</h2>
-        <p role="status" aria-live="polite" className="text-[14.5px] leading-normal text-foreground">
-          Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt.
+      // Grün getönter Kasten mit Haken, links bündig, ein Absatz (Board s2-/w2-passwort, Bild 2);
+      // die Antwort bleibt für jede Adresse gleich.
+      <ErfolgKasten titel="Schau in deine E-Mails">
+        <p role="status" aria-live="polite">
+          {`Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt. Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig. Schau auch im Spam-Ordner nach.`}
         </p>
-        <p className={HINWEIS_TEXT}>{`Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig. Schau auch im Spam-Ordner nach.`}</p>
-        <Link href="/login" className={TEXTKNOPF}>
+        <Link href="/login" className={TEXTLINK}>
           Zurück zur Anmeldung
         </Link>
-      </div>
+      </ErfolgKasten>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div>
-        <h2 className="font-heading text-[22px] leading-tight font-semibold text-foreground md:text-2xl">Passwort vergessen?</h2>
-        <p className="mt-1 text-[14px] leading-normal text-muted-foreground">Wir schicken dir einen Link zum Zurücksetzen.</p>
+        <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">Passwort vergessen?</h2>
+        <p className="mt-1.5 text-[15px] leading-normal text-muted-foreground">Wir schicken dir einen Link zum Zurücksetzen.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -88,7 +86,7 @@ export function PasswortVergessenFormular(): React.JSX.Element {
             inputMode="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@hof.at"
+            placeholder="name@beispiel.at"
             autoComplete="email"
             required
             aria-invalid={fehler ? true : undefined}
@@ -114,10 +112,6 @@ export function PasswortVergessenFormular(): React.JSX.Element {
           )}
         </button>
       </form>
-
-      <Link href="/login" className={cn(TEXTKNOPF, 'self-center')}>
-        Zurück zur Anmeldung
-      </Link>
     </div>
   )
 }
