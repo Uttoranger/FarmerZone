@@ -4,7 +4,7 @@ import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { barFristSatz, getBestellungenSeite, getHofBestellDetail, naechstesFensterMitZahl } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
-import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
+import { hofBestellFilterAus, hofBestellWunschAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import { MARKE } from '@/lib/marke'
 import { naechsteAbholungSatz } from '@/lib/heute'
@@ -54,7 +54,7 @@ export default async function OrdersPage({
   const jetzt = new Date()
   const seite = await getBestellungenSeite(farm.id, filter, jetzt)
   // Nur eine Bestellung aus der eigenen Liste wird gewählt — eine fremde oder alte ID fällt still auf die erste.
-  const wunsch = typeof suche.bestellung === 'string' ? suche.bestellung : null
+  const wunsch = hofBestellWunschAus(suche.bestellung)
   const inListe = seite.gruppen.flatMap((g) => g.bestellungen)
   const gewaehlt = inListe.find((b) => b.id === wunsch) ?? inListe[0]
   const detail = gewaehlt ? await getHofBestellDetail(farm, gewaehlt.id, jetzt) : null

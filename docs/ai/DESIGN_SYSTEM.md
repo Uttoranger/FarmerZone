@@ -1016,6 +1016,7 @@ Register N41 d (seit Nr. 219, Lauf 30; Boards w1-mehr-neu, w1-korb, w1-bestellun
   - **Alles andere** ist ein zentrierter Dialog, höchstens 560 px breit (`DialogMitte`), über abgedunkeltem Grund (hell die Textfarbe zu 55 %). Titel links, **genau ein Schließen-Element** rechts — der Textknopf „Schließen“ oder „Abbrechen“ (44 px), kein zusätzliches Kreuz. Aktionen am Ende des Dialogs (zerstörende Aktion in Orange-Outline, nie Grün).
 - **Toasts** stehen nur im Inhaltsbereich — nie über Seitenleiste, Kopf oder Unterleiste.
 - **Handy:** Blatt von unten mit Griff (`SheetBlatt`), Hauptaktion volle Breite unten, „Abbrechen" als Textknopf darunter; der Warenkorb ist dasselbe Blatt mit `SheetKopf` („Schließen“ oben rechts).
+- **Ausnahme Hofbereich (Nr. 237, Boards s1-/w1-bestellung):** `BestellDialog mitte` setzt „Abbrechen“ als das eine Schließen-Element oben rechts (Dialog wie Blatt), ohne zweiten Knopf unten; der Startfokus liegt darauf (gesucht im eigenen Popup). Gilt vor den Sätzen dieses Abschnitts zum Handy.
 - **Bestand:** `DialogContent` (Kreuz rechts oben, Breite je Aufrufer, bisher 480–820 px) bleibt, bis die Seiten-Nummern ihre Dialoge umstellen; ein neuer Dialog nimmt `DialogMitte`.
 
 ### Lesbarkeit

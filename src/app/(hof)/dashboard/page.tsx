@@ -121,7 +121,10 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       return []
     }),
     // Zähler am Postfach im Kopf (Handy, Board s1-heute) — derselbe Zähler wie in der Navigation; ein Fehler nimmt nur die Zahl weg.
-    zaehleUngelesenHof(farm.id).catch(() => 0),
+    zaehleUngelesenHof(farm.id).catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { bereich: 'postfach', seite: 'heute' }, extra: { farmId: farm.id } })
+      return 0
+    }),
   ])
   const postfach = heutePostfach(faeden, jetzt)
   // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.

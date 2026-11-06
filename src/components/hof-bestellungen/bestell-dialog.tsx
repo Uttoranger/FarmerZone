@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogMitte, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -63,6 +63,8 @@ export function BestellDialog({
 }): React.JSX.Element {
   const breit = useMindestbreite(768)
   const laeuft = hauptaktion.laeuft === true
+  const popup = useRef<HTMLDivElement>(null)
+  const startfokus = () => abbrechenIn(popup.current)
   const wechsel = (o: boolean) => {
     if (!laeuft) onOffenChange(o)
   }
@@ -84,7 +86,7 @@ export function BestellDialog({
   if (breit && mitte) {
     return (
       <Dialog open={offen} onOpenChange={wechsel}>
-        <DialogMitte titel={titel} schliessen="Abbrechen" className="gap-4" initialFocus={abbrechenZuerst}>
+        <DialogMitte ref={popup} titel={titel} schliessen="Abbrechen" className="gap-4" initialFocus={startfokus}>
           {unterzeile && <DialogDescription className="-mt-2 text-[13px] break-words text-muted-foreground">{unterzeile}</DialogDescription>}
           {children}
           <div className="flex flex-wrap items-center justify-end gap-2.5">
@@ -124,7 +126,7 @@ export function BestellDialog({
   if (mitte) {
     return (
       <Sheet open={offen} onOpenChange={wechsel}>
-        <SheetBlatt schleier="abgedunkelt" initialFocus={abbrechenZuerst}>
+        <SheetBlatt ref={popup} schleier="abgedunkelt" initialFocus={startfokus}>
           <div className="min-w-0">
             <SheetKopf titel={titel} schliessen="Abbrechen" />
             {unterzeile && <SheetDescription className="mt-1 text-[13px] break-words">{unterzeile}</SheetDescription>}
@@ -157,9 +159,13 @@ export function BestellDialog({
   )
 }
 
-/** Der Startfokus der Rückfragen mit `mitte`: das eine „Abbrechen“ oben rechts (Dialog bzw. Blatt). */
-function abbrechenZuerst(): HTMLElement | true {
-  const knopf = document.querySelector<HTMLElement>('[data-slot="dialog-mitte"] [data-slot="dialog-close"], [data-slot="sheet-kopf"] [data-slot="sheet-close"]')
+/**
+ * Der Startfokus der Rückfragen mit `mitte`: das eine „Abbrechen“ oben rechts (Dialog bzw. Blatt).
+ * Gesucht wird nur im eigenen Popup — beim Wechsel von einem Dialog zum nächsten steht der schließende
+ * noch kurz im DOM, und ein Treffer dort hieße: Fokus auf ein Element, das gleich verschwindet.
+ */
+export function abbrechenIn(popup: HTMLElement | null): HTMLElement | true {
+  const knopf = popup?.querySelector<HTMLElement>('[data-slot="dialog-close"], [data-slot="sheet-kopf"] [data-slot="sheet-close"]')
   return knopf ?? true
 }
 
