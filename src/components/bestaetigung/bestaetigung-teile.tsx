@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
-import { anzeigeGesamtCents, bestellSummen, centsAlsEuro, gebuehrEntfallen } from '@/lib/servicegebuehr'
+import { anzeigeGesamtCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer, gebuehrHinweisFuer } from '@/lib/plattformgebuehr'
 import type { BestaetigungsKopf, BestellSchritt } from '@/lib/bestaetigung'
 import { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
@@ -224,7 +224,9 @@ export function BestellPositionen({
   summeInZahlzeile?: boolean
 }): React.JSX.Element {
   const s = bestellSummen(summen)
-  const entfallen = gebuehrEntfallen(summen)
+  // „erstattet“ bzw. „entfällt“ — dieselbe Quelle wie der Abholzettel (gebuehrEntfallenVermerk).
+  const vermerk = gebuehrEntfallenVermerk(summen)
+  const entfallen = vermerk !== null
   // Ist die Gebühr entfallen bzw. erstattet, zählt „Gesamt“ sie nicht mit (Nr. 244) — sonst stünde die gestrichene
   // Zeile darüber und die volle Summe darunter.
   const gesamt = formatEuro(centsAlsEuro(anzeigeGesamtCents(summen)))
@@ -261,7 +263,7 @@ export function BestellPositionen({
         {s.gebuehrCents > 0 && (
           <li className="text-[15px] leading-normal">
             {gebuehrBezeichnungFuer(summen)}
-            {entfallen && <span className="text-[13px]"> ({summen.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'})</span>}
+            {vermerk && <span className="text-[13px]"> ({vermerk})</span>}
             {' · '}
             <span className={cn('whitespace-nowrap tabular-nums', entfallen && 'text-muted-foreground line-through')}>
               {formatEuro(centsAlsEuro(s.gebuehrCents))}

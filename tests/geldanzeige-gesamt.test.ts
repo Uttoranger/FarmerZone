@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { BestellPositionen } from '@/components/bestaetigung/bestaetigung-teile'
-import { anzeigeGesamtCents, barZuKassierenCents, bestellSummen, gebuehrErstattungOffen } from '@/lib/servicegebuehr'
+import { anzeigeGesamtCents, barZuKassierenCents, bestellSummen, gebuehrEntfallenVermerk, gebuehrErstattungOffen } from '@/lib/servicegebuehr'
 
 const ENTFALLEN_AM = new Date('2026-11-05T10:00:00.000Z')
 
@@ -42,6 +42,7 @@ describe('Bestätigung: „Gesamt“ ohne entfallene Gebühr', () => {
     const html = positionen({ totalAmount: '9.80', serviceFeeCents: 60, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONLINE' }, true)
     expect(html).toMatch(/>Online · Bezahlt · €\s9,80<\/p>/)
     expect(html).toContain('(erstattet)')
+    expect(html).toMatch(/<span class="[^"]*line-through[^"]*">€\s0,60<\/span>/)
   })
 })
 
@@ -67,20 +68,20 @@ describe('Bestätigung: Gebühr gilt noch oder gab es nie', () => {
 })
 
 describe('anzeigeGesamtCents: nur Anzeige, die Snapshot-Beträge bleiben', () => {
-  type Fall = { name: string; b: Summen & { status: string }; anzeige: number; kassieren: number | null }
+  type Fall = { name: string; b: Summen & { status: string }; anzeige: number; gesamt: number; kassieren: number | null }
   const ERSTATTUNG_OFFEN: Fall['b'] = { status: 'NOT_PICKED_UP', totalAmount: '19.99', serviceFeeCents: 120, serviceFeeRefundedAt: null, paymentMethod: 'ONLINE' }
   const FAELLE: Fall[] = [
     // (a) bar mit entfallener Gebühr (Storno, „nicht abgeholt“, verfallen)
-    { name: '(a) bar, Gebühr entfallen', b: { status: 'CANCELLED', totalAmount: '9.80', serviceFeeCents: 60, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONSITE_CASH' }, anzeige: 980, kassieren: 1040 },
+    { name: '(a) bar, Gebühr entfallen', b: { status: 'CANCELLED', totalAmount: '9.80', serviceFeeCents: 60, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONSITE_CASH' }, anzeige: 980, gesamt: 1040, kassieren: 1040 },
     // (b) online, Gebühr erstattet
-    { name: '(b) online, Gebühr erstattet', b: { status: 'CANCELLED', totalAmount: '19.99', serviceFeeCents: 120, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONLINE' }, anzeige: 1999, kassieren: null },
+    { name: '(b) online, Gebühr erstattet', b: { status: 'CANCELLED', totalAmount: '19.99', serviceFeeCents: 120, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONLINE' }, anzeige: 1999, gesamt: 2119, kassieren: null },
     // (c) nicht abgeholt, online, Erstattung steht noch aus
-    { name: '(c) NOT_PICKED_UP online, Erstattung offen', b: ERSTATTUNG_OFFEN, anzeige: 2119, kassieren: null },
+    { name: '(c) NOT_PICKED_UP online, Erstattung offen', b: ERSTATTUNG_OFFEN, anzeige: 2119, gesamt: 2119, kassieren: null },
     // (d) Hofpreis-Modell (N38), Gebühr entfallen
-    { name: '(d) Hofpreis-Modell, Gebühr entfallen', b: { status: 'NOT_PICKED_UP', totalAmount: '12.50', serviceFeeCents: 75, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONSITE_CASH', gebuehrModell: 'hofpreis' }, anzeige: 1250, kassieren: 1325 },
+    { name: '(d) Hofpreis-Modell, Gebühr entfallen', b: { status: 'NOT_PICKED_UP', totalAmount: '12.50', serviceFeeCents: 75, serviceFeeRefundedAt: ENTFALLEN_AM, paymentMethod: 'ONSITE_CASH', gebuehrModell: 'hofpreis' }, anzeige: 1250, gesamt: 1325, kassieren: 1325 },
     // (e) Gebühr 0 (bar vor dem Stichtag, B1)
-    { name: '(e) Gebühr 0', b: { status: 'PICKED_UP', totalAmount: '9.80', serviceFeeCents: 0, serviceFeeRefundedAt: null, paymentMethod: 'ONSITE_CASH' }, anzeige: 980, kassieren: 980 },
-    { name: 'Gebühr gilt, bar', b: { status: 'CONFIRMED', totalAmount: '9.80', serviceFeeCents: 60, serviceFeeRefundedAt: null, paymentMethod: 'ONSITE_CASH' }, anzeige: 1040, kassieren: 1040 },
+    { name: '(e) Gebühr 0', b: { status: 'PICKED_UP', totalAmount: '9.80', serviceFeeCents: 0, serviceFeeRefundedAt: null, paymentMethod: 'ONSITE_CASH' }, anzeige: 980, gesamt: 980, kassieren: 980 },
+    { name: 'Gebühr gilt, bar', b: { status: 'CONFIRMED', totalAmount: '9.80', serviceFeeCents: 60, serviceFeeRefundedAt: null, paymentMethod: 'ONSITE_CASH' }, anzeige: 1040, gesamt: 1040, kassieren: 1040 },
   ]
 
   for (const f of FAELLE) {
@@ -89,8 +90,7 @@ describe('anzeigeGesamtCents: nur Anzeige, die Snapshot-Beträge bleiben', () =>
     })
 
     it(`${f.name}: bestellSummen und barZuKassierenCents bleiben beim Snapshot (f)`, () => {
-      const s = bestellSummen(f.b)
-      expect(s.gesamtCents).toBe(s.warenpreisCents + f.b.serviceFeeCents)
+      expect(bestellSummen(f.b).gesamtCents).toBe(f.gesamt)
       expect(barZuKassierenCents(f.b)).toBe(f.kassieren)
     })
   }
@@ -98,5 +98,14 @@ describe('anzeigeGesamtCents: nur Anzeige, die Snapshot-Beträge bleiben', () =>
   it('(c) passt zu gebuehrErstattungOffen: solange die Erstattung aussteht, zählt die Gebühr mit', () => {
     expect(gebuehrErstattungOffen(ERSTATTUNG_OFFEN)).toBe(true)
     expect(anzeigeGesamtCents(ERSTATTUNG_OFFEN)).toBe(bestellSummen(ERSTATTUNG_OFFEN).gesamtCents)
+  })
+})
+
+describe('gebuehrEntfallenVermerk: ein Wort für Bildschirm und Papier', () => {
+  it('online erstattet, vor Ort entfällt, sonst nichts', () => {
+    expect(gebuehrEntfallenVermerk({ paymentMethod: 'ONLINE', serviceFeeRefundedAt: ENTFALLEN_AM })).toBe('erstattet')
+    expect(gebuehrEntfallenVermerk({ paymentMethod: 'ONSITE_CASH', serviceFeeRefundedAt: ENTFALLEN_AM })).toBe('entfällt')
+    expect(gebuehrEntfallenVermerk({ paymentMethod: 'ONSITE_CARD', serviceFeeRefundedAt: ENTFALLEN_AM })).toBe('entfällt')
+    expect(gebuehrEntfallenVermerk({ paymentMethod: 'ONLINE', serviceFeeRefundedAt: null })).toBeNull()
   })
 })

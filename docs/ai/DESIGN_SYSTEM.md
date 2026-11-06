@@ -547,6 +547,7 @@ Bewertung der Boards s1-/w1-korb, -kasse, -bestaetigung, -bestellung-link, -mein
 ### Geldanzeige nach der Abnahme Lauf 32 (Nr. 244)
 
 - **„Gesamt“ ohne entfallene Gebühr:** Auf Bestätigung und Bestellseite (`BestellPositionen`, auch `summeInZahlzeile`) ist „Gesamt“ Warenpreis + Gebühr, solange die Gebühr gilt; ist sie entfallen bzw. erstattet (`gebuehrEntfallen`), nur der Warenpreis. Die Zeile „<Gebühr> (entfällt)“ bzw. „(erstattet)“ bleibt mit durchgestrichenem Betrag stehen, „inkl. <Gebühr>“ entfällt. Der Betrag kommt aus `anzeigeGesamtCents` (`src/lib/servicegebuehr.ts`) — nur Anzeige, nie für Buchung, Erstattung, Abrechnung; „Bar zu kassieren“ und alle Snapshot-Beträge bleiben bei `bestellSummen`/`barZuKassierenCents` (Wache `tests/geldanzeige-gesamt-wache.test.ts`).
+- **Abholzettel (Papier):** dieselbe Regel — die Gebührenzeile trägt „(entfällt)“ bzw. „(erstattet)“ und einen gestrichenen Betrag, „Gesamt“ ist `anzeigeGesamtCents`; „Bar zu kassieren“ bleibt der Snapshot. Das Wort kommt auf Bildschirm und Papier aus `gebuehrEntfallenVermerk` (`src/lib/servicegebuehr.ts`), nie nachgebaut.
 
 ### Für Höfe, Registrieren, Einrichten (seit Nr. 15)
 

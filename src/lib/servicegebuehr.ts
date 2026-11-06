@@ -269,6 +269,19 @@ export function anzeigeGesamtCents(
 }
 
 /**
+ * Der Vermerk hinter einer entfallenen Gebührenzeile — „erstattet“ (online, über Stripe zurück) bzw. „entfällt“
+ * (vor Ort, nicht kassiert); null, solange die Gebühr gilt (`gebuehrEntfallen`). Die EINE Quelle für Bestätigung,
+ * Bestellseite (`BestellPositionen`) und Abholzettel, damit die Zeile auf Bildschirm und Papier gleich heißt
+ * (Nr. 244). Nur Anzeige.
+ */
+export function gebuehrEntfallenVermerk(
+  b: Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt' | 'paymentMethod'>
+): 'erstattet' | 'entfällt' | null {
+  if (!gebuehrEntfallen(b)) return null
+  return b.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'
+}
+
+/**
  * Steht bei dieser Bestellung eine Stripe-Erstattung der Gebühr noch AUS?
  * Der Fall entsteht, wenn beim Wechsel auf „nicht abgeholt" die Erstattung
  * fehlschlägt: Der Status ist gesetzt (das darf nie an Stripe hängen), die
