@@ -15,7 +15,9 @@
 #   fotograf.sh stopp <n|dev>
 #
 # Vor dem Start: Sperre (sperre-cli.ts --db) mit genau der Umgebung des
-# Servers; Abbruch bei .env-Dateien im Worktree oder Fotograf-Ordner.
+# Servers; Abbruch bei .env-Dateien im Worktree oder Fotograf-Ordner. Im
+# Modus dev läuft die Sperre vor der Worktree-Anlage, Install und Generate
+# laufen unter `env -i`, die .env-Prüfung des dev-Worktrees danach.
 # Ausgabe des Servers nur unter .nachtlauf/ (gitignored, beim Aufräumen weg).
 set -euo pipefail
 
@@ -55,17 +57,24 @@ case "$MODUS" in
     ;;
   dev)
     DB="${2:?DB fehlt}"; COMMIT="${3:-HEAD}"
+    # 1. Sperre zuerst (Adressen, Loopback, dieser Worktree) — vor Worktree,
+    #    Install und Generate.
+    sperre "$DB" 3000 "$WT"
+    mapfile -t L < <("$WT/scripts/pruefung/pruef-env.sh" liste --db "$DB" --port 3000)
     if [ ! -d "$DEV_WT" ]; then
       git -C "$WT" worktree add --detach "$DEV_WT" "$COMMIT" > /dev/null
-      ( cd "$DEV_WT" && pnpm install --frozen-lockfile --offline > /dev/null 2>&1 ) || {
+      # 2. Install und Generate nur unter env -i: prisma generate liest
+      #    prisma.config.ts und damit DATABASE_URL — aus der Sitzung käme eine
+      #    Adresse, die die Sperre nie gesehen hat.
+      ( cd "$DEV_WT" && env -i "${L[@]}" pnpm install --frozen-lockfile --offline > /dev/null 2>&1 ) || {
         echo "fotograf.sh: Installation offline gescheitert – einmal mit Netz" >&2
-        ( cd "$DEV_WT" && pnpm install --frozen-lockfile > /dev/null )
+        ( cd "$DEV_WT" && env -i "${L[@]}" pnpm install --frozen-lockfile > /dev/null )
       }
       git -C "$DEV_WT" diff --quiet -- pnpm-lock.yaml || { echo "fotograf.sh: pnpm-lock.yaml verändert" >&2; exit 1; }
-      ( cd "$DEV_WT" && pnpm exec prisma generate > /dev/null )
+      ( cd "$DEV_WT" && env -i "${L[@]}" pnpm exec prisma generate > /dev/null )
     fi
-    sperre "$DB" 3000 "$WT" "$DEV_WT"
-    mapfile -t L < <("$WT/scripts/pruefung/pruef-env.sh" liste --db "$DB" --port 3000)
+    # 3. Erst jetzt gibt es den dev-Worktree: keine .env-Datei darin.
+    env -i "${L[@]}" "$TSX" "$WT/scripts/pruefung/sperre-cli.ts" --ordner "$DEV_WT"
     mkdir -p "$WT/.nachtlauf/fotograf/dev"
     cd "$DEV_WT"
     nohup env -i "${L[@]}" "$DEV_WT/node_modules/.bin/next" dev -H 127.0.0.1 -p 3000 > "$WT/.nachtlauf/fotograf/dev/server.log" 2>&1 &

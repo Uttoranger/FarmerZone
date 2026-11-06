@@ -48,6 +48,10 @@ describe('leseSeedOptionen', () => {
     expect(typeof leseSeedOptionen(['--links', 'docs/links.json'])).toBe('string')
     expect(typeof leseSeedOptionen(['--passkey', '.nachtlauf/../schluessel.json'])).toBe('string')
     expect(leseSeedOptionen(['--links', '.nachtlauf/b/links.json'])).toMatchObject({ links: '.nachtlauf/b/links.json' })
+    // Ohne --wt prüft der Seed den Arbeitsordner; mit --wt einen anderen.
+    expect(SEED_VORGABEN.wt).toBeNull()
+    expect(leseSeedOptionen(['--wt', '/tmp/leer'])).toMatchObject({ wt: '/tmp/leer' })
+    expect(typeof leseSeedOptionen(['--wt'])).toBe('string')
   })
 
   it('liegtUnterNachtlauf', () => {

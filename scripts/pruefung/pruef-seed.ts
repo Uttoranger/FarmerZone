@@ -2,7 +2,9 @@
  * Der Prüf-Seed (freigabe.md §36, Nr. 243) — nur auf einer frischen
  * Wegwerf-DB auf localhost.
  *
- *   pnpm pruefen:seed [--stichtag vergangenheit|zukunft] [--links <pfad>] [--passkey <pfad>]
+ *   pnpm pruefen:seed [--stichtag vergangenheit|zukunft] [--links <pfad>] [--passkey <pfad>] [--wt <ordner>]
+ *
+ * `--wt`: der Ordner ohne .env-Datei (Vorgabe: Arbeitsordner).
  *
  * Läuft unter `env -i` mit der Liste aus pruef-env.sh (DATABASE_URL und
  * DIRECT_URL gleich, auf localhost; LINK_SECRET des Laufs). Schritte:
@@ -49,7 +51,7 @@ async function main(): Promise<void> {
   if (typeof optionen === 'string') abbruch(optionen)
   const adressen = pruefeDatenbankAdressen(pruefWerteAus(process.env))
   if (adressen) abbruch(adressen)
-  const env = pruefeOhneEnvDateien([process.cwd()])
+  const env = pruefeOhneEnvDateien([optionen.wt ?? process.cwd()])
   if (env) abbruch(env)
   const url = process.env['DATABASE_URL'] as string
   console.log(`Prüf-Seed gegen ${hostUndPort(url)} (Stichtag: ${optionen.stichtag}).`)
@@ -153,11 +155,14 @@ async function schreibeLinks(prisma: Prisma, jetzt: Date, optionen: SeedOptionen
   // Bar-Bestätigung: zwei neue Bestellungen als Abzug von TD-0015 (Beträge
   // unverändert übernommen, keine eigene Rechnung) — offen und verwaist.
   const vorlage = await bestellung('TD-0015')
+  // Token und Hash aus der Funktion der App (S17, Nr. 151/164): In die Spalte
+  // gehört nur der Hash — tokenKandidaten sucht nie den Klartext.
+  const { neuerBarToken } = await import('../../src/lib/bar-bestaetigung')
   for (const [nummer, zustand, alter] of [
     ['TP-BAR-1', 'offen', 0],
     ['TP-BAR-2', 'abgelaufen (Frist vorbei)', 3],
   ] as const) {
-    const token = randomBytes(24).toString('base64url')
+    const { token, hash } = neuerBarToken()
     const eingang = new Date(jetzt.getTime() - alter * TAG_MS)
     const abholung = new Date(jetzt.getTime() + (alter === 0 ? 2 : -1) * TAG_MS)
     await prisma.order.create({
@@ -178,7 +183,7 @@ async function schreibeLinks(prisma: Prisma, jetzt: Date, optionen: SeedOptionen
         serviceFeePercentApplied: vorlage.serviceFeePercentApplied,
         gebuehrModell: vorlage.gebuehrModell,
         kaeuferArt: vorlage.kaeuferArt,
-        confirmationToken: token,
+        confirmationToken: hash,
         createdAt: eingang,
         items: {
           create: vorlage.items.map((p) => ({
@@ -195,7 +200,8 @@ async function schreibeLinks(prisma: Prisma, jetzt: Date, optionen: SeedOptionen
     links[`bar-bestaetigen-${nummer}`] = { pfad: barBestaetigungsPfad(vorlage.farm.slug, token), zustand }
   }
   links['bar-bestaetigen-ungueltig'] = {
-    pfad: barBestaetigungsPfad(vorlage.farm.slug, randomBytes(24).toString('base64url')),
+    // Gleiche Form wie ein echter Token, aber zu keiner Bestellung gespeichert.
+    pfad: barBestaetigungsPfad(vorlage.farm.slug, neuerBarToken().token),
     zustand: 'unbekannter Token',
   }
 

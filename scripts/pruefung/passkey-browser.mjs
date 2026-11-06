@@ -11,7 +11,8 @@
  * deshalb einen Wert über allen bisherigen Anmeldungen angeben.
  *
  * Verbindet sich mit dem DevTools-Port der Prüf-Instanz (nur 127.0.0.1), hängt
- * sich an die Seite, deren Adresse `--url-teil` enthält, und ruft
+ * sich an die Seite, deren Adresse `--url-teil` enthält (keine solche Seite:
+ * Abbruch), und ruft
  * WebAuthn.enable, WebAuthn.addVirtualAuthenticator (ctap2, internal,
  * residentKey, Nutzerprüfung) und WebAuthn.addCredential mit dem Schlüssel aus
  * dem Prüf-Seed. Bleibt verbunden, bis es beendet wird — der Authenticator
@@ -58,8 +59,10 @@ if (!RP_IDS.includes(geheim.rpId)) abbruch('rpId nur localhost oder 127.0.0.1.')
 
 // 2. Die Seite finden — nur über 127.0.0.1.
 const ziele = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
-const seite = ziele.find((z) => z.type === 'page' && String(z.url).includes(urlTeil)) ?? ziele.find((z) => z.type === 'page')
-if (!seite) abbruch('keine Seite im Prüf-Browser.')
+// Nur die Seite mit `--url-teil` — nie irgendeine: Ein Authenticator an einer
+// fremden Seite gäbe den Prüf-Schlüssel einer anderen Herkunft.
+const seite = ziele.find((z) => z.type === 'page' && String(z.url).includes(urlTeil))
+if (!seite) abbruch(`keine Seite mit „${urlTeil}“ im Prüf-Browser — erst /login/admin öffnen.`)
 const wsUrl = new URL(seite.webSocketDebuggerUrl)
 if (wsUrl.hostname !== '127.0.0.1' && wsUrl.hostname !== 'localhost') abbruch('DevTools nur auf 127.0.0.1.')
 

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -13,6 +13,10 @@ import { afterAll, describe, expect, it } from 'vitest'
 const SKRIPT = join(process.cwd(), 'scripts/pruefung/pruef-env.sh')
 const ordner = mkdtempSync(join(tmpdir(), 'pruefung-umgebung-'))
 const datei = join(ordner, 'pruef-env')
+// Geprüft wird ein leerer Ordner, nicht der Klon: Ein Entwickler mit
+// .env.local im Haupt-Klon bekäme sonst ein rotes `pnpm test` (Runde 1).
+const leer = join(ordner, 'leer')
+mkdirSync(leer)
 
 const ERLAUBT = [
   'PATH',
@@ -57,7 +61,7 @@ const umgebung = {
 } as Record<string, string | undefined> as NodeJS.ProcessEnv
 
 function zeilen(): string[] {
-  execFileSync(SKRIPT, ['neu', '--datei', datei], { env: umgebung, stdio: 'pipe' })
+  execFileSync(SKRIPT, ['neu', '--datei', datei, '--wt', leer], { env: umgebung, stdio: 'pipe' })
   return execFileSync(SKRIPT, ['liste', '--db', 'fz_p243_test', '--port', '3101', '--datei', datei], { env: umgebung, encoding: 'utf8' })
     .trim()
     .split('\n')
@@ -99,6 +103,28 @@ describe('pruef-env.sh', () => {
     expect(statSync(datei).mode & 0o777).toBe(0o600)
     const vorher = wert('LINK_SECRET')
     expect(zeilen().find((z) => z.startsWith('LINK_SECRET='))).not.toBe(`LINK_SECRET=${vorher}`)
+  })
+
+  // Gegenprobe: Die Sperre selbst bleibt ohne Ausnahme — .env-Datei oder
+  // Verweis darauf im geprüften Ordner bricht ab, bevor eine Datei entsteht.
+  it.each([
+    ['.env.local', (o: string) => writeFileSync(join(o, '.env.local'), 'X=1\n')],
+    ['.env.test', (o: string) => writeFileSync(join(o, '.env.test'), 'X=1\n')],
+    ['Verweis auf .env.local', (o: string) => symlinkSync('/nirgends/.env.local', join(o, 'verweis'))],
+  ])('bricht bei %s im geprüften Ordner ab und legt keine Datei an', (_name, anlegen) => {
+    const mitEnv = mkdtempSync(join(ordner, 'mit-env-'))
+    anlegen(mitEnv)
+    const ziel = join(mitEnv, 'pruef-env')
+    expect(() => execFileSync(SKRIPT, ['neu', '--datei', ziel, '--wt', mitEnv], { env: umgebung, stdio: 'pipe' })).toThrow()
+    expect(existsSync(ziel)).toBe(false)
+  })
+
+  it.each(['p@ss', 'a:b', 'x/y', '%40'])('lehnt PGPASSWORD %s ab (stünde unkodiert in der Adresse)', (passwort) => {
+    const ziel = join(ordner, 'pruef-env-passwort')
+    expect(() =>
+      execFileSync(SKRIPT, ['neu', '--datei', ziel, '--wt', leer], { env: { ...umgebung, PGPASSWORD: passwort }, stdio: 'pipe' })
+    ).toThrow()
+    expect(existsSync(ziel)).toBe(false)
   })
 
   it('lehnt einen DB-Namen mit Sonderzeichen ab', () => {

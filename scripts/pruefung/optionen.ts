@@ -18,12 +18,19 @@ export type SeedOptionen = {
   links: string
   /** Wohin der private Schlüssel des Prüf-Passkeys geht (unter .nachtlauf/). */
   passkey: string
+  /**
+   * Der Ordner, in dem keine .env-Datei liegen darf; null = Arbeitsordner.
+   * Übergebbar, damit Tests einen leeren Temp-Ordner prüfen statt des Klons
+   * eines Entwicklers mit .env.local oder .env.test (Runde 1).
+   */
+  wt: string | null
 }
 
 export const SEED_VORGABEN: SeedOptionen = {
   stichtag: 'vergangenheit',
   links: '.nachtlauf/pruef-links.json',
   passkey: '.nachtlauf/admin-passkey.json',
+  wt: null,
 }
 
 export function stichtagFuer(art: StichtagArt, jetzt: Date): Date {
@@ -51,6 +58,9 @@ export function leseSeedOptionen(argv: readonly string[]): SeedOptionen | string
     } else if (name === '--links' || name === '--passkey') {
       if (!wert || !liegtUnterNachtlauf(wert)) return `${name} muss unter .nachtlauf/ liegen.`
       optionen[name === '--links' ? 'links' : 'passkey'] = wert
+    } else if (name === '--wt') {
+      if (!wert) return '--wt braucht einen Ordner.'
+      optionen.wt = wert
     } else {
       return `Unbekannte Angabe: ${name ?? ''}`
     }
