@@ -376,8 +376,9 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(teile).toContain('BRAUCHT_DICH_LEER')
     expect(teile).not.toContain('Nichts braucht dich heute.')
     expect(teile).not.toContain('Alles erledigt.')
-    // Die Zeile zum nächsten Abholtag entfällt ohne ihn und führt nach /orders.
-    expect(teile).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
+    // Die nächste Abholung steht nur in der Seitenspalte, nicht noch einmal als Zeile unter der Packliste (Board w1-heute, Lauf 31).
+    expect(teile).not.toContain('naechsteAbholungText(')
+    expect(seite).toContain('<NaechsteAbholungKarte')
     expect(beide).not.toContain('Morgen:')
     expect(teile).toContain('href="/orders/today/print"')
     expect(beide).not.toContain('getHours()')

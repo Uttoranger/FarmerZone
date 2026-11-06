@@ -160,13 +160,14 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/heute
 
-- src/components/heute/agb-karte.tsx · AgbZustimmenKarte · Karte „AGB bestätigen“ (Nr. 207, § 104 JN, P2B) in Heute und in „Hof einrichten“ — dasselbe Muster wie die anderen Karten in Heute (Hinweiskarte orange, ein Hauptknopf): Link zu /agb (neuer Tab, die … · genutzt
+- src/components/heute/agb-karte.tsx · AgbZustimmenKarte · Karte „AGB bestätigen“ (Nr. 207, § 104 JN, P2B) in Heute und in „Hof einrichten“ — dasselbe Muster wie die anderen Karten in Heute (PflichtKarte: orange, ohne Symbol, Knöpfe über die volle Breite, … · genutzt
 - src/components/heute/dein-beitrag.tsx · BeitragAnstoss, DeinBeitragKarte · „Dein Beitrag“ in Heute (Register E12, Ergänzung Nr. 129; Board system-k2-beitraege-v2, Abschnitt 5): der laufende Beitrag mit Anlass, seit wann, wie lange noch, E-Mail- und WhatsApp-Zahl (nur … · genutzt
 - src/components/heute/freischalt-moment.tsx · FreischaltMoment · „Dein Hof ist online!" (Mockup web-h1-freigeschaltet-jetzt-teilen, Nachtlauf Nr. 17). · genutzt
 - src/components/heute/heute-teile.tsx · AbholungHeuteMarke, BrauchtDichKarte, HeuteKopf, Kennzahlen, NaechsteAbholungKarte, Packliste, PostfachKarte, StripeEinrichtenHinweis, StripeHinweis, TeamSperreKarte, TeilenKarte, WocheKarte, ZuTunKarte · Die Bausteine von „Heute" im neuen Design (Gate 5, Nachtlauf Nr. 17; Mockups web-h3-heute-mit-teilen-karte, web-h3-heute-online-zahlung-pausiert, mobil-h3-heute-*, hell: system-heute-hell). · genutzt
-- src/components/heute/hof-email-karte.tsx · HofEmailKarte · Karte „E-Mail-Adresse für Kundschaft eintragen“ in Heute (Nr. 212, § 4 Abs. 1 Z 3 FAGG) — dasselbe Muster wie die AGB-Karte: Hinweiskarte orange, ein Link. · genutzt
+- src/components/heute/hof-email-karte.tsx · HofEmailKarte · Karte „E-Mail-Adresse für Kundschaft eintragen“ in Heute (Nr. 212, § 4 Abs. 1 Z 3 FAGG) — dasselbe Muster wie die AGB-Karte: PflichtKarte, ein Link über die volle Breite. · genutzt
 - src/components/heute/lastschrift-karte.tsx · LastschriftSperreKarte · Hof › Heute: Barzahlung gesperrt („Bar gesperrt“), weil die Plattformgebühr eines Monats offen oder zurückgebucht ist (Register N38, Nr. 198). · genutzt
-- src/components/heute/startbildschirm-karte.tsx · StartbildschirmAnleitung, StartbildschirmKarte, anzeigeImBrowser · Die Karte „auf den Startbildschirm legen" — ganz unten auf Heute, nur im Browser, nicht in der installierten App (Register N1, Nachtlauf Nr. 41). · genutzt
+- src/components/heute/pflicht-karte.tsx · PFLICHT_KNOPF, PFLICHT_KNOPF_RAHMEN, PflichtKarte · Die Form der Karten oben auf Heute (Pflichtkarten nach A2 Punkt 1 und der eine Kasten zur Online-Zahlung; Board s1-/w1-heute, Bild 3–5): orange Hinweiskarte ohne Symbol, Titel, Satz, darunter der … · genutzt
+- src/components/heute/startbildschirm-karte.tsx · StartbildschirmAnleitung, StartbildschirmKarte, anzeigeImBrowser · Die Karte „auf den Startbildschirm legen" — zuletzt in der Seitenspalte von Heute (Board w1-heute), nur im Browser, nicht in der installierten App (Register N1, Nachtlauf Nr. 41). · genutzt
 - src/components/heute/widerruf-karte.tsx · WiderrufHeuteKarte · Heute (Nr. 200, N39): offene Widerrufe nach der Abholung — je Bestellung ein Link ins Bestell-Detail, dort erstattet oder lehnt der Hof ab. · genutzt
 
 ## src/components/hoefe
@@ -191,9 +192,9 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/hof-bestellungen
 
-- src/components/hof-bestellungen/artikel-fehlt-dialog.tsx · ArtikelFehltDialog · „Was fehlt bei …?" (Mockup web-h3-artikel-fehlt, E14). · genutzt
-- src/components/hof-bestellungen/bestell-detail.tsx · BestellDetail · Die Bestellung im Detail (Mockups web-h3-bestellungen-packen-uebergeben, mobil-h3-bestelldetail): Name und Marke, „Bar zu kassieren" groß, die Packliste zum Abhaken, die Knöpfe Gepackt / Artikel … · genutzt
-- src/components/hof-bestellungen/bestell-dialog.tsx · BestellDialog, DialogFehler, type Hauptaktion · Die Rückfragen der Bestellungen (Storno, Artikel fehlt, Nicht abgeholt, Rückwege): ab 768 px ein Dialog (Titel links, Aktionen rechts unten), am Handy ein Blatt von unten mit der Hauptaktion über die … · genutzt
+- src/components/hof-bestellungen/artikel-fehlt-dialog.tsx · ArtikelFehltDialog · „Was fehlt bei …?" (Board s1-/w1-bestellung Bild 3, Lauf 31; E14). · genutzt
+- src/components/hof-bestellungen/bestell-detail.tsx · BestellDetail · Die Bestellung (Boards s1-/w1-bestellung, Lauf 31). · genutzt
+- src/components/hof-bestellungen/bestell-dialog.tsx · BestellDialog, DialogFehler, abbrechenIn, type Hauptaktion · Die Rückfragen der Bestellungen (Storno, Artikel fehlt, Nicht abgeholt, Rückwege): ab 768 px ein Dialog (Titel links, Aktionen rechts unten), am Handy ein Blatt von unten mit der Hauptaktion über die … · genutzt
 - src/components/hof-bestellungen/bestellungen-ansicht.tsx · BestellungenAnsicht, filterSuche · `?filter=` nur, wenn es nicht der Standard ist — die Adresse bleibt kurz (bestellListeHref). · genutzt
 - src/components/hof-bestellungen/stil.ts · FELD, FELD_LABEL, KARTE, KICKER, KNOPF_GRUEN, KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN, TEXT_ORANGE · Gemeinsame Formen der Bestellungen im neuen Design (Nachtlauf Nr. 19). · genutzt
 - src/components/hof-bestellungen/storno-dialog.tsx · StornoDialog · „Bestellung stornieren?" (Mockups web-h3-stornieren-erstatten, mobil-h3-stornieren). · genutzt
@@ -287,7 +288,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 - src/components/orders/druck-laden.tsx · BestellDruckLaden, PacklisteDruckLaden · Ladeansichten der Druckansichten (Nachtlauf Nr. 31): /orders/[orderId]/print (Abholzettel) und /orders/today/print (Packliste des Tages). · genutzt
 - src/components/orders/order-status.ts · ACTIVE_STATUSES, DONE_STATUSES, paymentLabel, statusLabel · Die Bedeutung (Art der Marke, Register G5) eines Status aus Sicht des Hofs liefert bestellMarke (src/lib/hof-bestellungen.ts) zusammen mit dem Wort — dort lesen sie Bestellliste, Bestelldetail und … · unbenutzt
-- src/components/orders/print-button.tsx · PrintButton · „Drucken" auf den Druckseiten (Papier, hell in beiden Themes): fast schwarzer Knopf mit Crème-Schrift aus den Tokens, die in Hell und Dunkel gleich sind. · genutzt
+- src/components/orders/print-button.tsx · PrintButton · „Drucken" auf den Druckseiten (Papier, hell in beiden Themes; Boards s2-/w2-druck): orange gefüllt ohne Symbol wie die Hauptaktion im Hofbereich (N42 a), im Leerzustand als Umriss (`zweit`, Board … · genutzt
 
 ## src/components/products
 

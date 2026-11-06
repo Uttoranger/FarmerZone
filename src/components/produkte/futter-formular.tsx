@@ -296,7 +296,7 @@ export function FutterFormular({
       titel="Neues Futtermittel"
       satz="Vom Sackerl für den Hasen bis zum Rundballen – jede Größe mit eigenem Preis und Vorrat."
       hinweis={speichernHinweis(zeilen.length - wartend, wartend)}
-      speichernText="Futter speichern"
+      speichernText="Speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
       meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
@@ -314,7 +314,7 @@ export function FutterFormular({
       </Feld>
 
       <div className="flex flex-col gap-2" data-feld="category">
-        <p id="futter-kategorie" className="text-[13px] font-medium text-foreground">
+        <p id="futter-kategorie" className="text-[15px] font-semibold text-foreground">
           Kategorie
         </p>
         <div role="radiogroup" aria-labelledby="futter-kategorie" className="flex flex-wrap gap-2">
@@ -328,7 +328,7 @@ export function FutterFormular({
 
       {sorten.length > 0 && (
         <div className="flex flex-col gap-2" data-feld="subcategory">
-          <p id="futter-sorte" className="text-[13px] font-medium text-foreground">
+          <p id="futter-sorte" className="text-[15px] font-semibold text-foreground">
             Sorte
           </p>
           <div role="radiogroup" aria-labelledby="futter-sorte" className="flex flex-wrap gap-2">
@@ -481,7 +481,7 @@ export function FutterFormular({
         satz={`${KENNZEICHNUNG_ERKLAERUNG} ${KENNZEICHNUNG_FUNDORT} Sie gelten für alle Größen; das Gewicht steht je Größe oben.`}
       >
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.futtermittelart">
-          <p id="futter-art" className="text-[13px] font-medium text-foreground">
+          <p id="futter-art" className="text-[15px] font-semibold text-foreground">
             Futtermittelart
           </p>
           {erlaubteArten.length === 1 ? (
@@ -509,7 +509,7 @@ export function FutterFormular({
         </div>
 
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.zielTierarten">
-          <p id="futter-tiere" className="text-[13px] font-medium text-foreground">
+          <p id="futter-tiere" className="text-[15px] font-semibold text-foreground">
             Für welche Tiere?
           </p>
           <div role="group" aria-labelledby="futter-tiere" className="flex flex-wrap gap-2">
@@ -663,7 +663,7 @@ export function KaeuferVorschau({
 
   return (
     <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
-      <h3 id="futter-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+      <h3 id="futter-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         So sehen Kunden dein Futter
       </h3>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">

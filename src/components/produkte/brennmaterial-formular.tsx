@@ -226,7 +226,7 @@ export function BrennmaterialFormular({
 
       <Abschnitt id="brenn-angaben" titel="Holz-Angaben" satz="Die drei Fragen, die jede Kundin stellt.">
         <div className="flex flex-col gap-2" data-feld="art">
-          <p id="brenn-art" className="text-[13px] font-medium text-foreground">
+          <p id="brenn-art" className="text-[15px] font-semibold text-foreground">
             Art
           </p>
           <div role="radiogroup" aria-labelledby="brenn-art" className="flex flex-wrap gap-2">
@@ -245,7 +245,7 @@ export function BrennmaterialFormular({
         </div>
 
         <div className="flex flex-col gap-2" data-feld="holzart">
-          <p id="brenn-holzart" className="text-[13px] font-medium text-foreground">
+          <p id="brenn-holzart" className="text-[15px] font-semibold text-foreground">
             Holzart
           </p>
           <div role="radiogroup" aria-labelledby="brenn-holzart" className="flex flex-wrap gap-2">
@@ -255,7 +255,7 @@ export function BrennmaterialFormular({
               </Wahl>
             ))}
           </div>
-          <label htmlFor={feldId('holzart')} className="text-xs text-muted-foreground">
+          <label htmlFor={feldId('holzart')} className="text-[13px] font-semibold text-foreground">
             Andere Holzart
           </label>
           <input
@@ -271,7 +271,7 @@ export function BrennmaterialFormular({
 
         {!hackschnitzel ? (
           <div className="flex flex-col gap-2" data-feld="scheitlaengeCm">
-            <p id="brenn-scheit" className="text-[13px] font-medium text-foreground">
+            <p id="brenn-scheit" className="text-[15px] font-semibold text-foreground">
               Scheitlänge{art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}
             </p>
             <div role="radiogroup" aria-labelledby="brenn-scheit" className="flex flex-wrap gap-2">
@@ -286,7 +286,7 @@ export function BrennmaterialFormular({
         ) : (
           <>
             <div className="flex flex-col gap-2" data-feld="wassergehalt">
-              <p id="brenn-w" className="text-[13px] font-medium text-foreground">
+              <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
                 Wassergehalt
               </p>
               <div role="radiogroup" aria-labelledby="brenn-w" className="flex flex-wrap gap-2">
@@ -299,7 +299,7 @@ export function BrennmaterialFormular({
               {fehler.wassergehalt && <FeldFehler>{fehler.wassergehalt}</FeldFehler>}
             </div>
             <div className="flex flex-col gap-2" data-feld="koernung">
-              <p id="brenn-p" className="text-[13px] font-medium text-foreground">
+              <p id="brenn-p" className="text-[15px] font-semibold text-foreground">
                 Körnung
               </p>
               <div role="radiogroup" aria-labelledby="brenn-p" className="flex flex-wrap gap-2">
@@ -315,7 +315,7 @@ export function BrennmaterialFormular({
         )}
 
         <div className="flex flex-col gap-2" data-feld="trocknung">
-          <p id="brenn-trocknung" className="text-[13px] font-medium text-foreground">
+          <p id="brenn-trocknung" className="text-[15px] font-semibold text-foreground">
             Trocknung
           </p>
           <div role="radiogroup" aria-labelledby="brenn-trocknung" className="flex flex-wrap gap-2">
@@ -468,7 +468,7 @@ export function BrennmaterialFormular({
       </p>
 
       <section aria-labelledby="brenn-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
-        <h3 id="brenn-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+        <h3 id="brenn-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
           So sehen Kunden dein Holz
         </h3>
         <p className="font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Brennmaterial'}</p>

@@ -130,7 +130,7 @@ function PreisZelle({ product, preisAnzeige }: { product: ProductData; preisAnze
   return (
     <>
       <p className="font-semibold text-foreground">{formatEuro(product.price)}</p>
-      <GrundpreisZeile price={product.price} unit={product.unit} unitSize={product.unitSize} className="text-[11.5px]" />
+      <GrundpreisZeile price={product.price} unit={product.unit} unitSize={product.unitSize} className="text-xs" />
     </>
   )
 }
@@ -367,15 +367,16 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                   schreibeAdresse(filterAdresse(ansicht.filter, wert))
                 }}
                 placeholder="Name des Produkts"
+                // Ohne das Kreuz des Browsers (hell blau, kein Token) — „Suche zurücksetzen“ steht im Leerzustand.
                 className={cn(
-                  'h-12 w-full rounded-[10px] border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground md:h-11 md:text-sm',
+                  '[&::-webkit-search-cancel-button]:hidden h-12 w-full rounded-[10px] border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground md:h-11 md:text-sm',
                   FOKUS_RAHMEN
                 )}
               />
             </label>
           </div>
 
-          {kopfzeile && (
+          {kopfzeile && gefiltert.length > 0 && (
             <p className="px-1 text-xs font-bold tracking-[1px] text-muted-foreground uppercase max-lg:hidden">{kopfzeile}</p>
           )}
 
@@ -520,7 +521,8 @@ function Tabelle({
     <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+          {/* Board w1-produkte: Köpfe in normaler Schreibung, 13 px (nie unter 12 px). */}
+          <tr className="text-left text-[13px] font-semibold text-muted-foreground">
             <th scope="col" className="w-[70px] py-2.5 pl-3.5">
               <span className="sr-only">Bild</span>
             </th>
@@ -606,19 +608,19 @@ function Zeilen({
   if (abschnitte.art === 'liste') return <div className="lg:hidden">{zeilen(abschnitte.produkte)}</div>
 
   const { brauchtDich, imShop, nichtImShop } = abschnitte
-  const kopf = (kennung: string, titel: string, zusatz: string, ton?: 'offen') => (
+  const kopf = (kennung: string, titel: string, zusatz: string) => (
     <div className="flex items-baseline gap-2 px-1 pb-2">
-      <h2 id={kennung} className={cn('text-xs font-bold tracking-[1px] uppercase', ton === 'offen' ? 'text-status-offen' : 'text-muted-foreground')}>
-        {titel}
+      {/* Board s1-produkte: „Braucht dich · 1“ in einem Zug, leise wie „Im Shop“ — die Dringlichkeit tragen die Zeilen. */}
+      <h2 id={kennung} className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
+        {titel} · {zusatz}
       </h2>
-      <span className="text-[12.5px] text-muted-foreground">{zusatz}</span>
     </div>
   )
   return (
     <div className="flex flex-col gap-4 lg:hidden">
       {brauchtDich.length > 0 && (
         <section>
-          {kopf(`${id}-braucht`, 'Braucht dich', formatZahl(brauchtDich.length), 'offen')}
+          {kopf(`${id}-braucht`, 'Braucht dich', formatZahl(brauchtDich.length))}
           {zeilen(brauchtDich, `${id}-braucht`)}
         </section>
       )}
@@ -693,8 +695,8 @@ function ProduktZeile({
 
 /**
  * Der Vorrat als Knopf (Register N25, Boards s1/w1-produkte): die Zahl im umrandeten Feld, ein
- * Tipp öffnet „Vorrat: …". In der Tabelle (`klein`) nur die Zahl wie im Board, in den Zeilen
- * darunter klein „Vorrat"; beide 44 px und mehr.
+ * Tipp öffnet „Vorrat: …". Im Knopf nur die Zahl wie in beiden Boards (Lauf 31); Einheit und
+ * „Vorrat“ stehen im aria-label. Tabelle 44 px, Zeilen 48 px.
  */
 function VorratKnopf({ product, onVorrat, klein }: { product: ProductData; onVorrat: () => void; klein?: boolean }): React.JSX.Element {
   const vorrat = hofVorratText(product.stock, product.unit, product.unitSize)
@@ -706,12 +708,12 @@ function VorratKnopf({ product, onVorrat, klein }: { product: ProductData; onVor
       aria-label={`Vorrat ${product.name}: ${vorrat}. Ändern`}
       className={cn(
         'flex shrink-0 flex-col items-center justify-center gap-px rounded-[10px] border border-input bg-background px-2.5 text-foreground hover:bg-muted',
-        klein ? 'min-h-11 min-w-11' : 'min-h-12 min-w-20',
+        klein ? 'min-h-11 min-w-11' : 'min-h-12 min-w-14',
         FOKUS_RAHMEN
       )}
     >
-      <span className="text-[15px] font-bold whitespace-nowrap">{klein ? formatZahl(product.stock) : vorrat}</span>
-      {!klein && <span className="text-[10.5px] font-medium text-muted-foreground">Vorrat</span>}
+      {/* Boards s1-/w1-produkte: im Knopf nur die Zahl — Einheit und „Vorrat“ sagt das aria-label. */}
+      <span className="text-[16px] font-bold whitespace-nowrap tabular-nums">{formatZahl(product.stock)}</span>
     </button>
   )
 }
@@ -723,10 +725,13 @@ function NamenKnopf({ product, onOeffnen }: { product: ProductData; onOeffnen: (
       type="button"
       onClick={onOeffnen}
       title={product.name}
-      className={cn('line-clamp-2 rounded-sm text-left text-sm font-semibold break-words text-foreground hover:underline', FOKUS_RAHMEN)}
+      // 44 px hoch wie jedes Ziel (Messung Gate A, Lauf 31); die zwei Zeilen kürzt der Text darin, nicht der Knopf.
+      className={cn('inline-flex min-h-11 items-center rounded-sm text-left text-[15px] font-semibold break-words text-foreground hover:underline', FOKUS_RAHMEN)}
     >
-      {product.name}
-      <span className="sr-only"> bearbeiten</span>
+      <span className="line-clamp-2">
+        {product.name}
+        <span className="sr-only"> bearbeiten</span>
+      </span>
     </button>
   )
 }
@@ -816,7 +821,7 @@ function ProduktBild({ product, className }: { product: ProductData; className?:
         // Die Rahmen sind 44 bis 48 px breit — `sizes` sagt das dem Browser.
         <Image src={product.imageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-cover" style={bildStil(product.bildAusschnitt)} />
       ) : product.categoryImageUrl ? (
-        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-contain dark:brightness-[0.85] dark:saturate-[0.9]" />
+        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-contain dark:brightness-[0.7] dark:saturate-[0.8]" />
       ) : (
         <Package className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
       )}

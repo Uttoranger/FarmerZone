@@ -43,7 +43,7 @@ export function LebensmittelVorschau({
   const karte = kaeuferVorschau({ name, price, unit, unitSize }, { foto, kategorie, unterkategorie })
   return (
     <section aria-labelledby="lebensmittel-vorschau" className="mt-4 flex flex-col gap-2.5 rounded-2xl border border-border bg-muted/40 p-4">
-      <h3 id="lebensmittel-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+      <h3 id="lebensmittel-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         {KAEUFER_VORSCHAU.titel}
       </h3>
       {/* Ab 768 px eine Kachel in der Breite wie auf der Hofseite, nicht über den ganzen Dialog. */}

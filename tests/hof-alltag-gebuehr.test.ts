@@ -252,7 +252,6 @@ describe('Heute', () => {
         createElement(Packliste, {
           zeilen: [{ id: 'o1', chip: 'vorbereiten', uhrzeit: '15:00–18:00', kunde: 'Erika B.', positionen: '2× Bergkäse', zahlart: 'bar', gesamtCents: 1912 }],
           stand: '1 zu packen',
-          naechsteAbholung: null,
           leer: { naechsteAbholung: null },
         })
       ) + renderToStaticMarkup(createElement(Kennzahlen, { bestellungen: 1, zuPacken: 1, umsatzHeuteCent: 1912 }))

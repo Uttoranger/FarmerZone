@@ -2,9 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Landmark } from 'lucide-react'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
+import { PFLICHT_KNOPF, PflichtKarte } from '@/components/heute/pflicht-karte'
 import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
 import { POSTFACH_HREF } from '@/lib/postfach'
 import { oeffneRechnung } from '@/server/actions/lastschrift'
@@ -32,29 +30,25 @@ export function LastschriftSperreKarte({
   const [fehler, setFehler] = useState<string | null>(null)
   if (stand === 'zurueckgebucht') {
     return (
-      <Hinweiskarte
-        ton="orange"
-        symbol={Landmark}
+      <PflichtKarte
         titel={LASTSCHRIFT_TEXT.heuteTitel}
-        aktion={
-          <Link href={POSTFACH_HREF} className={KNOPF_ORANGE}>
+        knoepfe={
+          <Link href={POSTFACH_HREF} className={PFLICHT_KNOPF}>
             {LASTSCHRIFT_TEXT.zumPostfach}
           </Link>
         }
       >
-        <p className="text-[12.5px]">{LASTSCHRIFT_TEXT.zurueckgebuchtSatz(monatText)}</p>
-      </Hinweiskarte>
+        <p>{LASTSCHRIFT_TEXT.zurueckgebuchtSatz(monatText)}</p>
+      </PflichtKarte>
     )
   }
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={Landmark}
+    <PflichtKarte
       titel={LASTSCHRIFT_TEXT.heuteTitel}
-      aktion={
+      knoepfe={
         <button
           type="button"
-          className={KNOPF_ORANGE}
+          className={PFLICHT_KNOPF}
           disabled={laeuft}
           aria-busy={laeuft || undefined}
           onClick={() =>
@@ -70,12 +64,12 @@ export function LastschriftSperreKarte({
         </button>
       }
     >
-      <p className="text-[12.5px]">{LASTSCHRIFT_TEXT.heuteSatz(monatText)}</p>
+      <p>{LASTSCHRIFT_TEXT.heuteSatz(monatText)}</p>
       {fehler && (
-        <p role="alert" className="mt-1 text-[12.5px]">
+        <p role="alert" className="mt-1 font-semibold">
           {fehler}
         </p>
       )}
-    </Hinweiskarte>
+    </PflichtKarte>
   )
 }
