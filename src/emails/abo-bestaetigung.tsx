@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, Knopf, KnopfReihe } from './_layout'
+import { EmailLayout, h1, bodyText, leiseZeile, Knopf, KnopfReihe } from './_layout'
 
 export interface AboBestaetigungProps {
   /** Name des Hofes — Text des Hofs, React escaped ihn. */
@@ -20,23 +20,16 @@ export interface AboBestaetigungProps {
  */
 export function AboBestaetigungEmail({ hofName, url, tage }: AboBestaetigungProps) {
   return (
-    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Bitte bestätige deine Anmeldung für Neuigkeiten von ${hofName}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Du möchtest Neuigkeiten von ${hofName} per E-Mail bekommen?`}>
       <Text style={h1}>Bitte bestätige deine Anmeldung</Text>
-      <Text style={bodyText}>
-        Hallo,
-        <br />
-        du möchtest Neuigkeiten von <strong>{hofName}</strong> per E-Mail bekommen. Öffne dazu den Link und
-        tippe auf der Seite auf „Anmeldung bestätigen“. Erst dann schicken wir dir Neuigkeiten.
-      </Text>
+      {/* Board s3/w3-mail-neuigkeiten Bild 1 — aber ehrlich: Der Knopf öffnet nur die Seite, bestätigt wird dort (Link-Scanner). */}
+      <Text style={bodyText}>{`Hallo, du möchtest Neuigkeiten von ${hofName} per E-Mail bekommen? Tipp auf den Knopf und bestätige auf der Seite.`}</Text>
 
       <KnopfReihe>
         <Knopf href={url}>Anmeldung bestätigen</Knopf>
       </KnopfReihe>
 
-      <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        Der Link gilt <strong>{tage} Tage</strong>.
-      </Text>
-      <Text style={mutedText}>Wenn du dich nicht angemeldet hast, ignorier diese Mail. Dann bekommst du nichts von uns.</Text>
+      <Text style={leiseZeile}>{`Der Link gilt ${tage} Tage. Ohne Bestätigung schicken wir dir nichts.`}</Text>
     </EmailLayout>
   )
 }

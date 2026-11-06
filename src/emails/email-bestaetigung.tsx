@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, Knopf, KnopfReihe } from './_layout'
+import { EmailLayout, h1, bodyText, leiseZeile, Knopf, KnopfReihe } from './_layout'
 import { MARKE } from '@/lib/marke'
 
 export interface EmailBestaetigungProps {
@@ -22,29 +22,14 @@ export interface EmailBestaetigungProps {
  */
 export function EmailBestaetigungEmail({ url, stunden }: EmailBestaetigungProps) {
   return (
-    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Bestätige deine E-Mail-Adresse – der Link gilt ${stunden} Stunden`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Der Link gilt ${stunden} Stunden.`}>
       <Text style={h1}>Bestätige deine E-Mail-Adresse</Text>
-      <Text style={bodyText}>
-        Hallo,
-        <br />
-        {`schön, dass du deinen Hof bei ${MARKE} einrichtest. Bitte bestätige noch kurz, dass diese E-Mail-Adresse dir gehört.`} Öffne dazu den Link und tippe auf der Seite auf „E-Mail bestätigen“.
-      </Text>
-
+      <Text style={bodyText}>{`Hallo, schön, dass du deinen Hof bei ${MARKE} einrichtest. Bitte bestätige noch deine E-Mail-Adresse:`}</Text>
+      {/* Der Knopf öffnet nur /verify; bestätigt wird dort per Knopf (Link-Scanner, siehe oben). */}
       <KnopfReihe>
         <Knopf href={url}>Zur Bestätigung</Knopf>
       </KnopfReihe>
-
-      <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        Bis dahin kannst du deinen Hof schon einrichten. Fotos hochladen und die Freischaltung gehen,
-        sobald die Adresse bestätigt ist.
-      </Text>
-      <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        Der Link gilt <strong>{stunden} Stunden</strong>. Danach kannst du dir nach dem Anmelden einen
-        neuen schicken lassen.
-      </Text>
-      <Text style={mutedText}>
-        {`Du hast dich nicht bei ${MARKE} registriert? Dann kannst du diese E-Mail einfach ignorieren.`}
-      </Text>
+      <Text style={leiseZeile}>{`Der Link gilt ${stunden} Stunden.`}</Text>
     </EmailLayout>
   )
 }

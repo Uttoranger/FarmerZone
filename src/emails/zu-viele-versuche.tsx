@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText } from './_layout'
+import { EmailLayout, h1, bodyText, leiseZeile } from './_layout'
 import { ZU_VIELE_VERSUCHE_MAIL, type FehlversuchArt } from '@/lib/anmeldecode'
 
 export interface ZuVieleVersucheProps {
@@ -24,12 +24,9 @@ export function ZuVieleVersucheEmail({ art, bis }: ZuVieleVersucheProps): React.
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={text.titel}>
       <Text style={h1}>{text.titel}</Text>
-      <Text style={bodyText}>
-        Hallo,
-        <br />
-        {text.text(bis)}
-      </Text>
-      <Text style={mutedText}>{text.ausweg}</Text>
+      {/* Anrede im selben Satz wie in den Boards (s3/w3-mail-sicherheit Bild 2 und 3). */}
+      <Text style={bodyText}>{`Hallo, ${text.text(bis)}`}</Text>
+      <Text style={leiseZeile}>{text.ausweg}</Text>
     </EmailLayout>
   )
 }

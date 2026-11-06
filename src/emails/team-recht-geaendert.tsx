@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Section, Text } from '@react-email/components'
-import { EmailLayout, bodyText, h1, highlightBox, kleinText, mutedText } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, bodyText, h1, leiseZeile, zwischenTitel } from './_layout'
 import { TEAM_MAIL, type TeamAnlass } from '@/lib/admin-team'
 
 /**
@@ -15,22 +15,19 @@ export function TeamRechtGeaendertEmail({ anlass, name, rechte }: { anlass: Team
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={t.betreff[anlass]}>
       <Text style={h1}>{t.betreff[anlass]}</Text>
-      <Text style={bodyText}>
-        {t.anrede(name)}
-        <br />
-        {t.satz[anlass]}
-      </Text>
+      {/* Board s3/w3-mail-team Bild 3: Anrede im Satz, die Rechte als Liste unter einer fetten Zeile. */}
+      <Text style={bodyText}>{`${t.anrede(name)} ${t.satz[anlass]}`}</Text>
       {anlass !== 'entfernt' && rechte.length > 0 && (
-        <Section style={{ ...highlightBox, padding: '12px 16px' }}>
-          <Text style={{ ...kleinText, margin: '0 0 4px' }}>{t.rechteTitel}</Text>
+        <>
+          <Text style={zwischenTitel}>{t.rechteTitel}</Text>
           {rechte.map((r) => (
-            <Text key={r} style={{ ...bodyText, margin: 0 }}>
-              {r}
+            <Text key={r} style={{ ...bodyText, margin: '0 0 2px', paddingLeft: '4px' }}>
+              {`• ${r}`}
             </Text>
           ))}
-        </Section>
+        </>
       )}
-      <Text style={mutedText}>{t.nichtDu}</Text>
+      <Text style={{ ...leiseZeile, marginTop: '14px' }}>{t.nichtDu}</Text>
     </EmailLayout>
   )
 }

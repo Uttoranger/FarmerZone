@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, zwischenTitel } from './_layout'
 
 export interface BriefkastenZusammenfassungProps {
   neu: number
@@ -17,51 +17,37 @@ export interface BriefkastenZusammenfassungProps {
 
 /** Wochenlage an den Betreiber (Register N32, Nr. 192): die Zahlen der Woche, darunter der Stand des Postfachs (Register N14). */
 export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungProps) {
+  // „Offen im Eingang: 1 Antwort · …“ — dieselbe Zählung wie im Eingang, als Zeile Beschriftung | Wert.
+  const trenner = p.offenZeile.indexOf(': ')
+  const offen = trenner > 0 ? { label: p.offenZeile.slice(0, trenner), wert: p.offenZeile.slice(trenner + 2) } : { label: p.offenZeile, wert: '' }
   return (
     <EmailLayout fuss={{ art: 'betrieb' }} previewText={p.offenZeile}>
       <Text style={h1}>{p.lage ? 'Wochenlage' : 'Postfach — Wochenstand'}</Text>
-      {p.lage && (
-        <div style={highlightBox}>
-          <Text style={highlightLabel}>Die letzten 7 Tage</Text>
-          {p.lage.map((z) => (
-            <Text key={z.label} style={{ ...highlightValue, fontSize: '14px' }}>
-              {z.label}: <strong>{z.wert}</strong>
-            </Text>
-          ))}
-        </div>
-      )}
-      <Text style={bodyText}>
-        <strong>{p.offenZeile}</strong>
-      </Text>
-      <Text style={bodyText}>
-        {p.neu === 1 ? 'Eine neue Meldung' : `${p.neu} neue Meldungen`} seit der letzten Sichtung.{' '}
-        {p.liegenGeblieben > 0 && (
-          <>
-            <strong>{p.liegenGeblieben}</strong>{' '}
-            {p.liegenGeblieben === 1 ? 'Meldung steht' : 'Meldungen stehen'} seit mehr als 14 Tagen auf
-            &bdquo;Neu&ldquo; oder &bdquo;Geprüft&ldquo;.{' '}
-          </>
-        )}
-        Offen insgesamt: {p.offen}.
-      </Text>
+      {/* Board s3/w3-mail-betrieb Bild 4: Zeilen mit der Zahl rechts, kein Kasten. */}
+      {p.lage?.map((z) => <BetragsZeile key={z.label} links={z.label} rechts={z.wert} />)}
+      {p.lage && <Trenner />}
+      <BetragsZeile umbrechen links={offen.label} rechts={offen.wert} />
+      <BetragsZeile links="Neue Meldungen" rechts={String(p.neu)} />
+      {p.liegenGeblieben > 0 && <BetragsZeile links="Seit mehr als 14 Tagen offen" rechts={String(p.liegenGeblieben)} />}
+      <BetragsZeile links="Meldungen offen insgesamt" rechts={String(p.offen)} />
 
       {p.neueste.length > 0 && (
-        <div style={highlightBox}>
-          <Text style={highlightLabel}>Die jüngsten neuen Meldungen</Text>
+        <>
+          <Text style={{ ...zwischenTitel, marginTop: '12px' }}>Die jüngsten neuen Meldungen</Text>
           {p.neueste.map((m) => (
-            <Text key={m.kurznummer} style={{ ...highlightValue, fontSize: '14px' }}>
-              <span style={{ fontFamily: 'monospace' }}>{m.kurznummer}</span> · {m.art} ·{' '}
-              {m.hofName ?? 'Kundin'} — {m.ersteZeile}
+            <Text key={m.kurznummer} style={{ ...bodyText, margin: '0 0 4px' }}>
+              {`${m.kurznummer} · ${m.art} · ${m.hofName ?? 'Kundin'} — ${m.ersteZeile}`}
             </Text>
           ))}
-        </div>
+        </>
       )}
 
-      <Link href={p.adminUrl} style={ctaButton}>Postfach öffnen →</Link>
+      <KnopfReihe>
+        <Knopf href={p.adminUrl}>Postfach öffnen →</Knopf>
+      </KnopfReihe>
 
-      <Text style={mutedText}>
-        Aufgeräumt: {p.geloescht === 0 ? 'nichts' : `${p.geloescht} erledigte ${p.geloescht === 1 ? 'Meldung' : 'Meldungen'}`}{' '}
-        älter als 90 Tage gelöscht.
+      <Text style={kleinText}>
+        {`Aufgeräumt: ${p.geloescht === 0 ? 'nichts' : `${p.geloescht} erledigte ${p.geloescht === 1 ? 'Meldung' : 'Meldungen'}`} älter als 90 Tage gelöscht.`}
       </Text>
     </EmailLayout>
   )

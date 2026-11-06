@@ -52,7 +52,7 @@ export const SCHRIFT_UEBERSCHRIFT = "Fraunces,Georgia,'Times New Roman',serif"
  * im Web (w3-mail-*, Karte bis 600 px) mit 12 px und 26 px. Inline steht die Web-Fassung —
  * Mailprogramme ohne Media Queries zeigen sie; die übrigen nehmen am Handy die schmale.
  */
-const SCHMAL_CSS = `@media only screen and (max-width:480px){.fz-grund{padding:16px 10px !important}.fz-kopf{padding:20px 18px 0 !important}.fz-inhalt{padding:18px 18px 22px !important}}`
+const SCHMAL_CSS = `@media only screen and (max-width:480px){.fz-grund>table>tbody>tr>td{padding:16px 10px !important}.fz-kopf{padding:20px 18px 0 !important}.fz-inhalt{padding:18px 18px 22px !important}}`
 
 const body: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.seite,
@@ -471,4 +471,18 @@ export function inklGebuehrSatz(betrag: string, hof?: string): string {
 /** „Hof Müller, Dorfstraße 12, 5280 Braunau am Inn“ — die Zeile „Wo“ der Bestellmails. */
 export function woZeile(hof: string, adresse: string, plz: string | undefined, ort: string): string {
   return `${hof}, ${adresse}, ${plz ? `${plz} ` : ''}${ort}`
+}
+
+/**
+ * „Zurück an dich … € 19,12“ als grüne Karte (Board s3/w3-mail-storno Bild 4 und 6):
+ * Beschriftung links, Betrag rechts in einer Zeile (15 px, fett), darunter ein leiser Satz.
+ * Der Betrag kommt fertig gerechnet; die Vorlage formatiert ihn nur.
+ */
+export function ErstattungKasten({ betrag, zeile }: { betrag: string; zeile: string }): React.JSX.Element {
+  return (
+    <Section style={gruenBox}>
+      <BetragsZeile stark links="Zurück an dich" rechts={betrag} />
+      <Text style={{ color: MAIL_FARBE.textLeise, fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{zeile}</Text>
+    </Section>
+  )
 }

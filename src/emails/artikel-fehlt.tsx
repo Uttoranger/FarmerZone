@@ -61,7 +61,6 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
       </Text>
 
       <BestellnummerKasten nummer={p.orderNumber} />
-      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
       <Trenner />
       <BetragsZeile links="Neuer Betrag" rechts={formatEuro(p.neu)} stark />
 

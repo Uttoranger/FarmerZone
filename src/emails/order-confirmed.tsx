@@ -1,8 +1,7 @@
 import * as React from 'react'
-import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, amberBox, textLink, MAIL_FARBE } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText } from './_layout'
 import { formatEuro } from '@/lib/format'
-import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { BAR_OHNE_GEBUEHR_SATZ } from '@/lib/konditionen'
 
 export interface OrderConfirmedProps {
@@ -32,69 +31,38 @@ export interface OrderConfirmedProps {
   heuteUrl: string
 }
 
+/**
+ * „Bar-Bestellung bestätigt“ an den Hof (Board s3/w3-mail-hof-bestellung Bild 3):
+ * Die Kundin hat bestätigt, der Hof kann packen. Was er kassiert, steht als
+ * Summenzeile; der Satz darunter sagt, wem die Gebühr darin gehört.
+ */
 export function OrderConfirmedEmail(p: OrderConfirmedProps) {
-  const anrufen = telefonLink(p.customerPhone)
   const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const wort = p.gebuehrWort ?? 'Servicegebühr'
   const kassieren = p.barZuKassieren ?? p.total
   // Papier und Mail sagen dasselbe wie der Bildschirm (V57): „Bar-Bestellung bestätigt“.
   const titel = p.zahlart === 'karte' ? 'Bestellung bestätigt (Karte bei Abholung)' : 'Bar-Bestellung bestätigt'
+  const gebuehrSatz = mitGebuehr
+    ? p.barOhneGebuehr
+      ? `${wort} darin ${formatEuro(p.serviceFee ?? 0)} – bei dir erlassen, der ganze Betrag bleibt dir.`
+      : `${wort} darin ${formatEuro(p.serviceFee ?? 0)} – die schuldest du der Monatsabrechnung. Der Warenpreis ${formatEuro(p.total)} bleibt dir.`
+    : p.barOhneGebuehr
+      ? `${BAR_OHNE_GEBUEHR_SATZ} Der ganze Betrag bleibt dir.`
+      : null
   return (
-    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${titel}: ${p.orderNumber} – ${p.customerName}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${p.customerName} hat ihre Bestellung bestätigt.`}>
       <Text style={h1}>{titel}</Text>
-      <Text style={bodyText}>
-        Hallo {p.farmerName},<br />
-        <strong>{p.customerName}</strong> hat ihre Bestellung per E-Mail bestätigt
-        und wird zum gewählten Termin abholen.
-      </Text>
+      <Text style={bodyText}>{`${p.customerName} hat ihre Bestellung per E-Mail bestätigt. Du kannst packen.`}</Text>
 
-      <div style={amberBox}>
-        <Text style={{ ...mutedText, margin: 0, fontWeight: '600', color: MAIL_FARBE.orangeText }}>
-          Bar zu kassieren: {formatEuro(kassieren)}
-        </Text>
-        {mitGebuehr && (
-          <Text style={{ ...mutedText, margin: '4px 0 0', color: MAIL_FARBE.orangeText }}>
-            davon {p.gebuehrWort ?? 'Servicegebühr'} {formatEuro(p.serviceFee ?? 0)}
-            {p.barOhneGebuehr ? '' : ' — die schuldest du der Monatsabrechnung'}; Warenpreis{' '}
-            {formatEuro(p.total)} bleibt dir.
-          </Text>
-        )}
-        {!mitGebuehr && p.barOhneGebuehr && (
-          <Text style={{ ...mutedText, margin: '4px 0 0', color: MAIL_FARBE.orangeText }}>
-            {BAR_OHNE_GEBUEHR_SATZ} Der ganze Betrag bleibt dir.
-          </Text>
-        )}
-      </div>
+      <BestellnummerKasten nummer={p.orderNumber} />
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      <Trenner />
+      <BetragsZeile stark links={p.zahlart === 'karte' ? 'Mit Karte zu kassieren' : 'Bar zu kassieren'} rechts={formatEuro(kassieren)} />
+      {gebuehrSatz && <Text style={{ ...kleinText, marginTop: '6px' }}>{gebuehrSatz}</Text>}
 
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Abholtermin</Text>
-        <Text style={highlightValue}>{p.pickupDate}</Text>
-        <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
-      </div>
-
-      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.text, margin: '0 0 8px' }}>
-        Bestellte Produkte
-      </Text>
-      {p.items.map((item, i) => (
-        <Text key={i} style={{ ...mutedText, margin: '2px 0' }}>
-          • {item.name}
-        </Text>
-      ))}
-
-      <Text style={{ ...mutedText, marginTop: '12px' }}>
-        <strong>Bestellnummer:</strong> {p.orderNumber}
-      </Text>
-      <Text style={mutedText}>
-        <strong>Kunde:</strong> {p.customerName} ·{' '}
-        {anrufen ? (
-          <Link href={anrufen} style={textLink}>
-            {formatiereTelefon(p.customerPhone)}
-          </Link>
-        ) : (
-          p.customerPhone
-        )}
-      </Text>
-
-      <Link href={p.heuteUrl} style={ctaButton}>Bei Heute ansehen →</Link>
+      <KnopfReihe>
+        <Knopf href={p.heuteUrl}>Bei Heute ansehen →</Knopf>
+      </KnopfReihe>
     </EmailLayout>
   )
 }

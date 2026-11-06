@@ -21,8 +21,8 @@ import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
 import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
-import { MARKE, MARKE_TEAM } from '@/lib/marke'
-import { WUENSCHE_TEXT, bescheidMailHtml } from '@/lib/meldung'
+import { MARKE } from '@/lib/marke'
+import { WUENSCHE_TEXT } from '@/lib/meldung'
 import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref, offenSatz, type EingangZahlen } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
@@ -837,8 +837,10 @@ export async function baueNewFarmNotification(
     timeZone: 'Europe/Vienna',
   })
   const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
+  const { ADMIN_HOEFE_HREF } = await import('@/lib/admin-hof-akte')
   const html = await toHtml(
     React.createElement(NewFarmNotificationEmail, {
+      pruefenUrl: `${APP_URL}${ADMIN_HOEFE_HREF}`,
       farmName: farm.name,
       farmId: farm.id,
       farmSlug: farm.slug,
@@ -985,8 +987,10 @@ export type ErstattungOffenMeldung = {
  */
 export async function baueErstattungOffen(m: ErstattungOffenMeldung, an: string): Promise<StapelMail> {
   const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
+  const { ADMIN_BESTELLUNGEN_HREF } = await import('@/lib/admin-bestellung')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
+      bestellungenUrl: `${APP_URL}${ADMIN_BESTELLUNGEN_HREF}`,
       was: m.was,
       bestellnummer: m.bestellnummer,
       bestellId: m.bestellId,
@@ -1133,7 +1137,8 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
+    // Zeilenbeträge wie in der Mail an die Kundin (mailPositionen: dieselbe Rechnung über Cent), Board s3/w3-mail-hof-bestellung Bild 1.
+    items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
@@ -1285,6 +1290,7 @@ export async function baueOrderCancelled(
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
+    farmPhone: order.farm.phone,
     total: n(order.totalAmount),
     refundAmount: erstattetCents === null ? null : centsAlsEuro(erstattetCents),
     cancelReason: cancelReason ?? undefined,
@@ -1401,12 +1407,13 @@ export async function bauePostfachMail(m: {
 
 /**
  * Bescheid an eine Kundin, die einen Wunsch gemeldet hat (Register N14,
- * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Text und Team-Name
- * baut `bescheidMailHtml` (src/lib/meldung.ts); die Antwort lädt der Renderer
- * frisch aus der Meldung.
+ * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Die Vorlage
+ * src/emails/bescheid.tsx; die Antwort lädt der Renderer frisch aus der Meldung.
  */
 export async function baueBescheidMail(an: string, antwort: string): Promise<StapelMail> {
-  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: bescheidMailHtml(antwort, MARKE_TEAM) }
+  // Seit Nr. 241 in der Karte aller Mails (Board s3/w3-mail-neuigkeiten Bild 4) statt als rohes HTML.
+  const { BescheidEmail } = await import('@/emails/bescheid')
+  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: await toHtml(React.createElement(BescheidEmail, { antwort })) }
 }
 
 /**

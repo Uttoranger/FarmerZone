@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, Trenner, h1, bodyText, kleinText } from './_layout'
+import { EmailLayout, BestellnummerKasten, h1, bodyText } from './_layout'
 
 export interface BestellungVerfallenProps {
   customerName: string
@@ -11,21 +11,17 @@ export interface BestellungVerfallenProps {
 /**
  * Eine Vor-Ort-Bestellung wurde nicht rechtzeitig per Link bestätigt und ist
  * verfallen; ihre Ware ist wieder frei (src/server/verwaiste-bestellungen.ts).
+ * Vertragsmail ohne Aufruf zur nächsten Bestellung (S11, Board s3/w3-mail-storno
+ * Bild 3: ohne „bestell einfach neu“).
  */
 export function BestellungVerfallenEmail(p: BestellungVerfallenProps) {
   return (
-    <EmailLayout fuss={{ art: 'hof' }} previewText="Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde">
+    <EmailLayout fuss={{ art: 'hof' }} previewText="Dir entstehen keine Kosten.">
       <Text style={h1}>Bestellung verfallen</Text>
       <Text style={bodyText}>
-        Hallo {p.customerName},<br />
-        deine Bestellung <strong>{p.orderNumber}</strong> bei <strong>{p.farmName}</strong> ist
-        verfallen, weil sie nicht bestätigt wurde. Wir haben die Ware wieder freigegeben – dir
-        entstehen keine Kosten.
+        {`Du hast deine Bestellung bei ${p.farmName} nicht rechtzeitig bestätigt. Deshalb haben wir die Ware wieder freigegeben – dir entstehen keine Kosten.`}
       </Text>
-      <Text style={bodyText}>Wenn du die Sachen noch möchtest, bestell einfach neu.</Text>
-
-      <Trenner />
-      <Text style={kleinText}>Bei Fragen wende dich direkt an {p.farmName}.</Text>
+      <BestellnummerKasten nummer={p.orderNumber} />
     </EmailLayout>
   )
 }
