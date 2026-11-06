@@ -112,7 +112,7 @@ describe('stimmeAgbZu mit echter Anmeldung', () => {
   })
 
   it('N45: ein Hof mit 0.9 stimmt 1.0 zu; „0.9“ aus dem Browser speichert nichts; ein fremder Hof mit 0.9 bleibt bei 0.9', async () => {
-    const vorStichtag = new Date('2026-12-01T10:00:00Z')
+    const vorStichtag = new Date('2026-10-01T10:00:00Z')
     const { farm, cookie } = await erstelleHofMitAnmeldung({ agbFassung: '0.9', agbZugestimmtAm: vorStichtag })
     const { farm: fremd } = await erstelleHof({ agbFassung: '0.9', agbZugestimmtAm: vorStichtag })
     await angemeldet(cookie)

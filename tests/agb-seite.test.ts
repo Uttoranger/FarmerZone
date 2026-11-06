@@ -12,8 +12,9 @@
  *  - Ladefehler → die Seite wirft (kein catch, keine stille Vorgabe), und
  *    agb/error.tsx zeigt „Die AGB lassen sich gerade nicht laden.“ mit den
  *    Links auf beide Fassungen statt einer Fassung.
- *  - /agb/[fassung]: nur 0.9 und 1.0 (generateStaticParams, dynamicParams =
- *    false, alles andere notFound), revalidate 3600, Canonical auf sich selbst,
+ *  - /agb/[fassung]: nur 0.9 und 1.0 (alles andere notFound, bevor etwas
+ *    gelesen wird), revalidate 3600, gebaut beim ersten Aufruf (keine
+ *    Datenbank im Bau der CI), Canonical auf sich selbst,
  *    der feste Satz „Welche Fassung gerade gilt, steht auf /agb.“; je Fassung
  *    alle Punkte mit Sprungmarke, kein Sprung ins Leere; Anhang 1/2 von 1.0
  *    enthalten Sätze aus BELEHRUNG.
@@ -159,9 +160,10 @@ describe('/agb — frisch je Aufruf, die Fassung folgt dem Stichtag', () => {
 })
 
 describe('/agb/[fassung] — genau eine Fassung', () => {
-  it('nur 0.9 und 1.0, statisch mit Stundentakt; alles andere gibt es nicht', async () => {
-    expect(generateStaticParams()).toEqual([{ fassung: '0.9' }, { fassung: '1.0' }])
-    expect(FassungSeite.dynamicParams).toBe(false)
+  it('nur 0.9 und 1.0, statisch mit Stundentakt (gebaut beim ersten Aufruf, nicht beim Deploy); alles andere gibt es nicht', async () => {
+    // Der Bau der CI hat keine Datenbank: ohne catch bräche er an /agb/1.0 ab (Bericht 259).
+    expect(generateStaticParams()).toEqual([])
+    expect('dynamic' in FassungSeite).toBe(false)
     expect(FassungSeite.revalidate).toBe(3600)
     await expect(fassungSeite('2.0')).rejects.toThrow('NEXT_NOT_FOUND')
     await expect(fassungSeite('../agb')).rejects.toThrow('NEXT_NOT_FOUND')
