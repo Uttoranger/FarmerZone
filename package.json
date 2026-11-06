@@ -20,7 +20,9 @@
     "briefkasten": "dotenv -e .env.local -- tsx scripts/briefkasten.ts",
     "bausteine": "tsx scripts/bausteine.ts",
     "illustrationen": "tsx scripts/illustrationen.ts",
-    "marke": "tsx scripts/marke.ts"
+    "marke": "tsx scripts/marke.ts",
+    "pruefen:doku": "vitest run tests/telefonnummern-wache.test.ts tests/doku-doppelte-absaetze.test.ts tests/wortliste.test.ts",
+    "pruefen:seed": "tsx scripts/pruefung/pruef-seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
