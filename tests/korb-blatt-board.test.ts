@@ -123,8 +123,9 @@ describe('Korb-Blatt (Boards s1-/w1-korb)', () => {
     expect(leer).toContain('before:self-stretch')
     expect(leer).toContain('[&>p:first-of-type]:font-sans')
     expect(leer).toContain('[&>div]:row-start-3')
-    // Register N9: Symbol, Satz, Aktion — das Symbol steht weiter im Kasten.
-    expect(html).toMatch(/data-slot="empty-state"[^>]*><span[^>]*><svg/)
+    // Register N9 mit Ergänzung N46 (Nr. 246, G4): Leerzustände ohne Symbol — im Kasten steht kein Symbol mehr.
+    expect(html).not.toMatch(/data-slot="empty-state"[^>]*><span[^>]*><svg/)
+    expect(html).toMatch(/data-slot="empty-state"[^>]*><p[^>]*>/)
     expect(html).toContain(KORB_LEER.titel)
     expect(html).toContain(KORB_LEER.zumHof)
   })

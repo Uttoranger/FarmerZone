@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronRight, Store } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { HOEFE_LEER, KARTE_ADRESSE, abholzeileDerKarte, STARTSEITE_CHIPS, STARTSEITE_HOEFE_DECKEL, STARTSEITE_HOEFE_TITEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
@@ -115,8 +115,6 @@ export function HofKarten({ hoefe, jetzt }: { hoefe: readonly StartseitenHof[]; 
     // Satz, Aktion — Register vor Board).
     return (
       <EmptyState
-        form="karte"
-        symbol={Store}
         titel={HOEFE_LEER.titel}
         satz={HOEFE_LEER.satz}
         ausweg={

@@ -2,8 +2,8 @@
  * Bausteine aus der Nacharbeit Nr. 242 (Lauf 31) — gerendert wie auf dem Server.
  *
  * Beweist:
- *  - EmptyState `form="karte"`: links bündig, Titel fett ohne Serifen, Ausweg über die volle Breite, ohne Symbol,
- *    wenn keins mitkommt; die Grundform bleibt mittig, gestrichelt und mit Symbol (additiv).
+ *  - EmptyState: die Karten-Form aus Nr. 242 ist seit Nr. 246 (G4) die einzige Form — links bündig, Titel fett ohne
+ *    Serifen, Ausweg über die volle Breite, ohne Symbol, fester Rand (tests/bausteine-246.test.ts prüft den Rest).
  *  - DialogMitte mit `aktionen`: kein Schließen-Knopf im Kopf, die Aktionen stehen unten; ohne `aktionen` bleibt
  *    genau der eine Knopf im Kopf (Gegenprobe).
  *  - Die Dunkel-Klassen für Bilder haben EINE Quelle (ui/bild-dunkel.ts, ohne 'use client'); keine zweite Kopie unter
@@ -16,7 +16,6 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Store } from 'lucide-react'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -52,29 +51,13 @@ describe('EmptyState in der Karten-Form', () => {
   const ausweg = createElement('a', { href: '/hoefe' }, 'Höfe entdecken')
 
   it('steht links bündig ohne Symbol, der Titel fett ohne Serifen, der Ausweg über die volle Breite', () => {
-    const html = renderToStaticMarkup(createElement(EmptyState, { form: 'karte', titel: 'Noch nichts da', satz: 'Ein Satz.', ausweg }))
-    expect(html).toContain('data-form="karte"')
+    const html = renderToStaticMarkup(createElement(EmptyState, { titel: 'Noch nichts da', satz: 'Ein Satz.', ausweg }))
     expect(html).toContain('text-left')
     expect(html).toMatch(/<p class="text-\[16px\] font-bold text-foreground">Noch nichts da<\/p>/)
     expect(html).toContain('*:w-full')
     expect(html).toContain('href="/hoefe"')
     expect(html).not.toContain('lucide')
     expect(html).not.toContain('border-dashed')
-  })
-
-  it('zeigt ein mitgegebenes Symbol links über dem Titel', () => {
-    const html = renderToStaticMarkup(createElement(EmptyState, { form: 'karte', symbol: Store, titel: 'T', ausweg }))
-    expect(html).toContain('lucide-store')
-    expect(html).toContain('aria-hidden="true"')
-  })
-
-  it('die Grundform bleibt mittig, gestrichelt und mit Symbol (additiv)', () => {
-    const html = renderToStaticMarkup(createElement(EmptyState, { symbol: Store, titel: 'T', ausweg }))
-    expect(html).not.toContain('data-form="karte"')
-    expect(html).toContain('items-center')
-    expect(html).toContain('border-dashed')
-    expect(html).toContain('lucide-store')
-    expect(html).toContain('font-heading')
   })
 })
 

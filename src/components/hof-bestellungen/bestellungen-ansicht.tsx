@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarCheck, Inbox, PartyPopper, Printer } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/server/queries/orders'
 import type { HofWiderruf } from '@/server/widerruf'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
@@ -230,7 +230,6 @@ function LeereListe({
   if (!seite.hatBestellungen) {
     return (
       <EmptyState
-        symbol={Inbox}
         titel="Noch keine Bestellungen"
         satz="Teile deine Hofseite, damit Kundinnen bei dir bestellen können."
         ausweg={
@@ -244,7 +243,6 @@ function LeereListe({
   if (filter === 'offen') {
     return (
       <EmptyState
-        symbol={PartyPopper}
         titel="Alles erledigt"
         satz="Gerade wartet keine Bestellung auf dich."
         ausweg={
@@ -271,7 +269,7 @@ function LeereListe({
     )
   }
   if (filter === 'heute') {
-    return <EmptyState symbol={CalendarCheck} titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." ausweg={ausweg} />
+    return <EmptyState titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." ausweg={ausweg} />
   }
-  return <EmptyState symbol={Inbox} titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." ausweg={ausweg} />
+  return <EmptyState titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." ausweg={ausweg} />
 }

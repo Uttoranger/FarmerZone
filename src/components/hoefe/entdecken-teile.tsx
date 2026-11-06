@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, MapPinOff, SearchX, Store, X } from 'lucide-react'
+import { ChevronRight, MapPinOff, X } from 'lucide-react'
 import type { HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   aktiveFilter,
@@ -526,7 +526,6 @@ export function EntdeckenLeer({
   )
   return (
     <EmptyState
-      symbol={SearchX}
       titel={leer.titel}
       satz={leer.satz}
       ausweg={
@@ -558,7 +557,6 @@ export function EntdeckenLeer({
 export function KeineHoefe(): React.JSX.Element {
   return (
     <EmptyState
-      symbol={Store}
       titel={HOEFE_LEER.titel}
       satz={HOEFE_LEER.satz}
       ausweg={

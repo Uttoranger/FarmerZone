@@ -262,7 +262,8 @@ const KARTEN_HOF: KartenHof = {
 describe('Ohne eigenen Standort — für beide Reiter gleich', () => {
   it('Leerzustand mit Ausweg direkt zur Karte im Hofprofil, darunter die eigene Hofkarte mit „Nicht auf der Karte"', () => {
     const seite = html(createElement(StandortFehlt, { eigeneKarte: { hof: KARTEN_HOF, bereich: 'LEBENSMITTEL', schaufenster: { produkte: [produkt('a', 'Freilandeier')], weitere: 5 } }, jetzt: JETZT }))
-    expect(seite).toContain(`<h2 class="font-heading text-lg font-semibold text-foreground">${OHNE_STANDORT_TEXT.titel}</h2>`)
+    // Titel fett in der Grundschrift (G4, Nr. 246).
+    expect(seite).toContain(`<h2 class="text-[16px] font-bold text-foreground">${OHNE_STANDORT_TEXT.titel}</h2>`)
     expect(seite).toContain(OHNE_STANDORT_TEXT.satz)
     expect(seite).toMatch(new RegExp(`<a href="/settings/profile#${STANDORT_ANKER}" class="[^"]*">${OHNE_STANDORT_TEXT.knopf}</a>`))
     expect(seite).toContain(OHNE_STANDORT_TEXT.ueberschriftListe)

@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { MapPin } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Segment } from '@/components/ui/segment'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
@@ -81,7 +80,6 @@ export function UmfeldAnzeige({
       </div>
       {ansicht.leer && (
         <EmptyState
-          symbol={MapPin}
           titel="Noch keine Höfe zum Vergleichen"
           satz={ansicht.leer}
           ausweg={

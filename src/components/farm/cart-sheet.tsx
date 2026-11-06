@@ -6,7 +6,7 @@ import { useRef, useState, type ComponentProps } from 'react'
 import type { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
-import { Minus, Plus, Trash2, ShoppingBasket } from 'lucide-react'
+import { Minus, Plus, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Sheet, SheetBlatt, SheetKopf } from '@/components/ui/sheet'
@@ -205,7 +205,6 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
           // Leer mit Weg weiter (Register N9, Nr. 175): zurück zum Angebot schließt das Blatt, sonst zu den Höfen.
           <div className="flex flex-col gap-2">
             <EmptyState
-              symbol={ShoppingBasket}
               titel={KORB_LEER.titel}
               satz={KORB_LEER.satz}
               // Board s1-/w1-korb Bild 3 (Runde 2): ein schmaler Kasten, links bündig — Titel fett in der Grundschrift, darunter

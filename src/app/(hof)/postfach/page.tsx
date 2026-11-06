@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import { CheckCheck, Inbox } from 'lucide-react'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFaedenHof } from '@/server/queries/postfach'
@@ -89,7 +88,6 @@ export default async function PostfachPage({
         </Hinweiskarte>
       ) : faeden.length === 0 ? (
         <EmptyState
-          symbol={Inbox}
           titel={POSTFACH_LEER.titel}
           satz={POSTFACH_LEER.satz}
           ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
@@ -108,7 +106,6 @@ export default async function PostfachPage({
           <LadeInhalt className="flex flex-col gap-4">
             {zeilen.length === 0 ? (
               <EmptyState
-                symbol={CheckCheck}
                 titel={POSTFACH_ALLES_GELESEN.titel}
                 satz={POSTFACH_ALLES_GELESEN.satz}
                 ausweg={

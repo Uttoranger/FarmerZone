@@ -184,7 +184,6 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
             // Leerzustand wie im Board (Bild 5): die Karten-Form des EmptyState, links bündig, ohne Symbol, Titel
             // fett ohne Serifen, Knopf über die volle Breite.
             <EmptyState
-              form="karte"
               titel="Du hast noch keine Neuigkeiten abonniert."
               satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
               ausweg={

@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { CheckCheck, Inbox } from 'lucide-react'
 import { z } from 'zod'
 import * as Sentry from '@sentry/nextjs'
 import { getAdminFarms } from '@/server/queries/admin'
@@ -182,7 +181,6 @@ export function EingangReiter({ daten, jetzt }: { daten: EingangDaten; jetzt: Da
           </div>
           {eintraege.length === 0 ? (
             <EmptyState
-              symbol={filter === 'offen' ? CheckCheck : Inbox}
               titel={leer.titel}
               satz={leer.satz}
               className="rounded-none border-0 py-8"

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ExternalLink, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, ExternalLink } from 'lucide-react'
 import type { HofAkteAnsicht as AkteDaten } from '@/lib/admin-hof-akte'
 import { ADMIN_HOEFE_HREF, AKTE_PROTOKOLL_LEER, SPERRE_TEXT, servicegebuehrKnopfSichtbar } from '@/lib/admin-hof-akte'
 import type { HofZustand } from '@/lib/admin-hoefe-liste'
@@ -240,7 +240,6 @@ export function HofAkteAnsicht({
       <Abschnitt titel="Akte" satz="Einträge aus dem Protokoll – Team und System">
         {akte.protokoll.length === 0 ? (
           <EmptyState
-            symbol={ShieldCheck}
             titel={AKTE_PROTOKOLL_LEER.titel}
             satz={AKTE_PROTOKOLL_LEER.satz}
             ausweg={{ ohne: 'Einträge entstehen erst mit einer Aktion; hier gibt es nichts zu tun' }}

@@ -202,7 +202,6 @@ function FutterLeerzustand({
           : link({ km: filter.km, art: null, menge: null, abholung: null })
   return (
     <EmptyState
-      symbol={Wheat}
       titel={leer.titel}
       satz={leer.satz}
       ausweg={

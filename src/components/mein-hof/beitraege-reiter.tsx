@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Megaphone, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { BeitraegeUebersicht } from '@/lib/mein-hof-beitraege'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ListGruppe } from '@/components/ui/list-row'
@@ -30,7 +30,6 @@ export function BeitraegeReiter({ uebersicht }: { uebersicht: BeitraegeUebersich
     return (
       <EmptyState
         className="max-w-3xl"
-        symbol={Megaphone}
         titel="Noch kein Beitrag"
         satz="Mit einem Beitrag erzählst du deinen Kunden, was es gerade gibt — er steht auf deiner Hofseite."
         ausweg={

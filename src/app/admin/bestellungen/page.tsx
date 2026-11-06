@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
-import { ChevronLeft, ExternalLink, PackageSearch } from 'lucide-react'
+import { ChevronLeft, ExternalLink } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeBestellDetail, ladeBestellListe, type BestellDetail, type BestellZeile } from '@/server/queries/admin-bestellungen'
 import { ladeHofAuswahl } from '@/server/queries/mails'
@@ -395,7 +395,6 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
               </div>
               {zeilen.length === 0 ? (
                 <EmptyState
-                  symbol={PackageSearch}
                   titel={T.leerTitel}
                   satz={T.leerSatz}
                   className="rounded-none border-0 py-8"

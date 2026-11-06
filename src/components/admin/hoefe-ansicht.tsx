@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, Store } from 'lucide-react'
+import { Search } from 'lucide-react'
 import {
   HOEFE_LISTE_FILTER,
   HOEFE_LISTE_FILTER_LABEL,
@@ -116,14 +116,12 @@ export function HoefeAnsicht({ zeilen }: { zeilen: HoefeListenZeile[] }): React.
 
       {zahlen.alle === 0 ? (
         <EmptyState
-          symbol={Store}
           titel={HOEFE_LISTE_TEXT.leerTitel}
           satz={HOEFE_LISTE_TEXT.leerSatz}
           ausweg={{ ohne: 'Höfe melden sich selbst an; vorher gibt es hier nichts zu tun' }}
         />
       ) : liste.length === 0 ? (
         <EmptyState
-          symbol={filter === 'braucht-blick' && suche.trim() === '' ? Store : Search}
           titel={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlick : HOEFE_LISTE_TEXT.keinTreffer}
           satz={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlickSatz : HOEFE_LISTE_TEXT.keinTrefferSatz}
           ausweg={

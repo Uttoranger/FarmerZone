@@ -2,21 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import {
-  BarChart3,
-  CalendarCheck,
-  Check,
-  Compass,
-  FlaskConical,
-  Info,
-  Package,
-  Plus,
-  ReceiptText,
-  SearchX,
-  ShoppingBasket,
-  SlidersHorizontal,
-  Users,
-} from 'lucide-react'
+import { BarChart3, CalendarCheck, Check, Compass, FlaskConical, Info, Package, Plus, ReceiptText, ShoppingBasket, SlidersHorizontal, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip, FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -422,7 +408,6 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
 
           <Abschnitt id="leer" titel="EmptyState" satz="Symbol, ein Satz und immer ein Ausweg.">
             <EmptyState
-              symbol={SearchX}
               titel="Keine Höfe im Umkreis"
               satz="Im Umkreis von 10 km bietet gerade niemand Eier an."
               ausweg={

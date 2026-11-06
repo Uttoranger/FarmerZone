@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
-import { Download, Wallet } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { aktuellerFinanzMonat, getFinanzenJahr, type FinanzenJahrDaten } from '@/server/queries/finanzen'
 import { monatsschluessel } from '@/lib/servicegebuehr'
 import {
@@ -136,7 +136,6 @@ export async function ladeJahrSeite({
 
           {(reiter === 'auszahlungen' || reiter === 'entfallen') && (
             <EmptyState
-              symbol={Wallet}
               titel={finanzenReiterLabel(reiter)}
               satz={FINANZEN_REITER_OHNE_INHALT}
               ausweg={{ ohne: 'Zu diesem Reiter hat die Finanzseite keine Zahlen; es gibt nichts, wohin der Weg führen könnte' }}
