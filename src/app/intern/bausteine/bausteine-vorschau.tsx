@@ -44,7 +44,15 @@ import type { MeldungFormular } from '@/components/shared/use-meldung-formular'
 import type { MeldungArt } from '@/lib/meldung'
 import { Input } from '@/components/ui/input'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { UnterDemWerkzeugKopf, WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG, RUNDUNG_PX, type RundungArt } from '@/components/ui/rundung'
+import { HINWEISKASTEN_LINK, Hinweiskasten } from '@/components/ui/hinweiskasten'
+import { AKTIONSLEISTE_KNOPF, AKTIONSLEISTE_ZURUECK, FesteAktionsleiste } from '@/components/ui/feste-aktionsleiste'
+import { HofBalken } from '@/components/hofbereich/hof-balken'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { Vorschau246 } from '@/app/intern/bausteine/vorschau-246'
+import { Vorschau247 } from '@/app/intern/bausteine/vorschau-247'
+import { Vorschau248 } from '@/app/intern/bausteine/vorschau-248'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { KaufZusammenfassung, type ZusammenfassungPosition } from '@/components/checkout/kauf-zusammenfassung'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
@@ -79,6 +87,9 @@ const KORB_ONLINE: ZusammenfassungPosition[] = [
 ]
 
 /** Knopf-Gestalt für die Beispiel-Aktionen (Pille, Inhaltsbreite). */
+/** Fester Zeitpunkt der Vorschau — die Unterzeile „Stand …“ hängt nicht an der Uhr (kein Hydration-Unterschied). */
+const VORSCHAU_JETZT = new Date('2027-03-03T10:00:00Z')
+
 const KNOPF = {
   gruen: cn('inline-flex h-10 items-center rounded-full bg-accent px-4 text-[14px] font-semibold text-accent-foreground hover:bg-accent-hover', FOKUS_RAHMEN),
   orange: cn('inline-flex h-10 items-center rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground hover:bg-primary/90', FOKUS_RAHMEN),
@@ -87,7 +98,7 @@ const KNOPF = {
 
 function Abschnitt({ id, titel, satz, children }: { id: string; titel: string; satz: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-titel`} className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:p-5">
+    <section aria-labelledby={`${id}-titel`} className={cn('flex min-w-0 flex-col gap-3 border border-border bg-card p-4 md:p-5', RUNDUNG.karte)}>
       <div>
         <h2 id={`${id}-titel`} className="font-heading text-lg font-semibold">
           {titel}
@@ -174,7 +185,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
       </header>
 
       <main className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 py-5 pb-16 md:px-8">
-        <nav aria-label="Shells ansehen" className="rounded-2xl border border-border bg-card p-4 md:p-5">
+        <nav aria-label="Shells ansehen" className={cn('border border-border bg-card p-4 md:p-5', RUNDUNG.karte)}>
           <h2 className="font-heading text-lg font-semibold">Shells</h2>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             In voller Fenstergröße — am Handy mit Unterleiste, ab 768 px mit Kopfzeile bzw. Seitenleiste.
@@ -254,15 +265,76 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           </Abschnitt>
 
           <Abschnitt
-            id="unterseitenkopf"
-            titel="UnterseitenKopf"
-            satz="Kopf einer Unterseite im Hofbereich (Nr. 44): am Handy eine feste Leiste mit Pfeil und Elternseite – hier im Kasten scrollen –, im Browser die Zeile „‹ …“, darunter der Titel."
+            id="werkzeugkopf"
+            titel="WerkzeugKopf (G1) mit Hof-Balken (G3)"
+            satz="Am Handy die feste Leiste mit „‹“, Titel und Unterzeile – hier im Kasten scrollen –, im Web der grüne Textlink „‹ Elternseite“, h1 und Unterzeile. Der Hof-Balken steht unter dem Kopf in der Inhaltsspalte."
           >
             {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5), damit die Leiste hier sichtbar klebt. */}
-            <div className="relative h-72 overflow-y-auto rounded-xl border border-border bg-background px-4 pt-5 md:px-8 md:pt-8">
-              <UnterseitenKopf pfad="/settings/profile" titel="Hofdaten" satz="Informationen, die auf deiner öffentlichen Hofseite sichtbar sind." />
+            <div className={cn('relative h-80 overflow-y-auto border border-border bg-background px-4 pt-5 md:px-8 md:pt-8', RUNDUNG.karte)}>
+              <UnterDemWerkzeugKopf
+                inhalt={<HofBalken lage="unter-kopf" balken={{ art: 'wartet', farmId: 'farm_vorschau', farmName: 'Hof Beispielberg', country: 'AT', stand: 'einrichten' }} />}
+              >
+                <WerkzeugKopf pfad="/settings/profile" titel="Hofdaten" unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />} />
+              </UnterDemWerkzeugKopf>
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="mb-3 h-24 rounded-2xl border border-border bg-card" />
+                <div key={i} className={cn('mb-3 h-24 border border-border bg-card', RUNDUNG.karte)} />
+              ))}
+            </div>
+            <div className={cn('relative h-48 overflow-y-auto border border-border bg-background px-4 pt-5 md:px-8 md:pt-8', RUNDUNG.karte)}>
+              <WerkzeugKopf
+                pfad="/settings"
+                titel="Einstellungen"
+                unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />}
+                aktion={
+                  <Link href="/intern/bausteine#werkzeugkopf" className={KNOPF.rand}>
+                    Postfach
+                  </Link>
+                }
+              />
+              <p className="text-[13px] text-muted-foreground">Ohne Elternseite (Seite der Leiste): kein Rückweg, eine Aktion rechts.</p>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt
+            id="hinweiskasten"
+            titel="Hinweiskasten (G3)"
+            satz="Braun getönt, Radius 12 px, Titel in status-offen, ohne Symbol und ohne Uhr; die Hof-ID steckt nur im vorausgefüllten Link."
+          >
+            <HofBalken lage="unter-kopf" balken={{ art: 'wartet', farmId: 'farm_vorschau', farmName: 'Hof Beispielberg', country: 'AT', stand: 'pruefung' }} />
+            <HofBalken lage="unter-kopf" balken={{ art: 'stillgelegt' }} />
+            <Hinweiskasten
+              titel="Online-Zahlung noch nicht eingerichtet"
+              aktion={
+                <Link href="/intern/bausteine#hinweiskasten" className={HINWEISKASTEN_LINK}>
+                  Zahlung einrichten
+                </Link>
+              }
+            >
+              Kundinnen können bis dahin nur bar bei Abholung zahlen.
+            </Hinweiskasten>
+          </Abschnitt>
+
+          <Abschnitt
+            id="aktionsleiste"
+            titel="Feste Aktionsleiste (G2)"
+            satz="Am Handy fest über der Unterleiste, Hauptknopf über die volle Breite, optional „← Zurück“; der Inhalt endet darüber. Im Web am Formularende. Hier ohne feste Position, damit sie in der Vorschau steht."
+          >
+            <div className={cn('border border-border bg-background p-4', RUNDUNG.karte)}>
+              <FesteAktionsleiste className="static" zurueck={<Link href="/intern/bausteine#aktionsleiste" className={AKTIONSLEISTE_ZURUECK}>← Zurück</Link>}>
+                <button type="button" className={AKTIONSLEISTE_KNOPF}>
+                  Hofdaten speichern
+                </button>
+              </FesteAktionsleiste>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="rundungen" titel="Rundungen in Pixeln (G8)" satz="RUNDUNG aus ui/rundung.ts statt der Tailwind-Stufen xl und 2xl, die mit --radius wachsen.">
+            <div className="grid grid-cols-2 gap-3">
+              {(Object.keys(RUNDUNG) as RundungArt[]).map((art) => (
+                <div key={art} className={cn('flex h-20 flex-col justify-end border border-border bg-muted p-3', RUNDUNG[art])}>
+                  <span className="text-[14px] font-semibold">{art}</span>
+                  <span className="text-[13px] text-muted-foreground">{RUNDUNG_PX[art]} px</span>
+                </div>
               ))}
             </div>
           </Abschnitt>
@@ -345,7 +417,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           </Abschnitt>
 
           <Abschnitt id="karte-laedt" titel="Karte lädt" satz="Platzhalter beider Karten, solange die Kartenbibliothek nachlädt — in der Größe der Karte, kein Spinner.">
-            <KarteLaedt className="h-[160px] rounded-2xl border border-border" />
+            <KarteLaedt className={cn('h-[160px] border border-border', RUNDUNG.karte)} />
           </Abschnitt>
 
           <Abschnitt id="leer" titel="EmptyState" satz="Symbol, ein Satz und immer ein Ausweg.">
@@ -500,7 +572,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           </Abschnitt>
 
           <Abschnitt id="sidebar" titel="Sidebar-Gruppe mit Zähler" satz="Die Seitenleiste des Hofbereichs ab 768 px; ohne Symbole, aktiv grün getönt (Board w1-mehr-neu).">
-            <div className="w-full max-w-[264px] rounded-2xl border border-border bg-card p-3">
+            <div className={cn('w-full max-w-[264px] border border-border bg-card p-3', RUNDUNG.karte)}>
               <SidebarGruppe>
                 <SidebarEintrag href="/intern/bausteine" label="Heute" aktuell="page" />
                 <SidebarEintrag href="/intern/bausteine#sidebar" label="Bestellungen" zahl={3} zahlWofuer="offene Bestellungen" />
@@ -514,7 +586,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
 
           <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht. Aktiv eine getönte Pille (grün bzw. orange). Im Hofbereich ist „Neu“ eine flache orange Fläche mit dem Wort darunter — Fläche und Wort sind ein Knopf.">
             <div className="flex flex-col gap-9 pt-6">
-              <BottomNav beschriftung="Beispiel: Unterleiste Kunde" className="relative z-0 rounded-2xl border md:block">
+              <BottomNav beschriftung="Beispiel: Unterleiste Kunde" className={cn('relative z-0 border md:block', RUNDUNG.karte)}>
                 <BottomNavLink href="/intern/bausteine" label="Entdecken" symbol={Compass} aktuell="page" />
                 <BottomNavMitte>
                   <Link href="/intern/bausteine#bottomnav" aria-label="Warenkorb öffnen, 2 Artikel" className={mittelknopfKlassen('gruen')}>
@@ -523,7 +595,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 </BottomNavMitte>
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} />
               </BottomNav>
-              <BottomNav beschriftung="Beispiel: Unterleiste Hof" ton="orange" className="relative z-0 rounded-2xl border md:block">
+              <BottomNav beschriftung="Beispiel: Unterleiste Hof" ton="orange" className={cn('relative z-0 border md:block', RUNDUNG.karte)}>
                 <BottomNavLink href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
                 <BottomNavMitte flach>
@@ -539,6 +611,12 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
               </BottomNav>
             </div>
           </Abschnitt>
+
+          {/* Einhängepunkte der Baustein-Nummern 246–248 (Lauf 32): Jede ändert nur ihre eigene vorschau-<nr>.tsx,
+              nie diese Datei — so kommen sich die Nummern hier nicht in die Quere. */}
+          <Vorschau246 />
+          <Vorschau247 />
+          <Vorschau248 />
         </div>
       </main>
     </div>

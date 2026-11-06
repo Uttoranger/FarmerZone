@@ -397,11 +397,16 @@ describe('7. Rückweg im Hofbereich: dieselbe Regel wie auf den Kundenseiten', (
     expect(tippAufRueckweg(hofseite, '/', 'zeile')).toEqual(tippAufZiel('/hoefe', '/'))
   })
 
-  it('UnterseitenKopf fragt die Regel mit dem Vorgänger aus dem RueckwegMerker — beide Links', () => {
-    const kopf = quelle('src/components/hofbereich/unterseiten-kopf.tsx')
-    expect(kopf).toContain('tippAufZiel(ziel, eigenerVorgaengerJetzt())')
-    expect(kopf).toContain('window.history.back()')
-    expect(kopf.match(/onClick=\{beimTipp\(ziel\)\}/g)).toHaveLength(2)
+  it('UnterseitenKopf und WerkzeugKopf fragen die Regel mit dem Vorgänger aus dem RueckwegMerker — je beide Links', () => {
+    // Seit Nr. 245 steht der Tipp in EINER Quelle (ui/rueckweg-tipp.ts), beide Köpfe nehmen sie.
+    const tipp = quelle('src/components/ui/rueckweg-tipp.ts')
+    expect(tipp).toContain('tippAufZiel(ziel, eigenerVorgaengerJetzt())')
+    expect(tipp).toContain('window.history.back()')
+    for (const datei of ['src/components/hofbereich/unterseiten-kopf.tsx', 'src/components/ui/werkzeug-kopf.tsx']) {
+      const kopf = quelle(datei)
+      expect(kopf, datei).toContain("from '@/components/ui/rueckweg-tipp'")
+      expect(kopf.match(/onClick=\{beimTipp\(ziel\)\}/g), datei).toHaveLength(2)
+    }
   })
 })
 

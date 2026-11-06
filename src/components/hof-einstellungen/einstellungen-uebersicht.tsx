@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { EINSTELLUNGEN_SATZ, EINSTELLUNGEN_TITEL, TON_TEXT, einstellungenGruppen, type EinstellungBereich, type EinstellungTon } from '@/lib/hof-einstellungen'
 import { cn } from '@/lib/utils'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
@@ -43,11 +44,10 @@ export function EinstellungenUebersicht({
 }): React.JSX.Element {
   return (
     <div className="flex max-w-[1000px] flex-col gap-2.5">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[28px]">{EINSTELLUNGEN_TITEL}</h1>
-        <HofUnterzeile hofName={hofName} jetzt={jetzt} />
-      </div>
-      <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground md:text-base">{EINSTELLUNGEN_SATZ}</p>
+      {/* Werkzeug-Kopf (G1, Nr. 245): am Handy die feste Leiste mit Titel und „<Hof> · Stand …“, im Web h1 und
+          Hofname; /settings hat keine Elternseite, also keinen Rückweg. Der Hof-Balken (G3) steht darunter. */}
+      <WerkzeugKopf titel={EINSTELLUNGEN_TITEL} unterzeile={<HofUnterzeile hofName={hofName} jetzt={jetzt} />} />
+      <p className="text-[15px] leading-relaxed text-muted-foreground md:text-base">{EINSTELLUNGEN_SATZ}</p>
 
       <div className="mt-1.5 grid items-start gap-4 lg:grid-cols-2">
         {einstellungenGruppen(bereiche).map((gruppe) => (
