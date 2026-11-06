@@ -253,6 +253,35 @@ export function gebuehrEntfallen(b: Pick<BestellungFuerGebuehrStatus, 'serviceFe
 }
 
 /**
+ * Das „Gesamt“, das Bestätigung und Bestellseite einer Kundin zeigen (Nr. 244): Warenpreis + Gebühr, solange die
+ * Gebühr gilt; ist sie entfallen bzw. erstattet (`gebuehrEntfallen`), nur der Warenpreis — die Gebührenzeile steht
+ * dann durchgestrichen daneben, und die Summe darunter darf sie nicht wieder mitzählen.
+ *
+ * NUR ANZEIGE, nie für Buchung, Erstattung, Abrechnung. Was gezahlt, kassiert oder erstattet wird, bleibt
+ * `bestellSummen(…).gesamtCents` bzw. `barZuKassierenCents` aus dem Snapshot (Wache:
+ * tests/geldanzeige-gesamt-wache.test.ts — kein Import aus src/server, src/app/api, plattformgebuehr*).
+ */
+export function anzeigeGesamtCents(
+  bestellung: BestellungMitGebuehr & Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt'>
+): number {
+  const s = bestellSummen(bestellung)
+  return gebuehrEntfallen(bestellung) ? s.warenpreisCents : s.gesamtCents
+}
+
+/**
+ * Der Vermerk hinter einer entfallenen Gebührenzeile — „erstattet“ (online, über Stripe zurück) bzw. „entfällt“
+ * (vor Ort, nicht kassiert); null, solange die Gebühr gilt (`gebuehrEntfallen`). Die EINE Quelle für Bestätigung,
+ * Bestellseite (`BestellPositionen`) und Abholzettel, damit die Zeile auf Bildschirm und Papier gleich heißt
+ * (Nr. 244). Nur Anzeige.
+ */
+export function gebuehrEntfallenVermerk(
+  b: Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt' | 'paymentMethod'>
+): 'erstattet' | 'entfällt' | null {
+  if (!gebuehrEntfallen(b)) return null
+  return b.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'
+}
+
+/**
  * Steht bei dieser Bestellung eine Stripe-Erstattung der Gebühr noch AUS?
  * Der Fall entsteht, wenn beim Wechsel auf „nicht abgeholt" die Erstattung
  * fehlschlägt: Der Status ist gesetzt (das darf nie an Stripe hängen), die
