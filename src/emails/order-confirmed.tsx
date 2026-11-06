@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { Text } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText } from './_layout'
+import { Link, Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, textLink } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { BAR_OHNE_GEBUEHR_SATZ } from '@/lib/konditionen'
 
 export interface OrderConfirmedProps {
@@ -42,13 +43,13 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
   const kassieren = p.barZuKassieren ?? p.total
   // Papier und Mail sagen dasselbe wie der Bildschirm (V57): „Bar-Bestellung bestätigt“.
   const titel = p.zahlart === 'karte' ? 'Bestellung bestätigt (Karte bei Abholung)' : 'Bar-Bestellung bestätigt'
+  // Die Sätze zur Gebühr sind Geld-Aussagen mit eigenen Tests (bargebuehr.test.ts, bargebuehr-mail.test.ts) — Wortlaut bleibt.
   const gebuehrSatz = mitGebuehr
-    ? p.barOhneGebuehr
-      ? `${wort} darin ${formatEuro(p.serviceFee ?? 0)} – bei dir erlassen, der ganze Betrag bleibt dir.`
-      : `${wort} darin ${formatEuro(p.serviceFee ?? 0)} – die schuldest du der Monatsabrechnung. Der Warenpreis ${formatEuro(p.total)} bleibt dir.`
+    ? `davon ${wort} ${formatEuro(p.serviceFee ?? 0)}${p.barOhneGebuehr ? '' : ' — die schuldest du der Monatsabrechnung'}; Warenpreis ${formatEuro(p.total)} bleibt dir.`
     : p.barOhneGebuehr
       ? `${BAR_OHNE_GEBUEHR_SATZ} Der ganze Betrag bleibt dir.`
       : null
+  const anrufen = telefonLink(p.customerPhone)
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={`${p.customerName} hat ihre Bestellung bestätigt.`}>
       <Text style={h1}>{titel}</Text>
@@ -57,8 +58,25 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
       <BestellnummerKasten nummer={p.orderNumber} />
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
       <Trenner />
-      <BetragsZeile stark links={p.zahlart === 'karte' ? 'Mit Karte zu kassieren' : 'Bar zu kassieren'} rechts={formatEuro(kassieren)} />
+      <BetragsZeile stark links="Bar zu kassieren:" rechts={formatEuro(kassieren)} />
       {gebuehrSatz && <Text style={{ ...kleinText, marginTop: '6px' }}>{gebuehrSatz}</Text>}
+      {/* Die Nummer der Kundin bleibt (Nr. 81): Der Hof ruft an, wenn etwas fehlt. */}
+      <BetragsZeile
+        umbrechen
+        links="Kundin"
+        rechts={
+          <>
+            {`${p.customerName} · `}
+            {anrufen ? (
+              <Link href={anrufen} style={textLink}>
+                {formatiereTelefon(p.customerPhone)}
+              </Link>
+            ) : (
+              p.customerPhone
+            )}
+          </>
+        }
+      />
 
       <KnopfReihe>
         <Knopf href={p.heuteUrl}>Bei Heute ansehen →</Knopf>

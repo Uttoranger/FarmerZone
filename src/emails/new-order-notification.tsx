@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { Text } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, zwischenTitel } from './_layout'
+import { Link, Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, textLink, zwischenTitel } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 export interface NewOrderNotificationProps {
   farmerName: string
@@ -35,6 +36,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
   const mitGebuehr = (p.serviceFee ?? 0) > 0
   const wort = p.gebuehrWort ?? 'Servicegebühr'
   const kassieren = p.customerTotal ?? p.total
+  const anrufen = telefonLink(p.customerPhone)
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={p.isOnline ? `${p.customerName} hat bestellt und online bezahlt.` : `${p.customerName} hat bestellt, bar bei Abholung.`}>
       <Text style={h1}>{p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}</Text>
@@ -63,6 +65,24 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
       ) : (
         <BetragsZeile stark links="Bar zu kassieren" rechts={formatEuro(kassieren)} />
       )}
+
+      {/* Die Nummer der Kundin bleibt (Nr. 81): Der Hof ruft an, wenn etwas fehlt. */}
+      <BetragsZeile
+        umbrechen
+        links="Kundin"
+        rechts={
+          <>
+            {`${p.customerName} · `}
+            {anrufen ? (
+              <Link href={anrufen} style={textLink}>
+                {formatiereTelefon(p.customerPhone)}
+              </Link>
+            ) : (
+              p.customerPhone
+            )}
+          </>
+        }
+      />
 
       <KnopfReihe>
         <Knopf href={p.heuteUrl}>Bei Heute ansehen →</Knopf>

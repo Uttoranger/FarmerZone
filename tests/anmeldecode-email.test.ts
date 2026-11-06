@@ -74,17 +74,20 @@ describe('sendAnmeldeCodeEmail', () => {
 
   it('der Code steht im Text, dazu Gültigkeit und Ignorieren-Hinweis', async () => {
     const { aufruf } = await versende('905173')
-    expect(aufruf.html).toContain('905173')
+    // In Dreiergruppen wie im Board (Nr. 241); das Feld entfernt beim Einfügen alles außer Ziffern.
+    expect(aufruf.html).toContain('905 173')
     expect(aufruf.html).toContain('10 Minuten')
-    expect(aufruf.html).toContain('ignorieren')
+    expect(aufruf.html).toContain('ignorier diese Mail')
   })
 
   it('der Vorschautext verrät den Code nicht', async () => {
     const { aufruf } = await versende('905173')
     // Der Vorschautext steht als erstes verstecktes div im Body.
-    const vorschau = aufruf.html.slice(0, aufruf.html.indexOf('905173'))
+    expect(aufruf.html).toContain('905 173')
+    const vorschau = aufruf.html.slice(0, aufruf.html.indexOf('905 173'))
     expect(vorschau).toContain('10 Minuten gültig')
-    expect(aufruf.html.indexOf('905173')).toBe(aufruf.html.lastIndexOf('905173'))
+    expect(aufruf.html.indexOf('905 173')).toBe(aufruf.html.lastIndexOf('905 173'))
+    expect(aufruf.html).not.toContain('905173')
   })
 
   it('kein Link, der anmeldet — der Code ist der einzige Weg', async () => {
@@ -117,17 +120,17 @@ describe('sendBestellCodeEmail', () => {
 
   it('Text „Dein Code für deine Bestellungen", Code einmal, 10 Minuten, nichts von Anmelden', async () => {
     const { aufruf } = await versendeBestellCode('905173')
-    expect(aufruf.html).toContain('Dein Code für deine Bestellungen')
     expect(aufruf.html).toContain('deine Bestellungen zu sehen')
     expect(aufruf.html).toContain('10 Minuten')
-    expect(aufruf.html.indexOf('905173')).toBe(aufruf.html.lastIndexOf('905173'))
+    expect(aufruf.html).toContain('905 173')
+    expect(aufruf.html.indexOf('905 173')).toBe(aufruf.html.lastIndexOf('905 173'))
     expect(aufruf.html).not.toMatch(/anzumelden|Anmeldecode/)
     expect(fremdeLinks(aufruf.html)).toEqual([])
   })
 
   it('Gegenprobe: die Anmelde-Mail bleibt beim alten Text', async () => {
     const { aufruf } = await versende()
-    expect(aufruf.html).toContain('Dein Anmeldecode')
+    expect(aufruf.html).toContain('um dich anzumelden')
     expect(aufruf.html).toContain('anzumelden')
   })
 })

@@ -67,7 +67,7 @@ describe('Bestätigungsmail', () => {
     expect(mail.html).toContain(`href="${LINK.replace(/&/g, '&amp;')}"`)
     expect(mail.html).toContain('Anmeldung bestätigen')
     expect(mail.html).toMatch(/7(<!-- -->)?\s*Tage/)
-    expect(mail.html).toContain('Wenn du dich nicht angemeldet hast, ignorier diese Mail.')
+    expect(mail.html).toContain('Ohne Bestätigung schicken wir dir nichts.')
   })
 
   it('ist keine Werbemail: kein Abmeldelink, kein „Benachrichtigungen verwalten", Betreff ohne Hofname', async () => {

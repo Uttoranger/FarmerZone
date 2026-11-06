@@ -346,7 +346,8 @@ export function BetragsZeile({
   const gewicht = stark ? '600' : '400'
   return (
     <Row style={{ width: '100%' }}>
-      <Column style={{ color: leise ? MAIL_FARBE.textLeise : MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 12px 3px 0', verticalAlign: 'top' }}>
+      {/* Bei Zeilen mit Datum oder Adresse ist die Beschriftung kurz („Wo“): Sie nimmt nur ihre Breite, der Wert den Rest (Board: eine Zeile bei 390 px). */}
+      <Column style={{ color: leise ? MAIL_FARBE.textLeise : MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 12px 3px 0', verticalAlign: 'top', ...(umbrechen ? { width: '1%', whiteSpace: 'nowrap' as const } : {}) }}>
         {links}
       </Column>
       <Column align="right" style={{ color: MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 0', textAlign: 'right' as const, verticalAlign: 'top', whiteSpace: umbrechen ? ('normal' as const) : ('nowrap' as const) }}>
@@ -405,16 +406,20 @@ export function HinweisKasten({ art, children }: { art: 'gruen' | 'orange'; chil
   )
 }
 
-/** Den Code in Dreiergruppen lesen („615 204“) — gezeigt wird er nur so, eingegeben ohne Leerzeichen. */
+/**
+ * Sechs Ziffern in Dreiergruppen („615 204“, Board s3/w3-mail-zugang). Nur für Codes,
+ * deren Feld beim Einfügen alles außer Ziffern entfernt (`codeAusEingabe` in
+ * src/lib/anmeldecode.ts) — sonst bliebe das Leerzeichen im kopierten Code hängen.
+ */
 export function codeGruppiert(code: string): string {
-  return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code
+  return /^\d{6}$/.test(code) ? `${code.slice(0, 3)} ${code.slice(3)}` : code
 }
 
 /**
  * Der Code groß zum Abtippen (Boards s3/w3-mail-zugang, -team): Überschriften-Serife,
  * neutrale Fläche ohne Rand, in Dreiergruppen. Kein Link — der Code steht nie im Betreff.
  */
-export function CodeKasten({ code }: { code: string }): React.JSX.Element {
+export function CodeKasten({ code, gruppiert = true }: { code: string; gruppiert?: boolean }): React.JSX.Element {
   return (
     <Text
       style={{
@@ -431,7 +436,7 @@ export function CodeKasten({ code }: { code: string }): React.JSX.Element {
         textAlign: 'center' as const,
       }}
     >
-      {codeGruppiert(code)}
+      {gruppiert ? codeGruppiert(code) : code}
     </Text>
   )
 }

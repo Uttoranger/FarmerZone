@@ -30,7 +30,8 @@ export function AdminSicherheitEmail({ anlass, geraet, wann, code }: AdminSicher
     return (
       <EmailLayout fuss={{ art: 'plattform' }} previewText={betreff}>
         <Text style={bodyText}>{`${text.anrede} ${text.satz.einrichtungscode}`}</Text>
-        {code && <CodeKasten code={code} />}
+        {/* Ungegliedert: Das Feld der Einrichtung nimmt nur sechs Ziffern ohne Leerzeichen (einrichtungscodeSchema). */}
+        {code && <CodeKasten code={code} gruppiert={false} />}
         <Text style={leiseZeile}>{text.codeGilt}</Text>
       </EmailLayout>
     )

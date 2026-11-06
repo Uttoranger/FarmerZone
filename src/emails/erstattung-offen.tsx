@@ -33,7 +33,7 @@ export function ErstattungOffenEmail(p: ErstattungOffenProps) {
         <BetragsZeile key={b.label} links={b.label} rechts={b.wert} />
       ))}
       {p.stripeKennung && <BetragsZeile umbrechen links="Bei Stripe" rechts={p.stripeKennung} />}
-      <HinweisKasten art="orange">{`${p.was} ${p.handanweisung}`}</HinweisKasten>
+      <HinweisKasten art="orange">{`${p.was} Was zu tun ist: ${p.handanweisung}${/[.!?]$/.test(p.handanweisung) ? '' : '.'}`}</HinweisKasten>
       {p.bestellungenUrl && (
         <KnopfReihe>
           <Knopf href={p.bestellungenUrl}>In Bestellungen öffnen →</Knopf>

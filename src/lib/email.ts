@@ -832,10 +832,8 @@ export async function baueNewFarmNotification(
   },
   an: string
 ): Promise<StapelMail> {
-  const registeredAt = farm.createdAt.toLocaleString('de-AT', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Europe/Vienna',
-  })
+  // „Mo, 22. Februar 2027, 18:40“ wie in den Boards (Wiener Zeit).
+  const registeredAt = `${formatPickupDate(farm.createdAt)}, ${farm.createdAt.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })}`
   const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
   const { ADMIN_HOEFE_HREF } = await import('@/lib/admin-hof-akte')
   const html = await toHtml(

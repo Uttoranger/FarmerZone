@@ -102,6 +102,9 @@ afterAll(() => {
 /** Mi, 3. März 2027, 07:40 in Wien — der Tag der Beispielwelt. */
 const JETZT = new Date('2027-03-03T06:40:00.000Z')
 
+/** Ein Foto für den Beitrag, ohne Netz: eine leere Fläche im Format des Boards (nur Vorschau, nie in der App). */
+const BEISPIEL_FOTO = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="320"><rect width="600" height="320" fill="#E8E4D8"/></svg>')}`
+
 /** Ein Code für die Vorschau entsteht erst zur Laufzeit — nie als Ziffernfolge im Test (tests/code-testwerte-wache.test.ts). */
 const beispielCode = (ziffern: readonly number[]): string => ziffern.join('')
 
@@ -323,7 +326,7 @@ const FAELLE: Fall[] = [
         title: 'Frischer Bergkäse ab Samstag',
         body: 'Hallo Maria! Unser Bergkäse hat jetzt 8 Monate gereift. Ab Samstag, 6. März, holst du ihn bei uns ab – solange der Laib reicht.',
         anlass: 'FRESH_PRODUCT',
-        photoUrl: `${PRODUKTION_ADRESSE}/beispiel/bergkaese.jpg`,
+        photoUrl: BEISPIEL_FOTO,
         showOnFarmPage: true,
         farm: { name: HOF.name, slug: HOF.slug },
       })

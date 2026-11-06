@@ -17,19 +17,19 @@ export interface BriefkastenZusammenfassungProps {
 
 /** Wochenlage an den Betreiber (Register N32, Nr. 192): die Zahlen der Woche, darunter der Stand des Postfachs (Register N14). */
 export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungProps) {
-  // „Offen im Eingang: 1 Antwort · …“ — dieselbe Zählung wie im Eingang, als Zeile Beschriftung | Wert.
-  const trenner = p.offenZeile.indexOf(': ')
-  const offen = trenner > 0 ? { label: p.offenZeile.slice(0, trenner), wert: p.offenZeile.slice(trenner + 2) } : { label: p.offenZeile, wert: '' }
   return (
     <EmailLayout fuss={{ art: 'betrieb' }} previewText={p.offenZeile}>
       <Text style={h1}>{p.lage ? 'Wochenlage' : 'Postfach — Wochenstand'}</Text>
       {/* Board s3/w3-mail-betrieb Bild 4: Zeilen mit der Zahl rechts, kein Kasten. */}
       {p.lage?.map((z) => <BetragsZeile key={z.label} links={z.label} rechts={z.wert} />)}
       {p.lage && <Trenner />}
-      <BetragsZeile umbrechen links={offen.label} rechts={offen.wert} />
-      <BetragsZeile links="Neue Meldungen" rechts={String(p.neu)} />
-      {p.liegenGeblieben > 0 && <BetragsZeile links="Seit mehr als 14 Tagen offen" rechts={String(p.liegenGeblieben)} />}
-      <BetragsZeile links="Meldungen offen insgesamt" rechts={String(p.offen)} />
+      <Text style={{ ...bodyText, margin: '6px 0 6px' }}>{p.offenZeile}</Text>
+      <Text style={bodyText}>
+        {`${p.neu === 1 ? 'Eine neue Meldung' : `${p.neu} neue Meldungen`} seit der letzten Sichtung. `}
+        {p.liegenGeblieben > 0 &&
+          `${p.liegenGeblieben} ${p.liegenGeblieben === 1 ? 'Meldung steht' : 'Meldungen stehen'} seit mehr als 14 Tagen auf „Neu“ oder „Geprüft“. `}
+        {`Offen insgesamt: ${p.offen}.`}
+      </Text>
 
       {p.neueste.length > 0 && (
         <>
