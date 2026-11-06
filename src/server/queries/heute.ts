@@ -63,8 +63,6 @@ export type Heute = {
   abholfensterHeute: string | null
   /** Das nächste Abholfenster laut Abholzeiten und wie viele Bestellungen dafür offen sind. */
   naechstesFenster: { fenster: NaechstesFenster; anzahl: number } | null
-  /** Der nächste Abholtag nach heute mit offenen Bestellungen; null = keiner in Sicht (die Zeile entfällt). */
-  naechsteAbholung: NaechsteAbholung | null
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   wochenBalken: WochenBalken[]
@@ -259,7 +257,6 @@ export async function getHeute(
     },
     abholfensterHeute: abholfensterHeute(slots, jetzt),
     naechstesFenster: fenster ? { fenster, anzahl: fensterZahl } : null,
-    naechsteAbholung,
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
       ausverkauft,

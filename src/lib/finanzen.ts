@@ -841,7 +841,6 @@ export const FINANZEN_JAHR_TEXT = {
     laufend
       ? `Was die Plattform ${jahr} einnimmt und was sie kostet — von Jänner bis heute, Testzahlungen zählen nicht.`
       : `Was die Plattform ${jahr} eingenommen hat und was sie gekostet hat — Testzahlungen zählen nicht.`,
-  diagrammTitel: (jahr: number) => `${jahr} nach Monaten`,
   /** `wort` aus `gebuehrWortFuerJahr`; ohne die Fassung „bisher“. */
   diagrammBeschriftung: (jahr: number, wort: GebuehrWort = SERVICEGEBUEHR_BEZEICHNUNG) => `${gebuehrenMehrzahl(wort)} und Kosten je Monat ${jahr}`,
   monatFuerMonat: 'Monat für Monat',

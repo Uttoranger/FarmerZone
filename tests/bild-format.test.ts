@@ -79,11 +79,18 @@ describe('formatFuerSharp — Laufzeit', () => {
   it('ein 25-MB-Original voller „a" hinter einem HEIC-Kopf ist schnell geprüft (die Suche nach av1C ist linear)', () => {
     const gross = new Uint8Array(25 * 1024 * 1024).fill(0x61)
     gross.set(HEIC.subarray(0, 24))
-    const beginn = performance.now()
-    expect(formatFuerSharp(gross)).toBe('heic')
+    // Die schnellste von drei Messungen (Nr. 242): Unter Last (Last über 12 auf 4 Kernen) lag eine einzelne Messung
+    // bei 587 bzw. 948 ms, ohne dass die Suche langsamer wurde. Die Grenze bleibt 500 ms — eine lineare Suche
+    // bleibt in jedem Lauf darunter, die frühere Schleife in keinem.
+    let schnellste = Number.POSITIVE_INFINITY
+    for (let lauf = 0; lauf < 3; lauf++) {
+      const beginn = performance.now()
+      expect(formatFuerSharp(gross)).toBe('heic')
+      schnellste = Math.min(schnellste, performance.now() - beginn)
+    }
     // Großzügig: nativ sind es Millisekunden; die frühere Schleife brauchte gut eine Sekunde.
-    expect(performance.now() - beginn).toBeLessThan(500)
-  })
+    expect(schnellste).toBeLessThan(500)
+  }, 30_000)
 })
 
 describe('Pixelgrenze', () => {

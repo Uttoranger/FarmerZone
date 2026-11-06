@@ -307,7 +307,6 @@ export const NEUE_ANMELDUNG_MAIL = {
   anrede: (name: string | null): string => (name ? `Hallo ${name},` : 'Hallo,'),
   vorher: 'am',
   nachher: 'hat sich jemand mit deinem Konto angemeldet:',
-  neuesGeraet: 'ein Gerät, das wir bei dir noch nicht kannten',
   warstDu: 'Warst du das? Dann musst du nichts tun.',
   knopf: 'Das war ich nicht',
   fuss: `Der Knopf öffnet eine Seite bei ${MARKE} – erst dort meldest du alle Geräte ab. Der Link gilt ${EINMAL_LINK_GUELTIG_TAGE} Tage und einmal. Wir fragen dich nie per Mail nach deinem Passwort.`,

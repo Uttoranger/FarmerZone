@@ -125,11 +125,6 @@ export type NaechsteAbholung = {
   anzahl: number
 }
 
-/** Die schmale Zeile unter „Heute abholen": „Morgen: 3 Bestellungen". */
-export function naechsteAbholungText(a: NaechsteAbholung): string {
-  return `${a.name}: ${a.anzahl} ${a.anzahl === 1 ? 'Bestellung' : 'Bestellungen'}`
-}
-
 // ─── Heute abholen ──────────────────────────────────────────────────────────
 
 /**

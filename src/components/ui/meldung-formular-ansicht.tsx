@@ -135,6 +135,7 @@ export function MeldungFormularAnsicht({
   }, [f.kurznummer])
 
   if (f.kurznummer) {
+    const DankeTitel = titel ? 'h1' : 'h2'
     return (
       <div
         role="status"
@@ -145,9 +146,11 @@ export function MeldungFormularAnsicht({
         <span aria-hidden="true" className="grid size-10 place-items-center rounded-full bg-accent text-accent-foreground">
           <Check className="size-5" strokeWidth={2.2} aria-hidden="true" />
         </span>
-        <h2 ref={dankeRef} tabIndex={-1} className="font-heading text-[22px] font-semibold text-foreground outline-none">
+        {/* Trägt die Ansicht die h1 der Seite (`titel`), ist der Dank jetzt sie — sonst stünde die Seite ohne h1 da
+            (Abnahme Lauf 31, problem-melden Bild 5; Nr. 242). */}
+        <DankeTitel ref={dankeRef} tabIndex={-1} className="font-heading text-[22px] font-semibold text-foreground outline-none">
           {T.dankeTitel}
-        </h2>
+        </DankeTitel>
         <p className="text-[15px] text-zustand-laeuft">
           {T.kurznummer} <strong className="font-mono">{f.kurznummer}</strong>. {alsHof ? T.dankeHof : T.dankeKunde}
         </p>
@@ -169,7 +172,11 @@ export function MeldungFormularAnsicht({
 
   return (
     <div data-slot="meldung-formular" data-welt={welt} className={cn('flex w-full max-w-[560px] flex-col gap-2.5', className)}>
-      {f.fehler && <HinweiskarteFehler titel={T.fehlerTitel}>{f.fehler}</HinweiskarteFehler>}
+      {f.fehler && (
+        <HinweiskarteFehler titel={T.fehlerTitel} nochmal={f.nochmal}>
+          {f.fehler}
+        </HinweiskarteFehler>
+      )}
       <form onSubmit={f.absenden} className="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-[18px]">
         {titel && <h1 className="font-heading text-2xl font-semibold text-foreground">{titel}</h1>}
         {satz && <p className="-mt-2 text-[15px] text-muted-foreground">{satz}</p>}

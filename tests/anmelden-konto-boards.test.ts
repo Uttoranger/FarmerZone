@@ -45,9 +45,11 @@ describe('/login, Hof-Karte nach Board s2-/w2-anmelden', () => {
   it('„Mit Passkey anmelden“ ohne Trennzeile und ohne Schlüssel-Symbol', () => {
     expect(html).toContain(HOF_PASSKEY_ANMELDEN.knopf)
     expect(html).not.toContain('lucide-key-round')
-    expect(html).not.toMatch(new RegExp(`>\\s*${HOF_PASSKEY_ANMELDEN.oder}\\s*<`))
-    // Gegenprobe: das Wort gibt es in der Quelle noch, die Suche hätte es gefunden.
-    expect(`<span>${HOF_PASSKEY_ANMELDEN.oder}</span>`).toMatch(new RegExp(`>\\s*${HOF_PASSKEY_ANMELDEN.oder}\\s*<`))
+    // Die Trennzeile „oder“ ist entfallen (ihr Text seit Nr. 242 auch aus HOF_PASSKEY_ANMELDEN).
+    const TRENNZEILE = />\s*oder\s*</
+    expect(html).not.toMatch(TRENNZEILE)
+    // Gegenprobe: die Suche hätte die Trennzeile gefunden.
+    expect('<span>oder</span>').toMatch(TRENNZEILE)
   })
 
   it('„Passwort vergessen?“ und „Noch kein Hof? Registrieren“ sind unterstrichene Links', () => {

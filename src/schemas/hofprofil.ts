@@ -45,7 +45,12 @@ function profilSchemaFuer(bestand?: ProfilBestand) {
     // „Bestand bleibt speicherbar"). Eine Obergrenze gab es nie; sie kommt nicht dazu.
     description: z.string(),
     address: z.string().min(3, PROFIL_MELDUNG.address),
-    postalCode: z.string().min(4, PROFIL_MELDUNG.postalCode),
+    // Leer und zu kurz je mit eigenem Satz (Nr. 242); was durchgeht, bleibt wie vorher (mindestens 4 Zeichen) —
+    // das Format wird nicht strenger, damit der Bestand speicherbar bleibt.
+    postalCode: z
+      .string()
+      .min(1, PROFIL_MELDUNG.postalCode)
+      .refine((v) => v.length === 0 || v.length >= 4, PROFIL_MELDUNG.postalCodeKurz),
     city: z.string().min(2, PROFIL_MELDUNG.city),
     // Die Spalte ist ein String mit Default (prisma/schema.prisma) — ERLAUBT
     // sind aber nur AT und DE, und das erzwingt genau diese Zeile. Ein drittes

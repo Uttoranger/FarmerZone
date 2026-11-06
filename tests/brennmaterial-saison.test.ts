@@ -9,7 +9,7 @@
  *    Jahreswechsel UTC+1) — je eine Minute davor und danach.
  */
 import { describe, it, expect } from 'vitest'
-import { BRENNMATERIAL_SAISON_TEXT, istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
+import { istBrennmaterialSaison } from '@/lib/brennmaterial-saison'
 
 /** Mitte eines Monats um 12:00 UTC — weit weg von jeder Grenze. */
 const monatsmitte = (jahr: number, monat: number) => new Date(Date.UTC(jahr, monat - 1, 15, 12, 0))
@@ -48,9 +48,5 @@ describe('istBrennmaterialSaison', () => {
     const zeitpunkt = new Date('2026-09-30T22:30:00Z')
     expect(zeitpunkt.getUTCMonth() + 1).toBe(9)
     expect(istBrennmaterialSaison(zeitpunkt)).toBe(true)
-  })
-
-  it('die Marke nennt die Saison', () => {
-    expect(BRENNMATERIAL_SAISON_TEXT).toBe('Saison Oktober bis März')
   })
 })

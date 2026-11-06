@@ -81,6 +81,13 @@ describe('Meldungen sagen, was fehlt und wozu', () => {
     expect(meldungen({ ...BASIS, [feld]: '' })).toEqual([satz])
   })
 
+  it('Postleitzahl: zu kurz hat einen eigenen Satz, vier Zeichen gehen weiter durch (Nr. 242)', () => {
+    expect(meldungen({ ...BASIS, postalCode: '52' })).toEqual([PROFIL_MELDUNG.postalCodeKurz])
+    expect(profileSchema.safeParse({ ...BASIS, postalCode: '5280' }).success).toBe(true)
+    // Gegenprobe: leer bleibt der Satz „Bitte gib … an“, nicht der zum Format.
+    expect(meldungen({ ...BASIS, postalCode: '' })).toEqual([PROFIL_MELDUNG.postalCode])
+  })
+
   it('Telefon: leer und zu kurz haben je einen eigenen Satz', () => {
     expect(meldungen({ ...BASIS, phone: '' })[0]).toBe(PROFIL_MELDUNG.phoneFehlt)
     expect(meldungen({ ...BASIS, phone: '123' })).toEqual([PROFIL_MELDUNG.phoneKurz])

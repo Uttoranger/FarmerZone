@@ -4,7 +4,7 @@ import { useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { BellOff, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
@@ -181,13 +181,12 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
           </h2>
 
           {subs.length === 0 ? (
-            // Leerzustand wie im Board: links bündig, ohne Symbol, Titel fett ohne Serifen, Knopf über die volle
-            // Breite. EmptyState hat dafür noch keine Variante (Bedarf an Nr. 242); die Klassen ändern nur die Form.
+            // Leerzustand wie im Board (Bild 5): die Karten-Form des EmptyState, links bündig, ohne Symbol, Titel
+            // fett ohne Serifen, Knopf über die volle Breite.
             <EmptyState
-              symbol={BellOff}
+              form="karte"
               titel="Du hast noch keine Neuigkeiten abonniert."
               satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
-              className="items-stretch gap-1.5 px-4 py-4 text-left [&>p]:max-w-none [&>p:first-of-type]:font-sans [&>p:first-of-type]:text-[16px] [&>p:first-of-type]:font-bold [&>span:first-child]:hidden [&>div]:mt-2"
               ausweg={
                 <Link href="/hoefe" className={KNOPF_GRUEN}>
                   Höfe entdecken
@@ -264,22 +263,21 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
           Während gelöscht wird, bleibt die Rückfrage offen. */}
       {breit ? (
         <Dialog open={deleteDialogOpen} onOpenChange={loeschenWechsel}>
-          {/* DialogMitte trägt oben rechts sein Schließen-Element; hier ist es „Abbrechen“ unten (Board w2-kundenkonto,
-              Bild 4) — der obere Knopf tritt aus dem Baum, damit es genau eines bleibt. Eine Variante ohne Kopf-Knopf
-              wäre Sache von ui/ (Bedarf an Nr. 242). */}
+          {/* „Abbrechen“ ist unten das eine Schließen-Element (Board w2-kundenkonto, Bild 4): DialogMitte mit
+              `aktionen` lässt den Knopf im Kopf weg. */}
           <DialogMitte
             titel="Konto wirklich löschen?"
-            schliessen="Abbrechen"
             initialFocus={abbrechenRef}
-            className="[&>[data-slot=dialog-mitte-kopf]>[data-slot=dialog-close]]:hidden"
+            aktionen={
+              <>
+                <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_UMRISS}>
+                  Abbrechen
+                </button>
+                {loeschenKnopf}
+              </>
+            }
           >
             <DialogDescription className="text-[15px] leading-normal text-foreground">{loeschenSatz}</DialogDescription>
-            <div className="mt-2 grid grid-cols-2 gap-2.5">
-              <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_UMRISS}>
-                Abbrechen
-              </button>
-              {loeschenKnopf}
-            </div>
           </DialogMitte>
         </Dialog>
       ) : (

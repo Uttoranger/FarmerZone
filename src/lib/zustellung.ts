@@ -202,7 +202,6 @@ export const ZUSTELLUNG_MAIL_TEXT = {
   bestaetigungTitel: 'Bitte bestätige deine Adresse',
   bestaetigungSatz: `Jemand aus dem Team von ${MARKE} hat diese Adresse für die Betriebs-Mails eingetragen: neue Höfe, Fehlermeldungen, offene Erstattungen. Öffne den Link und tippe auf der Seite auf „${BESTAETIGEN_TEXT.knopf}“. Erst dann schicken wir dir etwas.`,
   bestaetigungGueltig: `Der Link gilt ${BESTAETIGUNG_GUELTIG_STUNDEN} Stunden.`,
-  bestaetigungIgnorieren: 'Wenn du damit nichts zu tun hast, ignorier diese Mail. Dann bekommst du nichts von uns.',
   antwortBetreff: (hof: string, titel: string) => `Antwort von ${hof}: ${titel}`,
   antwortTitel: 'Ein Hof hat geantwortet',
   antwortZu: 'Zu',

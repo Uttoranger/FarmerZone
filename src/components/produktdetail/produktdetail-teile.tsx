@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { AusverkauftMarke } from '@/components/ui/marke'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
-import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/hofseite/produkt-karte'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 /*
  * Teile der Produktseite (Nachtlauf Nr. 11, Aufbau seit Nr. 235): „Kennzeichnung"

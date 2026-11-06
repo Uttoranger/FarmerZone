@@ -188,19 +188,26 @@ describe('Geld-Fließkomma-Wache — kein Geld mal Nicht-Zahl außerhalb des Bes
   }, 30_000)
 })
 
+/**
+ * Die Gegenproben am echten Bestand prüfen ganz src/ einmal je Eintrag des Bestands. Unter Last (vier Umsetzer, Last
+ * über 12 auf 4 Kernen) rissen sie die 30 s (Morgenbericht Lauf 30, Nr. 242) — die Grenze dieser Fälle ist darum
+ * höher; die Erwartungen bleiben.
+ */
+const GEGENPROBE_GRENZE = 120_000
+
 describe('Geld-Fließkomma-Wache — Gegenprobe am echten Bestand', () => {
   it('schlägt an, wenn eine neue Datei item.price * item.quantity schreibt', () => {
     const quellen = new Map(quellenAusSrc())
     quellen.set('src/lib/neue-summe.ts', 'export const summe = items.reduce((s, item) => s + item.price * item.quantity, 0)\n')
     expect(pruefeGeldFliesskomma(quellen).neu).toEqual(['src/lib/neue-summe.ts:1 item.price * item.quantity'])
-  }, 30_000)
+  }, GEGENPROBE_GRENZE)
 
   it('schlägt an, wenn ein Eintrag aus dem Bestand entfernt ist', () => {
     for (const eintrag of GELD_FLIESSKOMMA_BESTAND) {
       const ohne = GELD_FLIESSKOMMA_BESTAND.filter((b) => b !== eintrag)
       expect(pruefeGeldFliesskomma(quellenAusSrc(), ohne).neu, eintrag.datei).toEqual([expect.stringContaining(`${eintrag.datei}:`)])
     }
-  }, 30_000)
+  }, GEGENPROBE_GRENZE)
 
   it('schlägt an, wenn eine Stelle aus dem Bestand ein zweites Mal vorkommt (Anzahl je Eintrag)', () => {
     for (const eintrag of GELD_FLIESSKOMMA_BESTAND) {
@@ -210,7 +217,7 @@ describe('Geld-Fließkomma-Wache — Gegenprobe am echten Bestand', () => {
       quellen.set(eintrag.datei, `${text ?? ''}\nexport const zweiteStelle = ${eintrag.ausdruck}\n`)
       expect(pruefeGeldFliesskomma(quellen).neu, eintrag.datei).toEqual([expect.stringContaining(`${eintrag.datei}:`)])
     }
-  }, 30_000)
+  }, GEGENPROBE_GRENZE)
 
   it('schlägt als veraltet an, wenn die Stelle im Code fehlt oder ein Eintrag erfunden ist', () => {
     for (const eintrag of GELD_FLIESSKOMMA_BESTAND) {
@@ -222,12 +229,12 @@ describe('Geld-Fließkomma-Wache — Gegenprobe am echten Bestand', () => {
     }
     const erfunden = [...GELD_FLIESSKOMMA_BESTAND, { datei: 'src/lib/gibt-es-nicht.ts', ausdruck: 'x.price * y', anzahl: 1, grund: 'erfunden für die Gegenprobe, keine Stelle im Code' }]
     expect(pruefeGeldFliesskomma(quellenAusSrc(), erfunden).veraltet).toEqual(['src/lib/gibt-es-nicht.ts x.price * y'])
-  }, 30_000)
+  }, GEGENPROBE_GRENZE)
 
   it('schlägt als veraltet an, wenn von zwei eingetragenen Stellen eine fehlt', () => {
     const doppelt = GELD_FLIESSKOMMA_BESTAND.map((b) => ({ ...b, anzahl: b.anzahl + 1 }))
     expect(pruefeGeldFliesskomma(quellenAusSrc(), doppelt).veraltet).toHaveLength(GELD_FLIESSKOMMA_BESTAND.length)
-  }, 30_000)
+  }, GEGENPROBE_GRENZE)
 })
 
 describe('Geld-Fließkomma-Wache — Gegenprobe an Quelltext im Speicher: die Erkennung', () => {

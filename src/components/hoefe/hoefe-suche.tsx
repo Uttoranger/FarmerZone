@@ -141,7 +141,7 @@ export function HoefeSuche({
           {/* Sichtbare Beschriftung über dem Feld (Boards w1-/s1-hoefe); im Kartenmodus am Handy nur für Vorleser —
               dort steht das Feld allein in der Werkzeugzeile, der Platzhalter sagt dasselbe. */}
           <label htmlFor={feldId} className={kompakt ? 'sr-only' : 'mb-1.5 block w-fit text-[14px] font-semibold text-foreground'}>
-            {SUCHFELD_TEXT.platzhalter}
+            {SUCHFELD_TEXT.beschriftung}
           </label>
           <div className="relative">
             {ort.laeuft ? (
