@@ -1,48 +1,21 @@
 'use client'
 
-import type { MouseEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowLeft, ChevronLeft } from 'lucide-react'
-import { RUECKWEG_PRAEFIX, elternseite, type Elternseite } from '@/lib/bauern-navigation'
-import { tippAufZiel } from '@/lib/kunden-kopf'
-import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
+import { RUECKWEG_PRAEFIX, elternseite } from '@/lib/bauern-navigation'
+import { beimTipp, zielMitSuche } from '@/components/ui/rueckweg-tipp'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LEISTE_HANDY, ZEILE_BROWSER } from '@/components/hofbereich/unterseiten-kopf-stil'
 import { cn } from '@/lib/utils'
 
-/** Das Ziel samt Filter der Elternseite (z. B. /orders?filter=heute). */
-function zielMitSuche(eltern: Elternseite, suche: string | undefined): string {
-  if (!suche) return eltern.href
-  const teil = suche.replace(/^\?/, '')
-  return eltern.href + (eltern.href.includes('?') ? '&' : '?') + teil
-}
-
-/**
- * Der Tipp auf den Rückweg (Nr. 177): Stand die Elternseite direkt davor, ein
- * Schritt im Verlauf — die Liste steht dann mit Filter, Suche und Scrollstelle
- * da, wo man sie verlassen hat. Sonst folgt der Tipp dem Link und steigt
- * hinauf (der RueckwegMerker merkt es sich). Dieselbe Regel wie die
- * Browser-Zeile der Kundenseiten (`tippAufZiel`, lib/kunden-kopf.ts).
- *
- * `history.back()` statt `useRouter().back()`: Der App-Router tut dort nichts
- * anderes, und der Kopf bleibt ohne Router renderbar (Ladeansichten, Tests).
- */
-function beimTipp(ziel: string) {
-  return (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
-    const tipp = tippAufZiel(ziel, eigenerVorgaengerJetzt())
-    if (tipp.aktion === 'verlauf') {
-      e.preventDefault()
-      window.history.back()
-      return
-    }
-    merkeHinauf(tipp.ziel)
-  }
-}
-
 /**
  * Kopf einer Unterseite im Hofbereich (Nachtlauf Nr. 44, Register N1).
+ *
+ * @altbestand WerkzeugKopf (ui/werkzeug-kopf.tsx, G1, Nr. 245) — neue Seiten
+ * nehmen den Werkzeug-Kopf; die Aufrufer stehen in tests/bestandslisten/
+ * unterseiten-kopf.ts, die Liste schrumpft Route für Route.
  *
  * Am Handy eine feste Leiste oben (56 px) mit Pfeil und dem Namen der
  * Elternseite — die ganze Fläche ein Link (≥ 44 px), für den Screenreader

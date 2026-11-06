@@ -1,6 +1,7 @@
 import { ladeHofbereich } from '@/server/hofbereich'
 import { HofShell } from '@/components/shells/hof-shell'
 import { HofBalken } from '@/components/hofbereich/hof-balken'
+import { UnterDemWerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { ServiceWorkerAnmeldung } from '@/components/shared/service-worker-anmeldung'
 import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
 
@@ -23,6 +24,9 @@ import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
  * Schritte: „Richte deinen Hof fertig ein …“ bzw. „Dein Hof wird noch
  * geprüft …“ steht auf jeder Hof-Seite, nicht nur auf /onboarding (das in
  * (auth) seine eigene HofShell trägt und den Balken selbst setzt — einmal).
+ * Seit Nr. 245 (G3) steht der Balken unter dem Kopf in der Inhaltsspalte,
+ * sobald eine Seite den Werkzeug-Kopf trägt: Das Layout gibt ihn dem Kopf
+ * mit (UnterDemWerkzeugKopf), oben blendet er sich dann aus (hof-balken.tsx).
  */
 export default async function HofLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
   const { hof, personName, offeneBestellungen, ungelesenPostfach, balken, isAdmin, zuEntscheiden, tarifZeile } = await ladeHofbereich()
@@ -41,7 +45,7 @@ export default async function HofLayout({ children }: { children: React.ReactNod
       <ServiceWorkerAnmeldung />
       <SentryNutzer farmId={hof.id} />
       <HofBalken balken={balken} />
-      {children}
+      <UnterDemWerkzeugKopf inhalt={balken ? <HofBalken balken={balken} lage="unter-kopf" /> : null}>{children}</UnterDemWerkzeugKopf>
     </HofShell>
   )
 }

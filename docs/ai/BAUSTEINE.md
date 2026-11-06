@@ -234,12 +234,12 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/hofbereich
 
-- src/components/hofbereich/hof-balken.tsx · HofBalken, WarteBalken · Die Balken über jeder Seite der HofShell — dieselben Zustände und Wortlaute wie im Bestandslayout (ArchivedFarmBanner, PendingApprovalBanner), im neuen Design als orange Hinweiskarte: Beides ist … · genutzt
+- src/components/hofbereich/hof-balken.tsx · HofBalken, WarteBalken, type HofBalkenLage · Die Balken der HofShell (stillgelegt, wartet auf Freigabe) — seit Nr. 245 als Hinweiskasten (G3), oben über der Seite oder unter dem Werkzeug-Kopf. · genutzt
 - src/components/hofbereich/hof-laden.tsx · BeitragNeuLaden, HofSeiteLaden, UnterseitenKopfLaden, WhatsAppVersandLaden · Ladeansichten im Hofbereich für Routen ohne eigenes Bauteil (Nachtlauf Nr. 31): der Rückfall der Routengruppe (hof) und die beiden Unterseiten der Beiträge. · genutzt
 - src/components/hofbereich/neu-symbol.ts · NEU_SYMBOL · Das Symbol je Eintrag des Neu-Menüs — EINE Zuordnung für die HofShell (Aufklappmenü, Blatt) und den Dialog „Was legst du an?" auf /products (components/produkte/was-legst-du-an.tsx, Nachtlauf Nr. 18). · genutzt
 - src/components/hofbereich/tarif-zeile.tsx · TarifZeile · kein Zweck vermerkt · genutzt
 - src/components/hofbereich/unterseiten-kopf-stil.ts · LEISTE_HANDY, ZEILE_BROWSER · Maße des Unterseiten-Kopfs (unterseiten-kopf.tsx) — EINE Quelle für den Kopf und die Ladeansichten der Unterseiten (hof-laden.tsx), damit beim Umschalten nichts springt. · genutzt
-- src/components/hofbereich/unterseiten-kopf.tsx · UnterseitenKopf · Kopf einer Unterseite im Hofbereich (Nachtlauf Nr. 44, Register N1). · genutzt
+- src/components/hofbereich/unterseiten-kopf.tsx · UnterseitenKopf · Kopf einer Unterseite im Hofbereich (Nachtlauf Nr. 44, Register N1). · Altbestand → WerkzeugKopf (ui/werkzeug-kopf.tsx, G1, Nr. 245) — neue Seiten
 
 ## src/components/hofseite
 
@@ -440,10 +440,12 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/empty-state.tsx · EmptyState, type Ausweg · EmptyState: der Leerzustand nach docs/ai/DESIGN_SYSTEM.md — Symbol, ein Satz, eine nächste Handlung („Noch keine Produkte — Lege dein erstes an"). · genutzt
 - src/components/ui/erfolg-kasten.tsx · ErfolgKasten · Der grün getönte Kasten für ein erledigtes Ergebnis (Boards s2-/w2-passwort Bild 2 „Schau in deine E-Mails“, s3-/w3-widerruf Bild 4): Fläche und Schrift aus dem Paar „läuft“ … · genutzt
 - src/components/ui/feld-fehler.tsx · FELD_FEHLER_RAHMEN, FeldMitFehler, type FeldVerbindung · Der orange Rand eines Felds mit Fehler (V17; Board s1-produkt-neu Bild 5): 2 px in `--fz-status-offen`, gesetzt über `aria-invalid` — der Zustand, den der Screenreader liest, ist derselbe, den man … · genutzt
+- src/components/ui/feste-aktionsleiste.tsx · AKTIONSLEISTE_KNOPF, AKTIONSLEISTE_ZURUECK, FesteAktionsleiste · Feste Aktionsleiste am Handy (Baustein G2, Nr. 245; Liste Lauf 32, Abschnitt 3.2; Boards s2-hofdaten-zahlung, -meldungen, -verkaeufe …). · genutzt
 - src/components/ui/fokus.ts · FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN · Der sichtbare Fokus der neuen Bausteine und Shells — ein Rahmen außen in der Ringfarbe (im neuen Design --fz-status-fertig, ≥ 3:1 auf Grund und Fläche in beiden Modi). · genutzt
 - src/components/ui/form.tsx · Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, useFormField · kein Zweck vermerkt · genutzt
 - src/components/ui/groessenkachel.tsx · GroessenWahl, Groessenkachel · GroessenWahl + Groessenkachel: Verkaufsgrößen als Kacheln (Futter, Brennmaterial, alles mit Gebinden) — Größe, Hinweis, Preis, Grundpreis, Vorrat (docs/ai/DESIGN_SYSTEM.md, „Kaufstrecke"). · genutzt
 - src/components/ui/hinweiskarte.tsx · Hinweiskarte, HinweiskarteFehler · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
+- src/components/ui/hinweiskasten.tsx · HINWEISKASTEN_LINK, Hinweiskasten · Hinweiskasten (Baustein G3, Nr. 245; Liste Lauf 32, Abschnitt 3.2) — die Gestalt des Hof-Balkens und jedes Hinweises auf Offenes beim Hof, der unter dem Seitenkopf in der Inhaltsspalte steht (nie … · genutzt
 - src/components/ui/hofkarte-rahmen.tsx · HofkarteRahmen, hofkarteKlassen · Die Klassen einer Hofkarte in Listen (/hoefe, Startseite) je Zustand (V18; Board s1-hoefe, „Hof am Weiher"): Ein pausierter Hof ist ausgegraut, nicht versteckt — Fläche `bg-muted` statt `bg-card`, … · genutzt
 - src/components/ui/input.tsx · Input · kein Zweck vermerkt · genutzt
 - src/components/ui/label.tsx · Label · kein Zweck vermerkt · genutzt
@@ -455,6 +457,8 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/netz-hinweis.tsx · NetzHinweis, NetzZeile · Die Netz-Zeile unter dem Kopf der Shells (Register N29; Board system-sterne-kein-netz, Punkt 1): Geht dem Browser das Netz verloren, steht hier „Keine Verbindung – du siehst den letzten Stand.", bis … · genutzt
 - src/components/ui/password-input.tsx · PasswordInput · Passwortfeld mit Auge-Knopf — die EINE Umsetzung für alle Formulare (Nr. 173; vorher je eine Kopie in Registrierung und neuem Passwort). · genutzt
 - src/components/ui/progress-bar.tsx · ProgressBar · ProgressBar: Fortschritt als Balken, z. B. „Deine Hofseite · 64 %". · genutzt
+- src/components/ui/rueckweg-tipp.ts · beimTipp, zielMitSuche · Der Rückweg der Hof-Köpfe — EINE Quelle für UnterseitenKopf (hofbereich/unterseiten-kopf.tsx, seit Nr. 44/177) und WerkzeugKopf (ui/werkzeug-kopf.tsx, Nr. 245). · genutzt
+- src/components/ui/rundung.ts · RUNDUNG, RUNDUNG_PX, type RundungArt · Rundungen in Pixeln (Baustein G8, Nr. 245; Liste Lauf 32, Abschnitt 3.2). · genutzt
 - src/components/ui/segment.tsx · Segment, type SegmentOption · Segment: ein Umschalter mit genau einer Wahl („Handy | Web", „10 km | 25 km | 50 km"). · genutzt
 - src/components/ui/select.tsx · Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectScrollDownButton, SelectScrollUpButton, SelectSeparator, SelectTrigger, SelectValue · kein Zweck vermerkt · genutzt
 - src/components/ui/sheet.tsx · Sheet, SheetBlatt, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetKopf, SheetTitle, SheetTrigger · kein Zweck vermerkt · genutzt
@@ -468,6 +472,8 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/tabs.tsx · Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants · kein Zweck vermerkt · unbenutzt
 - src/components/ui/textarea.tsx · Textarea · kein Zweck vermerkt · genutzt
 - src/components/ui/textlink.tsx · Textlink, textlinkKlassen · Die Klassen eines Textlinks mit Trefferfläche ≥ 44 px (V16; Boards w1-korb „Route planen →", w1-mehr-neu „Hofseite ansehen"). · genutzt
+- src/components/ui/werkzeug-kopf-stil.ts · WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL · Maße des Werkzeug-Kopfs (werkzeug-kopf.tsx, G1, Nr. 245) — EINE Quelle für den Kopf und seine Ladeansicht, damit beim Umschalten nichts springt. · genutzt
+- src/components/ui/werkzeug-kopf.tsx · UnterDemWerkzeugKopf, WerkzeugKopf, WerkzeugKopfLaden · Werkzeug-Kopf (Baustein G1, Nr. 245): der Kopf der Hof-Werkzeuge am Handy (feste Leiste) und im Web in einem Baustein, mit dem Hof-Balken (G3) darunter; löst UnterseitenKopf ab. · genutzt
 - src/components/ui/zaehler.tsx · Zaehler · Eine kleine Zahl an einem Eintrag: offene Bestellungen, Meldungen zu entscheiden, Artikel im Korb. · genutzt
 
 ## src/lib
