@@ -518,6 +518,8 @@ describe('kein Big Bang', () => {
     '(public)/datenschutz/page.tsx',
     // Nr. 182: die Vorschau der Startseite (eigene dynamische Route) — dieselbe KundeShell wie die Startseite.
     'startseite-vorschau/page.tsx',
+    // Nr. 239: die 500 der Kundschaft in der KundeShell (Board s3-/w3-fehlerseiten, Bild 4); global-error bleibt ohne.
+    'error.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {
