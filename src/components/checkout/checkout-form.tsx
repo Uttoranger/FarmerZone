@@ -20,7 +20,7 @@ import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
-import { GEBUEHR_MODELL_HOFPREIS, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import type { CartItem } from '@/lib/use-cart'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
 import {
@@ -64,7 +64,7 @@ import {
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
 import { AGB_PFAD, kasseAgbSatz } from '@/lib/rechtstexte/agb-einbindung'
-import { agbFassungFuerBestellung, agbFassungPfad } from '@/lib/rechtstexte/agb-fassung'
+import { agbFassungPfad, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
@@ -1217,6 +1217,7 @@ export function ZahlungFortsetzen({
   anzeige,
   jetztIso,
   privat,
+  agbFassung,
 }: {
   farm: PublicFarm
   zahlung: Zahlung
@@ -1229,6 +1230,8 @@ export function ZahlungFortsetzen({
   jetztIso: string
   /** Käuferart der Bestellung ist PRIVAT (Seite, aus der Datenbank) — nur dann die Gewährleistungs-Mitteilung (Nr. 211). */
   privat: boolean
+  /** Die AGB-Fassung aus dem Snapshot der Bestellung (N45) — die Seite ermittelt sie auf dem Server und meldet einen unbekannten Wert. */
+  agbFassung: AgbKennung
 }): React.JSX.Element {
   const [jetzt, setJetzt] = useState(() => new Date(jetztIso))
   useEffect(() => {
@@ -1236,10 +1239,11 @@ export function ZahlungFortsetzen({
     return () => window.clearInterval(uhr)
   }, [])
   const zeilen = useMemo(() => new Map(Object.entries(zeilenCents)), [zeilenCents])
-  // N45: Satz und AGB-Link folgen dem Snapshot der Bestellung (`anzeige` ≠ null ⇔ Hofpreis-Modell, fortsetzungsKorb),
-  // nie der heutigen Lage des Hofs — eine Bestellung „bisher“ behält nach dem Stichtag den Satz mit Vermittlung und 0.9.
+  // N45: Satz und AGB-Link folgen dem Snapshot der Bestellung (`anzeige` ≠ null ⇔ Hofpreis-Modell, fortsetzungsKorb;
+  // die Fassung ermittelt die Seite auf dem Server), nie der heutigen Lage des Hofs — eine Bestellung „bisher“
+  // behält nach dem Stichtag den Satz mit Vermittlung und 0.9.
   const hofpreis = anzeige !== null
-  const agbPfad = agbFassungPfad(agbFassungFuerBestellung({ gebuehrModell: hofpreis ? GEBUEHR_MODELL_HOFPREIS : null }).fassung)
+  const agbPfad = agbFassungPfad(agbFassung)
   return (
     <KundeFokusShell
       titel="Bezahlen"

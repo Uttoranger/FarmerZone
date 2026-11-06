@@ -10,7 +10,8 @@ import type { OrderLineProduct } from '@/lib/order-line'
 import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
-import { AGB_BISHER, agbFassungFuerBestellung, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
+import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
+import { agbFassungMitMeldung } from '@/lib/rechtstexte/agb-fassung-melden'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
@@ -600,18 +601,6 @@ function belehrungFuer(order: OrderForEmail): Belehrung | undefined {
 }
 
 /**
- * Die Fassung der AGB für diese Bestellung (N45): aus ihrem Snapshot
- * (gebuehrModell), nie aus der Uhr — eine Bestellung „bisher“ bekommt 0.9 auch
- * nach dem Stichtag. Ein unbekannter Wert ergibt 0.9 und eine Meldung (nur
- * Wert und Bestell-ID, keine Personendaten).
- */
-function agbFassungDerBestellung(order: OrderForEmail): AgbKennung {
-  const { fassung, unbekannt } = agbFassungFuerBestellung({ gebuehrModell: order.gebuehrModell })
-  if (unbekannt) Sentry.captureMessage('Unbekanntes Gebührenmodell für die AGB-Fassung', { tags: { bereich: 'agb-fassung' }, extra: { gebuehrModell: order.gebuehrModell, orderId: order.id } })
-  return fassung
-}
-
-/**
  * Die AGB als Datei im Anhang (Nr. 207) in der Fassung der Bestellung (N45) —
  * erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). Für 1.0 braucht
  * der Stand-Vermerk den Stichtag; scheitert das Laden, steht der Ersatzwert
@@ -1042,7 +1031,8 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
   // Der signierte Weg zurück zur Bestellung — der einzige, den die Kundin
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
-  const agbFassung = agbFassungDerBestellung(order)
+  // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
+  const agbFassung = agbFassungMitMeldung(order)
 
   const { OrderConfirmationEmail } = await import('@/emails/order-confirmation')
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
@@ -1101,7 +1091,8 @@ export async function onsiteConfirmationInhalt(
         pickupTimeStart: order.pickupTimeStart,
       })
     : null
-  const agbFassung = agbFassungDerBestellung(order)
+  // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
+  const agbFassung = agbFassungMitMeldung(order)
 
   const { OnsiteConfirmationEmail } = await import('@/emails/onsite-confirmation')
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {

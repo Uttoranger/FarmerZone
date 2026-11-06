@@ -11,6 +11,7 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { ErneutSendenKnopf } from '@/components/email-bestaetigung/erneut-senden'
 import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
 import type { AgbKartenStichtag } from '@/lib/agb-zustimmung'
+import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WarteBalken } from '@/components/hofbereich/hof-balken'
 import { textlinkKlassen } from '@/components/ui/textlink'
 
@@ -225,7 +226,7 @@ export function EinrichtenSeite({
   /** Nur wenn die Bestätigung aussteht (bestaetigungOffen, frisch aus der Datenbank). */
   emailBestaetigung?: { email: string; warteSekunden: number } | null
   /** Nr. 207: Der Hof hat der aktuellen AGB-Fassung noch nicht zugestimmt — die Karte „AGB bestätigen“ (ohne Hof: null). */
-  agb?: { fassung: string; geaendert: boolean; stichtag: AgbKartenStichtag } | null
+  agb?: { fassung: AgbKennung; geaendert: boolean; stichtag: AgbKartenStichtag } | null
 }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-5 pb-12 md:px-8 md:pt-8">

@@ -14,15 +14,18 @@ export function AgbStuecke({
   stuecke,
   linkKlasse,
   neuerTab = false,
-  kontext = OHNE_STICHTAG,
+  kontext,
 }: {
   stuecke: readonly AgbStueck[]
   /** Klassen jedes Links im Text. */
   linkKlasse: string
   /** Links öffnen in einem neuen Tab — wo ein Formular offen bleiben muss. */
   neuerTab?: boolean
-  /** Der Stichtag für „[Tag des Inkrafttretens]“ (AGB 1.0); die Seiten der AGB geben ihn immer mit. */
-  kontext?: AgbKontext
+  /**
+   * Der Stichtag für „[Tag des Inkrafttretens]“ (AGB 1.0). Pflicht, ohne Vorgabe: Bei Rechtstexten fällt
+   * nichts still auf einen Ersatz zurück — wer keinen Stichtag braucht, gibt OHNE_STICHTAG ausdrücklich mit.
+   */
+  kontext: AgbKontext
 }): React.JSX.Element {
   return (
     <>
@@ -86,7 +89,8 @@ export function AgbSatz({
 }): React.JSX.Element {
   return (
     <p className={className}>
-      <AgbStuecke stuecke={stuecke} linkKlasse={SATZ_LINK} neuerTab={neuerTab} />
+      {/* Die Sätze der Einbindung tragen keinen Platzhalter für den Stichtag — darum ausdrücklich ohne. */}
+      <AgbStuecke stuecke={stuecke} linkKlasse={SATZ_LINK} neuerTab={neuerTab} kontext={OHNE_STICHTAG} />
     </p>
   )
 }

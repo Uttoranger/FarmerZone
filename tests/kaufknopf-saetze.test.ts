@@ -91,6 +91,7 @@ import { MINDESTBESTELLWERT_SATZ } from '@/lib/konditionen'
 import { mindestbestellwertHinweis } from '@/lib/plattformgebuehr'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
 import type { PublicFarm } from '@/server/queries/farm'
+import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { publicFarm } from './fabrik/public-farm'
 import { MARKE } from '@/lib/marke'
 
@@ -212,7 +213,8 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit den Sätzen
     name: '',
     email: 'kundin@example.com',
   }
-  const fortsetzen = (privat: boolean, anzeige: { hundertstel: number } | null = null, farm: PublicFarm = publicFarm({ name: HOFNAME })): string =>
+  // Die Fassung ermittelt die Kassen-Seite auf dem Server aus dem Snapshot (agbFassungMitMeldung); hier passend zum Modell.
+  const fortsetzen = (privat: boolean, anzeige: { hundertstel: number } | null = null, farm: PublicFarm = publicFarm({ name: HOFNAME }), agbFassung: AgbKennung = anzeige === null ? '0.9' : '1.0'): string =>
     renderToStaticMarkup(
       createElement(ZahlungFortsetzen, {
         farm,
@@ -222,6 +224,7 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit den Sätzen
         anzeige,
         jetztIso: JETZT.toISOString(),
         privat,
+        agbFassung,
       })
     )
 
@@ -251,6 +254,14 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit den Sätzen
     expect(html).not.toContain(VERMITTLUNG)
     expect(html).toContain('href="/agb/1.0"')
     expect(html).not.toContain('href="/agb/0.9"')
+  })
+
+  it('N45: der Link folgt der Fassung, die die Seite auf dem Server ermittelt hat — nicht einer Ableitung im Browser', () => {
+    // Ein unbekanntes Modell ergibt auf dem Server 0.9 (agbFassungMitMeldung, tests/agb-fassung.test.ts); die Komponente
+    // übernimmt die Fassung so. Gegenprobe zum Test davor: dieselbe Anzeige, andere Fassung → anderer Link.
+    const html = fortsetzen(true, { hundertstel: 600 }, publicFarm({ name: HOFNAME }), '0.9')
+    expect(html).toContain('href="/agb/0.9"')
+    expect(html).not.toContain('href="/agb/1.0"')
   })
 })
 

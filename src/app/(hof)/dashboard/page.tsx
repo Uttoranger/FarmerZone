@@ -132,9 +132,8 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const postfach = heutePostfach(faeden, jetzt)
   // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.
   const fassung = AGB_NEUESTE
-  const agbOffen = brauchtAgbZustimmung(farm, fassung)
-  // N45: Die Karte nennt vor dem Stichtag den Tag — nur geladen, wenn sie steht.
-  const agbStichtag = agbOffen ? await ladeAgbKartenStichtag(jetzt, farm.id) : null
+  // N45: Die Karte nennt vor dem Stichtag den Tag — nur geladen, wenn sie steht; null heißt: keine Karte.
+  const agbStichtag = brauchtAgbZustimmung(farm, fassung) ? await ladeAgbKartenStichtag(jetzt, farm.id) : null
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
@@ -235,7 +234,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
           {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
           {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
           <WiderrufHeuteKarte widerrufe={widerrufe} />
-          {agbOffen && agbStichtag && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} stichtag={agbStichtag} />}
+          {agbStichtag && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} stichtag={agbStichtag} />}
           {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
           {hofEmailFehlt(farm) && <HofEmailKarte />}
           {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}

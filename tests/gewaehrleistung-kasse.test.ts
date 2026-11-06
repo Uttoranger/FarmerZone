@@ -191,6 +191,7 @@ describe('Zahlung fortsetzen (Nr. 202): die Käuferart der Bestellung entscheide
         anzeige: null,
         jetztIso: JETZT.toISOString(),
         privat,
+        agbFassung: '0.9',
       })
     )
 

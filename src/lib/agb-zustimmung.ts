@@ -57,7 +57,7 @@ export function agbKartenStichtag(stichtag: Date | null, jetzt: Date): AgbKarten
 }
 
 /** Der Satz der Karte: vor dem Stichtag mit Tag, beiden Fassungen und dem Verzicht (32.4), ab dem Stichtag wie seit Nr. 207. */
-export function agbKartenSatz(lage: { fassung: string; geaendert: boolean; stichtag: AgbKartenStichtag }): string {
+export function agbKartenSatz(lage: { fassung: AgbKennung; geaendert: boolean; stichtag: AgbKartenStichtag }): string {
   if (!lage.stichtag.erreicht) return AGB_ZUSTIMMUNG_TEXT.satzVorStichtag(lage.stichtag.tag)
   return lage.geaendert ? AGB_ZUSTIMMUNG_TEXT.satzGeaendert(lage.fassung) : AGB_ZUSTIMMUNG_TEXT.satzNeu(lage.fassung)
 }

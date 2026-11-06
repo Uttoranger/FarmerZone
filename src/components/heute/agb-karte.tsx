@@ -7,6 +7,7 @@ import { PFLICHT_KNOPF, PFLICHT_KNOPF_RAHMEN, PflichtKarte } from '@/components/
 import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { textlinkKlassen } from '@/components/ui/textlink'
 import { AGB_ZUSTIMMUNG_TEXT, agbKartenSatz, type AgbKartenStichtag } from '@/lib/agb-zustimmung'
+import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { stimmeAgbZu } from '@/server/actions/agb-zustimmung'
 
 /**
@@ -27,7 +28,7 @@ export function AgbZustimmenKarte({
   geaendert,
   stichtag,
 }: {
-  fassung: string
+  fassung: AgbKennung
   geaendert: boolean
   stichtag: AgbKartenStichtag
 }): React.JSX.Element {

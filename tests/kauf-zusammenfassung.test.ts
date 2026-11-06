@@ -153,6 +153,7 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit Zusammenfas
         anzeige: null,
         jetztIso: JETZT.toISOString(),
         privat: true,
+        agbFassung: '0.9',
       })
     )
     vorDemKnopf(html, 'Jetzt bezahlen · € 10,30', ['Gesamt', ABHOLUNG])

@@ -12,9 +12,10 @@
  *  - Ladefehler → die Seite wirft (kein catch, keine stille Vorgabe), und
  *    agb/error.tsx zeigt „Die AGB lassen sich gerade nicht laden.“ mit den
  *    Links auf beide Fassungen statt einer Fassung.
- *  - /agb/[fassung]: nur 0.9 und 1.0 (alles andere notFound, bevor etwas
- *    gelesen wird), revalidate 3600, gebaut beim ersten Aufruf (keine
- *    Datenbank im Bau der CI), Canonical auf sich selbst,
+ *  - /agb/[fassung]: generateStaticParams genau 0.9 und 1.0, dynamicParams
+ *    = false (A005 4b); alles andere notFound, bevor etwas gelesen wird;
+ *    revalidate 3600; 1.0 liest den Stichtag erst nach `connection()` (keine
+ *    Datenbank im Bau der CI), 0.9 liest nichts; Canonical auf sich selbst,
  *    der feste Satz „Welche Fassung gerade gilt, steht auf /agb.“; je Fassung
  *    alle Punkte mit Sprungmarke, kein Sprung ins Leere; Anhang 1/2 von 1.0
  *    enthalten Sätze aus BELEHRUNG.
@@ -38,8 +39,20 @@ vi.mock('next/navigation', () => ({
   },
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+// Die Reihenfolge zählt: Für 1.0 muss `connection()` VOR dem Lesen des Stichtags laufen (Bau ohne Datenbank).
+const ablauf = vi.hoisted(() => [] as string[])
+vi.mock('next/server', () => ({
+  connection: async () => {
+    ablauf.push('connection')
+  },
+}))
 const lade = vi.hoisted(() => vi.fn())
-vi.mock('@/server/queries/plattform-einstellung', () => ({ ladePlattformEinstellung: lade }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({
+  ladePlattformEinstellung: (...args: unknown[]) => {
+    ablauf.push('lade')
+    return lade(...args)
+  },
+}))
 
 import * as AgbSeite from '@/app/(public)/agb/page'
 import AgbPage, { metadata } from '@/app/(public)/agb/page'
@@ -160,13 +173,25 @@ describe('/agb — frisch je Aufruf, die Fassung folgt dem Stichtag', () => {
 })
 
 describe('/agb/[fassung] — genau eine Fassung', () => {
-  it('nur 0.9 und 1.0, statisch mit Stundentakt (gebaut beim ersten Aufruf, nicht beim Deploy); alles andere gibt es nicht', async () => {
-    // Der Bau der CI hat keine Datenbank: ohne catch bräche er an /agb/1.0 ab (Bericht 259).
-    expect(generateStaticParams()).toEqual([])
+  it('nur 0.9 und 1.0 (generateStaticParams, dynamicParams = false, A005 4b), Stundentakt; alles andere gibt es nicht', async () => {
+    expect(generateStaticParams()).toEqual([{ fassung: '0.9' }, { fassung: '1.0' }])
+    expect(FassungSeite.dynamicParams).toBe(false)
     expect('dynamic' in FassungSeite).toBe(false)
     expect(FassungSeite.revalidate).toBe(3600)
     await expect(fassungSeite('2.0')).rejects.toThrow('NEXT_NOT_FOUND')
     await expect(fassungSeite('../agb')).rejects.toThrow('NEXT_NOT_FOUND')
+  })
+
+  it('1.0 liest den Stichtag erst nach connection() — der Bau der CI hat keine Datenbank; 0.9 liest nichts', async () => {
+    ablauf.length = 0
+    await fassungSeite('1.0')
+    expect(ablauf).toEqual(['connection', 'lade'])
+    ablauf.length = 0
+    await fassungSeite('0.9')
+    expect(ablauf).toEqual([])
+    // Gegenprobe: eine fremde Kennung liest ebenfalls nichts.
+    await expect(fassungSeite('2.0')).rejects.toThrow('NEXT_NOT_FOUND')
+    expect(ablauf).toEqual([])
   })
 
   it('Canonical auf sich selbst', async () => {
