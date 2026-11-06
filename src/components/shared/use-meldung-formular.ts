@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore, useTransition } from 'react'
 import * as Sentry from '@sentry/nextjs'
 import { meldungAbsenden } from '@/server/actions/meldung'
 import { MELDUNG_NICHT_GESPEICHERT, type MeldungArt } from '@/lib/meldung'
-import { NETZ_SATZ, istNetzFehler } from '@/lib/netz'
+import { NETZ_SATZ_UNSICHER, istNetzFehler } from '@/lib/netz'
 import { BEZEICHNER, befundVon } from '@/lib/upload-diagnose'
 import { useImageUpload } from '@/components/shared/image-upload'
 
@@ -116,9 +116,9 @@ export type MeldungFormular = {
   /** Die Ablehnung des Servers als Satz; leer = kein Fehler. */
   fehler: string
   /**
-   * Nur nach einer gescheiterten Anfrage (Netz, Wurf der Aktion): schickt dieselben Eingaben noch einmal — die
-   * Fehlerkarte zeigt dann „Nochmal“ (Register N29). Bei einer Ablehnung (zu viele Meldungen, Text zu kurz) fehlt
-   * er: Dort hilft nur, die Eingabe zu ändern oder zu warten.
+   * Nur nach einem Wurf der Aktion (Server, nicht Netz): schickt dieselben Eingaben noch einmal — die Fehlerkarte
+   * zeigt dann „Nochmal“. Nach einem Netzabbruch fehlt er (die Meldung kann schon angelegt sein, Register N29,
+   * Ergänzung 26.10.2026), ebenso bei einer Ablehnung (zu viele Meldungen, Text zu kurz).
    */
   nochmal?: () => void
   /** Nach dem Absenden die Kurznummer, sonst null. */
@@ -179,10 +179,13 @@ export function useMeldungFormular({
         })
       } catch (wurf) {
         // Geworfen ginge es an die Fehlergrenze (500), und der Text wäre weg (Board Bild 6, Nr. 242). Darum der
-        // Satz an der Karte, die Eingaben bleiben, „Nochmal“ schickt dieselben noch einmal.
+        // Satz an der Karte, die Eingaben bleiben. Am Netz gescheitert kann der Server die Meldung schon angelegt
+        // haben (Abbruch auf dem Rückweg): dann NETZ_SATZ_UNSICHER ohne „Nochmal“ (Register N29, Ergänzung
+        // 26.10.2026) — sonst entstünde eine zweite Meldung. „Nochmal“ nur nach einem Wurf des Servers.
         meldeGescheitertesAbsenden(wurf)
-        setFehler(istNetzFehler(wurf) ? NETZ_SATZ : MELDUNG_NICHT_GESPEICHERT)
-        setGescheitert(true)
+        const amNetz = istNetzFehler(wurf)
+        setFehler(amNetz ? NETZ_SATZ_UNSICHER : MELDUNG_NICHT_GESPEICHERT)
+        setGescheitert(!amNetz)
         return
       }
       if ('error' in result) setFehler(result.error)

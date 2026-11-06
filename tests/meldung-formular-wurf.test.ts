@@ -5,7 +5,8 @@
  * Beweist (Hook als Funktion, ein kleiner Prüfstand für useState/useTransition — TESTING_GUIDELINES §1):
  *  - Ein Wurf der Aktion setzt den Board-Satz an die Karte, die Eingaben bleiben, „Nochmal“ ist da und schickt
  *    dieselben Eingaben noch einmal.
- *  - Ein Netzabbruch nimmt NETZ_SATZ (Register N29); Sentry bekommt dann nur eine Brotkrume.
+ *  - Ein Netzabbruch nimmt NETZ_SATZ_UNSICHER ohne „Nochmal“ (Register N29, Ergänzung 26.10.2026: der Server kann
+ *    die Meldung schon angelegt haben); Sentry bekommt dann nur eine Brotkrume.
  *  - Ein echter Wurf geht nach Sentry — fester Text, ohne den Text der Meldung.
  *  - Gegenprobe: Eine Ablehnung des Servers (zu viele Meldungen) zeigt ihren Satz ohne „Nochmal“.
  *  - Der Dank trägt die h1, wenn die Ansicht die Überschrift der Seite trägt.
@@ -58,7 +59,7 @@ import { meldungAbsenden } from '@/server/actions/meldung'
 import { useMeldungFormular, type MeldungFormular } from '@/components/shared/use-meldung-formular'
 import { MeldungFormularAnsicht } from '@/components/ui/meldung-formular-ansicht'
 import { MELDUNG_NICHT_GESPEICHERT, ZU_VIELE_MELDUNGEN } from '@/lib/meldung'
-import { NETZ_KNOPF, NETZ_SATZ } from '@/lib/netz'
+import { NETZ_KNOPF, NETZ_SATZ, NETZ_SATZ_UNSICHER } from '@/lib/netz'
 
 const absenden = vi.mocked(meldungAbsenden)
 
@@ -117,14 +118,17 @@ describe('Absenden scheitert an der Anfrage', () => {
     expect(JSON.stringify(kontext)).not.toContain('Geheimer Inhalt')
   })
 
-  it('am Netz gescheitert: NETZ_SATZ und nur eine Brotkrume', async () => {
+  it('am Netz gescheitert: NETZ_SATZ_UNSICHER ohne „Nochmal“ (die Meldung kann schon angelegt sein) und nur eine Brotkrume', async () => {
+    useRender().setText('Der Knopf reagiert nicht.')
     absenden.mockRejectedValueOnce(new TypeError('Failed to fetch'))
     useRender().absenden(ereignis)
     await abwarten()
 
     const nachher = useRender()
-    expect(nachher.fehler).toBe(NETZ_SATZ)
-    expect(nachher.nochmal).toBeTypeOf('function')
+    expect(nachher.fehler).toBe(NETZ_SATZ_UNSICHER)
+    expect(nachher.fehler).not.toBe(NETZ_SATZ)
+    expect(nachher.nochmal).toBeUndefined()
+    expect(nachher.text).toBe('Der Knopf reagiert nicht.')
     expect(Sentry.captureException).not.toHaveBeenCalled()
     expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1)
   })

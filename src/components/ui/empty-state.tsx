@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils'
  *
  * `form="karte"` (seit Nr. 242, Boards s1-startseite Bild 5, s2-/w2-kundenkonto Bild 5): linksbündig in einer
  * Karte mit festem Rand, der Titel fett ohne Serifen, der Ausweg über die volle Breite. Das Symbol ist dort
- * freiwillig (die Boards zeigen keins) und steht, wenn es mitkommt, links über dem Titel. Vorher bauten zwei
+ * freiwillig (die Boards zeigen keins) und steht, wenn es mitkommt, in der Größe der Grundform links über dem
+ * Titel. Der Titel ohne Serifen folgt dem Board (s1-startseite: `strong` 16 px). Vorher bauten zwei
  * Seiten diese Form per Klassen von außen um (Nr. 234, Nr. 239).
  */
 export function EmptyState(props: MitteProps | KarteProps): React.JSX.Element {
@@ -27,8 +28,9 @@ export function EmptyState(props: MitteProps | KarteProps): React.JSX.Element {
         className={cn('flex flex-col items-stretch gap-2 rounded-[16px] border border-border bg-card px-4 py-4 text-left', className)}
       >
         {Symbol && (
-          <span className="flex size-11 items-center justify-center rounded-full bg-muted">
-            <Symbol className="size-6 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+          // Dasselbe Maß wie in der Grundform (56 px): Die Karten-Form ändert Ausrichtung und Titel, nicht das Symbol.
+          <span className="flex size-14 items-center justify-center rounded-full bg-muted">
+            <Symbol className="size-7 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
           </span>
         )}
         <Titel className="text-[16px] font-bold text-foreground">{titel}</Titel>
