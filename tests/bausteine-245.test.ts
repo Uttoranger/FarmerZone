@@ -156,12 +156,14 @@ describe('FesteAktionsleiste (G2)', () => {
 })
 
 describe('Vorschau /intern/bausteine', () => {
-  it('Einhängepunkte 246–248 sind eigene Dateien, eingebunden in bausteine-vorschau.tsx, zunächst leer', () => {
+  it('Einhängepunkte 246–248 sind eigene Dateien, eingebunden in bausteine-vorschau.tsx, zunächst leer (248 gefüllt)', () => {
     const vorschau = readFileSync(join(process.cwd(), 'src/app/intern/bausteine/bausteine-vorschau.tsx'), 'utf8')
     for (const nr of [246, 247, 248]) {
       expect(vorschau).toContain(`from '@/app/intern/bausteine/vorschau-${nr}'`)
       expect(vorschau).toContain(`<Vorschau${nr} />`)
     }
-    for (const Teil of [Vorschau246, Vorschau247, Vorschau248]) expect(html(createElement(Teil))).toBe('')
+    // 248 füllt ihren Einhängepunkt selbst (tests/bausteine-248.test.ts); 246 und 247 rendern zunächst nichts.
+    for (const Teil of [Vorschau246, Vorschau247]) expect(html(createElement(Teil))).toBe('')
+    expect(html(createElement(Vorschau248))).not.toBe('')
   })
 })
