@@ -46,6 +46,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/hof-test/checkout',
   useSearchParams: () => new URLSearchParams(),
 }))
+// Seit Lauf 31 trägt der Kopf der Fokus-Shell im Browser die Bildmarke (next/image); der Prüfstand setzt `window`
+// auf globalThis ohne `location`, an dem next/image beim Rendern liest — darum ein schlichtes <img>.
+vi.mock('next/image', () => ({ default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }) }))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
@@ -59,7 +62,7 @@ vi.mock('@stripe/react-stripe-js', () => ({
 vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 
 import { CheckoutForm } from '@/components/checkout/checkout-form'
-import { barGuenstiger, PREISE_INKL_UST, SERVICEGEBUEHR_ZUSATZ } from '@/lib/kasse'
+import { barGuenstiger, KASSE_DATENSCHUTZ_LINK, PREISE_INKL_UST, SERVICEGEBUEHR_ZUSATZ } from '@/lib/kasse'
 import { BAR_OHNE_GEBUEHR_HINWEIS, BAR_OHNE_GEBUEHR_ZAHLART } from '@/lib/konditionen'
 import { ANGABEN_ZUM_HOF_TITEL } from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
@@ -248,11 +251,13 @@ describe('Kasse: Vertrauen, Grund, Ausweg (Nr. 176)', () => {
   it('„Deine Daten" führt zur Datenschutzerklärung — neuer Tab, mit Hinweis für den Screenreader', () => {
     const html = kasseHof()
     const link = html.match(/<a [^>]*href="\/datenschutz"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? ''
-    expect(link).toContain('Was passiert damit?')
+    // Wortlaut des Boards w1-kasse (Lauf 31).
+    expect(link).toContain(KASSE_DATENSCHUTZ_LINK)
+    expect(KASSE_DATENSCHUTZ_LINK).toBe('Wie wir deine Daten verwenden (Datenschutz)')
     expect(link).toContain('target="_blank"')
     expect(link).toContain('rel="noopener noreferrer"')
     expect(link).toContain('öffnet in neuem Tab')
-    expect(html.indexOf('Deine Daten')).toBeLessThan(html.indexOf('Was passiert damit?'))
+    expect(html.indexOf('Deine Daten')).toBeLessThan(html.indexOf(KASSE_DATENSCHUTZ_LINK))
   })
 
   it('unter der Gesamtsumme steht „Preise inkl. USt"', () => {

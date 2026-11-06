@@ -102,7 +102,7 @@ describe('Produktkarte — der Ausschnitt am Foto', () => {
         wirdHinzugefuegt: false,
         href: '/hof-test/produkt/p_eier',
         onInDenKorb: () => {},
-        onMenge: () => {},
+       
       })
     )
 

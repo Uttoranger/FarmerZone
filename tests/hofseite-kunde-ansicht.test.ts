@@ -62,6 +62,7 @@ vi.mock('@/server/actions/products', () => ({ updateProductImageAction: vi.fn(),
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { HofseiteFotos } from '@/components/hofseite/hofseite-fotos'
+import { ohneKommaNachTag } from '@/components/hofseite/hofseite-seitenspalte'
 import { kartenZustand, kaufSperre } from '@/lib/bereiche-anzeige'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
@@ -230,8 +231,8 @@ describe('Zustände der Produktkarten — knapp, ausverkauft, kein „Merken"', 
 describe('Zahlung und Gebühr', () => {
   it('E5: online und bar bei Abholung, nie Karte bei Abholung', () => {
     const html = seite()
-    expect(html).toContain('Online bezahlen')
-    expect(html).toContain('Bar bei Abholung')
+    // Ein Satz in „Zahlung & Kontakt“ (Board w1-hofseite, Nr. 235).
+    expect(html).toContain('Online bezahlen oder bar bei Abholung.')
     expect(html).not.toMatch(/Karte bei Abholung|Vor Ort \(Bar &amp; Karte\)|Online \(Karte\)/)
   })
 
@@ -294,11 +295,13 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(seite({ beitraege: LISTE, suche: 'reiter=produkte' })).not.toContain('id="aktuell"')
   })
 
-  it('Kopf: Abschnitt mit Überschrift „Aktuell vom Hof" und der Zahl', () => {
+  it('Kopf: Abschnitt mit Überschrift „Aktuell vom Hof", ohne Zahl daneben (Board w1-/s1-hofseite, Nr. 235)', () => {
     const html = seite({ beitraege: LISTE })
     expect(html).toMatch(/<section[^>]*id="aktuell"[^>]*aria-labelledby="aktuell-titel"/)
     expect(html).toMatch(/<h2[^>]*id="aktuell-titel"[^>]*>Aktuell vom Hof<\/h2>/)
-    expect(html).toContain('>3 Beiträge<')
+    expect(html).not.toContain('3 Beiträge')
+    // Gegenprobe: alle drei Beiträge stehen da — nur die Zahl fehlt.
+    expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(3)
   })
 
   it('unter lg steht er im Quelltext nach den Knöpfen und dem Reiter, vor Fotos und Produkten (N5)', () => {
@@ -318,10 +321,11 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
   it('höchstens fünf, der neueste zuerst — „Aktuell" steht genau einmal, am neuesten (F8)', () => {
     const sechs = [NEU, MITTE, ALT, ...[4, 5, 6].map((n) => beitrag(`status${n}`, `Beitrag ${n}`, 'ANNOUNCEMENT', `2026-09-1${n}T08:00:00.000Z`))]
     const html = seite({ beitraege: sechs })
-    expect(html).toContain('>5 Beiträge<')
+    expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(5)
     expect(html).not.toContain('Beitrag 6')
     expect(html.match(/Aktuell ·/g)).toHaveLength(1)
-    const folge = ['Aktuell · vor 2 Stunden', NEU.title, MITTE.title, 'vor 3 Tagen', ALT.title, 'vor 12 Tagen']
+    // Die Zeit steht seit Nr. 235 in der Zeile des Titels, hinter ihm (Board w1-hofseite: die Karte bleibt zweizeilig).
+    const folge = [NEU.title, 'Aktuell · vor 2 Stunden', MITTE.title, 'vor 3 Tagen', ALT.title, 'vor 12 Tagen']
     expect(reihenfolge(html, [...folge].reverse())).toEqual(folge)
   })
 
@@ -352,9 +356,9 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(teil).toContain('href="/hof-test/produkt/p_honig"')
   })
 
-  it('kein „+" in der Vorschau des Hofs und bei Pause — wie bei allen Kaufwegen; der Abschnitt bleibt', () => {
+  it('kein „+" in der Vorschau des Hofs und bei Pause — wie bei allen Kaufwegen', () => {
     const vorschau = seite({ beitraege: LISTE, ansicht: { art: 'vorschau', kaufen: false } })
-    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true } })
+    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true }, suche: 'beitrag=statusneu' })
     for (const html of [vorschau, pausiert]) {
       expect(html).toContain('Dazu im Hofladen')
       expect(html).not.toContain('aria-label="Karotten in den Korb"')
@@ -370,7 +374,17 @@ describe('„Aktuell vom Hof" in der Übersicht (Register F8, N5)', () => {
     expect(html).not.toContain('Dieser Beitrag ist nicht mehr aktuell.')
     // Die Karte trägt die normale Zeit (Abweichung 1: kein „Geteilt").
     expect(html).not.toMatch(/Aktuell ·|Geteilt/)
-    expect(html).toContain('>3 Beiträge<')
+    // Der geteilte als Karte, der älteste als Zeile — der neueste steht als Link „Neuester: …“ darunter.
+    expect(html.match(/<article aria-labelledby="beitrag-titel-/g)).toHaveLength(2)
+  })
+
+  it('bei Pause bleibt „Aktuell vom Hof": das Register (F8) nennt keine Ausnahme — „Register vor Board“ zu Board Bild 4', () => {
+    const pausiert = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true } })
+    expect(pausiert).toContain('id="aktuell"')
+    expect(pausiert).toContain(NEU.title)
+    // Gegenprobe: mit geteiltem Beitrag steht auch bei Pause dieser oben.
+    const geteilt = seite({ beitraege: LISTE, farm: { ...HOF, isPaused: true }, suche: 'beitrag=statusmitte' })
+    expect(reihenfolge(geteilt, [NEU.title, MITTE.title])).toEqual([MITTE.title, NEU.title])
   })
 
   it('?beitrag= abgelaufen, gelöscht, fremd oder unbekannt: die normale Übersicht mit dem Satz darüber', () => {
@@ -421,7 +435,8 @@ describe('Leer, pausiert, lange Namen', () => {
   it('pausiert: Hinweis mit dem Text des Hofs, keine Termine, kein Kaufknopf', () => {
     const html = seite({ farm: { ...HOF, isPaused: true, pauseMessage: 'Wir sind im Urlaub.' }, suche: 'reiter=produkte' })
     expect(html).toContain('Hof Test pausiert gerade.')
-    expect(html).toContain('Wir sind im Urlaub.')
+    // Board w1-/s1-hofseite Bild 4: die Nachricht in Anführungszeichen und was noch geht.
+    expect(html).toContain('„Wir sind im Urlaub.“ Du kannst dir das Angebot ansehen. Dein Warenkorb bleibt gespeichert.')
     expect(html).not.toContain('Nächste Abholung')
     expect(html).not.toMatch(/in den Korb legen/)
   })
@@ -512,30 +527,36 @@ describe('Mini-Warenkorb rechnet in Cent, nicht in Fließkomma', () => {
 describe('Gebührenhinweis bei Mindestgebühr 0', () => {
   it('kein „mind. € 0,00"', () => {
     const html = seite({ farm: { ...HOF, serviceFeeMinCents: 0 } })
-    expect(html).toContain('Preise zzgl. 5 % Servicegebühr – im Warenkorb')
+    expect(html).toContain('Preise zzgl. 5 % Servicegebühr – einmal pro Bestellung')
     expect(html).not.toContain('mind. € 0,00')
   })
 })
 
-describe('Stepper der Produktkarte endet am Bestand', () => {
+describe('„In den Korb“ der Produktkarte endet am Bestand (seit Nr. 235 ohne Mengenfeld)', () => {
   const karte = (stock: number, imKorb: number) => {
     const p = { ...HOF.products[4]!, stock }
     return renderToStaticMarkup(
       createElement(ProduktKarte, {
         produkt: p, zustand: kartenZustand(p, null), imKorb, wirdHinzugefuegt: false,
-        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
+        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {},
       })
     )
   }
-  const plus = (html: string) => html.match(/<button[^>]*aria-label="Menge Karotten: eins mehr"[^>]*>/)?.[0] ?? ''
+  const knopf = (html: string) => html.match(/<button[^>]*aria-label="Karotten in den Korb legen[^"]*"[^>]*>/)?.[0] ?? ''
 
-  // Base UI sperrt über aria-disabled (die Klasse „disabled:…" zählt nicht).
-  it('alles im Korb, was da ist: „+" ist gesperrt', () => {
-    expect(plus(karte(3, 3))).toContain('aria-disabled="true"')
+  it('alles im Korb, was da ist: der Knopf ist gesperrt und sagt, wie viel im Korb liegt', () => {
+    expect(knopf(karte(3, 3))).toContain('disabled=""')
+    expect(knopf(karte(3, 3))).toContain('3 im Warenkorb')
   })
 
-  it('Gegenprobe: unter dem Bestand geht „+"', () => {
-    expect(plus(karte(20, 3))).toContain('aria-disabled="false"')
+  it('Gegenprobe: unter dem Bestand geht er, auch mit Ware im Korb', () => {
+    expect(knopf(karte(20, 3))).not.toContain('disabled=""')
+    expect(knopf(karte(20, 0))).not.toContain('disabled=""')
+  })
+
+  it('kein Mengenfeld auf der Karte — die Menge ändert man im Warenkorb (Board s1-/w1-hofseite)', () => {
+    expect(karte(20, 3)).not.toContain('<input')
+    expect(karte(20, 3)).not.toContain('data-slot="stepper"')
   })
 })
 
@@ -646,17 +667,18 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(quelle('src/components/hofseite/hofseite-kunde.tsx').match(/<HofseiteFotos\b/g)).toHaveLength(1)
   })
 
-  it('ohne Produkte kein Schaufenster: die Übersicht bleibt, wie sie war — rechte Spalte, Über uns, Fotos', () => {
+  it('ohne Produkte kein Schaufenster: dieselbe Reihenfolge — Fotos, rechte Spalte, Über uns (Nr. 235)', () => {
     const html = seite({ farm: { ...HOF, products: [], farmPhotos: FOTOS } })
     expect(html).not.toContain('Alle Produkte (')
     expect(html).toContain('Gerade keine Produkte')
+    expect(html.indexOf('id="fotos"')).toBeLessThan(html.indexOf('<aside'))
     expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="ueber-uns"'))
-    expect(html.indexOf('id="ueber-uns"')).toBeLessThan(html.indexOf('id="fotos"'))
   })
 
-  it('im Reiter Produkte bleibt die Reihenfolge, wie sie war', () => {
+  it('im Reiter Produkte steht die Spalte nach den Produkten und nur ab lg (rechts, Board w1-hofseite Bild 3)', () => {
     const html = seite({ suche: 'reiter=produkte' })
-    expect(html.indexOf('<aside')).toBeLessThan(html.indexOf('id="produkte"'))
+    expect(html.indexOf('<aside')).toBeGreaterThan(html.indexOf('id="produkte"'))
+    expect(html.match(/<aside[^>]*class="[^"]*"/)?.[0]).toMatch(/\bhidden\b.*\blg:flex\b/)
   })
 
   it('nach „Alle ansehen" und „Alle Produkte (n)" geht der Fokus auf den Reiter Produkte, ohne Scrollen — der Link verschwindet mit dem Wechsel', () => {
@@ -715,7 +737,7 @@ describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 
     const html = renderToStaticMarkup(
       createElement(ProduktKarte, {
         produkt: p, zustand: kartenZustand(p, null), imKorb: 0, wirdHinzugefuegt: false,
-        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {}, onMenge: () => {},
+        href: '/hof-test/produkt/p_karotten', onInDenKorb: () => {},
       })
     )
     expect(html).toContain('href="/hof-test/produkt/p_karotten"')
@@ -739,5 +761,65 @@ describe('Hofseite eines Testhofs (Register N21, Nr. 119)', () => {
     const html = seite()
     expect(html).not.toContain(TESTHOF_HINWEIS)
     expect(html).not.toContain('data-ton="neutral"')
+  })
+})
+
+describe('Nr. 235, UI-Runde 2 — Abweichungen aus der Bewertung r1', () => {
+  /** Das öffnende Tag eines Elements mit dieser Kennung. */
+  const tagMit = (html: string, merkmal: string) => html.match(new RegExp(`<[a-z]+[^>]*${merkmal}[^>]*>`))?.[0] ?? ''
+
+  it('Reiter Produkte: kleine Abschnitte stehen ab 768 px nebeneinander — je Produkt eine der drei Spalten', () => {
+    const html = seite({ suche: 'reiter=produkte' })
+    // Jeder Abschnitt des Testhofs hat ein Produkt: eine Spalte, darin eine Kachel so breit wie überall.
+    for (const anker of ['kategorie-eier', 'kategorie-brennmaterial']) {
+      expect(tagMit(html, `id="${anker}"`)).toContain('md:col-span-1')
+    }
+    expect(html).toMatch(/class="[^"]*md:grid md:grid-cols-3 md:gap-x-3[^"]*"/)
+    expect(html).toContain('md:grid-cols-1')
+  })
+
+  it('Gegenprobe: ein Abschnitt mit drei Produkten nimmt die ganze Zeile', () => {
+    const farm = publicFarm({
+      products: [produkt('e1', 'Eier S', 'EIER'), produkt('e2', 'Eier M', 'EIER'), produkt('e3', 'Eier L', 'EIER'), produkt('h1', 'Honig', 'HONIG')],
+    })
+    const html = seite({ farm, suche: 'reiter=produkte' })
+    expect(tagMit(html, 'id="kategorie-eier"')).toContain('md:col-span-3')
+    expect(tagMit(html, 'id="kategorie-honig"')).toContain('md:col-span-1')
+  })
+
+  it('bei Pause kein „Alle ansehen" (Board Bild 4) — „Alle Produkte (n)" am Handy bleibt (Register N5)', () => {
+    const pausiert = seite({ farm: { ...HOF, isPaused: true } })
+    expect(pausiert).not.toContain('Alle ansehen')
+    expect(pausiert).toContain('Alle Produkte (5)')
+    // Gegenprobe: offen steht der Link da — unterstrichen, mit dem Pfeil als Symbol.
+    const offen = seite()
+    expect(offen).toMatch(/<a[^>]*class="[^"]*underline decoration-\[1\.5px\][^"]*"[^>]*>Alle ansehen<svg[^>]*lucide-arrow-right/)
+  })
+
+  it('das Hof-Zeichen ist rund (Freigabe Nr. 98, Register vor Board), kein abgerundetes Quadrat', () => {
+    const zeichen = tagMit(seite(), 'size-14 shrink-0 items-center justify-center overflow-hidden')
+    expect(zeichen).toContain('rounded-full')
+    expect(zeichen).not.toContain('rounded-[14px]')
+  })
+
+  it('Abholzeiten ohne Komma nach dem Wochentag („Mittwoch 15–18 Uhr") — nur die Darstellung', () => {
+    expect(ohneKommaNachTag('Mittwoch, 15–18 Uhr')).toBe('Mittwoch 15–18 Uhr')
+    expect(ohneKommaNachTag('Samstag, 9–12 · 14–16 Uhr')).toBe('Samstag 9–12 · 14–16 Uhr')
+    // Gegenprobe: ohne Uhrzeit nach dem Komma bleibt die Zeile, wie sie ist.
+    expect(ohneKommaNachTag('Nach Vereinbarung, bitte anrufen')).toBe('Nach Vereinbarung, bitte anrufen')
+  })
+
+  it('Illustrationen gehen im Dunkeln in der Fläche auf (kein heller Fleck), Fotos bleiben leicht gedämpft', () => {
+    const farm = publicFarm({
+      products: [
+        publicProduct({ id: 'i1', name: 'Milch', category: 'MILCH', stock: 9, categoryImageUrl: '/categories/milch.webp' }),
+        publicProduct({ id: 'f1', name: 'Käse', category: 'MILCH', stock: 9, imageUrl: '/foto/kaese.jpg' }),
+      ],
+    })
+    const html = seite({ farm })
+    // Die Hülle entscheidet (next/image ist hier ein schlichtes <img>; die Mischung am Bild steht in ILLUSTRATION_BILD).
+    expect(html).toMatch(/<span class="[^"]*dark:brightness-\[1\.6\][^"]*"><img src="\/categories\/milch\.webp"/)
+    expect(html).toMatch(/<span class="[^"]*dark:brightness-\[0\.85\][^"]*"><img src="\/foto\/kaese\.jpg"/)
+    expect(html).not.toMatch(/dark:brightness-\[1\.6\][^"]*"><img src="\/foto/)
   })
 })

@@ -102,9 +102,12 @@ beforeEach(() => {
 })
 
 describe('Die Karte: kurz, mit „Weiterlesen“', () => {
-  it('Anlass, „Aktuell · vor 2 Stunden“, Titel als h3, Text ohne Platzhalter', () => {
+  it('„Aktuell · vor 2 Stunden“ (F8), Titel als h3, Text ohne Platzhalter — ohne Marke des Anlasses (Board w1-hofseite, Nr. 235)', () => {
     const seite = html(props())
-    expect(seite).toContain('Neue Saison')
+    const karte = seite.slice(seite.indexOf('<article aria-labelledby="beitrag-titel-bneu"'), seite.indexOf('</article>'))
+    expect(karte).not.toContain('Neue Saison')
+    // Gegenprobe: Die Zeilen der älteren Beiträge nennen ihren Anlass weiter.
+    expect(seite).toContain('Aktion ·')
     expect(seite).toContain('Aktuell · vor 2 Stunden')
     expect(seite).toMatch(/<h3 id="beitrag-titel-bneu"[^>]*>Die ersten Kürbisse sind da<\/h3>/)
     expect(seite).toContain('Hallo, die ersten Kürbisse sind da.')

@@ -117,7 +117,7 @@ describe('Leerer Korb im Blatt', () => {
         items: [],
         total: 0,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { sperre: null, hofName: 'Hof Test', pauseMessage: null },
       })

@@ -296,12 +296,15 @@ describe('Hofseite: ohne Abholtermin kein „+“, eine Hinweiskarte mit dem Gru
     for (const text of [TEXT.keineTitel, TEXT.vollTitel, `>${KAUFSPERRE_KNOPF}<`]) expect(html).not.toContain(text)
   })
 
-  it('Pause: weiter die Pause-Karte, der Knopf „Pausiert“ — nicht der neue Hinweis', async () => {
+  it('Pause: weiter die Pause-Karte, die Produkte ohne Bedienelement (Board w1-/s1-hofseite Bild 4) — nicht der neue Hinweis', async () => {
     const html = await hofseite({ ...HOF_OHNE, isPaused: true, pauseMessage: 'Wir sind im Urlaub.' }, { reiter: 'produkte' })
     expect(html).toContain('Hof Test pausiert gerade.')
     expect(html).toContain('Wir sind im Urlaub.')
-    expect(html).toContain(`>${SHOP_PAUSED_BUTTON_LABEL}<`)
+    expect(html).not.toContain(`>${SHOP_PAUSED_BUTTON_LABEL}<`)
+    expect(html).not.toContain('in den Korb legen')
     expect(html).not.toContain(TEXT.keineTitel)
+    // Gegenprobe: Die Produkte selbst stehen da.
+    expect(html).toContain('Karotten')
   })
 })
 
@@ -347,7 +350,7 @@ describe('Mini-Warenkorb: statt „Zur Kasse“ der Hinweis', () => {
         hof: HOF_SPALTE,
         sperre,
         zahlungsarten: [],
-        gebuehrKurz: null,
+        gebuehrHinweis: null,
         gebuehrKorb: null,
         mitKorb: true,
         jetzt: JETZT.toISOString(),
@@ -418,7 +421,7 @@ describe('Ein Zustand, eine Fassung: mit vollem Korb steht der Satz einmal auf d
       korb.positionen = [POSITION]
       const seiten = { hofseite: await hofseite(farm), produkte: await hofseite(farm, { reiter: 'produkte' }), produktseite: await produktseite(farm) }
       for (const [seite, html] of Object.entries(seiten)) {
-        expect(html, seite).toContain('Dein Warenkorb')
+        expect(html, seite).toContain('id="mini-warenkorb"')
         expect(vorkommen(html, satz), seite).toBe(1)
         expect(vorkommen(html, titel), seite).toBe(2)
       }
@@ -426,7 +429,8 @@ describe('Ein Zustand, eine Fassung: mit vollem Korb steht der Satz einmal auf d
 
     it(`${fall}: Gegenprobe — leerer Korb: kein Mini-Warenkorb, Titel und Satz je einmal`, async () => {
       for (const html of [await hofseite(farm), await produktseite(farm)]) {
-        expect(html).not.toContain('Dein Warenkorb')
+        // Am Kennzeichen, nicht am Wort: Die Pause sagt „Dein Warenkorb bleibt gespeichert.“ (Board, Nr. 235).
+        expect(html).not.toContain('id="mini-warenkorb"')
         expect(vorkommen(html, satz)).toBe(1)
         expect(vorkommen(html, titel)).toBe(1)
       }
@@ -452,7 +456,7 @@ describe('Korb-Blatt (unter 1024 px der einzige Weg zur Kasse): statt „Zur Kas
         items,
         total: 9,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { sperre, hofName: 'Hof Test', pauseMessage: null },
       })

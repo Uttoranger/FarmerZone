@@ -257,9 +257,42 @@ describe('Schild, Kennzeichnung, Gleich mit abholen', () => {
     expect(html).not.toMatch(/geprüft/i)
   })
 
-  it('die Kennzeichnung steht zugeklappt in einem <details>', async () => {
+  it('die Kennzeichnung steht offen als Karte mit Überschrift (Board w1-/s1-produkt Bild 2, seit Nr. 235) — nichts zum Aufklappen', async () => {
     const html = await seite('p_5kg')
-    expect(html).toMatch(/<details(?![^>]*\bopen\b)[^>]*>\s*<summary[^>]*>(?:(?!<\/summary>).)*Kennzeichnung/)
+    expect(html).toMatch(/<section aria-labelledby="kennzeichnung-titel"[^>]*><h2 id="kennzeichnung-titel"[^>]*>Kennzeichnung<\/h2>/)
+    expect(html).not.toContain('<details')
+    // Gegenprobe: Die Angaben stehen in der Karte.
+    const karte = html.slice(html.indexOf('id="kennzeichnung-titel"'))
+    expect(karte).toContain('1234567 (laut Angabe des Hofs)')
+  })
+
+  it('„Gehalte" entfällt, wenn „Analytische Bestandteile" dieselben Werte nennt (Pflichtzeile bleibt) — weicht ein Wert ab, stehen beide', async () => {
+    const mitWerten = (analytisch: string): PublicFarm => ({
+      ...HOF,
+      products: HOF.products.map((p) =>
+        p.id === 'p_5kg' && p.futter ? { ...p, futter: { ...p.futter, analytischeBestandteile: analytisch, rohprotein: 9, rohfaser: 28 } } : p
+      ),
+    })
+    const karte = (html: string) => html.slice(html.indexOf('id="kennzeichnung-titel"'), html.indexOf('</section>', html.indexOf('id="kennzeichnung-titel"')))
+    const gleich = karte(await seite('p_5kg', {}, mitWerten('Rohprotein 9 %, Rohfaser 28 %')))
+    expect(gleich).toContain('Analytische Bestandteile')
+    expect(gleich).toContain('Rohprotein 9 %, Rohfaser 28 %')
+    expect(gleich).not.toContain('Gehalte')
+    // Gegenprobe: ein anderer Wert — beide Zeilen bleiben, sie sagen Verschiedenes.
+    const anders = karte(await seite('p_5kg', {}, mitWerten('Rohprotein 10 %, Rohfaser 28 %')))
+    expect(anders).toContain('Gehalte')
+    expect(anders).toContain('Rohprotein 9 % · Rohfaser 28 %')
+  })
+
+  it('der Verantwortungs-Hinweis (E10a) steht unter der Kennzeichnung, vor „Gleich mit abholen" (Board w1-/s1-produkt Bild 2)', async () => {
+    const html = await seite('p_5kg')
+    const satz = 'Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof.'
+    expect(html.split(satz)).toHaveLength(2)
+    const kennzeichnungEnde = html.indexOf('</section>', html.indexOf('id="kennzeichnung-titel"'))
+    expect(html.indexOf(satz)).toBeGreaterThan(kennzeichnungEnde)
+    expect(html.indexOf(satz)).toBeLessThan(html.indexOf('id="gleich-mit-abholen"'))
+    // Gegenprobe: ohne Futter kein Satz.
+    expect(await seite('p_karotten')).not.toContain(satz)
   })
 
   it('ohne LFBIS-Status kein Schild', async () => {
@@ -326,7 +359,8 @@ describe('lange Namen', () => {
     const lang = 'Bergwiesen-Heu '.repeat(8).slice(0, 100)
     const farm = { ...HOF, products: HOF.products.map((p) => (p.id === 'p_1kg' ? { ...p, name: lang } : p)) }
     const html = await seite('p_1kg', {}, farm)
-    expect(html).toMatch(new RegExp(`<h1[^>]*break-words[^>]*>${lang}</h1>`))
+    // Der volle Name steht im title; sichtbar ist bei Größen der Teil, den alle teilen (Board w1-produkt, Nr. 235).
+    expect(html).toMatch(new RegExp(`<h1[^>]*break-words[^>]*title="${lang}"`))
   })
 })
 
