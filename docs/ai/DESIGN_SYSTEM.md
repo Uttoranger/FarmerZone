@@ -830,6 +830,7 @@ Boards s1-/w1-mein-hof, -einstellungen, -region, s2-/w2-hofdaten-zahlung, -konto
 - **Läuft von selbst:** `ABLAEUFE` mit Wann, Zuletzt und Stand-`Marke` wie Admin › Betrieb (Uptime ohne Aufruf „noch nicht eingerichtet“). **Kommt:** geplante Startseiten-Fassung, „Gründungsaktion festschreiben“ (bis festgeschrieben) und `HEUTE_TERMINE`. **Protokoll:** drei Einträge, Wer als „Du“/„Team“/„System“.
 - **Montags-Routine** (`HeuteRoutine`): fünf Haken (`MONTAGS_ROUTINE`, 44-px-Zeilen), gespeichert nur im Browser je Woche; Server und erster Render zeigen keinen Haken. „Bestellungen anhalten …“ kommt mit Nr. 189.
 - **Zustände:** Ladefehler einer Quelle → `AdminFehler` „Wir konnten Heute gerade nicht laden.“; die Betriebsleiste lässt dann nur die Zahl weg.
+- **Geld-Kachel nach Bestelldatum (Nr. 240, Register N32 Ergänzung 5.11.2026):** Warenwert und Gebühr zählen die abgeholten Bestellungen ohne Testzahlungen, die seit Montag (Wien) bestellt wurden (`createdAt`, wie das Gebühren-Wort), über eine eigene Bedingung aus `umsatzBestellungWhere` in `admin-heute.ts`; die Zahl „Woche: n“ der Bestellungen-Kachel und die Umsatzregel der Höfe zählen weiter nach Abholung, die Beschriftung „Geld · Woche“ / „Umsatz der Höfe“ bleibt wie im Board.
 
 ### Betrieb (/admin/betrieb, Register N18/N15, seit Nr. 103; Mockups admin-betrieb, mobil-admin-betrieb)
 
