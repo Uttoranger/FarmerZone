@@ -30,8 +30,10 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
-import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
-import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { FOTO_HUELLE_DUNKEL, HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { ProduktKurzliste } from '@/components/hoefe/produkt-kurzliste'
+import { hofkarteKlassen } from '@/components/ui/hofkarte-rahmen'
+import { HOEFE_LEER } from '@/lib/startseite'
 import { HofKopf } from '@/components/hoefe/hof-kopf'
 import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
 import { Abholzeile } from '@/components/hoefe/abholzeile'
@@ -114,6 +116,24 @@ export function ChipReihe({
       {chipsAlsLinks}
     </FilterChipReihe>
   )
+}
+
+/** So viele Hofladen-Kategorien stehen in der kurzen Reihe zwischen „Alle" und Futtermittel/Brennmaterial (Boards w1-/s1-hoefe). */
+export const KURZE_REIHE_KATEGORIEN = 2
+
+/**
+ * Die kurze Kategorie-Reihe der Boards (w1-/s1-hoefe, Nr. 234): „Alle", zwei Hofladen-Kategorien,
+ * Futtermittel und Brennmaterial — fünf Chips statt aller; die übrigen stehen im Filter-Blatt
+ * („Was suchst du?"). Eine gewählte Kategorie steht immer in der Reihe, auch wenn sie sonst nicht
+ * dabei wäre; aufgefüllt wird in der Reihenfolge von kategorieReihe (nach Angebot).
+ */
+export function kurzeKategorieReihe(chips: readonly EntdeckenChip[], plaetze: number = KURZE_REIHE_KATEGORIEN): EntdeckenChip[] {
+  const fest = new Set(['alle', 'futter', 'BRENNHOLZ'])
+  const mitte = chips.filter((c) => !fest.has(c.schluessel))
+  const gewaehlt = mitte.filter((c) => c.aktiv)
+  const auffuellen = mitte.filter((c) => !c.aktiv).slice(0, Math.max(0, plaetze - gewaehlt.length))
+  const zeigen = new Set([...gewaehlt, ...auffuellen].map((c) => c.schluessel))
+  return chips.filter((c) => fest.has(c.schluessel) || zeigen.has(c.schluessel))
 }
 
 /**
@@ -301,11 +321,8 @@ export function HofKarte({
   return (
     <article
       data-pausiert={hof.isPaused ? 'ja' : undefined}
-      className={cn(
-        'relative overflow-hidden rounded-2xl border transition-colors duration-[250ms]',
-        hof.isPaused ? 'border-dashed border-border bg-background' : 'border-border bg-card',
-        ausgewaehlt && 'border-status-fertig bg-accent/10'
-      )}
+      // Pausiert ausgegraut und gestrichelt wie auf der Startseite (V18, hofkarteKlassen).
+      className={cn(hofkarteKlassen(hof.isPaused).rahmen, ausgewaehlt && 'border-status-fertig bg-accent/10')}
     >
       {split ? (
         <button
@@ -332,7 +349,7 @@ export function HofKarte({
           Ohne Foto die Bildfläche in derselben Höhe — durchlässig für den Zeiger. */}
       {!split &&
         (hof.fotos.length > 0 ? (
-          <div className={cn(hof.isPaused && 'opacity-60 grayscale')}>
+          <div className={cn(FOTO_HUELLE_DUNKEL, hof.isPaused && 'opacity-60 grayscale')}>
             <HoefeFotostreifen
               fotos={hof.fotos}
               hofName={hof.name}
@@ -355,15 +372,27 @@ export function HofKarte({
           Klicks landen auf ihr, und Axe kann Schrift und Fläche messen. */}
       <div className="pointer-events-none relative flex items-start gap-3.5 p-3">
         {split && (
-          <span className="relative shrink-0">
-            <Vorschaubild
-              foto={hof.fotos[0] ?? null}
-              illustration={bilder[0]}
-              sizes="116px"
-              gedaempft={hof.isPaused}
-              className="h-[100px] w-[116px] rounded-xl"
-            />
-            {marke(true, 'absolute bottom-1.5 left-1.5')}
+          <span className="flex w-[116px] shrink-0 flex-col gap-2">
+            <span className="relative">
+              <Vorschaubild
+                foto={hof.fotos[0] ?? null}
+                illustration={bilder[0]}
+                sizes="116px"
+                gedaempft={hof.isPaused}
+                className="h-[100px] w-[116px] rounded-xl"
+              />
+              {marke(true, 'absolute bottom-1.5 left-1.5')}
+            </span>
+            {/* Der einzige Weg zur Hofseite im Splitscreen — unter dem Bild wie im Board (w1-hoefe, Bild 1), über der Auswahl-Fläche. */}
+            <Link
+              href={ziel}
+              className={cn(
+                'pointer-events-auto relative z-10 inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-input bg-card text-[14px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+                FOKUS_RAHMEN
+              )}
+            >
+              Zum Hof
+            </Link>
           </span>
         )}
 
@@ -373,23 +402,8 @@ export function HofKarte({
           <HofKopf hof={hof} als="h2" gedaempft={hof.isPaused} />
           {ohneKartenpunkt && <OhneKartenpunkt />}
           <Abholzeile fenster={hof.abholfenster} isPaused={hof.isPaused} bestellbar={istBestellbar(hof)} jetzt={jetzt} />
-          <HoefeProduktzeilen produkte={schaufenster.produkte} weitere={schaufenster.weitere} />
-          {split && (
-            <p className="mt-1">
-              {/* Der einzige Weg zur Hofseite im Splitscreen — über der Auswahl-Fläche. */}
-              <Link
-                href={ziel}
-                className={cn(
-                  // before: der unsichtbare Rand oben und unten — 36 px Knopf, 44 px Trefferfläche (wie chip.tsx: 5 px, das ::before sitzt im Innenrand des Rahmens).
-                  "pointer-events-auto relative z-10 inline-flex h-9 items-center gap-1 rounded-full border border-border bg-card px-3.5 text-[13px] font-semibold text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-[''] hover:bg-muted",
-                  FOKUS_RAHMEN
-                )}
-              >
-                Zum Hof
-                <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              </Link>
-            </p>
-          )}
+          {/* „Name … Preis" wie in den Boards (w1-/s1-hoefe) — dieselbe Kurzliste wie auf der Startseite. */}
+          <ProduktKurzliste produkte={schaufenster.produkte} weitere={schaufenster.weitere} className="mt-1" />
         </div>
       </div>
     </article>
@@ -535,22 +549,26 @@ export function EntdeckenLeer({
   )
 }
 
-/** Noch kein einziger öffentlicher Hof — kein Fehler, ein Anfang (wie die Startseite). */
+/**
+ * Noch kein einziger öffentlicher Hof — kein Fehler, ein Anfang: derselbe Zustand und dieselbe
+ * Textquelle wie auf der Startseite (`HOEFE_LEER`, Board w1-/s1-startseite Bild 5; die Boards von
+ * /hoefe zeigen ihn nicht). Der Ausweg führt zur Seite für Höfe.
+ */
 export function KeineHoefe(): React.JSX.Element {
   return (
     <EmptyState
       symbol={Store}
-      titel="Die ersten Höfe kommen gerade dazu"
-      satz="Schau bald wieder vorbei. Du hast selbst einen Hof? Dann mach den Anfang."
+      titel={HOEFE_LEER.titel}
+      satz={HOEFE_LEER.satz}
       ausweg={
         <Link
-          href="/register"
+          href={HOEFE_LEER.adresse}
           className={cn(
             'inline-flex h-11 items-center rounded-full border border-border px-[18px] text-sm font-semibold text-foreground hover:bg-muted',
             FOKUS_RAHMEN
           )}
         >
-          Hof registrieren
+          {HOEFE_LEER.knopf}
         </Link>
       }
     />

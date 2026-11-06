@@ -89,6 +89,7 @@ export function HoefeSuche({
   const [vorschlagsLage, setVorschlagsLage] = useState<VorschlagsLage>({ offen: false, markiert: null })
   const feld = useRef<HTMLInputElement>(null)
   const listeId = useId()
+  const feldId = useId()
   const ort = useOrtssuche({
     onStandort: onBezugspunkt,
     onOrt: (punkt) => {
@@ -134,8 +135,14 @@ export function HoefeSuche({
 
   return (
     <div className={cn('flex flex-col gap-2', kompakt && 'relative')}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-        <form role="search" onSubmit={absenden} className={cn('min-w-0 sm:flex-1', kompakt && 'relative')}>
+      <div className="flex flex-col gap-2">
+        {/* Ab 1024 px halb so breit wie die Seite, darunter „Standort nutzen" (Board w1-hoefe, Bild 1). */}
+        <form role="search" onSubmit={absenden} className={cn('min-w-0 lg:max-w-[520px]', kompakt && 'relative lg:max-w-none')}>
+          {/* Sichtbare Beschriftung über dem Feld (Boards w1-/s1-hoefe); im Kartenmodus am Handy nur für Vorleser —
+              dort steht das Feld allein in der Werkzeugzeile, der Platzhalter sagt dasselbe. */}
+          <label htmlFor={feldId} className={kompakt ? 'sr-only' : 'mb-1.5 block w-fit text-[14px] font-semibold text-foreground'}>
+            {SUCHFELD_TEXT.platzhalter}
+          </label>
           <div className="relative">
             {ort.laeuft ? (
               <Loader2 className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden="true" />
@@ -148,6 +155,7 @@ export function HoefeSuche({
             )}
             <input
               ref={feld}
+              id={feldId}
               type="search"
               role="combobox"
               value={suchtext}
@@ -167,8 +175,7 @@ export function HoefeSuche({
               onFocus={() => setVorschlagsLage((l) => ({ ...l, offen: true }))}
               onBlur={() => setVorschlagsLage({ offen: false, markiert: null })}
               enterKeyHint="search"
-              placeholder={SUCHFELD_TEXT.platzhalter}
-              aria-label={SUCHFELD_TEXT.beschriftung}
+              placeholder={kompakt ? SUCHFELD_TEXT.platzhalter : undefined}
               aria-autocomplete="list"
               aria-expanded={listeOffen}
               aria-controls={listeId}
@@ -256,7 +263,8 @@ export function HoefeSuche({
               type="button"
               onClick={ort.standortErfragen}
               aria-busy={ort.ortet}
-              className={cn(KNOPF, 'bg-accent text-accent-foreground hover:opacity-90')}
+              // Umrandet wie im Board (w1-/s1-hoefe): Der grüne Knopf der Seite ist „Zum Hof", nicht der Standort.
+              className={cn(KNOPF, 'border border-input bg-card text-foreground hover:bg-muted')}
             >
               {ort.ortet ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />

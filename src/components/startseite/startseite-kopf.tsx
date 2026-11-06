@@ -9,6 +9,8 @@ import {
   KARTE_OEFFNEN,
   KARTE_UEBERSCHRIFT,
   hoefeAdresse,
+  SUCHE_BESCHRIFTUNG,
+  SUCHE_PLATZHALTER,
   benenneKartenLink,
   formatiereRegionsZaehler,
   type StartseitenKarte,
@@ -77,10 +79,11 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
             <p className="text-[12.5px] font-bold tracking-[1.6px] text-white/85 uppercase">Direkt vom Hof in deiner Nähe</p>
             <h1
               id="startseite-titel"
-              className="font-heading text-[36px] leading-[1.06] font-semibold text-balance text-white md:text-[58px] md:leading-[1.04]"
+              // Ab 1024 px höchstens zwei Zeilen wie im Board (A1): kleiner und ohne die festen Umbrüche.
+              className="font-heading text-[36px] leading-[1.06] font-semibold text-balance text-white md:text-[58px] md:leading-[1.04] lg:text-[36px] lg:leading-[1.1] xl:text-[42px]"
             >
-              Frisch vom Hof. <br className="hidden md:inline" />
-              Online bestellen, <br className="hidden md:inline" />
+              Frisch vom Hof. <br className="hidden md:inline lg:hidden" />
+              Online bestellen, <br className="hidden md:inline lg:hidden" />
               am Hof abholen.
             </h1>
             <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">
@@ -100,26 +103,26 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
                 (abgesendeterSuchtext) — kein Feld `t` dazusetzen. Der Standort
                 steht nie in der Adresse; der Link darunter führt zu „Standort
                 nutzen" auf /hoefe. */}
-            <form
-              role="search"
-              action="/hoefe"
-              method="get"
-              className="flex flex-col gap-3 md:w-full md:max-w-[560px] md:flex-row md:items-center md:gap-2.5 md:rounded-full md:border md:border-border md:bg-card md:py-2 md:pr-2 md:pl-[18px]"
-            >
-              <label className="flex h-[50px] min-w-0 items-center gap-2.5 rounded-full border border-border bg-card px-4 md:h-auto md:flex-1 md:border-0 md:bg-transparent md:px-0">
+            <form role="search" action="/hoefe" method="get" className="flex flex-col gap-1.5 md:w-full md:max-w-[560px]">
+              {/* Die sichtbare Beschriftung über dem Feld (A1, Board Bild 1) — weiß wie alles auf dem Foto. */}
+              <label htmlFor="startseite-suche" className="w-fit text-[14px] font-semibold text-white">
+                {SUCHE_BESCHRIFTUNG}
+              </label>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-2.5 md:rounded-full md:border md:border-border md:bg-card md:py-2 md:pr-2 md:pl-[18px]">
+              <div className="flex h-[50px] min-w-0 items-center gap-2.5 rounded-full border border-border bg-card px-4 md:h-auto md:flex-1 md:border-0 md:bg-transparent md:px-0">
                 <Search className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-                <span className="sr-only">Hof oder Produkt suchen</span>
                 <input
+                  id="startseite-suche"
                   type="search"
                   name={SUCHTEXT_PARAMETER}
                   maxLength={SUCHTEXT_MAX}
-                  placeholder="Hof oder Produkt, z. B. Eier oder Heu"
+                  placeholder={SUCHE_PLATZHALTER}
                   className={cn(
                     'h-11 min-w-0 flex-1 rounded-md bg-transparent text-base text-foreground placeholder:text-muted-foreground',
                     FOKUS_RAHMEN
                   )}
                 />
-              </label>
+              </div>
               <button
                 type="submit"
                 className={cn(
@@ -129,6 +132,7 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               >
                 Höfe finden
               </button>
+              </div>
             </form>
 
             <Link
@@ -236,15 +240,16 @@ function Marke({ marke }: { marke: GezeichneteMarke }) {
  * Link, sein Name nennt die Zahl. Ohne Daten (laden, Fehler) steht nur das
  * Land da, ohne Zähler und Hofkarte; den Fehler zeigen die Hofkarten darunter.
  *
- * Die Karte folgt dem Modus bewusst NICHT: Sie ist Papier wie die Kacheln der
- * Hofübersicht (CODING_STANDARDS §7, „Was dem Modus NICHT folgt") und bleibt
- * hell wie im dunklen Mockup — im Browser auf dem Foto, am Handy auf dem
- * Seitengrund. Deshalb nur Tokens, die im neuen Design in beiden Themes gleich
- * sind: accent-foreground (Crème) für Papier und Flächen, primary-foreground
- * (fast schwarz) für Schrift und Linien, accent (Grün) für Höfe und Wasser —
- * ein Blau kennt das Design-System nicht. Auch der Hover der Pille geht über
- * die Deckkraft: accent-hover ist je Theme verschieden. Nur der Fokus folgt
- * dem Grund: weiß auf dem Foto, am Handy der Fokusring.
+ * Am Tag ist die Karte Papier: Tokens, die im neuen Design in beiden Themes
+ * gleich sind — accent-foreground (Crème) für Papier und Flächen,
+ * primary-foreground (fast schwarz) für Schrift und Linien, accent (Grün) für
+ * Höfe und Wasser; ein Blau kennt das Design-System nicht. Im Dunkeln ist sie
+ * gedämpft wie im Board (A1, Lauf 31): Papier und Schilder auf `card`, Straßen
+ * leise in `foreground`, Schrift in den Text-Tokens, grüne Schrift in
+ * `status-fertig` (das Knopf-Grün trägt auf dunklem Grund nur 3:1) — die Pins
+ * bleiben grün. Der Hover der Pille geht über die Deckkraft: accent-hover ist
+ * je Theme verschieden. Nur der Fokus folgt dem Grund: weiß auf dem Foto, am
+ * Handy der Fokusring.
  */
 export function RegionsKarte({ form, karte }: { form: KartenForm; karte: StartseitenKarte | null }): React.JSX.Element {
   const mass = REGIONSKARTE_MASSE[form]
@@ -260,7 +265,7 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
       href={KARTE_ADRESSE}
       aria-label={benenneKartenLink(anzahl)}
       className={cn(
-        'group relative block overflow-hidden bg-accent-foreground shadow-2xl',
+        'group relative block overflow-hidden bg-accent-foreground shadow-2xl dark:bg-card dark:ring-1 dark:ring-border',
         form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]',
         form === 'web' ? FOKUS_AUF_FOTO : FOKUS_RAHMEN
       )}
@@ -268,7 +273,7 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
     >
       <svg viewBox={`0 0 ${mass.breite} ${mass.hoehe}`} aria-hidden="true" className="absolute inset-0 block size-full">
         {/* Papier: Crème mit einem Hauch Dunkel, damit die Straßen heller sind als das Land. */}
-        <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6" />
+        <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6 dark:fill-foreground/4" />
         {land.fluesse.map((fluss) =>
           fluss.pfade.map((d, i) => (
             <path
@@ -278,15 +283,15 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
               strokeWidth={FLUSS_STRICH[fluss.name] ?? 4}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="stroke-accent/45"
+              className="stroke-accent/45 dark:stroke-accent/70"
             />
           ))
         )}
         {land.strassen.map((strasse, s) =>
           strasse.pfade.map((d, i) => (
             <g key={`${s}-${i}`} fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20" />
-              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground" />
+              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20 dark:stroke-background" />
+              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground dark:stroke-foreground/14" />
             </g>
           ))
         )}
@@ -301,7 +306,7 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
                 textAnchor="middle"
                 fontSize={12}
                 strokeWidth={3}
-                className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke]"
+                className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke] dark:fill-status-fertig dark:stroke-card"
               >
                 {b.text}
               </text>
@@ -317,9 +322,9 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
                 width={rundeAufZehntel(breite)}
                 height={16}
                 rx={4}
-                className="fill-accent-foreground stroke-primary-foreground/25"
+                className="fill-accent-foreground stroke-primary-foreground/25 dark:fill-card dark:stroke-foreground/25"
               />
-              <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans">
+              <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans dark:fill-foreground/70">
                 {schild.text}
               </text>
             </g>
@@ -334,7 +339,7 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
             fontSize={10}
             fontWeight={600}
             letterSpacing={2}
-            className="fill-primary-foreground/65 font-sans"
+            className="fill-primary-foreground/65 font-sans dark:fill-foreground/65"
           >
             {name.text}
           </text>
@@ -357,8 +362,8 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
       </svg>
 
       {anzahl > 0 && (
-        <span className="absolute top-3.5 left-3.5 flex h-[34px] items-center gap-[7px] rounded-full bg-accent-foreground px-[13px] text-[13px] font-semibold text-primary-foreground shadow-md">
-          <House className="size-[15px] shrink-0 text-accent" strokeWidth={1.7} aria-hidden="true" />
+        <span className="absolute top-3.5 left-3.5 flex h-[34px] items-center gap-[7px] rounded-full bg-accent-foreground px-[13px] text-[13px] font-semibold text-primary-foreground shadow-md dark:bg-background dark:text-foreground dark:ring-1 dark:ring-border">
+          <House className="size-[15px] shrink-0 text-accent dark:text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
           {formatiereRegionsZaehler(anzahl)}
         </span>
       )}
@@ -372,27 +377,27 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
 
       {hof && lage && (
         <span
-          className="absolute flex items-center gap-2.5 rounded-2xl bg-accent-foreground p-2.5 text-primary-foreground shadow-xl"
+          className="absolute flex items-center gap-2.5 rounded-2xl bg-accent-foreground p-2.5 text-primary-foreground shadow-xl dark:bg-background dark:text-foreground dark:ring-1 dark:ring-border"
           style={{
             left: `${lage.links}%`,
             width: `${HOFKARTE_ANTEIL[form] * 100}%`,
             ...(lage.senkrecht.kante === 'oben' ? { top: `${lage.senkrecht.abstand}%` } : { bottom: `${lage.senkrecht.abstand}%` }),
           }}
         >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-accent/15 text-accent">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-accent/15 text-accent dark:bg-accent/30 dark:text-status-fertig">
             <Sprout className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span title={hof.name} className="truncate font-heading text-[15px] font-semibold">
               {hof.name}
             </span>
-            {hof.zeile && <span className="truncate text-[11.5px] text-primary-foreground/70">{hof.zeile}</span>}
+            {hof.zeile && <span className="truncate text-[12px] text-primary-foreground/70 dark:text-muted-foreground">{hof.zeile}</span>}
             {hof.abholung && (
               // Die Abholzeit darf umbrechen statt abzubrechen — abgeschnitten fehlte genau die Uhrzeit.
               <span
                 className={cn(
-                  'line-clamp-2 text-[11.5px] break-words',
-                  hof.abholungIstTermin ? 'font-semibold text-accent' : 'text-primary-foreground/70'
+                  'line-clamp-2 text-[12px] break-words',
+                  hof.abholungIstTermin ? 'font-semibold text-accent dark:text-status-fertig' : 'text-primary-foreground/70 dark:text-muted-foreground'
                 )}
               >
                 {hof.abholungIstTermin ? `Abholung: ${hof.abholung}` : hof.abholung}

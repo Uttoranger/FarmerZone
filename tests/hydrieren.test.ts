@@ -473,9 +473,9 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
   it('HoefeClient (useIstBreit): der Server zeichnet die schmale Gestalt, am breiten Fenster springt der Splitscreen erst nach dem Hydrieren ein', async () => {
     const element = createElement(HoefeClient, { hoefe: [hof('a'), hof('b')], jetzt: JETZT })
     const ergebnis = await pruefeHydrieren(element, { imBrowser: () => (fenster.breite = 1280) })
-    // Die Zahlzeile in der Filterreihe (ein <span role="status">) steht nur im Splitscreen; die <p role="status"> über der Liste immer.
-    expect(ergebnis.serverHtml).not.toContain('<span role="status"')
-    expect(ergebnis.container.querySelector('span[role="status"]')).not.toBeNull()
+    // Den Splitscreen trägt sein Rahmen (data-ansicht="split") — der Server zeichnet ihn nie.
+    expect(ergebnis.serverHtml).not.toContain('data-ansicht="split"')
+    expect(ergebnis.container.querySelector('[data-ansicht="split"]')).not.toBeNull()
   })
 })
 
