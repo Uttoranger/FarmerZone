@@ -7,7 +7,7 @@ import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
-import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
@@ -1173,6 +1173,46 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
   }))
 
   return { an: hofKontaktEmail(order.farm), betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
+}
+
+/**
+ * Neue Barbestellung → Hof (Nr. 256, N46; Board s3/w3-mail-hof-bestellung
+ * Bild 2), solange die Kundin noch bestätigen muss. Ob sie noch passt (Status,
+ * Frist), entscheidet der Renderer `rendereBestellungBarHof` — hier wird nur
+ * gebaut. Ohne Telefonnummer, ohne E-Mail-Adresse und ohne Notiz der Kundin:
+ * Vor ihrer Bestätigung braucht der Hof nur, was er packen und kassieren wird.
+ * Kein Reply-To: Antworten an die Kundin laufen über die Bestellung.
+ */
+export async function baueBarBestellungAnHof(order: OrderForHofMail): Promise<StapelMail> {
+  // „Bar zu kassieren“ allein aus dem Snapshot (barZuKassierenCents) — nie aus dem Warenpreis als Rückfall.
+  const kassierenCents = barZuKassierenCents({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0, paymentMethod: order.paymentMethod })
+  if (kassierenCents === null) throw new Error('Bar-Mail an den Hof für eine Online-Bestellung')
+  // Dieselbe Frist wie die Mail „Bitte bestätige“ an die Kundin und das Verfallen (fristen.ts), als fester Tag mit Uhrzeit (C-Zeile mail-kauf).
+  const frist = order.createdAt
+    ? // Vor Ort, nie online (oben ausgeschlossen): fristVon rechnet bar und Karte vor Ort gleich.
+      fristVon({ paymentMethod: 'ONSITE_CASH', createdAt: order.createdAt, pickupDate: order.pickupDate, pickupTimeStart: order.pickupTimeStart })
+    : null
+
+  const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
+  const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
+    farmerName: order.farm.ownerName,
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
+    paymentLabel: 'Bar bei Abholung',
+    isOnline: false,
+    barZuKassieren: centsAlsEuro(kassierenCents),
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
+    heuteUrl: await heuteUrl(),
+  }))
+
+  return {
+    an: hofKontaktEmail(order.farm),
+    betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (Bar bei Abholung)`,
+    html,
+  }
 }
 
 /** Bar bestätigt → Bauer (alte Bestellungen mit Karte bei Abholung, E5, gehen denselben Weg) */

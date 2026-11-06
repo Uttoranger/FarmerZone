@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ALLE_MAILS_TEXT,
   NOCHMAL_ERLAUBT,
+  adresseQuelle,
   NOCHMAL_NIE,
   alleMailZeile,
   alleMailsHref,
@@ -169,6 +170,19 @@ describe('passtNochmal', () => {
     expect(passtNochmal('bar-bestaetigungslink', { bestellung: { ...offen, status: 'CANCELLED', cancelReason: GRUND_NICHT_BESTAETIGT }, hof: null }, JETZT).ok).toBe(false)
     const spaet = new Date('2026-10-26T12:00:00.000Z')
     expect(passtNochmal('bar-bestaetigungslink', { bestellung: offen, hof: null }, spaet)).toEqual({ ok: false, grund: 'Die Frist zum Bestätigen ist vorbei.' })
+  })
+
+  it('„Neue Bestellung bar“ an den Hof (Nr. 256): nur unbestätigt und in der Frist — dieselbe Regel wie der Renderer', () => {
+    const offen = bestellung({ status: 'PENDING_CONFIRMATION', paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING' })
+    expect(passtNochmal('bestellung-bar-hof', { bestellung: offen, hof: null }, JETZT)).toEqual({ ok: true })
+    for (const status of ['CONFIRMED', 'CANCELLED', 'PICKED_UP'] as const) {
+      expect(passtNochmal('bestellung-bar-hof', { bestellung: { ...offen, status }, hof: null }, JETZT)).toMatchObject({ ok: false, grund: expect.stringContaining('Passt nicht mehr') })
+    }
+    const spaet = new Date('2026-10-26T12:00:00.000Z')
+    expect(passtNochmal('bestellung-bar-hof', { bestellung: offen, hof: null }, spaet)).toEqual({ ok: false, grund: 'Die Frist zum Bestätigen ist vorbei.' })
+    // Gegenprobe: eine Online-Bestellung vor der Zahlung steht auch auf PENDING_CONFIRMATION — nie diese Mail.
+    expect(passtNochmal('bestellung-bar-hof', { bestellung: { ...offen, paymentMethod: 'ONLINE' }, hof: null }, JETZT).ok).toBe(false)
+    expect(adresseQuelle('bestellung-bar-hof')).toBe('hof')
   })
 
   it('NOCHMAL_NIE: immer nein, mit dem Satz der Gruppe', () => {

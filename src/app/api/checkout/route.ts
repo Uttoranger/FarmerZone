@@ -12,6 +12,8 @@ import { HOF_GESPERRT_SATZ } from '@/lib/bereiche-anzeige'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
+import { stelleEinOhneRisiko } from '@/server/mail-warteschlange'
+import { bestellMailAuftrag } from '@/server/mail-arten/bestellung'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import {
   alsCents,
@@ -1008,6 +1010,7 @@ export async function POST(request: NextRequest) {
       // weil ein Mailserver hakte.
       console.error('[/api/checkout] Bestätigungsmail fehlgeschlagen', orderNumber, e)
     }
+    await stelleEinOhneRisiko('bestellung-bar-hof', order.id, bestellMailAuftrag('bestellung-bar-hof', order))
   })
 
   return NextResponse.json({
