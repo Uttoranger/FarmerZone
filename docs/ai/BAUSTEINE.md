@@ -194,7 +194,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 - src/components/hof-bestellungen/artikel-fehlt-dialog.tsx · ArtikelFehltDialog · „Was fehlt bei …?" (Board s1-/w1-bestellung Bild 3, Lauf 31; E14). · genutzt
 - src/components/hof-bestellungen/bestell-detail.tsx · BestellDetail · Die Bestellung (Boards s1-/w1-bestellung, Lauf 31). · genutzt
-- src/components/hof-bestellungen/bestell-dialog.tsx · BestellDialog, DialogFehler, type Hauptaktion · Die Rückfragen der Bestellungen (Storno, Artikel fehlt, Nicht abgeholt, Rückwege): ab 768 px ein Dialog (Titel links, Aktionen rechts unten), am Handy ein Blatt von unten mit der Hauptaktion über die … · genutzt
+- src/components/hof-bestellungen/bestell-dialog.tsx · BestellDialog, DialogFehler, abbrechenIn, type Hauptaktion · Die Rückfragen der Bestellungen (Storno, Artikel fehlt, Nicht abgeholt, Rückwege): ab 768 px ein Dialog (Titel links, Aktionen rechts unten), am Handy ein Blatt von unten mit der Hauptaktion über die … · genutzt
 - src/components/hof-bestellungen/bestellungen-ansicht.tsx · BestellungenAnsicht, filterSuche · `?filter=` nur, wenn es nicht der Standard ist — die Adresse bleibt kurz (bestellListeHref). · genutzt
 - src/components/hof-bestellungen/stil.ts · FELD, FELD_LABEL, KARTE, KICKER, KNOPF_GRUEN, KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN, TEXT_ORANGE · Gemeinsame Formen der Bestellungen im neuen Design (Nachtlauf Nr. 19). · genutzt
 - src/components/hof-bestellungen/storno-dialog.tsx · StornoDialog · „Bestellung stornieren?" (Mockups web-h3-stornieren-erstatten, mobil-h3-stornieren). · genutzt
