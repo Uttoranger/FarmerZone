@@ -691,7 +691,7 @@ describe('Abschnitte', () => {
       for (const weg of WEGE) {
         const huelle = klassenVor(seitenfuss, weg)
         expect(huelle, weg).toContain('hidden')
-        expect(huelle, weg).toContain('md:flex')
+        expect(huelle, weg).toContain('md:block')
         // … und im Fuß der Startseite genau umgekehrt: am Handy sichtbar, ab md verborgen.
         const spalte = klassenVor(startseite, weg)
         expect(spalte, weg).toContain('md:hidden')
@@ -705,7 +705,8 @@ describe('Abschnitte', () => {
   })
 
   // Nr. 127: „Für Höfe" im Seitenfuß führt zu /fuer-hoefe (dort stehen /register und /konditionen), „Anmelden" steht im Kopf.
-  describe('Am Computer genau ein Fuß mit der Wortmarke: /, Hofseite, Produktseite, /fuer-hoefe', () => {
+  // Seit Nr. 247 (G11): Der Seitenfuß trägt am Computer keine Wortmarke mehr — sie steht im Kopf.
+  describe('Am Computer genau ein Fuß, ohne Wortmarke: /, Hofseite, Produktseite, /fuer-hoefe', () => {
     const WORTMARKE = `text-brand-text">${MARKE}</span>`
     type Fuss = { klassen: string[]; wortmarken: number }
     /** Alle <footer> eines Markups mit ihren Klassen und der Zahl der Wortmarken darin. */
@@ -720,21 +721,21 @@ describe('Abschnitte', () => {
     /** Eine Kundenseite wie die vier Routen sie bauen: der Fuß der Startseite im Inhalt, der Seitenfuß der Shell danach. */
     const seite = (): string => html(createElement('div', null, createElement('main', null, createElement(StartseiteFuss, { jahr: 2026 })), createElement(KundeFuss)))
 
-    it('am Computer ist genau ein Fuß sichtbar, und er trägt genau eine Wortmarke — der Seitenfuß', () => {
+    it('am Computer ist genau ein Fuß sichtbar — der Seitenfuß, ohne Wortmarke (G11)', () => {
       const alle = fuesse(seite())
       expect(alle).toHaveLength(2)
       const sichtbar = alle.filter(amComputerSichtbar)
       expect(sichtbar).toHaveLength(1)
-      expect(sichtbar[0].wortmarken).toBe(1)
+      expect(sichtbar[0].wortmarken).toBe(0)
       expect(sichtbar[0].klassen).toContain('print:hidden')
-      // Am Handy bleibt der Fuß der Startseite sichtbar, wie er war: beide Füße tragen die Wortmarke.
-      expect(alle.reduce((n, f) => n + f.wortmarken, 0)).toBe(2)
+      // Am Handy bleibt der Fuß der Startseite sichtbar, wie er war: nur er trägt die Wortmarke.
+      expect(alle.reduce((n, f) => n + f.wortmarken, 0)).toBe(1)
     })
 
-    it('Gegenprobe: ohne md:hidden am Fuß der Startseite stünden am Computer zwei Füße mit zwei Wortmarken', () => {
+    it('Gegenprobe: ohne md:hidden am Fuß der Startseite stünden am Computer zwei Füße, einer mit Wortmarke', () => {
       const alt = fuesse(seite().replace('border-t border-border py-10 md:hidden', 'border-t border-border py-10'))
       expect(alt.filter(amComputerSichtbar)).toHaveLength(2)
-      expect(alt.filter(amComputerSichtbar).reduce((n, f) => n + f.wortmarken, 0)).toBe(2)
+      expect(alt.filter(amComputerSichtbar).reduce((n, f) => n + f.wortmarken, 0)).toBe(1)
     })
 
     it('alle vier Seiten setzen den Fuß der Startseite genau einmal in die Shell, und die Shell setzt den Seitenfuß', () => {

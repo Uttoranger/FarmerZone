@@ -26,7 +26,7 @@ const ZU_KLEIN = /(?<![\w:[-])text-(?:sm|xs|\[(?:[0-9]|1[0-5])(?:\.\d+)?px\])(?!
 
 /** Mit Grund erlaubt: „Datei:Zeile-frei" – eine Zeile je Feld. */
 const AUSNAHMEN: Record<string, string> = {
-  'src/components/shells/kunde-shell.tsx': 'Suchfeld der Kopfzeile, nur ab 768 px sichtbar (hidden md:block) – dort zoomt kein Browser',
+  // Nr. 247 (G9): Das Suchfeld der Kopfzeile ist weg — die Ausnahme für kunde-shell.tsx mit ihm.
 }
 
 /** Felder unter 16 px, die es vor Nr. 174 gab und die nicht zu den Dateien von 174 gehören. */

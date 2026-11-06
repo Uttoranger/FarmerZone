@@ -48,7 +48,8 @@ describe('KundeShellMitSitzung', () => {
 
   it('Kundensitzung (Rolle CUSTOMER): „Mein Konto", kein „Anmelden", kein „Mein Hof"', () => {
     const text = kopf({ data: { user: { id: 'k1', role: 'CUSTOMER' } }, isPending: false })
-    expect(text).toContain('aria-label="Mein Konto"')
+    // Seit Nr. 247 (G9) als Pille mit sichtbarem Wort, nicht mehr als Personen-Symbol.
+    expect(text).toMatch(/<a [^>]*href="\/account\/profile"[^>]*>Mein Konto<\/a>/)
     expect(text).not.toContain('>Anmelden<')
     expect(text).not.toContain('Mein Hof')
   })

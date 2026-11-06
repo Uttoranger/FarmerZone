@@ -162,6 +162,8 @@ describe('Vorschau /intern/bausteine', () => {
       expect(vorschau).toContain(`from '@/app/intern/bausteine/vorschau-${nr}'`)
       expect(vorschau).toContain(`<Vorschau${nr} />`)
     }
-    for (const Teil of [Vorschau246, Vorschau247, Vorschau248]) expect(html(createElement(Teil))).toBe('')
+    // Nr. 247 füllt ihren Einhängepunkt (geprüft in tests/bausteine-247.test.ts); die übrigen bleiben leer, bis ihre Nummer kommt.
+    for (const Teil of [Vorschau246, Vorschau248]) expect(html(createElement(Teil))).toBe('')
+    expect(html(createElement(Vorschau247))).toContain('id="chip-gruppe-titel"')
   })
 })
