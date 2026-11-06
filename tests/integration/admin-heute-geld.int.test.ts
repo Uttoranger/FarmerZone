@@ -3,7 +3,10 @@
  * Bestelldatum (Register N32, Ergänzung 5.11.2026, zweite Fassung; Nr. 240).
  *
  * Aussagen über die Woche, die `ladeHeute` aus Postgres liest:
- *  - Bestellt in dieser Woche, abgeholt erst in der nächsten: zählt im Geld.
+ *  - Bestellt in dieser Woche: zählt im Geld, wann immer der Abholzeitpunkt
+ *    liegt — das Fenster hängt nicht an `pickedUpAt` (Fall A setzt ihn bewusst
+ *    nach `JETZT`; echt kommt das nicht vor). Eine Bestellung, die erst nach
+ *    dem Wochenende abgeholt wird, steht in keiner laufenden Woche (Bericht 240).
  *  - Bestellt in der Vorwoche, abgeholt in dieser Woche: zählt im Geld nicht
  *    (Gegenprobe: die Umsatzregel nach Abholung hätte genau sie gezählt).
  *  - Status und Testzahlungen wie bisher: Storno zählt nicht, eine
@@ -79,7 +82,7 @@ async function bestelle(farmId: string, b: Bestellung): Promise<void> {
 
 /** Die Bestände des Beispiels: je Fall eine Bestellung mit eigenem Betrag, damit jede Summe zeigt, wer mitzählt. */
 async function legeWocheAn(farmId: string): Promise<void> {
-  // A · bestellt Dienstag, abgeholt erst nächsten Montag: zählt im Geld.
+  // A · bestellt Dienstag, Abholzeitpunkt nach JETZT (künstlich): zählt im Geld, weil das Fenster nicht an pickedUpAt hängt.
   await bestelle(farmId, { createdAt: new Date('2083-03-16T09:00:00+01:00'), pickedUpAt: new Date('2083-03-22T16:00:00+01:00'), warenpreis: 20, gebuehrCents: 100 })
   // B · bestellt Freitag der Vorwoche (nach dem Vergleichszeitpunkt), abgeholt Dienstag: zählt im Geld nicht.
   await bestelle(farmId, { createdAt: new Date('2083-03-12T09:00:00+01:00'), pickedUpAt: new Date('2083-03-16T16:00:00+01:00'), warenpreis: 40, gebuehrCents: 200 })
