@@ -94,7 +94,8 @@ function Abholung({ hof }: { hof: StartseitenHof }) {
   const { abholung } = hofkarteKlassen(hof.pausiert === true)
   return (
     <span className={cn('block text-[14px]', hof.abholungIstTermin ? 'font-semibold text-status-fertig' : cn(abholung, 'text-muted-foreground'))}>
-      {hof.abholungIstTermin ? `Abholung ${hof.abholung}` : hof.abholung}
+      {/* „Abholung heute …“ wie im Board: nach „Abholung“ klein (formatiereAbholung schreibt „Heute“/„Morgen“ für den Satzanfang). */}
+      {hof.abholungIstTermin ? `Abholung ${hof.abholung.replace(/^(Heute|Morgen)\b/, (w) => w.toLowerCase())}` : hof.abholung}
     </span>
   )
 }

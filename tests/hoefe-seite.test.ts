@@ -978,7 +978,8 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
   it('die Zahlzeile ist eine Statusmeldung: „2 Höfe · 1 holt heute ab · nach Freischaltung"', () => {
     const heute = { ...hof('hof-a', 'Hof Anfang'), abholfenster: [{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }] }
     const seite = html(createElement(HoefeClient, { hoefe: [heute, hof('hof-b', 'Hof Berg')], jetzt: JETZT }))
-    expect(seite).toContain('<p role="status" class="text-[13px] text-muted-foreground">2 Höfe · 1 holt heute ab · nach Freischaltung</p>')
+    // Seit Nr. 234 nur für Vorleser — sichtbar steht an ihrer Stelle der Satz zur Reihenfolge (Board w1-/s1-hoefe).
+    expect(seite).toContain('<p role="status" class="sr-only">2 Höfe · 1 holt heute ab · nach Freischaltung</p>')
   })
 
   // Nr. 127 (Nacharbeit 120): Die Trefferzahl sagt EINE Live-Region an, die Zahlzeile. Die zweite unter dem
@@ -989,7 +990,7 @@ describe('das Server-HTML: die ganze Hofliste, ungefiltert, mit Links auf die Ho
     expect(regionen(seite)).toHaveLength(2)
     expect(regionen(seite).filter((r) => r.includes('id="umkreis-meldung"'))).toHaveLength(1)
     // Genau eine trägt die Zahl (die Zahlzeile).
-    expect(seite).toContain('<p role="status" class="text-[13px] text-muted-foreground">2 Höfe')
+    expect(seite).toContain('<p role="status" class="sr-only">2 Höfe')
     // Gegenprobe: Eine zweite Region wie die alte, ohne Kennung, würde mitgezählt.
     expect(regionen(`${seite}<p role="status" class="sr-only">2 Treffer gefunden.</p>`)).toHaveLength(3)
   })
@@ -1020,7 +1021,8 @@ describe('Filter „Abholung" (Register N22)', () => {
   it('im Filter-Blatt unter „Wann holst du ab?" mit dem Satz des Boards, am Computer in der zweiten Zeile', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
     expect(client).toMatch(/<BlattGruppe titel=\{ABHOLUNG_TEXT\.frage\}>\s*<p[^>]*>\{ABHOLUNG_TEXT\.erklaerung\}<\/p>/)
-    expect(client).toMatch(/<FilterGruppe titel=\{ABHOLUNG_TEXT\.beschriftung\}>/)
+    // Seit Nr. 234 (Boards w1-/s1-hoefe): an beiden Breiten in der zweiten Zeile, daneben „Filter" und „Liste | Karte".
+    expect(client).toMatch(/<ChipReihe beschriftung=\{ABHOLUNG_TEXT\.beschriftung\} chips=\{reihen\.abholung\} onWahl=\{schreibeUrl\} className="min-w-0" \/>\s*<div className="flex flex-wrap items-center gap-2">\s*\{filterblatt\(false\)\}\s*<ChipReihe beschriftung="Ansicht"/)
   })
 })
 
@@ -1050,10 +1052,11 @@ describe('Filter-Links auf /hoefe tragen rel="nofollow" (Register N19)', () => {
     expect(links[0]).toContain('rel="nofollow"')
   })
 
-  it('die Seite selbst: „Zurücksetzen", „Liste zeigen" und „Karte öffnen"', () => {
+  it('die Seite selbst: „Zurücksetzen" und „Liste zeigen" — „Liste | Karte" sind seit Nr. 234 Chips der Reihe (ChipReihe, oben)', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
     const links = [...client.matchAll(/<Link\s[^>]*?href=\{hoefeHref\([\s\S]*?>/g)].map((m) => m[0])
-    expect(links).toHaveLength(3)
+    expect(links).toHaveLength(2)
+    expect(client).toContain('<ChipReihe beschriftung="Ansicht" chips={ansichtChips} onWahl={schreibeUrl} umbrechen />')
     for (const link of links) expect(link, link).toContain('rel="nofollow"')
   })
 

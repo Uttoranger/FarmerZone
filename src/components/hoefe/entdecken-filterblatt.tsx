@@ -83,7 +83,8 @@ export function EntdeckenFilterblatt({
           )}
         </SheetTrigger>
       )}
-      <SheetBlatt>
+      {/* Am Handy von unten, ab 768 px von rechts wie der Warenkorb (Board w1-hoefe: „Filter" auch im Browser). */}
+      <SheetBlatt seite="rechts">
         <div className="flex items-center justify-between gap-2">
           <SheetTitle className="font-heading text-xl font-semibold">Filter</SheetTitle>
           {zuruecksetzen}
