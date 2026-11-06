@@ -2,19 +2,20 @@ import * as React from 'react'
 import { Link, Text } from '@react-email/components'
 import {
   EmailLayout,
+  BestellnummerKasten,
   BetragsZeile,
+  HinweisKasten,
   Knopf,
   KnopfReihe,
   Trenner,
-  amberBox,
   h1,
   bodyText,
   kleinText,
-  MAIL_FARBE,
   textLink,
+  inklGebuehrSatz,
+  woZeile,
 } from './_layout'
 import { formatEuro } from '@/lib/format'
-import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import type { Belehrung } from '@/lib/widerruf'
@@ -25,6 +26,8 @@ export interface OnsiteConfirmationProps {
   farmName: string
   farmAddress: string
   farmCity: string
+  /** PLZ des Hofs für die Zeile „Wo“; fehlt sie, steht nur der Ort. */
+  farmPostalCode?: string
   pickupDate: string
   pickupTime: string
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
@@ -67,45 +70,38 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
   return (
     <EmailLayout fuss={{ art: 'hof' }} previewText={`Bestellung bei ${p.farmName} bestätigen – Abholung ${p.pickupDate}`}>
       <Text style={h1}>Bitte bestätige deine Bestellung</Text>
-      <Text style={bodyText}>
-        {`Du hast bei ${p.farmName} bestellt. Erst mit deiner Bestätigung packt der Hof deine Sachen.`}
-      </Text>
+      <Text style={bodyText}>Erst mit deiner Bestätigung packt der Hof deine Sachen.</Text>
 
-      {p.bestaetigenBis && (
-        <div style={amberBox}>
-          <Text style={{ ...bodyText, color: MAIL_FARBE.text, fontWeight: '600', margin: 0 }}>
-            {`Bitte bestätige bis ${p.bestaetigenBis}.`}
-          </Text>
-          <Text style={{ ...kleinText, margin: '2px 0 0' }}>
+      {/* Die Frist mit Tag und Uhrzeit (V87, fristVon) — als orange Karte, denn die Kundin muss handeln. */}
+      <HinweisKasten art="orange">
+        {p.bestaetigenBis ? (
+          <>
+            <strong>{`Bitte bestätige bis ${p.bestaetigenBis}.`}</strong>
+            <br />
             Danach geben wir die Ware wieder frei – ohne Kosten für dich.
-          </Text>
-        </div>
-      )}
+          </>
+        ) : (
+          <strong>Bitte bestätige bald – sonst geben wir die Ware wieder frei.</strong>
+        )}
+      </HinweisKasten>
 
       <KnopfReihe>
         <Knopf href={p.confirmationUrl}>Bestellung bestätigen</Knopf>
       </KnopfReihe>
 
-      <BetragsZeile links="Bestellnummer" rechts={p.orderNumber} />
+      <BestellnummerKasten nummer={p.orderNumber} />
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
-      <BetragsZeile umbrechen links="Adresse" rechts={`${p.farmAddress}, ${p.farmCity}`} />
+      <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
       <Trenner />
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
       {gebuehr && <BetragsZeile links={gebuehr.wort} rechts={formatEuro(gebuehr.betrag)} />}
+      <Trenner />
       <BetragsZeile stark links="Bar bei Abholung" rechts={formatEuro(p.total)} />
 
-      {gebuehr && <Text style={{ ...kleinText, marginTop: '12px' }}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
-      {(p.plattformgebuehr ?? 0) > 0 && (
-        <Text style={{ ...kleinText, marginTop: '12px' }}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>
-      )}
-      {/* V87: Die Frist steht oben mit Tag und Uhrzeit (fristVon). Ein zweiter Satz mit einer Dauer nannte sie doppelt und unvollständig. */}
-      <Text style={{ ...kleinText, marginTop: '12px' }}>
-        {p.bestaetigenBis
-          ? 'Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach.'
-          : 'Falls du diese Bestellung nicht aufgegeben hast, ignoriere diese E-Mail einfach. Bitte bestätige bald – sonst geben wir die Ware wieder frei.'}
-      </Text>
+      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklGebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
+      {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
       {/* Nr. 207: Die AGB hängen auch dieser Mail als Datei an — derselbe Satz wie in der Bestätigung (Register O4). */}
       <Text style={kleinText}>
         {MAIL_AGB_ZEILE.map((stueck, i) =>

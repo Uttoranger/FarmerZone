@@ -409,9 +409,11 @@ async function sendeAnListe(an: readonly string[], subject: string, html: string
 
 function formatPickupDate(date: Date): string {
   // Wiener Kalendertag, nie die Zeitzone des Servers (CODING_STANDARDS §2).
-  return date.toLocaleDateString('de-AT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna',
-  })
+  // Kurzer Wochentag ohne Punkt wie in den Boards („Mi, 3. März 2027“, Lauf 31):
+  // Ausgeschrieben bricht „Uhr“ am Handy allein in die nächste Zeile.
+  const wochentag = date.toLocaleDateString('de-AT', { weekday: 'short', timeZone: 'Europe/Vienna' }).replace(/\.$/, '')
+  const datum = date.toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna' })
+  return `${wochentag}, ${datum}`
 }
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
@@ -1016,6 +1018,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     zahlart: mailZahlart(order.paymentMethod),
@@ -1071,6 +1074,7 @@ export async function onsiteConfirmationInhalt(
     farmName: order.farm.name,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: mailPositionen(order),
@@ -1194,6 +1198,7 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
@@ -1215,6 +1220,7 @@ export async function baueOrderNotReady(order: OrderForEmail): Promise<StapelMai
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),

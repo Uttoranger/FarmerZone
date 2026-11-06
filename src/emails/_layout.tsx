@@ -4,6 +4,7 @@ import { MARKE } from '@/lib/marke'
 import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
 import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
+import { INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 
 /**
  * Die Mail-Palette — die EINZIGE Stelle mit Farbwerten unter src/emails/
@@ -45,6 +46,13 @@ export const MAIL_FARBE = {
 /** Schriften: Fraunces/Instrument Sans, wo installiert — Mails laden keine Webfonts (kein CDN). */
 const SCHRIFT = "'Instrument Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 export const SCHRIFT_UEBERSCHRIFT = "Fraunces,Georgia,'Times New Roman',serif"
+
+/**
+ * Am Handy (Board s3-mail-*) steht die Karte mit 10 px Rand und 18 px Innenabstand,
+ * im Web (w3-mail-*, Karte bis 600 px) mit 12 px und 26 px. Inline steht die Web-Fassung —
+ * Mailprogramme ohne Media Queries zeigen sie; die übrigen nehmen am Handy die schmale.
+ */
+const SCHMAL_CSS = `@media only screen and (max-width:480px){.fz-grund{padding:16px 10px !important}.fz-kopf{padding:20px 18px 0 !important}.fz-inhalt{padding:18px 18px 22px !important}}`
 
 const body: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.seite,
@@ -159,15 +167,16 @@ export function EmailLayout({ previewText, children, manageUrl, fuss }: EmailLay
         {/* Bitte nicht automatisch abdunkeln — die Mail ist bewusst hell. */}
         <meta name="color-scheme" content="light" />
         <meta name="supported-color-schemes" content="light" />
+        <style>{SCHMAL_CSS}</style>
       </Head>
       <Preview>{previewText}</Preview>
-      <Body style={body}>
+      <Body style={body} className="fz-grund">
         <Container style={container}>
           <Section style={karte}>
-            <Section style={kopf}>
+            <Section style={kopf} className="fz-kopf">
               <Text style={wortmarke}>{MARKE}</Text>
             </Section>
-            <Section style={content}>{children}</Section>
+            <Section style={content} className="fz-inhalt">{children}</Section>
           </Section>
           <Section style={{ padding: '16px 24px 0' }}>
             <Text style={footerText}>{fussSatz(fuss)}</Text>
@@ -226,6 +235,7 @@ export const kleinText: React.CSSProperties = {
 /** Links im Text: grün und unterstrichen, damit sie ohne Farbe erkennbar bleiben. */
 export const textLink: React.CSSProperties = {
   color: MAIL_FARBE.gruen,
+  fontWeight: '600',
   textDecoration: 'underline',
 }
 
@@ -236,12 +246,13 @@ export const highlightBox: React.CSSProperties = {
   margin: '16px 0',
 }
 
+/** Die kleine Kennzeile in Großbuchstaben (wie im Board: 12 px, fett) — nie kleiner als 12 px (Lauf 31). */
 export const highlightLabel: React.CSSProperties = {
   color: MAIL_FARBE.textLeise,
-  fontSize: '11px',
-  fontWeight: '600',
+  fontSize: '12px',
+  fontWeight: '700',
   textTransform: 'uppercase' as const,
-  letterSpacing: '1.2px',
+  letterSpacing: '0.06em',
   margin: '0 0 6px',
 }
 
@@ -378,4 +389,86 @@ export function Knopf({ href, art = 'gruen', children }: { href: string; art?: '
 /** Knöpfe nebeneinander, am Handy umbrechend. */
 export function KnopfReihe({ children }: { children: React.ReactNode }): React.JSX.Element {
   return <Section style={{ margin: '16px 0 6px' }}>{children}</Section>
+}
+
+/**
+ * Hinweiskarte wie im Board: grün für Gutes (Erstattung, „Bring bitte … mit“),
+ * orange für „du musst etwas tun“ (Frist, Warnung) — dann ist auch die Schrift
+ * orange. 14 px, ein Absatz; Fettes setzt die Vorlage selbst.
+ */
+export function HinweisKasten({ art, children }: { art: 'gruen' | 'orange'; children: React.ReactNode }): React.JSX.Element {
+  const kasten = art === 'gruen' ? gruenBox : amberBox
+  return (
+    <Section style={kasten}>
+      <Text style={{ color: art === 'gruen' ? MAIL_FARBE.text : MAIL_FARBE.orangeText, fontSize: '14px', lineHeight: '1.5', margin: 0 }}>{children}</Text>
+    </Section>
+  )
+}
+
+/** Den Code in Dreiergruppen lesen („615 204“) — gezeigt wird er nur so, eingegeben ohne Leerzeichen. */
+export function codeGruppiert(code: string): string {
+  return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code
+}
+
+/**
+ * Der Code groß zum Abtippen (Boards s3/w3-mail-zugang, -team): Überschriften-Serife,
+ * neutrale Fläche ohne Rand, in Dreiergruppen. Kein Link — der Code steht nie im Betreff.
+ */
+export function CodeKasten({ code }: { code: string }): React.JSX.Element {
+  return (
+    <Text
+      style={{
+        backgroundColor: MAIL_FARBE.seite,
+        borderRadius: '12px',
+        color: MAIL_FARBE.text,
+        fontFamily: SCHRIFT_UEBERSCHRIFT,
+        fontSize: '34px',
+        fontWeight: '600',
+        letterSpacing: '6px',
+        lineHeight: '1.3',
+        margin: '6px 0 14px',
+        padding: '12px',
+        textAlign: 'center' as const,
+      }}
+    >
+      {codeGruppiert(code)}
+    </Text>
+  )
+}
+
+/**
+ * Die Telefonnummer des Hofs wie im Board: fett in Textfarbe, als Anruf-Link
+ * (tel:), damit sie am Handy mit einem Tippen wählt. Ohne gültige Nummer nur Text.
+ */
+export function TelefonFett({ href, nummer }: { href: string | null; nummer: string }): React.JSX.Element {
+  const stil: React.CSSProperties = { color: MAIL_FARBE.text, fontWeight: '600', textDecoration: 'none' }
+  return href ? (
+    <Link href={href} style={stil}>
+      {nummer}
+    </Link>
+  ) : (
+    <strong style={{ color: MAIL_FARBE.text }}>{nummer}</strong>
+  )
+}
+
+/** Leiser Satz wie im Board (13 px): Fristen, „Fragen? …“. */
+export const leiseZeile: React.CSSProperties = { ...mutedText, margin: '0 0 6px' }
+
+/** Zwischenüberschrift fett in Textfarbe (z. B. „Deine Rechte jetzt:“). */
+export const zwischenTitel: React.CSSProperties = { ...bodyText, fontWeight: '600', margin: '0 0 6px' }
+
+/**
+ * Der Satz unter dem Betrag im Hofpreis-Modell (N38, Board s3/w3-mail-kauf):
+ * „Alle Preise inkl. Plattformgebühr (darin € 1,12). Den Kaufvertrag schließt
+ * du mit Hof Müller.“ Die Gebühr steckt in den Zeilen — der Satz nennt sie nur,
+ * gerechnet hat sie src/lib/email.ts. Ohne Hof (Bitte bestätige) nur der erste Satz.
+ */
+export function inklGebuehrSatz(betrag: string, hof?: string): string {
+  const erster = `Alle Preise ${INKL_PLATTFORMGEBUEHR} (darin ${betrag}).`
+  return hof ? `${erster} Den Kaufvertrag schließt du mit ${hof}.` : erster
+}
+
+/** „Hof Müller, Dorfstraße 12, 5280 Braunau am Inn“ — die Zeile „Wo“ der Bestellmails. */
+export function woZeile(hof: string, adresse: string, plz: string | undefined, ort: string): string {
+  return `${hof}, ${adresse}, ${plz ? `${plz} ` : ''}${ort}`
 }

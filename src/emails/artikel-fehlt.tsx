@@ -3,18 +3,18 @@ import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
 import {
   EmailLayout,
+  BestellnummerKasten,
   BetragsZeile,
+  HinweisKasten,
   Knopf,
   KnopfReihe,
+  TelefonFett,
   Trenner,
-  amberBox,
-  gruenBox,
   h1,
   bodyText,
-  mutedText,
   kleinText,
+  leiseZeile,
   textLink,
-  MAIL_FARBE,
 } from './_layout'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -54,35 +54,35 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
   return (
     <EmailLayout fuss={{ art: 'hof' }} previewText={`Ein Artikel fehlt in deiner Bestellung ${p.orderNumber}`}>
       <Text style={h1}>Ein Artikel fehlt</Text>
+      {/* Board s3/w3-mail-kauf Bild 6: ohne Anrede, der Hof als Absender des Satzes. */}
       <Text style={bodyText}>
-        Hallo {p.customerName},<br />
-        bei deiner Bestellung <strong>{p.orderNumber}</strong> bei <strong>{p.farmName}</strong> fehlt leider:{' '}
+        {`${p.farmName} hat für dich gepackt, aber es fehlt leider: `}
         <strong>{p.artikel}</strong>. Den Rest bekommst du wie geplant.
       </Text>
 
+      <BestellnummerKasten nummer={p.orderNumber} />
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      <Trenner />
+      <BetragsZeile links="Neuer Betrag" rechts={formatEuro(p.neu)} stark />
+
       {p.zahlung === 'vor_ort' ? (
-        <div style={amberBox}>
-          <Text style={{ ...bodyText, margin: 0, color: MAIL_FARBE.text, fontWeight: '600' }}>
-            {`Bring bitte ${formatEuro(p.neu)} in bar mit (statt ${formatEuro(p.bisher)}).`}
-          </Text>
-          <Text style={{ ...mutedText, margin: '6px 0 0' }}>
-            {`Die ${p.gebuehrWort ?? 'Servicegebühr'} gilt nur für das, was du bekommst.`}
-          </Text>
-        </div>
+        <>
+          <HinweisKasten art="gruen">
+            Bring bitte <strong>{formatEuro(p.neu)}</strong>
+            {` in bar mit (statt ${formatEuro(p.bisher)}).`}
+          </HinweisKasten>
+          <Text style={kleinText}>{`Die ${p.gebuehrWort ?? 'Servicegebühr'} gilt nur für das, was du bekommst.`}</Text>
+        </>
       ) : (
-        <div style={gruenBox}>
-          <Text style={{ ...bodyText, margin: 0, color: MAIL_FARBE.text, fontWeight: '600' }}>
-            {`Wir haben dir ${formatEuro(p.erstattet ?? 0)} zurückerstattet.`}
-          </Text>
-          <Text style={{ ...mutedText, margin: '6px 0 0' }}>
+        <>
+          <HinweisKasten art="gruen">
+            Wir haben dir <strong>{formatEuro(p.erstattet ?? 0)}</strong> zurückerstattet.
+          </HinweisKasten>
+          <Text style={kleinText}>
             {`Das ist der Preis des Artikels und die ${p.gebuehrWort ?? 'Servicegebühr'}, die dafür angefallen wäre. Die Rückerstattung erscheint in 5–10 Werktagen auf deinem Konto.`}
           </Text>
-        </div>
+        </>
       )}
-
-      <BetragsZeile links="Bestellnummer" rechts={p.orderNumber} />
-      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
-      <BetragsZeile links="Neuer Betrag" rechts={formatEuro(p.neu)} stark />
 
       <KnopfReihe>
         <Knopf href={p.orderUrl} art="rahmen">
@@ -90,20 +90,12 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
         </Knopf>
       </KnopfReihe>
 
-      <Trenner />
-      <Text style={kleinText}>
-        Fragen?{' '}
-        {anrufen ? (
-          <Link href={anrufen} style={textLink}>
-            {formatiereTelefon(p.farmPhone)}
-          </Link>
-        ) : (
-          p.farmPhone
-        )}
+      <Text style={leiseZeile}>
+        Fragen? Ruf direkt beim Hof an: <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.farmPhone) : p.farmPhone} />
       </Text>
       {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. */}
       {p.widerrufUrl && (
-        <Text style={kleinText}>
+        <Text style={leiseZeile}>
           <Link href={p.widerrufUrl} style={textLink}>
             {WIDERRUF_TEXT.knopfWiderrufen}
           </Link>

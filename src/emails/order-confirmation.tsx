@@ -6,16 +6,20 @@ import {
   EmailLayout,
   BestellnummerKasten,
   BetragsZeile,
+  HinweisKasten,
   Knopf,
   KnopfReihe,
+  TelefonFett,
   Trenner,
   h1,
   bodyText,
   kleinText,
+  leiseZeile,
   textLink,
+  inklGebuehrSatz,
+  woZeile,
 } from './_layout'
 import { formatEuro } from '@/lib/format'
-import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
@@ -29,6 +33,8 @@ export interface OrderConfirmationProps {
   farmPhone: string
   farmAddress: string
   farmCity: string
+  /** PLZ des Hofs für die Zeile „Wo“; fehlt sie, steht nur der Ort. */
+  farmPostalCode?: string
   pickupDate: string
   pickupTime: string
   /** Online bezahlt (Webhook) oder vor Ort bestätigt (Bar-Knopf, alte Karte-Bestellungen). */
@@ -92,13 +98,28 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       <BestellnummerKasten nummer={p.orderNumber} />
 
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
-      <BetragsZeile umbrechen links="Adresse" rechts={`${p.farmAddress}, ${p.farmCity}`} />
+      <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
       <Trenner />
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
       {gebuehr && <BetragsZeile links={gebuehr.wort} rechts={formatEuro(gebuehr.betrag)} />}
+      <Trenner />
       <BetragsZeile stark links={GESAMT_LABEL[p.zahlart]} rechts={formatEuro(p.total)} />
+
+      {/* Board s3/w3-mail-kauf Bild 3: was die Kundin mitbringt, als grüne Karte direkt unter dem Betrag. */}
+      {p.zahlart === 'bar' && (
+        <HinweisKasten art="gruen">
+          Bring bitte <strong>{formatEuro(p.total)}</strong> in bar mit.
+        </HinweisKasten>
+      )}
+      {p.zahlart === 'karte' && (
+        <HinweisKasten art="gruen">
+          Bitte zahle <strong>{formatEuro(p.total)}</strong> bei der Abholung mit Karte.
+        </HinweisKasten>
+      )}
+      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklGebuehrSatz(formatEuro(p.plattformgebuehr ?? 0), p.farmName)}</Text>}
+      {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
 
       <KnopfReihe>
         {/* Der Weg zurück zur Bestellung, wenn der Tab längst zu ist: Status,
@@ -123,11 +144,9 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           )
         )}
       </Text>
-
-      {p.zahlart === 'bar' && <Text style={kleinText}>{`Bring bitte ${formatEuro(p.total)} in bar mit.`}</Text>}
-      {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
-      {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
-      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
+      <Text style={leiseZeile}>
+        Fragen? Ruf direkt beim Hof an: <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.farmPhone) : p.farmPhone} />
+      </Text>
       {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. Mit Belehrung steht er unter ihr. */}
       {p.widerrufUrl && !p.belehrung && (
         <Text style={kleinText}>
@@ -136,16 +155,6 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           </Link>
         </Text>
       )}
-      <Text style={kleinText}>
-        Fragen? Ruf direkt beim Hof an:{' '}
-        {anrufen ? (
-          <Link href={anrufen} style={textLink}>
-            {formatiereTelefon(p.farmPhone)}
-          </Link>
-        ) : (
-          p.farmPhone
-        )}
-      </Text>
       {/* Nr. 207: Teil A, Teil B, Hinweis zur Rückgabe am Hof und der Link zum Widerruf. */}
       {p.belehrung && <BelehrungTeil belehrung={p.belehrung} widerrufUrl={p.widerrufUrl} />}
     </EmailLayout>
