@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
-import { ChevronLeft, CircleAlert, Clock, Info, Inbox, X } from 'lucide-react'
+import { ChevronLeft, CircleAlert, Clock, Info, X } from 'lucide-react'
 import { ADMIN_BETRIEB_HREF, ADMIN_BETRIEB_MAILS_HREF } from '@/lib/betrieb'
 import {
   ALLE_MAILS_TEXT,
@@ -415,7 +415,6 @@ export async function MailsAlle({ jetzt, p, suche, sucheRoh }: { jetzt: Date; p:
           <TeilFehler />
         ) : zeilen.length === 0 ? (
           <EmptyState
-            symbol={Inbox}
             titel={ALLE_MAILS_TEXT.leer}
             satz={nurKannWarten ? ALLE_MAILS_TEXT.leerKannWarten : ALLE_MAILS_TEXT.leerSatz}
             ausweg={<a href={alleMailsHref({})} className={LINK}>{ALLE_MAILS_TEXT.filterZuruecksetzen}</a>}

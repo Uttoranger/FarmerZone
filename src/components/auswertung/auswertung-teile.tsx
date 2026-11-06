@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChartColumn, ChevronLeft, ChevronRight, Lightbulb, Share2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Lightbulb, Share2 } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
@@ -227,7 +227,6 @@ export function UmsatzKarte({
       </div>
       {leer ? (
         <EmptyState
-          symbol={ChartColumn}
           titel={UMSATZ_LEER.titel}
           ausweg={
             <Link href={UMSATZ_LEER.aktion.href} className={KNOPF_RAHMEN}>

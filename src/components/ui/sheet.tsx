@@ -123,6 +123,12 @@ const BLATT_SCHLEIER = "bg-foreground/55 supports-backdrop-filter:backdrop-blur-
  * `kopf` (Nr. 233, Board s1-mehr-neu): Griff und Kopf stehen fest, nur der
  * Inhalt darunter scrollt — beim Scrollen scheint nichts über dem Kopf durch,
  * und der Griff bleibt stehen. Ohne `kopf` scrollt das ganze Blatt wie bisher.
+ *
+ * Startfokus (Nr. 246): Fragt das Blatt nach etwas, das sich nicht mit einem
+ * Tipp zurücknehmen lässt (löschen, stornieren, pausieren, stilllegen — der
+ * Hauptknopf ist orange), setzt der Aufrufer `initialFocus` auf „Abbrechen“;
+ * ein Enter zu viel löst sonst die Aktion aus. Wache
+ * tests/startfokus-wache.test.ts (Bestandsliste, die nur schrumpft).
  */
 function SheetBlatt({
   className,

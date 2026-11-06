@@ -374,8 +374,8 @@ export function vorratFrage(unit: string, unitSize: number | null): string {
 
 // ─── Fehler im Formular (V17; Board s1/w1-produkt-neu, Bild 5 und 6) ────────
 
-/** Die Karte über dem Formular, wenn Felder markiert sind — statt eines Toasts. */
-export const FORMULAR_PRUEFEN = 'Bitte prüfe die markierten Felder.'
+/** Die Karte über dem Formular, wenn Felder markiert sind — statt eines Toasts (Quelle: lib/formular-saetze.ts). */
+export { FORMULAR_PRUEFEN } from '@/lib/formular-saetze'
 
 /** Speichern gescheitert: Titel und Sätze der orangen Karte (ohne Feld). */
 export const SPEICHERN_FEHLER = {

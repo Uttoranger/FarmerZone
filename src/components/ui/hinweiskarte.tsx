@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NETZ_KNOPF } from '@/lib/netz'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 type Ton = 'gruen' | 'orange' | 'neutral'
 
@@ -82,10 +83,19 @@ export function Hinweiskarte({
  * „Speichern hat nicht geklappt"): Fläche und Schrift aus dem Bedeutungs-Paar „tun"
  * (`bg-zustand-tun-grund`, `text-zustand-tun`, ≥ 4,5:1 in beiden Modi, tests/design-tokens.test.ts),
  * Titel fett, darunter ein Satz. `role="alert"`, damit der Screenreader ihn beim Erscheinen liest.
+ * Der Titel ist freiwillig (G6, Nr. 246; Boards s2-teilen Bild 3, s2-konto-hof): Ein Netzfehler am
+ * Formular ist oft nur der eine Satz (`NETZ_SATZ`), 14 px halbfett.
  *
- * Mit `nochmal` steht darunter der Knopf „Nochmal" (NETZ_KNOPF, Register N29) über die volle Breite,
- * 52 px, als Rahmenknopf — die Eingabe bleibt stehen, ein Tipp wiederholt den Aufruf. Nie bei
- * Aktionen, die der Server schon ausgeführt haben kann (NETZ_SATZ_UNSICHER, DESIGN_SYSTEM „Zustände").
+ * Mit `nochmal` steht darunter der Knopf „Nochmal" (NETZ_KNOPF, Register N29) — seit Nr. 246 nach G6
+ * klein und linksbündig in der Warnfarbe (Rand und Schrift `zustand-tun`, 44 px; Liste Lauf 32, teilen
+ * „Klein, linksbündig, Warnfarbe"), nicht mehr über die volle Breite. Er bekommt beim Erscheinen den
+ * Fokus (Board s2-teilen `data-erstfokus`, meldungen „Fokus darauf"): Wer gerade auf „Speichern"
+ * getippt hat, steht danach auf dem Ausweg. Er ist nie deaktiviert (G6: Knöpfe nie deaktiviert);
+ * solange der zweite Versuch läuft, meldet er `aria-busy` und schluckt den Tipp. Nie bei Aktionen,
+ * die der Server schon ausgeführt haben kann (NETZ_SATZ_UNSICHER, DESIGN_SYSTEM „Zustände"), nie in
+ * Verkäufe (doppelte Buchung, D1) und nie beim Anlegen eines Produkts (Abnahme-Grundlage Lauf 32).
+ * Titel und Satz hängen per `aria-describedby` am Knopf: Der Fokus kommt vor der Ansage von
+ * `role="alert"`, und manche Screenreader verschluckten sie sonst — so liest er den Satz mit dem Knopf.
  */
 export function HinweiskarteFehler({
   titel,
@@ -94,32 +104,47 @@ export function HinweiskarteFehler({
   laeuft,
   className,
 }: {
-  titel: string
+  titel?: string
   children?: ReactNode
   /** Wiederholt den Aufruf; ohne sie kein Knopf. */
   nochmal?: () => void
-  /** Solange der zweite Versuch läuft, ist der Knopf gesperrt. */
+  /** Solange der zweite Versuch läuft, nimmt der Knopf keinen Tipp an (bleibt aber bedienbar sichtbar). */
   laeuft?: boolean
   className?: string
 }): React.JSX.Element {
+  const kennung = useId()
+  // Nur mit Knopf: ohne „Nochmal" verweist nichts auf Titel und Satz.
+  const titelId = nochmal && titel ? `${kennung}-titel` : undefined
+  const satzId = nochmal && children ? `${kennung}-satz` : undefined
+  const beschreibung = [titelId, satzId].filter(Boolean).join(' ') || undefined
   return (
     <div
       role="alert"
       data-slot="hinweiskarte-fehler"
-      className={cn('flex flex-col gap-1.5 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun', className)}
+      className={cn('flex flex-col gap-2 border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun', RUNDUNG.hinweis, className)}
     >
-      <p className="text-[15px] font-bold">{titel}</p>
-      {children && <div className="text-[14px] leading-normal">{children}</div>}
+      {titel && (
+        <p id={titelId} className="text-[15px] font-bold">
+          {titel}
+        </p>
+      )}
+      {children && (
+        <div id={satzId} className={cn('text-[14px] leading-normal', !titel && 'font-semibold')}>
+          {children}
+        </div>
+      )}
       {nochmal && (
         <button
           type="button"
-          onClick={nochmal}
-          disabled={laeuft}
+          // Der Fokus springt auf den Ausweg, sobald der Kasten erscheint (G6) — React setzt ihn beim Einhängen.
+          autoFocus
+          onClick={() => {
+            if (!laeuft) nochmal()
+          }}
           aria-busy={laeuft || undefined}
-          className={cn(
-            'mt-1.5 inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-3 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
-            FOKUS_RAHMEN
-          )}
+          aria-describedby={beschreibung}
+          data-slot="nochmal"
+          className={cn(NOCHMAL_KNOPF, FOKUS_RAHMEN)}
         >
           {NETZ_KNOPF}
         </button>
@@ -127,3 +152,10 @@ export function HinweiskarteFehler({
     </div>
   )
 }
+
+/**
+ * Der Knopf „Nochmal" nach G6 (Boards s2-teilen, s2-konto-hof): 44 px hoch, so breit wie sein Wort,
+ * links bündig, 1,5 px Rand und Schrift in der Warnfarbe auf der Kartenfläche, 16 px fett.
+ */
+export const NOCHMAL_KNOPF =
+  'inline-flex min-h-11 items-center justify-center self-start rounded-[14px] border-[1.5px] border-zustand-tun bg-card px-[18px] text-[16px] font-bold text-zustand-tun hover:bg-muted aria-busy:opacity-60'

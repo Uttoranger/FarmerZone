@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Wallet } from 'lucide-react'
 import { FINANZEN_JAHR_TEXT, ergebnisText, monatOhneJahr, type JahrMonatAnzeige } from '@/lib/finanzen'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -97,7 +96,7 @@ export function JahrMonate({
   const mitVergleich = vergleich && vorjahr !== null
   const leer = monate.every((m) => m.zahlen === null || (m.zahlen.servicegebuehrCents === 0 && m.zahlen.kostenCents === 0))
   if (leer) {
-    return <EmptyState symbol={Wallet} titel={text.leerTitel} satz={text.leer} ausweg={{ ohne: 'Die Monate füllen sich von selbst, sobald Bestellungen eingehen; es gibt nichts, wohin der Weg führen könnte' }} />
+    return <EmptyState titel={text.leerTitel} satz={text.leer} ausweg={{ ohne: 'Die Monate füllen sich von selbst, sobald Bestellungen eingehen; es gibt nichts, wohin der Weg führen könnte' }} />
   }
 
   const gezaehlt = monate.filter((m) => m.zahlen !== null).reverse()

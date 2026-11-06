@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bell, Phone, Search, Users } from 'lucide-react'
+import { Bell, Phone } from 'lucide-react'
 import type { CustomerSummary } from '@/server/queries/customers'
 import {
   KUNDEN_FILTER_LABEL,
@@ -78,7 +78,6 @@ export function KundenAnsicht({
 
       {kunden.length === 0 ? (
         <EmptyState
-          symbol={Users}
           titel="Noch keine Kunden"
           satz="Sobald jemand bei dir bestellt, taucht er hier auf. Eine vollständige Hofseite hilft dabei."
           ausweg={
@@ -145,7 +144,6 @@ export function KundenAnsicht({
 
           {liste.length === 0 ? (
             <EmptyState
-              symbol={Search}
               titel="Niemand passt"
               satz={suche.trim() ? `Nichts gefunden für „${suche.trim()}“.` : 'In diesem Filter ist gerade niemand.'}
               ausweg={

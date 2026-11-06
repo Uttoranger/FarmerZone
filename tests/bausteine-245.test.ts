@@ -162,8 +162,9 @@ describe('Vorschau /intern/bausteine', () => {
       expect(vorschau).toContain(`from '@/app/intern/bausteine/vorschau-${nr}'`)
       expect(vorschau).toContain(`<Vorschau${nr} />`)
     }
-    // Nr. 247 füllt ihren Einhängepunkt (geprüft in tests/bausteine-247.test.ts); die übrigen bleiben leer, bis ihre Nummer kommt.
-    for (const Teil of [Vorschau246, Vorschau248]) expect(html(createElement(Teil))).toBe('')
+    // Nr. 246 und 247 füllen ihre Einhängepunkte (geprüft in tests/bausteine-246.test.ts und tests/bausteine-247.test.ts); 248 bleibt leer, bis ihre Nummer kommt.
+    expect(html(createElement(Vorschau246))).toContain('<section')
     expect(html(createElement(Vorschau247))).toContain('id="chip-gruppe-titel"')
+    expect(html(createElement(Vorschau248))).toBe('')
   })
 })

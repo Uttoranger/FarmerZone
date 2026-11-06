@@ -307,7 +307,6 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
 
       {products.length === 0 ? (
         <EmptyState
-          symbol={Package}
           titel={PRODUKTE_LEER.titel}
           satz={produkteLeerSatz(hof.sichtbar)}
           ausweg={erstesProduktKnopf}
@@ -382,7 +381,6 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
 
           {gefiltert.length === 0 ? (
             <EmptyState
-              symbol={Search}
               titel={PRODUKTE_KEIN_TREFFER.titel}
               satz={keinTrefferSatz(suche)}
               ausweg={

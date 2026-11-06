@@ -548,7 +548,6 @@ export function WuenscheAnsicht({
         </FilterChipReihe>
         {mitStichwort.length === 0 ? (
           <EmptyState
-            symbol={Lightbulb}
             titel={WUENSCHE_LEER.titel}
             satz={WUENSCHE_LEER.satz}
             className="rounded-xl border-0 py-6"
@@ -558,7 +557,6 @@ export function WuenscheAnsicht({
           />
         ) : liste.length === 0 ? (
           <EmptyState
-            symbol={Lightbulb}
             titel={WUENSCHE_LEER_FILTER.titel}
             className="rounded-xl border-0 py-6"
             ausweg={

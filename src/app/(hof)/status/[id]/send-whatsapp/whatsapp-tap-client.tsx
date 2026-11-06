@@ -118,7 +118,6 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
       <div>
         {/* Der Titel ist hier die eine Überschrift der Seite: eine zweite, unsichtbare mit dem Seitennamen wäre eine zweite Fassung desselben Textes. */}
         <EmptyState
-          symbol={MessageSquare}
           titel={TEXT.leer.titel}
           titelStufe={1}
           satz={TEXT.leer.satz}

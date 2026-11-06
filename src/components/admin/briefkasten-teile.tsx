@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Lightbulb } from 'lucide-react'
 import { MELDUNG_ART_LABEL, WUENSCHE_TEXT, kiBegruendung, kurznummer, prLink, type TriageStand } from '@/lib/meldung'
 import { ADMIN_STATUS_TON, WUNSCHLISTE_LEER, WUNSCHLISTE_SATZ, adminStatusText, bildschirmText } from '@/lib/admin-briefkasten'
 import { MELDUNG_ART_TON, OHNE_IP_UND_COOKIES, geraetKurz } from '@/lib/hof-hilfe'
@@ -44,7 +43,6 @@ export function Wunschliste({ buendel }: { buendel: WunschBuendel[] }): React.JS
       </h2>
       {buendel.length === 0 ? (
         <EmptyState
-          symbol={Lightbulb}
           titel={WUNSCHLISTE_LEER.titel}
           ausweg={{ ohne: 'Die Wunschliste bündelt jeden Wunsch außer Dubletten; Wünsche kommen nur von Höfen und Kundinnen, der Admin legt keinen an' }}
           className="rounded-xl py-6"

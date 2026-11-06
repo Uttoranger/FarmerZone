@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Eye, History, Undo2 } from 'lucide-react'
+import { Check, Eye, Undo2 } from 'lucide-react'
 import {
   ENTWURF_TEXT as E,
   abstandText,
@@ -141,7 +141,7 @@ export function StartseiteZeitplan({
         {E.verlauf}
       </h2>
       {daten.frueher.length === 0 ? (
-        <EmptyState symbol={History} titel={E.keinVerlauf} ausweg={{ ohne: 'Eine frühere Fassung entsteht erst, wenn eine neuere live geht.' }} />
+        <EmptyState titel={E.keinVerlauf} ausweg={{ ohne: 'Eine frühere Fassung entsteht erst, wenn eine neuere live geht.' }} />
       ) : (
         <ul>
           {daten.frueher.map((f) => (

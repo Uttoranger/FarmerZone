@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
@@ -37,7 +36,6 @@ export function StandortFehlt({ eigeneKarte, jetzt }: { eigeneKarte?: EigeneKart
   return (
     <div className="flex flex-col gap-3">
       <EmptyState
-        symbol={MapPin}
         titel={OHNE_STANDORT_TEXT.titel}
         titelStufe={2}
         satz={OHNE_STANDORT_TEXT.satz}

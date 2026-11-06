@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Printer } from 'lucide-react'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
@@ -64,7 +63,6 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
         <QrPlakat daten={daten} />
       ) : (
         <EmptyState
-          symbol={Printer}
           titel="Das Plakat gibt es, sobald dein Hof online ist"
           satz="Solange Kundinnen deine Hofseite nicht sehen können, würde der Code ins Leere führen."
           ausweg={

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, ImageOff, LineChart, List, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Database, Download, ExternalLink, Image as BildSymbol, List, Mail, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import {
   ALARM_MATRIX,
   ADMIN_BETRIEB_HREF,
@@ -312,7 +312,6 @@ export function VerlaufDiagramm({ von, bis, linien, beschreibung }: { von: strin
   if (linien.every((l) => l.punkte.length === 0)) {
     return (
       <EmptyState
-        symbol={LineChart}
         titel={BETRIEB_TEXT.verlaufLeer}
         ausweg={{ ohne: 'Die erste Messung macht der Ablauf jeden Morgen von selbst oder der Knopf „Jetzt messen“ oben auf der Seite.' }}
         className="rounded-xl py-8"
@@ -675,7 +674,6 @@ export function BilderOhneVerwendung({ karte, produktion, anker }: { karte: Ohne
         <p className={cn('text-[13px] leading-snug', LEISE)}>{BETRIEB_TEXT.ohneVerwendungVorschau}</p>
       ) : karte === null ? (
         <EmptyState
-          symbol={ImageOff}
           titel={BETRIEB_TEXT.ohneVerwendungLeer}
           ausweg={{ ohne: 'Die Messung zählt die Bilder ohne Verwendung jeden Morgen von selbst; der Knopf „Jetzt messen“ oben auf der Seite zählt sofort.' }}
           className="rounded-xl py-6"

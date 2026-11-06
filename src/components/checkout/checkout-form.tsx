@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, type FieldErrors } from 'react-hook-form'
-import { Info, Loader2, ShoppingBasket } from 'lucide-react'
+import { Info, Loader2 } from 'lucide-react'
 import { hoefeAdresse } from '@/lib/startseite'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 // Ohne Zod (Nr. 196): Die Kasse prüft mit reinen Funktionen, Zod bleibt auf dem Server.
@@ -961,7 +961,6 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
         </div>
       )}
       <EmptyState
-        symbol={ShoppingBasket}
         titel="Dein Warenkorb ist leer"
         satz={`Leg bei ${hof.name} etwas in den Warenkorb, dann kannst du hier bestellen.`}
         ausweg={

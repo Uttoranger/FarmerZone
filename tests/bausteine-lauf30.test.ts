@@ -150,7 +150,8 @@ const FAELLE: Fall[] = [
   {
     name: 'Hinweiskarte mit „Nochmal“',
     element: createElement(HinweiskarteFehler, { titel: 'Speichern hat nicht geklappt', nochmal: () => {} }, 'Deine Eingaben sind noch da.'),
-    merkmale: ['role="alert"', 'bg-zustand-tun-grund', 'text-zustand-tun', 'Speichern hat nicht geklappt', /<button type="button"[^>]*min-h-\[52px\][^>]*>Nochmal<\/button>/],
+    // Seit Nr. 246 (G6): „Nochmal" klein, linksbündig, in der Warnfarbe statt 52 px über die volle Breite.
+    merkmale: ['role="alert"', 'bg-zustand-tun-grund', 'text-zustand-tun', 'Speichern hat nicht geklappt', /<button type="button"[^>]*self-start[^>]*border-zustand-tun[^>]*>Nochmal<\/button>/],
   },
   {
     name: 'Hinweiskarte ohne Knopf (Karte abgelehnt)',

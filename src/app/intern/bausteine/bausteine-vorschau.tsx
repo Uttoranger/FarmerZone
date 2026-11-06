@@ -2,21 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import {
-  BarChart3,
-  CalendarCheck,
-  Check,
-  Compass,
-  FlaskConical,
-  Info,
-  Package,
-  Plus,
-  ReceiptText,
-  SearchX,
-  ShoppingBasket,
-  SlidersHorizontal,
-  Users,
-} from 'lucide-react'
+import { BarChart3, CalendarCheck, Check, Compass, FlaskConical, Info, Package, Plus, ReceiptText, ShoppingBasket, SlidersHorizontal, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip, FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -422,7 +408,6 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
 
           <Abschnitt id="leer" titel="EmptyState" satz="Symbol, ein Satz und immer ein Ausweg.">
             <EmptyState
-              symbol={SearchX}
               titel="Keine Höfe im Umkreis"
               satz="Im Umkreis von 10 km bietet gerade niemand Eier an."
               ausweg={
@@ -541,9 +526,11 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             <FotoHinzufuegen />
           </Abschnitt>
 
-          <Abschnitt id="hinweis-fehler" titel="Hinweiskarte mit „Nochmal“" satz="Orange für Fehler, die kein Feld betreffen (V17): Karten-Ablehnung ohne Knopf, Speicherfehler mit „Nochmal“.">
+          {/* Ohne „Nochmal": Der Knopf nimmt beim Erscheinen den Fokus (G6) und spränge sonst beim Laden mitten in die Seite —
+              er steht erst nach einem Tipp im Abschnitt „Formularfehler und Nochmal (G6)" (vorschau-246.tsx). */}
+          <Abschnitt id="hinweis-fehler" titel="Hinweiskarte (Fehler)" satz="Orange für Fehler, die kein Feld betreffen (V17): Karten-Ablehnung, Speicherfehler. „Nochmal“ zeigt der Abschnitt G6 weiter unten nach einem Tipp.">
             <HinweiskarteFehler titel="Deine Karte wurde abgelehnt">Es wurde nichts abgebucht. Deine Ware bleibt bis 07:55 Uhr für dich reserviert.</HinweiskarteFehler>
-            <HinweiskarteFehler titel="Speichern hat nicht geklappt" nochmal={() => {}}>
+            <HinweiskarteFehler titel="Speichern hat nicht geklappt">
               Deine Eingaben sind noch da. Prüf den Empfang und versuch es noch einmal.
             </HinweiskarteFehler>
           </Abschnitt>

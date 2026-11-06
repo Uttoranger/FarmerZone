@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CalendarClock, Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -247,7 +247,6 @@ export function PickupSlotsClient({
         />
         {slots.length === 0 ? (
           <EmptyState
-            symbol={CalendarClock}
             titel={ABHOLZEITEN_FEHLEN.titel}
             satz={ABHOLZEITEN_FEHLEN.satz}
             ausweg={

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, MapPin, Share2, Sprout } from 'lucide-react'
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, MapPin, Share2 } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -347,7 +347,6 @@ export function HofseiteKunde({
         <div className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-6 pb-16">
           <h1 className="font-heading text-[28px] leading-tight font-semibold break-words text-foreground">{farm.name}</h1>
           <EmptyState
-            symbol={Sprout}
             titel="Dieser Hof richtet gerade seinen Shop ein"
             satz="Schau bald wieder vorbei."
             ausweg={
