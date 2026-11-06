@@ -51,7 +51,7 @@ import { bestellMarke, zahlartText } from '@/lib/hof-bestellungen'
 import { MARKE } from '@/lib/marke'
 import type { MarkeArt } from '@/lib/marke-art'
 import { barLinkErneutMoeglich, type BarBestellung } from '@/lib/bar-bestaetigung'
-import { fristVon, istVerwaist } from '@/lib/fristen'
+import { fristVon, istVerwaist, type FristBestellung } from '@/lib/fristen'
 import { MAIL_ARTEN, MAIL_WEG, VORRANG, type MailArt } from '@/schemas/mail-auftrag'
 import type { AlleMailsFilter, MailStandFilter, MailWegFilter, MailZeitraum } from '@/schemas/betrieb-mails'
 import { hofSichtbar } from '@/lib/hof-sichtbar'
@@ -78,6 +78,7 @@ export const MAIL_ART_NAME: Record<MailArt, string> = {
   'bestellung-bestaetigung': 'Bestellbestätigung',
   'bestellung-bezahlt-hof': 'Bezahlt (an den Hof)',
   'bar-bestaetigt-hof': 'Bar bestätigt (an den Hof)',
+  'bestellung-bar-hof': 'Neue Bestellung bar (an den Hof)',
   abholbereit: 'Abholbereit',
   'nicht-abholbereit': 'Nicht abholbereit',
   storniert: 'Storniert',
@@ -1054,6 +1055,7 @@ export const NOCHMAL_ERLAUBT = [
   // Hof
   'bestellung-bezahlt-hof',
   'bar-bestaetigt-hof',
+  'bestellung-bar-hof',
   'freischaltung',
   'plattformgebuehr-ankuendigung',
   'lastschrift-gescheitert',
@@ -1248,6 +1250,18 @@ export type NochmalHof = { approvedAt: Date | null; archivedAt: Date | null; ges
 export type NochmalStand = { bestellung: NochmalBestellung | null; hof: NochmalHof | null }
 export type NochmalPruefung = { ok: true } | { ok: false; grund: string }
 
+/**
+ * Wartet die Barbestellung noch auf die Bestätigung der Kundin? Nur dann passt
+ * die Mail „Neue Bestellung bar“ an den Hof (Nr. 256) — EINE Regel für den
+ * Renderer beim Versand (`rendereBestellungBarHof`) und für `passtNochmal`.
+ * Die Frist gilt beim Lesen (`istVerwaist`), nicht erst, wenn der Cron die
+ * Bestellung verfallen lässt: Sonst packte der Hof für eine Bestellung, die
+ * gleich storniert wird.
+ */
+export function barBestellungWartet(b: FristBestellung & { status: string }, jetzt: Date): boolean {
+  return b.status === 'PENDING_CONFIRMATION' && b.paymentMethod !== 'ONLINE' && !istVerwaist(b, jetzt)
+}
+
 const NICHT_MEHR = (status: string): string => `Passt nicht mehr: Die Bestellung steht jetzt auf „${bestellMarke(status).text}“.`
 
 /**
@@ -1286,6 +1300,10 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
       return b.paymentMethod === 'ONLINE' && ['PAID', 'IN_PREPARATION', 'READY', 'PICKED_UP'].includes(s) ? { ok: true } : nein
     case 'bar-bestaetigt-hof':
       return b.paymentMethod !== 'ONLINE' && ['CONFIRMED', 'IN_PREPARATION', 'READY', 'PICKED_UP'].includes(s) ? { ok: true } : nein
+    case 'bestellung-bar-hof':
+      if (barBestellungWartet(b, jetzt)) return { ok: true }
+      if (s === 'PENDING_CONFIRMATION' && b.paymentMethod !== 'ONLINE') return { ok: false, grund: 'Die Frist zum Bestätigen ist vorbei.' }
+      return nein
     case 'abholbereit':
       return s === 'READY' ? { ok: true } : nein
     case 'nicht-abholbereit':
@@ -1308,7 +1326,7 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
 
 /** Woher die Adresse einer Art kommt — frisch geladen, nie aus dem Protokoll. `null`: nirgends gespeichert. */
 export function adresseQuelle(art: string): 'bestellung' | 'hof' | 'hofInhaber' | null {
-  if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof' || art === 'widerruf-hof') return 'hof'
+  if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof' || art === 'bestellung-bar-hof' || art === 'widerruf-hof') return 'hof'
   if (art === 'freischaltung' || art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') return 'hofInhaber'
   if (nochmalErlaubt(art)) return 'bestellung'
   return null
