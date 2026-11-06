@@ -228,6 +228,35 @@ export const HOEFE_LEER = {
 export const SUCHE_BESCHRIFTUNG = 'Hof oder Produkt'
 export const SUCHE_PLATZHALTER = 'z. B. Eier oder Heu'
 
+/**
+ * Die Abholzeile einer Hofkarte der Startseite (Board w1-startseite, „Abholung heute, …"): ein
+ * Termin mit „Abholung" davor, „Heute"/„Morgen" (formatiereAbholung schreibt sie für den
+ * Satzanfang) danach klein; ein Hinweis (Pause) steht, wie er ist; ohne Abholzeit null.
+ */
+export function abholzeileDerKarte(hof: Pick<StartseitenHof, 'abholung' | 'abholungIstTermin'>): string | null {
+  if (!hof.abholung) return null
+  if (!hof.abholungIstTermin) return hof.abholung
+  return `Abholung ${hof.abholung.replace(/^(Heute|Morgen)(?=\s)/, (wort) => wort.toLowerCase())}`
+}
+
+/** Die kurzen Karten, die nebeneinander stehen dürfen (Board w1-startseite, Bild 2). */
+const KURZ_ARTEN: ReadonlySet<string> = new Set(['FUTTER', 'BRENNMATERIAL'])
+
+/**
+ * Die Einträge der Startseite in Gruppen (Nr. 234): Folgen Futter und Brennmaterial in der Liste
+ * direkt aufeinander, bilden sie ein Paar (ab 768 px nebeneinander) — die Reihenfolge aus Admin ›
+ * Startseite bleibt, nur der Rahmen ist gemeinsam. Alles andere steht allein.
+ */
+export function gruppiereKurzkarten<T extends { art: string }>(eintraege: readonly T[]): T[][] {
+  const gruppen: T[][] = []
+  for (const eintrag of eintraege) {
+    const letzte = gruppen.at(-1)
+    if (letzte && letzte.length === 1 && KURZ_ARTEN.has(letzte[0].art) && KURZ_ARTEN.has(eintrag.art)) letzte.push(eintrag)
+    else gruppen.push([eintrag])
+  }
+  return gruppen
+}
+
 /** Wo der Browser merkt, dass die Person das Startvideo angehalten hat (nur „pause" wird gespeichert). */
 export const HERO_VIDEO_SCHLUESSEL = 'fz-startvideo'
 

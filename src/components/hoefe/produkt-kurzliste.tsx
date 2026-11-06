@@ -3,22 +3,14 @@ import { INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import type { VorschauProdukt } from '@/lib/hofuebersicht'
 import { cn } from '@/lib/utils'
 
-/** Eine Zeile „Name … Preis" (Board w1-startseite: „Heumilch frisch, 1 L … € 1,49"). */
-export type KurzZeile = {
-  id: string
-  name: string
-  /** Wie überall der Preis je Gebinde über formatGrundpreis („€ 1,49 / L", „€ 50,00 für 2 kg") — im Hofpreis-Modell schon der Endpreis. */
-  preis: string
-  /** Bestand abzüglich Reservierung über null — sonst steht „derzeit aus" statt des Preises. */
-  verfuegbar: boolean
-}
+// Eine Zeile „Name … Preis" (Board w1-startseite: „Heumilch frisch, 1 L … € 1,49"): der Preis wie überall
+// über formatGrundpreis („€ 1,49 / L", „€ 50,00 für 2 kg", im Hofpreis-Modell schon der Endpreis);
+// nicht verfügbar (Bestand abzüglich Reservierung über null) steht „derzeit aus" statt des Preises.
+type KurzZeile = { id: string; name: string; preis: string; verfuegbar: boolean }
 
-/**
- * Die Zeilen aus der Produktvorschau der Hofliste — EINE Quelle für Startseite und /hoefe.
- * Gerechnet wird nichts: Der Preis kommt aus der Liste (im Hofpreis-Modell der Endpreis) und
- * wird nur formatiert.
- */
-export function produktKurzzeilen(produkte: readonly VorschauProdukt[]): { zeilen: KurzZeile[]; inklPlattformgebuehr: boolean } {
+// Die Zeilen aus der Produktvorschau der Hofliste. Gerechnet wird nichts: Der Preis kommt aus der
+// Liste und wird nur formatiert.
+function produktKurzzeilen(produkte: readonly VorschauProdukt[]): { zeilen: KurzZeile[]; inklPlattformgebuehr: boolean } {
   return {
     zeilen: produkte.map((p) => ({ id: p.id, name: p.name, preis: formatGrundpreis(p.price, p.unit, p.unitSize), verfuegbar: p.verfuegbar })),
     inklPlattformgebuehr: produkte.some((p) => p.inklPlattformgebuehr === true),
@@ -30,7 +22,7 @@ export function produktKurzzeilen(produkte: readonly VorschauProdukt[]): { zeile
  * w1-/s1-hoefe, Nr. 234): links der Name (gekürzt, voller Name im title), rechts der Preis, ohne
  * Vorschaubild; darunter einmal „inkl. Plattformgebühr", wenn die Preise sie enthalten (N38).
  * EINE Gestalt für die Startseite und die Hofkarte auf /hoefe (auch die eigene Hofkarte in
- * Region); die Zeilen baut produktKurzzeilen. Ohne eigene Links: Die Zeilen erben das Verhalten
+ * Region); die Zeilen baut produktKurzzeilen (oben). Ohne eigene Links: Die Zeilen erben das Verhalten
  * der Karte (#82). „derzeit aus" steht statt des Preises — leise, aber nie verblasst (Kontrast).
  * `weitere` (Zahl der nicht gezeigten Produkte, nur /hoefe) sagt „+ n weitere Produkte".
  */

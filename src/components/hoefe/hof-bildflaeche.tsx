@@ -1,15 +1,14 @@
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
-/**
- * Bilder im Dunkeln (Freigabe Lauf 31, Maßstab Punkt 4: keine hellen Flecken) — dieselben Werte wie
- * Hofseite und Produktseite (ILLUSTRATION_HUELLE/-BILD, FOTO_HUELLE in hofseite/produkt-karte.tsx,
- * Nr. 235). Hier eigens, weil jene Datei ein Client-Modul ist: Eine Server-Komponente (Startseite)
- * bekäme aus ihr nur einen Verweis statt der Klassen. Eine gemeinsame Quelle in ui/ ist Nacharbeit.
- * Illustration: mit der Fläche der Hülle multipliziert, die Hülle hellt danach auf; Foto: leicht dunkler.
- */
-export const ILLUSTRATION_HUELLE_DUNKEL = 'dark:brightness-[1.6]'
-export const ILLUSTRATION_BILD_DUNKEL = 'dark:mix-blend-multiply'
+// Bilder im Dunkeln (Freigabe Lauf 31, Maßstab Punkt 4: keine hellen Flecken) — dieselben Werte wie
+// Hofseite und Produktseite (ILLUSTRATION_HUELLE/-BILD, FOTO_HUELLE in hofseite/produkt-karte.tsx,
+// Nr. 235). Hier eigens, weil jene Datei ein Client-Modul ist: Eine Server-Komponente (Startseite)
+// bekäme aus ihr nur einen Verweis statt der Klassen. Eine gemeinsame Quelle in ui/ ist Nacharbeit (242).
+// Illustration: mit der Fläche der Hülle multipliziert, die Hülle hellt danach auf; Foto: leicht dunkler
+// (FOTO_HUELLE_DUNKEL nehmen auch Vorschaubild, Fotostreifen und die Hofkarten der Startseite).
+const ILLUSTRATION_HUELLE_DUNKEL = 'dark:brightness-[1.6]'
+const ILLUSTRATION_BILD_DUNKEL = 'dark:mix-blend-multiply'
 export const FOTO_HUELLE_DUNKEL = 'dark:brightness-[0.85]'
 
 /**

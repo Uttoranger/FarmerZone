@@ -56,6 +56,7 @@ import {
   ProduktZeile,
   type KartenHof,
   type TrefferHof,
+  kurzeKategorieReihe,
 } from '@/components/hoefe/entdecken-teile'
 import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
@@ -468,8 +469,10 @@ describe('Leerzustand, kein Hof, Fehler', () => {
 
   it('ohne Höfe: kein Fehler, sondern ein Anfang', () => {
     const leer = html(createElement(KeineHoefe))
+    // Dieselbe Textquelle wie die Startseite (HOEFE_LEER, Nr. 234): „Für Höfe" statt „Hof registrieren".
     expect(leer).toContain('Die ersten Höfe kommen gerade dazu')
-    expect(leer).toContain('href="/register"')
+    expect(leer).toMatch(/<a href="\/fuer-hoefe"[^>]*>Für Höfe<\/a>/)
+    expect(leer).not.toContain('href="/register"')
   })
 
   it('der Fehler steht inline, ohne Technik und ohne roten Text', () => {
@@ -1070,5 +1073,23 @@ describe('Filter-Links auf /hoefe tragen rel="nofollow" (Register N19)', () => {
       html(createElement(FilterChip, props as ComponentProps<typeof FilterChip>, text))
     expect(chip({ href: '/admin?reiter=alle' }, 'Alle')).not.toContain('rel=')
     expect(chip({ href: '/hoefe?kat=EIER', nofollow: true }, 'Eier')).toContain('rel="nofollow"')
+  })
+})
+
+describe('Nr. 234: die kurze Kategorie-Reihe (Boards w1-/s1-hoefe)', () => {
+  const chip = (schluessel: string, aktiv = false) => ({ schluessel, label: schluessel, aktiv, ziel: LEERER_HOEFE_FILTER })
+  const reihe = [chip('alle', true), chip('MILCH'), chip('EIER'), chip('FLEISCH'), chip('FISCH'), chip('futter'), chip('BRENNHOLZ')]
+  const schluessel = (chips: { schluessel: string }[]) => chips.map((c) => c.schluessel)
+
+  it('fünf Chips: „Alle", die zwei ersten Hofladen-Kategorien, Futtermittel, Brennmaterial', () => {
+    expect(schluessel(kurzeKategorieReihe(reihe))).toEqual(['alle', 'MILCH', 'EIER', 'futter', 'BRENNHOLZ'])
+  })
+
+  it('eine gewählte Kategorie bleibt in der Reihe, auch wenn sie hinten steht — aufgefüllt wird davor', () => {
+    const gewaehlt = reihe.map((c) => (c.schluessel === 'FISCH' ? { ...c, aktiv: true } : c))
+    expect(schluessel(kurzeKategorieReihe(gewaehlt))).toEqual(['alle', 'MILCH', 'FISCH', 'futter', 'BRENNHOLZ'])
+    // Gegenprobe: zwei gewählte verdrängen die ungewählten ganz.
+    const zwei = reihe.map((c) => (c.schluessel === 'FISCH' || c.schluessel === 'FLEISCH' ? { ...c, aktiv: true } : c))
+    expect(schluessel(kurzeKategorieReihe(zwei))).toEqual(['alle', 'FLEISCH', 'FISCH', 'futter', 'BRENNHOLZ'])
   })
 })

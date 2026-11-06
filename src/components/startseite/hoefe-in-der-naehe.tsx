@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ChevronRight, Store } from 'lucide-react'
-import { HOEFE_LEER, KARTE_ADRESSE, STARTSEITE_CHIPS, STARTSEITE_HOEFE_DECKEL, STARTSEITE_HOEFE_TITEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
+import { HOEFE_LEER, KARTE_ADRESSE, abholzeileDerKarte, STARTSEITE_CHIPS, STARTSEITE_HOEFE_DECKEL, STARTSEITE_HOEFE_TITEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -90,12 +90,12 @@ function HofBild({ hof, sizes, className }: { hof: StartseitenHof; sizes: string
  * („Macht gerade Pause – …") halbfett und leise wie auf /hoefe (V18, hofkarteKlassen).
  */
 function Abholung({ hof }: { hof: StartseitenHof }) {
-  if (!hof.abholung) return null
+  const text = abholzeileDerKarte(hof)
+  if (!text) return null
   const { abholung } = hofkarteKlassen(hof.pausiert === true)
   return (
     <span className={cn('block text-[14px]', hof.abholungIstTermin ? 'font-semibold text-status-fertig' : cn(abholung, 'text-muted-foreground'))}>
-      {/* „Abholung heute …“ wie im Board: nach „Abholung“ klein (formatiereAbholung schreibt „Heute“/„Morgen“ für den Satzanfang). */}
-      {hof.abholungIstTermin ? `Abholung ${hof.abholung.replace(/^(Heute|Morgen)\b/, (w) => w.toLowerCase())}` : hof.abholung}
+      {text}
     </span>
   )
 }

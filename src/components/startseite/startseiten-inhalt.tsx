@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { Eye } from 'lucide-react'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
-import { waehleKartenHoefe, waehleStartseitenHoefe, type StartseitenHof, type StartseitenKarte } from '@/lib/startseite'
+import { gruppiereKurzkarten, waehleKartenHoefe, waehleStartseitenHoefe, type StartseitenHof, type StartseitenKarte } from '@/lib/startseite'
 import { HOEFE_AUSWAHL_MAX, type RenderEintrag, type StartseitenBlockDaten } from '@/lib/startseite-gestalten'
 import { vorschauBandText } from '@/lib/startseite-fassung'
 import type { VorschauQuelle } from '@/schemas/startseite'
@@ -126,24 +126,6 @@ function Eintrag({ eintrag, jetzt }: { eintrag: RenderEintrag; jetzt: Date }) {
       return <Abschnitt jetzt={jetzt} />
     }
   }
-}
-
-/** Die kurzen Karten, die nebeneinander stehen dürfen (Board w1-startseite, Bild 2). */
-const KURZ_ARTEN = new Set<string>(['FUTTER', 'BRENNMATERIAL'])
-
-/**
- * Die Einträge in Gruppen: Folgen Futter und Brennmaterial in der Liste direkt aufeinander, stehen
- * sie als Paar nebeneinander (ab 768 px zwei Spalten, darunter untereinander) — die Reihenfolge aus
- * Admin › Startseite bleibt, nur der Rahmen ist gemeinsam (Nr. 234).
- */
-export function gruppiereKurzkarten(eintraege: readonly RenderEintrag[]): RenderEintrag[][] {
-  const gruppen: RenderEintrag[][] = []
-  for (const eintrag of eintraege) {
-    const letzte = gruppen.at(-1)
-    if (letzte && letzte.length === 1 && KURZ_ARTEN.has(letzte[0].art) && KURZ_ARTEN.has(eintrag.art)) letzte.push(eintrag)
-    else gruppen.push([eintrag])
-  }
-  return gruppen
 }
 
 /** Futter und Brennmaterial als Paar: EIN Rahmen der Breite, zwei Spalten ab 768 px. */

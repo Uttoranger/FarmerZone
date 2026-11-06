@@ -33,6 +33,7 @@ import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
 import { FOTO_HUELLE_DUNKEL, HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
 import { ProduktKurzliste } from '@/components/hoefe/produkt-kurzliste'
 import { hofkarteKlassen } from '@/components/ui/hofkarte-rahmen'
+import { HOEFE_LEER } from '@/lib/startseite'
 import { HofKopf } from '@/components/hoefe/hof-kopf'
 import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
 import { Abholzeile } from '@/components/hoefe/abholzeile'
@@ -548,22 +549,26 @@ export function EntdeckenLeer({
   )
 }
 
-/** Noch kein einziger öffentlicher Hof — kein Fehler, ein Anfang (wie die Startseite). */
+/**
+ * Noch kein einziger öffentlicher Hof — kein Fehler, ein Anfang: derselbe Zustand und dieselbe
+ * Textquelle wie auf der Startseite (`HOEFE_LEER`, Board w1-/s1-startseite Bild 5; die Boards von
+ * /hoefe zeigen ihn nicht). Der Ausweg führt zur Seite für Höfe.
+ */
 export function KeineHoefe(): React.JSX.Element {
   return (
     <EmptyState
       symbol={Store}
-      titel="Die ersten Höfe kommen gerade dazu"
-      satz="Schau bald wieder vorbei. Du hast selbst einen Hof? Dann mach den Anfang."
+      titel={HOEFE_LEER.titel}
+      satz={HOEFE_LEER.satz}
       ausweg={
         <Link
-          href="/register"
+          href={HOEFE_LEER.adresse}
           className={cn(
             'inline-flex h-11 items-center rounded-full border border-border px-[18px] text-sm font-semibold text-foreground hover:bg-muted',
             FOKUS_RAHMEN
           )}
         >
-          Hof registrieren
+          {HOEFE_LEER.knopf}
         </Link>
       }
     />
