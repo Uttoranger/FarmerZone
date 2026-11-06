@@ -3,7 +3,12 @@
  * Virtueller Authenticator für den Prüf-Browser (freigabe.md §36,
  * „Virtueller Authenticator“). Node mit eingebautem WebSocket, kein Paket.
  *
- *   node scripts/pruefung/passkey-browser.mjs --port <devtools-port> [--passkey .nachtlauf/admin-passkey.json] [--url-teil localhost:3000]
+ *   node scripts/pruefung/passkey-browser.mjs --port <devtools-port> [--passkey .nachtlauf/admin-passkey.json] [--url-teil localhost:3000] [--zaehler <n>]
+ *
+ * `--zaehler`: Startwert des Signaturzählers. Nach einer Anmeldung steht der
+ * Zähler in der DB höher; ein neuer Authenticator mit 0 würde als Kopie
+ * abgewiesen (Zähler darf nicht sinken). Für eine zweite Browser-Sitzung
+ * deshalb einen Wert über allen bisherigen Anmeldungen angeben.
  *
  * Verbindet sich mit dem DevTools-Port der Prüf-Instanz (nur 127.0.0.1), hängt
  * sich an die Seite, deren Adresse `--url-teil` enthält, und ruft
@@ -37,6 +42,7 @@ const wert = (name, vorgabe) => {
 const port = wert('--port', '')
 const passkeyDatei = wert('--passkey', join(WT, '.nachtlauf', 'admin-passkey.json'))
 const urlTeil = wert('--url-teil', 'localhost:3000')
+const zaehler = wert('--zaehler', '0')
 
 // 1. Sperre — vor allem anderen.
 const sperre = spawnSync(join(WT, 'node_modules', '.bin', 'tsx'), [join(WT, 'scripts', 'pruefung', 'sperre-cli.ts'), '--db', '--ordner', WT], {
@@ -45,6 +51,7 @@ const sperre = spawnSync(join(WT, 'node_modules', '.bin', 'tsx'), [join(WT, 'scr
 })
 if (sperre.status !== 0) abbruch('Sperre hat abgebrochen.')
 if (!/^\d+$/.test(port)) abbruch('--port <devtools-port> fehlt.')
+if (!/^\d+$/.test(zaehler)) abbruch('--zaehler <zahl>.')
 
 const geheim = JSON.parse(readFileSync(passkeyDatei, 'utf8'))
 if (!RP_IDS.includes(geheim.rpId)) abbruch('rpId nur localhost oder 127.0.0.1.')
@@ -103,7 +110,7 @@ try {
       rpId: geheim.rpId,
       userHandle: geheim.userHandle,
       privateKey: geheim.privateKey,
-      signCount: geheim.signCount,
+      signCount: Math.max(geheim.signCount, Number(zaehler)),
     },
   })
   console.log(`passkey-browser: Authenticator bereit (Seite ${new URL(seite.url).host}). Beenden mit Strg+C.`)
