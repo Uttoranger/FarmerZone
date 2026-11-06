@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
-import { BestellungenFindenFormular } from '@/components/bestellungen/bestellungen-finden-formular'
+import { BestellungenFindenBlock } from '@/components/bestellungen/bestellungen-finden-formular'
 
 /*
  * Die Bausteine der Seite „Meine Bestellungen" (/bestellungen, Nr. 14). Mockups:
@@ -24,7 +24,7 @@ const SEITE = 'mx-auto flex w-full max-w-[552px] flex-col gap-4 px-4 pt-6 pb-12 
 const TITEL = 'font-heading text-[26px] leading-tight font-semibold md:text-[28px]'
 /** Knopf mit Rand in Inhaltsbreite (Board s1-/w1-meine-bestellungen: 44 px, Radius 12 px, Feldrand). */
 const KNOPF_KLEIN_RAHMEN = cn(
-  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-input bg-card px-3.5 text-[14px] font-bold text-foreground hover:bg-muted',
+  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-[12px] border border-input bg-card px-3.5 text-[14px] font-bold text-foreground hover:bg-muted',
   FOKUS_RAHMEN
 )
 
@@ -32,19 +32,12 @@ const KNOPF_KLEIN_RAHMEN = cn(
 export function BestellungenFinden({ abgelaufen }: { abgelaufen: boolean }): React.JSX.Element {
   return (
     <div className={SEITE}>
-      <div className="flex flex-col gap-1.5">
-        <h1 className={TITEL}>Meine Bestellungen</h1>
-        {!abgelaufen && (
-          <p className="text-[15px] leading-normal text-foreground">
-            Hier findest du alle Bestellungen zu deiner E-Mail-Adresse – ohne Konto, nur für diesen Besuch.
-          </p>
-        )}
-      </div>
+      <h1 className={TITEL}>Meine Bestellungen</h1>
       {abgelaufen && (
         // Farben aus dem Paar „tun“ (≥ 4,5:1 in beiden Themes), wie die Hinweiskarte für Fehler — hier ein Zustand, kein Fehler.
         <section
           aria-labelledby="abgelaufen-titel"
-          className="flex flex-col gap-1 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun"
+          className="flex flex-col gap-1 rounded-[16px] border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun"
         >
           <h2 id="abgelaufen-titel" className="text-[15px] font-bold">
             Deine Ansicht ist abgelaufen
@@ -52,14 +45,8 @@ export function BestellungenFinden({ abgelaufen }: { abgelaufen: boolean }): Rea
           <p className="text-[14px] leading-normal">Sie gilt nur für einen Besuch. Hol dir einfach einen neuen Code.</p>
         </section>
       )}
-      <section aria-label="Bestellungen finden" className={KARTE}>
-        <BestellungenFindenFormular />
-      </section>
-      {!abgelaufen && (
-        <p className="text-[13px] leading-normal text-muted-foreground">
-          Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.
-        </p>
-      )}
+      {/* Einleitung, Karte und Hinweis: Die Sätze stehen nur im ersten Schritt — den Schritt kennt nur der Browser. */}
+      <BestellungenFindenBlock ohneSaetze={abgelaufen} />
     </div>
   )
 }
@@ -130,7 +117,7 @@ export function BestellungenListe({
           titel="Keine Bestellungen gefunden"
           satz="Zu dieser Adresse gibt es bei uns keine Bestellung. Vielleicht hast du mit einer anderen bestellt?"
           // Board Bild 4: die Wege über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
-          className="items-stretch border-solid py-6 [&>span]:self-center"
+          className="items-stretch rounded-[16px] border-solid py-6 [&>span]:self-center"
           ausweg={
             <div className="flex w-full flex-col gap-1">
               <Link href="/hoefe" className={KNOPF_BREIT_GRUEN}>
@@ -192,7 +179,7 @@ export function BestellungenFehler({ email }: { email?: string }): React.JSX.Ele
     <div className={SEITE}>
       <h1 className={TITEL}>Meine Bestellungen</h1>
       {email && <AnsichtKarte email={email} />}
-      <section role="alert" aria-labelledby="fehler-titel" className="flex flex-col gap-1.5 rounded-2xl border-[1.5px] border-input bg-card px-4 py-4">
+      <section role="alert" aria-labelledby="fehler-titel" className="flex flex-col gap-1.5 rounded-[16px] border-[1.5px] border-input bg-card px-4 py-4">
         <h2 id="fehler-titel" className="text-[16px] font-bold">
           Wir konnten deine Bestellungen gerade nicht laden
         </h2>

@@ -4,6 +4,15 @@ import { kundenPausenText } from '@/lib/shop-pause'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 
 /**
+ * Der Zustand bei Pause in der Wortform der Boards w1-/s1-hofseite: „<Hof> pausiert gerade." als Titel
+ * der Karte und klein in der Hofzeile („Braunau am Inn · pausiert gerade"). EINE Quelle für beide.
+ */
+export const PAUSIERT_GERADE = 'pausiert gerade'
+
+/** Was bei einer Pause noch geht (Board w1-/s1-hofseite Bild 4) — nur auf Hof- und Produktseite. */
+export const PAUSE_ANSEHEN_SAETZE = 'Du kannst dir das Angebot ansehen. Dein Warenkorb bleibt gespeichert.'
+
+/**
  * Die Hinweiskarte zur Kaufsperre (Register N24) — EINE Komponente für Hofseite,
  * Produktseite, Mini-Warenkorb und Kasse, an der Stelle, an der vorher nur die
  * Pause-Karte stand:
@@ -21,6 +30,7 @@ export function KaufSperreHinweis({
   hofName,
   pauseMessage,
   kurz = false,
+  hofseite = false,
 }: {
   sperre: KaufSperre
   hofName: string
@@ -28,11 +38,32 @@ export function KaufSperreHinweis({
   pauseMessage: string | null
   /** Nur der Titel, ohne Satz — für den Mini-Warenkorb neben der vollen Karte. */
   kurz?: boolean
+  /**
+   * Die Pause auf Hof- und Produktseite in der Gestalt der Boards w1-/s1-hofseite Bild 4:
+   * Fläche und Schrift „tun“, ohne Symbol, die Nachricht des Hofs in Anführungszeichen und
+   * die zwei Sätze, die der Kundin sagen, was noch geht. Nur Anzeige — die Sperre selbst
+   * entscheidet `kaufSperre`. Kasse, Korb-Blatt und Mein Hof bleiben bei der Hinweiskarte.
+   */
+  hofseite?: boolean
 }): React.JSX.Element | null {
   if (sperre === null) return null
+  if (sperre === 'pause' && (hofseite || kurz)) {
+    const titel = `${hofName} ${PAUSIERT_GERADE}.`
+    // Im Mini-Warenkorb nur der Titel auf der getönten Fläche (Board w1-hofseite Bild 4).
+    if (kurz) return <p className="rounded-xl bg-zustand-tun-grund px-3 py-2.5 text-[14px] font-bold text-zustand-tun">{titel}</p>
+    const eigene = pauseMessage?.trim()
+    return (
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-zustand-tun">
+        <p className="text-[15px] font-bold">{titel}</p>
+        <p className="text-[14px] break-words">
+          {eigene ? `„${eigene}“` : kundenPausenText(null)} {PAUSE_ANSEHEN_SAETZE}
+        </p>
+      </div>
+    )
+  }
   if (sperre === 'pause') {
     return (
-      <Hinweiskarte ton="orange" symbol={PauseCircle} titel={`${hofName} pausiert gerade.`}>
+      <Hinweiskarte ton="orange" symbol={PauseCircle} titel={`${hofName} ${PAUSIERT_GERADE}.`}>
         {!kurz && <span className="break-words">{kundenPausenText(pauseMessage)}</span>}
       </Hinweiskarte>
     )

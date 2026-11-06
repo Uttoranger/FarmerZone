@@ -226,6 +226,17 @@ describe('Übersicht: Servicegebühr als eigene Zeile', () => {
     expect(html).not.toContain('entfällt')
   })
 
+  it('unter dem Mindestbestellwert (Board s1-/w1-kasse Bild 5, Runde 2): ohne (i)-Knopf, der Betrag bleibt', () => {
+    const zeile = gebuehrZeile(GEBUEHR_5, JETZT, 'ONLINE')
+    const ohne = renderToStaticMarkup(
+      createElement(UebersichtKarte, { betraege: kassenBetraege(korb, GEBUEHR_5, JETZT, 'ONLINE'), gebuehrText: zeile.titel, mitErklaerung: false })
+    )
+    expect(ohne).toContain('€ 0,52')
+    expect(ohne).not.toContain('aria-expanded')
+    // Gegenprobe: ohne Angabe steht der Knopf (N10).
+    expect(uebersicht(GEBUEHR_5, 'ONLINE')).toContain('aria-expanded')
+  })
+
   it('ohne Gebühr keine Gebührenzeile — online wie bar beim gebührenfreien Hof', () => {
     const frei = { ...GEBUEHR_5, serviceFeeActiveFrom: null }
     for (const art of ['ONLINE', 'ONSITE_CASH'] as const) {
@@ -512,5 +523,16 @@ describe('Abholung: jeder Termin mit Datum (Nr. 46)', () => {
     expect((html.match(/type="radio"/g) ?? []).length).toBe(kacheln.length)
     // Ein Wochentag ohne Datum („Samstag") kommt nicht mehr vor.
     expect(html).not.toMatch(/>(Montag|Samstag|Mittwoch)</)
+  })
+})
+
+describe('Unter dem Mindestbestellwert im Browser (Board w1-kasse Bild 5, Runde 2)', () => {
+  const quelle = readFileSync(join(process.cwd(), 'src/components/checkout/checkout-form.tsx'), 'utf8')
+
+  it('die h1 „Bestellen bei <Hof>“ steht ab 768 px in der Seite, der Kopf zeigt dann keinen Titel', () => {
+    const ansicht = quelle.slice(quelle.indexOf('export function KasseUnterMindestwert'))
+    expect(ansicht).toMatch(/<h1 className="hidden [^"]*md:block">\s*Bestellen bei \{hofName\}/)
+    // Der Aufruf setzt h1InSeiteAbMd (dritter Parameter) und die schmale Spalte für „Vertrag widerrufen“.
+    expect(quelle).toMatch(/mitErklaerung=\{false\}[\s\S]{0,400}\/>,\s*\/\/[^\n]*\n\s*true,\s*KASSE_SCHMAL\s*\)/)
   })
 })
