@@ -11,7 +11,7 @@
  *  3. Seed wie prisma/seed.ts (seed-lauf.ts), ohne dessen Abschlussausgabe —
  *     die nennt das Seed-Passwort, und das gehört in keine Datei.
  *  4. Stichtag hofpreisModellAb setzen; Gründung bleibt unberührt (P2).
- *  5. Admin: adminSeit und die Zeile „Prüf-Passkey“; der private Schlüssel nur
+ *  5. Admin: adminSeit, Inhaberin und die Zeile „Prüf-Passkey“; der private Schlüssel nur
  *     nach .nachtlauf/admin-passkey.json (chmod 600).
  *  6. Signierte Links je Zustand mit den Signier-Funktionen der App nach
  *     .nachtlauf/pruef-links.json (chmod 600).
@@ -111,7 +111,9 @@ async function legePasskeyAn(prisma: Prisma, jetzt: Date, optionen: SeedOptionen
   // adminSeit vor dem Passkey: adminPasskeyWo zählt nur Passkeys ab adminSeit.
   const adminSeit = new Date(jetzt.getTime() - 60 * 60 * 1000)
   const passkey = erzeugePruefPasskey(admin.id, new Date(jetzt.getTime() - 30 * 60 * 1000))
-  await prisma.user.update({ where: { id: admin.id }, data: { adminSeit } })
+  // Inhaberin, damit alle Admin-Seiten erreichbar sind (Geld braucht das Recht
+  // „geld“, N35); die Boards zeigen das Betreiber-Konto mit allen Rechten.
+  await prisma.user.update({ where: { id: admin.id }, data: { adminSeit, adminInhaber: true } })
   await prisma.passkey.create({ data: passkey.zeile })
   schreibeGeheim(optionen.passkey, passkey.geheim)
 }

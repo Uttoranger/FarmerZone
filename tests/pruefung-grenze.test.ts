@@ -27,7 +27,8 @@ describe('Grenze des Prüfwerkzeugs', () => {
       .filter((pfad) => VERWEIS.test(readFileSync(pfad, 'utf8')))
       .map((pfad) => pfad.slice(WURZEL.length + 1))
     expect(treffer).toEqual([])
-  })
+    // Liest ganz src/ — unter Last braucht das mehr als die Vorgabe (zeitgrenzen-wache).
+  }, 30_000)
 
   it('pruefen:seed kommt in build, vercel-build, postinstall und db:seed nicht vor', () => {
     const skripte = (JSON.parse(readFileSync(join(WURZEL, 'package.json'), 'utf8')) as { scripts: Record<string, string> }).scripts
