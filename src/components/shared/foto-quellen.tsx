@@ -95,6 +95,18 @@ function istInstalliert(): boolean {
   )
 }
 
+/**
+ * Der Name jeder verborgenen Datei-Eingabe (Nr. 242, Abnahme Lauf 31: „Feld ohne Beschriftung“ auf Beiträge und
+ * Problem melden). Bedient werden die Eingaben nur über die sichtbaren Knöpfe („Foto wählen“, „Foto aufnehmen“);
+ * die Eingaben selbst stehen in einer `hidden`-Hülle außerhalb von Tab-Reihe und Screenreader. Der Name hilft,
+ * wo ein Werkzeug sie trotzdem als Feld zählt.
+ */
+export const FOTO_EINGABE_NAME = {
+  galerie: 'Foto aus der Galerie wählen',
+  dateien: 'Foto aus den Dateien wählen',
+  kamera: 'Foto aufnehmen',
+} as const
+
 /** Was der Screenreader zur Karte ansagt — je Grund. */
 const KARTEN_LABEL: Record<KartenGrund, string> = {
   lesen: 'Foto nicht lesbar',
@@ -230,40 +242,47 @@ export function useFotoQuellen({
 
   const elemente = (
     <>
-      {/* Die Galerie: accept="image/*" ohne capture — Android zeigt die
-          Systemfotoauswahl, das iPhone die Mediathek samt iCloud-Abruf.
-          Erster Weg auf iPhone und Desktop, Ausweg auf Android. */}
-      <input
-        ref={galerieRef}
-        type="file"
-        accept="image/*"
-        multiple={multiple}
-        className="hidden"
-        onClick={vorAuswahl}
-        onChange={(e) => auswahl(e, 'galerie')}
-      />
-      {/* Die Dateien-App: Das breite accept führt Android in die Dateien-App
-          statt in die Fotoauswahl. Erster Weg auf Android, Ausweg sonst.
-          Weil dort auch Nicht-Bilder wählbar sind, prüft die Lese-Stufe die
-          ersten Bytes (foto-wege.ts). */}
-      <input
-        ref={dateienRef}
-        type="file"
-        accept="image/*,application/octet-stream"
-        multiple={multiple}
-        className="hidden"
-        onClick={vorAuswahl}
-        onChange={(e) => auswahl(e, 'dateien')}
-      />
-      <input
-        ref={kameraRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onClick={vorAuswahl}
-        onChange={(e) => auswahl(e, 'kamera')}
-      />
+      {/* Die Hülle verbirgt alle drei Eingaben auf einmal (FOTO_EINGABE_NAME); sie steht fest im Baum, damit
+          keine Eingabe zwischen Auswahl und Upload aus- und eingehängt wird (CODING_STANDARDS §8). */}
+      <div hidden data-slot="foto-eingaben">
+        {/* Die Galerie: accept="image/*" ohne capture — Android zeigt die
+            Systemfotoauswahl, das iPhone die Mediathek samt iCloud-Abruf.
+            Erster Weg auf iPhone und Desktop, Ausweg auf Android. */}
+        <input
+          ref={galerieRef}
+          type="file"
+          accept="image/*"
+          multiple={multiple}
+          tabIndex={-1}
+          onClick={vorAuswahl}
+          aria-label={FOTO_EINGABE_NAME.galerie}
+          onChange={(e) => auswahl(e, 'galerie')}
+        />
+        {/* Die Dateien-App: Das breite accept führt Android in die Dateien-App
+            statt in die Fotoauswahl. Erster Weg auf Android, Ausweg sonst.
+            Weil dort auch Nicht-Bilder wählbar sind, prüft die Lese-Stufe die
+            ersten Bytes (foto-wege.ts). */}
+        <input
+          ref={dateienRef}
+          type="file"
+          accept="image/*,application/octet-stream"
+          multiple={multiple}
+          tabIndex={-1}
+          onClick={vorAuswahl}
+          aria-label={FOTO_EINGABE_NAME.dateien}
+          onChange={(e) => auswahl(e, 'dateien')}
+        />
+        <input
+          ref={kameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          tabIndex={-1}
+          onClick={vorAuswahl}
+          aria-label={FOTO_EINGABE_NAME.kamera}
+          onChange={(e) => auswahl(e, 'kamera')}
+        />
+      </div>
 
       {menueOffen && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Foto auswählen">

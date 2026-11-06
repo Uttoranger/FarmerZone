@@ -13,7 +13,7 @@ import { BildPlatzhalter } from '@/components/ui/bild-platzhalter'
 import { HofkarteRahmen, hofkarteKlassen } from '@/components/ui/hofkarte-rahmen'
 import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
 import { ProduktKurzliste } from '@/components/hoefe/produkt-kurzliste'
-import { FOTO_HUELLE_DUNKEL } from '@/components/hoefe/hof-bildflaeche'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 
 /*
  * „Höfe in deiner Nähe" (Mockups web-k0-startseite, mobil-k0-startseite):
@@ -79,7 +79,7 @@ function HofBild({ hof, sizes, className }: { hof: StartseitenHof; sizes: string
   const { bild } = hofkarteKlassen(hof.pausiert === true)
   if (!hof.foto) return <BildPlatzhalter gedaempft={hof.pausiert === true} className={cn('rounded-none border-0', className)} />
   return (
-    <span className={cn('relative block shrink-0 overflow-hidden bg-muted', FOTO_HUELLE_DUNKEL, className)}>
+    <span className={cn('relative block shrink-0 overflow-hidden bg-muted', FOTO_HUELLE, className)}>
       <Image src={hof.foto} alt="" fill sizes={sizes} className={cn('object-cover', bild)} />
     </span>
   )
@@ -110,14 +110,15 @@ function Abholung({ hof }: { hof: StartseitenHof }) {
  */
 export function HofKarten({ hoefe, jetzt }: { hoefe: readonly StartseitenHof[]; jetzt?: string }): React.JSX.Element {
   if (hoefe.length === 0) {
-    // Leerzustand mit Ausweg (DESIGN_SYSTEM, „Leerzustände"; Board Bild 5): linksbündig in einer
-    // Karte, der Knopf über die volle Breite. Das Symbol bleibt (Register N9: Symbol, Satz, Aktion).
+    // Leerzustand mit Ausweg (DESIGN_SYSTEM, „Leerzustände"; Board Bild 5): die Karten-Form des
+    // EmptyState, linksbündig, der Knopf über die volle Breite. Das Symbol bleibt (Register N9: Symbol,
+    // Satz, Aktion — Register vor Board).
     return (
       <EmptyState
+        form="karte"
         symbol={Store}
         titel={HOEFE_LEER.titel}
         satz={HOEFE_LEER.satz}
-        className="items-start border-solid px-4 py-4 text-left [&>div]:w-full"
         ausweg={
           <Link
             href={HOEFE_LEER.adresse}

@@ -30,7 +30,8 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import HoefeFotostreifen from '@/components/hoefe/hoefe-fotostreifen'
-import { FOTO_HUELLE_DUNKEL, HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 import { ProduktKurzliste } from '@/components/hoefe/produkt-kurzliste'
 import { hofkarteKlassen } from '@/components/ui/hofkarte-rahmen'
 import { HOEFE_LEER } from '@/lib/startseite'
@@ -349,7 +350,7 @@ export function HofKarte({
           Ohne Foto die Bildfläche in derselben Höhe — durchlässig für den Zeiger. */}
       {!split &&
         (hof.fotos.length > 0 ? (
-          <div className={cn(FOTO_HUELLE_DUNKEL, hof.isPaused && 'opacity-60 grayscale')}>
+          <div className={cn(FOTO_HUELLE, hof.isPaused && 'opacity-60 grayscale')}>
             <HoefeFotostreifen
               fotos={hof.fotos}
               hofName={hof.name}

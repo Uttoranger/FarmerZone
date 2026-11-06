@@ -1,15 +1,6 @@
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-
-// Bilder im Dunkeln (Freigabe Lauf 31, Maßstab Punkt 4: keine hellen Flecken) — dieselben Werte wie
-// Hofseite und Produktseite (ILLUSTRATION_HUELLE/-BILD, FOTO_HUELLE in hofseite/produkt-karte.tsx,
-// Nr. 235). Hier eigens, weil jene Datei ein Client-Modul ist: Eine Server-Komponente (Startseite)
-// bekäme aus ihr nur einen Verweis statt der Klassen. Eine gemeinsame Quelle in ui/ ist Nacharbeit (242).
-// Illustration: mit der Fläche der Hülle multipliziert, die Hülle hellt danach auf; Foto: leicht dunkler
-// (FOTO_HUELLE_DUNKEL nehmen auch Vorschaubild, Fotostreifen und die Hofkarten der Startseite).
-const ILLUSTRATION_HUELLE_DUNKEL = 'dark:brightness-[1.6]'
-const ILLUSTRATION_BILD_DUNKEL = 'dark:mix-blend-multiply'
-export const FOTO_HUELLE_DUNKEL = 'dark:brightness-[0.85]'
+import { ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 /**
  * Die Bildfläche einer Hofkarte ohne Foto (Register N22, Board
@@ -22,9 +13,9 @@ export const FOTO_HUELLE_DUNKEL = 'dark:brightness-[0.85]'
  * Reiner Schmuck (`alt=""`): Der Hofname steht direkt darunter. Jede
  * Illustration steht quadratisch auf ihrem Creme-Grund; die Fläche dahinter
  * ist `bg-muted`, im hellen Theme fast derselbe Ton. Im Dunkeln gerahmt statt
- * beschattet und mit der Fläche multipliziert (ILLUSTRATION_HUELLE_DUNKEL/-BILD_DUNKEL
- * wie Hofseite und Produktseite, Nr. 234): Mit `brightness` allein leuchtete der
- * Crème-Grund noch als hellgraues Quadrat (Abnahme Lauf 31).
+ * beschattet und mit der Fläche multipliziert (ILLUSTRATION_HUELLE/-BILD aus
+ * ui/bild-dunkel.ts, dieselbe Quelle wie Hofseite und Produktseite): Mit
+ * `brightness` allein leuchtete der Crème-Grund noch als hellgraues Quadrat (Abnahme Lauf 31).
  *
  * `fuellen`: Die Bilder teilen sich die Breite, statt quadratisch zu bleiben —
  * für kleine Vorschaubilder (Splitscreen, Karussell, Produktzeile), in denen
@@ -48,7 +39,7 @@ export function HofBildflaeche({
   return (
     <span
       data-slot="hof-bildflaeche"
-      className={cn('flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border', ILLUSTRATION_HUELLE_DUNKEL, className)}
+      className={cn('flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border', ILLUSTRATION_HUELLE, className)}
     >
       {bilder.map((src) => (
         <span key={src} className={cn('relative h-full min-w-0', fuellen ? 'flex-1' : 'aspect-square shrink')}>
@@ -57,7 +48,7 @@ export function HofBildflaeche({
             alt=""
             fill
             sizes={sizes}
-            className={cn('object-cover', ILLUSTRATION_BILD_DUNKEL, gedaempft && 'opacity-60 grayscale')}
+            className={cn('object-cover', ILLUSTRATION_BILD, gedaempft && 'opacity-60 grayscale')}
           />
         </span>
       ))}

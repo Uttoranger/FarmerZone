@@ -2,7 +2,8 @@ import Image from 'next/image'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
-import { FOTO_HUELLE_DUNKEL, HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { HofBildflaeche } from '@/components/hoefe/hof-bildflaeche'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 
 /**
  * Das Bild einer Karte: Foto oder, ohne Foto, die Illustration der Kategorie
@@ -30,8 +31,8 @@ export function Vorschaubild({
     return <HofBildflaeche bilder={[illustration]} sizes={sizes} gedaempft={gedaempft} fuellen className={cn('shrink-0', className)} />
   }
   return (
-    // Im Dunkeln leicht gedämpft (FOTO_HUELLE_DUNKEL, Freigabe Lauf 31: keine hellen Flecken).
-    <span className={cn('relative block shrink-0 overflow-hidden bg-muted', FOTO_HUELLE_DUNKEL, className)}>
+    // Im Dunkeln leicht gedämpft (FOTO_HUELLE, Freigabe Lauf 31: keine hellen Flecken).
+    <span className={cn('relative block shrink-0 overflow-hidden bg-muted', FOTO_HUELLE, className)}>
       <Image
         src={foto}
         alt=""

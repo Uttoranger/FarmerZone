@@ -17,6 +17,7 @@ import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { AusverkauftMarke } from '@/components/ui/marke'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 /**
  * Die Liste der Produktkarten (Boards s1-/w1-hofseite): am Handy EINE Karte mit Zeilen
@@ -25,19 +26,6 @@ import { AusverkauftMarke } from '@/components/ui/marke'
  */
 export const PRODUKT_LISTE =
   'flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card md:grid md:grid-cols-3 md:gap-3 md:divide-y-0 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent'
-
-/**
- * Die Kategorie-Illustration im Dunkeln (Freigabe Lauf 31, Maßstab Punkt 4: keine hellen Flecken). Ihr Crème-Grund
- * leuchtete mit `brightness` allein noch als hellgraues Quadrat auf der dunklen Karte. Darum wird das Bild im Dunkeln
- * mit der Fläche der Hülle (`bg-muted`) multipliziert: Der Grund wird zur Fläche, die Zeichnung bleibt als dunkle,
- * gedämpfte Form; die Hülle hellt das Ergebnis danach etwas auf, damit die Form lesbar bleibt (der Filter der Hülle
- * trennt die Mischung vom Rest der Seite). Am Tag unverändert. EINE Quelle für Hofseite und Produktseite.
- * Fotos des Hofs bekommen das nicht — sie bleiben leicht gedämpft (`FOTO_HUELLE`).
- */
-export const ILLUSTRATION_HUELLE = 'dark:brightness-[1.6]'
-export const ILLUSTRATION_BILD = 'dark:mix-blend-multiply'
-/** Ein Foto des Hofs im Dunkeln: leicht gedämpft über die Hülle — der Inline-Filter des Hofs bleibt am Bild. */
-export const FOTO_HUELLE = 'dark:brightness-[0.85]'
 
 /** Was der Preis braucht; null = kein gültiger Preis (nur in der Vorschau des Produktdialogs). */
 type PreisAngabe = Pick<PublicProduct, 'price' | 'unit' | 'unitSize' | 'futter'> | null

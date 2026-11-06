@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
  * (`bg-zustand-laeuft-grund`, `text-zustand-laeuft`, ≥ 4,5:1 in beiden Themes,
  * tests/design-tokens.test.ts), links bündig, oben ein grün gefüllter Kreis mit Haken, darunter
  * der Titel in Fraunces und der Inhalt. Das Gegenstück für Fehler ist `HinweiskarteFehler`
- * (ui/hinweiskarte.tsx). Liegt in components/anmelden, weil ui/ nicht zur Nr. 239 gehört;
- * der Bedarf für ui/ steht im Bericht 239.
+ * (ui/hinweiskarte.tsx). Seit Nr. 242 in ui/ (vorher components/anmelden, Nr. 239): ein
+ * Grundbaustein, den jede Seite mit einem erledigten Ergebnis nimmt.
  */
 export function ErfolgKasten({
   titel,

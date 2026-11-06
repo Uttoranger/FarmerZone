@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE, TEXTLINK } from '@/components/anmelden/stil'
-import { ErfolgKasten } from '@/components/anmelden/erfolg-kasten'
+import { ErfolgKasten } from '@/components/ui/erfolg-kasten'
 
 /**
  * „Passwort vergessen?" — das Formular (seit Nr. 54 in der Fokus-Shell, die
