@@ -28,6 +28,7 @@ import { KundeFuss } from '@/components/shells/kunde-fuss'
 import { WARENKORB_ZAEHLER } from '@/components/ui/bottom-nav'
 import { ChipGruppe, chipGruppeText } from '@/components/ui/segment'
 import type { KundenSitzung } from '@/lib/kunden-navigation'
+import { MARKE } from '@/lib/marke'
 
 function shell(sitzung: KundenSitzung, mitKorb: number | null = null): string {
   korb.aktuell = mitKorb === null ? null : { anzahl: mitKorb, href: '/hof-beispiel?korb=1' }
@@ -107,7 +108,7 @@ describe('G11 – Seitenfuß', () => {
 
   it('im Browser ohne Wortmarke, die Wege nur ab md; Gegenprobe: die Rechtslinks stehen in jeder Breite', () => {
     const fuss = renderToStaticMarkup(createElement(KundeFuss))
-    expect(fuss).not.toContain('aria-label="Agrilo – zur Startseite"')
+    expect(fuss).not.toContain(`aria-label="${MARKE} – zur Startseite"`)
     expect(fuss).toMatch(/<nav aria-label="Mehr entdecken" class="hidden md:block">/)
     expect(fuss).toMatch(/<nav aria-label="Rechtliches" class="md:ml-auto">/)
   })
