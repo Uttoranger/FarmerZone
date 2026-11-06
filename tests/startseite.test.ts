@@ -56,6 +56,7 @@ import {
   BRENNMATERIAL_ADRESSE,
   FUTTER_KARTE,
   BRENNMATERIAL_KARTE,
+  HOEFE_LEER,
   KARTE_ADRESSE,
   KARTE_KNOPF,
   KARTE_UEBERSCHRIFT,
@@ -510,7 +511,7 @@ describe('Höfe in deiner Nähe — gefüllt, leer, laden, Fehler', () => {
   it('leer: kein nacktes „nichts gefunden" — ein Satz und ein Ausweg', () => {
     const text = abschnitt(createElement(HofKarten, { hoefe: [] }))
     expect(text).toContain('Die ersten Höfe kommen gerade dazu')
-    expect(text).toContain('Schau bald wieder vorbei – oder erzähl einem Hof von Agrilo.')
+    expect(text).toContain(HOEFE_LEER.satz)
     // Board Bild 5: „Für Höfe" statt „Hof registrieren"; die Marke blendet „Oder direkt suchen" aus.
     expect(text).toMatch(/<a href="\/fuer-hoefe" data-hoefe-leer=""[^>]*>Für Höfe<\/a>/)
     expect(text).toContain('group-has-[[data-hoefe-leer]]/hoefe:hidden')

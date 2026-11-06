@@ -126,11 +126,11 @@ export const KURZE_REIHE_KATEGORIEN = 2
  * („Was suchst du?"). Eine gewählte Kategorie steht immer in der Reihe, auch wenn sie sonst nicht
  * dabei wäre; aufgefüllt wird in der Reihenfolge von kategorieReihe (nach Angebot).
  */
-export function kurzeKategorieReihe(chips: readonly EntdeckenChip[], anzahl: number = KURZE_REIHE_KATEGORIEN): EntdeckenChip[] {
+export function kurzeKategorieReihe(chips: readonly EntdeckenChip[], plaetze: number = KURZE_REIHE_KATEGORIEN): EntdeckenChip[] {
   const fest = new Set(['alle', 'futter', 'BRENNHOLZ'])
   const mitte = chips.filter((c) => !fest.has(c.schluessel))
   const gewaehlt = mitte.filter((c) => c.aktiv)
-  const auffuellen = mitte.filter((c) => !c.aktiv).slice(0, Math.max(0, anzahl - gewaehlt.length))
+  const auffuellen = mitte.filter((c) => !c.aktiv).slice(0, Math.max(0, plaetze - gewaehlt.length))
   const zeigen = new Set([...gewaehlt, ...auffuellen].map((c) => c.schluessel))
   return chips.filter((c) => fest.has(c.schluessel) || zeigen.has(c.schluessel))
 }
