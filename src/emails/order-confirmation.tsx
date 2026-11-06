@@ -22,6 +22,7 @@ import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
+import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
 /** Wie bezahlt wird — entscheidet nur der Satz und die Gesamtzeile, nie der Betrag. */
@@ -65,6 +66,8 @@ export interface OrderConfirmationProps {
    * fehlt sie, der Anhang mit den AGB bleibt.
    */
   belehrung?: Belehrung
+  /** Die Fassung der AGB dieser Bestellung (N45, aus ihrem Snapshot): Link und Anhang zeigen dieselbe. Ohne Angabe 0.9. */
+  agbFassung?: AgbKennung
   /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
   appUrl?: string
 }
@@ -134,7 +137,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           die abwechselnd Text und Link sind — nebeneinander stehende Textteile trennt
           react-email mit Kommentaren. */}
       <Text style={kleinText}>
-        {MAIL_AGB_ZEILE.map((stueck, i) =>
+        {MAIL_AGB_ZEILE(p.agbFassung ?? AGB_BISHER).map((stueck, i) =>
           typeof stueck === 'string' ? (
             stueck
           ) : (

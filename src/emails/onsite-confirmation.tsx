@@ -17,6 +17,7 @@ import {
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
+import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import type { Belehrung } from '@/lib/widerruf'
 import { BelehrungTeil } from './belehrung-teil'
@@ -53,6 +54,8 @@ export interface OnsiteConfirmationProps {
   bestaetigenBis?: string
   /** Die Belehrung nach Anhang I FAGG mit den Angaben des Hofs (Nr. 207) — nur bei Verbraucherinnen. */
   belehrung?: Belehrung
+  /** Die Fassung der AGB dieser Bestellung (N45, aus ihrem Snapshot): Link und Anhang zeigen dieselbe. Ohne Angabe 0.9. */
+  agbFassung?: AgbKennung
   /** „Vertrag widerrufen“ unter der Belehrung (signiert, Nr. 200) — nur bei Verbraucherinnen. */
   widerrufUrl?: string
   /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
@@ -104,7 +107,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
       {/* Nr. 207: Die AGB hängen auch dieser Mail als Datei an — derselbe Satz wie in der Bestätigung (Register O4). */}
       <Text style={kleinText}>
-        {MAIL_AGB_ZEILE.map((stueck, i) =>
+        {MAIL_AGB_ZEILE(p.agbFassung ?? AGB_BISHER).map((stueck, i) =>
           typeof stueck === 'string' ? (
             stueck
           ) : (

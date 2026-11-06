@@ -3,8 +3,10 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { KONTAKT_EMAIL } from '@/lib/support'
 import { GRUENDUNGS_AUFNAHME_SCHRITTE, GRUENDUNG_TEXT } from '@/lib/gruendungshof'
-import { gruendungFuerSeiten, ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
-import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, TARIFE_AB_SATZ, konditionenGebuehrAbschnitt, konditionenStand } from '@/lib/konditionen'
+import { gruendungFuerSeiten, ladePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { PRO_MONAT, TARIFE, TARIFE_AB_SATZ, konditionenGebuehrAbschnitt, konditionenStand, konditionenStichtagZeile } from '@/lib/konditionen'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { formatDatumLang } from '@/lib/format'
 import { gebuehrModellFuer, hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 import { KARTE, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
@@ -24,11 +26,14 @@ export const metadata: Metadata = {
     'Gebühr, Abrechnung und Aufnahme für Höfe.',
 }
 
-// Statisch, aber stündlich neu gebaut (Register F6, 19a): Welche Fassung dasteht
-// (bis zum Stichtag „Hofpreis-Modell ab“ die Servicegebühr, ab dann die
-// Plattformgebühr; davor auch die Bar-Ausnahme B1), entscheidet sich je Bau.
-// Ohne revalidate stünde nach dem Stichtag bis zum nächsten Deploy die alte da.
-export const revalidate = 3600
+// Bei jedem Aufruf frisch gebaut (N45, A005 4e): Welche Fassung dasteht (bis
+// zum Stichtag „Hofpreis-Modell ab“ die Servicegebühr, ab dann die
+// Plattformgebühr; davor auch die Bar-Ausnahme B1), hängt an Stichtag und Uhr —
+// mit einem Stundentakt stünde nach dem Stichtag bis zu einer Stunde die alte
+// Fassung da. Den Stichtag liest die Seite aus dem Data Cache mit Etikett
+// (ladePlattformEinstellung), ohne catch: Scheitert das, zeigt
+// konditionen/error.tsx die Fehlerseite statt der stillen Vorgabe.
+export const dynamic = 'force-dynamic'
 
 const CTA_MAILTO = `mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent(`Mein Hof auf ${MARKE}`)}`
 
@@ -65,22 +70,24 @@ async function AktionAbschnitt({ jetzt }: { jetzt: Date }): Promise<React.JSX.El
 //
 // Die Gebühr je Modell (N38, V62): bis zum Stichtag „Hofpreis-Modell ab“ der
 // Abschnitt „Servicegebühr und Abrechnung“ (Fassung „bisher“), ab dann
-// „Plattformgebühr und Abrechnung“ mit der Kennzeichnung „Entwurf – die
-// Anwältin prüft den Wortlaut“ darüber — beides aus konditionenGebuehrAbschnitt.
-// Der Übergang (K1, KONDITIONEN_UEBERGANG) steht nur im Modell „bisher“: Ab
-// dem Stichtag wäre er falsch (Board-Notiz w3-rechtstexte, Go-live-Risiko).
+// „Plattformgebühr und Abrechnung“ — seit N45 ohne die Kennzeichnung
+// „Entwurf“; beides aus konditionenGebuehrAbschnitt. Der Übergang (K1,
+// KONDITIONEN_UEBERGANG) steht nur im Modell „bisher“: Ab dem Stichtag wäre er
+// falsch (Board-Notiz w3-rechtstexte, Go-live-Risiko); dann steht dort der
+// Satz „Seit <Tag> …“ (konditionenStichtagZeile).
 //
 // ALLE Preise kommen aus src/lib/konditionen.ts — derselben Quelle wie
 // /fuer-hoefe (Nr. 15, E6 = Tarife: „damit nichts Widersprüchliches live
 // geht"). Steht hier eine Zahl im Text, ist das ein Fehler
 // (tests/konditionen-seiten.test.ts).
 export default async function KonditionenPage(): Promise<React.JSX.Element> {
-  // Je Bau bzw. stündlicher Revalidierung (oben): Danach entscheiden sich Modell und Bar-Ausnahme.
+  // Je Aufruf (oben): Danach entscheiden sich Modell und Bar-Ausnahme.
   const jetzt = new Date()
-  const einstellung = await ladeHofpreisEinstellung()
+  const einstellung = hofpreisEinstellungAus(await ladePlattformEinstellung())
   const modell = gebuehrModellFuer(einstellung, jetzt)
   const gebuehr = konditionenGebuehrAbschnitt(modell, jetzt)
-  const stand = konditionenStand(modell, hofpreisModellAb(einstellung))
+  const stichtag = hofpreisModellAb(einstellung)
+  const stand = konditionenStand(modell, stichtag)
   return (
     <KundeShellMitSitzung>
       <RechtstextVorlage kicker="Was es kostet" titel="Konditionen für Höfe" stand={`Stand ${stand}`} fussStand={stand}>
@@ -88,8 +95,10 @@ export default async function KonditionenPage(): Promise<React.JSX.Element> {
           <h2 id="tarife" className="sr-only">
             Tarife
           </h2>
-          {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
-          {modell === 'bisher' && <p className="mb-3 font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>}
+          {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). Seit N45 mit dem Stichtag:
+              vor dem Stichtag K1 wörtlich und der Satz zum Stichtag, ab dann der Stichtag und – solange er in der
+              Zukunft liegt – der Tarifstart. */}
+          <p className="mb-3 font-semibold text-foreground">{konditionenStichtagZeile(modell, formatDatumLang(stichtag), jetzt)}</p>
           <ul className="grid gap-3 sm:grid-cols-2">
             {TARIFE.map((tarif) => (
               <li key={tarif.id} className={cn(KARTE, 'rounded-[14px] px-4 py-3.5 text-foreground')}>

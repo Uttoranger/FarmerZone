@@ -454,8 +454,24 @@ export const KONDITIONEN_STAND = 'Oktober 2026'
 // die Funktionen. Nur der Typ wird eingebunden — ein Ring zur Laufzeit
 // entsteht so nicht.
 
-/** Über dem Abschnitt „Plattformgebühr und Abrechnung“, bis die Projektleitung sie entfernt (wie AGB 0.9). */
+/**
+ * Die frühere Kennzeichnung über „Plattformgebühr und Abrechnung“. Seit N45
+ * fällt sie ab dem Stichtag weg (`entwurf` ist dann null) — der Abschnitt
+ * steht erst ab dem Stichtag da, die Seite zeigt sie also nicht mehr.
+ */
 export const KONDITIONEN_ENTWURF = 'Entwurf – die Anwältin prüft den Wortlaut'
+
+/**
+ * Die Zeile über den Tarifen auf /konditionen mit dem Stichtag (N45, ergänzt
+ * K1): vor dem Stichtag K1 wörtlich und danach der Satz zum Stichtag; ab dem
+ * Stichtag der Satz zum Stichtag und, solange der Tarifstart in der Zukunft
+ * liegt, TARIFE_AB_SATZ. `tag` ist der Stichtag als Text (formatDatumLang).
+ */
+export function konditionenStichtagZeile(modell: GebuehrModell, tag: string, jetzt: Date): string {
+  if (modell === 'bisher') return `${KONDITIONEN_UEBERGANG} Ab ${tag} ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG} im Preis enthalten (Stichtag).`
+  const seit = `Seit ${tag} ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG} im Preis enthalten (Stichtag).`
+  return jetzt.getTime() < TARIFE_AB.getTime() ? `${seit} ${TARIFE_AB_SATZ}` : seit
+}
 
 /** Ein Abschnitt der Konditionen-Seite: Überschrift, Kennzeichnung (null = keine) und Absätze. */
 export type KonditionenAbschnitt = { titel: string; entwurf: string | null; absaetze: readonly string[] }
@@ -464,7 +480,7 @@ export type KonditionenAbschnitt = { titel: string; entwurf: string | null; absa
  * Der Abschnitt zur Gebühr auf /konditionen (V62; Wortlaut nach Board
  * w3-rechtstexte Bild 6 und dem Auftrag Lauf 30). Vor dem Stichtag der
  * bisherige (Servicegebühr, Bar-Ausnahme B1, Monatsabrechnung), ab dem
- * Stichtag „Plattformgebühr und Abrechnung“ mit Entwurf-Kennzeichnung.
+ * Stichtag „Plattformgebühr und Abrechnung“ — seit N45 ohne Entwurf-Kennzeichnung.
  * `satz` ist der Satz eines bestimmten Hofs („6,5“); ohne ihn steht der
  * Standard mit dem Hinweis, dass ein eingetragener Satz vorgeht.
  */
@@ -476,7 +492,8 @@ export function konditionenGebuehrAbschnitt(modell: GebuehrModell, jetzt: Date, 
   const standard = satz === undefined ? ' (Standard; ist für deinen Hof ein anderer Satz eingetragen, gilt dieser)' : ''
   return {
     titel: `${PLATTFORMGEBUEHR_BEZEICHNUNG} und Abrechnung`,
-    entwurf: KONDITIONEN_ENTWURF,
+    // N45: Ab dem Stichtag fällt „Entwurf – die Anwältin prüft den Wortlaut“ weg; das Feld bleibt im Typ.
+    entwurf: null,
     absaetze: [
       `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} beträgt ${prozent} % vom Warenpreis, je Stück auf den Cent aufgerundet${standard}. ` +
         `Sie steckt im Preis, den Kundinnen sehen – online und bar gleich. Mindestbestellwert ${MINDESTBESTELLWERT_TEXT} Warenwert je Bestellung.`,

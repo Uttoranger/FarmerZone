@@ -179,7 +179,8 @@ function findeVerbotene(quelltext: string, verbote: Verbot[], datei = 'schnipsel
  */
 type AusnahmeDatei = { datei: string; grund: string }
 const AUSNAHME_DATEIEN: AusnahmeDatei[] = [
-  { datei: 'src/lib/rechtstexte/agb.ts', grund: 'Rechtstext, wörtlich aus docs/recht/agb.md, Register O4' },
+  { datei: 'src/lib/rechtstexte/agb.ts', grund: 'AGB 1.0: Rechtstext, wörtlich aus docs/recht/agb.md, Register O4 (N45)' },
+  { datei: 'src/lib/rechtstexte/agb-0-9.ts', grund: 'Fassung 0.9 eingefroren (N45/A005)' },
   {
     datei: 'src/app/(public)/datenschutz/page.tsx',
     grund: 'Recht prüft: Die Datenschutzerklärung bleibt als ganze Datei wörtlich bis zur Entscheidung der Anwältin (N43 (4)); „Widerruf“ meint dort auch den Widerruf einer Einwilligung (N43 (5))',

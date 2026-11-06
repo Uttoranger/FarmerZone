@@ -137,7 +137,7 @@ describe('Zahlungsschritt: über „Jetzt bezahlen“', () => {
         angaben: null,
         zusammenfassung: createElement(KaufZusammenfassung, { positionen: POSITIONEN, abholung: ABHOLUNG, hofName: HOFNAME }),
         privat,
-        kaufknopfSaetze: createElement(KaufknopfSaetze, { privat }),
+        kaufknopfSaetze: createElement(KaufknopfSaetze, { privat, hofpreis: false, agbPfad: '/agb' }),
       })
     )
 

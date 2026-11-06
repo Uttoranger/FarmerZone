@@ -502,6 +502,7 @@ describe('kein Big Bang', () => {
     '(public)/konditionen/page.tsx',
     // Nr. 90: die AGB (Register O4) sind gleich in der KundeShell entstanden.
     '(public)/agb/page.tsx',
+    '(public)/agb/[fassung]/page.tsx',
     '(public)/problem-melden/page.tsx',
     // Nr. 200: Widerruf online (N39) — gleich in der KundeShell.
     '(public)/widerruf/page.tsx',
@@ -520,6 +521,9 @@ describe('kein Big Bang', () => {
     'startseite-vorschau/page.tsx',
     // Nr. 239: die 500 der Kundschaft in der KundeShell (Board s3-/w3-fehlerseiten, Bild 4); global-error bleibt ohne.
     'error.tsx',
+    // N45 (Nr. 259): die Fehlerseiten von /agb und /konditionen, wenn der Stichtag nicht zu laden ist — in der KundeShell wie die 500.
+    '(public)/agb/error.tsx',
+    '(public)/konditionen/error.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

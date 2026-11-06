@@ -68,7 +68,9 @@ import {
   AGB_LINK_TEXT,
   AGB_PFAD,
   KASSE_AGB_SATZ,
+  KASSE_AGB_SATZ_HOFPREIS,
   MAIL_AGB_ZEILE,
+  kasseAgbSatz,
   REGISTRIERUNG_AGB_SATZ,
   REIHENFOLGE_HINWEIS,
 } from '@/lib/rechtstexte/agb-einbindung'
@@ -131,9 +133,11 @@ describe('Kasse: der Satz unter dem Kaufknopf', () => {
   it('Gegenprobe: ohne die Zeile in KassenAbschluss fände die Suche den Satz nicht', () => {
     const quelle = lies('src/components/checkout/checkout-form.tsx')
     const abschlussQuelle = quelle.slice(quelle.indexOf('export function KassenAbschluss'))
-    expect(abschlussQuelle).toContain('<AgbSatz stuecke={KASSE_AGB_SATZ}')
+    // Seit N45 je Modell: kasseAgbSatz wählt zwischen KASSE_AGB_SATZ und KASSE_AGB_SATZ_HOFPREIS.
+    expect(abschlussQuelle).toContain('<AgbSatz stuecke={kasseAgbSatz({ hofpreis, agbPfad })}')
     // Der Satz steht nur dort, nicht noch einmal im Formular.
-    expect(quelle.match(/KASSE_AGB_SATZ/g)).toHaveLength(2)
+    expect(quelle.match(/kasseAgbSatz\(/g)).toHaveLength(1)
+    expect(quelle).not.toMatch(/KASSE_AGB_SATZ/)
     expect(abschluss(true).match(/Es gelten die/g)).toHaveLength(1)
   })
 })
@@ -192,22 +196,28 @@ describe('Bestellbestätigung per Mail: eine Zeile mit Link auf die AGB', () => 
     routeUrl: 'https://maps.example/route',
   }
 
+  async function render(element: Parameters<typeof import('@react-email/render').render>[0]): Promise<string> {
+    return (await import('@react-email/render')).render(element)
+  }
+
   async function mail(extra: { appUrl?: string } = {}): Promise<string> {
-    const { render } = await import('@react-email/render')
     return render(createElement(OrderConfirmationEmail, { ...props, ...extra }))
   }
 
-  it('der Link ist absolut und führt auf die AGB der echten Seite', async () => {
+  it('der Link ist absolut und führt auf die AGB der echten Seite — in der Fassung der Bestellung (ohne Angabe 0.9, N45)', async () => {
     const html = await mail()
-    expect(html).toContain(`href="${PRODUKTION_ADRESSE}${AGB_PFAD}"`)
+    expect(html).toContain(`href="${PRODUKTION_ADRESSE}${AGB_PFAD}/0.9"`)
+    const hofpreis = await render(createElement(OrderConfirmationEmail, { ...props, agbFassung: '1.0' }))
+    expect(hofpreis).toContain(`href="${PRODUKTION_ADRESSE}${AGB_PFAD}/1.0"`)
+    expect(hofpreis).not.toContain(`${AGB_PFAD}/0.9"`)
     expect(html).toContain(`Es gelten die <a`)
     expect(html).toContain(`von ${MARKE}. Du findest sie auch als Datei im Anhang dieser E-Mail und kannst sie jederzeit nachlesen, speichern und ausdrucken.`)
   })
 
   it('eine übergebene Adresse gilt für den Link — Gegenprobe zur echten Seite', async () => {
     const html = await mail({ appUrl: 'https://vorschau.example' })
-    expect(html).toContain(`href="https://vorschau.example${AGB_PFAD}"`)
-    expect(html).not.toContain(`href="${PRODUKTION_ADRESSE}${AGB_PFAD}"`)
+    expect(html).toContain(`href="https://vorschau.example${AGB_PFAD}/0.9"`)
+    expect(html).not.toContain(`href="${PRODUKTION_ADRESSE}${AGB_PFAD}/0.9"`)
   }, 30_000)
 
   it('der Satz bleibt zusammenhängend: kein Kommentar zwischen „Es gelten die" und dem Link', async () => {
@@ -293,9 +303,22 @@ describe('Die Sätze: eine Quelle', () => {
   it('Kasse und Mail nennen den Namen nur über MARKE — und den Hof als Vertragspartner', () => {
     expect(KASSE_AGB_SATZ.filter((s) => typeof s === 'string').join('')).toContain(`von ${MARKE}.`)
     expect(KASSE_AGB_SATZ.filter((s) => typeof s === 'string').join('')).toContain('Dein Vertragspartner ist der Hof.')
-    expect(MAIL_AGB_ZEILE.filter((s) => typeof s === 'string').join('')).toContain(`von ${MARKE}.`)
-    const links = [...REGISTRIERUNG_AGB_SATZ, ...KASSE_AGB_SATZ, ...MAIL_AGB_ZEILE].filter((s) => typeof s !== 'string')
-    expect(links.map((l) => l.ziel)).toEqual(['/agb', '/konditionen', '/agb', '/agb'])
+    expect(MAIL_AGB_ZEILE('0.9').filter((s) => typeof s === 'string').join('')).toContain(`von ${MARKE}.`)
+    expect(KASSE_AGB_SATZ_HOFPREIS.filter((s) => typeof s === 'string').join('')).toBe(`Es gelten die  von ${MARKE}. Dein Vertragspartner ist der Hof.`)
+    const links = [...REGISTRIERUNG_AGB_SATZ, ...KASSE_AGB_SATZ, ...KASSE_AGB_SATZ_HOFPREIS, ...MAIL_AGB_ZEILE('0.9'), ...MAIL_AGB_ZEILE('1.0')].filter((s) => typeof s !== 'string')
+    // N45: Die Mail verlinkt die Fassung der Bestellung, die Kasse /agb.
+    expect(links.map((l) => l.ziel)).toEqual(['/agb', '/konditionen', '/agb', '/agb', '/agb/0.9', '/agb/1.0'])
+  })
+
+  it('N45: kasseAgbSatz — je Modell der Satz, das Ziel des Links frei; kein Wort ändert sich mit dem Ziel', () => {
+    expect(kasseAgbSatz({ hofpreis: false, agbPfad: '/agb' })).toEqual(KASSE_AGB_SATZ)
+    expect(kasseAgbSatz({ hofpreis: true, agbPfad: '/agb' })).toEqual(KASSE_AGB_SATZ_HOFPREIS)
+    const zuONeun = kasseAgbSatz({ hofpreis: false, agbPfad: '/agb/0.9' })
+    expect(zuONeun.filter((s) => typeof s !== 'string').map((l) => l.ziel)).toEqual(['/agb/0.9'])
+    expect(zuONeun.filter((s) => typeof s === 'string')).toEqual(KASSE_AGB_SATZ.filter((s) => typeof s === 'string'))
+    // Gegenprobe: Der Satz im Modell „bisher“ nennt die Vermittlung, der im Hofpreis-Modell nicht.
+    expect(KASSE_AGB_SATZ.join('')).toContain('Vermittlung')
+    expect(KASSE_AGB_SATZ_HOFPREIS.filter((s) => typeof s === 'string').join('')).not.toContain('Vermittlung')
   })
 
   it('Registrierung und Kasse laden nicht die ganzen AGB ins Browserpaket', () => {
@@ -308,8 +331,11 @@ describe('Die Sätze: eine Quelle', () => {
     ]) {
       expect(lies(datei), datei).not.toMatch(/from '@\/lib\/rechtstexte\/agb'/)
     }
-    // Gegenprobe: Die Seite und ihre Teile laden den Text.
-    expect(lies('src/app/(public)/agb/page.tsx')).toMatch(/from '@\/lib\/rechtstexte\/agb'/)
+    for (const datei of ['src/components/checkout/checkout-form.tsx', 'src/lib/rechtstexte/agb-fassung.ts']) {
+      expect(lies(datei), datei).not.toMatch(/from '@\/lib\/rechtstexte\/agb(-0-9|-texte|-datei)?'/)
+    }
+    // Gegenprobe: Die Seite lädt den Text (über agb-texte.ts, N45).
+    expect(lies('src/app/(public)/agb/page.tsx')).toMatch(/from '@\/lib\/rechtstexte\/agb-texte'/)
   })
 
   it('die Registrierung bindet den Satz aus der Quelle ein', () => {

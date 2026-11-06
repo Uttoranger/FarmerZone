@@ -35,8 +35,11 @@ import { WiderrufHeuteKarte } from '@/components/heute/widerruf-karte'
 import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
 import { HofEmailKarte } from '@/components/heute/hof-email-karte'
 import { hofEmailFehlt } from '@/lib/hof-kontakt'
-import { agbFassung } from '@/lib/rechtstexte/agb-datei'
-import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
+import { agbKartenStichtag, brauchtAgbZustimmung, type AgbKartenStichtag } from '@/lib/agb-zustimmung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { ladePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import {
   abholTagMitDatum,
@@ -128,8 +131,10 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   ])
   const postfach = heutePostfach(faeden, jetzt)
   // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.
-  const fassung = agbFassung()
+  const fassung = AGB_NEUESTE
   const agbOffen = brauchtAgbZustimmung(farm, fassung)
+  // N45: Die Karte nennt vor dem Stichtag den Tag — nur geladen, wenn sie steht.
+  const agbStichtag = agbOffen ? await ladeAgbKartenStichtag(jetzt, farm.id) : null
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
@@ -230,7 +235,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
           {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
           {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
           <WiderrufHeuteKarte widerrufe={widerrufe} />
-          {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
+          {agbOffen && agbStichtag && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} stichtag={agbStichtag} />}
           {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
           {hofEmailFehlt(farm) && <HofEmailKarte />}
           {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
@@ -265,4 +270,19 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       )}
     </div>
   )
+}
+
+/**
+ * Der Stichtag für die Karte „AGB bestätigen“ (N45) — aus der gecachten Zeile,
+ * nie über ladeHofpreisEinstellung (deren stille Vorgabe gehört nicht in einen
+ * Rechtstext). Scheitert das Laden, steht der Satz ohne Datum da, gemeldet mit
+ * festem Bereich; Heute bleibt.
+ */
+async function ladeAgbKartenStichtag(jetzt: Date, farmId: string): Promise<AgbKartenStichtag> {
+  try {
+    return agbKartenStichtag(hofpreisModellAb(hofpreisEinstellungAus(await ladePlattformEinstellung())), jetzt)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'agb-karte-stichtag', seite: 'heute' }, extra: { farmId } })
+    return agbKartenStichtag(null, jetzt)
+  }
 }
