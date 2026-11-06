@@ -188,17 +188,24 @@ export function zustandsZeile({
   sperre,
   naechste,
   kaufbar,
+  pauseMessage = null,
 }: {
   zustand: HofZustandArt
   sperre: KaufSperre
   naechste: NaechsteAbholung | null
   kaufbar: boolean
+  /** Die Nachricht der Pause — sie steht in der Karte wie auf der Hofseite (Board s1-/w1-mein-hof Bild 4). */
+  pauseMessage?: string | null
 }): ZustandsZeile | null {
   const t = ZUSTANDSZEILE_TEXT
   if (zustand === 'stillgelegt' || zustand === 'wartet') return null
   if (zustand === 'aus') return { ton: 'grau', ...t.aus, knopf: null }
   if (sperre === 'gesperrt') return { ton: 'orange', ...t.gesperrt, knopf: null }
-  if (zustand === 'pausiert') return { ton: 'orange', titel: t.pausiert.titel, satz: t.pausiert.satz, knopf: { art: 'fortsetzen', text: t.pausiert.knopf } }
+  if (zustand === 'pausiert') {
+    const nachricht = pauseMessage?.trim()
+    const satz = nachricht ? `${t.pausiert.satz} „${nachricht}“` : t.pausiert.satz
+    return { ton: 'orange', titel: t.pausiert.titel, satz, knopf: { art: 'fortsetzen', text: t.pausiert.knopf } }
+  }
   if (sperre === 'keine-abholzeit') {
     return { ton: 'orange', titel: t.keineAbholzeit.titel, satz: t.keineAbholzeit.satz, knopf: { art: 'eintragen', text: t.keineAbholzeit.knopf } }
   }

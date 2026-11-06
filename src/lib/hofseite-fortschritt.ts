@@ -132,14 +132,16 @@ const WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 const WOCHE_AB_MONTAG = [1, 2, 3, 4, 5, 6, 0]
 
 /** „Fr 15–18 · Sa 9–12" — die aktiven Abholzeiten in einer Zeile, Montag zuerst. */
-export function abholzeitenKurz(slots: readonly WeeklySlot[]): string {
+export function abholzeitenKurz(slots: readonly WeeklySlot[], { mitUhr = false }: { mitUhr?: boolean } = {}): string {
+  // „Uhr“ hinter jedem Tag wie in den Boards von Mein Hof und Einstellungen (Lauf 31); das Teilen-Bild bleibt knapp.
+  const uhr = mitUhr ? ' Uhr' : ''
   return WOCHE_AB_MONTAG.filter((tag) => slots.some((s) => s.dayOfWeek === tag))
     .map((tag) => {
       const fenster = slots
         .filter((s) => s.dayOfWeek === tag)
         .toSorted((a, b) => a.startTime.localeCompare(b.startTime))
         .map((s) => `${formatSlotTime(s.startTime)}–${formatSlotTime(s.endTime)}`)
-      return `${WOCHENTAG_KURZ[tag]} ${fenster.join(', ')}`
+      return `${WOCHENTAG_KURZ[tag]} ${fenster.join(', ')}${uhr}`
     })
     .join(' · ')
 }
@@ -227,7 +229,7 @@ function zeilen(stand: HofseiteStand): HofseiteZeile[] {
       'abholzeiten',
       'abholen-bezahlen',
       stand.abholzeiten.length > 0
-        ? abholzeitenKurz(stand.abholzeiten)
+        ? abholzeitenKurz(stand.abholzeiten, { mitUhr: true })
         : ABHOLZEITEN_FEHLEN_ZEILE,
       stand.abholzeiten.length > 0
     ),

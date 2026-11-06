@@ -5,14 +5,19 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { centsAlsEuro, einheitLabel, formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
 import { UMSATZ_LEER, zahlartZeile, type GebuehrenKarteText, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
+import { MARKE } from '@/lib/marke'
 import { UMSATZ_TEXT, type Balken, type KanalAnteil, type Periode, type TopProdukt, type Vergleichssatz } from '@/lib/umsatz'
 import { AUSWERTUNG_MAX_ZURUECK, auswertungHref } from '@/schemas/auswertung'
 import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { cn } from '@/lib/utils'
 import type { ServicegebuehrenDiesesMonats } from '@/server/queries/auswertung'
+
+/** Fußsatz der Karte „Was lief am besten“, wörtlich nach Board s2-/w2-auswertung. */
+const TOP_PRODUKTE_FUSS = `Nur Bestellungen über ${MARKE}, Warenpreis.`
 
 /*
  * Die Teile der Auswertung im neuen Design (Nachtlauf Nr. 22c, Mockup
@@ -90,7 +95,8 @@ export function ZeitraumWahl({ periode, zurueck, zeitraum }: { periode: Periode;
 function Kachel({ titel, wert, satz }: { titel: string; wert: string; satz: string }): React.JSX.Element {
   return (
     <div className={cn(KARTE, 'flex min-w-0 flex-col px-4 py-4 md:px-[18px]')}>
-      <dt className={KICKER}>{titel}</dt>
+      {/* Normale Schreibung, fett — wie im Board s2-/w2-auswertung (nicht als Versal-Kicker). */}
+      <dt className="text-[13px] leading-snug font-semibold text-foreground">{titel}</dt>
       <dd className="mt-1.5 font-heading text-[26px] leading-tight font-semibold text-foreground tabular-nums md:text-[30px]">{wert}</dd>
       <dd className={cn('text-xs leading-normal', LEISE)}>{satz}</dd>
     </div>
@@ -103,7 +109,16 @@ function Kachel({ titel, wert, satz }: { titel: string; wert: string; satz: stri
  * neben „€ 206" in der Umsatzkarte stand dann „€ 0" ohne Erklärung. Seit
  * Nr. 53 sagen beide, was sie zählen (UMSATZ_TEXT): hier nur Bestellungen.
  */
-export function KennzahlenReihe({ k, zeitraum }: { k: Kennzahlen; zeitraum: string }): React.JSX.Element {
+export function KennzahlenReihe({
+  k,
+  zeitraum,
+  satzZeitraum = zeitraum,
+}: {
+  k: Kennzahlen
+  zeitraum: string
+  /** Der Zeitraum im Satz unter dem Betrag: „im Februar", „1.–7. März" (zeitraumImSatz, Board s2-/w2-auswertung). */
+  satzZeitraum?: string
+}): React.JSX.Element {
   return (
     <section aria-labelledby="auswertung-kennzahlen">
       <h2 id="auswertung-kennzahlen" className="sr-only">
@@ -111,7 +126,7 @@ export function KennzahlenReihe({ k, zeitraum }: { k: Kennzahlen; zeitraum: stri
       </h2>
       {/* Eine Beschreibungsliste; jede Kachel ist eine Gruppe aus dt und dd (div in dl ist erlaubt). */}
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kachel titel={UMSATZ_TEXT.ueberPlattform} wert={euroGanz(k.warenCents)} satz={`${zeitraum} · abgeholte Bestellungen`} />
+        <Kachel titel={UMSATZ_TEXT.ueberPlattform} wert={euroGanz(k.warenCents)} satz={`abgeholt ${satzZeitraum}`} />
         <Kachel titel="Bestellungen" wert={formatZahl(k.bestellungen)} satz={zahlartZeile(k) ?? 'noch keine abgeholt'} />
         <Kachel titel="Ø Bestellung" wert={k.durchschnittCents === null ? '–' : euro(k.durchschnittCents)} satz="Warenpreis" />
         <Kachel titel="Nicht abgeholt" wert={formatZahl(k.nichtAbgeholt)} satz="kostenlos für dich" />
@@ -133,8 +148,9 @@ export function TeilenWirkungKarte({ karte, zeitraum }: { karte: TeilenKarteDate
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <h2 id="auswertung-teilen" className={KARTEN_TITEL}>
           Über deine geteilten Links
+          {/* Der Zeitraum steht schon über den Kennzahlen; für den Screenreader bleibt er am Titel. */}
+          <span className="sr-only"> · {zeitraum}</span>
         </h2>
-        <span className={cn('text-[12.5px]', LEISE)}>{zeitraum}</span>
         {karte.kopf && <span className="text-sm font-semibold text-foreground tabular-nums sm:ml-auto">{karte.kopf}</span>}
       </div>
       {karte.zeilen.length === 0 ? (
@@ -191,10 +207,11 @@ export function UmsatzKarte({
   return (
     <section aria-labelledby="auswertung-umsatz" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
       <div className="flex flex-wrap items-baseline gap-x-2.5">
+        {/* Der Titel sagt, was zählt (Board s2-/w2-auswertung); der Zeitraum steht über den Kennzahlen. */}
         <h2 id="auswertung-umsatz" className={KARTEN_TITEL}>
-          {UMSATZ_TEXT.mitHofladen}
+          {UMSATZ_TEXT.karteTitel}
+          <span className="sr-only"> · {zeitraum}</span>
         </h2>
-        <span className={cn('text-[12.5px] sm:ml-auto', LEISE)}>{zeitraum}</span>
       </div>
       <div>
         <p className="font-heading text-4xl font-semibold text-foreground tabular-nums">{euro(summeCent)}</p>
@@ -206,10 +223,7 @@ export function UmsatzKarte({
         >
           {vergleich.text}
         </p>
-        <p className={cn('mt-0.5 text-xs', LEISE)}>
-          Abgeholte Bestellungen und eingetragene Verkäufe
-          {laufend && vergleich.richtung !== 'keiner' ? ' · verglichen bis zum selben Zeitpunkt' : ''}
-        </p>
+        {laufend && vergleich.richtung !== 'keiner' && <p className={cn('mt-0.5 text-xs', LEISE)}>verglichen bis zum selben Zeitpunkt</p>}
       </div>
       {leer ? (
         <EmptyState
@@ -245,7 +259,7 @@ function BalkenDiagramm({ balken, zeitraum, vergleichLabel }: { balken: Balken[]
       </div>
       <div aria-hidden="true" className="mt-1.5 flex gap-1 border-t border-border pt-1.5 sm:gap-2">
         {balken.map((b) => (
-          <span key={b.label} className="min-w-0 flex-1 truncate text-center text-[11px] text-muted-foreground">
+          <span key={b.label} className="min-w-0 flex-1 truncate text-center text-xs text-muted-foreground">
             {b.label}
           </span>
         ))}
@@ -370,22 +384,21 @@ export function TopProdukteKarte({ produkte }: { produkte: TopProdukt[] }): Reac
       <h2 id="auswertung-top" className={KARTEN_TITEL}>
         Was lief am besten
       </h2>
-      <ol className="flex flex-col gap-3">
-        {produkte.map((p, i) => (
-          <li key={`${p.name}-${i}`} className="flex items-center gap-3">
-            <span className={cn('w-4 shrink-0 text-right text-xs', LEISE)}>{i + 1}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground" title={p.name}>
-                {p.name}
+      {/* Eine Zeile je Produkt mit Trennlinien, ohne Rangziffer (Board s2-/w2-auswertung); die Reihenfolge trägt die Liste. */}
+      <ol className="flex flex-col [&>li+li]:border-t [&>li+li]:border-border">
+        {produkte.map((p, i) => {
+          const menge = p.einheit ? `${formatZahl(p.menge)} ${einheitLabel(p.einheit, p.menge)}` : `${formatZahl(p.menge)}×`
+          return (
+            <li key={`${p.name}-${i}`} className="flex min-h-11 items-center gap-3 py-2">
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={`${p.name} · ${menge}`}>
+                {p.name} · {menge}
               </p>
-              <p className={cn('text-xs', LEISE)}>
-                {p.einheit ? `${formatZahl(p.menge)} ${einheitLabel(p.einheit, p.menge)}` : `${formatZahl(p.menge)}×`}
-              </p>
-            </div>
-            <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">{euro(p.cent)}</span>
-          </li>
-        ))}
+              <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">{euro(p.cent)}</span>
+            </li>
+          )
+        })}
       </ol>
+      <p className={cn('text-xs leading-normal', LEISE)}>{TOP_PRODUKTE_FUSS}</p>
     </section>
   )
 }
@@ -417,7 +430,7 @@ export function GrenzeKarte({
     <section aria-labelledby="auswertung-grenze" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="auswertung-grenze" className={KICKER}>
+          <h2 id="auswertung-grenze" className={KICKER_12}>
             {grenzeText} Grenze Be- &amp; Verarbeitung {jahr}
           </h2>
           <p className="mt-1 font-heading text-2xl font-semibold text-foreground tabular-nums">

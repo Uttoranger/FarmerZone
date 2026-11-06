@@ -8,7 +8,7 @@ import { erstelleKartenBremse, type KartenBremse, type StandortKandidat } from '
 import { KARTEN_KACHELN, erstelleAusschnittMerker } from '@/lib/hoefe-anzeige'
 import { cn } from '@/lib/utils'
 import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
-import { STANDORT_KARTE_RAHMEN } from '@/components/karte/karten-masse'
+import { STANDORT_KARTE_RAHMEN, KARTEN_STEUERUNG } from '@/components/karte/karten-masse'
 
 /**
  * Die DAUERHAFT eingebettete Minikarte im Hofprofil — kein Dialog mehr.
@@ -145,7 +145,7 @@ export default function StandortKarte({
           `isolate`: eine eigene Stapelebene — sonst lägen Leaflets Ebenen
           (400, Bedienteile 1000) über dem festen Kopf des Hof-Profils (Nr. 44)
           und über der Unterleiste. */}
-      <div className={cn('relative isolate overflow-hidden', STANDORT_KARTE_RAHMEN)}>
+      <div className={cn('relative isolate overflow-hidden', STANDORT_KARTE_RAHMEN, KARTEN_STEUERUNG)}>
         <div ref={kartenDiv} className="h-full w-full" />
         {/* Der feste Pin: exakt über der Kartenmitte, mit der Spitze im
             Zentrum — deshalb um die halbe Icon-Höhe angehoben. */}

@@ -890,7 +890,24 @@ Boards s2/w2-auswertung, -kunden, -verkaeufe, -postfach, -meldungen, -beitraege,
 - **WhatsApp versenden:** „Öffnen“ (für den Screenreader „– Nachricht an <Name> in WhatsApp“); nur die nächste offene Person trägt den orangen Knopf, die übrigen sind Umrisse.
 - **QR-Plakat ohne öffentlichen Hof:** Ausweg „Hofseite einrichten“.
 - **/teilen:** oben der Rückweg „Zu Heute“, ohne geteilte Fotos derselbe Ausweg; ein gescheitertes Hochladen steht als `HinweiskarteFehler` mit „Nochmal“ und dem Ausweg Mein Hof › Hofseite, die Fotos bleiben in der Ablage.
-- **Kunden, Verkäufe:** Suche „Kundin suchen“; leer „Hofseite vervollständigen“. „Noch einmal eintragen“ steht unter „Letzte Verkäufe“; im Dialog „Was hast du verkauft? (optional)“.
+- **Kunden, Verkäufe:** Suche mit sichtbarer Beschriftung „Kundin suchen“ über dem Feld (Platzhalter „Name, Telefon oder E-Mail“); leer „Hofseite vervollständigen“. „Noch einmal eintragen“ steht unter „Letzte Verkäufe“; im Dialog „Was hast du verkauft? (optional)“.
+
+### Mein Hof, Einstellungen, Region und Hof-Werkzeuge nach den Boards November 2026 (Nr. 238, Lauf 31)
+
+Boards s1-/w1-mein-hof, -einstellungen, -region, s2-/w2-hofdaten-zahlung, -konto-hof, -auswertung, -kunden, -verkaeufe, -postfach, -beitraege, -meldungen, -teilen, -whatsapp-plakat, s3-/w3-problem-melden. Geht den Abschnitten Mein Hof, Einstellungen, Kunden, Verkäufe, Postfach, Auswertung, Region, Teilen und den Abschnitten Nr. 224/225 vor, wo sie sich widersprechen.
+
+- **Mein Hof, Kopf:** „Mein Hof“ ist die sichtbare h1 — am Handy die Titelzeile von `MeinHofKopf` (`titelAlsH1`, nur auf /farm-page; /products behält den Absatz), ab lg eine eigene h1 (Fraunces 30 px), darunter Schild · Hofname · Adresse (Adress-Link 44 px hoch, das Wort darin gekürzt), rechts „Teilen“ und „Kundenansicht“ (ohne Pfeil). Keine Kopfkarte mit Logo, keine zweite sr-only-h1 im Inhalt. Die Reiter stehen direkt unter dem Kopf: am Handy gleich breit (`gleichBreit`), ab lg 180 px breit (`breit`); der gewählte grün unterstrichen.
+- **Mein Hof, Zustandskarte:** EIN Baustein `MeinHofZustandsKarte` (in `mein-hof-kopf.tsx`) unter den Reitern, am Handy und ab lg, nie auf Beiträge. Getönt wie die Hinweiskarte (grün nimmt an, orange tun, grau ruhig), ohne Punkt; Satz auf Tönung in der Textfarbe. „Pausieren“ und „Fortsetzen“ als Umriss in der Textfarbe, 10 px rund, ohne Symbol. Pausiert mit Nachricht zitiert der Satz sie („Bestellen kann gerade niemand. „…““, `zustandsZeile` mit `pauseMessage`).
+- **Abholzeiten mit „Uhr“** in Mein Hof und Einstellungen (`abholzeitenKurz(…, { mitUhr: true })`); das Teilen-Bild bleibt knapp.
+- **Zeile unter der Überschrift der Werkzeuge** (Einstellungen, Region, Auswertung, Kunden, Verkäufe, Postfach): `HofUnterzeile` (`components/mein-hof/hof-unterzeile.tsx`) — am Handy „<Hof> · Stand <Datum>“ (derselbe Text wie im Kopf von Mein Hof), ab 768 px nur der Hofname; ein Einleitungssatz steht als eigener Absatz darunter. Die Rahmen der Werkzeuge stehen links neben der Seitenleiste (kein `mx-auto`).
+- **Ladefehler** der Werkzeuge als neutrale Hinweiskarte ohne Symbol (Einstellungen „Neu laden“, Region „Nochmal“, Postfach mit „Neu laden“); Wortlaut nach Board.
+- **Auswertung:** Kennzahlen in normaler Schreibung fett, Satz „abgeholt im Februar“ bzw. „abgeholt 1.–7. März“ (`zeitraumImSatz`); die Woche heißt auch laufend nach ihren Tagen (`zeitraumName`). Umsatzkarte „Abgeholte Bestellungen und eingetragene Verkäufe“ (`UMSATZ_TEXT.karteTitel`), der Zeitraum nur noch für den Screenreader am Titel. „Was lief am besten“ einzeilig mit Trennlinien, ohne Rang, Fußsatz „Nur Bestellungen über Agrilo, Warenpreis.“.
+- **Kunden:** Chips und „Sortieren“ in einer Zeile, die Suche „Name, Telefon oder E-Mail“ (48 px, ohne Lupe) am Handy darunter, ab 1280 px dazwischen; die Trefferzahl nur für den Screenreader. Zeile am Handy: Name und Marke, darunter Bestellungen und „Häufig“, kein Betrag; Anrufen als 44-px-Kreis mit Rand. Tabellenköpfe 13 px in normaler Schreibung. „Zeigen“: Alle, Stammkunden, Neu, Lange nicht gesehen, Diesen Monat aktiv (`ZEIGEN_REIHENFOLGE`).
+- **Verkäufe:** Betragsfeld mit sichtbarer Beschriftung „Betrag in Euro“; Speicherfehler „… Deine Angaben sind noch da.“ (ohne „Nochmal“: ein zweiter Versuch könnte doppelt eintragen).
+- **Leaflet-Bedienteile** (Hofdaten-Karte, Region › Karte): `KARTEN_STEUERUNG` (`components/karte/karten-masse.ts`) am Rahmen — Zoom 44 px auf `bg-card`, Quellenhinweis auf `bg-card` in der Textfarbe.
+- **Problem melden (Hof):** die Karte „Das schicken wir automatisch mit“ trägt die Zeile „Hof“ (`MeldungFormularAnsicht` mit `hofName`, gegeben von `MeldungForm`).
+- **/teilen:** ohne Fotos ein gestrichelter Kasten ohne Symbol, Titel fett in eigener Zeile, „Zu Heute“ als Umriss über die Breite; Fotos frei auf der Seite, zweispaltig; gleiche Fehlermeldungen nur einmal.
+- **Schrift:** in diesen Seiten nie unter 12 px (Kicker über `cn(KICKER, 'text-xs')`, bis `KICKER` selbst 12 px hat); Ausnahme bleiben die Bild-Vorschauen mit `aria-hidden` (Titelbild-Baustein).
 
 ### Infoseiten (/impressum, /konditionen, seit Nr. 54)
 

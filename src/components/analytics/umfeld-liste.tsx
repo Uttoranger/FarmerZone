@@ -55,7 +55,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                       </span>
                     )}
                     {preis.deins && (
-                      <span className="rounded-full border border-accent/45 bg-accent/12 px-2 py-0.5 text-[11.5px] font-semibold text-status-fertig tabular-nums">
+                      <span className="rounded-full border border-accent/45 bg-accent/12 px-2 py-0.5 text-xs font-semibold text-status-fertig tabular-nums">
                         Deins: {preis.deins}
                       </span>
                     )}
@@ -63,7 +63,7 @@ export function UmfeldListe({ zeilen }: { zeilen: UmfeldZeile[] }) {
                 ))}
                 {zeile.hinweis && <span className="mt-1 block text-sm text-muted-foreground">{zeile.hinweis}</span>}
                 {deinsOhnePreis && (
-                  <span className="mt-1 inline-block rounded-full border border-accent/45 bg-accent/12 px-2 py-0.5 text-[11.5px] font-semibold text-status-fertig">
+                  <span className="mt-1 inline-block rounded-full border border-accent/45 bg-accent/12 px-2 py-0.5 text-xs font-semibold text-status-fertig">
                     Deins
                   </span>
                 )}

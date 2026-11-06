@@ -49,7 +49,7 @@ export function KmWahl({
               )}
             >
               {s.km} km
-              {zahl !== undefined && <span className="text-[11.5px] font-medium">{zahl}</span>}
+              {zahl !== undefined && <span className="text-xs font-medium">{zahl}</span>}
               <LadePunkt />
             </Link>
           </li>

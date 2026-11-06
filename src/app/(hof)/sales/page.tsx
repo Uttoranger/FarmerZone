@@ -7,6 +7,7 @@ import { getMeistverkaufteProduktIds, getSalesOverview } from '@/server/queries/
 import { getProductsForFarm } from '@/server/queries/products'
 import { getStripeReadiness } from '@/server/queries/farm'
 import { VerkaeufeAnsicht } from '@/components/hof-verkaeufe/verkaeufe-ansicht'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { VerkaeufeFehler } from '@/components/hof-verkaeufe/verkaeufe-fehler'
 import { VERKAEUFE_RAHMEN } from '@/components/hof-verkaeufe/verkaeufe-laden'
 import { MARKE } from '@/lib/marke'
@@ -31,10 +32,11 @@ export default async function SalesPage(): Promise<React.JSX.Element> {
   const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
+  const jetzt = new Date()
   let daten: React.ComponentProps<typeof VerkaeufeAnsicht> | null = null
   try {
     const [overview, produkte, topProduktIds, stripeReady] = await Promise.all([
-      getSalesOverview(farm.id, new Date()),
+      getSalesOverview(farm.id, jetzt),
       getProductsForFarm(farm.id),
       getMeistverkaufteProduktIds(farm.id),
       getStripeReadiness(userId),
@@ -50,5 +52,5 @@ export default async function SalesPage(): Promise<React.JSX.Element> {
     Sentry.captureException(err, { tags: { bereich: 'verkaeufe', seite: 'liste' }, extra: { farmId: farm.id } })
   }
 
-  return <div className={VERKAEUFE_RAHMEN}>{daten ? <VerkaeufeAnsicht {...daten} /> : <VerkaeufeFehler />}</div>
+  return <div className={VERKAEUFE_RAHMEN}>{daten ? <VerkaeufeAnsicht {...daten} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} /> : <VerkaeufeFehler />}</div>
 }

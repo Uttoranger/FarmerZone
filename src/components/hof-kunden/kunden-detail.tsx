@@ -10,7 +10,8 @@ import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { cn } from '@/lib/utils'
 
@@ -103,7 +104,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
             </dl>
 
             <section aria-labelledby="kundin-bestellungen" className="flex flex-col gap-2">
-              <h2 id="kundin-bestellungen" className={KICKER}>
+              <h2 id="kundin-bestellungen" className={KICKER_12}>
                 Letzte Bestellungen
               </h2>
               <ListGruppe>
@@ -147,7 +148,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
           <div className="flex min-w-0 flex-col gap-4">
             <section aria-labelledby="kundin-kontakt" className={cn(KARTE, 'flex flex-col gap-1 p-4 md:px-[18px]')}>
-              <h2 id="kundin-kontakt" className={KICKER}>
+              <h2 id="kundin-kontakt" className={KICKER_12}>
                 Kontakt
               </h2>
               {anrufen ? (
@@ -171,7 +172,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
             {kunde.topProducts.length > 0 && (
               <section aria-labelledby="kundin-lieblinge" className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
-                <h2 id="kundin-lieblinge" className={KICKER}>
+                <h2 id="kundin-lieblinge" className={KICKER_12}>
                   Lieblingsprodukte
                 </h2>
                 <ol className="flex flex-col gap-2">
@@ -192,7 +193,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
             {abo && (
               <section aria-labelledby="kundin-neuigkeiten" className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
-                <h2 id="kundin-neuigkeiten" className={KICKER}>
+                <h2 id="kundin-neuigkeiten" className={KICKER_12}>
                   Neuigkeiten von dir
                 </h2>
                 <dl className="flex flex-col gap-1.5 text-[14px]">

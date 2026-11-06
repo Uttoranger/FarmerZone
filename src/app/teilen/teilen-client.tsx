@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, ImageIcon } from 'lucide-react'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import {
   ladeFotoHoch,
   stufenText,
@@ -179,16 +179,19 @@ export function TeilenClient({
 
         {/* Aufgerufen ohne geteilte Datei: der dezente Hinweis */}
         {fotos !== null && fotos.length === 0 && !ergebnisse && (
-          <div className="rounded-2xl bg-card p-6 shadow-sm">
-            <ImageIcon className="size-6 text-muted-foreground mb-3" aria-hidden="true" />
+          // Board s2/w2-teilen Bild 2: gestrichelter Kasten ohne Symbol, Titel fett in eigener Zeile, „Zu Heute“ als Umriss über die Breite.
+          <div className="flex flex-col gap-2 rounded-[14px] border-[1.5px] border-dashed border-input p-5">
+            <p className="text-[16px] font-bold text-foreground">Gerade wurde nichts geteilt</p>
             <p className="text-sm leading-relaxed text-foreground">
-              Gerade wurde nichts geteilt. So geht’s: {MARKE} über das Browser-Menü als
-              App installieren, dann in der Galerie ein Foto wählen und über „Teilen“ an{' '}
-              {MARKE} schicken – das funktioniert auch mit Cloud-Fotos.
+              So geht’s: {MARKE} über das Browser-Menü als App installieren, dann in der Galerie ein Foto wählen und über
+              „Teilen“ an {MARKE} schicken – das funktioniert auch mit Cloud-Fotos.
             </p>
             <Link
               href={HEUTE_HREF}
-              className={cn('mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
+              className={cn(
+                'mt-2 flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-4 text-[16px] font-bold text-foreground hover:bg-muted',
+                FOKUS_RAHMEN
+              )}
             >
               {ZU_HEUTE}
             </Link>
@@ -197,8 +200,9 @@ export function TeilenClient({
 
         {/* Fotos da, noch nicht (fertig) hochgeladen */}
         {fotos !== null && fotos.length > 0 && !fertigOhneFehler && (
-          <div className="rounded-2xl bg-card p-5 shadow-sm">
-            <div className="grid grid-cols-3 gap-2 mb-4">
+          // Frei auf der Seite wie im Board (keine zusätzliche Karte); Vorschauen zweispaltig über die Breite.
+          <div>
+            <div className="grid grid-cols-2 gap-2.5 mb-4">
               {vorschauen.map((url, i) => (
                 /* Vorschau ist nur Vorschau: Ob die Datei taugt, entscheidet
                    der Server — ein nicht darstellbares Bild bleibt trotzdem
@@ -208,14 +212,14 @@ export function TeilenClient({
                   key={url}
                   src={url}
                   alt={fotos[i]?.name || `Foto ${i + 1}`}
-                  className="aspect-square w-full rounded-lg object-cover bg-muted"
+                  className="aspect-[4/3] w-full rounded-xl object-cover bg-muted"
                 />
               ))}
             </div>
 
             {/* Zielauswahl — bei mehreren Fotos ist nur die Galerie sinnvoll */}
             {mehrere ? (
-              <p className="text-xs text-muted-foreground mb-4">
+              <p className="text-[15px] font-semibold text-foreground mb-4">
                 {fotos.length} Fotos – sie gehen in die Hofgalerie.
               </p>
             ) : (
@@ -248,11 +252,10 @@ export function TeilenClient({
             {ergebnisse && !laeuft ? (
               <HinweiskarteFehler titel={TEILEN_FEHLER_TITEL} nochmal={hochladen} laeuft={laeuft}>
                 <ul className="space-y-1">
-                  {ergebnisse
-                    .filter((e) => !e.ok)
-                    .map((e, i) => (
-                      <li key={i}>{e.meldung}</li>
-                    ))}
+                  {/* Gleiche Meldungen nur einmal — zwei Fotos mit demselben Netzfehler sagten sonst zweimal dasselbe. */}
+                  {[...new Set(ergebnisse.filter((e) => !e.ok).map((e) => e.meldung))].map((meldung) => (
+                    <li key={meldung}>{meldung}</li>
+                  ))}
                 </ul>
                 <p className="mt-1">{TEILEN_FEHLER_AUSWEG}</p>
               </HinweiskarteFehler>

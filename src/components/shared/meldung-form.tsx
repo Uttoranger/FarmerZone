@@ -23,6 +23,7 @@ export function MeldungForm({
   titel,
   satz,
   kennungVorbelegt = '',
+  hofName,
 }: {
   /** Signierter Zeitstempel aus dem Seitenaufbau (Zweck 'meldung'). */
   formToken: string
@@ -41,7 +42,9 @@ export function MeldungForm({
    * abtippen müssen. Nur der Startwert — danach gehört das Feld dem Menschen.
    */
   kennungVorbelegt?: string
+  /** Angemeldeter Hof: sein Name für die Zeile „Hof“ in der Karte „Das schicken wir automatisch mit“. */
+  hofName?: string
 }): React.JSX.Element {
   const formular = useMeldungFormular({ formToken, alsHof, kennungVorbelegt })
-  return <MeldungFormularAnsicht formular={formular} welt={welt} alsHof={alsHof} abbrechenHref={abbrechenHref} titel={titel} satz={satz} />
+  return <MeldungFormularAnsicht formular={formular} welt={welt} alsHof={alsHof} abbrechenHref={abbrechenHref} titel={titel} satz={satz} hofName={alsHof ? hofName : undefined} />
 }

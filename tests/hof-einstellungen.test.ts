@@ -294,7 +294,8 @@ describe('einstellungenBereiche', () => {
     const liste = einstellungenBereiche(daten(), VOR_STICHTAG)
     expect(bereich(liste, 'hofdaten')).toMatchObject({ ton: 'fertig', zeile: 'Hof Sonnenhang · Dorfstraße 1, 8700 Teststadt' })
     expect(bereich(liste, 'auftritt').ton).toBe('fertig')
-    expect(bereich(liste, 'abholzeiten')).toMatchObject({ ton: 'fertig', zeile: 'Mi 15–18' })
+    // Mit „Uhr“ wie im Board s1-/w1-einstellungen (Lauf 31).
+    expect(bereich(liste, 'abholzeiten')).toMatchObject({ ton: 'fertig', zeile: 'Mi 15–18 Uhr' })
     expect(bereich(liste, 'zahlung')).toMatchObject({ ton: 'fertig' })
     expect(bereich(liste, 'zahlung').zeile).toContain('Online-Zahlung über Stripe aktiv')
     expect(bereich(liste, 'konto').ton).toBe('fertig')
@@ -494,7 +495,7 @@ const html = (el: React.ReactElement) => renderToStaticMarkup(el)
 
 describe('Übersicht gerendert', () => {
   const bereiche = einstellungenBereiche(daten({ name: LANG }, { name: LANG }), VOR_STICHTAG)
-  const markup = html(createElement(EinstellungenUebersicht, { bereiche }))
+  const markup = html(createElement(EinstellungenUebersicht, { bereiche, hofName: 'Hof Test', jetzt: VOR_STICHTAG }))
 
   it('eine h1, neun Links auf die Bereiche, jeder Punkt mit Text für Screenreader', () => {
     expect(markup.match(/<h1\b/g)).toHaveLength(1)
@@ -662,10 +663,11 @@ describe('Kopf, Fehler, Laden', () => {
     expect(k.match(/<h1\b/g)).toHaveLength(1)
   })
 
-  it('Fehler inline als orange Hinweiskarte mit „Noch einmal versuchen"', () => {
+  it('Fehler inline als neutrale Hinweiskarte mit „Neu laden" (Board s1-/w1-einstellungen Bild 2, Lauf 31)', () => {
     const f = html(createElement(EinstellungenFehler, { titel: 'Einstellungen', href: '/settings' }))
-    expect(f).toContain('data-ton="orange"')
-    expect(f).toContain('Noch einmal versuchen')
+    expect(f).toContain('data-ton="neutral"')
+    expect(f).toContain('Neu laden')
+    expect(f).toContain('Deine Angaben sind nicht verloren. Versuch es noch einmal.')
     expect(f).toContain('href="/settings"')
   })
 

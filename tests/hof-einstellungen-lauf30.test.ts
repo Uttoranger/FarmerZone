@@ -252,7 +252,7 @@ describe('„Deine Konditionen“: Rechenbeispiel und Karte „Barzahlung“ nen
 describe('Wörter der Boards', () => {
   it('die Übersicht nennt „Urlaub und Pause“ (V8)', () => {
     const bereich: EinstellungBereich = { id: 'urlaubsmodus', titel: URLAUB_UND_PAUSE, zeile: 'Aus · du nimmst Bestellungen an', ton: 'neutral', href: '/settings/pause' }
-    const markup = html(createElement(EinstellungenUebersicht, { bereiche: [bereich] }))
+    const markup = html(createElement(EinstellungenUebersicht, { bereiche: [bereich], hofName: 'Hof Test', jetzt: new Date('2027-03-03T10:00:00Z') }))
     expect(markup).toContain('Urlaub und Pause')
     expect(markup).not.toContain('Urlaubsmodus')
   })

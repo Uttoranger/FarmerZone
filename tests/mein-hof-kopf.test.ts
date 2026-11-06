@@ -101,7 +101,8 @@ describe('ein Kopf, eine Hülle (Reiter an derselben Stelle)', () => {
 })
 
 describe('Titelzeile (Board s1-mein-hof statt Titelbild-Streifen)', () => {
-  const titelzeile = (html: string) => html.slice(0, html.indexOf('min-h-[70px]') === -1 ? html.indexOf('<nav') : html.indexOf('min-h-[70px]'))
+  // Seit Lauf 31 (Nr. 238) stehen die Reiter direkt unter der Titelzeile, die Zustandskarte darunter.
+  const titelzeile = (html: string) => html.slice(0, html.indexOf('<nav'))
 
   it('„Mein Hof" ohne h1, Schild „Öffentlich", darunter Hofname und Stand mit dem Wiener Datum', () => {
     const html = titelzeile(kopf())
@@ -112,6 +113,14 @@ describe('Titelzeile (Board s1-mein-hof statt Titelbild-Streifen)', () => {
     expect(html).toContain('>Testhof A · Stand Mittwoch, 3.\u00a0März\u00a02027</p>')
     // Gegenprobe: in UTC wäre es noch Dienstag.
     expect(html).not.toContain('Dienstag')
+  })
+
+  it('auf /farm-page ist „Mein Hof" die sichtbare h1 (titelAlsH1), auf /products bleibt es ein Absatz', () => {
+    const h1 = titelzeile(renderToStaticMarkup(createElement(MeinHofKopf, { hof: HOF, zustand: ZUSTAND, aktiv: 'hofseite', jetzt: JETZT, titelAlsH1: true })))
+    expect(h1).toMatch(/<h1 class="[^"]*\bfont-heading\b[^"]*">Mein Hof<\/h1>/)
+    expect(h1.match(/<h1\b/g)).toHaveLength(1)
+    // Gegenprobe: ohne die Angabe (wie auf /products) keine h1.
+    expect(titelzeile(kopf())).not.toContain('<h1')
   })
 
   it('kein Titelbild-Streifen mehr: kein Bild, kein Logo, kein Schleier — das Titelbild bleibt in der Liste „Bearbeiten"', () => {
@@ -166,22 +175,41 @@ describe('Titelzeile (Board s1-mein-hof statt Titelbild-Streifen)', () => {
 })
 
 describe('Zustandszeile', () => {
-  const zeile = (html: string) => html.slice(html.indexOf('min-h-[70px]'), html.indexOf('<nav'))
+  // Die Karte steht seit Lauf 31 unter den Reitern (Board s1-mein-hof) — sie reicht bis zum Ende des Kopfs.
+  const zeile = (html: string) => (html.includes('data-zustands-karte') ? html.slice(html.lastIndexOf('<div', html.indexOf('data-zustands-karte'))) : '')
 
-  it('nimmt an: Punkt aria-hidden, Titel, Satz mit der nächsten Abholung, Knopf „Pausieren" (öffnet das Blatt)', () => {
+  it('Reiter vor der Karte: die Zustandskarte steht unter der Reiterleiste', () => {
+    const html = kopf(ZUSTAND, HOF, 'hofseite')
+    expect(html.indexOf('<nav aria-label="Mein Hof"')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-zustands-karte')).toBeGreaterThan(html.indexOf('</nav>'))
+  })
+
+  it('auf Beiträge keine Zustandskarte (Board s1-mein-hof Bild 5); die Reiter stehen trotzdem', () => {
+    const html = kopf(ZUSTAND, HOF, 'beitraege')
+    expect(html).not.toContain('data-zustands-karte')
+    expect(html).toContain('<nav aria-label="Mein Hof"')
+    // Gegenprobe: auf Hofseite steht sie.
+    expect(kopf(ZUSTAND, HOF, 'hofseite')).toContain('data-zustands-karte')
+  })
+
+  it('nimmt an: grün getönt ohne Punkt, Titel, Satz mit der nächsten Abholung, Knopf „Pausieren" (öffnet das Blatt)', () => {
     const z = zeile(kopf())
-    expect(z).toMatch(/<span aria-hidden="true" class="[^"]*\bbg-status-fertig\b/)
+    expect(z).toMatch(/^<div class="[^"]*\bbg-accent\/12\b[^"]*\bborder-accent\/45\b|^<div class="[^"]*\bborder-accent\/45\b[^"]*\bbg-accent\/12\b/)
+    expect(z).not.toMatch(/size-\[9px\]/)
     expect(z).toContain('>Nimmt Bestellungen an</p>')
     expect(z).toContain('>Nächste Abholung: Morgen 15:00–18:00</p>')
-    expect(z).toMatch(/<button type="button" class="[^"]*"><svg[^>]*aria-hidden="true">[\s\S]*?<\/svg>Pausieren<\/button>/)
+    // Umriss ohne Symbol wie im Board (Lauf 31).
+    expect(z).toMatch(/<button type="button" class="[^"]*\bborder-foreground\b[^"]*">Pausieren<\/button>/)
     // Das Blatt ist zu.
     expect(z).not.toContain('Bestellungen pausieren?')
   })
 
-  it('pausiert: derselbe Knopf heißt „Fortsetzen" (grün) — kein Blatt', () => {
+  it('pausiert: derselbe Knopf heißt „Fortsetzen" (Umriss) — kein Blatt', () => {
     const z = zeile(kopf({ ...ZUSTAND, zustand: 'pausiert', sperre: 'pause' }))
     expect(z).toContain('>Pausiert</p>')
-    expect(z).toMatch(/<button type="button" class="[^"]*\bbg-accent\b[^"]*">Fortsetzen<\/button>/)
+    // Derselbe Umriss wie „Pausieren“ (Board s1-mein-hof Bild 4: Rahmenknopf, nicht grün gefüllt).
+    expect(z).toMatch(/<button type="button" class="[^"]*\bborder-foreground\b[^"]*">Fortsetzen<\/button>/)
+    expect(z).not.toMatch(/\bbg-accent\b[^"]*">Fortsetzen/)
     expect(z).toMatch(/border-primary\/45/)
   })
 
@@ -204,7 +232,7 @@ describe('Zustandszeile', () => {
 
   it('der Satz wird nie gekürzt', () => {
     const text = quelle('src/components/mein-hof/mein-hof-kopf.tsx')
-    const satz = /<p className="([^"]*)">\{zeile\.satz\}<\/p>/.exec(text)?.[1] ?? ''
+    const satz = /<p className=\{cn\(([^}]*)\)\}>\{zeile\.satz\}<\/p>/.exec(text)?.[1] ?? ''
     expect(satz).toContain('text-muted-foreground')
     expect(satz).not.toMatch(/truncate|line-clamp|whitespace-nowrap/)
   })

@@ -5,6 +5,7 @@ import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getCustomersForFarm, type CustomerSummary } from '@/server/queries/customers'
 import { KundenAnsicht } from '@/components/hof-kunden/kunden-ansicht'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { KundenFehler } from '@/components/hof-kunden/kunden-fehler'
 import { KUNDEN_RAHMEN } from '@/components/hof-kunden/kunden-laden'
 import { MARKE } from '@/lib/marke'
@@ -28,9 +29,10 @@ export default async function CustomersPage(): Promise<React.JSX.Element> {
   const farm = await getFarmForUser(userId)
   if (!farm) redirect('/onboarding')
 
+  const jetzt = new Date()
   let kunden: CustomerSummary[] | null = null
   try {
-    kunden = await getCustomersForFarm(farm.id, new Date())
+    kunden = await getCustomersForFarm(farm.id, jetzt)
   } catch (err) {
     // Nur Art und Hof — keine Personendaten; Texte bereinigt sentry-hygiene ohnehin.
     Sentry.captureException(err, { tags: { bereich: 'kunden', seite: 'liste' }, extra: { farmId: farm.id } })
@@ -38,7 +40,7 @@ export default async function CustomersPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={KUNDEN_RAHMEN}>
-      {kunden ? <KundenAnsicht kunden={kunden} /> : <KundenFehler titel="Kunden" nochmal="/customers" />}
+      {kunden ? <KundenAnsicht kunden={kunden} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} /> : <KundenFehler titel="Kunden" nochmal="/customers" />}
     </div>
   )
 }
