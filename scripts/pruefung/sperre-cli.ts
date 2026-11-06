@@ -4,13 +4,14 @@
  *
  *   tsx scripts/pruefung/sperre-cli.ts [--ordner <pfad>]… [--db]
  *
- *   --ordner  Ordner, in dem keine .env-Datei liegen darf (mehrfach).
+ *   Immer geprüft: der Worktree dieses Skripts und der Arbeitsordner.
+ *   --ordner  weiterer Ordner ohne .env-Datei (mehrfach; erweitert nur).
  *   --db      Adressen aus DATABASE_URL/DIRECT_URL prüfen, verbinden und
  *             `SELECT inet_server_addr()` verlangen: Loopback oder Socket.
  *
  * Exit 0 = erlaubt, Exit 1 = Abbruch. Meldungen nennen nur Host und Port.
  */
-import { hostUndPort, istLoopbackServerAdresse, pruefeDatenbankAdressen, pruefeOhneEnvDateien, pruefWerteAus } from './sperre'
+import { hostUndPort, istLoopbackServerAdresse, pflichtOrdner, pruefeDatenbankAdressen, pruefeOhneEnvDateien, pruefWerteAus } from './sperre'
 
 function abbruch(grund: string): never {
   console.error(`Prüf-Sperre: ${grund}`)
@@ -28,7 +29,7 @@ async function main(): Promise<void> {
     else abbruch(`unbekannte Angabe ${a ?? ''}`)
   }
 
-  const env = pruefeOhneEnvDateien(ordner)
+  const env = pruefeOhneEnvDateien(pflichtOrdner(process.cwd(), ordner))
   if (env) abbruch(env)
   if (!mitDb) return
 

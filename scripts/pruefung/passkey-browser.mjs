@@ -46,7 +46,7 @@ const urlTeil = wert('--url-teil', 'localhost:3000')
 const zaehler = wert('--zaehler', '0')
 
 // 1. Sperre — vor allem anderen.
-const sperre = spawnSync(join(WT, 'node_modules', '.bin', 'tsx'), [join(WT, 'scripts', 'pruefung', 'sperre-cli.ts'), '--db', '--ordner', WT], {
+const sperre = spawnSync(join(WT, 'node_modules', '.bin', 'tsx'), [join(WT, 'scripts', 'pruefung', 'sperre-cli.ts'), '--db'], {
   stdio: 'inherit',
   env: process.env,
 })

@@ -2,9 +2,10 @@
  * Der Prüf-Seed (freigabe.md §36, Nr. 243) — nur auf einer frischen
  * Wegwerf-DB auf localhost.
  *
- *   pnpm pruefen:seed [--stichtag vergangenheit|zukunft] [--links <pfad>] [--passkey <pfad>] [--wt <ordner>]
+ *   pnpm pruefen:seed [--stichtag vergangenheit|zukunft] [--links <pfad>] [--passkey <pfad>]
  *
- * `--wt`: der Ordner ohne .env-Datei (Vorgabe: Arbeitsordner).
+ * Ohne .env-Datei müssen immer der Worktree dieses Skripts und der
+ * Arbeitsordner sein — keine Angabe lenkt das um.
  *
  * Läuft unter `env -i` mit der Liste aus pruef-env.sh (DATABASE_URL und
  * DIRECT_URL gleich, auf localhost; LINK_SECRET des Laufs). Schritte:
@@ -30,6 +31,7 @@ import {
   pruefWerteAus,
   pruefeDatenbankZustand,
   pruefeOhneEnvDateien,
+  pflichtOrdner,
 } from './sperre'
 
 function abbruch(grund: string): never {
@@ -51,7 +53,7 @@ async function main(): Promise<void> {
   if (typeof optionen === 'string') abbruch(optionen)
   const adressen = pruefeDatenbankAdressen(pruefWerteAus(process.env))
   if (adressen) abbruch(adressen)
-  const env = pruefeOhneEnvDateien([optionen.wt ?? process.cwd()])
+  const env = pruefeOhneEnvDateien(pflichtOrdner(process.cwd()))
   if (env) abbruch(env)
   const url = process.env['DATABASE_URL'] as string
   console.log(`Prüf-Seed gegen ${hostUndPort(url)} (Stichtag: ${optionen.stichtag}).`)

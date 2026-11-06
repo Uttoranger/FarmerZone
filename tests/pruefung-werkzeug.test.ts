@@ -1,4 +1,7 @@
 import { createPublicKey, createPrivateKey, sign, verify } from 'node:crypto'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { coseSchluessel, erzeugePruefPasskey, PRUEF_RP_IDS } from '../scripts/pruefung/passkey'
 import {
@@ -8,6 +11,7 @@ import {
   STICHTAG_VERGANGENHEIT,
   stichtagFuer,
 } from '../scripts/pruefung/optionen'
+import { pflichtOrdner, werkzeugWorktree } from '../scripts/pruefung/sperre'
 
 /**
  * Bausteine des Prüf-Seeds ohne Datenbank (freigabe.md §36, Nr. 243):
@@ -48,10 +52,9 @@ describe('leseSeedOptionen', () => {
     expect(typeof leseSeedOptionen(['--links', 'docs/links.json'])).toBe('string')
     expect(typeof leseSeedOptionen(['--passkey', '.nachtlauf/../schluessel.json'])).toBe('string')
     expect(leseSeedOptionen(['--links', '.nachtlauf/b/links.json'])).toMatchObject({ links: '.nachtlauf/b/links.json' })
-    // Ohne --wt prüft der Seed den Arbeitsordner; mit --wt einen anderen.
-    expect(SEED_VORGABEN.wt).toBeNull()
-    expect(leseSeedOptionen(['--wt', '/tmp/leer'])).toMatchObject({ wt: '/tmp/leer' })
-    expect(typeof leseSeedOptionen(['--wt'])).toBe('string')
+    // Keine Angabe lenkt die .env-Prüfung auf einen anderen Ordner (Runde 2).
+    expect(typeof leseSeedOptionen(['--wt', '/tmp/leer'])).toBe('string')
+    expect(Object.keys(SEED_VORGABEN).sort()).toEqual(['links', 'passkey', 'stichtag'])
   })
 
   it('liegtUnterNachtlauf', () => {
@@ -59,6 +62,24 @@ describe('leseSeedOptionen', () => {
     expect(liegtUnterNachtlauf('/home/x/wt/.nachtlauf/pruef-links.json')).toBe(true)
     expect(liegtUnterNachtlauf('tests/pruef-links.json')).toBe(false)
     expect(liegtUnterNachtlauf('.nachtlauf/../x.json')).toBe(false)
+  })
+})
+
+describe('Ordner der .env-Prüfung', () => {
+  it('der Worktree kommt aus dem Pfad des Werkzeugs, nicht aus einer Angabe', () => {
+    expect(realpathSync(werkzeugWorktree())).toBe(realpathSync(process.cwd()))
+  })
+
+  it('immer Worktree und Arbeitsordner; Zusätze erweitern nur, doppelte fallen weg', () => {
+    const anders = mkdtempSync(join(tmpdir(), 'pruefung-pflicht-'))
+    try {
+      const wt = realpathSync(werkzeugWorktree())
+      expect(pflichtOrdner(process.cwd())).toEqual([wt])
+      expect(pflichtOrdner(anders)).toEqual([wt, realpathSync(anders)])
+      expect(pflichtOrdner(process.cwd(), [anders, anders])).toEqual([wt, realpathSync(anders)])
+    } finally {
+      rmSync(anders, { recursive: true, force: true })
+    }
   })
 })
 

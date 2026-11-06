@@ -16,25 +16,28 @@
  *    Der Seed bricht an der Loopback-Prüfung ab und schreibt nichts. Das ist
  *    gewolltes Verhalten der Sperre, keine Lockerung.
  *
- * Die .env-Prüfung gilt einem leeren Temp-Ordner (`--wt`), nicht dem Klon —
- * ein Entwickler mit .env.test bekäme sonst einen roten Lauf; die Gegenprobe
- * mit .env-Datei läuft in beiden Zweigen.
+ * Der Seed läuft aus einem Temp-Worktree (Kopie von scripts/pruefung/,
+ * Verweise auf node_modules, src, prisma …; tests/pruefung-worktree.ts) mit
+ * diesem als Arbeitsordner: Das Werkzeug prüft immer seinen eigenen Worktree
+ * und den Arbeitsordner, ohne Ausnahme — so läuft der Test auch in einem Klon
+ * mit .env.test. Die Gegenprobe mit .env-Datei läuft in beiden Zweigen.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import pg from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { tokenKandidaten } from '@/lib/bar-bestaetigung'
 import { istLoopbackServerAdresse } from '../../scripts/pruefung/sperre'
+import { tempWorktree, type TempWorktree } from '../pruefung-worktree'
 import { INTEGRATIONS_ENV } from './setup/integrations-umgebung'
 
 const WURZEL = process.cwd()
 const AUSGABE = '.nachtlauf/int-pruefung-seed'
-const LINKS = join(WURZEL, AUSGABE, 'links.json')
-const PASSKEY = join(WURZEL, AUSGABE, 'passkey.json')
+const WT = tempWorktree('pruef-seed-wt-')
+const LINKS = join(WT.ordner, AUSGABE, 'links.json')
+const PASSKEY = join(WT.ordner, AUSGABE, 'passkey.json')
 
 // Die Konfiguration hat die Adresse schon durch die Sperre geschickt.
 const TEST_URL = process.env['DATABASE_URL'] ?? ''
@@ -60,14 +63,12 @@ async function mitClient<T>(url: string, arbeit: (c: pg.Client) => Promise<T>): 
 const serverAdresse = await mitClient(TEST_URL, async (c) => (await c.query<{ a: string | null }>('SELECT inet_server_addr()::text AS a')).rows[0]?.a ?? null)
 const LOOPBACK = istLoopbackServerAdresse(serverAdresse)
 
-const leer = mkdtempSync(join(tmpdir(), 'pruef-seed-leer-'))
-
-function pruefSeed(wt: string): { status: number | null; ausgabe: string; stderr: string } {
+function pruefSeed(wt: TempWorktree): { status: number | null; ausgabe: string; stderr: string } {
   const lauf = spawnSync(
-    join(WURZEL, 'node_modules', '.bin', 'tsx'),
-    ['scripts/pruefung/pruef-seed.ts', '--links', `${AUSGABE}/links.json`, '--passkey', `${AUSGABE}/passkey.json`, '--wt', wt],
+    join(wt.ordner, 'node_modules', '.bin', 'tsx'),
+    [wt.skript('pruef-seed.ts'), '--links', `${AUSGABE}/links.json`, '--passkey', `${AUSGABE}/passkey.json`],
     {
-      cwd: WURZEL,
+      cwd: wt.ordner,
       encoding: 'utf8',
       // Wie `env -i` mit der Liste aus pruef-env.sh: kein RESEND, kein Sentry, kein VERCEL.
       env: {
@@ -122,18 +123,18 @@ beforeAll(async () => {
 }, 120_000)
 
 afterEach(() => {
-  rmSync(join(WURZEL, AUSGABE), { recursive: true, force: true })
+  rmSync(join(WT.ordner, AUSGABE), { recursive: true, force: true })
 })
 
 afterAll(async () => {
-  rmSync(leer, { recursive: true, force: true })
+  WT.weg()
   await mitClient(TEST_URL, (c) => c.query(`DROP DATABASE IF EXISTS "${WEGWERF_NAME}" WITH (FORCE)`))
 })
 
 describe('Prüf-Seed auf einer Wegwerf-DB', () => {
   if (LOOPBACK) {
     it('Server über Loopback: erster Lauf seedet, zweiter Lauf bricht wegen der Passkey-Zeile ab und schreibt nichts', async () => {
-      const erster = pruefSeed(leer)
+      const erster = pruefSeed(WT)
       expect(erster.status, erster.stderr).toBe(0)
       expect(statSync(PASSKEY).mode & 0o777).toBe(0o600)
       expect(statSync(LINKS).mode & 0o777).toBe(0o600)
@@ -161,8 +162,8 @@ describe('Prüf-Seed auf einer Wegwerf-DB', () => {
       )
       expect(klartext).toBe(0)
 
-      rmSync(join(WURZEL, AUSGABE), { recursive: true, force: true })
-      const zweiter = pruefSeed(leer)
+      rmSync(join(WT.ordner, AUSGABE), { recursive: true, force: true })
+      const zweiter = pruefSeed(WT)
       expect(zweiter.status).toBe(1)
       expect(zweiter.stderr).toContain('Passkey-Zeile')
       expect(zweiter.ausgabe).not.toContain(wegwerfUrl)
@@ -172,7 +173,7 @@ describe('Prüf-Seed auf einer Wegwerf-DB', () => {
   } else {
     it('Server ohne Loopback-Adresse (z. B. CI-Dienst-Container): Seed bricht an der Loopback-Prüfung ab und schreibt nichts', async () => {
       const vorher = await stand()
-      const lauf = pruefSeed(leer)
+      const lauf = pruefSeed(WT)
       expect(lauf.status).toBe(1)
       expect(lauf.stderr).toContain('keine Loopback-Adresse')
       expect(lauf.ausgabe).not.toContain(wegwerfUrl)
@@ -182,18 +183,18 @@ describe('Prüf-Seed auf einer Wegwerf-DB', () => {
     }, 60_000)
   }
 
-  it('Gegenprobe: .env-Datei im geprüften Ordner bricht ab, bevor verbunden wird', async () => {
-    const mitEnv = mkdtempSync(join(tmpdir(), 'pruef-seed-env-'))
+  it('Gegenprobe: .env.test im Worktree des Seeds bricht ab, bevor verbunden wird', async () => {
+    const mitEnv = tempWorktree('pruef-seed-env-')
     try {
-      writeFileSync(join(mitEnv, '.env.test'), 'X=1\n')
+      writeFileSync(join(mitEnv.ordner, '.env.test'), 'X=1\n')
       const vorher = await stand()
       const lauf = pruefSeed(mitEnv)
       expect(lauf.status).toBe(1)
       expect(lauf.stderr).toContain('.env-Datei')
-      keineDateien()
+      expect(existsSync(join(mitEnv.ordner, AUSGABE))).toBe(false)
       expect(await stand()).toEqual(vorher)
     } finally {
-      rmSync(mitEnv, { recursive: true, force: true })
+      mitEnv.weg()
     }
   }, 60_000)
 })

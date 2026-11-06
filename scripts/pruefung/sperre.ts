@@ -1,5 +1,6 @@
-import { lstatSync, readdirSync, readlinkSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { lstatSync, readdirSync, readlinkSync, realpathSync } from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { istTestDatenbank } from '../../src/lib/umgebung'
 
 /**
@@ -150,4 +151,33 @@ export function pruefeOhneEnvDateien(ordner: readonly string[]): string | null {
   const funde = ordner.flatMap((o) => findeEnvDateien(o))
   if (funde.length === 0) return null
   return `.env-Datei oder Verweis darauf gefunden (${funde.join(', ')}). Im Prüf-Worktree sind keine .env-Dateien erlaubt.`
+}
+
+/**
+ * Der Worktree, aus dem dieses Werkzeug stammt — aus dem Pfad dieser Datei
+ * (scripts/pruefung/ → zwei Ebenen höher), nie aus einer Angabe oder Variable.
+ * Eine übergebbare Angabe lenkte die Prüfung auf einen beliebigen Ordner um
+ * (Gegenlesen Runde 2); die Sperre hat keine Ausnahme.
+ */
+export function werkzeugWorktree(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+}
+
+function echterPfad(ordner: string): string {
+  try {
+    return realpathSync(ordner)
+  } catch {
+    return resolve(ordner)
+  }
+}
+
+/**
+ * Die Ordner, die immer ohne .env-Datei sein müssen: der Worktree des
+ * Werkzeugs und der Arbeitsordner, falls verschieden; dazu, was ein Aufrufer
+ * zusätzlich prüft (Fotograf-Ordner, dev-Worktree). Zusätze erweitern nur,
+ * ersetzen nie.
+ */
+export function pflichtOrdner(arbeitsordner: string, zusaetzlich: readonly string[] = []): string[] {
+  const alle = [werkzeugWorktree(), arbeitsordner, ...zusaetzlich].map(echterPfad)
+  return [...new Set(alle)]
 }

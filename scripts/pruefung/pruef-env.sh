@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Die feste Umgebung jedes Prüf-Befehls (freigabe.md §36, „Prüf-Umgebung“).
 #
-#   pruef-env.sh neu   [--datei <pfad>] [--wt <ordner>]
+#   pruef-env.sh neu   [--datei <pfad>]
 #       Legt die Datei (Vorgabe .nachtlauf/pruef-env, chmod 600) neu an:
 #       BETTER_AUTH_SECRET und LINK_SECRET je Lauf neu aus `openssl rand -hex 32`,
 #       Stripe nur als Platzhalter, die Basis der Prüf-DB aus PGUSER/PGPASSWORD
 #       (Host fest localhost:5432; beide nur A-Z, a-z, 0-9, _ und -, weil sie
-#       unverändert in der Adresse stehen). Prüft vorher, dass der Ordner
-#       `--wt` (Vorgabe: Arbeitsordner) keine .env-Datei hat.
+#       unverändert in der Adresse stehen). Prüft vorher, dass der Worktree
+#       dieses Skripts und der Arbeitsordner keine .env-Datei haben.
 #   pruef-env.sh liste --db <name> --port <port> [--datei <pfad>]
 #       Gibt die Liste für `env -i` aus, eine Zuweisung je Zeile:
 #         mapfile -t L < <(scripts/pruefung/pruef-env.sh liste --db fz_p243_a --port 3101)
@@ -22,7 +22,6 @@ set -euo pipefail
 
 WT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DATEI="$WT/.nachtlauf/pruef-env"
-ORDNER="$PWD"
 BEFEHL="${1:-}"
 shift || true
 DB=""
@@ -30,7 +29,6 @@ PORT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --datei) DATEI="$2"; shift 2 ;;
-    --wt) ORDNER="$2"; shift 2 ;;
     --db) DB="$2"; shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
     *) echo "pruef-env.sh: unbekannte Angabe $1" >&2; exit 1 ;;
@@ -39,7 +37,7 @@ done
 
 case "$BEFEHL" in
   neu)
-    "$WT/node_modules/.bin/tsx" "$WT/scripts/pruefung/sperre-cli.ts" --ordner "$ORDNER"
+    "$WT/node_modules/.bin/tsx" "$WT/scripts/pruefung/sperre-cli.ts"
     : "${PGPASSWORD:?PGPASSWORD fehlt (Passwort der lokalen Prüf-DB)}"
     # Unkodiert in der Adresse: @, :, / oder % verschöben Host oder Datenbank.
     [[ "$PGPASSWORD" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "pruef-env.sh: PGPASSWORD nur A-Z, a-z, 0-9, _ und -" >&2; exit 1; }
