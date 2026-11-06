@@ -1454,7 +1454,7 @@ export async function baueHofAntwortAnTeam(
 /** „Testmail an alle senden" (Postfach › Zustellung) → EINE Adresse der Liste (je Adresse ein Auftrag). */
 export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {
   const { BetreiberTestmailEmail } = await import('@/emails/betreiber-testmail')
-  const html = await toHtml(React.createElement(BetreiberTestmailEmail, { url: `${APP_URL}${eingangAdresse('offen')}` }))
+  const html = await toHtml(React.createElement(BetreiberTestmailEmail))
   return { an, betreff: ZUSTELLUNG_MAIL_TEXT.testBetreff, html }
 }
 
