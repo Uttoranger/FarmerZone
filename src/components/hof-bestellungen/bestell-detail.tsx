@@ -56,7 +56,7 @@ const LEISTE_NEBEN = cn(KNOPF_RAHMEN, 'min-h-12 w-full rounded-[14px] border-for
  *   Position, „Packliste · 1 von 3“), rechts ab 1024 px die Kundin; unten
  *   eine feste Leiste mit der Hauptaktion, einem zweiten Knopf und „Weitere
  *   Aktionen …“ (Menü mit dem Rest).
- * - `vorschau` (/orders ab 1024 px rechts neben der Liste, Board w1-
+ * - `kompakt` (/orders ab 1024 px rechts neben der Liste, Board w1-
  *   bestellungen): Name, Marke, Nummer und Abholung, der Betrag in einer
  *   Zeile, der Satz dazu, die Artikel, die Hauptaktion über die volle Breite
  *   und „Ganze Bestellung öffnen →“.
@@ -80,8 +80,8 @@ export function BestellDetail({
   widerrufe?: readonly HofWiderruf[]
   /** Der gewählte Filter der Liste (`?filter=…` oder leer) — der Rückweg führt mit ihm zurück. */
   zurueckSuche: string
-  /** voll = eigene Seite der Bestellung; vorschau = kompakt neben der Liste (/orders ab 1024 px). */
-  ansicht?: 'voll' | 'vorschau'
+  /** voll = eigene Seite der Bestellung; kompakt = Vorschau neben der Liste (/orders ab 1024 px). */
+  ansicht?: 'voll' | 'kompakt'
 }): React.JSX.Element {
   const [abgehakt, setAbgehakt] = useState<ReadonlySet<string>>(new Set())
   const [offen, setOffen] = useState<Offen>(null)
@@ -199,7 +199,7 @@ export function BestellDetail({
   // „Nicht abgeholt kostet dich nichts.“ steht dort, wo der Knopf sichtbar ist — in der Leiste oder sonst bei der Kundin.
   const nichtAbgeholtInLeiste = zweite?.schluessel === 'nicht-abgeholt'
 
-  if (ansicht === 'vorschau') {
+  if (ansicht === 'kompakt') {
     return (
       <article aria-labelledby={`bestellung-${bestellung.id}`} className={cn(KARTE, 'flex flex-col gap-3 rounded-[14px] p-4 md:px-[18px]')}>
         <div className="flex flex-col gap-1">
@@ -324,7 +324,8 @@ export function BestellDetail({
           <>
             {/* Platz für die feste Leiste, damit sie das Ende der Seite nicht verdeckt. */}
             <div aria-hidden="true" className={cn(nichtAbgeholtInLeiste ? 'h-40' : 'h-32', 'md:h-24')} />
-            <div className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card md:bottom-0 md:left-[264px] print:hidden">
+            {/* data-unten-fest: Der Cookie-Hinweis misst die Leiste und steht darüber (src/lib/cookie-hinweis.ts). */}
+            <div data-unten-fest="" className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card md:bottom-0 md:left-[264px] print:hidden">
               {/* Am Handy: Hauptaktion oben über die volle Breite, darunter die zwei Knöpfe, dann der Satz (so auch
                   die Reihenfolge beim Tabben). Ab 768 px eine Zeile rechtsbündig: Satz links, die zwei Knöpfe, die
                   Hauptaktion ganz rechts. */}

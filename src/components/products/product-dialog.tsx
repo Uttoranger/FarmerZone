@@ -179,6 +179,11 @@ function FormMessage({ className, ...props }: React.ComponentProps<typeof UiForm
   return <UiFormMessage role="alert" className={cn('text-[14px] leading-snug font-semibold text-status-offen', className)} {...props} />
 }
 
+// Die Abschnitte als eigene Karten mit fetter Überschrift und der Zusammenfassung darunter
+// (Board s1-/w1-produkt-neu, Lauf 31) statt Trennlinien mit kleiner Überschrift.
+const ABSCHNITT_KARTE = 'rounded-[14px] border border-border bg-card px-4 last:border'
+const ABSCHNITT_KOPF = 'text-[16px] font-bold'
+
 function SchalterZeile({
   id,
   titel,
@@ -961,7 +966,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           {pflicht && ' *'}
         </span>
         {zu && (
-          <span className={cn('truncate text-xs', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
+          <span className={cn('truncate text-[13px]', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
             {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
           </span>
         )}
@@ -1018,12 +1023,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
               />
               <Accordion
                 multiple
+                className="flex flex-col gap-3"
                 value={offen}
                 onValueChange={(v) => setOffen(v as Abschnitt[])}
               >
                 {/* === 1. GRUNDDATEN === */}
-                <AccordionItem value="grunddaten">
-                  <AccordionTrigger>{abschnittTitel('grunddaten')}</AccordionTrigger>
+                <AccordionItem value="grunddaten" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('grunddaten')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
                       {/* Foto zuerst (Vorbild Depop, Shopify, Nextdoor): der schnellste
@@ -1203,8 +1209,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                 </AccordionItem>
 
                 {/* === 2. PREIS & VERFÜGBARKEIT === */}
-                <AccordionItem value="preis">
-                  <AccordionTrigger>{abschnittTitel('preis')}</AccordionTrigger>
+                <AccordionItem value="preis" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('preis')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
                       {/* Reihenfolge Einheit → Gebinde → Preis: Das Preisfeld heißt je
@@ -1561,8 +1567,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                 </AccordionItem>
 
                 {/* === 3. DETAILS === */}
-                <AccordionItem value="details">
-                  <AccordionTrigger>{abschnittTitel('details')}</AccordionTrigger>
+                <AccordionItem value="details" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('details')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-4">
                       {/* Siegel — drei Zeilen mit Erklärsatz */}
@@ -1729,8 +1735,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
 
                 {/* === 4. KENNZEICHNUNG — nur bei Futtermitteln === */}
                 {futterBereich && (
-                  <AccordionItem value="kennzeichnung">
-                    <AccordionTrigger>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
+                  <AccordionItem value="kennzeichnung" className={ABSCHNITT_KARTE}>
+                    <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
                     <AccordionPanel>
                       <div className="space-y-4">
                         <p className="text-xs text-muted-foreground">

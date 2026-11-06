@@ -339,6 +339,8 @@ const MENUE_DATEIEN: Record<string, { unter: 'AdminShell' | 'HofShell' } | { gru
   'src/components/admin/meldungen-werkzeug.tsx': { unter: 'AdminShell' },
   'src/components/shells/admin-konto.tsx': { unter: 'AdminShell' },
   'src/components/shells/hof-shell.tsx': { unter: 'HofShell' },
+  // Nr. 237: „Weitere Aktionen …“ in der festen Leiste der Bestellung (/orders/[orderId], Layout (hof)).
+  'src/components/hof-bestellungen/bestell-detail.tsx': { unter: 'HofShell' },
 }
 
 /** Hat die Datei ein `<DropdownMenuContent` als Element (Kommentare und Zeichenketten zählen nicht)? */

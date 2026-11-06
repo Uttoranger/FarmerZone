@@ -22,7 +22,7 @@ export function filterSuche(filter: HofBestellFilter): string {
 }
 
 /** Die Vorschau einer Bestellung neben der Liste (ab 1024 px): dieselbe Liste mit `?bestellung=<id>`. */
-export function vorschauHref(filter: HofBestellFilter, bestellungId: string): string {
+function vorschauHref(filter: HofBestellFilter, bestellungId: string): string {
   const basis = bestellListeHref(filter)
   return `${basis}${basis.includes('?') ? '&' : '?'}bestellung=${encodeURIComponent(bestellungId)}`
 }
@@ -120,7 +120,7 @@ export function BestellungenAnsicht({
           </div>
           {detail && (
             <div className="hidden min-w-0 flex-1 lg:block">
-              <BestellDetail key={detail.id} ansicht="vorschau" bestellung={detail} zurueckSuche={suche} barFrist={barFrist} />
+              <BestellDetail key={detail.id} ansicht="kompakt" bestellung={detail} zurueckSuche={suche} barFrist={barFrist} />
             </div>
           )}
         </LadeInhalt>
@@ -153,7 +153,7 @@ function BestellListe({
           <ul className={cn(KARTE, 'overflow-hidden rounded-[14px]')}>
             {gruppe.bestellungen.map((b) => (
               <li key={b.id} className="border-t border-border first:border-t-0">
-                <ListenZeile eintrag={b} href={`/orders/${b.id}${suche}`} vorschau={vorschauHref(filter, b.id)} gewaehlt={b.id === gewaehlt} />
+                <ListenZeile eintrag={b} href={`/orders/${b.id}${suche}`} auswahlHref={vorschauHref(filter, b.id)} gewaehlt={b.id === gewaehlt} />
               </li>
             ))}
           </ul>
@@ -172,12 +172,12 @@ function BestellListe({
 function ListenZeile({
   eintrag,
   href,
-  vorschau,
+  auswahlHref,
   gewaehlt,
 }: {
   eintrag: HofListenEintrag
   href: string
-  vorschau: string
+  auswahlHref: string
   gewaehlt: boolean
 }): React.JSX.Element {
   const inhalt = (
@@ -204,7 +204,7 @@ function ListenZeile({
         <LadePunkt />
       </Link>
       <Link
-        href={vorschau}
+        href={auswahlHref}
         title={eintrag.kunde}
         aria-current={gewaehlt ? 'true' : undefined}
         scroll={false}
