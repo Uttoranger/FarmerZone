@@ -103,7 +103,8 @@ import { ladeAdminbereich } from '@/server/adminbereich'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { leseBestellstopp, lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ladeHeute } from '@/server/queries/admin-heute'
-import { umsatzBestellungWhere, umsatzfenster } from '@/lib/umsatz'
+import { umsatzfenster } from '@/lib/umsatz'
+import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
 
 const STUNDE = 60 * 60_000
 
@@ -142,12 +143,12 @@ beforeEach(() => {
     { status: 'READY', _count: { _all: 2 } },
     { status: 'CANCELLED', _count: { _all: 1 } },
   ])
-  // Woche: Warenwert und Servicegebühr (ohne entfallene) nach Bestelldatum (Nr. 240); die Zahl dieser Woche und
-  // der Vorwoche nach Abholung über count — diese Woche endet jetzt, die Vorwoche früher.
+  // Woche: Warenwert, Servicegebühr (ohne entfallene) und die Zahl nach der Zählregel der Kachel (Nr. 258); die Zahl
+  // dieser Woche und der Vorwoche über count — diese Woche endet jetzt, die Vorwoche früher (Fenster nach createdAt).
   db.order.aggregate.mockImplementation(async (a: { _sum: { serviceFeeCents?: true } }) =>
     a._sum.serviceFeeCents ? { _sum: { serviceFeeCents: 9200 } } : { _sum: { totalAmount: new Prisma.Decimal('1840.00') } }
   )
-  db.order.count.mockImplementation(async (a: { where: { pickedUpAt?: { lte?: Date } } }) => (a.where.pickedUpAt?.lte?.getTime() === JETZT.getTime() ? 118 : 108))
+  db.order.count.mockImplementation(async (a: { where: { createdAt?: { lte?: Date } } }) => (a.where.createdAt?.lte?.getTime() === JETZT.getTime() ? 118 : 108))
   db.adminAktion.findMany.mockResolvedValue([{ wann: new Date(JETZT.getTime() - STUNDE), wer: 'ich', art: 'hof_freigeschaltet' }])
   db.user.findUnique.mockResolvedValue({ name: 'Max Mustermann', role: 'CUSTOMER', farm: null })
   db.$queryRaw.mockResolvedValue([])
@@ -174,7 +175,7 @@ describe('Admin › Heute', () => {
     expect(html).toContain('Im Rahmen')
     expect(html).toContain('Woche: 118 (+9 % zur Vorwoche)')
     expect(html).toMatch(/Servicegebühr € 92,00/)
-    expect(db.order.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ serviceFeeRefundedAt: null, status: 'PICKED_UP' }) }))
+    expect(db.order.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ serviceFeeRefundedAt: null, status: { not: 'CANCELLED' } }) }))
     expect(html).toContain('Hof freigeschaltet')
     // Signal „ohne Bestellung“: Storno und Testzahlung zählen nicht als letzte Bestellung.
     const hofAbfrage = db.farm.findMany.mock.calls[0]?.[0] as { select: { orders: { where: { status: unknown; AND: unknown[] } } } }
@@ -312,48 +313,51 @@ describe('Gebühren-Wort der Geld-Kachel (Nr. 229, V63)', () => {
   })
 })
 
-describe('Geld-Kachel nach Bestelldatum (Nr. 240, Register N32 Ergänzung 5.11.2026)', () => {
+describe('Zählregel der Geld-Kachel und „Woche: n“ (Nr. 258, Register N32 Ergänzung N46; ersetzt die Zählweise nach Nr. 240)', () => {
   type Bedingung = Record<string, unknown> & { AND?: unknown[] }
   const geldAbfragen = (): Bedingung[] => db.order.aggregate.mock.calls.map((c) => (c[0] as { where: Bedingung }).where)
   const zahlAbfragen = (): Bedingung[] => db.order.count.mock.calls.map((c) => (c[0] as { where: Bedingung }).where)
   const STICHTAG = new Date('2026-10-20T00:00:00.000Z')
   // Montag, 26.10.2026, 0:00 in Wien (MEZ, seit 25.10.) — der Wochenbeginn zu JETZT.
   const MONTAG = new Date('2026-10-25T23:00:00.000Z')
+  const ZAHLART = { OR: [{ paymentMethod: 'ONLINE', paymentStatus: 'PAID' }, { paymentMethod: { in: ['ONSITE_CASH', 'ONSITE_CARD'] } }] }
 
-  it('Warenwert und Gebühr nach createdAt seit Montag (Wien) bis jetzt, Status und Testzahlungen wie die Umsatzregel', async () => {
+  it('Warenwert und Gebühr: eingegangen seit Montag (Wien) bis jetzt, nicht storniert, online nur bezahlt, vor Ort ab Eingang, ohne Testzahlungen', async () => {
     await ladeHeute(JETZT, { mitBetrieb: false }, STICHTAG)
 
     expect(geldAbfragen()).toHaveLength(2)
     for (const where of geldAbfragen()) {
       expect(where.createdAt).toEqual({ gte: MONTAG, lte: JETZT })
-      expect(where.status).toBe('PICKED_UP')
+      // Ersetzt die Zählweise nach Nr. 240 (dort `status: 'PICKED_UP'`): der Abholstatus zählt nicht mehr.
+      expect(where.status).toEqual({ not: 'CANCELLED' })
       expect(where).not.toHaveProperty('pickedUpAt')
       expect(where).not.toHaveProperty('farmId')
-      // Die Testzahlungs-Regel als Element von AND, genau wie in umsatzBestellungWhere.
-      expect(where.AND).toEqual(umsatzBestellungWhere('', { von: MONTAG, bis: JETZT }, STICHTAG).AND)
+      // Zahlart und Testzahlungs-Regel als Elemente von AND (CODING_STANDARDS §2).
+      expect(where.AND).toEqual([ZAHLART, ohneTestzahlungenWhere(STICHTAG)])
     }
     expect(geldAbfragen()[1]?.serviceFeeRefundedAt).toBeNull()
   })
 
-  it('die Zahl der Kachel „Bestellungen heute“ bleibt nach Abholung (Umsatzregel), diese Woche und Vorwoche', async () => {
+  it('„Woche: n“ und die Vorwoche bis zum selben Zeitpunkt zählen nach derselben Bedingung wie die Kachel', async () => {
     await ladeHeute(JETZT, { mitBetrieb: false }, STICHTAG)
 
     const fenster = umsatzfenster('woche', JETZT)
-    const erwartet = [fenster.aktuell, fenster.vergleich].map((f) => {
-      const where = umsatzBestellungWhere('', f, STICHTAG)
-      delete where.farmId
-      return where
-    })
-    expect(zahlAbfragen()).toEqual(erwartet)
-    for (const where of zahlAbfragen()) expect(where).not.toHaveProperty('createdAt')
+    const [kachel] = geldAbfragen()
+    const [woche, vorwoche] = zahlAbfragen()
+    expect(zahlAbfragen()).toHaveLength(2)
+    // Ersetzt die Zählweise nach Nr. 240 (dort Umsatzregel: abgeholt in der Woche, nach pickedUpAt).
+    expect(woche).toEqual(kachel)
+    expect(vorwoche).toEqual({ ...kachel, createdAt: { gte: fenster.vergleich.von, lte: fenster.vergleich.bis } })
+    for (const where of zahlAbfragen()) expect(where).not.toHaveProperty('pickedUpAt')
   })
 
-  it('Gegenprobe ohne Stichtag: keine Testzahlungs-Bedingung, das Fenster bleibt nach createdAt', async () => {
+  it('Gegenprobe ohne Stichtag: keine Testzahlungs-Bedingung, die Zahlart-Bedingung bleibt', async () => {
     await ladeHeute(JETZT, { mitBetrieb: false }, null)
 
-    for (const where of geldAbfragen()) {
-      expect(where).not.toHaveProperty('AND')
-      expect(where.createdAt).toEqual({ gte: MONTAG, lte: JETZT })
+    for (const where of [...geldAbfragen(), ...zahlAbfragen()]) {
+      expect(where.AND).toEqual([ZAHLART, ohneTestzahlungenWhere(null)])
+      expect(ohneTestzahlungenWhere(null)).toEqual({})
+      expect(where.createdAt).toHaveProperty('gte')
     }
   })
 })

@@ -807,17 +807,17 @@ export const HEUTE_TEXT = {
 // ─── Lage ────────────────────────────────────────────────────────────────────
 
 /**
- * Die Woche aller Höfe, ohne Testzahlungen; Beträge in Cent. Zwei Zählregeln (seit Nr. 240): Geld nach
- * Bestelldatum seit Montag (Geld-Kachel, A2 Punkt 8), die Zahlen nach der Umsatzregel (abgeholt seit Montag).
+ * Die Woche aller Höfe, ohne Testzahlungen; Beträge in Cent. Eine Zählregel für Geld und Zahlen (Nr. 258, N46,
+ * ersetzt die zwei Regeln aus Nr. 240): in der Woche eingegangen, nicht storniert, online nur bezahlt, vor Ort ab Eingang.
  */
 export type HeuteWoche = {
-  /** Bestellwert der Woche nach Bestelldatum (`geldKachelWhere`). */
+  /** Bestellwert der in der Woche eingegangenen Bestellungen (`geldKachelWhere`, Nr. 258). */
   umsatzCents: number
   /** Gebühr derselben Bestellungen (Service- bzw. Plattformgebühr), ohne entfallene. */
   gebuehrCents: number
-  /** Bestellungen der Woche nach der Umsatzregel (abgeholt seit Montag). */
+  /** Dieselben Bestellungen gezählt — „Woche: n“ zählt nach der Regel der Geld-Kachel (N46). */
   anzahl: number
-  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt. */
+  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt, nach derselben Regel. */
   anzahlVorwoche: number
 }
 
