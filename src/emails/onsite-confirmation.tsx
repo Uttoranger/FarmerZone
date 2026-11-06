@@ -12,10 +12,10 @@ import {
   bodyText,
   kleinText,
   textLink,
-  inklGebuehrSatz,
   woZeile,
 } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import type { Belehrung } from '@/lib/widerruf'
@@ -100,7 +100,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       <Trenner />
       <BetragsZeile stark links="Bar bei Abholung" rechts={formatEuro(p.total)} />
 
-      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklGebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
+      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
       {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
       {/* Nr. 207: Die AGB hängen auch dieser Mail als Datei an — derselbe Satz wie in der Bestätigung (Register O4). */}
       <Text style={kleinText}>

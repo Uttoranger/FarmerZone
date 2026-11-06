@@ -1289,6 +1289,7 @@ export async function baueOrderCancelled(
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
+    zahlart: mailZahlart(order.paymentMethod),
     total: n(order.totalAmount),
     refundAmount: erstattetCents === null ? null : centsAlsEuro(erstattetCents),
     cancelReason: cancelReason ?? undefined,

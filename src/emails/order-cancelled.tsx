@@ -13,7 +13,14 @@ export interface OrderCancelledProps {
   total: number
   /** Erstattet in Euro (stornoBetraege); null = vor Ort bezahlt, nichts zu erstatten. */
   refundAmount: number | null
+  /** Wie bezahlt werden sollte — nur für den Satz ohne Erstattung; fehlt sie, der neutrale Satz. */
+  zahlart?: 'online' | 'bar' | 'karte'
   cancelReason?: string
+}
+
+/** Der Satz, wenn nichts zu erstatten ist: nur bei Bar der Satz des Boards (s3/w3-mail-storno Bild 2). */
+export function stornoOhneErstattungSatz(zahlart: OrderCancelledProps['zahlart']): string {
+  return zahlart === 'bar' ? 'Du hättest bar bezahlt – es ist nichts zu erstatten.' : 'Da du vor Ort bezahlst, entstehen dir keine Kosten.'
 }
 
 /** „Deine Bestellung wurde storniert“ (Board s3/w3-mail-storno Bild 1 und 2): Grund, Nummer, Geld, Telefon des Hofs. */
@@ -41,7 +48,8 @@ export function OrderCancelledEmail(p: OrderCancelledProps) {
 
       {wasOnline && p.refundAmount === 0 && <Text style={bodyText}>Da noch keine Zahlung erfolgt ist, entstehen dir keine Kosten.</Text>}
 
-      {!wasOnline && <Text style={bodyText}>Du hättest bar bezahlt – es ist nichts zu erstatten.</Text>}
+      {/* Board-Satz nur bei Bar; „Karte bei Abholung“ (alte Bestellungen, E5) und unbekannte Zahlart neutral. */}
+      {!wasOnline && <Text style={bodyText}>{stornoOhneErstattungSatz(p.zahlart)}</Text>}
 
       {p.farmPhone ? (
         <Text style={leiseZeile}>

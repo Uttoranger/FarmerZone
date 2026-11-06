@@ -805,3 +805,38 @@ describe('Recht bleibt wörtlich (N43 (1) und (2), Lauf 30 — gleich dem Stand 
     expect(text((await ausRenderer('abholbereit', { orderId: BESTELLUNG.id })).html)).not.toContain(WIDERRUF_TEXT.fussLink)
   })
 })
+
+describe('Storno ohne Erstattung: der Satz folgt der Zahlart (Nr. 241, Runde 1)', () => {
+  const satz = async (zahlart?: 'online' | 'bar' | 'karte') => {
+    const [{ OrderCancelledEmail }, { render }] = await Promise.all([import('@/emails/order-cancelled'), import('@react-email/render')])
+    return text(await render(OrderCancelledEmail({ customerName: 'Eva Steiner', orderNumber: 'HM-0303-7E15', farmName: HOF.name, total: 18, refundAmount: null, zahlart })))
+  }
+
+  it('bar: der Satz des Boards', async () => {
+    expect(await satz('bar')).toContain('Du hättest bar bezahlt – es ist nichts zu erstatten.')
+  })
+
+  it('Karte bei Abholung und ohne Zahlart: neutral, nie „bar“', async () => {
+    for (const t of [await satz('karte'), await satz()]) {
+      expect(t).toContain('Da du vor Ort bezahlst, entstehen dir keine Kosten.')
+      expect(t).not.toContain('bar bezahlt')
+    }
+  })
+
+  it('der Renderer gibt die Zahlart der Bestellung weiter (Karte → neutral)', async () => {
+    bestellung({ ...BAR, paymentMethod: 'ONSITE_CARD' })
+    expect(text((await ausRenderer('storniert', { orderId: BAR.id })).html)).not.toContain('bar bezahlt')
+    bestellung(BAR)
+    expect(text((await ausRenderer('storniert', { orderId: BAR.id })).html)).toContain('Du hättest bar bezahlt')
+  })
+})
+
+describe('Bescheid: die Antwort des Teams steht nur als Text da (Nr. 241, Runde 1)', () => {
+  it('<script> und Zeichen in der Antwort werden maskiert, nie als Markup ausgegeben', async () => {
+    const mail = await email.baueBescheidMail('maria.huber@example.org', '<script>alert(1)</script>\n„Danke" & <b>gut</b>')
+    expect(mail.html).not.toContain('<script>')
+    expect(mail.html).not.toContain('<b>gut</b>')
+    expect(mail.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(mail.html).toContain('&amp; &lt;b&gt;gut&lt;/b&gt;')
+  })
+})

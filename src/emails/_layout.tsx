@@ -4,7 +4,6 @@ import { MARKE } from '@/lib/marke'
 import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
 import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
-import { INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 
 /**
  * Die Mail-Palette — die EINZIGE Stelle mit Farbwerten unter src/emails/
@@ -239,13 +238,6 @@ export const textLink: React.CSSProperties = {
   textDecoration: 'underline',
 }
 
-export const highlightBox: React.CSSProperties = {
-  backgroundColor: MAIL_FARBE.seite,
-  borderRadius: '12px',
-  padding: '16px 20px',
-  margin: '16px 0',
-}
-
 /** Die kleine Kennzeile in Großbuchstaben (wie im Board: 12 px, fett) — nie kleiner als 12 px (Lauf 31). */
 export const highlightLabel: React.CSSProperties = {
   color: MAIL_FARBE.textLeise,
@@ -254,14 +246,6 @@ export const highlightLabel: React.CSSProperties = {
   textTransform: 'uppercase' as const,
   letterSpacing: '0.06em',
   margin: '0 0 6px',
-}
-
-export const highlightValue: React.CSSProperties = {
-  color: MAIL_FARBE.text,
-  fontSize: '17px',
-  fontWeight: '600',
-  margin: '0 0 4px',
-  lineHeight: '1.3',
 }
 
 export const tableRow: React.CSSProperties = {
@@ -461,17 +445,6 @@ export const leiseZeile: React.CSSProperties = { ...mutedText, margin: '0 0 6px'
 
 /** Zwischenüberschrift fett in Textfarbe (z. B. „Deine Rechte jetzt:“). */
 export const zwischenTitel: React.CSSProperties = { ...bodyText, fontWeight: '600', margin: '0 0 6px' }
-
-/**
- * Der Satz unter dem Betrag im Hofpreis-Modell (N38, Board s3/w3-mail-kauf):
- * „Alle Preise inkl. Plattformgebühr (darin € 1,12). Den Kaufvertrag schließt
- * du mit Hof Müller.“ Die Gebühr steckt in den Zeilen — der Satz nennt sie nur,
- * gerechnet hat sie src/lib/email.ts. Ohne Hof (Bitte bestätige) nur der erste Satz.
- */
-export function inklGebuehrSatz(betrag: string, hof?: string): string {
-  const erster = `Alle Preise ${INKL_PLATTFORMGEBUEHR} (darin ${betrag}).`
-  return hof ? `${erster} Den Kaufvertrag schließt du mit ${hof}.` : erster
-}
 
 /** „Hof Müller, Dorfstraße 12, 5280 Braunau am Inn“ — die Zeile „Wo“ der Bestellmails. */
 export function woZeile(hof: string, adresse: string, plz: string | undefined, ort: string): string {

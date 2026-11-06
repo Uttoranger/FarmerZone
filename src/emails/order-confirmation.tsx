@@ -16,10 +16,10 @@ import {
   kleinText,
   leiseZeile,
   textLink,
-  inklGebuehrSatz,
   woZeile,
 } from './_layout'
 import { formatEuro } from '@/lib/format'
+import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
@@ -118,7 +118,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           Bitte zahle <strong>{formatEuro(p.total)}</strong> bei der Abholung mit Karte.
         </HinweisKasten>
       )}
-      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklGebuehrSatz(formatEuro(p.plattformgebuehr ?? 0), p.farmName)}</Text>}
+      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
       {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
 
       <KnopfReihe>
