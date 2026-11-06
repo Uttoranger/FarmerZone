@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Text, Link, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, textLink, MAIL_FARBE } from './_layout'
+import { Link, Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, textLink, zwischenTitel } from './_layout'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
@@ -11,7 +11,8 @@ export interface NewOrderNotificationProps {
   orderNumber: string
   pickupDate: string
   pickupTime: string
-  items: Array<{ name: string; quantity: number }>
+  /** Positionen; mit `betrag` (Endpreis der Zeile in Euro, gerechnet in src/lib/email.ts) steht er rechts. */
+  items: Array<{ name: string; quantity: number; betrag?: number }>
   /** Der WARENPREIS — das, was dem Hof überwiesen wird. */
   total: number
   /** Servicegebühr in Euro (von der Plattform einbehalten); 0 = keine Zeile. */
@@ -26,60 +27,66 @@ export interface NewOrderNotificationProps {
   heuteUrl: string
 }
 
+/**
+ * „Neue bezahlte Bestellung“ an den Hof (Board s3/w3-mail-hof-bestellung Bild 1;
+ * Bild 2 ist der Zweig ohne Online-Zahlung). Aufbau wie die Bestellmails der
+ * Kundin: Nummer groß, Abholung, Produkte mit Preis, darunter der Anteil des Hofs.
+ */
 export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
   const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const wort = p.gebuehrWort ?? 'Servicegebühr'
+  const kassieren = p.customerTotal ?? p.total
   const anrufen = telefonLink(p.customerPhone)
   return (
-    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
-      <Text style={h1}>
-        {p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}
-      </Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={p.isOnline ? `${p.customerName} hat bestellt und online bezahlt.` : `${p.customerName} hat bestellt, bar bei Abholung.`}>
+      <Text style={h1}>{p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}</Text>
       <Text style={bodyText}>
-        Hallo {p.farmerName},<br />
-        <strong>{p.customerName}</strong> hat eine Bestellung aufgegeben.
-        {p.isOnline
-          ? ' Die Zahlung wurde bereits online abgewickelt.'
-          : ` Die Zahlung (${p.paymentLabel}) erfolgt bei der Abholung.`}
+        {`Hallo ${p.farmerName}, ${p.customerName} hat eine Bestellung aufgegeben.`}
+        {p.isOnline ? ' Die Zahlung wurde bereits online abgewickelt.' : ` Die Zahlung (${p.paymentLabel}) erfolgt bei der Abholung.`}
       </Text>
 
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Abholtermin</Text>
-        <Text style={highlightValue}>{p.pickupDate}</Text>
-        <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
-      </div>
+      <BestellnummerKasten nummer={p.orderNumber} />
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
 
-      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.text, margin: '0 0 8px' }}>
-        Bestellte Produkte
-      </Text>
+      {/* Bar: Erst die Bestätigung der Kundin gibt die Bestellung zum Packen frei. */}
+      {!p.isOnline && <HinweisKasten art="orange">{`${p.customerName} bestätigt die Bestellung per E-Mail. Erst dann packst du.`}</HinweisKasten>}
+
+      {p.isOnline && <Text style={{ ...zwischenTitel, margin: '12px 0 4px' }}>Bestellte Produkte</Text>}
       {p.items.map((item, i) => (
-        <Text key={i} style={{ ...mutedText, margin: '2px 0' }}>
-          • {item.name}
-        </Text>
+        <BetragsZeile key={i} links={item.name} rechts={item.betrag !== undefined ? formatEuro(item.betrag) : ''} />
       ))}
-
-      <Hr style={{ borderColor: MAIL_FARBE.rand, margin: '16px 0' }} />
-      <Text style={{ ...bodyText, margin: '0 0 4px' }}>
-        <strong>{mitGebuehr ? 'Warenpreis (dein Anteil):' : 'Gesamtbetrag:'}</strong> {formatEuro(p.total)}
-      </Text>
-      {mitGebuehr && (
-        <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-          <strong>{p.gebuehrWort ?? 'Servicegebühr'}:</strong> {formatEuro(p.serviceFee ?? 0)} — von der Plattform
-          einbehalten, dir wird der Warenpreis überwiesen. Die Kundin hat{' '}
-          {formatEuro(p.customerTotal ?? p.total)} bezahlt.
-        </Text>
+      <Trenner />
+      {p.isOnline ? (
+        <>
+          <BetragsZeile stark links={mitGebuehr ? 'Warenpreis (dein Anteil)' : 'Gesamtbetrag'} rechts={formatEuro(p.total)} />
+          {mitGebuehr && <BetragsZeile links={wort} rechts={formatEuro(p.serviceFee ?? 0)} />}
+          {mitGebuehr && <Text style={{ ...kleinText, marginTop: '6px' }}>{`Die ${wort} behält Stripe gleich ein. Die Kundin hat ${formatEuro(kassieren)} bezahlt.`}</Text>}
+        </>
+      ) : (
+        <BetragsZeile stark links="Bar zu kassieren" rechts={formatEuro(kassieren)} />
       )}
-      <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-        <strong>Zahlung:</strong> {p.paymentLabel}
-      </Text>
-      <Text style={mutedText}>
-        <strong>Bestellnummer:</strong> {p.orderNumber}
-      </Text>
-      <Text style={mutedText}>
-        <strong>Kunde:</strong> {p.customerName} ·{' '}
-        {anrufen ? <Link href={anrufen} style={textLink}>{formatiereTelefon(p.customerPhone)}</Link> : p.customerPhone}
-      </Text>
 
-      <Link href={p.heuteUrl} style={ctaButton}>Bei Heute ansehen →</Link>
+      {/* Die Nummer der Kundin bleibt (Nr. 81): Der Hof ruft an, wenn etwas fehlt. */}
+      <BetragsZeile
+        umbrechen
+        links="Kundin"
+        rechts={
+          <>
+            {`${p.customerName} · `}
+            {anrufen ? (
+              <Link href={anrufen} style={textLink}>
+                {formatiereTelefon(p.customerPhone)}
+              </Link>
+            ) : (
+              p.customerPhone
+            )}
+          </>
+        }
+      />
+
+      <KnopfReihe>
+        <Knopf href={p.heuteUrl}>Bei Heute ansehen →</Knopf>
+      </KnopfReihe>
     </EmailLayout>
   )
 }

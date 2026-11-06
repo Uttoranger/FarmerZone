@@ -5,11 +5,11 @@ import { PreisAnzeigeRahmen } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, ChevronLeft, Leaf, ShoppingBasket } from 'lucide-react'
+import { ChevronLeft, Leaf } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
-import { formatEuro, formatGrundpreis, formatKategorie } from '@/lib/format'
+import { formatEuro, formatGrundpreis } from '@/lib/format'
 import { kartenZustand, knappText, ruhenderKnopfText, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { gebuehrHinweisFuerHof, mengeAbgelehntText, zahlungsarten } from '@/lib/hofseite-kunde'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
@@ -17,6 +17,7 @@ import {
   alleProdukteLink,
   brennmaterialZeilen,
   futterSchild,
+  gemeinsamerAnfang,
   gewaehlteGroesse,
   gleichMitAbholen,
   groesseAdresse,
@@ -40,16 +41,17 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { AusverkauftMarke, Marke } from '@/components/ui/marke'
 import { Stepper } from '@/components/ui/stepper'
 import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { CartSheet } from '@/components/farm/cart-sheet'
 import type { HofseiteHof } from '@/components/hofseite/hofseite-kunde'
-import { HofseiteSeitenspalte } from '@/components/hofseite/hofseite-seitenspalte'
+import { HofseiteSeitenspalte, SPALTEN_KARTE } from '@/components/hofseite/hofseite-seitenspalte'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-band'
 import { sperreMitBestellstopp } from '@/lib/notbremse'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
 import { raummassErklaeren } from '@/lib/verkaufsgroessen'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
@@ -61,7 +63,8 @@ import { kassenAdresse } from '@/lib/kasse'
 import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufer-vorbelegung'
 
 /*
- * Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4).
+ * Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4; Aufbau
+ * seit Nr. 235 nach den Boards w1-/s1-produkt).
  * Mockups: web-k2-futter-groesse-waehlen, web-k2-brennmaterial-brennholz,
  * mobil-k2-futter-groesse-waehlen, mobil-k2-brennmaterial-brennholz — für ein
  * Lebensmittel dieselbe Seite ohne Größen und Brennmaterial-Angaben.
@@ -69,8 +72,9 @@ import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufe
  * DIE Darstellung der Produktdetails: Die Karten der Hofseite verlinken
  * hierher, das Blatt von früher gibt es nicht mehr. Aufbau: Bild, Name,
  * Marken, Schild (E9), Beschreibung; die Kaufkarte mit Größenkacheln der
- * Familie (E3), Menge und „In den Korb" — am Handy als EINE feste Leiste
- * unten (Fokus-Seite, keine Unterleiste); die Kennzeichnung zugeklappt;
+ * Familie (E3), Menge und „In den Korb" — als EINE Leiste, am Handy fest
+ * unten (Fokus-Seite, keine Unterleiste), ab 768 px am Ende der Inhaltsspalte
+ * klebend; die Kennzeichnung als offene Karte;
  * „Gleich mit abholen"; ab 1024 px rechts die Spalte der Hofseite
  * (EINE Komponente, hofseite-seitenspalte.tsx) mit dem Mini-Warenkorb.
  *
@@ -79,8 +83,6 @@ import { mitKaeuferVorbelegung, type KaeuferVorbelegung } from '@/schemas/kaeufe
  * in src/lib/produktdetail.ts. Die Vorschau des Hofs (?vorschau=1) zeigt die
  * Seite ohne Korb (korbErlaubt), Links bleiben in der Vorschau.
  */
-
-const KARTE = 'rounded-2xl border border-border bg-card'
 
 export function ProduktdetailKunde({
   farm,
@@ -125,7 +127,6 @@ export function ProduktdetailKunde({
   const kundenSeite: KundenSeite = { art: 'produkt', hofSlug: farm.slug }
   const zurueck = alleProdukteLink(farm.slug, alsVorschau)
   const beimZurueckZeile = useRueckwegKlick(kundenSeite, 'zeile')
-  const beimZurueckKnopf = useRueckwegKlick(kundenSeite, 'knopf')
 
   // Die Seite prüft vorher (notFound); hier nur die Absicherung für den Typ.
   if (!einstieg) return null
@@ -183,9 +184,6 @@ export function ProduktdetailKunde({
   }
 
   const bild = produkt.imageUrl ?? produkt.categoryImageUrl
-  const kicker = [produkt.category ? formatKategorie(produkt.category, produkt.subcategory) : null, farm.name]
-    .filter(Boolean)
-    .join(' · ')
   const schild = futterSchild(produkt, farm.betriebsstatus)
   const brennmaterial = produkt.brennmaterial ? brennmaterialZeilen(produkt.brennmaterial) : []
   const beschreibung = produkt.description?.trim() ?? ''
@@ -202,97 +200,106 @@ export function ProduktdetailKunde({
   // „nur an Betriebe" darf auf der Seite nicht fehlen, wenn eine Größe ihn braucht.
   const verantwortung = futterVerantwortung(familie.length > 0 ? familie : [produkt])
 
-  const marke = zustand.art === 'ausverkauft' ? <StatusBadge status="neutral">Ausverkauft</StatusBadge> : null
+  const ausverkauft = zustand.art === 'ausverkauft'
   // „Nur noch …" als leise Zeile statt als Marke — wie auf der Produktkarte (Freigabe Lauf 13, Nr. 85).
   const knapp = zustand.art === 'knapp' ? knappText(zustand.bestand, produkt.unit, produkt.unitSize) : null
+  // Der Titel nennt bei Größen nur, was alle Größen teilen („Futterhafer“, Board w1-produkt Bild 1) — die
+  // Größe steht in der Auswahl darunter. Dieselbe Regel wie die Namen der Kacheln (gemeinsamerAnfang).
+  const titel = familienTitel(produkt.name, familie)
+  // Der Satz unter der Auswahl bzw. dem Preis (Board): „Grundpreis zum Vergleichen · Preise inkl. …“.
+  const preisSatz = [kacheln.length > 0 && mitGrundpreis ? 'Grundpreis zum Vergleichen' : null, gebuehr?.produkte ?? null].filter(Boolean).join(' · ')
+  // Ausverkauft ohne andere Größe: statt Kaufknopf die Karte „Gerade ausverkauft“ mit dem Weg zum Angebot (Board Bild 3).
+  const ausverkauftKarte = ausverkauft && kacheln.length === 0
 
   return (
     // Die Preisanzeige (N38, Nr. 197) für Preis, Korb und Seitenspalte dieser Seite.
     <PreisAnzeigeRahmen anzeige={farm.preisAnzeige}>
-      {/* Rückweg ab 768 px als Zeile (Mockup „‹ Alle Produkte"); am Handy sitzt er als runder Knopf auf dem Bild. */}
-      <div className="mx-auto hidden max-w-[1200px] px-6 pt-3 md:block">
-        <Link
-          href={zurueck}
-          onClick={beimZurueckZeile}
-          className={cn('inline-flex min-h-11 items-center rounded-md text-[13.5px] font-medium text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}
-        >
-          ‹ Alle Produkte
-        </Link>
-      </div>
+      <div className="mx-auto max-w-[1152px] px-4 pt-2 pb-12 md:px-6 md:pt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-x-16">
+        <div className="flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-1">
+          {/* Rückweg (Board w1-/s1-produkt): am Handy „‹ Alle Produkte von <Hof>“, im Browser „‹ Zurück zu allen Produkten“. */}
+          <Link
+            href={zurueck}
+            onClick={beimZurueckZeile}
+            className={cn(
+              'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-[16px] font-semibold text-foreground md:text-[15px] md:text-brand-text md:underline md:underline-offset-4',
+              FOKUS_RAHMEN
+            )}
+          >
+            <ChevronLeft className="size-5 md:hidden" strokeWidth={1.9} aria-hidden="true" />
+            <span className="md:hidden">Alle Produkte von {farm.name}</span>
+            <span className="hidden md:inline">‹ Zurück zu allen Produkten</span>
+          </Link>
 
-      <div className="mx-auto max-w-[1200px] px-4 pb-12 md:px-6 md:pt-2 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="flex min-w-0 flex-col gap-[22px] lg:col-start-1 lg:row-start-1">
           {/* ── Bild und Angaben ── */}
-          <section aria-labelledby="produkt-titel" className="flex flex-col md:flex-row md:items-start md:gap-[26px]">
-            <div className="relative -mx-4 h-[200px] shrink-0 overflow-hidden bg-muted md:mx-0 md:size-[300px] md:rounded-[18px] md:border md:border-border">
+          <section aria-labelledby="produkt-titel" className="flex flex-col gap-3">
+            {/* Das Bild als Band über der ganzen Spalte, Titel und Texte darunter (Board w1-/s1-produkt): am Handy
+                390 : 200 wie die Vorschau „Auf der Produktseite“ (Bild-Baustein, Register N17), ab 768 px 160 px hoch.
+                Im Dunkeln gedämpft (Freigabe Lauf 31), damit kein heller Fleck bleibt. */}
+            <div
+              className={cn(
+                'relative aspect-[390/200] w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-muted md:aspect-auto md:h-[160px]',
+                bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE
+              )}
+            >
               {bild ? (
                 <Image
                   src={bild}
                   alt={produkt.imageUrl ? produkt.name : ''}
                   fill
                   priority
-                  sizes="(min-width: 768px) 300px, 100vw"
-                  // Nur die Kategorie-Illustration wird nachts gedämpft (CODING_STANDARDS §7); Fotos bleiben.
+                  sizes="(min-width: 1024px) 680px, 100vw"
+                  // Die Kategorie-Illustration geht nachts in der Fläche auf — ihr Crème-Grund leuchtete sonst (ILLUSTRATION_BILD).
                   className={cn(
-                    produkt.imageUrl ? 'object-cover' : 'object-contain p-6 dark:brightness-[0.85] dark:saturate-[0.9]',
-                    zustand.art === 'ausverkauft' && 'grayscale'
+                    produkt.imageUrl ? 'object-cover' : cn('object-contain p-6 md:p-4', ILLUSTRATION_BILD),
+                    ausverkauft && 'grayscale'
                   )}
                   // Ausschnitt nur am echten Foto (Register N17); ausverkauft ohne Filter des Hofs, sonst überschriebe er grayscale.
-                  style={produkt.imageUrl ? bildStil(produkt.bildAusschnitt, { filter: zustand.art !== 'ausverkauft' }) : undefined}
+                  style={produkt.imageUrl ? bildStil(produkt.bildAusschnitt, { filter: !ausverkauft }) : undefined}
                 />
               ) : (
                 <span aria-hidden="true" className="flex h-full items-center justify-center font-heading text-5xl font-semibold text-brand-text">
                   {produktInitiale(produkt.name)}
                 </span>
               )}
-              {/* Am Handy: Zurück auf dem Bild (Mockup), dunkler Kreis theme-fest (DESIGN_SYSTEM, Bild-Overlays). */}
-              <Link
-                href={zurueck}
-                onClick={beimZurueckKnopf}
-                aria-label="Zurück zu allen Produkten"
-                className={cn(
-                  'absolute top-3.5 left-3.5 flex size-11 items-center justify-center rounded-full bg-primary-foreground/55 text-accent-foreground transition-colors hover:bg-primary-foreground/70 md:hidden',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <ChevronLeft className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
-              </Link>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-3 pt-4 md:pt-0">
-              <p className="text-[11px] font-semibold tracking-[1.1px] break-words text-muted-foreground uppercase md:text-xs">{kicker}</p>
-              <h1 id="produkt-titel" className="font-heading text-2xl leading-[1.1] font-semibold break-words text-foreground md:text-[30px]">
-                {produkt.name}
-              </h1>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h1 id="produkt-titel" className="font-heading text-[26px] leading-[1.1] font-semibold break-words text-foreground md:text-[28px]" title={produkt.name}>
+                  {titel}
+                </h1>
+                {ausverkauft && <AusverkauftMarke />}
+              </div>
               {/* Rücktritt je Produkt (Nr. 214): Angaben des Hofs unter dem Namen — nicht bei Ware nur für Betriebe (kein Rücktritt für Unternehmer). */}
-              {produkt.abgabe !== 'NUR_BETRIEBE' && <RuecktrittHinweis angabe={produkt} className="-mt-1 text-[13px]" />}
+              {produkt.abgabe !== 'NUR_BETRIEBE' && <RuecktrittHinweis angabe={produkt} className="text-[13px]" />}
 
-              {(marke || produkt.labels.length > 0 || produkt.abgabe === 'NUR_BETRIEBE' || produkt.brennmaterial || produkt.category === 'BRENNHOLZ') && (
+              {(produkt.labels.length > 0 || produkt.abgabe === 'NUR_BETRIEBE' || produkt.brennmaterial || produkt.category === 'BRENNHOLZ') && (
                 <ul className="flex flex-wrap gap-1.5">
-                  {marke && <li>{marke}</li>}
                   {produkt.labels.map((l) => (
                     // Nicht die grüne StatusBadge: Grüne Schrift auf grüner Tönung erreicht auf dem
                     // hellen Seitengrund nur 4,37 : 1 (Axe) — wie die Hinweiskarte normale Schrift, grünes Symbol.
                     <li
                       key={l}
-                      className="inline-flex items-center gap-1 rounded-full border border-accent/50 bg-accent/12 px-2.5 py-0.5 text-[11.5px] font-semibold whitespace-nowrap text-foreground"
+                      className="inline-flex h-[22px] items-center gap-1 rounded-full border border-accent/50 bg-accent/12 px-2 text-[12px] font-bold whitespace-nowrap text-foreground"
                     >
                       {l === 'BIO' && <Leaf className="size-3 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />}
                       {SIEGEL[l].name}
                     </li>
                   ))}
+                  {/* Register E9-Ergänzung: Ware nur für Betriebe ist gekennzeichnet (Register vor Board). */}
                   {produkt.abgabe === 'NUR_BETRIEBE' && (
                     <li>
-                      <StatusBadge status="offen">
-                        <Building2 className="mr-1 inline-block size-3 align-[-2px]" strokeWidth={1.7} aria-hidden="true" />
+                      <Marke art="tun" form="schild">
                         Nur an Betriebe
-                      </StatusBadge>
+                      </Marke>
                     </li>
                   )}
                   {/* Brennmaterial gibt es nur zum Abholen (E11). */}
                   {(produkt.brennmaterial || produkt.category === 'BRENNHOLZ') && (
                     <li>
-                      <StatusBadge status="neutral">Nur Abholung am Hof</StatusBadge>
+                      <Marke art="erledigt" form="schild">
+                        Nur Abholung am Hof
+                      </Marke>
                     </li>
                   )}
                 </ul>
@@ -305,48 +312,43 @@ export function ProduktdetailKunde({
               {/* Abholhinweise des Futters (N23, Nr. 123) — derselbe Baustein wie in „Futter kaufen". */}
               {produkt.abholhinweise.length > 0 && <AbholhinweisZeile hinweise={produkt.abholhinweise.map((hinweis) => ({ hinweis }))} />}
 
-              {/* Kacheln nach Platz statt fester Spalten: In der schmalen Textspalte ab 1024 px brach „Ofenfertig“ sonst mitten im Wort. */}
+              {/* Holzart, Länge, Trocknung als drei Kacheln (Board w1-produkt Bild 3), nach Platz statt fester Spalten. */}
               {brennmaterial.length > 0 && (
                 <dl className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                   {brennmaterial.map((z) => (
-                    <div key={z.titel} className="rounded-xl border border-border bg-card px-3 py-2">
-                      <dt className="text-[11.5px] text-muted-foreground">{z.titel}</dt>
-                      <dd className="text-[13.5px] font-semibold break-words text-foreground">{z.wert}</dd>
+                    <div key={z.titel} className="rounded-xl border border-border bg-card px-2.5 py-2">
+                      <dt className="text-[13px] text-muted-foreground">{z.titel}</dt>
+                      <dd className="text-[15px] font-bold break-words text-foreground">{z.wert}</dd>
                     </div>
                   ))}
                 </dl>
               )}
 
               {produkt.abgabe === 'NUR_BETRIEBE' && (
-                <p className="text-[13.5px] text-muted-foreground">
+                <p className="text-[14px] text-foreground">
                   Dieses Futtermittel gibt der Hof nur an landwirtschaftliche Betriebe ab. Beim Bestellen fragen wir nach deiner Betriebsnummer.
                 </p>
               )}
 
-              {beschreibung && (
-                <p className="text-[14px] leading-relaxed break-words whitespace-pre-line text-muted-foreground">{beschreibung}</p>
-              )}
+              {beschreibung && <p className="text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground">{beschreibung}</p>}
             </div>
           </section>
 
           {/* Kaufsperre (Pause, keine Abholzeit, ausgebucht — Register N24): Das Produkt bleibt sichtbar,
               nur gekauft wird nicht; dieselbe Karte wie auf der Hofseite. */}
-          <KaufSperreHinweis sperre={sperre} hofName={farm.name} pauseMessage={farm.pauseMessage} />
+          <KaufSperreHinweis sperre={sperre} hofName={farm.name} pauseMessage={farm.pauseMessage} hofseite />
           {/* Die Sperre des Hofs geht vor; sonst der Satz der Notbremse an derselben Stelle. */}
           {sperre === null && <BestellstoppHinweis stopp={stopp} />}
 
-          {/* ── Kaufen ── */}
-          <section aria-labelledby="kaufen-titel" className={cn(KARTE, 'flex flex-col gap-3.5 p-4 md:px-5 md:py-[18px]')}>
+          {/* ── Kaufen: frei auf der Seite, ohne Karte (Board) ── */}
+          <section aria-labelledby="kaufen-titel" className="flex flex-col gap-2.5">
             {kacheln.length > 0 ? (
               <>
-                <div className="flex flex-wrap items-baseline gap-x-2.5">
-                  <h2 id="kaufen-titel" className="text-[15.5px] font-semibold text-foreground">
-                    Größe wählen
-                  </h2>
-                  <span className="flex-1" />
-                  {mitGrundpreis && <p className="text-[12.5px] text-muted-foreground">Grundpreis zum Vergleichen</p>}
-                </div>
-                <GroessenWahl beschriftung="Größe wählen" wert={produkt.id} onWertChange={waehleGroesse} className="md:grid-cols-4">
+                <h2 id="kaufen-titel" className="text-[16px] font-bold text-foreground">
+                  Größe wählen
+                </h2>
+                {/* Untereinander über die volle Breite (Board w1-/s1-produkt Bild 1). */}
+                <GroessenWahl beschriftung="Größe wählen" wert={produkt.id} onWertChange={waehleGroesse} className="grid-cols-1">
                   {kacheln.map((k) => (
                     <Groessenkachel
                       key={k.id}
@@ -363,54 +365,18 @@ export function ProduktdetailKunde({
                 {raummass && <RaummassErklaerung />}
               </>
             ) : (
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-1">
                 <h2 id="kaufen-titel" className="sr-only">
                   Preis und Menge
                 </h2>
-                <p className="text-xl font-semibold text-foreground tabular-nums">{formatGrundpreis(preisProdukt.price, preisProdukt.unit, preisProdukt.unitSize)}</p>
+                <p className="text-[16px] font-bold text-foreground tabular-nums">{formatGrundpreis(preisProdukt.price, preisProdukt.unit, preisProdukt.unitSize)}</p>
                 {zweite && <p className="text-[13px] text-muted-foreground tabular-nums">{zweite}</p>}
                 {vorrat && zustand.art === 'kaufbar' && <p className="text-[13px] text-muted-foreground">Vorrat: {vorrat}</p>}
-                {raummass && <RaummassErklaerung className="mt-2" />}
+                {raummass && <RaummassErklaerung className="mt-1" />}
               </div>
             )}
 
-            <FutterVerantwortung saetze={verantwortung} />
-
-            {/* Am Handy die EINE feste Leiste unten (Fokus-Seite), ab 768 px in der Karte.
-                data-unten-fest: Der Cookie-Hinweis steht darüber (src/lib/cookie-hinweis.ts). */}
-            <div data-unten-fest="" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
-              <div className="mx-auto flex max-w-[1200px] items-center gap-2.5 md:gap-3.5">
-                {kaufbar ? (
-                  <>
-                    <Stepper
-                      beschriftung={`Menge ${produkt.name}`}
-                      wert={mengeJetzt}
-                      min={1}
-                      max={Math.max(1, nochMoeglich)}
-                      disabled={nochMoeglich === 0}
-                      onWertChange={setMenge}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void inDenKorb(produkt, mengeJetzt)}
-                      disabled={wirdHinzugefuegt === produkt.id || nochMoeglich === 0}
-                      className={cn(
-                        'inline-flex h-[46px] min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60 md:flex-none md:px-6',
-                        FOKUS_RAHMEN
-                      )}
-                    >
-                      <ShoppingBasket className="size-[17px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                      <span className="truncate">{wirdHinzugefuegt === produkt.id ? 'Einen Moment …' : `In den Korb · ${betrag}`}</span>
-                    </button>
-                  </>
-                ) : (
-                  <p className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-muted px-4 text-center text-sm text-muted-foreground md:flex-none">
-                    {ruhenderKnopfText(zustand)}
-                  </p>
-                )}
-                {gebuehr && kaufbar && <p className="hidden max-w-60 text-xs leading-snug text-muted-foreground md:block">{gebuehr.produkte}</p>}
-              </div>
-            </div>
+            {preisSatz && <p className="text-[13px] text-muted-foreground">{preisSatz}</p>}
 
             {kaufbar && nochMoeglich === 0 && (
               <p className="text-[13px] text-muted-foreground">Alles, was der Hof davon hat, liegt schon in deinem Warenkorb.</p>
@@ -421,18 +387,88 @@ export function ProduktdetailKunde({
                 <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>
               </div>
             )}
+
+            {ausverkauftKarte && (
+              <div className={cn(SPALTEN_KARTE, 'gap-1.5')}>
+                <p className="text-[15px] font-bold text-foreground">Gerade ausverkauft</p>
+                <p className="text-[14px] break-words text-muted-foreground">
+                  Bei {farm.name} ist {produkt.name} gerade aus. Schau, was es sonst gibt.
+                </p>
+                <Link
+                  href={zurueck}
+                  className={cn(
+                    'mt-1 flex min-h-[52px] items-center justify-center rounded-[14px] border border-input bg-card px-3 text-center text-[16px] font-bold text-foreground hover:bg-muted',
+                    FOKUS_RAHMEN
+                  )}
+                >
+                  Zum Angebot von {farm.name}
+                </Link>
+              </div>
+            )}
           </section>
 
-          <Kennzeichnung zeilen={produktAngaben(produkt, farm)} bestaetigtAm={produkt.futter?.bestaetigtAm ?? null} />
+          {/* Ausverkauft ohne andere Größe zeigt das Board weder Kennzeichnung noch „Gleich mit abholen“ (Bild 3):
+              Gekauft wird hier nichts, die Karte darüber führt zum Angebot. */}
+          {!ausverkauftKarte && <Kennzeichnung zeilen={produktAngaben(produkt, farm)} bestaetigtAm={produkt.futter?.bestaetigtAm ?? null} />}
+          {/* Bei jedem Futter der Verantwortungs-Hinweis (E10a) — unter der Kennzeichnung, wo das Board seinen Futter-Satz zeigt
+              (w1-/s1-produkt Bild 2); der Wortlaut ist der aus E10a (futterVerantwortung, „Register vor Board“). */}
+          {!ausverkauftKarte && <FutterVerantwortung saetze={verantwortung} className="text-[13px]" />}
 
-          <GleichMitAbholen
-            produkte={mitnehmen}
-            link={link}
-            mitFamilie={(p) => produktFamilie(produkte, p).length > 0}
-            imKorb={imKorb}
-            wirdHinzugefuegt={wirdHinzugefuegt}
-            onInDenKorb={(p) => void inDenKorb(p, 1)}
-          />
+          {!ausverkauftKarte && (
+            <GleichMitAbholen
+              produkte={mitnehmen}
+              link={link}
+              mitFamilie={(p) => produktFamilie(produkte, p).length > 0}
+              imKorb={imKorb}
+              wirdHinzugefuegt={wirdHinzugefuegt}
+              onInDenKorb={(p) => void inDenKorb(p, 1)}
+            />
+          )}
+
+          {/* Die EINE Leiste mit Menge und „In den Korb · €“ (Board): am Handy fest unten (Fokus-Seite,
+              keine Unterleiste), ab 768 px am unteren Rand der Inhaltsspalte klebend, der Knopf links und breit.
+              data-unten-fest: Der Cookie-Hinweis steht darüber (src/lib/cookie-hinweis.ts). Ausverkauft ohne
+              Leiste — dort führt die Karte zum Angebot. */}
+          {!ausverkauftKarte && (
+            <div
+              data-unten-fest=""
+              className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] md:sticky md:inset-x-auto md:mt-6 md:bg-background md:px-0 md:pt-4 md:pb-4"
+            >
+              <div className="mx-auto flex max-w-[1152px] items-center gap-3 md:flex-row-reverse">
+                {kaufbar ? (
+                  <>
+                    {/* Die Menge als Pille mit grünem Rand; Knöpfe und Zahl je 44 px. */}
+                    <span className="inline-flex shrink-0 rounded-full border border-accent">
+                      <Stepper
+                        beschriftung={`Menge ${produkt.name}`}
+                        wert={mengeJetzt}
+                        min={1}
+                        max={Math.max(1, nochMoeglich)}
+                        disabled={nochMoeglich === 0}
+                        onWertChange={setMenge}
+                        eingabeClassName="w-11"
+                      />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void inDenKorb(produkt, mengeJetzt)}
+                      disabled={wirdHinzugefuegt === produkt.id || nochMoeglich === 0}
+                      className={cn(
+                        'inline-flex min-h-[50px] min-w-0 flex-1 items-center justify-center rounded-[14px] bg-accent px-4 text-[16px] font-bold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
+                        FOKUS_RAHMEN
+                      )}
+                    >
+                      <span className="truncate">{wirdHinzugefuegt === produkt.id ? 'Einen Moment …' : `In den Korb · ${betrag}`}</span>
+                    </button>
+                  </>
+                ) : (
+                  <p className="flex min-h-[50px] flex-1 items-center justify-center rounded-[14px] bg-muted px-4 text-center text-[15px] text-muted-foreground">
+                    {ruhenderKnopfText(zustand)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Ab 1024 px die rechte Spalte der Hofseite — dieselbe Komponente, mit dem Mini-Warenkorb. */}
@@ -440,7 +476,7 @@ export function ProduktdetailKunde({
           hof={farm}
           sperre={sperre}
           zahlungsarten={zahlungsarten(farm)}
-          gebuehrKurz={gebuehr?.kurz ?? null}
+          gebuehrHinweis={gebuehr?.produkte ?? null}
           gebuehrKorb={gebuehr?.korb ?? null}
           mitKorb={mitKorb}
           jetzt={jetzt}
@@ -468,4 +504,11 @@ export function ProduktdetailKunde({
       )}
     </PreisAnzeigeRahmen>
   )
+}
+
+/** „Futterhafer“ aus „Futterhafer, Big Bag 500 kg“ — die Wörter, die alle Größen teilen; ohne Familie der ganze Name. */
+function familienTitel(name: string, familie: readonly { name: string }[]): string {
+  const anfang = gemeinsamerAnfang(familie.map((p) => p.name))
+  if (anfang === 0) return name
+  return name.trim().split(/\s+/).slice(0, anfang).join(' ').replace(/[,;:–-]+$/, '')
 }

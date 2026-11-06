@@ -20,7 +20,7 @@ export function Saisonkarte({ block }: { block: StartseitenBlockDaten }): React.
     <section aria-labelledby={titelId} className={BLOCK_ABSTAND}>
       <div className={BLOCK_CONTAINER}>
         <div className="relative overflow-hidden rounded-[18px] border border-accent/45 bg-linear-135 from-accent/14 to-card to-70% md:rounded-3xl">
-          <span aria-hidden="true" className="absolute top-3 right-3 text-[11px] font-semibold tracking-[1px] text-status-fertig uppercase md:top-4 md:right-5">
+          <span aria-hidden="true" className="absolute top-3 right-3 text-[12px] font-semibold tracking-[1px] text-status-fertig uppercase md:top-4 md:right-5">
             Saison
           </span>
           <div className="flex items-center gap-3.5 p-4 pr-16 md:gap-6 md:p-6 md:pr-24">
@@ -30,7 +30,7 @@ export function Saisonkarte({ block }: { block: StartseitenBlockDaten }): React.
               </span>
             )}
             <div className="min-w-0">
-              {block.ueberzeile && <Kicker className="text-[11px] tracking-[1px] md:text-[12.5px]">{block.ueberzeile}</Kicker>}
+              {block.ueberzeile && <Kicker className="text-[12px] tracking-[1px] md:text-[12.5px]">{block.ueberzeile}</Kicker>}
               <h2 id={titelId} className="mt-0.5 font-heading text-xl leading-tight font-semibold text-balance break-words md:text-[26px]">
                 {block.titel}
               </h2>

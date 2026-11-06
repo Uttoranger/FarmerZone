@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CircleAlert, LifeBuoy, Plus } from 'lucide-react'
+import { LifeBuoy, Plus } from 'lucide-react'
 import { MEINE_MELDUNGEN_HREF, NEUE_MELDUNG_HREF, type MeldungZeile } from '@/lib/hof-hilfe'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -34,8 +34,8 @@ export function MeineMeldungen({ zeilen }: { zeilen: MeldungZeile[] | null }): R
 
       {zeilen === null ? (
         <Hinweiskarte
-          ton="orange"
-          symbol={CircleAlert}
+
+          ton="neutral"
           titel="Wir konnten deine Meldungen gerade nicht laden."
           aktion={
             <a href={MEINE_MELDUNGEN_HREF} className={KNOPF_RAHMEN}>

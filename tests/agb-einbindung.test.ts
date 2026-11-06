@@ -165,7 +165,9 @@ describe('Seitenfuß: Impressum, Datenschutz, AGB, Problem melden', () => {
     const fuss = renderToStaticMarkup(createElement(KundeFuss))
     expect(fuss).toContain(`href="${AGB_PFAD}"`)
     const klassen = (markup: string) => markup.match(/<footer[^>]*class="([^"]*)"/)?.[1].split(/\s+/) ?? []
-    expect(klassen(fuss)).toContain('border-t')
+    // Lauf 31: die Linie am Handy am Fuß selbst, im Browser an der Spalte des Inhalts darin (Boards w1-bestaetigung u. a.).
+    expect(klassen(fuss)).toContain('max-md:border-t')
+    expect(fuss).toMatch(/class="[^"]*\bmd:border-t\b[^"]*"/)
     expect(klassen(fuss)).not.toContain('hidden')
     expect(klassen(fuss)).not.toContain('md:hidden')
     // Gegenprobe: Der Fuß der Startseite ist ab md verborgen und führt die AGB nicht — sie hängen allein am Seitenfuß.
@@ -214,7 +216,7 @@ describe('Bestellbestätigung per Mail: eine Zeile mit Link auf die AGB', () => 
   })
 })
 
-describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
+describe('/hoefe: der Satz zur Reihenfolge über der Liste (Board w1-/s1-hoefe, Nr. 234)', () => {
   const quelle = lies('src/components/hoefe/hoefe-client.tsx')
 
   const hof = (slug: string): HofUebersichtEintrag => ({
@@ -249,11 +251,13 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     expect(REIHENFOLGE_HINWEIS).toBe('Reihenfolge: nach Entfernung zum gewählten Ort, sonst nach Freischaltung. Keine bezahlte Platzierung.')
   })
 
-  it('mit Höfen steht der Satz genau einmal da — hinter der Liste, nicht davor', () => {
+  it('mit Höfen steht der Satz genau einmal da — direkt über der Liste, wo man die Höfe liest', () => {
     const html = uebersicht()
     expect(html.match(new RegExp(REIHENFOLGE_HINWEIS, 'g'))).toHaveLength(1)
     expect(html.indexOf('aria-label="Höfe"')).toBeGreaterThan(-1)
-    expect(html.indexOf(REIHENFOLGE_HINWEIS)).toBeGreaterThan(html.lastIndexOf('</ol>'))
+    expect(html.indexOf(REIHENFOLGE_HINWEIS)).toBeLessThan(html.indexOf('aria-label="Höfe"'))
+    // Zwischen Satz und Liste steht nichts mehr (keine Karten-Vorschau, kein Filter).
+    expect(html.slice(html.indexOf(REIHENFOLGE_HINWEIS), html.indexOf('aria-label="Höfe"'))).not.toMatch(/<a |<button/)
   })
 
   it('Gegenprobe: ohne Treffer gibt es keine Liste und keinen Satz', () => {
@@ -262,13 +266,14 @@ describe('/hoefe: der Satz zur Reihenfolge unter der Liste', () => {
     expect(html).not.toContain(REIHENFOLGE_HINWEIS)
   })
 
-  it('im Browser (ab 1024 px) steht er unter der Liste im linken Teil; der Kartenmodus hat keine Liste und keinen Satz', () => {
+  it('im Browser (ab 1024 px) steht er über der Liste im linken Teil; der Kartenmodus am Handy hat keine Liste und keinen Satz', () => {
     // Der Server rendert die schmale Gestalt; den Splitscreen sieht erst der Browser — darum am Quelltext.
-    expect(quelle).toMatch(/\{ergebnisse\(true\)\}\s+\{reihenfolgeHinweis\('mt-4'\)\}/)
-    expect(quelle).toMatch(/const reihenfolgeHinweis = \(klasse\?: string\) =>\s+anzahl > 0 &&/)
-    expect(quelle.match(/reihenfolgeHinweis\(/g)).toHaveLength(2)
+    expect(quelle).toMatch(/\{reihenfolgeHinweis\}\s+\{ergebnisse\(true\)\}/)
+    expect(quelle).toMatch(/\{anzahl > 0 && <p className="text-\[13px\] text-muted-foreground">\{REIHENFOLGE_HINWEIS\}<\/p>\}/)
+    // Splitscreen, Karte im Browser und Liste am Handy — der Kartenmodus am Handy nicht.
+    expect(quelle.match(/\{reihenfolgeHinweis\}/g)).toHaveLength(3)
     // Gegenprobe: Ohne die Zeile fände die Suche den Satz nicht.
-    expect(quelle.replace("{reihenfolgeHinweis('mt-4')}", '')).not.toMatch(/\{ergebnisse\(true\)\}\s+\{reihenfolgeHinweis\('mt-4'\)\}/)
+    expect(quelle.replace(/\{reihenfolgeHinweis\}\s+\{ergebnisse\(true\)\}/, '')).not.toMatch(/\{reihenfolgeHinweis\}\s+\{ergebnisse\(true\)\}/)
   })
 })
 

@@ -16,7 +16,6 @@ import {
   MELDUNG_ARTEN,
   MELDUNG_STATUS,
   ablaufStand,
-  bescheidMailHtml,
   buendelStandVon,
   buendelVorschau,
   fuerHof,
@@ -310,13 +309,9 @@ describe('Suche in Zusammenfassen und Dazunehmen', () => {
   })
 })
 
-describe('Bescheid an Kundinnen — die Antwort bleibt Text', () => {
-  it('maskiert Markup und hält Zeilen', () => {
-    const html = bescheidMailHtml('<script>x</script>\n„Danke" & gut', 'Team')
-    expect(html).not.toContain('<script>')
-    expect(html).toContain('&lt;script&gt;x&lt;/script&gt;<br>„Danke&quot; &amp; gut')
-  })
-})
+// Der Bescheid an Kundinnen maskiert die Antwort jetzt in der Vorlage (src/emails/bescheid.tsx); der Test dazu
+// steht in tests/mail-vorschau.test.ts („Bescheid: die Antwort des Teams steht nur als Text da“, Nr. 241).
+// bescheidMailHtml war danach ohne Aufrufer und ist mit Nr. 242 entfallen.
 
 describe('Grenzen: Adresse und Eingaben', () => {
   it('unbekannte oder kaputte Werte in der Adresse heißen Standard, nie ein Fehler', () => {

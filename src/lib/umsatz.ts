@@ -349,13 +349,14 @@ function monatsname(tag: string): string {
   return new Intl.DateTimeFormat('de-AT', { month: 'long', timeZone: 'UTC' }).format(datumAusTag(tag))
 }
 
-/** „Diese Woche", „Letzte Woche", „14.–20. Sep", „September 2026", „2026". */
+/**
+ * „1.–7. März", „28. Feb – 6. März", „September 2026", „2026". Die Woche nennt seit Lauf 31
+ * (Nr. 238, Board s2-/w2-auswertung Bild 3) immer ihre Tage, auch die laufende — nicht „Diese Woche".
+ */
 export function zeitraumName(pf: Periodenfenster): string {
   const { j } = zerlege(pf.startTag)
   if (pf.periode === 'jahr') return String(j)
   if (pf.periode === 'monat') return `${monatsname(pf.startTag)} ${j}`
-  if (pf.zurueck === 0) return 'Diese Woche'
-  if (pf.zurueck === 1) return 'Letzte Woche'
   const ende = tagVersetzt(pf.startTag, 6)
   // Feste Kürzel statt Intl: je nach ICU-Stand käme „Sep" oder „Sep." heraus.
   const kurz = (tag: string) => MONATE_KURZ[zerlege(tag).m - 1]
@@ -365,6 +366,13 @@ export function zeitraumName(pf: Periodenfenster): string {
   return a.m === b.m
     ? `${a.t}.–${b.t}. ${kurz(ende)}${jahr}`
     : `${a.t}. ${kurz(pf.startTag)} – ${b.t}. ${kurz(ende)}${jahr}`
+}
+
+/** Der Zeitraum im Satz der Kennzahlen: „im Februar", „1.–7. März", „im Jahr 2026" (Board s2-/w2-auswertung). */
+export function zeitraumImSatz(pf: Periodenfenster): string {
+  if (pf.periode === 'jahr') return `im Jahr ${zerlege(pf.startTag).j}`
+  if (pf.periode === 'monat') return `im ${monatsname(pf.startTag)}`
+  return zeitraumName(pf)
 }
 
 /** Kurzname der Vorperiode für die Legende der blassen Balken: „Woche davor", „August", „2025". */
@@ -487,4 +495,9 @@ export const UMSATZ_TEXT = {
   mitHofladen: 'Mit Hofladen',
   /** Unter einem Betrag, klein: „€ 178 · mit Hofladen" (Kennzahl auf Heute). */
   mitHofladenKlein: 'mit Hofladen',
+  /**
+   * Titel der Umsatzkarte der Auswertung, wörtlich nach Board s2-/w2-auswertung (Lauf 31, Nr. 238):
+   * Er sagt, was die Karte zählt — dieselbe Menge wie „Mit Hofladen“.
+   */
+  karteTitel: 'Abgeholte Bestellungen und eingetragene Verkäufe',
 } as const

@@ -69,7 +69,7 @@ const KNOPF_ORANGE = cn(
   'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary-foreground/25 bg-primary px-3.5 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
   FOKUS_RAHMEN
 )
-const UEBERSCHRIFT = 'text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase'
+const UEBERSCHRIFT = 'text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase'
 const TEXT_LINK = 'font-semibold text-status-fertig underline-offset-2 hover:underline'
 
 const KANAL_SYMBOL: Record<(typeof FENSTER_KANAELE)[number]['kanal'], LucideIcon> = {

@@ -40,7 +40,7 @@ import {
   AccordionTrigger,
   AccordionPanel,
 } from '@/components/ui/accordion'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button, TREFFER_44, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
@@ -179,6 +179,11 @@ function FormMessage({ className, ...props }: React.ComponentProps<typeof UiForm
   return <UiFormMessage role="alert" className={cn('text-[14px] leading-snug font-semibold text-status-offen', className)} {...props} />
 }
 
+// Die Abschnitte als eigene Karten mit fetter Überschrift und der Zusammenfassung darunter
+// (Board s1-/w1-produkt-neu, Lauf 31) statt Trennlinien mit kleiner Überschrift.
+const ABSCHNITT_KARTE = 'rounded-[14px] border border-border bg-card px-4 last:border'
+const ABSCHNITT_KOPF = 'text-[16px] font-bold'
+
 function SchalterZeile({
   id,
   titel,
@@ -197,10 +202,11 @@ function SchalterZeile({
       htmlFor={id}
       className="flex min-h-14 items-center gap-3 rounded-lg border border-border p-3"
     >
-      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      {/* Grün wie „Im Shop“ in der Liste (ImShopSchalter, Board s1-produkt-neu); 44 px Trefferfläche über ::before. */}
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} className={cn(TREFFER_44, 'data-checked:bg-accent')} />
       <span className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-foreground">{titel}</span>
-        <span className="text-xs text-muted-foreground">{untertitel}</span>
+        <span className="text-[15px] font-semibold text-foreground">{titel}</span>
+        <span className="text-[13px] text-muted-foreground">{untertitel}</span>
       </span>
     </label>
   )
@@ -960,7 +966,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           {pflicht && ' *'}
         </span>
         {zu && (
-          <span className={cn('truncate text-xs', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
+          <span className={cn('truncate text-[13px]', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
             {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
           </span>
         )}
@@ -1000,8 +1006,12 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             ref={formRef}
             onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             onKeyDown={weiterMitEnter}
-            // Feldfehler orange (V17): Rand am Feld, Beschriftung bleibt in der Textfarbe.
-            className={cn('flex min-h-0 flex-1 flex-col [&_[data-slot=form-label][data-error=true]]:text-foreground!', FELD_FEHLER_IM_FORMULAR)}
+            // Feldfehler orange (V17): Rand am Feld, Beschriftung bleibt in der Textfarbe. Beschriftungen fett
+            // und 15 px wie im Board s1-produkt-neu (Lauf 31) — eine Stelle für alle Felder des Dialogs.
+            className={cn(
+              'flex min-h-0 flex-1 flex-col [&_[data-slot=form-label]]:text-[15px] [&_[data-slot=form-label]]:font-semibold [&_[data-slot=form-label][data-error=true]]:text-foreground!',
+              FELD_FEHLER_IM_FORMULAR
+            )}
           >
             {/* Scrollbarer Inhalt — pb-8, damit die letzte Karte nie unter dem Fuß liegt */}
             <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-8">
@@ -1013,12 +1023,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
               />
               <Accordion
                 multiple
+                className="flex flex-col gap-3"
                 value={offen}
                 onValueChange={(v) => setOffen(v as Abschnitt[])}
               >
                 {/* === 1. GRUNDDATEN === */}
-                <AccordionItem value="grunddaten">
-                  <AccordionTrigger>{abschnittTitel('grunddaten')}</AccordionTrigger>
+                <AccordionItem value="grunddaten" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('grunddaten')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
                       {/* Foto zuerst (Vorbild Depop, Shopify, Nextdoor): der schnellste
@@ -1198,8 +1209,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                 </AccordionItem>
 
                 {/* === 2. PREIS & VERFÜGBARKEIT === */}
-                <AccordionItem value="preis">
-                  <AccordionTrigger>{abschnittTitel('preis')}</AccordionTrigger>
+                <AccordionItem value="preis" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('preis')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
                       {/* Reihenfolge Einheit → Gebinde → Preis: Das Preisfeld heißt je
@@ -1556,8 +1567,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                 </AccordionItem>
 
                 {/* === 3. DETAILS === */}
-                <AccordionItem value="details">
-                  <AccordionTrigger>{abschnittTitel('details')}</AccordionTrigger>
+                <AccordionItem value="details" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('details')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-4">
                       {/* Siegel — drei Zeilen mit Erklärsatz */}
@@ -1724,8 +1735,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
 
                 {/* === 4. KENNZEICHNUNG — nur bei Futtermitteln === */}
                 {futterBereich && (
-                  <AccordionItem value="kennzeichnung">
-                    <AccordionTrigger>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
+                  <AccordionItem value="kennzeichnung" className={ABSCHNITT_KARTE}>
+                    <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
                     <AccordionPanel>
                       <div className="space-y-4">
                         <p className="text-xs text-muted-foreground">
@@ -2044,7 +2055,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             {/* Fuß: fest am unteren Rand als eigene Flex-Zone — kein sticky, keine
                 negativen Ränder (die von DialogFooter ragten bei p-0 über die
                 Kante). Hintergrund card, feine Linie oben, Safe-Area-Abstand. */}
-            <div className="flex shrink-0 flex-row justify-end gap-2 border-t border-border bg-card px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {/* Am Handy wie Futter und Brennmaterial (Board s1-produkt-neu): „Speichern“ über die volle Breite,
+                „Abbrechen“ darunter; ab 640 px in einer Zeile rechts. */}
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-card px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6 sm:pt-4">
               {/* Löschen nur beim Bearbeiten, links und leise — die Rückfrage stellt die Liste. */}
               {isEdit && onLoeschen && (
                 <Button
@@ -2052,7 +2065,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                   variant="ghost"
                   onClick={() => onLoeschen(product)}
                   disabled={isSubmitting}
-                  className="mr-auto text-status-offen hover:bg-primary/10"
+                  className="text-status-offen hover:bg-primary/10 sm:mr-auto"
                 >
                   Löschen
                 </Button>
@@ -2064,7 +2077,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                   und springt zum ersten fehlenden Feld (onInvalid). */}
               {/* Solange das Foto geprüft wird, gibt es noch nichts zu speichern —
                   sonst ginge das Produkt ohne (oder mit dem vorigen) Foto hinaus. */}
-              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-w-[100px]">
+              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-h-12 w-full rounded-xl text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
                 {isSubmitting
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)
@@ -2150,8 +2163,8 @@ function ProduktfotoAusschnitt({
 }): React.JSX.Element {
   const zeilen = (klein: boolean) => (
     <div className={cn('min-w-0', klein ? 'px-2 py-1.5' : 'flex-1')}>
-      <div className={cn('truncate font-semibold text-foreground', klein ? 'text-[11.5px]' : 'text-[13px]')}>{name}</div>
-      <div className={cn('truncate text-muted-foreground', klein ? 'text-[10px]' : 'text-[11.5px]')}>{preis}</div>
+      <div className={cn('truncate font-semibold text-foreground', klein ? 'text-xs' : 'text-[13px]')}>{name}</div>
+      <div className="truncate text-xs text-muted-foreground">{preis}</div>
     </div>
   )
   const karte = (rahmen: ReactNode) => (

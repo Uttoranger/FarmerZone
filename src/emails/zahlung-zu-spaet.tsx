@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, Trenner, h1, bodyText, mutedText, kleinText, highlightBox, highlightLabel, highlightValue } from './_layout'
+import { EmailLayout, BestellnummerKasten, ErstattungKasten, h1, bodyText, leiseZeile } from './_layout'
 import { formatEuro } from '@/lib/format'
 
 export interface ZahlungZuSpaetProps {
@@ -14,34 +14,19 @@ export interface ZahlungZuSpaetProps {
 
 /**
  * Die Zahlung kam an, als die Bestellung schon storniert war — das Geld ging
- * sofort zurück (Webhook, payment_intent.succeeded auf CANCELLED).
+ * sofort zurück (Webhook, payment_intent.succeeded auf CANCELLED). Ohne Aufruf
+ * zur nächsten Bestellung (S11, Board s3/w3-mail-storno Bild 4).
  */
 export function ZahlungZuSpaetEmail(p: ZahlungZuSpaetProps) {
   return (
-    <EmailLayout fuss={{ art: 'hof' }} previewText="Deine Zahlung kam zu spät – das Geld ist zurück">
+    <EmailLayout fuss={{ art: 'hof' }} previewText={`Zurück an dich ${formatEuro(p.erstattet)}.`}>
       <Text style={h1}>Zahlung kam zu spät</Text>
       <Text style={bodyText}>
-        Hallo {p.customerName},<br />
-        deine Zahlung für die Bestellung <strong>{p.orderNumber}</strong> bei{' '}
-        <strong>{p.farmName}</strong> ist angekommen – aber erst, nachdem die Bestellung schon
-        storniert war. Deshalb haben wir dir das Geld sofort zurückgeschickt.
+        {`Deine Zahlung für deine Bestellung bei ${p.farmName} ist erst angekommen, als die Bestellung schon storniert war. Wir haben dir das Geld sofort zurückgeschickt.`}
       </Text>
-
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Zurück an dich</Text>
-        <Text style={highlightValue}>{formatEuro(p.erstattet)}</Text>
-        <Text style={{ ...mutedText, margin: 0 }}>
-          Das Geld ist in 5–10 Werktagen wieder auf deinem Konto.
-        </Text>
-      </div>
-
-      <Text style={bodyText}>
-        Die Bestellung bleibt storniert, für dich wird nichts zurückgelegt. Wenn du die Sachen
-        noch möchtest, bestell einfach neu.
-      </Text>
-
-      <Trenner />
-      <Text style={kleinText}>Bei Fragen schreib uns an {p.supportEmail}.</Text>
+      <BestellnummerKasten nummer={p.orderNumber} />
+      <ErstattungKasten betrag={formatEuro(p.erstattet)} zeile="erscheint in 5–10 Werktagen auf deinem Konto" />
+      <Text style={leiseZeile}>{`Bei Fragen schreib uns an ${p.supportEmail}.`}</Text>
     </EmailLayout>
   )
 }

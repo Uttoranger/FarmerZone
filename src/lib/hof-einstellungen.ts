@@ -198,7 +198,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
       titel: 'Abholzeiten',
       zeile:
         d.abholzeiten.length > 0
-          ? abholzeitenKurz(d.abholzeiten)
+          ? abholzeitenKurz(d.abholzeiten, { mitUhr: true })
           : d.abholzeitenGesamt > 0
             ? 'Alle Abholzeiten sind pausiert — gerade kann niemand bestellen'
             : ABHOLZEITEN_FEHLEN_ZEILE,

@@ -7,10 +7,10 @@
  * kommt aus einer Attrappe, weil der Server-Stand immer „keine“ ist.
  *
  * Beweist (je mit Gegenprobe ohne Notbremse):
- *  - Hofzeile: „Musterdorf · Bestellen geht gerade nicht“ statt „Nimmt Bestellungen an“;
+ *  - Hofzeile: „Musterdorf · Bestellen geht gerade nicht“ statt „nimmt Bestellungen an“;
  *  - „Bestellen“/„Jetzt bestellen“ fehlt, „Anfahrt“ bleibt;
  *  - die Produktkarten ruhen („In den Korb“ fehlt), die Produkte bleiben sichtbar;
- *  - eine Sperre des Hofs geht vor („Pausiert“ bleibt „Pausiert“).
+ *  - eine Sperre des Hofs geht vor („pausiert gerade“ bleibt es), auch ohne Ort („Pausiert gerade“).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -77,7 +77,7 @@ beforeEach(() => {
 describe('Hofseite während der Notbremse', () => {
   it('Gegenprobe ohne Notbremse: „Nimmt Bestellungen an“, „Bestellen“ und „In den Korb“ stehen da', () => {
     const html = seite()
-    expect(hofzeile(html)).toContain('Musterdorf · Nimmt Bestellungen an')
+    expect(hofzeile(html)).toContain('Musterdorf · nimmt Bestellungen an')
     expect(html).toContain('>Bestellen</span>')
     expect(html).toContain('>Jetzt bestellen</span>')
     expect(html).toMatch(/aria-label="Heumilch in den Korb"|>In den Korb</)
@@ -87,7 +87,7 @@ describe('Hofseite während der Notbremse', () => {
     browser.stopp = STOPP
     const html = seite()
     expect(hofzeile(html)).toContain('Musterdorf · Bestellen geht gerade nicht')
-    expect(html).not.toContain('Nimmt Bestellungen an')
+    expect(html).not.toMatch(/[Nn]immt Bestellungen an/)
     expect(html).not.toContain('>Bestellen</span>')
     expect(html).not.toContain('>Jetzt bestellen</span>')
     expect(html).not.toMatch(/aria-label="Heumilch in den Korb"|>In den Korb</)
@@ -95,9 +95,9 @@ describe('Hofseite während der Notbremse', () => {
     expect(html).toContain('Anfahrt')
   })
 
-  it('eine Sperre des Hofs geht vor: pausiert bleibt „Pausiert“, auch während der Notbremse', () => {
+  it('eine Sperre des Hofs geht vor: pausiert bleibt „pausiert gerade“, auch während der Notbremse', () => {
     browser.stopp = STOPP
-    expect(hofzeile(seite('pause'))).toContain('Musterdorf · Pausiert')
+    expect(hofzeile(seite('pause'))).toContain('Musterdorf · pausiert gerade')
     expect(hofZeileZustand(null, true)).toBe('Bestellen geht gerade nicht')
     expect(hofZeileZustand(null, false)).toBe('Nimmt Bestellungen an')
     expect(hofZeileZustand('pause', true)).toBe(hofZeileZustand('pause', false))

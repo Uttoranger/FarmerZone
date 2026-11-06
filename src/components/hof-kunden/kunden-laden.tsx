@@ -10,7 +10,7 @@ import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
  * den Daten ab). Farbstaffelung wie die anderen Hof-Routen im neuen Design:
  * bg-border für Überschriften, bg-muted für Zweitzeilen und Flächen.
  */
-export const KUNDEN_RAHMEN = 'mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
+export const KUNDEN_RAHMEN = 'w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
 
 export function KundenLaden({ modus }: { modus: 'liste' | 'detail' }): React.JSX.Element {
   return (

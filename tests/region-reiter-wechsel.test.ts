@@ -45,7 +45,7 @@ const HOF = { id: 'hof-a', name: 'Testhof A' }
 function reiterZiele(html: string): { preise: string; futter: string } {
   const nav = html.slice(html.indexOf('<nav aria-label="Region"'), html.indexOf('</nav>'))
   const ziel = (label: string): string => {
-    const treffer = new RegExp(`<a href="([^"]+)"[^>]*>${label}`).exec(nav)
+    const treffer = new RegExp(`<a href="([^"]+)"[^>]*>(?:<span[^>]*>)?${label}`).exec(nav)
     if (!treffer) throw new Error(`Reiter „${label}“ fehlt im Kopf`)
     return treffer[1].replaceAll('&amp;', '&')
   }

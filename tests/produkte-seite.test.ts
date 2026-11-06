@@ -747,7 +747,7 @@ describe('Produktdialog im neuen Design', () => {
     expect(dialogTitel(false, 'brennmaterial')).toBe('Neues Brennmaterial')
     expect(dialogTitel(false, null)).toBe('Neues Produkt')
     expect(dialogTitel(true, 'futter')).toBe('Produkt bearbeiten')
-    expect(speichernText(0, false, true)).toBe('Produkt veröffentlichen')
+    expect(speichernText(0, false, true)).toBe('Speichern')
     expect(speichernText(0, false, false)).toBe('Speichern (nicht im Shop)')
     expect(speichernText(2, false, true)).toBe('Noch 2 Angaben fehlen')
     expect(speichernText(0, true, true)).toBe('Speichern')

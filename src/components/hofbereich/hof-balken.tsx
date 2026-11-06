@@ -17,11 +17,11 @@ import { cn } from '@/lib/utils'
  * Balken gilt, entscheidet der Lader (stillgelegt sticht „wartet").
  *
  * Seit Lauf 30 (N42 e) hängt der Titel von „wartet" am Stand der Schritte
- * (`warteStand`, src/lib/einrichten.ts): Wer ihn kennt, gibt `stand` mit
- * (Einrichten); das Layout des Hofbereichs lädt die Schritte nicht und zeigt
- * ohne Stand den Titel „wird noch geprüft" wie bisher.
+ * (`warteStand`, src/lib/einrichten.ts); seit Nr. 233 bringt der Lader des
+ * Layouts den Stand im Balken mit (`ladeHofbereich`), so steht auf JEDER Seite
+ * der HofShell derselbe Titel wie auf „Hof einrichten“.
  */
-export function HofBalken({ balken, stand = null }: { balken: Hofbereich['balken']; stand?: WarteStand | null }): React.JSX.Element | null {
+export function HofBalken({ balken }: { balken: Hofbereich['balken'] }): React.JSX.Element | null {
   if (!balken) return null
 
   if (balken.art === 'stillgelegt') {
@@ -49,7 +49,7 @@ export function HofBalken({ balken, stand = null }: { balken: Hofbereich['balken
 
   return (
     <div className="px-4 pt-4 md:px-8 print:hidden">
-      <WarteBalken farmId={balken.farmId} farmName={balken.farmName} country={balken.country} stand={stand} />
+      <WarteBalken farmId={balken.farmId} farmName={balken.farmName} country={balken.country} stand={balken.stand} />
     </div>
   )
 }

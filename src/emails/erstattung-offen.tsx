@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue } from './_layout'
+import { EmailLayout, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, h1 } from './_layout'
 
 export interface ErstattungOffenProps {
   /** Was passiert ist — ein Satz. */
@@ -13,56 +13,32 @@ export interface ErstattungOffenProps {
   handanweisung: string
   /** Die Kennung der Erstattung bei Stripe (re_…), falls bekannt. */
   stripeKennung: string | null
+  /** Admin › Bestellungen — dort wird die Erstattung abgeschlossen. Fehlt sie, bleibt der Knopf weg. */
+  bestellungenUrl?: string
 }
 
 /**
  * Betreiber-Meldung: Geld an eine Kundin steht aus (Storno ohne Erstattung,
- * später gescheiterte Erstattung). Bewusst ohne Name und Adresse der Kundin —
- * die Bestellnummer genügt zum Wiederfinden.
+ * später gescheiterte Erstattung; Board s3/w3-mail-betrieb Bild 3). Bewusst
+ * ohne Name und Adresse der Kundin — die Bestellnummer genügt zum Wiederfinden.
+ * Was zu tun ist, steht in der orangen Karte: Erstatten kann nur das Plattformkonto.
  */
 export function ErstattungOffenEmail(p: ErstattungOffenProps) {
+  const bestellung = [p.bestellnummer ?? 'unbekannt', p.hofName].filter(Boolean).join(' · ')
   return (
     <EmailLayout fuss={{ art: 'betrieb' }} previewText={`Erstattung offen${p.bestellnummer ? ` – Bestellung ${p.bestellnummer}` : ''}`}>
       <Text style={h1}>Erstattung offen</Text>
-      <Text style={bodyText}>{p.was}</Text>
-
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Bestellung</Text>
-        <Text style={highlightValue}>{p.bestellnummer ?? 'unbekannt'}</Text>
-
-        {p.bestellId && (
-          <>
-            <Text style={{ ...highlightLabel, marginTop: '14px' }}>Bestell-ID</Text>
-            <Text style={{ ...highlightValue, fontFamily: 'monospace' }}>{p.bestellId}</Text>
-          </>
-        )}
-
-        {p.hofName && (
-          <>
-            <Text style={{ ...highlightLabel, marginTop: '14px' }}>Hof</Text>
-            <Text style={highlightValue}>{p.hofName}</Text>
-          </>
-        )}
-
-        {p.stripeKennung && (
-          <>
-            <Text style={{ ...highlightLabel, marginTop: '14px' }}>Erstattung bei Stripe</Text>
-            <Text style={{ ...highlightValue, fontFamily: 'monospace' }}>{p.stripeKennung}</Text>
-          </>
-        )}
-
-        {p.betraege.map((b) => (
-          <React.Fragment key={b.label}>
-            <Text style={{ ...highlightLabel, marginTop: '14px' }}>{b.label}</Text>
-            <Text style={highlightValue}>{b.wert}</Text>
-          </React.Fragment>
-        ))}
-      </div>
-
-      <Text style={bodyText}>
-        <strong>Was zu tun ist:</strong> {p.handanweisung}
-      </Text>
-      <Text style={mutedText}>Erstatten kann nur das Plattformkonto – der Hof hat dort keinen Zugang.</Text>
+      <BetragsZeile umbrechen links="Bestellung" rechts={bestellung} />
+      {p.betraege.map((b) => (
+        <BetragsZeile key={b.label} links={b.label} rechts={b.wert} />
+      ))}
+      {p.stripeKennung && <BetragsZeile umbrechen links="Bei Stripe" rechts={p.stripeKennung} />}
+      <HinweisKasten art="orange">{`${p.was} Was zu tun ist: ${p.handanweisung}${/[.!?]$/.test(p.handanweisung) ? '' : '.'}`}</HinweisKasten>
+      {p.bestellungenUrl && (
+        <KnopfReihe>
+          <Knopf href={p.bestellungenUrl}>In Bestellungen öffnen →</Knopf>
+        </KnopfReihe>
+      )}
     </EmailLayout>
   )
 }

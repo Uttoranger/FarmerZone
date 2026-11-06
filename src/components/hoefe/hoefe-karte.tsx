@@ -29,6 +29,7 @@ import {
 } from '@/lib/hoefe-anzeige'
 import { cn } from '@/lib/utils'
 import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
+import { LEAFLET_BEDIENTEILE } from '@/components/karte/karten-masse'
 import { KURZKARTE_BREITE } from '@/components/hoefe/hof-kurzkarte'
 
 /**
@@ -383,7 +384,8 @@ export default function HoefeKarte({
     const map = L.map(kartenDiv.current, {
       center: OESTERREICH_MITTE,
       zoom: OESTERREICH_ZOOM,
-      zoomControl: true,
+      // Der Zoom kommt unten selbst dazu — oben rechts wie in den Boards (w1-/s1-hoefe, Nr. 234).
+      zoomControl: false,
       attributionControl: false,
       // Den Größenwechsel misst useKartenGroesse (ResizeObserver) — nicht
       // zusätzlich Leaflet beim window-resize.
@@ -395,6 +397,8 @@ export default function HoefeKarte({
       .attribution({ position: attributionOben ? 'topright' : 'bottomright' })
       .setPrefix(false)
       .addTo(map)
+    // Nach der Attribution angelegt: Steht sie oben rechts (Kartenmodus am Handy), liegt der Zoom darunter.
+    L.control.zoom({ position: 'topright', zoomInTitle: 'Hineinzoomen', zoomOutTitle: 'Herauszoomen' }).addTo(map)
     L.tileLayer(KARTEN_KACHELN.url, {
       maxZoom: KARTEN_KACHELN.maxZoom,
       attribution: KARTEN_KACHELN.attribution,
@@ -705,14 +709,14 @@ export default function HoefeKarte({
   return (
     // `isolate`: Leaflets Ebenen (400) und Bedienteile (1000) bleiben in der
     // Karte — sonst lägen sie beim Scrollen über der klebenden Kopfzeile (40).
-    <div className={cn('relative isolate overflow-hidden', !randlos && 'rounded-2xl border border-border', hoeheKlasse)}>
+    <div className={cn('relative isolate overflow-hidden', !randlos && 'rounded-2xl border border-border', LEAFLET_BEDIENTEILE, hoeheKlasse)}>
       <div ref={kartenDiv} className="h-full w-full" />
       {hinweis && (
-        // Über den Pins (Ebene 600), neben dem Zoom links oben und unter der Attribution, wenn sie oben steht.
+        // Über den Pins (Ebene 600), links oben neben dem Zoom (oben rechts, 44 px) — unter der Attribution, wenn sie oben steht.
         <p
           ref={hinweisRef}
           className={cn(
-            'pointer-events-none absolute right-3 left-14 z-[700] w-fit max-w-[calc(100%-4.25rem)] rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground shadow-md',
+            'pointer-events-none absolute left-3 z-[700] w-fit max-w-[calc(100%-5.5rem)] rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground shadow-md',
             attributionOben ? 'top-8' : 'top-3'
           )}
         >

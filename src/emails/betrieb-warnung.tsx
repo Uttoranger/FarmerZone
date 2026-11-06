@@ -1,7 +1,7 @@
 import * as React from 'react'
-import { Link, Text } from '@react-email/components'
+import { Text } from '@react-email/components'
 import { BETRIEB_MAIL_TEXT, type BetriebMail } from '@/lib/betrieb'
-import { EmailLayout, bodyText, ctaButton, h1, kleinText, mutedText } from './_layout'
+import { EmailLayout, HinweisKasten, Knopf, KnopfReihe, bodyText, h1, kleinText } from './_layout'
 
 export interface BetriebWarnungProps {
   /** Betreff und Sätze aus `betriebMail` (src/lib/betrieb.ts) — die Vorlage rendert nur. */
@@ -11,29 +11,26 @@ export interface BetriebWarnungProps {
 }
 
 /**
- * Warn-Mail von Admin › Betrieb (Register N18, Nr. 103; Mockup
- * email-betrieb-warnung): Grenze erreicht (80 %, 95 %, voll), Entwarnung,
- * Ablauf überfällig oder gescheitert. Nur Zahlen und Namen aus festen Listen —
- * kein Hofname, keine Adresse, kein Meldungstext.
+ * Warn-Mail von Admin › Betrieb (Register N18, Nr. 103; Board s3/w3-mail-betrieb
+ * Bild 6): Grenze erreicht (80 %, 95 %, voll), Entwarnung, Ablauf überfällig
+ * oder gescheitert. Der erste Satz (die Messung) steht in der orangen Karte.
+ * Nur Zahlen und Namen aus festen Listen — kein Hofname, keine Adresse, kein Meldungstext.
  */
 export function BetriebWarnungEmail({ mail, url }: BetriebWarnungProps): React.JSX.Element {
+  const [erster, ...weitere] = mail.absaetze
   return (
     <EmailLayout fuss={{ art: 'betrieb' }} previewText={mail.titel}>
-      <Text style={mutedText}>{BETRIEB_MAIL_TEXT.kopf}</Text>
       <Text style={h1}>{mail.titel}</Text>
-      {mail.absaetze.map((satz) => (
+      {erster && <HinweisKasten art="orange">{erster}</HinweisKasten>}
+      {weitere.map((satz) => (
         <Text key={satz} style={bodyText}>
           {satz}
         </Text>
       ))}
-      {mail.hilft && (
-        <Text style={bodyText}>
-          <strong>{BETRIEB_MAIL_TEXT.hilft}</strong> {mail.hilft}
-        </Text>
-      )}
-      <Link href={url} style={ctaButton}>
-        {mail.knopf}
-      </Link>
+      {mail.hilft && <Text style={bodyText}>{`${BETRIEB_MAIL_TEXT.hilft} ${mail.hilft}`}</Text>}
+      <KnopfReihe>
+        <Knopf href={url}>{mail.knopf}</Knopf>
+      </KnopfReihe>
       <Text style={kleinText}>{mail.fuss}</Text>
     </EmailLayout>
   )

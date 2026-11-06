@@ -79,9 +79,13 @@ export function emailAnmeldungSchritt(abo: EmailAboStand | null, jetzt: Date): E
 
 // ── Texte (eine Quelle für Seite, Aktion und Tests) ──────────────────────────
 
+/** Wie lange der Bestätigungslink gilt — als eigener Satz für die Fehlerkarte (Board s2-neuigkeiten, Bild 4), Nr. 242. */
+const ABO_GUELTIGKEIT_SATZ = `Er gilt ${ABO_BESTAETIGUNG_GUELTIG_TAGE} Tage.`
+
 export const ABO_TEXT = {
   ungueltig: 'Dieser Link ist nicht gültig. Vielleicht wurde er beim Kopieren abgeschnitten.',
-  abgelaufen: `Dieser Link ist abgelaufen. Er gilt ${ABO_BESTAETIGUNG_GUELTIG_TAGE} Tage.`,
+  abgelaufen: `Dieser Link ist abgelaufen. ${ABO_GUELTIGKEIT_SATZ}`,
+  gueltigkeit: ABO_GUELTIGKEIT_SATZ,
   ueberholt: 'Dieser Link gilt nicht mehr. Vielleicht hast du die Anmeldung inzwischen ausgeschaltet oder einen neueren Link bekommen.',
   ausweg: 'Melde dich einfach noch einmal an – beim nächsten Einkauf oder unter „Mein Konto“. Dann schicken wir dir einen neuen Link.',
   abo_weg: 'Diese Anmeldung gibt es nicht mehr. Melde dich einfach noch einmal an, dann schicken wir dir einen neuen Link.',

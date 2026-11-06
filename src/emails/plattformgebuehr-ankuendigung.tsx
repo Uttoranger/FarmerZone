@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Link, Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, ctaButton } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, Knopf, KnopfReihe, h1, bodyText } from './_layout'
 
 export interface PlattformgebuehrAnkuendigungProps {
   /** Der Satz aus `ankuendigungText` (src/lib/konditionen.ts) — dieselben Worte wie im Postfach. */
@@ -17,9 +17,9 @@ export function PlattformgebuehrAnkuendigungEmail({ text, datum, lastschriftUrl,
     <EmailLayout fuss={{ art: 'plattform' }} previewText={`Plattformgebühr ab ${datum}`}>
       <Text style={h1}>Plattformgebühr ab {datum}</Text>
       <Text style={bodyText}>{text}</Text>
-      <Link href={lastschriftUrl} style={ctaButton}>
-        {knopf}
-      </Link>
+      <KnopfReihe>
+        <Knopf href={lastschriftUrl}>{knopf}</Knopf>
+      </KnopfReihe>
     </EmailLayout>
   )
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Clock, List, Map as MapIcon } from 'lucide-react'
+import { List } from 'lucide-react'
 import { leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
@@ -37,6 +37,7 @@ import {
   zaehleFilter,
   zahlZeile,
   zeigtProdukte,
+  type EntdeckenChip,
 } from '@/lib/hoefe-entdecken'
 import { hofseitenLink } from '@/lib/bereiche-anzeige'
 import { REIHENFOLGE_HINWEIS } from '@/lib/rechtstexte/agb-einbindung'
@@ -60,6 +61,7 @@ import {
   HofKarte,
   ProduktZeile,
   beimNavigieren,
+  kurzeKategorieReihe,
 } from '@/components/hoefe/entdecken-teile'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu. Die Karte wird
@@ -84,18 +86,6 @@ function useIstBreit(): boolean {
     // Der Server rendert die schmale Gestalt — nach der Hydration springt der
     // Splitscreen ein; die schmale Gestalt ist kurz sichtbar, aber bedienbar.
     () => false
-  )
-}
-
-/** Eine Gruppe der Filterzeile im Browser: leiser Name davor, damit „Pferde" nicht neben „Ballen & mehr" rätselt. */
-function FilterGruppe({ titel, children }: { titel: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span aria-hidden="true" className="text-[13px] text-muted-foreground">
-        {titel}
-      </span>
-      {children}
-    </div>
   )
 }
 
@@ -131,8 +121,9 @@ function stufeAusWert(wert: string): UmkreisStufe {
  *
  * Welche Chips es gibt, was passt und was die Liste zeigt, entscheiden reine
  * Funktionen (src/lib/hoefe-entdecken.ts, berechneHofAuswahl); diese Datei
- * verdrahtet nur. Im Browser ab 1024 px Liste links, Karte randlos rechts;
- * darunter die Liste mit einer Karten-Vorschau und die Filter im Blatt.
+ * verdrahtet nur. Im Browser ab 1024 px Liste links, Karte rechts im Rahmen
+ * der Seite (oder mit „Karte" die Karte allein); darunter die Liste, „Karte"
+ * öffnet den Kartenmodus. Die Filter über „Filter" im Blatt (Nr. 234).
  */
 export function HoefeClient({
   hoefe,
@@ -421,54 +412,18 @@ export function HoefeClient({
     )
   }
 
-  // Die Hauptparameter der Reihenfolge (§ 4a Abs. 1 Z 1 FAGG, Register O4) stehen unter der Liste,
-  // wo man die Höfe liest — in beiden Ansichten mit Liste, nie über einer leeren.
-  const reihenfolgeHinweis = (klasse?: string) =>
-    anzahl > 0 && <p className={cn('text-[13px] text-muted-foreground', klasse)}>{REIHENFOLGE_HINWEIS}</p>
-
-  const filterReihenBrowser = (
-    <div className="hidden flex-col gap-3 lg:flex">
-      <ChipReihe beschriftung="Kategorie" chips={reihen.kategorien} onWahl={schreibeUrl} />
-      <ChipReihe beschriftung="Futtersorte" chips={reihen.futter} onWahl={schreibeUrl} />
-      <ChipReihe beschriftung="Sorte" chips={reihen.sorten} onWahl={schreibeUrl} />
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <FilterGruppe titel={ABHOLUNG_TEXT.beschriftung}>
-          <ChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} chips={reihen.abholung} onWahl={schreibeUrl} />
-        </FilterGruppe>
-        {umkreisSegment && <FilterGruppe titel="Umkreis">{umkreisSegment}</FilterGruppe>}
-        {reihen.mengen.length > 0 && (
-          <FilterGruppe titel="Menge">
-            <ChipReihe beschriftung="Menge" chips={reihen.mengen} onWahl={schreibeUrl} />
-          </FilterGruppe>
-        )}
-        {reihen.tiere.length > 0 && (
-          <FilterGruppe titel="Für Tiere">
-            <ChipReihe beschriftung="Für Tiere" chips={reihen.tiere} onWahl={schreibeUrl} />
-          </FilterGruppe>
-        )}
-        {reihen.siegel.length > 0 && (
-          <FilterGruppe titel="Siegel">
-            <ChipReihe beschriftung="Siegel" chips={reihen.siegel} onWahl={schreibeUrl} />
-          </FilterGruppe>
-        )}
-        <ChipReihe beschriftung="Sortierung" chips={reihen.sortierung} onWahl={schreibeUrl} />
-        <span className="flex-1" />
-        {/* Die Zahlzeile als Statusmeldung: Sie sagt nach jedem Filter neu, wie viele Höfe passen. Am Handy steht sie über der Liste. */}
-        {istBreit && (
-          <span role="status" className="text-[13px] text-muted-foreground">
-            {zahlZeilenText}
-          </span>
-        )}
-      </div>
-    </div>
-  )
-
-  /** Am Handy die Reihe „Abholung" über der Liste (Board, Handy 1) — eine Liste von Links mit aria-current, keine Radiogruppe. */
-  const abholungReiheHandy = (
-    <div className="flex items-center gap-2 lg:hidden">
-      <Clock className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-      <ChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} chips={reihen.abholung} onWahl={schreibeUrl} className="min-w-0 flex-1" />
-    </div>
+  // Die Hauptparameter der Reihenfolge (§ 4a Abs. 1 Z 1 FAGG, Register O4) stehen über der Liste wie
+  // im Board (w1-/s1-hoefe, Nr. 234; vorher darunter) — nie über einer leeren. Der Wortlaut bleibt der
+  // aus agb-einbindung.ts (das Board kürzt ihn, „Offen für Recht"). Die Zahlzeile sagt nach jedem
+  // Filter neu, wie viele Höfe passen — seit Nr. 234 nur noch für Vorleser: Sichtbar zeigt das Board
+  // an ihrer Stelle den Satz zur Reihenfolge.
+  const reihenfolgeHinweis = (
+    <>
+      <p role="status" className="sr-only">
+        {zahlZeilenText}
+      </p>
+      {anzahl > 0 && <p className="text-[13px] text-muted-foreground">{REIHENFOLGE_HINWEIS}</p>}
+    </>
   )
 
   /** Das Filter-Blatt; kompakt im Kartenmodus am Handy (ein runder Knopf, Zahl als Zähler). */
@@ -550,6 +505,37 @@ export function HoefeClient({
     />
   )
 
+  // Liste | Karte als Links mit aria-current wie jeder Filter in der Adresse (Board w1-hoefe): Die Ansicht steht in der URL.
+  const ansichtChips: EntdeckenChip[] = [
+    { schluessel: 'liste', label: 'Liste', aktiv: ansicht !== 'karte', ziel: { ...filter, ansicht: 'liste' } },
+    { schluessel: 'karte', label: 'Karte', aktiv: ansicht === 'karte', ziel: { ...filter, ansicht: 'karte' } },
+  ]
+
+  /**
+   * Die Filter über der Liste (Boards w1-/s1-hoefe, Nr. 234): EINE kurze Kategorie-Reihe (fünf Chips,
+   * kurzeKategorieReihe), darunter die Abholung und daneben „Filter" sowie „Liste | Karte". Alles
+   * Weitere — übrige Kategorien, Umkreis, Menge, Tiere, Siegel, Reihenfolge — steht im Filter-Blatt.
+   * Futtersorte und Sorte erscheinen im Browser unter der Reihe, sobald es sie gibt (am Handy im Blatt).
+   */
+  const filterReihen = (
+    <div className="flex flex-col gap-2">
+      <ChipReihe beschriftung="Kategorie" chips={kurzeKategorieReihe(reihen.kategorien)} onWahl={schreibeUrl} />
+      {(reihen.futter.length > 0 || reihen.sorten.length > 0) && (
+        <div className="hidden flex-col gap-2 lg:flex">
+          <ChipReihe beschriftung="Futtersorte" chips={reihen.futter} onWahl={schreibeUrl} />
+          <ChipReihe beschriftung="Sorte" chips={reihen.sorten} onWahl={schreibeUrl} />
+        </div>
+      )}
+      <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-3">
+        <ChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} chips={reihen.abholung} onWahl={schreibeUrl} className="min-w-0" />
+        <div className="flex flex-wrap items-center gap-2">
+          {filterblatt(false)}
+          <ChipReihe beschriftung="Ansicht" chips={ansichtChips} onWahl={schreibeUrl} umbrechen />
+        </div>
+      </div>
+    </div>
+  )
+
   const kopfbereich = (
     <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 pt-5 md:px-6 md:pt-7">
       <div className="flex items-start gap-3">
@@ -558,46 +544,56 @@ export function HoefeClient({
           <h1 className="line-clamp-3 font-heading text-[26px] leading-tight font-semibold break-words text-foreground md:text-[30px]">
             {kopf.titel}
           </h1>
-          <p className="mt-1 text-[14px] text-muted-foreground">{kopf.unterzeile}</p>
+          {/* Die Unterzeile nur am Handy — im Browser zeigt das Board keine (w1-hoefe, Bild 1). */}
+          <p className="mt-1 text-[14px] text-muted-foreground lg:hidden">{kopf.unterzeile}</p>
         </div>
-        <div className="lg:hidden">{filterblatt(false)}</div>
       </div>
       {suchfeld(false)}
-      {abholungReiheHandy}
-      {filterReihenBrowser}
+      {filterReihen}
       {futterHinweis}
       <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
     </div>
   )
 
   if (istBreit) {
-    // BROWSER-SPLITSCREEN: Liste links, Karte rechts dauerhaft sichtbar und
-    // randlos bis an den rechten Fensterrand (Mockup). Die linke Kante folgt
-    // dem Seiteninhalt (max. 1200 px, zentriert); die Anordnung ist mit dem
-    // Betreiber entschieden, nicht spiegeln.
+    const karte = (
+      <HoefeKarte
+        hoefe={kartenHoefe}
+        lage={sichtbareLage}
+        fokus={fokus}
+        hinweis={kartenHinweis}
+        kurzkarte={pinVorschau}
+        hoeheKlasse="h-full"
+        onAuswahl={pinGewaehlt}
+        onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
+      />
+    )
+    if (ansicht === 'karte') {
+      // KARTE IM BROWSER (Umschalter „Karte", Nr. 234): die Karte über die Breite des Inhalts, die
+      // Pin-Vorschau führt zum Hof. Leer steht die Leermeldung über ihr.
+      return (
+        <div>
+          {kopfbereich}
+          <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-6 pb-12">
+            {reihenfolgeHinweis}
+            {anzahl === 0 && ergebnisse(true)}
+            <div className="h-[calc(100dvh-6rem)] min-h-[420px]">{karte}</div>
+          </div>
+        </div>
+      )
+    }
+    // BROWSER-SPLITSCREEN: Liste links, Karte rechts, beide im Rahmen der Seite (Board w1-hoefe:
+    // die Karte endet bündig mit dem Inhalt; vorher randlos bis an den Fensterrand).
     return (
-      <div>
+      <div data-ansicht="split">
         {kopfbereich}
-        <div className="mt-5 grid grid-cols-[minmax(0,600px)_minmax(0,1fr)] items-start gap-6 pb-12 pl-[max(1.5rem,calc((100vw-1200px)/2+1.5rem))]">
-          <div className="min-w-0">
+        <div className="mx-auto mt-4 grid max-w-[1200px] grid-cols-[minmax(0,480px)_minmax(0,1fr)] items-start gap-4 px-6 pb-12">
+          <div className="flex min-w-0 flex-col gap-3">
+            {reihenfolgeHinweis}
             {ergebnisse(true)}
-            {reihenfolgeHinweis('mt-4')}
           </div>
           {/* Unter der Kopfzeile (64 px) plus Luft; die Höhe füllt das Fenster. */}
-          <div className="sticky top-20 flex h-[calc(100dvh-6rem)] min-h-[420px] flex-col gap-2">
-            <div className="isolate min-h-0 flex-1 overflow-hidden rounded-l-2xl border-y border-l border-border">
-              <HoefeKarte
-                hoefe={kartenHoefe}
-                lage={sichtbareLage}
-                fokus={fokus}
-                hinweis={kartenHinweis}
-                kurzkarte={pinVorschau}
-                hoeheKlasse="h-full"
-                onAuswahl={pinGewaehlt}
-                onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
-              />
-            </div>
-          </div>
+          <div className="sticky top-20 h-[calc(100dvh-6rem)] min-h-[420px]">{karte}</div>
         </div>
       </div>
     )
@@ -607,7 +603,6 @@ export function HoefeClient({
   const auswahlMitPunkt =
     sichtbareLage.ausgewaehlt !== null && karussellHoefe.some((h) => h.slug === sichtbareLage.ausgewaehlt)
   const zurListe = { ...filter, ansicht: 'liste' as const }
-  const zurKarte = { ...filter, ansicht: 'karte' as const }
 
   if (ansicht === 'karte') {
     // KARTENMODUS AM HANDY (unter lg, Nr. 52; kein Mockup — Regeln in
@@ -719,40 +714,8 @@ export function HoefeClient({
     <div>
       {kopfbereich}
       <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-4 pb-10 md:px-6">
-        {/* Die Karten-Vorschau (Mockup mobil-k1-entdecken): ein Bild, kein
-            Kartendienst — Leaflet lädt erst, wer sie öffnet. */}
-        <Link
-          href={hoefeHref(zurKarte)}
-          onNavigate={beimNavigieren(zurKarte, schreibeUrl)}
-          prefetch={false}
-          rel="nofollow"
-          aria-label="Karte öffnen"
-          // 84 px hoch (Board, Handy 1): Die Hofkarten mit Produktzeilen brauchen den Platz.
-          className={cn('relative block h-[84px] overflow-hidden rounded-2xl border border-border bg-accent', FOKUS_RAHMEN)}
-        >
-          {/* Der dunkle Schleier: primary-foreground ist im neuen Design in
-              beiden Themes fast schwarz — theme-fest wie jedes Bild-Overlay
-              (DESIGN_SYSTEM.md), aber ein Token statt Tailwind-Schwarz. */}
-          <span aria-hidden="true" className="absolute inset-0 bg-linear-150 from-primary-foreground/25 via-transparent via-55% to-primary/25" />
-          <span aria-hidden="true" className="absolute top-[58px] -left-6 h-1.5 w-[520px] rotate-[-8deg] rounded-full bg-accent-foreground/15" />
-          <span aria-hidden="true" className="absolute -top-6 left-[30%] h-[200px] w-1 rotate-[12deg] rounded-full bg-accent-foreground/12" />
-          {['left-[26%] top-[30%]', 'left-[58%] top-[52%]', 'left-[78%] top-[24%]'].map((lage) => (
-            <span
-              key={lage}
-              aria-hidden="true"
-              className={cn('absolute size-3.5 rounded-full border-[2.5px] border-primary-foreground bg-primary', lage)}
-            />
-          ))}
-          <span className="absolute right-3 bottom-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-[13px] font-semibold text-foreground">
-            <MapIcon className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            Karte öffnen
-          </span>
-        </Link>
-        <p role="status" className="text-[13px] text-muted-foreground">
-          {zahlZeilenText}
-        </p>
+        {reihenfolgeHinweis}
         {ergebnisse(false)}
-        {reihenfolgeHinweis()}
       </div>
     </div>
   )

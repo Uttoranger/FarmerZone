@@ -10274,3 +10274,128 @@ Hinweis der Schaltzentrale (Entscheidungen der Projektleitung im Chat vom 3.11.2
 10. Kein `git stash`. Diese Sitzung meldet sich nicht automatisch bei der Schaltzentrale. Deshalb gehört der Morgenbericht in den Sammel-PR, oder in den Doku-PR, falls kein Sammel-PR entsteht. Setz Morgenbericht-Pfad, PR-Nummern und offene Punkte in den PR-Text und in deine letzte Nachricht.
 
 Vermerk des Dirigenten (4.11.2026): Über 6ce5aa98 liegt ein zweiter Commit f179cabc, der nur docs/nachtlauf/auftrag-lauf30.md hinzufügt; auch er entstand ausnahmsweise von Windows aus ohne vollen grünen Lauf, mit Freigabe der Projektleitung (nur diese eine Datei). Die Datei ist Auftrag, kein Vorbild für Regeln, und steht nicht in docs/ai/.
+
+## 35. Lauf 31 (uttoranger, im Chat erteilt, 5.11.2026)
+
+Nachtlauf 31
+Ort: lokal (agent-browser, lokales Postgres mit Seed, die Boards unter docs/mockups/redesign-2026-11/; in der Cloud fehlte agent-browser in Lauf 29)
+Basis: main (1216b8cf oder später)
+Berührt: Kasse (nur Darstellung, nie /api/**) · Webhook: nein · Schema: nein (keine Migration) · Geldberechnung: nein
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate (ohne Regel-Inventur, die lief in Lauf 30), 4a Tempo (höchstens drei Umsetzer gleichzeitig), §5 Stoppen, §6 Morgenbericht, §7 Fortsetzen. Dieser Text ist die Freigabe. Der Doku-PR trägt ihn wörtlich als „## 35. Lauf 31 (uttoranger, im Chat erteilt, 5.11.2026)“ in docs/nachtlauf/freigabe.md ein. Zeitbuch: docs/nachtlauf/berichte/zeitbuch-lauf31.md. Nummern ab 233.
+
+══════════════════════════════════════════════════════════════════════
+ANTWORTEN DER PROJEKTLEITUNG (Vorgabe = Empfehlung des Teams; gilt, wenn hier nichts geändert ist)
+══════════════════════════════════════════════════════════════════════
+A1 Startseite, Kopf: Das Video (Nr. 176, hero-video.tsx) bleibt. Die Boards w1-/s1-startseite zeigen es nicht; das gilt als Fehler des Boards. Nachgezogen werden nur: sichtbare Beschriftung „Hof oder Produkt“ über dem Suchfeld, Karte im Dunkeln gedämpft, Überschrift wie im Board höchstens zwei Zeilen ab 1024 px.
+A2 Rückfragen aus Morgenbericht 30:
+   1 (Nr. 45): Pflichtkarten (N34, N39, Nr. 207, Nr. 212, Lastschrift-Sperre) zählen nicht zur Regel „höchstens ein Hinweis-Kasten“. Sie stehen untereinander wie gebaut.
+   2 READY heißt „Gepackt“ (wie gebaut, wie s1-/w1-heute).
+   3 N25 gilt vor dem Board: Vorrat-Blatt mit „Dazu“ und „Ausverkauft“ bleibt.
+   4 Produkt-Formulare im Web bleiben Dialoge (N41 d), keine Seite mit Vorschau.
+   5 Die Marke für gesperrte Barzahlung heißt „Bar gesperrt“, nicht „Pausiert“.
+   6 Kopf von Mein Hof am Handy wie im Board (Titel und Schild), kein Titelbild-Streifen.
+   7 N42 e: Der Balken je Stand kommt auf alle Hof-Seiten. Die Grenze wird für (hof)/layout.tsx und src/server/hofbereich.ts erweitert (Nr. 233).
+   8 Geld-Kachel in Admin › Heute zählt nach createdAt (wie die Freigabe von Lauf 30).
+   9 setServiceFeeAction: nur prüfen und im Bericht nennen, ob Farm.serviceFee* im Hofpreis-Modell noch wirkt. Nichts ändern (Geld).
+
+══════════════════════════════════════════════════════════════════════
+AUSGANGSLAGE (geprüft 05.11.2026 auf test.agrilo.at = main 1216b8cf, Entwicklungsdatenbank; Web 1440 und Handy 390, hell und dunkel; nur gelesen)
+══════════════════════════════════════════════════════════════════════
+Stand: Lauf 30 ist gemergt (#464), Produktion READY, keine Laufzeitfehler. Gebührenwörter, Rücktritt nach N43, Mail-Fuß und die Zustände entsprechen den Boards. Abweichungen sind vor allem Aufbau, Maße und Schrift:
+
+Kundschaft
+- Startseite (src/components/startseite/startseite-kopf.tsx): keine sichtbare Beschriftung über dem Suchfeld; Karte im Dunkeln hell; Überschrift dreizeilig. Futter- und Brennmaterial-Karten groß mit Illustration statt kompakt (Board w1-startseite Bild 3). Leerzustand „Die ersten Höfe …“ mit Knopf „Hof registrieren“, Board: „Für Höfe“.
+- Höfe entdecken (src/components/hoefe/hoefe-client.tsx, hoefe-suche.tsx): 12 Kategorie-Chips und Siegel-Filter statt 5 Chips plus „Filter“; es fehlen „Filter“, der Umschalter Liste | Karte (Web) und „Reihenfolge: nach Entfernung. Keine bezahlte Platzierung.“; Feld „Ort oder Produkt“ nur als Platzhalter. Hofkarte: „Zum Hof“ als Link unter den Produkten statt Knopf unter dem Bild (Board w1-hoefe Bild 1).
+- Hofseite (src/components/hofseite/hofseite-kunde.tsx, titelbild.tsx, hofseite-seitenspalte.tsx): Titelbild über die volle Breite, Seitenspalte beginnt erst darunter. Board w1-hofseite: Titelbild links in der Inhaltsspalte, Seitenspalte (Warenkorb, Nächste Abholung, Abholzeiten, Zahlung, Anfahrt) oben rechts daneben. Im hellen Modus steht der Hofname halb über dem Titelbild (Kontrast prüfen). „Anfahrt“ statt „Route“; „Jetzt bestellen“ gefüllt statt Umriss; „In den Korb“ klein neben dem Preis statt breit darunter. Am Handy lädt die Seite über 2 s nur die Skelett-Ansicht (Messen, Ursache im Bericht).
+- Produktseite: Zähler am Warenkorb 9,5 px; Pfad „Heu & Stroh · …“ 11 px.
+- Kasse: am Handy nimmt die feste Leiste mit Knopf und vier Sätzen etwa 40 % der Höhe ein (Board s1-kasse: Knopf und Satz kompakt). Web zweispaltig wie im Board.
+- Überall in der KundeShell: Zähler „Artikel im Warenkorb“ 11 px.
+
+Hofbereich
+- Schrift unter 12 px (Boards: nie unter 12 px): Überschrift der Seitenleistengruppe „Verkauf und Kunden“ 10,5 px (src/components/ui/sidebar-gruppe.tsx); Tabellenköpfe Produkte 11 px; Abschnittsköpfe Mein Hof, Neuer Beitrag, Verkäufe 11 px; Marken („Noch nicht freigegeben“, „Fehlt“, „Online fehlt“, „Aktiv“) 11,5 px; Achsen der Wochengrafik 11 px; Kennzahl-Bezeichnungen in Auswertung 11 px. Im Code stehen text-[8–11.5px] an 119 Stellen in 55 Dateien (rg "text-\[(1[01](\.5)?|9(\.5)?|8)px\]" src). Ausnahme bleibt die Unterleiste unter 360 px (DESIGN_SYSTEM) und reine Illustrationen mit aria-hidden.
+- Mein Hof: sichtbare Überschrift fehlt; Board: „Mein Hof“ mit Schild und Teilen | Kundenansicht im Kopf (h1 heute nur sr-only „Hofseite bearbeiten“).
+- Aktiver Eintrag der Seitenleiste: helle Pille; Board: getönte Fläche in Primärfarbe (s. Nacharbeit 220).
+- Hofdaten: Zoom-Knöpfe der Karte 30 px ohne 44-px-Trefferfläche.
+- Problem melden, Registrieren: Datei-Feld 24 px hoch.
+- Region: Testhof ohne Standort zeigt „Wo liegt dein Hof?“ – richtig; Karte mit Standort nicht prüfbar gewesen.
+
+Nicht geprüft (bitte in Gate A)
+- Admin vollständig (Passkey), Druckseiten, alle E-Mails, alle Zustände der Boards (leer, Fehler, gesperrt), Hof am Moos-Fall (nicht freigegeben), Stand nach dem Stichtag (Admin › Einstellungen „Hofpreis-Modell ab“ lokal in die Vergangenheit).
+
+Falsch-Positive, nicht „beheben“: Chips (36 px sichtbar), Segmente, Fußlinks und Textlinks haben über ::before 44 px Trefferfläche (DESIGN_SYSTEM: chip.tsx, textlink.tsx, kunde-fuss.tsx).
+
+Offene Nacharbeit aus Morgenbericht 30 gehört in diesen Lauf (je Bereich der Nummer zugeteilt): ui/-Bausteine (aktive Pille, flaches „Neu“, Seitenleiste ohne Symbole, getönte Admin-Zähler, Satz im Melde-Baustein); Abfragen (gebuehrModell in server/geld-abgleich.ts, Gebühren-Karte in queries/auswertung.ts, „Bar bis …“ in queries/products.ts, Uhrzeit der Packliste in queries/heute.ts); Texte ohne Nummer (kasse.ts, postfach.ts, meldung.ts, admin-anmeldung.ts, betrieb-mails.ts, startbildschirm.ts, farm-archive.ts, hof-verkaeufe.ts, Storno-Grund in server/widerruf.ts – ohne N39-Wortlaut); Doku-Punkte; tote Teile (HoefeLaden, RegistrierenSatz, pending-approval-banner.tsx, FINANZEN_JAHR_TEXT.diagrammTitel, Felder …Kurz in einrichten.ts); Robustheit (lesePlattformEinstellung im Promise.all von Admin-Heute und Akte, Formatprüfung antwortAnHof, /teilen lädt beim „Nochmal“ alles neu); Zeitgrenzen der Tests mail-wege-wache und bild-format; Hofkarten der Startseite (Pause gestrichelt, drei Preise; StartseitenHof in src/lib/startseite.ts).
+
+══════════════════════════════════════════════════════════════════════
+ENTSCHIEDEN (alles hier ist Auftrag, keine Rückfrage)
+══════════════════════════════════════════════════════════════════════
+- Maßstab ist das Board in docs/mockups/redesign-2026-11/ (Index docs/mockups/README.md). Gilt ein Register-Eintrag anders, gilt das Register; der Bericht nennt es als „Register vor Board“.
+- Der 5-Sterne-Maßstab je Board (Handy und Web, hell und dunkel; Mails und Druck nur hell):
+  1. Aufbau und Reihenfolge wie das Board (Spalten, Kopf, Seitenspalte, feste Leisten nur wo das Board sie zeigt, V47).
+  2. Texte wörtlich wie das Board, außer N39-Wortlaut und Rechtstexte (bleiben).
+  3. Schrift nie unter 12 px (Ausnahmen oben), Ziele mindestens 44 px (sichtbar oder per ::before), eine sichtbare h1 je Seite, Felder mit sichtbarer Beschriftung.
+  4. Kontrast WCAG AA in beiden Themes; im Dunkeln Bilder und Karten gedämpft; keine hellen Flecken.
+  5. Fokus sichtbar; in Dialogen im Dialog; Startfokus bei Löschen auf „Abbrechen“.
+  6. Alle Zustände des Boards erreichbar und gleich (leer, Fehler mit „Nochmal“, gesperrt, nicht freigegeben, vor/nach Stichtag).
+  7. Keine Hexfarbe, keine Palette-Klasse, nur Tokens.
+  Unter 5 Sterne ist jede sichtbare Abweichung, die nicht als „Register vor Board“ oder „Board-Fehler“ (A1) begründet ist.
+- Bewertet wird von einem eigenen Subagenten „pruefer-ui“ (Agent-Aufruf mit eigenem Auftrag, keine neue Datei unter .claude/agents) mit frischem Kontext, der nur Bild der App, Bild des Boards und diesen Maßstab bekommt – nicht den Code und nicht den Bericht des Umsetzers.
+- Beispieldaten im Seed bleiben erfunden; neue Seed-Daten nur, wenn ein Board-Zustand sonst nicht erreichbar ist (mit ＠example.com, Telefonnummern genullt).
+
+══════════════════════════════════════════════════════════════════════
+UMSETZUNG
+══════════════════════════════════════════════════════════════════════
+Gate A – Abnahme-Lauf (Nr. 233a, nur lesen, kein Code)
+1. Lokal starten: pnpm dev gegen lokales Postgres mit pnpm db:seed. Anmelden mit den Seed-Konten (Hof, Kundin, Admin). Für den Admin die vorhandene Test-Anmeldung verwenden; gibt es keine ohne Passkey, STOPP und melden – keinen Passkey-Umweg bauen.
+2. Für jede Route aus docs/mockups/README.md (Abschnitt Redesign November 2026) und jeden Zustand des Boards: agent-browser-Bilder bei 390 und 1440 px, hell und dunkel, nach .nachtlauf/screens/abnahme/<board>/<bild>-<breite>-<thema>.png; dazu dasselbe Bild des Boards (Board-HTML im Browser rendern).
+3. pruefer-ui bewertet je Board mit Sternen und Liste der Abweichungen. Ergebnis: docs/nachtlauf/berichte/abnahme-lauf31.md (Tabelle Board × Fassung × Sterne, darunter die Mängel je Board mit Bild-Pfad). Zusätzlich automatische Messung je Seite: Schrift < 12 px, Ziele < 44 px ohne ::before, h1-Zahl, Felder ohne Beschriftung, Kontrast (axe-core über agent-browser, wenn vorhanden; sonst die Messung im Bericht beschreiben).
+4. Doku-PR mit Freigabe, Abnahme-Bericht, Status-Zeilen; danach Nummern je Bereich anlegen.
+
+Nummern (je ein Branch und PR, gestapelt auf docs/lauf31; Grenzen je Nummer im Bericht)
+233 Hof-Shell und Balken N42 e (alle Hof-Seiten), aktive Pille, Seitenleiste, Schriftgrößen in ui/ (sidebar-gruppe, marke, status-badge, table)
+234 Kundschaft Finden: Startseite (A1), Höfe entdecken, Hofkarten der Startseite
+235 Hofseite und Produktseite (Aufbau nach w1-/s1-hofseite, w1-/s1-produkt)
+236 Kauf: Warenkorb, Kasse (feste Leiste am Handy), Bestätigung, Bestellung ansehen, Meine Bestellungen
+237 Hof-Alltag und Produkte (Heute, Bestellungen, Bestellung, Druck, Produkte, Formulare)
+238 Mein Hof, Einstellungen, Region, Hof-Werkzeuge (Auswertung, Kunden, Verkäufe, Postfach, Beiträge, Problem melden)
+239 Anmelden, Konto, Systemseiten, Rechtstexte, Fehlerseiten
+240 Admin (alle Boards s3-/w3-admin-*)
+241 E-Mails (Bilder 390/600, nur hell) und Druck
+242 Nacharbeit-Abfragen, Texte ohne Nummer, tote Teile, Robustheit, Test-Zeitgrenzen (ohne Geld-Logik)
+Je Nummer:
+- Umsetzer baut nach den Mängeln aus abnahme-lauf31.md für seine Boards; wiederverwendbare Bausteine zuerst in src/components/ui/ (eine Quelle, keine Einzellösung je Seite).
+- Danach pruefer-ui auf die eigenen Boards (alle vier Fassungen). Unter 5 Sterne: nächste Runde, höchstens 4 Runden; danach STOPP für diese Nummer mit Begründung im Bericht.
+- Voller Lauf vor jedem Push (G10).
+Sammel-PR integration/lauf31 per --no-ff, nach jedem Merge der volle Lauf; am Ende Gate A noch einmal komplett (alle Boards, alle Fassungen) auf dem Sammelstand.
+
+══════════════════════════════════════════════════════════════════════
+NICHT
+══════════════════════════════════════════════════════════════════════
+- Keine Migration, kein neues Paket, keine neue Variable; nichts in /api/**, Webhook, Stripe, Geldberechnung, Fristen (src/lib/fristen.ts), Reservierung.
+- Keine Daten in Entwicklungs- oder Produktionsdatenbank ändern (nur lokal mit Seed).
+- N39-Wortlaut („Vertrag widerrufen“, „Widerruf bestätigen“, Belehrung, Muster-Formular), AGB, Datenschutzerklärung, Impressum (A001): Wortlaut bleibt.
+- Offen und nicht bauen: „Ab Hof“, Willkommenszeit G1, Zahl der Gründungsplätze, Kartenquelle E-003, Tarife als Abrechnung E-012, Preise vergleichen v2 E-004.
+- Kein Video entfernen (A1). Kein Claude in Chrome.
+
+══════════════════════════════════════════════════════════════════════
+FERTIG, WENN
+══════════════════════════════════════════════════════════════════════
+- abnahme-lauf31.md (Schluss-Durchgang auf dem Sammelstand): jedes Board in jeder Fassung 5 Sterne von pruefer-ui, oder die Abweichung ist als „Register vor Board“/„Board-Fehler“ mit Quelle begründet.
+- Messung: 0 sichtbare Texte unter 12 px außer den Ausnahmen; 0 Ziele unter 44 px ohne ::before; je Seite genau eine sichtbare h1; 0 Felder ohne Beschriftung; axe ohne Verstöße der Stufe „serious/critical“.
+- pnpm typecheck && pnpm lint && pnpm test grün; test:integration grün; Wachen (palette-klassen, design-tokens, fokus-sichtbar, grundbausteine-groesse, wortliste, gebuehr-wort, telefonnummern) grün; Geld-Tests ohne geänderte Erwartung.
+- Hofseite am Handy: erste Inhalte nach höchstens 1 s im lokalen Lauf (gemessen, Zahl im Bericht).
+- PR-Text je Nummer: Bericht nach CLAUDE.md §4, Tabelle Board × Fassung × Sterne vorher/nachher, Bild-Pfade, „Register vor Board“, „Offen für Recht“, „Gestapelt auf #…“.
+- Morgenbericht mit: Ergebnis-Tabelle, Merge-Reihenfolge (Merge-Commit, nicht Squash), Antwort zu A2 Punkt 9, offene Rückfragen.
+Woran die Projektleitung den Erfolg erkennt: Vorschau-URL je PR und test.agrilo.at nach dem Merge zeigen jede Route wie ihr Board (390/1440, hell/dunkel); die Abnahme-Tabelle im Morgenbericht steht überall auf 5.
+
+### Präzisierungen der Projektleitung (uttoranger, im Chat, 5.11.2026)
+
+Sie gelten vor dem Text oben.
+
+1. Ort: Der Lauf läuft in der Cloud auf Linux, nicht lokal. agent-browser, Postgres und Seed sind dort vorhanden. Die Bilder bleiben im Container und werden nicht committet.
+2. Admin: Ist der Admin ohne Passkey nicht erreichbar, stoppt der Lauf NICHT. Die Admin-Boards stehen dann in abnahme-lauf31.md als „nicht abgenommen“ und fallen aus dem Fertig-Kriterium. Kein Passkey-Umweg, weder in Code noch in Daten. Nr. 240 baut dann nur die Geld-Kachel nach `createdAt` (A2 Punkt 8) mit Tests; alle anderen Admin-Mängel bleiben offen und stehen im Morgenbericht.
+3. A2 Punkt 2 gilt für den Hof. Die Kundin liest bei READY „Abholbereit“: Marke, Meine Bestellungen, Mails und die Schritt-Leiste der Bestätigung (Register N9). Das Board s1-/w1-bestaetigung zeigt dort „Gepackt“; im Bericht steht das als „Register vor Board“.
+4. Mit #465 erledigt, nicht wiederholen: die Register-Einträge zu A2 Punkt 1 bis 9, „Bar gesperrt“ (Punkt 5) und der Kopf von Mein Hof am Handy (Punkt 6). Die Ausgangslage unten ist älter als #465; prüfe deshalb den Kopf von Mein Hof gegen den aktuellen Stand. Offen aus A2 bleiben: Punkt 7 (Nr. 233), Punkt 8 (Nr. 240), Punkt 9 (nur prüfen, im Morgenbericht beantworten).
+5. Ändert ein Punkt aus Nr. 242 eine Geldberechnung, statt nur Anzeige oder Text: nicht bauen, im Morgenbericht nennen.
+6. PR #448 (Impressum) ist offen und bleibt unberührt.

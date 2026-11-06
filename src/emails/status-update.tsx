@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text, Link, Img } from '@react-email/components'
-import { EmailLayout, h1, bodyText, ctaButton, MAIL_FARBE } from './_layout'
+import { EmailLayout, Knopf, KnopfReihe, h1, bodyText, kleinText, MAIL_FARBE } from './_layout'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import { beitragLink } from '@/lib/teilen-fenster'
 import { BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
@@ -61,50 +61,36 @@ export function StatusUpdateEmail({
           backgroundColor: anlassFarbe.flaeche,
           color: anlassFarbe.schrift,
           borderRadius: '100px',
-          padding: '4px 12px',
+          padding: '3px 10px',
           fontSize: '12px',
           fontWeight: '600',
-          marginBottom: '16px',
+          marginBottom: '8px',
         }}
       >
         {anlassLabel}
       </div>
 
-      {/* Farm name */}
-      <Text style={{ ...bodyText, color: MAIL_FARBE.textLeise, marginBottom: '4px' }}>
-        Neuer Beitrag von {farmName}
-      </Text>
+      {/* Board s3/w3-mail-neuigkeiten Bild 2 und 3: Absender, dann das Foto (falls da), Titel, Text, Knopf links. */}
+      <Text style={{ ...bodyText, color: MAIL_FARBE.textLeise, fontSize: '13px', margin: '0 0 10px' }}>Neuer Beitrag von {farmName}</Text>
 
-      {/* Title */}
+      {photoUrl && <Img src={photoUrl} alt={title} style={{ width: '100%', borderRadius: '12px', margin: '0 0 16px', objectFit: 'cover' }} />}
+
       <Text style={h1}>{title}</Text>
 
-      {/* Photo */}
-      {photoUrl && (
-        <Img
-          src={photoUrl}
-          alt={title}
-          style={{ width: '100%', borderRadius: '12px', margin: '16px 0', objectFit: 'cover' }}
-        />
-      )}
-
-      {/* Body */}
       {body.split('\n').map((line, i) => (
         <Text key={i} style={{ ...bodyText, marginBottom: line ? '8px' : '4px' }}>
-          {line || ' '}
+          {line || ' '}
         </Text>
       ))}
 
-      {/* CTA */}
-      <div style={{ textAlign: 'center', margin: '24px 0 8px' }}>
-        <Link href={farmUrl} style={ctaButton}>
-          {`Zu ${farmName}`}
-        </Link>
-      </div>
+      <KnopfReihe>
+        <Knopf href={farmUrl}>{`Zu ${farmName}`}</Knopf>
+      </KnopfReihe>
 
-      {/* Unsubscribe */}
-      <Text style={{ color: MAIL_FARBE.textLeise, fontSize: '11px', textAlign: 'center', marginTop: '16px' }}>
+      {/* Abmelden im Text (S11, unverändert): derselbe signierte Link wie unter dem Fuß und in List-Unsubscribe. */}
+      <Text style={{ ...kleinText, marginTop: '8px' }}>
         {`Du bekommst diese E-Mail, weil du Neuigkeiten von ${farmName} per E-Mail bestellt hast. `}
-        <Link href={unsubscribeUrl} style={{ color: MAIL_FARBE.textLeise }}>
+        <Link href={unsubscribeUrl} style={{ color: MAIL_FARBE.textLeise, textDecoration: 'underline' }}>
           Abmelden
         </Link>
       </Text>

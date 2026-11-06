@@ -476,6 +476,4 @@ export const ADMIN_SICHERHEIT_MAIL = {
   warstDu: 'Warst du das? Dann musst du nichts tun. Sonst melde dich sofort bei der Projektleitung.',
   ersatzcodeFolge: 'Bevor sich der Admin-Bereich wieder öffnet, richtest du einen neuen Passkey ein.',
   codeGilt: `Der Code gilt ${EINRICHTUNGSCODE_GUELTIG_MINUTEN} Minuten und nur in der Sitzung, in der du ihn angefordert hast.`,
-  codeNichtDu: 'Du wolltest keinen Passkey einrichten? Dann melde dich bei der Projektleitung.',
-  fuss: `Diese E-Mail enthält keinen Link zum Anmelden. ${MARKE} fragt dich nie per Mail nach einem Passkey oder Ersatzcode.`,
 } as const

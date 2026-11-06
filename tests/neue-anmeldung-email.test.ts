@@ -67,7 +67,8 @@ describe('sendNeueAnmeldungEmail', () => {
     expect(aufruf.html).toContain('Hallo Testhof A,')
     expect(aufruf.html).toContain('19.10. um 14:32')
     expect(aufruf.html).toContain('Windows · Chrome')
-    expect(aufruf.html).toContain('ein Gerät, das wir bei dir noch nicht kannten')
+    // Board s3/w3-mail-sicherheit Bild 1: Gerät als Zeile, ohne Erklärsatz darunter.
+    expect(aufruf.html).toContain('Gerät')
     expect(aufruf.html).toMatch(new RegExp(`href="${LINK.replace(/[.?]/g, '\\$&')}"[^>]*>Das war ich nicht<`))
     expect(aufruf.html).toContain('Der Link gilt 7 Tage und einmal')
     // Kein Ort, keine IP-Adresse.

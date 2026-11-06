@@ -49,7 +49,6 @@ export const HOF_PASSKEY_TEXT = {
 export const HOF_PASSKEY_ANMELDEN = {
   knopf: 'Mit Passkey anmelden',
   laeuft: 'Dein Browser fragt …',
-  oder: 'oder',
   unbekannt: 'Diesen Passkey kennen wir nicht. Melde dich mit deinem Passwort an und richte ihn unter Konto und Sicherheit neu ein.',
 } as const
 

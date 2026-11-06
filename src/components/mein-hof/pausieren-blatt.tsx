@@ -12,7 +12,6 @@ import { Sheet, SheetBlatt, SheetClose, SheetTitle } from '@/components/ui/sheet
 import { Textarea } from '@/components/ui/textarea'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
-import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +28,15 @@ import { cn } from '@/lib/utils'
  * Die Vorschau ist die echte Hinweiskarte der Hofseite (KaufSperreHinweis), kein
  * Nachbau. Bestellungen, die schon da sind, berührt setPause nicht.
  */
+
+/**
+ * „Pausieren“ und „Fortsetzen“ in der Zustandskarte: Umriss in der Textfarbe, 10 px rund, ohne Symbol —
+ * wie die Boards s1-/w1-mein-hof (Bild 1 und 4); auf der getönten Karte trägt der Rand.
+ */
+const ZEILEN_KNOPF = cn(
+  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-[10px] border-[1.5px] border-foreground bg-card px-4 text-[15px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted disabled:opacity-60',
+  FOKUS_RAHMEN
+)
 
 const BLATT_SAETZE = [
   'Deine Hofseite bleibt sichtbar, mit deiner Nachricht.',
@@ -100,9 +108,8 @@ export function PausierenBlatt({
         onClick={pausiert ? fortsetzen : oeffne}
         disabled={laeuft && !offen}
         aria-busy={(laeuft && !offen) || undefined}
-        className={pausiert ? KNOPF_GRUEN : KNOPF_RAHMEN}
+        className={ZEILEN_KNOPF}
       >
-        {!pausiert && <Pause className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />}
         {text}
       </button>
 

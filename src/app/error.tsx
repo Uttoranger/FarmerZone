@@ -3,6 +3,11 @@
 import { useEffect } from 'react'
 import * as Sentry from '@sentry/nextjs'
 import { FehlerAnsicht } from '@/components/shared/fehler-ansicht'
+import dynamic from 'next/dynamic'
+
+// Die Shell kommt erst, wenn wirklich ein Fehler zu zeigen ist: Diese Grenze hängt an JEDER Route (auch Hofbereich
+// und Admin), ein statischer Import legte den Code der KundeShell in jedes Bündel.
+const KundeShellMitSitzung = dynamic(() => import('@/components/shells/kunde-shell-mit-sitzung').then((m) => m.KundeShellMitSitzung))
 
 /**
  * Die Fehlergrenze innerhalb des Root-Layouts: Hier landet alles, was beim
@@ -20,6 +25,12 @@ import { FehlerAnsicht } from '@/components/shared/fehler-ansicht'
  *
  * Bei einem reinen Client-Fehler ist `error.digest` übrigens `undefined` —
  * dann zeigt die Ansicht keine Fehlernummer, und Sentry ist die einzige Spur.
+ *
+ * Seit Nr. 239 (Boards s3-/w3-fehlerseiten, Bild 4) steht die 500 der
+ * Kundschaft in der KundeShell — Kopf, Fuß und Unterleiste wie jede
+ * Kundenseite, die Sitzung liest der Browser (KundeShellMitSitzung). Reißt die
+ * Shell selbst, wirft diese Grenze beim Rendern, und der Fehler geht an
+ * global-error.tsx weiter: Die steht ohne Shell und bleibt der Boden.
  */
 export default function ErrorPage({
   error,
@@ -36,5 +47,9 @@ export default function ErrorPage({
     if (process.env.NODE_ENV !== 'production') console.error(error)
   }, [error])
 
-  return <FehlerAnsicht fehlernummer={error.digest} nochmal={reset} />
+  return (
+    <KundeShellMitSitzung>
+      <FehlerAnsicht fehlernummer={error.digest} nochmal={reset} imLayout />
+    </KundeShellMitSitzung>
+  )
 }

@@ -68,7 +68,8 @@ export default async function OrderPrintPage({
         <PrintButton />
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 py-6 md:px-12 md:py-12">
+      {/* Blatt wie im Board w2-druck: Inhalt rund 650 px breit. */}
+      <div className="mx-auto max-w-[746px] px-4 py-6 md:px-12 md:py-12">
         {/* Hof */}
         <div className="mb-5 border-b-2 border-primary-foreground pb-3">
           <div className="font-heading text-xl font-semibold md:text-[22px]">{farm.name}</div>
@@ -81,26 +82,27 @@ export default async function OrderPrintPage({
         {/* Bestellung */}
         <div className="mb-5">
           <div className="flex items-baseline justify-between gap-3">
-            <div className="text-2xl font-bold tracking-wide md:text-[28px]">{order.orderNumber}</div>
+            {/* Die eine Überschrift des Zettels ist die Bestellnummer. */}
+            <h1 className="text-2xl font-bold tracking-wide md:text-[28px]">{order.orderNumber}</h1>
             <div className="text-sm font-semibold">{marke.text}</div>
           </div>
-          <div className="mt-2 text-xs text-primary-foreground/70">Eingang: {datumLang(order.createdAt)}, {uhrzeitInWien(order.createdAt)} Uhr</div>
+          <div className="mt-2 text-sm text-primary-foreground/70">Eingang: {datumLang(order.createdAt)}, {uhrzeitInWien(order.createdAt)} Uhr</div>
         </div>
 
         {/* Abholung und Kunde nebeneinander */}
         <div className="mb-5 grid grid-cols-2 gap-4">
           <div className="min-w-0">
-            <div className="mb-0.5 text-xs font-semibold tracking-wide text-primary-foreground/70 uppercase">Abholung</div>
+            <div className="mb-0.5 text-[13px] font-semibold tracking-wide text-primary-foreground/70 uppercase">Abholung</div>
             <div className="font-semibold break-words">{pickupDate}</div>
             <div className="text-sm text-primary-foreground/80">
               {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
             </div>
           </div>
           <div className="min-w-0">
-            <div className="mb-0.5 text-xs font-semibold tracking-wide text-primary-foreground/70 uppercase">Kunde</div>
+            <div className="mb-0.5 text-[13px] font-semibold tracking-wide text-primary-foreground/70 uppercase">Kunde</div>
             <div className="font-semibold break-words">{order.customerName}</div>
             <div className="text-sm text-primary-foreground/80">{formatiereTelefon(order.customerPhone)}</div>
-            <div className="text-sm break-all text-primary-foreground/80">{order.customerEmail}</div>
+            <div className="text-sm [overflow-wrap:anywhere] text-primary-foreground/80">{order.customerEmail}</div>
           </div>
         </div>
         {order.customerNote && <div className="mb-5 text-sm break-words text-primary-foreground/70 italic">{order.customerNote}</div>}
@@ -109,9 +111,9 @@ export default async function OrderPrintPage({
         <table className="mb-4 w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-primary-foreground/30">
-              <th className="py-1 text-left text-xs font-semibold">Produkt</th>
-              <th className="w-14 py-1 text-right text-xs font-semibold">Menge</th>
-              <th className="w-24 py-1 text-right text-xs font-semibold">Betrag</th>
+              <th className="py-1 text-left text-sm font-semibold text-primary-foreground/70">Produkt</th>
+              <th className="w-16 py-1 text-right text-sm font-semibold text-primary-foreground/70">Menge</th>
+              <th className="w-24 py-1 text-right text-sm font-semibold text-primary-foreground/70">Betrag</th>
             </tr>
           </thead>
           <tbody>
@@ -155,7 +157,7 @@ export default async function OrderPrintPage({
 
         <div className="text-sm">Zahlung: {zahlartText(order.paymentMethod, order.paymentStatus)}</div>
         {kassieren !== null && (
-          <div className="mt-3 rounded-lg border-2 border-primary-foreground px-3.5 py-2.5 text-base font-bold md:text-lg">
+          <div className="mt-3 rounded-md border-2 border-primary-foreground px-3.5 py-2.5 text-base font-bold md:text-lg">
             Bar zu kassieren: {formatEuro(centsAlsEuro(kassieren))}
             {gebuehrZeile && (
               <span className="text-sm font-normal text-primary-foreground/70">
@@ -165,7 +167,7 @@ export default async function OrderPrintPage({
             )}
           </div>
         )}
-        <p className="mt-4 text-xs text-primary-foreground/70">
+        <p className="mt-4 text-sm text-primary-foreground/70">
           {preisHinweis ? `${preisHinweis} ` : ''}
           {DRUCK_ABGLEICH}
         </p>

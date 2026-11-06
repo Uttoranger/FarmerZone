@@ -27,6 +27,7 @@ import {
   zaehltBestellung,
   zaehltVerkauf,
   zeitraumName,
+  zeitraumImSatz,
   type UmsatzBuchung,
 } from '@/lib/umsatz'
 
@@ -307,12 +308,19 @@ describe('einsichtSatz', () => {
 describe('zeitraumName', () => {
   const jetzt = new Date('2026-09-29T12:00:00Z')
   it('Woche, Monat, Jahr', () => {
-    expect(zeitraumName(umsatzfenster('woche', jetzt))).toBe('Diese Woche')
-    expect(zeitraumName(umsatzfenster('woche', jetzt, 1))).toBe('Letzte Woche')
+    // Seit Lauf 31 (Board s2-/w2-auswertung) auch die laufende Woche mit ihren Tagen.
+    expect(zeitraumName(umsatzfenster('woche', jetzt))).toBe('28. Sep – 4. Okt')
+    expect(zeitraumName(umsatzfenster('woche', jetzt, 1))).toBe('21.–27. Sep')
     expect(zeitraumName(umsatzfenster('woche', jetzt, 2))).toBe('14.–20. Sep')
     expect(zeitraumName(umsatzfenster('woche', jetzt, 5))).toBe('24.–30. Aug')
     expect(zeitraumName(umsatzfenster('monat', jetzt))).toBe('September 2026')
     expect(zeitraumName(umsatzfenster('jahr', jetzt, 1))).toBe('2025')
+  })
+
+  it('im Satz der Kennzahlen: „im September", die Tage der Woche, „im Jahr 2025"', () => {
+    expect(zeitraumImSatz(umsatzfenster('monat', jetzt))).toBe('im September')
+    expect(zeitraumImSatz(umsatzfenster('woche', jetzt, 2))).toBe('14.–20. Sep')
+    expect(zeitraumImSatz(umsatzfenster('jahr', jetzt, 1))).toBe('im Jahr 2025')
   })
 
   it('über den Monatswechsel beide Monate', () => {

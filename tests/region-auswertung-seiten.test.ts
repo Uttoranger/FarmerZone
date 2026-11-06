@@ -151,7 +151,7 @@ describe('Routen und Navigation', () => {
 
 describe('Karten im neuen Design', () => {
   it('RegionKopf: zwei Reiter als Links, der offene mit aria-current', () => {
-    const html = renderToStaticMarkup(createElement(RegionKopf, { reiter: 'futter', km: 25 }))
+    const html = renderToStaticMarkup(createElement(RegionKopf, { reiter: 'futter', km: 25, hofName: 'Hof Test', jetzt: new Date('2027-03-03T10:00:00Z') }))
     expect(html).toContain('<h1')
     expect(html).toMatch(/href="\/region\?reiter=futter&amp;km=25"[^>]*aria-current="page"/)
     expect(html).toContain('href="/region?km=25"')
@@ -278,9 +278,10 @@ describe('Karten im neuen Design', () => {
   })
 
   it(`Kennzahl „Über ${MARKE}" zählt die abgeholten Bestellungen — kein „Warenumsatz" mehr (Nr. 53)`, () => {
-    const html = renderToStaticMarkup(createElement(KennzahlenReihe, { k: kennzahlen([], 0), zeitraum: 'Diese Woche' }))
+    const html = renderToStaticMarkup(createElement(KennzahlenReihe, { k: kennzahlen([], 0), zeitraum: 'Februar 2027', satzZeitraum: 'im Februar' }))
     expect(html).toMatch(new RegExp(`<dt[^>]*>${UMSATZ_TEXT.ueberPlattform}</dt>`))
-    expect(html).toContain('Diese Woche · abgeholte Bestellungen')
+    // Wörtlich nach Board s2-/w2-auswertung (Lauf 31): „abgeholt im Februar“.
+    expect(html).toContain('abgeholt im Februar')
     expect(html).not.toMatch(/Warenumsatz|Gesamt/)
   })
 
@@ -295,19 +296,25 @@ describe('Karten im neuen Design', () => {
         vergleichLabel: 'Woche davor',
       })
     )
-    expect(html).toMatch(new RegExp(`<h2[^>]*>${UMSATZ_TEXT.mitHofladen}</h2>`))
+    // Seit Lauf 31 (Board s2-/w2-auswertung) sagt der Titel selbst, was zählt — aus derselben Quelle.
+    expect(html).toMatch(new RegExp(`<h2[^>]*>${UMSATZ_TEXT.karteTitel}<span class="sr-only"> · Diese Woche</span></h2>`))
     expect(html).toContain('€ 206,00')
     expect(html).toContain('Abgeholte Bestellungen und eingetragene Verkäufe')
     expect(html).not.toMatch(/Umsatz pro (Tag|Woche|Monat)|Warenumsatz|Gesamt/)
   })
 
   it('Texte aus EINER Quelle: Auswertung und Heute nehmen UMSATZ_TEXT, keine Seite schreibt die Wörter selbst', () => {
-    expect(UMSATZ_TEXT).toEqual({ ueberPlattform: `Über ${MARKE}`, mitHofladen: 'Mit Hofladen', mitHofladenKlein: 'mit Hofladen' })
+    expect(UMSATZ_TEXT).toEqual({
+      ueberPlattform: `Über ${MARKE}`,
+      mitHofladen: 'Mit Hofladen',
+      mitHofladenKlein: 'mit Hofladen',
+      karteTitel: 'Abgeholte Bestellungen und eingetragene Verkäufe',
+    })
     // „Heute eingenommen · mit Hofladen" ist dasselbe Wort wie die Umsatzkarte der Auswertung.
     expect(KENNZAHL_TEXT.eingenommenMit).toBe(UMSATZ_TEXT.mitHofladenKlein)
     const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
     expect(teile).toContain('UMSATZ_TEXT.ueberPlattform')
-    expect(teile).toContain('UMSATZ_TEXT.mitHofladen')
+    expect(teile).toContain('UMSATZ_TEXT.karteTitel')
     for (const datei of ['src/components/auswertung/auswertung-teile.tsx', 'src/app/(hof)/analytics/page.tsx', 'src/components/heute/heute-teile.tsx', 'src/lib/heute.ts', 'src/lib/auswertung.ts']) {
       const text = quelle(datei).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
       expect(text, datei).not.toMatch(SELBST_GESCHRIEBEN)

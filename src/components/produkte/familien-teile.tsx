@@ -78,7 +78,7 @@ export function FamilienDialog({
           </div>
           <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6">
             {hinweis && (
-              <p className="text-[12.5px] leading-snug text-muted-foreground" aria-live="polite">
+              <p className="text-[13px] leading-snug text-muted-foreground" aria-live="polite">
                 {hinweis}
               </p>
             )}
@@ -86,7 +86,7 @@ export function FamilienDialog({
               <Button type="button" variant="ghost" onClick={onClose} disabled={speichert} className="min-h-11">
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={speichert} className="min-h-11 w-full rounded-xl sm:w-auto sm:min-w-[160px] sm:rounded-full">
+              <Button type="submit" disabled={speichert} className="min-h-12 w-full rounded-xl text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
                 {speichert ? 'Speichere …' : speichernText}
               </Button>
             </div>
@@ -157,7 +157,8 @@ export function Feld({
   const eingabe = isValidElement<Record<string, unknown>>(children) && Object.keys(verbindung).length > 0 ? cloneElement(children, verbindung) : children
   return (
     <div className="flex min-w-0 flex-col gap-1.5" data-feld={feld}>
-      <label htmlFor={id} className={cn('text-[13px] font-medium text-foreground', labelKlasse)}>
+      {/* Fett und 15 px wie im Board s1-produkt-neu (Lauf 31). */}
+      <label htmlFor={id} className={cn('text-[15px] font-semibold text-foreground', labelKlasse)}>
         {label}
         {labelZusatz && <span className="sr-only"> {labelZusatz}</span>}
       </label>

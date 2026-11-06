@@ -6,7 +6,7 @@ import { Loader2, MailCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NEUIGKEITEN_TEXT } from '@/lib/abo-bestaetigung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { ETIKETT, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
+import { ETIKETT, KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { meldeNeuigkeitenAn } from '@/server/actions/neuigkeiten'
 
 /**
@@ -54,7 +54,7 @@ export function NeuigkeitenKarte({
   return (
     // Board s1-/w1-bestaetigung: die kleine Überschrift, ein Satz, der Knopf mit Rand über die volle Breite. Die
     // Texte der Einwilligung (Satz, Bestätigung, Datenschutz) bleiben wörtlich aus NEUIGKEITEN_TEXT.
-    <section aria-labelledby="neuigkeiten-titel" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+    <section aria-labelledby="neuigkeiten-titel" className={cn(KARTE, 'flex min-w-0 flex-col gap-2')}>
       <h2 id="neuigkeiten-titel" className={ETIKETT}>
         {NEUIGKEITEN_TEXT.titel}
       </h2>

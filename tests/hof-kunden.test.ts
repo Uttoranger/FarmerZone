@@ -524,7 +524,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('4 Personen · 1 Stammkunde')
     expect(html).toMatch(/href="\/customers\?filter=stammkunden"[^>]*>Stammkunden<span[^>]*>· 1</)
     expect(html).toContain('aria-current="page"')
-    expect(html).toContain('placeholder="Kundin suchen"')
+    expect(html).toContain('placeholder="Name, Telefon oder E-Mail"')
     expect(html).toContain('Kundin suchen')
     expect(html).toMatch(/<button[^>]*>[\s\S]*?Sortieren[\s\S]*?<\/button>/)
     expect(html).toContain('href="/customers/aaaaaaaaaaaaaaaa"')
@@ -760,5 +760,14 @@ describe('Kundendetail', () => {
   it('ohne Einwilligung keine Karte „Neuigkeiten"', () => {
     const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ isSubscribed: false, subscription: null }), jetzt: JETZT }))
     expect(html).not.toContain('E-Mail-Neuigkeiten')
+  })
+})
+
+describe('„Zeigen“ nach Board s2-/w2-kunden (Lauf 31, Nr. 238)', () => {
+  it('nennt alle Filter genau einmal, in der Reihenfolge des Boards, mit den Wörtern der Marken', async () => {
+    const { ZEIGEN_REIHENFOLGE: reihe, KUNDEN_FILTER_LABEL: label } = await import('@/lib/hof-kunden')
+    const { KUNDEN_FILTER_WERTE: werte } = await import('@/schemas/hof-kunden')
+    expect([...reihe].sort()).toEqual([...werte].sort())
+    expect(reihe.map((f) => label[f])).toEqual(['Alle', 'Stammkunden', 'Neu', 'Lange nicht gesehen', 'Diesen Monat aktiv'])
   })
 })

@@ -628,8 +628,10 @@ function abholungLeer(filter: HoefeFilter, wahl: AbholungWahl, naechster: Naechs
  * bleibt im Browser.
  */
 export const SUCHFELD_TEXT = {
+  /** Platzhalter im Kartenmodus am Handy, wo die Beschriftung nur für Vorleser steht. */
   platzhalter: 'Ort oder Produkt',
-  beschriftung: 'Ort, Postleitzahl oder Produkt suchen',
+  /** Die sichtbare Beschriftung über dem Feld, wörtlich wie die Boards w1-/s1-hoefe (Nr. 242). */
+  beschriftung: 'Ort oder Produkt',
   standort: 'Standort nutzen',
   nichtsGespeichert: 'Nichts wird gespeichert.',
   /** Standort abgelehnt oder nicht verfügbar — kein Fehler, nur der andere Weg. */

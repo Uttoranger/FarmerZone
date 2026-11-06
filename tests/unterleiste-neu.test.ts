@@ -5,8 +5,9 @@
  * Beweist:
  *  - Das Wort steht IM Knopf des Plus, unter dem Symbol: Ein Tipp auf das Wort
  *    öffnet dasselbe Blatt wie ein Tipp auf den Kreis.
- *  - Die Trefferfläche wird nicht kleiner: Der Kreis bleibt 54 px, das Wort
- *    kommt dazu; der Knopf behält seinen Namen „Neu erstellen" (das sichtbare
+ *  - Die Trefferfläche wird nicht kleiner: Seit Nr. 233 (Board s1-heute) eine
+ *    flache Fläche von 52 × 34 px in der Leiste, der Knopf füllt die ganze
+ *    Spalte; das Wort kommt dazu; der Knopf behält seinen Namen „Neu erstellen" (das sichtbare
  *    Wort steht am Anfang des Namens) — abgeleitet aus HOF_NEU_KNOPF, nie
  *    fest eingetippt (Runde 1).
  *  - Das Wort kommt aus der Navigations-Quelle (HOF_NEU_KNOPF), dieselbe wie
@@ -77,10 +78,20 @@ describe('Unterleiste Hof: „Neu" unter dem Plus', () => {
     }
   })
 
-  it('die Trefferfläche wird nicht kleiner: der Kreis bleibt 54 px, das Wort kommt darunter dazu', () => {
+  it('die Trefferfläche wird nicht kleiner: der Knopf füllt die Spalte, darin die flache Fläche 52 × 34 px und das Wort (Nr. 233)', () => {
     expect(knopf).toMatch(/<button[^>]*class="[^"]*flex-col[^"]*"/)
-    expect(knopf).toMatch(/<span[^>]*class="[^"]*size-\[54px\][^"]*"/)
+    // Der Knopf ist so breit wie ein Eintrag und so hoch wie die Leiste (68 px) — größer als die Fläche, nie kleiner.
+    expect(knopf).toMatch(/<button[^>]*class="[^"]*\bflex-1\b[^"]*"/)
+    expect(knopf).toMatch(/<span[^>]*class="[^"]*h-\[34px\] w-\[52px\][^"]*bg-primary[^"]*"/)
     expect(knopf).not.toMatch(/<button[^>]*class="[^"]*\bsize-(?:\d|\[)/)
+    // Flach: nicht mehr über die Leiste gehoben (Board s1-heute).
+    expect(knopf).not.toMatch(/<button[^>]*class="[^"]*-mt-5/)
+  })
+
+  it('Gegenprobe: der Warenkorb der Kundschaft bleibt der erhobene Kreis (54 px)', () => {
+    const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
+    const kundenLeiste = abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')
+    expect(kundenLeiste).toMatch(/<span[^>]*class="[^"]*size-\[54px\][^"]*"/)
   })
 
   it('der Neu-Knopf der Seitenleiste nennt dasselbe Wort', () => {
@@ -122,7 +133,7 @@ describe('Unterleiste Hof: 11 px unter 360 px Breite (Entscheidung 6, Nr. 195)',
     expect(ELF).toContain('max-[359px]')
     expect(quelle('src/components/ui/bottom-nav.tsx')).toContain('engUnter360')
     // Seit Nr. 220 liegen die Blätter über der Leiste (Board s1-mehr-neu) — die Leiste bleibt auf ihrer Ebene, ohne ueberSchleier.
-    expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav engUnter360>')
+    expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav engUnter360 ton="orange">')
   })
 })
 
@@ -146,5 +157,34 @@ describe('Unterleiste Hof: „Bestellungen“ bei 320 px nicht abgeschnitten (Nr
     expect(leiste.match(/max-\[359px\]:inline/g)?.length).toBe(1)
     const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
     expect(abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')).not.toContain('max-[359px]:inline')
+  })
+})
+
+describe('Unterleiste: getönte Pille am aktiven Eintrag (Nr. 233, Nacharbeit 220; Boards s1-heute, s1-hoefe)', () => {
+  it('Hof: die Leiste trägt den Ton orange, der aktive Eintrag (Heute) eine Pille im Paar „tun“', () => {
+    expect(leiste).toMatch(/<nav[^>]*data-ton="orange"/)
+    const heute = abschnitt(leiste, '<a href="/dashboard"', '</a>')
+    expect(heute).toContain('aria-current="page"')
+    expect(heute).toContain('group-data-[ton=orange]/leiste:bg-zustand-tun-grund')
+    expect(heute).toContain('group-data-[ton=orange]/leiste:text-zustand-tun')
+  })
+
+  it('Gegenprobe: ein nicht aktiver Eintrag hat keine Pille', () => {
+    const bestellungen = abschnitt(leiste, '<a href="/orders"', '</a>')
+    expect(bestellungen).not.toContain('aria-current')
+    expect(bestellungen).not.toContain('bg-zustand-tun-grund')
+  })
+
+  it('Kundschaft: dieselbe Pille in Grün (Paar „läuft“), ohne Ton orange', () => {
+    const kunde = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' }))
+    const kundenLeiste = abschnitt(kunde, 'data-slot="bottom-nav"', '</nav>')
+    expect(kundenLeiste).toContain('data-ton="gruen"')
+    expect(quelle('src/components/ui/bottom-nav.tsx')).toMatch(/aktiv && 'bg-zustand-laeuft-grund/)
+  })
+
+  it('der Zähler am Symbol hat 12 px — nie kleiner (vorher 9,5 px)', () => {
+    const bestellungen = abschnitt(leiste, '<a href="/orders"', '</a>')
+    expect(bestellungen).toMatch(/data-slot="zaehler"[^>]*class="[^"]*text-\[12px\]/)
+    expect(bestellungen).not.toContain('text-[9.5px]')
   })
 })

@@ -20,17 +20,26 @@ import { KundeShell } from '@/components/shells/kunde-shell'
 export function KundeShellMitSitzung({
   unterleiste,
   aktiv,
+  handyTitel,
+  fussSpalte,
+  platzFuerLeiste,
   children,
 }: {
   /** Durchgereicht an die KundeShell — `false` für Fokus-Seiten mit Kopf (Produktseite). */
   unterleiste?: boolean
   /** Durchgereicht an die KundeShell — Hof- und Produktseite setzen `entdecken` (Nr. 177). */
   aktiv?: KundenNavId
+  /** Durchgereicht an die KundeShell — die Titelzeile am Handy (Bestätigung, Bestellseite; Lauf 31). */
+  handyTitel?: string
+  /** Durchgereicht an die KundeShell — der Seitenfuß im Browser in der Spalte des Inhalts (Lauf 31). */
+  fussSpalte?: string
+  /** Durchgereicht an die KundeShell — Platz unter dem Seitenfuß für die feste Leiste im Browser (Bestätigung). */
+  platzFuerLeiste?: boolean
   children: ReactNode
 }): React.JSX.Element {
   const sitzung = useKundenSitzung()
   return (
-    <KundeShell sitzung={sitzung} unterleiste={unterleiste} aktiv={aktiv}>
+    <KundeShell sitzung={sitzung} unterleiste={unterleiste} aktiv={aktiv} handyTitel={handyTitel} fussSpalte={fussSpalte} platzFuerLeiste={platzFuerLeiste}>
       {children}
     </KundeShell>
   )

@@ -57,7 +57,7 @@ export function FutterKarte({ angebot, jetzt }: { angebot: FutterAngebot; jetzt:
         {angebot.schild && <FutterSchild text={angebot.schild} />}
         {angebot.grundpreis && (
           <p className="ml-auto text-right">
-            <span className="block text-[11px] text-muted-foreground">{FUTTER_KARTE_TEXT.grundpreis}</span>
+            <span className="block text-xs text-muted-foreground">{FUTTER_KARTE_TEXT.grundpreis}</span>
             <span className="text-[13.5px] font-semibold text-foreground tabular-nums">{angebot.grundpreis}</span>
           </p>
         )}
@@ -151,13 +151,13 @@ function GroessenFeld({
           {groesse.name}
         </span>
         <span className="text-[12.5px] font-semibold text-foreground tabular-nums">{groesse.preis}</span>
-        <span className="text-[11.5px] text-muted-foreground tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {groesse.kaufbar ? groesse.kilopreis : FUTTER_KARTE_TEXT.derzeitAus}
         </span>
       </span>
       {groesse.guenstigster && (
         // Grün wie im Board (Art „läuft"); eine Angabe zum Angebot, kein eigener Zustand — keine neue Farbe (G5).
-        <Marke art="laeuft" className="absolute -top-2.5 right-2 px-2 text-[10.5px]">
+        <Marke art="laeuft" className="absolute -top-2.5 right-2 px-2">
           {FUTTER_KARTE_TEXT.guenstigster}
         </Marke>
       )}

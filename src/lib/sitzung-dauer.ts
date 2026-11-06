@@ -43,5 +43,4 @@ export const KUNDIN_GERAETE_TEXT = {
   hinweis: 'Kennst du ein Gerät nicht? Melde es ab – deine Bestellungen bleiben, nur die Anmeldung dort endet.',
   blattTitel: 'Überall abmelden?',
   blattSatz: 'Du wirst auf allen Geräten abgemeldet, auch auf diesem. Deine Bestellungen und Abos bleiben.',
-  wasWirSpeichern: 'Was wir speichern',
 } as const

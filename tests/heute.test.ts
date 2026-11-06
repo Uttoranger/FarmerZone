@@ -27,7 +27,6 @@ import {
   brauchtDich,
   datumLang,
   kurzname,
-  naechsteAbholungText,
   naechsteAbholungWhere,
   positionenKurz,
   ueberfaelligWhere,
@@ -120,11 +119,6 @@ describe('nächste Abholung', () => {
     // 0:30 Wien am 29.9. ist in UTC noch der 28.9. — „Morgen" ist der 30.9.
     const heute = tagVersetzt('2026-09-28', 1)
     expect(abholtagName(heute, '2026-09-30')).toBe('Morgen')
-  })
-
-  it('Zeile: Einzahl und Mehrzahl', () => {
-    expect(naechsteAbholungText({ tag: '2026-09-30', name: 'Morgen', anzahl: 1 })).toBe('Morgen: 1 Bestellung')
-    expect(naechsteAbholungText({ tag: '2026-10-01', name: 'Donnerstag', anzahl: 4 })).toBe('Donnerstag: 4 Bestellungen')
   })
 })
 
@@ -376,8 +370,9 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(teile).toContain('BRAUCHT_DICH_LEER')
     expect(teile).not.toContain('Nichts braucht dich heute.')
     expect(teile).not.toContain('Alles erledigt.')
-    // Die Zeile zum nächsten Abholtag entfällt ohne ihn und führt nach /orders.
-    expect(teile).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
+    // Die nächste Abholung steht nur in der Seitenspalte, nicht noch einmal als Zeile unter der Packliste (Board w1-heute, Lauf 31).
+    expect(teile).not.toContain('naechsteAbholungText(')
+    expect(seite).toContain('<NaechsteAbholungKarte')
     expect(beide).not.toContain('Morgen:')
     expect(teile).toContain('href="/orders/today/print"')
     expect(beide).not.toContain('getHours()')

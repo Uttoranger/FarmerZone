@@ -61,13 +61,21 @@ export default async function FehlerMeldenPage({
         <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
           {/* Am Handy trägt die feste Leiste den Namen schon („← Problem melden", Elternseite = derselbe
               Punkt). Die h1 gleichen Wortlauts steht dort nur für den Screenreader, ab 768 px sichtbar wie im
-              Web-Mockup (Nr. 56, Bericht 44). */}
+              Web-Mockup (Nr. 56, Bericht 44). Das Board s2-meldungen zeigt die h1 in der Leiste selbst —
+              das gehört in UnterseitenKopf (Bericht 238, Grenze). */}
           <h1 className="sr-only font-heading text-2xl font-semibold text-foreground md:not-sr-only md:text-[26px]">
             {PROBLEM_MELDEN}
           </h1>
           <p className="text-sm leading-normal text-muted-foreground">{PROBLEM_MELDEN_SATZ_HOF}</p>
           {/* Der gemeinsame Baustein in Orange (V51, Board s2/w2-meldungen); „Abbrechen" führt ab 768 px zur Übersicht der eigenen Meldungen. */}
-          <MeldungForm formToken={generateFormToken('meldung')} alsHof welt="hof" abbrechenHref={MEINE_MELDUNGEN_HREF} kennungVorbelegt={kennung} />
+          <MeldungForm
+            formToken={generateFormToken('meldung')}
+            alsHof
+            welt="hof"
+            abbrechenHref={MEINE_MELDUNGEN_HREF}
+            kennungVorbelegt={kennung}
+            hofName={farm.name}
+          />
         </div>
         <div className="hidden min-w-0 flex-1 lg:block">
           <HilfeSeitenspalte stand={stand} mailto={mailto} />

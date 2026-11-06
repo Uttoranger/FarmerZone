@@ -8,7 +8,6 @@ import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, TARIFE_AB_SATZ, konditionenGe
 import { gebuehrModellFuer, hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 import { KARTE, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
-import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
 import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK } from '@/components/shared/infoseite-stil'
 import { EntwurfMarke, RechtstextVorlage } from '@/components/shared/rechtstext-vorlage'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
@@ -93,10 +92,11 @@ export default async function KonditionenPage(): Promise<React.JSX.Element> {
           {modell === 'bisher' && <p className="mb-3 font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>}
           <ul className="grid gap-3 sm:grid-cols-2">
             {TARIFE.map((tarif) => (
-              <li key={tarif.id} className={cn(KARTE, 'px-4 py-3.5 text-foreground')}>
+              <li key={tarif.id} className={cn(KARTE, 'rounded-[14px] px-4 py-3.5 text-foreground')}>
+                {/* Name und Preis 20 px, Ecken 14 px (Board s3-/w3-rechtstexte, Bild 5) — nur der Rahmen. */}
                 <p className="flex items-baseline justify-between gap-3">
-                  <strong className="font-heading text-[16px] font-semibold">{tarif.name}</strong>
-                  <span className="text-[15px] font-semibold whitespace-nowrap">
+                  <strong className="font-heading text-[20px] font-semibold">{tarif.name}</strong>
+                  <span className="text-[20px] font-semibold whitespace-nowrap">
                     {tarif.grundgebuehrCents > 0 ? `${tarif.preis} ${PRO_MONAT}` : tarif.preis}
                   </span>
                 </p>
@@ -131,15 +131,20 @@ export default async function KonditionenPage(): Promise<React.JSX.Element> {
           <h2 id="aufnahme" className={INFOSEITE_ABSCHNITT}>
             So läuft die Aufnahme
           </h2>
-          {/* Dieselben orangen Ringe wie auf /fuer-hoefe — Schritte der Hofwelt. */}
-          <div className="text-foreground">
-            <StartSchritte schritte={GRUENDUNGS_AUFNAHME_SCHRITTE} />
-          </div>
+          {/* Eine schlichte nummerierte Liste (Board s3-/w3-rechtstexte, Bild 6); Wortlaut aus derselben Quelle. */}
+          <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-foreground">
+            {GRUENDUNGS_AUFNAHME_SCHRITTE.map((schritt) => (
+              <li key={schritt.titel}>
+                <strong className="block font-semibold">{schritt.titel}</strong>
+                {schritt.text}
+              </li>
+            ))}
+          </ol>
           {/* Orange: Registrieren ist eine Hof-Aktion (DESIGN_SYSTEM „Farbrollen"),
               der eine Hauptknopf dieser Seite. Die Registrierung ist offen —
               der Weg führt direkt in die App, nicht ins Mail-Programm. */}
           <div className="mt-5 flex flex-col items-start gap-2">
-            <Link href="/register" className={KNOPF_ORANGE}>
+            <Link href="/register" className={cn(KNOPF_ORANGE, 'h-[50px] w-full rounded-[14px] text-[16px] font-bold sm:w-auto md:h-14 md:px-8')}>
               Hof registrieren
             </Link>
             <a href={CTA_MAILTO} className={cn(INFOSEITE_LINK, 'inline-flex min-h-11 items-center')}>

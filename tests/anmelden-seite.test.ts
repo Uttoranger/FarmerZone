@@ -11,9 +11,9 @@
  *    „Registrieren" in der Kundenkarte — nur der Hof wird registriert.
  *  - Zustände der Kundenkarte: E-Mail-Schritt, laden, Fehler inline am Feld
  *    (role="alert", aria-invalid), Code-Schritt mit der Adresse, Hinweis
- *    „10 Minuten", Code-Feld für das automatische Einfügen
+ *    zur Adresse, EIN beschriftetes Code-Feld für das automatische Einfügen
  *    (autocomplete="one-time-code"), „Code erneut senden" mit Wartezeit und
- *    „Andere E-Mail".
+ *    „Andere E-Mail-Adresse".
  *  - Hofkarte: E-Mail, Passwort, Passwort vergessen, Hof registrieren.
  *  - Die Routen: Kundenseite gibt nur ein sicheres Ziel weiter (keine offene
  *    Weiterleitung), Hofseite behält die Sitzungsprüfung; beide in der
@@ -168,11 +168,11 @@ describe('Kundenkarte — E-Mail-Schritt', () => {
 })
 
 describe('Kundenkarte — Code-Schritt', () => {
-  it('nennt die Adresse, den 6-stelligen Code und „10 Minuten"', () => {
+  it('nennt die Adresse und den 6-stelligen Code, ohne Satz zur Gültigkeit (Board s2-kundenkonto, Nr. 239)', () => {
     const html = codeSchritt()
     expect(html).toContain('kundin@example.com')
     expect(html).toContain('6-stelligen Code')
-    expect(html).toContain('10 Minuten')
+    expect(html).not.toContain('10 Minuten')
   })
 
   it('Code-Feld fürs automatische Einfügen, nur Ziffern, beschriftet', () => {
@@ -182,12 +182,18 @@ describe('Kundenkarte — Code-Schritt', () => {
     expect(html).toMatch(/<label[^>]*>[^<]*Code[^<]*<\/label>/)
   })
 
-  it('zeigt die eingegebenen Ziffern in sechs Kästchen', () => {
+  it('EIN sichtbar beschriftetes Feld „6-stelliger Code aus der E-Mail" mit Platzhalter „6 Ziffern" (Nr. 239)', () => {
     const html = codeSchritt({ code: '481' })
-    expect(html.match(/data-kaestchen=""/g)).toHaveLength(6)
-    expect(html).toContain('>4<')
-    expect(html).toContain('>8<')
-    expect(html).toContain('>1<')
+    const label = html.match(/<label[^>]*for="([^"]+)"[^>]*>6-stelliger Code aus der E-Mail<\/label>/)
+    expect(label).not.toBeNull()
+    expect(label?.[0]).not.toContain('sr-only')
+    const felder = html.match(/<input[^>]*autocomplete="one-time-code"[^>]*>/gi) ?? []
+    expect(felder).toHaveLength(1)
+    expect(felder[0]).toContain(`id="${label?.[1]}"`)
+    expect(felder[0]).toContain('placeholder="6 Ziffern"')
+    expect(felder[0]).toContain('value="481"')
+    // Gegenprobe: die sechs Kästchen des alten Felds gibt es nicht mehr.
+    expect(html).not.toContain('data-kaestchen')
   })
 
   it('„Code erneut senden" wartet und nennt die Sekunden, danach frei', () => {
@@ -198,8 +204,8 @@ describe('Kundenkarte — Code-Schritt', () => {
     expect(frei).not.toMatch(/disabled=""[^>]*>Code erneut senden/)
   })
 
-  it('„Andere E-Mail" führt zurück zum ersten Schritt', () => {
-    expect(codeSchritt()).toContain('Andere E-Mail')
+  it('„Andere E-Mail-Adresse" führt zurück zum ersten Schritt', () => {
+    expect(codeSchritt()).toContain('Andere E-Mail-Adresse')
   })
 
   it('Fehler inline am Code-Feld, Hinweis (neuer Code geschickt) als Status', () => {
@@ -240,17 +246,11 @@ describe('Kundenkarte — Code-Schritt', () => {
     expect(status(emailSchritt({ laedt: true, email: 'kundin@example.com' }))).toContain('Einen Moment …')
   })
 
-  it('320 px: sechs Kästchen teilen sich die Breite (flexibel), bleiben aber ≥ 44 px hoch', () => {
-    const html = codeSchritt({ code: '481' })
-    const kaestchen = html.match(/<span[^>]*data-kaestchen=""[^>]*>/g) ?? []
-    expect(kaestchen).toHaveLength(6)
-    for (const k of kaestchen) {
-      expect(k).toMatch(/\bmin-w-0\b/)
-      expect(k).toMatch(/\bflex-1\b/)
-      expect(k).toMatch(/\bmax-w-\[46px\]/)
-      expect(k).not.toMatch(/(?<![-\w])w-\[46px\]/)
-      expect(k).toMatch(/\bh-\[54px\]/)
-    }
+  it('320 px: das Code-Feld nimmt die volle Breite und ist ≥ 44 px hoch', () => {
+    const feld = codeSchritt({ code: '481' }).match(/<input[^>]*autocomplete="one-time-code"[^>]*>/i)?.[0] ?? ''
+    expect(feld).toMatch(/\bw-full\b/)
+    expect(feld).toMatch(/\bh-12\b/)
+    expect(feld).toMatch(/\btext-base\b/)
   })
 
   it('hält eine 80 Zeichen lange Adresse aus (bricht um statt zu überlaufen)', () => {

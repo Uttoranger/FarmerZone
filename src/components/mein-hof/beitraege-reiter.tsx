@@ -56,7 +56,7 @@ export function BeitraegeReiter({ uebersicht }: { uebersicht: BeitraegeUebersich
       <div className="mt-6 flex flex-col gap-6">
         {uebersicht.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`beitraege-${gruppe.id}`}>
-            <h2 id={`beitraege-${gruppe.id}`} className="px-1 text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">
+            <h2 id={`beitraege-${gruppe.id}`} className="px-1 text-xs font-semibold tracking-[1.1px] text-muted-foreground uppercase">
               {gruppe.titel}
             </h2>
             <ListGruppe className="mt-2">

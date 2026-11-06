@@ -58,7 +58,7 @@ const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 function spalte(sperre: KaufSperre = null): string {
   return renderToStaticMarkup(
-    createElement(HofseiteSeitenspalte, { hof: HOF, sperre, zahlungsarten: [], gebuehrKurz: null, gebuehrKorb: null, mitKorb: true, jetzt: '2026-10-26T08:00:00.000Z' })
+    createElement(HofseiteSeitenspalte, { hof: HOF, sperre, zahlungsarten: [], gebuehrHinweis: null, gebuehrKorb: null, mitKorb: true, jetzt: '2026-10-26T08:00:00.000Z' })
   )
 }
 
@@ -100,7 +100,7 @@ describe('Korb-Blatt: Grund statt „Zur Kasse“ (Nr. 205)', () => {
         items: [posten],
         total: 3,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { hofName: 'Musterdorf', pauseMessage: null, sperre },
       })

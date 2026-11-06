@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Search } from 'lucide-react'
 import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 import { NICHT_GEFUNDEN_KICKER, SUCHE_TEXT, ZUM_HOF } from '@/lib/fehlerseite'
 import { cn } from '@/lib/utils'
@@ -67,28 +66,24 @@ export function NichtGefundenAnsicht({
           {neben.text}
         </Link>
         {suchfeldId && (
-          <form action="/hoefe" method="get" role="search" className="mt-1 w-full">
-            <label htmlFor={suchfeldId} className="sr-only">
+          // Die Beschriftung steht sichtbar über dem Feld (Maßstab Punkt 3: Felder mit sichtbarer Beschriftung;
+          // das Board w3-/s3-fehlerseiten blendet sie aus — Maßstab vor Board, Nr. 242). Ohne Lupe, 44 px als
+          // Pille wie im Board.
+          <form action="/hoefe" method="get" role="search" className="mt-1 flex w-full flex-col gap-1.5 text-left">
+            <label htmlFor={suchfeldId} className="text-[14px] font-semibold text-foreground">
               {SUCHE_TEXT.beschriftung}
             </label>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground"
-                strokeWidth={1.7}
-                aria-hidden="true"
-              />
-              <input
-                id={suchfeldId}
-                type="search"
-                name={SUCHTEXT_PARAMETER}
-                maxLength={SUCHTEXT_MAX}
-                placeholder={SUCHE_TEXT.platzhalter}
-                className={cn(
-                  'h-12 w-full rounded-full border border-input bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:text-[14px]',
-                  FOKUS_RAHMEN
-                )}
-              />
-            </div>
+            <input
+              id={suchfeldId}
+              type="search"
+              name={SUCHTEXT_PARAMETER}
+              maxLength={SUCHTEXT_MAX}
+              placeholder={SUCHE_TEXT.platzhalter}
+              className={cn(
+                'h-11 w-full rounded-full border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]',
+                FOKUS_RAHMEN
+              )}
+            />
           </form>
         )}
       </FehlerseiteAufbau>

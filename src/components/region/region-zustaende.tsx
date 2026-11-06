@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CircleAlert, MapPin } from 'lucide-react'
+import { MapPin } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
@@ -49,7 +49,7 @@ export function StandortFehlt({ eigeneKarte, jetzt }: { eigeneKarte?: EigeneKart
       />
       {eigeneKarte !== undefined && (
         <section aria-label={OHNE_STANDORT_TEXT.ueberschriftListe} className="flex flex-col gap-2">
-          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{OHNE_STANDORT_TEXT.ueberschriftListe}</p>
+          <p className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">{OHNE_STANDORT_TEXT.ueberschriftListe}</p>
           {eigeneKarte ? (
             <HofKarte
               hof={eigeneKarte.hof}
@@ -72,16 +72,17 @@ export function StandortFehlt({ eigeneKarte, jetzt }: { eigeneKarte?: EigeneKart
 export function RegionFehler({ nochmal }: { nochmal: string }): React.JSX.Element {
   return (
     <Hinweiskarte
-      ton="orange"
-      symbol={CircleAlert}
+
+      ton="neutral"
       titel="Wir konnten die Höfe in deiner Nähe gerade nicht laden."
       aktion={
         <Link href={nochmal} className={KNOPF_RAHMEN}>
-          Noch einmal versuchen
+          Nochmal
         </Link>
       }
     >
-      Es ist nichts verloren gegangen. Versuch es bitte gleich noch einmal.
+      {/* Wörtlich nach Board s1-/w1-region Bild 4 (am Handy ist meist das Netz schuld). */}
+      Prüf den Empfang und versuch es noch einmal.
     </Hinweiskarte>
   )
 }

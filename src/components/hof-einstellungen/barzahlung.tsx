@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils'
 import { StatusBadge, type StatusTon } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ReceiptText } from 'lucide-react'
-import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 
 const T = LASTSCHRIFT_TEXT
 
@@ -175,7 +176,7 @@ function RechnungKnopf({ abrechnungId, art }: { abrechnungId: string; art: 'bar'
 function Monatsabrechnungen({ zeilen }: { zeilen: BarzahlungAnzeige['abrechnungen'] }): React.JSX.Element {
   return (
     <section aria-labelledby="abrechnungen-titel" className="flex flex-col gap-2.5">
-      <h2 id="abrechnungen-titel" className={KICKER}>
+      <h2 id="abrechnungen-titel" className={KICKER_12}>
         {T.abrechnungen}
       </h2>
       {zeilen.length === 0 ? (

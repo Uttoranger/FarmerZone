@@ -31,5 +31,8 @@ export const FELD = cn(
   FOKUS_RAHMEN
 )
 
-/** Kleine Überschrift in Großbuchstaben („Packliste", „Heute, 15–18 Uhr · 3 Bestellungen"). */
-export const KICKER = 'text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase'
+/**
+ * Kleine Überschrift in Großbuchstaben („Kundin", „Heute, 15–18 Uhr · 3"): 13 px fett wie die
+ * Köpfe von Heute (Boards s1-/w1-bestellungen, Lauf 31) — Schrift nie unter 12 px (Nr. 237).
+ */
+export const KICKER = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'

@@ -10,10 +10,10 @@
 import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
 
 /** Meldung abgeben: Formular (640 px) links, ab lg die Seitenspalte rechts. */
-export const MELDEN_RAHMEN = 'mx-auto w-full max-w-[1040px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
+export const MELDEN_RAHMEN = 'w-full max-w-[1040px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
 
 /** Meine Meldungen: eine Spalte bis 900 px (Mockup web-h6-meine-meldungen). */
-export const MELDUNGEN_RAHMEN = 'mx-auto w-full max-w-[900px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
+export const MELDUNGEN_RAHMEN = 'w-full max-w-[900px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
 
 export function MeldungAbgebenLaden(): React.JSX.Element {
   return (

@@ -17,8 +17,9 @@ import { DARSTELLUNG_TEXT } from '@/lib/kunden-navigation'
  * zurück zu „System" geht es über die Karte im Konto.
  *
  * Vor dem Mount steht ein Platzhalter gleicher Größe: Der Server kennt den
- * Modus nicht, ein direkt gerendertes Sonne/Mond-Symbol wäre beim Hydrieren
- * zwangsläufig manchmal falsch (Muster wie darstellung-karte.tsx).
+ * Modus nicht, die Beschriftung („Hellen Modus …“/„Dunkelmodus …“) wäre beim
+ * Hydrieren zwangsläufig manchmal falsch (Muster wie darstellung-karte.tsx).
+ * Das Symbol des runden Knopfs ist seit Nr. 233 in beiden Modi der Mond.
  */
 
 function nichtsAbonnieren(): () => void {
@@ -54,9 +55,36 @@ function useThemeUmschalter(): {
 }
 
 /**
+ * Der Mond mit zwei Funkeln aus den Boards (w1-mehr-neu, w1-heute, s1-startseite):
+ * Zeichen für „Darstellung“, nicht für einen Modus — darum in beiden Themes
+ * derselbe (UI-Runde 3 der Nr. 233; vorher Sonne im Dunkeln). Strich in der
+ * Schriftfarbe (currentColor), keine eigene Farbe.
+ */
+function MondSymbol(): React.JSX.Element {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      aria-hidden="true"
+      data-symbol="mond"
+      className="size-5"
+    >
+      <path d="M12 3a6 6 0 1 0 9 9 7.5 7.5 0 0 1-9-9z" />
+      <path d="M5 3v2M4 4h2M19 17v2M18 18h2" />
+    </svg>
+  )
+}
+
+/**
  * Der runde Symbolknopf für Kopfzeilen. 44 px Fläche: das Mindestmaß, das
  * ein Daumen zuverlässig trifft. `title` ist der Tooltip — dieselbe Beschriftung
- * wie das aria-label, damit Maus und Screenreader dasselbe hören.
+ * wie das aria-label, damit Maus und Screenreader dasselbe hören. Das Symbol
+ * ist in beiden Themes der Mond (Board); was ein Tipp tut, sagt das aria-label.
  */
 export function ThemeUmschalter({
   className,
@@ -65,7 +93,7 @@ export function ThemeUmschalter({
   className?: string
   style?: CSSProperties
 }): React.JSX.Element {
-  const { montiert, dunkel, beschriftung, umschalten } = useThemeUmschalter()
+  const { montiert, beschriftung, umschalten } = useThemeUmschalter()
 
   if (!montiert) {
     return <span aria-hidden="true" className={cn('inline-block size-11', className)} />
@@ -81,11 +109,7 @@ export function ThemeUmschalter({
       className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors', FOKUS_RAHMEN, className)}
       style={style}
     >
-      {dunkel ? (
-        <Sun className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      ) : (
-        <Moon className="size-5" strokeWidth={1.7} aria-hidden="true" />
-      )}
+      <MondSymbol />
     </button>
   )
 }

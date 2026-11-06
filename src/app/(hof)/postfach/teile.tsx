@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
  */
 
 /** Liste und Faden: eine Spalte bis 760 px (Mockups mobil-h6-*), am Handy 16 px Rand. */
-export const POSTFACH_RAHMEN = 'mx-auto w-full max-w-[760px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
+export const POSTFACH_RAHMEN = 'w-full max-w-[760px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
 
 /** Das Zeichen des Teams: ein Keimling auf heller Fläche (die Bildmarke steht für die Plattform). */
 export function TeamZeichen({ groesse = 'mittel' }: { groesse?: 'klein' | 'mittel' }): React.JSX.Element {
@@ -66,7 +66,7 @@ export function PostfachZeile({ zeile }: { zeile: FadenZeile }): React.JSX.Eleme
         </span>
         {zeile.eigeneAntwort && (
           <span className="mt-1.5 flex max-w-full">
-            <span className="truncate rounded-full border border-border bg-muted px-2 py-0.5 text-[11.5px] text-foreground">
+            <span className="truncate rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground">
               {POSTFACH_TEXT.duHastGeantwortet} · {zeile.eigeneAntwort}
             </span>
           </span>
@@ -123,7 +123,7 @@ export function FadenVerlauf({
       {eintraege.map((e) => {
         if (e.art === 'tag') {
           return (
-            <li key={e.schluessel} className="self-center pt-1 text-[11.5px] text-muted-foreground">
+            <li key={e.schluessel} className="self-center pt-1 text-xs text-muted-foreground">
               {e.text}
             </li>
           )
@@ -153,7 +153,7 @@ export function FadenVerlauf({
               {(istErste || e.wichtig) && (
                 <div className="mb-1.5 flex flex-wrap items-center gap-2">
                   {istErste && (
-                    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-brand-text">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-text">
                       <Sprout className="size-3.5" strokeWidth={2} aria-hidden="true" />
                       {POSTFACH_TEXT.absender}
                     </span>
@@ -163,11 +163,11 @@ export function FadenVerlauf({
               )}
               <p className="text-sm leading-relaxed break-words whitespace-pre-line">{e.text}</p>
               {e.link && <LinkKnopf href={e.link} />}
-              {istErste && fussErste && <p className="mt-1.5 text-[11px] text-muted-foreground">{fussErste}</p>}
+              {istErste && fussErste && <p className="mt-1.5 text-xs text-muted-foreground">{fussErste}</p>}
             </div>
             <p
               className={cn(
-                'mt-1 px-1 text-[11px] text-muted-foreground',
+                'mt-1 px-1 text-xs text-muted-foreground',
                 eigene ? 'text-right' : 'text-left'
               )}
             >

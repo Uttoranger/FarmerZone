@@ -94,7 +94,6 @@ export default async function FarmPageOwnerRoute({
         }
       >
         <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8 lg:max-w-none lg:pt-0">
-          <h1 className="sr-only">Beiträge</h1>
           <BeitraegeReiter uebersicht={uebersicht} />
         </div>
       </MeinHofAnsicht>
@@ -145,11 +144,9 @@ export default async function FarmPageOwnerRoute({
         }
       >
         {/* Unter lg, „Bearbeiten": die Liste der Abschnitte, bearbeitet im
-            Blatt von unten. Sichtbar ist der Hofname im Kopf; die H1 hört nur
-            der Screenreader. */}
+            Blatt von unten. Die h1 „Mein Hof“ steht sichtbar im Kopf (Lauf 31). */}
         <div className="lg:hidden">
           <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8">
-            <h1 className="sr-only">Hofseite bearbeiten</h1>
             <AbschnitteListe fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />
           </div>
         </div>
@@ -157,8 +154,7 @@ export default async function FarmPageOwnerRoute({
 
       {/* Ab lg: Liste links, Vorschau rechts. */}
       <div className="hidden px-8 pb-12 lg:block">
-        {/* Sichtbar ist der Hofname im Kopf; die H1 hört nur der Screenreader. */}
-        <h1 className="sr-only">Hofseite bearbeiten</h1>
+        {/* Die h1 „Mein Hof“ steht sichtbar im Kopf (Lauf 31, Board w1-mein-hof). */}
         <HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />
       </div>
     </>

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { formatPosition } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { bestellLinkGilt, bestellungPfad, kalenderPfad } from '@/lib/bestell-link'
 import { widerrufPfad } from '@/lib/bestell-link'
@@ -19,6 +18,7 @@ import {
   neuigkeitenErlaubt,
 } from '@/lib/bestaetigung'
 import { zahlungFortsetzenPfad } from '@/lib/kasse'
+import { positionMengeVorn } from '@/lib/format'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
@@ -59,11 +59,15 @@ export const metadata: Metadata = {
   referrer: 'no-referrer',
 }
 
-/** Die Spalte der Seite: 896 px wie im Board w1-bestaetigung (ab 768 px Karten paarweise), am Handy mit 16 px Rand. */
-const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:px-4 md:pt-8'
+/**
+ * Die Spalte der Seite: 896 px wie im Board w1-bestaetigung (ab 768 px Karten paarweise), am Handy mit 16 px Rand und
+ * 12 px zwischen den Karten (s1-bestaetigung Bild 2, UI-Runde 3). Im Browser steht die Hauptaktion fest unten außerhalb
+ * des Flusses — ohne Polster unten bleiben bis zur Linie des Seitenfußes rund 25 px wie im Board.
+ */
+const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-3 px-4 pt-6 pb-12 md:gap-4 md:px-4 md:pt-8 md:pb-0'
 
-/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen, Erzähl's weiter · Neuigkeiten). */
-const PAAR = 'grid items-start gap-4 md:grid-cols-2'
+/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen, Erzähl's weiter · Neuigkeiten), am Handy 12 px. */
+const PAAR = 'grid items-start gap-3 md:grid-cols-2 md:gap-4'
 
 /*
  * Neues Design (Nr. 13): KundeShell ohne Unterleiste — eine Fokus-Seite mit
@@ -84,7 +88,8 @@ function BestellungEingegangen() {
   // Kein ClearCartOnMount (Nr. 202, Audit Phase 3 Punkt 12): Ohne Signatur kennt die
   // Seite den Stand nicht — ein alter Link oder ein Lesezeichen leert keinen neuen Korb.
   return (
-    <KundeShellMitSitzung unterleiste={false}>
+    // Board s1-bestaetigung Bild 4: am Handy die Titelzeile „Bestellung“ statt Marke und Knopf.
+    <KundeShellMitSitzung unterleiste={false} handyTitel="Bestellung" fussSpalte="md:max-w-[608px]">
       {/* Board s1-/w1-bestaetigung Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zu den Höfen. */}
       <div className={cn(SPALTE, 'max-w-[592px]')}>
         <div className={cn(KARTE, 'flex flex-col gap-3')}>
@@ -95,6 +100,7 @@ function BestellungEingegangen() {
               titel: 'Deine Bestellung ist eingegangen',
               satz: 'Danke – alle Details stehen in deiner E-Mail.',
             }}
+            satzLeise
           />
           <Link href="/hoefe" className={KNOPF_BREIT_RAHMEN}>
             Höfe entdecken
@@ -223,7 +229,8 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   const bestellungHref = bestellungPfad(farmSlug, order.id)
 
   const positionen = order.items.map((item) => ({
-    text: formatPosition({
+    // Menge vorn wie im Board („2 × Bergkäse, 250 g · € 13,16“, s1-/w1-bestaetigung).
+    text: positionMengeVorn({
       name: item.productName,
       quantity: item.quantity,
       unit: item.product?.unit ?? null,
@@ -245,7 +252,10 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         : { haupt: { href: bestellungHref, text: 'Bestellung ansehen' }, neben: { href: `/${farmSlug}`, text: 'Weiter einkaufen' } }
 
   return (
-    <KundeShellMitSitzung unterleiste={false}>
+    // Boards s1-/w1-bestaetigung (Lauf 31): am Handy die Titelzeile „Bestellung bei <Hof>“, im Browser der Seitenfuß in
+    // der Spalte der Seite (896 px Inhalt).
+    // Ab 768 px steht die Hauptaktion fest unten (w1-bestaetigung, Runde 2): Der Seitenfuß hält darunter Platz frei.
+    <KundeShellMitSitzung unterleiste={false} handyTitel={`Bestellung bei ${order.farm.name}`} fussSpalte="md:max-w-[944px]" platzFuerLeiste>
       {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
       {korbLeeren(zustand) && <ClearCartOnMount />}
       <div className={SPALTE}>
@@ -284,8 +294,10 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           positionen={positionen}
           summen={order}
           zahlung={`${zahlung.art} · ${zahlung.zustand}`}
+          // Bar offen nennt die Karte mit der Frist Termin und Adresse schon (Board Bild 3: keine Zeile darunter).
           fuss={
-            !bloecke.abholkarte && (
+            !bloecke.abholkarte &&
+            !bloecke.fristHinweis && (
               <p className="text-[12px] leading-normal break-words text-muted-foreground">
                 Bestellnummer {order.orderNumber} · Abholung: {abholZeit} · {adresse}
               </p>
@@ -293,14 +305,16 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
           }
         />
 
-        {(bloecke.teilen || neuigkeiten) && (
+        {/* Bar offen zeigt das Board nach der Bestellung nichts mehr (s1-/w1-bestaetigung Bild 3, Lauf 31): Die Karte
+            der Neuigkeiten kommt, sobald die Bestellung bestätigt ist — die Seite, auf die der Link der Mail führt. */}
+        {(bloecke.teilen || (neuigkeiten && !bloecke.fristHinweis)) && (
           <div className={PAAR}>
             {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
             {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
             {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.
                 Kennung und Signatur stehen ohnehin in der Adresse dieser Seite; welche
                 Adresse angemeldet wird, nimmt der Server aus der Bestellung. */}
-            {neuigkeiten && (
+            {neuigkeiten && !bloecke.fristHinweis && (
               <NeuigkeitenKarte orderId={order.id} sig={sig} hofName={order.farm.name} email={customerEmail ?? undefined} />
             )}
           </div>

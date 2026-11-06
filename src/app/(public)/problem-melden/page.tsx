@@ -54,6 +54,7 @@ export default async function ProblemMeldenPage({
           titel={PROBLEM_MELDEN}
           satz={PROBLEM_MELDEN_SATZ_KUNDE}
           kennungVorbelegt={kennung}
+          hofName={farm?.name}
         />
       </div>
     </KundeShellMitSitzung>

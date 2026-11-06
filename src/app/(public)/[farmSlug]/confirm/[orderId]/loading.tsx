@@ -26,7 +26,7 @@ export default function BestaetigungLaden() {
       <div className="h-14 border-b border-border bg-background md:h-16" />
 
       {/* Seit Nr. 227 (Board s1-/w1-bestaetigung): Spalte 896 px, Kopf links mit Kicker, Schritte als Balken. */}
-      <main className="mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8">
+      <main className="mx-auto flex w-full max-w-[928px] flex-col gap-3 px-4 pt-6 pb-12 md:gap-4 md:pt-8 md:pb-0">
         {/* Kicker, Überschrift, Satz */}
         <div className="flex flex-col gap-1.5">
           <div className="h-3 w-44 rounded bg-app-chip" />
@@ -45,7 +45,7 @@ export default function BestaetigungLaden() {
         </div>
 
         {/* Abholung · Hof erreichen */}
-        <div className="grid items-start gap-4 md:grid-cols-2">
+        <div className="grid items-start gap-3 md:grid-cols-2 md:gap-4">
           <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4">
             <div className="h-3 w-20 rounded bg-app-chip" />
             <div className="h-6 w-56 max-w-full rounded bg-app-trough" />

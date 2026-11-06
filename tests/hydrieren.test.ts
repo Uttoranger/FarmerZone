@@ -25,12 +25,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, createElement, useState, type ComponentProps, type ReactNode } from 'react'
+import { act, createElement, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { NotbremseBand } from '@/components/notbremse-band'
-import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { NETZ_ZEILE } from '@/lib/netz'
 import { HeuteRoutine } from '@/components/admin/heute-routine'
 
@@ -185,6 +184,15 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
     expect(ergebnis.serverHtml).not.toContain('<button')
     // Im Browser ist es dunkel: Der Knopf bietet den hellen Modus an.
     expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
+    // Das Symbol ist auch im Dunkeln der Mond des Boards (Nr. 233, UI-Runde 3), keine Sonne.
+    expect(ergebnis.container.querySelector('button svg[data-symbol="mond"]')).not.toBeNull()
+    expect(ergebnis.container.querySelector('button .lucide-sun')).toBeNull()
+  })
+
+  it('ThemeUmschalter hell: derselbe Mond, nur die Beschriftung sagt, was der Tipp tut (Nr. 233)', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalter), { imBrowser: () => localStorage.setItem('theme', 'light') })
+    expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Dunkelmodus einschalten')
+    expect(ergebnis.container.querySelector('button svg[data-symbol="mond"]')).not.toBeNull()
   })
 
   // Fund aus Nr. 135 (damals an ThemeUmschalterZeile, die seit Nr. 220 der Pille und der Wahl gewichen ist): Die
@@ -238,28 +246,6 @@ describe('Hydrieren – das Band der Notbremse (Register N34, Nr. 189)', () => {
     expect(holen).toHaveBeenCalledWith('/api/notbremse', { cache: 'no-store' })
     expect(ergebnis.container.textContent).toContain(satz)
     expect(ergebnis.container.querySelector('[role="status"]')).not.toBeNull()
-  })
-})
-
-describe('Hydrieren – klebt die Hofzeile (Nr. 195)', () => {
-  function Probe(): React.JSX.Element {
-    const [block, setzeBlock] = useState<HTMLDivElement | null>(null)
-    return createElement('div', { ref: setzeBlock }, `klebt: ${useHofzeileKlebt(block)}`)
-  }
-  afterEach(() => vi.restoreAllMocks())
-  const lageDesBlocks = (oben: number) => () =>
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: oben, height: 0 } as DOMRect)
-
-  it('im Server-HTML „klebt nicht“; oben angekommen nach dem Hydrieren „klebt“', async () => {
-    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(0) })
-    expect(ergebnis.serverHtml).toContain('klebt: false')
-    expect(ergebnis.meldungen).toEqual([])
-    expect(ergebnis.container.textContent).toBe('klebt: true')
-  })
-
-  it('Gegenprobe: weit unten im Fluss bleibt es bei „klebt nicht“', async () => {
-    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(420) })
-    expect(ergebnis.container.textContent).toBe('klebt: false')
   })
 })
 
@@ -438,7 +424,7 @@ describe('Hydrieren – Teile mit der Breite und der Adresse des Browsers', () =
   it('StartbildschirmKarte: im Server-HTML nichts, im Browser die Anleitung — in der installierten App nicht', async () => {
     const imBrowser = await pruefeHydrieren(createElement(StartbildschirmKarte))
     expect(imBrowser.serverHtml).toBe('')
-    expect(imBrowser.container.textContent).toContain(STARTBILDSCHIRM_KARTE.titel)
+    expect(imBrowser.container.textContent).toContain(STARTBILDSCHIRM_KARTE.titel.split(': ')[0])
     await raeumeHydrierenAuf()
 
     fenster.standalone = true
@@ -487,9 +473,9 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
   it('HoefeClient (useIstBreit): der Server zeichnet die schmale Gestalt, am breiten Fenster springt der Splitscreen erst nach dem Hydrieren ein', async () => {
     const element = createElement(HoefeClient, { hoefe: [hof('a'), hof('b')], jetzt: JETZT })
     const ergebnis = await pruefeHydrieren(element, { imBrowser: () => (fenster.breite = 1280) })
-    // Die Zahlzeile in der Filterreihe (ein <span role="status">) steht nur im Splitscreen; die <p role="status"> über der Liste immer.
-    expect(ergebnis.serverHtml).not.toContain('<span role="status"')
-    expect(ergebnis.container.querySelector('span[role="status"]')).not.toBeNull()
+    // Den Splitscreen trägt sein Rahmen (data-ansicht="split") — der Server zeichnet ihn nie.
+    expect(ergebnis.serverHtml).not.toContain('data-ansicht="split"')
+    expect(ergebnis.container.querySelector('[data-ansicht="split"]')).not.toBeNull()
   })
 })
 
@@ -509,7 +495,6 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/cookie-banner.tsx': ['CookieBanner'],
   'src/components/farm/vorschau-im-rahmen.tsx': ['useImVorschauRahmen'],
   'src/components/heute/startbildschirm-karte.tsx': ['StartbildschirmKarte'],
-  'src/components/hofseite/use-hofzeile-klebt.ts': ['useHofzeileKlebt'],
   'src/components/hoefe/hoefe-client.tsx': ['HoefeClient'],
   'src/components/hoefe/use-hoefe-adresse.ts': ['useHoefeAdresse'],
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],

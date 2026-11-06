@@ -21,16 +21,25 @@ export const metadata: Metadata = {
 export default function AdminAnmeldenPage(): React.JSX.Element {
   return (
     <div data-design="neu" className="flex min-h-dvh flex-col bg-background text-foreground">
+      {/* Am Handy steht „Admin“ direkt hinter der Marke, im Browser rechts vor Hell/Dunkel (Boards s2-/w2-anmelden, Bild 3/4). */}
       <header className="border-b border-border bg-card">
-        <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2 md:min-h-16 md:px-8">
+        <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2 md:min-h-16 md:px-10">
           <div className="flex items-center gap-2.5">
             <Wortmarke />
-            <StatusBadge status="offen">Admin</StatusBadge>
+            <span className="md:hidden">
+              <StatusBadge status="offen">Admin</StatusBadge>
+            </span>
           </div>
-          <ThemeUmschalter />
+          <div className="flex items-center gap-3">
+            <span className="hidden md:inline-flex">
+              <StatusBadge status="offen">Admin</StatusBadge>
+            </span>
+            <ThemeUmschalter />
+          </div>
         </div>
       </header>
-      <main className="flex flex-1 justify-center px-4 py-10 md:items-start md:justify-start md:px-14 md:py-16">
+      {/* Eine schmale Spalte ohne Karte, im Browser mittig (Board w2-anmelden, Bild 3). */}
+      <main className="flex flex-1 justify-center px-4 pt-6 pb-10 md:pt-8">
         <AdminAnmeldungKarte />
       </main>
     </div>

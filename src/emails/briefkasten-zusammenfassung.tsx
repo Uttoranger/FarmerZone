@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, zwischenTitel } from './_layout'
 
 export interface BriefkastenZusammenfassungProps {
   neu: number
@@ -20,48 +20,34 @@ export function BriefkastenZusammenfassungEmail(p: BriefkastenZusammenfassungPro
   return (
     <EmailLayout fuss={{ art: 'betrieb' }} previewText={p.offenZeile}>
       <Text style={h1}>{p.lage ? 'Wochenlage' : 'Postfach — Wochenstand'}</Text>
-      {p.lage && (
-        <div style={highlightBox}>
-          <Text style={highlightLabel}>Die letzten 7 Tage</Text>
-          {p.lage.map((z) => (
-            <Text key={z.label} style={{ ...highlightValue, fontSize: '14px' }}>
-              {z.label}: <strong>{z.wert}</strong>
-            </Text>
-          ))}
-        </div>
-      )}
+      {/* Board s3/w3-mail-betrieb Bild 4: Zeilen mit der Zahl rechts, kein Kasten. */}
+      {p.lage?.map((z) => <BetragsZeile key={z.label} links={z.label} rechts={z.wert} />)}
+      {p.lage && <Trenner />}
+      <Text style={{ ...bodyText, margin: '6px 0 6px' }}>{p.offenZeile}</Text>
       <Text style={bodyText}>
-        <strong>{p.offenZeile}</strong>
-      </Text>
-      <Text style={bodyText}>
-        {p.neu === 1 ? 'Eine neue Meldung' : `${p.neu} neue Meldungen`} seit der letzten Sichtung.{' '}
-        {p.liegenGeblieben > 0 && (
-          <>
-            <strong>{p.liegenGeblieben}</strong>{' '}
-            {p.liegenGeblieben === 1 ? 'Meldung steht' : 'Meldungen stehen'} seit mehr als 14 Tagen auf
-            &bdquo;Neu&ldquo; oder &bdquo;Geprüft&ldquo;.{' '}
-          </>
-        )}
-        Offen insgesamt: {p.offen}.
+        {`${p.neu === 1 ? 'Eine neue Meldung' : `${p.neu} neue Meldungen`} seit der letzten Sichtung. `}
+        {p.liegenGeblieben > 0 &&
+          `${p.liegenGeblieben} ${p.liegenGeblieben === 1 ? 'Meldung steht' : 'Meldungen stehen'} seit mehr als 14 Tagen auf „Neu“ oder „Geprüft“. `}
+        {`Offen insgesamt: ${p.offen}.`}
       </Text>
 
       {p.neueste.length > 0 && (
-        <div style={highlightBox}>
-          <Text style={highlightLabel}>Die jüngsten neuen Meldungen</Text>
+        <>
+          <Text style={{ ...zwischenTitel, marginTop: '12px' }}>Die jüngsten neuen Meldungen</Text>
           {p.neueste.map((m) => (
-            <Text key={m.kurznummer} style={{ ...highlightValue, fontSize: '14px' }}>
-              <span style={{ fontFamily: 'monospace' }}>{m.kurznummer}</span> · {m.art} ·{' '}
-              {m.hofName ?? 'Kundin'} — {m.ersteZeile}
+            <Text key={m.kurznummer} style={{ ...bodyText, margin: '0 0 4px' }}>
+              {`${m.kurznummer} · ${m.art} · ${m.hofName ?? 'Kundin'} — ${m.ersteZeile}`}
             </Text>
           ))}
-        </div>
+        </>
       )}
 
-      <Link href={p.adminUrl} style={ctaButton}>Postfach öffnen →</Link>
+      <KnopfReihe>
+        <Knopf href={p.adminUrl}>Postfach öffnen →</Knopf>
+      </KnopfReihe>
 
-      <Text style={mutedText}>
-        Aufgeräumt: {p.geloescht === 0 ? 'nichts' : `${p.geloescht} erledigte ${p.geloescht === 1 ? 'Meldung' : 'Meldungen'}`}{' '}
-        älter als 90 Tage gelöscht.
+      <Text style={kleinText}>
+        {`Aufgeräumt: ${p.geloescht === 0 ? 'nichts' : `${p.geloescht} erledigte ${p.geloescht === 1 ? 'Meldung' : 'Meldungen'}`} älter als 90 Tage gelöscht.`}
       </Text>
     </EmailLayout>
   )

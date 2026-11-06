@@ -21,8 +21,8 @@ import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
 import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
-import { MARKE, MARKE_TEAM } from '@/lib/marke'
-import { WUENSCHE_TEXT, bescheidMailHtml } from '@/lib/meldung'
+import { MARKE } from '@/lib/marke'
+import { WUENSCHE_TEXT } from '@/lib/meldung'
 import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref, offenSatz, type EingangZahlen } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
@@ -409,9 +409,11 @@ async function sendeAnListe(an: readonly string[], subject: string, html: string
 
 function formatPickupDate(date: Date): string {
   // Wiener Kalendertag, nie die Zeitzone des Servers (CODING_STANDARDS §2).
-  return date.toLocaleDateString('de-AT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna',
-  })
+  // Kurzer Wochentag ohne Punkt wie in den Boards („Mi, 3. März 2027“, Lauf 31):
+  // Ausgeschrieben bricht „Uhr“ am Handy allein in die nächste Zeile.
+  const wochentag = date.toLocaleDateString('de-AT', { weekday: 'short', timeZone: 'Europe/Vienna' }).replace(/\.$/, '')
+  const datum = date.toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna' })
+  return `${wochentag}, ${datum}`
 }
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
@@ -830,13 +832,13 @@ export async function baueNewFarmNotification(
   },
   an: string
 ): Promise<StapelMail> {
-  const registeredAt = farm.createdAt.toLocaleString('de-AT', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Europe/Vienna',
-  })
+  // Kurzer Wochentag, Datum und Uhrzeit wie in den Boards („Do, 15. Oktober 2026, 10:00“, Wiener Zeit).
+  const registeredAt = `${formatPickupDate(farm.createdAt)}, ${farm.createdAt.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })}`
   const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
+  const { ADMIN_HOEFE_HREF } = await import('@/lib/admin-hof-akte')
   const html = await toHtml(
     React.createElement(NewFarmNotificationEmail, {
+      pruefenUrl: `${APP_URL}${ADMIN_HOEFE_HREF}`,
       farmName: farm.name,
       farmId: farm.id,
       farmSlug: farm.slug,
@@ -983,8 +985,10 @@ export type ErstattungOffenMeldung = {
  */
 export async function baueErstattungOffen(m: ErstattungOffenMeldung, an: string): Promise<StapelMail> {
   const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
+  const { ADMIN_BESTELLUNGEN_HREF } = await import('@/lib/admin-bestellung')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
+      bestellungenUrl: `${APP_URL}${ADMIN_BESTELLUNGEN_HREF}`,
       was: m.was,
       bestellnummer: m.bestellnummer,
       bestellId: m.bestellId,
@@ -1016,6 +1020,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     zahlart: mailZahlart(order.paymentMethod),
@@ -1071,6 +1076,7 @@ export async function onsiteConfirmationInhalt(
     farmName: order.farm.name,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: mailPositionen(order),
@@ -1129,7 +1135,8 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
+    // Zeilenbeträge wie in der Mail an die Kundin (mailPositionen: dieselbe Rechnung über Cent), Board s3/w3-mail-hof-bestellung Bild 1.
+    items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
@@ -1194,6 +1201,7 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
@@ -1215,6 +1223,7 @@ export async function baueOrderNotReady(order: OrderForEmail): Promise<StapelMai
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
@@ -1279,6 +1288,8 @@ export async function baueOrderCancelled(
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
+    farmPhone: order.farm.phone,
+    zahlart: mailZahlart(order.paymentMethod),
     total: n(order.totalAmount),
     refundAmount: erstattetCents === null ? null : centsAlsEuro(erstattetCents),
     cancelReason: cancelReason ?? undefined,
@@ -1395,12 +1406,13 @@ export async function bauePostfachMail(m: {
 
 /**
  * Bescheid an eine Kundin, die einen Wunsch gemeldet hat (Register N14,
- * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Text und Team-Name
- * baut `bescheidMailHtml` (src/lib/meldung.ts); die Antwort lädt der Renderer
- * frisch aus der Meldung.
+ * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Die Vorlage
+ * src/emails/bescheid.tsx; die Antwort lädt der Renderer frisch aus der Meldung.
  */
 export async function baueBescheidMail(an: string, antwort: string): Promise<StapelMail> {
-  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: bescheidMailHtml(antwort, MARKE_TEAM) }
+  // Seit Nr. 241 in der Karte aller Mails (Board s3/w3-mail-neuigkeiten Bild 4) statt als rohes HTML.
+  const { BescheidEmail } = await import('@/emails/bescheid')
+  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: await toHtml(React.createElement(BescheidEmail, { antwort })) }
 }
 
 /**
@@ -1443,7 +1455,7 @@ export async function baueHofAntwortAnTeam(
 /** „Testmail an alle senden" (Postfach › Zustellung) → EINE Adresse der Liste (je Adresse ein Auftrag). */
 export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {
   const { BetreiberTestmailEmail } = await import('@/emails/betreiber-testmail')
-  const html = await toHtml(React.createElement(BetreiberTestmailEmail, { url: `${APP_URL}${eingangAdresse('offen')}` }))
+  const html = await toHtml(React.createElement(BetreiberTestmailEmail))
   return { an, betreff: ZUSTELLUNG_MAIL_TEXT.testBetreff, html }
 }
 

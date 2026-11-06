@@ -278,6 +278,28 @@ export function formatPosition(p: {
 }
 
 /**
+ * Eine Position mit der Menge vorn, wie in den Boards der Kaufstrecke (s1-/w1-kasse, s1-/w1-bestaetigung,
+ * s1-/w1-bestellung-link, Lauf 31) — nur Anzeige, ohne Betrag, in EINER Form „Anzahl × Name, Gebinde“:
+ *   Stück ohne Gebinde (oder ohne Einheit): „3 × Bergkäse“
+ *   sonst mit dem Gebinde dahinter:         „1 × Bio-Freilandeier, 6 Pakete“, „4 × Heumilch frisch, 1 L“
+ * Ohne Gebindegröße zählt eine Einheit (Preis-Semantik unten: Anzahl × Gebinde).
+ * Mails, Hofbereich und Admin behalten `formatPosition` (Name vorn); dort ist nichts geändert.
+ */
+export function positionMengeVorn(p: {
+  name: string
+  quantity: number
+  unit?: string | null
+  unitSize?: number | { toString(): string } | null
+}): string {
+  const anzahl = `${formatZahl(p.quantity)} × ${p.name}`
+  if (!p.unit) return anzahl
+  const gebinde = gebindeGroesse(p.unitSize) ?? 1
+  // „3 × Bergkäse, 1 Stück“ sagte nichts Neues — beim Stück steht das Gebinde nur, wenn es mehr als eins ist.
+  if (p.unit === 'STUECK' && gebinde === 1) return anzahl
+  return `${anzahl}, ${formatZahl(gebinde)} ${einheitLabel(p.unit, gebinde)}`
+}
+
+/**
  * Singular oder Plural — für Sätze wie „1 Produkt" statt „1 Produkte"
  * (Bug-Report Befund 11). Die Zahl steht mit davor.
  */

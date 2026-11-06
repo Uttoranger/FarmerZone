@@ -200,6 +200,12 @@ export const MELDUNGEN_PRO_STUNDE = 5
 export const ZU_VIELE_MELDUNGEN =
   'Zu viele Meldungen in kurzer Zeit — bitte versuche es in einer Stunde noch einmal.'
 
+/**
+ * Die Meldung kam nicht an, weil die Anfrage scheiterte (Wurf der Aktion, nicht ihre Ablehnung) — wörtlich wie
+ * Board s3-/w3-problem-melden, Bild 6 (Nr. 242). Vorher fiel /problem-melden dann auf die 500, der Text war weg.
+ */
+export const MELDUNG_NICHT_GESPEICHERT = 'Wir konnten deine Meldung gerade nicht speichern. Dein Text ist noch da – versuch es bitte gleich noch einmal.'
+
 /** Wohin „PR #<nr>" in sprintName zeigt — das Repository ist öffentlich. */
 export const PR_BASIS_URL = 'https://github.com/Uttoranger/FarmerZone/pull/'
 
@@ -818,17 +824,6 @@ export const WUENSCHE_TEXT = {
   bescheidTitel: 'Neuer Stand zu deinem Wunsch',
   bescheidNichtGesendet: 'Der Stand ist gespeichert, die Nachricht an die Höfe aber nicht – schick sie über „Rundschreiben schreiben“.',
 } as const
-
-const HTML_ZEICHEN: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-
-/**
- * Der Körper der Betriebsmail an Kundinnen eines Bündels (über sendRaw, Post-Sperre Z3):
- * die Antwort des Teams als maskierter Text — nie als Markup —, Zeilen bleiben Zeilen.
- */
-export function bescheidMailHtml(antwort: string, team: string): string {
-  const text = (s: string): string => s.replace(/[&<>"']/g, (z) => HTML_ZEICHEN[z] ?? z)
-  return `<p>${text(antwort).replace(/\r?\n/g, '<br>')}</p><p>${text(team)}</p>`
-}
 
 // ─── Suche in Zusammenfassen und Dazunehmen ─────────────────────────────────
 

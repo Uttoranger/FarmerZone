@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
+import { ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 /**
  * Die Bildfläche einer Hofkarte ohne Foto (Register N22, Board
@@ -11,9 +12,10 @@ import { cn } from '@/lib/utils'
  *
  * Reiner Schmuck (`alt=""`): Der Hofname steht direkt darunter. Jede
  * Illustration steht quadratisch auf ihrem Creme-Grund; die Fläche dahinter
- * ist `bg-muted`, im hellen Theme fast derselbe Ton. Im Dunkeln gedämpft und
- * gerahmt statt beschattet (CODING_STANDARDS §7, Vorbild `Illustration` der
- * Startseite) — der helle Grund leuchtete sonst als Fläche.
+ * ist `bg-muted`, im hellen Theme fast derselbe Ton. Im Dunkeln gerahmt statt
+ * beschattet und mit der Fläche multipliziert (ILLUSTRATION_HUELLE/-BILD aus
+ * ui/bild-dunkel.ts, dieselbe Quelle wie Hofseite und Produktseite): Mit
+ * `brightness` allein leuchtete der Crème-Grund noch als hellgraues Quadrat (Abnahme Lauf 31).
  *
  * `fuellen`: Die Bilder teilen sich die Breite, statt quadratisch zu bleiben —
  * für kleine Vorschaubilder (Splitscreen, Karussell, Produktzeile), in denen
@@ -35,7 +37,10 @@ export function HofBildflaeche({
   className?: string
 }): React.JSX.Element {
   return (
-    <span data-slot="hof-bildflaeche" className={cn('flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border', className)}>
+    <span
+      data-slot="hof-bildflaeche"
+      className={cn('flex justify-center overflow-hidden bg-muted dark:ring-1 dark:ring-border', ILLUSTRATION_HUELLE, className)}
+    >
       {bilder.map((src) => (
         <span key={src} className={cn('relative h-full min-w-0', fuellen ? 'flex-1' : 'aspect-square shrink')}>
           <Image
@@ -43,7 +48,7 @@ export function HofBildflaeche({
             alt=""
             fill
             sizes={sizes}
-            className={cn('object-cover dark:brightness-[0.78] dark:saturate-[0.9]', gedaempft && 'opacity-60 grayscale')}
+            className={cn('object-cover', ILLUSTRATION_BILD, gedaempft && 'opacity-60 grayscale')}
           />
         </span>
       ))}

@@ -308,6 +308,18 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 231 | Rechtstexte, Rücktrittsrecht, Fehlerseiten (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N43 |
 | 232 | E-Mails: Fuß-Arten, Reply-To, Texte (vom Zwischenstand `integration/lauf30` nach 219–221) | `freigabe.md` §34 | N43 |
 | Sammel 30 | Sammel-PR `integration/lauf30` | `freigabe.md` §34 | G3, G10 |
+| 233a | Gate A – Abnahme-Lauf: Bilder je Board und Zustand, Bewertung durch pruefer-ui, Messung (nur lesen, kein Code; im Doku-PR `docs/lauf31`) | `freigabe.md` §35 | – |
+| 233 | Hof-Shell und Balken N42 e (alle Hof-Seiten), aktive Pille, Seitenleiste, Schriftgrößen in ui/ (von `docs/lauf31`) | `freigabe.md` §35 | N42 |
+| 234 | Kundschaft Finden: Startseite (A1), Höfe entdecken, Hofkarten der Startseite (vom Zwischenstand `integration/lauf31` nach 233) | `freigabe.md` §35 | – |
+| 235 | Hofseite und Produktseite (von `docs/lauf31`) | `freigabe.md` §35 | – |
+| 236 | Kauf: Warenkorb, Kasse (feste Leiste am Handy), Bestätigung, Bestellung ansehen, Meine Bestellungen (von `docs/lauf31`) | `freigabe.md` §35 | N9 |
+| 237 | Hof-Alltag und Produkte (vom Zwischenstand `integration/lauf31` nach 233) | `freigabe.md` §35 | N25, N41 |
+| 238 | Mein Hof, Einstellungen, Region, Hof-Werkzeuge (vom Zwischenstand `integration/lauf31` nach 233) | `freigabe.md` §35 | – |
+| 239 | Anmelden, Konto, Systemseiten, Rechtstexte, Fehlerseiten (vom Zwischenstand `integration/lauf31` nach 233) | `freigabe.md` §35 | N39 (Wortlaut bleibt) |
+| 240 | Admin: nur die Geld-Kachel nach `createdAt` (A2 Punkt 8), Admin ohne Passkey nicht erreichbar (Präzisierung 2) | `freigabe.md` §35 | – |
+| 241 | E-Mails (Bilder 390/600, nur hell) und Druck (vom Zwischenstand `integration/lauf31` nach 233) | `freigabe.md` §35 | N39 (Wortlaut bleibt) |
+| 242 | Nacharbeit-Abfragen, Texte ohne Nummer, tote Teile, Robustheit, Test-Zeitgrenzen, ohne Geld-Logik (vom Zwischenstand `integration/lauf31`, zuletzt) | `freigabe.md` §35 | – |
+| Sammel 31 | Sammel-PR `integration/lauf31`, danach Gate A noch einmal auf dem Sammelstand | `freigabe.md` §35 | G3, G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -455,6 +467,8 @@ Keine Migration, kein neues Paket, keine neue Variable. Priorität 168 → 169 �
 **Reihenfolge in Lauf 26** (`freigabe.md` §30, Haltepunkt Sammel-PR): Doku-PR → Welle 1 von `docs/lauf26`: 188 ∥ 184 ∥ 192 ∥ 194 ∥ 195 ∥ 196 → Welle 2 vom Zwischenstand `integration/lauf26`, sobald 188 hineingemergt und der volle lokale Lauf grün ist: 185 ∥ 186 ∥ 187 ∥ 189 ∥ 191 ∥ 197 (197 erst, wenn 195 und 196 im Zwischenstand sind) → Welle 3 vom Zwischenstand: 190 nach 187 und 188, 198 nach 185, 187, 191 und 197, 193 nach 185, 186, 187, 190, 191 und 198 (Navigation und Umzüge zuletzt) → Sammel-PR. Die Branches heißen `nacht/2026-10-26/<nr>-<kurz>`. Ist eine Vorgängerin Entwurf oder entfallen, startet die Nachfolgerin vom letzten grünen Zwischenstand und nennt das im Bericht; Teile, die die Vorgängerin brauchen, entfallen mit Bericht.
 
 Genau eine Migration (188, nur Expand), kein neues Paket, keine neue Variable. Priorität 188 → 184 → 185 → 186 → 187 → 189 → 197 → 191 → 198 → 190 → 193 → 192 → 194 → 195 → 196. 197 und 198 gehören zusammen: Ist 197 nicht grün, entfällt 198 mit Bericht; ist 198 nicht fertig, bleibt 197 im Sammel-PR, und bis zum Einzug gilt „erlassen“ (N38), nichts wird eingezogen. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §30).
+
+**Reihenfolge in Lauf 31** (`freigabe.md` §35 mit den Präzisierungen, Haltepunkt Sammel-PR mit Schluss-Durchgang Gate A): Doku-PR mit Gate A (233a) → Welle 1: 233 ∥ 235 ∥ 236 (alle von `docs/lauf31`) → 237, 238, 234, 239, 241, 240 vom Zwischenstand `integration/lauf31`, sobald 233 dort gemergt und der volle Lauf grün ist, je ein freier Platz → 242 zuletzt vom Zwischenstand → Sammel-PR → Gate A auf dem Sammelstand. Höchstens drei Umsetzer gleichzeitig. `src/components/ui/**` gehört allein 233; spätere Nummern nehmen die Bausteine vom Zwischenstand und ändern ui/ nur mit Grenz-Erweiterung durch den Dirigenten. Je Nummer bis zu vier Runden pruefer-ui (Bewertung nur aus App-Bild, Board-Bild und Maßstab), daneben tester und pruefer nach §4. Keine Migration, kein neues Paket, keine neue Variable. Priorität 233 → 235 → 236 → 237 → 238 → 234 → 239 → 241 → 240 → 242. Admin-Boards „nicht abgenommen“, wenn der Admin ohne Passkey nicht erreichbar ist (Präzisierung 2).
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 

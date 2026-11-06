@@ -50,6 +50,7 @@ import {
   meldungZeilen,
   meldungenStand,
   seiteKurz,
+  seiteName,
 } from '@/lib/hof-hilfe'
 import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
 import { MeldungForm } from '@/components/shared/meldung-form'
@@ -317,6 +318,10 @@ describe('Meldungen: Ton, Zähler, Zeilen', () => {
     expect(geraetKurz('')).toBe('–')
     expect(seiteKurz('http://localhost:3000/orders?filter=heute')).toBe('/orders?filter=heute')
     expect(seiteKurz('')).toBe('–')
+    expect(seiteName('http://localhost:3000/orders?filter=heute')).toBe('Bestellungen')
+    expect(seiteName('/dashboard#oben')).toBe('Heute')
+    expect(seiteName('http://localhost:3000/unbekannt/x?a=1#b')).toBe('/unbekannt/x')
+    expect(seiteName('')).toBe('–')
   })
 
   it('das Textfeld fragt passend zur Art', () => {
@@ -382,7 +387,11 @@ describe('Meldung abgeben (gerendert)', () => {
     expect(html).toContain('Absenden')
     expect(html).toContain(`href="${MEINE_MELDUNGEN_HREF}"`)
     expect(html).toContain('name="website"')
-    expect(html).toContain('Mitgeschickt: Seite, Gerät und dein Hof.')
+    // Seit Nr. 233 (Board s2-meldungen): im Hofbereich die Karte statt des Satzes — Seite und Gerät, ohne IP und Cookies.
+    expect(html).toContain('Das schicken wir automatisch mit')
+    expect(html).toMatch(/<dt[^>]*>Seite<\/dt>/)
+    expect(html).toMatch(/<dt[^>]*>Gerät<\/dt>/)
+    expect(html).not.toContain('Mitgeschickt:')
     expect(html).toContain('Keine IP-Adresse, keine Cookies.')
     expect(html).toContain('Bildschirmfoto hinzufügen')
   })

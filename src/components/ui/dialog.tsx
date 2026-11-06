@@ -115,12 +115,19 @@ function DialogMitte({
   children,
   titel,
   schliessen = SCHLIESSEN_TEXT,
+  aktionen,
   ...props
 }: DialogPrimitive.Popup.Props & {
   /** Der Name des Dialogs, als h2 links oben. */
   titel: React.ReactNode
   /** Der Text des einen Schließen-Elements. */
   schliessen?: string
+  /**
+   * Die Aktionen am Ende des Dialogs, gleich breit nebeneinander (Board w2-kundenkonto, Bild 4: „Abbrechen“ |
+   * „Konto löschen“; seit Nr. 242). Dann trägt eine davon das eine Schließen-Element („Abbrechen“, als
+   * `DialogClose` oder Knopf mit Handler), und der Kopf hat keinen eigenen Knopf — sonst stünden zwei da.
+   */
+  aktionen?: React.ReactNode
 }) {
   return (
     <DialogPortal>
@@ -139,17 +146,24 @@ function DialogMitte({
             <DialogPrimitive.Title data-slot="dialog-title" className="min-w-0 pt-2 font-heading text-[21px] leading-tight font-semibold text-foreground">
               {titel}
             </DialogPrimitive.Title>
-            <DialogPrimitive.Close
-              data-slot="dialog-close"
-              className={cn(
-                "-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[15px] font-semibold text-foreground hover:bg-muted",
-                FOKUS_RAHMEN
-              )}
-            >
-              {schliessen}
-            </DialogPrimitive.Close>
+            {aktionen === undefined && (
+              <DialogPrimitive.Close
+                data-slot="dialog-close"
+                className={cn(
+                  "-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[15px] font-semibold text-foreground hover:bg-muted",
+                  FOKUS_RAHMEN
+                )}
+              >
+                {schliessen}
+              </DialogPrimitive.Close>
+            )}
           </div>
           {children}
+          {aktionen !== undefined && (
+            <div data-slot="dialog-mitte-aktionen" className="mt-2 grid auto-cols-fr grid-flow-col gap-2.5">
+              {aktionen}
+            </div>
+          )}
         </DialogPrimitive.Popup>
       </MenueZielAnbieter>
     </DialogPortal>

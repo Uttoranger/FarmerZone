@@ -1,10 +1,10 @@
 'use client'
 
 import { useRef, useState, useTransition } from 'react'
-import { Check, Loader2, Printer } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 import { WIDERRUF_GRENZEN, WIDERRUF_TEXT, eingangZeitpunkt, type WiderrufUmfang } from '@/lib/widerruf'
 import { reicheWiderrufMitLinkEin, reicheWiderrufOhneLinkEin, type WiderrufAntwort } from '@/server/actions/widerruf'
-import { FELD, FELD_LABEL, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { FELD, FELD_LABEL, KNOPF_GRUEN, KNOPF_UMRISS } from '@/components/anmelden/stil'
 import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
@@ -21,9 +21,17 @@ export type WiderrufBestellAnsicht = {
 
 type Schritt = 'eingabe' | 'zusammenfassung' | 'eingegangen'
 
-const KARTE = 'flex flex-col gap-3.5 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]'
+/*
+ * Seit Nr. 239 (Abnahme Lauf 31, Boards s3-/w3-widerruf) nur am Rahmen geändert, nie am Wortlaut: Felder, Beschriftungen
+ * und Knöpfe in den Formen der Anmeldung (components/anmelden/stil.ts: Beschriftung in Textfarbe, Feld mit Feldrand,
+ * Knöpfe als Rechteck über die volle Breite), Ecken in Pixeln (rounded-2xl wächst im neuen Design mit --radius), der
+ * Eingang im Paar „läuft“ (mintgrün, Beschriftungen ≥ 4,5:1 auf der Fläche) und „Drucken oder speichern“ ohne Symbol.
+ */
+const KARTE = 'flex flex-col gap-3.5 rounded-[16px] border border-border bg-card px-4 py-4 md:px-[18px]'
+/** Mehrzeiliges Feld: die Feldform ohne die feste Höhe. */
+const FELD_MEHRZEILIG = cn(FELD, 'h-auto min-h-[88px] resize-y py-3 leading-normal')
 const AUSWAHL = cn(
-  'flex min-h-11 cursor-pointer items-start gap-3 rounded-[12px] border border-border px-3.5 py-3 text-[14.5px] text-foreground has-[:checked]:border-accent has-[:checked]:bg-accent/10',
+  'flex min-h-11 cursor-pointer items-start gap-3 rounded-[12px] border border-input px-3.5 py-3 text-[15px] text-foreground has-[:checked]:border-accent has-[:checked]:bg-accent/10',
   FOKUS_RAHMEN
 )
 /** „Schritt 1 von 2" über der Karte (Board w3-widerruf). */
@@ -109,7 +117,7 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
   if (schritt === 'eingegangen' && eingegangenAm) {
     // Grün getönt wie die Hinweiskarte der Kundenwelt (Board w3-widerruf Bild 4).
     return (
-      <section aria-labelledby="widerruf-kopf" className="flex flex-col gap-3.5 rounded-2xl border border-accent/45 bg-accent/12 px-4 py-4 md:px-[18px]">
+      <section aria-labelledby="widerruf-kopf" className="flex flex-col gap-3.5 rounded-[16px] border border-zustand-laeuft/30 bg-zustand-laeuft-grund px-4 py-4 md:px-[18px]">
         <span className="flex size-9 items-center justify-center rounded-full bg-accent text-accent-foreground" aria-hidden="true">
           <Check className="size-5" strokeWidth={2} aria-hidden="true" />
         </span>
@@ -127,9 +135,8 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
           ))}
         </ol>
         {/* Der Beleg zum Drucken: was eingegangen ist (über das Board hinaus, Bericht 231). */}
-        <Zusammenfassung bestellung={bestellung} nummer={nummer} name={name} email={email} umfangZeilen={umfangZeilen} />
-        <button type="button" onClick={() => window.print()} className={cn(KNOPF_RAHMEN, 'self-start bg-card print:hidden')}>
-          <Printer className="size-4" strokeWidth={1.7} aria-hidden="true" />
+        <Zusammenfassung bestellung={bestellung} nummer={nummer} name={name} email={email} umfangZeilen={umfangZeilen} aufGruen />
+        <button type="button" onClick={() => window.print()} className={cn(KNOPF_UMRISS, 'print:hidden')}>
           {WIDERRUF_TEXT.speichern}
         </button>
       </section>
@@ -152,11 +159,11 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
           </div>
           <Zusammenfassung bestellung={bestellung} nummer={nummer} name={name} email={email} umfangZeilen={umfangZeilen} />
           <div className="flex flex-col gap-2.5">
-            <button type="button" onClick={bestaetigen} disabled={laeuft || name.trim() === ''} aria-busy={laeuft} className={cn(KNOPF_GRUEN, 'w-full')}>
+            <button type="button" onClick={bestaetigen} disabled={laeuft || name.trim() === ''} aria-busy={laeuft} className={KNOPF_GRUEN}>
               {laeuft && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
               {WIDERRUF_TEXT.knopfBestaetigen}
             </button>
-            <button type="button" onClick={() => setSchritt('eingabe')} disabled={laeuft} className={cn(KNOPF_RAHMEN, 'w-full')}>
+            <button type="button" onClick={() => setSchritt('eingabe')} disabled={laeuft} className={KNOPF_UMRISS}>
               {WIDERRUF_TEXT.zurueck}
             </button>
           </div>
@@ -167,7 +174,7 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
 
   const nameFeld = (
     <Feld id="widerruf-name" label={WIDERRUF_TEXT.name}>
-      <input id="widerruf-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={WIDERRUF_GRENZEN.name} required autoComplete="name" className={cn(FELD, 'min-h-11')} />
+      <input id="widerruf-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={WIDERRUF_GRENZEN.name} required autoComplete="name" className={FELD} />
     </Feld>
   )
 
@@ -192,7 +199,7 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
               required
               autoComplete="email"
               aria-describedby="widerruf-email-hinweis"
-              className={cn(FELD, 'min-h-11')}
+              className={FELD}
             />
           </Feld>
           <Feld id="widerruf-nummer" label={WIDERRUF_TEXT.bestellnummer} hinweis={WIDERRUF_TEXT.bestellnummerHinweis}>
@@ -204,14 +211,14 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
               required
               autoCapitalize="characters"
               aria-describedby="widerruf-nummer-hinweis"
-              className={cn(FELD, 'min-h-11 sm:w-64')}
+              className={FELD}
             />
           </Feld>
         </>
       )}
 
       <fieldset className="flex flex-col gap-2">
-        <legend className={cn(FELD_LABEL, 'mb-2 text-[13.5px] text-foreground')}>{WIDERRUF_TEXT.positionenTitel}</legend>
+        <legend className={cn(FELD_LABEL, 'mb-2')}>{WIDERRUF_TEXT.positionenTitel}</legend>
         <label className={AUSWAHL}>
           <input type="radio" name="umfang" value="ganz" checked={umfang === 'ganz'} onChange={() => setUmfang('ganz')} className="mt-1 size-4 accent-accent" />
           <span>{WIDERRUF_TEXT.ganz}</span>
@@ -253,7 +260,7 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
             required
             rows={3}
             aria-describedby="widerruf-freitext-hinweis"
-            className={cn(FELD, 'min-h-[88px] resize-y leading-normal')}
+            className={FELD_MEHRZEILIG}
           />
         </Feld>
       )}
@@ -268,13 +275,13 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
             onChange={(e) => setNachricht(e.target.value)}
             maxLength={WIDERRUF_GRENZEN.nachricht}
             rows={3}
-            className={cn(FELD, 'min-h-[88px] resize-y leading-normal')}
+            className={FELD_MEHRZEILIG}
           />
         </Feld>
       )}
 
       <div aria-live="polite">{fehler && <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>}</div>
-      <button type="submit" className={cn(KNOPF_GRUEN, 'w-full')}>
+      <button type="submit" className={KNOPF_GRUEN}>
         {WIDERRUF_TEXT.knopfWiderrufen}
       </button>
     </form>
@@ -284,12 +291,12 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
 function Feld({ id, label, hinweis, children }: { id: string; label: string; hinweis?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className={cn(FELD_LABEL, 'mb-0')}>
+      <label htmlFor={id} className={FELD_LABEL}>
         {label}
       </label>
       {children}
       {hinweis && (
-        <p id={`${id}-hinweis`} className="text-xs text-muted-foreground">
+        <p id={`${id}-hinweis`} className="text-[13px] text-muted-foreground">
           {hinweis}
         </p>
       )}
@@ -314,12 +321,15 @@ function Zusammenfassung({
   name,
   email,
   umfangZeilen,
+  aufGruen = false,
 }: {
   bestellung: WiderrufBestellAnsicht | null
   nummer: string
   name: string
   email: string
   umfangZeilen: string[]
+  /** Auf der grünen Fläche des Eingangs: Beschriftung im Paar „läuft“ statt leise (axe color-contrast, Abnahme Lauf 31). */
+  aufGruen?: boolean
 }) {
   const zeilen: [string, string][] = [
     [WIDERRUF_TEXT.bestellung, bestellung ? WIDERRUF_TEXT.bestellungBei(bestellung.bestellnummer, bestellung.hof) : nummer],
@@ -329,10 +339,10 @@ function Zusammenfassung({
     ...(!bestellung && email ? ([[WIDERRUF_TEXT.eingangsbestaetigungAn, email]] as [string, string][]) : []),
   ]
   return (
-    <dl className="flex flex-col text-[14px]">
+    <dl className="flex flex-col text-[15px]">
       {zeilen.map(([titel, wert]) => (
-        <div key={titel} className="flex flex-col gap-0.5 border-t border-border py-2">
-          <dt className="text-[12.5px] text-muted-foreground">{titel}</dt>
+        <div key={titel} className={cn('flex flex-col gap-0.5 border-t py-2', aufGruen ? 'border-zustand-laeuft/30' : 'border-border')}>
+          <dt className={cn('text-[13px]', aufGruen ? 'font-semibold text-zustand-laeuft' : 'text-muted-foreground')}>{titel}</dt>
           <dd className="min-w-0 break-words whitespace-pre-line text-foreground">{wert}</dd>
         </div>
       ))}

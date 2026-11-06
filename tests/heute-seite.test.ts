@@ -624,7 +624,6 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       createElement(Packliste, {
         zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' }), zeile({ id: 'o2', chip: 'bereit', gesamtCents: 2190 })],
         stand: '1 zu packen',
-        naechsteAbholung: null,
         leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr · 2 Bestellungen' },
       })
     )
@@ -641,7 +640,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
   })
 
   it('Packliste leer: ohne Abholzeit „Noch keine Abholzeiten" mit Knopf, mit Abholzeit die nächste Abholung samt Zahl — beide ohne Druckknopf (Board s1-heute, Bild 3 und 4)', () => {
-    const ohneFenster = html(createElement(Packliste, { zeilen: [], stand: '', naechsteAbholung: null, leer: { naechsteAbholung: null } }))
+    const ohneFenster = html(createElement(Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: null } }))
     expect(ohneFenster).toContain(ABHOLZEITEN_FEHLEN.titel)
     expect(ohneFenster).toContain('href="/settings/pickup-slots"')
     expect(ohneFenster).not.toContain('/orders/today/print')
@@ -651,7 +650,6 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       createElement(Packliste, {
         zeilen: [],
         stand: '',
-        naechsteAbholung: { tag: '2026-10-08', name: 'Donnerstag', anzahl: 3 },
         leer: { naechsteAbholung: satz },
       })
     )
@@ -664,7 +662,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   it('lange Namen: eine Zeile mit Auslassung, voller Text im title', () => {
     const lang = 'K'.repeat(80)
-    const h = html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten', kunde: lang })], stand: '1 zu packen', naechsteAbholung: null, leer: { naechsteAbholung: null } }))
+    const h = html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten', kunde: lang })], stand: '1 zu packen', leer: { naechsteAbholung: null } }))
     expect(h).toContain(`title="${lang}"`)
     expect(h).toContain('truncate')
   })
@@ -843,7 +841,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   it('Packliste mit Bestellungen, aber ohne aktive Abholzeit: Satz und Knopf unter der Liste — mit Abholzeit nicht', () => {
     const ohneAbholzeit = html(
-      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', naechsteAbholung: null, leer: { naechsteAbholung: null } })
+      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })
     )
     expect(ohneAbholzeit).toContain('href="/orders/o1"')
     expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.satz)
@@ -853,7 +851,6 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       createElement(Packliste, {
         zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })],
         stand: '1 zu packen',
-        naechsteAbholung: null,
         leer: { naechsteAbholung: 'Nächste Abholung: Do, 8. Okt, 15–18 Uhr' },
       })
     )
@@ -866,7 +863,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       html(createElement(StripeHinweis, { barMoeglich: true })),
       html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x' })),
       html(createElement(HeuteKopf, { datum: 'x' })),
-      html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', naechsteAbholung: null, leer: { naechsteAbholung: null } })),
+      html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })),
       html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: false, ausblenden: null })),
     ].join('')
     const symbole = alle.match(/<svg[^>]*>/g) ?? []

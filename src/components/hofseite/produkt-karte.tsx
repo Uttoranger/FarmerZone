@@ -9,21 +9,23 @@ import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
 import { formatGrundpreis } from '@/lib/format'
 import { knappText, ruhenderKnopfText, type KartenZustand } from '@/lib/bereiche-anzeige'
-import { KAEUFER_VORSCHAU, stepperObergrenze, type KartenVorschau } from '@/lib/hofseite-kunde'
+import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
 import { zweitePreiszeile } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { StatusBadge } from '@/components/ui/status-badge'
-import { Stepper } from '@/components/ui/stepper'
+import { AusverkauftMarke } from '@/components/ui/marke'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
-/** Die erste Zeile der Beschreibung als Unterzeile der Karte — der Rest steht im Produktdetail. */
-function kurzbeschreibung(p: PublicProduct): string | null {
-  const zeile = p.description?.trim().split('\n')[0]?.trim()
-  return zeile ? zeile : null
-}
+/**
+ * Die Liste der Produktkarten (Boards s1-/w1-hofseite): am Handy EINE Karte mit Zeilen
+ * und Trennlinien, ab 768 px drei Kacheln nebeneinander. Eine Klasse für das Schaufenster
+ * der Übersicht und die Abschnitte im Reiter Produkte.
+ */
+export const PRODUKT_LISTE =
+  'flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card md:grid md:grid-cols-3 md:gap-3 md:divide-y-0 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent'
 
 /** Was der Preis braucht; null = kein gültiger Preis (nur in der Vorschau des Produktdialogs). */
 type PreisAngabe = Pick<PublicProduct, 'price' | 'unit' | 'unitSize' | 'futter'> | null
@@ -34,15 +36,13 @@ function Preis({ preis: roh, className }: { preis: PreisAngabe; className?: stri
   const preis = roh ? mitEndpreis(roh, anzeige) : null
   if (!preis) {
     // Ruhiger Platzhalter statt „€ 0,00" oder „NaN" (Nr. 51).
-    return <span className={cn('flex min-w-0 flex-col text-[15px] text-muted-foreground md:text-base', className)}>{KAEUFER_VORSCHAU.preisFehlt}</span>
+    return <span className={cn('flex min-w-0 flex-col text-[15px] text-muted-foreground', className)}>{KAEUFER_VORSCHAU.preisFehlt}</span>
   }
   const zweite = zweitePreiszeile(preis)
   return (
     <span className={cn('flex min-w-0 flex-col', className)}>
-      <span className="text-[15px] font-semibold text-foreground md:text-base">
-        {formatGrundpreis(preis.price, preis.unit, preis.unitSize)}
-      </span>
-      {zweite && <span className="text-xs text-muted-foreground">{zweite}</span>}
+      <span className="text-[15px] text-foreground tabular-nums">{formatGrundpreis(preis.price, preis.unit, preis.unitSize)}</span>
+      {zweite && <span className="text-[13px] text-muted-foreground tabular-nums">{zweite}</span>}
     </span>
   )
 }
@@ -57,7 +57,6 @@ type KaufKarte = {
   /** Die Produktseite (produktLink — in der Vorschau des Hofs bleibt sie in der Vorschau). */
   href: string
   onInDenKorb: (p: PublicProduct) => void
-  onMenge: (p: PublicProduct, menge: number) => void
 }
 
 type MusterKarte = {
@@ -74,25 +73,25 @@ type MusterKarte = {
 }
 
 /**
- * Eine Produktkarte der Hofseite (Mockups web-k2-alle-produkte-nach-kategorie
- * und mobil-k2-produkte): am Handy eine Zeile mit Bild, Name, Preis und
- * Plus-Knopf, ab 768 px eine Kachel mit Bild oben und „In den Korb" rechts
- * neben dem Preis. Liegt das Produkt schon im Korb, steht dort die Menge mit
- * − und +; „+" endet am Bestand (stepperObergrenze), damit es nicht still an
- * der Reservierung scheitert.
+ * Eine Produktkarte der Hofseite (Boards s1-/w1-hofseite, seit Nr. 235): am Handy eine
+ * Zeile in der gemeinsamen Karte (`PRODUKT_LISTE`) mit Bild 56 px, Name, Preis,
+ * Grundpreis und rundem „+“ mit grünem Rand; ab 768 px eine Kachel mit Bild oben und
+ * „In den Korb“ mit grünem Rand über die volle Breite. Die Menge ändert man im
+ * Warenkorb — die Karte hat kein Mengenfeld mehr (Board: auch mit Ware im Korb steht
+ * „In den Korb“). Liegt schon alles im Korb, was der Hof hat, ist der Knopf gesperrt,
+ * damit er nicht still an der Reservierung scheitert.
  *
  * Bild und Name sind seit Nr. 11 ein echter Link auf die Produktseite
- * (/[hof]/produkt/[id]) — die eine Darstellung der Produktdetails; das Blatt
- * von vorher gibt es nicht mehr. Die zweite Preiszeile kommt aus derselben
- * Regel wie dort (zweitePreiszeile). Den Zustand (knapp, ausverkauft,
- * pausiert, nicht bestellbar — Kaufsperre, N24) entscheidet kartenZustand, die Karte zeigt ihn nur: knapp als
- * orangene Marke „Nur noch …", ausverkauft ausgegraut — nie über opacity auf
- * Text (Kontrast). Ohne „Merken" (E8, S11).
+ * (/[hof]/produkt/[id]) — die eine Darstellung der Produktdetails. Die zweite
+ * Preiszeile kommt aus derselben Regel wie dort (zweitePreiszeile). Den Zustand
+ * (knapp, ausverkauft, pausiert, nicht bestellbar — Kaufsperre, N24) entscheidet
+ * kartenZustand, die Karte zeigt ihn nur: knapp als leise Zeile „Nur noch …",
+ * ausverkauft als neutrale Marke mit entsättigtem Bild, pausiert ohne Bedienelement
+ * (Board Bild 4) — nie über opacity auf Text (Kontrast). Ohne „Merken" (E8, S11).
  *
  * Die Vorschau-Variante (`variante="muster"`, seit Nr. 51) ist dieselbe Karte
  * im Produktdialog: Foto, Name, Preis und Einheit aus dem Formular — ohne
- * Link, ohne Korb, ohne Beschreibung und Zustand, die erst das gespeicherte
- * Angebot hat.
+ * Link, ohne Korb und Zustand, die erst das gespeicherte Angebot hat.
  */
 export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element {
   if (props.variante === 'muster') {
@@ -108,14 +107,14 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
     )
   }
 
-  const { produkt, zustand, imKorb, wirdHinzugefuegt, href, onInDenKorb, onMenge } = props
+  const { produkt, zustand, imKorb, wirdHinzugefuegt, href, onInDenKorb } = props
   const kaufbar = zustand.art === 'kaufbar' || zustand.art === 'knapp'
   const ausverkauft = zustand.art === 'ausverkauft'
-  const marke = ausverkauft ? <StatusBadge status="neutral">Ausverkauft</StatusBadge> : null
   // „Nur noch …" ist ein Hinweis an die Kundin, kein Zustand, den jemand erledigen muss: eine leise
-  // Zeile statt einer Marke — „tun" (Orange) passte nicht, eine fünfte Art kennt DESIGN_SYSTEM nicht
-  // (Freigabe Lauf 13, Nr. 85).
+  // Zeile statt einer Marke (Freigabe Lauf 13, Nr. 85).
   const hinweis = zustand.art === 'knapp' ? knappText(zustand.bestand, produkt.unit, produkt.unitSize) : null
+  // Alles, was der Hof hat, liegt schon im Korb: „+" ginge nur an der Reservierung zugrunde.
+  const allesImKorb = imKorb > 0 && imKorb >= produkt.stock
 
   return (
     <KartenAufbau
@@ -125,34 +124,28 @@ export function ProduktKarte(props: KaufKarte | MusterKarte): React.JSX.Element 
       ausschnitt={produkt.bildAusschnitt}
       preis={produkt}
       href={href}
-      kurz={kurzbeschreibung(produkt)}
       ausgegraut={ausverkauft}
-      markeAufBild={marke}
       hinweis={hinweis}
       aktion={
-        kaufbar && imKorb > 0 ? (
-          <Stepper
-            beschriftung={`Menge ${produkt.name}`}
-            wert={imKorb}
-            max={stepperObergrenze(produkt.stock, imKorb)}
-            onWertChange={(menge) => onMenge(produkt, menge)}
-          />
-        ) : kaufbar ? (
+        kaufbar ? (
           <button
             type="button"
             onClick={() => onInDenKorb(produkt)}
-            disabled={wirdHinzugefuegt}
-            aria-label={`${produkt.name} in den Korb legen`}
+            disabled={wirdHinzugefuegt || allesImKorb}
+            aria-label={[`${produkt.name} in den Korb legen`, imKorb > 0 ? `${imKorb} im Warenkorb` : null].filter(Boolean).join(', ')}
             className={cn(
-              "relative inline-flex size-11 items-center justify-center gap-1.5 rounded-full bg-accent text-accent-foreground transition-opacity duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:opacity-90 disabled:opacity-60 md:h-9 md:w-auto md:px-3.5 md:text-[12.5px] md:font-semibold",
+              'inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-accent bg-card text-brand-text transition-colors duration-[250ms] hover:bg-accent/12 disabled:cursor-not-allowed disabled:opacity-60 md:h-11 md:w-full md:rounded-xl md:text-[14px] md:font-bold',
               FOKUS_RAHMEN
             )}
           >
-            <Plus className="size-5 md:size-4" strokeWidth={1.7} aria-hidden="true" />
+            <Plus className="size-5 md:hidden" strokeWidth={1.7} aria-hidden="true" />
             <span className="hidden md:inline">{wirdHinzugefuegt ? 'Einen Moment …' : 'In den Korb'}</span>
           </button>
-        ) : (
-          <span className="max-w-32 rounded-full bg-muted px-3 py-1.5 text-center text-xs text-muted-foreground md:max-w-none">
+        ) : ausverkauft ? (
+          <AusverkauftMarke className="shrink-0 md:self-start" />
+        ) : zustand.art === 'pausiert' ? null : (
+          // Nicht bestellbar oder nicht im Angebot: der Grund leise, wo sonst der Knopf steht.
+          <span className="max-w-32 shrink-0 rounded-full bg-muted px-3 py-1.5 text-center text-[12px] text-muted-foreground md:max-w-none md:self-start">
             {ruhenderKnopfText(zustand)}
           </span>
         )
@@ -173,9 +166,7 @@ function KartenAufbau({
   ausschnitt,
   preis,
   href,
-  kurz = null,
   ausgegraut = false,
-  markeAufBild = null,
   hinweis = null,
   aktion = null,
 }: {
@@ -186,25 +177,31 @@ function KartenAufbau({
   ausschnitt: BildAusschnitt | null
   preis: PreisAngabe
   href?: string
-  kurz?: string | null
   ausgegraut?: boolean
-  markeAufBild?: ReactNode
-  /** Leise Zeile unter Name und Kurztext in jeder Breite, etwa „Nur noch 3 Stück"; „Ausverkauft" steht am Handy schon rechts. */
+  /** Leise Zeile unter dem Preis in jeder Breite, etwa „Nur noch 3 Stück". */
   hinweis?: string | null
   aktion?: ReactNode
 }): React.JSX.Element {
   const bildUndName = (
     <>
-      <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted md:h-[140px] md:w-full md:rounded-none">
+      {/* Im Dunkeln gedämpft (Freigabe Lauf 31, Maßstab Punkt 4): kein heller Fleck auf der dunklen Karte —
+          die Illustration über ILLUSTRATION_HUELLE/-BILD, das Foto leicht (FOTO_HUELLE). Gerahmt statt Schatten
+          (CODING_STANDARDS §7). */}
+      <span
+        className={cn(
+          'relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted md:h-24 md:w-full md:rounded-[10px]',
+          bild && !istFoto ? ILLUSTRATION_HUELLE : FOTO_HUELLE
+        )}
+      >
         {bild ? (
           <Image
             src={bild}
             // Das Produktfoto heißt wie das Produkt (Nr. 117); die Kategorie-Illustration ist Schmuck.
             alt={istFoto ? name : ''}
             fill
-            sizes="(min-width: 1280px) 260px, (min-width: 768px) 33vw, 64px"
+            sizes="(min-width: 1280px) 220px, (min-width: 768px) 30vw, 56px"
             className={cn(
-              istFoto ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.85] dark:saturate-[0.9]',
+              istFoto ? 'object-cover' : cn('object-contain p-1', ILLUSTRATION_BILD),
               ausgegraut && 'grayscale'
             )}
             // Ausgegraut ohne Filter des Hofs: Ein Inline-Filter überschriebe sonst die Klasse grayscale.
@@ -215,23 +212,20 @@ function KartenAufbau({
             {produktInitiale(name)}
           </span>
         )}
-        {markeAufBild && <span className="absolute top-2.5 left-2.5 hidden md:block">{markeAufBild}</span>}
       </span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:px-3.5 md:pt-3">
-        <span className="line-clamp-2 text-[15px] font-semibold break-words text-foreground">{name}</span>
-        {kurz && <span className="truncate text-[13px] text-muted-foreground">{kurz}</span>}
-        <Preis preis={preis} className="md:hidden" />
-        {hinweis && <span className="text-[12.5px] font-medium text-muted-foreground">{hinweis}</span>}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="line-clamp-2 text-[15px] font-bold break-words text-foreground">{name}</span>
+        <Preis preis={preis} />
+        {hinweis && <span className="text-[13px] font-medium text-muted-foreground">{hinweis}</span>}
       </span>
     </>
   )
-  const anordnung =
-    'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-0 md:rounded-none'
+  const anordnung = 'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-1.5'
 
   return (
-    <article className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 md:h-full md:flex-col md:items-stretch md:gap-0 md:overflow-hidden md:p-0">
+    <article className="flex items-center gap-3 px-2.5 py-2 md:h-full md:flex-col md:items-stretch md:gap-1.5 md:rounded-2xl md:border md:border-border md:bg-card md:p-2.5">
       {href ? (
-        <Link href={href} title={name} className={cn(anordnung, FOKUS_RAHMEN, 'md:focus-visible:-outline-offset-2')}>
+        <Link href={href} title={name} className={cn(anordnung, FOKUS_RAHMEN)}>
           {bildUndName}
         </Link>
       ) : (
@@ -239,11 +233,7 @@ function KartenAufbau({
           {bildUndName}
         </div>
       )}
-
-      <div className="flex shrink-0 items-center gap-2 md:mt-auto md:px-3.5 md:pt-2 md:pb-3.5">
-        <Preis preis={preis} className="hidden flex-1 md:flex" />
-        {aktion}
-      </div>
+      {aktion && <div className="flex shrink-0 md:mt-auto">{aktion}</div>}
     </article>
   )
 }

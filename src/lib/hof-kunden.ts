@@ -225,10 +225,14 @@ export const ZURUECKHOLEN_AB = 3
 export const KUNDEN_FILTER_LABEL: Record<KundenFilter, string> = {
   alle: 'Alle',
   stammkunden: 'Stammkunden',
-  aktiv: 'Diesen Monat',
-  lange: 'Lange weg',
+  // Dieselben Wörter wie die Marken der Zeilen (Board s2-/w2-kunden, Lauf 31).
+  aktiv: 'Diesen Monat aktiv',
+  lange: 'Lange nicht gesehen',
   neu: 'Neu',
 }
+
+/** Reihenfolge im Abschnitt „Zeigen“ des Blatts, wie im Board s2-/w2-kunden Bild 2. */
+export const ZEIGEN_REIHENFOLGE: readonly KundenFilter[] = ['alle', 'stammkunden', 'neu', 'lange', 'aktiv']
 
 /**
  * Höchstens zwei Filter stehen als Chips da (freigabe.md §12 Nr. 45): „Alle"

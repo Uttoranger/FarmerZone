@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { barFristSatz, getBestellungenSeite, getHofBestellDetail } from '@/server/queries/orders'
+import { barFristSatz, getHofBestellDetail } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
@@ -30,7 +30,8 @@ export const maxDuration = 60
  * Eine Bestellung in der HofShell (Gate 5, Nachtlauf Nr. 19; Mockups
  * web-h3-bestellungen-packen-uebergeben, mobil-h3-bestelldetail,
  * web-h3-stornieren-erstatten, mobil-h3-stornieren, web-h3-artikel-fehlt).
- * Ab 1024 px mit der Liste links, am Handy allein mit „Zurück". Nur
+ * In jeder Breite eine eigene Seite mit „Zurück" (Board w1-bestellung, Lauf
+ * 31: keine Liste daneben — die steht auf /orders mit der Vorschau). Nur
  * Bestellungen des eigenen Hofs — eine fremde ID ergibt 404 (die Abfrage
  * sucht nach ID UND Hof).
  */
@@ -56,13 +57,12 @@ export default async function OrderDetailPage({
   if (!detail) notFound()
 
   const filter = hofBestellFilterAus((await searchParams).filter)
-  const [seite, widerrufe, barFrist] = await Promise.all([
-    getBestellungenSeite(farm.id, filter, jetzt),
+  const [widerrufe, barFrist] = await Promise.all([
     // Nr. 200 (N39): die offenen Widerrufe dieser Bestellung — ein Fehler hier nimmt dem Hof nie die Bestellung.
     ladeOffeneWiderrufe(farm.id, detail.id).catch(() => []),
     // V87: bis wann die Kundin eine Bar-Bestellung bestätigt (fristVon).
     barFristSatz(farm.id, detail, jetzt),
   ])
 
-  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="detail" widerrufe={widerrufe} hofName={farm.name} barFrist={barFrist} />
+  return <BestellungenAnsicht seite={null} filter={filter} detail={detail} modus="detail" widerrufe={widerrufe} hofName={farm.name} barFrist={barFrist} />
 }

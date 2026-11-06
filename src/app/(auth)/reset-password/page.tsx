@@ -1,9 +1,6 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
-import { TEXTKNOPF } from '@/components/anmelden/stil'
-import { cn } from '@/lib/utils'
 import { NeuesPasswortFormular } from './neues-passwort-formular'
 import { MARKE } from '@/lib/marke'
 
@@ -17,10 +14,9 @@ export const metadata: Metadata = {
 
 /**
  * „Neues Passwort wählen" in der Fokus-Shell (seit Nr. 54) — wie /register
- * und /verify: keine Navigation, nur Zurück zur Anmeldung und der Titel. Kein
- * Mockup; gebaut nach DESIGN_SYSTEM.md wie /verify (eine Karte auf --surface,
- * höchstens 520 px, genau ein oranger Hauptknopf, ein ungültiger Link als
- * orange Hinweiskarte mit Ausweg).
+ * und /verify: keine Navigation, nur Zurück zur Anmeldung und der Titel. Seit
+ * Nr. 239 nach Board s2-/w2-passwort: ohne Karte, höchstens 520 px, genau ein
+ * oranger Hauptknopf, ein ungültiger Link als orange Fehlerkarte mit Ausweg.
  *
  * Die Seite bleibt statisch: Den Token liest das Formular im Browser
  * (useSearchParams), wie bisher. Überschrift und Satz stehen außerhalb der
@@ -29,20 +25,13 @@ export const metadata: Metadata = {
 export default function ResetPasswordPage(): React.JSX.Element {
   return (
     <KundeFokusShell titel="Neues Passwort" zurueck={{ href: '/login', label: 'Zurück zur Anmeldung' }}>
-      <div className="mx-auto w-full max-w-[520px] px-4 pt-6 pb-12 md:pt-10">
-        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 md:p-6">
-          <div>
-            <h2 className="font-heading text-[22px] leading-tight font-semibold text-foreground md:text-2xl">Neues Passwort wählen</h2>
-            <p className="mt-1 text-[14px] leading-normal text-muted-foreground">Für dein {MARKE}-Konto.</p>
-          </div>
-          {/* useSearchParams verlangt beim Prerendern eine Suspense-Grenze */}
-          <Suspense fallback={null}>
-            <NeuesPasswortFormular />
-          </Suspense>
-          <Link href="/login" className={cn(TEXTKNOPF, 'self-center')}>
-            Zurück zur Anmeldung
-          </Link>
-        </div>
+      {/* Ohne Karte und ohne zweiten Rückweg: Den trägt der Kopf der Fokus-Shell (Board s2-/w2-passwort). */}
+      <div className="mx-auto flex w-full max-w-[520px] flex-col gap-3 px-4 pt-5 pb-12 md:pt-10">
+        <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">Neues Passwort wählen</h2>
+        {/* useSearchParams verlangt beim Prerendern eine Suspense-Grenze */}
+        <Suspense fallback={null}>
+          <NeuesPasswortFormular />
+        </Suspense>
       </div>
     </KundeFokusShell>
   )

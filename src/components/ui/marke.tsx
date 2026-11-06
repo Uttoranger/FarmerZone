@@ -53,7 +53,7 @@ export function Marke({
       data-art={art}
       data-form={form === 'schild' ? 'schild' : undefined}
       className={cn(
-        'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold whitespace-nowrap',
+        'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-semibold whitespace-nowrap',
         ART_KLASSEN[art],
         form === 'schild' && 'h-[22px] border-transparent px-2 py-0 text-[12px] font-bold',
         className

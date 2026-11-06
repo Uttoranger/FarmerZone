@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import {
-  ANMELDECODE_GUELTIG_SEKUNDEN,
   ANMELDECODE_LAENGE,
   anmeldeFehlerText,
   anmeldeFehlerVon,
@@ -15,8 +14,7 @@ import {
 import { codeAnfordernSchema, codeEingabeSchema } from '@/schemas/anmeldecode'
 import { CodeFeld } from '@/components/anmelden/code-feld'
 import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN, TEXTKNOPF } from '@/components/anmelden/stil'
-
-const MINUTEN = ANMELDECODE_GUELTIG_SEKUNDEN / 60
+import { cn } from '@/lib/utils'
 
 /*
  * Die Kunden-Anmeldung mit Code (E7, Nr. 08): E-Mail eingeben → Code aus der
@@ -164,26 +162,28 @@ export function CodeEingabeSchritt({
     >
       <p className={HINWEIS_TEXT}>
         {variante === 'anmelden' && 'Kein Passwort nötig. '}Wir haben dir einen {ANMELDECODE_LAENGE}-stelligen Code an{' '}
-        <strong className="font-semibold break-words text-foreground">{email}</strong> geschickt. Er gilt {MINUTEN}{' '}
-        Minuten.
+        <strong className="font-semibold break-words text-foreground">{email}</strong> geschickt.
       </p>
-      <label htmlFor={feldId} className="sr-only">
-        {ANMELDECODE_LAENGE}-stelliger Code aus der E-Mail
-      </label>
-      <CodeFeld
-        id={feldId}
-        wert={code}
-        onWert={onCode}
-        ungueltig={Boolean(fehler)}
-        beschreibtVon={fehler || hinweis ? meldungId : undefined}
-        gesperrt={laedt}
-        feldRef={codeFeldRef}
-      />
-      {fehler && (
-        <p id={meldungId} role="alert" className={FEHLER_TEXT}>
-          {fehler}
-        </p>
-      )}
+      {/* Sichtbar beschriftet (Boards s2-/w2-kundenkonto, Bild 2), Feld und Satz in einer Gruppe wie die E-Mail. */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={feldId} className={FELD_LABEL}>
+          {ANMELDECODE_LAENGE}-stelliger Code aus der E-Mail
+        </label>
+        <CodeFeld
+          id={feldId}
+          wert={code}
+          onWert={onCode}
+          ungueltig={Boolean(fehler)}
+          beschreibtVon={fehler || hinweis ? meldungId : undefined}
+          gesperrt={laedt}
+          feldRef={codeFeldRef}
+        />
+        {fehler && (
+          <p id={meldungId} role="alert" className={FEHLER_TEXT}>
+            {fehler}
+          </p>
+        )}
+      </div>
       {/* Die Status-Region steht immer da (leer, solange nichts zu sagen ist): Screenreader sagen eine Region nur an,
           wenn sie schon im DOM war, bevor der Text hineinkommt (WCAG 4.1.3). Leer ist sie sr-only und nimmt keinen Platz. */}
       <p
@@ -206,17 +206,15 @@ export function CodeEingabeSchritt({
         )}
       </button>
       <LadeStatus laedt={laedt} />
-      <div className="flex flex-wrap justify-between gap-x-2">
+      {/* Untereinander und mittig wie im Board; „Andere E-Mail-Adresse“ in Textfarbe, der Zähler leise, solange er läuft. */}
+      <div className="flex flex-col items-center">
         <button type="button" onClick={onErneut} disabled={laedt || wartezeit > 0} className={TEXTKNOPF}>
           {wartezeit > 0 ? `Code erneut senden (${wartezeit} s)` : 'Code erneut senden'}
         </button>
-        <button type="button" onClick={onAndereEmail} disabled={laedt} className={TEXTKNOPF}>
-          Andere E-Mail
+        <button type="button" onClick={onAndereEmail} disabled={laedt} className={cn(TEXTKNOPF, 'text-foreground')}>
+          Andere E-Mail-Adresse
         </button>
       </div>
-      <p className="text-[12px] leading-normal text-muted-foreground lg:hidden">
-        Der Code wird beim Antippen automatisch aus der E-Mail übernommen, wenn dein Telefon das kann.
-      </p>
     </form>
   )
 }

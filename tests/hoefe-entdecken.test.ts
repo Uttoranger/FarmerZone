@@ -433,9 +433,10 @@ describe('leerzustand — immer mit Ausweg', () => {
 })
 
 describe('Ein Suchfeld „Ort oder Produkt" (Nr. 46)', () => {
-  it('der Platzhalter sagt beides, die Beschriftung auch die Postleitzahl', () => {
+  it('Platzhalter und sichtbare Beschriftung sagen beide „Ort oder Produkt“ (Board w1-/s1-hoefe)', () => {
     expect(SUCHFELD_TEXT.platzhalter).toBe('Ort oder Produkt')
-    expect(SUCHFELD_TEXT.beschriftung).toMatch(/Ort.*Postleitzahl.*Produkt/)
+    // Die sichtbare Beschriftung wörtlich wie die Boards w1-/s1-hoefe (Nr. 242).
+    expect(SUCHFELD_TEXT.beschriftung).toBe('Ort oder Produkt')
     expect(SUCHFELD_TEXT.standort).toBe('Standort nutzen')
   })
 

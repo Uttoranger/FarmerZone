@@ -162,10 +162,11 @@ export function speichernText(fehlend: number, bearbeiten: boolean, sichtbar?: b
   if (fehlend === 1) return 'Noch 1 Angabe fehlt'
   if (fehlend > 1) return `Noch ${fehlend} Angaben fehlen`
   if (bearbeiten) return 'Speichern'
-  // Im neuen Design (Mockup mobil-h2-neues-produkt, Nr. 18) sagt der Knopf,
-  // was danach passiert: sichtbar geht es sofort auf die Hofseite.
+  // Board s1-/w1-produkt-neu (Lauf 31): „Speichern“ wie beim Bearbeiten; dass es
+  // gleich im Shop steht, sagt der Schalter „Im Shop“ darüber. Nur „nicht im
+  // Shop“ steht im Knopf (Register B2), weil es dann nicht auf die Hofseite geht.
   if (sichtbar === undefined) return 'Anlegen'
-  return sichtbar ? 'Produkt veröffentlichen' : SPEICHERN_NICHT_IM_SHOP
+  return sichtbar ? 'Speichern' : SPEICHERN_NICHT_IM_SHOP
 }
 
 /** Der Titel des Produktdialogs — beim Anlegen nach der Wahl aus „Was legst du an?". */

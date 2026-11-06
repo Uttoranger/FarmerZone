@@ -49,7 +49,7 @@ export function BeitragMarke({
         data-slot="beitrag-marke"
         className={cn(
           'pointer-events-none inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-card font-semibold whitespace-nowrap text-foreground shadow-sm',
-          kompakt ? 'h-6 px-2 text-[11px]' : 'h-7 px-2.5 text-[12px]',
+          kompakt ? 'h-6 px-2 text-[12px]' : 'h-7 px-2.5 text-[12px]',
           className
         )}
       >

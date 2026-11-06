@@ -23,7 +23,8 @@ import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 import { POSTFACH_RAHMEN, PostfachZeile } from './teile'
@@ -60,17 +61,32 @@ export default async function PostfachPage({
 
   const ungelesen = faeden ? zaehleUngelesen(faeden) : 0
   // Ein Zeitpunkt für die ganze Seite, auf dem Server („vor 3 Std.").
-  const zeilen = faeden ? postfachZeilen(faeden, filter, new Date()) : []
+  const jetzt = new Date()
+  const zeilen = faeden ? postfachZeilen(faeden, filter, jetzt) : []
 
   return (
     <div className={cn(POSTFACH_RAHMEN, 'flex flex-col gap-4')}>
-      <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <h1 className="font-heading text-[27px] font-semibold md:text-[30px]">{POSTFACH_TEXT.titel}</h1>
-        {ungelesen > 0 && <Marke art="tun">{neuText(ungelesen)}</Marke>}
+      {/* Wie im Board s2-/w2-postfach: Titel und Hofzeile links, „n neu“ rechts am Rand der Spalte. */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-heading text-[27px] font-semibold md:text-[30px]">{POSTFACH_TEXT.titel}</h1>
+          <HofUnterzeile hofName={farm.name} jetzt={jetzt} />
+        </div>
+        {ungelesen > 0 && <Marke art="tun" className="mt-2 shrink-0">{neuText(ungelesen)}</Marke>}
       </header>
 
       {faeden === null ? (
-        <Hinweiskarte ton="orange">{POSTFACH_FEHLER.laden}</Hinweiskarte>
+        // Neutral mit „Neu laden“ wie im Board s2-/w2-postfach Bild 6 — der Link fragt dieselbe Seite neu.
+        <Hinweiskarte
+          ton="neutral"
+          aktion={
+            <a href={postfachFilterHref(filter)} className={KNOPF_RAHMEN}>
+              Neu laden
+            </a>
+          }
+        >
+          {POSTFACH_FEHLER.laden}
+        </Hinweiskarte>
       ) : faeden.length === 0 ? (
         <EmptyState
           symbol={Inbox}
@@ -85,7 +101,8 @@ export default async function PostfachPage({
               {POSTFACH_TEXT.alle}
             </FilterChip>
             <FilterChip href={postfachFilterHref('ungelesen')} aktiv={filter === 'ungelesen'} ladePunkt>
-              {POSTFACH_TEXT.ungelesen}
+              {/* Mit Zahl wie im Board s2-/w2-postfach („Ungelesen · 1“). */}
+              {ungelesen > 0 ? `${POSTFACH_TEXT.ungelesen} · ${ungelesen}` : POSTFACH_TEXT.ungelesen}
             </FilterChip>
           </FilterChipReihe>
           <LadeInhalt className="flex flex-col gap-4">
@@ -97,7 +114,7 @@ export default async function PostfachPage({
                 ausweg={
                   <Link
                     href={postfachFilterHref('alle')}
-                    className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}
+                    className={KNOPF_RAHMEN}
                   >
                     {POSTFACH_ALLES_GELESEN.ausweg}
                   </Link>

@@ -19,6 +19,10 @@ import { SentryNutzer } from '@/components/farmer/sentry-nutzer'
  *
  * Zugang, Zahlen, Balken und seit Nr. 61 die Tarif-Zeile aus demselben Lader
  * wie das Bestandslayout (src/server/hofbereich.ts); die Shell lädt nichts selbst.
+ * Seit Nr. 233 (Register N42 e) trägt der Balken „wartet“ den Stand der
+ * Schritte: „Richte deinen Hof fertig ein …“ bzw. „Dein Hof wird noch
+ * geprüft …“ steht auf jeder Hof-Seite, nicht nur auf /onboarding (das in
+ * (auth) seine eigene HofShell trägt und den Balken selbst setzt — einmal).
  */
 export default async function HofLayout({ children }: { children: React.ReactNode }): Promise<React.JSX.Element> {
   const { hof, personName, offeneBestellungen, ungelesenPostfach, balken, isAdmin, zuEntscheiden, tarifZeile } = await ladeHofbereich()
