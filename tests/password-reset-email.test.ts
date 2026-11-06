@@ -22,6 +22,11 @@ vi.mock('resend', () => ({
 // Vorlagen nach. Unter Last (parallele Suiten) dauert das länger als das
 // 5-s-Testlimit — deshalb einmal pro Datei mit eigenem Timeout statt in jedem Test.
 const IMPORT_TIMEOUT = 30_000
+/**
+ * Das erste Rendern der Vorlage (React-Mail) zählt im Fall selbst; unter Last riss es die 5 s des Standards
+ * (Morgenbericht Lauf 30, Nr. 242). Nur die Grenze dieser Fälle, die Erwartungen bleiben.
+ */
+const RENDER_GRENZE = 30_000
 
 let email: typeof import('@/lib/email')
 
@@ -52,7 +57,7 @@ describe('sendPasswordResetEmail', () => {
     expect(call.to).toBe('bauer@example.com')
     expect(call.subject).toBe(`Passwort zurücksetzen · ${MARKE}`)
     expect(call.html).toContain(url)
-  })
+  }, RENDER_GRENZE)
 
   it('nennt die Gültigkeit (1 Stunde) und den Ignorieren-Hinweis im Body', async () => {
     sendMock.mockResolvedValue({ data: { id: 'email_2' }, error: null })
@@ -63,5 +68,5 @@ describe('sendPasswordResetEmail', () => {
     const call = sendMock.mock.calls[0][0]
     expect(call.html).toContain('1 Stunde')
     expect(call.html).toContain('ignorier diese Mail')
-  })
+  }, RENDER_GRENZE)
 })
