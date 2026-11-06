@@ -1981,3 +1981,1902 @@ Begründete Ausnahmen gesehen:
 Nicht prüfbar:
 - keines (alle Bilder erreichbar). Hinweis: Betreff, Absender und Vorschauzeile zeigt das Board im Posteingangs-Rahmen; die App-Bilder zeigen nur den Mailkörper, diese Zeilen sind im Bild nicht zu sehen und daher nicht bewertet. Dunkle Fassungen entfallen (Mails nur hell).
 
+---
+
+# Schluss-Durchgang Gate A auf dem Sammelstand (integration/lauf31 = 690992e9)
+
+Gebaute App (`pnpm build`, `next start`) des Sammelstands mit allen Nummern 233–242, je Gruppe eine frische DB-Kopie des Seeds (`fz_s1` … `fz_s7`, Stichtag `hofpreisModellAb` = 2026-10-01), dieselben Zustände wie in Gate A (Vorlage: die Gate-A-Manifeste). Bewertet von pruefer-ui (frischer Unteragent je Board, nur Bildpaare und Maßstab). Bilder: `.nachtlauf/screens/schluss/<board>/` (im Container, nicht committet).
+
+**Umgebung, kein Mangel der Seiten:** Alle Server teilten den Next-Cache des einen Baus. Der Eintrag der Plattform-Einstellung stand dadurch für alle Gruppen auf „nach dem Stichtag“ (alle Boards zeigen diesen Stand); Gruppe S1 lief wegen fremder Höfe im Prerender-Cache aus einer privaten Kopie des Baus. `/konditionen` und das Beispiel der Startseite waren beim Bau gegen eine Datenbank vor dem Stichtag vorgerendert und zeigen deshalb „Servicegebühr“. Mails ohne Webfonts zeigen im Container eine Ersatz-Serife.
+
+| Board | Nr. | Gate A (390h·390d·1440h·1440d) | Schluss | Schrift < 12 | Ziele < 44 | h1 ≠ 1 | Felder | axe | n. e. |
+|---|---|---|---|---|---|---|---|---|---|
+| mehr-neu | 233 | 3·3·2·2 | **5·5·4·3** | 0 | 0 | 6 | 0 | 0 | 0 |
+| hoefe | 234 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 1 | 4 |
+| startseite | 234 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| hofseite | 235 | 2·2·2·2 | **3·3·4·4** | 0 | 0 | 0 | 0 | 0 | 0 |
+| produkt | 235 | 2·2·2·2 | **3·3·3·3** | 0 | 0 | 0 | 8 | 4 | 0 |
+| bestaetigung | 236 | 2·2·2·2 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 0 |
+| bestellung-link | 236 | 2·2·2·2 | **4·4·4·3** | 0 | 0 | 0 | 0 | 0 | 0 |
+| kasse | 236 | 2·2·2·2 | **5·5·5·4** | 0 | 0 | 0 | 0 | 0 | 4 |
+| korb | 236 | 3·3·3·3 | **4·4·3·3** | 0 | 0 | 12 | 0 | 0 | 0 |
+| meine-bestellungen | 236 | 3·3·2·2 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 16 |
+| bestellung | 237 | 2·2·2·2 | **2·2·3·3** | 0 | 8 | 4 | 0 | 0 | 0 |
+| bestellungen | 237 | 2·2·2·2 | **3·3·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| heute | 237 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| produkt-neu | 237 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 24 | 12 | 0 | 0 |
+| produkte | 237 | 2·2·3·2 | **3·3·3·3** | 0 | 0 | 10 | 4 | 0 | 0 |
+| auswertung | 238 | 2·2·3·3 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| beitraege | 238 | 2·2·2·2 | **2·2·2·2** | 4 | 0 | 0 | 0 | 0 | 0 |
+| einstellungen | 238 | 2·2·3·2 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 0 |
+| hofdaten-zahlung | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 2 | 0 |
+| konto-hof | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| kunden | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 4 | 0 | 0 | 0 |
+| mein-hof | 238 | 2·2·2·2 | **2·2·2·2** | 8 | 0 | 6 | 0 | 0 | 0 |
+| meldungen | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 6 | 0 | 0 | 0 |
+| postfach | 238 | 2·2·2·2 | **2·2·3·3** | 0 | 0 | 0 | 0 | 0 | 0 |
+| problem-melden | 238 | 3·3·2·2 | **3·3·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| region | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| teilen | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 0 |
+| verkaeufe | 238 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 8 | 0 | 2 | 0 |
+| whatsapp-plakat | 238 | 2·2·2·2 | **2·2·2·2** | 2 | 0 | 0 | 0 | 0 | 0 |
+| abmelden | 239 | 3·3·3·3 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 4 |
+| anmelden | 239 | 2·2·2·2 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 0 |
+| fehlerseiten | 239 | 2·2·2·2 | **3·3·3·3** | 0 | 2 | 0 | 0 | 0 | 4 |
+| kundenkonto | 239 | 2·2·2·2 | **3·3·2·2** | 0 | 4 | 4 | 0 | 0 | 0 |
+| neuigkeiten | 239 | 2·2·1·1 | **4·4·4·4** | 0 | 0 | 0 | 0 | 0 | 12 |
+| passwort | 239 | 3·3·2·2 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 0 |
+| rechtstexte | 239 | 3·3·3·3 | **3·3·3·3** | 0 | 8 | 0 | 0 | 0 | 0 |
+| registrieren | 239 | 2·2·2·2 | **2·2·2·2** | 0 | 0 | 0 | 0 | 0 | 8 |
+| systemseiten | 239 | 3·3·3·3 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 16 |
+| widerruf | 239 | 3·3·3·3 | **3·3·3·3** | 0 | 0 | 0 | 0 | 0 | 8 |
+| druck | 241 | 3·–·3·– | **3·–·3·–** | 0 | 0 | 0 | 0 | 0 | 0 |
+| mail-betrieb | 241 | 2·–·2·– | **2·–·2·–** | 0 | 0 | 12 | 0 | 12 | 0 |
+| mail-hof-bestellung | 241 | 2·–·2·– | **3·–·3·–** | 0 | 0 | 8 | 0 | 8 | 0 |
+| mail-hof-konto | 241 | 3·–·3·– | **3·–·3·–** | 0 | 0 | 10 | 0 | 10 | 0 |
+| mail-kauf | 241 | 2·–·2·– | **3·–·3·–** | 0 | 0 | 12 | 0 | 12 | 0 |
+| mail-neuigkeiten | 241 | 1·–·1·– | **3·–·3·–** | 0 | 0 | 8 | 0 | 8 | 0 |
+| mail-sicherheit | 241 | 2·–·2·– | **3·–·3·–** | 0 | 0 | 12 | 0 | 12 | 0 |
+| mail-storno | 241 | 2·–·2·– | **3·–·3·–** | 0 | 0 | 12 | 0 | 12 | 0 |
+| mail-team | 241 | 3·–·3·– | **3·–·3·–** | 0 | 0 | 10 | 0 | 10 | 0 |
+| mail-zugang | 241 | 3·–·3·– | **3·–·3·–** | 0 | 0 | 8 | 0 | 8 | 0 |
+
+Mails und Druck nur hell. „–“ = Fassung nicht geprüft (nur hell) oder nicht herstellbar. Messspalten = Zahl der Bild-Fassungen mit mindestens einem Befund im Schluss-Durchgang.
+
+**Ergebnis:** Kein Board erreicht in allen Fassungen 5 Sterne; das Fertig-Kriterium der Freigabe ist nicht erfüllt. Verbessert gegenüber Gate A haben sich 23 von 49 Boards (z. B. kasse 2→5·5·5·4, mehr-neu 3·3·2·2→5·5·4·3, neuigkeiten 2·2·1·1→4·4·4·4, hofseite 2→3·3·4·4), unverändert sind 25, schlechter eines (auswertung 2·2·3·3→2·2·2·2). Am wenigsten bewegt hat sich der Hofbereich von Nr. 238 (dort stehen Hofdaten/Zahlung, Konto, WhatsApp/Plakat, Beiträge und die Region-Liste im Bericht 238 als „aus Zeitgründen offen“) und die Teile, die der feste Handy-Kopf als Baustein in `ui/` tragen würde (in 242 offen geblieben).
+
+**Hinweise des Dirigenten zur Bewertung** (die Sterne oben bleiben, wie pruefer-ui sie vergab):
+- Aufnahmefehler, keine Mängel der Seite: bestellungen Bild 1 (1440) zeigt die Detailseite `/orders/<id>` statt der Liste mit Vorschau (die Route aus Gate A gilt seit Nr. 237 nicht mehr); produkt Bild 2 und mein-hof Bild 2 (1440) zeigen nicht den gescrollten Stand; hoefe Bild 4/5 teils gescrollt aufgenommen; verkaeufe Bild 3 (1440) ohne den Fehlerzustand.
+- Freigabe vor Board: verkaeufe „Hofladen“ statt „Ab Hof“ – „Ab Hof“ steht in der Freigabe unter NICHT bauen.
+- Register vor Board, von pruefer-ui als Mangel gezählt: heute – AGB-Karte mit „Ich stimme den AGB zu“ (Register O4); Hinweise „nicht freigegeben“ mit Hof-ID (Pflichtkarte, Register A2 Punkt 1 – nur ihre Lage über der h1 ist ein echter Mangel); Mails – Anbieterzeile (A001, Recht prüft); passwort/kundenkonto – Auge im Passwortfeld (Rückfrage, DESIGN_SYSTEM `PasswordInput`).
+- Umgebung: startseite – das Beispiel nennt „Servicegebühr 5 %“ und `/konditionen` „Servicegebühr“, weil beide beim Bau gegen eine Datenbank vor dem Stichtag vorgerendert wurden; im Vorschau-Build mit echtem Stichtag ist das zu prüfen. Mails – Ersatz-Serife im Container.
+- Nicht prüfbar (signierter Mail-Link, Mail-Code, Stripe, Nominatim, G1 nicht gebaut, global-error): siehe Spalte „n. e.“ und die Abschnitte je Board.
+
+## Mängel je Board (Schluss-Durchgang)
+
+### mehr-neu
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 5 | 3 | 0 |
+| 390 dunkel | 5 | 3 | 0 |
+| 1440 hell | 4 | 3 | 0 |
+| 1440 dunkel | 3 | 3 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 1 und 2 · Punkt 1 · Hauptspalte: Das Board zeigt die Postfach-Nachricht als einzeilige Zeile „Neue Nachricht im Postfach“ (Absender · Betreff, Punkt, Pfeil). Die App zeigt stattdessen eine große Nachrichtenkarte (Agrilo-Team, „gestern“, Betreff als Überschrift, ganzer Text, Knöpfe „Ansehen“, „Antworten“, „Gelesen“). Gehört inhaltlich zum Board „heute“ · .nachtlauf/screens/schluss/mehr-neu/1-1440-hell.png, .nachtlauf/screens/schluss/mehr-neu/2-1440-hell.png, .nachtlauf/screens/schluss/mehr-neu/1-1440-dunkel.png, .nachtlauf/screens/schluss/mehr-neu/2-1440-dunkel.png
+- 1440 dunkel · Bild 1, 2 und 3 · Punkt 4 · Wochen-Balken „Umsatz diese Woche“: Im Board sind sie im Dunkeln hell mintgrün. In der App sind sie dunkelgrün wie im hellen Theme und heben sich deshalb kaum vom dunklen Kartengrund ab (andere Farbwirkung, weniger Kontrast) · .nachtlauf/screens/schluss/mehr-neu/1-1440-dunkel.png, .nachtlauf/screens/schluss/mehr-neu/3-1440-dunkel.png
+- 1440 hell/dunkel · Bild 3 · Punkt 5 · Menü „Was legst du an?“: Hervorgehoben ist der zweite Eintrag „Futtermittel“ (getönter Hintergrund), nicht der erste Eintrag „Lebensmittel“, obwohl der Aufbau laut Manifest den Fokus auf den ersten Eintrag setzt. Im Board ist kein Eintrag hervorgehoben. Den Fokus zeigt nur eine schwache Tönung, ein Fokusring fehlt · .nachtlauf/screens/schluss/mehr-neu/3-1440-hell.png, .nachtlauf/screens/schluss/mehr-neu/3-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1, 2 und 3 · Punkt 1 · Karte „Zu tun · 3“ rechts oben: Die App hat einen zusätzlichen Knopf „Ausblenden“. Board Bild 3 zeigt „Zu tun · 1“ ohne „Ausblenden“, Board Bild 1/2 zeigt die Karte gar nicht. Die App zeigt außerdem in Bild 1/2 die Karte „Mit einem Tipp in deinem Hof“, die Board Bild 1/2 nicht hat (Zustand der Heute-Seite; gehört zum Board „heute“) · .nachtlauf/screens/schluss/mehr-neu/1-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Hinweis ohne Abzug: In Board Bild 3 heißt die Seitenleistenzeile „Konto“, in Board Bild 1/2 „Konto · Franz Müller“. Die App zeigt überall „Konto · Franz Müller“, also so wie Board Bild 1/2. Das Board widerspricht sich hier selbst · .nachtlauf/screens/schluss/mehr-neu/3-1440-hell.png
+- 390 hell/dunkel · Bild 1, 2 und 3 · Punkt 5 · Hinweis ohne Abzug: Der Startfokus im Blatt sitzt sichtbar auf „Schließen“ bzw. „Abbrechen“ (Ring). Das Board zeigt dort keinen Fokus, sonst sind Blatt, Abschnitte, Zeilen und Wortlaut gleich · .nachtlauf/screens/schluss/mehr-neu/1-390-hell.png, .nachtlauf/screens/schluss/mehr-neu/3-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board (Pflichtkarten untereinander): Die App zeigt im Hintergrund bzw. in der Hauptspalte die Karten „AGB bestätigen“ und „Online-Zahlung einrichten“ untereinander. Das Board zeigt dort nur einen Hinweis-Kasten („Online-Zahlung ist pausiert“) bzw. „Abholung heute“ und die Kennzahlen (390 Bild 3, 1440 alle Bilder).
+- Umgebung: ein etwa 15 px breiter leerer Streifen am rechten Rand der 390-Bilder.
+- Beispieldaten (keine Abweichung): Datum, Gründungshof-Frist (14 Monate / 31. Dezember 2027), Kennzahlen, Umsatz, Packliste, Kürzel „HM“ statt „M“, Logo-Bild statt Platzhalter-Quadrat.
+
+Nicht prüfbar:
+- Bild 2 (390) und Bild 1/2 (1440): Zeile „Admin“ mit Zähler 3 im Mehr-Blatt bzw. in der Seitenleiste. Sie erscheint nur mit Admin-Recht, und der Admin ist ohne Passkey nicht erreichbar. In der App fehlt sie, das wird nicht abgezogen. Alle Bilder sind laut Manifest erreichbar.
+
+### hoefe
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 4 | 1 |
+| 390 dunkel | 2 | 4 | 1 |
+| 1440 hell | 2 | 4 | 1 |
+| 1440 dunkel | 2 | 4 | 1 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 5 · Punkt 6 · Zustand „Karte: Hof Müller gewählt“ nicht erreicht: App zeigt die Listenansicht („Liste“ aktiv statt „Karte“), keine Karte mit Markern, kein Auswahl-Blatt „1 · Hof Müller“ mit „Schließen“ und „Zum Hof“; dazu ein liegengebliebener Filter „Umkreis: 10 km“ („Filter ·1“) · .nachtlauf/screens/schluss/hoefe/5-390-hell.png
+- alle Fassungen · Bild 1, 4, 5 · Punkt 1/2 · Statt Feld mit Ort („5280 Braunau am Inn“) und darunter Knopf „Standort nutzen“ + „Nichts wird gespeichert.“ zeigt die App ein leeres Suchfeld mit Lupe und einen zusätzlichen grünen Kasten „Wir zeigen Höfe rund um deinen Standort – nichts wird gespeichert.“ mit Knopf „Ort ändern“ · .nachtlauf/screens/schluss/hoefe/1-1440-hell.png
+- alle Fassungen · Bild 1, 2, 4, 5 · Punkt 2 · Kategorie-Chips: Board „Milch & Eier“, „Fleisch“; App „Milch & Molkerei“, „Eier“ (Fleisch fehlt in Bild 1/2/5) bzw. „Fleisch & Wurst“ (Bild 4) · .nachtlauf/screens/schluss/hoefe/1-390-hell.png
+- alle Fassungen · Bild 1, 2, 5 · Punkt 2 · Reihenfolge-Satz: Board „Reihenfolge: nach Entfernung. Keine bezahlte Platzierung.“; App „Reihenfolge: nach Entfernung zum gewählten Ort, sonst nach Freischaltung. Keine bezahlte Platzierung.“ (zweizeilig) · .nachtlauf/screens/schluss/hoefe/1-1440-hell.png
+- alle Fassungen · Bild 1, 5 · Punkt 2 · Hofkarte: Zeile „inkl. Plattformgebühr“ fehlt; Produkte als Tabelle mit rechtsbündigen Preisen und zusätzlicher Zeile „+ 1 weiteres Produkt“ statt Fließzeile „Heumilch frisch, 1 L € 1,49 · …“; Abholzeile mit Uhr-Symbol in normaler Stärke statt fetter grüner Zeile „Abholung heute, Mi 3. März, 15–18 Uhr“; Marke „Gründungshof“ fehlt (evtl. Beispieldaten) · .nachtlauf/screens/schluss/hoefe/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 1 · Karte: zusätzlicher Hinweis „Ein Hof hat noch keinen Kartenpunkt – Nr. 22 steht nur in der Liste.“ oben links; Marker als Häufchen „4 Höfe“, „2 Höfe“ ohne Hofnamen, im Hellen weiß mit grünem Rand statt dunkler Nummernkreise mit Namensschild („1 Hof Müller“) · .nachtlauf/screens/schluss/hoefe/1-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Suche „Eier“: App zeigt zusätzlich beide Chip-Reihen, „Filter/Liste/Karte“, Zeile „Aktive Filter: Suche: Eier × Alle zurücksetzen“ und den Reihenfolge-Satz; Board zeigt nach „Standort nutzen“ direkt den Hinweis und die Produktliste · .nachtlauf/screens/schluss/hoefe/2-390-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Produktkarte gequetscht: Name bricht um („Bio-/Freilandeier“), Ortszeile abgeschnitten („Hof Müller · 5…“), Abholzeile über vier Zeilen, Preis in eigener rechter Spalte; Board: Name, Meta-Zeile, darunter fetter Preis + „inkl. Plattformgebühr“ · .nachtlauf/screens/schluss/hoefe/2-390-hell.png
+- alle Fassungen · Bild 2 · Punkt 2 · Produktkarten ohne „inkl. Plattformgebühr“; im Web zusätzlicher Knopf „Zum Hof ›“ je Karte, Preis oben rechts statt unter der Meta-Zeile; zusätzliche Marke „Bio“ · .nachtlauf/screens/schluss/hoefe/2-1440-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · Hinweis „Produkte statt Höfe, weil du nach einem Produkt suchst.“ fehlt (390: steht als Unterzeile unter der h1 statt unter „Standort nutzen“, ohne Schlusspunkt) · .nachtlauf/screens/schluss/hoefe/2-1440-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · Offene Vorschlagsliste unter dem Feld („Freilandeier 10er 6 Höfe“, „Bio-Freilandeier 1 Hof“, „Höfe rund um „Eier“ zeigen“) und Löschen-× im Feld, Board zeigt keine; zusätzliche Zeile „Aktive Filter: Suche: Eier ×  Alle zurücksetzen“ · .nachtlauf/screens/schluss/hoefe/2-1440-hell.png
+- alle Fassungen · Bild 2 · Punkt 2 · h1 mit geradem Schlusszeichen „Eier"“ statt typografischem „Eier“ · .nachtlauf/screens/schluss/hoefe/2-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 1/2 · Leerzustand: Board linksbündige Karte, fette Sans-Überschrift, Satz „Mit 25 km sind es 2 Höfe mit Fleisch.“, umrandeter Knopf über volle Breite; App mittig, gestrichelter Rand, Lupen-Symbol, Serifen-Überschrift, Satz „Nimm den Umkreis weiter, dann siehst du mehr Höfe.“, grüner gefüllter Knopf in Textbreite · .nachtlauf/screens/schluss/hoefe/4-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 1/2 · Aktive Filter: Board grün getönte Chips „Fleisch ×“, „10 km ×“ + „Alle zurücksetzen“ ohne Vorsatz; App Vorsatz „Aktive Filter:“, Chips „Umkreis: 10 km“, „Fleisch & Wurst“ (umgekehrte Reihenfolge, nicht getönt), 390: „Alle zurücksetzen“ in eigener Zeile · .nachtlauf/screens/schluss/hoefe/4-390-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · Karte ohne Standort-Marke „Du / Dein Standort“ und ohne gestrichelten Umkreis-Kreis (fehlende Kacheln allein wären Umgebung) · .nachtlauf/screens/schluss/hoefe/4-1440-hell.png
+- 390 hell/dunkel · Bild 4 · Punkt 1 · Bild nach unten gescrollt: h1, Feld und Chip-Reihen nicht im Bild, oben abgeschnittene Knöpfe „Filter ·2 / Liste / Karte“ unter dem Kopf; Aufbau oberhalb nicht vergleichbar · .nachtlauf/screens/schluss/hoefe/4-390-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Auswahl-Karte unter der Karte („1 · Hof Müller“, „Schließen“, breiter Knopf „Zum Hof“) im Bild nicht sichtbar; stattdessen ist die Listenkarte „Hof Müller“ grün hinterlegt bzw. umrandet (Board hebt die Listenkarte nicht hervor); Seite gescrollt, h1 nicht im Bild · .nachtlauf/screens/schluss/hoefe/5-1440-hell.png
+- 1440 hell · Bild 5 · Punkt 4 · graue Unterzeile „5280 Braunau am Inn · 0,2 km“ auf grün getönter Auswahlkarte wirkt blass (axe meldet color-contrast) · .nachtlauf/screens/schluss/hoefe/5-1440-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 6 · liegengebliebener Filter „Umkreis: 10 km“ / „Filter ·1“, im Board kein aktiver Filter · .nachtlauf/screens/schluss/hoefe/5-1440-hell.png
+- 390 hell/dunkel · Bild 1, 2, 5 · Punkt 1 · h1 deutlich größer (ca. 26 px statt ca. 20 px) und ohne abgesetzten Kopfstreifen mit Trennlinie wie im Board; Chips sichtbar flacher als im Board (Chips dürfen kleiner sein) · .nachtlauf/screens/schluss/hoefe/1-390-hell.png
+- alle Fassungen · Bild 1, 2, 4, 5 · Punkt 1 · Knopf „Filter“ mit zusätzlichem Regler-Symbol, Board ohne Symbol · .nachtlauf/screens/schluss/hoefe/1-1440-hell.png
+- 390 hell/dunkel · alle Bilder · Punkt 1 (Shell) · Zusätzlicher Kopf „Agrilo“ + „Anmelden“, Board zeigt am Handy keinen Kopf; Beschriftung „Warenkorb“ in der Leiste dünner/blasser als im Board · .nachtlauf/screens/schluss/hoefe/1-390-dunkel.png
+- 390 hell/dunkel · Bild 4 · Punkt 1 (Shell) · Knopf „Darstellung: hell/dunkel“ im Seitenfuß, Board zeigt ihn nicht · .nachtlauf/screens/schluss/hoefe/4-390-dunkel.png
+- 1440 dunkel · Bild 2 · Punkt 4 · markierter Feldtext „Eier“ mit grellblauer Browser-Markierung (kleiner heller Fleck) · .nachtlauf/screens/schluss/hoefe/2-1440-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslinks „Impressum, Datenschutz, AGB, Problem melden, Vertrag widerrufen“ (Bild 4, 390) – Register N22/N39.
+- Chips, Segmente und Textlinks („Alle zurücksetzen“) sichtbar unter 44 px – Trefferfläche über ::before.
+- Umgebung: leerer Streifen rechts (Bildlaufleiste); Karte ohne Kacheln (Kartendienst nicht erreichbar).
+- Dunkel: Produktbilder und Karten gedämpft, keine hellen Flecken außer der Textmarkierung oben.
+
+Nicht prüfbar:
+- Bild 3 (390/1440, hell/dunkel): Die Ortssuche löst "Neukirchen" über Nominatim auf (Server-Aktion loeseOrtAuf); der Rechner hat keinen Zugang zu nominatim.openstreetmap.org, die Auswahl "Welches Neukirchen?" erscheint nicht (stattdessen "Keinen Ort gefunden").
+
+### startseite
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 5 | 0 |
+| 390 dunkel | 2 | 5 | 0 |
+| 1440 hell | 2 | 5 | 0 |
+| 1440 dunkel | 2 | 5 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell+dunkel · Bild 3 · Punkt 1/2 · „So funktioniert’s“ anders gebaut: Board = h2 „In drei Schritten zum Hofkorb“ über einer Liste in einer Karte (3 Zeilen mit Nummernkreis, nur Titel); App = Überzeile „SO FUNKTIONIERT’S“, viel größere h2, Schritte ohne Karte mit zusätzlichem Beschreibungstext je Schritt · .nachtlauf/screens/schluss/startseite/3-1440-hell.png
+- 1440 hell+dunkel · Bild 3 · Punkt 1/2 · „Warum direkt vom Hof?“: Board = Karte mit Titel „Warum direkt vom Hof?“ und drei Aufzählungspunkten („Du weißt, von welchem Hof es kommt.“ / „Kurze Wege – …“ / „Der Hof setzt seinen Preis selbst.“); App = Überzeile „WARUM DIREKT VOM HOF?“, h2 „Du weißt, woher es kommt“, zwei Punkte mit Icon („Der Hof bekommt den vollen Preis“, „Kurze Wege, persönlich“) mit Unterzeilen · .nachtlauf/screens/schluss/startseite/3-1440-hell.png
+- 1440 hell+dunkel · Bild 3 · Punkt 2 · Kasten „BEISPIEL“: Board = Fließtext „Der Hof verlangt € 4,50 für 10 Eier. Du zahlst € 4,77 – darin stecken 6 % Plattformgebühr. Der Hof bekommt seine vollen € 4,50.“; App = Rechentabelle „Warenpreis / Servicegebühr · 5 % / Du zahlst / Der Hof bekommt“ plus Satz „Bei Online-Zahlung. Bei Barzahlung bis 31. Jänner 2027 ohne Servicegebühr.“ und oben „5 % Servicegebühr dazu, mindestens € 0,50“ – Board zeigt Stand nach Stichtag mit „Plattformgebühr“ · .nachtlauf/screens/schluss/startseite/3-1440-hell.png
+- 1440 hell+dunkel · Bild 3/4 · Punkt 1/2/4 · „Für Höfe“: Board = schlichte Karte „Du hast einen Hof? Dein Hofladen, online.“ mit einem breiten Knopf „Für Höfe“; App = Banner mit Überzeile „FÜR HÖFE“, große Serif-h2, Zusatztext „Schnell eingerichtet. …“, zwei Knöpfe „Mehr für Höfe“ + orange „Hof registrieren“, Zeile „Schon dabei? Anmelden“, Pfirsich-Verlauf und orangefarbener Rand (andere Farbwirkung) · .nachtlauf/screens/schluss/startseite/3-1440-hell.png
+- 1440 hell+dunkel · Bild 4 · Punkt 1/2 · „Gut zu wissen“: Board = Überzeile „GUT ZU WISSEN“ und halbbreite Karte mit drei Zeilen „Wie bezahle ich?“, „Was ist die Plattformgebühr?“, „Wo finde ich meine Bestellung?“; App = zweispaltig, Überzeile „FRAGEN“ + h2 „Gut zu wissen“, Akkordeon mit Pfeilen, erste Frage offen, Fragen „Brauche ich ein Konto?“, „Wie bezahle ich?“, „Was, wenn ich nicht abholen kann?“, „Wird auch geliefert?“ · .nachtlauf/screens/schluss/startseite/4-1440-hell.png
+- 390 hell+dunkel · Bild 4 · Punkt 1 · Seitenfuß: Board = nur Rechtslinks-Zeile und Knopf „Darstellung: hell/dunkel“; App = zusätzlicher Markenblock (Logo, „Regional einkaufen, direkt beim Hof abholen. Aus Österreich, für Österreich.“, „© 2026 Agrilo“) und zwei Linkspalten „Agrilo“ / „Für Höfe“ (Höfe entdecken, So funktioniert’s, Hof registrieren, Anmelden für Höfe, Konditionen); Rechtslinks nicht unterstrichen · .nachtlauf/screens/schluss/startseite/4-390-hell.png
+- 390 hell+dunkel · Bild 4 · Punkt 1/2 · „Gut zu wissen“ mobil: Fragen „Was, wenn ich nicht abholen kann?“, „Wird auch geliefert?“ mit Pfeilen statt „Wie bezahle ich?“ / „Was ist die Plattformgebühr?“ / „Wo finde ich meine Bestellung?“ in einer Karte; „BEISPIEL“-Kasten und „Für Höfe“-Karte im Bildausschnitt nicht zu sehen · .nachtlauf/screens/schluss/startseite/4-390-hell.png
+- 1440 hell+dunkel · Bild 1/5 · Punkt 1/2 · Regionskarte: Board = Karte mit Zoom-Knöpfen „+“/„−“, nummerierten Hof-Markern, darunter Textlink „Alle Höfe auf der Karte →“; App = Pille „35 Höfe in der Region“, Infokarte „Bergwiesenhof“, Knopf „Karte öffnen“, keine Zoom-Knöpfe, kein Link unter der Karte · .nachtlauf/screens/schluss/startseite/1-1440-hell.png
+- 1440 hell+dunkel · Bild 1/5 · Punkt 2 · Untertitel: Board „Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen.“; App hängt an „Von Bäuerinnen und Bauern aus deiner Gegend, ohne Umweg über den Supermarkt.“ · .nachtlauf/screens/schluss/startseite/1-1440-hell.png
+- 390 hell+dunkel · Bild 1 · Punkt 2 · Untertitel: Board „Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen.“; App „Eier, Gemüse, Brot – und Heu für die Hasen. Von Höfen aus deiner Gegend.“ (fehlt „Fleisch“, „sogar“, Zusatzsatz) · .nachtlauf/screens/schluss/startseite/1-390-hell.png
+- 390 hell+dunkel · Bild 1 · Punkt 1 · Suche: Board = Feld und Knopf „Höfe finden“ nebeneinander; App = Feld mit Lupe, Knopf darunter in voller Breite · .nachtlauf/screens/schluss/startseite/1-390-hell.png
+- 390 hell+dunkel · Bild 1 · Punkt 1/2 · Karte: Board = Karte direkt unter der Häkchenliste ohne Überschrift, darunter Link „Alle Höfe auf der Karte →“; App = eigene h2 „Höfe in deiner Region“ über der Karte und Pille „35 Höfe in der Region“ · .nachtlauf/screens/schluss/startseite/1-390-hell.png
+- alle · Bild 1/5 · Punkt 1 · Standort-Link: Board = grüner, unterstrichener Textlink „In deiner Nähe suchen – mit Postleitzahl oder Standort“; App = weißer, fetter Text mit Zielkreuz-Icon, nicht unterstrichen · .nachtlauf/screens/schluss/startseite/1-1440-hell.png
+- 1440 hell+dunkel · Bild 1/5 · Punkt 1 · Häkchenliste: Board einspaltig untereinander; App zwei Punkte nebeneinander, dritter darunter · .nachtlauf/screens/schluss/startseite/1-1440-hell.png
+- alle · Bild 1/2/5 · Punkt 1/2 · Abschnittskopf: Board = kleine Überzeile „HÖFE AUS DER REGION“ (Großbuchstaben); App = große Serif-h2 „Höfe aus der Region“ mit Knopf „Alle Höfe auf der Karte ›“ rechts bzw. darunter (Board zeigt diesen Link im Web links neben „Oder direkt suchen:“ als Textlink) · .nachtlauf/screens/schluss/startseite/2-1440-hell.png
+- alle · Bild 2 · Punkt 2 · Hofkarten: Zeile „inkl. Plattformgebühr“ unter den Preisen fehlt in der App (Board zeigt sie bei jeder Karte, Stand nach Stichtag) · .nachtlauf/screens/schluss/startseite/2-390-hell.png
+- 1440 hell+dunkel · Bild 2 · Punkt 2 · Chips „Oder direkt suchen:“: Board „Eier, Heumilch, Heu, Brennholz, Honig“; App Kategorien „Eier, Gemüse & Obst, Fleisch, Milch & Käse, Brot, Honig, Futtermittel, Brennmaterial“ · .nachtlauf/screens/schluss/startseite/2-1440-hell.png
+- 390 hell+dunkel · Bild 2 · Punkt 1 · Chipzeile „Oder direkt suchen:“ unter den Hofkarten im App-Bild nicht zu sehen (Board zeigt sie nach den Karten) · .nachtlauf/screens/schluss/startseite/2-390-hell.png
+- 390 hell+dunkel · Bild 3 · Punkt 6 · App-Bild zeigt den Seitenkopf statt „Futter vom Hof“ / „Brennmaterial vom Hof“ / „In drei Schritten zum Hofkorb“ / „Warum direkt vom Hof?“ – Zustand des Boards im Bild nicht nachweisbar (Futter/Brennmaterial nur in Bild 5 sichtbar, dort passend) · .nachtlauf/screens/schluss/startseite/3-390-hell.png
+- 1440 hell+dunkel · Bild 5 · Punkt 1/6 · Leerzustand Kopf: Board zeigt bei „Noch keine Höfe“ keinen Standort-Link und keine Häkchenliste; App zeigt beides; Leer-Karte unter dem Falz kaum zu sehen · .nachtlauf/screens/schluss/startseite/5-1440-hell.png
+- alle · Bild 5 · Punkt 1 · Leer-Karte „Die ersten Höfe kommen gerade dazu“: App mit zusätzlichem Hofladen-Icon im Kreis und zusätzlichem Knopf „Alle Höfe auf der Karte ›“ darüber (Board: keiner) · .nachtlauf/screens/schluss/startseite/5-390-hell.png
+- 1440 hell+dunkel · Bild 2 · Punkt 5 · Fokusrahmen der ersten Hofkarte läuft nur um den Textteil (links, rechts, unten), oben am Bildbereich nicht geschlossen; Board umrahmt die ganze Karte · .nachtlauf/screens/schluss/startseite/2-1440-hell.png
+- 1440 hell+dunkel · Bild 1–5 · Punkt 1 · Inhaltsbreite und Abstände: App-Inhalt breiter (Rand ca. 136 px statt 171 px), Kopf mit Video deutlich höher, Abschnitte mit viel größeren Abständen – Hofkarten erst unter dem Falz · .nachtlauf/screens/schluss/startseite/1-1440-hell.png
+- 1440 dunkel / 390 dunkel · Bild 1/3/5 · Punkt 4 · Video im Kopf im Dunkeln nur mäßig gedämpft, rechts oben helle goldene Flächen (Video selbst ist A1) · .nachtlauf/screens/schluss/startseite/1-1440-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Board-Fehler (A1): Video im Kopf (alle Fassungen, Bild 1/3/5) samt Pause-Knopf.
+- Recht vor Board (N22/N39): „Vertrag widerrufen“ in den Rechtslinks des Seitenfußes (390 und 1440, Bild 4).
+- Chips „Oder direkt suchen:“ im Web sichtbar kleiner als 44 px – erlaubt (Trefferfläche über ::before); Fußlinks ebenso.
+- (Shell) Kopf „Agrilo“ mit Logo-Bildmarke „A“ statt leerem Quadrat, Themen-Knopf, Anmelden, untere Leiste Entdecken/Warenkorb/Bestellungen: entspricht im Aufbau dem Board; Warenkorb-Beschriftung mobil kleiner/grau statt dunkel.
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (Bildlaufleiste).
+
+Nicht prüfbar:
+- keine (alle Bilder im Manifest erreichbar: true).
+
+### hofseite
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | 3 | 4 | 0 |
+| 1440 hell | 4 | 4 | 0 |
+| 1440 dunkel | 4 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1–4 · Punkt 1 · (Shell) Zusätzliche feste Kopfleiste „Agrilo“ + „Anmelden“ über dem Hof-Kopf; das Board zeigt oben nur den Hof-Kopf (Zurück · „Hof Müller“ · Teilen). Dadurch zwei feste Leisten übereinander statt einer · .nachtlauf/screens/schluss/hofseite/1-390-hell.png (ebenso 2-/3-/4-390-hell.png, 1-/2-/3-/4-390-dunkel.png)
+- 390 hell/dunkel · Bild 1–3 · Punkt 1 · Warenkorb-Leiste „3 Produkte · € … / Zum Warenkorb ›“: im Board eine volle Leiste in eigenem Band über der Navigation, in der App eine schwebende Pille, die über dem Inhalt liegt (Produktzeilen und „+“-Knöpfe laufen sichtbar darunter durch) · .nachtlauf/screens/schluss/hofseite/1-390-hell.png
+- 390 hell/dunkel · Bild 1–4 · Punkt 4 · Zähler-Marke am Warenkorb-Knopf der unteren Navigation orange/braun, im Board dunkelgrün mit hellem Ring · .nachtlauf/screens/schluss/hofseite/1-390-dunkel.png
+- alle Fassungen · Bild 1–4 · Punkt 2 · Preiszeile anders aufgebaut: Board zeigt Preis fett („€ 1,49“) und darunter grau den Grundpreis („€ 1,49 / L“); App zeigt nur „€ 1,49 / L“ in einer Zeile (bzw. „€ 3,82 für 6 Pakete“ ohne Grundpreiszeile) · .nachtlauf/screens/schluss/hofseite/3-390-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 2 · Karte „Dein Warenkorb“ hat einen zusätzlichen Hinweis mit Info-Symbol („Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; Agrilo vermittelt nur und prüft die Angaben nicht.“), im Board nicht vorhanden – falls das ein Rechtstext ist, als „Recht vor Board“ einstufen · .nachtlauf/screens/schluss/hofseite/1-1440-hell.png
+- 1440 dunkel · Bild 1–4 · Punkt 4 · Titelbild-Platzhalter mit Verlauf ins Hellgraue rechts unten (sichtbar heller Fleck), im Board gleichmäßig dunkle Fläche; 390 dunkel ebenso, schwächer · .nachtlauf/screens/schluss/hofseite/1-1440-dunkel.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Produktkarten einer Reihe ungleich: „In den Korb“ der ersten beiden Karten sitzt direkt unter dem Preis, bei der höheren dritten Karte tiefer; im Board stehen die Knöpfe einer Reihe auf gleicher Höhe (in Bild 1 der App korrekt) · .nachtlauf/screens/schluss/hofseite/3-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · Im Zustand „pausiert“ folgen unter den Produkten „Preise inkl. Plattformgebühr …“ und „Über uns“; das Board zeigt nach den Produktkarten nichts mehr (geringe Sicherheit, Board kann gekürzt sein) · .nachtlauf/screens/schluss/hofseite/4-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Unter „Nächste Abholung“ beginnt in der App ein weiterer Block („Mittwoch 15–18 Uhr“, Abholzeiten), den das Board im Handy nicht zeigt (Board: Produkte → Über uns → Zahlung & Kontakt) · .nachtlauf/screens/schluss/hofseite/2-390-hell.png
+- Prüfen, nicht in die Sterne gerechnet (vermutlich Testdaten, ohne Codeeinsicht nicht entscheidbar): Marke „GRÜNDUNGSHOF“ über dem Hofnamen fehlt in allen Bildern; Leitsatz „„Heumilch seit drei Generationen““ fehlt; Block „AKTUELL VOM HOF“ mit „Weiterlesen“ fehlt in Bild 1; „Über uns“ ohne Chip „Seit 1987“ und ohne Häkchenliste; „Zahlung & Kontakt“ „Bar bei Abholung.“ statt „Online bezahlen oder bar bei Abholung.“; „Anfahrt“ ohne „· Parken im Hof“ · .nachtlauf/screens/schluss/hofseite/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board (N5): Knopf „Alle Produkte (8)“ unter dem Schaufenster, „Nächste Abholung“ erst nach dem Schaufenster (390, Bild 1/2).
+- Register vor Board (N22/N39): Seitenfuß mit Impressum, Datenschutz, AGB, Problem melden, „Vertrag widerrufen“ (1440, Bild 2).
+- Freigabe §19 Nr. 98: Hof-Logo „HM“ rund statt abgerundetes Quadrat (alle Bilder).
+- Shell (andere Nummer): Kopf „Agrilo“, Warenkorb-Knopf „Warenkorb · 3“, Themen-Knopf, „Anmelden“ – im Web gleich dem Board; im Handy zusätzliche Kopfleiste (oben als Mangel mit „(Shell)“ geführt).
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (1440); Produktfotos als Illustrationen/Platzhalter; Titelbild fehlt (Platzhalter).
+- Fokus: im Web sichtbarer Fokusring auf „Route“ (Bild 1, 3, 4) bzw. „Alle ansehen“ (Bild 2), wie im Board.
+
+Nicht prüfbar:
+- keine (alle 16 App-Bilder erreichbar)
+
+### produkt
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 3 | 0 |
+| 390 dunkel | 3 | 3 | 0 |
+| 1440 hell | 3 | 3 | 0 |
+| 1440 dunkel | 3 | 3 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- alle · Bild 1 · Punkt 1 · Größen-Karten anders gebaut: Board hat Radio-Kreis links, Name „Sack, 25 kg“ mit Zeile „€ 0,51 / kg · 14 da“ darunter und Preis rechts; App hat keinen Radio-Kreis, Name „Sack 25 kg“ (ohne Komma) oben, Preis groß links, Grundpreis rechts, Zeile „noch 14 × 25 kg“ · .nachtlauf/screens/schluss/produkt/1-390-hell.png
+- alle · Bild 1 · Punkt 1 · Reihenfolge der Größen: Board Sack → Big Bag → Lose; App Big Bag → Sack → Lose · .nachtlauf/screens/schluss/produkt/1-1440-hell.png
+- alle · Bild 1 · Punkt 2 · Größe „Lose, 1t“: Board zeigt „€ 0,35 / kg · gerade nicht da“ und Preis € 349,80; App zeigt nur „Lose 1 t“ und „1 000 kg“, kein Preis, kein „gerade nicht da“ · .nachtlauf/screens/schluss/produkt/1-1440-hell.png
+- alle · Bild 1 und 3 · Punkt 2 · Zeile „14 Tage Rücktrittsrecht ab Abholung – Details in den AGB.“ unter der h1 fehlt in der App · .nachtlauf/screens/schluss/produkt/3-390-hell.png
+- alle · Bild 1 · Punkt 1/2 · Zusatzblock: App zeigt Marke „Nur an Betriebe“ und Absatz „Dieses Futtermittel gibt der Hof nur an landwirtschaftliche Betriebe ab. Beim Bestellen fragen wir nach deiner Betriebsnummer.“, das Board nicht · .nachtlauf/screens/schluss/produkt/1-390-hell.png
+- alle · Bild 1 · Punkt 2 · Chip: Board „Futtermittel-Nummer laut Hof“ (ohne Symbol); App „Futtermittelbetrieb · LFBIS … · laut Hof“ mit Schild-Symbol und Rahmen · .nachtlauf/screens/schluss/produkt/1-390-hell.png
+- alle · Bild 1/2 · Punkt 1 · Reihenfolge Beschreibung: Board zeigt über „Größe wählen“ nur einen kurzen Hinweis und die Beschreibung erst unter den Größen direkt über „Kennzeichnung“; App zeigt die lange Beschreibung über „Größe wählen“, über „Kennzeichnung“ steht stattdessen „Grundpreis zum Vergleichen …“ · .nachtlauf/screens/schluss/produkt/2-390-hell.png
+- 390 · Bild 2 · Punkt 2 · Kennzeichnung: Board drei Zeilen „Zusammensetzung / Inhaltsstoffe / Gebrauch“; App acht Zeilen „Art / Für / Zusammensetzung / Analytische Bestandteile / Nettomenge / Gebrauchshinweis / Betriebsnummer / Verantwortlich“ und Zusatzsatz „Charge und Mindesthaltbarkeit stehen auf dem Sackanhänger.“ (vermutlich Futtermittelrecht, aber nicht als Ausnahme begründet) · .nachtlauf/screens/schluss/produkt/2-390-hell.png
+- alle · Bild 1/2 · Punkt 2 · Futter-Hinweis: Board „Futter: Die Angaben macht der Hof. Für die richtige Fütterung deiner Tiere bist du selbst verantwortlich.“; App mit Info-Symbol „Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; Agrilo vermittelt nur und prüft die Angaben nicht. Als Betrieb bist du für den bestimmungsgemäßen Einsatz verantwortlich.“ · .nachtlauf/screens/schluss/produkt/2-390-hell.png
+- 1440 · Bild 1 und 3 · Punkt 1 · Seitenspalte „Dein Warenkorb“: App zeigt darin zusätzlich den Futter-Hinweis „Die Angaben zu Registrierung und Kennzeichnung …“ (auch auf der Brennholz-Seite); Board zeigt dort nur Zeile und „Zur Kasse“ · .nachtlauf/screens/schluss/produkt/3-1440-hell.png
+- 1440 · Bild 2 · Punkt 6 · App-Bild ist bytegleich mit Bild 1 (Seitenanfang); der Zustand „weiter unten: Kennzeichnung“ mit Kennzeichnung, „Gleich mit abholen“ und „Preise inkl. Plattformgebühr“ ist im Web nicht abgebildet, also nicht vergleichbar · .nachtlauf/screens/schluss/produkt/2-1440-hell.png
+- alle · Bild 3 · Punkt 1 · Drei Merkmal-Kacheln „Holzart Buche / Länge 33 cm / Gelagert seit Frühjahr 2025“ fehlen in der App · .nachtlauf/screens/schluss/produkt/3-390-hell.png
+- alle · Bild 3 · Punkt 2 · Preis: Board „€ 100,70 je Raummeter“; App „€ 100,70 / m³“ · .nachtlauf/screens/schluss/produkt/3-1440-hell.png
+- alle · Bild 3 · Punkt 2 · Erklärzeile „1 Raummeter = 1 m × 1 m × 1 m geschlichtetes Holz mit Zwischenräumen.“ fehlt in der App · .nachtlauf/screens/schluss/produkt/3-390-hell.png
+- alle · Bild 3 · Punkt 2 · Ausverkauft-Karte: Board „Hof Müller hat gerade kein Brennholz Buche. Schau, was es sonst gibt.“; App „Bei Hof Müller ist Brennholz Buche gerade aus. Schau, was es sonst gibt.“ · .nachtlauf/screens/schluss/produkt/3-390-hell.png
+- alle · Bild 3 · Punkt 1 · App zeigt zusätzlich einen Beschreibungsabsatz („Ofentrocken gespaltenes Buchenholz …“) zwischen Marke und Preis, den das Board in diesem Zustand nicht hat · .nachtlauf/screens/schluss/produkt/3-1440-hell.png
+- 390 dunkel / 1440 dunkel · Bild 1–3 · Punkt 4 · Bildfläche im Dunkeln mittelgrün und deutlich heller als die dunkle, gedämpfte Bildfläche des Boards (wirkt als heller Fleck) · .nachtlauf/screens/schluss/produkt/1-390-dunkel.png
+- 390 · Bild 1–3 · Punkt 1 · Kopf „Agrilo“ mit Taschen-Symbol (Zähler 3) und „Anmelden“ über der Zurück-Zeile; das Board zeigt an 390 keinen Kopf (Shell) · .nachtlauf/screens/schluss/produkt/1-390-hell.png
+- 1440 · Bild 1 · Punkt 1 · Feste Kauf-Leiste: Board mit Trennlinie über der Leiste und Inhalt endet darüber; App ohne Trennlinie, die Leiste überdeckt die Karte „Lose 1 t“ · .nachtlauf/screens/schluss/produkt/1-1440-hell.png
+- 1440 · Bild 1–3 · Punkt 2 · „Zahlung & Kontakt“: Board „Online bezahlen oder bar bei Abholung. …“; App „Bar bei Abholung. …“ (möglicherweise datenabhängig) · .nachtlauf/screens/schluss/produkt/1-1440-hell.png
+- 390 · Bild 1 · Punkt 1 · Minus-Knopf im Mengenwähler in der App ausgegraut (deaktiviert bei Menge 1), im Board gleich stark wie Plus · .nachtlauf/screens/schluss/produkt/1-390-hell.png
+- 1440 hell · Bild 3 · Punkt 4 · Marke „Ausverkauft“ in der App fast ohne Hintergrund, im Board graue Pille · .nachtlauf/screens/schluss/produkt/3-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslinks und „Vertrag widerrufen“ (Bild 3, 390 und 1440) – Register N22/N39.
+- Kopf „Agrilo“ / Warenkorb-Knopf / Themen-Knopf gehören zur Kunden-Shell – bewertet, in der Mängelliste mit „(Shell)“ gekennzeichnet; an 1440 entspricht der Kopf dem Board bis auf das Logo-Bild.
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand (Bildlaufleiste).
+- Fokus am ersten Bedienelement („‹ Zurück zu allen Produkten“) an 1440 sichtbar, als abgerundeter Ring statt eckigem Rahmen – keine Abweichung.
+
+Nicht prüfbar:
+- keine (alle Bilder laut Manifest erreichbar; Bild 2 an 1440 zeigt allerdings nicht den Board-Zustand, siehe Mängel)
+
+### bestaetigung
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | 3 | 4 | 0 |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | 3 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- alle · Bild 2 · Punkt 2 · Karte „Neuigkeiten vom Hof per E-Mail“: Board „Höchstens zweimal im Monat. Abmelden jederzeit.“, App „Möchtest du erfahren, wenn es bei Hof Müller frische Produkte oder Aktionen gibt? Freiwillig – abmelden kannst du dich jederzeit.“ plus zusätzlicher Absatz unter dem Knopf „Wir schicken dir zuerst eine E-Mail an … zum Bestätigen. Ohne Bestätigung bekommst du nichts.“ (Web außerdem „Abmelden kannst du dich jederzeit über den Link in jeder Nachricht. Mehr dazu in unserer Datenschutzerklärung.“); nicht als Ausnahme begründet · .nachtlauf/screens/schluss/bestaetigung/2-390-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 2 · wie oben, Neuigkeiten-Karte dadurch deutlich höher als „Erzähl’s weiter“ (Board: beide Karten gleich hoch) · .nachtlauf/screens/schluss/bestaetigung/2-1440-hell.png
+- alle · Bild 1/2 · Punkt 2 · Zahlungszeile unter „Gesamt“: Board „Online bezahlt · inkl. Plattformgebühr (6 %)“, App „Online · Bezahlt · inkl. Plattformgebühr“ (anderes Wort-Gefüge, „(6 %)“ fehlt) · .nachtlauf/screens/schluss/bestaetigung/1-1440-hell.png
+- alle · Bild 3 · Punkt 2 · Zahlungszeile: Board „Bar bei Abholung · inkl. Plattformgebühr (6 %)“, App „Bar bei Abholung · Noch offen · inkl. Plattformgebühr“ (zusätzlich „Noch offen“, „(6 %)“ fehlt) · .nachtlauf/screens/schluss/bestaetigung/3-390-hell.png
+- alle · Bild 3 · Punkt 2 · Frist-Überschrift im Hinweis: Board „Bitte bis heute, 09:40 Uhr bestätigen“, App „Bitte bis heute, Fr, 6. Nov, 06:25 Uhr bestätigen“ (Wochentag und Datum zusätzlich zu „heute“; am Handy dadurch zweizeilig) · .nachtlauf/screens/schluss/bestaetigung/3-390-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Link unter „Hof erreichen“ (Board rechte Spalte direkt unter der Karte) steht in der App erst unter allen Karten über dem Seitenfuß; App folgt damit Board Bild 2, Board Bild 1 und 2 widersprechen sich hier (Wortlaut „Vertrag widerrufen“ selbst ist Ausnahme) · .nachtlauf/screens/schluss/bestaetigung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Unter „Deine Bestellung“ zeigt die App die Karten „Erzähl’s weiter“ und „Neuigkeiten vom Hof per E-Mail“ an, Board Bild 1 zeigt dort nichts mehr (Board Bild 2 zeigt sie; Board-Widerspruch, App folgt Bild 2) · .nachtlauf/screens/schluss/bestaetigung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1/3/4 · Punkt 1 · h1 sichtbar größer als im Board (Bild 1/3 etwa 9 % breiter, Bild 4 „Deine Bestellung ist eingegangen“ etwa 18 % breiter) · .nachtlauf/screens/schluss/bestaetigung/4-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · Karte breiter als im Board (etwa 560 statt 520 px) · .nachtlauf/screens/schluss/bestaetigung/4-1440-hell.png
+- alle · Bild 2 · Punkt 1 · Karte „Erzähl’s weiter“ deutlich stärker abgerundet und mit größerem Innenabstand als die übrigen Karten (Board: alle Karten gleicher Radius) · .nachtlauf/screens/schluss/bestaetigung/2-1440-hell.png
+- 390 hell/dunkel · Bild 1/4 · Punkt 1 · h1 bricht anders um: Board „Danke, deine Bestellung ist / da!“ bzw. „Deine Bestellung ist / eingegangen“, App „Danke, deine / Bestellung ist da!“ bzw. „Deine Bestellung / ist eingegangen“ (geringfügig) · .nachtlauf/screens/schluss/bestaetigung/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 5 · Fokus sichtbar, aber als dünner Doppelring statt des kräftigen grünen Rahmens im Board; im Dunkeln und auf dem Hinweis-Kasten (Bild 3) schwächer (geringfügig) · .nachtlauf/screens/schluss/bestaetigung/3-1440-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Schritt-Leiste „Abholbereit“ statt „Gepackt“ (Bild 1–3, alle Fassungen).
+- Register N38: Plattformgebühr als eigene Zeile und Satz „Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“ (Bild 1–3).
+- Register N39/N43 bzw. Recht vor Board: „Vertrag widerrufen“ statt „Rücktrittsrecht“ (Bild 1/2), zusätzlich in Bild 3 und im Seitenfuß, wo das Board ihn nicht zeigt.
+- Register N22/N39: Seitenfuß mit Rechtslinks, am Handy mit „Darstellung“-Knopf (Bild 4), im Web mit Marke (Bild 2–4).
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand.
+
+Nicht prüfbar:
+- keine
+
+### bestellung-link
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 4 | 4 | 0 |
+| 390 dunkel | 4 | 4 | 0 |
+| 1440 hell | 4 | 4 | 0 |
+| 1440 dunkel | 3 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 dunkel · Bild 2 · Punkt 5 · Board zeigt den Fokusring am Knopf „Ja, ich hole verbindlich ab“; in der App ist an keinem Bedienelement ein Fokus sichtbar (in Bild 3 und 4 dagegen schon) · .nachtlauf/screens/schluss/bestellung-link/2-1440-dunkel.png
+- 390 hell · Bild 2 · Punkt 2 · Zahlzeile im Board „Bar bei Abholung · inkl. Plattformgebühr“, in der App nur „Bar bei Abholung“ · .nachtlauf/screens/schluss/bestellung-link/2-390-hell.png
+- 390 dunkel · Bild 2 · Punkt 2 · wie oben: „· inkl. Plattformgebühr“ fehlt hinter „Bar bei Abholung“ · .nachtlauf/screens/schluss/bestellung-link/2-390-dunkel.png
+- 1440 hell · Bild 2 · Punkt 2 · wie oben: „· inkl. Plattformgebühr“ fehlt hinter „Bar bei Abholung“ · .nachtlauf/screens/schluss/bestellung-link/2-1440-hell.png
+- 1440 dunkel · Bild 2 · Punkt 2 · wie oben: „· inkl. Plattformgebühr“ fehlt hinter „Bar bei Abholung“ · .nachtlauf/screens/schluss/bestellung-link/2-1440-dunkel.png
+- 390 hell · Bild 1 · Punkt 2 · Zahlzeile im Board „Online bezahlt · € … inkl. Plattformgebühr“, in der App „Online · Bezahlt · € … inkl. Plattformgebühr“; die Zeile ist zudem sichtbar kleiner gesetzt als im Board (Board in Größe der Positionszeilen) · .nachtlauf/screens/schluss/bestellung-link/1-390-hell.png
+- 390 dunkel · Bild 1 · Punkt 2 · wie oben: „Online · Bezahlt“ statt „Online bezahlt“, Zeile kleiner · .nachtlauf/screens/schluss/bestellung-link/1-390-dunkel.png
+- 1440 hell · Bild 1 · Punkt 2 · wie oben: „Online · Bezahlt“ statt „Online bezahlt“, Zeile kleiner · .nachtlauf/screens/schluss/bestellung-link/1-1440-hell.png
+- 1440 dunkel · Bild 1 · Punkt 2 · wie oben: „Online · Bezahlt“ statt „Online bezahlt“, Zeile kleiner · .nachtlauf/screens/schluss/bestellung-link/1-1440-dunkel.png
+- 1440 hell · Bild 1 · Punkt 5/1 · Fokus am Link „Deine Bestellung bei Hof Müller“: Board eckiger Rahmen mit Innenabstand und Luft zur h1, App runder, eng anliegender Ring, der fast an die h1 stößt; Linktext in der App etwas kleiner, h1 „HM-…“ etwas größer als im Board · .nachtlauf/screens/schluss/bestellung-link/1-1440-hell.png
+- 1440 dunkel · Bild 1 · Punkt 5/1 · wie oben (Fokusring-Form, Abstand zur h1, Größen Link/h1) · .nachtlauf/screens/schluss/bestellung-link/1-1440-dunkel.png
+- 390 hell · Bild 1 · Punkt 1 · Link „Deine Bestellung bei Hof Müller“ sichtbar kleiner als im Board · .nachtlauf/screens/schluss/bestellung-link/1-390-hell.png
+- 1440 hell · Bild 2 · Punkt 1 · Trennlinie über der Knopfleiste im Board breiter als die Inhaltsspalte, in der App nur so breit wie die Inhaltsspalte; Pfeil bei „Zurück zum Hof“ in der App nicht mit unterstrichen (Kleinigkeit) · .nachtlauf/screens/schluss/bestellung-link/2-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Plattformgebühr als eigene Zeile („Plattformgebühr · € …“) und Satz „Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“ in Bild 1 (Bestellseite) und Bild 2 (Bar bestätigen) – Register N38.
+- „Vertrag widerrufen“ als Link in Bild 1 (statt „Rücktrittsrecht“, Web), Bild 2 und Bild 3 (zusätzlich, Board zeigt ihn nicht) sowie im Seitenfuß – Register N39/N43, Recht vor Board.
+- Seitenfuß mit Rechtslinks: Bild 4 am Handy mit „Darstellung“-Knopf, Bild 1 und 4 im Web mit Marke und „Vertrag widerrufen“ – Register N22/N39.
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand in allen App-Bildern (scrollbar-gutter).
+- Marke im Kopf mit „A“-Zeichen statt leerer Fläche im Board – Platzhalter im Board, keine Abweichung.
+
+Nicht prüfbar:
+- keine (alle Bilder erreichbar). Hinweis: Die App-Bilder sind nur Fensterausschnitte (390×844); in Bild 1 (390) liegen „Rücktrittsrecht“/„Vertrag widerrufen“ und der Satz „Stornieren geht hier nicht. Für Änderungen erreich den Hof.“ unterhalb des Ausschnitts und konnten am Handy nicht verglichen werden (im Web vorhanden und gleich).
+
+### kasse
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 5 | 4 | 1 |
+| 390 dunkel | 5 | 4 | 1 |
+| 1440 hell | 5 | 4 | 1 |
+| 1440 dunkel | 4 | 4 | 1 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 dunkel · Bild 2 · Punkt 4 · Die Grafik „Gesetzliche Gewährleistung“ unter „Deine Bestellung“ ist im Dunkeln nicht gedämpft: Der Kopf ist kräftig blau, der untere Teil fast weiß, das ergibt einen hellen Fleck auf der dunklen Seite. Dass die Grafik da ist, deckt „Recht vor Board“ ab, ihre Dämpfung im Dunkeln aber nicht · .nachtlauf/screens/schluss/kasse/2-1440-dunkel.png
+- 390 hell/dunkel · Bild 2 · Punkt 2 (klein, kein Abzug) · Im Feld „Notiz an den Hof (freiwillig)“ steht der Platzhalter „z. B. komme später“, im Handy-Board ist das Feld leer. Das Web-Board zeigt denselben Platzhalter, deshalb sehe ich darin eine Unstimmigkeit im Board und keinen Mangel der App · .nachtlauf/screens/schluss/kasse/2-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board (Kasse): Unter jedem Kaufknopf steht der Satz „Es gelten die AGB von Agrilo. Dein Vertragspartner ist der Hof. … So geht's: Rücktritt“ statt „Du zahlst im nächsten Schritt …“ bzw. „Mit dem Klick bestellst du verbindlich …“ (390, Bild 1–3).
+- Recht vor Board (Kasse): Die Zusammenfassung („Du bestellst: …“ im Board in der Übersicht) steht als Karte „Deine Bestellung“ über dem Kaufknopf, darunter die Grafik „Gesetzliche Gewährleistung“ (1440, Bild 2).
+- Register N10/N2: Karte „Angaben zum Hof (dein Vertragspartner)“ statt der Zeile „Verkäufer ist Hof Müller, … gesetzliche Gewährleistung“ (390 Bild 3, 1440 Bild 1–3).
+- Register F9: Reservierungshinweis „Deine Ware ist bis … Uhr für dich reserviert (noch 15 Minuten)“ in der Übersicht (390 Bild 3, 1440 Bild 1–3).
+- Freigabe §29: „Preise inkl. USt“ in der Übersicht (alle Fassungen, Bild 3 und 5 bzw. 1–3 und 5).
+- Register N38: Plattformgebühr als eigene Zeile und der Satz „Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“ (Bild 3 und 5, 1440 Bild 1–3).
+- Register N41 (A3): „mit Plattformgebühr ab € 10,60“, kein Fehlbetrag „mit Gebühr“ im Hinweis zum Mindestbestellwert (Bild 5, alle Fassungen).
+- Register N39/N43: Link „Vertrag widerrufen“ unter der Übersicht, im Board nicht vorhanden (Bild 5, alle Fassungen).
+- Register N10: Die Bar-Karte sagt „Du bestätigst per E-Mail.“ statt „… dann packt der Hof.“ (Bild 2/3, alle Fassungen).
+- Beispieldaten: Der Hof bietet nur Barzahlung an, deshalb fehlt die Karte „Online bezahlen“, der Knopf heißt schon in Bild 1/2 „Zahlungspflichtig bestellen“ und im Web nimmt die Bar-Karte die volle Breite ein.
+- Register N38: Grundpreis „€ 18,87 / kg“ unter dem Warenkorb-Eintrag (Bild 1, alle Fassungen).
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (1440, alle Bilder).
+
+Nicht prüfbar:
+- Bild 4 (390/1440, hell/dunkel): Braucht Online-Zahlung: Hof Mueller bietet nur Bar an (Stripe nicht bereit, Platzhalter-Schluessel); der Abgelehnt-Hinweis entsteht nur nach einer abgelehnten Stripe-Zahlung im Browser.
+- Bild 1–3 (1440): Die Leiste mit dem Kaufknopf und dem Satz darunter ist auf keinem Web-Bild zu sehen. Bild 3 steht laut Manifest auf „Bezahlen“, zeigt aber den Seitenanfang, Bild 2 endet bei der Grafik „Gesetzliche Gewährleistung“. Ob Knopf und Satz im Web dem Board entsprechen, kann ich deshalb nicht beurteilen.
+- Bild 1 (alle Fassungen): Den Satz „Bestellschluss für heute: 15:00 Uhr.“ unter „Abholung wählen“ kann ich nicht prüfen, weil die Beispieldaten keinen Abholtermin für heute haben (der erste ist „Morgen, Sa, 7. Nov“).
+
+### korb
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 4 | 3 | 0 |
+| 390 dunkel | 4 | 3 | 0 |
+| 1440 hell | 3 | 3 | 0 |
+| 1440 dunkel | 3 | 3 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 2 · Punkt 2 · Hinweis-Kasten, zweiter Satz: Board „Bergkäse ist gerade ausverkauft – wir haben ihn herausgenommen.“ (nennt das Produkt und den Grund), App „Eine Position ist nicht mehr verfügbar und wurde entfernt.“ (ohne Produktnamen, anderer Satz) · .nachtlauf/screens/schluss/korb/2-390-hell.png
+- 390 dunkel · Bild 2 · Punkt 2 · derselbe Satz im Hinweis-Kasten weicht ab (Board „… ist gerade ausverkauft – wir haben ihn herausgenommen.“, App „Eine Position ist nicht mehr verfügbar und wurde entfernt.“) · .nachtlauf/screens/schluss/korb/2-390-dunkel.png
+- 1440 hell · Bild 2 · Punkt 2 · derselbe Satz im Hinweis-Kasten weicht ab (wie 390) · .nachtlauf/screens/schluss/korb/2-1440-hell.png
+- 1440 dunkel · Bild 2 · Punkt 2 · derselbe Satz im Hinweis-Kasten weicht ab (wie 390) · .nachtlauf/screens/schluss/korb/2-1440-dunkel.png
+- 1440 hell · Bild 1 · Punkt 5 · Fokus auf „Schließen“: Board zeigt einen eckigen, eng anliegenden Rahmen um den Textknopf, App einen runden Pillen-Ring mit Abstand (sichtbar, aber andere Form und Größe) · .nachtlauf/screens/schluss/korb/1-1440-hell.png
+- 1440 hell · Bild 2 · Punkt 5 · Fokusring auf „Schließen“ rund statt eckig wie Board · .nachtlauf/screens/schluss/korb/2-1440-hell.png
+- 1440 hell · Bild 3 · Punkt 5 · Fokusring auf „Schließen“ rund statt eckig wie Board · .nachtlauf/screens/schluss/korb/3-1440-hell.png
+- 1440 dunkel · Bild 1/2/3 · Punkt 5 · Fokusring auf „Schließen“ rund (hellgrün) statt eckiger Rahmen wie Board · .nachtlauf/screens/schluss/korb/1-1440-dunkel.png
+- 1440 hell · Bild 3 · Punkt 3 · Textknopf „Höfe entdecken“ wirkt in der App etwas kleiner und leichter als im Board (geringer Unterschied, Messung durch Skript bestätigen) · .nachtlauf/screens/schluss/korb/3-1440-hell.png
+- 390 hell · Bild 3 · Punkt 5 · App zeigt einen Fokusring um „Schließen“, das Board an 390 keinen; vermutlich Fokus nach dem letzten Papierkorb-Klick (Aufnahmezustand, nicht abgezogen) · .nachtlauf/screens/schluss/korb/3-390-hell.png
+- 390 dunkel · Bild 3 · Punkt 5 · wie 390 hell: Fokusring um „Schließen“, den das Board nicht zeigt (Aufnahmezustand, nicht abgezogen) · .nachtlauf/screens/schluss/korb/3-390-dunkel.png
+
+Hinweis ohne Abzug: Die abgedunkelte Seite hinter dem Blatt steht in der App in anderem Zustand (390: globaler Kopf „Agrilo/Anmelden“ über dem Hofkopf, anderer Bildlauf; 1440: Reiter „Übersicht“ statt „Produkte“ in Bild 1/2). Das betrifft das Hof-Board und den Aufnahmezustand, nicht den Warenkorb.
+
+Begründete Ausnahmen gesehen:
+- Symbol (Korb) im Kasten „Dein Warenkorb ist leer.“ – Register N9 (Bild 3, alle Fassungen).
+- Grundpreis „€ … / kg“ unter Warenkorb-Einträgen (Rindfleisch-Paket mit Paketpreis und Kilopreis) – Register N38 (Bild 1).
+- Zeile „Inkl. Plattformgebühr · Reservierung gilt 15 Minuten.“ wie im Board; Plattformgebühr-Hinweis – Register N38.
+- Umgebung: etwa 15 px breiter Streifen am rechten Rand (Bildlaufleiste), Blatt dadurch um diesen Betrag nach links versetzt.
+
+Nicht prüfbar:
+- keine
+
+### meine-bestellungen
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 2 | 4 |
+| 390 dunkel | 3 | 2 | 4 |
+| 1440 hell | 3 | 2 | 4 |
+| 1440 dunkel | 3 | 2 | 4 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- alle Fassungen · Bild 2 · Punkt 1 · zusätzlicher Knopf „Andere E-Mail-Adresse“ unter „Code erneut senden“ in der Karte; das Board zeigt nach „Code erneut senden (30 s)“ kein weiteres Bedienelement · .nachtlauf/screens/schluss/meine-bestellungen/2-390-hell.png (ebenso 2-390-dunkel.png, 2-1440-hell.png, 2-1440-dunkel.png)
+- alle Fassungen · Bild 1 · Punkt 1/2 · zusätzlicher Satz oben in der Karte „Gib die E-Mail-Adresse ein, mit der du bestellt hast. Wir schicken dir einen 6-stelligen Code – ein Konto brauchst du dafür nicht.“; im Board beginnt die Karte direkt mit der Beschriftung „E-Mail“ · .nachtlauf/screens/schluss/meine-bestellungen/1-390-hell.png (ebenso 1-390-dunkel.png, 1-1440-hell.png, 1-1440-dunkel.png)
+- 1440 dunkel · Bild 2 · Punkt 5 · Board zeigt einen sichtbaren hellen Fokusring am Knopf „Bestellungen anzeigen“; in der App ist kein Fokus zu sehen (weder am Knopf noch anderswo) · .nachtlauf/screens/schluss/meine-bestellungen/2-1440-dunkel.png
+- alle Fassungen · Bild 2 · Punkt 2 · Feldbeschriftung lautet „6-stelliger Code aus der E-Mail“, im Board „Code“ · .nachtlauf/screens/schluss/meine-bestellungen/2-390-hell.png (ebenso 2-390-dunkel.png, 2-1440-hell.png, 2-1440-dunkel.png)
+- alle Fassungen · Bild 2 · Punkt 4 · Einleitungssatz „Wir haben dir einen 6-stelligen Code an … geschickt.“ in gedämpfter Grauschrift mit fett gesetzter Adresse; im Board volle Textfarbe, Adresse normal gesetzt · .nachtlauf/screens/schluss/meine-bestellungen/2-1440-hell.png (ebenso 2-390-*, 2-1440-dunkel.png)
+- alle Fassungen · Bild 2 · Punkt 1 · eingegebener Code in Festbreitenschrift ohne Gruppierung („48217“); im Board normale Schrift mit Gruppierung „48 217“ · .nachtlauf/screens/schluss/meine-bestellungen/2-390-hell.png (ebenso 2-390-dunkel.png, 2-1440-hell.png, 2-1440-dunkel.png)
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 1 · Überschrift „Meine Bestellungen“ sichtbar größer (ca. 30 px statt ca. 24 px im Board), Kopfbereich dadurch höher · .nachtlauf/screens/schluss/meine-bestellungen/1-1440-hell.png (ebenso 1-1440-dunkel.png, 2-1440-hell.png, 2-1440-dunkel.png)
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · „Code erneut senden (… s)“ sichtbar kleiner (ca. 14 px statt ca. 16 px im Board) · .nachtlauf/screens/schluss/meine-bestellungen/2-1440-hell.png (ebenso 2-1440-dunkel.png)
+- 390 hell/dunkel · Bild 1, 2 · Punkt 1/4 · Beschriftung „Warenkorb“ in der unteren Leiste in dünner, grauer Schrift; im Board kräftig in Textfarbe wie „Entdecken“ · .nachtlauf/screens/schluss/meine-bestellungen/1-390-hell.png (ebenso 1-390-dunkel.png, 2-390-hell.png, 2-390-dunkel.png)
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslinks, am Handy mit „Darstellung“-Knopf, im Web mit Marke (Register N22/N39) – Bild 1 und 2, alle Fassungen.
+- „Vertrag widerrufen“ als Link im Seitenfuß, wo das Board ihn nicht zeigt (Register N39/N43) – Bild 1 und 2, alle Fassungen.
+- Umgebung: ca. 15 px leerer Streifen am rechten Rand im Web (Bildlaufleisten-Platz) – 1440 hell/dunkel.
+- Beispieldaten (E-Mail-Adresse, Sekunden im Zähler „Code erneut senden“) – keine Abweichung.
+
+Nicht prüfbar:
+- Bild 3 (390/1440, hell/dunkel): Mail-Code: Die Liste erscheint erst nach einem richtigen 6-stelligen Code per Mail; lokal geht keine Mail raus, Code/Cookie wurde nicht umgangen.
+- Bild 4 (390/1440, hell/dunkel): Mail-Code (siehe Bild 3); „Keine Bestellungen gefunden“ folgt erst nach bestandenem Code.
+- Bild 5 (390/1440, hell/dunkel): Mail-Code und Datenbankfehler nötig (Ladefehler der Liste); nicht herstellbar.
+- Bild 6 (390/1440, hell/dunkel): Braucht einen gültigen, dann abgelaufenen Zugangs-Cookie (Mail-Code); nicht herstellbar.
+
+### bestellung
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 4 | 0 |
+| 390 dunkel | 2 | 4 | 0 |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | 3 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1, 2, 4 · Punkt 1 · Zusätzliche feste untere Navigationsleiste (Heute, Bestellungen, Neu, Mein Hof, Mehr) unter der Aktionsleiste; das Board zeigt auf der Bestelldetailseite nur die Aktionsleiste, keine Tab-Leiste · .nachtlauf/screens/schluss/bestellung/1-390-hell.png (ebenso 2-/4-390-hell.png, 1-/2-/4-390-dunkel.png)
+- 390 hell/dunkel · Bild 1–4 · Punkt 1 · Kopf anders aufgebaut: Board hat eine Kopfzeile „‹ Bestellung HM-…“ mit Unterzeile „Bestellungen“ und Telefon-Symbol rechts in derselben Zeile; App hat eine eigene Zeile „← Bestellungen“, darunter frei stehend „Bestellung TD-…“ als große Überschrift, Unterzeile fehlt · .nachtlauf/screens/schluss/bestellung/1-390-hell.png
+- alle Fassungen · Bild 4 · Punkt 1 · „Abholung rückgängig“ ist in der App ein gefüllter oranger Hauptknopf; im Board ein schlichter Textknopf ohne Fläche · .nachtlauf/screens/schluss/bestellung/4-390-hell.png, .nachtlauf/screens/schluss/bestellung/4-1440-hell.png
+- alle Fassungen · Bild 2 · Punkt 1/4 · Toast „Als gepackt markiert“: Board dunkler, breiter Balken unten über der Aktionsleiste mit „Rückgängig“ als oranger Textknopf; App heller, schmaler Kasten oben (verdeckt am Handy die Überschrift „Bestellung TD-G31“), „Rückgängig“ als kleiner gefüllter Knopf (im Dunkeln heller Fleck) · .nachtlauf/screens/schluss/bestellung/2-390-dunkel.png, .nachtlauf/screens/schluss/bestellung/2-1440-dunkel.png
+- alle Fassungen · Bild 1, 2 · Punkt 2 · Kasten „Bar zu kassieren“: Board „Du bekommst die vollen € 17,31 – bis 31. Jänner 2028 zahlst du auf Barverkäufe keine Plattformgebühr.“; App nur „Warenpreis € 17,31“ · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 2 · Kasten „Online bezahlt“: Board „Du bekommst € 18,00 · die Kundin zahlt € 19,12 – die Gebühr ist online einbehalten.“; App „Warenpreis € 9,20 + Servicegebühr € 0,50 – die Gebühr ist online einbehalten.“ · .nachtlauf/screens/schluss/bestellung/4-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 4 · Marke „Abgeholt“ in der App grau/neutral, im Board grün · .nachtlauf/screens/schluss/bestellung/4-390-hell.png
+- alle Fassungen · Bild 4 · Punkt 2 · Überschrift „Packliste · 2 von 2“ im Board, in der App nur „Packliste“ (Zähler fehlt) · .nachtlauf/screens/schluss/bestellung/4-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 2 · Zeitzeile: Board „… 15–18 Uhr · abgeholt um 16:05“; in der App fehlt „· abgeholt um …“ · .nachtlauf/screens/schluss/bestellung/4-390-hell.png
+- alle Fassungen · Bild 1–4 · Punkt 1 · Packliste-Zeilen: Board stellt die Menge fett voran („**4** × Heumilch frisch, 1 L“); App schreibt „Heumilch frisch · 4 L“ ohne fette Mengenangabe vorn (auch im Dialog „Artikel fehlt“) · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 1/2 · Rücklink: Board „← Zurück“ als grüner unterstrichener Link; App „‹ Bestellungen“ grau ohne Unterstreichung · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 1 · Unterzeile „Bestellungen“ unter der Überschrift „Bestellung …“ fehlt in der App · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2, 4 · Punkt 1 · Karte „Kundin“ hat in der App zusätzlich „Abholzettel drucken“ (mit Drucker-Symbol); im Board nicht vorhanden · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 1 · Inhaltsbreite: im Board enden Kundin-Karte und Aktionsleiste bei etwa 1200 px mit freiem Rand rechts; in der App reichen Spalten und Aktionsleiste bis an den rechten Rand (ca. 1385 px), Hauptspalte deutlich breiter · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Dialog „Was fehlt bei …“: Board „Ohne Freilandeier übergeben“ rechts, darunter „Ganze Bestellung stornieren …“; App setzt „Ganze Bestellung stornieren …“ links neben den Hauptknopf in eine Zeile · .nachtlauf/screens/schluss/bestellung/3-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Hinter dem Dialog ist in der App die Aktionsleiste (Artikel fehlt, Weitere Aktionen …, Als gepackt markieren) sichtbar; im Board nicht · .nachtlauf/screens/schluss/bestellung/3-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 2 · Zeile „Bestellt: …“: im Board mit Zusatz „· bar, bezahlt wird bei Abholung“; in der App fehlt der Zusatz · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 5 · Fokus laut Bildtitel am ersten Bedienelement: Board zeigt ihn an der ersten Packlisten-Checkbox; App zeigt ihn am Knopf „Abholung rückgängig“ unten rechts · .nachtlauf/screens/schluss/bestellung/4-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 5 · Fokusring liegt in der App um die ganze erste Packlistenzeile, im Board eng um die Checkbox (klein) · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 390/1440 · Bild 4 · Punkt 1 · Toast „Als abgeholt gespeichert“ mit „Rückgängig“ oben sichtbar, Board zeigt im Zustand keinen Toast (vermutlich aufnahmebedingt; verdeckt am Handy die Überschrift) · .nachtlauf/screens/schluss/bestellung/4-390-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ statt „Konto“ (klein) · .nachtlauf/screens/schluss/bestellung/1-1440-hell.png
+- 390 hell/dunkel · Bild 3 · Punkt 4 · Gewählte Zeile „fehlt“ im Blatt in der App farbig hinterlegt (hell: zartes Orange, dunkel: braun), im Board ohne Flächenfarbe (klein) · .nachtlauf/screens/schluss/bestellung/3-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Im Hofbereich heißt der Stand „Gepackt“ (Bild 2, alle Fassungen); das Board zeigt „Abholbereit“.
+- Umgebung: schmaler leerer Streifen am rechten Rand (Bildlaufleiste) in den 1440-Bildern und 390-Bildern.
+
+Nicht prüfbar:
+- keine (alle 16 App-Bilder laut Manifest erreichbar); Admin-Einträge kommen auf diesem Board nicht vor.
+
+### bestellungen
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 3 | 0 |
+| 390 dunkel | 3 | 3 | 0 |
+| 1440 hell | 2 | 3 | 0 |
+| 1440 dunkel | 2 | 3 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 1 · Punkt 1/6 · Zustand „Noch offen, zwei Abholfenster“ nicht gezeigt: Board zeigt die Liste (h1 „Bestellungen“, „6 offen, davon 1 gepackt“, Chips, zwei Abholfenster-Gruppen) links und rechts die Vorschau-Karte der gewählten Bestellung; die App zeigt stattdessen die volle Detailseite (Zurück-Knopf „Bestellungen“, h1 „Bestellung TD-G31“, Packliste mit Kästchen, Karte „KUNDIN“) ohne Liste · .nachtlauf/screens/schluss/bestellungen/1-1440-hell.png, .nachtlauf/screens/schluss/bestellungen/1-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · feste Leiste unten („Artikel fehlt“, „Weitere Aktionen …“, „Als gepackt markieren“), die das Board nicht zeigt; Board hat „Als gepackt markieren“ als breiten Knopf in der Vorschau-Karte plus Link „Ganze Bestellung öffnen →“ und Satz „Du bekommst die vollen € … – bis … zahlst du auf Barverkäufe keine Plattformgebühr.“ – fehlt in der App · .nachtlauf/screens/schluss/bestellungen/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Knopf „Packliste drucken“ oben rechts fehlt (Detailseite statt Liste) · .nachtlauf/screens/schluss/bestellungen/1-1440-dunkel.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1 · Reihenfolge: Board zeigt Kopf (h1 „Bestellungen“ + Hofname) zuerst, darunter den Hinweis-Kasten; App setzt den Hinweis-Kasten über die h1 · .nachtlauf/screens/schluss/bestellungen/3-390-hell.png, .nachtlauf/screens/schluss/bestellungen/3-1440-hell.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 2 · Leer-Karte anderer Text: Board „Sobald dein Hof freigeschaltet ist, kommen hier die Bestellungen an. Dann kannst du deine Hofseite teilen.“, App „Teile deine Hofseite, damit Kundinnen bei dir bestellen können.“ · .nachtlauf/screens/schluss/bestellungen/3-390-hell.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1/2 · Leer-Karte anderes Bedienelement: Board Textlink „Was bis zur Freischaltung noch fehlt →“, App Knopf „Zu Mein Hof“ · .nachtlauf/screens/schluss/bestellungen/3-390-dunkel.png, .nachtlauf/screens/schluss/bestellungen/3-1440-dunkel.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1 · Leer-Karte anders gebaut: Board linksbündig, durchgezogener Rand, Überschrift in Grundschrift, volle Breite (1440); App zentriert mit Symbol-Kreis, gestricheltem Rand, Serifen-Überschrift, im Web nur etwa 440 px breit · .nachtlauf/screens/schluss/bestellungen/3-1440-hell.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1/2 · Hinweis-Kasten mit Zusätzen, die das Board nicht hat: Uhr-Symbol, Zeile „Deine Hof-ID: …“, Nachsatz „– die Hof-ID ist in der Nachricht schon eingetragen.“; Titel im Board in Warnfarbe (braun/orange), in der App in Grundtextfarbe; Kasten in der App stärker gerundet · .nachtlauf/screens/schluss/bestellungen/3-390-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · zusätzliche Seitenleisten-Karte „Startphase: kostenlos · bis 31. Jänner 2027“, die das Board für den neuen Hof nicht zeigt · .nachtlauf/screens/schluss/bestellungen/3-1440-hell.png
+- 390/1440 hell/dunkel · Bild 2 · Punkt 6 · Zustand nicht gleich: Board „2 offen“, Chip „Noch offen · 2“, „Nächste Abholung: Sa, 6. März, 9–12 Uhr · 2 Bestellungen“; App „0 offen“, „Noch offen · 0“, „Nächste Abholung: Heute, Fr 6. Nov, 15–18 Uhr“ ohne Anzahl – widerspricht dem Satz „Heute holt niemand etwas ab.“ direkt darüber; Zähler an „Bestellungen“ in Seitenleiste/Tab-Leiste fehlt dadurch · .nachtlauf/screens/schluss/bestellungen/2-390-hell.png, .nachtlauf/screens/schluss/bestellungen/2-1440-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 5 · Fokus sitzt auf „Packliste drucken“; Board zeigt den Fokusring am Chip „Heute abholen · 0“ · .nachtlauf/screens/schluss/bestellungen/2-1440-hell.png, .nachtlauf/screens/schluss/bestellungen/2-1440-dunkel.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · Kopf enger: Unterzeile „0 offen“ sitzt dicht unter der h1, Chips und Karte rücken deutlich höher als im Board; Leer-Karte stärker gerundet · .nachtlauf/screens/schluss/bestellungen/2-1440-dunkel.png
+- 1440 hell/dunkel · alle · Punkt 2 · Seitenleiste „Konto · Franz Müller“ bzw. „Konto · Thomas Weiz“, Board nur „Konto“ · .nachtlauf/screens/schluss/bestellungen/2-1440-hell.png
+- 390 hell/dunkel · Bild 1–3 · Punkt 1 · Beschriftungen der unteren Tab-Leiste („Heute“, „Bestellungen“, „Mein Hof“, „Mehr“) sichtbar kleiner als im Board; Symbol „Heute“ (Kalender mit Haken) und „Bestellungen“ anders als im Board · .nachtlauf/screens/schluss/bestellungen/1-390-hell.png
+- 390 dunkel · Bild 1–2 · Punkt 4 · nicht gewählte Chips („Heute abholen · 4“, „Erledigt“) ohne sichtbaren Umriss, im Board klar umrandet · .nachtlauf/screens/schluss/bestellungen/1-390-dunkel.png
+- 390/1440 hell/dunkel · Bild 2–3 · Punkt 1 · Karten in der App deutlich stärker gerundet als im Board · .nachtlauf/screens/schluss/bestellungen/2-390-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Im Hofbereich heißt der fertige Stand „Gepackt“ (Maria Huber, 390 Bild 1); das Board zeigt „Abholbereit“.
+- Chips sichtbar kleiner als 44 px (Filter-Chips 390 und 1440), Trefferfläche laut Ausnahme über ::before.
+- Umgebung: leerer Streifen am rechten Rand (Bildlaufleiste) in den 390er- und 1440er-Bildern.
+
+Nicht prüfbar:
+- keine
+
+### heute
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 5 | 0 |
+| 390 dunkel | 2 | 5 | 0 |
+| 1440 hell | 2 | 5 | 0 |
+| 1440 dunkel | 2 | 5 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell+dunkel · Bild 4 · Punkt 1 · Freischaltungs-Hinweis „Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht“ steht über dem Kopf, h1 „Heute“ mit Datum erst darunter; Board: Kopf oben, Hinweis als erste Karte unter dem Kopf · .nachtlauf/screens/schluss/heute/4-390-hell.png
+- 1440 hell+dunkel · Bild 4 · Punkt 1 · Freischaltungs-Hinweis läuft über Haupt- und rechte Spalte und steht über dem h1 „Heute“; Board: Hinweis in der Hauptspalte unter dem Kopf, rechte Spalte beginnt auf Höhe des Hinweises · .nachtlauf/screens/schluss/heute/4-1440-hell.png
+- 1440 hell+dunkel · Bild 2 · Punkt 1 · Beim Scrollen läuft die ganze Seite mit: Kopf „Heute“/Datum verschwindet, rechte Spalte scrollt mit (Zu tun oben abgeschnitten); Board: nur die Hauptspalte scrollt, Kopf und rechte Spalte (Zu tun, Nächste Abholung, Umsatz, Tipp) bleiben stehen · .nachtlauf/screens/schluss/heute/2-1440-hell.png
+- alle · Bild 1/2/3 · Punkt 1 · Zusätzlicher Block „Was gibt’s Neues am Hof?“ mit Chips „Frisches Produkt“, „Neue Saison“, „Aktion“, „Hinweis“ zwischen „Alle Bestellungen ansehen“ und der Teilen-Karte; im Board nicht vorhanden · .nachtlauf/screens/schluss/heute/2-390-hell.png
+- 390 hell+dunkel · Bild 2 · Punkt 1 · Reihenfolge unten: App „Alle Bestellungen ansehen“ → Was gibt’s Neues → Teilen → „Zu tun · 3“; Board: Braucht dich → Teilen → Nächste Abholung → Umsatz diese Woche → Tipp; Nächste Abholung und Umsatz nicht in Sicht, Zu-tun-Karte zusätzlich im Handy-Strom · .nachtlauf/screens/schluss/heute/2-390-hell.png
+- 390 hell+dunkel · Bild 1/2/5 · Punkt 1 · Packliste-Zeilen ohne linke Uhrzeit-Spalte; Zeit als „15:00–18:00 ·“ vor den Positionen, Positionszeile dadurch abgeschnitten („Big Bag · o…“, „1× Heumilch fris…“); Board: Uhrzeit fett links, Name und Positionen daneben · .nachtlauf/screens/schluss/heute/1-390-hell.png
+- alle · Bild 3 · Punkt 2/6 · Zustand „Online-Zahlung ist pausiert“ nicht erreicht: App „Online-Zahlung einrichten“ / „Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können, … Dauert etwa 10 Minuten.“ / Knopf „Jetzt einrichten“; Board „Online-Zahlung ist pausiert“ / „Stripe braucht noch eine Angabe von dir. Bar bei Abholung geht weiter.“ / Knopf „Bei Stripe ergänzen“ · .nachtlauf/screens/schluss/heute/3-390-hell.png
+- alle · Bild 5 (auch 4) · Punkt 2 · AGB-Karte: App Titel „AGB bestätigen“, Text „Bitte lies die AGB (Fassung 0.9) und stimm ihnen zu. Dein Hof bleibt in der Zwischenzeit wie gewohnt nutzbar.“, zwei Knöpfe „Ich stimme den AGB zu“ + „AGB lesen“; Board Titel „Bitte bestätige die neuen AGB“, Text „Ab 1. April 2027 gelten neue AGB für Agrilo. Lies sie in Ruhe – das Wichtigste steht ganz oben.“, ein Knopf „AGB lesen und bestätigen“ (keine gelistete Recht-vor-Board-Ausnahme) · .nachtlauf/screens/schluss/heute/5-390-hell.png
+- alle · Bild 4 · Punkt 2 · Freischaltungs-Hinweis mit zusätzlicher Zeile „Deine Hof-ID: …“ (auf 390 mitten in der ID umbrochen), Zusatz „– die Hof-ID ist in der Nachricht schon eingetragen.“ und Uhr-Symbol; Board nur Titel, Text und Link „Frage zur Freischaltung stellen“ · .nachtlauf/screens/schluss/heute/4-390-hell.png
+- 1440 hell+dunkel · Bild 4 · Punkt 1 · Pflichtkarte „Online-Zahlung einrichten“ mit Knopf „Jetzt einrichten“ fehlt in der Hauptspalte (nur als Zu-tun-Eintrag rechts); Board zeigt sie als zweite Karte · .nachtlauf/screens/schluss/heute/4-1440-hell.png
+- 1440 hell+dunkel · Bild 4 · Punkt 2 · Leerzustand Packliste: App „Trag deine Abholzeiten ein, damit deine Kundinnen bei dir bestellen können.“; Board „Ohne Abholzeit kann niemand bei dir bestellen. Trag ein, wann man bei dir abholen kann.“ · .nachtlauf/screens/schluss/heute/4-1440-hell.png
+- 1440 hell+dunkel · Bild 4 · Punkt 1/2 · Zu tun: zusätzlicher Einleitungssatz „Arbeite die Liste am besten jetzt schon ab — …“, Link „Abholzeiten festlegen“ (Board „Abholzeiten eintragen“), Beschreibung unter jedem Link; zusätzliche Karte „Nächste Abholung · Noch keine Abholzeiten“ rechts, im Board nicht vorhanden · .nachtlauf/screens/schluss/heute/4-1440-hell.png
+- alle · Bild 1/2/3/5 · Punkt 1/2 · Zu-tun-Karte mit zusätzlichem Knopf „Ausblenden“ und Beschreibungszeile unter jedem Eintrag („Farbverlauf — ein eigenes Foto …“); Board nur Überschrift und Linkzeile · .nachtlauf/screens/schluss/heute/1-1440-hell.png
+- alle · Bild 1/3/4/5 · Punkt 2 · Kennzahl „€ 0,00“ mit Zusatzzeile „mit Hofladen“; Board „€ 0“ und nur „Heute eingenommen“ · .nachtlauf/screens/schluss/heute/1-390-hell.png
+- 1440 hell+dunkel · Bild 1/2/3/5 · Punkt 2 · Umsatz-Karte: Satz „Mo und Di: Verkäufe, die du selbst eingetragen hast.“ fehlt; Vergleich als „+472 % gegenüber der Vorwoche bis Freitag, 04:24“ (mit Uhrzeit, Prozent) statt „Mehr als letzte Woche bis Mittwoch (€ 431,20).“ · .nachtlauf/screens/schluss/heute/1-1440-hell.png
+- alle · Bild 1/3/4/5 · Punkt 6 · Karte „Neue Nachricht im Postfach“ und Zähler am Postfach-Symbol bzw. in der Seitenleiste fehlen in allen Zuständen; Board zeigt sie überall (eventuell keine ungelesene Nachricht in den Prüfdaten) · .nachtlauf/screens/schluss/heute/1-390-hell.png
+- alle · Bild 3/4/5 · Punkt 2/4 · Titel der Hinweis-/Pflichtkarten klein und in normaler Textfarbe; Board: Titel größer und in Warnfarbe (Terrakotta), im Dunkeln Titel und Text orange auf braun getönter Fläche, App weiß/grau auf fast schwarzer Fläche mit Rand · .nachtlauf/screens/schluss/heute/5-1440-dunkel.png
+- 1440 hell+dunkel · Bild 3/4 · Punkt 2 · Abschnittstitel im leeren Zustand „Packliste für heute“; Board „Packliste“ · .nachtlauf/screens/schluss/heute/3-1440-hell.png
+- 1440 hell+dunkel · Bild 3 · Punkt 2 · „Braucht dich“-Zeilen nur mit Titel; Board mit Erklärzeile („Ohne Kategorie bleibt er nicht im Shop.“) · .nachtlauf/screens/schluss/heute/3-1440-hell.png
+- 1440 dunkel / 390 dunkel · Bild 1/2/3/5 · Punkt 4 · Balken der Umsatzkurve im Dunkeln dunkelgrün wie im Hellen; Board im Dunkeln helles Mintgrün · .nachtlauf/screens/schluss/heute/1-1440-dunkel.png
+- alle · Bild 1–5 · Punkt 1 · Karten (Kennzahlen, Packliste, rechte Spalte) deutlich stärker gerundet und höher als im Board · .nachtlauf/screens/schluss/heute/1-1440-hell.png
+- 1440 hell+dunkel · Bild 1–5 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ statt „Konto“ · .nachtlauf/screens/schluss/heute/1-1440-hell.png
+- 1440 hell+dunkel · Bild 4 · Punkt 1 · Seitenleiste mit zusätzlicher Karte „Startphase: kostenlos · bis 31. Jänner 2027“; Board beim neuen Hof ohne solche Karte · .nachtlauf/screens/schluss/heute/4-1440-hell.png
+- alle · Bild 2 · Punkt 2 · Knopf „Teilen“ mit Teilen-Symbol; Board ohne Symbol · .nachtlauf/screens/schluss/heute/2-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Pflichtkarten untereinander – Bild 5 „AGB bestätigen“ und „Online-Zahlung einrichten“ gestapelt; Bild 4 zusätzlich AGB-Karte unter dem Freischaltungs-Hinweis (Prüfhof ohne AGB-Bestätigung).
+- Register vor Board: Im Hofbereich heißt der Stand „Gepackt“ (Packliste, deckt sich mit dem Board).
+- Chips („Frisches Produkt“ usw.) und Textlinks (Zu tun, „Alle Bestellungen ansehen“, „Auswertung“) sichtbar kleiner als 44 px.
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand der 390-Bilder (Bildlaufleiste).
+
+Nicht prüfbar:
+- keine (alle 20 Bildpaare erreichbar; keine Admin-Elemente im Board)
+
+### produkt-neu
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390/1440 hell+dunkel · Bild 6 · Punkt 6 + 2 · Fehlerkasten anders: Board „Speichern hat nicht geklappt“ / „Deine Eingaben sind noch da. Prüf den Empfang und versuch es noch einmal.“ mit Knopf „Nochmal“; App „Keine Verbindung“ / „Wir wissen nicht, ob es geklappt hat – lade die Seite neu, bevor du es nochmal tust.“, **kein Knopf „Nochmal“** · .nachtlauf/screens/schluss/produkt-neu/6-390-hell.png
+- 390 hell+dunkel · alle Bilder · Punkt 1 + 2 · Kopf anders: Board Zurück-Pfeil links, Titel und Unterzeile mit Produktart („Lebensmittel“, „Futtermittel“, „Brennmaterial“); App Schließen-X rechts, keine Unterzeile, bei Futtermittel/Brennmaterial stattdessen ein Erklärsatz („Vom Sackerl für den Hasen bis zum Rundballen – …“, „Brennholz, Anzündholz oder Hackschnitzel – …“) · .nachtlauf/screens/schluss/produkt-neu/2-390-hell.png
+- 1440 hell+dunkel · Bild 1, 5, 6 · Punkt 1 · rechte Spalte „SO SEHEN KUNDEN DEIN PRODUKT“ (Vorschau mit Preis, „€ 15,90 / kg · inkl. Plattformgebühr“ bzw. „Preis fehlt noch“) und grüner Kasten „Du bekommst € 7,50 · die Kundin zahlt € 7,95 / Bar bis 31. Jänner 2028 ohne Gebühr für dich.“ fehlen ganz · .nachtlauf/screens/schluss/produkt-neu/1-1440-hell.png
+- 1440 hell+dunkel · Bild 2, 4 · Punkt 1 · Vorschau „SO SEHEN KUNDEN DEIN FUTTER“ / „… DEIN BRENNHOLZ“ fehlt neben dem Formular (Board: rechte Spalte, sichtbar ab Seitenbeginn) · .nachtlauf/screens/schluss/produkt-neu/4-1440-hell.png
+- 390/1440 · Bild 1, 6 · Punkt 1 + 2 · Preis & Verfügbarkeit anders: Board Einheit „500 g Glas“ und „Preis je Glas“ nebeneinander, darunter Gebühren-Kasten „Du bekommst … die Kundin zahlt …“; App Einheit-Auswahl „Stück“, zusätzlicher Schalter „Ich verkaufe in festen Paketen“, „Preis je Stück“ ganze Breite, Zeile „Kunden sehen: € 7,50 / Stück“, eigenes Feld „Vorrat (Stück)“, kein Gebühren-Kasten · .nachtlauf/screens/schluss/produkt-neu/1-390-hell.png
+- 1440 · Bild 1 · Punkt 1 · zusätzlicher Schalter „Nur saisonal verfügbar“, im Board nicht vorhanden · .nachtlauf/screens/schluss/produkt-neu/1-1440-hell.png
+- 390/1440 · Bild 1, 5, 6 · Punkt 2 · Kartenköpfe ohne Zusammenfassung: Board „Grunddaten / Waldhonig · Honig und Aufstriche“, „Preis & Verfügbarkeit / 500 g · € 7,50 · Vorrat 12“, „Details / Siegel, Allergene, Lagerung, Rücktritt“; App ohne Unterzeile bzw. „Details / Keine Siegel“ · .nachtlauf/screens/schluss/produkt-neu/5-390-hell.png
+- 390/1440 · Bild 1, 5, 6 · Punkt 1 · zusätzliches Feld „Kurzbeschreibung (freiwillig)“ in Grunddaten; Kategorie als Zeile mit Pfeil „Keine Angabe ›“ statt Auswahlfeld mit Pfeil nach unten · .nachtlauf/screens/schluss/produkt-neu/6-390-hell.png
+- 390/1440 · Bild 1, 5 · Punkt 2 · Hauptknopf heißt „Noch 1 Angabe fehlt“ / „Noch 2 Angaben fehlen“ statt „Speichern“ · .nachtlauf/screens/schluss/produkt-neu/5-390-hell.png
+- 390 hell+dunkel · Bild 5 · Punkt 6 · Fehlerzusammenfassung „Bitte prüfe die markierten Felder.“ oben nicht sichtbar (1440: halb unter dem Dialogkopf abgeschnitten); Fokus liegt auf dem Kartenkopf „Grunddaten“ statt im ersten markierten Feld; das Feld Kategorie ist trotz Fehlertext nicht rot umrandet (Board: Preisfeld rot umrandet) · .nachtlauf/screens/schluss/produkt-neu/5-1440-hell.png
+- 390/1440 · Bild 5 · Punkt 1 · zusätzlicher Vorschlag „Passt das? Honig & Bienenprodukte · Waldhonig“ unter „Was verkaufst du?“; Kartentitel „Grunddaten“ und „Preis & Verfügbarkeit“ in Fehlerfarbe (Board: nur Unterzeile „Bitte prüfen“ farbig) · .nachtlauf/screens/schluss/produkt-neu/5-390-hell.png
+- 390/1440 · Bild 2 · Punkt 1 · zusätzliche Chip-Gruppen „Kategorie“ (Heu & Stroh, Getreide & Körner, Mischfutter, Ergänzungsfutter) und „Sorte“ (Wiesenheu, Luzerne, Stroh, Silage) · .nachtlauf/screens/schluss/produkt-neu/2-390-hell.png
+- 390/1440 · Bild 2 · Punkt 2 · Hilfetext unter Name: Board „Name und Größe, z. B. „Heu, 1. Schnitt, Kleinballen““; App „Jede Größe heißt im Shop „Name + Größe“, z. B. „Bergwiesen-Heu 5 kg-Sack“.“ · .nachtlauf/screens/schluss/produkt-neu/2-1440-hell.png
+- 390/1440 · Bild 2, 3 · Punkt 1 + 2 · Verkaufsgrößen anders: Board aufklappbare Karte „Verkaufsgrößen / vom Sackerl bis zum Rundballen · 2 Größen“ mit Größen-Zeilen („ca. 15 kg · Du bekommst … · die Kundin zahlt … · Vorrat …“) und Knopf „+ Größe hinzufügen“; App Überschrift mit „Tipp an, was du abgibst – …“, Chips (1 kg-Sackerl, 5 kg-Sack, Kleinballen, Rundballen, Big Bag), „+ Eigene Größe“ und Bearbeitungskarten „Größe / Gewicht (ca.) / Preis / Vorrat“ mit Zähler · .nachtlauf/screens/schluss/produkt-neu/2-1440-hell.png
+- 390/1440 · Bild 3 · Punkt 1 · Board-Block fehlt bzw. anders: Schalter „Nur an landwirtschaftliche Betriebe / Dann fragt die Kasse nach der Betriebsnummer.“ ist in der App ein Chip unter „Hinweise für Kunden“ (neben „Bio“); Karte „Abholung / Hinweise für die Abholung“ mit Textfeld „Hinweis“ ist in der App eine Chip-Gruppe (Anhänger nötig, Verladen mit Frontlader, Abholung nach Absprache) · .nachtlauf/screens/schluss/produkt-neu/3-1440-hell.png
+- 390/1440 · Bild 3 · Punkt 1 + 6 · Karte „Kennzeichnung / Pflicht · noch offen“ mit Erklärsatz und Knopf „Angaben eintragen“ in keinem App-Bild zu sehen · .nachtlauf/screens/schluss/produkt-neu/3-390-hell.png
+- 390 · Bild 3 · Punkt 1 + 2 · Registrierungen anders: Board Überschrift „DEINE FUTTERMITTEL-REGISTRIERUNGEN“ und eine Zeile „Futtermittel-Nummer (LFBIS) … / Gilt für alle deine Futtermittel. Agrilo prüft sie nicht. ›“; App farbige Karten („… automatisch erfasst“, Schloss-Karte „Eigene Ernte als Heimtierfutter abgepackt … BAES-Meldung · fehlt“) und Link „Alle Futterarten anzeigen (Handel, Mischfutter, BARF …)“ · .nachtlauf/screens/schluss/produkt-neu/3-390-hell.png
+- 390 · Bild 3 · Punkt 1 + 2 · Vorschau „SO SEHEN KUNDEN DEIN FUTTER“: Board eine Zeile „Heu, 1. Schnitt · ab € … · ab € … / kg“; App große Karte mit Titel in Serifenschrift, „2 Größen sichtbar“, Siegel-Chip, Größen-Chips mit Hofpreis und zwei zusätzlichen Sätzen („Die Servicegebühr zahlt die Kundin zusätzlich …“, „Erscheint auf deiner Hofseite …“) · .nachtlauf/screens/schluss/produkt-neu/3-390-hell.png
+- 1440 · Bild 3 · Punkt 1 · zusätzliche Blöcke „Rücktritt“ (Kästchen „Verdirbt schnell – kein Rücktritt möglich …“) und „Geschätzte Kosten, wenn die Kundin die Ware zurückschickt …“, im Board an dieser Stelle nicht vorhanden; Bild zeigt nicht das Ende des Dialogs wie das Board · .nachtlauf/screens/schluss/produkt-neu/3-1440-hell.png
+- 390/1440 · Bild 4 · Punkt 1 · Holz-Angaben anders: Board aufklappbare Karte mit Feldern „Holzart“ und „Scheitlänge“ nebeneinander, Feld „Gelagert seit“, Schalter „Überdacht gelagert / Unter Dach, vor Regen geschützt“; App ohne Karte, Chip-Gruppen „Art“ (zusätzlich), „Holzart“ + Feld „Andere Holzart“, „Scheitlänge“, „Trocknung“ (zusätzlich), Auswahl „Gelagert seit (freiwillig)“ und Kästchen „überdacht gelagert“ unter „Lagerung“ · .nachtlauf/screens/schluss/produkt-neu/4-1440-hell.png
+- 390/1440 · Bild 4 · Punkt 2 · Hilfetext unter Name zusätzlich („Jede Größe heißt im Shop „Name + Größe“, z. B. „Buche, ofenfertig Raummeter“.“); Board hat keinen · .nachtlauf/screens/schluss/produkt-neu/4-390-hell.png
+- 390 · Bild 4 · Punkt 1 · Karte „Verkaufsgrößen / Preis je Raummeter · 1 Größe“ mit Zeile „1 Raummeter, geschlichtet“ und Satz „1 Raummeter = 1 m × 1 m × 1 m …“ im sichtbaren Bereich nicht vorhanden (in der App unter langen Chip-Gruppen) · .nachtlauf/screens/schluss/produkt-neu/4-390-hell.png
+- 1440 · Bild 3, 4 · Punkt 3 · Beschriftungen „Vorrat“, „Andere Holzart“ und „Lagerung“ sichtbar kleiner und dünner als die übrigen Feldbeschriftungen · .nachtlauf/screens/schluss/produkt-neu/3-1440-hell.png
+- 1440 dunkel · Bild 3, 4 · Punkt 4 · Kästchen „Verdirbt schnell …“ / „überdacht gelagert“ als helles Grau, wirkt im Dunkeln wie ein kleiner heller Fleck · .nachtlauf/screens/schluss/produkt-neu/4-1440-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Produkt-Formulare im Web als Dialog über der Produktliste (statt eigener Seite mit „← Zurück“ und Fußleiste „Abbrechen“ / „Speichern“).
+- Umgebung: etwa 15 px breiter Streifen am rechten Rand in den 1440-Bildern (Bildlaufleiste).
+
+Nicht prüfbar:
+- keine (alle 24 App-Bilder erreichbar)
+
+### produkte
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | 3 | 4 | 0 |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | 3 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1, 4 · Punkt 1 · Zusätzliche Karte „Nimmt Bestellungen an · Nächste Abholung … / Pausieren“ zwischen Reitern und Chips; das Board zeigt dort direkt die Chips · .nachtlauf/screens/schluss/produkte/1-390-hell.png, .nachtlauf/screens/schluss/produkte/4-390-hell.png (ebenso -dunkel)
+- 390 hell/dunkel · Bild 1 · Punkt 2 · Produktzeile: Board „500 g · Du bekommst € 7,50 · die Kundin zahlt € 7,95 · nicht im Shop“, App nur „je Paket · € 7,50“ – „Du bekommst … die Kundin zahlt …“ fehlt in allen Zeilen · .nachtlauf/screens/schluss/produkte/1-390-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 2 · Spalte „Preis“: Board zweizeilig „Du bekommst € 7,50 / die Kundin zahlt € 7,95“ (bzw. „ab“), App nur „€ 1,40“ (einzeilig, teils mit „€ 17,80 / kg“) · .nachtlauf/screens/schluss/produkte/1-1440-hell.png (ebenso -dunkel, 2-1440-*)
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Gruppierung: Board „Braucht dich · 1“ nur Waldhonig, Freilandeier („Nur noch 3 …“) und Brennholz (0) unter „Im Shop“; App „Braucht dich · 3“ mit Brennholz (Marke „Ausverkauft“), Bio-Freilandeier, Waldhonig · .nachtlauf/screens/schluss/produkte/1-390-hell.png (ebenso -dunkel)
+- 390/1440 alle · Bild 1 · Punkt 2 · Marke bei Produkt ohne Kategorie: Board „Kategorie ergänzen“ (Status-Marke), App gestrichelter Vorschlag mit Funkel-Symbol „Honig & Bienenprodukte · Waldhonig übernehmen“; im Web steht als Status „Im Shop“ statt „Kategorie ergänzen“ · .nachtlauf/screens/schluss/produkte/1-1440-hell.png, .nachtlauf/screens/schluss/produkte/1-390-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Reihenfolge/Hervorhebung: Board stellt Waldhonig (nicht im Shop, Schalter aus) als erste Zeile mit getöntem Grund; App zeigt Waldhonig als letzte Zeile, ungetönt, Schalter an · .nachtlauf/screens/schluss/produkte/1-1440-hell.png (ebenso -dunkel)
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Karte „Braucht dich“ im Board mit abgesetztem (getöntem) Grund, in der App gleicher Kartengrund wie „Im Shop“ · .nachtlauf/screens/schluss/produkte/1-390-hell.png (ebenso -dunkel)
+- 390 hell/dunkel · Bild 3 · Punkt 1 · Hinweis „Richte deinen Hof fertig ein …“ steht in der App ganz oben über dem Kopf „Mein Hof“ und den Reitern; im Board unter Kopf und Reitern · .nachtlauf/screens/schluss/produkte/3-390-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Hinweis steht über der Überschrift „Produkte“; im Board unter der Überschrift · .nachtlauf/screens/schluss/produkte/3-1440-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Chip-Zeile „Alle · 0 / Lebensmittel / Futtermittel / Brennmaterial / Nicht im Shop · 0“ fehlt in der App · .nachtlauf/screens/schluss/produkte/3-1440-hell.png (ebenso -dunkel)
+- 390/1440 alle · Bild 3 · Punkt 2 · Hinweis enthält zusätzlich Uhr-Symbol, Zeile „Deine Hof-ID: …“ und den Nachsatz „– die Hof-ID ist in der Nachricht schon eingetragen.“; Board nur Titel, Text und Link · .nachtlauf/screens/schluss/produkte/3-1440-hell.png, .nachtlauf/screens/schluss/produkte/3-390-hell.png (ebenso -dunkel)
+- 390/1440 alle · Bild 3 · Punkt 4 · Hinweis-Titel im Board in Warnfarbe (rotbraun bzw. orange im Dunkeln), App in normaler Textfarbe; Fläche hell deutlich satter · .nachtlauf/screens/schluss/produkte/3-1440-hell.png (ebenso -390-*, -dunkel)
+- 390/1440 alle · Bild 3, 4 · Punkt 1 · Leerzustand „Noch keine Produkte“ / „Kein Produkt passt“: Board linksbündige Karte mit Titel in Grundschrift und Knopf über volle Breite; App zentriert, gestrichelter Rahmen, zusätzliches rundes Symbol (Paket bzw. Lupe), Titel in Serifenschrift, Knopf schmal · .nachtlauf/screens/schluss/produkte/3-1440-hell.png, .nachtlauf/screens/schluss/produkte/4-1440-hell.png, .nachtlauf/screens/schluss/produkte/3-390-hell.png, .nachtlauf/screens/schluss/produkte/4-390-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Seitenleiste zeigt zusätzliche Karte „Startphase: kostenlos · bis 31. Jänner 2027“; Board zeigt für den neuen Hof keine Karte an dieser Stelle · .nachtlauf/screens/schluss/produkte/3-1440-hell.png (ebenso -dunkel)
+- 390 hell/dunkel · Bild 1, 3, 4 · Punkt 1 · Briefkasten-Symbol mit Zähler rechts im Kopf fehlt (Board: Teilen, Ansehen, Briefkasten mit „1“; App nur Teilen und Ansehen bzw. nur Ansehen) – kann an fehlenden Nachrichten liegen, im Bild nicht unterscheidbar · .nachtlauf/screens/schluss/produkte/1-390-hell.png, .nachtlauf/screens/schluss/produkte/3-390-hell.png (ebenso -dunkel)
+- 390 dunkel / 1440 dunkel · Bild 1, 2 · Punkt 4 · Produktbilder sitzen auf hellgrauen Kreisen/Kacheln und wirken im Dunkeln als helle Flecken; Board zeigt dunkle, gedämpfte Platzhalter · .nachtlauf/screens/schluss/produkte/1-1440-dunkel.png, .nachtlauf/screens/schluss/produkte/1-390-dunkel.png
+- 1440 hell/dunkel · Bild 1, 4 · Punkt 5 · Gezeigter Startfokus liegt in der App auf „Neues Produkt“, im Board auf dem Chip „Alle · 7“ (Fokus in beiden sichtbar) · .nachtlauf/screens/schluss/produkte/1-1440-hell.png, .nachtlauf/screens/schluss/produkte/4-1440-hell.png (ebenso -dunkel)
+- 390/1440 alle · Bild 2 · Punkt 1 · Zähler im Vorrat-Blatt: Board eine gerahmte Pille „− 3 +“; App zwei getrennte runde Knöpfe und große Zahl mit Einheit („3 Pakete“) über einer Unterstreichung · .nachtlauf/screens/schluss/produkte/2-390-hell.png, .nachtlauf/screens/schluss/produkte/2-1440-hell.png (ebenso -dunkel)
+- 390 hell/dunkel · Bild 2 · Punkt 4 · Hintergrund hinter dem Blatt ist in der App unscharf gezeichnet und stärker abgedunkelt; im Board nur leicht abgedunkelt und lesbar · .nachtlauf/screens/schluss/produkte/2-390-hell.png (ebenso -dunkel)
+- 390/1440 alle · Bild 1, 4 · Punkt 1 · Filter-Chips und Suchfeld kleiner als im Board (Chip-Schrift ca. 13 statt 15 px, Suchfeld ca. 44 statt 48 px hoch, Eingabeschrift kleiner); im Web Tabellenkopf ohne getönten Grund, Tabelle stark gerundet · .nachtlauf/screens/schluss/produkte/1-1440-hell.png, .nachtlauf/screens/schluss/produkte/1-390-hell.png (ebenso -dunkel, 4-*)
+- 1440 hell/dunkel · Bild 1 · Punkt 3 · Spalte „Einheit“ in der App sichtbar kleiner und blasser als im Board (ca. 12–13 px statt 15 px) · .nachtlauf/screens/schluss/produkte/1-1440-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 1–4 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ bzw. „Konto · Thomas Weiz“, Board nur „Konto“ · .nachtlauf/screens/schluss/produkte/1-1440-hell.png (ebenso alle 1440)
+- 1440 hell/dunkel · Bild 4 · Punkt 2 · Satz „Prüf die Schreibweise oder leg „Kürbis“ als neues Produkt an.“ bricht mit einzelnem Wort „an.“ in die zweite Zeile (Board einzeilig) · .nachtlauf/screens/schluss/produkte/4-1440-hell.png (ebenso -dunkel)
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Vorrat-Blatt mit „Dazu“ (+5/+10/+25/+50) und „Ausverkauft“ (Bild 2, alle Fassungen).
+- Register vor Board: Produkt-Formular im Web als Dialog (Bild 2, 1440).
+- Umgebung: etwa 15 px breiter Streifen am rechten Rand (Bild 2, 390 und 1440).
+- Chips kleiner als 44 px sichtbar (Trefferfläche über ::before zulässig) – nur als Größenabweichung zum Board oben genannt.
+
+Nicht prüfbar:
+- keine (alle 16 App-Bilder erreichbar)
+
+### auswertung
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1–6 · Punkt 1 · Kopf fehlt: Board zeigt eine eigene Kopfleiste (Fläche mit Trennlinie, Zurück-Pfeil „‹“, „Auswertung“, darunter „Hof … · Stand …“), die beim Scrollen stehen bleibt (Bild 2, 2b); die App zeigt nur eine große Überschrift ohne Zurück-Pfeil, die mitscrollt · .nachtlauf/screens/schluss/auswertung/1-390-hell.png
+- 390 hell/dunkel · Bild 2/2b · Punkt 1 · Reihenfolge: Board hat unter dem Umsatz-Diagramm den Hinweis, dann „Wo kam das Geld her“, „Was lief am besten“ und ganz unten „Plattformgebühr“ + „Grenze“; die App setzt die Gebühren-Karte direkt unter das Diagramm, vor den Hinweis · .nachtlauf/screens/schluss/auswertung/2-390-hell.png
+- 390/1440 alle · Bild 1, 3, 4, 5 · Punkt 1 · Zeitraum-Wahl: Board zeigt drei getrennte Pillen-Knöpfe (aktiver Knopf hell: dunkel gefüllt, dunkel: hell gefüllt); die App zeigt eine Segment-Leiste mit beige (hell) bzw. dunkelgrau (dunkel) hinterlegtem aktivem Segment – andere Form und im Dunkeln umgekehrte Farbwirkung · .nachtlauf/screens/schluss/auswertung/1-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1, 4, 5 · Punkt 1 · Monatswahl: Board hat eine eigene Zeile unter der Zeitraum-Wahl mit „‹ Februar 2027 ›“ mittig über die Inhaltsbreite; die App setzt „‹ November 2026“ rechts in dieselbe Zeile wie die Zeitraum-Wahl (390: Titel linksbündig statt mittig) · .nachtlauf/screens/schluss/auswertung/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 1 · Inhaltsbreite: Board begrenzt den Inhalt auf etwa 900 px (rechts bleibt Rand frei); die App zieht alle Karten bis an den rechten Rand (bis ca. 1375 px) · .nachtlauf/screens/schluss/auswertung/2-1440-hell.png
+- 1440 hell/dunkel · Bild 3 (2b) · Punkt 1 · Board stellt „Grenze Be- & Verarbeitung“ als schmale Karte rechts neben die Gebühren-Karte; die App zeigt sie volle Breite ganz unten (Board Bild 2 zeigt allerdings die volle Breite – Board in sich uneinheitlich) · .nachtlauf/screens/schluss/auswertung/3-1440-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Spalten: Board stellt „Über deine geteilten Links“ und „Abgeholte Bestellungen und eingetragene Verkäufe“ nebeneinander, darunter Gebühr + Grenze; die App stapelt Links-Karte volle Breite, darunter Diagramm + Gebühr · .nachtlauf/screens/schluss/auswertung/5-1440-hell.png
+- 390/1440 alle · Bild 1–5 · Punkt 2 · Gebühren-Karte: Board-Titel „Plattformgebühr im Februar“ (Woche: „Plattformgebühr diese Woche“), App „Plattformgebühren dieses Monats“ mit zusätzlicher Unterzeile „November 2026“; Board-Erklärtext „Darum € … und nicht glatt 6 % … Bar zahlst du als Gründungshof bis … keine.“ bzw. „6 % je Stück, aufgerundet – …“, App „Sie wird je Stück aufgerundet …“ + zusätzlicher Absatz „Die Gebühr aus Barverkäufen ziehen wir einmal im Monat per Lastschrift ein – …“; Zeilen im Board mit Trennlinien und großem Abstand, in der App eng ohne Trennlinien · .nachtlauf/screens/schluss/auswertung/3-1440-hell.png
+- 390/1440 alle · Bild 4 · Punkt 6 · Woche: Gebühren-Karte zeigt in der App den Monat („dieses Monats · November 2026“) statt der Woche („Plattformgebühr diese Woche“) · .nachtlauf/screens/schluss/auswertung/4-1440-hell.png
+- 390/1440 alle · Bild 4 · Punkt 2 · Vergleichszeile: Board „+4 % · verglichen bis zum selben Zeitpunkt (€ 431,20)“ in einer Zeile; App „▲ 472 % mehr als letzte Woche“ und darunter „verglichen bis zum selben Zeitpunkt“ ohne Vorwochen-Betrag; Board-Fußsatz „Mo und Di: Verkäufe, die du selbst eingetragen hast. …“ in der App nicht sichtbar · .nachtlauf/screens/schluss/auswertung/4-1440-hell.png
+- 390 hell/dunkel · Bild 4 · Punkt 1 · Board zeigt in der Wochenansicht direkt unter den Kennzahlen das Umsatz-Diagramm mit Vergleich; die App schiebt die Karte „Über deine geteilten Links“ dazwischen, das Diagramm mit „verglichen bis …“ ist im ersten Bild nicht zu sehen · .nachtlauf/screens/schluss/auswertung/4-390-hell.png
+- 390/1440 alle · Bild 1, 2, 4 · Punkt 1 · Diagramm: App zeigt zusätzlich Vergleichsbalken des Vormonats/der Vorwoche und eine Legende („November 2026 · Oktober“, „2.–8. Nov · Woche davor“), die das Board nicht hat; Board-Balken sind breite Blöcke je Woche, App schmale Säulen · .nachtlauf/screens/schluss/auswertung/1-1440-hell.png
+- 390/1440 dunkel · Bild 1–4 · Punkt 4 · Balken (Diagramm, „Wo kam das Geld her“) im Board hellgrün (mint) auf dunkler Karte, in der App dunkelgrün – deutlich schwächerer Kontrast; Vergleichsbalken „Oktober“ im Dunkeln kaum sichtbar · .nachtlauf/screens/schluss/auswertung/2-1440-dunkel.png
+- 390/1440 alle · Bild 2/2b · Punkt 1 · Grenze-Karte: Board „GRENZE BE- & VERARBEITUNG 2027“, Marke „Im grünen Bereich“ rechts neben dem Titel, „€ 1.630 von € 55.000“ in einer Zeile, Satz „Nur verarbeitete Produkte wie Bergkäse. Zählweise vereinfacht, …“; App „€ 55 000 GRENZE BE- & VERARBEITUNG 2026“ (zusätzlicher Betrag im Titel), großer Betrag „€ 258“ + „von € 55 000“, Marke darunter (390), zusätzliche Zeilen „Anteil an der Grenze 0 %“ und „Noch € 54 742 Spielraum“, erster Satz „Nur verarbeitete Produkte wie Bergkäse.“ fehlt · .nachtlauf/screens/schluss/auswertung/3-390-hell.png
+- 390/1440 alle · Bild 2 · Punkt 1 · Hinweis-Kasten: Board grün hinterlegter Streifen mit grünem fettem Text ohne Symbol; App neutrale Karte mit Glühbirnen-Symbol und normalem Text · .nachtlauf/screens/schluss/auswertung/2-1440-hell.png
+- 390/1440 alle · Bild 5 · Punkt 6 · Zustand „nicht freigegeben“ nicht erreicht: Hinweiskarte „Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht“ mit Link „Frage zur Freischaltung stellen“ fehlt; Links-Karte zeigt „Hof teilen auf Heute“ statt „Teilen geht, sobald dein Hof online ist.“; Web: Startfokus auf dem Link fehlt (Grund laut Manifest: Testhof ist freigegeben) · .nachtlauf/screens/schluss/auswertung/5-390-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 6 · Leeres Diagramm: Board „Noch keine Verkäufe in diesem Zeitraum“ (fette Grundschrift) + Satz „Verkaufst du auch am Markt oder ab Hof? Trag es ein, dann siehst du hier alles zusammen.“ + breiter Knopf „Verkauf eintragen“; App zeigt zusätzlich „€ 0,00“ und „Noch kein Vormonat zum Vergleich“, gestrichelten Kasten mit Symbol, Serifen-Überschrift, kleinen Knopf – der erklärende Satz fehlt · .nachtlauf/screens/schluss/auswertung/5-1440-hell.png
+- 390/1440 alle · Bild 6 · Punkt 6 · Fehler-Karte: Board weiße Karte mit dunklem Rand, größere fette Überschrift, Knopf „Noch einmal versuchen“ volle Breite unter dem Text; App getönte Karte, kleinere Überschrift, Knopf klein (390: links unter dem Text, 1440: rechts neben dem Text) · .nachtlauf/screens/schluss/auswertung/6-1440-hell.png
+- 390/1440 alle · Bild 1, 6 · Punkt 1 · Link „Region“: Board fett und unterstrichen, App grün ohne Unterstrich; Web: Fokusrahmen überdeckt das Leerzeichen („unterRegion“), Board „unter Region.“ mit Punkt · .nachtlauf/screens/schluss/auswertung/1-1440-hell.png
+- 390/1440 alle · Bild 1 · Punkt 2 · Leere Links-Karte: App „In diesem Zeitraum kam noch niemand …“ + Knopf „Hof teilen auf Heute“ + „Wir zählen nur Besuche über deinen Link – ohne Cookies …“; Board (gefüllt) Fußsatz „Gezählt werden Besuche, keine Bestellungen.“, Board-Leerzustand (Bild 4) ohne Knopf und ohne Fußsatz · .nachtlauf/screens/schluss/auswertung/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 2 · Seitenspalte: Board „Konto“, App „Konto · Franz Müller“; Avatar Board ein Buchstabe („M“), App zwei („HM“) · .nachtlauf/screens/schluss/auswertung/1-1440-hell.png
+- 390/1440 alle · Bild 4 · Punkt 2 · Wochen-Titel: Board „1.–7. März“ (Monat ausgeschrieben), App „2.–8. Nov“ (abgekürzt) · .nachtlauf/screens/schluss/auswertung/4-390-hell.png
+- 1440 hell/dunkel · Bild 4, 5 · Punkt 1 · Board blendet die Zeile „Deine Zahlen – den Markt rundherum findest du unter Region.“ in Woche/neuer Hof aus, die App zeigt sie immer (Board in sich uneinheitlich mit Bild 1) · .nachtlauf/screens/schluss/auswertung/4-1440-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · „Was lief am besten“: Beträge im Board normal, in der App fett · .nachtlauf/screens/schluss/auswertung/2-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand in allen 390-Bildern (Bildlaufleiste des Test-Browsers) – keine Abweichung.
+- Keine Ausnahme „Register vor Board“, „Recht vor Board“ oder „Board-Fehler (A1)“ in diesem Board gesehen.
+
+Nicht prüfbar:
+- Keine ganzen Bilder (alle im Manifest erreichbar).
+- Bild 5 (390/1440) nur teilweise: Hinweiskarte „nicht freigegeben“ und Startfokus auf „Frage zur Freischaltung stellen“ – laut Manifest „Hof ohne Verkäufe (innbogenhof), freigegeben; Board zeigt Hof am Moos (nicht freigegeben, Hinweiskarte oben fehlt). Web: Fokusziel (Link Frage zur Freischaltung) fehlt, kein Fokus gesetzt.“ Trotzdem oben als Punkt 6 geführt, weil der Zustand des Boards nicht erreicht wurde.
+- Gefüllte Links-Karte (Balken je Quelle) in keinem App-Bild zu sehen, weil im Testzeitraum keine Besuche über geteilte Links vorliegen.
+
+### beitraege
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 4 | 0 |
+| 390 dunkel | 2 | 4 | 0 |
+| 1440 hell | 2 | 4 | 0 |
+| 1440 dunkel | 2 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1–4 · Punkt 1 · Kopf anders: Board zeigt Kopfzeile mit Zurück-Pfeil, Titel „Neuer Beitrag“ und Unterzeile „Mein Hof › Beiträge“ über dem Schrittzeiger; App zeigt nur Leiste „← Beiträge“, darunter eine abgesetzte Karte mit Schrittzeiger, „Neuer Beitrag“ erst in der Karte und ohne Brotkrumen · .nachtlauf/screens/schluss/beitraege/1-390-hell.png
+- 390 hell/dunkel · Bild 1–4 · Punkt 1 · Feste Leiste fehlt: Board hat über der unteren Navigation eine feste Leiste mit „Weiter zu Empfängern“ / „Vorschau ansehen“ / „Versand starten“ (bei 3 und 4 darunter „← Zurück“); App hat bei Bild 1–2 keinen sichtbaren Weiter-Knopf, bei 3–4 steht der Knopf im Fluss in der Karte · .nachtlauf/screens/schluss/beitraege/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 1 · Seitenaufbau anders: Board linksbündig im Inhaltsbereich mit Textlink „‹ Beiträge“, großer h1 „Neuer Beitrag“ und „Mein Hof › Beiträge“; App mittig gesetzte Karte, Zurück als umrandeter Pillen-Knopf „‹ Beiträge“, h1 klein in der Karte, ohne Brotkrumen · .nachtlauf/screens/schluss/beitraege/1-1440-hell.png
+- 390/1440 · Bild 3, 4 · Punkt 1 · Überschrift „Neuer Beitrag“ fehlt ganz in Schritt 2 und 3 (Board zeigt sie in jedem Schritt); App beginnt direkt mit „Empfänger wählen“ / „Überprüfen und absenden“ · .nachtlauf/screens/schluss/beitraege/3-1440-hell.png
+- 390/1440 · Bild 3, 4 · Punkt 1 · „Zurück“ an falscher Stelle und Form: Board „← Zurück“ als Knopf unter dem Hauptknopf (Handy) bzw. umrandeter Knopf links neben „Vorschau ansehen“/„Versand starten“ (Web, beide rechtsbündig); App kleiner grauer Textlink „← Zurück“ über der Überschrift, Hauptknopf volle Breite · .nachtlauf/screens/schluss/beitraege/3-1440-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 5 · Fokus am falschen Element: Board zeigt Fokusring am ersten Bedienelement des Formulars (Bild 1 Chip „Frisches Produkt“, Bild 2 Feld „Titel“, Bild 3 erste Checkbox, Bild 4 Produkt-Chip „Bergkäse · € 6,58“); App zeigt den Ring jeweils am Pillen-Knopf „Beiträge“ · .nachtlauf/screens/schluss/beitraege/2-1440-hell.png
+- 390/1440 · Bild 1, 2 · Punkt 1 · Anlass anders: Board einzeilige Chips ohne Symbole („Frisches Produkt“, „Neue Saison“, „Aktion“, „Hinweis“); App 2×2-Kacheln mit Symbolen und Haken · .nachtlauf/screens/schluss/beitraege/1-1440-hell.png
+- 390/1440 · Bild 1, 2 · Punkt 1/2 · Zusätzliche Elemente: Unterzeile „Inhalt erstellen“ als graue Unterzeile statt eigener Abschnittsüberschrift; zusätzliche Zähler „27/80“, „124/500“, „0/80“ neben Titel/Nachricht (Board ohne) · .nachtlauf/screens/schluss/beitraege/1-390-hell.png
+- 390/1440 · Bild 1, 2 · Punkt 2 · Wortlaut „Produkte verlinken (freiwillig)“ statt Board „(optional)“ · .nachtlauf/screens/schluss/beitraege/1-1440-hell.png
+- 1440 · Bild 1, 2 · Punkt 1/3 · Produkt-Chips anders: Board nur Namen („Bergkäse“, „Heumilch frisch“), kräftige Schrift; App „Name — € Preis“, sichtbar kleinere, blasse Schrift (Kontrast im Dunkeln knapp) · .nachtlauf/screens/schluss/beitraege/1-1440-dunkel.png
+- 390/1440 · Bild 2 · Punkt 1/3 · Feldfehler: Board-Fehlertext „Bitte gib einen Titel ein – er steht über deinem Beitrag.“ fett und in Fließtextgröße; App deutlich kleiner und nicht fett; App zeigt zusätzlich Platzhalter „z.B. Frisches Rindfleisch ab Samstag“ im leeren Feld (Board leer) · .nachtlauf/screens/schluss/beitraege/2-390-hell.png
+- 390/1440 · Bild 3 · Punkt 1 · Empfänger-Karten: Board Checkbox links, kein Symbol; App rundes Symbol (Haus/Brief) links und Haken-Kreis rechts, keine Checkbox; zusätzliche Unterzeile „Kanäle auswählen“ · .nachtlauf/screens/schluss/beitraege/3-390-hell.png
+- 390/1440 · Bild 3 · Punkt 1 · Hinweistext „Nur Kundinnen, die selbst zugestimmt haben …“ in grauem Kasten; Board als einfacher Text ohne Kasten · .nachtlauf/screens/schluss/beitraege/3-1440-hell.png
+- 390/1440 · Bild 3 · Punkt 2 · Knopf „Vorschau ansehen →“ mit Pfeil; Board „Vorschau ansehen“ ohne Pfeil · .nachtlauf/screens/schluss/beitraege/3-390-hell.png
+- 390/1440 · Bild 4 · Punkt 1 · Vorschau-Karte: zusätzliche Marke „Frisches Produkt“ über dem Titel; Anrede zeigt Platzhalter-Chip „{Vorname}“ statt eingesetztem Namen („Hallo Anna!“ im Board), Chip-Schrift sichtbar winzig (11 px laut Messung) · .nachtlauf/screens/schluss/beitraege/4-390-hell.png
+- 390/1440 · Bild 4 · Punkt 1 · Produkt in der Vorschau: Board umrandeter Pillen-Knopf „Bergkäse · € 6,58“; App kleine gefüllte Marke „Heumilch frisch — € 1,40“ unter Trennlinie · .nachtlauf/screens/schluss/beitraege/4-1440-hell.png
+- 390/1440 · Bild 4 · Punkt 1/2 · Empfänger-Block: Board Kleinbuchstaben-Kopf „EMPFÄNGER“ in weißer Karte mit einfachen Haken „✓“; App „Empfänger“ normal geschrieben, grauer Kasten, Haken im Kreis · .nachtlauf/screens/schluss/beitraege/4-1440-hell.png
+- 390 hell/dunkel · Bild 1–4 · Punkt 1 · Schrittzeiger mit Verbindungslinien und linksbündig/rechtsbündig gesetzten Beschriftungen; Board ohne Linien, Schritte gleichmäßig zentriert; erledigte Schritte im Board grün mit Haken, in der App dunkel (hell) bzw. hell (dunkel) · .nachtlauf/screens/schluss/beitraege/3-390-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 2 · Seitenleiste: „Konto · Franz Müller“ statt Board „Konto“ · .nachtlauf/screens/schluss/beitraege/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine (Foto fehlt und anderes Produkt laut Manifest Datenänderung; Bestellzähler, Gründungshof-Frist, Hof-Initialen „HM“ und „die letzte ging am 17. Feb raus“ als Beispieldaten nicht gewertet)
+
+Nicht prüfbar:
+- keine
+
+### einstellungen
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 2 | 0 |
+| 390 dunkel | 3 | 2 | 0 |
+| 1440 hell | 3 | 2 | 0 |
+| 1440 dunkel | 3 | 2 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 2 · Punkt 6 · Fehlerkarte: Board zeigt „Neu laden“ als vollbreiten, umrandeten Knopf mit fetter Schrift unter dem Text; App zeigt einen kleinen Pillen-Knopf mit normaler Schrift links unten; Karte in der App stärker gerundet, getönt gefüllt, schwächerer Rand; Überschrift „Wir konnten deine Einstellungen gerade nicht laden.“ sichtbar kleiner als im Board · .nachtlauf/screens/schluss/einstellungen/2-390-hell.png
+- 390 dunkel · Bild 2 · Punkt 6 · wie hell: kleiner Pillen-Knopf „Neu laden“ statt vollbreitem Knopf; Karte grünlich getönt statt dunkle Fläche mit hellem Rand; Überschrift kleiner · .nachtlauf/screens/schluss/einstellungen/2-390-dunkel.png
+- 390 hell · Bild 2 · Punkt 1 · Kopf: Board zeigt Kopfleiste mit Zurück-Pfeil „<“, Titel und Zeile „Hof Müller · Stand …“ über einer Trennlinie; App zeigt nur die Überschrift „Einstellungen“ ohne Zurück-Pfeil und ohne Zeile „Hof Müller · Stand …“ · .nachtlauf/screens/schluss/einstellungen/2-390-hell.png
+- 390 dunkel · Bild 2 · Punkt 1 · wie hell: Zurück-Pfeil, Kopfleiste mit Trennlinie und Zeile „Hof Müller · Stand …“ fehlen · .nachtlauf/screens/schluss/einstellungen/2-390-dunkel.png
+- 390 hell · Bild 1 · Punkt 1 · Kopf: Board hat Kopfleiste mit Zurück-Pfeil „<“ links vom Titel und Trennlinie darunter; App zeigt Titel und Zeile „Hof Müller · Stand …“ frei ohne Zurück-Pfeil und ohne Leiste · .nachtlauf/screens/schluss/einstellungen/1-390-hell.png
+- 390 dunkel · Bild 1 · Punkt 1 · wie hell: Zurück-Pfeil und Kopfleiste fehlen · .nachtlauf/screens/schluss/einstellungen/1-390-dunkel.png
+- 1440 hell · Bild 2 · Punkt 1/6 · Fehlerkarte: Board zeigt „Neu laden“ als vollbreiten Knopf unter dem Text (Fokusring darauf); App setzt einen kleinen Pillen-Knopf rechts neben den Text in eine flache, einzeilige Karte; Karte in der App getönt und stärker gerundet, schmaler (endet bei etwa 1223 px statt 1300 px); Überschrift kleiner · .nachtlauf/screens/schluss/einstellungen/2-1440-hell.png
+- 1440 dunkel · Bild 2 · Punkt 1/6 · wie hell: kleiner Knopf rechts statt vollbreiter Knopf darunter; Karte grünlich getönt statt dunkle Fläche mit Rand · .nachtlauf/screens/schluss/einstellungen/2-1440-dunkel.png
+- 1440 hell · Bild 2 · Punkt 1 · Unterzeile „Hof Müller“ unter der h1 fehlt in der App · .nachtlauf/screens/schluss/einstellungen/2-1440-hell.png
+- 1440 dunkel · Bild 2 · Punkt 1 · Unterzeile „Hof Müller“ unter der h1 fehlt in der App · .nachtlauf/screens/schluss/einstellungen/2-1440-dunkel.png
+- 390/1440 hell+dunkel · Bild 1 · Punkt 2 · Zeile „Teilen-Hinweise“: Board fester Satz „Was beim Teilen deiner Hofseite erscheint“; App „An · wir fragen einmal, ob du teilen willst“ · .nachtlauf/screens/schluss/einstellungen/1-1440-hell.png
+- 390/1440 hell+dunkel · Bild 1 · Punkt 2 · Zeile „Futtermittel-Registrierung“: Board „Futtermittel-Nummer (LFBIS) 1234567“; App „Eigene Ernte (Primärproduktion) · LFBIS 1234567“ (Bezeichnung „Futtermittel-Nummer“ fehlt, Zusatz davor) · .nachtlauf/screens/schluss/einstellungen/1-390-hell.png
+- 1440 hell+dunkel · Bild 1 · Punkt 2 · Zeile „Konditionen und Tarif“: Board „Gründungshof bis <Datum> · ohne Grundgebühr“; App „Gründungshof · ohne Grundgebühr bis <Datum>“ (Satzbau umgestellt) · .nachtlauf/screens/schluss/einstellungen/1-1440-hell.png
+- 1440 hell+dunkel · Bild 1+2 · Punkt 2 · Seitenleiste unten: Board „Konto“; App „Konto · Franz Müller“ (Name angehängt) · .nachtlauf/screens/schluss/einstellungen/1-1440-dunkel.png
+- 1440 hell+dunkel · Bild 1 · Punkt 1 · Spalten „Dein Hof“ und „Konto“ in der App sichtbar schmaler (je etwa 450 px statt etwa 490 px), Inhalt endet bei etwa 1223 px statt 1300 px · .nachtlauf/screens/schluss/einstellungen/1-1440-hell.png
+- 390 hell+dunkel · Bild 1 · Punkt 1 · Statuspunkt sitzt in der App auf Höhe der Unterzeile statt mittig zur Titelzeile wie im Board (klein) · .nachtlauf/screens/schluss/einstellungen/1-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine
+
+Nicht prüfbar:
+- keine (alle 8 Bilder erreichbar). Beispieldaten (Adresse, Zähler, Datum, Status von Zahlung/Mein Auftritt/Konto-Punkt, Gründungshof-Restzeit, Logo-Platzhalter, Kürzel „M“/„HM“, fehlender Postfach-Zähler) nicht als Abweichung gewertet.
+
+### hofdaten-zahlung
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 5 | 0 |
+| 390 dunkel | 2 | 5 | 0 |
+| 1440 hell | 2 | 5 | 0 |
+| 1440 dunkel | 2 | 5 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 1–3 · Punkt 1 · Board hat zwei Spalten (links Karte „Hof-Informationen“ + „Adresse“, rechts Karte „Kontakt“ + „Betriebsnummer“, darunter rechts der Knopf „Hofdaten speichern“); App zeigt eine einzige schmale Spalte mit getrennten Karten, Kontakt/Betriebsnummer und Speichern-Knopf nicht im Bild · .nachtlauf/screens/schluss/hofdaten-zahlung/1-1440-hell.png
+- 390 hell/dunkel · Bild 1–3 · Punkt 1 · Board hat eine feste Leiste mit „Hofdaten speichern“ über der Tab-Leiste; in der App fehlt sie · .nachtlauf/screens/schluss/hofdaten-zahlung/1-390-hell.png
+- 390 hell/dunkel · Bild 1–5 · Punkt 1 · Kopf anders: Board hat einen Kopf mit Zurück-Pfeil, h1 „Hofdaten“/„Zahlung“ und Unterzeile „Hof Müller · Stand …“; App hat eine eigene Leiste „← Einstellungen“ und die h1 erst darunter im Inhalt, ohne Hof-Unterzeile · .nachtlauf/screens/schluss/hofdaten-zahlung/4-390-hell.png
+- 1440 hell/dunkel · Bild 1–5 · Punkt 1/2 · Unterzeile „Hof Müller“ bzw. „Hof am Moos“ unter der h1 fehlt; Rücklink „‹ Einstellungen“ im Board grün unterstrichen, in der App grau ohne Unterstreichung · .nachtlauf/screens/schluss/hofdaten-zahlung/4-1440-hell.png
+- alle · Bild 3 · Punkt 6 · Board bleibt nach dem Speichern auf „Hofdaten“ und zeigt unten eine dunkle Meldung „Hofdaten gespeichert“; App springt auf „Einstellungen“ (Handy mitten in die Liste gescrollt, keine h1 im Bild) und zeigt oben eine hellgrüne Meldung mit Haken, die im Handy Inhalt überdeckt · .nachtlauf/screens/schluss/hofdaten-zahlung/3-390-hell.png
+- 390 hell / 1440 hell · Bild 3 · Punkt 4 · Meldung „Hofdaten gespeichert“ grün auf Hellgrün, Kontrast nicht ausreichend (axe color-contrast) · .nachtlauf/screens/schluss/hofdaten-zahlung/3-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 6 · Kasten oben „Bitte prüfe das markierte Feld.“ fehlt in der App · .nachtlauf/screens/schluss/hofdaten-zahlung/2-390-hell.png
+- alle · Bild 2 · Punkt 2 · Fehlertext Board „Die Postleitzahl hat in Österreich 4 Ziffern.“, App „Die Postleitzahl ist zu kurz – sie hat mindestens 4 Ziffern.“; in der App kleiner und nicht fett · .nachtlauf/screens/schluss/hofdaten-zahlung/2-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Board stellt im Fehlerfall Postleitzahl und Ort untereinander; App lässt sie nebeneinander (Fehlertext bricht in drei Zeilen um) · .nachtlauf/screens/schluss/hofdaten-zahlung/2-390-dunkel.png
+- 1440 hell/dunkel · Bild 2 · Punkt 5 · Board zeigt am Fehlerfeld den grünen Fokusring außen um den Fehlerrand; App zeigt nur einen roten Rand mit markiertem Text, kein eigener Fokusring erkennbar · .nachtlauf/screens/schluss/hofdaten-zahlung/2-1440-dunkel.png
+- 390 dunkel / 1440 dunkel · Bild 2 · Punkt 4 · Fehlerrand im Board hell-orange, in der App dunkelrot und kaum vom Hintergrund abgesetzt · .nachtlauf/screens/schluss/hofdaten-zahlung/2-390-dunkel.png
+- alle · Bild 1–3 · Punkt 1 · Abschnitte im Board als kleine Großbuchstaben-Überschriften („HOF-INFORMATIONEN“, „ADRESSE“, „KONTAKT“), Feldbeschriftungen fett, Felder mit kleiner Rundung; App: Abschnittstitel in normaler Schreibung und größer in eigenen Karten, Beschriftungen dünn und grau, Felder ganz rund (Pillenform) · .nachtlauf/screens/schluss/hofdaten-zahlung/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–3 · Punkt 1 · „Auf der Karte suchen“ im Board breit über die ganze Karte und fett; in der App kleiner Knopf links · .nachtlauf/screens/schluss/hofdaten-zahlung/1-1440-dunkel.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · App zeigt unter „Auf der Karte suchen“ eine Karte mit Zoom-Knöpfen, die das Board an dieser Stelle nicht zeigt · .nachtlauf/screens/schluss/hofdaten-zahlung/2-390-hell.png
+- alle · Bild 4–5 · Punkt 1 · Kartentitel „Online-Zahlung (Stripe)“ und „Bar bei Abholung“ im Board in der Serifenschrift; App in der Grundschrift. Marken „Aktiv“/„Braucht Lastschrift“ stehen im Board rechts neben dem Titel, in der App unter der Beschreibung (auch die Stripe-Marke im Handy) · .nachtlauf/screens/schluss/hofdaten-zahlung/4-1440-hell.png
+- alle · Bild 4 · Punkt 2/6 · Board: „Dein Stripe-Konto ist verbunden. Auszahlungen kommen auf dein Konto, das auf 7788 endet.“ und Link „Auszahlungen bei Stripe ansehen“; App: „Online-Zahlung läuft noch im Testbetrieb.“ und Knopf „Status prüfen“ (laut Manifest ohne Stripe-Aufruf nicht anders erreichbar – trotzdem sichtbare Abweichung) · .nachtlauf/screens/schluss/hofdaten-zahlung/4-390-hell.png
+- alle · Bild 5 · Punkt 1 · Kasten „Richte deinen Hof fertig ein …“ steht in der App ganz oben über Rücklink und h1 (Web über die ganze Breite); im Board unter dem Kopf in der Inhaltsspalte · .nachtlauf/screens/schluss/hofdaten-zahlung/5-1440-hell.png
+- alle · Bild 5 · Punkt 2 · Zusatz in der App: „Deine Hof-ID: …“ und „– die Hof-ID ist in der Nachricht schon eingetragen.“, im Board nicht vorhanden; Kasten im Board ohne Uhr-Symbol · .nachtlauf/screens/schluss/hofdaten-zahlung/5-390-hell.png
+- alle · Bild 5 · Punkt 2 · Hinweis Board „Die Einrichtung bei Stripe ist noch nicht ganz fertig. Bitte setz sie fort – erst mit Online-Zahlung können wir deinen Hof freischalten.“; App „Online-Zahlung einrichten – Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können, richte bitte die Online-Zahlung ein. Dauert etwa 10 Minuten.“ · .nachtlauf/screens/schluss/hofdaten-zahlung/5-1440-dunkel.png
+- alle · Bild 5 · Punkt 2 · Kartensatz Board „Bei Stripe fehlen noch Angaben. Das dauert etwa 10 Minuten.“; App „Online-Zahlung läuft noch im Testbetrieb.“ · .nachtlauf/screens/schluss/hofdaten-zahlung/5-390-dunkel.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Zusätzlicher Knopf „Status prüfen“ neben „Einrichtung fortsetzen“; „Einrichtung fortsetzen“ (mit Symbol) und „Lastschrift einrichten“ im Board über die ganze Kartenbreite, in der App schmal · .nachtlauf/screens/schluss/hofdaten-zahlung/5-1440-hell.png
+- 390 hell/dunkel · Bild 5 · Punkt 1 · „Einrichtung fortsetzen“ im Board volle Breite ohne Symbol, in der App schmal mit Symbol für externen Link · .nachtlauf/screens/schluss/hofdaten-zahlung/5-390-hell.png
+- 1440 hell/dunkel · Bild 1–5 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ bzw. „Konto · Thomas Weiz“; Board nur „Konto“ · .nachtlauf/screens/schluss/hofdaten-zahlung/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Pflichtkarte „Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht“ (nicht freigegeben) steht als eigene Karte über dem Zahlungs-Hinweis (Bild 5) – nur die Stapelung, nicht Lage und Zusatztext.
+- Textlink „Frage zur Freischaltung stellen“ im Satz kleiner als 44 px (Bild 5, Textlink-Ausnahme).
+- Umgebung: etwa 15 px leerer Streifen rechts im Handy-Bild; Kartenfläche ohne Kacheln (Bild 2, 390).
+- Beispieldaten: Hofname (Weizberghof statt Hof am Moos), Adresse, Beschreibung, Zähler, Datum „1. Jänner“/„31. Jänner“, Seitenleistenkarte „Startphase: kostenlos“ statt „Gründungshof“ – nicht gewertet.
+
+Nicht prüfbar:
+- keine (alle 20 App-Bilder laut Manifest erreichbar). Admin-Einträge kommen auf diesem Board nicht vor.
+
+### konto-hof
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1–6 · Punkt 1 · Kopf anders: Das Board zeigt eine Kopfleiste mit Zurück-Pfeil, Titel („Konto und Sicherheit“ bzw. „Teilen-Hinweise“) und Unterzeile „Hof Müller · Stand …“. Die App zeigt eine Leiste „← Einstellungen“ und den Titel erst darunter als große h1, ohne Hof-/Stand-Zeile · .nachtlauf/screens/schluss/konto-hof/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 1/2 · Unter der h1 fehlt die Unterzeile „Hof Müller“. Der Zurück-Link „‹ Einstellungen“ ist im Board grün unterstrichen, in der App grau mit Chevron · .nachtlauf/screens/schluss/konto-hof/1-1440-hell.png
+- alle Fassungen · Bild 6 · Punkt 6 · Fehlerzustand anders: Im Board steht in der Karte unter dem Schalter ein Hinweis-Kasten „Wir konnten die Einstellung nicht speichern. Die Teilen-Hinweise sind weiter an.“ mit dem Knopf „Nochmal“ (fokussiert). Die App zeigt nur oben eine Meldung „… Bitte versuch es noch einmal.“, ohne „Nochmal“ und ohne Fokus · .nachtlauf/screens/schluss/konto-hof/6-1440-hell.png
+- 390 hell/dunkel · Bild 6 · Punkt 1/4 · Die Meldung liegt über der h1 „Teilen-Hinweise“ und der Kopfleiste und verdeckt beide. Im Dunkeln ist sie halbdurchsichtig, die Leiste „Einstellungen“ scheint durch. Das grelle Rot der Meldung (hell: rosa Fläche, roter Text) passt nicht zur Fehlerfarbe der Boards (Orange-Braun) · .nachtlauf/screens/schluss/konto-hof/6-390-dunkel.png
+- alle Fassungen · Bild 3 · Punkt 6 · Zustand „Passwort falsch“ anders: Im Board ist das Feld „Aktuelles Passwort“ rot umrandet und behält seine Eingabe, die Fehlerzeile steht direkt darunter, darunter der Link „Passwort vergessen?“. Die App leert alle Felder, zeigt den Fehler als Kasten über dem Knopf und hat keinen Link „Passwort vergessen?“ · .nachtlauf/screens/schluss/konto-hof/3-390-hell.png
+- alle Fassungen · Bild 3 · Punkt 6 · Die Regelliste zeigt im Board nach der Eingabe vier grüne Haken. In der App sind es graue Punkte, weil das Feld geleert wurde · .nachtlauf/screens/schluss/konto-hof/3-1440-hell.png
+- alle Fassungen · Bild 1 · Punkt 1 · Zusätzliche Karte „Anmelden mit Fingerabdruck oder Gesicht“ mit dem Knopf „Auf diesem Handy einrichten“ bzw. „Auf diesem Gerät einrichten“ ganz oben. Das Board zeigt sie nicht · .nachtlauf/screens/schluss/konto-hof/1-1440-hell.png
+- alle Fassungen · Bild 1/3 · Punkt 1/2 · In „Passwort ändern“ kommen hinzu: die Zeile „Passwort für dein Agrilo-Konto“, Augen-Knöpfe in allen drei Feldern, der Platzhalter „Mindestens 8 Zeichen“ und die Regelliste schon vor der Eingabe. Unter dem Knopf steht eine Trennlinie · .nachtlauf/screens/schluss/konto-hof/1-1440-dunkel.png
+- alle Fassungen · Bild 1/3 · Punkt 1 · Knopf „Passwort ändern“: im Board ein heller Knopf mit Rand über die volle Breite, in der App ein schmaler, ausgegrauter oranger Knopf (Web) · .nachtlauf/screens/schluss/konto-hof/1-1440-hell.png
+- alle Fassungen · Bild 1–6 · Punkt 1 · Vor den Kartenüberschriften (Umschlag, Schild, Geräte, Sonne, Stilllegen, Teilen) stehen Symbole, die das Board nicht hat · .nachtlauf/screens/schluss/konto-hof/2-1440-hell.png
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Die Anmelde-Adresse steht in der App in derselben Zeile wie „Deine Anmelde-Adresse:“. Im Board steht sie fett in einer eigenen Zeile · .nachtlauf/screens/schluss/konto-hof/1-390-hell.png
+- alle Fassungen · Bild 2 · Punkt 1 · „Angemeldete Geräte“: Im Board steht eine Bereichsüberschrift in Großbuchstaben über einer Liste, „Alle anderen abmelden“ ist ein heller Knopf mit Rand über die volle Breite außerhalb der Liste, der Hinweis steht darunter. In der App ist alles eine Karte mit Serif-Überschrift, Zähler „3“, Gerätesymbolen und einem orange getönten Knopf mit Symbol in der Karte · .nachtlauf/screens/schluss/konto-hof/2-1440-hell.png
+- alle Fassungen · Bild 2 · Punkt 2 · Geräte-Hinweis: Das Board zeigt einen Absatz, der mit „Du bleibst 30 Tage angemeldet.“ endet. Die App hat zwei Absätze und den Zusatz „Danach melden wir dich zur Sicherheit ab – bei einem neuen Gerät bekommst du eine E-Mail.“, außerdem in den Zeilen den Zusatz „angemeldet seit …“ · .nachtlauf/screens/schluss/konto-hof/2-390-hell.png
+- alle Fassungen · Bild 2/4 · Punkt 1/2 · „Darstellung“: Im Board stehen „Gilt für dieses Gerät.“ und drei einzelne Chips Hell/Dunkel/System (der gewählte gefüllt). Die App zeigt „Hell, dunkel — oder so, wie dein Gerät es eingestellt hat.“, ein Segment mit Symbolen über die volle Breite und einen zusätzlichen Absatz „Die Einstellung gilt nur auf diesem Gerät …“ · .nachtlauf/screens/schluss/konto-hof/4-1440-hell.png
+- alle Fassungen · Bild 2/4 · Punkt 2 · „Hof stilllegen“: Das Board hat einen Absatz. Die App hat drei Absätze mit anderem Wortlaut („Deine Daten bleiben vollständig erhalten — Bestellungen, Produkte, Kundinnen und Auswertungen. Du kannst dich weiterhin anmelden und alles einsehen …“) · .nachtlauf/screens/schluss/konto-hof/4-390-hell.png
+- alle Fassungen · Bild 4 · Punkt 1 · Hinweis „offene Bestellungen“: Im Board ist der Titel „Du hast noch 6 offene Bestellungen.“ fett und farbig, darunter steht ein Knopf „Zu den Bestellungen“ über die volle Breite. In der App ist der Titel normaler Fließtext, „Zu den Bestellungen“ nur ein Textlink (Web rechts daneben) · .nachtlauf/screens/schluss/konto-hof/4-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 6 · In diesem Zustand zeigt die App weiter den Knopf „Hof stilllegen“ unter dem Hinweis. Das Board zeigt ihn dort nicht mehr · .nachtlauf/screens/schluss/konto-hof/4-390-dunkel.png
+- alle Fassungen · Bild 2/4 · Punkt 1/2 · „Konto löschen“: Im Board steht der Text „Schreib dem Agrilo-Support – die Nachricht ist bereits vorausgefüllt. Bestelldaten müssen wir … 7 Jahre aufbewahren. Nur den Hof schließen? …“, darunter der Knopf „Support schreiben“. Die App hat anderen, längeren Text („Wenn du dein Konto löschen möchtest, schreib dem Agrilo-Support — … Die Löschung wird innerhalb weniger Werktage bearbeitet …“) mit einem Textlink statt Knopf und ein Mülleimer-Symbol · .nachtlauf/screens/schluss/konto-hof/4-1440-dunkel.png
+- alle Fassungen · Bild 5/6 · Punkt 2 · Listenpunkt „… das sofort im Shop steht“, im Board „… das sofort auf deiner Hofseite steht“ · .nachtlauf/screens/schluss/konto-hof/5-390-hell.png
+- alle Fassungen · Bild 5/6 · Punkt 1 · „Wann wir fragen“ ist klein und fett in Sans-Schrift, im Board eine Serif-Kartenüberschrift. Die Listenpunkte sind kleiner und grauer als im Board · .nachtlauf/screens/schluss/konto-hof/5-1440-hell.png
+- alle Fassungen · Bild 5/6 · Punkt 1 · Zusätzliches Teilen-Symbol links in der Schalterzeile. Im Web liegt der Fokusrahmen um die ganze Zeile, im Board um den Schalter · .nachtlauf/screens/schluss/konto-hof/5-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 2 · In der Seitenleiste steht „Konto · Franz Müller“, im Board „Konto“ · .nachtlauf/screens/schluss/konto-hof/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Umgebung: Bei 390 ist am rechten Rand ein etwa 15 px breiter leerer Streifen zu sehen (Platz der Bildlaufleiste).
+- Abweichende Beispieldaten (Hof-Initialen, Adresse, Geräte Linux · Chrome, Anzahl der Bestellungen 2 statt 6, Gründungshof-Datum) und die gewählte Darstellung „System“ statt Hell/Dunkel habe ich nicht abgezogen.
+
+Nicht prüfbar:
+- keine (alle 24 App-Bilder erreichbar)
+
+### kunden
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1, 4, 6 · Punkt 1 · Kopf fehlt: Board zeigt eine Kopfleiste mit Zurück-Pfeil „‹“, Titel „Kunden“ und Unterzeile darunter, abgesetzt durch eine Linie; App zeigt nur eine freie h1 „Kunden“ ohne Zurück-Pfeil und ohne Leiste · .nachtlauf/screens/schluss/kunden/1-390-hell.png
+- 390 hell/dunkel · Bild 3 · Punkt 1/2 · Kopf anders: Board „‹ Kundin“ mit Unterzeile „Kunden“; App nur „← Kunden“. Profil steht in der App in einer Karte, die Marke „Stammkunde“ unter dem Namen statt daneben, „E-Mail“ bricht in eine zweite Zeile (Board: Anrufen, WhatsApp, E-Mail in einer Zeile, ohne Symbole bei WhatsApp/E-Mail) · .nachtlauf/screens/schluss/kunden/3-390-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Karte „Neuigkeiten von dir“ (E-Mail-Neuigkeiten an / WhatsApp-Neuigkeiten aus) fehlt in der rechten Spalte · .nachtlauf/screens/schluss/kunden/3-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1/2 · Kontakt: Board Zeilen mit Beschriftung „Telefon“ / „E-Mail“ links und unterstrichenem Wert rechts, Überschrift „Kontakt“ in Serifenschrift; App nur Symbol + Wert, Überschrift „KONTAKT“ als kleine Versal-Zeile. Gleiches bei „Lieblingsprodukte“ (Board Serifen-Überschrift, Menge rechts wie „38 L“, „9×“; App „LIEBLINGSPRODUKTE“, Rangnummern 1/2 und „10× bestellt“) · .nachtlauf/screens/schluss/kunden/3-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Profilkopf steht in der App in einer breiten Karte über beide Spalten; im Board ohne Karte frei auf dem Grund. Zurück-Link im Board grün unterstrichen „‹ Kunden“, in der App grau ohne Unterstreichung · .nachtlauf/screens/schluss/kunden/3-1440-hell.png
+- alle · Bild 3 · Punkt 1 · Kennzahl-Kacheln: Board Beschriftung oben links („Bestellungen“, „Umsatz“, „zuletzt bestellt“), Wert darunter linksbündig; App Wert zentriert, Beschriftung darunter · .nachtlauf/screens/schluss/kunden/3-390-hell.png
+- alle · Bild 3 · Punkt 1 · Bestellzeilen: Board fette Zeile mit Abholtag und Zeitfenster („Mi 3. März, 15–18 Uhr“), darunter Bestellnummer · Positionen; App fett nur die Nummer („TD-0006“), darunter „vor 2 Tagen · …“ – Abholtermin fehlt · .nachtlauf/screens/schluss/kunden/3-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1/2 · Blatt-Kopf: „Abbrechen“ oben rechts fehlt in der App · .nachtlauf/screens/schluss/kunden/2-390-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1/5 · Dialog: „Abbrechen“ steht im Board oben rechts im Kopf (dort der Startfokus), in der App als Knopf unten links neben „Übernehmen“ · .nachtlauf/screens/schluss/kunden/2-1440-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · „Sortieren nach“ im Board zweispaltig (Anzahl Bestellungen | Umsatz, Letzte Bestellung | Name, Kunde seit), in der App einspaltig · .nachtlauf/screens/schluss/kunden/2-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · „Reihenfolge“ im Board zwei Kacheln nebeneinander, in der App untereinander · .nachtlauf/screens/schluss/kunden/2-390-hell.png
+- alle · Bild 2 · Punkt 4 · Farbwirkung: gewählte Option und Knopf „Übernehmen“ im Board orange/terrakotta, in der App grün; Abschnittstitel im Board in Versalien („SORTIEREN NACH“, „REIHENFOLGE“, „ZEIGEN“), in der App normal geschrieben; Optionstexte im Board fett, in der App normal · .nachtlauf/screens/schluss/kunden/2-1440-dunkel.png
+- alle · Bild 2 · Punkt 6 · Vorauswahl: Board „Letzte Bestellung“ + „Zuletzt bestellt zuerst“ / „Am längsten her zuerst“; App „Anzahl Bestellungen“ + „Meiste zuerst“ / „Wenigste zuerst“ · .nachtlauf/screens/schluss/kunden/2-390-hell.png
+- 1440 hell/dunkel · Bild 1, 4 · Punkt 1 · Suchfeld steht im Board direkt nach den Chips (links), in der App rechts neben „Sortieren“; zusätzliche Beschriftung „Kundin suchen“ über dem Feld (von Punkt 3 verlangt, im Board fehlend – Board-Fehler-Verdacht; nicht abgezogen) · .nachtlauf/screens/schluss/kunden/1-1440-hell.png
+- alle · Bild 1, 4 · Punkt 1 · „Sortieren“ hat in der App ein zusätzliches Symbol „⇅“; im Board nur Text · .nachtlauf/screens/schluss/kunden/1-390-hell.png
+- alle · Bild 1 · Punkt 4 · Avatare im Board grün getönt mit grüner Schrift, in der App neutral beige; Marken „Stammkunde“ in der App mit Rand · .nachtlauf/screens/schluss/kunden/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 3–6 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ bzw. „Konto · Thomas Weiz“; Board nur „Konto“ · .nachtlauf/screens/schluss/kunden/1-1440-hell.png
+- alle · Bild 4, 5 · Punkt 1 · Leer-Kasten: Board linksbündig, Überschrift fett ohne Serifen, Knopf über die ganze Breite mit dunklem Rand („Alle Kunden zeigen“, „Hofseite vervollständigen“); App zentriert, mit Kreis-Symbol, Serifen-Überschrift, kleiner Pillenknopf · .nachtlauf/screens/schluss/kunden/4-1440-hell.png
+- alle · Bild 5 · Punkt 1 · Reihenfolge: Freischalt-Hinweis steht in der App über der h1 „Kunden“; im Board unter Titel und Unterzeile · .nachtlauf/screens/schluss/kunden/5-390-hell.png
+- alle · Bild 5 · Punkt 2 · Freischalt-Hinweis mit Zusatztext „Deine Hof-ID: …“ und „– die Hof-ID ist in der Nachricht schon eingetragen.“ sowie Uhr-Symbol; Überschrift dunkel statt orange/terrakotta wie im Board (falls N39-Wortlaut, gedeckt) · .nachtlauf/screens/schluss/kunden/5-1440-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Seitenleiste zeigt zusätzlich Karte „Startphase: kostenlos bis 31. Jänner 2027“; Board zeigt für den neuen Hof keine solche Karte · .nachtlauf/screens/schluss/kunden/5-1440-hell.png
+- alle · Bild 6 · Punkt 1 · Fehlerzustand: Unterzeile („Hof Müller · Stand …“ bzw. „Hof Müller“) unter der h1 fehlt; Fehler-Überschrift deutlich kleiner; Knopf „Noch einmal versuchen“ im Board über die ganze Breite unter dem Text, in der App klein (Handy linksbündig, Web rechts neben dem Text) · .nachtlauf/screens/schluss/kunden/6-1440-hell.png
+- 1440 dunkel · Bild 6 · Punkt 5 · Fokus auf „Noch einmal versuchen“ im Board sichtbar (grüner Ring), in der App kein sichtbarer Ring · .nachtlauf/screens/schluss/kunden/6-1440-dunkel.png
+- 1440 hell/dunkel · Bild 2 · Punkt 4 · Hintergrund hinter dem Dialog in der App weichgezeichnet und kaum abgedunkelt (hell); Board deutlich abgedunkelt ohne Weichzeichnung · .nachtlauf/screens/schluss/kunden/2-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Im Hofbereich heißt der Stand „Gepackt“ (Bild 3, Bestellzeile TD-0004).
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand (Bild 1–6, 390 und 1440).
+
+Nicht prüfbar:
+- keine (alle 24 App-Bilder erreichbar). Hinweis aus dem Manifest: Bild 3 zeigt Maria Huber statt Anna Berger, Bild 5 Weizberghof statt „Hof am Moos“ (Beispieldaten, nicht abgezogen); ob der Hinweis „6 weitere Bestellungen findest du …“ (Bild 3) erscheint, ist mit nur 4 Bestellungen nicht prüfbar.
+
+### mein-hof
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Board zeigt einen mittigen Dialog „Hof pausieren“ über der Seite; App zeigt ein Blatt über die volle Breite am unteren Rand · .nachtlauf/screens/schluss/mein-hof/3-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 5 · Board zeigt den Startfokus auf „Abbrechen“ (oben rechts im Dialog); in der App liegt der Fokus im Textfeld, „Abbrechen“ steht als Textlink ganz unten · .nachtlauf/screens/schluss/mein-hof/3-1440-dunkel.png
+- 390/1440 alle · Bild 3 · Punkt 2 · Board: Titel „Hof pausieren“, Feld „Nachricht an deine Kundschaft (freiwillig)“, Kasten mit Überschrift „SO STEHT ES AUF DEINER HOFSEITE“ und der Nachricht in „…“, Satz „Offene Bestellungen bleiben bestehen. Neue Bestellungen sind erst nach „Fortsetzen“ möglich.“; App: Titel „Bestellungen pausieren?“, drei zusätzliche Aufzählungspunkte, Feld „Nachricht an deine Kundinnen“, Beschriftung außerhalb des Kastens in kleiner Schrift, Kasten orange getönt mit Pause-Symbol, Nachricht ohne Anführungszeichen, Schluss-Satz fehlt · .nachtlauf/screens/schluss/mein-hof/3-390-hell.png
+- 390 alle · Bild 3 · Punkt 1 · Board: „Abbrechen“ oben rechts neben dem Titel; App: „Abbrechen“ als Textlink unter dem Knopf „Pausieren“ (Knopf mit zusätzlichem Pause-Symbol) · .nachtlauf/screens/schluss/mein-hof/3-390-dunkel.png
+- 1440 hell/dunkel · Bild 2 · Punkt 6 · Zustand „weiter unten“ nicht gezeigt: App-Bild ist derselbe Stand wie Bild 1 (nicht gescrollt); Board zeigt Abschnitte ab „AUFBAU UND FOTOS“ bis „AKTUELL VOM HOF“ und die Vorschau mit „ÜBER UNS“, „ZAHLUNG & KONTAKT“, „ANFAHRT“ · .nachtlauf/screens/schluss/mein-hof/2-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Board hält Kopf („Mein Hof“, Marke, Symbole) und Reiter Produkte/Hofseite/Beiträge beim Scrollen fest oben; in der App scrollen Kopf und Reiter weg · .nachtlauf/screens/schluss/mein-hof/2-390-hell.png
+- 390 alle · Bild 1–5 · Punkt 1 · Kopf: Board zeigt rechts drei Symbole (Teilen, Ansehen, Postfach mit Zähler); App nur Teilen und Ansehen, Postfach-Symbol fehlt · .nachtlauf/screens/schluss/mein-hof/1-390-hell.png
+- alle · Bild 1/2/4/6 · Punkt 1 · Fortschritt: Board nur Zeile „Noch 1 Punkt offen“ mit flachem Balken; App eine eigene Karte „Noch 3 Punkte offen · 8 von 11“ (390: mit Liste Titelbild/Logo/Fotos und Marken „Fehlt“, 1440: Satz „Es fehlen noch: …“) · .nachtlauf/screens/schluss/mein-hof/1-1440-hell.png
+- alle · Bild 1/2/4/6 · Punkt 1 · Zusätzliche Karte „Aktuell vom Hof · Kein Beitrag · Neuer Beitrag“ oben; im Board steht „AKTUELL VOM HOF“ als letzter Abschnitt unter „ÜBER UNS“ (390 Bild 2) · .nachtlauf/screens/schluss/mein-hof/2-390-dunkel.png
+- 1440 alle · Bild 1/4/6 · Punkt 1+2 · Abschnitte: Board „OBEN AUF DER SEITE“ (Titelbild und Logo, Name und Leitspruch, Adresse und Karte), „AUFBAU UND FOTOS“, „ABHOLEN UND BEZAHLEN“, „ÜBER UNS“; App Abschnitt „AUFTRITT“ mit Titelbild, Logo, Name und Kurzbeschreibung, Leitspruch und Gründungsjahr, Über uns, Werte – getrennte Zeilen, zusätzliche Symbole links, Marken „Fehlt“ statt „offen“ · .nachtlauf/screens/schluss/mein-hof/4-1440-hell.png
+- 390 alle · Bild 1/2/4 · Punkt 2 · Zeilentitel: Board „Titelbild und Logo“, „Name und Leitspruch“, „Adresse und Karte“, „Abschnitte“, „Zahlung“, „Fotos … offen“; App „Name und Kurzbeschreibung“, „Leitspruch und Gründungsjahr“, „Adresse und Standort“, „Abschnitte der Hofseite“, „Zahlungsarten“ (Marke „Online fehlt“), Titelbild/Logo in der Fortschrittskarte · .nachtlauf/screens/schluss/mein-hof/2-390-hell.png
+- 390 alle · Bild 1/2/4 · Punkt 1 · Erledigt-Häkchen fehlen: Board zeigt bei fertigen Zeilen ✓ vor dem Pfeil, die App nur den Pfeil (bei 1440 sind die Häkchen da) · .nachtlauf/screens/schluss/mein-hof/4-390-hell.png
+- 1440 alle · Bild 1/2/4/6 · Punkt 2 · Unterzeile: Board „Öffentlich · Hof Müller · <Adresse>“; App „Hof Müller · <Adresse der Hofseite> “ mit Kopier-Symbol · .nachtlauf/screens/schluss/mein-hof/1-1440-dunkel.png
+- 1440 alle · Bild 1/4/6 · Punkt 1 · Vorschau: Board schlichte Karte mit Segment „Handy“ (gefüllt) / „Web“; App Handy-Rahmen (im Dunkeln rotbrauner Rand) mit zusätzlicher Kopfzeile „Agrilo · Mein Hof“, Segment hell getönt mit Symbolen; untere Leiste der Vorschau (Entdecken/Warenkorb/Bestellungen) nicht sichtbar, weil der Rahmen unter den Bildrand läuft · .nachtlauf/screens/schluss/mein-hof/6-1440-dunkel.png
+- 390/1440 alle · Bild 6 (und Vorschau Bild 1) · Punkt 1 · Hofkopf der Kundenansicht: Marke „GRÜNDUNGSHOF“ fehlt (Hof ist laut Seitenleiste Gründungshof), Karte „Nächste Abholung: …“ unter den Reitern fehlt · .nachtlauf/screens/schluss/mein-hof/6-390-hell.png
+- 390 alle · Bild 6 · Punkt 1 · Kundenansicht: App zeigt unter dem Balken „Kundenansicht“ zusätzlich die Kopfzeile „Agrilo · Mein Hof“; Balken in der App orange getönt mit Augen-Symbol und kleinem farbigem Titel, im Board neutral mit großem Serifen-Titel · .nachtlauf/screens/schluss/mein-hof/6-390-dunkel.png
+- 390 alle · Bild 6 · Punkt 4 · „Warenkorb“ in der unteren Leiste blass (Knopf und Beschriftung kaum lesbar), im Board kräftig grün · .nachtlauf/screens/schluss/mein-hof/6-390-hell.png
+- 390/1440 alle · Bild 5 · Punkt 6 · Board-Zustand mit Beiträgen nicht gezeigt (App zeigt Leerzustand); dabei fehlen die Kopf-Karte „Was du deinen Kunden erzählst – auf der Hofseite und auf Wunsch per E-Mail oder WhatsApp.“ mit Knopf „Neuer Beitrag“ und die Gruppen „LÄUFT“/„FRÜHER“; Leerzustand nutzt „Ersten Beitrag schreiben“ · .nachtlauf/screens/schluss/mein-hof/5-1440-hell.png
+- 390/1440 dunkel · Bild 1/2/6 · Punkt 4 · Statuskarte „Nimmt Bestellungen an“: Board grün getönte Fläche mit grüner Überschrift; App neutral dunkel mit weißer Überschrift · .nachtlauf/screens/schluss/mein-hof/1-390-dunkel.png
+- 390/1440 dunkel · Bild 4 · Punkt 4 · Statuskarte „Pausiert“: Board rostrot gefüllt mit orangefarbener Überschrift und Text; App dunkel mit rotem Rand und weißer Schrift (hell: Überschrift dunkel statt rostrot) · .nachtlauf/screens/schluss/mein-hof/4-1440-dunkel.png
+- 1440 alle · Bild 1–6 · Punkt 2 · Seitenleiste: „Konto · Franz Müller“ statt „Konto“ · .nachtlauf/screens/schluss/mein-hof/5-1440-dunkel.png
+- 390 alle · Bild 6 · Punkt 1 · Logo-Feld im Board abgerundetes Quadrat, in der App Kreis · .nachtlauf/screens/schluss/mein-hof/6-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (390 Bild 1–6, 1440 Bild 3) – keine Abweichung.
+- Fehlende Fotos/Kartenbilder sind Platzhalter bzw. Umgebung – keine Abweichung.
+
+Nicht prüfbar:
+- keine (alle Bilder im Manifest erreichbar). Hinweis: Bild 2 bei 1440 ist erreichbar gemeldet, zeigt aber denselben Stand wie Bild 1 (siehe Mängel).
+
+### meldungen
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1–3 · Punkt 1/3 · Kopf anders: Board zeigt Zurück-Pfeil, große Serifen-Überschrift „Problem melden“ und Unterzeile „Hof Müller · Stand Mittwoch, 3. März 2027“; App zeigt nur eine kleine Leiste „← Problem melden“ ohne Unterzeile, keine sichtbare große h1 · .nachtlauf/screens/schluss/meldungen/1-390-hell.png
+- 390 hell/dunkel · Bild 4–6 · Punkt 1 · Kopf anders: Board „‹ Meine Meldungen“ mit Zurück-Pfeil und Unterzeile „Hof Müller · Stand …“; App große Überschrift ohne Zurück-Pfeil und ohne Unterzeile · .nachtlauf/screens/schluss/meldungen/4-390-hell.png
+- 390 hell/dunkel · Bild 1–2 · Punkt 1 · feste Leiste fehlt: Board hat über der Tab-Leiste eine feste Leiste mit „Absenden“; App hat keine, der Knopf liegt unten im Formular · .nachtlauf/screens/schluss/meldungen/1-390-hell.png
+- alle Fassungen · Bild 2 · Punkt 1/6 · Fehler anders: Board zeigt Feldfehler direkt unter dem Textfeld (roter Rand, „Schreib bitte etwas mehr – mindestens 10 Zeichen, damit wir die Stelle finden.“); App zeigt oben einen Kasten „Das hat nicht geklappt / Bitte beschreibe es mit mindestens 10 Zeichen.“, Textfeld ohne Fehlerrand · .nachtlauf/screens/schluss/meldungen/2-390-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 5 · Board zeigt Fokus im Textfeld „Was ist passiert?“ (Seite nach unten gerollt); App: kein Fokus sichtbar, Seite oben · .nachtlauf/screens/schluss/meldungen/2-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 1 · Liste anders: Board eine zusammenhängende Liste, je Zeile oben Art-Marke + Datum, darunter Titel, darunter Status-Marke, rechts Pfeil „›“; App einzelne Karten (Web: alles in einer Zeile), keine Pfeile, zusätzlich „Nr. cmg5me00“ und aufgeklappte „Antwort: …“-Kästen, die das Board nicht zeigt · .nachtlauf/screens/schluss/meldungen/4-1440-hell.png
+- 390 hell/dunkel · Bild 4–6 · Punkt 1 · zusätzlicher Knopf „+ Neue Meldung“ über dem Einleitungssatz, Board zeigt im Handy keinen · .nachtlauf/screens/schluss/meldungen/5-390-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · zusätzlicher Knopf „+ Neue Meldung“; Board zeigt im leeren Zustand keinen · .nachtlauf/screens/schluss/meldungen/5-1440-hell.png
+- 1440 hell/dunkel · Bild 4–6 · Punkt 1 · Zurück-Link „‹ Problem melden“ über der Überschrift und Unterzeile „Hof Müller“ fehlen · .nachtlauf/screens/schluss/meldungen/4-1440-hell.png
+- 1440 hell/dunkel · Bild 1–3 · Punkt 1 · Unterzeile „Hof Müller“ unter „Problem melden“ fehlt · .nachtlauf/screens/schluss/meldungen/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–2 · Punkt 1 · Auswahl „Worum geht es?“ als drei Kacheln nebeneinander; Board drei breite Zeilen untereinander; Formular in App zusätzlich in einer Karte · .nachtlauf/screens/schluss/meldungen/1-1440-hell.png
+- alle Fassungen · Bild 1–2 · Punkt 1/2 · Reihenfolge: Board „Bildschirmfoto“ vor „Fehlernummer“; App „Fehlernummer“ vor „Bildschirmfoto“. Knopftext Board „+ Bildschirmfoto hinzufügen (optional)“, App „Bildschirmfoto hinzufügen“ (gestrichelt, Kamera-Zeichen) · .nachtlauf/screens/schluss/meldungen/1-390-hell.png
+- alle Fassungen · Bild 1–2 · Punkt 2 · Feld „Fehlernummer“ ohne Platzhalter „z. B. A7F3“; im Web nur schmal statt volle Breite · .nachtlauf/screens/schluss/meldungen/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 5 · Board zeigt Fokus auf der ersten Auswahl „Etwas funktioniert nicht“; App: kein Fokus sichtbar · .nachtlauf/screens/schluss/meldungen/1-1440-hell.png
+- 1440 hell/dunkel · Bild 4–6 · Punkt 5 · Fokus auf „+ Neue Meldung“; Board zeigt ihn auf der ersten Listenzeile (Bild 4), auf „Meldung schreiben“ (Bild 5) bzw. „Noch einmal versuchen“ (Bild 6) · .nachtlauf/screens/schluss/meldungen/6-1440-hell.png
+- alle Fassungen · Bild 3 · Punkt 2 · Knopf „Zu deinen Meldungen“ statt „Meine Meldungen“; zusätzlicher Satz „Deine Kurznummer: …“; „Danke — ist angekommen.“ mit langem Strich statt „Danke – ist angekommen.“ · .nachtlauf/screens/schluss/meldungen/3-390-hell.png
+- alle Fassungen · Bild 3 · Punkt 1 · Knöpfe schmal nebeneinander (Web) bzw. schmal untereinander (Handy); Board beide volle Breite untereinander; Einleitungssatz „Etwas klemmt …“ steht noch über der Bestätigung, Board zeigt ihn nicht · .nachtlauf/screens/schluss/meldungen/3-1440-hell.png
+- alle Fassungen · Bild 5 · Punkt 1 · leerer Zustand mittig mit Rettungsring-Zeichen und kleinem Knopf; Board linksbündig ohne Zeichen, Knopf „Meldung schreiben“ volle Breite; Text mit „—“ statt „–“ · .nachtlauf/screens/schluss/meldungen/5-390-hell.png
+- alle Fassungen · Bild 6 · Punkt 1 · Fehlerkasten: Knopf „Noch einmal versuchen“ klein (Web rechts daneben) statt volle Breite darunter; Einleitungssatz steht darüber, Board zeigt ihn im Fehlerzustand nicht · .nachtlauf/screens/schluss/meldungen/6-1440-hell.png
+- 390/1440 dunkel · Bild 5–6 · Punkt 4 · Rand der Knöpfe „Meldung schreiben“/„Noch einmal versuchen“ und gestrichelter Kartenrand kaum sichtbar; Board klare helle Ränder; Fehlerkarte grünlich statt neutral · .nachtlauf/screens/schluss/meldungen/6-390-dunkel.png
+- 1440 hell/dunkel · Bild 1–3 · Punkt 1 · Seitenspalte schmaler und endet weit vor dem rechten Rand; „Alle ansehen ›“ mittig statt linksbündig unterstrichen; „E-Mail schreiben“ kleiner mit Brief-Zeichen; Zeilen „Offen/Beantwortet“ ohne Trennlinie · .nachtlauf/screens/schluss/meldungen/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 2 · „wir antworten dir so bald wie möglich“ und „Kein Fehler — Antwort lesen“ mit langem Strich statt „–“ · .nachtlauf/screens/schluss/meldungen/4-1440-hell.png
+- 390 hell/dunkel · Bild 1–2 · Punkt 1 · Auswahlzeilen „Worum geht es?“ deutlich niedriger als im Board · .nachtlauf/screens/schluss/meldungen/1-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine (Kasten „Das schicken wir automatisch mit“ zeigt das Board im Web ebenfalls; leerer Streifen rechts als Umgebung)
+
+Nicht prüfbar:
+- keine
+
+### postfach
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 3 | 6 | 0 |
+| 1440 dunkel | 3 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 2, 3, 4 · Punkt 1/2 · Kopf anders: Board zeigt Kopfleiste mit Zurück-Pfeil, Titel „Nachricht“ und Unterzeile „Postfach“; App zeigt nur „← Postfach“ als Zeile, ohne „Nachricht“ · .nachtlauf/screens/schluss/postfach/2-390-hell.png
+- 390 hell/dunkel · Bild 1, 5, 6 · Punkt 1 · Kopf anders: Board hat Zurück-Pfeil links neben „Postfach“ (Titel kleiner, in Kopfleiste); App ohne Zurück-Pfeil, großer freistehender Titel · .nachtlauf/screens/schluss/postfach/1-390-hell.png
+- 390 hell/dunkel · Bild 3 · Punkt 1/6 · Die Team-Antwort „Super, danke dir – schöne Ostern!“ ist von der Antwort-Leiste verdeckt (nur ein Rand sichtbar); im Board steht sie vollständig über dem Antwortfeld · .nachtlauf/screens/schluss/postfach/3-390-hell.png
+- alle · Bild 1 · Punkt 1 · Listenzeile anders aufgebaut: Board = kleine Kopfzeile „Agrilo-Team · Datum“ (+ „Wichtig“ dahinter), darunter Betreff fett und mehrzeilig, Pfeil „›“ rechts; App = Absender fett mit Datum rechtsbündig, Betreff einzeilig abgeschnitten, kein Pfeil „›“, „Wichtig“ vor dem Betreff · .nachtlauf/screens/schluss/postfach/1-1440-hell.png
+- alle · Bild 1 · Punkt 1 · „Du hast geantwortet · …“ steht im Board als schlichte graue Unterzeile, in der App als umrandeter Chip · .nachtlauf/screens/schluss/postfach/1-390-hell.png
+- alle · Bild 1, 5 · Punkt 2 · Fußtext: „Problem melden“ ist im Board ein grüner, unterstrichener Link; in der App nur Text in Anführungszeichen, kein Link · .nachtlauf/screens/schluss/postfach/1-1440-hell.png
+- alle · Bild 5 · Punkt 1/2/6 · Leer-Zustand anders: Board linksbündig, Text „Neue Nachrichten vom Team erscheinen hier und als Karte auf Heute.“, breiter Knopf „Alle Nachrichten zeigen“; App zentriert mit zusätzlichem Häkchen-Symbol, Serifen-Überschrift, Text „Neue Nachrichten vom Team erscheinen hier.“, kleiner Knopf „Alle zeigen“ · .nachtlauf/screens/schluss/postfach/5-390-hell.png
+- alle · Bild 6 · Punkt 2/6 · Fehler-Zustand: Board hat fette Überschrift „Wir konnten dein Postfach gerade nicht laden.“ und Text „Lade die Seite bitte neu. Deine Nachrichten sind nicht verloren.“; App nur ein Fließtext ohne Überschrift, Satz „Deine Nachrichten sind nicht verloren.“ fehlt · .nachtlauf/screens/schluss/postfach/6-1440-hell.png
+- alle · Bild 6 · Punkt 1 · Knopf „Neu laden“ im Board volle Breite unter dem Text; in der App klein (390 unter dem Text, 1440 rechts neben dem Text in einer Zeile); Kasten in der App getönt statt Karte mit Rand · .nachtlauf/screens/schluss/postfach/6-390-hell.png
+- alle · Bild 2, 3, 4 · Punkt 2 · Knopf in der Nachricht heißt „Ansehen“; Board „Abholzeiten ansehen“ bzw. „Verkäufe ansehen“ · .nachtlauf/screens/schluss/postfach/4-1440-hell.png
+- alle · Bild 2, 3, 4 · Punkt 1 · Nachrichtenblase: App hat zusätzliche Zeile „Agrilo-Team“ mit Symbol in der Blase und grünen Rand; Uhrzeit steht außerhalb unter der Blase statt „8:10 · auch per E-Mail“ in der Blase · .nachtlauf/screens/schluss/postfach/2-1440-hell.png
+- alle · Bild 4 · Punkt 2 · „auch per E-Mail“ fehlt unter der Nachricht (Board: „20. Jän, 9:00 · auch per E-Mail“); zusätzliche Datumstrennung „Di, 20. Okt“ über der Blase, die das Board nicht zeigt · .nachtlauf/screens/schluss/postfach/4-390-hell.png
+- alle · Bild 3 · Punkt 1/4 · Eigene Antwort als satt grün gefüllte Blase mit weißer Schrift (im Dunkeln auffällig hell); Board zeigt eine zart grün getönte Blase mit dunkler Schrift · .nachtlauf/screens/schluss/postfach/3-1440-dunkel.png
+- alle · Bild 3 · Punkt 2 · Unter der eigenen Antwort fehlt „· gelesen“ (Board „9:02 · gelesen“, App nur Uhrzeit außerhalb der Blase) · .nachtlauf/screens/schluss/postfach/3-1440-hell.png
+- alle · Bild 4 · Punkt 1/2 · Hinweis „Auf diese Nachricht kannst du nicht antworten …“: Board grau gefüllter Kasten, „Problem melden“ unterstrichen ohne Anführungszeichen; App heller Kasten mit Rand, „„Problem melden““ in Anführungszeichen, nicht unterstrichen · .nachtlauf/screens/schluss/postfach/4-1440-hell.png
+- 1440 hell/dunkel · Bild 2, 3, 4 · Punkt 1/5 · Zurück: Board kleiner grüner Textlink „‹ Postfach“, Fokus auf dem Knopf in der Nachricht; App großer umrandeter Pillen-Knopf „‹ Postfach“ mit Fokusring · .nachtlauf/screens/schluss/postfach/2-1440-hell.png
+- 1440 hell/dunkel · Bild 2, 3, 4 · Punkt 1 · Überschrift der Nachricht in der App sichtbar größer als im Board (Bild 4 bricht auf zwei Zeilen um) · .nachtlauf/screens/schluss/postfach/4-1440-hell.png
+- 390 hell/dunkel · Bild 2, 3 · Punkt 2 · Zusätzliches Schloss-Symbol vor „Deine Antwort geht nur an das Agrilo-Team.“ (auch 1440) · .nachtlauf/screens/schluss/postfach/2-390-hell.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 2 · Seitenleiste „Konto · Franz Müller“; Board nur „Konto“ · .nachtlauf/screens/schluss/postfach/1-1440-hell.png
+- 390 hell/dunkel · Bild 1–4 · Punkt 1 · Zusätzlicher Zähler „1“ an „Mehr“ in der unteren Leiste; Board zeigt dort keinen Zähler · .nachtlauf/screens/schluss/postfach/1-390-hell.png
+- 1440 hell/dunkel · Bild 2, 3, 4 / 6 · Punkt 6 · Zähler „1“ an „Postfach“ in der Seitenleiste: App zeigt ihn nach dem Öffnen der Nachricht noch (Board nicht), im Fehler-Zustand fehlt er (Board zeigt „1“) · .nachtlauf/screens/schluss/postfach/6-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 5 · Punkt 5 · Fokusring um „Alle“ links abgeschnitten · .nachtlauf/screens/schluss/postfach/5-1440-hell.png
+- 1440 dunkel / 390 dunkel · Bild 1 · Punkt 4 · Rand der Listenkarte deutlich heller als im Board (wirkt als helle Linie) · .nachtlauf/screens/schluss/postfach/1-1440-dunkel.png
+- alle · Bild 1 · Punkt 1 · Symbol der Absender rund mit Keimling statt grünem Quadrat; Chip „Ungelesen · 1“ in der App ohne sichtbaren Rand und niedriger · .nachtlauf/screens/schluss/postfach/1-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine (Inhalt der Rundschreiben, Datum und Uhrzeiten, Zähler bei „Bestellungen“ und Gründungshof-Frist als Beispieldaten gewertet)
+
+Nicht prüfbar:
+- keine
+
+### problem-melden
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 6 | 0 |
+| 390 dunkel | 3 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 1–4, 6 · Punkt 1 · Die Auswahl „Worum geht es?“ steht im Board als drei volle Karten untereinander (je ca. 64 px hoch, ein Text pro Zeile). In der App stehen drei schmale Kacheln nebeneinander, deren Text auf zwei Zeilen umbricht („Etwas / funktioniert nicht“) · .nachtlauf/screens/schluss/problem-melden/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 1 · Im Board sitzen die Formular-Karte und die Danke-Karte links in der Inhaltsspalte (bündig mit dem Fuß, x≈221). In der App sind sie mittig auf der Seite (x≈433) · .nachtlauf/screens/schluss/problem-melden/1-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1–4, 6 · Punkt 5 · Das Board zeigt einen eckigen Fokusrahmen am ersten Auswahlknopf („Etwas funktioniert nicht“ bzw. in Bild 3 am nicht gewählten ersten Knopf). In der App ist auf der ganzen Seite kein Fokus zu sehen, weder im Kopf noch im Formular · .nachtlauf/screens/schluss/problem-melden/3-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1/2 · Board: eine einzelne Zeile „Mitgeschickt: Seite, Gerät und dein Hof (Hof Müller). Keine IP-Adresse, keine Cookies.“ App: ein zusätzlicher Kasten „DAS SCHICKEN WIR AUTOMATISCH MIT“ mit den Zeilen Seite /problem-melden · Gerät Linux · Chrome · Hof Hof Müller und dem Satz „Keine IP-Adresse, keine Cookies.“. Abbrechen/Absenden rutschen deshalb aus dem ersten Bildschirm · .nachtlauf/screens/schluss/problem-melden/4-1440-hell.png
+- alle Fassungen · Bild 3 · Punkt 1 · Wenn „Ich hätte gern, dass …“ gewählt ist, zeigt das Board kein Feld „Fehlernummer“: auf „Was wünschst du dir?“ folgt gleich „Deine E-Mail“. Die App zeigt in diesem Zustand trotzdem das Feld „Fehlernummer (optional)“ mit Hilfetext · .nachtlauf/screens/schluss/problem-melden/3-390-hell.png
+- alle Fassungen · Bild 6 · Punkt 6/2 · Board-Zustand Serverfehler: Banner mit „Wir konnten deine Meldung gerade nicht speichern. Dein Text ist noch da – versuch es bitte gleich noch einmal.“ und vorbelegter Fehlernummer. Die App zeigt hier „Zu viele Meldungen in kurzer Zeit — bitte versuche es in einer Stunde noch einmal.“ Laut Manifest führt ein echter Speicherfehler in der App zur Fehlerseite „Fehler 500“, nicht zu diesem Banner. Der Zustand des Boards ist also nicht erreichbar · .nachtlauf/screens/schluss/problem-melden/6-390-hell.png
+- alle Fassungen · Bild 1–4, 6 · Punkt 2 · Unter „Fehlernummer“ zeigt die App einen zusätzlichen Hilfetext „Manche Fehlermeldungen enden auf ein Kürzel in eckigen Klammern – das hilft uns, die Stelle zu finden.“, den das Board nicht hat · .nachtlauf/screens/schluss/problem-melden/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–4, 6 · Punkt 1 · Das Feld „Fehlernummer“ geht im Board über die volle Breite der Karte. In der App ist es nur halb so breit (ca. 224 px) · .nachtlauf/screens/schluss/problem-melden/2-1440-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 2 · Board: „Mitgeschickt: Seite und Gerät. Keine IP-Adresse, keine Cookies.“ App: „Mitgeschickt: Fehlernummer 3141592653, Seite und Gerät. Keine IP-Adresse, keine Cookies.“ · .nachtlauf/screens/schluss/problem-melden/2-1440-hell.png
+- 390 hell/dunkel · Bild 1–6 · Punkt 1 · Der Handy-Kopf zeigt im Board nur das Logo. In der App steht rechts ein zusätzlicher Knopf „Anmelden“ (in Bild 4 „Mein Hof“) · .nachtlauf/screens/schluss/problem-melden/1-390-hell.png
+- 390 hell/dunkel · Bild 1–4, 6 · Punkt 1 · Die Auswahlkarten sind im Board ca. 64 px hoch, in der App ca. 46 px. Die Abstände zwischen den Karten sind ebenfalls kleiner · .nachtlauf/screens/schluss/problem-melden/1-390-dunkel.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · Im Board steht „+ Bildschirmfoto hinzufügen“ linksbündig mit Pluszeichen. In der App steht der Text mittig mit Kamera-Symbol statt „+“. Auf dem Handy ist es genauso · .nachtlauf/screens/schluss/problem-melden/4-1440-dunkel.png
+- alle Fassungen · Bild 1–4, 6 · Punkt 1 · Der Zeichenzähler „0 / 2000“ steht im Board rechtsbündig unter dem Textfeld, in der App linksbündig · .nachtlauf/screens/schluss/problem-melden/1-1440-hell.png
+- alle Fassungen · Bild 1–4, 6 · Punkt 2 · Im Board sind die Feldbeschriftungen ganz fett („Fehlernummer (optional)“, „Deine E-Mail · nur für unsere Antwort, optional“). In der App ist nur das erste Wort fett, der Zusatz normal · .nachtlauf/screens/schluss/problem-melden/2-390-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Der Fuß der App hat links ein zusätzliches Logo „Agrilo“, das Board nicht. Der Fuß ist außerdem breiter (x≈137 bis 1289 statt 221 bis 1221) · .nachtlauf/screens/schluss/problem-melden/5-1440-hell.png
+- 390 dunkel / 1440 dunkel · Bild 1–4, 6 · Punkt 4 · Im Board ist der gewählte Auswahlknopf im Dunkeln ein heller, gefüllter Punkt. In der App ist es ein heller Ring mit dunkler Mitte · .nachtlauf/screens/schluss/problem-melden/1-1440-dunkel.png
+- 390 hell/dunkel · Bild 5 · Punkt 2 · Die Fußlinks (Impressum, Datenschutz, AGB, Problem melden) sind im Board unterstrichen, in der App nicht unterstrichen · .nachtlauf/screens/schluss/problem-melden/5-390-hell.png
+- alle Fassungen · Bild 5 · Punkt 2 · Die Kurznummer ist im Board kurz und groß geschrieben („4F8M“). In der App ist sie eine lange Kennung in Kleinbuchstaben („cmw4fc4j“). Das Format weicht ab, nicht nur der Beispielwert · .nachtlauf/screens/schluss/problem-melden/5-390-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board: zusätzlicher Fußlink „Vertrag widerrufen“ (Bild 5, 390 und 1440).
+- Umgebung: ein etwa 15 px breiter leerer Streifen am rechten Rand (alle App-Bilder).
+
+Nicht prüfbar:
+- keine (alle 24 App-Bilder erreichbar). Hinweis aus dem Manifest zu Bild 6: Der Serverfehler wurde ersatzweise mit dem Mengenlimit-Banner aufgenommen, weil ein echter Speicherfehler zur Seite „Fehler 500“ führt. Das ist oben als Mangel unter Punkt 6 gewertet.
+
+### region
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 1, 2, 5 · Punkt 1 · Board zeigt zwei Spalten (Liste links, Karte mit Umkreis und nummerierten Höfen rechts); die App zeigt nur die Liste mit zusätzlichem Umschalter „Liste / Karte“, die Karte fehlt; der Inhalt endet bei etwa 1120 px statt die Breite bis 1400 px zu nutzen · .nachtlauf/screens/schluss/region/1-1440-hell.png, 2-1440-hell.png, 5-1440-hell.png (dunkel ebenso)
+- 1440 hell/dunkel · Bild 6 · Punkt 1 · Board: Liste links bleibt, Karte rechts, darunter das Feld des gewählten Hofs „1 · Hof am Bach · 4 km“ mit Knopf „Schließen“; App: Karte ersetzt die Liste über die volle Breite, Hof-Karte liegt als Overlay über der Karte mit „×“ statt „Schließen“, Umkreis-Kreis nur angeschnitten, „Du“ als eckige braune Marke statt runder Marke mit Beschriftung „Hof Müller“ · .nachtlauf/screens/schluss/region/6-1440-hell.png (dunkel ebenso)
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Sortenzeile anders aufgebaut: Board „Milch, 1 L“ + Zeile „5 Höfe · € 1,43 – 1,60 · Mitte € 1,52“, Marke „Deins: € 1,49“ rechts neben dem Pfeil; App „Trinkmilch“ mit „3 Höfe“ rechts, Preisspanne in eigener Zeile, „Deins“-Marke darunter · .nachtlauf/screens/schluss/region/1-390-hell.png
+- 390/1440 alle · Bild 1 · Punkt 1 · Aufgeklappte Sorte: Board je Hof eine Zeile „Hof am Bach · 4 km · Heumilch € 1,43 / L“ und Schluss „1 weiterer Hof · Kaufen geht über die Hofseite.“; App je Hof ein Block über drei Zeilen (Hofname grün als Überschrift, Ort, Produkt + Preis rechts) und nur „Kaufen geht über die Hofseite.“; ausgeklappte Karte mit grünem Rahmen statt neutral · .nachtlauf/screens/schluss/region/1-390-hell.png, 1-1440-hell.png
+- 390/1440 alle · Bild 1 · Punkt 1 · Umschalter „Hofladen / Futtermittel“ als breites Segment mit Symbolen und orangem aktivem Teil; Board zwei einzelne Chips, aktiver Chip dunkel (hell) bzw. hell (dunkel) ohne Symbole · .nachtlauf/screens/schluss/region/1-390-hell.png
+- 390/1440 alle · Bild 1, 2, 5, 6 · Punkt 1 · Umkreis „10 km / 25 km / 50 km“ als zusammenhängendes Segment mit kleiner Schrift; Board einzelne Chips in Knopfgröße; im Futter-Reiter Board „10 km · 1“, App „10 km 4“ (ohne Mittelpunkt) · .nachtlauf/screens/schluss/region/2-390-hell.png
+- 390/1440 alle · Bild 1 · Punkt 1/2 · „Liste / Karte“ steht in der App rechts neben dem Hinweistext statt als eigene Chip-Zeile unter dem Umkreis (Board 390); zusätzliche Zeile „1 Hof hat noch keinen Standort auf der Karte und fehlt hier.“, die das Board nicht zeigt; Hinweis endet ohne Punkt („… günstigstes Angebot“ statt „… günstigstes Angebot.“) · .nachtlauf/screens/schluss/region/1-390-hell.png
+- 390/1440 alle · Bild 2, 6 · Punkt 1/2 · Sorten-Chips: Board „Alle · Heu · Stroh · Getreide · Silage“; App „Alle · Heu & Stroh · Getreide & Körner · Mischfutter · Ergänzungsfutter“; zusätzliche Chip-Zeile „Alle Mengen · Kleinmengen · Ballen & mehr“ und Uhr-Symbol vor der Tage-Zeile, beide nicht im Board · .nachtlauf/screens/schluss/region/2-390-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 2 · Zählzeile: Board „2 Höfe mit LFBIS-Nummer“; App „10 Angebote · nur Höfe mit LFBIS-Nummer“ · .nachtlauf/screens/schluss/region/2-390-hell.png
+- 1440 hell/dunkel · Bild 2, 5, 6 · Punkt 2 · Hinweis: Board „Höfe mit LFBIS-Nummer im Umkreis von 25 km – du kaufst für deine Tiere.“; App „Höfe mit LFBIS-Nummer – du kaufst für deine Tiere.“ (Umkreis fehlt) · .nachtlauf/screens/schluss/region/2-1440-hell.png
+- 390/1440 alle · Bild 2 · Punkt 1/2 · Futterkarte anders: Board Titel „Heu, 1. Schnitt“ fett, darunter „Hof am Bach · 4 km“, Zeile „Abholung … · Aufladen hilft der Hof“, „ab € 0,15 / kg“ mit Marke „Futtermittel-Nummer laut Hof“, Auswahl „Größe“ mit Optionsfeldern, Knopf „Bestellen …“; App Produkt klein, Hofname groß fett, Adresse, grüne Abholzeile mit Uhr, Marke „Futtermittelbetrieb · LFBIS … · laut Hof“, Block „Grundpreis“ rechts, keine „Größe“-Auswahl, Knopf „Bestellen · € 8,00“ · .nachtlauf/screens/schluss/region/2-390-hell.png, 2-1440-hell.png
+- 390/1440 alle · Bild 3 · Punkt 1 · „Wo liegt dein Hof?“: Board linksbündige Karte, Überschrift fett serifenlos, Knopf orange über die volle Breite; App gestrichelter, zentrierter Leer-Kasten mit Standort-Symbol, Serifen-Überschrift, Knopf grün und schmal · .nachtlauf/screens/schluss/region/3-390-hell.png, 3-1440-hell.png
+- 390/1440 alle · Bild 3 · Punkt 1 · „So steht dein Hof gerade in der Liste der Kundschaft“: Board Überschrift in der Karte, nur Hofname und „Nicht auf der Karte“; App Überschrift außerhalb, volle Hofkarte mit Bildfläche, Ort, Abholzeit und Produktliste mit Preisen · .nachtlauf/screens/schluss/region/3-390-hell.png, 3-1440-hell.png
+- 390/1440 alle · Bild 4 · Punkt 1/6 · Fehlerkasten: Board Überschrift groß fett, Knopf „Nochmal“ umrandet über die volle Breite unter dem Text; App Überschrift kleiner, „Nochmal“ als kleiner Pillenknopf (390 links unter dem Text, 1440 rechts neben dem Text), Kasten grau gefüllt ohne Rahmen statt Karte mit Rahmen · .nachtlauf/screens/schluss/region/4-390-hell.png, 4-1440-hell.png
+- 390/1440 alle · Bild 5 · Punkt 2/6 · Leer-Zustand: Board Karte „Gerade verkauft im Umkreis von 10 km kein Hof Silage“, „Mit 25 km ist es 1 Hof.“, Knopf „Auf 25 km erweitern“ über die volle Breite; App gestrichelter Kasten mit Symbol, „Gerade kein Futter in der Nähe“, „Im Umkreis von 10 km verkauft gerade kein Hof mit LFBIS-Nummer Futter.“, schmaler Knopf „Umkreis auf 25 km“ · .nachtlauf/screens/schluss/region/5-390-hell.png, 5-1440-hell.png
+- 390/1440 alle · Bild 5 · Punkt 1 · Sorten-Chips im Leer-Zustand auf „Alle“ reduziert (Board zeigt alle Sorten mit „Silage“ gewählt); zusätzliche Zeile „0 Angebote · nur Höfe mit LFBIS-Nummer“ bzw. Hinweis mit „Liste / Karte“, die das Board im Leer-Zustand nicht zeigt · .nachtlauf/screens/schluss/region/5-390-hell.png
+- 390 hell/dunkel · Bild 6 · Punkt 1 · Karte-Ansicht: Board zeigt nur Umkreis-Chips und „Liste / Karte“ über der Karte; App zeigt zusätzlich Sorten-, Mengen- und Tage-Zeile und Hinweis, die Karte rutscht unter die Falz · .nachtlauf/screens/schluss/region/6-390-hell.png
+- 390 hell/dunkel · Bild 6 · Punkt 1/2 · Gewählter Hof: Board Feld unter der Karte „1 · Hof am Bach · 4 km“, Knopf „Schließen“, „Größe“-Auswahl, „Bestellen …“; App Overlay über der Karte mit „×“, Hofname mit Adresse, ohne „Größe“-Auswahl · .nachtlauf/screens/schluss/region/6-390-hell.png
+- 390 hell/dunkel · Bild 6 · Punkt 1 · Kartenausschnitt: „Du“-Marke am linken Rand abgeschnitten, Marke 2 mit Beschriftung von der Minus-Taste verdeckt, Umkreis-Kreis nicht sichtbar, Quellenangabe oben statt unten rechts · .nachtlauf/screens/schluss/region/6-390-hell.png
+- 1440 hell/dunkel · Bild 1–6 · Punkt 2 · Seitenleiste: Board „Konto“; App „Konto · <Name>“ · .nachtlauf/screens/schluss/region/1-1440-hell.png
+- 390 hell/dunkel · Bild 1–6 · Punkt 1 · Kopf: Board „Region“ mit Unterzeile in einem abgesetzten Kopfbereich mit Trennlinie; App Kopf ohne Trennlinie direkt auf dem Grund · .nachtlauf/screens/schluss/region/1-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Umgebung: graue Karten ohne Kacheln (Bild 6, 390 und 1440).
+- Umgebung: etwa 15 px breiter Streifen am rechten Rand (390).
+
+Nicht prüfbar:
+- keine (alle Bilder erreichbar). Admin-Zeilen in der Seitenleiste kommen weder im Board noch in der App vor.
+
+### teilen
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 3 | 0 |
+| 390 dunkel | 2 | 3 | 0 |
+| 1440 hell | 2 | 3 | 0 |
+| 1440 dunkel | 2 | 3 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Auswahl „Titelbild“ / „Hofgalerie“ (zwei Radio-Karten, Hofgalerie gewählt) unter „2 Fotos – sie gehen in die Hofgalerie.“ fehlt ganz · .nachtlauf/screens/schluss/teilen/1-390-hell.png, .nachtlauf/screens/schluss/teilen/1-390-dunkel.png
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Board zeigt den Knopf „In die Hofgalerie laden“ in einer festen Leiste am unteren Rand (eckig, ganze Breite); App setzt ihn direkt unter den Text in den Inhalt, als Pille · .nachtlauf/screens/schluss/teilen/1-390-hell.png, .nachtlauf/screens/schluss/teilen/1-390-dunkel.png
+- 390 hell/dunkel · Bild 1–3 · Punkt 1 · Kopfleiste des Boards (Zurück-Pfeil „‹“ + Titel „Geteilte Fotos“ in eigener Leiste mit Trennlinie) fehlt; App zeigt stattdessen einen Textlink „← Zu Heute“ über der h1 · .nachtlauf/screens/schluss/teilen/1-390-hell.png, .nachtlauf/screens/schluss/teilen/2-390-hell.png, .nachtlauf/screens/schluss/teilen/3-390-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 1–3 · Punkt 1 · Kopfleiste des Boards (Agrilo-Logo, Trennstrich, „Geteilte Fotos“ links, Link „← Zu Heute“ rechts) fehlt; App hat keine Kopfleiste, nur einen umrandeten Link „← Zu Heute“ über der h1 · .nachtlauf/screens/schluss/teilen/1-1440-hell.png, .nachtlauf/screens/schluss/teilen/2-1440-hell.png, .nachtlauf/screens/schluss/teilen/3-1440-hell.png (ebenso -dunkel)
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Auswahl „Titelbild“ / „Hofgalerie“ fehlt; damit fehlt auch der im Board gezeigte Startfokus auf „Titelbild“ (App fokussiert „← Zu Heute“) · .nachtlauf/screens/schluss/teilen/1-1440-hell.png, .nachtlauf/screens/schluss/teilen/1-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Knopf „In die Hofgalerie laden“ im Board schmal, linksbündig, eckig; in der App über die ganze Spaltenbreite als Pille · .nachtlauf/screens/schluss/teilen/1-1440-hell.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1 · Auswahl „Titelbild“ / „Hofgalerie“ fehlt auch im Fehlerzustand · .nachtlauf/screens/schluss/teilen/3-390-hell.png, .nachtlauf/screens/schluss/teilen/3-1440-hell.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 2 · Fehlertext anders: Board ein Absatz „Keine Verbindung – die Fotos sind nicht hochgeladen, sie liegen noch hier. Prüf den Empfang und tippe auf „Nochmal“. Du kannst sie auch später unter Mein Hof › Hofseite hochladen.“; App drei Zeilen „Die Fotos sind nicht hochgeladen – sie liegen noch hier.“ (fett) / „Verbindung unterbrochen — bitte nochmal versuchen. [S139]“ / „Du kannst sie auch später unter Mein Hof › Hofseite hochladen.“ – „Keine Verbindung“ und „Prüf den Empfang und tippe auf „Nochmal““ fehlen, Fehlercode zusätzlich · .nachtlauf/screens/schluss/teilen/3-390-hell.png, .nachtlauf/screens/schluss/teilen/3-1440-hell.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1 · Knopf „Nochmal“ im Board klein, linksbündig, mit Warnfarbe (Rahmen und Schrift terrakotta); App über ganze Kastenbreite, neutral (dunkler Rahmen, dunkle Schrift bzw. dunkler Grund im Dunkeln) · .nachtlauf/screens/schluss/teilen/3-390-hell.png, .nachtlauf/screens/schluss/teilen/3-1440-dunkel.png
+- 390/1440 hell/dunkel · Bild 3 · Punkt 1 · Fehlerkasten mit deutlich größerem Eckenradius als im Board (fast Pillenform) · .nachtlauf/screens/schluss/teilen/3-390-hell.png
+- 390/1440 dunkel · Bild 1, 3 · Punkt 4 · Fotos im Dunkeln nicht sichtbar gedämpft: die Vorschaubilder wirken genauso hell wie im hellen Thema und stehen als helle Flecken auf dem dunklen Grund · .nachtlauf/screens/schluss/teilen/1-390-dunkel.png, .nachtlauf/screens/schluss/teilen/1-1440-dunkel.png, .nachtlauf/screens/schluss/teilen/3-1440-dunkel.png
+- 390/1440 hell/dunkel · Bild 1, 3 · Punkt 1 · Vorschaubilder mit deutlich größerem Eckenradius als im Board · .nachtlauf/screens/schluss/teilen/1-390-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 5 · Board zeigt den Fokus auf dem Knopf „Zu Heute“ im Kasten; App fokussiert den Link „← Zu Heute“ über der h1 (folgt aus der fehlenden Kopfleiste) · .nachtlauf/screens/schluss/teilen/2-1440-hell.png
+- 390/1440 hell/dunkel · Bild 2 · Punkt 1 · Erklärtext im Kasten („So geht’s: …“) in der App kräftiger (Textfarbe statt gedämpft) und mit größerem Zeilenabstand als im Board · .nachtlauf/screens/schluss/teilen/2-390-hell.png, .nachtlauf/screens/schluss/teilen/2-1440-hell.png
+- 1440 hell/dunkel · Bild 1–3 · Punkt 1 · Inhaltsspalte etwas schmaler als im Board (ca. 450 px statt ca. 520 px) · .nachtlauf/screens/schluss/teilen/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine
+
+Nicht prüfbar:
+- keine
+
+### verkaeufe
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | 2 | 6 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | 2 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 3 · Punkt 6 · Fehlerzustand nicht sichtbar: Dialog sieht genau aus wie Bild 2, ohne Kasten „Wir konnten den Verkauf nicht speichern. Deine Angaben sind noch da.“ und ohne Knopf „Nochmal“ (Board: Kasten am Dialogende, Fokus auf „Nochmal“) · .nachtlauf/screens/schluss/verkaeufe/3-1440-hell.png, .nachtlauf/screens/schluss/verkaeufe/3-1440-dunkel.png
+- 390 hell/dunkel · Bild 3 · Punkt 6/2 · Fehlerkasten ohne Knopf „Nochmal“; dafür bleiben „€ 24,80 eintragen“ und „Abbrechen“ darunter. Text länger als im Board („… Schau in der Liste nach, ob er schon dasteht, bevor du es noch einmal versuchst.“); Kastentext in normaler Textfarbe statt Warnfarbe · .nachtlauf/screens/schluss/verkaeufe/3-390-hell.png, .nachtlauf/screens/schluss/verkaeufe/3-390-dunkel.png
+- 390 alle · Bild 1/4/5/6 · Punkt 1 · Kopf fehlt: kein Zurück-Pfeil, keine abgesetzte Kopfleiste mit „Hof Müller · Stand …“; h1 „Verkäufe“ steht frei im Inhalt (Bild 6 ganz ohne Unterzeile) · .nachtlauf/screens/schluss/verkaeufe/1-390-hell.png
+- 390 alle · Bild 1/4/5 · Punkt 1 · Feste Leiste „Verkauf eintragen“ über der Tab-Leiste fehlt; stattdessen kleiner Knopf „+ Verkauf eintragen“ oben unter dem Kopf · .nachtlauf/screens/schluss/verkaeufe/1-390-hell.png
+- 390 alle · Bild 1/4/5 · Punkt 1 · Zusätzliche große Karte „Diese Woche“ mit Umsatzgrenze-Erklärung („Dieses Jahr (für die Umsatzgrenze) …“), im Board nicht vorhanden; „Online bezahlt“/„Bar kassiert“ untereinander statt zweispaltig nebeneinander · .nachtlauf/screens/schluss/verkaeufe/1-390-hell.png
+- 1440 alle · Bild 1/4/5 · Punkt 1 · Drei Karten in voller Breite (mit „Diese Woche“) statt zwei schmaler Karten links und rechter Spalte „Noch einmal eintragen“ mit Chips („Markt · € 290,00“, „Ab Hof · € 160,00“); Liste über die ganze Breite statt in der linken Spalte · .nachtlauf/screens/schluss/verkaeufe/1-1440-hell.png
+- alle · Bild 1/4 · Punkt 1 · Abschnitt „Noch einmal eintragen“ mit Chips fehlt ganz · .nachtlauf/screens/schluss/verkaeufe/1-390-hell.png, .nachtlauf/screens/schluss/verkaeufe/1-1440-dunkel.png
+- alle · Bild 1/4 · Punkt 1/2 · Link „Auszahlungen bei Stripe ansehen“ fehlt (Board: unter den Karten, im Web mit Fokus) · .nachtlauf/screens/schluss/verkaeufe/4-1440-hell.png
+- alle · Bild 1/4 · Punkt 1/2 · Listenzeilen anders: rundes Kanal-Symbol links, Kanal-Chip („Hofladen“, „Geschäftskunde“, „WhatsApp“, „Bar · Abholung“) statt Marke „Eingetragen“/„Bestellung“ unter dem Betrag; Titel ohne Mengenvorsatz („Heumilch frisch“ statt Muster „4× Bergkäse“); Bestellzeile „Name TD-0002“ mit Produktzeile statt „Name · Bestellnummer“ · .nachtlauf/screens/schluss/verkaeufe/4-1440-dunkel.png
+- alle · Bild 4 · Punkt 1/2/4 · Bestätigung oben als hellgrüner Kasten mit Häkchen (verdeckt in 390 den Kopf) statt dunkler Leiste unten; Text „Verkauf eingetragen. Vorrat jetzt: 46 L.“ statt „Verkauf eingetragen · Bergkäse: noch 14 auf Vorrat“; grüner Text auf Hellgrün wirkt kontrastschwach (Messung meldet color-contrast im Hellen) · .nachtlauf/screens/schluss/verkaeufe/4-390-hell.png, .nachtlauf/screens/schluss/verkaeufe/4-1440-hell.png
+- 390 alle · Bild 2/3 · Punkt 1 · Blatt füllt fast den ganzen Bildschirm (Seite dahinter nicht mehr erkennbar), Tab-Leiste verdeckt; Board zeigt Blatt mit sichtbarem Seitenkopf oben · .nachtlauf/screens/schluss/verkaeufe/2-390-hell.png
+- alle · Bild 2/3 · Punkt 1/2 · Kopf des Formulars: „Abbrechen“ oben rechts fehlt (Web: als Knopf unten neben „€ 24,80 eintragen“, 390: unten); Datum als Auswahl „Heute ⌄“ oben rechts statt Chip „Heute, Mi 3. März“ unter dem Titel · .nachtlauf/screens/schluss/verkaeufe/2-1440-hell.png
+- alle · Bild 2/3 · Punkt 2 · Kanal-Knöpfe mit Symbolen und Wort „Hofladen“ statt „Ab Hof“; zusätzlicher Chip „Anderer Weg“ statt Textlink „Anderes“ rechts neben „Wo verkauft?“; zusätzlicher Chip „Anderes“ bei den Produkten · .nachtlauf/screens/schluss/verkaeufe/2-390-hell.png
+- alle · Bild 2/3 · Punkt 1/2 · Reihenfolge: „Vorrat abziehen“ vor Menge (Board: Menge, dann Vorrat); Menge hinter Klappe „Menge oder Notiz ergänzen“ mit Feld in voller Breite und Einheit im Feld, statt schmalem Feld mit „Stück · Notiz ergänzen“ daneben; Notizfeld offen sichtbar · .nachtlauf/screens/schluss/verkaeufe/2-390-dunkel.png
+- alle · Bild 2/3 · Punkt 2 · Vorrat-Satz „Im Vorrat: 50 L. Wir ziehen 4 L ab.“ statt Muster „Bergkäse: 18 auf Vorrat, danach 14“ · .nachtlauf/screens/schluss/verkaeufe/2-1440-dunkel.png
+- 1440 alle · Bild 2 · Punkt 1/2 · Hinweis „Nur Verkäufe, die nicht über Agrilo bestellt wurden …“ im sichtbaren Dialog nicht zu sehen (nur nach Scrollen); Dialog mit Fußleiste und Bildlauf statt vollständig sichtbar; Seite dahinter verschwommen statt nur abgedunkelt · .nachtlauf/screens/schluss/verkaeufe/2-1440-hell.png
+- 1440 alle · Bild 2/3 · Punkt 5 · Startfokus auf „Hofladen“ statt auf dem Betragsfeld (Board: Fokus im Betrag) · .nachtlauf/screens/schluss/verkaeufe/2-1440-dunkel.png
+- alle · Bild 2/3 · Punkt 1 · Betrag in Serifenschrift mit blassem „€“ statt Groteskschrift; 390: Betragsfeld mit Kasten-Rahmen statt nur Unterstrich · .nachtlauf/screens/schluss/verkaeufe/2-390-hell.png
+- alle · Bild 5 · Punkt 1 · Hinweis „Richte deinen Hof fertig ein …“ steht über der h1 „Verkäufe“ (390 und Web, im Web über ganze Breite bis zum Rand) statt unter dem Kopf; Titel und Link in Textfarbe statt Warnfarbe; zusätzliches Uhr-Symbol · .nachtlauf/screens/schluss/verkaeufe/5-390-hell.png, .nachtlauf/screens/schluss/verkaeufe/5-1440-dunkel.png
+- alle · Bild 5 · Punkt 2 · Zusätzlicher Text im Hinweis: „Deine Hof-ID: …“ und „– die Hof-ID ist in der Nachricht schon eingetragen.“ · .nachtlauf/screens/schluss/verkaeufe/5-1440-hell.png
+- 1440 alle · Bild 5 · Punkt 1/2 · Leerzustand anders: zusätzliche Überschrift „Letzte Verkäufe“, Symbol, Titel zentriert in Serifenschrift, zusätzlicher Knopf „Verkauf eintragen“; zweiter Satz „Was du am Markt oder ab Hof verkaufst, trägst du mit „Verkauf eintragen“ ein.“ fehlt. In 390 Leerzustand im Bild nicht sichtbar (unter der Falz) · .nachtlauf/screens/schluss/verkaeufe/5-1440-hell.png
+- 1440 alle · Bild 5 · Punkt 1 · Seitenleiste zeigt zusätzliche Karte „Startphase: kostenlos · bis 31. Jänner 2027“; Board zeigt beim neuen Hof keine Karte · .nachtlauf/screens/schluss/verkaeufe/5-1440-dunkel.png
+- alle · Bild 6 · Punkt 1 · Fehlerkarte: Knopf „Noch einmal versuchen“ klein (390 links, Web rechts neben dem Text) statt Knopf in voller Kartenbreite unter dem Text; Titel kleiner; Kopf ohne „Hof Müller“ (Web) bzw. ohne Zurück-Pfeil und Unterzeile (390) · .nachtlauf/screens/schluss/verkaeufe/6-390-hell.png, .nachtlauf/screens/schluss/verkaeufe/6-1440-hell.png
+- 1440 alle · Bild 6 · Punkt 1 · Knopf „Verkauf eintragen“ oben rechts fehlt im Fehlerzustand (Board zeigt ihn) · .nachtlauf/screens/schluss/verkaeufe/6-1440-dunkel.png
+- 1440 alle · Bild 1/4/6 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ statt „Konto“; Knopf „Verkauf eintragen“ mit „+“ und tiefer gesetzt statt bündig neben der h1 · .nachtlauf/screens/schluss/verkaeufe/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (390-Bilder und 1440-Dialogbilder), keine Abweichung.
+- Register vor Board: Pflichtkarte „nicht freigegeben“ als eigene Karte (Bild 5) – die Lage über der h1 ist davon nicht gedeckt und steht oben als Mangel.
+
+Nicht prüfbar:
+- keine (alle 24 App-Bilder erreichbar)
+
+### whatsapp-plakat
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 4 | 0 |
+| 390 dunkel | 2 | 4 | 0 |
+| 1440 hell | 2 | 4 | 0 |
+| 1440 dunkel | 2 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel, 1440 hell/dunkel · Bild 1 · Punkt 1/6 · Die noch offenen Zeilen haben keinen Knopf „Öffnen“ (Board: gefüllter Knopf „Öffnen“ bei der nächsten, umrandeter „Öffnen“ bei der übrigen) – die Hauptaktion des Zustands fehlt sichtbar · .nachtlauf/screens/schluss/whatsapp-plakat/1-390-hell.png
+- 390 hell/dunkel, 1440 hell/dunkel · Bild 3 · Punkt 1/2 · Plakat ganz anders aufgebaut: Board zentriert mit Wortmarke „Agrilo“ oben, Schlagzeile zentriert, „Hof Müller · Braunau am Inn“ fett unter der Schlagzeile, QR zentriert, Adresse darunter, drei Schritte nebeneinander; App linksbündig mit Augenbraue „HOF MÜLLER · BRAUNAU AM INN“ über der Schlagzeile, zusätzlichem Satz „Handy-Kamera auf den Code halten, aussuchen, bestellen – und zur Abholzeit einfach mitnehmen.“, QR links mit Schritten untereinander rechts, zusätzlicher Fußzeile „Abholung Mi 15–18 · Sa 9–12 Uhr“ / „Bar bei der Abholung bezahlen“, ohne Wortmarke oben · .nachtlauf/screens/schluss/whatsapp-plakat/3-390-hell.png
+- 390 hell/dunkel · Bild 3 · Punkt 1 · Feste Leiste unten mit vollbreitem Knopf „Drucken“ fehlt; stattdessen Knopf „Plakat drucken“ (mit Druckersymbol) oben rechts neben dem Einleitungstext · .nachtlauf/screens/schluss/whatsapp-plakat/3-390-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 2 · Knopf heißt „Plakat drucken“ statt „Drucken“; steht neben dem Einleitungstext statt neben der h1; Plakat füllt die ganze Inhaltsbreite statt schmaler Vorschau (~420 px) und läuft über den Bildschirmrand · .nachtlauf/screens/schluss/whatsapp-plakat/3-1440-hell.png
+- 390 hell/dunkel · Bild 3 · Punkt 3 · Schrift im Plakat sichtbar winzig (Zeile „Hof Müller · Braunau am Inn“, Schritte, Fußzeile; Messung 9 Stellen unter 12 px, kleinste ~6,5 px) · .nachtlauf/screens/schluss/whatsapp-plakat/3-390-hell.png
+- alle Fassungen · Bild 1–4 · Punkt 1 · Kopf anders: Board h1 mit Zurück-Pfeil und Brotkrumen „Mein Hof › Beiträge“ (Bild 2: „Hof am Bach · Mein Hof › Beiträge“) darunter; App ohne Brotkrumen, eigene Zurück-Zeile über der h1 (Handy „← Beiträge“, Web Pillen-Knopf „‹ Beiträge“ statt Textlink) · .nachtlauf/screens/schluss/whatsapp-plakat/1-390-hell.png
+- alle Fassungen · Bild 3/4 · Punkt 2 · Zurück-Ziel heißt „Heute“ statt „Beiträge“ · .nachtlauf/screens/schluss/whatsapp-plakat/3-1440-hell.png
+- alle Fassungen · Bild 1 · Punkt 1 · Zusätzliche Karte „DEIN BEITRAG“ mit Nachrichtentext und zusätzlicher Fortschrittsbalken; Board zeigt nur die Zeile „Frischer Bergkäse ab Samstag“ und darunter „1 von 3 geöffnet / 2 ausstehend“ · .nachtlauf/screens/schluss/whatsapp-plakat/1-390-hell.png
+- alle Fassungen · Bild 1 · Punkt 1 · Hinweis „WhatsApp öffnet sich mit dem Text …“ steht unter der h1 statt unter der Liste · .nachtlauf/screens/schluss/whatsapp-plakat/1-390-hell.png
+- alle Fassungen · Bild 1 · Punkt 1/2 · Geöffnete Zeile: Board „✓ Geöffnet“ oben rechts und Link „Doch nicht gesendet?“ darunter; App Text „Doch nicht gesendet?“ plus zusätzlicher Link „Zurücksetzen“ links unter dem Namen, „Geöffnet“ ohne Haken rechts mittig, Häkchen statt Initialen im Kreis · .nachtlauf/screens/schluss/whatsapp-plakat/1-1440-hell.png
+- alle Fassungen · Bild 1 · Punkt 1/4 · Liste als einzelne Karten mit Abstand statt einer Karte mit Trennlinien; geöffnete Zeile farbig hinterlegt; Telefonnummer als zusätzliche Zeile; „1 von 3 geöffnet“ nicht fett und „2 ausstehend“ grau statt fett in Akzentfarbe · .nachtlauf/screens/schluss/whatsapp-plakat/1-390-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 1 · Inhalt mittig in der Fläche statt linksbündig an der Seitenspalte (Board ab ~300 px, Breite ~670 px; App ab ~430/590 px) · .nachtlauf/screens/schluss/whatsapp-plakat/1-1440-hell.png
+- alle Fassungen · Bild 2 · Punkt 1 · Keine sichtbare Seitenüberschrift „WhatsApp versenden“ und keine Zeile „Frische Eier vom Freilandstall“; Leer-Kasten zentriert mit Symbol und Serifen-Titel statt linksbündig; Knopf „Zu den Beiträgen“ klein als Pille statt vollbreit · .nachtlauf/screens/schluss/whatsapp-plakat/2-390-hell.png
+- alle Fassungen · Bild 4 · Punkt 1 · Hinweis „Richte deinen Hof fertig ein …“ steht ganz oben über Zurück-Zeile und h1 statt unter dem Kopf; im Web über die ganze Breite statt in der Inhaltsspalte · .nachtlauf/screens/schluss/whatsapp-plakat/4-390-hell.png
+- alle Fassungen · Bild 4 · Punkt 2 · Im Hinweis zusätzlich „Deine Hof-ID: …“ und „– die Hof-ID ist in der Nachricht schon eingetragen.“; zusätzliches Uhr-Symbol; Titel im Dunkeln weiß statt Akzentfarbe · .nachtlauf/screens/schluss/whatsapp-plakat/4-390-dunkel.png
+- alle Fassungen · Bild 4 · Punkt 1 · Zusätzlicher Einleitungstext „Zum Aushängen im Hofladen …“ unter der h1 (Board zeigt ihn in diesem Zustand nicht); Kasten „Das Plakat gibt es, sobald dein Hof online ist“ zentriert mit Druckersymbol, Knopf „Hofseite einrichten“ klein statt vollbreit · .nachtlauf/screens/schluss/whatsapp-plakat/4-1440-hell.png
+- 1440 hell/dunkel · Bild 1–4 · Punkt 2 · Seitenspalte: „Konto · <Name>“ statt „Konto“ · .nachtlauf/screens/schluss/whatsapp-plakat/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board (Pflichtkarten): Bild 4 zeigt die Freischaltungs-Karte als eigene Karte – die Karte selbst ist gedeckt, nicht aber ihre Stellung über dem Kopf und die zusätzlichen Sätze (siehe Mängel).
+- Umgebung: ~15 px leerer Streifen am rechten Rand im Handy-Bild.
+- Beispieldaten (Namen als E-Mail-Adressen, Hofnamen, Zähler in der Leiste, Gründungshof-Datum, echter statt angedeuteter QR-Code) nicht gewertet.
+- Fokus sichtbar in allen Web-Bildern (in Bild 1–3 am Zurück-Knopf, in Bild 4 am Link „Frage zur Freischaltung stellen“); das Board zeigt ihn in Bild 1 und 2 an einem anderen Element, wegen des anderen Aufbaus nicht gesondert gewertet.
+
+Nicht prüfbar:
+- keine
+
+### abmelden
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 2 | 1 |
+| 390 dunkel | 3 | 2 | 1 |
+| 1440 hell | 3 | 2 | 1 |
+| 1440 dunkel | 3 | 2 | 1 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 1 · Punkt 1 · Kopf zeigt rechts einen zusätzlichen Knopf „Anmelden“; das Board zeigt im Handy-Kopf nur das Logo „Agrilo“ · .nachtlauf/screens/schluss/abmelden/1-390-hell.png
+- 390 dunkel · Bild 1 · Punkt 1 · zusätzlicher Knopf „Anmelden“ im Handy-Kopf, Board nur Logo · .nachtlauf/screens/schluss/abmelden/1-390-dunkel.png
+- 390 hell · Bild 3 · Punkt 1 · zusätzlicher Knopf „Anmelden“ im Handy-Kopf, Board nur Logo · .nachtlauf/screens/schluss/abmelden/3-390-hell.png
+- 390 dunkel · Bild 3 · Punkt 1 · zusätzlicher Knopf „Anmelden“ im Handy-Kopf, Board nur Logo · .nachtlauf/screens/schluss/abmelden/3-390-dunkel.png
+- 390 hell · Bild 1 · Punkt 1 · Fußlinks „Impressum · Datenschutz · AGB · Problem melden“ ohne Unterstreichung und blasser; im Board unterstrichen · .nachtlauf/screens/schluss/abmelden/1-390-hell.png
+- 390 dunkel · Bild 1 · Punkt 1 · Fußlinks ohne Unterstreichung; im Board unterstrichen · .nachtlauf/screens/schluss/abmelden/1-390-dunkel.png
+- 390 hell · Bild 3 · Punkt 1 · Fußlinks ohne Unterstreichung; im Board unterstrichen · .nachtlauf/screens/schluss/abmelden/3-390-hell.png
+- 390 dunkel · Bild 3 · Punkt 1 · Fußlinks ohne Unterstreichung; im Board unterstrichen · .nachtlauf/screens/schluss/abmelden/3-390-dunkel.png
+- 390 hell · Bild 1 · Punkt 1 · Abstand Karte → Trennlinie des Fußes deutlich größer (Board: Linie direkt unter der Karte, ca. 10 px; App: ca. 40 px) · .nachtlauf/screens/schluss/abmelden/1-390-hell.png
+- 390 hell · Bild 1 · Punkt 1 · untere Leiste: Beschriftung „Warenkorb“ dünn/normal und dichter am Knopf; im Board fett wie „Entdecken“/„Bestellungen“ (gilt in allen 390-Bildern) · .nachtlauf/screens/schluss/abmelden/1-390-hell.png
+- 1440 hell · Bild 1 · Punkt 1 · Seitenfuß zeigt links zusätzlich das Logo „Agrilo“ vor „Höfe entdecken“; das Board zeigt dort kein Logo · .nachtlauf/screens/schluss/abmelden/1-1440-hell.png
+- 1440 dunkel · Bild 1 · Punkt 1 · zusätzliches Logo „Agrilo“ im Seitenfuß · .nachtlauf/screens/schluss/abmelden/1-1440-dunkel.png
+- 1440 hell · Bild 3 · Punkt 1 · zusätzliches Logo „Agrilo“ im Seitenfuß · .nachtlauf/screens/schluss/abmelden/3-1440-hell.png
+- 1440 dunkel · Bild 3 · Punkt 1 · zusätzliches Logo „Agrilo“ im Seitenfuß · .nachtlauf/screens/schluss/abmelden/3-1440-dunkel.png
+- 1440 hell · Bild 1 · Punkt 1 · Fuß breiter als im Board und nicht an der Karte ausgerichtet (Board: Trennlinie und Fußlinks beginnen bündig mit der Karte bei x≈221 und enden bei x≈1221; App: Fuß von x≈137 bis x≈1289, Karte beginnt bei x≈213) · .nachtlauf/screens/schluss/abmelden/1-1440-hell.png
+- 1440 dunkel · Bild 3 · Punkt 1 · Fuß breiter und nicht bündig mit der Karte (wie oben) · .nachtlauf/screens/schluss/abmelden/3-1440-dunkel.png
+- 1440 hell · Bild 3 · Punkt 5 · Fokusrahmen um „Abonnements verwalten“: Board eckiger Rahmen mit Innenabstand um den Link; App abgerundeter Rahmen, Text liegt fast am Rand · .nachtlauf/screens/schluss/abmelden/3-1440-hell.png
+- 1440 dunkel · Bild 3 · Punkt 5 · Fokusrahmen um „Abonnements verwalten“ abgerundet statt eckig mit Innenabstand · .nachtlauf/screens/schluss/abmelden/3-1440-dunkel.png
+- 390 hell · Bild 1 · Punkt 2 · Fließtext: Board „…von den Neuigkeiten von **Hof Müller** abmelden?“, App „…von den Neuigkeiten dieses Hofs abmelden?“ (Hofname fehlt, nicht fett). Vermutlich durch das ungültige Prüf-Token bedingt (Hof unbekannt); mit gültigem Link nachprüfen, gilt ebenso für 390 dunkel und 1440 hell/dunkel · .nachtlauf/screens/schluss/abmelden/1-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslink „Vertrag widerrufen“ (Handy und Web) – Register N22/N39 (Recht vor Board).
+- Seitenfuß am Handy mit „Darstellung“-Knopf – Register N22/N39 (entspricht auch dem Board).
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand (scrollbar-gutter) in allen App-Bildern.
+- Logo-Bildmarke („A“ mit Blatt statt grünem Quadrat) – Platzhalter im Board, keine Abweichung gewertet.
+
+Nicht prüfbar:
+- Bild 2 (390/1440, hell/dunkel): ‚Abgemeldet‘ braucht einen gültigen signierten Abmelde-Link aus einer Mail; Tokens werden nicht selbst erzeugt
+
+### anmelden
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | 3 | 4 | 0 |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | 3 | 4 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Kopf: App zeigt rechts einen zusätzlichen Knopf „Anmelden“; im Board steht im Handy-Kopf nur das Logo · .nachtlauf/screens/schluss/anmelden/1-390-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Kopf: derselbe zusätzliche Knopf „Anmelden“ · .nachtlauf/screens/schluss/anmelden/2-390-hell.png
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Feld „Passwort“ hat rechts ein zusätzliches Augen-Symbol (Passwort zeigen); das Board zeigt ein leeres Feld ohne Symbol · .nachtlauf/screens/schluss/anmelden/1-390-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Feld „Passwort“ mit zusätzlichem Augen-Symbol, im Board ohne · .nachtlauf/screens/schluss/anmelden/1-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Fehlerzustand: Felder „E-Mail“ und „Passwort“ haben in der App einen roten bzw. orangen Fehlerrahmen; im Board bleiben beide Felder neutral umrandet (nur der Hinweis-Kasten ist rot) · .nachtlauf/screens/schluss/anmelden/2-390-hell.png
+- 1440 hell/dunkel · Bild 2 · Punkt 1 · Fehlerzustand: dieselben roten Feldrahmen an „E-Mail“ und „Passwort“, im Board neutral; Passwortfeld zusätzlich mit Augen-Symbol · .nachtlauf/screens/schluss/anmelden/2-1440-hell.png
+- 390/1440 hell/dunkel · Bild 2 · Punkt 1 · Hinweis-Kasten „E-Mail oder Passwort falsch.“ deutlich stärker gerundet (fast Pillenform) als im Board (kleiner Radius wie die Felder) · .nachtlauf/screens/schluss/anmelden/2-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 1 · Seitenfuß: App zeigt links zusätzlich das Agrilo-Logo und läuft breiter (etwa 137–1289 px) als im Board, wo der Fuß ohne Logo auf Inhaltsbreite (etwa 273–1169 px) steht · .nachtlauf/screens/schluss/anmelden/1-1440-hell.png
+- 390 hell/dunkel · Bild 1 · Punkt 1 · Unter „Admin-Anmeldung“ fehlt die Trennlinie, die das Board über der unteren Leiste zeigt · .nachtlauf/screens/schluss/anmelden/1-390-hell.png
+- 390 hell/dunkel · Bild 1, 2 · Punkt 4 · Untere Leiste: Beschriftung „Warenkorb“ in der App blasser (grau) als „Entdecken“/„Bestellungen“, im Board gleich dunkel; runder Warenkorb-Knopf größer als im Board · .nachtlauf/screens/schluss/anmelden/1-390-hell.png
+- 390/1440 hell/dunkel · Bild 4 · Punkt 1 · Karte „Mit Ersatzcode anmelden“ deutlich stärker gerundet als im Board · .nachtlauf/screens/schluss/anmelden/4-390-hell.png
+- 390/1440 hell/dunkel · Bild 3, 4 · Punkt 1 · Marke „Admin“ im Kopf mit sichtbarem Rand; im Board flächig ohne Rand · .nachtlauf/screens/schluss/anmelden/3-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 5 · Fokus: Board zeigt den Fokusring am Feld „Passwort“ der Hof-Karte, App am Feld „E-Mail“ der Kunden-Karte (erstes Bedienelement laut Bildtitel; Fokus selbst gut sichtbar) – Abweichung vom Board-Bild, vermutlich durch die im Board vorbelegte E-Mail · .nachtlauf/screens/schluss/anmelden/1-1440-hell.png
+- 390 hell/dunkel · Bild 3, 4 · Punkt 1 · Knopftext „Mit Passkey anmelden“ und Einleitungstext etwas anders gesetzt (Knopftext kleiner, Einleitung bricht auf vier statt drei Zeilen) · .nachtlauf/screens/schluss/anmelden/3-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslinks inklusive „Vertrag widerrufen“ (1440, Bild 1/2) – Register N22/N39 (Recht vor Board).
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand (Bildlaufleiste, `scrollbar-gutter: stable`) in allen App-Bildern.
+- Beispieldaten: E-Mail bauer@example.com bzw. leeres Feld statt franz.mueller@beispiel.at, andere Passwortlänge – Platzhalter, keine Abweichung.
+
+Nicht prüfbar:
+- keine (alle 16 App-Bilder erreichbar).
+
+### fehlerseiten
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 5 | 1 |
+| 390 dunkel | 3 | 5 | 1 |
+| 1440 hell | 3 | 5 | 1 |
+| 1440 dunkel | 3 | 5 | 1 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 5 · Punkt 1 · Seitenkopf fehlt ganz: Board zeigt oben den Kopf „Heute“ mit Unterzeile „Hof Müller · Stand <Datum>“, die App beginnt direkt mit dem Warn-Symbol · .nachtlauf/screens/schluss/fehlerseiten/5-390-hell.png
+- 390 dunkel · Bild 5 · Punkt 1 · wie hell: Seitenkopf „Heute“ mit Stand-Zeile fehlt · .nachtlauf/screens/schluss/fehlerseiten/5-390-dunkel.png
+- 1440 hell · Bild 4 · Punkt 1 · Kopf anders: Board zeigt Kopf mit „Höfe entdecken · So funktioniert’s · Für Höfe · Meine Bestellungen“ und Knopf „Anmelden“; App zeigt Suchfeld „Hof oder Produkt suchen …“ im Kopf, nur „Höfe entdecken“ und „Meine Bestellungen“ und ein Personen-Symbol statt „Anmelden“ · .nachtlauf/screens/schluss/fehlerseiten/4-1440-hell.png
+- 1440 dunkel · Bild 4 · Punkt 1 · wie hell: Kunden-Kopf mit Suchfeld, zwei statt vier Menüpunkten, Personen-Symbol statt „Anmelden“ · .nachtlauf/screens/schluss/fehlerseiten/4-1440-dunkel.png
+- 390 hell · Bild 1–3 · Punkt 1 · zusätzlicher Knopf „Anmelden“ rechts im Handy-Kopf; Board zeigt dort nur das Logo · .nachtlauf/screens/schluss/fehlerseiten/1-390-hell.png
+- 390 hell · Bild 4 · Punkt 1 · zusätzliches Personen-Symbol rechts im Handy-Kopf; Board zeigt nur das Logo · .nachtlauf/screens/schluss/fehlerseiten/4-390-hell.png
+- 390 dunkel · Bild 1–4 · Punkt 1 · wie hell: „Anmelden“ (1–3) bzw. Personen-Symbol (4) im Kopf, im Board nicht vorhanden · .nachtlauf/screens/schluss/fehlerseiten/1-390-dunkel.png
+- 390 hell · Bild 1–5 · Punkt 4 · Zweitknopf („Höfe entdecken“, „Zur Startseite“, „Zu Heute“) mit kaum sichtbarem hellem Rand; Board zeigt einen dunklen, deutlichen Rand · .nachtlauf/screens/schluss/fehlerseiten/2-390-hell.png
+- 390 dunkel · Bild 1–5 · Punkt 4 · Zweitknopf mit sehr schwachem Rand, im Board heller, deutlicher Rand · .nachtlauf/screens/schluss/fehlerseiten/3-390-dunkel.png
+- 1440 hell · Bild 1–5 · Punkt 4 · Zweitknopf mit schwachem hellem Rand statt deutlichem dunklem Rand wie im Board · .nachtlauf/screens/schluss/fehlerseiten/1-1440-hell.png
+- 1440 dunkel · Bild 1–5 · Punkt 4 · Zweitknopf fast randlos, Board zeigt hellen Rand · .nachtlauf/screens/schluss/fehlerseiten/2-1440-dunkel.png
+- 390 hell · Bild 3 · Punkt 2 · Hauptknopf heißt „Zum Hof“, Board „Zu Hof Müller“ (Hofname fehlt im Knopf) · .nachtlauf/screens/schluss/fehlerseiten/3-390-hell.png
+- 390 dunkel · Bild 3 · Punkt 2 · „Zum Hof“ statt „Zu Hof <Hofname>“ · .nachtlauf/screens/schluss/fehlerseiten/3-390-dunkel.png
+- 1440 hell · Bild 3 · Punkt 2 · „Zum Hof“ statt „Zu Hof <Hofname>“ · .nachtlauf/screens/schluss/fehlerseiten/3-1440-hell.png
+- 1440 dunkel · Bild 3 · Punkt 2 · „Zum Hof“ statt „Zu Hof <Hofname>“ · .nachtlauf/screens/schluss/fehlerseiten/3-1440-dunkel.png
+- 1440 hell · Bild 2, 3 · Punkt 1 · Überschrift bricht in zwei Zeilen um („Diesen Hof gibt es / hier nicht (mehr)“, „Dieses Produkt gibt / es hier nicht (mehr)“), Board einzeilig; Inhalt rutscht dadurch nach unten · .nachtlauf/screens/schluss/fehlerseiten/2-1440-hell.png
+- 1440 dunkel · Bild 2, 3 · Punkt 1 · wie hell: Überschrift zweizeilig statt einzeilig · .nachtlauf/screens/schluss/fehlerseiten/3-1440-dunkel.png
+- 390 hell · Bild 1–4 · Punkt 1 · Überschrift schmaler gesetzt und kleiner wirkend, bricht anders um („Diese Seite gibt / es nicht (mehr)“ statt „Diese Seite gibt es nicht / (mehr)“) · .nachtlauf/screens/schluss/fehlerseiten/1-390-hell.png
+- 1440 hell · Bild 1–4 · Punkt 1 · Seitenfuß mit zusätzlichem Agrilo-Logo links; Board zeigt nur die Links · .nachtlauf/screens/schluss/fehlerseiten/1-1440-hell.png
+- 1440 dunkel · Bild 1–4 · Punkt 1 · wie hell: zusätzliches Logo im Seitenfuß · .nachtlauf/screens/schluss/fehlerseiten/1-1440-dunkel.png
+- 390 hell · Bild 1–4 · Punkt 1 · Fußlinks (Impressum, Datenschutz, AGB, Problem melden) ohne Unterstreichung, Board unterstrichen · .nachtlauf/screens/schluss/fehlerseiten/2-390-hell.png
+- 390 dunkel · Bild 1, 4 · Punkt 1 · Knopf „Darstellung: dunkel“ wird vom runden Warenkorb-Knopf der unteren Leiste überdeckt („Darstellung: dur…“/„dunl…“); im Board steht er frei · .nachtlauf/screens/schluss/fehlerseiten/1-390-dunkel.png
+- 390 hell · Bild 1, 4 · Punkt 1 · „Darstellung: hell“ von unterer Leiste/Warenkorb-Knopf angeschnitten · .nachtlauf/screens/schluss/fehlerseiten/4-390-hell.png
+- 1440 hell · Bild 5 · Punkt 2 · Seitenleiste „Konto · Franz Müller“ statt „Konto“ (zusätzlicher Name in der Zeile) · .nachtlauf/screens/schluss/fehlerseiten/5-1440-hell.png
+- 390/1440 hell+dunkel · Bild 1 · Punkt 1 · sichtbare Beschriftung „Hof oder Produkt suchen“ über dem Suchfeld, im Board nicht vorhanden (vermutlich durch Maßstab Punkt 3 „Felder mit sichtbarer Beschriftung“ gedeckt, aber nicht als Ausnahme geführt) · .nachtlauf/screens/schluss/fehlerseiten/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslinks, zusätzlicher Link „Vertrag widerrufen“ (Handy und Web), am Handy mit „Darstellung“-Knopf – Register N22/N39 (Recht vor Board).
+- Fußlinks, Textlinks und „Problem melden“ als Textlink sichtbar kleiner als 44 px – zulässig (Trefferfläche über ::before).
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand in allen 1440- und 390-Bildern (Bildlaufleiste, `scrollbar-gutter: stable`).
+- Beispieldaten ohne Abzug: Fehlernummer (Manifest: „Fehlernummer weicht vom Board ab“), Zähler an „Bestellungen“/„Postfach“, Gründungshof-Frist, aktiver Reiter „Mein Hof“ statt „Heute“ (andere Route), Logo-Platzhalter im Board.
+
+Nicht prüfbar:
+- Bild 6 (390/1440, hell/dunkel): global-error erscheint nur, wenn das Root-Layout selbst fehlschlägt; das nutzt keine Datenbank, ohne Codeänderung nicht herstellbar
+- Hinweis Messung (nicht Bildvergleich): Bild 4, 1440 hell/dunkel – Suchfeld im Kunden-Kopf 340 × 38 px, unter 44 px (Skript-Messung im Manifest)
+
+### kundenkonto
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 5 | 0 |
+| 390 dunkel | 3 | 5 | 0 |
+| 1440 hell | 2 | 5 | 0 |
+| 1440 dunkel | 2 | 5 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Kopf angemeldet anders als Board: App zeigt Suchfeld „Hof oder Produkt suchen …“ links neben der Navigation (Board: keins), Navigation nur „Höfe entdecken“, „Meine Bestellungen“ (Board: „Höfe entdecken“, „So funktioniert’s“, „Für Höfe“, „Meine Bestellungen“), rechts runder Personen-Knopf ohne Text statt Knopf „Mein Konto“ · .nachtlauf/screens/schluss/kundenkonto/3-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/3-1440-dunkel.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · derselbe abweichende Kopf (Suchfeld, zwei Navigationslinks fehlen, Personen-Knopf statt „Mein Konto“) · .nachtlauf/screens/schluss/kundenkonto/4-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/4-1440-dunkel.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · derselbe abweichende Kopf (Suchfeld, zwei Navigationslinks fehlen, Personen-Knopf statt „Mein Konto“) · .nachtlauf/screens/schluss/kundenkonto/5-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/5-1440-dunkel.png
+- 390 hell/dunkel · Bild 1 · Punkt 1 · zusätzlicher Knopf „Anmelden“ rechts im Kopf der Anmeldeseite; Board zeigt dort keinen Knopf · .nachtlauf/screens/schluss/kundenkonto/1-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/1-390-dunkel.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · zusätzlicher Knopf „Anmelden“ rechts im Kopf (wie Bild 1) · .nachtlauf/screens/schluss/kundenkonto/2-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/2-390-dunkel.png
+- 390 hell/dunkel · Bild 5 · Punkt 6 · Leerzustand „Du hast noch keine Neuigkeiten abonniert.“: Board gestrichelter Rahmen, App durchgezogener Rahmen (normale Karte) · .nachtlauf/screens/schluss/kundenkonto/5-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/5-390-dunkel.png
+- 1440 hell/dunkel · Bild 5 · Punkt 6 · Leerzustand-Karte: Board gestrichelter Rahmen, App durchgezogener Rahmen · .nachtlauf/screens/schluss/kundenkonto/5-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/5-1440-dunkel.png
+- 390/1440 hell/dunkel · Bild 5 · Punkt 1 · App zeigt unter den Geräten zusätzlich den Block „KONTO“ (Angemeldet als …, „Konto und alle Neuigkeiten-Abos löschen (DSGVO)“); Board 5 geht nach dem Geräte-Hinweis direkt in den Seitenfuß. Board 3/4 zeigen den Block auf derselben Seite – vermutlich Lücke im Board, bitte klären · .nachtlauf/screens/schluss/kundenkonto/5-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/5-1440-hell.png
+- 390/1440 hell/dunkel · Bild 2 · Punkt 1 · „Code erneut senden (… s)“ und „Andere E-Mail-Adresse“ sichtbar kleiner als im Board (Board etwa 16 px, App etwa 14 px), Abstand dazwischen kleiner · .nachtlauf/screens/schluss/kundenkonto/2-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/2-1440-hell.png
+- 390 hell · Bild 3 · Punkt 4 · ausgeschalteter Schalter „WhatsApp-Neuigkeiten“: App heller Knopf auf heller Spur, kaum vom Kartengrund zu unterscheiden; Board grauer Knopf mit sichtbarer Kontur · .nachtlauf/screens/schluss/kundenkonto/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 4 · derselbe ausgeschaltete Schalter mit sehr schwachem Kontrast (Board: dunkelgrauer Knopf) · .nachtlauf/screens/schluss/kundenkonto/3-1440-hell.png
+- 390/1440 hell · Bild 3/4/5 · Punkt 4 · Rahmen von „Konto und alle Neuigkeiten-Abos löschen (DSGVO)“ und „Konto löschen“ hell-orange und blass; Board kräftiger braun-orange Rahmen · .nachtlauf/screens/schluss/kundenkonto/4-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/5-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/4-390-hell.png
+- 390 hell/dunkel · Bild 1/2/5 · Punkt 1 · Fußlinks „Impressum“, „Datenschutz“, „AGB“, „Problem melden“ ohne Unterstreichung; Board unterstreicht sie · .nachtlauf/screens/schluss/kundenkonto/1-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/1-390-dunkel.png
+- 1440 hell/dunkel · Bild 1–5 · Punkt 1 · Seitenfuß breiter als der Inhalt und mit Agrilo-Logo vorn; Board: Fuß ohne Logo, bündig mit der Inhaltsbreite · .nachtlauf/screens/schluss/kundenkonto/1-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/3-1440-dunkel.png
+- 390/1440 hell/dunkel · Bild 3/5 · Punkt 2 · Geräte-Zeile Untertitel „dieses Gerät · angemeldet seit 6.11.“; Board „zuletzt heute“ (fester Satzbau, nicht nur Beispieldatum) · .nachtlauf/screens/schluss/kundenkonto/3-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/5-1440-hell.png
+- 390 dunkel · Bild 2 · Punkt 1 · Knopf „Darstellung: dunkel“ am Bildende vom Warenkorb-Knopf der unteren Leiste überdeckt (Board: frei über der Leiste); wohl nur Bildausschnitt, Abstand unten prüfen · .nachtlauf/screens/schluss/kundenkonto/2-390-dunkel.png
+- 1440 hell/dunkel · Bild 1/2 · Punkt 1 · Passwortfeld der Hof-Anmeldung mit zusätzlichem Augen-Symbol (Passwort zeigen); Board ohne · .nachtlauf/screens/schluss/kundenkonto/1-1440-hell.png, .nachtlauf/screens/schluss/kundenkonto/2-1440-dunkel.png
+- 390 hell/dunkel · Bild 3 · Punkt 1 · Schalter etwas kleiner als im Board; Personen-Symbol im Kopf mit gefülltem Kreis (Board: Symbol ohne Kreis) · .nachtlauf/screens/schluss/kundenkonto/3-390-hell.png, .nachtlauf/screens/schluss/kundenkonto/3-390-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board (N39/N22): Fußlink „Vertrag widerrufen“ in allen Bildern (390 als eigene Zeile, 1440 am Ende der Rechtslinks).
+- Register N22/N39: Seitenfuß mit Rechtslinks, am Handy mit Knopf „Darstellung: hell/dunkel“.
+- Register S18: Knopf „Überall abmelden“ für Kundinnen (Bild 3, 4, 5).
+- Startfokus beim Löschen auf „Abbrechen“ sichtbar, im Dialog (Bild 4, alle Fassungen) – wie Maßstab Punkt 5 verlangt.
+- Umgebung: etwa 15 px breiter Streifen am rechten Rand (Bildlaufleiste, `scrollbar-gutter: stable`), in Bild 4 bei abgedunkeltem Hintergrund als heller bzw. ungedämpfter Rand sichtbar – keine Abweichung.
+
+Nicht prüfbar:
+- keine (alle 20 App-Bilder im Manifest erreichbar).
+
+### neuigkeiten
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 4 | 1 | 3 |
+| 390 dunkel | 4 | 1 | 3 |
+| 1440 hell | 4 | 1 | 3 |
+| 1440 dunkel | 4 | 1 | 3 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- alle Fassungen · Bild 4 · Punkt 6 · Die Board-Variante „Link abgelaufen“ ist nicht aufgenommen; die App zeigt die Variante „Link nicht gültig“ (falsches Token, siehe Manifest). Überschrift Board „Der Link ist abgelaufen“, App „Das hat nicht geklappt“; Kastentitel Board „Er gilt 7 Tage.“, App „Dieser Link ist nicht gültig. Vielleicht wurde er beim Kopieren abgeschnitten.“ Der Wortlaut der Board-Variante ist damit nicht belegt (nicht als Wortmangel der Seite gezählt, aber Zustand nicht gleich nachgewiesen) · .nachtlauf/screens/schluss/neuigkeiten/4-390-hell.png
+- alle Fassungen · Bild 4 · Punkt 1 · Hinweis-Kasten deutlich runder als im Board (App etwa 20–24 px Eckradius, Board etwa 12 px) · .nachtlauf/screens/schluss/neuigkeiten/4-1440-hell.png
+- alle Fassungen · Bild 4 · Punkt 1 · Kastentitel in der App größer und mit mehr Zeilenabstand als „Er gilt 7 Tage.“ im Board (teils durch den längeren Text der anderen Variante) · .nachtlauf/screens/schluss/neuigkeiten/4-390-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · Inhaltsspalte schmaler als im Board (App etwa 490 px, x 469–957; Board etwa 520 px, x 461–981); Überschrift sitzt etwas tiefer (Abstand zum Kopf größer) · .nachtlauf/screens/schluss/neuigkeiten/4-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · Fußlink „Vertrag widerrufen“ steht links bei x≈137, nicht an der Inhaltsspalte ausgerichtet; wirkt losgelöst von der Seite (Vorhandensein ist Ausnahme, die Lage nicht) · .nachtlauf/screens/schluss/neuigkeiten/4-1440-dunkel.png
+- 1440 hell/dunkel · Bild 4 · Punkt 5 · Fokus auf „Mein Konto“: Board zeigt eine dicke grüne Umrandung am Knopf selbst, App zeigt dünnen Rand plus abgesetzten Außenring (Doppellinie). Sichtbar, aber andere Form · .nachtlauf/screens/schluss/neuigkeiten/4-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · „← Zur Startseite“: im Board ist der Pfeil Teil des unterstrichenen Links, in der App steht der Pfeil getrennt und nicht unterstrichen (klein) · .nachtlauf/screens/schluss/neuigkeiten/4-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslink „Vertrag widerrufen“ (Register N22/N39, Recht vor Board), in allen vier Fassungen; am Handy ohne sichtbaren „Darstellung“-Knopf.
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (scrollbar-gutter) in allen Fassungen.
+- Markenzeichen im Kopf (App mit Buchstaben-Mark statt leerem Platzhalter-Quadrat im Board) – Platzhalter, keine Abweichung.
+
+Nicht prüfbar:
+- Bild 1 (390/1440, hell/dunkel): ‚Anmeldung bestätigen‘ braucht einen gültigen signierten Link aus der Bestätigungs-Mail
+- Bild 2 (390/1440, hell/dunkel): ‚Bestätigt‘ braucht einen gültigen signierten Link aus einer Mail
+- Bild 3 (390/1440, hell/dunkel): ‚Schon angemeldet‘ braucht einen gültigen signierten Link und ein bereits bestätigtes Abo
+- Bild 4, Variante „Der Link ist abgelaufen (7 Tage)“: Falsches Token ?token=abc: die App zeigt ‚Das hat nicht geklappt – Link nicht gültig‘, nicht die Variante ‚Der Link ist abgelaufen (7 Tage)‘ (Aufbau und Form dennoch bewertet)
+
+### passwort
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 5 | 0 |
+| 390 dunkel | 3 | 5 | 0 |
+| 1440 hell | 3 | 5 | 0 |
+| 1440 dunkel | 3 | 5 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 1440 hell/dunkel · Bild 3 · Punkt 6 · Zustand „Neues Passwort“ zeigt beim leeren Formular schon die Fehlermeldung „Bitte alle Passwort-Anforderungen erfüllen.“ und einen roten Feldrand im Feld „Neues Passwort“; das Board zeigt im Zustand 3 keinen Fehler · .nachtlauf/screens/schluss/passwort/3-1440-hell.png, .nachtlauf/screens/schluss/passwort/3-1440-dunkel.png
+- alle Fassungen · Bild 3 · Punkt 2 · Unterzeile „Für dein Agrilo-Konto.“ unter der Überschrift „Neues Passwort wählen“ fehlt in der App · .nachtlauf/screens/schluss/passwort/3-390-hell.png, .nachtlauf/screens/schluss/passwort/3-390-dunkel.png, .nachtlauf/screens/schluss/passwort/3-1440-hell.png, .nachtlauf/screens/schluss/passwort/3-1440-dunkel.png
+- alle Fassungen · Bild 4 · Punkt 2 · Unterzeile „Für dein Agrilo-Konto.“ fehlt ebenso · .nachtlauf/screens/schluss/passwort/4-390-hell.png, .nachtlauf/screens/schluss/passwort/4-390-dunkel.png, .nachtlauf/screens/schluss/passwort/4-1440-hell.png, .nachtlauf/screens/schluss/passwort/4-1440-dunkel.png
+- alle Fassungen · Bild 3 und 4 · Punkt 1 · zusätzlicher Knopf „Passwort zeigen“ (Augen-Symbol) rechts in beiden Passwortfeldern; das Board zeigt die Felder ohne Bedienelement · .nachtlauf/screens/schluss/passwort/3-390-hell.png, .nachtlauf/screens/schluss/passwort/4-1440-hell.png (gleich in allen Fassungen)
+- 1440 hell/dunkel · Bild 4 · Punkt 5 · Board zeigt den Fokus auf dem fehlerhaften Feld „Passwort wiederholen“; die App hat den Fokus auf „Neues Passwort“ mit blau markiertem Inhalt (Textauswahl) · .nachtlauf/screens/schluss/passwort/4-1440-hell.png, .nachtlauf/screens/schluss/passwort/4-1440-dunkel.png
+- alle Fassungen · Bild 3 und 4 · Punkt 1 · Anforderungsliste (Mindestens 8 Zeichen …) sichtbar kleiner und enger gesetzt als im Board, Abstand zu „Passwort wiederholen“ und zum Knopf „Passwort speichern“ größer · .nachtlauf/screens/schluss/passwort/4-390-hell.png, .nachtlauf/screens/schluss/passwort/4-1440-hell.png
+- alle Fassungen · Bild 2 und 5 · Punkt 1 · Karten („Schau in deine E-Mails“, „Dieser Link ist ungültig oder abgelaufen.“) mit deutlich stärker gerundeten Ecken als im Board (etwa 24 px statt etwa 14 px) · .nachtlauf/screens/schluss/passwort/2-390-hell.png, .nachtlauf/screens/schluss/passwort/5-1440-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 1 · Fließtext der Erfolgskarte etwas größer (bricht anders um: „Der Link / ist 1 Stunde …“), Link „Zurück zur Anmeldung“ in der Karte kleiner als im Board · .nachtlauf/screens/schluss/passwort/2-390-hell.png, .nachtlauf/screens/schluss/passwort/2-390-dunkel.png
+- 1440 hell/dunkel · Bild 1–5 · Punkt 1 · Formularspalte etwas schmaler als im Board (etwa 488 px statt etwa 520 px) · .nachtlauf/screens/schluss/passwort/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board (N39/N22): Link „Vertrag widerrufen“ unter dem Inhalt in allen Bildern und Fassungen (am Web links außerhalb der Formularspalte).
+- Umgebung: etwa 15 px breiter Streifen am rechten Rand (Bildlaufleiste) in allen App-Bildern.
+- Beispieldaten: Feld „E-Mail“ in der App leer mit Platzhalter „name@beispiel.at“, im Board ausgefüllt; in Bild 3 (390) Passwortfelder leer, daher Anforderungsliste mit leeren Kreisen statt Haken (erfüllter Zustand in Bild 4 sichtbar und gleich).
+
+Nicht prüfbar:
+- keine
+
+### rechtstexte
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 6 | 0 |
+| 390 dunkel | 3 | 6 | 0 |
+| 1440 hell | 3 | 6 | 0 |
+| 1440 dunkel | 3 | 6 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell/dunkel · Bild 4 · Punkt 1 · Impressum anders aufgebaut: Board zeigt Kopf „RECHTLICHES“ + h1 + Unterzeile „Angaben gemäß § 5 ECG (Österreich) · Stand …“ und darunter eine Karte mit Zeilen Betreiber / Anschrift / E-Mail / UID-Nummer / Firmenbuch / Aufsichtsbehörde (Werte rechts, Platzhalter gestrichelt); App zeigt ohne Kopfzeile „RECHTLICHES“ eine h2 „Angaben gemäß § 5 ECG (Österreich)“, einen zusätzlichen orangen Warnkasten „Pilotbetrieb …“ und den Betreiber als Fließtext-Block „Betreiber der Plattform:“; die Karte und die Zeilen UID-Nummer, Firmenbuch, Aufsichtsbehörde fehlen · .nachtlauf/screens/schluss/rechtstexte/4-390-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 1 · wie am Handy: keine Schlüssel-Wert-Karte, Betreiber als Fließtext, keine Zeilen UID/Firmenbuch/Aufsichtsbehörde · .nachtlauf/screens/schluss/rechtstexte/4-1440-hell.png
+- 390 hell/dunkel · Bild 5 · Punkt 1 · Karte „Aktion 12 Gründungshöfe“ fehlt unter den Tarif-Karten; in der App folgt auf „Hofladen“ direkt der Abschnitt „Servicegebühr und Abrechnung“ · .nachtlauf/screens/schluss/rechtstexte/5-390-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 6 · Verzeichnis-Spalte ohne gewählten Punkt: Board hebt den aktuellen Abschnitt grün und fett hervor („8. Preise und Plattformgebühr“ bzw. „15. Tarife, Plattformgebühr, Abrechnung“), App hebt keinen Eintrag hervor; bei #punkt-17 ist der gewählte Eintrag in der (intern gescrollten) Spalte nicht einmal sichtbar, sie endet bei „13. Stornieren vor der …“ · .nachtlauf/screens/schluss/rechtstexte/2-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 6 · Datenschutz-Verzeichnis ebenfalls ohne hervorgehobenen Abschnitt (Board: „14. SEPA-Lastschrift für Höfe“ grün) · .nachtlauf/screens/schluss/rechtstexte/3-1440-hell.png
+- alle Fassungen · Bild 1–6 · Punkt 1 · Marke „Entwurf, Anwältin prüft“ neben/unter der Stand-Zeile fehlt auf AGB, Datenschutz, Impressum und Konditionen (AGB nennt „Entwurf“ nur im Fließtext der Fassungszeile) · .nachtlauf/screens/schluss/rechtstexte/1-390-hell.png
+- 390 hell/dunkel · Bild 1–6 · Punkt 1 · Kopf am Handy mit zusätzlichem Knopf „Anmelden“ rechts; Board zeigt dort nur das Logo · .nachtlauf/screens/schluss/rechtstexte/1-390-hell.png
+- 1440 hell/dunkel · Bild 4, 5, 6 · Punkt 1 · Inhaltsspalte bei Impressum und Konditionen mittig gesetzt (beginnt bei x≈392) statt links bündig mit Kopf und Fuß (Board x≈221, Breite wie Tarif-Karten); Fuß breiter und mit zusätzlichem Logo links · .nachtlauf/screens/schluss/rechtstexte/6-1440-hell.png
+- 1440 hell/dunkel · Bild 6 · Punkt 5 · Board zeigt den Fokusring an „Hof registrieren“, im App-Bild ist kein Fokus sichtbar (in Bild 5 ist derselbe Ring an diesem Knopf sichtbar) · .nachtlauf/screens/schluss/rechtstexte/6-1440-dunkel.png
+- 1440 hell/dunkel · Bild 1–3 · Punkt 5 · Startfokus liegt auf „Drucken/Speichern“ statt auf dem ersten Eintrag der Verzeichnis-Spalte („Kurz erklärt“ bzw. „1. Verantwortliche Stelle“) wie im Board · .nachtlauf/screens/schluss/rechtstexte/1-1440-hell.png
+- 1440 hell/dunkel · Bild 4 · Punkt 5 · Fokus springt auf den E-Mail-Link im Inhalt (Seite dadurch gescrollt, h1 nicht im Bild) statt auf „Höfe entdecken“ im Kopf wie im Board · .nachtlauf/screens/schluss/rechtstexte/4-1440-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 6 · Fokus springt auf „Hof registrieren“, die Seite scrollt ans Ende; Tarif-Karten nebeneinander und Aktion-Karte (Board-Zustand „Tarife und Aktion“) sind im App-Bild nicht zu sehen · .nachtlauf/screens/schluss/rechtstexte/5-1440-hell.png
+- 1440 hell/dunkel · Bild 3 · Punkt 1 · Datenschutz-Verzeichnis: die letzten vier Einträge („Standortsuche und Kartendarstellung“, „Umkreissuche auf der Hofübersicht“, „Fehler- und Wunschmeldungen“, „Postfach“) ohne Nummer; Board nummeriert durchgehend (11.–15.) · .nachtlauf/screens/schluss/rechtstexte/3-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 1 · Verzeichnis-Spalte anders gesetzt: Teil-Überschriften („Teil A – Für alle“ …) klein, fett und grau als Zwischenzeilen statt in Eintragsgröße; Spalte läuft über den Bildrand und scrollt intern statt als geschlossene Karte zu enden · .nachtlauf/screens/schluss/rechtstexte/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 1 · h1 „Allgemeine Geschäftsbedingungen (AGB) von Agrilo“ bricht in zwei Zeilen um (Board: eine Zeile); Textspalte schmaler und h1 sichtbar größer · .nachtlauf/screens/schluss/rechtstexte/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1, 2 · Punkt 1 · zusätzliche Trennlinie zwischen „Kurz erklärt“-Karte und „Teil A“ · .nachtlauf/screens/schluss/rechtstexte/1-1440-hell.png
+- 390 hell/dunkel · Bild 6 · Punkt 3 · „Hof registrieren“ über die volle Breite; Board zeigt den Knopf in Inhaltsbreite (ca. 165 px) links · .nachtlauf/screens/schluss/rechtstexte/6-390-hell.png
+- 390 hell/dunkel · Bild 2 · Punkt 6 · App-Bild zeigt die Seite bei #punkt-17 statt Seitenanfang mit geschlossenem „Inhalt“; der Zustand „Inhalt zu“ ist nur im App-Bild 1 zu sehen (dort gleich wie Board, Pfeil als Winkel statt ▼) · .nachtlauf/screens/schluss/rechtstexte/2-390-hell.png
+- 390 hell/dunkel · Bild 3, 6 · Punkt 1 · Fußlinks (Impressum, Datenschutz, AGB, Problem melden) grau und ohne Unterstreichung; Board zeigt sie unterstrichen · .nachtlauf/screens/schluss/rechtstexte/6-390-hell.png
+- 390 hell/dunkel · Bild 1–6 · Punkt 4 · Beschriftung „Warenkorb“ in der unteren Leiste grau und schwächer als „Entdecken“/„Bestellungen“; Board zeigt alle drei gleich kräftig · .nachtlauf/screens/schluss/rechtstexte/1-390-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board: Wortlaut von AGB, Datenschutz, Impressum und Konditionen weicht ab (Fassung 0.9 statt 1.0, andere Punktnummern, Kurz-erklärt-Punkte, „Haftungsausschluss“, „Urheberrecht“, vier Aufnahme-Schritte, „€ 19 / Monat“, Stand-Zeilen) – nur Rahmen und Form bewertet.
+- Umgebung (Vorrendern): /konditionen und AGB zeigen „Servicegebühr“ statt „Plattformgebühr“ (Abschnitt „Servicegebühr und Abrechnung“, Tarif-Punkt 17).
+- Register K1 (vermutlich Satz KONDITIONEN_UEBERGANG): fetter Satz „In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027 …“ über den Tarif-Karten.
+- Register N22/N39: Seitenfuß mit Rechtslinks inkl. „Vertrag widerrufen“, am Handy mit Knopf „Darstellung: hell/dunkel“.
+- Inline-Links im Fließtext (Impressum, E-Mail-Adressen, /konditionen) und Fußlinks kleiner als 44 px.
+- Umgebung: etwa 15 px breiter leerer Streifen am rechten Rand (Bildlaufleiste).
+
+Nicht prüfbar:
+- keine (alle 24 App-Bilder erreichbar)
+
+### registrieren
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 4 | 2 |
+| 390 dunkel | 2 | 4 | 2 |
+| 1440 hell | 2 | 4 | 2 |
+| 1440 dunkel | 2 | 4 | 2 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- alle · Bild 3 · Punkt 6/1/2 · Board-Zustand „gerade registriert“ nicht gezeigt: Board flach ohne Karte mit „Wir haben dir einen Link an <E-Mail> geschickt …“, „Einrichten kannst du deinen Hof schon jetzt …“, Knopf „Weiter zum Einrichten“, „E-Mail erneut senden (45 s)“, Hinweis „Keine E-Mail da? …“; App zeigt eine Karte mit Brief-Symbol, Text „Öffne den Link aus unserer E-Mail …“ / „Du findest die E-Mail nicht mehr? Melde dich an …“ und Knopf „Anmelden“, ohne Erneut-senden und ohne Spam-Hinweis · .nachtlauf/screens/schluss/registrieren/3-390-hell.png (ebenso 3-390-dunkel, 3-1440-hell, 3-1440-dunkel)
+- 390 hell/dunkel · Bild 5 · Punkt 1 · Kopfleiste des Boards fehlt: Board hat Leiste mit Zurück-Pfeil, Titel „Hof einrichten“ und Unterzeile „<Hof> · Stand <Datum>“, darunter h2 „Willkommen“; App hat keine Leiste, große h1 „Hof einrichten“ mit Hofname als Unterzeile · .nachtlauf/screens/schluss/registrieren/5-390-hell.png
+- alle · Bild 6 · Punkt 6 · Board-Zustand „alle Schritte erledigt, wartet auf die Prüfung“ nicht gezeigt (Hinweis „Dein Hof wird noch geprüft — Kundinnen sehen ihn noch nicht“, „4 von 5“, Prüfung „wartet auf uns“); App zeigt „2 von 5“, Prüfung „kommt später“ mit Knopf „Online-Zahlung einrichten“ · .nachtlauf/screens/schluss/registrieren/6-1440-hell.png (ebenso 6-390-*, 6-1440-dunkel)
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Link „← Zurück“ über der h1 fehlt · .nachtlauf/screens/schluss/registrieren/5-1440-hell.png
+- 1440 hell/dunkel · Bild 5 · Punkt 1 · Inhaltsbreite größer als im Board: Hinweis-Kasten und Seitenspalte reichen bis ca. 1393 px statt ca. 1197 px · .nachtlauf/screens/schluss/registrieren/5-1440-hell.png
+- alle · Bild 5 · Punkt 1/2 · Hinweis-Kasten mit Zusatzzeile „Deine Hof-ID: …“ und Zusatz „– die Hof-ID ist in der Nachricht schon eingetragen.“ sowie Uhr-Symbol; Board zeigt nur Titel, Satz und Link. Am Handy bricht die Hof-ID mitten im Wort um („…d4n2 / 5“) · .nachtlauf/screens/schluss/registrieren/5-390-hell.png
+- 1440 hell/dunkel · Bild 5/6 · Punkt 2 · Tarife-Karte: Board „Die Plattformgebühr (6 %) steckt im Preis, den die Kundin zahlt – online wie bar.“; App „In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027 …“ und „Die Servicegebühr zahlt der Kunde – du behältst den vollen Warenpreis.“ (vermutlich Stand vor Stichtag, Board zeigt 3. März 2027; nach-Stichtag-Zustand nicht gezeigt) · .nachtlauf/screens/schluss/registrieren/5-1440-hell.png (ebenso 6-390-hell)
+- 1440 hell/dunkel · Bild 5/6 · Punkt 1 · zusätzliche Karte „Startphase: kostenlos · bis 31. Jänner 2027“ in der Seitenleiste, im Board nicht vorhanden · .nachtlauf/screens/schluss/registrieren/5-1440-hell.png
+- 1440 hell/dunkel · Bild 5/6 · Punkt 1 · Schritt „Hofseite einrichten“: Board Knopf „Weiter“ gefüllt orange (Hauptknopf); App heller Umriss-Knopf; dafür in der App zusätzlicher Hauptknopf „Mit Stripe einrichten“ bei „Online-Zahlung einrichten“ · .nachtlauf/screens/schluss/registrieren/6-1440-hell.png
+- 1440 hell/dunkel · Bild 5/6 · Punkt 2 · Online-Zahlung-Text: Board „Damit deine Kundinnen auch mit Karte, Apple Pay oder EPS zahlen können. Dauert etwa 10 Minuten.“; App „… zahlen können, richte bitte die Online-Zahlung ein. Dauert etwa 10 Minuten.“ · .nachtlauf/screens/schluss/registrieren/6-1440-hell.png
+- 1440 hell/dunkel · Bild 6 · Punkt 2 · Lastschrift-Text: Board „Ohne Lastschrift gibt es bei dir kein …“ / „brauchst du es nicht“; App „… bei dir ab dem Einzug kein …“ / „brauchst du sie nicht“; „Lastschrift einrichten“ ohne Unterstreichung, Info-Symbol als Umriss statt graue Scheibe · .nachtlauf/screens/schluss/registrieren/6-1440-hell.png
+- 390 hell/dunkel · Bild 1 · Punkt 1 · zusätzlicher Knopf „Anmelden“ rechts in der Kopfleiste; Board hat dort nichts und unten den Link „Schon dabei? Anmelden“ (im App-Bild nicht mehr sichtbar) · .nachtlauf/screens/schluss/registrieren/1-390-hell.png
+- alle · Bild 1 · Punkt 2 · Hilfetext unter dem Hofnamen: Board „Deine Adresse wird: agrilo.at/…“, App „Wird zu deiner Adresse: agrilo.at/…“ · .nachtlauf/screens/schluss/registrieren/1-1440-hell.png
+- alle · Bild 1 · Punkt 1 · zusätzlicher Auge-Knopf (Passwort zeigen) im Passwortfeld, im Board nicht vorhanden · .nachtlauf/screens/schluss/registrieren/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 2 · Seitenspalte Schritt 3: Board „mit Stripe, etwa 10 Minuten; für SEPA ist jetzt nichts zu tun“; App „über Stripe, etwa 10 Minuten – gehört zum Start; für SEPA ist jetzt nichts zu tun“ · .nachtlauf/screens/schluss/registrieren/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 2 · Board einteiliger Link „Schon dabei? Anmelden“; App „Schon dabei?“ als Text, nur „Anmelden“ als Link · .nachtlauf/screens/schluss/registrieren/1-1440-hell.png
+- 1440 hell/dunkel · Bild 1 · Punkt 5 · Fokus steht im Board am Feld „Name deines Hofs“, in der App am Link „Zurück zu Für Höfe“ in der Kopfleiste · .nachtlauf/screens/schluss/registrieren/1-1440-hell.png
+- 390/1440 dunkel · Bild 5 · Punkt 4 · Hinweis-Kasten: Titel und Text im Board in Akzentfarbe (orange), in der App in heller Grundschrift · .nachtlauf/screens/schluss/registrieren/5-1440-dunkel.png
+- 390 hell/dunkel · Bild 5/6 · Punkt 1 · untere Leiste: im Board ist „Mehr“ als aktiv hervorgehoben, in der App ist kein Eintrag aktiv · .nachtlauf/screens/schluss/registrieren/5-390-hell.png
+- alle · Bild 5 · Punkt 2 · h2 „Willkommen, Thomas“ statt „Willkommen“; Konto-Zeile der Seitenleiste „Konto · Thomas Weiz“ statt „Konto“ (1440) · .nachtlauf/screens/schluss/registrieren/5-1440-hell.png
+- 1440 hell/dunkel · Bild 5/6 · Punkt 1 · Hilfe-Karte: Knopf „E-Mail schreiben“ mit Brief-Symbol, dünner Rahmen und normale Schrift statt kräftigem Rahmen und fetter Schrift; „Konditionen ansehen“ ohne Unterstreichung · .nachtlauf/screens/schluss/registrieren/5-1440-hell.png
+- 390/1440 · Bild 3 · Punkt 1 · Link „Vertrag widerrufen“ (N39) sitzt am Web links außerhalb der Inhaltsspalte (x ≈ 137 px), nicht unter der Karte ausgerichtet · .nachtlauf/screens/schluss/registrieren/3-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register K1: Satz KONDITIONEN_UEBERGANG („In der Startphase kostenlos. Die Tarife gelten ab 1. Februar 2027 …“) über dem Registrieren-Formular; der Gründungshöfe-Kasten des Boards entfällt dafür (Bild 1, alle Fassungen).
+- Register O4: AGB-Karte „AGB bestätigen“ mit „Ich stimme den AGB zu“ / „AGB lesen“ im Onboarding (Bild 5).
+- Register N39 (Recht vor Board): Link „Vertrag widerrufen“ unter /verify (Bild 3).
+- Register vor Board: Pflichtkarte Lastschrift in der Schrittliste (Bild 5/6).
+- Umgebung: ca. 15 px leerer Streifen am rechten Rand (1440, Bildlaufleiste).
+- Beispieldaten (Hofname Weizberghof, Hof-ID, Schrittzahlen, E-Mail-Adressen) nicht gewertet.
+
+Nicht prüfbar:
+- Bild 2 (390/1440): Variante G1 ‚mit Willkommenszeit‘ ist ein offener Vorschlag und nicht gebaut; die App zeigt den Text von Bild 1
+- Bild 4 (390/1440): ‚E-Mail bestätigt‘ braucht den Bestätigungs-Link aus der Mail an einen frisch registrierten Hof; Tokens werden nicht selbst erzeugt
+
+### systemseiten
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 1 | 4 |
+| 390 dunkel | 3 | 1 | 4 |
+| 1440 hell | 3 | 1 | 4 |
+| 1440 dunkel | 3 | 1 | 4 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 5 · Punkt 1 · Kopf hat rechts einen zusätzlichen Knopf „Anmelden“; das Board zeigt im Handy-Kopf nur Logo „Agrilo“, keinen Knopf (doppelt zum Karten-Knopf „Zur Anmeldung“) · .nachtlauf/screens/schluss/systemseiten/5-390-hell.png
+- 390 dunkel · Bild 5 · Punkt 1 · derselbe zusätzliche Knopf „Anmelden“ im Kopf · .nachtlauf/screens/schluss/systemseiten/5-390-dunkel.png
+- 390 hell · Bild 5 · Punkt 1 · Fußlinks „Impressum · Datenschutz · AGB · Problem melden“ ohne Unterstreichung; im Board unterstrichen · .nachtlauf/screens/schluss/systemseiten/5-390-hell.png
+- 390 dunkel · Bild 5 · Punkt 1 · Fußlinks ohne Unterstreichung, Board unterstrichen · .nachtlauf/screens/schluss/systemseiten/5-390-dunkel.png
+- 390 hell · Bild 5 · Punkt 1 · Karte deutlich stärker gerundet (Ecken ca. 24 px statt ca. 12 px im Board), Fließtext mit größerem Zeilenabstand · .nachtlauf/screens/schluss/systemseiten/5-390-hell.png
+- 390 dunkel · Bild 5 · Punkt 1 · Karte stärker gerundet als im Board · .nachtlauf/screens/schluss/systemseiten/5-390-dunkel.png
+- 1440 hell · Bild 5 · Punkt 1 · Seitenfuß zeigt links ein zusätzliches Logo „Agrilo“ vor „Höfe entdecken“; im Board beginnt der Fuß direkt mit „Höfe entdecken“ · .nachtlauf/screens/schluss/systemseiten/5-1440-hell.png
+- 1440 dunkel · Bild 5 · Punkt 1 · zusätzliches Logo „Agrilo“ im Seitenfuß · .nachtlauf/screens/schluss/systemseiten/5-1440-dunkel.png
+- 1440 hell · Bild 5 · Punkt 1 · Fuß breiter als im Board (Trennlinie und Links ca. x 137–1289 statt 221–1221), dadurch nicht mehr bündig mit der linken Kante der Karte; Karte selbst ca. 8 px weiter links (x 213 statt 221) · .nachtlauf/screens/schluss/systemseiten/5-1440-hell.png
+- 1440 dunkel · Bild 5 · Punkt 1 · Fuß breiter, nicht bündig mit der Karte · .nachtlauf/screens/schluss/systemseiten/5-1440-dunkel.png
+- 1440 hell · Bild 5 · Punkt 1 · Karte stärker gerundet (ca. 24 px statt ca. 12 px), Fließtext mit größerem Zeilenabstand · .nachtlauf/screens/schluss/systemseiten/5-1440-hell.png
+- 1440 dunkel · Bild 5 · Punkt 1 · Karte stärker gerundet als im Board · .nachtlauf/screens/schluss/systemseiten/5-1440-dunkel.png
+- 1440 hell · Bild 5 · Punkt 5 · Fokus auf „Zur Anmeldung“ sichtbar, aber als doppelter Ring mit Abstand statt des einen kräftigen grünen Rahmens im Board (nur Form, kein Funktionsmangel) · .nachtlauf/screens/schluss/systemseiten/5-1440-hell.png
+- 1440 dunkel · Bild 5 · Punkt 5 · Fokus als doppelter Ring statt einem hellgrünen Rahmen wie im Board (nur Form) · .nachtlauf/screens/schluss/systemseiten/5-1440-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Seitenfuß mit Rechtslinks, am Handy mit Knopf „Darstellung: hell/dunkel“ (Register N22/N39).
+- Fußlink „Vertrag widerrufen“ zusätzlich zum Board (Register N39, Recht vor Board) – 390 und 1440, beide Themes.
+- Fußlinks und Textlinks kleiner als 44 px (Trefferfläche über ::before).
+- Umgebung: etwa 15 px leerer Streifen am rechten Rand (scrollbar-gutter) in allen App-Bildern.
+- Logo-Bildmarke im App-Bild mit „A“-Zeichen statt leerem grünem Quadrat im Board – Platzhalter des Boards, keine Abweichung gewertet.
+
+Nicht prüfbar:
+- Bild 1 (390/1440, hell/dunkel): braucht den signierten Link ‚Neue Anmelde-Adresse bestätigen‘ aus einer Mail
+- Bild 2 (390/1440, hell/dunkel): braucht gültigen Link aus Mail (/konto/email-bestaetigen)
+- Bild 3 (390/1440, hell/dunkel): ‚Das war ich nicht‘ braucht den signierten Link aus der Mail ‚Neue Anmeldung‘
+- Bild 4 (390/1440, hell/dunkel): braucht gültigen Link und die Aktion ‚Alle Geräte abmelden‘ danach
+
+### widerruf
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 2 |
+| 390 dunkel | 3 | 4 | 2 |
+| 1440 hell | 3 | 4 | 2 |
+| 1440 dunkel | 3 | 4 | 2 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 2 · Punkt 1/2 · Board: ein Textfeld „Welche Artikel?“ (Inhalt „Die ganze Bestellung“); App: Auswahlgruppe „Wovon möchtest du zurücktreten?“ mit zwei Optionen „Die ganze Bestellung“/„Einzelne Artikel“ · .nachtlauf/screens/schluss/widerruf/2-390-hell.png
+- 390 hell · Bild 2 · Punkt 1 · zusätzliches Feld „Nachricht an den Hof (freiwillig)“, das das Board nicht zeigt · .nachtlauf/screens/schluss/widerruf/2-390-hell.png
+- 390 hell · Bild 2 · Punkt 2 · zusätzlicher Hinweis unter dem E-Mail-Feld „An diese Adresse schicken wir die Eingangsbestätigung.“ (Board: kein Hinweis) · .nachtlauf/screens/schluss/widerruf/2-390-hell.png
+- 390 hell · Bild 4 · Punkt 1 · App zeigt über der Bestätigungskarte weiter Seitentitel „Rücktrittsrecht“ und Einleitungssatz; Board zeigt die Karte direkt unter dem Kopf ohne Seitentitel · .nachtlauf/screens/schluss/widerruf/4-390-hell.png
+- 390 hell · Bild 4 · Punkt 2 · Schritt-Liste anders: Board „1. Hof Müller bekommt deinen Rücktritt sofort. 2. Der Hof prüft ihn und meldet sich bei dir. 3. Ist die Rückgabe bestätigt, kommt das Geld auf demselben Weg zurück.“; App „1. Der Hof, bei dem du bestellt hast, ist dein Vertragspartner. Wir leiten deinen Rücktritt an ihn weiter. 2. Hast du noch nicht abgeholt, wird die Bestellung storniert; … 3. Hast du die Ware schon abgeholt, bring sie bitte innerhalb von 14 Tagen zum Hof zurück. …“ · .nachtlauf/screens/schluss/widerruf/4-390-hell.png
+- 390 hell · Bild 4 · Punkt 1 · zusätzliche Zeilen „Bestellung“, „Was“ (und auf 1440 sichtbar „Name“, „Eingangsbestätigung an“) in der Bestätigungskarte; Board zeigt nach der Liste nur „Drucken oder speichern“ · .nachtlauf/screens/schluss/widerruf/4-390-hell.png
+- 390 hell · Bild 4 · Punkt 2 · Datum ohne Wochentag: Board „Eingegangen am Mi, 3. März 2027, 19:40.“, App „Eingegangen am 6. November 2026, 04:28 Uhr.“ (Wochentag fehlt, „Uhr“ zusätzlich) · .nachtlauf/screens/schluss/widerruf/4-390-hell.png
+- 390 hell · Bild 2/3/4/6 · Punkt 1 · Kopf am Handy mit zusätzlichem Knopf „Anmelden“ rechts; Board-Kopf am Handy zeigt nur die Marke · .nachtlauf/screens/schluss/widerruf/3-390-hell.png
+- 390 dunkel · Bild 2 · Punkt 1/2 · wie 390 hell: Auswahlgruppe „Wovon möchtest du zurücktreten?“ statt Textfeld „Welche Artikel?“, zusätzliches Feld „Nachricht an den Hof (freiwillig)“, zusätzlicher Hinweis unter E-Mail · .nachtlauf/screens/schluss/widerruf/2-390-dunkel.png
+- 390 dunkel · Bild 4 · Punkt 1/2 · wie 390 hell: Seitentitel über der Karte, andere Schritt-Liste, zusätzliche Zeilen „Bestellung“/„Was“, Datum ohne Wochentag · .nachtlauf/screens/schluss/widerruf/4-390-dunkel.png
+- 390 dunkel · Bild 2/3/4/6 · Punkt 1 · zusätzlicher Knopf „Anmelden“ im Handy-Kopf · .nachtlauf/screens/schluss/widerruf/3-390-dunkel.png
+- 1440 hell · Bild 2 · Punkt 1/2 · Auswahlgruppe „Wovon möchtest du zurücktreten?“ statt Textfeld „Welche Artikel?“, zusätzliches Feld „Nachricht an den Hof (freiwillig)“, zusätzlicher Hinweis „An diese Adresse schicken wir die Eingangsbestätigung.“ · .nachtlauf/screens/schluss/widerruf/2-1440-hell.png
+- 1440 hell · Bild 4 · Punkt 1/2 · andere Schritt-Liste (s. o.), zusätzliche Zeilen „Bestellung“, „Was“, „Name“, „Eingangsbestätigung an“ in der Karte · .nachtlauf/screens/schluss/widerruf/4-1440-hell.png
+- 1440 hell · Bild 4 · Punkt 1 · Knopf „Drucken oder speichern“ über die ganze Kartenbreite; Board: schmaler Knopf links, so breit wie sein Text · .nachtlauf/screens/schluss/widerruf/4-1440-hell.png
+- 1440 hell · Bild 2/3/4/6 · Punkt 1 · Inhaltsspalte sichtbar breiter (Karte ca. 640 px statt ca. 600 px) und Zeilenabstände in den Prüf-Zeilen größer als im Board · .nachtlauf/screens/schluss/widerruf/3-1440-hell.png
+- 1440 hell · Bild 6 · Punkt 1 · Fehlerkasten „Das hat nicht geklappt“ mit deutlich stärker gerundeten Ecken als im Board (fast Pillenform); gilt auch am Handy · .nachtlauf/screens/schluss/widerruf/6-1440-hell.png
+- 1440 dunkel · Bild 2 · Punkt 1/2 · wie 1440 hell: Auswahlgruppe statt Textfeld „Welche Artikel?“, zusätzliches Feld „Nachricht an den Hof (freiwillig)“, zusätzlicher Hinweis unter E-Mail · .nachtlauf/screens/schluss/widerruf/2-1440-dunkel.png
+- 1440 dunkel · Bild 4 · Punkt 1/2 · wie 1440 hell: andere Schritt-Liste, zusätzliche Zeilen, Knopf „Drucken oder speichern“ in voller Breite · .nachtlauf/screens/schluss/widerruf/4-1440-dunkel.png
+- 1440 dunkel · Bild 6 · Punkt 1 · Fehlerkasten stärker gerundet als im Board · .nachtlauf/screens/schluss/widerruf/6-1440-dunkel.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board (N39): Knopf „Vertrag widerrufen“ statt „Weiter zur Prüfung“ (Bild 2, 1440 sichtbar).
+- Recht vor Board (N39): Knopf „Widerruf bestätigen“ statt „Rücktritt bestätigen“ (Bild 3, 6) und entsprechend im Fehlersatz „… tipp bitte noch einmal auf „Widerruf bestätigen““ (Bild 6).
+- Recht vor Board (N39): Karte „Teil A – Widerrufsbelehrung“ unter dem Formular bzw. der Bestätigung (Bild 3, 4, 6); Wortlaut nicht bewertet. Hinweis ohne Abzug: In Bild 4 steht in der Belehrung sichtbar der Platzhalter „[Name, Anschrift, Telefonnummer und E-Mail-Adresse des Hofs – stehen in deiner Bestellung]“ (Fall ohne Link) – bitte fachlich prüfen.
+- Umgebung: ca. 15 px leerer Streifen am rechten Rand in allen App-Bildern (Bildlaufleiste).
+- Beispieldaten (HM-0000-0000 ohne „bei Hof …“, Maria Muster, maria@example.com, „Die ganze Bestellung“ ohne Artikelliste, leere Felder in Bild 2) nicht als Abweichung gewertet.
+
+Nicht prüfbar:
+- Bild 1 (390/1440, hell/dunkel): ‚Schritt 1 mit signiertem Link‘ braucht einen signierten Rücktrittslink aus der Bestellmail
+- Bild 5 (390/1440, hell/dunkel): ‚Nicht mehr möglich‘ erscheint nur über den signierten Link einer Bestellung mit abgelaufener Frist
+
+### druck
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 3 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 3 | 2 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+(Druck nur hell; dunkle Fassungen gibt es für dieses Board nicht.)
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 1 · Punkt 2 · Fußzeile: Board „Preise inkl. Plattformgebühr. Bestellnummer nur zum Abgleich – bitte zusätzlich den Namen prüfen.“, App nur „Bestellnummer nur zum Abgleich – bitte zusätzlich den Namen prüfen.“ (erster Satz fehlt) · .nachtlauf/screens/schluss/druck/1-390-hell.png
+- 1440 hell · Bild 1 · Punkt 2 · derselbe fehlende Satz „Preise inkl. Plattformgebühr.“ in der Fußzeile des Abholzettels · .nachtlauf/screens/schluss/druck/1-1440-hell.png
+- 390 hell · Bild 2 · Punkt 1 · zusätzliche Zeile unter dem Betrag bei online bezahlten Bestellungen („inkl. € 18,00 Servicegebühr“, „inkl. € 0,50 Servicegebühr“); das Board zeigt unter „Online bezahlt“ nur den Betrag · .nachtlauf/screens/schluss/druck/2-390-hell.png
+- 1440 hell · Bild 2 · Punkt 1 · dieselbe zusätzliche Zeile „inkl. € … Servicegebühr“ bei Josef Wagner und Maria Huber; macht diese Kundenblöcke sichtbar höher als im Board · .nachtlauf/screens/schluss/druck/2-1440-hell.png
+- 390 hell · Bild 1 · Punkt 1 · E-Mail-Adresse der Kundin bricht mitten im Wort um („anna.berger@example.co“ / „m“); im Board steht sie in einer Zeile · .nachtlauf/screens/schluss/druck/1-390-hell.png
+- 390 hell · Bild 3 · Punkt 2 · fester Satz: Board „Die nächste Abholung ist Sa, 6. März, 9–12 Uhr.“, App „Die nächste Abholung ist heute, Fr 6. Nov, 15–18 Uhr.“ – zusätzliches Wort „heute,“ und fehlendes Komma nach dem Wochentag; wirkt direkt unter „Heute keine Bestellungen zur Abholung.“ widersprüchlich · .nachtlauf/screens/schluss/druck/3-390-hell.png
+- 1440 hell · Bild 1 und 2 · Punkt 1 (Hinweis, nicht abgezogen) · App zeigt oben die Leiste „Zurück“/„Drucken“, das A4-Board zeigt das Blatt ohne Leiste; das App-Bild ist die Bildschirmansicht, nicht die Druckansicht – ob die Leiste beim Drucken verschwindet, ist aus dem Bild nicht prüfbar · .nachtlauf/screens/schluss/druck/1-1440-hell.png
+- 390/1440 hell · Bild 1 · Punkt 1 (Hinweis, nicht abgezogen) · zusätzliche kursive Zeile mit dem Kundenhinweis („Komme mit dem Rad, …“) zwischen Kunde und Produkttabelle; Board-Bestellung hat keinen Hinweis, daher vermutlich datenabhängig · .nachtlauf/screens/schluss/druck/1-390-hell.png
+- 390/1440 hell · Bild 1 · Punkt 1 (klein, nicht einzeln abgezogen) · Tabellenkopf „Produkt / Menge / Betrag“ in der App normal statt fett wie im Board · .nachtlauf/screens/schluss/druck/1-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- Register vor Board: Marke „Gepackt“ im Abholzettel (Hofbereich, Status Abholbereit), Board zeigt „Zum Packen“ für einen anderen Stand – Hofbereich-Wortlaut „Gepackt“ ist begründet.
+
+Nicht prüfbar:
+- keine (alle 5 App-Bilder erreichbar; dunkle Fassungen für Druck nicht vorgesehen)
+
+### mail-betrieb
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 2 | 6 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 2 | 6 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+(Mails nur hell; dunkle Fassungen gibt es für dieses Board nicht. Web-Fassung als Mail-Fenster 600 px.)
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390/1440 hell · Bild 4 · Punkt 1 · Aufbau ganz anders: Board zeigt drei Zeilen „Offen im Postfach“, „Neue Meldungen“, „Beantwortet in 7 Tagen“; App zeigt sieben andere Zeilen („Bestellungen“, „Umsatz der Höfe“, „Plattformgebühr“, „Neue Höfe“, „Offene Aufgaben“, „Fehlermeldungen der Woche“, „Kosten diesen Monat“), dazu Trennlinie, zwei Sätze („Offen im Eingang: 1 Antwort · 1 Meldung · 0 Aufgaben“, „Eine neue Meldung seit der letzten Sichtung. Offen insgesamt: 2.“) und Fußnote „Aufgeräumt: nichts älter als 90 Tage gelöscht.“, die das Board nicht hat · .nachtlauf/screens/schluss/mail-betrieb/4-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/4-1440-hell.png
+- 390/1440 hell · Bild 3 · Punkt 1/2 · Zeilen anders: Board „Bestellung“, „Betrag“; App „Bestellung“, „An die Kundin erstatten“ (statt „Betrag“), zusätzlich „Davon vom Hof (über die Rückbuchung der Überweisung)“ und „Bei Stripe re_…“ · .nachtlauf/screens/schluss/mail-betrieb/3-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/3-1440-hell.png
+- 390/1440 hell · Bild 3 · Punkt 2 · Warnkasten-Text anders: Board „Stripe hat die Erstattung seit 24 Stunden nicht bestätigt. Prüf sie in Stripe und schließ sie in Bestellungen ab.“; App „Der Hof hat die Bestellung storniert, die Erstattung über Stripe hat aber nicht geklappt. Die Bestellung ist storniert, das Geld steht noch aus. Was zu tun ist: Überweisung zurückbuchen und Plattformgebühr erstatten.“ · .nachtlauf/screens/schluss/mail-betrieb/3-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/3-1440-hell.png
+- 390/1440 hell · Bild 6 · Punkt 2 · Warnkasten-Text anders: Board „Die Messung von heute, 05:02 liegt über der Warnstufe 80 %: 410 MB von 500 MB.“; App „410 MB von 500 MB. Bei 8 GB ist der inklusive Speicher voll – die Datenbank wächst weiter und kostet ab dann extra.“ (in sich widersprüchlich: 500 MB gegen 8 GB) · .nachtlauf/screens/schluss/mail-betrieb/6-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/6-1440-hell.png
+- 390/1440 hell · Bild 6 · Punkt 2 · Fließtext anders: Board „Größte Tabelle: Protokoll (120 MB). Prüf, ob alte Einträge archiviert werden können, oder erhöh den Tarif.“; App „Was hilft: Unter „Größte Tabellen“ auf der Seite Betrieb steht, was wächst.“ · .nachtlauf/screens/schluss/mail-betrieb/6-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/6-1440-hell.png
+- 390/1440 hell · Bild 6 · Punkt 2 · Knopf: Board „In Betrieb ansehen →“, App „Betrieb ansehen“ (anderes Wort, Pfeil fehlt) · .nachtlauf/screens/schluss/mail-betrieb/6-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/6-1440-hell.png
+- 390/1440 hell · Bild 6 · Punkt 1 · zusätzliche Fußnote unter dem Knopf („Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und noch einmal, wenn der Wert wieder unter 75 % liegt. Abschalten lässt sie sich nicht – …“), im Board nicht vorhanden · .nachtlauf/screens/schluss/mail-betrieb/6-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/6-1440-hell.png
+- 390/1440 hell · Bild 1 · Punkt 1 · Zeile „Fehlt noch“ (Board: „Stripe, Produkte, Abholzeit“) fehlt in der App; Zeile „Hof“ zeigt nur den Namen, das Board Name mit Ort („…, 5230 Mattighofen“) · .nachtlauf/screens/schluss/mail-betrieb/1-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/1-1440-hell.png
+- 390/1440 hell · Bild 2 · Punkt 2 · Überschrift „Neue Fehlermeldung cmeldung“: statt eines Kurzcodes wie im Board („7K2Q“) steht ein Wortstück aus der ID; wirkt kaputt, auch wenn der Wert Beispieldatum ist · .nachtlauf/screens/schluss/mail-betrieb/2-390-hell.png, .nachtlauf/screens/schluss/mail-betrieb/2-1440-hell.png
+- 390/1440 hell · Bild 1–6 · Punkt 1 (Schrift) · Wortmarke „Agrilo“ und Überschrift in einer Times-artigen Ersatzschrift statt der runden Anzeige-Serifenschrift des Boards; Überschrift wirkt fetter und schmaler · .nachtlauf/screens/schluss/mail-betrieb/1-390-hell.png (gleich in 2–6, beide Breiten)
+
+Begründete Ausnahmen gesehen:
+- keine
+
+Nicht prüfbar:
+- Bild 1–6 (390/1440), nur teilweise: Betreff, Von/An, Marke „Wichtig“/„Kann warten“ und Vorschauzeile aus dem Posteingang-Rahmen des Boards sind im App-Bild (reine Mail-Vorschau, kein Server) nicht zu sehen und wurden nicht verglichen.
+- 390/1440 dunkel: entfällt, Mails nur hell.
+
+### mail-hof-bestellung
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | – | 0 | 0 (Mails nur hell) |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | – | 0 | 0 (Mails nur hell) |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 4 · Punkt 2 · Hinweis-Kasten anderer Satz: Board „Bei schnell verderblicher Ware (Heumilch, Bergkäse) gilt das Rücktrittsrecht meist nicht. Prüf das und antworte der Kundin in der Bestellung.“, App „Ausnahmen nach § 18 FAGG (etwa schnell verderbliche Ware) prüfst du im Einzelfall.“ (Paragraf und Fachwort statt Board-Wortlaut; falls das ein freigegebener Rechtstext ist, fehlt die Begründung im Auftrag) · .nachtlauf/screens/schluss/mail-hof-bestellung/4-390-hell.png
+- 1440 hell · Bild 4 · Punkt 2 · derselbe Hinweis-Kasten wie oben (§ 18 FAGG statt Board-Satz) · .nachtlauf/screens/schluss/mail-hof-bestellung/4-1440-hell.png
+- 390 hell · Bild 4 · Punkt 2 · Einleitungssatz anders: Board „Maria Huber ist von ihrer Bestellung HM-0303-2C91 zurückgetreten: die ganze Bestellung.“, App „Zur Bestellung **HM-0303-2C91** ist am 3. März 2027, 07:40 Uhr ein Rücktritt eingegangen: die ganze Bestellung.“ (kein Kundinnenname, zusätzlich Zeitpunkt, Nummer fett) · .nachtlauf/screens/schluss/mail-hof-bestellung/4-390-hell.png
+- 1440 hell · Bild 4 · Punkt 2 · derselbe Einleitungssatz wie oben · .nachtlauf/screens/schluss/mail-hof-bestellung/4-1440-hell.png
+- 390 hell · Bild 2 · Punkt 2 · Hinweis-Kasten anderer Satz: Board „Eva Steiner bestätigt bis heute, 09:40 Uhr. Erst dann packst du.“, App „Eva Steiner bestätigt die Bestellung per E-Mail. Erst dann packst du.“ (Frist fehlt, „per E-Mail“ zusätzlich; außerdem Umbruch „E-/Mail“) · .nachtlauf/screens/schluss/mail-hof-bestellung/2-390-hell.png
+- 1440 hell · Bild 2 · Punkt 2 · derselbe Hinweis-Kasten ohne Frist · .nachtlauf/screens/schluss/mail-hof-bestellung/2-1440-hell.png
+- 390 hell · Bild 3 · Punkt 2 · Satz unter „Bar zu kassieren“ anders: Board „Plattformgebühr darin € 1,68 – als Gründungshof bis 31. Jänner 2028 erlassen.“, App „davon Plattformgebühr € 1,12; Warenpreis € 18,00 bleibt dir.“ (anderer Satzbau, Gründungshof-Fall des Boards nicht gezeigt) · .nachtlauf/screens/schluss/mail-hof-bestellung/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · derselbe Gebühren-Satz wie oben · .nachtlauf/screens/schluss/mail-hof-bestellung/3-1440-hell.png
+- 390 hell · Bild 3 · Punkt 2 · Beschriftung „Bar zu kassieren:“ mit Doppelpunkt, Board „Bar zu kassieren“ ohne · .nachtlauf/screens/schluss/mail-hof-bestellung/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · „Bar zu kassieren:“ mit Doppelpunkt · .nachtlauf/screens/schluss/mail-hof-bestellung/3-1440-hell.png
+- 390 hell · Bild 1/2/3 · Punkt 1 · zusätzliche Zeile „Kundin · <Name> · <Telefon als Link>“ über dem Knopf, im Board nicht vorhanden · .nachtlauf/screens/schluss/mail-hof-bestellung/1-390-hell.png
+- 1440 hell · Bild 1/2/3 · Punkt 1 · zusätzliche Zeile „Kundin“ mit Telefon-Link · .nachtlauf/screens/schluss/mail-hof-bestellung/1-1440-hell.png
+- 390 hell · Bild 1/2 · Punkt 2 · Produktzeilen anders aufgebaut: Board „2× Bergkäse (250 g)“ / „4× Heumilch frisch (1 L)“, App „Bergkäse · 2 × 250 g“ / „Heumilch frisch · 4 L“ (Menge hinten, Einheit multipliziert statt in Klammern) · .nachtlauf/screens/schluss/mail-hof-bestellung/1-390-hell.png
+- 1440 hell · Bild 1/2 · Punkt 2 · Produktzeilen im Format „Name · Menge“ statt „n× Name (Einheit)“ · .nachtlauf/screens/schluss/mail-hof-bestellung/2-1440-hell.png
+- 390 hell · Bild 1 · Punkt 1 · Trennlinie zwischen „Abholung“ und „Bestellte Produkte“ fehlt (Board zeigt eine Linie) · .nachtlauf/screens/schluss/mail-hof-bestellung/1-390-hell.png
+- 1440 hell · Bild 1 · Punkt 1 · Trennlinie unter „Abholung“ fehlt · .nachtlauf/screens/schluss/mail-hof-bestellung/1-1440-hell.png
+- 390 hell · alle Bilder · Punkt 1 · Schriftwirkung von „Agrilo“, Überschrift und Bestellnummer: Board eine weiche Antiqua (Display-Serife), App eine Times-artige Ersatzschrift – Überschriften wirken fetter und enger · .nachtlauf/screens/schluss/mail-hof-bestellung/1-390-hell.png
+- 1440 hell · alle Bilder · Punkt 1 · dieselbe Ersatz-Serife bei Marke, Überschrift und Bestellnummer · .nachtlauf/screens/schluss/mail-hof-bestellung/1-1440-hell.png
+- 390 hell · Bild 2/3 · Punkt 2 · Uhrzeitformat „09:00–12:00 Uhr“, Board „9:00–12:00 Uhr“ (klein) · .nachtlauf/screens/schluss/mail-hof-bestellung/2-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board (Impressum/Anbieterzeile, im Board selbst als „Vorschlag (V68/V79), Recht prüft“ markiert): Fuß in der App „Agrilo · agrilo.at/impressum“ statt Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“ – in allen 8 Bildern.
+- „Rücktritt“-Wortlaut (V73, Anwältin prüft) in Bild 4 übernommen wie im Board (Überschrift „Eine Kundin ist zurückgetreten“, Knopf „Bestellung öffnen“).
+
+Nicht prüfbar:
+- 390 dunkel und 1440 dunkel: Mails nur hell, keine Bilder.
+- Bild 1–4 (390/1440): Mail-Client-Kopf des Boards (Betreff, Von, An, Marke „Wichtig“, Vorschauzeile) ist im App-Bild nicht enthalten (Mail-Vorschau ohne Client-Rahmen, kein Server); Betreff und Vorschautext lassen sich aus den Bildern nicht vergleichen.
+
+### mail-hof-konto
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 5 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 3 | 5 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 1 · Punkt 1 · grüner Hinweis-Kasten „Du bist **Gründungshof Nr. 5**: Hofladen 12 Monate kostenlos, bis 11. März 2028.“ zwischen Einleitung und Knopf „Zur Hofseite“ fehlt ganz · .nachtlauf/screens/schluss/mail-hof-konto/1-390-hell.png
+- 1440 hell · Bild 1 · Punkt 1 · derselbe Gründungshof-Kasten fehlt · .nachtlauf/screens/schluss/mail-hof-konto/1-1440-hell.png
+- 390 hell · Bild 3 · Punkt 1 · roter Warn-Kasten „Klappt es innerhalb von 14 Tagen nicht, pausieren wir „Bar bei Abholung“ bei dir, bis die Gebühr bezahlt ist.“ fehlt · .nachtlauf/screens/schluss/mail-hof-konto/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 1 · derselbe Warn-Kasten fehlt · .nachtlauf/screens/schluss/mail-hof-konto/3-1440-hell.png
+- 390 hell · Bild 3 · Punkt 2 · Text anders: Board „Die Plattformgebühr aus deinen Barbestellungen im April 2028 (€ 7,42) konnten wir nicht einziehen. Stripe versucht es in den nächsten Tagen erneut.“; App „Die Lastschrift für April 2028 hat nicht geklappt. Stripe versucht es erneut. Bitte sorg für Deckung auf deinem Konto oder bezahl die Rechnung direkt. Bleibt der Betrag 14 Tage offen, nehmen wir bei dir keine Barbestellungen mehr an – laufende Bestellungen bleiben.“ (Betrag fehlt) · .nachtlauf/screens/schluss/mail-hof-konto/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · derselbe abweichende Text · .nachtlauf/screens/schluss/mail-hof-konto/3-1440-hell.png
+- 390 hell · Bild 2 · Punkt 2 · Text anders: Anrede „Hallo Franz Müller,“ fehlt; Satz „Bis dahin ist sie für dich als Gründungshof erlassen.“ fehlt; zusätzlich „Bei Online-Zahlungen behält Stripe sie schon beim Bezahlen ein.“; Board „Ohne Lastschrift gibt es ab dann bei dir kein „Bar bei Abholung“.“, App „Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.“; ein Absatz statt zwei · .nachtlauf/screens/schluss/mail-hof-konto/2-390-hell.png
+- 1440 hell · Bild 2 · Punkt 2 · derselbe abweichende Text, ein Absatz statt zwei · .nachtlauf/screens/schluss/mail-hof-konto/2-1440-hell.png
+- 390 hell · Bild 4 · Punkt 2 · fester Satz: Board „Antworten geht in der App, im Postfach.“, App „Antworten geht in der App: Öffne die Nachricht in deinem Postfach und schreib dort zurück.“ · .nachtlauf/screens/schluss/mail-hof-konto/4-390-hell.png
+- 1440 hell · Bild 4 · Punkt 2 · derselbe Satz abweichend · .nachtlauf/screens/schluss/mail-hof-konto/4-1440-hell.png
+- 390 hell · Bild 5 · Punkt 2 · derselbe Satz abweichend („Antworten geht in der App, im Postfach.“ → „…: Öffne die Nachricht in deinem Postfach und schreib dort zurück.“) · .nachtlauf/screens/schluss/mail-hof-konto/5-390-hell.png
+- 1440 hell · Bild 5 · Punkt 2 · derselbe Satz abweichend · .nachtlauf/screens/schluss/mail-hof-konto/5-1440-hell.png
+- 390 hell · Bild 1–5 · Punkt 2 · Anbieterzeile im Fuß: Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“, App „Agrilo · agrilo.at/impressum“ (Anschrift-Platz und Wort „Impressum:“ fehlen; Board markiert die Zeile als Vorschlag, Recht prüft) · .nachtlauf/screens/schluss/mail-hof-konto/1-390-hell.png (ebenso 2–5)
+- 1440 hell · Bild 1–5 · Punkt 2 · dieselbe abweichende Anbieterzeile · .nachtlauf/screens/schluss/mail-hof-konto/1-1440-hell.png (ebenso 2–5)
+- 390 hell · Bild 1–5 · Punkt 1 · Schriftbild: Marke „Agrilo“ und Überschrift im Board in der weichen Hausserife, in der App in einer Times-artigen Ersatzschrift, sichtbar fetter und schmaler (Bild 2 bricht dadurch „Plattformgebühr ab 1. Februar / 2028“ statt „Plattformgebühr ab / 1. Februar 2028“) · .nachtlauf/screens/schluss/mail-hof-konto/2-390-hell.png (ebenso 1, 3–5)
+- 1440 hell · Bild 1–5 · Punkt 1 · dieselbe Ersatzschrift in Marke und Überschrift · .nachtlauf/screens/schluss/mail-hof-konto/1-1440-hell.png (ebenso 2–5)
+- 390 hell · Bild 1–5 · Punkt 1 · Abstände kleiner: Karte sitzt dichter am Rand und oben, Knopf und Text rücken enger zusammen als im Board (klein) · .nachtlauf/screens/schluss/mail-hof-konto/1-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine. (Text der Rundschreiben-Nachricht in Bild 4 und der Bezug „Zu: …“ in Bild 5 sind Beispieldaten und nicht als Abweichung gewertet.)
+
+Nicht prüfbar:
+- Dunkel-Fassungen (390/1440): Mails werden nur hell geprüft, keine Bilder vorhanden.
+- Bild 1–5 (390/1440): Betreff, Absender, Empfänger, Marke „Wichtig“/„Kann warten“ und Vorschauzeile gehören zum Mail-Programm-Rahmen des Boards; die App-Bilder zeigen nur den Mail-Körper (Mail-Vorschau, kein Server), daher nicht vergleichbar.
+
+### mail-kauf
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 6 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 3 | 6 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+(Mails nur hell; 1440 = Mail-Fenster 600 px laut Manifest.)
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 4 · Punkt 1 · zusätzlicher Link „Dieselbe Bestellung nochmal aufgeben“ unter „Vertrag widerrufen“; das Board zeigt ihn ausdrücklich nicht (Bildtitel „ohne … (V70)“) · .nachtlauf/screens/schluss/mail-kauf/4-390-hell.png
+- 1440 hell · Bild 4 · Punkt 1 · derselbe zusätzliche Link „Dieselbe Bestellung nochmal aufgeben“ · .nachtlauf/screens/schluss/mail-kauf/4-1440-hell.png
+- 390 hell · Bild 6 · Punkt 1 · Positionsliste der verbleibenden Artikel fehlt: Board zeigt zwischen Bestellnummer und „Neuer Betrag“ die Zeilen (z. B. „4× Heumilch frisch (1 L) € 5,96“, „1× Bergkäse (250 g) € 6,58“), die App springt direkt von der Bestellnummer über eine Linie zu „Neuer Betrag“ · .nachtlauf/screens/schluss/mail-kauf/6-390-hell.png
+- 1440 hell · Bild 6 · Punkt 1 · dieselbe fehlende Positionsliste · .nachtlauf/screens/schluss/mail-kauf/6-1440-hell.png
+- 390 hell · Bild 3 · Punkt 1/2 · zusätzlicher Satz „Alle Preise inkl. Plattformgebühr (darin € 1,12). Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“ zwischen grünem Bar-Kasten und Knöpfen; das Board hat in der Bar-Bestätigung keine Gebührenzeile (entfällt, falls N39-Wortlaut) · .nachtlauf/screens/schluss/mail-kauf/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 1/2 · derselbe zusätzliche Gebührensatz · .nachtlauf/screens/schluss/mail-kauf/3-1440-hell.png
+- 390 hell · Bild 1, 2 · Punkt 2 · Gebührensatz: Board „Alle Preise inkl. Plattformgebühr (darin € 1,12). Den Kaufvertrag schließt du mit Hof Müller.“ (Bild 2: nur „Alle Preise inkl. Plattformgebühr (darin € 1,68).“), App „… Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“; der Satz zum Kaufvertrag mit dem Hof fehlt (entfällt, falls N39-Wortlaut) · .nachtlauf/screens/schluss/mail-kauf/1-390-hell.png
+- 1440 hell · Bild 1, 2 · Punkt 2 · derselbe abweichende Gebührensatz · .nachtlauf/screens/schluss/mail-kauf/1-1440-hell.png
+- 390 hell · Bild 1, 2, 3 · Punkt 2 · Positionszeilen anders geschrieben: Board „2× Bergkäse (250 g)“, „4× Heumilch frisch (1 L)“, App „Bergkäse · 2 × 250 g“, „Heumilch frisch · 4 L“ (Menge vorn und Einheit in Klammern im Board; Gesamtmenge statt Gebindegröße in der App); ebenso im Fehlt-Satz von Bild 6 (Board „1 × Freilandeier, 10 Stk.“, App „Heumilch frisch · 4 L“) · .nachtlauf/screens/schluss/mail-kauf/1-390-hell.png
+- 1440 hell · Bild 1, 2, 3, 6 · Punkt 2 · dieselbe abweichende Schreibweise der Positionen · .nachtlauf/screens/schluss/mail-kauf/1-1440-hell.png
+- 390 hell · alle Bilder · Punkt 1 (Schriftwirkung) · Überschrift („Danke für deine Bestellung!“, „Bitte bestätige deine Bestellung“ …) und Bestellnummer stehen in einer Times-artigen Ersatzschrift, das Board zeigt die runde Display-Serife; Bestellnummer wirkt dadurch schmaler und gesperrter · .nachtlauf/screens/schluss/mail-kauf/1-390-hell.png
+- 1440 hell · alle Bilder · Punkt 1 (Schriftwirkung) · dieselbe Ersatzschrift in Überschrift und Bestellnummer · .nachtlauf/screens/schluss/mail-kauf/1-1440-hell.png
+- 390 hell · Bild 2 · Punkt 2 · Frist: Board „Bitte bestätige bis heute, 09:40 Uhr.“, App „Bitte bestätige bis Mittwoch, 3. März, 09:40 Uhr.“ (vermutlich vom Vorschaudatum abhängig; sonst Wortabweichung „heute“) · .nachtlauf/screens/schluss/mail-kauf/2-390-hell.png
+- 1440 hell · Bild 2 · Punkt 2 · dieselbe Fristformulierung · .nachtlauf/screens/schluss/mail-kauf/2-1440-hell.png
+- 390 hell · Bild 1, 3, 4, 5 · Punkt 1 · Adresse in „Wo“ bricht um („… Braunau am“ / „Inn“), im Board einzeilig – kleine Layoutabweichung durch breitere Werteschrift/Abstand · .nachtlauf/screens/schluss/mail-kauf/5-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board: In Bild 1–3 steht statt des kurzen Kastens „Belehrung über das Rücktrittsrecht … Rücktrittsrecht“ die volle Widerrufsbelehrung (Teil A), das Muster-Widerrufsformular (Teil B), der Link „Vertrag widerrufen“ und der Block „Gesetzliche Gewährleistung“ (Grafik als Alt-Text, Bild aus dem Netz lädt nicht).
+- Recht vor Board: Wortlaut „Vertrag widerrufen“ statt „Rücktrittsrecht“ in Bild 4, 5, 6.
+- Recht vor Board: AGB-Satz „Es gelten die AGB von Agrilo. Du findest sie auch als Datei im Anhang dieser E-Mail und kannst sie jederzeit nachlesen, speichern und ausdrucken.“ statt Board „Es gelten die AGB von Agrilo (Fassung 1.0). Du findest sie im Anhang und unter agrilo.at/agb.“ (Hinweis: „(Fassung 1.0)“ fehlt in der App).
+- Recht vor Board: Impressum-Zeile „Agrilo · agrilo.at/impressum“ im Fuß aller Mails.
+- Umgebung: fehlendes Bild aus dem Netz (Gewährleistungs-Grafik nur als Alt-Text, laut Manifest keine Abweichung).
+
+Nicht prüfbar:
+- 390 dunkel, 1440 dunkel: Mails werden nur hell geprüft (Auftrag).
+- Bild 1–6 (390/1440), Kopf des Posteingangs (Betreff, Von, An, „Antwort: Hof Müller <…>“, Anhang AGB-PDF, Marke „Wichtig“/„Sofort“, Vorschauzeile): die App-Bilder sind Mail-Vorschauen als Datei („anonym (Mail-Vorschau, kein Server)“) ohne Mail-Kopf; „Antwort an den Hof“ ist im Bild nicht sichtbar.
+
+### mail-neuigkeiten
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | – | 0 | 0 (Mails nur hell) |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | – | 0 | 0 (Mails nur hell) |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 3 · Punkt 2 · Anlass-Marke über dem Titel: Board „Neuigkeit“ (laut Bildtitel V57 ausdrücklich), App „Hinweis“ · .nachtlauf/screens/schluss/mail-neuigkeiten/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · Anlass-Marke: Board „Neuigkeit“, App „Hinweis“ · .nachtlauf/screens/schluss/mail-neuigkeiten/3-1440-hell.png
+- 390 hell · Bild 1 · Punkt 2 · Fließtext-Ende: Board „Tipp auf den Knopf, dann ist es erledigt.“, App „Tipp auf den Knopf und bestätige auf der Seite.“ · .nachtlauf/screens/schluss/mail-neuigkeiten/1-390-hell.png
+- 1440 hell · Bild 1 · Punkt 2 · wie oben: „dann ist es erledigt.“ statt „und bestätige auf der Seite.“ · .nachtlauf/screens/schluss/mail-neuigkeiten/1-1440-hell.png
+- 390 hell · Bild 1 · Punkt 2 · „Hof Müller“ im Fließtext im Board fett, in der App normal · .nachtlauf/screens/schluss/mail-neuigkeiten/1-390-hell.png
+- 1440 hell · Bild 1 · Punkt 2 · „Hof Müller“ im Board fett, in der App normal · .nachtlauf/screens/schluss/mail-neuigkeiten/1-1440-hell.png
+- 390 hell · Bild 2 · Punkt 2 · Fußzeile Auftrag: Board „Im Auftrag von Hof Müller, Dorfstraße 12, 5280 Braunau am Inn · versandt von Agrilo“ (mit Hofanschrift), App „Im Auftrag von Hof Müller · versandt von Agrilo“ (Anschrift fehlt) · .nachtlauf/screens/schluss/mail-neuigkeiten/2-390-hell.png
+- 1440 hell · Bild 2 · Punkt 2 · Hofanschrift in der Auftragszeile fehlt · .nachtlauf/screens/schluss/mail-neuigkeiten/2-1440-hell.png
+- 390 hell · Bild 3 · Punkt 2 · Hofanschrift in der Auftragszeile fehlt · .nachtlauf/screens/schluss/mail-neuigkeiten/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · Hofanschrift in der Auftragszeile fehlt · .nachtlauf/screens/schluss/mail-neuigkeiten/3-1440-hell.png
+- 390 hell · Bild 1–4 · Punkt 2 · Anbieterzeile: Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“, App „Agrilo · agrilo.at/impressum“ (Anschrift-Teil und Wort „Impressum:“ fehlen; Bildtitel nennt die Zeile „Vorschlag, Recht prüft“) · .nachtlauf/screens/schluss/mail-neuigkeiten/1-390-hell.png (ebenso 2-, 3-, 4-390-hell.png)
+- 1440 hell · Bild 1–4 · Punkt 2 · Anbieterzeile wie oben verkürzt · .nachtlauf/screens/schluss/mail-neuigkeiten/1-1440-hell.png (ebenso 2-, 3-, 4-1440-hell.png)
+- 390 hell · Bild 4 · Punkt 4 · Absatz „Mehrere Kundinnen haben sich das gewünscht – darum diese eine Antwort an alle.“ im Board gedämpft (graue Nebenschrift, kleiner), in der App volle Textfarbe und Fließtextgröße · .nachtlauf/screens/schluss/mail-neuigkeiten/4-390-hell.png
+- 1440 hell · Bild 4 · Punkt 4 · derselbe Absatz nicht gedämpft · .nachtlauf/screens/schluss/mail-neuigkeiten/4-1440-hell.png
+- 1440 hell · Bild 2 · Punkt 1 · Fotofläche deutlich höher als im Board (App etwa 280 px, Board etwa 180 px bei gleicher Kartenbreite) · .nachtlauf/screens/schluss/mail-neuigkeiten/2-1440-hell.png
+- 390 hell · Bild 1–4 · Punkt 1 · Überschrift und Wortmarke „Agrilo“ in anderer Serifenschrift (App wirkt wie Times/Georgia-Ersatzschrift, Board zeigt die Marken-Serife mit weicherer Form); möglicherweise Mail-Ersatzschrift, aber sichtbar anders · .nachtlauf/screens/schluss/mail-neuigkeiten/1-390-hell.png
+- 1440 hell · Bild 1–4 · Punkt 1 · andere Serifenschrift bei Überschrift und Wortmarke · .nachtlauf/screens/schluss/mail-neuigkeiten/1-1440-hell.png
+- 1440 hell · Bild 2/3 · Punkt 1 · „Abmelden“ bricht in der App in eine eigene Zeile um, im Board steht es am Ende derselben Zeile (Fenster 600 px statt Board-Kartenbreite; klein) · .nachtlauf/screens/schluss/mail-neuigkeiten/2-1440-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine. (Posteingangs-Rahmen des Boards mit Betreff, Von/An, Marke „Wichtig“/„Kann warten“ und Vorschauzeile ist Darstellung des Mailprogramms, nicht Mailinhalt; nicht als Abweichung gewertet. Graue Fotofläche statt Bild: Beispieldaten.)
+
+Nicht prüfbar:
+- 390 dunkel und 1440 dunkel: Mails werden nur hell geprüft (Auftrag), keine Bilder vorhanden.
+
+### mail-sicherheit
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 6 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 3 | 6 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+(Dunkle Fassungen entfallen: Mails nur hell. Die Fassung „1440“ ist laut Manifest ein 600-px-Fenster.)
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390+1440 hell · Bild 3 · Punkt 1 · Knopf „Passwort zurücksetzen“ fehlt ganz; stattdessen nur ein grauer Absatz „Über „Passwort vergessen“ kannst du dein Passwort jederzeit zurücksetzen – …“ · .nachtlauf/screens/schluss/mail-sicherheit/3-390-hell.png, .nachtlauf/screens/schluss/mail-sicherheit/3-1440-hell.png
+- 390+1440 hell · Bild 3 · Punkt 2 · Text: Board „Für dein Hof-Konto wurde mehrmals ein falsches Passwort eingegeben. Deshalb ist die Anmeldung mit Passwort bis heute, 09:15 Uhr pausiert.“; App „Hallo, bei deinem Konto wurde zu oft ein falsches Passwort eingegeben. Deshalb … bis Mittwoch, 3. März, 09:15 Uhr pausiert.“ plus zusätzlicher Absatz (Warst du das nicht? Dann setz … / Wir fragen dich nie …) · .nachtlauf/screens/schluss/mail-sicherheit/3-390-hell.png
+- 390+1440 hell · Bild 1 · Punkt 2 · Überschrift: Board „Neue Anmeldung“, App „Neue Anmeldung bei deinem Hof-Konto“ (Board-Betreffzeile als Überschrift) · .nachtlauf/screens/schluss/mail-sicherheit/1-390-hell.png, .nachtlauf/screens/schluss/mail-sicherheit/1-1440-hell.png
+- 390+1440 hell · Bild 1 · Punkt 1/2 · zusätzlicher grauer Absatz unter dem Knopf „Der Knopf öffnet eine Seite bei Agrilo – erst dort meldest du alle Geräte ab. Der Link gilt 7 Tage und einmal. Wir fragen dich nie per Mail nach deinem Passwort.“, im Board nicht vorhanden · .nachtlauf/screens/schluss/mail-sicherheit/1-390-hell.png
+- 390+1440 hell · Bild 1 · Punkt 2 · Zeitangabe im Satz und in der Zeile „Wann“: Board „am Di, 2. März 2027“ / „Di, 2. März 2027, 21:14 Uhr“, App „am 2.3. um 21:14“ / „2.3. um 21:14“ (anderes festes Format, ohne Wochentag und „Uhr“) · .nachtlauf/screens/schluss/mail-sicherheit/1-390-hell.png
+- 390+1440 hell · Bild 2 · Punkt 2 · Text: Board „Für deine Adresse wurde mehrmals ein falscher Code eingegeben. Zum Schutz nehmen wir für diese Adresse bis heute, 09:15 Uhr keinen Code mehr an.“; App „Hallo, für deine E-Mail-Adresse wurde zu oft ein falscher Code eingegeben. Deshalb nehmen wir … bis Mittwoch, 3. März, 09:15 Uhr …“ · .nachtlauf/screens/schluss/mail-sicherheit/2-390-hell.png, .nachtlauf/screens/schluss/mail-sicherheit/2-1440-hell.png
+- 390+1440 hell · Bild 2 · Punkt 2 · Hinweis: Board „Warst du das nicht? Dann musst du nichts tun – ohne Code kommt niemand in dein Konto.“; App „Warst du das nicht? Dann musst du nichts tun: Ohne den Code aus deiner E-Mail kommt niemand weiter. Gib Codes nie an andere weiter – wir fragen dich nie danach.“ · .nachtlauf/screens/schluss/mail-sicherheit/2-390-hell.png
+- 390+1440 hell · Bild 4 · Punkt 2 · Überschrift: Board „Neue Anmelde-Adresse bestätigen“, App „Bestätige deine neue Anmelde-Adresse“ · .nachtlauf/screens/schluss/mail-sicherheit/4-390-hell.png, .nachtlauf/screens/schluss/mail-sicherheit/4-1440-hell.png
+- 390+1440 hell · Bild 4 · Punkt 2 · Text: Board „… hat auf deinen Wunsch eine neue Anmelde-Adresse eingetragen. Bitte bestätige sie:“; App „… hat auf deinen Wunsch die Anmelde-Adresse deines Kontos auf diese Adresse umgestellt. Erst wenn du bestätigst, gilt sie.“ · .nachtlauf/screens/schluss/mail-sicherheit/4-390-hell.png
+- 390+1440 hell · Bild 4 · Punkt 2 · Fußsatz: Board „Der Link gilt 7 Tage. Bis dahin meldest du dich mit der alten Adresse an.“; App „Der Link gilt 24 Stunden und einmal. Warst du das nicht? Dann musst du nichts tun – die alte Adresse bleibt. Wir fragen dich nie per Mail nach deinem Passwort.“ (andere Frist und Inhalt) · .nachtlauf/screens/schluss/mail-sicherheit/4-390-hell.png
+- 390+1440 hell · Bild 5 · Punkt 2 · Text: Board „Ab jetzt meldest du dich mit franz.mueller@neu.beispiel.at an. Alle Geräte sind abgemeldet.“; App „Hallo Hof Müller, am 3.3. um 07:40 wurde die Anmelde-Adresse deines Kontos geändert. Alle Geräte sind abgemeldet.“ (neue Adresse wird nicht genannt) · .nachtlauf/screens/schluss/mail-sicherheit/5-390-hell.png, .nachtlauf/screens/schluss/mail-sicherheit/5-1440-hell.png
+- 390+1440 hell · Bild 1–6 · Punkt 7 · Schrift von Marke „Agrilo“ und Überschrift: Board zeigt die Anzeige-Serife (weich, mittelfett), App eine Ersatz-Serife (Times-artig, fett), sichtbar andere Schriftwirkung · .nachtlauf/screens/schluss/mail-sicherheit/6-390-hell.png (gilt für alle sechs App-Bilder)
+- 390+1440 hell · Bild 1–6 · Punkt 2 · Anbieterzeile im Fuß: Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“; App „Agrilo · agrilo.at/impressum“ (Anschrift-Platzhalter und „Impressum:“ fehlen; im Board als Vorschlag markiert, Recht prüft) · .nachtlauf/screens/schluss/mail-sicherheit/1-390-hell.png (gilt für alle sechs App-Bilder)
+- 390+1440 hell · Bild 1 · Punkt 1 · kleiner Abstand: im Board steht „Warst du das? Dann musst du nichts tun.“ direkt unter der Zeile „Gerät“, in der App mit deutlichem Abstand · .nachtlauf/screens/schluss/mail-sicherheit/1-390-hell.png
+
+Hinweis zur Rahmung: Der Postfach-Rahmen des Boards (Posteingang, Betreff, Von/An, Marke „Sofort“, Vorschauzeile) ist in der Mail-Vorschau der App nicht abgebildet; Betreff und Vorschauzeile sind im Bild daher nicht prüfbar und wurden nicht abgezogen.
+
+Begründete Ausnahmen gesehen:
+- keine
+
+Nicht prüfbar:
+- keine (alle 12 App-Bilder erreichbar)
+
+### mail-storno
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 6 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 3 | 6 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+(Mails nur hell; keine dunklen Fassungen im Board. 1440 wurde im Mail-Fenster 600 px aufgenommen.)
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 5 · Punkt 1/2 · Unter „So geht es weiter“ fehlt der zweite Satz „Ist die Rückgabe bestätigt, kommt das Geld auf demselben Weg zurück.“; App zeigt nur „Hof Müller prüft deinen Rücktritt und meldet sich.“ · .nachtlauf/screens/schluss/mail-storno/5-390-hell.png
+- 1440 hell · Bild 5 · Punkt 1/2 · derselbe fehlende Satz „Ist die Rückgabe bestätigt, kommt das Geld auf demselben Weg zurück.“ · .nachtlauf/screens/schluss/mail-storno/5-1440-hell.png
+- 390 hell · Bild 5 · Punkt 1 · Kleiner Hinweis am Kartenende fehlt ganz: Board „Bei schnell verderblicher Ware gilt das Rücktrittsrecht meist nicht – der Hof prüft das.“ · .nachtlauf/screens/schluss/mail-storno/5-390-hell.png
+- 1440 hell · Bild 5 · Punkt 1 · derselbe fehlende Hinweis zu schnell verderblicher Ware · .nachtlauf/screens/schluss/mail-storno/5-1440-hell.png
+- 390 hell · Bild 3 · Punkt 2 · Fester Satz geändert: Board „… nicht bis Mi, 3. März, 09:40 Uhr bestätigt.“, App „… nicht rechtzeitig bestätigt.“ – die Frist fehlt · .nachtlauf/screens/schluss/mail-storno/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · wie oben, „nicht rechtzeitig bestätigt“ statt „nicht bis <Frist> bestätigt“ · .nachtlauf/screens/schluss/mail-storno/3-1440-hell.png
+- 390 hell · Bild 4 · Punkt 2 · Fester Satz geändert: Board „… als die Bestellung schon abgelaufen war.“, App „… als die Bestellung schon storniert war.“ · .nachtlauf/screens/schluss/mail-storno/4-390-hell.png
+- 1440 hell · Bild 4 · Punkt 2 · wie oben, „storniert“ statt „abgelaufen“ · .nachtlauf/screens/schluss/mail-storno/4-1440-hell.png
+- 390 hell · Bild 5 · Punkt 2 · Datumsformat „Eingegangen“: Board „Mi, 3. März 2027, 19:40“, App „Mittwoch, 3. März 2027, 19:40 Uhr“ (Wochentag ausgeschrieben, „Uhr“ zusätzlich) · .nachtlauf/screens/schluss/mail-storno/5-390-hell.png
+- 1440 hell · Bild 5 · Punkt 2 · gleiches Datumsformat „Mittwoch, … 19:40 Uhr“ statt „Mi, … 19:40“ · .nachtlauf/screens/schluss/mail-storno/5-1440-hell.png
+- 390 hell · Bild 1–6 · Schriftbild · Wortmarke „Agrilo“, Überschrift und Bestellnummer erscheinen in einer Systemserif (Times-artig, fetter, Bestellnummer mit weiter Laufweite) statt der Marken-Serif des Boards; sichtbar anderer Charakter · .nachtlauf/screens/schluss/mail-storno/1-390-hell.png (ebenso 2–6)
+- 1440 hell · Bild 1–6 · Schriftbild · wie oben, Systemserif statt Marken-Serif in Wortmarke, Überschrift, Bestellnummer · .nachtlauf/screens/schluss/mail-storno/1-1440-hell.png (ebenso 2–6)
+- 390 hell · Bild 5 · Punkt 1 · Fuß-Anbieterzeile anders: Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“, App „Agrilo · agrilo.at/impressum“ (Board-Titel: „Recht prüft“ – falls Recht vor Board gewollt, als Ausnahme werten) · .nachtlauf/screens/schluss/mail-storno/5-390-hell.png
+- 1440 hell · Bild 5 · Punkt 1 · gleiche abweichende Anbieterzeile im Fuß · .nachtlauf/screens/schluss/mail-storno/5-1440-hell.png
+- 390 hell · Bild 1, 2, 3, 4, 6 · Punkt 1 · Zusätzliche Fußzeile „Agrilo · agrilo.at/impressum“ unter „Versandt von Agrilo im Auftrag eines Hofes.“; das Board zeigt dort nur die eine Zeile (vermutlich Recht vor Board/Impressum, siehe Ausnahmen) · .nachtlauf/screens/schluss/mail-storno/1-390-hell.png (ebenso 2, 3, 4, 6)
+- 1440 hell · Bild 1, 2, 3, 4, 6 · Punkt 1 · wie oben, zusätzliche Impressum-Zeile im Fuß · .nachtlauf/screens/schluss/mail-storno/1-1440-hell.png (ebenso 2, 3, 4, 6)
+
+Begründete Ausnahmen gesehen:
+- Recht vor Board (Impressum): Fußzeile mit Link „agrilo.at/impressum“ in allen Mails; in Bild 5 sieht das Board selbst eine Impressum-Zeile vor („Fuß und Anbieterzeile: Vorschlag, Recht prüft“). Oben trotzdem aufgeführt, damit entschieden werden kann, ob es als Ausnahme zählt.
+- Beispieldaten (Namen, Bestellnummern, Beträge, Telefonnummer, Storno-Grund in Bild 2, Hofname in Bild 4) weichen ab – Platzhalter, keine Abweichung.
+
+Nicht prüfbar:
+- Bild 1–6 (390/1440), nur der Mail-Kopf: Betreff, Von, An, Antwort an (Hof bzw. support@), Marke „Wichtig“/„Sofort“ und Vorschauzeile zeigt das Board im Postfach-Rahmen; die App-Bilder sind Mail-Vorschauen ohne Server und zeigen nur den Mail-Körper. Der Körper ist geprüft und bewertet, der Kopf nicht (nicht abgezogen).
+
+### mail-team
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 5 | 0 |
+| 390 dunkel | – | 0 | 0 (Mails nur hell) |
+| 1440 hell | 3 | 5 | 0 |
+| 1440 dunkel | – | 0 | 0 (Mails nur hell) |
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390/1440 hell · Bild 3 · Punkt 1 · Knopf „Admin-Zugang absichern“ fehlt in der App ganz (Board: grüner Knopf zwischen Rechte-Liste und Hinweissatz) · .nachtlauf/screens/schluss/mail-team/3-390-hell.png, .nachtlauf/screens/schluss/mail-team/3-1440-hell.png
+- 390/1440 hell · Bild 5 · Punkt 1 · Grauer Absendersatz „Gesendet am Mi, 3. März 2027, 08:50 aus Einstellungen › Benachrichtigungen.“ fehlt als eigene Zeile; der Inhalt steckt umformuliert im Fließtext · .nachtlauf/screens/schluss/mail-team/5-390-hell.png, .nachtlauf/screens/schluss/mail-team/5-1440-hell.png
+- 390/1440 hell · Bild 5 · Punkt 2 · Überschrift Board „Testmail“, App „Testmail aus dem Postfach“; Fließtext Board „… Wenn du diese Mail liest, stimmt die Zustellung.“, App „… Diese Adresse steht auf der Liste unter Einstellungen › Benachrichtigungen.“ · .nachtlauf/screens/schluss/mail-team/5-390-hell.png, .nachtlauf/screens/schluss/mail-team/5-1440-hell.png
+- 390/1440 hell · Bild 2 · Punkt 2 · Überschrift Board „Neuer Passkey“, App „Neuer Passkey bei deinem Admin-Konto“ · .nachtlauf/screens/schluss/mail-team/2-390-hell.png, .nachtlauf/screens/schluss/mail-team/2-1440-hell.png
+- 390/1440 hell · Bild 2 · Punkt 2 · Fließtext Board „Bei deinem Admin-Konto wurde der Passkey „Laptop · Chrome“ hinzugefügt (Fr, 23. Oktober 2026, 21:20).“, App „Hallo, am **3.3. um 07:40** wurde bei deinem Admin-Konto ein neuer Passkey eingerichtet: **Laptop · Chrome**.“ (anderer Satzbau, Anrede, Fettungen, Datumsformat ohne Wochentag/Jahr) · .nachtlauf/screens/schluss/mail-team/2-390-hell.png, .nachtlauf/screens/schluss/mail-team/2-1440-hell.png
+- 390/1440 hell · Bild 3 · Punkt 2 · Einleitung Board „Hallo Jonas Pichler, Clara Wimmer hat dich ins Admin-Team von Agrilo aufgenommen.“, App „… du wurdest ins Admin-Team von Agrilo eingeladen. Richte in den nächsten 24 Stunden deinen Passkey ein – melde dich dafür an und öffne den Admin-Bereich.“ (einladende Person fehlt, zusätzlicher Satz) · .nachtlauf/screens/schluss/mail-team/3-390-hell.png, .nachtlauf/screens/schluss/mail-team/3-1440-hell.png
+- 390/1440 hell · Bild 3 · Punkt 2 · Hinweissatz Board „Kennst du diese Änderung nicht? Melde dich bei der Projektleitung.“, App „Kennst du diese Änderung nicht? Antworte nicht auf diese Mail, sondern sag es sofort einer Inhaberin oder einem Inhaber.“ · .nachtlauf/screens/schluss/mail-team/3-390-hell.png, .nachtlauf/screens/schluss/mail-team/3-1440-hell.png
+- 1440 hell · Bild 3 · Punkt 1 · Im Hinweissatz wechselt die zweite Zeile („sofort einer Inhaberin oder einem Inhaber.“) sichtbar in eine Serifenschrift; Board durchgehend serifenlos · .nachtlauf/screens/schluss/mail-team/3-1440-hell.png
+- 390/1440 hell · Bild 4 · Punkt 2 · Fließtext Board „Clara Wimmer hat dich als Empfänger für Betriebs-Mails eingetragen. Bitte bestätige deine Adresse:“, App „Jemand aus dem Team von Agrilo hat diese Adresse für die Betriebs-Mails eingetragen: neue Höfe, Fehlermeldungen, offene Erstattungen. Öffne den Link und tippe auf der Seite auf „Adresse bestätigen“. Erst dann schicken wir dir etwas.“ (deutlich länger, eintragende Person fehlt) · .nachtlauf/screens/schluss/mail-team/4-390-hell.png, .nachtlauf/screens/schluss/mail-team/4-1440-hell.png
+- 390/1440 hell · Bild 1 · Punkt 2 · Gültigkeitssatz Board „Der Code gilt 15 Minuten und nur einmal.“, App „Der Code gilt 10 Minuten und nur in der Sitzung, in der du ihn angefordert hast.“ · .nachtlauf/screens/schluss/mail-team/1-390-hell.png, .nachtlauf/screens/schluss/mail-team/1-1440-hell.png
+- 390/1440 hell · Bild 1 · Punkt 2 · Anrede Board „Hallo Jonas Pichler, gib diesen Code …“, App „Hallo, gib diesen Code …“ (Name fehlt); schließendes Anführungszeichen nach „Admin-Zugang absichern“ ist in der App ein gerades " statt “ · .nachtlauf/screens/schluss/mail-team/1-390-hell.png, .nachtlauf/screens/schluss/mail-team/1-1440-hell.png
+- 390/1440 hell · Bild 1 · Punkt 1 · Code im Board in zwei Dreiergruppen „482 917“ (Anzeigeschrift), in der App ungeteilt „482917“ in anderer, schmalerer Serifenschrift · .nachtlauf/screens/schluss/mail-team/1-390-hell.png, .nachtlauf/screens/schluss/mail-team/1-1440-hell.png
+- 390/1440 hell · Bild 1–5 · Punkt 1 · Wortmarke „Agrilo“ und Überschriften stehen in der App in einer Times-artigen Ersatzschrift (fett, enger), im Board in der weicheren Anzeige-Serifenschrift; sichtbar andere Schriftwirkung · .nachtlauf/screens/schluss/mail-team/2-390-hell.png, .nachtlauf/screens/schluss/mail-team/2-1440-hell.png (gleich in 1, 3, 4, 5)
+- 390/1440 hell · Bild 1–4 · Punkt 2 · Anbieterzeile im Fuß Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“, App „Agrilo · agrilo.at/impressum“ (Platzhalter für Betreiber und Anschrift sowie das Wort „Impressum:“ fehlen; Board-Titel nennt die Zeile „Vorschlag, Recht prüft“ – falls hier Recht vor Board gilt, ist das nicht begründet hinterlegt) · .nachtlauf/screens/schluss/mail-team/1-390-hell.png, .nachtlauf/screens/schluss/mail-team/1-1440-hell.png (gleich in 2, 3, 4)
+- 390/1440 hell · Bild 3 · Punkt 1 · Aufzählungspunkte der Rechte-Liste in der App eingerückt mit kleinem Abstand („• Höfe …“ direkt am Text), im Board als Listenpunkte mit größerem Einzug; Abstand zwischen Zeilen etwas größer · .nachtlauf/screens/schluss/mail-team/3-390-hell.png
+
+Begründete Ausnahmen gesehen:
+- keine
+
+Nicht prüfbar:
+- Bild 1–5 (390/1440): Kopf des Posteingangs (Betreff, Von/An, Marke „Sofort“/„Wichtig“, Vorschauzeile) zeigt nur das Board; das App-Bild ist die reine Mail-Vorschau ohne Postfach-Rahmen, Betreff und Vorschauzeile sind darin nicht zu sehen (Manifest: „anonym (Mail-Vorschau, kein Server)“). Nicht abgezogen.
+- Dunkle Fassungen: nicht erstellt, Mails nur hell.
+
+### mail-zugang
+
+| Fassung | Sterne | Bilder geprüft | nicht prüfbar |
+|---|---|---|---|
+| 390 hell | 3 | 4 | 0 |
+| 390 dunkel | – | 0 | 0 |
+| 1440 hell | 3 | 4 | 0 |
+| 1440 dunkel | – | 0 | 0 |
+
+(Dunkle Fassungen entfallen: Mails werden laut Auftrag nur hell geprüft. „1440“ ist bei Mails ein Fenster von 600 px laut Manifest.)
+
+Mängel (je Zeile: Fassung · Bild · Maßstab-Punkt · was weicht ab · App-Bild-Pfad):
+- 390 hell · Bild 3 · Punkt 2 · Anrede und Satz anders: Board „Hallo Franz Müller, du möchtest ein neues Passwort für dein Hof-Konto.“, App „Hallo, du möchtest ein neues Passwort für dein Konto.“ (Name fehlt in der Anrede, „Hof-Konto“ wurde zu „Konto“) · .nachtlauf/screens/schluss/mail-zugang/3-390-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · wie oben: „Hallo Franz Müller, … dein Hof-Konto“ im Board, „Hallo, … dein Konto“ in der App · .nachtlauf/screens/schluss/mail-zugang/3-1440-hell.png
+- 390 hell · Bild 1 · Punkt 2 · Anbieterzeile im Fuß: Board „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“, App „Agrilo · agrilo.at/impressum“ (Feld für die Anschrift und Vorsatz „Impressum:“ fehlen; Link in der App unterstrichen, im Board nicht) · .nachtlauf/screens/schluss/mail-zugang/1-390-hell.png
+- 390 hell · Bild 2 · Punkt 2 · Anbieterzeile im Fuß wie bei Bild 1 gekürzt („Agrilo · agrilo.at/impressum“ statt „[Betreiber laut Impressum] · [Anschrift] · Impressum: agrilo.at/impressum“) · .nachtlauf/screens/schluss/mail-zugang/2-390-hell.png
+- 390 hell · Bild 3 · Punkt 2 · Anbieterzeile im Fuß wie bei Bild 1 gekürzt · .nachtlauf/screens/schluss/mail-zugang/3-390-hell.png
+- 390 hell · Bild 4 · Punkt 2 · Anbieterzeile im Fuß wie bei Bild 1 gekürzt · .nachtlauf/screens/schluss/mail-zugang/4-390-hell.png
+- 1440 hell · Bild 1 · Punkt 2 · Anbieterzeile im Fuß wie bei 390 gekürzt · .nachtlauf/screens/schluss/mail-zugang/1-1440-hell.png
+- 1440 hell · Bild 2 · Punkt 2 · Anbieterzeile im Fuß gekürzt · .nachtlauf/screens/schluss/mail-zugang/2-1440-hell.png
+- 1440 hell · Bild 3 · Punkt 2 · Anbieterzeile im Fuß gekürzt · .nachtlauf/screens/schluss/mail-zugang/3-1440-hell.png
+- 1440 hell · Bild 4 · Punkt 2 · Anbieterzeile im Fuß gekürzt · .nachtlauf/screens/schluss/mail-zugang/4-1440-hell.png
+- 390 hell · Bild 1 · Punkt 1 · Schrift von Wortmarke „Agrilo“ und Code „615 204“: Board weiche Antiqua mit Mediävalziffern, App eine harte Times-artige fette Serifenschrift mit weiter Laufweite – deutlich andere Wirkung des Codes · .nachtlauf/screens/schluss/mail-zugang/1-390-hell.png
+- 390 hell · Bild 2 · Punkt 1 · Wortmarke und Code „730 254“ in Times-artiger Ersatzschrift statt der Board-Antiqua · .nachtlauf/screens/schluss/mail-zugang/2-390-hell.png
+- 390 hell · Bild 3 · Punkt 1 · Wortmarke und Überschrift „Passwort zurücksetzen“ in Times-artiger Ersatzschrift statt der Board-Antiqua · .nachtlauf/screens/schluss/mail-zugang/3-390-hell.png
+- 390 hell · Bild 4 · Punkt 1 · Wortmarke und Überschrift „Bestätige deine E-Mail-Adresse“ in Times-artiger Ersatzschrift statt der Board-Antiqua · .nachtlauf/screens/schluss/mail-zugang/4-390-hell.png
+- 1440 hell · Bild 1–4 · Punkt 1 · dieselbe Ersatzschrift für Wortmarke, Überschriften und Code wie bei 390 · .nachtlauf/screens/schluss/mail-zugang/1-1440-hell.png (ebenso 2-, 3-, 4-1440-hell.png)
+
+Begründete Ausnahmen gesehen:
+- keine aus der Liste. Hinweis: Die Anbieterzeile ist im Board als „Vorschlag (V68/V79), Recht prüft“ markiert; falls sie als Rechtstext gilt (Maßstab Punkt 2, „Rechtstexte bleiben“), entfällt dieser Mangel und die Sterne steigen auf 4.
+
+Nicht prüfbar:
+- keine (alle 8 App-Bilder erreichbar).
+- Hinweis, nicht abgezogen: Der Posteingangs-Rahmen des Boards (Betreff „Dein Anmeldecode für Agrilo“ usw., Von, An, „Sofort“, Vorschauzeile, Leiste „Antworten · Weiterleiten · Archivieren“) ist Darstellung des Mailprogramms und im App-Bild (nur Mail-Körper) nicht enthalten; Betreff und Vorschauzeile lassen sich aus den Bildern nicht prüfen.
+
