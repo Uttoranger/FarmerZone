@@ -31,7 +31,7 @@ import { KURZNUMMER_LAENGE, kurznummerAus, passtZurKurznummer } from '@/lib/kurz
 import { Vorschau248 } from '@/app/intern/bausteine/vorschau-248'
 
 const html = (el: ReturnType<typeof createElement>) => renderToStaticMarkup(el)
-const wahl = (...kinder: ReactNode[]) => createElement(GroessenWahl, { beschriftung: 'Größe wählen', standardWert: 'sack' }, ...kinder)
+const wahl = (kind: ReactNode) => createElement(GroessenWahl, { beschriftung: 'Größe wählen', standardWert: 'sack' } as Parameters<typeof GroessenWahl>[0], kind)
 
 describe('Größenkachel (G5)', () => {
   it('Name mit Menge, darunter Grundpreis · Vorrat, Preis rechts, Radio-Kreis vorn', () => {
