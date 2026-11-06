@@ -27,7 +27,6 @@ import {
   brauchtDich,
   datumLang,
   kurzname,
-  naechsteAbholungText,
   naechsteAbholungWhere,
   positionenKurz,
   ueberfaelligWhere,
@@ -120,11 +119,6 @@ describe('nächste Abholung', () => {
     // 0:30 Wien am 29.9. ist in UTC noch der 28.9. — „Morgen" ist der 30.9.
     const heute = tagVersetzt('2026-09-28', 1)
     expect(abholtagName(heute, '2026-09-30')).toBe('Morgen')
-  })
-
-  it('Zeile: Einzahl und Mehrzahl', () => {
-    expect(naechsteAbholungText({ tag: '2026-09-30', name: 'Morgen', anzahl: 1 })).toBe('Morgen: 1 Bestellung')
-    expect(naechsteAbholungText({ tag: '2026-10-01', name: 'Donnerstag', anzahl: 4 })).toBe('Donnerstag: 4 Bestellungen')
   })
 })
 

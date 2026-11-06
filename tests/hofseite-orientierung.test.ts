@@ -58,10 +58,8 @@ import {
   KLEBE_BLOCK_VAR,
   REITER_PX,
   blattBeimErstenMal,
-  TITELBILD_ZURUECK,
   hofZeileUnterzeile,
   hofZeileZustand,
-  hofzeileSteht,
   korbFehlerText,
   vergissBlattMerker,
 } from '@/lib/hofseite-orientierung'
@@ -411,21 +409,11 @@ describe('Zurück am Handy (Entscheidung 5, Nr. 195; seit Nr. 235 über die Hofz
   it('die Hofzeile mit Zurück steht vor dem Titelbild — Zurück ist von Anfang an zu sehen, ein Knopf im Bild entfällt', () => {
     const html = seite()
     expect(html).not.toContain('data-titelbild-zurueck')
-    expect(html).not.toContain(`aria-label="${TITELBILD_ZURUECK}"`)
+    // Der Name des alten Knopfs im Bild („Zu allen Höfen“, bis Nr. 235 TITELBILD_ZURUECK) steht nirgends mehr.
+    expect(html).not.toContain('aria-label="Zu allen Höfen"')
     const block = ganzesDiv(html, 'data-klebe-block')
     expect(block).toContain('aria-label="Zurück zu allen Höfen"')
     // Gegenprobe: Der Block steht im Quelltext vor dem Titelbild.
     expect(html.indexOf('data-klebe-block')).toBeLessThan(html.indexOf('data-abschnitt="titelbild"'))
-  })
-
-  it('hofzeileSteht: klebt, sobald die Oberkante des Blocks unter dem Kopf angekommen ist', () => {
-    expect(hofzeileSteht(56, 56)).toBe(true)
-    expect(hofzeileSteht(20, 56)).toBe(true)
-    // Gegenprobe: noch darunter im Fluss.
-    expect(hofzeileSteht(57, 56)).toBe(false)
-    expect(hofzeileSteht(420, 56)).toBe(false)
-    // Ohne Kopf zählt die Fensterkante.
-    expect(hofzeileSteht(0, 0)).toBe(true)
-    expect(hofzeileSteht(10, 0)).toBe(false)
   })
 })

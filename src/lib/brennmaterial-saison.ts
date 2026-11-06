@@ -14,9 +14,6 @@ import { wienKalendertag } from '@/lib/kalender'
 /** Die Monate der Saison (1 = Jänner) — Oktober, November, Dezember, Jänner, Februar, März. */
 export const BRENNMATERIAL_SAISON_MONATE: readonly number[] = [10, 11, 12, 1, 2, 3]
 
-/** Der Wortlaut der Saison-Marke am Band. */
-export const BRENNMATERIAL_SAISON_TEXT = 'Saison Oktober bis März'
-
 /** Ob die Startseite das Brennmaterial-Band zeigt — rein, `jetzt` ist Parameter. */
 export function istBrennmaterialSaison(jetzt: Date): boolean {
   const monat = Number(wienKalendertag(jetzt).slice(5, 7))

@@ -819,17 +819,6 @@ export const WUENSCHE_TEXT = {
   bescheidNichtGesendet: 'Der Stand ist gespeichert, die Nachricht an die Höfe aber nicht – schick sie über „Rundschreiben schreiben“.',
 } as const
 
-const HTML_ZEICHEN: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-
-/**
- * Der Körper der Betriebsmail an Kundinnen eines Bündels (über sendRaw, Post-Sperre Z3):
- * die Antwort des Teams als maskierter Text — nie als Markup —, Zeilen bleiben Zeilen.
- */
-export function bescheidMailHtml(antwort: string, team: string): string {
-  const text = (s: string): string => s.replace(/[&<>"']/g, (z) => HTML_ZEICHEN[z] ?? z)
-  return `<p>${text(antwort).replace(/\r?\n/g, '<br>')}</p><p>${text(team)}</p>`
-}
-
 // ─── Suche in Zusammenfassen und Dazunehmen ─────────────────────────────────
 
 /** Eine Meldung, wie die Dialoge sie kennen: Kurztitel, Wer, Teil und der gespeicherte Stand für den Triage-Aufruf. */
