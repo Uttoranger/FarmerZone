@@ -832,7 +832,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Jeder Hof hat eine Akte; jede Bestellung ist im Admin auffindbar (Nummer oder genaue Adresse).
   - Mockups ‚ADMIN · Regelbetrieb‘.“
 - **Umsetzung:** Nr. 185 (Heute), Nr. 186 (Bestellungen), Nr. 187 (Höfe und Akte), Nr. 192 (Handbuch), Nr. 193 (Navigation, Postfach nur Gespräche) und Nr. 184 (Betrieb: Alarm-Matrix) (freigabe.md §30); keine Migration außer der in Nr. 188.
-- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen. ersetzt die Zählweise nach Nr. 240.
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen; ersetzt die Zählweise nach Nr. 240.
 
 ### N33 · Admin-Protokoll (26.10.2026)
 - **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Jede Admin-Aktion, jedes Ansehen einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand eines Hofs ändert, steht im Protokoll.
