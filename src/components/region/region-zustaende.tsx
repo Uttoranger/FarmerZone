@@ -72,7 +72,7 @@ export function StandortFehlt({ eigeneKarte, jetzt }: { eigeneKarte?: EigeneKart
 export function RegionFehler({ nochmal }: { nochmal: string }): React.JSX.Element {
   return (
     <Hinweiskarte
-      
+
       ton="neutral"
       titel="Wir konnten die Höfe in deiner Nähe gerade nicht laden."
       aktion={

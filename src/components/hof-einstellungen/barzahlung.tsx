@@ -11,10 +11,8 @@ import { cn } from '@/lib/utils'
 import { StatusBadge, type StatusTon } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ReceiptText } from 'lucide-react'
-import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
-
-/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
-const KICKER_12 = cn(KICKER, 'text-xs')
+import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 
 const T = LASTSCHRIFT_TEXT
 

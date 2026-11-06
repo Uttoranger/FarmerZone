@@ -113,7 +113,7 @@ export function KundenAnsicht({
               })}
             </FilterChipReihe>
             <label className="relative order-3 block w-full xl:order-2 xl:w-[360px] xl:shrink-0">
-              <span className="sr-only">Kundin suchen</span>
+              <span className="mb-1 block text-sm font-semibold text-foreground">Kundin suchen</span>
               <input
                 type="search"
                 value={suche}

@@ -12,7 +12,7 @@ export function EinstellungenFehler({ titel, href }: { titel: string; href: stri
     <div className="flex flex-col gap-4">
       <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">{titel}</h1>
       <Hinweiskarte
-        
+
         ton="neutral"
         titel="Wir konnten deine Einstellungen gerade nicht laden."
         aktion={

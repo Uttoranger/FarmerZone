@@ -5,7 +5,8 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { centsAlsEuro, einheitLabel, formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
 import { UMSATZ_LEER, zahlartZeile, type GebuehrenKarteText, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
 import { MARKE } from '@/lib/marke'
@@ -14,9 +15,6 @@ import { AUSWERTUNG_MAX_ZURUECK, auswertungHref } from '@/schemas/auswertung'
 import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { cn } from '@/lib/utils'
 import type { ServicegebuehrenDiesesMonats } from '@/server/queries/auswertung'
-
-/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
-const KICKER_12 = cn(KICKER, 'text-xs')
 
 /** Fußsatz der Karte „Was lief am besten“, wörtlich nach Board s2-/w2-auswertung. */
 const TOP_PRODUKTE_FUSS = `Nur Bestellungen über ${MARKE}, Warenpreis.`

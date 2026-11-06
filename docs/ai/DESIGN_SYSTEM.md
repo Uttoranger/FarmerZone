@@ -876,7 +876,7 @@ Boards s2/w2-auswertung, -kunden, -verkaeufe, -postfach, -meldungen, -beitraege,
 - **WhatsApp versenden:** „Öffnen“ (für den Screenreader „– Nachricht an <Name> in WhatsApp“); nur die nächste offene Person trägt den orangen Knopf, die übrigen sind Umrisse.
 - **QR-Plakat ohne öffentlichen Hof:** Ausweg „Hofseite einrichten“.
 - **/teilen:** oben der Rückweg „Zu Heute“, ohne geteilte Fotos derselbe Ausweg; ein gescheitertes Hochladen steht als `HinweiskarteFehler` mit „Nochmal“ und dem Ausweg Mein Hof › Hofseite, die Fotos bleiben in der Ablage.
-- **Kunden, Verkäufe:** Suche „Kundin suchen“; leer „Hofseite vervollständigen“. „Noch einmal eintragen“ steht unter „Letzte Verkäufe“; im Dialog „Was hast du verkauft? (optional)“.
+- **Kunden, Verkäufe:** Suche mit sichtbarer Beschriftung „Kundin suchen“ über dem Feld (Platzhalter „Name, Telefon oder E-Mail“); leer „Hofseite vervollständigen“. „Noch einmal eintragen“ steht unter „Letzte Verkäufe“; im Dialog „Was hast du verkauft? (optional)“.
 
 ### Mein Hof, Einstellungen, Region und Hof-Werkzeuge nach den Boards November 2026 (Nr. 238, Lauf 31)
 

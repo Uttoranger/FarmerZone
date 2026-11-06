@@ -23,8 +23,8 @@ import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 import { POSTFACH_RAHMEN, PostfachZeile } from './teile'
@@ -80,7 +80,7 @@ export default async function PostfachPage({
         <Hinweiskarte
           ton="neutral"
           aktion={
-            <a href={postfachFilterHref(filter)} className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}>
+            <a href={postfachFilterHref(filter)} className={KNOPF_RAHMEN}>
               Neu laden
             </a>
           }
@@ -114,7 +114,7 @@ export default async function PostfachPage({
                 ausweg={
                   <Link
                     href={postfachFilterHref('alle')}
-                    className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}
+                    className={KNOPF_RAHMEN}
                   >
                     {POSTFACH_ALLES_GELESEN.ausweg}
                   </Link>

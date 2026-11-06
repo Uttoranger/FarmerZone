@@ -13,7 +13,7 @@ export const AUSWERTUNG_RAHMEN = 'w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt
 export function AuswertungFehler({ nochmal }: { nochmal: string }): React.JSX.Element {
   return (
     <Hinweiskarte
-      
+
       ton="neutral"
       titel="Wir konnten deine Zahlen gerade nicht laden."
       aktion={

@@ -200,7 +200,7 @@ export function VerkaufFormular({
       else toast.success(antwort.vorrat?.text ?? (bearbeiten ? 'Verkauf gespeichert' : 'Verkauf eingetragen'))
       onFertig()
     } catch {
-      setServerFehler('Wir konnten den Verkauf nicht speichern. Deine Angaben sind noch da.')
+      setServerFehler('Wir konnten den Verkauf nicht speichern. Deine Angaben sind noch da. Schau in der Liste nach, ob er schon dasteht, bevor du es noch einmal versuchst.')
     } finally {
       setLaeuft(false)
     }

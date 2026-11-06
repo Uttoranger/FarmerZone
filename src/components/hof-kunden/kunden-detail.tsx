@@ -10,12 +10,10 @@ import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { cn } from '@/lib/utils'
-
-/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
-const KICKER_12 = cn(KICKER, 'text-xs')
 
 /*
  * Eine Kundin des Hofs (/customers/[kundeId], Gate 8 „Code ohne Mockup",

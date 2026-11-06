@@ -31,8 +31,9 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     if (daten) {
       bereiche = einstellungenBereiche(daten, jetzt)
       hofName = daten.name
+    } else {
+      gefunden = false
     }
-    else gefunden = false
   } catch (err) {
     // Nur Art und Bereich — keine Personendaten.
     Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'uebersicht' } })

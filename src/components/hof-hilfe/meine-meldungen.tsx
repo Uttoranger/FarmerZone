@@ -34,7 +34,7 @@ export function MeineMeldungen({ zeilen }: { zeilen: MeldungZeile[] | null }): R
 
       {zeilen === null ? (
         <Hinweiskarte
-          
+
           ton="neutral"
           titel="Wir konnten deine Meldungen gerade nicht laden."
           aktion={

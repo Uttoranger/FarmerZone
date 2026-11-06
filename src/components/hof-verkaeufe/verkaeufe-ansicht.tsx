@@ -23,13 +23,11 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KanalSymbol } from '@/components/sales/kanal-symbol'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
-import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { VerkaufDialog } from './verkauf-dialog'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
-
-/** Kicker der Hof-Seiten nie unter 12 px (Lauf 31); `KICKER` aus stil.ts setzt noch 11 px. */
-const KICKER_12 = cn(KICKER, 'text-xs')
 
 /*
  * Verkäufe in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf Nr. 22b) —
