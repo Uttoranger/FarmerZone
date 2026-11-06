@@ -74,13 +74,13 @@ describe('Mail an das bestehende Konto', () => {
     )
   }
 
-  it('Hof: sagt, was passiert ist, mit beiden Auswegen (anmelden, Passwort zurücksetzen)', () => {
+  it('Hof: sagt, was passiert ist, mit einem Knopf zum Anmelden (Board s3/w3-mail-sicherheit Bild 6)', () => {
     const text = html('passwort')
-    expect(text).toContain(`jemand wollte sich mit deiner E-Mail-Adresse bei ${MARKE} registrieren`)
+    expect(text).toContain('Gerade wollte sich jemand mit dieser Adresse neu registrieren.')
     expect(text).toContain('href="https://plattform.example/login"')
-    expect(text).toContain('href="https://plattform.example/forgot-password"')
-    expect(text).toContain('Passwort zurücksetzen')
-    expect(text).toContain('kannst du diese E-Mail ignorieren')
+    // „Passwort vergessen“ steht auf der Anmeldeseite; die Mail hat nur den einen Knopf.
+    expect(text).not.toContain('forgot-password')
+    expect(text).toContain('Warst du das nicht? Dann musst du nichts tun.')
   })
 
   it('Kundin: Anmelden mit Code, kein Passwort-Link', () => {
