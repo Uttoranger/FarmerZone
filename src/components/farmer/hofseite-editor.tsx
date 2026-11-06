@@ -252,7 +252,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
 
         {fortschritt.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>
-            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
               {gruppe.titel}
             </h3>
             <ul className="mt-2 overflow-hidden rounded-2xl border border-border bg-card">

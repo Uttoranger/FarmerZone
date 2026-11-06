@@ -10,6 +10,8 @@ export const PROFIL_MELDUNG = {
   ownerName: 'Bitte gib deinen Vor- und Nachnamen an – Kundinnen sehen, wer den Hof führt.',
   address: 'Bitte gib Straße und Hausnummer an – so finden dich Kundinnen zur Abholung.',
   postalCode: 'Bitte gib die Postleitzahl an – sie gehört zur Abholadresse.',
+  /** Zu kurz statt leer (Board s2-/w2-hofdaten-zahlung, Bild 2; Nr. 242): vorher stand dort auch „Bitte gib … an“. */
+  postalCodeKurz: 'Die Postleitzahl hat in Österreich 4 Ziffern.',
   city: 'Bitte gib den Ort an – er gehört zur Abholadresse.',
   phoneFehlt: 'Bitte gib eine Telefonnummer an – bei Fragen zur Abholung rufen Kundinnen dort an.',
   phoneKurz: 'Die Telefonnummer ist zu kurz – bitte mit Vorwahl, damit Kundinnen dich erreichen.',

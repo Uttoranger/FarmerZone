@@ -211,7 +211,10 @@ export const PLATTFORMGEBUEHR_BEZEICHNUNG = 'Plattformgebühr'
 /** Der Zusatz am Endpreis — Hofseite, Produktseite, Karten, Korb und Mails (N38). */
 export const INKL_PLATTFORMGEBUEHR = 'inkl. Plattformgebühr'
 
-/** Der Satz unter Korb und Positionen der Kasse im Hofpreis-Modell. */
+/**
+ * Der Satz unter einer Preisliste im Hofpreis-Modell: unter den Produktzeilen auf /hoefe und unter „Gleich mit
+ * abholen“ der Produktseite. Die Kasse zeigt ihn seit Nr. 236 nicht mehr (N38 verlangt ihn dort nicht).
+ */
 export const PREISE_INKL_PLATTFORMGEBUEHR = `Preise ${INKL_PLATTFORMGEBUEHR}`
 
 /** Der Satz in der Kasse unter der Aufschlüsselung (Freigabe Lauf 26, Nr. 197, wörtlich). */

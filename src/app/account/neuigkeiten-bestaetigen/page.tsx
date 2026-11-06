@@ -23,7 +23,7 @@ const SATZ = 'text-[15px] leading-normal break-words text-muted-foreground [over
 
 /** Die erste Zeile des Fehlerkastens je Fall; darunter steht der Ausweg (Board s2-neuigkeiten, Bild 4: „Er gilt 7 Tage.“). */
 function fehlerZeile(grund: 'ungueltig' | 'abgelaufen' | 'ueberholt' | 'abo_weg'): string {
-  if (grund === 'abgelaufen') return ABO_TEXT.abgelaufen.slice(ABO_TEXT.abgelaufen.indexOf('Er gilt'))
+  if (grund === 'abgelaufen') return ABO_TEXT.gueltigkeit
   return ABO_TEXT[grund]
 }
 
