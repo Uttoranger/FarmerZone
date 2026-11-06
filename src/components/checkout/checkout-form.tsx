@@ -63,7 +63,8 @@ import {
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
-import { KASSE_AGB_SATZ } from '@/lib/rechtstexte/agb-einbindung'
+import { AGB_PFAD, kasseAgbSatz } from '@/lib/rechtstexte/agb-einbindung'
+import { agbFassungPfad, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { cn } from '@/lib/utils'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
@@ -608,7 +609,7 @@ export function CheckoutForm({
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
         privat={privat}
-        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} hofpreis={farm.preisAnzeige !== null} agbPfad={AGB_PFAD} />}
       />
     )
   }
@@ -693,6 +694,7 @@ export function CheckoutForm({
         uebersicht={
           <KassenAbschluss
             hof={farm}
+            hofpreis={farm.preisAnzeige !== null}
             uebersicht={
               <UebersichtKarte
                 betraege={betraege}
@@ -1076,6 +1078,7 @@ export function KassenAbschluss({
   fussnote,
   privat = true,
   zusammenfassung,
+  hofpreis = false,
 }: {
   hof: AngabenHof
   /** Die Übersicht mit Frist, Beträgen und einem Fehler der Anfrage. */
@@ -1091,6 +1094,8 @@ export function KassenAbschluss({
   privat?: boolean
   /** Ware, Gesamtpreis, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210). */
   zusammenfassung?: React.ReactNode
+  /** Hofpreis-Modell (farm.preisAnzeige !== null): der Satz unter dem Knopf ohne Zustimmung zur sofortigen Vermittlung (N45). */
+  hofpreis?: boolean
 }): React.JSX.Element {
   return (
     // max-md:mb-6: Mit den Sätzen ist die feste Leiste am Handy bis 200 px hoch (Lauf 31, vorher rund 250);
@@ -1124,7 +1129,7 @@ export function KassenAbschluss({
         </button>
         {/* Am Handy 12 px wie die Sätze darunter (Lauf 31: die Leiste knapp halten). */}
         {fussnote && <p className={cn(HINWEIS, 'text-center max-md:text-[12px] max-md:leading-[1.35] md:text-left lg:text-right')}>{fussnote}</p>}
-        <KaufknopfSaetze privat={privat} />
+        <KaufknopfSaetze privat={privat} hofpreis={hofpreis} agbPfad={AGB_PFAD} />
       </AktionsLeiste>
       </div>
     </div>
@@ -1137,17 +1142,27 @@ export function KassenAbschluss({
  * zusätzlich unter „Weiter zur Zahlung“. EINE Quelle für Formular (`KassenAbschluss`) und
  * Zahlungsschritt (`StripeZahlung`, Prop `kaufknopfSaetze`), damit beide Leisten nie auseinanderlaufen.
  */
-export function KaufknopfSaetze({ privat }: { privat: boolean }): React.JSX.Element {
+export function KaufknopfSaetze({
+  privat,
+  hofpreis,
+  agbPfad,
+}: {
+  privat: boolean
+  /** Hofpreis-Modell (N45): ohne die Zustimmung zur sofortigen Vermittlung. In der Kasse aus farm.preisAnzeige, bei einer bestehenden Bestellung aus ihrem Snapshot. */
+  hofpreis: boolean
+  /** Ziel des AGB-Links: in der Kasse /agb, bei einer bestehenden Bestellung /agb/<Fassung ihres Snapshots>. */
+  agbPfad: string
+}): React.JSX.Element {
   // Lauf 31 (Board s1-kasse: Knopf und Satz kompakt): Am Handy laufen beide Sätze als EIN Absatz in 12 px — derselbe
   // Wortlaut, nur ohne Zwischenraum zwischen zwei Absätzen; ab 768 px wie bisher zwei Absätze.
   const satz = 'max-md:inline text-[12px] leading-[1.35] text-muted-foreground md:text-[12.5px] md:leading-normal'
   return (
     // Schrift und Zeilenhöhe auch an der Hülle: Die Zeilen eines Absatzes aus Inline-Teilen messen sich an ihr.
     <div className="text-center text-[12px] leading-[1.35] text-muted-foreground md:flex md:flex-col md:gap-2 md:text-left md:text-[12.5px] md:leading-normal lg:text-right">
-      {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
-          Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
-          in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
-      <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={satz} />
+      {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und im Modell „bisher“ fällt mit dem
+          Tippen auf den Knopf die Zustimmung zur sofortigen Ausführung — ohne Haken (im Hofpreis-Modell
+          entfällt dieser Teil, N45). Der Link öffnet in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
+      <AgbSatz stuecke={kasseAgbSatz({ hofpreis, agbPfad })} neuerTab className={satz} />
       {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf
           im neuen Tab. Bei „Betrieb“ gibt es kein Rücktrittsrecht, also keinen Satz. */}
       {privat && (
@@ -1202,6 +1217,7 @@ export function ZahlungFortsetzen({
   anzeige,
   jetztIso,
   privat,
+  agbFassung,
 }: {
   farm: PublicFarm
   zahlung: Zahlung
@@ -1214,6 +1230,8 @@ export function ZahlungFortsetzen({
   jetztIso: string
   /** Käuferart der Bestellung ist PRIVAT (Seite, aus der Datenbank) — nur dann die Gewährleistungs-Mitteilung (Nr. 211). */
   privat: boolean
+  /** Die AGB-Fassung aus dem Snapshot der Bestellung (N45) — die Seite ermittelt sie auf dem Server und meldet einen unbekannten Wert. */
+  agbFassung: AgbKennung
 }): React.JSX.Element {
   const [jetzt, setJetzt] = useState(() => new Date(jetztIso))
   useEffect(() => {
@@ -1221,6 +1239,11 @@ export function ZahlungFortsetzen({
     return () => window.clearInterval(uhr)
   }, [])
   const zeilen = useMemo(() => new Map(Object.entries(zeilenCents)), [zeilenCents])
+  // N45: Satz und AGB-Link folgen dem Snapshot der Bestellung (`anzeige` ≠ null ⇔ Hofpreis-Modell, fortsetzungsKorb;
+  // die Fassung ermittelt die Seite auf dem Server), nie der heutigen Lage des Hofs — eine Bestellung „bisher“
+  // behält nach dem Stichtag den Satz mit Vermittlung und 0.9.
+  const hofpreis = anzeige !== null
+  const agbPfad = agbFassungPfad(agbFassung)
   return (
     <KundeFokusShell
       titel="Bezahlen"
@@ -1236,12 +1259,12 @@ export function ZahlungFortsetzen({
         stand={reservierungsStand(zahlung.reserviertBis, jetzt)}
         betrag={zahlung.betrag}
         gebuehrText={zahlung.gebuehrText}
-        hofpreis={anzeige !== null}
+        hofpreis={hofpreis}
         korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
         privat={privat}
-        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} hofpreis={hofpreis} agbPfad={agbPfad} />}
       />
     </KundeFokusShell>
   )

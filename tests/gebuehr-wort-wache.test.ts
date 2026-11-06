@@ -274,8 +274,8 @@ type Fest = { datei: string; text: string | RegExp | null; grund: string }
 const BISHER = 'nur Modell bisher'
 
 const FESTE_LISTE: Fest[] = [
-  // AGB 0.9 (Register O4) — Wortlaut bleibt, AGB 1.0 ist ein eigener /fix.
-  { datei: 'src/lib/rechtstexte/agb.ts', text: null, grund: 'AGB 0.9: Rechtstext, wörtlich aus docs/recht/agb.md (Register O4); AGB 1.0 ist ein eigener /fix' },
+  // AGB 0.9 (Register O4) eingefroren für Bestellungen im Modell bisher (N45). AGB 1.0 (agb.ts) nennt die Servicegebühr nicht mehr.
+  { datei: 'src/lib/rechtstexte/agb-0-9.ts', text: null, grund: 'Fassung 0.9 eingefroren (N45/A005)' },
   // Die Quellen des Worts im Modell „bisher“ (ihre Leser zählt RUECKFALL_WERTE)
   { datei: 'src/lib/servicegebuehr.ts', text: 'Servicegebühr', grund: `${BISHER}: SERVICEGEBUEHR_BEZEICHNUNG — gebuehrBezeichnungFuer und gebuehrWortFuerZeitraum wählen es nur für das alte Modell` },
   {

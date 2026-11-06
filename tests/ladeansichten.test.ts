@@ -382,7 +382,11 @@ describe('Hofseite und Produktseite — die 404 kommt vor dem Skelett (Nr. 117)'
   it('die Infoseiten der Gruppe warten auf nichts — ohne Ladeansicht davor', () => {
     for (const ordner of ['agb', 'datenschutz', 'impressum', 'konditionen', 'fuer-hoefe']) {
       const text = liesDatei(`src/app/(public)/${ordner}/page.tsx`)
-      expect(text, ordner).not.toMatch(/force-dynamic|searchParams|from 'next\/headers'/)
+      expect(text, ordner).not.toMatch(/searchParams|from 'next\/headers'/)
+      expect(existiert(`src/app/(public)/${ordner}/loading.tsx`), ordner).toBe(false)
+      // N45 (A005 4a/4e): /agb und /konditionen werden je Aufruf frisch gebaut, lesen aber nur den Data Cache
+      // (ladePlattformEinstellung) — keine Anfrage, keine Wartezeit, also keine Ladeansicht. Die anderen bleiben statisch.
+      if (ordner !== 'agb' && ordner !== 'konditionen') expect(text, ordner).not.toMatch(/force-dynamic/)
     }
     // Gegenprobe: Die Hofseite ist dynamisch und fiele hier auf.
     expect(liesDatei('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/force-dynamic/)
@@ -676,6 +680,7 @@ describe('Die Fehlernummer auf dem Weg in den Briefkasten', () => {
       'src/lib/bauern-navigation.ts': 'Navigation des Hofbereichs, dort baut Nr. 87 den Punkt Postfach (Nacharbeit)',
       'src/app/(public)/datenschutz/page.tsx': 'ein Satz der Datenschutzerklärung (Rechtstext)',
       'src/lib/rechtstexte/agb.ts': 'die AGB Wort für Wort aus docs/recht/agb.md (Nr. 90; Rechtstext ist von Textwachen ausgenommen, Freigabe §17 §2)',
+      'src/lib/rechtstexte/agb-0-9.ts': 'Fassung 0.9 eingefroren (N45/A005)',
     }
     const quellen = (ordner: string): string[] =>
       fs.readdirSync(ordner, { withFileTypes: true }).flatMap((e) => {

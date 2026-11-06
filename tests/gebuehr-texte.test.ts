@@ -153,10 +153,11 @@ describe('mindestbestellwertHinweis (A3) — ohne Gebühr beim Fehlbetrag', () =
 describe('Konditionen je Modell (V62)', () => {
   const JETZT = new Date('2027-03-03T08:42:00+01:00')
 
-  it('ab dem Stichtag: „Plattformgebühr und Abrechnung“ mit Entwurf-Kennzeichnung, Satz, Mindestbestellwert, Stripe, Lastschrift, Gründungshöfe', () => {
+  it('ab dem Stichtag: „Plattformgebühr und Abrechnung“ ohne Entwurf-Kennzeichnung (N45), Satz, Mindestbestellwert, Stripe, Lastschrift, Gründungshöfe', () => {
     const a = konditionenGebuehrAbschnitt('hofpreis', JETZT)
     expect(a.titel).toBe('Plattformgebühr und Abrechnung')
-    expect(a.entwurf).toBe(KONDITIONEN_ENTWURF)
+    // N45: Ab dem Stichtag fällt die Marke weg — das Feld bleibt im Typ und gibt null.
+    expect(a.entwurf).toBeNull()
     expect(KONDITIONEN_ENTWURF).toBe('Entwurf – die Anwältin prüft den Wortlaut')
     const text = a.absaetze.join(' ')
     expect(text).toContain('6 % vom Warenpreis, je Stück auf den Cent aufgerundet (Standard; ist für deinen Hof ein anderer Satz eingetragen, gilt dieser)')

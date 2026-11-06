@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
@@ -10,14 +11,15 @@ import { isAdminUser } from '@/server/queries/admin'
 import { zaehleZuEntscheiden } from '@/server/queries/meldung'
 import { ladeTarifZeile } from '@/server/hofbereich'
 import { getFarmBannerState } from '@/server/queries/farm'
-import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
-import { gebuehrModellFuer } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung, ladePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { gebuehrModellFuer, hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { HofShell } from '@/components/shells/hof-shell'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EinrichtenSeite } from '@/components/einrichten/einrichten-seite'
 import { MARKE } from '@/lib/marke'
-import { agbFassung } from '@/lib/rechtstexte/agb-datei'
-import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
+import { agbKartenStichtag, brauchtAgbZustimmung, type AgbKartenStichtag } from '@/lib/agb-zustimmung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 
 export const metadata: Metadata = {
   title: `Hof einrichten — ${MARKE}`,
@@ -62,8 +64,9 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
   const person = { name: session.user.name ?? '', email: session.user.email ?? '' }
   const stand = einrichtenStand({ personName: person.name, email: person.email, hof, emailOffen })
   // Nr. 207 (§ 104 JN, P2B): Zustimmung zur aktuellen AGB-Fassung — erst mit Hof, nie ein Lockout.
-  const fassung = agbFassung()
-  const agb = hof && brauchtAgbZustimmung(hof, fassung) ? { fassung, geaendert: hof.agbFassung !== null } : null
+  const fassung = AGB_NEUESTE
+  // N45: Der Stichtag für die Karte kommt aus ladePlattformEinstellung (nie aus der stillen Vorgabe von ladeHofpreisEinstellung).
+  const agb = hof && brauchtAgbZustimmung(hof, fassung) ? { fassung, geaendert: hof.agbFassung !== null, stichtag: await ladeAgbKartenStichtag(jetzt) } : null
   // Ohne Hof gibt es keinen Balken; stillgelegt zeigt Einrichten wie bisher keinen.
   const banner = hof && !hof.freigeschaltet ? await getFarmBannerState(session.user.id) : null
   const warten = banner && banner.archivedAt === null && banner.approvedAt === null ? { farmId: banner.id, farmName: banner.name, country: banner.country } : null
@@ -112,4 +115,14 @@ export default async function OnboardingPage(): Promise<React.JSX.Element> {
       {inhalt}
     </HofShell>
   )
+}
+
+/** Der Stichtag für die Karte „AGB bestätigen“ (N45); bei einem Ladefehler der Satz ohne Datum, gemeldet mit festem Bereich. */
+async function ladeAgbKartenStichtag(jetzt: Date): Promise<AgbKartenStichtag> {
+  try {
+    return agbKartenStichtag(hofpreisModellAb(hofpreisEinstellungAus(await ladePlattformEinstellung())), jetzt)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'agb-karte-stichtag', seite: 'einrichten' } })
+    return agbKartenStichtag(null, jetzt)
+  }
 }

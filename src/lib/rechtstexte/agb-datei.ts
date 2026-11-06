@@ -1,49 +1,44 @@
 /**
  * Die AGB als Datei für den Anhang der Bestätigungsmails (Nr. 207, Auftrag
  * Punkt 1; § 11 ECG, dauerhafter Datenträger — eine Webseite ist keiner,
- * EuGH C-49/11) und die Kennung der Fassung, der ein Hof zustimmt (Punkt 4).
+ * EuGH C-49/11) — je Fassung (N45): Jede Bestellung bekommt die Fassung ihres
+ * Gebührenmodells (agbFassungFuerBestellung in agb-fassung.ts).
  *
- * Erzeugt aus src/lib/rechtstexte/agb.ts — derselbe Text wie /agb, Wort für
- * Wort: Titel, Stand-Vermerk, Teil A bis D und der Anhang. „Kurz erklärt“ ist
+ * Erzeugt aus den Daten der Fassung (agb-0-9.ts, agb.ts) — derselbe Text wie
+ * /agb/<Fassung>, Wort für Wort: Titel, Stand-Vermerk, Teil A bis D und die
+ * Anhänge. Anhang 1 und 2 von 1.0 kommen aus BELEHRUNG (src/lib/widerruf.ts),
+ * mit dessen Platzhaltern statt Hofangaben. „Kurz erklärt“ ist
  * kein Teil der AGB und fehlt; die Hinweise für die anwaltliche Prüfung stehen
  * nur in docs/recht/agb.md und nie in agb.ts. Platzhalter füllt dieselbe
  * Quelle wie die Seite (PLATZHALTER_ANGABE), Links zeigen auf die echte Seite.
  *
  * Bewusst eine eigene Datei und nicht agb-einbindung.ts: Die Einbindung lädt
  * Registrierung und Kasse im Browser und darf den AGB-Text nicht mitziehen.
- * Nur Server-Wege (Mail, Zustimmung) importieren diese Datei.
+ * Nur Server-Wege (Mail) importieren diese Datei.
  *
  * HTML ohne Farben und ohne fremde Schrift — es öffnet sich in jedem Browser
- * und druckt schwarz auf weiß; höchstens AGB_DATEI_MAX_BYTES groß (Test).
+ * und druckt schwarz auf weiß; je Fassung höchstens AGB_DATEI_MAX_BYTES groß
+ * (Test). Der Stand-Vermerk von 1.0 braucht den Stichtag (`kontext`); den lädt
+ * der Aufrufer (src/lib/email.ts), diese Datei bleibt ohne Datenbank.
  */
-import { AGB_ANHANG, AGB_STAND_VERMERK, AGB_TEILE, AGB_TITEL, type AgbBlock } from '@/lib/rechtstexte/agb'
-import { PLATZHALTER_ANGABE, type AgbStueck } from '@/lib/rechtstexte/stuecke'
+import { AGB_TEXTE } from '@/lib/rechtstexte/agb-texte'
+import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
+import type { AgbBlock } from '@/lib/rechtstexte/agb-bloecke'
+import { PLATZHALTER_ANGABE, type AgbKontext, type AgbStueck } from '@/lib/rechtstexte/stuecke'
+import { BELEHRUNG } from '@/lib/widerruf'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 
-/** Obergrenze der Datei (Auftrag 207): 300 kB. */
+/** Obergrenze der Datei (Auftrag 207): 300 kB — je Fassung. */
 export const AGB_DATEI_MAX_BYTES = 300 * 1024
-
-/**
- * Die Kennung der Fassung aus dem Stand-Vermerk: „Fassung 0.9 – Entwurf, …“
- * → „0.9“, später „1.0“. Eine Quelle: Ändert die Projektleitung den Vermerk,
- * folgen Dateiname und Zustimmung von selbst. Ohne lesbare Kennung wirft die
- * Funktion — eine Zustimmung zu „irgendeiner“ Fassung gibt es nicht
- * (tests/agb-zustimmung.test.ts hält den Vermerk fest).
- */
-export function agbFassung(vermerk: string = AGB_STAND_VERMERK): string {
-  const treffer = /Fassung\s+(\d+(?:\.\d+)*)/.exec(vermerk)
-  if (!treffer?.[1]) throw new Error('AGB-Stand-Vermerk ohne Kennung der Fassung')
-  return treffer[1]
-}
 
 /**
  * „agb-<marke>-0.9.html“ — der Name der Marke klein, aus der Domain gelesen
  * (Register M1: Name und Domain stehen unter src/ nur als MARKE bzw.
  * PRODUKTION_HOST, tests/marke-name-wache.test.ts).
  */
-export function agbDateiname(fassung: string = agbFassung()): string {
+export function agbDateiname(kennung: AgbKennung): string {
   const marke = new URL(PRODUKTION_ADRESSE).hostname.split('.')[0]
-  return `agb-${marke}-${fassung}.html`
+  return `agb-${marke}-${kennung}.html`
 }
 
 function maskiere(text: string): string {
@@ -55,13 +50,13 @@ function ziel(href: string): string {
   return href.startsWith('/') ? `${PRODUKTION_ADRESSE}${href}` : href
 }
 
-function stueckeAlsHtml(stuecke: readonly AgbStueck[]): string {
+function stueckeAlsHtml(stuecke: readonly AgbStueck[], kontext: AgbKontext): string {
   return stuecke
     .map((s) => {
       if (typeof s === 'string') return maskiere(s)
       switch (s.art) {
         case 'fett':
-          return `<strong>${stueckeAlsHtml(s.stuecke)}</strong>`
+          return `<strong>${stueckeAlsHtml(s.stuecke, kontext)}</strong>`
         case 'kursiv':
           return `<em>${maskiere(s.text)}</em>`
         case 'link':
@@ -69,47 +64,76 @@ function stueckeAlsHtml(stuecke: readonly AgbStueck[]): string {
         case 'mail':
           return `<a href="mailto:${maskiere(s.adresse)}">${maskiere(s.adresse)}</a>`
         case 'platzhalter':
-          return stueckeAlsHtml(PLATZHALTER_ANGABE[s.was])
+          return stueckeAlsHtml(PLATZHALTER_ANGABE(kontext)[s.was], kontext)
       }
     })
     .join('')
 }
 
-function blockAlsHtml(b: AgbBlock): string {
+/**
+ * Das gesetzliche Muster steht in der Datei in einem eigenen Rahmen
+ * (`class="muster"`): So sieht man, wo es beginnt und endet, und
+ * tests/agb-wortgleich.test.ts erkennt die Stelle, an der der Text der AGB
+ * nur auf src/lib/widerruf.ts verweist.
+ */
+function musterAlsHtml(art: 'belehrung' | 'formular'): string {
+  if (art === 'belehrung') {
+    const abschnitte = BELEHRUNG.teilA.abschnitte
+      .map((a) => `<h4>${maskiere(a.titel)}</h4>${a.absaetze.map((t) => `<p>${maskiere(t)}</p>`).join('')}`)
+      .join('')
+    return `<div class="muster">${abschnitte}</div>`
+  }
+  const b = BELEHRUNG.teilB
+  return `<div class="muster"><p>${maskiere(b.einleitung)}</p><p>${b.zeilen.map(maskiere).join('<br>')}</p><p>${maskiere(b.fussnote)}</p></div>`
+}
+
+function blockAlsHtml(b: AgbBlock, kontext: AgbKontext): string {
   switch (b.art) {
     case 'absatz':
-      return `<p>${b.nummer ? `<b>${maskiere(b.nummer)}</b> ` : ''}${stueckeAlsHtml(b.stuecke)}</p>`
+      return `<p>${b.nummer ? `<b>${maskiere(b.nummer)}</b> ` : ''}${stueckeAlsHtml(b.stuecke, kontext)}</p>`
     case 'liste':
-      return `<ul>${b.eintraege.map((e) => `<li>${stueckeAlsHtml(e)}</li>`).join('')}</ul>`
+      return `<ul>${b.eintraege.map((e) => `<li>${stueckeAlsHtml(e, kontext)}</li>`).join('')}</ul>`
     case 'tabelle':
       return `<table><thead><tr>${b.kopf.map((k) => `<th>${maskiere(k)}</th>`).join('')}</tr></thead><tbody>${b.zeilen
         .map((z) => `<tr>${z.map((zelle) => `<td>${maskiere(zelle)}</td>`).join('')}</tr>`)
         .join('')}</tbody></table>`
     case 'zeilen':
-      return `<p>${b.zeilen.map((z) => stueckeAlsHtml(z)).join('<br>')}</p>`
+      return `<p>${b.zeilen.map((z) => stueckeAlsHtml(z, kontext)).join('<br>')}</p>`
+    case 'hinweis':
+      return b.kursiv ? `<p><em>${stueckeAlsHtml(b.stuecke, kontext)}</em></p>` : `<p>${stueckeAlsHtml(b.stuecke, kontext)}</p>`
+    case 'belehrung':
+    case 'formular':
+      return musterAlsHtml(b.art)
   }
 }
 
-/** Die AGB als eigenständige HTML-Datei (UTF-8). */
-export function agbAlsHtml(): string {
-  const teile = AGB_TEILE.map(
-    (teil) =>
-      `<h2>${maskiere(teil.titel)}</h2>${teil.punkte
-        .map((p) => `<h3>${p.nummer}. ${maskiere(p.titel)}</h3>${p.bloecke.map(blockAlsHtml).join('')}`)
-        .join('')}`
-  ).join('')
-  const anhang = `<h2>${maskiere(AGB_ANHANG.titel)}</h2>${AGB_ANHANG.bloecke.map(blockAlsHtml).join('')}`
+/**
+ * Die AGB einer Fassung als eigenständige HTML-Datei (UTF-8). `kontext` füllt
+ * den Tag des Inkrafttretens von 1.0; ohne geladenen Stichtag
+ * (`inkrafttreten: null`) steht der Ersatzwert da — die Mail geht trotzdem.
+ */
+export function agbAlsHtml(kennung: AgbKennung, kontext: AgbKontext): string {
+  const fassung = AGB_TEXTE[kennung]
+  const teile = fassung.teile
+    .map(
+      (teil) =>
+        `<h2>${maskiere(teil.titel)}</h2>${teil.punkte
+          .map((p) => `<h3>${p.nummer}. ${maskiere(p.titel)}</h3>${p.bloecke.map((b) => blockAlsHtml(b, kontext)).join('')}`)
+          .join('')}`
+    )
+    .join('')
+  const anhaenge = fassung.anhaenge.map((a) => `<h2>${maskiere(a.titel)}</h2>${a.bloecke.map((b) => blockAlsHtml(b, kontext)).join('')}`).join('')
   return [
     '<!doctype html>',
     '<html lang="de"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    `<title>${maskiere(AGB_TITEL)}</title>`,
-    '<style>body{font-family:system-ui,sans-serif;line-height:1.5;max-width:46rem;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse}th,td{border:1px solid;padding:.25rem .5rem;text-align:left;vertical-align:top}</style>',
+    `<title>${maskiere(fassung.titel)}</title>`,
+    '<style>body{font-family:system-ui,sans-serif;line-height:1.5;max-width:46rem;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse}th,td{border:1px solid;padding:.25rem .5rem;text-align:left;vertical-align:top}.muster{border-left:2px solid;padding-left:1rem}</style>',
     '</head><body>',
-    `<h1>${maskiere(AGB_TITEL)}</h1>`,
-    `<p><i>${maskiere(AGB_STAND_VERMERK)}</i></p>`,
+    `<h1>${maskiere(fassung.titel)}</h1>`,
+    `<p><i>${maskiere(fassung.vermerk(kontext))}</i></p>`,
     teile,
-    anhang,
+    anhaenge,
     '</body></html>',
   ].join('\n')
 }

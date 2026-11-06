@@ -21,6 +21,8 @@ import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vor
 import { TESTBETRIEB } from '@/lib/umgebung-server'
 import { prisma } from '@/lib/prisma'
 import { HOF_FUER_GEBUEHR_LAGE, ladeBarMoeglich } from '@/server/queries/plattform-einstellung'
+import { agbFassungMitMeldung } from '@/lib/rechtstexte/agb-fassung-melden'
+import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 
 interface Props {
   params: Promise<{ farmSlug: string }>
@@ -38,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 type Fortsetzung =
   | { art: 'kasse' }
   | { art: 'bestaetigung'; pfad: string }
-  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[]; korb: Omit<FortsetzungsKorb, 'gebuehrText'>; privat: boolean }
+  | { art: 'zahlung'; zahlung: Zahlung; positionen: KorbPosition[]; korb: Omit<FortsetzungsKorb, 'gebuehrText'>; privat: boolean; agbFassung: AgbKennung }
 
 const KASSE: Fortsetzung = { art: 'kasse' }
 
@@ -145,6 +147,9 @@ async function ladeFortsetzung(farm: PublicFarm, suche: Record<string, string | 
     korb,
     // Nr. 211: die Gewährleistungs-Mitteilung über dem Knopf nur bei Verbraucherinnen — aus der Bestellung, wie oben der Rücktritt.
     privat: order.kaeuferArt === 'PRIVAT',
+    // N45: die AGB-Fassung aus dem Snapshot DIESER Bestellung, nie aus der heutigen Lage des Hofs;
+    // ein unbekannter Wert ergibt 0.9 und eine Meldung an Sentry (nur Wert und Bestell-ID).
+    agbFassung: agbFassungMitMeldung(order),
   }
 }
 
@@ -185,6 +190,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
         anzeige={fortsetzung.korb.anzeige}
         jetztIso={jetzt.toISOString()}
         privat={fortsetzung.privat}
+        agbFassung={fortsetzung.agbFassung}
       />
     )
   }
