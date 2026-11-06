@@ -637,6 +637,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Der Hof sieht „Gepackt“, die Kundin „Abholbereit“. So ist es gebaut.
   - Das ist eine Ausnahme von „kein Zustand hat zwei Fassungen“; DESIGN_SYSTEM „Zustände“ nennt sie.
   - Nachtrag (uttoranger, „Ja, Abholbereit“, 5.11.2026; über die Schaltzentrale, zur Beobachtung in PR #465): Auch die Schritt-Leiste der Kundin auf der Bestätigungsseite (`bestellSchritte`) heißt beim dritten Schritt „Abholbereit“ statt „Gepackt“. Das weicht bewusst von den Boards s1-bestaetigung und w1-bestaetigung ab, die dort noch „Gepackt“ zeigen; die Mockups bleiben unverändert.
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Leerzustände ohne Symbol; ‚Symbol‘ ist aus der Entscheidung gestrichen.
 
 ### N10 · Kasse glätten (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** vier flache Karten in Lesereihenfolge Korb → Abholung (eine Zeile Chips, Adresse rechts im Kopf) → Deine Daten (ab md zwei Spalten: E-Mail · Name / Telefon · Notiz, Notiz einzeilig und wächst) → Bezahlen (Optionen ab md nebeneinander, jede mit eigener Erklärung). **Online bleibt vorbelegt**, auch im Testbetrieb (Entscheidung uttoranger 13.10.: Die Plattform verdient nur an Online-Zahlungen); der Testbetrieb-Satz steht an der Online-Option. Bar trägt seinen Vorteil selbst („Ohne Servicegebühr bis 31. Jänner 2027. Du bestätigst per E-Mail – ein Tipp genügt."); der Stripe-Satz nur bei Online (wie heute). „Ein Korb pro Hof" entfällt in der Kasse. Übersicht: „Servicegebühr (5 %)" mit (i)-Knopf, der den Erklärsatz und „mind. € 0,50" aufklappt; bei Bar ohne Gebühr steht „entfällt" statt € 0,00. Angaben zum Hof, Kaufknopf und Knopftexte bleiben (Nr. 60, N2). Abweichung von k3-kasse-angaben-zum-hof genehmigt.
@@ -731,6 +732,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Umsetzung (Lauf 18):** Nr. 115 lief in Lauf 17 nicht (Installation des Pakets gesperrt) und läuft neu in Lauf 18 (freigabe.md §22; Migration `20261020110000_admin_passkey`, Expand; das Paket kam vorher mit dem Paket-PR, G6).
 - **Ergänzung (uttoranger, im Chat, 19.10.2026; Nr. 115 in Lauf 18):** „Die frische Bestätigung ist eine erneute Anmeldung mit Passkey; sie zählt nur, wenn der Passkey zum angemeldeten Konto gehört, und ersetzt dessen Sitzung. Ein Admin-Passkey verlangt Fingerabdruck, Gesicht oder PIN (Nutzerprüfung) beim Einrichten und bei jeder Anmeldung. Die Pflicht ‚erst Passkey, dann Admin-Bereich‘ prüft jede Admin-Seite selbst, nicht nur das Layout. Nach einem Ersatzcode ist genau ein neuer Passkey erlaubt. Migration `20261020110000_admin_passkey` (statt des nie angelegten Namens aus Lauf 17).“
 - **Ergänzung (uttoranger, im Chat, 23.10.2026):** „Auch Freischalten, Servicegebühr ändern, ‚Gründungshof bis‘ ändern, Rundschreiben senden, Startseite veröffentlichen und einen Empfänger der Zustellung hinzufügen verlangen eine frische Bestätigung mit Passkey (höchstens 5 Minuten alt). Der Bescheid an die Höfe beim Stand eines Bündels in Postfach › Meldungen läuft über denselben Versand wie ein Rundschreiben, aber mit der Wache seiner eigenen Aktion; er verlangt keine eigene frische Bestätigung.“
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Für die lokale Abnahme darf ein Prüf-Passkey nur in einer Wegwerf-Datenbank auf localhost angelegt werden (scripts/pruefung); nie in Code, Entwicklungs- oder Produktionsdatenbank.
 
 ### N21 · Testhof (19.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 18):** „Ein Hof kann im Admin als Testhof markiert werden. Ein Testhof erscheint in keiner Liste, Karte, Zählung oder Auswahl der Plattform – nicht auf /hoefe, nicht auf der Startseite, nicht in Region (Preise vergleichen, Futter kaufen), nicht in der Produktsuche und nicht in der Sitemap – und trägt noindex. Seine Hofseite bleibt per direktem Link erreichbar und zeigt oben ‚Testhof – nur zum Ausprobieren‘; Bestellen bleibt möglich. Ein Testhof ist immer auch aus der Gründung ausgenommen und bekommt nie einen Gründungsplatz und nie das Abzeichen; wird ein Hof mit Platz markiert, wird der Platz frei (Haken wie beim Ausnehmen). ‚Ausgenommen‘ heißt ab jetzt nur noch: zählt nicht für die Gründungsplätze – ein ausgenommener echter Hof ist normal sichtbar und wird indexiert. Ändert die Festlegung von Nr. 117 (noindex und Sitemap lesen das Testhof-Merkmal statt `gruendungAusgenommen`) und ergänzt K2.“
@@ -830,6 +832,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Jeder Hof hat eine Akte; jede Bestellung ist im Admin auffindbar (Nummer oder genaue Adresse).
   - Mockups ‚ADMIN · Regelbetrieb‘.“
 - **Umsetzung:** Nr. 185 (Heute), Nr. 186 (Bestellungen), Nr. 187 (Höfe und Akte), Nr. 192 (Handbuch), Nr. 193 (Navigation, Postfach nur Gespräche) und Nr. 184 (Betrieb: Alarm-Matrix) (freigabe.md §30); keine Migration außer der in Nr. 188.
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen. ersetzt die Zählweise nach Nr. 240.
 
 ### N33 · Admin-Protokoll (26.10.2026)
 - **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Jede Admin-Aktion, jedes Ansehen einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand eines Hofs ändert, steht im Protokoll.
@@ -965,6 +968,14 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Der Lauf ändert keine Daten.
 - **Umsetzung:** Nr. 221 (freigabe.md §34).
 
+### N46 · Antworten auf Morgenbericht 31 und Abnahme-Grundlage (6.11.2026)
+- **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Die Entscheidungsliste docs/nachtlauf/berichte/lauf32-board-oder-code.md gilt für die Abnahme: B wird gebaut, C, R und U sind kein Mangel. Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen. Packliste auf Heute mit Kurzname, ohne Uhrzeit. Passwort-Auge, ‚Willkommen, <Vorname>‘, Kürzel ‚HM‘, Sicherheits-Link 24 Stunden und die Bot-Bremse mit stillem Scheinerfolg bleiben. Der Hof bekommt die Mail ‚Neue Bestellung bar‘. Der Link ‚Dieselbe Bestellung nochmal aufgeben‘ entfällt. Leerzustände ohne Symbol. ‚Höchstens zweimal im Monat‘ entfällt. Ein Prüf-Passkey entsteht nur in einer lokalen Wegwerf-Datenbank (scripts/pruefung); App-Code und Passkey-Logik bleiben unverändert (N20).“
+- **Umsetzung:** Nr. 243–258b (freigabe.md §36); keine Migration.
+
+### N47 · Abholung nach Absprache (6.11.2026)
+- **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Enthält eine Bestellung ein Produkt mit dem Abholhinweis ‚Abholung nach Absprache‘, sagt die Kasse über der Terminwahl ‚Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.‘ und das Notizfeld heißt ‚Notiz zur Abholung‘. Die Bestätigungsmail sagt ‚Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.‘ (mit Reply-To auf die Profil-E-Mail des Hofs) bzw. ‚Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.‘ Der Hof sieht in Bestellung und Heute die Marke ‚Abholung absprechen‘ mit ‚Anrufen‘ und ‚Mail schreiben‘, nur bei offenen Bestellungen. Kein neues Feld, Preis und Zahlung unverändert.“
+- **Umsetzung:** Nr. 257 (freigabe.md §36); keine Migration.
+
 ---
 
 ## I – Illustrationen
@@ -988,6 +999,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 | O6 | Kachelquelle der Karten (10.10.2026) | OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung. **Nicht bauen**; Nr. 52 legt nur einen Vorschlag in den Bericht. Stand 12.10.2026: weiter offen; der Vorschlag aus Bericht 52 steht. |
 | O7 | Gründungszusage (10.10.2026) | **Entschieden durch K2 (12.10.2026, Freigabe Lauf 10).** Bisher: Der Freischalt-Dialog im Admin (`GRUENDUNGS_KONDITIONEN`, `src/lib/gruendungshof.ts`) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt. |
 | O8 | Produkte über der Grenze ab 1.2.2027 (12.10.2026) | **Entschieden 12.10.2026 (uttoranger, Freigabe Lauf 10), Bau in Gate 8 / Lauf 11:** Der Hof wählt die 3 sichtbaren Produkte, die übrigen ruhen, nichts wird gelöscht; ohne Wahl bleiben die 3 zuletzt verkauften sichtbar; Vorwarnung per Mail im Jänner 2027. |
+| O9 | Rücktritts-Hinweise an Kundinnen (6.11.2026) | Zeile ‚14 Tage Rücktrittsrecht …‘ je Produkt auf der Produktseite und zwei Sätze in der Storno-Mail (Rückzahlung, verderbliche Ware); Wortlaut liegt bei der Anwältin. Lauf 32 baut nicht. |
 
 ---
 
@@ -1044,3 +1056,5 @@ Stand Lauf 28 (uttoranger, 31.10.2026): Die Ergänzungen zu N17, G8, N2/E5 und N
 Stand Lauf 29 (uttoranger, 1.11.2026): Die Ergänzungen zu N2/O4, N2 (Handy-Reihenfolge) und zur Fließkomma-Wache sind entschieden; 211 (Gewährleistungs-Mitteilung, Grafik liegt vor) und 215–218 sind eingeplant (freigabe.md §33). Lauf 29 hat keine Migration, kein neues Paket, keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, 212-Profil, Monatsabrechnung, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.
 
 Stand Lauf 30 (uttoranger, 3.11.2026): N41–N44 entschieden; Redesign nach den Mockups November 2026 in Nr. 219–232 (freigabe.md §34). Keine Migration, kein Paket, keine Variable. Nicht: Ab Hof, Willkommenszeit, Zahl der Gründungsplätze, Kartenquelle, Tarife als Abrechnung, Preise vergleichen v2 (PR #329), AGB 1.0, Impressum (A001).
+
+Stand Lauf 32 (uttoranger, 6.11.2026): N46 und N47 entschieden; Abnahme nach der Board-oder-Code-Liste, gemeinsame Bausteine G1–G14 und die B-Zeilen je Board in Nr. 243–258b, dazu AGB 1.0 mit dem Stichtag in Nr. 259 (N45, A005), in zwei Abschnitten (freigabe.md §36). Keine Migration, kein Paket, keine neue Variable. Nicht: P1 (O9, Anwältin), Zahl der Gründungsplätze (offen), Recht-Texte außer AGB 1.0 nach A005 (Datenschutz A006, Impressum A004), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F030), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien.
