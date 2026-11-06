@@ -184,7 +184,7 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/ui/dropdown-menu.tsx': 1,
   'src/components/ui/erfolg-kasten.tsx': 1,
   'src/components/ui/groessenkachel.tsx': 1,
-  'src/components/ui/hinweiskarte.tsx': 2,
+  'src/components/ui/hinweiskarte.tsx': 1,
   'src/components/ui/hofkarte-rahmen.tsx': 1,
   'src/components/ui/input.tsx': 1,
   'src/components/ui/list-row.tsx': 1,
