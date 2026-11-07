@@ -56,9 +56,9 @@ import {
   vorname,
   zahlartText,
 } from '@/lib/hof-bestellungen'
-import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, HEUTE_NIEMAND } from '@/lib/heute'
+import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, HEUTE_NIEMAND, hofWartetAufFreigabe } from '@/lib/heute'
 import { HOF_BESTELL_FILTER_WERTE, hofBestellFilterAus } from '@/schemas/hof-bestellungen'
-import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
+import { BESTELLUNGEN_LEER, BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import type { BestellungenSeite, HofBestellDetail } from '@/server/queries/orders'
 
 // Dienstag, 6. Oktober 2026, 10:00 in Wien (UTC+2)
@@ -340,6 +340,29 @@ describe('Ansicht /orders — die Filterreihe', () => {
     expect(voll).toContain('Packliste für heute drucken')
   })
 
+  it('noch nie eine Bestellung: der Satz je Stand — wartend der Textlink „Was bis zur Freischaltung noch fehlt →“ (Board s1-bestellungen Bild 3)', () => {
+    const leer = seite({ hatBestellungen: false, kopfzeile: '0 offen' })
+    const wartet = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: leer, filter: 'offen', detail: null, modus: 'liste', hofName: 'Hof Test', wartetAufFreigabe: true }))
+    expect(wartet).toContain(BESTELLUNGEN_LEER.wartet.satz)
+    expect(wartet).toMatch(/<a href="\/onboarding"[^>]*>Was bis zur Freischaltung noch fehlt →<\/a>/)
+    expect(wartet).not.toContain('Zu Mein Hof')
+    // Gegenprobe: freigeschaltet der Weg zu Mein Hof.
+    const frei = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: leer, filter: 'offen', detail: null, modus: 'liste', hofName: 'Hof Test' }))
+    expect(frei).toContain(BESTELLUNGEN_LEER.frei.satz)
+    expect(frei).toContain('href="/farm-page"')
+    // Der Kopf ist der Werkzeug-Kopf (G1): der Balken (G3) steht darunter.
+    expect(frei).toContain('data-werkzeug-kopf')
+  })
+
+  it('wartet auf Freigabe nur ein nicht freigeschalteter, nicht stillgelegter Hof', () => {
+    const zeit = new Date('2026-01-01T00:00:00Z')
+    expect(hofWartetAufFreigabe({ approvedAt: null, archivedAt: null })).toBe(true)
+    expect(hofWartetAufFreigabe({ approvedAt: zeit, archivedAt: null })).toBe(false)
+    // Gegenprobe stillgelegt: kein „Sobald dein Hof freigeschaltet ist …“.
+    expect(hofWartetAufFreigabe({ approvedAt: null, archivedAt: zeit })).toBe(false)
+    expect(hofWartetAufFreigabe(null)).toBe(false)
+  })
+
   it('leer bei „Noch offen": „Alles erledigt" mit Weg zu den erledigten; nie ein Link auf ?filter=alle', () => {
     const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: seite(), filter: 'offen', detail: null, modus: 'liste', hofName: 'Hof Test' }))
     expect(html).toContain('Alles erledigt')
@@ -390,6 +413,66 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
     expect(karte).toContain('+43 660 000 0000')
     expect(karte).toContain('href="tel:+436600000000"')
     expect(html).not.toContain('0660 0000000')
+  })
+
+  it('Liste Lauf 32 (bestellung): Werkzeug-Kopf mit Unterzeile, Mengen fett voran (G14), „· bar, bezahlt wird bei Abholung“, Geldsatz statt betragSatz', () => {
+    const detail: HofBestellDetail = {
+      ...bestellung('0660 0000000'),
+      zahlungBeiAbholung: 'bar, bezahlt wird bei Abholung',
+      positionen: [
+        {
+          id: 'p1',
+          zeile: 'Heumilch frisch · 1 L',
+          teile: { anzahl: '4', name: 'Heumilch frisch', gebinde: '1 L', text: '4 × Heumilch frisch (1 L)' },
+          betragCents: 596,
+          fehlt: false,
+          fehltVorschau: { art: 'fehlt' } as unknown as HofBestellDetail['positionen'][number]['fehltVorschau'],
+        },
+      ],
+    }
+    const html = renderToStaticMarkup(
+      createElement(BestellungenAnsicht, {
+        seite: null,
+        filter: 'offen',
+        detail,
+        modus: 'detail',
+        hofName: 'Hof Test',
+        geldsatz: 'Du bekommst die vollen € 10,00 – bis 31. Jänner 2028 zahlst du auf Barverkäufe keine Plattformgebühr.',
+      })
+    ).replaceAll('<!-- -->', '')
+    expect(html).toContain('data-werkzeug-kopf')
+    expect(html).toMatch(/<h1[^>]*>Bestellung HT-0210-A4F2<\/h1>/)
+    expect(html).toContain('>Bestellungen</p>')
+    expect(html).toContain('<span class="font-bold">4</span> × Heumilch frisch (1 L)')
+    expect(html).toContain(' · bar, bezahlt wird bei Abholung')
+    expect(html).toContain('bis 31. Jänner 2028 zahlst du auf Barverkäufe keine Plattformgebühr.')
+    expect(html).not.toContain('auf diese Barbestellung zahlst du')
+    expect(html).toContain('max-w-[1200px]')
+  })
+
+  it('abgeholt: „· abgeholt um 16:05“, „Packliste · n von n“ und „Abholung rückgängig“ als Textknopf, nicht orange gefüllt', () => {
+    const abgeholt: HofBestellDetail = {
+      ...bestellung('0660 0000000'),
+      status: 'PICKED_UP',
+      marke: { text: 'Abgeholt', art: 'laeuft' },
+      abgeholtUm: '16:05',
+      positionen: [
+        { id: 'p1', zeile: 'Eier', betragCents: 300, fehlt: false, fehltVorschau: {} as HofBestellDetail['positionen'][number]['fehltVorschau'] },
+        { id: 'p2', zeile: 'Milch', betragCents: 200, fehlt: false, fehltVorschau: {} as HofBestellDetail['positionen'][number]['fehltVorschau'] },
+      ],
+      aktionen: bestellAktionen({ status: 'PICKED_UP', paymentMethod: 'ONSITE_CASH', offenePositionen: 2 }),
+    }
+    const html = renderToStaticMarkup(createElement(BestellungenAnsicht, { seite: null, filter: 'offen', detail: abgeholt, modus: 'detail', hofName: 'Hof Test' })).replaceAll(
+      '<!-- -->',
+      ''
+    )
+    expect(html).toContain(' · abgeholt um 16:05')
+    expect(html).toContain('· 2 von 2')
+    const knopf = html.match(/<button[^>]*>Abholung rückgängig<\/button>/)?.[0] ?? ''
+    expect(knopf).not.toBe('')
+    expect(knopf).toContain('text-status-offen')
+    expect(knopf).not.toContain('bg-primary')
+    expect(html).toContain('data-art="laeuft"')
   })
 
   it('eine Nummer, die sich nicht lesen lässt, steht als Text da: kein Anrufen-Link, die Eingabe der Kundin bleibt für den Hof zu lesen (N8)', () => {

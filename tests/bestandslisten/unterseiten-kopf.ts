@@ -22,7 +22,6 @@ export const UNTERSEITEN_KOPF_BESTAND: readonly string[] = [
   'src/app/(hof)/status/new/page.tsx',
   'src/app/(hof)/status/plakat/loading.tsx',
   'src/app/(hof)/status/plakat/page.tsx',
-  'src/components/hof-bestellungen/bestell-detail.tsx',
   'src/components/hof-einstellungen/einstellungen-laden.tsx',
   'src/components/hof-einstellungen/konditionen-ansicht.tsx',
   'src/components/hof-hilfe/hilfe-laden.tsx',

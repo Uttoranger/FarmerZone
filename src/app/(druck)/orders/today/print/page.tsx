@@ -11,7 +11,7 @@ import { formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { HEUTE_KEINE_ABHOLUNG_PAPIER, abholtage, abholWhere, datumLang, naechsteAbholungPapier } from '@/lib/heute'
 import { wienKalendertag } from '@/lib/kalender'
-import { druckGebuehrZeile, druckPreisHinweis, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
+import { druckPreisHinweis, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
 import { naechstesFensterMitZahl } from '@/server/queries/orders'
 import { MARKE } from '@/lib/marke'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -20,8 +20,9 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Rechts unter einer Bestellung (Board w2-druck): bar „Bar zu kassieren € 17,31“, online der
- * Betrag, den die Kundin gezahlt hat — derselbe wie in der Liste am Bildschirm (V57). Die
- * Gebühr steht als eigene Zeile nur im Modell „bisher“ (druckGebuehrZeile).
+ * Betrag, den die Kundin gezahlt hat — derselbe wie in der Liste am Bildschirm (V57). Seit Nr. 249
+ * ohne die Zeile „inkl. € … <Gebühr>“ darunter (Liste Lauf 32, druck Bild 2: das Papier zeigt nur
+ * den Betrag; die Aufteilung steht auf dem Abholzettel).
  */
 function PacklistenBetrag({
   order,
@@ -30,17 +31,11 @@ function PacklistenBetrag({
 }) {
   const summen = bestellSummen(order)
   const kassieren = barZuKassierenCents(order)
-  const gebuehrZeile = druckGebuehrZeile(order, summen.gebuehrCents)
   return (
     <span className="shrink-0 text-right">
       <span className="block text-sm font-bold text-primary-foreground">
         {kassieren !== null ? `Bar zu kassieren ${formatEuro(centsAlsEuro(kassieren))}` : formatEuro(centsAlsEuro(summen.gesamtCents))}
       </span>
-      {gebuehrZeile && (
-        <span className="block text-sm text-primary-foreground/70">
-          inkl. {formatEuro(centsAlsEuro(summen.gebuehrCents))} {gebuehrZeile}
-        </span>
-      )}
     </span>
   )
 }

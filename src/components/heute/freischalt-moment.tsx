@@ -71,7 +71,7 @@ export function FreischaltMoment({
           slug={hofSlug}
           label="Hof teilen"
           className={cn(
-            'inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary-foreground/25 bg-primary px-4 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 md:w-auto',
+            'inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-primary-foreground/25 bg-primary px-4 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 md:w-auto',
             FOKUS_RAHMEN
           )}
         />
@@ -80,7 +80,7 @@ export function FreischaltMoment({
       <Link
         href={PLAKAT_PFAD}
         className={cn(
-          'inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-[13.5px] font-semibold transition-colors duration-[250ms] hover:bg-muted md:w-auto',
+          'inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-border bg-card px-4 text-[13.5px] font-semibold transition-colors duration-[250ms] hover:bg-muted md:w-auto',
           FOKUS_RAHMEN
         )}
       >

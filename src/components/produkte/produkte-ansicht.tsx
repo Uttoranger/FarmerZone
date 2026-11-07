@@ -69,6 +69,8 @@ import type { HofRegistrierung } from '@/lib/futter-registrierung'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 type Props = {
   products: ProductData[]
@@ -76,6 +78,8 @@ type Props = {
   hofBetriebsnummer: string | null
   /** N38 (Nr. 197): im Hofpreis-Modell der Satz — der Produktdialog zeigt, was die Kundin zahlt. */
   preisAnzeige?: PreisAnzeige
+  /** „Bar bis … ohne Gebühr für dich.“ — nur für den grünen Kasten im Produktformular (V1). */
+  barOhneGebuehr?: string | null
   /** Nummer und Status des Hofs — „Deine Futtermittel-Registrierungen" im Futter-Formular (Nr. 20). */
   registrierung: HofRegistrierung
   /** teilenMomenteAus: Farm.teilenMomenteAus (Nr. 30) — dann fragt kein Moment. */
@@ -149,7 +153,7 @@ function PreisZelle({ product, preisAnzeige }: { product: ProductData; preisAnze
  * öffnen ?neu=1 (mit ?bereich= aus „Was legst du an?") und ?edit=<id>.
  * Bearbeiten öffnet der Name; Löschen steht im Bearbeiten-Dialog.
  */
-export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster, preisAnzeige = null }: Props): React.JSX.Element {
+export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster, preisAnzeige = null, barOhneGebuehr = null }: Props): React.JSX.Element {
   const ansicht = produkteAnsichtAus(useSearchParams())
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
@@ -325,6 +329,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                       key={f}
                       href={adresse}
                       aktiv={ansicht.filter === f}
+                      // Chip 15 px wie das Board (Liste Lauf 32, produkte) — die Höhe bleibt die der Chip-Reihe.
+                      className="text-[15px]"
                       onNavigate={(e) => {
                         e.preventDefault()
                         schreibeAdresse(adresse)
@@ -368,7 +374,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                 placeholder="Name des Produkts"
                 // Ohne das Kreuz des Browsers (hell blau, kein Token) — „Suche zurücksetzen“ steht im Leerzustand.
                 className={cn(
-                  '[&::-webkit-search-cancel-button]:hidden h-12 w-full rounded-[10px] border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground md:h-11 md:text-sm',
+                  // 48 px in jeder Breite (Liste Lauf 32, produkte).
+                  '[&::-webkit-search-cancel-button]:hidden h-12 w-full rounded-[10px] border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]',
                   FOKUS_RAHMEN
                 )}
               />
@@ -383,6 +390,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
             <EmptyState
               titel={PRODUKTE_KEIN_TREFFER.titel}
               satz={keinTrefferSatz(suche)}
+              // Kein „an.“ allein in Zeile 2 (Liste Lauf 32, produkte Bild 4): der Satz bricht ausgewogen.
+              className="[&_p]:text-pretty"
               ausweg={
                 // Mit Suche bleibt der Filter und nur die Suche geht (Board, Bild 4); sonst zurück zu „Alle".
                 <Link
@@ -446,6 +455,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
         }}
         hofBetriebsnummer={hofBetriebsnummer}
         preisAnzeige={preisAnzeige}
+        barOhneGebuehr={barOhneGebuehr}
       />
 
       <Dialog open={loeschen !== null} onOpenChange={(o) => !o && setLoeschen(null)}>
@@ -516,11 +526,12 @@ function Tabelle({
   preisAnzeige: PreisAnzeige
 }): React.JSX.Element {
   return (
-    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
+    <div className={cn('hidden overflow-hidden border border-border bg-card lg:block', RUNDUNG.karte)}>
       <table className="w-full text-sm">
         <thead>
           {/* Board w1-produkte: Köpfe in normaler Schreibung, 13 px (nie unter 12 px). */}
-          <tr className="text-left text-[13px] font-semibold text-muted-foreground">
+          {/* Liste Lauf 32 (produkte): der Kopf getönt. */}
+          <tr className="bg-muted text-left text-[13px] font-semibold text-muted-foreground">
             <th scope="col" className="w-[70px] py-2.5 pl-3.5">
               <span className="sr-only">Bild</span>
             </th>
@@ -538,7 +549,7 @@ function Tabelle({
             return (
               <tr key={product.id} className="border-t border-border align-middle">
                 <td className="py-2.5 pl-3.5">
-                  <ProduktBild product={product} className="size-11 rounded-xl" />
+                  <ProduktBild product={product} className="size-11 rounded-[10px]" />
                 </td>
                 <td className="px-3 py-2.5">
                   <NamenKnopf product={product} onOeffnen={oeffnen(product)} />
@@ -547,7 +558,8 @@ function Tabelle({
                   <RuecktrittHinweis angabe={product} className="mt-0.5" />
                   <Hinweise product={product} onOeffnen={oeffnen(product)} />
                 </td>
-                <td className="hidden px-3 py-2.5 text-[12.5px] whitespace-nowrap text-muted-foreground xl:table-cell">{formatGebinde(product.unit, product.unitSize)}</td>
+                {/* Einheit 15 px in Textfarbe (Liste Lauf 32, produkte 1440) — sie ist eine Angabe, kein Nebensatz. */}
+                <td className="hidden px-3 py-2.5 text-[15px] whitespace-nowrap text-foreground xl:table-cell">{formatGebinde(product.unit, product.unitSize)}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   <PreisZelle product={product} preisAnzeige={preisAnzeige} />
                 </td>
@@ -596,8 +608,12 @@ function Zeilen({
   zuAdresse: (adresse: string) => void
 }): React.JSX.Element {
   const id = useId()
-  const zeilen = (produkte: ProductData[], ueberschrift?: string) => (
-    <ul aria-labelledby={ueberschrift} className="overflow-hidden rounded-2xl border border-border bg-card">
+  // „Braucht dich“ als getönte Karte (Liste Lauf 32, produkte 390) — die übrigen Abschnitte auf bg-card.
+  const zeilen = (produkte: ProductData[], ueberschrift?: string, getoent = false) => (
+    <ul
+      aria-labelledby={ueberschrift}
+      className={cn('overflow-hidden border', RUNDUNG.karte, getoent ? 'border-zustand-tun/30 bg-zustand-tun-grund' : 'border-border bg-card')}
+    >
       {produkte.map((product) => (
         <ProduktZeile key={product.id} product={product} preisAnzeige={preisAnzeige} onOeffnen={oeffnen(product)} onVorrat={() => onVorrat(product)} />
       ))}
@@ -619,7 +635,7 @@ function Zeilen({
       {brauchtDich.length > 0 && (
         <section>
           {kopf(`${id}-braucht`, 'Braucht dich', formatZahl(brauchtDich.length))}
-          {zeilen(brauchtDich, `${id}-braucht`)}
+          {zeilen(brauchtDich, `${id}-braucht`, true)}
         </section>
       )}
       {imShop.length > 0 && (
@@ -814,12 +830,20 @@ const PRODUKT_BILD_SIZES = '44px'
 /** Foto des Hofs, sonst die Kategorie-Illustration (im Dunkeln gedämpft), sonst ein Symbol. */
 function ProduktBild({ product, className }: { product: ProductData; className?: string }): React.JSX.Element {
   return (
-    <div className={cn('relative flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted', className)}>
+    // G12 (Liste Lauf 32, produkte dunkel): jede Bildfläche über bild-dunkel.ts — Foto gedämpft, Illustration
+    // multipliziert statt auf hellem Kreis, Platzhalter als gedämpfte Fläche.
+    <div
+      className={cn(
+        'relative flex shrink-0 items-center justify-center overflow-hidden border border-border',
+        product.imageUrl ? FOTO_HUELLE : product.categoryImageUrl ? cn(PLATZHALTER_FLAECHE, ILLUSTRATION_HUELLE) : PLATZHALTER_FLAECHE,
+        className
+      )}
+    >
       {product.imageUrl ? (
         // Die Rahmen sind 44 bis 48 px breit — `sizes` sagt das dem Browser.
         <Image src={product.imageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-cover" style={bildStil(product.bildAusschnitt)} />
       ) : product.categoryImageUrl ? (
-        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-contain dark:brightness-[0.7] dark:saturate-[0.8]" />
+        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className={cn('object-contain', ILLUSTRATION_BILD)} />
       ) : (
         <Package className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
       )}

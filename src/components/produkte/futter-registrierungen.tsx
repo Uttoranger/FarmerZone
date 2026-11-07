@@ -1,5 +1,6 @@
 'use client'
 
+import { RUNDUNG } from '@/components/ui/rundung'
 import Link from 'next/link'
 import { CheckCircle2, ChevronRight, CircleDashed, ExternalLink, Info, Lock, Mail, Phone } from 'lucide-react'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -63,7 +64,7 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
   return (
     <div className="flex flex-col gap-3">
       {/* Kopfhinweis über allem, was folgt (E10a). */}
-      <div className="flex gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3">
+      <div className="flex gap-2.5 rounded-[12px] border border-border bg-card px-3.5 py-3">
         <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] leading-snug text-foreground">{ORIENTIERUNG_HINWEIS}</p>
@@ -109,23 +110,25 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
         <span className="sr-only"> (öffnet in einem neuen Tab)</span>
       </Link>
 
-      <ul className="flex flex-col gap-2">
+      {/* Liste Lauf 32 (produkt-neu 390, Bild 3): kompakte Zeilen in einer Karte statt farbiger Einzelkarten —
+          der Stand steht als Symbol und als zweite Zeile (BAES-Fall), der Inhalt bleibt (E10). */}
+      <ul className={cn('flex flex-col divide-y divide-border border border-border bg-card', RUNDUNG.karte)}>
         {haupt.map((f) => (
           <FallZeile key={f.id} fall={f} stand={fallStand(f.id, registrierung)} zeile={fallZeile(f.id, registrierung)} />
         ))}
       </ul>
 
-      <details className="group rounded-xl border border-border">
+      <details className="group rounded-[12px] border border-border">
         <summary
           className={cn(
-            'flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-xl px-3.5 text-[13.5px] font-medium text-brand-text [&::-webkit-details-marker]:hidden',
+            'flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-3.5 text-[13.5px] font-medium text-brand-text [&::-webkit-details-marker]:hidden',
             FOKUS_RAHMEN
           )}
         >
           Alle Futterarten anzeigen (Handel, Mischfutter, BARF …)
           <ChevronRight className="size-4 transition-transform group-open:rotate-90" strokeWidth={1.7} aria-hidden="true" />
         </summary>
-        <ul className="flex flex-col gap-2 px-3.5 pb-3.5">
+        <ul className="mx-3.5 mb-3.5 flex flex-col divide-y divide-border border-y border-border">
           {weitere.map((f) => (
             <FallZeile key={f.id} fall={f} stand={fallStand(f.id, registrierung)} zeile={null} />
           ))}
@@ -140,12 +143,7 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
 function FallZeile({ fall, stand, zeile }: { fall: RegistrierungsFall; stand: FallStand; zeile: string | null }): React.JSX.Element {
   const Symbol = STAND_SYMBOL[stand]
   return (
-    <li
-      className={cn(
-        'flex gap-3 rounded-xl border px-3.5 py-3',
-        stand === 'erfuellt' ? 'border-accent/45 bg-accent/8' : stand === 'fehlt' ? 'border-primary/45 bg-primary/8' : 'border-border bg-card'
-      )}
-    >
+    <li className="flex gap-3 px-3.5 py-2.5">
       <Symbol
         className={cn(
           'mt-0.5 size-[18px] shrink-0',
@@ -156,11 +154,10 @@ function FallZeile({ fall, stand, zeile }: { fall: RegistrierungsFall; stand: Fa
       />
       <div className="min-w-0 flex-1">
         <p className="text-[13.5px] font-semibold text-foreground">{fall.titel}</p>
-        <p className="text-xs text-muted-foreground">{fall.beispiele}</p>
-        <p className="mt-1 text-xs text-foreground">{fall.nachweis}</p>
-        {zeile && (
-          <p className={cn('mt-1 text-xs font-semibold', stand === 'erfuellt' ? 'text-status-fertig' : 'text-status-offen')}>{zeile}</p>
-        )}
+        {zeile && <p className={cn('text-xs font-semibold', stand === 'erfuellt' ? 'text-status-fertig' : 'text-status-offen')}>{zeile}</p>}
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {fall.beispiele} · {fall.nachweis}
+        </p>
         <span className="sr-only">
           {stand === 'erfuellt' ? 'Eingetragen.' : stand === 'fehlt' ? 'Fehlt noch.' : 'Dazu hast du nichts eingetragen.'}
         </span>

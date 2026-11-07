@@ -1,5 +1,9 @@
 'use client'
 
+import { Switch } from '@/components/ui/switch'
+import { TREFFER_44 } from '@/components/ui/button'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { cn } from '@/lib/utils'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { istNetzFehler } from '@/lib/netz'
@@ -8,6 +12,7 @@ import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeFutterFamilieAn } from '@/server/actions/produktfamilie'
 import {
+  PRODUKTE_FILTER_LABEL,
   hofpreisZeile,
   speicherFehlerAusAntwort,
   speicherFehlerNachWurf,
@@ -294,6 +299,7 @@ export function FutterFormular({
       open
       onClose={onClose}
       titel="Neues Futtermittel"
+      art={PRODUKTE_FILTER_LABEL.futter}
       satz="Vom Sackerl für den Hasen bis zum Rundballen – jede Größe mit eigenem Preis und Vorrat."
       hinweis={speichernHinweis(zeilen.length - wartend, wartend)}
       speichernText="Speichern"
@@ -301,7 +307,7 @@ export function FutterFormular({
       onSpeichern={() => void speichern()}
       meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
-      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Bergwiesen-Heu 5 kg-Sack“.">
+      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Name und Größe, z. B. „Heu, 1. Schnitt, Kleinballen“">
         <input
           id={feldId('name')}
           value={name}
@@ -353,25 +359,13 @@ export function FutterFormular({
       </Feld>
 
       <Abschnitt id="futter-groessen" titel="Verkaufsgrößen" satz="Tipp an, was du abgibst – vom Sackerl für den Hasen bis zum Rundballen.">
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-groessen" data-feld="groessen">
-          {FUTTER_VORLAGEN.map((v) => {
-            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
-            return (
-              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
-                {v.bezeichnung}
-              </Wahl>
-            )
-          })}
-          <EigeneGroesseKnopf onClick={eigeneGroesse} disabled={zeilen.length >= GROESSEN_MAX} />
-        </div>
-        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
-
+        {/* Erst die gewählten Größen, dann die Schnellwahl (Liste Lauf 32, produkt-neu: Reihenfolge Board). */}
         <ul className="flex flex-col gap-2.5">
           {zeilen.map((z, i) => {
             const pfad = `groessen.${i}`
             const kilo = grundpreisVorschau(z.price, z.nettoMenge)
             return (
-              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
+              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-[12px] border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
@@ -448,6 +442,19 @@ export function FutterFormular({
             )
           })}
         </ul>
+
+        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-groessen" data-feld="groessen">
+          {FUTTER_VORLAGEN.map((v) => {
+            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
+            return (
+              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
+                {v.bezeichnung}
+              </Wahl>
+            )
+          })}
+          <EigeneGroesseKnopf onClick={eigeneGroesse} disabled={zeilen.length >= GROESSEN_MAX} />
+        </div>
+        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
         <p className="text-[12.5px] leading-snug text-muted-foreground">
           € / kg rechnet sich automatisch und wird deinen Kundinnen zum Vergleichen gezeigt. Sackerl und Säcke gelten als abgepacktes Heimtierfutter,
           Ballen als lose Ernte – siehe Registrierungen unten. Jede Größe hat ihren eigenen Vorrat.
@@ -459,11 +466,20 @@ export function FutterFormular({
           <Wahl aktiv={bio} onClick={() => setBio((b) => !b)}>
             Bio
           </Wahl>
-          <Wahl aktiv={nurBetriebe} onClick={() => setNurBetriebe((n) => !n)}>
-            Nur an landwirtschaftliche Betriebe
-          </Wahl>
         </div>
-        {nurBetriebe && <p className="text-xs text-muted-foreground">Wer bestellt, muss in der Kasse eine Betriebsnummer angeben.</p>}
+        {/* Liste Lauf 32 (produkt-neu Bild 3): eine Einstellung mit Folge in der Kasse — ein Schalter mit Satz, kein Chip. */}
+        <label htmlFor="futter-nur-betriebe" className={cn('flex min-h-14 items-center gap-3 border border-border p-3', RUNDUNG.feld)}>
+          <Switch
+            id="futter-nur-betriebe"
+            checked={nurBetriebe}
+            onCheckedChange={setNurBetriebe}
+            className={cn(TREFFER_44, 'data-checked:bg-accent')}
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-semibold text-foreground">Nur an landwirtschaftliche Betriebe</span>
+            <span className="text-[13px] text-muted-foreground">Dann fragt die Kasse nach der Betriebsnummer.</span>
+          </span>
+        </label>
       </Abschnitt>
 
       <AbholhinweisWahl wert={abholhinweise} onWert={setAbholhinweise} />
@@ -660,22 +676,36 @@ export function KaeuferVorschau({
   }, null)
   const ab = guenstigste?.price != null && guenstigste.nettoMenge != null ? formatGrundpreisNetto(guenstigste.price, guenstigste.nettoMenge, 'KG') : null
   const schild = futterSchild({ category, futter: { betriebsnummer: registrierung.betriebsnummer } }, registrierung.betriebsstatus)
+  // Nur Anzeige: der kleinste Preis einer sichtbaren Größe („ab € 2,65“) — verglichen, nicht gerechnet.
+  const abPreis = sichtbar.reduce<number | null>((best, z) => (z.price !== null && (best === null || z.price < best) ? z.price : best), null)
+  const anzeigeName = name.trim() || 'Dein Futter'
 
   return (
-    <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
+    <section aria-labelledby="futter-vorschau" className={cn('flex flex-col gap-2 border border-border bg-muted/40 p-4', RUNDUNG.karte)}>
       <h3 id="futter-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         So sehen Kunden dein Futter
       </h3>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Futter'}</p>
+      {/* Am Handy eine Zeile (Liste Lauf 32, produkt-neu 390 Bild 3): „<Name> · ab € … · ab € … / kg“, darunter der
+          Gebührensatz des Modells; ab 640 px die ausführliche Vorschau. */}
+      <p className="text-sm text-foreground sm:hidden">
+        <span className="font-semibold">{anzeigeName}</span>
+        {abPreis !== null && <span className="tabular-nums"> · ab {formatEuro(abPreis)}</span>}
+        {ab && <span className="tabular-nums"> · ab {ab}</span>}
+      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 max-sm:hidden">
+        <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{anzeigeName}</p>
         {ab && <p className="text-sm font-semibold text-foreground tabular-nums">ab {ab}</p>}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground max-sm:hidden">
         {sichtbar.length === 1 ? '1 Größe sichtbar' : `${formatZahl(sichtbar.length)} Größen sichtbar`}
       </p>
-      {schild && <FutterSchild text={schild} />}
+      {schild && (
+        <div className="max-sm:hidden">
+          <FutterSchild text={schild} />
+        </div>
+      )}
       {sichtbar.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul className="flex flex-wrap gap-1.5 max-sm:hidden">
           {sichtbar.map((z) => (
             <li key={z.schluessel} className="rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground tabular-nums">
               {gewichtUngefaehr(z.unit) ? '~' : ''}
@@ -686,7 +716,7 @@ export function KaeuferVorschau({
         </ul>
       )}
       <p className="text-xs text-muted-foreground">{vorschauGebuehrSatz(preisAnzeige)}</p>
-      <p className="text-xs text-muted-foreground">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
+      <p className="text-xs text-muted-foreground max-sm:hidden">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
     </section>
   )
 }

@@ -206,6 +206,20 @@ describe('Nichts unter dem Überstand (V28)', () => {
     expect(fuss).toContain('pb-[calc(var(--kunde-unterleiste)+var(--kunde-ueberstand)+1.5rem)]')
   })
 
+  it('HofShell: Das Bestelldetail ist am Handy eine Fokus-Seite ohne Unterleiste (Liste Lauf 32, bestellung 390), die Liste nicht', () => {
+    const shellAuf = (adresse: string) => {
+      pfad.aktuell = adresse
+      return renderToStaticMarkup(
+        el(HofShell, { hofName: 'Hof Beispiel', hofSlug: 'hof-beispiel', personName: 'Max Mustermann', isAdmin: false, zahlen: { bestellungen: 0, postfach: 0, admin: 0 }, tarifZeile: TARIF })
+      )
+    }
+    // Die Unterleiste ist die einzige <nav> mit fixed bottom-0; versteckt trägt sie `hidden`.
+    const unterleiste = (html: string) => html.match(/<nav[^>]*aria-label="Hauptnavigation"[^>]*class="([^"]*fixed[^"]*)"/)?.[1] ?? html.match(/<nav[^>]*class="([^"]*fixed[^"]*)"[^>]*aria-label="Hauptnavigation"/)?.[1] ?? ''
+    expect(unterleiste(shellAuf('/orders/abc123')).split(/\s+/)).toContain('hidden')
+    expect(unterleiste(shellAuf('/orders')).split(/\s+/)).not.toContain('hidden')
+    expect(unterleiste(shellAuf('/orders')).length).toBeGreaterThan(0)
+  })
+
   it('HofShell: Der Inhalt hält Unterleiste plus erhobenes „Neu“ frei', () => {
     const main = abschnitt(hof(), '<main', '>')
     expect(pbPx(main.match(/class="([^"]*)"/)?.[1] ?? '')).toBeGreaterThanOrEqual(leiste + ueberstand)

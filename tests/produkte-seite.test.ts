@@ -169,6 +169,15 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
     expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Nicht im Shop', ton: 'neutral' })
   })
 
+  it('ohne Kategorie im Shop: „Kategorie ergänzen“ (orange) statt „Im Shop“ (Liste Lauf 32, produkte 1440); ausverkauft und nicht im Shop bleiben', () => {
+    expect(produktStatus({ ...p({ stock: 24 }), category: null })).toEqual({ text: 'Kategorie ergänzen', ton: 'offen' })
+    expect(produktStatus({ ...p({ stock: 0 }), category: null }).text).toBe('Ausverkauft')
+    expect(produktStatus({ ...p({ isAvailable: false, stock: 24 }), category: null }).text).toBe('Nicht im Shop')
+    // Gegenprobe: mit Kategorie bzw. ohne das Feld wie bisher.
+    expect(produktStatus({ ...p({ stock: 24 }), category: 'GEMUESE' }).text).toBe('Im Shop')
+    expect(produktStatus({ isAvailable: true, stock: 24, unit: 'KG', unitSize: null }).text).toBe('Im Shop')
+  })
+
   it('Nicht im Shop sticht Ausverkauft — ausgeblendet ist für Kunden gar nicht da', () => {
     expect(produktStatus(p({ isAvailable: false, stock: 0 })).text).toBe('Nicht im Shop')
   })
@@ -176,7 +185,7 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
   it('B2: Marke, Filter und Speichern-Knopf nehmen das Wort aus EINER Quelle', () => {
     expect(produktStatus(p({ isAvailable: false })).text).toBe(NICHT_IM_SHOP)
     expect(PRODUKTE_FILTER_LABEL.entwuerfe).toBe(NICHT_IM_SHOP)
-    expect(speichernText(0, false, false)).toBe(SPEICHERN_NICHT_IM_SHOP)
+    expect(speichernText(false, false)).toBe(SPEICHERN_NICHT_IM_SHOP)
   })
 
   it('B2: kein „Entwurf" mehr in den Texten rund um Produkte', () => {
@@ -747,10 +756,10 @@ describe('Produktdialog im neuen Design', () => {
     expect(dialogTitel(false, 'brennmaterial')).toBe('Neues Brennmaterial')
     expect(dialogTitel(false, null)).toBe('Neues Produkt')
     expect(dialogTitel(true, 'futter')).toBe('Produkt bearbeiten')
-    expect(speichernText(0, false, true)).toBe('Speichern')
-    expect(speichernText(0, false, false)).toBe('Speichern (nicht im Shop)')
-    expect(speichernText(2, false, true)).toBe('Noch 2 Angaben fehlen')
-    expect(speichernText(0, true, true)).toBe('Speichern')
+    expect(speichernText(false, true)).toBe('Speichern')
+    expect(speichernText(false, false)).toBe('Speichern (nicht im Shop)')
+    // Kein Zähler mehr (Liste Lauf 32, produkt-neu): geprüft wird beim Speichern.
+    expect(speichernText(true, true)).toBe('Speichern')
   })
 
   it('speichert mit dem Vorrat beim Öffnen und lädt Fotos weiter über ladeFotoHoch (Sperre 17b in der Upload-Route)', () => {
@@ -765,5 +774,33 @@ describe('Produktdialog im neuen Design', () => {
     const muster = /from '@\/components\/shells\//
     expect(quelle('src/components/produkte/produkte-ansicht.tsx')).not.toMatch(muster)
     expect(quelle('src/app/(hof)/layout.tsx')).toMatch(muster)
+  })
+})
+
+describe('Produkt anlegen nach der Liste Lauf 32 (Nr. 249)', () => {
+  it('der Bar-Hinweis im grünen Kasten kommt aus der Geldsatz-Hilfe (geldsaetzeFuer), nie als fester Text', () => {
+    const abfrage = quelle('src/server/queries/products.ts')
+    expect(abfrage).toMatch(/geldsaetzeFuer\(\{ art: 'angebot', positionen: \[\] \}, hof, einstellung, gruendungBis, jetzt\)\?\.barOhneGebuehr/)
+    const dialog = quelle('src/components/products/product-dialog.tsx')
+    expect(dialog).toContain('{barOhneGebuehr && <p className="text-muted-foreground">{barOhneGebuehr}</p>}')
+    // Kein fester Satz „Bar bis … ohne Gebühr“ im Formular selbst.
+    expect(dialog).not.toMatch(/['"`]Bar bis /)
+  })
+
+  it('der Kopf am Handy: Pfeil zurück links, Produktart darunter, Kreuz erst ab 640 px (alle drei Formulare)', () => {
+    const kopf = quelle('src/components/produkte/produkt-dialog-kopf.tsx')
+    expect(kopf).toMatch(/<DialogClose[\s\S]*?sm:hidden[\s\S]*?<ChevronLeft/)
+    expect(kopf).toMatch(/<DialogClose[\s\S]*?max-sm:hidden[\s\S]*?<XIcon/)
+    for (const datei of ['src/components/products/product-dialog.tsx', 'src/components/produkte/familien-teile.tsx']) {
+      const q = quelle(datei)
+      expect(q, datei).toContain('showCloseButton={false}')
+      expect(q, datei).toContain('<ProduktDialogKopf')
+    }
+  })
+
+  it('„Nur an landwirtschaftliche Betriebe“ ist im Futter-Formular ein Schalter mit dem Satz des Boards', () => {
+    const q = quelle('src/components/produkte/futter-formular.tsx')
+    expect(q).toMatch(/<Switch\s+id="futter-nur-betriebe"/)
+    expect(q).toContain('Dann fragt die Kasse nach der Betriebsnummer.')
   })
 })

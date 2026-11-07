@@ -25,6 +25,19 @@ export const dynamic = 'force-dynamic'
  * Ist die Gebühr entfallen bzw. erstattet (Storno, „nicht abgeholt“), steht die Zeile mit „(entfällt)“ bzw.
  * „(erstattet)“ und gestrichenem Betrag da, „Gesamt“ ist der Warenpreis — wie auf der Bestätigung (Nr. 244).
  */
+/** Die E-Mail mit einer Umbruchstelle nach dem „@“ — so bricht sie an der Stelle, die man noch lesen kann. */
+function EmailMitUmbruch({ adresse }: { adresse: string }) {
+  const at = adresse.indexOf('@')
+  if (at < 0) return <>{adresse}</>
+  return (
+    <>
+      {adresse.slice(0, at + 1)}
+      <wbr />
+      {adresse.slice(at + 1)}
+    </>
+  )
+}
+
 export default async function OrderPrintPage({
   params,
 }: {
@@ -107,7 +120,10 @@ export default async function OrderPrintPage({
             <div className="mb-0.5 text-[13px] font-semibold tracking-wide text-primary-foreground/70 uppercase">Kunde</div>
             <div className="font-semibold break-words">{order.customerName}</div>
             <div className="text-sm text-primary-foreground/80">{formatiereTelefon(order.customerPhone)}</div>
-            <div className="text-sm [overflow-wrap:anywhere] text-primary-foreground/80">{order.customerEmail}</div>
+            {/* Umbruch zuerst nach dem „@“, mitten im Wort nur als letzter Ausweg (Liste Lauf 32, druck Bild 1). */}
+            <div className="text-sm break-words text-primary-foreground/80">
+              <EmailMitUmbruch adresse={order.customerEmail} />
+            </div>
           </div>
         </div>
         {order.customerNote && <div className="mb-5 text-sm break-words text-primary-foreground/70 italic">{order.customerNote}</div>}
@@ -116,9 +132,9 @@ export default async function OrderPrintPage({
         <table className="mb-4 w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-primary-foreground/30">
-              <th className="py-1 text-left text-sm font-semibold text-primary-foreground/70">Produkt</th>
-              <th className="w-16 py-1 text-right text-sm font-semibold text-primary-foreground/70">Menge</th>
-              <th className="w-24 py-1 text-right text-sm font-semibold text-primary-foreground/70">Betrag</th>
+              <th className="py-1 text-left text-sm font-bold text-primary-foreground">Produkt</th>
+              <th className="w-16 py-1 text-right text-sm font-bold text-primary-foreground">Menge</th>
+              <th className="w-24 py-1 text-right text-sm font-bold text-primary-foreground">Betrag</th>
             </tr>
           </thead>
           <tbody>
