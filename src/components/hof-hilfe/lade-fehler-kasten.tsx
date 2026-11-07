@@ -25,17 +25,20 @@ export function LadeFehlerKasten({
   titel,
   satz = LADE_FEHLER_SATZ,
   nochmal,
+  knopf = 'Noch einmal versuchen',
   className,
 }: {
   titel: string
   satz?: string
+  /** Text des Auswegs — „Noch einmal versuchen“, im Postfach „Neu laden“ (Board s2-/w2-postfach Bild 6). */
+  knopf?: string
   /** Dieselbe Adresse — neu laden heißt neu abfragen. */
   nochmal: string
   className?: string
 }): React.JSX.Element {
-  const knopf = useRef<HTMLAnchorElement>(null)
+  const ausweg = useRef<HTMLAnchorElement>(null)
   useEffect(() => {
-    knopf.current?.focus()
+    ausweg.current?.focus()
   }, [])
   return (
     <div
@@ -50,7 +53,7 @@ export function LadeFehlerKasten({
         {satz}
       </p>
       <Link
-        ref={knopf}
+        ref={ausweg}
         href={nochmal}
         aria-describedby="lade-fehler-titel lade-fehler-satz"
         className={cn(
@@ -59,7 +62,7 @@ export function LadeFehlerKasten({
           FOKUS_RAHMEN
         )}
       >
-        Noch einmal versuchen
+        {knopf}
       </Link>
     </div>
   )

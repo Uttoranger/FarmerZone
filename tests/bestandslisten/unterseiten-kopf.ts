@@ -8,8 +8,6 @@
  * Sammel-PR unterseiten-kopf.tsx und unterseiten-kopf-stil.ts (Auftrag Lauf 32, G1).
  */
 export const UNTERSEITEN_KOPF_BESTAND: readonly string[] = [
-  'src/app/(hof)/postfach/[id]/loading.tsx',
-  'src/app/(hof)/postfach/[id]/page.tsx',
   'src/app/(hof)/settings/account/page.tsx',
   'src/app/(hof)/settings/pause/page.tsx',
   'src/app/(hof)/settings/payments/page.tsx',
