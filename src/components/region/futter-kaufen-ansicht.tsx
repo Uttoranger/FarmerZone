@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ChevronRight, Clock, Plus, Wheat } from 'lucide-react'
+import { ChevronRight, Plus, Wheat } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -32,7 +32,7 @@ import { futterKaufenLink, leseFutterAnsicht, type FutterAnsichtWahl, type Futte
 // (tests/futter-karte-import.test.ts prüft das am Import-Graph).
 const FutterKarteAnsicht = dynamic(() => import('@/components/region/futter-karte-ansicht'), {
   ssr: false,
-  loading: () => <div className="h-[60vh] min-h-[320px] animate-pulse rounded-2xl bg-muted" aria-hidden="true" />,
+  loading: () => <div className="h-[60vh] min-h-[320px] animate-pulse rounded-[12px] bg-muted" aria-hidden="true" />,
 })
 
 const ANSICHTEN = [
@@ -99,39 +99,38 @@ export function FutterKaufenAnsicht({
           </FilterChipReihe>
         )}
         {/* Abholung wie auf /hoefe: eine Liste von Links mit aria-current, am Handy waagrecht wischbar. */}
-        <div className="flex items-center gap-2">
-          <Clock className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          <FilterChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} className="min-w-0 flex-1">
-            {ansicht.abholungChips.map((chip) => (
-              <FilterChip key={chip.wert ?? 'alle'} href={link({ abholung: chip.wert })} aktiv={chip.aktiv} ladePunkt>
-                {chip.label}
-              </FilterChip>
-            ))}
-          </FilterChipReihe>
-        </div>
+        {/* Ohne Uhr-Symbol vor der Tage-Zeile (Liste Lauf 32 region). */}
+        <FilterChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} className="min-w-0">
+          {ansicht.abholungChips.map((chip) => (
+            <FilterChip key={chip.wert ?? 'alle'} href={link({ abholung: chip.wert })} aktiv={chip.aktiv} ladePunkt>
+              {chip.label}
+            </FilterChip>
+          ))}
+        </FilterChipReihe>
       </div>
 
       {/* Liste | Karte ist Zustand der Seite (replaceState), kein Filter — deshalb Segment, nicht FilterChips. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="flex items-center gap-2 text-[12.5px] leading-normal text-muted-foreground">
+      {/* „Liste / Karte“ in eigener Zeile, der Hinweis darunter (Liste Lauf 32 region). */}
+      <Segment
+        beschriftung="Ansicht wählen"
+        optionen={ANSICHTEN}
+        wert={wahl}
+        onWertChange={(neu) => waehle(neu === 'karte' ? 'karte' : 'liste')}
+      />
+      <div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="flex items-center gap-2 text-[13px] leading-normal text-muted-foreground">
             {/* Am Handy die Zeile mit der Zahl (Board v2, Handy 3), am Computer der Satz (Board v3) — beide mit (i). */}
             <span className="min-w-0 md:hidden">{ansicht.zahlZeile}</span>
             <span className="hidden min-w-0 md:inline">{FUTTER_KAUFEN_HINWEIS}</span>
             <ErklaerKnopf titel={FUTTER_ERKLAERUNG.titel} punkte={FUTTER_ERKLAERUNG.punkte} />
           </p>
           {ansicht.hinweise.map((hinweis) => (
-            <p key={hinweis} className="text-[12.5px] leading-normal text-muted-foreground">
+            <p key={hinweis} className="text-[13px] leading-normal text-muted-foreground">
               {hinweis}
             </p>
           ))}
         </div>
-        <Segment
-          beschriftung="Ansicht wählen"
-          optionen={ANSICHTEN}
-          wert={wahl}
-          onWertChange={(neu) => waehle(neu === 'karte' ? 'karte' : 'liste')}
-        />
       </div>
 
       {ansicht.leer && <FutterLeerzustand leer={ansicht.leer} filter={filter} link={link} />}
@@ -151,7 +150,7 @@ export function FutterKaufenAnsicht({
       )}
 
       {ansicht.selbst?.art === 'anlegen' && (
-        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border px-4 py-3.5">
+        <div className="flex items-start gap-3 rounded-[12px] border border-dashed border-border px-4 py-3.5">
           <Plus className="mt-0.5 size-[17px] shrink-0 text-status-offen" strokeWidth={2} aria-hidden="true" />
           <div className="min-w-0 text-[12.5px] leading-normal text-muted-foreground">
             <p>{FUTTER_SELBST_VERKAUFEN}</p>
@@ -206,7 +205,7 @@ function FutterLeerzustand({
       satz={leer.satz}
       ausweg={
         ausweg && ziel ? (
-          <Link href={ziel} className={KNOPF_RAHMEN}>
+          <Link href={ziel} className={cn(KNOPF_RAHMEN, 'w-full justify-center rounded-[10px] border-primary text-status-offen')}>
             {ausweg.label}
             <LadePunkt />
           </Link>

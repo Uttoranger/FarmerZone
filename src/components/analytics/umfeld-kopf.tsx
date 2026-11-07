@@ -1,9 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { BereichUmschalter } from '@/components/shared/bereich-umschalter'
+import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { KmWahl } from '@/components/region/km-wahl'
-import type { AnzeigeBereich } from '@/lib/taxonomie'
+import { ANZEIGE_BEREICHE, ANZEIGE_BEREICH_VALUES, type AnzeigeBereich } from '@/lib/taxonomie'
 import { UMFELD_KM, type UmfeldKm } from '@/lib/umfeld'
 import { umfeldLink, type UmfeldAnsichtWahl } from '@/schemas/umfeld-filter'
 
@@ -12,9 +11,9 @@ import { umfeldLink, type UmfeldAnsichtWahl } from '@/schemas/umfeld-filter'
  * stehen in der URL (`/region?km=25&bereich=futter`) — gewechselt wird per
  * Navigation, der Server rechnet neu; Zurück führt zur vorigen Wahl.
  *
- * Seit Nr. 22c ist der Umkreis die Wanne aus den Region-Mockups (`KmWahl`,
- * echte Links mit aria-current), dieselbe wie in „Futter kaufen". Der
- * Bereich-Umschalter darüber bleibt, wie er war.
+ * Seit Nr. 251 sind Bereich und Umkreis Chip-Gruppen (G11, Liste Lauf 32 region:
+ * „Hofladen / Futtermittel als Segment, orange“) — echte Links mit aria-current,
+ * der Umkreis dieselbe `KmWahl` wie in „Futter kaufen".
  */
 export function UmfeldKopf({
   bereich,
@@ -26,10 +25,15 @@ export function UmfeldKopf({
   /** Bleibt beim Wechsel von Bereich und Umkreis erhalten. */
   ansicht: UmfeldAnsichtWahl
 }) {
-  const router = useRouter()
   return (
     <div className="flex flex-col gap-3">
-      <BereichUmschalter aktiv={bereich} onWechsel={(neu) => router.push(umfeldLink({ km, bereich: neu, ansicht }))} />
+      <FilterChipReihe beschriftung="Bereich wählen">
+        {ANZEIGE_BEREICH_VALUES.map((b) => (
+          <FilterChip key={b} href={umfeldLink({ km, bereich: b, ansicht })} aktiv={b === bereich} ladePunkt>
+            {ANZEIGE_BEREICHE[b].titel}
+          </FilterChip>
+        ))}
+      </FilterChipReihe>
       <KmWahl stufen={UMFELD_KM.map((stufe) => ({ km: stufe, href: umfeldLink({ km: stufe, bereich, ansicht }), aktiv: stufe === km }))} />
     </div>
   )
