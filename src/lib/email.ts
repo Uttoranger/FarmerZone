@@ -3,12 +3,11 @@ import * as React from 'react'
 import * as Sentry from '@sentry/nextjs'
 import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { abspracheMailSatz, brauchtAbsprache } from '@/lib/abholhinweise'
-import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, anzeigeGesamtCents, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallen, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
@@ -432,6 +431,12 @@ export type OrderForEmail = {
   totalAmount: { toString(): string } | number
   /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
   serviceFeeCents?: number
+  /**
+   * Gesetzt, wenn die Gebühr entfallen bzw. erstattet ist (Storno, „nicht abgeholt“, verfallen) — dann zeigt
+   * das „Gesamt“ der Kunden-Mails nur den Warenpreis (anzeigeGesamtCents, Nr. 255). Das betrifft fast nur
+   * die Admin-Vorschau: Die echten Mails gehen vorher hinaus. Fehlt es, gilt die Gebühr.
+   */
+  serviceFeeRefundedAt?: Date | string | null
   /** Gebührenmodell aus dem Snapshot (N38): 'hofpreis' oder null/fehlend = bisher. */
   gebuehrModell?: string | null
   /** Einzugsweg aus dem Snapshot (N38): 'erlassen' heißt, die Bargebühr bleibt beim Hof. */
@@ -529,14 +534,30 @@ function imHofpreis(order: OrderForEmail): boolean {
   return istHofpreisBestellung({ gebuehrModell: order.gebuehrModell ?? null })
 }
 
+/** Ist die Gebühr dieser Bestellung entfallen bzw. erstattet (gebuehrEntfallen)? Fehlt das Feld, gilt sie. NUR Anzeige. */
+function mailGebuehrEntfallen(order: OrderForEmail): boolean {
+  return gebuehrEntfallen({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })
+}
+
 /**
- * Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise,
- * Betrag fertig gerechnet — im Hofpreis-Modell der Endpreis inkl.
- * Plattformgebühr (N38), sonst der Warenpreis.
+ * Positionen für die Mails: Zeile in der gemeinsamen Schreibweise, Betrag
+ * fertig gerechnet — im Hofpreis-Modell der Endpreis inkl. Plattformgebühr
+ * (N38), sonst der Warenpreis. `mitGebuehr` überschreibt das für die
+ * Kunden-Mails (`kundenPositionen`); die Hof-Mails rufen ohne.
  */
-function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
-  const hofpreis = imHofpreis(order)
-  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) }))
+function mailPositionen(order: OrderForEmail, mitGebuehr: boolean = imHofpreis(order)): Array<{ name: string; betrag: number }> {
+  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, mitGebuehr) }))
+}
+
+/**
+ * Positionen der Kunden-Mails mit „Gesamt“ (Bestätigung, „Bitte bestätige“):
+ * Endpreise inkl. Gebühr nur, solange die Gebühr gilt. Ist sie entfallen,
+ * zeigt „Gesamt“ den Warenpreis (anzeigeGesamtCents) — dann auch die Zeilen,
+ * sonst wäre die Zeilensumme größer als „Gesamt“ (Nr. 255 Runde 1, wie die
+ * Bestätigungsseite). NUR Anzeige; gespeicherte Beträge bleiben.
+ */
+function kundenPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
+  return mailPositionen(order, imHofpreis(order) && !mailGebuehrEntfallen(order))
 }
 
 /**
@@ -545,10 +566,19 @@ function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: num
  * keine Zeile — sie steckt in den Endpreisen, der Satz darunter nennt sie
  * (`plattformgebuehr`).
  */
-function kundenGebuehr(order: OrderForEmail): { gebuehrZeile?: { wort: string; betrag: number; hinweis: string }; plattformgebuehr: number } {
+function kundenGebuehr(order: OrderForEmail): {
+  gebuehrZeile?: { wort: string; betrag: number; hinweis: string; vermerk?: 'erstattet' | 'entfällt' }
+  plattformgebuehr: number
+} {
   const { gebuehr } = betraege(order)
-  if (imHofpreis(order)) return { plattformgebuehr: gebuehr }
-  return { gebuehrZeile: { wort: gebuehrWort(order), betrag: gebuehr, hinweis: gebuehrHinweisFuer({ gebuehrModell: order.gebuehrModell ?? null }) }, plattformgebuehr: 0 }
+  // Hofpreis-Modell: bei entfallener Gebühr kein „inkl.“-Satz (freigabe §36 „Seiten“, wie zahlzeile.ts) — 0 heißt „kein Satz“.
+  if (imHofpreis(order)) return { plattformgebuehr: mailGebuehrEntfallen(order) ? 0 : gebuehr }
+  // Nr. 255: „erstattet“/„entfällt“ wie Bestätigungsseite und Abholzettel (gebuehrEntfallenVermerk) — sonst zählte die Zeile über „Gesamt“ scheinbar mit.
+  const vermerk = gebuehrEntfallenVermerk({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null, paymentMethod: order.paymentMethod })
+  return {
+    gebuehrZeile: { wort: gebuehrWort(order), betrag: gebuehr, hinweis: gebuehrHinweisFuer({ gebuehrModell: order.gebuehrModell ?? null }), ...(vermerk ? { vermerk } : {}) },
+    plattformgebuehr: 0,
+  }
 }
 
 /**
@@ -640,17 +670,37 @@ function routeUrl(order: OrderForEmail): string {
 }
 
 /**
- * Die drei Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
+ * Die Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
  * (src/lib/servicegebuehr.ts), damit Mail, Bestellseite und Checkout dieselbe
  * Rechnung zeigen: Warenpreis, Servicegebühr, Gesamt (= was die Kundin zahlt).
+ * `anzeigeGesamt` ist das „Gesamt“ der Kunden-Mails (Nr. 255): wie Bestätigung
+ * und Bestellseite ohne entfallene Gebühr (anzeigeGesamtCents) — NUR Anzeige;
+ * „Bar zu kassieren“ und „Die Kundin hat … bezahlt“ bleiben `gesamt`.
  */
-function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number } {
-  const s = bestellSummen({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 })
+function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number; anzeigeGesamt: number } {
+  const summen = { totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 }
+  const s = bestellSummen(summen)
   return {
     warenpreis: centsAlsEuro(s.warenpreisCents),
     gebuehr: centsAlsEuro(s.gebuehrCents),
     gesamt: centsAlsEuro(s.gesamtCents),
+    anzeigeGesamt: centsAlsEuro(anzeigeGesamtCents({ ...summen, serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })),
   }
+}
+
+/**
+ * Der Betrag in „Bring bitte … in bar mit“ / „Bitte zahle … mit Karte“: was der
+ * Hof kassiert, aus dem Snapshot (barZuKassierenCents) — dieselbe Zahl wie
+ * „Bar zu kassieren“ in der Hof-Mail, nie das Anzeige-Gesamt (Nr. 255 Runde 1).
+ * Online gibt es nichts zu kassieren: dann das Gesamt aus dem Snapshot.
+ * null = kein Kasten: Ist die Gebühr entfallen (Storno, „nicht abgeholt“,
+ * verfallen — nur die Admin-Vorschau), ist bei der Abholung nichts mehr zu
+ * zahlen; der Snapshot-Betrag stünde sonst neben „Servicegebühr (entfällt)“.
+ */
+function vorOrtBetrag(order: OrderForEmail): number | null {
+  if (mailGebuehrEntfallen(order)) return null
+  const cents = barZuKassierenCents({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0, paymentMethod: order.paymentMethod })
+  return cents === null ? betraege(order).gesamt : centsAlsEuro(cents)
 }
 
 // ─── Send-Funktionen ──────────────────────────────────────────────────────────
@@ -861,6 +911,11 @@ export async function baueNewFarmNotification(
     slug: string
     ownerEmail: string
     createdAt: Date
+    /** PLZ und Ort für die Zeile „Hof“ (Board Bild 1); fehlen sie, steht nur der Name. */
+    postalCode?: string
+    city?: string
+    /** Was zum Verkaufen noch fehlt („Stripe“, „Produkte“, „Abholzeit“); leer oder fehlend = keine Zeile. */
+    fehlt?: string[]
   },
   an: string
 ): Promise<StapelMail> {
@@ -872,6 +927,8 @@ export async function baueNewFarmNotification(
     React.createElement(NewFarmNotificationEmail, {
       pruefenUrl: `${APP_URL}${ADMIN_HOEFE_HREF}`,
       farmName: farm.name,
+      farmOrt: [farm.postalCode, farm.city].filter(Boolean).join(' ') || undefined,
+      fehlt: farm.fehlt,
       farmId: farm.id,
       farmSlug: farm.slug,
       ownerEmail: farm.ownerEmail,
@@ -1060,9 +1117,10 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     abspracheSatz,
     zahlart: mailZahlart(order.paymentMethod),
-    items: mailPositionen(order),
+    items: kundenPositionen(order),
     ...kundenGebuehr(order),
-    total: betraege(order).gesamt,
+    total: betraege(order).anzeigeGesamt,
+    vorOrtBetrag: vorOrtBetrag(order),
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
     orderUrl,
@@ -1118,9 +1176,9 @@ export async function onsiteConfirmationInhalt(
     farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: mailPositionen(order),
+    items: kundenPositionen(order),
     ...kundenGebuehr(order),
-    total: betraege(order).gesamt,
+    total: betraege(order).anzeigeGesamt,
     confirmationUrl,
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
     belehrung: belehrungFuer(order),
@@ -1159,6 +1217,15 @@ export async function sendOnsiteConfirmation(
   })
 }
 
+/**
+ * Die Abholzeit in den Hof-Mails ohne führende Null der Stunde: „9:00–12:00“ (Board s3/w3-mail-hof-bestellung, V9).
+ * Die Kunden-Mails behalten „09:00“ wie die Bestätigungsseite — die Frist „bis …, 09:40 Uhr“ ebenso (C-Zeile mail-kauf).
+ */
+function hofAbholzeit(order: Pick<OrderForEmail, 'pickupTimeStart' | 'pickupTimeEnd'>): string {
+  const ohneNull = (zeit: string) => zeit.replace(/^0(\d:)/, '$1')
+  return `${ohneNull(order.pickupTimeStart)}–${ohneNull(order.pickupTimeEnd)}`
+}
+
 /** „Bei Heute ansehen →“ in den Hof-Mails: die Startseite des Hofbereichs (Wortliste N42 c), dieselbe Adresse wie in der Navigation. */
 async function heuteUrl(): Promise<string> {
   const { hauptPunktHref } = await import('@/lib/bauern-navigation')
@@ -1174,7 +1241,7 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    pickupTime: hofAbholzeit(order),
     // Zeilenbeträge wie in der Mail an die Kundin (mailPositionen: dieselbe Rechnung über Cent), Board s3/w3-mail-hof-bestellung Bild 1.
     items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
@@ -1214,7 +1281,7 @@ export async function baueBarBestellungAnHof(order: OrderForHofMail): Promise<St
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    pickupTime: hofAbholzeit(order),
     items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     paymentLabel: 'Bar bei Abholung',
     isOnline: false,
@@ -1241,7 +1308,7 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    pickupTime: hofAbholzeit(order),
     items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
@@ -1270,8 +1337,8 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
 
 /** Bauer markiert als bereit → Kunde */
 export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> {
-  const reorderToken = generateReorderToken(order.id, order.farm.id)
-  const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+  // Antwort 8 (Lauf 32, Nr. 255): kein „Dieselbe Bestellung nochmal aufgeben“ mehr — Vertragsmail ohne Werbung (S11).
+  // Die Route ?reorder= bleibt für Links in alten Mails.
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const { OrderReadyEmail } = await import('@/emails/pickup-reminder')
@@ -1285,7 +1352,6 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
-    reorderUrl,
     orderUrl,
     widerrufUrl: widerrufUrl(order),
   }))
@@ -1391,15 +1457,20 @@ export async function baueArtikelFehlt(
     bisherCents: number
     neuCents: number
     erstattetCents: number | null
+    /** Was in der Bestellung bleibt (Board s3/w3-mail-kauf Bild 6); fehlt es, keine Zeilen. */
+    uebrig?: OrderForEmail['items']
   }
 ): Promise<StapelMail> {
   const { ArtikelFehltEmail } = await import('@/emails/artikel-fehlt')
+  const hofpreis = imHofpreis(order)
   const html = await toHtml(React.createElement(ArtikelFehltEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
     artikel: positionsZeile(fehlt.position),
+    // Dieselbe Zeilenrechnung wie die Bestätigung (mailPositionen): Decimal/Cent, im Hofpreis-Modell der Endpreis.
+    uebrig: (fehlt.uebrig ?? []).map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) })),
     gebuehrWort: gebuehrWort(order),
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
@@ -1435,15 +1506,23 @@ export async function baueZahlungZuSpaet(
 
 /** Barbestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
 export async function baueBestellungVerfallen(
-  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
-    farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
-  }
+  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> &
+    Partial<Pick<OrderForEmail, 'createdAt' | 'pickupDate' | 'pickupTimeStart'>> & {
+      farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
+    }
 ): Promise<StapelMail> {
+  // Board s3/w3-mail-storno Bild 3 (V87): die Frist, die verstrichen ist — dieselbe Rechnung wie „Bitte bestätige“
+  // (fristVon, nur gelesen), als fester Tag. Fehlt ein Zeitpunkt, bleibt „nicht rechtzeitig“.
+  const frist =
+    order.createdAt && order.pickupDate && order.pickupTimeStart
+      ? fristVon({ paymentMethod: 'ONSITE_CASH', createdAt: order.createdAt, pickupDate: order.pickupDate, pickupTimeStart: order.pickupTimeStart })
+      : null
   const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
   const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
   return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html, ...mitAntwortAn(order.farm) }

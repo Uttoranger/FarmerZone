@@ -542,7 +542,7 @@ describe('Mail „Bar-Bestellung bestätigt" an den Hof', () => {
 
   it('bar vor dem Stichtag ohne Gebühr: der ganze Betrag bleibt dem Hof, mit dem Satz aus konditionen.ts', () => {
     const t = text({ serviceFee: 0, barZuKassieren: 10.3, barOhneGebuehr: true })
-    expect(t).toContain('Bar zu kassieren: € 10,30')
+    expect(t).toContain('Bar zu kassieren € 10,30')
     expect(t).toContain(`${normal(BAR_OHNE_GEBUEHR_SATZ)} Der ganze Betrag bleibt dir.`)
     expect(t).not.toContain('Monatsabrechnung')
   })

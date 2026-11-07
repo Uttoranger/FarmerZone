@@ -445,7 +445,7 @@ const FAELLE: Fall[] = [
     art: 'neuer-hof',
     fuss: 'betrieb',
     rendere: () => {
-      db.farm.findUnique.mockResolvedValue({ id: 'chofammoos00000000000001', name: 'Hof am Moos', slug: 'hof-am-moos', createdAt: new Date('2027-02-22T17:40:00.000Z'), owner: { email: 'kontakt@hof-am-moos.example.org' } })
+      db.farm.findUnique.mockResolvedValue({ id: 'chofammoos00000000000001', name: 'Hof am Moos', slug: 'hof-am-moos', createdAt: new Date('2027-02-22T17:40:00.000Z'), postalCode: '5230', city: 'Mattighofen', stripeAccountReady: false, _count: { products: 0, pickupSlots: 0 }, owner: { email: 'kontakt@hof-am-moos.example.org' } })
       return ausRenderer('neuer-hof', { farmId: 'chofammoos00000000000001', empfaengerId: 'support' })
     },
   },

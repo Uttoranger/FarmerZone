@@ -31,6 +31,8 @@ const BESTELLUNG_FUER_MAIL = {
   customerPhone: true,
   totalAmount: true,
   serviceFeeCents: true,
+  // Nr. 255: Ist die Gebühr entfallen, zeigt das „Gesamt“ der Kunden-Mails (auch in der Admin-Vorschau) nur den Warenpreis — nur Anzeige.
+  serviceFeeRefundedAt: true,
   // N38 (Nr. 197): Modell und Einzug — die Kunden-Mails zeigen im Hofpreis-Modell Endpreise inkl. Plattformgebühr.
   gebuehrModell: true,
   gebuehrEinzug: true,
@@ -57,6 +59,8 @@ const BESTELLUNG_FUER_MAIL = {
       unitPrice: true,
       totalPrice: true,
       gebuehrCents: true,
+      // Nr. 255: „Ein Artikel fehlt“ listet, was bleibt — ohne die schon fehlenden Positionen.
+      fehltSeit: true,
       // Einheit nur für die Anzeige in der Mail
       // ruecksendekostenCents (Nr. 214): Schätzung für den 5-b-Satz der Belehrung in der Bestätigung.
       // abholhinweise (N47, Nr. 257): „Abholung nach Absprache“ sagt die Bestätigung im Abholblock.
@@ -220,6 +224,7 @@ function alsMailBestellung(b: BestellungFuerMail): OrderForHofMail {
     customerPhone: b.customerPhone,
     totalAmount: b.totalAmount,
     serviceFeeCents: b.serviceFeeCents,
+    serviceFeeRefundedAt: b.serviceFeeRefundedAt,
     gebuehrModell: b.gebuehrModell,
     gebuehrEinzug: b.gebuehrEinzug,
     createdAt: b.createdAt,
@@ -330,6 +335,10 @@ export async function rendereArtikelFehlt(bezug: Record<string, string>): Promis
     bisherCents: cents(f.bisherCents),
     neuCents: cents(f.neuCents),
     erstattetCents: f.erstattetCents === undefined ? null : cents(f.erstattetCents),
+    // Board s3/w3-mail-kauf Bild 6: die Positionen, die bleiben, vor „Neuer Betrag“ — ohne diese und früher fehlende.
+    uebrig: b.items
+      .filter((i) => i.id !== f.itemId && i.fehltSeit === null)
+      .map((i) => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice, totalPrice: i.totalPrice, gebuehrCents: i.gebuehrCents, product: i.product })),
   })
 }
 
