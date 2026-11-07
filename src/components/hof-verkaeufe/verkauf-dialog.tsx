@@ -12,7 +12,7 @@ import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { KANAL_SYMBOL } from '@/components/sales/kanal-symbol'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FeldFehler } from '@/components/checkout/kasse-teile'
-import { FELD, FELD_LABEL, KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
 import { createManualSale, updateManualSale } from '@/server/actions/manual-sales'
 import type { VerkaufDaten, VerkaufProdukt } from '@/lib/hof-verkaeufe'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
@@ -219,8 +219,19 @@ export function VerkaufFormular({
 
   return (
     <form onSubmit={form.handleSubmit(absenden)} noValidate className={cn('flex min-h-0 flex-col', breit ? 'max-h-[min(92dvh,760px)]' : 'gap-4')}>
-      <div className={cn('flex items-start justify-between gap-3', breit && 'px-6 pt-6')}>
-        <div className="min-w-0">{titel(bearbeiten ? 'Verkauf bearbeiten' : 'Verkauf eintragen')}</div>
+      {/* „Abbrechen“ oben rechts neben dem Titel, darunter der Tag als Chip (V11, Board s2-/w2-verkaeufe Bild 2). */}
+      <div className={cn('flex flex-col items-start gap-2', breit && 'px-6 pt-6')}>
+        <div className="flex w-full items-start justify-between gap-3">
+          <div className="min-w-0 pt-2">{titel(bearbeiten ? 'Verkauf bearbeiten' : 'Verkauf eintragen')}</div>
+          <button
+            type="button"
+            onClick={onAbbrechen}
+            disabled={laeuft}
+            className={cn('-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+          >
+            Abbrechen
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => setDatumOffen((o) => !o)}
@@ -461,33 +472,15 @@ export function VerkaufFormular({
         </div>
 
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst — auch die mit &bdquo;Bar bei
+          Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst – auch die mit &bdquo;Bar bei
           Abholung&ldquo;.
         </p>
 
         <DialogFehler text={serverFehler} />
       </div>
 
-      {breit ? (
-        <div className="flex flex-wrap justify-end gap-2.5 border-t border-border px-6 py-4">
-          <button type="button" onClick={onAbbrechen} disabled={laeuft} className={KNOPF_RAHMEN}>
-            Abbrechen
-          </button>
-          {hauptKnopf}
-        </div>
-      ) : (
-        <>
-          {hauptKnopf}
-          <button
-            type="button"
-            onClick={onAbbrechen}
-            disabled={laeuft}
-            className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
-          >
-            Abbrechen
-          </button>
-        </>
-      )}
+      {/* Genau ein „Abbrechen“ (oben rechts); unten nur der Hauptknopf. */}
+      {breit ? <div className="flex flex-wrap justify-end gap-2.5 border-t border-border px-6 py-4">{hauptKnopf}</div> : hauptKnopf}
     </form>
   )
 }
