@@ -9,6 +9,7 @@ import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeBrennmaterialFamilieAn } from '@/server/actions/produktfamilie'
 import {
+  PRODUKTE_FILTER_LABEL,
   hofpreisZeile,
   speicherFehlerAusAntwort,
   speicherFehlerNachWurf,
@@ -206,13 +207,14 @@ export function BrennmaterialFormular({
       open
       onClose={onClose}
       titel="Neues Brennmaterial"
+      art={PRODUKTE_FILTER_LABEL.brennmaterial}
       satz="Brennholz, Anzündholz oder Hackschnitzel – jede Größe mit eigenem Preis und Vorrat. Nur Abholung am Hof."
       speichernText="Speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
       meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
-      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Buche, ofenfertig Raummeter“.">
+      <Feld feld="name" label="Name" fehler={fehler.name}>
         <input
           id={feldId('name')}
           value={name}

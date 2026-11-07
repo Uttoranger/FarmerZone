@@ -185,7 +185,7 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
   it('B2: Marke, Filter und Speichern-Knopf nehmen das Wort aus EINER Quelle', () => {
     expect(produktStatus(p({ isAvailable: false })).text).toBe(NICHT_IM_SHOP)
     expect(PRODUKTE_FILTER_LABEL.entwuerfe).toBe(NICHT_IM_SHOP)
-    expect(speichernText(0, false, false)).toBe(SPEICHERN_NICHT_IM_SHOP)
+    expect(speichernText(false, false)).toBe(SPEICHERN_NICHT_IM_SHOP)
   })
 
   it('B2: kein „Entwurf" mehr in den Texten rund um Produkte', () => {
@@ -756,10 +756,10 @@ describe('Produktdialog im neuen Design', () => {
     expect(dialogTitel(false, 'brennmaterial')).toBe('Neues Brennmaterial')
     expect(dialogTitel(false, null)).toBe('Neues Produkt')
     expect(dialogTitel(true, 'futter')).toBe('Produkt bearbeiten')
-    expect(speichernText(0, false, true)).toBe('Speichern')
-    expect(speichernText(0, false, false)).toBe('Speichern (nicht im Shop)')
-    expect(speichernText(2, false, true)).toBe('Noch 2 Angaben fehlen')
-    expect(speichernText(0, true, true)).toBe('Speichern')
+    expect(speichernText(false, true)).toBe('Speichern')
+    expect(speichernText(false, false)).toBe('Speichern (nicht im Shop)')
+    // Kein Zähler mehr (Liste Lauf 32, produkt-neu): geprüft wird beim Speichern.
+    expect(speichernText(true, true)).toBe('Speichern')
   })
 
   it('speichert mit dem Vorrat beim Öffnen und lädt Fotos weiter über ladeFotoHoch (Sperre 17b in der Upload-Route)', () => {

@@ -157,10 +157,12 @@ export function fehlendeAngaben(werte: unknown, schema: z.ZodType): number {
   return new Set(ergebnis.error.issues.map((i) => i.path.slice(0, 2).join('.'))).size
 }
 
-/** Der Text des Speichern-Buttons. */
-export function speichernText(fehlend: number, bearbeiten: boolean, sichtbar?: boolean): string {
-  if (fehlend === 1) return 'Noch 1 Angabe fehlt'
-  if (fehlend > 1) return `Noch ${fehlend} Angaben fehlen`
+/**
+ * Der Text des Speichern-Buttons. Kein wechselnder Zähler „Noch 1 Angabe fehlt“ mehr (Liste Lauf 32,
+ * produkt-neu; G6): ein Knopf, dessen Text sich beim Tippen ändert, ist für Screenreader schwer — geprüft wird
+ * beim Speichern, der Fokus springt ins erste fehlende Feld.
+ */
+export function speichernText(bearbeiten: boolean, sichtbar?: boolean): string {
   if (bearbeiten) return 'Speichern'
   // Board s1-/w1-produkt-neu (Lauf 31): „Speichern“ wie beim Bearbeiten; dass es
   // gleich im Shop steht, sagt der Schalter „Im Shop“ darüber. Nur „nicht im

@@ -2,7 +2,8 @@
 
 import { cloneElement, isValidElement } from 'react'
 import { Check, Lock, Plus, X } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { KREUZ_NUR_AB_SM, ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
 import { Button } from '@/components/ui/button'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
@@ -31,6 +32,7 @@ export function FamilienDialog({
   open,
   onClose,
   titel,
+  art,
   satz,
   hinweis,
   speichernText,
@@ -42,6 +44,8 @@ export function FamilienDialog({
   open: boolean
   onClose: () => void
   titel: string
+  /** Die Produktart als Unterzeile am Handy (Liste Lauf 32, produkt-neu 390). */
+  art: string
   satz: string
   /** Satz über den Knöpfen, z. B. was sofort online geht (speichernHinweis). */
   hinweis?: string | null
@@ -56,12 +60,12 @@ export function FamilienDialog({
     <Dialog open={open} onOpenChange={(o) => !o && !speichert && onClose()}>
       <DialogContent
         data-app-palette="neu"
-        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-[16px]"
+        className={cn(
+          'flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-[16px]',
+          KREUZ_NUR_AB_SM
+        )}
       >
-        <div className="shrink-0 px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
-          <DialogTitle className="pr-10 font-heading text-xl font-semibold text-foreground md:text-2xl">{titel}</DialogTitle>
-          <DialogDescription className="mt-1 text-[13px] text-muted-foreground">{satz}</DialogDescription>
-        </div>
+        <ProduktDialogKopf titel={titel} art={art} satz={satz} zurueckGesperrt={speichert} />
         <form
           noValidate
           onSubmit={(e) => {

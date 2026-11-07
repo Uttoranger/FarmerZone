@@ -8,6 +8,7 @@ import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeFutterFamilieAn } from '@/server/actions/produktfamilie'
 import {
+  PRODUKTE_FILTER_LABEL,
   hofpreisZeile,
   speicherFehlerAusAntwort,
   speicherFehlerNachWurf,
@@ -294,6 +295,7 @@ export function FutterFormular({
       open
       onClose={onClose}
       titel="Neues Futtermittel"
+      art={PRODUKTE_FILTER_LABEL.futter}
       satz="Vom Sackerl für den Hasen bis zum Rundballen – jede Größe mit eigenem Preis und Vorrat."
       hinweis={speichernHinweis(zeilen.length - wartend, wartend)}
       speichernText="Speichern"
@@ -301,7 +303,7 @@ export function FutterFormular({
       onSpeichern={() => void speichern()}
       meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
-      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Bergwiesen-Heu 5 kg-Sack“.">
+      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Name und Größe, z. B. „Heu, 1. Schnitt, Kleinballen“">
         <input
           id={feldId('name')}
           value={name}

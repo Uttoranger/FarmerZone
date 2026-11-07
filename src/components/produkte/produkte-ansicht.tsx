@@ -78,6 +78,8 @@ type Props = {
   hofBetriebsnummer: string | null
   /** N38 (Nr. 197): im Hofpreis-Modell der Satz — der Produktdialog zeigt, was die Kundin zahlt. */
   preisAnzeige?: PreisAnzeige
+  /** „Bar bis … ohne Gebühr für dich.“ — nur für den grünen Kasten im Produktformular (V1). */
+  barOhneGebuehr?: string | null
   /** Nummer und Status des Hofs — „Deine Futtermittel-Registrierungen" im Futter-Formular (Nr. 20). */
   registrierung: HofRegistrierung
   /** teilenMomenteAus: Farm.teilenMomenteAus (Nr. 30) — dann fragt kein Moment. */
@@ -151,7 +153,7 @@ function PreisZelle({ product, preisAnzeige }: { product: ProductData; preisAnze
  * öffnen ?neu=1 (mit ?bereich= aus „Was legst du an?") und ?edit=<id>.
  * Bearbeiten öffnet der Name; Löschen steht im Bearbeiten-Dialog.
  */
-export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster, preisAnzeige = null }: Props): React.JSX.Element {
+export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, registrierung, hof, naechstesFenster, preisAnzeige = null, barOhneGebuehr = null }: Props): React.JSX.Element {
   const ansicht = produkteAnsichtAus(useSearchParams())
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
@@ -327,6 +329,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                       key={f}
                       href={adresse}
                       aktiv={ansicht.filter === f}
+                      // Chip 15 px wie das Board (Liste Lauf 32, produkte) — die Höhe bleibt die der Chip-Reihe.
+                      className="text-[15px]"
                       onNavigate={(e) => {
                         e.preventDefault()
                         schreibeAdresse(adresse)
@@ -386,6 +390,8 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
             <EmptyState
               titel={PRODUKTE_KEIN_TREFFER.titel}
               satz={keinTrefferSatz(suche)}
+              // Kein „an.“ allein in Zeile 2 (Liste Lauf 32, produkte Bild 4): der Satz bricht ausgewogen.
+              className="[&_p]:text-pretty"
               ausweg={
                 // Mit Suche bleibt der Filter und nur die Suche geht (Board, Bild 4); sonst zurück zu „Alle".
                 <Link
@@ -449,6 +455,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
         }}
         hofBetriebsnummer={hofBetriebsnummer}
         preisAnzeige={preisAnzeige}
+        barOhneGebuehr={barOhneGebuehr}
       />
 
       <Dialog open={loeschen !== null} onOpenChange={(o) => !o && setLoeschen(null)}>

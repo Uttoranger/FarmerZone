@@ -110,7 +110,7 @@ import { KategorieSheet } from './kategorie-sheet'
 import { AbholhinweisWahl, FELD_FEHLER_IM_FORMULAR, FormularMeldung } from '@/components/produkte/familien-teile'
 import { istNetzFehler } from '@/lib/netz'
 import { LebensmittelVorschau } from './lebensmittel-vorschau'
-import { produktBereich } from '@/lib/produkte-hof'
+import { PRODUKTE_FILTER_LABEL, produktBereich } from '@/lib/produkte-hof'
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
 import { AUSSCHNITT_STANDARD, bildStil } from '@/lib/bild-ausschnitt'
 import {
@@ -128,6 +128,8 @@ import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
+import { KREUZ_NUR_AB_SM, ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 import {
   FUTTER_BESTAETIGUNG_AUSNAHME,
   FUTTER_BESTAETIGUNG_NEU,
@@ -157,7 +159,6 @@ import {
   abschnitteMitFehlern,
   auswahlLabel,
   erstesFehlerfeld,
-  fehlendeAngaben,
   saisonVorbelegung,
   speichernText,
   dialogTitel,
@@ -220,6 +221,8 @@ type Props = {
   hofBetriebsnummer: string | null
   /** N38 (Nr. 197): im Hofpreis-Modell der Satz — „Du bekommst … · die Kundin zahlt …“ unter dem Preis. */
   preisAnzeige?: PreisAnzeige
+  /** „Bar bis … ohne Gebühr für dich.“ unter dem Geldsatz (Liste Lauf 32, produkt-neu; aus geldsaetzeFuer). */
+  barOhneGebuehr?: string | null
   /**
    * Die Wahl aus „Was legst du an?" (Nachtlauf Nr. 18), nur beim Anlegen:
    * Brennmaterial setzt Brennholz, Futtermittel startet die Kategorie bei den
@@ -347,17 +350,20 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
   }
 }
 
-/** Die Zeile unter dem Abschnittstitel, wenn er zugeklappt ist. */
+/** Die Zeile unter dem Abschnittstitel — offen wie zugeklappt (Liste Lauf 32, produkt-neu: Kartenköpfe mit Zusammenfassung). */
 function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
   switch (abschnitt) {
-    case 'grunddaten':
-      return w.category ? formatKategorie(w.category, w.subcategory) : 'Noch keine Kategorie'
+    case 'grunddaten': {
+      // Board s1/w1-produkt-neu: „Waldhonig · Honig und Aufstriche“ — der Name zuerst, sobald einer dasteht.
+      const kategorie = w.category ? formatKategorie(w.category, w.subcategory) : 'Noch keine Kategorie'
+      return w.name.trim() ? `${w.name.trim()} · ${kategorie}` : kategorie
+    }
     case 'preis': {
       // Ohne gültigen Preis derselbe ruhige Satz wie die Käufer-Vorschau statt „€ 0,00" (Nr. 51).
       const preis = gueltigerPreis(w.price)
       const teile = [
         preis === null ? KAEUFER_VORSCHAU.preisFehlt : formatGrundpreis(preis, w.unit, w.unitSize),
-        `${Number.isFinite(w.stock) ? w.stock : 0} im Vorrat`,
+        `Vorrat ${Number.isFinite(w.stock) ? w.stock : 0}`,
       ]
       if (!w.isAvailable) teile.push(NICHT_IM_SHOP_IM_SATZ)
       return teile.join(' · ')
@@ -393,7 +399,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preisAnzeige = null, vorwahl = null, onLoeschen, onAngelegt }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preisAnzeige = null, barOhneGebuehr = null, vorwahl = null, onLoeschen, onAngelegt }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -521,7 +527,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   )
   // Nur ein Vorschlag, nie eine Wahl — und nur, solange keine Kategorie gewählt ist.
   const vorschlag = category == null ? kategorieVorschlag(werte.name) : null
-  const fehlend = fehlendeAngaben(werte, schema)
   const erlaubteArten = futtermittelartenFuer(category)
   const betriebsnummer = betriebsnummerFuerAnzeige(
     { betriebsnummer: hofBetriebsnummer },
@@ -957,19 +962,18 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   }
 
   function abschnittTitel(abschnitt: Abschnitt, pflicht = false) {
-    const zu = !offen.includes(abschnitt)
     const fehler = fehlerhafteAbschnitte.has(abschnitt)
+    // Liste Lauf 32 (produkt-neu): Die Unterzeile steht immer; bei einem Fehler ist NUR sie farbig
+    // („Bitte prüfen“), der Kartentitel bleibt in Textfarbe.
     return (
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className={cn(fehler && 'text-status-offen')}>
+        <span>
           {ABSCHNITT_TITEL[abschnitt]}
           {pflicht && ' *'}
         </span>
-        {zu && (
-          <span className={cn('truncate text-[13px]', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
-            {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
-          </span>
-        )}
+        <span className={cn('truncate text-[13px]', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
+          {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
+        </span>
       </span>
     )
   }
@@ -987,11 +991,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           --app-*) im Teilbaum die Werte des Design-Systems (DESIGN_SYSTEM „Mein Hof"). */}
       <DialogContent
         data-app-palette="neu"
-        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-[16px]"
+        className={cn(
+          'flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-[16px]',
+          KREUZ_NUR_AB_SM
+        )}
       >
-        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-          <DialogTitle className="font-heading text-xl font-semibold">{dialogTitel(isEdit, vorwahl)}</DialogTitle>
-        </DialogHeader>
+        {/* Liste Lauf 32 (produkt-neu 390): am Handy „‹“ links, Titel, Produktart darunter. */}
+        <ProduktDialogKopf titel={dialogTitel(isEdit, vorwahl)} art={PRODUKTE_FILTER_LABEL[produktBereich(category)]} zurueckGesperrt={isSubmitting} />
 
         {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#135):
             Base UI hängt einen zugeklappten Abschnitt aus dem DOM aus
@@ -1213,40 +1219,79 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                   <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('preis')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
-                      {/* Reihenfolge Einheit → Gebinde → Preis: Das Preisfeld heißt je
-                          nach Gebinde anders („Preis je kg" / „Preis für das 2-kg-Paket"),
-                          also stehen die beiden zuerst. */}
-                      <FormField
-                        control={form.control}
-                        name="unit"
-                        render={({ field }) => (
-                          <FormItem data-feld="unit">
-                            <FormLabel>Einheit</FormLabel>
-                            <Select
-                              onValueChange={(v) => einheitSetzen(v as ProductFormData['unit'])}
-                              value={field.value}
-                            >
+                      {/* Einheit und Preis in einer Reihe (Liste Lauf 32, produkt-neu). Das Preisfeld heißt je nach
+                          Gebinde anders („Preis je kg“ / „Preis für das 2-kg-Paket“) — die Beschriftung folgt live. */}
+                      <div className="grid grid-cols-2 items-start gap-3">
+                        <FormField
+                          control={form.control}
+                          name="unit"
+                          render={({ field }) => (
+                            <FormItem data-feld="unit">
+                              <FormLabel>Einheit</FormLabel>
+                              <Select
+                                onValueChange={(v) => einheitSetzen(v as ProductFormData['unit'])}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    {/* Base UI zeigt ohne Formatierer den ROHWERT („KG") —
+                                        die Kinder-Funktion macht daraus das Label. */}
+                                    <SelectValue placeholder="Wählen…">
+                                      {(v: string | null) => auswahlLabel(UNIT_OPTIONS, v) ?? 'Wählen…'}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {unitOptionsFuer(category).map((u) => (
+                                    <SelectItem key={u.value} value={u.value}>
+                                      {u.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)}</FormLabel>
                               <FormControl>
-                                <SelectTrigger>
-                                  {/* Base UI zeigt ohne Formatierer den ROHWERT („KG") —
-                                      die Kinder-Funktion macht daraus das Label. */}
-                                  <SelectValue placeholder="Wählen…">
-                                    {(v: string | null) => auswahlLabel(UNIT_OPTIONS, v) ?? 'Wählen…'}
-                                  </SelectValue>
-                                </SelectTrigger>
+                                <DezimalFeld
+                                  name={field.name}
+                                  value={field.value}
+                                  placeholder="0,00"
+                                  enterKeyHint={enterTaste(false)}
+                                  praefix="€"
+                                  stellen={2}
+                                  onBlur={field.onBlur}
+                                  onChange={(neu) => field.onChange(neu ?? Number.NaN)}
+                                />
                               </FormControl>
-                              <SelectContent>
-                                {unitOptionsFuer(category).map((u) => (
-                                  <SelectItem key={u.value} value={u.value}>
-                                    {u.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {/* Live-Vorschau direkt unter Einheit und Preis: was Kundinnen aus Preis und Gebinde lesen werden.
+                          Im Hofpreis-Modell der grüne Kasten (V1, Liste Lauf 32 produkt-neu): „Du bekommst … · die
+                          Kundin zahlt …“, darunter „Bar bis … ohne Gebühr für dich.“ aus der Geldsatz-Hilfe — nie als
+                          fester Text. Im Modell „bisher“ die leise Zeile „Kunden sehen: …“ (dort stimmt sie noch). */}
+                      {preisVorschau &&
+                        (preisAnzeige ? (
+                          <div className={cn('bg-accent/10 px-3 py-2.5 text-[13px] text-foreground', RUNDUNG.hinweis)} aria-live="polite">
+                            <p className="font-semibold">{preisVorschau}</p>
+                            {barOhneGebuehr && <p className="mt-0.5 text-muted-foreground">{barOhneGebuehr}</p>}
+                          </div>
+                        ) : (
+                          <p className="-mt-1 text-xs text-muted-foreground" aria-live="polite">
+                            {preisVorschau}
+                          </p>
+                        ))}
 
                       {/* Futtermittel: Das Gewicht je Gebinde steht direkt unter der Einheit
                           und übernimmt die Rolle der festen Pakete — es sind dieselben
@@ -1360,39 +1405,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                         />
                       )}
 
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)}</FormLabel>
-                            <FormControl>
-                              <DezimalFeld
-                                name={field.name}
-                                value={field.value}
-                                placeholder="0,00"
-                                enterKeyHint={enterTaste(false)}
-                                praefix="€"
-                                stellen={2}
-                                onBlur={field.onBlur}
-                                onChange={(neu) => field.onChange(neu ?? Number.NaN)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Live-Vorschau: was Kundinnen aus Preis und Gebinde lesen werden */}
-                      {/* Im Hofpreis-Modell als grün getönte Zeile wie im Board (s1/w1-produkt-neu, Bild 1). */}
-                      {preisVorschau && (
-                        <p
-                          className={cn('text-xs -mt-1', preisAnzeige ? 'mt-0 rounded-[12px] bg-accent/10 px-3 py-2.5 text-[13px] text-foreground' : 'text-muted-foreground')}
-                          aria-live="polite"
-                        >
-                          {preisVorschau}
-                        </p>
-                      )}
                       {preisFraglich && (
                         <div
                           className="rounded-lg bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200"
@@ -2073,8 +2085,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
-              {/* Fehlt noch etwas, sagt der Knopf wie viel; ein Tipp prüft trotzdem
-                  und springt zum ersten fehlenden Feld (onInvalid). */}
+              {/* Immer „Speichern“ (Liste Lauf 32, produkt-neu; G6): geprüft wird beim Tipp, der springt zum
+                  ersten fehlenden Feld (onInvalid). */}
               {/* Solange das Foto geprüft wird, gibt es noch nichts zu speichern —
                   sonst ginge das Produkt ohne (oder mit dem vorigen) Foto hinaus. */}
               <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-h-12 w-full rounded-[10px] text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
@@ -2082,7 +2094,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)
                     : 'Speichere…'
-                  : speichernText(fehlend, isEdit, isAvailable)}
+                  : speichernText(isEdit, isAvailable)}
               </Button>
             </div>
           </form>
