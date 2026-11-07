@@ -367,6 +367,11 @@ describe('einstellungenBereiche', () => {
     expect(futtermittelZeile(null, 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1')
     expect(futtermittelZeile('REGISTRIERT', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1 · BAES-Meldung')
     expect(futtermittelZeile('ZUGELASSEN', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1 · BAES-Meldung')
+    // Vorsatz „LFBIS“ in der gespeicherten Nummer steht nicht doppelt in der Zeile (Runde 2).
+    expect(futtermittelZeile('PRIMAERPRODUKTION', 'LFBIS 0000000')).toBe('Futtermittel-Nummer (LFBIS) 0000000')
+    expect(futtermittelZeile(null, ' lfbis-1234567 ')).toBe('Futtermittel-Nummer (LFBIS) 1234567')
+    expect(futtermittelZeile('REGISTRIERT', 'LFBIS: 1234567')).toBe('Futtermittel-Nummer (LFBIS) 1234567 · BAES-Meldung')
+    expect(futtermittelZeile(null, 'LFBIS')).toBe('Futtermittel-Nummer (LFBIS) LFBIS')
     // Gegenprobe: das Fachwort der Liste steht in keiner Zeile mehr.
     expect(bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'futtermittel').zeile).not.toContain('Primärproduktion')
   })
