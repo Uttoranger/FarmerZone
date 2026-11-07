@@ -10,6 +10,10 @@
  *  - Vor dem Stichtag (Modell „bisher“) gibt es keinen Geldsatz, auch nicht beim Gründungshof.
  *  - Bestellung: nur der Snapshot (`totalAmount`, `serviceFeeCents`), je Weg ein Satz — online einbehalten, bar
  *    erlassen („die vollen € …“, Wort der Gebühr aus der Konstante), bar mit Monatsabrechnung; „bisher“ → null.
+ *  - Entfallene Gebühr (`serviceFeeRefundedAt` gesetzt: erstattet bzw. nicht kassiert) → null, kein Satz mit dem
+ *    Betrag samt Gebühr und keine Monatsabrechnung (N38, Auftrag: kein „inkl.“); Gegenprobe ohne Erstattung.
+ *  - Erlassene Bestellung, deren Frist (heute aus den Hofdaten, auch `einzugAb` aus dem Admin) schon vorbei ist:
+ *    Satz ohne Datum, nie „bis <vergangener Tag> zahlst du …“; Gegenprobe mit Frist in der Zukunft.
  *  - Prozent und Wort der Gebühr stehen nie als fester Text in der Hilfe (Gegenprobe am Schnipsel).
  */
 import { describe, it, expect } from 'vitest'
@@ -20,6 +24,7 @@ import {
   endpreisJeStueckCents,
   geldsaetzeFuer,
   satzHundertstel,
+  type GebuehrEinzug,
   type GeldsatzHof,
 } from '@/lib/plattformgebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
@@ -109,9 +114,14 @@ describe('Geldsatz eines Angebots', () => {
 })
 
 describe('Geldsatz einer Bestellung (Snapshot)', () => {
-  const bestellung = (paymentMethod: string, gebuehrEinzug: string | null, gebuehrModell: string | null = 'hofpreis') => ({
+  const bestellung = (
+    paymentMethod: string,
+    gebuehrEinzug: GebuehrEinzug | null,
+    gebuehrModell: string | null = 'hofpreis',
+    serviceFeeRefundedAt: Date | null = null
+  ) => ({
     art: 'bestellung' as const,
-    bestellung: { totalAmount: '18.00', serviceFeeCents: 112, paymentMethod, gebuehrModell, gebuehrEinzug },
+    bestellung: { totalAmount: '18.00', serviceFeeCents: 112, paymentMethod, gebuehrModell, gebuehrEinzug, serviceFeeRefundedAt },
   })
 
   it('online: die Gebühr ist online einbehalten', () => {
@@ -130,7 +140,7 @@ describe('Geldsatz einer Bestellung (Snapshot)', () => {
   })
 
   it('bar mit Einzug (kein Gründungshof): die Gebühr holt die Monatsabrechnung', () => {
-    for (const einzug of ['sepa', 'ueberweisung']) {
+    for (const einzug of ['sepa', 'ueberweisung'] as const) {
       const g = geldsaetzeFuer(bestellung('ONSITE_CASH', einzug), HOF, STICHTAG, null, NACH_STICHTAG)
       expect(g?.hofCents).toBe(1800)
       expect(g?.satz).toBe(`Du bekommst €${NBSP}18,00 · die Kundin zahlt €${NBSP}19,12 – die Gebühr holt die Monatsabrechnung.`)
@@ -140,6 +150,43 @@ describe('Geldsatz einer Bestellung (Snapshot)', () => {
   it('nimmt den Snapshot, nie den Satz des Hofs: ein anderer Satz ändert nichts', () => {
     const hof: GeldsatzHof = { plattformgebuehrProzent: '9', einzugAb: null }
     expect(geldsaetzeFuer(bestellung('ONLINE', 'stripe'), hof, STICHTAG, null, NACH_STICHTAG)?.kundinCents).toBe(1912)
+  })
+
+  it('entfallene Gebühr (erstattet bzw. nicht kassiert): kein Geldsatz — weder „die Kundin zahlt € 19,12“ noch die Monatsabrechnung', () => {
+    const erstattet = new Date('2027-03-02T09:00:00Z')
+    expect(geldsaetzeFuer(bestellung('ONLINE', 'stripe', 'hofpreis', erstattet), HOF, STICHTAG, null, NACH_STICHTAG)).toBeNull()
+    for (const einzug of ['sepa', 'ueberweisung', 'erlassen'] as const) {
+      expect(geldsaetzeFuer(bestellung('ONSITE_CASH', einzug, 'hofpreis', erstattet), HOF, STICHTAG, GRUENDUNG_BIS, NACH_STICHTAG)).toBeNull()
+    }
+    // Gegenprobe: dieselbe Bestellung ohne Erstattung hat ihren Satz.
+    expect(geldsaetzeFuer(bestellung('ONLINE', 'stripe'), HOF, STICHTAG, null, NACH_STICHTAG)?.satz).toContain('19,12')
+    expect(geldsaetzeFuer(bestellung('ONSITE_CASH', 'sepa'), HOF, STICHTAG, null, NACH_STICHTAG)?.satz).toContain('Monatsabrechnung')
+  })
+
+  it('Karte vor Ort zählt wie bar (istVorOrtZahlung): kein „online einbehalten“', () => {
+    expect(geldsaetzeFuer(bestellung('ONSITE_CARD', 'sepa'), HOF, STICHTAG, null, NACH_STICHTAG)?.satz).toContain('Monatsabrechnung')
+    expect(geldsaetzeFuer(bestellung('ONSITE_CARD', 'sepa'), HOF, STICHTAG, null, NACH_STICHTAG)?.satz).not.toContain('online')
+  })
+
+  it('erlassen, Frist schon vorbei (Gründungsende vorbei): Satz ohne Datum, nie „bis <vergangener Tag> zahlst du“', () => {
+    const spaeter = new Date('2028-03-01T10:00:00Z') // nach dem 31. Jänner 2028
+    const g = geldsaetzeFuer(bestellung('ONSITE_CASH', 'erlassen'), HOF, STICHTAG, GRUENDUNG_BIS, spaeter)
+
+    expect(g?.hofCents).toBe(1912)
+    expect(g?.satz).toBe(`Du bekommst die vollen €${NBSP}19,12 – für diesen Barverkauf zahlst du keine ${PLATTFORMGEBUEHR_BEZEICHNUNG}.`)
+    expect(g?.satz).not.toContain(' bis ')
+  })
+
+  it('erlassen, einzugAb aus dem Admin: Datum aus den heutigen Hofdaten, vorbei → ohne Datum', () => {
+    // Admin hat den Einzug auf den 1. März 2027 vorgezogen — der Tag ist am 3. März vorbei, obwohl gruendungBis 2028 wäre.
+    const vorgezogen: GeldsatzHof = { plattformgebuehrProzent: null, einzugAb: new Date('2027-02-28T23:00:00Z') }
+    const vorbei = geldsaetzeFuer(bestellung('ONSITE_CASH', 'erlassen'), vorgezogen, STICHTAG, GRUENDUNG_BIS, NACH_STICHTAG)
+    expect(vorbei?.satz).toBe(`Du bekommst die vollen €${NBSP}19,12 – für diesen Barverkauf zahlst du keine ${PLATTFORMGEBUEHR_BEZEICHNUNG}.`)
+
+    // Gegenprobe: einzugAb in der Zukunft (1. Mai 2027) → der letzte freie Tag davor im Satz.
+    const kuenftig: GeldsatzHof = { plattformgebuehrProzent: null, einzugAb: new Date('2027-04-30T22:00:00Z') }
+    const offen = geldsaetzeFuer(bestellung('ONSITE_CASH', 'erlassen'), kuenftig, STICHTAG, null, NACH_STICHTAG)
+    expect(offen?.satz).toBe(`Du bekommst die vollen €${NBSP}19,12 – bis 30.${NBSP}April 2027 zahlst du auf Barverkäufe keine ${PLATTFORMGEBUEHR_BEZEICHNUNG}.`)
   })
 
   it('Bestellung im Modell „bisher“ (vor dem Stichtag bestellt): kein Geldsatz', () => {

@@ -28,8 +28,10 @@ import {
   SERVICEGEBUEHR_BEZEICHNUNG,
   SERVICEGEBUEHR_HINWEIS,
   bestellSummen,
+  gebuehrEntfallen,
   gebuehrFuerMonatsabrechnung,
   istVorOrtZahlung,
+  type BestellungFuerGebuehrStatus,
   type BestellungMitGebuehr,
   type Zahlungsart,
 } from '@/lib/servicegebuehr'
@@ -384,8 +386,9 @@ export type Geldsaetze = {
   /**
    * Angebot: „Du bekommst € 7,50 · die Kundin zahlt € 7,95“ (mit `ab`: „Du bekommst ab € 2,50 · die Kundin
    * zahlt ab € 2,65“). Bestellung: der ganze Satz je Weg — online „… – die Gebühr ist online einbehalten.“, bar
-   * erlassen „Du bekommst die vollen € … – bis <Tag> zahlst du auf Barverkäufe keine <Wort>.“, bar mit Einzug
-   * „… – die Gebühr holt die Monatsabrechnung.“
+   * erlassen „Du bekommst die vollen € … – bis <Tag> zahlst du auf Barverkäufe keine <Wort>.“ (ist der Tag schon
+   * vorbei: „… – für diesen Barverkauf zahlst du keine <Wort>.“), bar mit Einzug „… – die Gebühr holt die
+   * Monatsabrechnung.“
    */
   satz: string
   /** Nur beim Angebot, solange die Bargebühr erlassen ist (N38, Gründungshof bzw. „Einzug ab“): „Bar bis <Tag> ohne Gebühr für dich.“ */
@@ -397,7 +400,13 @@ export type GeldsatzQuelle =
   | { art: 'angebot'; positionen: readonly GebuehrPosition[]; ab?: boolean }
   | {
       art: 'bestellung'
-      bestellung: BestellungMitGebuehr & { paymentMethod: string; gebuehrModell: string | null; gebuehrEinzug: string | null }
+      bestellung: BestellungMitGebuehr &
+        Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt'> & {
+          paymentMethod: string
+          gebuehrModell: string | null
+          /** `Order.gebuehrEinzug` (in der DB ein Text) — der Aufrufer reicht nur einen der vier Wege oder null durch. */
+          gebuehrEinzug: GebuehrEinzug | null
+        }
     }
 
 /** Was der Geldsatz über den Hof wissen muss: Satz (`plattformgebuehrProzent`, null = Vorgabe) und `Farm.einzugAb`. */
@@ -413,9 +422,17 @@ const letzterFreierTag = (einzugAb: Date): string => formatDatumLang(new Date(ei
  *  - Angebot (Produkt, Größe, „ab“ einer Familie): Beträge über `bestellGebuehr` mit dem Satz des Hofs
  *    (`satzHundertstel`), der Hinweis „Bar bis …“ nur, solange `einzugAbFuer` in der Zukunft liegt.
  *  - Bestellung: nur der Snapshot (`bestellSummen`: Warenpreis und `serviceFeeCents`) und der gespeicherte Weg
- *    (`gebuehrEinzug`); `erlassen` heißt, die Gebühr bleibt beim Hof — er bekommt die vollen Euro.
- * Im Modell „bisher“ (Angebot vor dem Stichtag, Bestellung ohne `gebuehrModell`) gibt es keinen Geldsatz: null.
+ *    (`gebuehrEinzug`); `erlassen` heißt, die Gebühr bleibt beim Hof — er bekommt die vollen Euro. Das Datum im
+ *    Satz kommt aus den HEUTIGEN Hofdaten (`einzugAbFuer`); liegt es schon zurück, steht der Satz ohne Datum —
+ *    nie „bis <vergangener Tag> zahlst du …“.
+ * Kein Geldsatz (null): im Modell „bisher“ (Angebot vor dem Stichtag, Bestellung ohne `gebuehrModell`) und bei einer
+ * Bestellung mit entfallener Gebühr (`gebuehrEntfallen`: erstattet bzw. nicht kassiert — Storno, nicht abgeholt);
+ * dort zeigt die Seite die Gebührenzeile mit Vermerk und ohne „inkl.“ (N38, Nr. 244).
  * Das Wort der Gebühr kommt aus `gebuehrWortFuerModell`, der Satz nie als fester Text.
+ *
+ * `hof.einzugAb` ist der Einzugsbeginn aus dem Admin (null = keiner gesetzt); `gruendungBis` übergibt der Aufrufer
+ * als das WIRKSAME Gründungsende des Hofs (Farm.gruendungBis, null ohne Gründungsplatz) — dieselben Werte, mit
+ * denen `einzugFuer` beim Bestellen entscheidet, sonst nennt der Satz einen anderen Tag als der Einzug.
  */
 export function geldsaetzeFuer(
   quelle: GeldsatzQuelle,
@@ -437,18 +454,19 @@ export function geldsaetzeFuer(
     }
   }
   const b = quelle.bestellung
-  if (!istHofpreisBestellung(b)) return null
+  if (!istHofpreisBestellung(b) || gebuehrEntfallen(b)) return null
   const { warenpreisCents, gesamtCents } = bestellSummen(b)
   const betraege = `Du bekommst ${geldText(warenpreisCents)} · die Kundin zahlt ${geldText(gesamtCents)}`
-  if (b.paymentMethod === 'ONLINE') {
+  if (!istVorOrtZahlung(b.paymentMethod)) {
     return { hofCents: warenpreisCents, kundinCents: gesamtCents, satz: `${betraege} – die Gebühr ist online einbehalten.`, barOhneGebuehr: null }
   }
   if (b.gebuehrEinzug === 'erlassen') {
     const wort = gebuehrWortFuerModell('hofpreis')
+    const frist = jetzt.getTime() < einzugAb.getTime() ? `bis ${letzterFreierTag(einzugAb)} zahlst du auf Barverkäufe` : 'für diesen Barverkauf zahlst du'
     return {
       hofCents: gesamtCents,
       kundinCents: gesamtCents,
-      satz: `Du bekommst die vollen ${geldText(gesamtCents)} – bis ${letzterFreierTag(einzugAb)} zahlst du auf Barverkäufe keine ${wort}.`,
+      satz: `Du bekommst die vollen ${geldText(gesamtCents)} – ${frist} keine ${wort}.`,
       barOhneGebuehr: null,
     }
   }

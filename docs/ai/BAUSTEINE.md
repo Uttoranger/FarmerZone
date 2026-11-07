@@ -444,7 +444,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/feste-aktionsleiste.tsx · AKTIONSLEISTE_KNOPF, AKTIONSLEISTE_ZURUECK, FesteAktionsleiste · Feste Aktionsleiste am Handy (Baustein G2, Nr. 245; Liste Lauf 32, Abschnitt 3.2; Boards s2-hofdaten-zahlung, -meldungen, -verkaeufe …). · genutzt
 - src/components/ui/fokus.ts · FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN · Der sichtbare Fokus der neuen Bausteine und Shells — ein Rahmen außen in der Ringfarbe (im neuen Design --fz-status-fertig, ≥ 3:1 auf Grund und Fläche in beiden Modi). · genutzt
 - src/components/ui/form.tsx · Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, useFormField · kein Zweck vermerkt · genutzt
-- src/components/ui/groessenkachel.tsx · GROESSE_NICHT_DA, GroessenWahl, Groessenkachel, groessenName, groessenUnterzeile · GroessenWahl + Groessenkachel (G5, Lauf 32, Nr. 248; Boards s1-/w1-produkt Bild 1, Futterkarte der Region): Verkaufsgrößen als Zeilen untereinander — links der Radio-Kreis, daneben der Name („Sack, … · genutzt
+- src/components/ui/groessenkachel.tsx · GROESSE_NICHT_DA, GroessenWahl, Groessenkachel, groessenName, groessenUnterzeile, type GroessenForm · GroessenWahl + Groessenkachel: Verkaufsgrößen als Kacheln (Futter, Brennmaterial, alles mit Gebinden) — Größe, Hinweis, Preis, Grundpreis, Vorrat (docs/ai/DESIGN_SYSTEM.md, „Kaufstrecke"). · genutzt
 - src/components/ui/hinweiskarte.tsx · Hinweiskarte, HinweiskarteFehler · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
 - src/components/ui/hinweiskasten.tsx · HINWEISKASTEN_LINK, Hinweiskasten · Hinweiskasten (Baustein G3, Nr. 245; Liste Lauf 32, Abschnitt 3.2) — die Gestalt des Hof-Balkens und jedes Hinweises auf Offenes beim Hof, der unter dem Seitenkopf in der Inhaltsspalte steht (nie … · genutzt
 - src/components/ui/hofkarte-rahmen.tsx · HofkarteRahmen, hofkarteKlassen · Die Klassen einer Hofkarte in Listen (/hoefe, Startseite) je Zustand (V18; Board s1-hoefe, „Hof am Weiher"): Ein pausierter Hof ist ausgegraut, nicht versteckt — Fläche `bg-muted` statt `bg-card`, … · genutzt
@@ -467,7 +467,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/skeleton.tsx · Skeleton · kein Zweck vermerkt · unbenutzt
 - src/components/ui/sonner.tsx · Toaster · kein Zweck vermerkt · genutzt
 - src/components/ui/status-badge.tsx · StatusBadge, type StatusTon · StatusBadge: ein Zustand als Marke — offen/zum Packen, fertig/gepackt/ bezahlt, neutral (pausiert, Entwurf). · genutzt
-- src/components/ui/stepper.tsx · Stepper · Stepper (G13, Lauf 32, Nr. 248): Menge als gerahmte Pille „− n +“, die Einheit neben der Zahl (Vorrat-Blatt, Menge auf der Produktseite; Boards s1-produkte Bild 2, s1-/w1-produkt). · genutzt
+- src/components/ui/stepper.tsx · Stepper · Stepper: Menge mit − und +. · genutzt
 - src/components/ui/switch.tsx · Switch · kein Zweck vermerkt · genutzt
 - src/components/ui/table.tsx · Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow · kein Zweck vermerkt · genutzt
 - src/components/ui/tabs.tsx · Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants · kein Zweck vermerkt · unbenutzt

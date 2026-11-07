@@ -70,14 +70,14 @@ export function Vorschau248(): React.JSX.Element {
   const gruendungshof = geldsaetzeFuer({ art: 'angebot', positionen: [{ preisCents: 750, menge: 1 }] }, HOF, EINSTELLUNG, GRUENDUNG_BIS, JETZT)
   const ohneGruendung = geldsaetzeFuer({ art: 'angebot', positionen: [{ preisCents: 250, menge: 1 }], ab: true }, HOF, EINSTELLUNG, null, JETZT)
   const online = geldsaetzeFuer(
-    { art: 'bestellung', bestellung: { totalAmount: '18.00', serviceFeeCents: 112, paymentMethod: 'ONLINE', gebuehrModell: 'hofpreis', gebuehrEinzug: 'stripe' } },
+    { art: 'bestellung', bestellung: { totalAmount: '18.00', serviceFeeCents: 112, paymentMethod: 'ONLINE', gebuehrModell: 'hofpreis', gebuehrEinzug: 'stripe', serviceFeeRefundedAt: null } },
     HOF,
     EINSTELLUNG,
     GRUENDUNG_BIS,
     JETZT
   )
   const barErlassen = geldsaetzeFuer(
-    { art: 'bestellung', bestellung: { totalAmount: '16.33', serviceFeeCents: 98, paymentMethod: 'ONSITE_CASH', gebuehrModell: 'hofpreis', gebuehrEinzug: 'erlassen' } },
+    { art: 'bestellung', bestellung: { totalAmount: '16.33', serviceFeeCents: 98, paymentMethod: 'ONSITE_CASH', gebuehrModell: 'hofpreis', gebuehrEinzug: 'erlassen', serviceFeeRefundedAt: null } },
     HOF,
     EINSTELLUNG,
     GRUENDUNG_BIS,
@@ -87,17 +87,17 @@ export function Vorschau248(): React.JSX.Element {
   return (
     <>
       <Abschnitt248 id="groessenkachel-g5" titel="Größenkachel (G5)" satz="Radio links, Name mit Menge, darunter Grundpreis und Vorrat bzw. „gerade nicht da“, Preis rechts — auch die leere Größe zeigt ihren Preis.">
-        <GroessenWahl beschriftung="Größe wählen" wert={groesse} onWertChange={setGroesse}>
-          <Groessenkachel wert="sack" name="Sack" hinweis="25 kg" preis="€ 12,72" grundpreis="€ 0,51 / kg" vorrat="noch 14" />
-          <Groessenkachel wert="bigbag" name="Big Bag" hinweis="500 kg" preis="€ 212,00" grundpreis="€ 0,42 / kg" vorrat="nur noch 2" zustand="knapp" />
-          <Groessenkachel wert="lose" name="Lose" hinweis="1 t" preis="€ 371,00" grundpreis="€ 0,37 / kg" vorrat="ausverkauft" zustand="ausverkauft" />
+        <GroessenWahl form="zeile" beschriftung="Größe wählen" wert={groesse} onWertChange={setGroesse}>
+          <Groessenkachel form="zeile" wert="sack" name="Sack" hinweis="25 kg" preis="€ 12,72" grundpreis="€ 0,51 / kg" vorrat="noch 14" />
+          <Groessenkachel form="zeile" wert="bigbag" name="Big Bag" hinweis="500 kg" preis="€ 212,00" grundpreis="€ 0,42 / kg" vorrat="nur noch 2" zustand="knapp" />
+          <Groessenkachel form="zeile" wert="lose" name="Lose" hinweis="1 t" preis="€ 371,00" grundpreis="€ 0,37 / kg" vorrat="ausverkauft" zustand="ausverkauft" />
         </GroessenWahl>
       </Abschnitt248>
 
       <Abschnitt248 id="stepper-g13" titel="Stepper und Diagrammfarbe (G13)" satz="Gerahmte Pille „− n +“ mit Einheit; Balken im Dunkeln helles Mint, der Vergleich leichter, aber sichtbar.">
         <div className="flex flex-wrap items-center gap-4">
-          <Stepper beschriftung="Menge Heumilch" wert={menge} onWertChange={setMenge} min={1} max={9} einheit="L" />
-          <Stepper beschriftung="Vorrat Bergkäse" standardWert={3} min={0} gross einheit="Stück" inputMode="numeric" />
+          <Stepper form="pille" beschriftung="Menge Heumilch" wert={menge} onWertChange={setMenge} min={1} max={9} einheit="L" />
+          <Stepper form="pille" beschriftung="Vorrat Bergkäse" standardWert={3} min={0} gross einheit="Stück" inputMode="numeric" />
         </div>
         <div aria-hidden="true" className="flex h-24 items-end gap-2">
           {BALKEN.map((b) => (
