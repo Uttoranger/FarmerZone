@@ -222,7 +222,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
               feldGeaendert()
             }}
             aria-describedby={`${plaetzeId}-zeile ${hinweisId}`}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </Feld>
         <Feld id={monateId} titel={TEXT.feldMonate} zeile={TEXT.feldMonateZeile}>
@@ -237,7 +237,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
               feldGeaendert()
             }}
             aria-describedby={`${monateId}-zeile ${hinweisId}`}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </Feld>
         <Feld id={aktionBisId} titel={TEXT.feldAktionBis} zeile={g.aktionBisTag === null ? TEXT.feldAktionBisZeile : GRUENDUNG_EINSTELLUNG_FEHLER.nieNachHinten}>
@@ -251,7 +251,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
               feldGeaendert()
             }}
             aria-describedby={`${aktionBisId}-zeile ${hinweisId}`}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </Feld>
       </div>
@@ -264,7 +264,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
             </label>
             <span className="text-[12.5px] text-muted-foreground">{TEXT.feldGesperrt}</span>
           </div>
-          <input id={bisId} type="text" value={gruendungTagKurz(g.bisTag)} readOnly className={cn(FELD, GESPERRT)} />
+          <input id={bisId} type="text" value={gruendungTagKurz(g.bisTag)} readOnly className={cn(FELD, GESPERRT, 'min-h-11')} />
         </div>
       )}
 

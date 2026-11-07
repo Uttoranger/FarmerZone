@@ -269,7 +269,7 @@ export function Klappkarte({ titel, zeile, children }: { titel: string; zeile: s
         </span>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
       </summary>
-      <div className="flex flex-col gap-3 border-t border-border p-4">{children}</div>
+      <div className="hidden flex-col gap-3 border-t border-border p-4 group-open:flex">{children}</div>
     </details>
   )
 }

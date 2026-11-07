@@ -39,7 +39,7 @@ export function Kennzahlen({
       <dl className={cn('grid grid-cols-3 gap-2 md:gap-3', spalten)}>
         {eintraege.map((k) => (
           <div key={k.id} className={cn(KARTE, 'min-w-0 px-2.5 py-2.5 md:px-4 md:py-3.5', k.amHandy === false && 'hidden md:block')}>
-            <dt className="text-[10.5px] leading-tight font-semibold tracking-[0.05em] break-words text-muted-foreground uppercase md:text-[11px] md:tracking-[0.1em]">
+            <dt className="text-xs leading-tight font-semibold tracking-[0.04em] break-words text-muted-foreground uppercase md:tracking-[0.08em]">
               {k.titelKurz ? (
                 <>
                   <span className="md:hidden">{k.titelKurz}</span>
