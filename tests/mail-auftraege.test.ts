@@ -294,7 +294,7 @@ describe('Renderer: frisch geladen, Vorlage aus email.ts, heutige Adresse', () =
   })
 
   it('neuer Hof, Meldung und Antwort an das Team laden Hof, Meldung und Nachricht frisch', async () => {
-    db.farm.findUnique.mockResolvedValue({ id: 'h1', name: 'Hof Beispiel', slug: 'hof-beispiel', createdAt: JETZT, owner: { email: 'hof@example.org' } })
+    db.farm.findUnique.mockResolvedValue({ id: 'h1', name: 'Hof Beispiel', slug: 'hof-beispiel', createdAt: JETZT, postalCode: '4910', city: 'Beispieldorf', stripeAccountReady: true, _count: { products: 2, pickupSlots: 1 }, owner: { email: 'hof@example.org' } })
     expect(alsMail(await rendere('neuer-hof', { farmId: 'h1', empfaengerId: 'support' })).betreff).toContain('Hof Beispiel')
     db.meldung.findUnique.mockResolvedValue({ id: 'cmeldung0000000000000001', text: 'Knopf geht nicht', seiteUrl: '/', userAgent: 'x', viewport: '1x1', diagKennung: null, screenshotUrl: null, createdAt: JETZT, farm: null })
     expect(alsMail(await rendere('meldung', { meldungId: 'cmeldung0000000000000001', empfaengerId: 'support' })).html).toContain('Knopf geht nicht')

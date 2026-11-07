@@ -6,6 +6,8 @@ export interface BestellungVerfallenProps {
   customerName: string
   orderNumber: string
   farmName: string
+  /** „Mittwoch, 3. März, 09:40 Uhr“ — die verstrichene Frist (fristVon, zeitpunktFuerMail); fehlt sie, „nicht rechtzeitig“. */
+  bestaetigenBis?: string
 }
 
 /**
@@ -19,7 +21,7 @@ export function BestellungVerfallenEmail(p: BestellungVerfallenProps) {
     <EmailLayout fuss={{ art: 'hof' }} previewText="Dir entstehen keine Kosten.">
       <Text style={h1}>Bestellung verfallen</Text>
       <Text style={bodyText}>
-        {`Du hast deine Bestellung bei ${p.farmName} nicht rechtzeitig bestätigt. Deshalb haben wir die Ware wieder freigegeben – dir entstehen keine Kosten.`}
+        {`Du hast deine Bestellung bei ${p.farmName} ${p.bestaetigenBis ? `nicht bis ${p.bestaetigenBis}` : 'nicht rechtzeitig'} bestätigt. Deshalb haben wir die Ware wieder freigegeben – dir entstehen keine Kosten.`}
       </Text>
       <BestellnummerKasten nummer={p.orderNumber} />
     </EmailLayout>

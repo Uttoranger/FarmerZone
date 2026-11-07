@@ -879,6 +879,11 @@ export async function baueNewFarmNotification(
     slug: string
     ownerEmail: string
     createdAt: Date
+    /** PLZ und Ort für die Zeile „Hof“ (Board Bild 1); fehlen sie, steht nur der Name. */
+    postalCode?: string
+    city?: string
+    /** Was zum Verkaufen noch fehlt („Stripe“, „Produkte“, „Abholzeit“); leer oder fehlend = keine Zeile. */
+    fehlt?: string[]
   },
   an: string
 ): Promise<StapelMail> {
@@ -890,6 +895,8 @@ export async function baueNewFarmNotification(
     React.createElement(NewFarmNotificationEmail, {
       pruefenUrl: `${APP_URL}${ADMIN_HOEFE_HREF}`,
       farmName: farm.name,
+      farmOrt: [farm.postalCode, farm.city].filter(Boolean).join(' ') || undefined,
+      fehlt: farm.fehlt,
       farmId: farm.id,
       farmSlug: farm.slug,
       ownerEmail: farm.ownerEmail,
@@ -1177,6 +1184,15 @@ export async function sendOnsiteConfirmation(
   })
 }
 
+/**
+ * Die Abholzeit in den Hof-Mails ohne führende Null der Stunde: „9:00–12:00“ (Board s3/w3-mail-hof-bestellung, V9).
+ * Die Kunden-Mails behalten „09:00“ wie die Bestätigungsseite — die Frist „bis …, 09:40 Uhr“ ebenso (C-Zeile mail-kauf).
+ */
+function hofAbholzeit(order: Pick<OrderForEmail, 'pickupTimeStart' | 'pickupTimeEnd'>): string {
+  const ohneNull = (zeit: string) => zeit.replace(/^0(\d:)/, '$1')
+  return `${ohneNull(order.pickupTimeStart)}–${ohneNull(order.pickupTimeEnd)}`
+}
+
 /** „Bei Heute ansehen →“ in den Hof-Mails: die Startseite des Hofbereichs (Wortliste N42 c), dieselbe Adresse wie in der Navigation. */
 async function heuteUrl(): Promise<string> {
   const { hauptPunktHref } = await import('@/lib/bauern-navigation')
@@ -1192,7 +1208,7 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    pickupTime: hofAbholzeit(order),
     // Zeilenbeträge wie in der Mail an die Kundin (mailPositionen: dieselbe Rechnung über Cent), Board s3/w3-mail-hof-bestellung Bild 1.
     items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
@@ -1232,7 +1248,7 @@ export async function baueBarBestellungAnHof(order: OrderForHofMail): Promise<St
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    pickupTime: hofAbholzeit(order),
     items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     paymentLabel: 'Bar bei Abholung',
     isOnline: false,
@@ -1259,7 +1275,7 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    pickupTime: hofAbholzeit(order),
     items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
@@ -1408,15 +1424,20 @@ export async function baueArtikelFehlt(
     bisherCents: number
     neuCents: number
     erstattetCents: number | null
+    /** Was in der Bestellung bleibt (Board s3/w3-mail-kauf Bild 6); fehlt es, keine Zeilen. */
+    uebrig?: OrderForEmail['items']
   }
 ): Promise<StapelMail> {
   const { ArtikelFehltEmail } = await import('@/emails/artikel-fehlt')
+  const hofpreis = imHofpreis(order)
   const html = await toHtml(React.createElement(ArtikelFehltEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
     artikel: positionsZeile(fehlt.position),
+    // Dieselbe Zeilenrechnung wie die Bestätigung (mailPositionen): Decimal/Cent, im Hofpreis-Modell der Endpreis.
+    uebrig: (fehlt.uebrig ?? []).map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) })),
     gebuehrWort: gebuehrWort(order),
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
@@ -1452,15 +1473,23 @@ export async function baueZahlungZuSpaet(
 
 /** Barbestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
 export async function baueBestellungVerfallen(
-  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
-    farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
-  }
+  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> &
+    Partial<Pick<OrderForEmail, 'createdAt' | 'pickupDate' | 'pickupTimeStart'>> & {
+      farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
+    }
 ): Promise<StapelMail> {
+  // Board s3/w3-mail-storno Bild 3 (V87): die Frist, die verstrichen ist — dieselbe Rechnung wie „Bitte bestätige“
+  // (fristVon, nur gelesen), als fester Tag. Fehlt ein Zeitpunkt, bleibt „nicht rechtzeitig“.
+  const frist =
+    order.createdAt && order.pickupDate && order.pickupTimeStart
+      ? fristVon({ paymentMethod: 'ONSITE_CASH', createdAt: order.createdAt, pickupDate: order.pickupDate, pickupTimeStart: order.pickupTimeStart })
+      : null
   const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
   const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
   return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html, ...mitAntwortAn(order.farm) }

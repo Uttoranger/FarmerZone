@@ -15,14 +15,15 @@ export interface ZahlungZuSpaetProps {
 /**
  * Die Zahlung kam an, als die Bestellung schon storniert war — das Geld ging
  * sofort zurück (Webhook, payment_intent.succeeded auf CANCELLED). Ohne Aufruf
- * zur nächsten Bestellung (S11, Board s3/w3-mail-storno Bild 4).
+ * zur nächsten Bestellung (S11, Board s3/w3-mail-storno Bild 4). Für die Kundin heißt das „abgelaufen“
+ * (B-Zeile Nr. 255): Sie hat nichts storniert, ihr Zeitfenster zum Bezahlen ist vorbei.
  */
 export function ZahlungZuSpaetEmail(p: ZahlungZuSpaetProps) {
   return (
     <EmailLayout fuss={{ art: 'hof' }} previewText={`Zurück an dich ${formatEuro(p.erstattet)}.`}>
       <Text style={h1}>Zahlung kam zu spät</Text>
       <Text style={bodyText}>
-        {`Deine Zahlung für deine Bestellung bei ${p.farmName} ist erst angekommen, als die Bestellung schon storniert war. Wir haben dir das Geld sofort zurückgeschickt.`}
+        {`Deine Zahlung für deine Bestellung bei ${p.farmName} ist erst angekommen, als die Bestellung schon abgelaufen war. Wir haben dir das Geld sofort zurückgeschickt.`}
       </Text>
       <BestellnummerKasten nummer={p.orderNumber} />
       <ErstattungKasten betrag={formatEuro(p.erstattet)} zeile="erscheint in 5–10 Werktagen auf deinem Konto" />

@@ -67,6 +67,8 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
 
       <BestellnummerKasten nummer={p.orderNumber} />
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      {/* Board s3/w3-mail-hof-bestellung: Linie unter „Abholung“, wie in „Bar-Bestellung bestätigt“. */}
+      <Trenner />
 
       {/* Bar: Erst die Bestätigung der Kundin gibt die Bestellung zum Packen frei. */}
       {!p.isOnline && (
