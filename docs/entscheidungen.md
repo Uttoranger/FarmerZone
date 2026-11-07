@@ -552,6 +552,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Einstellungs-Unterseiten führen nach dem Speichern zur Übersicht zurück.
 - **Begründung:** Befund vom 08.10.2026 (Handy, 390 px): Bestehende Höfe finden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe"); im Kopf der KundeShell ist „Anmelden" unter 768 px ausgeblendet; ein angemeldeter Hof sieht auf öffentlichen Seiten keinen Weg in seinen Bereich. Im Hofbereich ist der Rückweg auf Unterseiten klein und nach dem Scrollen weg.
 - **Dateien:** KundeShell und KundenKopf, AdminShell, `src/lib/kunden-navigation.ts`, `src/lib/kunden-menue.ts`, `src/lib/admin-navigation.ts`, `src/lib/bauern-navigation.ts`, Hofbereich-Unterseiten; Umsetzung Nr. 41 und 44 (freigabe.md §12).
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** /settings bekommt am Handy „Mehr“ als Elternseite („‹ Mehr“ im Kopf).
 
 ### N2 · Kasse ohne Zusatz-Haken (08.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
@@ -836,6 +837,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Mockups ‚ADMIN · Regelbetrieb‘.“
 - **Umsetzung:** Nr. 185 (Heute), Nr. 186 (Bestellungen), Nr. 187 (Höfe und Akte), Nr. 192 (Handbuch), Nr. 193 (Navigation, Postfach nur Gespräche) und Nr. 184 (Betrieb: Alarm-Matrix) (freigabe.md §30); keine Migration außer der in Nr. 188.
 - **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen; ersetzt die Zählweise nach Nr. 240.
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** Das Kachel-Wort der Geld-Kachel in Admin › Heute heißt „Bestellwert“; /admin/geld behält sein Wort.
 
 ### N33 · Admin-Protokoll (26.10.2026)
 - **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Jede Admin-Aktion, jedes Ansehen einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand eines Hofs ändert, steht im Protokoll.
@@ -988,6 +990,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ### N46 · Antworten auf Morgenbericht 31 und Abnahme-Grundlage (6.11.2026)
 - **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Die Entscheidungsliste docs/nachtlauf/berichte/lauf32-board-oder-code.md gilt für die Abnahme: B wird gebaut, C, R und U sind kein Mangel. Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen. Packliste auf Heute mit Kurzname, ohne Uhrzeit. Passwort-Auge, ‚Willkommen, <Vorname>‘, Kürzel ‚HM‘, Sicherheits-Link 24 Stunden und die Bot-Bremse mit stillem Scheinerfolg bleiben. Der Hof bekommt die Mail ‚Neue Bestellung bar‘. Der Link ‚Dieselbe Bestellung nochmal aufgeben‘ entfällt. Leerzustände ohne Symbol. ‚Höchstens zweimal im Monat‘ entfällt. Ein Prüf-Passkey entsteht nur in einer lokalen Wegwerf-Datenbank (scripts/pruefung); App-Code und Passkey-Logik bleiben unverändert (N20).“
 - **Umsetzung:** Nr. 243–258b (freigabe.md §36); keine Migration.
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** Abholzettel: Der Kasten heißt bei nicht abgeholter Bestellung bzw. entfallener Gebühr „Nichts zu kassieren“, bei Karte bei Abholung „Zu kassieren“ statt „Bar zu kassieren“; nur Anzeige, gespeicherte Beträge und jede Berechnung bleiben.
 
 ### N47 · Abholung nach Absprache (6.11.2026)
 - **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Enthält eine Bestellung ein Produkt mit dem Abholhinweis ‚Abholung nach Absprache‘, sagt die Kasse über der Terminwahl ‚Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.‘ und das Notizfeld heißt ‚Notiz zur Abholung‘. Die Bestätigungsmail sagt ‚Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.‘ (mit Reply-To auf die Profil-E-Mail des Hofs) bzw. ‚Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.‘ Der Hof sieht in Bestellung und Heute die Marke ‚Abholung absprechen‘ mit ‚Anrufen‘ und ‚Mail schreiben‘, nur bei offenen Bestellungen. Kein neues Feld, Preis und Zahlung unverändert.“
