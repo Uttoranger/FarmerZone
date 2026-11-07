@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getOrderDetail } from '@/server/queries/orders'
 import { PrintButton } from '@/components/orders/print-button'
-import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { anzeigeGesamtCents, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { datumLang } from '@/lib/heute'
@@ -22,7 +22,22 @@ export const dynamic = 'force-dynamic'
  * Die Zeile mit der Gebühr steht nur bei Bestellungen im Modell „bisher“ — im
  * Hofpreis-Modell steckt die Plattformgebühr im Preis (N38), darunter steht
  * „Preise inkl. Plattformgebühr.“ (druckGebuehrZeile, druckPreisHinweis).
+ * Ist die Gebühr entfallen bzw. erstattet (Storno, „nicht abgeholt“), steht die Zeile mit „(entfällt)“ bzw.
+ * „(erstattet)“ und gestrichenem Betrag da, „Gesamt“ ist der Warenpreis — wie auf der Bestätigung (Nr. 244).
  */
+/** Die E-Mail mit einer Umbruchstelle nach dem „@“ — so bricht sie an der Stelle, die man noch lesen kann. */
+function EmailMitUmbruch({ adresse }: { adresse: string }) {
+  const at = adresse.indexOf('@')
+  if (at < 0) return <>{adresse}</>
+  return (
+    <>
+      {adresse.slice(0, at + 1)}
+      <wbr />
+      {adresse.slice(at + 1)}
+    </>
+  )
+}
+
 export default async function OrderPrintPage({
   params,
 }: {
@@ -44,8 +59,11 @@ export default async function OrderPrintPage({
 
   // Wiener Tag, nie der der Serveruhr (CODING_STANDARDS „Tage und Wochen").
   const pickupDate = datumLang(order.pickupDate)
-  // Beträge aus dem Snapshot: Warenpreis, Gebühr, Gesamt wie im Checkout, „Bar zu kassieren" vor Ort.
+  // Beträge aus dem Snapshot: Warenpreis, Gebühr, „Bar zu kassieren" vor Ort. „Gesamt“ ohne entfallene Gebühr
+  // (anzeigeGesamtCents, nur Anzeige) — sonst stünde die gestrichene Zeile darüber und die volle Summe darunter.
   const summen = bestellSummen(order)
+  const gesamtCents = anzeigeGesamtCents(order)
+  const vermerk = gebuehrEntfallenVermerk(order)
   const kassieren = barZuKassierenCents(order)
   const gebuehrZeile = druckGebuehrZeile(order, summen.gebuehrCents)
   const preisHinweis = druckPreisHinweis(order)
@@ -102,7 +120,10 @@ export default async function OrderPrintPage({
             <div className="mb-0.5 text-[13px] font-semibold tracking-wide text-primary-foreground/70 uppercase">Kunde</div>
             <div className="font-semibold break-words">{order.customerName}</div>
             <div className="text-sm text-primary-foreground/80">{formatiereTelefon(order.customerPhone)}</div>
-            <div className="text-sm [overflow-wrap:anywhere] text-primary-foreground/80">{order.customerEmail}</div>
+            {/* Umbruch zuerst nach dem „@“, mitten im Wort nur als letzter Ausweg (Liste Lauf 32, druck Bild 1). */}
+            <div className="text-sm break-words text-primary-foreground/80">
+              <EmailMitUmbruch adresse={order.customerEmail} />
+            </div>
           </div>
         </div>
         {order.customerNote && <div className="mb-5 text-sm break-words text-primary-foreground/70 italic">{order.customerNote}</div>}
@@ -111,9 +132,9 @@ export default async function OrderPrintPage({
         <table className="mb-4 w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-primary-foreground/30">
-              <th className="py-1 text-left text-sm font-semibold text-primary-foreground/70">Produkt</th>
-              <th className="w-16 py-1 text-right text-sm font-semibold text-primary-foreground/70">Menge</th>
-              <th className="w-24 py-1 text-right text-sm font-semibold text-primary-foreground/70">Betrag</th>
+              <th className="py-1 text-left text-sm font-bold text-primary-foreground">Produkt</th>
+              <th className="w-16 py-1 text-right text-sm font-bold text-primary-foreground">Menge</th>
+              <th className="w-24 py-1 text-right text-sm font-bold text-primary-foreground">Betrag</th>
             </tr>
           </thead>
           <tbody>
@@ -141,8 +162,9 @@ export default async function OrderPrintPage({
                 <tr>
                   <td colSpan={2} className="py-1.5">
                     {gebuehrZeile}
+                    {vermerk && <> ({vermerk})</>}
                   </td>
-                  <td className="py-1.5 text-right">{formatEuro(centsAlsEuro(summen.gebuehrCents))}</td>
+                  <td className={`py-1.5 text-right ${vermerk ? 'line-through' : ''}`}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</td>
                 </tr>
               </>
             )}
@@ -150,7 +172,7 @@ export default async function OrderPrintPage({
               <td colSpan={2} className="py-2 font-bold">
                 Gesamt
               </td>
-              <td className="py-2 text-right text-base font-bold">{formatEuro(centsAlsEuro(summen.gesamtCents))}</td>
+              <td className="py-2 text-right text-base font-bold">{formatEuro(centsAlsEuro(gesamtCents))}</td>
             </tr>
           </tfoot>
         </table>

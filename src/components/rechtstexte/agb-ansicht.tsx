@@ -3,21 +3,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK } from '@/components/shared/infoseite-stil'
 import { AgbStuecke } from '@/components/rechtstexte/agb-stuecke'
 import {
-  AGB_ANHANG,
-  AGB_ANHANG_ANKER,
-  AGB_KURZ_ERKLAERT,
-  AGB_TEILE,
   agbAnker,
+  agbPunktZahl,
   agbTeilAnker,
+  type AgbAnhang,
   type AgbBlock,
+  type AgbFassungDaten,
+  type AgbKurzErklaert,
   type AgbPunkt,
   type AgbTeil,
-} from '@/lib/rechtstexte/agb'
+} from '@/lib/rechtstexte/agb-bloecke'
+import type { AgbKontext } from '@/lib/rechtstexte/stuecke'
+import { BELEHRUNG } from '@/lib/widerruf'
 import { RECHTSTEXT_TEXT, type RechtstextVerzeichnisDaten } from '@/components/shared/rechtstext-vorlage'
 
 /*
- * Die Teile der Seite /agb (Register O4), gezeichnet aus den Daten in
- * src/lib/rechtstexte/agb.ts. Formen der Infoseiten (infoseite-stil.ts):
+ * Die Teile der Seiten /agb und /agb/<Fassung> (Register O4, N45), gezeichnet
+ * aus den Daten der Fassung, die die Seite als Prop gibt (agb-0-9.ts bzw.
+ * agb.ts) — samt `kontext` für den Tag des Inkrafttretens. Formen der Infoseiten (infoseite-stil.ts):
  * Fließtext leise, Überschriften in Fraunces, Links grün und unterstrichen.
  * Jede Überschrift trägt eine Sprungmarke und einen Abstand nach oben
  * (scroll-mt), damit die klebende Kopfzeile sie beim Springen nicht verdeckt.
@@ -33,7 +36,8 @@ const STUECKE = { linkKlasse: INFOSEITE_LINK } as const
 /** Die Sprungmarke von „Kurz erklärt“ — Überschrift und Verzeichnis nehmen dieselbe. */
 const KURZ_ERKLAERT_ANKER = 'kurz-erklaert'
 
-function Block({ block }: { block: AgbBlock }): React.JSX.Element {
+function Block({ block, kontext }: { block: AgbBlock; kontext: AgbKontext }): React.JSX.Element {
+  const stuecke = { ...STUECKE, kontext }
   switch (block.art) {
     case 'absatz':
       return (
@@ -43,7 +47,7 @@ function Block({ block }: { block: AgbBlock }): React.JSX.Element {
               <span className="font-semibold text-foreground tabular-nums">{block.nummer}</span>{' '}
             </>
           )}
-          <AgbStuecke stuecke={block.stuecke} {...STUECKE} />
+          <AgbStuecke stuecke={block.stuecke} {...stuecke} />
         </p>
       )
     case 'liste':
@@ -51,7 +55,7 @@ function Block({ block }: { block: AgbBlock }): React.JSX.Element {
         <ul className="list-disc space-y-1.5 pl-5 marker:text-muted-foreground">
           {block.eintraege.map((eintrag, i) => (
             <li key={i}>
-              <AgbStuecke stuecke={eintrag} {...STUECKE} />
+              <AgbStuecke stuecke={eintrag} {...stuecke} />
             </li>
           ))}
         </ul>
@@ -86,15 +90,50 @@ function Block({ block }: { block: AgbBlock }): React.JSX.Element {
         <p>
           {block.zeilen.map((zeile, i) => (
             <span key={i} className="block">
-              <AgbStuecke stuecke={zeile} {...STUECKE} />
+              <AgbStuecke stuecke={zeile} {...stuecke} />
             </span>
           ))}
         </p>
       )
+    case 'hinweis':
+      return (
+        <p className={block.kursiv ? 'italic' : undefined}>
+          <AgbStuecke stuecke={block.stuecke} {...stuecke} />
+        </p>
+      )
+    case 'belehrung':
+      // Das gesetzliche Muster wörtlich aus src/lib/widerruf.ts (Anhang I Teil A FAGG), mit dessen Platzhaltern.
+      return (
+        <div className="flex flex-col gap-3 border-l-2 border-border pl-4">
+          {BELEHRUNG.teilA.abschnitte.map((abschnitt) => (
+            <div key={abschnitt.titel} className="flex flex-col gap-2">
+              <h4 className="font-semibold text-foreground">{abschnitt.titel}</h4>
+              {abschnitt.absaetze.map((text) => (
+                <p key={text}>{text}</p>
+              ))}
+            </div>
+          ))}
+        </div>
+      )
+    case 'formular':
+      // Das Muster-Widerrufsformular (Anhang I Teil B FAGG) — Zeilen untereinander wie im Gesetz.
+      return (
+        <div className="flex flex-col gap-3 border-l-2 border-border pl-4">
+          <p>{BELEHRUNG.teilB.einleitung}</p>
+          <p>
+            {BELEHRUNG.teilB.zeilen.map((zeile) => (
+              <span key={zeile} className="block">
+                {zeile}
+              </span>
+            ))}
+          </p>
+          <p>{BELEHRUNG.teilB.fussnote}</p>
+        </div>
+      )
   }
 }
 
-function Punkt({ punkt }: { punkt: AgbPunkt }): React.JSX.Element {
+function Punkt({ punkt, kontext }: { punkt: AgbPunkt; kontext: AgbKontext }): React.JSX.Element {
   const anker = agbAnker(punkt.nummer)
   return (
     <section aria-labelledby={anker}>
@@ -103,7 +142,7 @@ function Punkt({ punkt }: { punkt: AgbPunkt }): React.JSX.Element {
       </h3>
       <div className="flex flex-col gap-3">
         {punkt.bloecke.map((block, i) => (
-          <Block key={i} block={block} />
+          <Block key={i} block={block} kontext={kontext} />
         ))}
       </div>
     </section>
@@ -111,7 +150,7 @@ function Punkt({ punkt }: { punkt: AgbPunkt }): React.JSX.Element {
 }
 
 /** Ein Teil (A bis D) mit seinen Punkten. */
-export function TeilAbschnitt({ teil }: { teil: AgbTeil }): React.JSX.Element {
+export function TeilAbschnitt({ teil, kontext }: { teil: AgbTeil; kontext: AgbKontext }): React.JSX.Element {
   const anker = agbTeilAnker(teil.id)
   return (
     <section aria-labelledby={anker} className="border-t border-border pt-8">
@@ -120,23 +159,23 @@ export function TeilAbschnitt({ teil }: { teil: AgbTeil }): React.JSX.Element {
       </h2>
       <div className="flex flex-col gap-8">
         {teil.punkte.map((punkt) => (
-          <Punkt key={punkt.nummer} punkt={punkt} />
+          <Punkt key={punkt.nummer} punkt={punkt} kontext={kontext} />
         ))}
       </div>
     </section>
   )
 }
 
-/** Der Anhang: das Muster-Rücktrittsformular, beim Drucken auf einer eigenen Seite. */
-export function AnhangAbschnitt(): React.JSX.Element {
+/** Ein Anhang (0.9: das Muster-Rücktrittsformular; 1.0: Belehrung, Formular, Auftragsverarbeitung), beim Drucken auf einer eigenen Seite. */
+export function AnhangAbschnitt({ anhang, kontext }: { anhang: AgbAnhang; kontext: AgbKontext }): React.JSX.Element {
   return (
-    <section aria-labelledby={AGB_ANHANG_ANKER} className="border-t border-border pt-8 print:break-before-page">
-      <h2 id={AGB_ANHANG_ANKER} className={cn(INFOSEITE_ABSCHNITT, 'scroll-mt-20 text-[20px]')}>
-        {AGB_ANHANG.titel}
+    <section aria-labelledby={anhang.anker} className="border-t border-border pt-8 print:break-before-page">
+      <h2 id={anhang.anker} className={cn(INFOSEITE_ABSCHNITT, 'scroll-mt-20 text-[20px]')}>
+        {anhang.titel}
       </h2>
       <div className="flex flex-col gap-3">
-        {AGB_ANHANG.bloecke.map((block, i) => (
-          <Block key={i} block={block} />
+        {anhang.bloecke.map((block, i) => (
+          <Block key={i} block={block} kontext={kontext} />
         ))}
       </div>
     </section>
@@ -148,16 +187,16 @@ export function AnhangAbschnitt(): React.JSX.Element {
  * ihnen. Eine Karte auf der Fläche, damit sie sich vom Vertragstext abhebt
  * (seit Nr. 231 nach Board w3-rechtstexte Bild 1 statt der grünen Hinweiskarte).
  */
-export function KurzErklaert(): React.JSX.Element {
+export function KurzErklaert({ kurzErklaert, kontext }: { kurzErklaert: AgbKurzErklaert; kontext: AgbKontext }): React.JSX.Element {
   return (
     <section aria-labelledby={KURZ_ERKLAERT_ANKER} className="rounded-2xl border border-border bg-card px-4 py-3.5 text-[14px] text-foreground">
         <h2 id={KURZ_ERKLAERT_ANKER} className="scroll-mt-20 font-heading text-[16px] font-semibold text-foreground">
-          {AGB_KURZ_ERKLAERT.titel} <span className="font-sans text-[12.5px] font-normal text-muted-foreground">({AGB_KURZ_ERKLAERT.zusatz})</span>
+          {kurzErklaert.titel} <span className="font-sans text-[12.5px] font-normal text-muted-foreground">({kurzErklaert.zusatz})</span>
         </h2>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 marker:text-muted-foreground">
-          {AGB_KURZ_ERKLAERT.punkte.map((stuecke, i) => (
+          {kurzErklaert.punkte.map((stuecke, i) => (
             <li key={i}>
-              <AgbStuecke stuecke={stuecke} {...STUECKE} />
+              <AgbStuecke stuecke={stuecke} {...STUECKE} kontext={kontext} />
             </li>
           ))}
         </ul>
@@ -168,21 +207,35 @@ export function KurzErklaert(): React.JSX.Element {
 /**
  * Das Inhaltsverzeichnis der AGB für die Vorlage der Rechtsseiten
  * (`RechtstextVorlage`, Nr. 231): zuerst „Kurz erklärt“, dann ein Sprung je
- * Punkt, nach Teilen gruppiert, zuletzt der Anhang. Nur der Rahmen — Titel
- * und Nummern kommen unverändert aus src/lib/rechtstexte/agb.ts.
+ * Punkt, nach Teilen gruppiert, zuletzt die Anhänge. Nur der Rahmen — Titel
+ * und Nummern kommen unverändert aus den Daten der Fassung.
  */
-export function agbVerzeichnis(): RechtstextVerzeichnisDaten {
-  const punkte = AGB_TEILE.reduce((summe, teil) => summe + teil.punkte.length, 0)
+export function agbVerzeichnis(fassung: AgbFassungDaten): RechtstextVerzeichnisDaten {
   return {
     kennung: 'agb-inhalt',
-    zusammenfassung: RECHTSTEXT_TEXT.teileUndPunkte(AGB_TEILE.length, punkte, true),
+    zusammenfassung: RECHTSTEXT_TEXT.teileUndPunkte(fassung.teile.length, agbPunktZahl(fassung), fassung.anhaenge.length > 0),
     gruppen: [
-      { eintraege: [{ anker: KURZ_ERKLAERT_ANKER, text: AGB_KURZ_ERKLAERT.titel }] },
-      ...AGB_TEILE.map((teil) => ({
+      { eintraege: [{ anker: KURZ_ERKLAERT_ANKER, text: fassung.kurzErklaert.titel }] },
+      ...fassung.teile.map((teil) => ({
         titel: teil.titel,
         eintraege: teil.punkte.map((punkt) => ({ anker: agbAnker(punkt.nummer), text: punkt.titel, nummer: punkt.nummer })),
       })),
-      { eintraege: [{ anker: AGB_ANHANG_ANKER, text: AGB_ANHANG.titel }], betont: true },
+      { eintraege: fassung.anhaenge.map((anhang) => ({ anker: anhang.anker, text: anhang.titel })), betont: true },
     ],
   }
+}
+
+/** Der ganze Text einer Fassung, wie /agb und /agb/<Fassung> ihn zeigen: Kurz erklärt, Teil A bis D, die Anhänge. */
+export function AgbText({ fassung, kontext }: { fassung: AgbFassungDaten; kontext: AgbKontext }): React.JSX.Element {
+  return (
+    <>
+      <KurzErklaert kurzErklaert={fassung.kurzErklaert} kontext={kontext} />
+      {fassung.teile.map((teil) => (
+        <TeilAbschnitt key={teil.id} teil={teil} kontext={kontext} />
+      ))}
+      {fassung.anhaenge.map((anhang) => (
+        <AnhangAbschnitt key={anhang.anker} anhang={anhang} kontext={kontext} />
+      ))}
+    </>
+  )
 }

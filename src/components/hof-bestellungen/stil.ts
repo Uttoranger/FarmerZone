@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
  * Trefferflächen ≥ 44 px, Pillen für Knöpfe in Inhaltsbreite.
  */
 
-export const KARTE = 'rounded-2xl border border-border bg-card'
+export const KARTE = 'rounded-[12px] border border-border bg-card'
 export const LEISE = 'text-muted-foreground'
 
 const PILLE =

@@ -35,8 +35,12 @@ export type ProduktStatus = { text: string; ton: ProduktStatusTon }
  * „N Größen warten auf Meldung" gehört zu Gate 6 (Futter-Sperre je Gebinde)
  * und kommt mit Nr. 20.
  */
-export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null }): ProduktStatus {
+export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null; category?: string | null }): ProduktStatus {
   const zustand = produktZustand(p)
+  // Liste Lauf 32 (produkte 1440): Ohne Kategorie steht das Produkt nicht im Shop (Board, Heute „Braucht dich“) —
+  // das Schild sagt, was zu tun ist; der Vorschlag mit „Übernehmen“ bleibt darunter (Hinweise). Nur wenn die
+  // Kategorie ausdrücklich fehlt (null); Aufrufer ohne das Feld bekommen das Schild wie bisher.
+  if (zustand.art === 'im-shop' && p.category === null) return { text: 'Kategorie ergänzen', ton: 'offen' }
   switch (zustand.art) {
     case 'nicht-im-shop':
       return { text: NICHT_IM_SHOP, ton: 'neutral' }
@@ -374,8 +378,8 @@ export function vorratFrage(unit: string, unitSize: number | null): string {
 
 // ─── Fehler im Formular (V17; Board s1/w1-produkt-neu, Bild 5 und 6) ────────
 
-/** Die Karte über dem Formular, wenn Felder markiert sind — statt eines Toasts. */
-export const FORMULAR_PRUEFEN = 'Bitte prüfe die markierten Felder.'
+/** Die Karte über dem Formular, wenn Felder markiert sind — statt eines Toasts (Quelle: lib/formular-saetze.ts). */
+export { FORMULAR_PRUEFEN } from '@/lib/formular-saetze'
 
 /** Speichern gescheitert: Titel und Sätze der orangen Karte (ohne Feld). */
 export const SPEICHERN_FEHLER = {

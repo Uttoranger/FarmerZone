@@ -272,13 +272,45 @@ describe('KundeShell', () => {
     expect(kopf).not.toContain('Mein Konto')
   })
 
-  it('Kundensitzung: Suche nach /hoefe?q=…, Mein Konto, kein Anmelden, kein „Mein Hof"', () => {
+  // Nr. 247 (G9, V12): Der Kopf ist in jeder Sitzung derselbe — vier Links, kein Suchfeld, „Mein Konto" als Pille.
+  it('Kundensitzung: vier Links, „Mein Konto" als Pille mit 44 px, kein Suchfeld, kein Anmelden, kein „Mein Hof"', () => {
     const kopf = abschnitt(kunde('kunde'), '<header', '</header>')
-    expect(kopf).toMatch(/<form role="search"[^>]*action="\/hoefe" method="get"/)
-    expect(kopf).toContain('name="q"')
-    expect(kopf).toContain('aria-label="Mein Konto"')
+    for (const p of kundenNavigation({ sitzung: 'gast' }).web) expect(kopf).toContain(`href="${p.href}"`)
+    expect(kopf).toMatch(/<a [^>]*href="\/account\/profile"[^>]*>Mein Konto<\/a>/)
+    const konto = linkTag(kopf, '/account/profile')
+    expect(konto).toMatch(/\brounded-full\b/)
+    expect(konto).toMatch(/\bborder-input\b/)
+    expect(konto).toMatch(/\bh-11\b/)
+    expect(konto).not.toMatch(/\bhidden\b/)
+    expect(kopf).not.toContain('role="search"')
+    expect(kopf).not.toContain('aria-label="Mein Konto"')
     expect(kopf).not.toContain('>Anmelden<')
     expect(kopf).not.toContain('Mein Hof')
+  })
+
+  // Liste Lauf 32, Q2 und G9: Auf der Anmeldeseite selbst steht am Handy nur die Marke; im Browser bleibt die Pille.
+  it('auf /login ist die Pille am Handy weg (max-md:hidden), im Browser bleibt sie; Gegenprobe auf /hoefe', () => {
+    const aufLogin = linkTag(abschnitt(kunde('gast', '/login'), '<header', '</header>'), '/login')
+    expect(aufLogin).toMatch(/\bmax-md:hidden\b/)
+    expect(aufLogin).not.toMatch(/(^|\s|")hidden\b/)
+    expect(linkTag(abschnitt(kunde('gast', '/hoefe'), '<header', '</header>'), '/login')).not.toMatch(/\bmax-md:hidden\b/)
+  })
+
+  // G9: Auf Hof- und Produktseite (aktiv = entdecken) klebt am Handy nur der Kopf des Hofs.
+  it('mit aktiv = entdecken klebt der Kopf am Handy nicht (max-md:relative, data-kopf-scrollt); Gegenprobe ohne aktiv', () => {
+    pfad.aktuell = '/hof-beispiel'
+    const hofseite = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', aktiv: 'entdecken' }))
+    const kopf = abschnitt(hofseite, '<header', '>')
+    expect(kopf).toMatch(/\bsticky\b/)
+    expect(kopf).toMatch(/\bmax-md:relative\b/)
+    expect(hofseite).toContain('data-kopf-scrollt=""')
+    const sonst = kunde('gast', '/hof-beispiel')
+    expect(abschnitt(sonst, '<header', '>')).not.toMatch(/max-md:relative/)
+    expect(sonst).not.toContain('data-kopf-scrollt')
+    // Gegenprobe Produktseite (unterleiste = false, aktiv = entdecken): kein eigener Hof-Kopf bis Nr. 252, der Kopf klebt weiter.
+    const produktseite = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', aktiv: 'entdecken', unterleiste: false }))
+    expect(abschnitt(produktseite, '<header', '>')).not.toMatch(/max-md:relative/)
+    expect(produktseite).not.toContain('data-kopf-scrollt')
   })
 
   // Nr. 41: Am Handy braucht „Anmelden" den Platz oben rechts — Hell/Dunkel steht dort am Seitenfuß.
@@ -295,10 +327,10 @@ describe('KundeShell', () => {
   })
 
   // Nr. 127 (Register N22, Ergänzung): Am Computer hat jede Seite der Kundschaft genau einen Fuß, diesen. Der
-  // Fuß der Startseite erscheint nur am Handy; darum führt der Seitenfuß hier alles, was am Computer sonst
-  // fehlte: die Marke und die Wege. „Für Höfe" führt zu /fuer-hoefe (das /register und /konditionen
-  // verlinkt), „Anmelden" steht im Kopf — der Seitenfuß hat keine zweite Anmeldung.
-  it.each(['gast', 'kunde', 'hof'] as const)('Seitenfuß am Computer: Wortmarke und die Wege, nie verborgen; „Anmelden" nur im Kopf (Sitzung: %s)', (sitzung) => {
+  // Fuß der Startseite erscheint nur am Handy; darum führt der Seitenfuß hier die Wege, die am Computer sonst
+  // fehlten. Seit Nr. 247 (G11) ohne Marke — sie steht im Kopf. „Für Höfe" führt zu /fuer-hoefe (das /register
+  // und /konditionen verlinkt), „Anmelden" steht im Kopf — der Seitenfuß hat keine zweite Anmeldung.
+  it.each(['gast', 'kunde', 'hof'] as const)('Seitenfuß am Computer: die Wege ohne Wortmarke, nie verborgen; „Anmelden" nur im Kopf (Sitzung: %s)', (sitzung) => {
     const html = kunde(sitzung)
     // `print:hidden` (nur beim Drucken) ist erlaubt; am Bildschirm ist der Seitenfuß nie verborgen.
     const klassen = abschnitt(html, '<footer', '>').match(/class="([^"]*)"/)?.[1].split(/\s+/) ?? []
@@ -308,7 +340,9 @@ describe('KundeShell', () => {
     expect(klassen).not.toContain('md:hidden')
     const fuss = abschnitt(html, '<footer', '</footer>')
     expect(fuss).toMatch(/class="[^"]*\bmd:border-t\b[^"]*"/)
-    expect(fuss.match(new RegExp(`text-brand-text">${MARKE}</span>`, 'g'))).toHaveLength(1)
+    expect(fuss).not.toContain(`text-brand-text">${MARKE}</span>`)
+    // Gegenprobe: Die Suche findet die Wortmarke dort, wo sie steht — im Kopf.
+    expect(abschnitt(html, '<header', '</header>')).toContain(`text-brand-text">${MARKE}</span>`)
     const wege = abschnitt(fuss, 'aria-label="Mehr entdecken"', '</nav>')
     expect(linkTag(wege, '/fuer-hoefe')).toBeDefined()
     expect(wege).toMatch(/<a [^>]*href="\/fuer-hoefe"[^>]*>Für Höfe<\/a>/)
@@ -327,7 +361,8 @@ describe('KundeShell', () => {
 
   it('der Seitenfuß hält unten Platz für die Unterleiste frei, die Fokus-Seite ohne Unterleiste trägt ihn auch', () => {
     const fuss = abschnitt(kunde('gast'), '<footer', '>')
-    expect(fuss).toMatch(/\bpb-28\b/)
+    // G10 (V28): aus den Maßen der Shell samt Home-Indicator, nicht mehr feste 112 px.
+    expect(fuss).toContain('pb-[calc(var(--kunde-unterleiste)+var(--kunde-ueberstand)+1.5rem)]')
     expect(fuss).toMatch(/\bmd:pb-0\b/)
     pfad.aktuell = '/hof-beispiel/produkt/p1'
     const ohneLeiste = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', unterleiste: false }))
@@ -502,6 +537,7 @@ describe('kein Big Bang', () => {
     '(public)/konditionen/page.tsx',
     // Nr. 90: die AGB (Register O4) sind gleich in der KundeShell entstanden.
     '(public)/agb/page.tsx',
+    '(public)/agb/[fassung]/page.tsx',
     '(public)/problem-melden/page.tsx',
     // Nr. 200: Widerruf online (N39) — gleich in der KundeShell.
     '(public)/widerruf/page.tsx',
@@ -520,6 +556,9 @@ describe('kein Big Bang', () => {
     'startseite-vorschau/page.tsx',
     // Nr. 239: die 500 der Kundschaft in der KundeShell (Board s3-/w3-fehlerseiten, Bild 4); global-error bleibt ohne.
     'error.tsx',
+    // N45 (Nr. 259): die Fehlerseiten von /agb und /konditionen, wenn der Stichtag nicht zu laden ist — in der KundeShell wie die 500.
+    '(public)/agb/error.tsx',
+    '(public)/konditionen/error.tsx',
   ]
 
   it('nur die Vorschau unter /intern und die umgestellten Routen binden eine Shell ein', () => {

@@ -105,8 +105,10 @@ export function VorratBlatt({
         {vorratFrage(produkt.unit, produkt.unitSize)}
       </p>
       <div className="flex flex-col items-center gap-1">
+        {/* G13 (Liste Lauf 32, produkte Bild 2): die gerahmte Pille „− n +“ statt zweier runder Knöpfe. */}
         <Stepper
           gross
+          form="pille"
           beschriftung={bestandLabel(produkt.unit, produkt.unitSize)}
           wert={anzeige}
           onWertChange={setAnzeige}
@@ -129,7 +131,7 @@ export function VorratBlatt({
               disabled={laeuft}
               // Nur das Feld; gespeichert wird erst mit „Speichern".
               onClick={() => setAnzeige(Math.min(anzeige + n, max))}
-              className={cn('h-11 rounded-xl border border-input text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50', FOKUS_RAHMEN)}
+              className={cn('h-11 rounded-[10px] border border-input text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50', FOKUS_RAHMEN)}
             >
               {`+${n}`}
             </button>

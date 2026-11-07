@@ -31,6 +31,8 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 vi.mock('@/server/queries/plattform-einstellung', () => ({
   gruendungFuerSeiten: async () => null,
   ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: new Date('2099-01-01T00:00:00Z') }),
+  // N45: /konditionen liest den Stichtag ohne stille Vorgabe über ladePlattformEinstellung — derselbe Tag.
+  ladePlattformEinstellung: async () => ({ hofpreisModellAb: '2099-01-01T00:00:00.000Z' }),
 }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
@@ -113,9 +115,10 @@ const ZWEITES_EXEMPLAR =
 describe('Kein zweites Exemplar unter src/', () => {
   const dateien = quelldateien(join(process.cwd(), 'src')).map((p) => relative(process.cwd(), p))
 
-  // Die AGB (Register O4) sagen in Punkt 17.2 „Startphase" und verweisen für das Datum auf die Konditionen —
-  // wörtlich aus docs/recht/agb.md, das ein Lauf nicht umschreibt. Die Ausnahme gilt nur für dieses Wort.
-  const AGB = 'src/lib/rechtstexte/agb.ts'
+  // Die AGB 0.9 (Register O4) sagen in Punkt 17.2 „Startphase" und verweisen für das Datum auf die Konditionen —
+  // wörtlich aus docs/recht/agb-0.9.md, Fassung 0.9 eingefroren (N45/A005). Die Ausnahme gilt nur für dieses Wort.
+  // Fassung 1.0 (agb.ts) braucht keine Ausnahme: Sie nennt weder das Wort noch das Datum noch den Satz.
+  const AGB = 'src/lib/rechtstexte/agb-0-9.ts'
 
   it('nur src/lib/konditionen.ts nennt das Datum oder den Satz', () => {
     const treffer = dateien.filter((d) => ZWEITES_EXEMPLAR.test(lies(d)) && d !== AGB)
@@ -127,6 +130,7 @@ describe('Kein zweites Exemplar unter src/', () => {
     expect(text).toContain('Startphase')
     expect(ZWEITES_EXEMPLAR.test(text)).toBe(true)
     expect(ZWEITES_EXEMPLAR.test(text.replaceAll('Startphase', ''))).toBe(false)
+    expect(ZWEITES_EXEMPLAR.test(lies('src/lib/rechtstexte/agb.ts'))).toBe(false)
   })
 
   it('Gegenprobe: die Suche schlägt bei Datum und Satzteilen an', () => {

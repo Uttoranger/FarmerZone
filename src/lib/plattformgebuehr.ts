@@ -15,7 +15,7 @@
  * (tests/plattformgebuehr.test.ts, Wache): Euro-Zahlen der Anzeige entstehen
  * nur über `alsCents` und `centsAlsEuro`.
  */
-import { centsAlsEuro } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro } from '@/lib/format'
 import {
   BAR_SERVICEGEBUEHR_AB,
   MINDESTBESTELLWERT_CENTS,
@@ -24,7 +24,17 @@ import {
   PLATTFORMGEBUEHR_PROZENT,
   PLATTFORMGEBUEHR_SATZ,
 } from '@/lib/konditionen'
-import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS, gebuehrFuerMonatsabrechnung, istVorOrtZahlung, type Zahlungsart } from '@/lib/servicegebuehr'
+import {
+  SERVICEGEBUEHR_BEZEICHNUNG,
+  SERVICEGEBUEHR_HINWEIS,
+  bestellSummen,
+  gebuehrEntfallen,
+  gebuehrFuerMonatsabrechnung,
+  istVorOrtZahlung,
+  type BestellungFuerGebuehrStatus,
+  type BestellungMitGebuehr,
+  type Zahlungsart,
+} from '@/lib/servicegebuehr'
 import { alsCents } from '@/lib/order-totals'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import type { Umgebung } from '@/lib/umgebung'
@@ -360,6 +370,108 @@ export function gebuehrWortFuerZeitraum(von: Date, bis: Date, stichtag: Date): G
 /** „Servicegebühren“, „Plattformgebühren“, „Gebühren“ — die Mehrzahl für Summen und Legenden. */
 export function gebuehrenMehrzahl(wort: GebuehrWort): string {
   return wort === GEBUEHREN_WORT ? wort : `${wort}en`
+}
+
+// ─── Geldsätze für den Hof nach V1 (Lauf 32, Nr. 248) ───────────────────────
+
+/**
+ * Was ein Geldsatz zeigt — NUR Anzeige für den Hof (Produktformular, Produktliste, Bestellung, Auswertung,
+ * Mail an den Hof), nie für Buchung, Kasse oder Abrechnung.
+ */
+export type Geldsaetze = {
+  /** Was beim Hof bleibt. */
+  hofCents: number
+  /** Was die Kundin zahlt (online und bar gleich, N38). */
+  kundinCents: number
+  /**
+   * Angebot: „Du bekommst € 7,50 · die Kundin zahlt € 7,95“ (mit `ab`: „Du bekommst ab € 2,50 · die Kundin
+   * zahlt ab € 2,65“). Bestellung: der ganze Satz je Weg — online „… – die Gebühr ist online einbehalten.“, bar
+   * erlassen „Du bekommst die vollen € … – bis <Tag> zahlst du auf Barverkäufe keine <Wort>.“ (ist der Tag schon
+   * vorbei: „… – für diesen Barverkauf zahlst du keine <Wort>.“), bar mit Einzug „… – die Gebühr holt die
+   * Monatsabrechnung.“
+   */
+  satz: string
+  /** Nur beim Angebot, solange die Bargebühr erlassen ist (N38, Gründungshof bzw. „Einzug ab“): „Bar bis <Tag> ohne Gebühr für dich.“ */
+  barOhneGebuehr: string | null
+}
+
+/** Woher die Beträge kommen: ein Angebot rechnet mit dem Satz des Hofs, eine Bestellung nimmt ihren Snapshot. */
+export type GeldsatzQuelle =
+  | { art: 'angebot'; positionen: readonly GebuehrPosition[]; ab?: boolean }
+  | {
+      art: 'bestellung'
+      bestellung: BestellungMitGebuehr &
+        Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt'> & {
+          paymentMethod: string
+          gebuehrModell: string | null
+          /** `Order.gebuehrEinzug` (in der DB ein Text) — der Aufrufer reicht nur einen der vier Wege oder null durch. */
+          gebuehrEinzug: GebuehrEinzug | null
+        }
+    }
+
+/** Was der Geldsatz über den Hof wissen muss: Satz (`plattformgebuehrProzent`, null = Vorgabe) und `Farm.einzugAb`. */
+export type GeldsatzHof = HofMitSatz & { einzugAb: Date | null }
+
+const geldText = (cents: number): string => formatEuro(centsAlsEuro(cents), 2, { geschuetztesLeerzeichen: true })
+
+/** Der letzte Tag ohne Bargebühr: der Wiener Tag vor dem Einzugsbeginn (`einzugAbFuer` liefert Mitternacht danach). */
+const letzterFreierTag = (einzugAb: Date): string => formatDatumLang(new Date(einzugAb.getTime() - 1))
+
+/**
+ * Die Geldsätze nach V1 (Entscheidungsliste Lauf 32, 3.2) — EINE Anzeige-Hilfe, keine neue Rechnung:
+ *  - Angebot (Produkt, Größe, „ab“ einer Familie): Beträge über `bestellGebuehr` mit dem Satz des Hofs
+ *    (`satzHundertstel`), der Hinweis „Bar bis …“ nur, solange `einzugAbFuer` in der Zukunft liegt.
+ *  - Bestellung: nur der Snapshot (`bestellSummen`: Warenpreis und `serviceFeeCents`) und der gespeicherte Weg
+ *    (`gebuehrEinzug`); `erlassen` heißt, die Gebühr bleibt beim Hof — er bekommt die vollen Euro. Das Datum im
+ *    Satz kommt aus den HEUTIGEN Hofdaten (`einzugAbFuer`); liegt es schon zurück, steht der Satz ohne Datum —
+ *    nie „bis <vergangener Tag> zahlst du …“.
+ * Kein Geldsatz (null): im Modell „bisher“ (Angebot vor dem Stichtag, Bestellung ohne `gebuehrModell`) und bei einer
+ * Bestellung mit entfallener Gebühr (`gebuehrEntfallen`: erstattet bzw. nicht kassiert — Storno, nicht abgeholt);
+ * dort zeigt die Seite die Gebührenzeile mit Vermerk und ohne „inkl.“ (N38, Nr. 244).
+ * Das Wort der Gebühr kommt aus `gebuehrWortFuerModell`, der Satz nie als fester Text.
+ *
+ * `hof.einzugAb` ist der Einzugsbeginn aus dem Admin (null = keiner gesetzt); `gruendungBis` übergibt der Aufrufer
+ * als das WIRKSAME Gründungsende des Hofs (Farm.gruendungBis, null ohne Gründungsplatz) — dieselben Werte, mit
+ * denen `einzugFuer` beim Bestellen entscheidet, sonst nennt der Satz einen anderen Tag als der Einzug.
+ */
+export function geldsaetzeFuer(
+  quelle: GeldsatzQuelle,
+  hof: GeldsatzHof,
+  einstellung: HofpreisEinstellung | null,
+  gruendungBis: Date | null,
+  jetzt: Date
+): Geldsaetze | null {
+  const einzugAb = einzugAbFuer(hof, einstellung, gruendungBis)
+  if (quelle.art === 'angebot') {
+    if (gebuehrModellFuer(einstellung, jetzt) === 'bisher') return null
+    const { warenCents, gesamtCents } = bestellGebuehr(quelle.positionen, satzHundertstel(hof))
+    const ab = quelle.ab ? 'ab ' : ''
+    return {
+      hofCents: warenCents,
+      kundinCents: gesamtCents,
+      satz: `Du bekommst ${ab}${geldText(warenCents)} · die Kundin zahlt ${ab}${geldText(gesamtCents)}`,
+      barOhneGebuehr: jetzt.getTime() < einzugAb.getTime() ? `Bar bis ${letzterFreierTag(einzugAb)} ohne Gebühr für dich.` : null,
+    }
+  }
+  const b = quelle.bestellung
+  if (!istHofpreisBestellung(b) || gebuehrEntfallen(b)) return null
+  const { warenpreisCents, gesamtCents } = bestellSummen(b)
+  const betraege = `Du bekommst ${geldText(warenpreisCents)} · die Kundin zahlt ${geldText(gesamtCents)}`
+  if (!istVorOrtZahlung(b.paymentMethod)) {
+    return { hofCents: warenpreisCents, kundinCents: gesamtCents, satz: `${betraege} – die Gebühr ist online einbehalten.`, barOhneGebuehr: null }
+  }
+  if (b.gebuehrEinzug === 'erlassen') {
+    const wort = gebuehrWortFuerModell('hofpreis')
+    const frist = jetzt.getTime() < einzugAb.getTime() ? `bis ${letzterFreierTag(einzugAb)} zahlst du auf Barverkäufe` : 'für diesen Barverkauf zahlst du'
+    return {
+      hofCents: gesamtCents,
+      kundinCents: gesamtCents,
+      satz: `Du bekommst die vollen ${geldText(gesamtCents)} – ${frist} keine ${wort}.`,
+      barOhneGebuehr: null,
+    }
+  }
+  const nachsatz = b.gebuehrEinzug === 'sepa' || b.gebuehrEinzug === 'ueberweisung' ? ' – die Gebühr holt die Monatsabrechnung.' : '.'
+  return { hofCents: warenpreisCents, kundinCents: gesamtCents, satz: `${betraege}${nachsatz}`, barOhneGebuehr: null }
 }
 
 // ─── Mindestbestellwert-Satz (Register N41 a, A3) ────────────────────────────

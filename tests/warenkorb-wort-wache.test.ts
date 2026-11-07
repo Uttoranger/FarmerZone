@@ -59,7 +59,11 @@ function findeKorb(quelltext: string, datei = 'schnipsel.tsx'): Fund[] {
 }
 
 /** Wörtlicher Rechtstext, den kein Lauf umschreibt (Register O4). */
-const AUSNAHME_DATEIEN = ['src/lib/rechtstexte/agb.ts']
+const AUSNAHME_DATEIEN = [
+  'src/lib/rechtstexte/agb.ts',
+  // Fassung 0.9 eingefroren (N45/A005).
+  'src/lib/rechtstexte/agb-0-9.ts',
+]
 
 /** Name oder Aufschrift eines Knopfes — dort heißt es „In den Korb“. Nur streichen, nie ergänzen. */
 const BESTAND: { datei: string; text: RegExp; grund: string }[] = [

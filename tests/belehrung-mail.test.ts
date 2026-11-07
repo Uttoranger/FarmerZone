@@ -7,7 +7,13 @@
  *    tragen bei einer Verbraucherin Teil A mit den vier Angaben des Hofs,
  *    Teil B, den Hinweis zur Rückgabe am Hof und den Link zum Widerruf;
  *  - jede dieser Mails trägt die AGB als Datei agb-<marke>-<fassung>.html,
- *    deren Inhalt genau agbAlsHtml() ist (aus agb.ts) — auch bei „Betrieb“;
+ *    deren Inhalt genau agbAlsHtml(<Fassung>) ist — auch bei „Betrieb“;
+ *  - N45: die Fassung kommt aus dem Snapshot der Bestellung, nie aus der Uhr:
+ *    gebuehrModell null → agb-…-0.9.html und Link /agb/0.9, 'hofpreis' →
+ *    agb-…-1.0.html und Link /agb/1.0 (Gegenprobe: eine Bestellung „bisher“,
+ *    gebaut nach dem Stichtag, bekommt 0.9); Ladefehler beim Stichtag → Mail
+ *    mit Ersatzwert und Meldung, kein Wurf; unbekanntes Modell → 0.9 und
+ *    Meldung nur mit Wert und Bestell-ID;
  *  - bei „Betrieb“ entfallen Belehrung und Formular (Gegenprobe);
  *  - Nr. 211: unter der Belehrung die Gewährleistungs-Mitteilung (Anhang II
  *    FAGG) als PNG mit absoluter Adresse auf der echten Seite, Alt-Text aus
@@ -17,13 +23,20 @@
  *    ins Log zu schreiben; versendeStapel schickt eine Mail mit Anhang einzeln
  *    über emails.send mit dem Idempotenz-Schlüssel und lehnt mehrere ab.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 
-const { sendMock, batchMock } = vi.hoisted(() => ({ sendMock: vi.fn(), batchMock: vi.fn() }))
+const { sendMock, batchMock, ladeMock, sentry } = vi.hoisted(() => ({
+  sendMock: vi.fn(),
+  batchMock: vi.fn(),
+  ladeMock: vi.fn(),
+  sentry: { captureException: vi.fn(), captureMessage: vi.fn() },
+}))
 
 vi.mock('server-only', () => ({}))
 vi.mock('@/server/mail-warteschlange', () => ({ protokolliereSofortMail: vi.fn() }))
 vi.mock('@/server/betrieb-zaehler', () => ({ zaehleMail: vi.fn() }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({ ladePlattformEinstellung: ladeMock }))
+vi.mock('@sentry/nextjs', async (original) => ({ ...(await original<typeof import('@sentry/nextjs')>()), ...sentry }))
 vi.mock('resend', () => ({
   Resend: class {
     emails = { send: sendMock }
@@ -32,6 +45,9 @@ vi.mock('resend', () => ({
 }))
 
 import { agbAlsHtml, agbDateiname } from '@/lib/rechtstexte/agb-datei'
+import { INKRAFTTRETEN_ERSATZ, OHNE_STICHTAG } from '@/lib/rechtstexte/stuecke'
+import { PLATTFORM_EINSTELLUNG_STANDARD } from '@/lib/plattform-einstellung'
+import { formatDatumLang } from '@/lib/format'
 import { BELEHRUNG, HOF_ANGABEN_OHNE_LINK } from '@/lib/widerruf'
 import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
@@ -49,11 +65,20 @@ afterAll(() => {
   vi.unstubAllEnvs()
 })
 
+const STICHTAG = new Date('2027-02-01T00:00:00+01:00')
+
 beforeEach(() => {
   sendMock.mockReset()
   batchMock.mockReset()
   sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
+  ladeMock.mockReset()
+  ladeMock.mockResolvedValue({ ...PLATTFORM_EINSTELLUNG_STANDARD, hofpreisModellAb: STICHTAG.toISOString() })
+  sentry.captureException.mockReset()
+  sentry.captureMessage.mockReset()
 })
+
+/** Die Datei 0.9 — sie hängt nicht am Stichtag. */
+const ANHANG_0_9 = { dateiname: agbDateiname('0.9'), inhalt: agbAlsHtml('0.9', OHNE_STICHTAG) }
 
 function bestellung(teil: Partial<OrderForEmail> = {}): OrderForEmail {
   return {
@@ -127,7 +152,7 @@ describe.each(MAILS)('%s', (_name, baue, teil) => {
     expect(text).not.toContain(HOF_ANGABEN_OHNE_LINK.voll)
     expect(mail.html).toMatch(/href="[^"]*\/widerruf\?bestellung=order-1&amp;sig=/)
     expect(text).toContain('Du findest sie auch als Datei im Anhang dieser E-Mail')
-    expect(mail.anhaenge).toEqual([{ dateiname: agbDateiname(), inhalt: agbAlsHtml() }])
+    expect(mail.anhaenge).toEqual([ANHANG_0_9])
     expect(mail.anhaenge?.[0]?.dateiname).toMatch(/^agb-[a-z]+-\d+(\.\d+)*\.html$/)
   }, 30_000)
 
@@ -174,7 +199,47 @@ describe.each(MAILS)('%s', (_name, baue, teil) => {
     expect(text).not.toContain(BELEHRUNG.teilB.titel)
     expect(text).not.toContain('Widerrufsrecht')
     expect(mail.html).not.toContain('/widerruf?')
-    expect(mail.anhaenge).toEqual([{ dateiname: agbDateiname(), inhalt: agbAlsHtml() }])
+    expect(mail.anhaenge).toEqual([ANHANG_0_9])
+  }, 30_000)
+})
+
+describe.each(MAILS)('N45 · %s: die AGB-Fassung der Bestellung', (_name, baue, teil) => {
+  afterEach(() => vi.useRealTimers())
+
+  it('gebuehrModell null → Datei 0.9 und Link /agb/0.9; Gegenprobe: auch nach dem Stichtag gebaut', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2027-03-01T10:00:00+01:00'))
+    const mail = await baue(bestellung({ ...teil, gebuehrModell: null }))
+    expect(mail.anhaenge).toEqual([ANHANG_0_9])
+    expect(mail.html).toContain('/agb/0.9"')
+    expect(mail.html).not.toContain('/agb/1.0"')
+    expect(ladeMock).not.toHaveBeenCalled()
+  }, 30_000)
+
+  it("gebuehrModell 'hofpreis' → Datei 1.0 mit Stichtag und Link /agb/1.0 — auch vor dem Stichtag gebaut", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-01T10:00:00+01:00'))
+    const mail = await baue(bestellung({ ...teil, gebuehrModell: 'hofpreis' }))
+    expect(mail.anhaenge).toEqual([{ dateiname: agbDateiname('1.0'), inhalt: agbAlsHtml('1.0', { inkrafttreten: STICHTAG }) }])
+    expect(mail.anhaenge?.[0]?.inhalt).toContain(`Fassung 1.0 – gilt ab ${formatDatumLang(STICHTAG)}`)
+    expect(mail.html).toContain('/agb/1.0"')
+    expect(mail.html).not.toContain('/agb/0.9"')
+  }, 30_000)
+
+  it('Ladefehler beim Stichtag → die Mail entsteht mit dem Ersatzwert, gemeldet mit festem Bereich, kein Wurf', async () => {
+    ladeMock.mockRejectedValue(new Error('Datenbank weg'))
+    const mail = await baue(bestellung({ ...teil, gebuehrModell: 'hofpreis' }))
+    expect(mail.anhaenge?.[0]?.dateiname).toBe(agbDateiname('1.0'))
+    expect(mail.anhaenge?.[0]?.inhalt).toContain(`Fassung 1.0 – gilt ab dem ${INKRAFTTRETEN_ERSATZ}`)
+    expect(mail.anhaenge?.[0]?.inhalt).not.toMatch(/dem dem/)
+    expect(sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { bereich: 'agb-anhang-stichtag' } })
+  }, 30_000)
+
+  it('unbekanntes Modell → 0.9 und eine Meldung nur mit Wert und Bestell-ID', async () => {
+    const mail = await baue(bestellung({ ...teil, gebuehrModell: 'zukunft' }))
+    expect(mail.anhaenge).toEqual([ANHANG_0_9])
+    expect(sentry.captureMessage).toHaveBeenCalledWith(expect.any(String), { tags: { bereich: 'agb-fassung' }, extra: { gebuehrModell: 'zukunft', orderId: 'order-1' } })
+    expect(JSON.stringify(sentry.captureMessage.mock.calls)).not.toContain('erika')
   }, 30_000)
 })
 
@@ -192,8 +257,8 @@ describe('Anhang über den bestehenden Mail-Weg', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     await email.sendOnsiteConfirmation(bestellung({ paymentMethod: 'ONSITE_CASH' }), 'token-1')
     const aufruf = sendMock.mock.calls.at(-1)?.[0] as { attachments?: Array<{ filename: string; content: string }> }
-    expect(aufruf.attachments).toEqual([{ filename: agbDateiname(), content: Buffer.from(agbAlsHtml(), 'utf8').toString('base64') }])
-    expect(JSON.stringify(log.mock.calls)).not.toContain(agbDateiname())
+    expect(aufruf.attachments).toEqual([{ filename: agbDateiname('0.9'), content: Buffer.from(agbAlsHtml('0.9', OHNE_STICHTAG), 'utf8').toString('base64') }])
+    expect(JSON.stringify(log.mock.calls)).not.toContain(agbDateiname('0.9'))
     log.mockRestore()
   }, 30_000)
 

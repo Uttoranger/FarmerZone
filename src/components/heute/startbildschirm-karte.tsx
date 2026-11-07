@@ -55,7 +55,7 @@ export function StartbildschirmAnleitung(): React.JSX.Element {
   const titel = trenner > 0 ? STARTBILDSCHIRM_KARTE.titel.slice(0, trenner) : STARTBILDSCHIRM_KARTE.titel
   const satz = trenner > 0 ? `${STARTBILDSCHIRM_KARTE.titel.slice(trenner + 2)}.` : null
   return (
-    <section aria-labelledby="heute-startbildschirm" className="flex flex-col gap-1 rounded-2xl border border-border bg-card p-[18px]">
+    <section aria-labelledby="heute-startbildschirm" className="flex flex-col gap-1 rounded-[12px] border border-border bg-card p-[18px]">
       <h2 id="heute-startbildschirm" className="text-[15px] leading-snug font-semibold">
         {titel}
       </h2>

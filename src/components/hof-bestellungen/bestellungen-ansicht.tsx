@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarCheck, Inbox, PartyPopper, Printer } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import type { BestellungenSeite, HofBestellDetail, HofListenEintrag } from '@/server/queries/orders'
 import type { HofWiderruf } from '@/server/widerruf'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
@@ -7,7 +7,9 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
-import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { bestellListeHref } from '@/lib/hof-bestellungen'
@@ -20,6 +22,26 @@ import { KARTE, KICKER, KNOPF_RAHMEN, LEISE } from './stil'
 export function filterSuche(filter: HofBestellFilter): string {
   return bestellListeHref(filter).slice('/orders'.length)
 }
+
+/**
+ * Der Leerzustand „noch nie eine Bestellung“ je Stand (Board s1-bestellungen Bild 3, Liste Lauf 32): Vor der
+ * Freischaltung kann der Hof noch nichts teilen — der Weg führt als Textlink zu dem, was noch fehlt (/onboarding);
+ * freigeschaltet bleibt der Weg zu Mein Hof, wo geteilt wird.
+ */
+export const BESTELLUNGEN_LEER = {
+  titel: 'Noch keine Bestellungen',
+  wartet: {
+    satz: 'Sobald dein Hof freigeschaltet ist, kommen hier die Bestellungen an. Dann kannst du deine Hofseite teilen.',
+    link: { text: 'Was bis zur Freischaltung noch fehlt →', href: '/onboarding' },
+  },
+  frei: {
+    satz: 'Teile deine Hofseite, damit Kundinnen bei dir bestellen können.',
+    link: { text: 'Zu Mein Hof', href: '/farm-page' },
+  },
+} as const
+
+/** Textlink im Leerzustand: grün, unterstrichen, 44 px (wie „Alle Bestellungen ansehen →“ auf Heute). */
+const TEXTLINK = cn('inline-flex min-h-11 items-center text-[15px] font-semibold text-status-fertig underline underline-offset-2', FOKUS_RAHMEN)
 
 /** Die Vorschau einer Bestellung neben der Liste (ab 1024 px): dieselbe Liste mit `?bestellung=<id>`. */
 function vorschauHref(filter: HofBestellFilter, bestellungId: string): string {
@@ -51,7 +73,13 @@ export function BestellungenAnsicht({
   hofName,
   barFrist = null,
   naechsteAbholung = null,
+  wartetAufFreigabe = false,
+  geldsatz = null,
 }: {
+  /** Der Geldsatz nach V1 der gewählten Bestellung (ladeBestellGeldsatz). */
+  geldsatz?: string | null
+  /** Wartet der Hof auf die Freischaltung? Wählt den Leerzustand ohne Bestellung (BESTELLUNGEN_LEER). */
+  wartetAufFreigabe?: boolean
   /** Die Liste — nur `liste` zeigt sie; `detail` braucht sie nicht. */
   seite: BestellungenSeite | null
   /** Ohne Bestellungen steht der Hofname unter der Überschrift (Board s1-bestellungen, Bild 3). */
@@ -71,8 +99,11 @@ export function BestellungenAnsicht({
   if (modus === 'detail') {
     return (
       <LadeRahmen>
-        <div className="mx-auto w-full max-w-7xl px-4 pb-12 md:px-8 md:pt-8 xl:px-10">
-          <LadeInhalt>{detail && <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} widerrufe={widerrufe} barFrist={barFrist} />}</LadeInhalt>
+        {/* Inhalt höchstens 1200 px breit (Liste Lauf 32, bestellung); pt-5 trägt die feste Kopfleiste am Handy (G1). */}
+        <div className="mx-auto w-full max-w-[1200px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
+          <LadeInhalt>
+            {detail && <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} widerrufe={widerrufe} barFrist={barFrist} geldsatz={geldsatz} />}
+          </LadeInhalt>
         </div>
       </LadeRahmen>
     )
@@ -82,26 +113,28 @@ export function BestellungenAnsicht({
     <LadeRahmen>
       <div className="mx-auto w-full max-w-7xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
         <div className="flex flex-col gap-4 md:gap-[18px]">
-          <div className="flex items-end gap-3">
-            <div className="min-w-0">
-              <h1 className="font-heading text-2xl font-semibold md:text-[30px]">Bestellungen</h1>
-              <p className={cn('text-[13.5px] leading-normal md:text-[14.5px]', LEISE)}>{liste.hatBestellungen ? liste.kopfzeile : hofName}</p>
-            </div>
-            {liste.hatBestellungen && (
-              <Link
-                href="/orders/today/print"
-                target="_blank"
-                aria-label="Packliste für heute drucken"
-                // Am Handy das freistehende Symbol (Board s1-bestellungen), ab 768 px der Umriss mit Wort.
-                className={cn(KNOPF_RAHMEN, 'ml-auto size-11 border-transparent px-0 md:w-auto md:border-input md:px-[18px]')}
-              >
-                <Printer className="size-5 md:size-4" strokeWidth={1.7} aria-hidden="true" />
-                <span className="hidden md:inline" aria-hidden="true">
-                  Packliste drucken
-                </span>
-              </Link>
-            )}
-          </div>
+          {/* Seit Nr. 249 der Werkzeug-Kopf (G1) ohne Rückweg — Bestellungen ist eine Seite der Leiste; der
+              Freischalt-Balken (G3) steht damit unter dem Kopf statt über der h1 (Liste Lauf 32, bestellungen). */}
+          <WerkzeugKopf
+            titel="Bestellungen"
+            unterzeile={<p className={cn('truncate text-[13.5px] leading-normal md:text-[14.5px]', LEISE)}>{liste.hatBestellungen ? liste.kopfzeile : hofName}</p>}
+            aktion={
+              liste.hatBestellungen ? (
+                <Link
+                  href="/orders/today/print"
+                  target="_blank"
+                  aria-label="Packliste für heute drucken"
+                  // Am Handy das freistehende Symbol (Board s1-bestellungen), ab 768 px der Umriss mit Wort.
+                  className={cn(KNOPF_RAHMEN, 'size-11 border-transparent px-0 md:w-auto md:border-input md:px-[18px]')}
+                >
+                  <Printer className="size-5 md:size-4" strokeWidth={1.7} aria-hidden="true" />
+                  <span className="hidden md:inline" aria-hidden="true">
+                    Packliste drucken
+                  </span>
+                </Link>
+              ) : undefined
+            }
+          />
           {/* Ohne jede Bestellung keine Filter (Board s1-bestellungen, Bild 3): Es gäbe nichts zu filtern. */}
           {liste.hatBestellungen && (
             <FilterChipReihe beschriftung="Bestellungen filtern">
@@ -116,11 +149,11 @@ export function BestellungenAnsicht({
 
         <LadeInhalt className="mt-4 lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6">
           <div className="lg:w-[360px] lg:shrink-0 xl:w-[440px] 2xl:w-[520px]">
-            <BestellListe seite={liste} filter={filter} gewaehlt={detail?.id ?? null} suche={suche} naechsteAbholung={naechsteAbholung} />
+            <BestellListe seite={liste} filter={filter} gewaehlt={detail?.id ?? null} suche={suche} naechsteAbholung={naechsteAbholung} wartetAufFreigabe={wartetAufFreigabe} />
           </div>
           {detail && (
             <div className="hidden min-w-0 flex-1 lg:block">
-              <BestellDetail key={detail.id} ansicht="kompakt" bestellung={detail} zurueckSuche={suche} barFrist={barFrist} />
+              <BestellDetail key={detail.id} ansicht="kompakt" bestellung={detail} zurueckSuche={suche} barFrist={barFrist} geldsatz={geldsatz} />
             </div>
           )}
         </LadeInhalt>
@@ -135,22 +168,24 @@ function BestellListe({
   gewaehlt,
   suche,
   naechsteAbholung,
+  wartetAufFreigabe,
 }: {
   seite: BestellungenSeite
   filter: HofBestellFilter
   naechsteAbholung: string | null
+  wartetAufFreigabe: boolean
   /** Die Bestellung in der Vorschau (nur ab 1024 px sichtbar) — am Handy ist nichts gewählt. */
   gewaehlt: string | null
   suche: string
 }): React.JSX.Element {
-  if (seite.gruppen.length === 0) return <LeereListe seite={seite} filter={filter} naechsteAbholung={naechsteAbholung} />
+  if (seite.gruppen.length === 0) return <LeereListe seite={seite} filter={filter} naechsteAbholung={naechsteAbholung} wartetAufFreigabe={wartetAufFreigabe} />
   return (
     <div className="flex flex-col gap-5">
       {seite.gruppen.map((gruppe) => (
         <section key={gruppe.schluessel} aria-label={gruppe.titel}>
           <h2 className={cn(KICKER, 'mb-2')}>{gruppe.titel}</h2>
           {/* Eine Karte je Abholfenster, die Zeilen durch Linien getrennt (Boards s1-/w1-bestellungen). */}
-          <ul className={cn(KARTE, 'overflow-hidden rounded-[14px]')}>
+          <ul className={cn(KARTE, 'overflow-hidden', RUNDUNG.karte)}>
             {gruppe.bestellungen.map((b) => (
               <li key={b.id} className="border-t border-border first:border-t-0">
                 <ListenZeile eintrag={b} href={`/orders/${b.id}${suche}`} auswahlHref={vorschauHref(filter, b.id)} gewaehlt={b.id === gewaehlt} />
@@ -222,20 +257,22 @@ function LeereListe({
   seite,
   filter,
   naechsteAbholung,
+  wartetAufFreigabe,
 }: {
   seite: BestellungenSeite
   filter: HofBestellFilter
   naechsteAbholung: string | null
+  wartetAufFreigabe: boolean
 }): React.JSX.Element {
   if (!seite.hatBestellungen) {
+    const stand = wartetAufFreigabe ? BESTELLUNGEN_LEER.wartet : BESTELLUNGEN_LEER.frei
     return (
       <EmptyState
-        symbol={Inbox}
-        titel="Noch keine Bestellungen"
-        satz="Teile deine Hofseite, damit Kundinnen bei dir bestellen können."
+        titel={BESTELLUNGEN_LEER.titel}
+        satz={stand.satz}
         ausweg={
-          <Link href="/farm-page" className={KNOPF_RAHMEN}>
-            Zu Mein Hof
+          <Link href={stand.link.href} className={wartetAufFreigabe ? TEXTLINK : KNOPF_RAHMEN}>
+            {stand.link.text}
           </Link>
         }
       />
@@ -244,7 +281,6 @@ function LeereListe({
   if (filter === 'offen') {
     return (
       <EmptyState
-        symbol={PartyPopper}
         titel="Alles erledigt"
         satz="Gerade wartet keine Bestellung auf dich."
         ausweg={
@@ -271,7 +307,7 @@ function LeereListe({
     )
   }
   if (filter === 'heute') {
-    return <EmptyState symbol={CalendarCheck} titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." ausweg={ausweg} />
+    return <EmptyState titel={HEUTE_NIEMAND} satz="Alles, was noch abgeholt wird, steht unter „Noch offen“." ausweg={ausweg} />
   }
-  return <EmptyState symbol={Inbox} titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." ausweg={ausweg} />
+  return <EmptyState titel="Noch nichts erledigt" satz="Abgeholte, stornierte und nicht abgeholte Bestellungen stehen dann hier." ausweg={ausweg} />
 }

@@ -42,7 +42,8 @@ describe('Wortliste: Kasse statt Checkout, Warenkorb, Problem melden', () => {
   it('„im Checkout" steht in keinem der beiden Hof-Formulare mehr', () => {
     for (const datei of ['src/components/products/product-dialog.tsx', 'src/components/produkte/futter-formular.tsx']) {
       expect(quelle(datei), datei).not.toContain('im Checkout')
-      expect(quelle(datei), datei).toContain('in der Kasse eine Betriebsnummer angeben')
+      // Seit Nr. 249 der Satz des Boards am Schalter (Liste Lauf 32, produkt-neu) — weiter „Kasse“.
+      expect(quelle(datei), datei).toContain('Dann fragt die Kasse nach der Betriebsnummer.')
     }
   })
 

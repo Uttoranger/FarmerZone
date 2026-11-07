@@ -42,7 +42,7 @@ export function LebensmittelVorschau({
 }): React.JSX.Element {
   const karte = kaeuferVorschau({ name, price, unit, unitSize }, { foto, kategorie, unterkategorie })
   return (
-    <section aria-labelledby="lebensmittel-vorschau" className="mt-4 flex flex-col gap-2.5 rounded-2xl border border-border bg-muted/40 p-4">
+    <section aria-labelledby="lebensmittel-vorschau" className="mt-4 flex flex-col gap-2.5 rounded-[12px] border border-border bg-muted/40 p-4">
       <h3 id="lebensmittel-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         {KAEUFER_VORSCHAU.titel}
       </h3>

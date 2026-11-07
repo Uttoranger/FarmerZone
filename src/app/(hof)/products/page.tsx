@@ -72,6 +72,7 @@ export default async function ProductsPage(): Promise<React.JSX.Element> {
           hof={{ name: farm.name, slug: farm.slug, sichtbar: seite.hofSichtbar, teilenMomenteAus: seite.teilenMomenteAus }}
           naechstesFenster={seite.naechstesFenster}
           preisAnzeige={seite.preisAnzeige}
+          barOhneGebuehr={seite.barOhneGebuehr}
         />
       </div>
     </MeinHofAnsicht>

@@ -30,8 +30,12 @@ export const REITER_PX = 49
 /** Die Chip-Zeile: 36 px Chips, 4 px Luft oben und unten, 1 px Linie (nur unter md, nur im Reiter Produkte). */
 export const CHIPS_PX = 45
 
-/** Der klebende Block: am Handy unter dem 56-px-Kopf (`top-14`), ab md unter dem 64-px-Kopf (`top-16`), wie bisher die Reiter. */
-export const KLEBE_BLOCK = 'sticky top-14 z-30 bg-background md:top-16'
+/**
+ * Der klebende Block: am Handy ganz oben (`top-0`) — seit Nr. 247 (G9) scrollt der Kopf der KundeShell auf der
+ * Hofseite am Handy weg, nur der Kopf des Hofs klebt (kopfScrolltWegAmHandy); ab md unter dem 64-px-Kopf
+ * (`top-16`), wie bisher die Reiter.
+ */
+export const KLEBE_BLOCK = 'sticky top-0 z-30 bg-background md:top-16'
 
 /** Die gemessene Höhe des Blocks am Wurzelelement — globals.css rechnet scroll-padding damit. */
 export const KLEBE_BLOCK_VAR = '--hof-klebeblock'

@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { HOF_KONTAKT_FELDER } from '@/lib/hof-kontakt'
+import { barBestellungWartet } from '@/lib/betrieb-mails'
 import type { OrderForEmail, OrderForHofMail, StapelMail } from '@/lib/email'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { MailRenderer, Verworfen } from '@/server/mail-arten'
@@ -66,7 +67,14 @@ const BESTELLUNG_FUER_MAIL = {
 type BestellungFuerMail = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_FUER_MAIL }>
 
 /** Die Arten, deren Auftrag nur die Bestellung kennt. */
-export type EinfacheBestellArt = 'bestellung-bestaetigung' | 'bestellung-bezahlt-hof' | 'bar-bestaetigt-hof' | 'abholbereit' | 'nicht-abholbereit' | 'verfallen'
+export type EinfacheBestellArt =
+  | 'bestellung-bestaetigung'
+  | 'bestellung-bezahlt-hof'
+  | 'bar-bestaetigt-hof'
+  | 'bestellung-bar-hof'
+  | 'abholbereit'
+  | 'nicht-abholbereit'
+  | 'verfallen'
 
 /**
  * Der Auftrag einer Bestellmail. Der fachliche Schlüssel ist `<art>:<orderId>`
@@ -257,6 +265,19 @@ function einfach(baue: (email: typeof import('@/lib/email'), order: OrderForHofM
 export const rendereBestellungBestaetigung: MailRenderer = einfach((e, o) => e.baueOrderConfirmation(o))
 export const rendereBestellungBezahltHof: MailRenderer = einfach((e, o) => e.baueOrderPaidToFarmer(o))
 export const rendereBarBestaetigtHof: MailRenderer = einfach((e, o) => e.baueOrderConfirmedToFarmer(o))
+/**
+ * „Neue Bestellung bar“ an den Hof (Nr. 256) nur, solange die Kundin noch
+ * bestätigen kann: Ist sie bestätigt, storniert, abgeholt oder die Frist vorbei
+ * (`barBestellungWartet`, dieselbe Regel wie `passtNochmal`), käme die Mail zu
+ * spät oder führte zum Packen einer Bestellung, die verfällt — verworfen.
+ */
+export const rendereBestellungBarHof: MailRenderer = async (bezug) => {
+  const { orderId } = bestellungBezugSchema.parse(bezug)
+  const b = await ladeBestellung(orderId)
+  if (!b) return GELOESCHT
+  if (!barBestellungWartet(b, new Date())) return { verworfen: 'nicht_mehr_offen' }
+  return (await import('@/lib/email')).baueBarBestellungAnHof(alsMailBestellung(b))
+}
 /**
  * „Abholbereit“ nur, solange die Bestellung bereit ist (Nr. 195, Audit A4):
  * Nimmt der Hof „Gepackt“ zurück, bevor der Worker die Mail schickt, wäre sie

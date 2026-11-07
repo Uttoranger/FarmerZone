@@ -109,6 +109,11 @@ const SCHLIESSEN_TEXT = "Schließen"
  * Kundschaft). Eine zusätzliche Variante — DialogContent bleibt, wie es ist.
  * Am Handy nimmt der Aufrufer das Blatt (SheetBlatt); ist der Inhalt höher als
  * das Fenster, scrollt der Dialog innen.
+ *
+ * Startfokus (Nr. 246): Fragt der Dialog nach etwas, das sich nicht mit einem
+ * Tipp zurücknehmen lässt (löschen, stornieren, pausieren, stilllegen — der
+ * Hauptknopf ist orange), setzt der Aufrufer `initialFocus` auf „Abbrechen“.
+ * Wache tests/startfokus-wache.test.ts (Bestandsliste, die nur schrumpft).
  */
 function DialogMitte({
   className,

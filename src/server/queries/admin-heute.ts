@@ -12,7 +12,7 @@ import { naechsterTermin } from '@/server/queries/startseite'
 import { centAusDecimal } from '@/server/queries/umsatz'
 import { MELDUNG_STATUS_OFFEN_IM_EINGANG } from '@/lib/postfach'
 import { ABHOLUNG_ERLEDIGT, abholtage } from '@/lib/heute'
-import { umsatzBestellungWhere, umsatzfenster, type Umsatzfenster } from '@/lib/umsatz'
+import { umsatzfenster, type Umsatzfenster } from '@/lib/umsatz'
 import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
 import { gruendungEinstellungAus, hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
@@ -119,7 +119,7 @@ export async function ladeAdminAufgaben(jetzt: Date, optionen: { mitBetrieb: boo
 export type HeuteRoh = {
   stand: AufgabenStand
   bestellungen: { zurAbholung: number; nichtGepackt: number; storniert: number }
-  /** Die Woche aller Höfe, Beträge in Cent: Geld nach Bestelldatum (Nr. 240), die Zahl nach Abholung (Umsatzregel). */
+  /** Die Woche aller Höfe, Beträge in Cent: Geld und Zahl nach derselben Zählregel (`geldKachelWhere`, Nr. 258). */
   woche: HeuteWoche
   hoefe: { verkaufen: number; warten: number }
   naechsteFassung: Date | null
@@ -159,44 +159,48 @@ async function ladeBestellungenHeute(jetzt: Date, stripeLiveAb: Date | null): Pr
 }
 
 /**
- * Die Bedingung der Geld-Kachel (Register N32, Ergänzung 5.11.2026, zweite
- * Fassung; Nr. 240): dieselbe wie die Umsatzregel — abgeholt, ohne
- * Testzahlungen —, nur das Fenster nach `createdAt` der Bestellung statt nach
- * dem Abholzeitpunkt. Das Wort der Gebühr (`gebuehrWortFuerZeitraum`) gilt nach
- * `createdAt`; so sprechen Wort und Summe über dieselben Bestellungen. Aus
- * `umsatzBestellungWhere` abgeleitet, damit Status und Testzahlungs-Regel nie
- * auseinanderlaufen; die Regel selbst bleibt für Auswertung und Verkäufe der
- * Höfe, wie sie ist. Nur Anzeige — keine Geldberechnung ändert sich.
+ * Die Zählregel der Geld-Kachel und der Zahl „Woche: n“ (Register N32,
+ * Ergänzung N46, 6.11.2026; Nr. 258 — ersetzt die Zählweise nach Nr. 240):
+ * alle Bestellungen, die im Fenster eingegangen sind (`createdAt`), außer
+ * storniert bzw. abgelaufen (verfallene Bestellungen sind CANCELLED); online
+ * nur bezahlt — eine Online-Bestellung vor der Zahlung oder mit Erstattung
+ * (REFUNDED, auch ohne Storno) zählt nicht —, vor Ort (bar, Altbestand Karte)
+ * ab Eingang, auch unbestätigt; ohne Testzahlungen. Der Abholstatus spielt
+ * keine Rolle: Eine in der Woche bestellte Bestellung zählt in dieser Woche,
+ * auch wenn sie erst später oder gar nicht abgeholt wird.
+ *
+ * EINE Quelle für Kachel, „Woche: n“ und Vorwoche — die Zahlen sprechen so
+ * immer über dieselben Bestellungen. Die Umsatzregel der Höfe
+ * (`umsatzBestellungWhere`: abgeholt, nach Abholzeitpunkt) gilt für
+ * Auswertung und Verkäufe unverändert. Nur Anzeige — keine Geldberechnung
+ * ändert sich. Die Testzahlungs-Regel kommt als Element in die eigene
+ * `AND`-Liste (CODING_STANDARDS §2), nie gespreizt neben ein zweites `AND`.
  */
 function geldKachelWhere(fenster: Umsatzfenster, stripeLiveAb: Date | null): Prisma.OrderWhereInput {
-  const where = umsatzBestellungWhere('', fenster, stripeLiveAb)
-  delete where.farmId
-  delete where.pickedUpAt
-  return { ...where, createdAt: { gte: fenster.von, lte: fenster.bis } }
+  return {
+    createdAt: { gte: fenster.von, lte: fenster.bis },
+    status: { not: 'CANCELLED' },
+    AND: [
+      { OR: [{ paymentMethod: 'ONLINE', paymentStatus: 'PAID' }, { paymentMethod: { in: ['ONSITE_CASH', 'ONSITE_CARD'] } }] },
+      ohneTestzahlungenWhere(stripeLiveAb),
+    ],
+  }
 }
 
 /**
- * Die Woche aller Höfe seit Montag (Wien), ohne Testzahlungen. Geld-Kachel:
- * Warenwert und Gebühr (ohne entfallene, wie die Monatsabrechnung) der
- * abgeholten Bestellungen, die in dieser Woche bestellt wurden
- * (`geldKachelWhere`, Nr. 240). Die Zahl der Kachel „Bestellungen heute“
- * zählt weiter nach der Umsatzregel (`umsatzBestellungWhere` ohne den Hof:
- * abgeholt in dieser Woche) gegen die Vorwoche bis zum selben Zeitpunkt
- * (`umsatzfenster`).
+ * Die Woche aller Höfe seit Montag (Wien) bis jetzt, nach `geldKachelWhere`:
+ * Warenwert, Gebühr (ohne entfallene, wie die Monatsabrechnung) und die Zahl
+ * „Woche: n“ der Kachel „Bestellungen heute“ — gegen die Vorwoche bis zum
+ * selben Zeitpunkt (`umsatzfenster`) nach derselben Regel.
  */
 async function ladeWoche(jetzt: Date, stripeLiveAb: Date | null): Promise<HeuteRoh['woche']> {
   const fenster = umsatzfenster('woche', jetzt)
-  const alleHoefe = (f: typeof fenster.aktuell) => {
-    const where = umsatzBestellungWhere('', f, stripeLiveAb)
-    delete where.farmId
-    return where
-  }
   const geld = geldKachelWhere(fenster.aktuell, stripeLiveAb)
   const [summe, gebuehr, anzahl, anzahlVorwoche] = await Promise.all([
     prisma.order.aggregate({ where: geld, _sum: { totalAmount: true } }),
     prisma.order.aggregate({ where: { ...geld, serviceFeeRefundedAt: null }, _sum: { serviceFeeCents: true } }),
-    prisma.order.count({ where: alleHoefe(fenster.aktuell) }),
-    prisma.order.count({ where: alleHoefe(fenster.vergleich) }),
+    prisma.order.count({ where: geld }),
+    prisma.order.count({ where: geldKachelWhere(fenster.vergleich, stripeLiveAb) }),
   ])
   return {
     umsatzCents: centAusDecimal(summe._sum.totalAmount),

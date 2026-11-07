@@ -6,12 +6,14 @@ import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { AGB_ZUSTIMMUNG_TEXT } from '@/lib/agb-zustimmung'
-import { agbFassung } from '@/lib/rechtstexte/agb-datei'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
 import { agbZustimmungSchema } from '@/schemas/agb-zustimmung'
 
 /*
  * „Ich stimme den AGB zu“ (§ 104 JN, P2B; Nachtlauf Nr. 207): speichert für
- * den Hof der Sitzung die aktuelle Fassung und den Zeitpunkt. Besitz über die
+ * den Hof der Sitzung die neueste Fassung (AGB_NEUESTE, N45) und den
+ * Zeitpunkt — auch vor dem Stichtag (Zustimmung vorab, Verzicht nach AGB 32.4).
+ * Eine ältere Kennung aus dem Browser (etwa '0.9') wird abgelehnt. Besitz über die
  * Sitzung (ownerId in der WHERE), nie über eine Kennung aus dem Browser.
  *
  * Bedingt geschrieben (`updateMany`): nur, wenn der Hof dieser Fassung noch
@@ -24,7 +26,7 @@ export async function stimmeAgbZu(eingabe: unknown): Promise<{ ok: true } | { er
   if (!session?.user) return { error: AGB_ZUSTIMMUNG_TEXT.abgemeldet }
   const geprueft = agbZustimmungSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: AGB_ZUSTIMMUNG_TEXT.fehler }
-  const aktuell = agbFassung()
+  const aktuell = AGB_NEUESTE
   if (geprueft.data.fassung !== aktuell) return { error: AGB_ZUSTIMMUNG_TEXT.veraltet }
   try {
     const { count } = await prisma.farm.updateMany({

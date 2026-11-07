@@ -262,7 +262,6 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
 const ALTLAST_IM_AUFRUF: Array<{ datei: string; text: string }> = [
   { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Neuigkeiten abonniert.' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', text: 'Noch keine Höfe zum Vergleichen' },
-  { datei: 'src/components/hof-bestellungen/bestellungen-ansicht.tsx', text: 'Noch keine Bestellungen' },
   { datei: 'src/components/hof-hilfe/meine-meldungen.tsx', text: 'Noch keine Meldungen' },
   { datei: 'src/components/hof-kunden/kunden-ansicht.tsx', text: 'Noch keine Kunden' },
   { datei: 'src/components/hof-verkaeufe/verkaeufe-ansicht.tsx', text: 'Noch keine Verkäufe' },

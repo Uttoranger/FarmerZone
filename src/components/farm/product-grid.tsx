@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Sprout, Check, WifiOff } from 'lucide-react'
+import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Check, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
@@ -813,7 +813,6 @@ export function ProductGrid({
         teil === 'keins' ? null : products.length === 0 ? (
           // Leer, mit Ausweg (DESIGN_SYSTEM, „Zustände").
           <EmptyState
-            symbol={Sprout}
             titel="Gerade keine Produkte"
             satz="Dieser Hof hat im Moment nichts im Angebot. Schau bald wieder vorbei – oder such dir einen anderen Hof in der Nähe."
             ausweg={

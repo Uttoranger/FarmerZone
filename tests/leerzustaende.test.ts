@@ -30,6 +30,7 @@ vi.mock('@/server/actions/farm', () => ({
 vi.mock('@/server/actions/status-posts', () => ({ setzeWhatsAppGetippt: () => undefined }))
 
 import { ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID } from '@/lib/pickup-slot-rules'
+import { HEUTE_ABHOLZEITEN_SATZ } from '@/lib/heute'
 import { UMSATZ_LEER } from '@/lib/auswertung'
 import { WHATSAPP_VERSAND_TEXT } from '@/lib/whatsapp-versand'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
@@ -61,17 +62,16 @@ const alsLink = (href: string, text: string) => new RegExp(`<a href="${maskiere(
 const alsKnopf = (text: string) => new RegExp(`<button type="button"[^>]*>${maskiere(text)}</button>`)
 
 describe('Heute — keine Abholzeiten', () => {
-  it('Satz und Knopf stehen auf der Seite genau einmal — in der Packliste; die Karte sagt es in einer Zeile', () => {
+  it('Satz und Knopf stehen auf der Seite genau einmal — in der Packliste; die Karte „Nächste Abholung“ entfällt (Liste Lauf 32, heute Bild 4)', () => {
     const packliste = html(createElement(heute.Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: null } }))
     const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, tag: null, anzahl: 0 }))
     // So stehen die beiden Blöcke auf /dashboard untereinander (app/(hof)/dashboard/page.tsx).
     const seite = packliste + karte
-    expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.satz)).toBe(1)
+    expect(vorkommen(seite, HEUTE_ABHOLZEITEN_SATZ)).toBe(1)
     expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.aktion.text)).toBe(1)
     expect(packliste).toMatch(alsLink(ABHOLZEITEN_FEHLEN.aktion.href, ABHOLZEITEN_FEHLEN.aktion.text))
-    // Die Karte: nur der Titel als Zeile, kein EmptyState, kein Knopf, kein Link.
+    expect(karte).toBe('')
     expect(anzahlEmptyStates(karte)).toBe(0)
-    expect(karte).toContain(ABHOLZEITEN_FEHLEN.titel)
     expect(karte).not.toContain('<a ')
     expect(karte).not.toContain('<button')
     // Die zweiten Fassungen von früher sind weg.
@@ -88,7 +88,7 @@ describe('Heute — keine Abholzeiten', () => {
       createElement(heute.Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr' } })
     )
     expect(packliste).toContain('Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr')
-    expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.satz)
+    expect(packliste).not.toContain(HEUTE_ABHOLZEITEN_SATZ)
     expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.aktion.text)
   })
 })

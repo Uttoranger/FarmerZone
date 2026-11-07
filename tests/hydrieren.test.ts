@@ -86,6 +86,8 @@ import { useImVorschauRahmen, VorschauImRahmen } from '@/components/farm/vorscha
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 import { useMeldungFormular } from '@/components/shared/use-meldung-formular'
 import { useWarenkorbVomHof } from '@/lib/use-warenkorb-kopf'
+import { Toaster, useImNeuenDesign } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
 /** Die Breite des Fensters für matchMedia, und ob die Seite als installierte App läuft. */
@@ -445,6 +447,60 @@ describe('Hydrieren – Teile mit der Breite und der Adresse des Browsers', () =
   })
 })
 
+describe('Hydrieren – die Meldung (Toast) nur im Geltungsbereich data-design="neu" (Nr. 246, Runde 1)', () => {
+  // Die Shell mit der Marke steht neben dem Toaster (der hängt im Root-Layout): Der Server sieht sie nicht.
+  function setzeMarke(): HTMLElement {
+    const shell = document.createElement('div')
+    shell.setAttribute('data-design', 'neu')
+    document.body.appendChild(shell)
+    return shell
+  }
+
+  it('useImNeuenDesign: im Server-HTML und beim Hydrieren „alt“, erst danach „neu“', async () => {
+    function Gestalt(): React.JSX.Element {
+      return createElement('p', null, `Toast: ${useImNeuenDesign() ? 'neu' : 'alt'}`)
+    }
+    let shell: HTMLElement | undefined
+    try {
+      const ergebnis = await pruefeHydrieren(createElement(Gestalt), { imBrowser: () => (shell = setzeMarke()) })
+      expect(ergebnis.serverHtml).toContain('Toast: alt')
+      expect(ergebnis.container.textContent).toBe('Toast: neu')
+    } finally {
+      shell?.remove()
+    }
+  })
+
+  // Mit den Props, die src/app/layout.tsx heute mitgibt: innen G7 (unten, ohne richColors), außen der Bestand (oben).
+  for (const [fall, mitMarke, lage, bunt] of [
+    ['innen: unten mittig, ohne richColors, dunkler Balken', true, 'bottom', 'false'],
+    ['Gegenprobe außen: oben mittig mit richColors wie bisher', false, 'top', 'true'],
+  ] as const) {
+    it(`Toaster ${fall}`, async () => {
+      const shell = mitMarke ? setzeMarke() : undefined
+      try {
+        const ergebnis = await pruefeHydrieren(createElement(Toaster, { position: 'top-center', richColors: true }))
+        // sonner reicht die Meldung über einen Takt (setTimeout) an den Toaster weiter.
+        await act(async () => {
+          toast.success('Gespeichert')
+          await new Promise((fertig) => setTimeout(fertig, 20))
+        })
+        const liste = ergebnis.container.querySelector('[data-sonner-toaster]')
+        expect(liste?.getAttribute('data-y-position')).toBe(lage)
+        expect(liste?.getAttribute('data-x-position')).toBe('center')
+        const meldung = ergebnis.container.querySelector('[data-sonner-toast]')
+        expect(meldung?.getAttribute('data-rich-colors')).toBe(bunt)
+        expect(meldung?.className.includes('bg-[var(--fz-text)]!')).toBe(mitMarke)
+      } finally {
+        await act(async () => {
+          toast.dismiss()
+          await new Promise((fertig) => setTimeout(fertig, 20))
+        })
+        shell?.remove()
+      }
+    })
+  }
+})
+
 describe('Hydrieren – die Hofübersicht /hoefe', () => {
   const hof = (slug: string): HofUebersichtEintrag => ({
     slug,
@@ -501,6 +557,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterPille', 'ThemeWahl'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
+  'src/components/ui/sonner.tsx': ['useImNeuenDesign'],
   'src/components/notbremse-band.tsx': ['NotbremseBand'],
   'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],

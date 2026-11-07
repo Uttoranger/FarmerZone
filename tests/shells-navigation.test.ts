@@ -202,7 +202,22 @@ describe('Nichts unter dem Überstand (V28)', () => {
     const fuss = abschnitt(renderToStaticMarkup(el(KundeShell, { sitzung: 'gast' })), '<footer', '>')
     expect(leiste).toBe(69)
     expect(ueberstand).toBe(20)
-    expect(pbPx(fuss.match(/class="([^"]*)"/)?.[1] ?? '')).toBeGreaterThanOrEqual(leiste + ueberstand)
+    // Seit Nr. 247 (G10) rechnet der Fuß mit den Variablen selbst — samt Home-Indicator, der in festen px fehlte.
+    expect(fuss).toContain('pb-[calc(var(--kunde-unterleiste)+var(--kunde-ueberstand)+1.5rem)]')
+  })
+
+  it('HofShell: Das Bestelldetail ist am Handy eine Fokus-Seite ohne Unterleiste (Liste Lauf 32, bestellung 390), die Liste nicht', () => {
+    const shellAuf = (adresse: string) => {
+      pfad.aktuell = adresse
+      return renderToStaticMarkup(
+        el(HofShell, { hofName: 'Hof Beispiel', hofSlug: 'hof-beispiel', personName: 'Max Mustermann', isAdmin: false, zahlen: { bestellungen: 0, postfach: 0, admin: 0 }, tarifZeile: TARIF })
+      )
+    }
+    // Die Unterleiste ist die einzige <nav> mit fixed bottom-0; versteckt trägt sie `hidden`.
+    const unterleiste = (html: string) => html.match(/<nav[^>]*aria-label="Hauptnavigation"[^>]*class="([^"]*fixed[^"]*)"/)?.[1] ?? html.match(/<nav[^>]*class="([^"]*fixed[^"]*)"[^>]*aria-label="Hauptnavigation"/)?.[1] ?? ''
+    expect(unterleiste(shellAuf('/orders/abc123')).split(/\s+/)).toContain('hidden')
+    expect(unterleiste(shellAuf('/orders')).split(/\s+/)).not.toContain('hidden')
+    expect(unterleiste(shellAuf('/orders')).length).toBeGreaterThan(0)
   })
 
   it('HofShell: Der Inhalt hält Unterleiste plus erhobenes „Neu“ frei', () => {

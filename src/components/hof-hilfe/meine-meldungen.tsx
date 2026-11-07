@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LifeBuoy, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { MEINE_MELDUNGEN_HREF, NEUE_MELDUNG_HREF, type MeldungZeile } from '@/lib/hof-hilfe'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -47,7 +47,6 @@ export function MeineMeldungen({ zeilen }: { zeilen: MeldungZeile[] | null }): R
         </Hinweiskarte>
       ) : zeilen.length === 0 ? (
         <EmptyState
-          symbol={LifeBuoy}
           titel="Noch keine Meldungen"
           satz="Wenn etwas klemmt oder dir etwas fehlt, schreib uns — hier siehst du dann, was daraus geworden ist."
           ausweg={

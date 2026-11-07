@@ -146,6 +146,10 @@ export async function speichereHofpreisStichtag(eingabe: unknown): Promise<{ ok:
 
   updateTag(PLATTFORM_EINSTELLUNG_TAG)
   revalidatePath('/')
+  // N45: /agb und /konditionen sind frisch je Aufruf; die zwei Seiten je Fassung und /fuer-hoefe sind statisch und nennen den Stichtag.
+  revalidatePath('/agb/0.9')
+  revalidatePath('/agb/1.0')
+  revalidatePath('/fuer-hoefe')
   revalidatePath(ADMIN_EINSTELLUNGEN_HREF)
   return { ok: true }
 }

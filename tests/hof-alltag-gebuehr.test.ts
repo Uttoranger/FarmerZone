@@ -171,6 +171,11 @@ describe('Druck: Abholzettel und Packliste', () => {
     // V57: Papier = Bildschirm.
     expect(html).toContain('Zum Packen')
     expect(html).toContain('Zahlung: Bar bei Abholung')
+    // Liste Lauf 32 (druck Bild 1): „Preise inkl. …“ voran im Fuß, E-Mail bricht nach dem „@“, Tabellenkopf fett.
+    expect(html).toMatch(/Preise inkl\. Plattformgebühr\. Bestellnummer nur zum Abgleich/)
+    expect(html).toContain('erika@<wbr/>example.com')
+    expect(html).not.toContain('[overflow-wrap:anywhere]')
+    expect(html).toMatch(/<th class="[^"]*font-bold[^"]*">Produkt<\/th>/)
   })
 
   it('Gegenprobe: dieselbe Bestellung im Modell „bisher“ nennt die Servicegebühr', async () => {
@@ -189,8 +194,13 @@ describe('Druck: Abholzettel und Packliste', () => {
     expect(html).toContain('Wartet auf Kunde')
     expect(html).toContain('Preise inkl. Plattformgebühr.')
 
+    // Seit Nr. 249 (Liste Lauf 32, druck Bild 2) zeigt die Packliste nur den Betrag, ohne „inkl. € … <Gebühr>“ —
+    // auch im Modell „bisher“; die Aufteilung steht auf dem Abholzettel (Gegenprobe dort).
     m.bestellungen = [bestellungFuerDruck(null, 'ONSITE_CASH')]
-    expect(renderToStaticMarkup(await PrintPacklistPage())).toContain(WORT_BISHER)
+    const bisher = renderToStaticMarkup(await PrintPacklistPage())
+    expect(bisher).not.toContain(WORT_BISHER)
+    expect(bisher).not.toMatch(/inkl\. €/)
+    expect(bisher).toContain('Bar zu kassieren')
   })
 
   it('leere Packliste: der Satz des Boards', async () => {

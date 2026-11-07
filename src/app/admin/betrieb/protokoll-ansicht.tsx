@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
-import { Download, ScrollText } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { ladeProtokoll } from '@/server/queries/admin-protokoll'
 import { ADMIN_BETRIEB_PROTOKOLL_HREF, BETRIEB_TEXT } from '@/lib/betrieb'
 import { PROTOKOLL_TAGE, PROTOKOLL_WER, type ProtokollFilter } from '@/schemas/betrieb-mails'
@@ -161,7 +161,6 @@ export async function ProtokollAnsicht({ f, ich, jetzt, mailsOffen }: { f: Proto
           <h2 className="font-heading text-[17px] font-semibold text-foreground">{titel}</h2>
           {zeilen.length === 0 ? (
             <EmptyState
-              symbol={ScrollText}
               titel={PROTOKOLL_TEXT.leerTitel}
               satz={PROTOKOLL_TEXT.leerSatz}
               ausweg={

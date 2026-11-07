@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, MapPin, Share2, Sprout } from 'lucide-react'
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Clock, MapPin, Share2 } from 'lucide-react'
 import type { PublicFarm } from '@/server/queries/farm'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
@@ -268,7 +268,9 @@ export function HofseiteKunde({
       const anker = reiterAnker.current
       if (anker) {
         // Der Anker ist der Anfang der Inhaltsspalte: Er soll unter dem Kopf und der klebenden Hofzeile stehen.
-        const kopf = document.querySelector('header')?.getBoundingClientRect().height ?? 0
+        // Nur ein klebender Kopf zählt: Am Handy scrollt der Kopf der Shell hier weg (G9, Nr. 247).
+        const kopfZeile = document.querySelector('header')
+        const kopf = kopfZeile && getComputedStyle(kopfZeile).position === 'sticky' ? kopfZeile.getBoundingClientRect().height : 0
         const ziel = anker.getBoundingClientRect().top + window.scrollY - kopf - (klebeBlock?.offsetHeight ?? 0)
         if (window.scrollY > ziel) window.scrollTo({ top: ziel })
       }
@@ -345,7 +347,6 @@ export function HofseiteKunde({
         <div className="mx-auto flex max-w-xl flex-col gap-5 px-4 pt-6 pb-16">
           <h1 className="font-heading text-[28px] leading-tight font-semibold break-words text-foreground">{farm.name}</h1>
           <EmptyState
-            symbol={Sprout}
             titel="Dieser Hof richtet gerade seinen Shop ein"
             satz="Schau bald wieder vorbei."
             ausweg={

@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { ReceiptText } from 'lucide-react'
 import type { BestellEintrag } from '@/lib/bestellungen-finden'
 import { BESTELLUNGEN_PFAD } from '@/lib/bestellungen-finden'
 import { cn } from '@/lib/utils'
@@ -113,7 +112,6 @@ export function BestellungenListe({
 
       {leer && (
         <EmptyState
-          symbol={ReceiptText}
           titel="Keine Bestellungen gefunden"
           satz="Zu dieser Adresse gibt es bei uns keine Bestellung. Vielleicht hast du mit einer anderen bestellt?"
           // Board Bild 4: die Wege über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).

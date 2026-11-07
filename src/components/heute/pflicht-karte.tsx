@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { Hinweiskasten } from '@/components/ui/hinweiskasten'
 import { KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 
@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils'
  * damit sie untereinander gleich aussehen (A2 Punkt 1: untereinander wie
  * gebaut). Was in der Karte steht und wann sie erscheint, entscheiden die
  * Karten selbst.
+ *
+ * Seit Nr. 249 (Liste Lauf 32, heute: „Titel der Hinweis-/Pflichtkarten klein, neutrale Farbe“ → G3) zeichnet
+ * der Hinweiskasten: braun getönt, Titel 16 px fett in `status-offen`, 12 px rund, ohne Symbol.
  */
 
 /** Hauptknopf der Karte: orange gefüllt, volle Breite (Board: „Bei Stripe ergänzen“, „AGB lesen und bestätigen“). */
@@ -29,9 +32,8 @@ export function PflichtKarte({
   knoepfe?: ReactNode
 }): React.JSX.Element {
   return (
-    <Hinweiskarte ton="orange" titel={titel} className="sm:flex-col sm:items-stretch">
-      <div className="text-[13.5px] leading-snug">{children}</div>
-      {knoepfe && <div className="mt-3 flex flex-col gap-2">{knoepfe}</div>}
-    </Hinweiskarte>
+    <Hinweiskasten titel={titel} aktion={knoepfe ? <div className="mt-2 flex w-full flex-col gap-2">{knoepfe}</div> : undefined}>
+      {children}
+    </Hinweiskasten>
   )
 }

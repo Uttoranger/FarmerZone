@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
-import { CircleAlert, CircleCheck, Clock, Info } from 'lucide-react'
+import { CircleAlert, Clock, Info } from 'lucide-react'
 import { ADMIN_BETRIEB_HREF, ADMIN_BETRIEB_MAILS_HREF, BETRIEB_TEXT, TARIFE } from '@/lib/betrieb'
 import {
   ADMIN_BETRIEB_ALLE_MAILS_HREF,
@@ -243,7 +243,7 @@ function BrauchtDichListe({ zeilen, gruppen, anker }: { zeilen: readonly Braucht
         <span className={cn('text-[12.5px]', LEISE)}>{`${zeilen.length} ${zeilen.length === 1 ? 'Mail' : 'Mails'}`}</span>
       </div>
       {zeilen.length === 0 ? (
-        <EmptyState symbol={CircleCheck} titel={MAIL_TEXT.brauchtLeer} satz={MAIL_TEXT.brauchtLeerSatz} ausweg={{ ohne: 'Es gibt nichts zu tun; die Seite lädt jede Minute neu.' }} className="py-6" />
+        <EmptyState titel={MAIL_TEXT.brauchtLeer} satz={MAIL_TEXT.brauchtLeerSatz} ausweg={{ ohne: 'Es gibt nichts zu tun; die Seite lädt jede Minute neu.' }} className="py-6" />
       ) : (
         <>
           {gruppen.map((g) => (

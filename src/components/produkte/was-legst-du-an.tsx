@@ -108,7 +108,7 @@ function BereichKarte({ punkt, onNavigate }: { punkt: HofNeuPunkt; onNavigate: (
 function BereichZeile({ punkt, onNavigate }: { punkt: HofNeuPunkt; onNavigate: () => void }): React.JSX.Element {
   const Symbol = NEU_SYMBOL[punkt.id]
   return (
-    <Link href={punkt.href} onClick={onNavigate} className={cn('flex min-h-14 items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted', FOKUS_RAHMEN)}>
+    <Link href={punkt.href} onClick={onNavigate} className={cn('flex min-h-14 items-center gap-3 rounded-[10px] px-2 py-2 hover:bg-muted', FOKUS_RAHMEN)}>
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/14 text-status-offen">
         <Symbol className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
       </span>

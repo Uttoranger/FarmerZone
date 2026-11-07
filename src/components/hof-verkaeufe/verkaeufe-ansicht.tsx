@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronRight, ExternalLink, Pencil, Plus, ReceiptText, ShoppingCart, Trash2 } from 'lucide-react'
+import { ChevronRight, ExternalLink, Pencil, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { SalesOverview } from '@/server/queries/manual-sales'
@@ -118,7 +118,6 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
         </h2>
         {overview.zeilen.length === 0 ? (
           <EmptyState
-            symbol={ReceiptText}
             titel="Noch keine Verkäufe"
             satz="Abgeholte Bestellungen und eingetragene Direktverkäufe erscheinen hier."
             ausweg={

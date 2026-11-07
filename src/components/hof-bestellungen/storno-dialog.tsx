@@ -10,6 +10,7 @@ import { STORNO_GRUND_MAX } from '@/lib/eingabegrenzen'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { FELD, FELD_LABEL, LEISE } from './stil'
 import { stornoGebuehrSatz, stornoZusammensetzung } from '@/lib/storno'
@@ -86,7 +87,7 @@ export function StornoDialog({
       }}
     >
       {storno ? (
-        <div className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-3.5">
+        <div className={cn(RUNDUNG.karte, 'flex flex-col gap-1 border border-border bg-background px-4 py-3.5')}>
           <p className="flex items-baseline gap-3 text-[13.5px]">
             <span className={LEISE}>{kunde.vorname} bekommt zurück</span>
             <span className="ml-auto font-semibold tabular-nums">{euro(storno.erstattetCents)}</span>
@@ -105,7 +106,7 @@ export function StornoDialog({
           </p>
         </div>
       ) : (
-        <p className="rounded-xl border border-border bg-background px-4 py-3.5 text-[13.5px]">
+        <p className={cn(RUNDUNG.karte, 'border border-border bg-background px-4 py-3.5 text-[13.5px]')}>
           {bestellung.vorOrt
             ? 'Bei Barzahlung wird nichts erstattet – die Bestellung entfällt einfach.'
             : 'Es wurde noch nichts bezahlt – die Bestellung entfällt einfach.'}

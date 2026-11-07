@@ -1,7 +1,11 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'
-import { gebuehrFuerMonatsabrechnungJeModell, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import * as Sentry from '@sentry/nextjs'
+import { gebuehrFuerMonatsabrechnungJeModell, geldsaetzeFuer, istHofpreisBestellung, type GebuehrEinzug } from '@/lib/plattformgebuehr'
+import { positionszeile, type Positionszeile } from '@/lib/positionszeile'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { ladeGruendungBis } from '@/server/queries/admin'
 import { stornoBetraege, type StornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltRechnung, type ArtikelFehltErgebnis } from '@/lib/artikel-fehlt'
@@ -20,7 +24,8 @@ import {
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
 import { fristVon, tagInWorten, uhrzeitInWien, zeitpunktFuerMail } from '@/lib/fristen'
-import { abholWhere, naechstesAbholfenster, wienerTag, type NaechstesFenster } from '@/lib/heute'
+import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAbholungWhere, wienerTag, type NaechstesFenster } from '@/lib/heute'
+import { wienKalendertag } from '@/lib/kalender'
 import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
 import type { MarkeArt } from '@/lib/marke-art'
@@ -156,6 +161,7 @@ const DETAIL_AUSWAHL = {
   customerNote: true,
   createdAt: true,
   paidAt: true,
+  pickedUpAt: true,
   cancelReason: true,
   platformFeeAmount: true,
   stripePaymentIntentId: true,
@@ -193,6 +199,8 @@ export type HofListenEintrag = {
 export type HofBestellPosition = {
   id: string
   zeile: string
+  /** Die Positionszeile nach G14 („**4** × Heumilch frisch (1 L)“, positionszeile) — die Anzahl fett vorn. */
+  teile?: Positionszeile
   betragCents: number
   fehlt: boolean
   /** Was „Artikel fehlt" für diese Position hieße — auf dem Server gerechnet. */
@@ -211,6 +219,10 @@ export type HofBestellDetail = {
   zahlart: string
   vorOrt: boolean
   bezahltAm: string | null
+  /** Abgeholt: „16:05“ (Wiener Uhrzeit aus pickedUpAt) für „· abgeholt um 16:05“ (Board s1-bestellung Bild 4). */
+  abgeholtUm?: string | null
+  /** Vor Ort: „bar, bezahlt wird bei Abholung“ hinter „Bestellt: …“ (Board w1-bestellung); online null. */
+  zahlungBeiAbholung?: string | null
   betrag: {
     warenCents: number
     gebuehrCents: number
@@ -297,7 +309,9 @@ export async function getHofBestellDetail(
     id: o.id,
     nummer: o.orderNumber,
     status: o.status,
-    marke: bestellMarke(o.status),
+    // Abgeholt grün statt grau (Liste Lauf 32, bestellung Bild 4: Status fertig) — das grüne Paar der Marke ist
+    // „läuft“ (Register G5 kennt keine eigene Art „fertig“); Liste, Admin und Kundendetail bleiben bei bestellMarke.
+    marke: o.status === 'PICKED_UP' ? { ...bestellMarke(o.status), art: 'laeuft' } : bestellMarke(o.status),
     abholung: abholungKurz(o.pickupDate, o.pickupTimeStart, o.pickupTimeEnd, jetzt),
     bestelltAm: zeitpunktFuerMail(o.createdAt),
     kunde: {
@@ -310,6 +324,8 @@ export async function getHofBestellDetail(
     zahlart: zahlartText(o.paymentMethod, o.paymentStatus),
     vorOrt: istVorOrtZahlung(o.paymentMethod),
     bezahltAm: o.paidAt ? zeitpunktFuerMail(o.paidAt) : null,
+    abgeholtUm: o.status === 'PICKED_UP' && o.pickedUpAt ? uhrzeitInWien(o.pickedUpAt) : null,
+    zahlungBeiAbholung: ZAHLUNG_BEI_ABHOLUNG[o.paymentMethod] ?? null,
     betrag: {
       warenCents,
       gebuehrCents: o.serviceFeeCents,
@@ -335,6 +351,7 @@ export async function getHofBestellDetail(
         unit: i.product?.unit ?? null,
         unitSize: i.product?.unitSize ?? null,
       }),
+      teile: positionszeile({ name: i.productName, quantity: i.quantity, unit: i.product?.unit ?? null, unitSize: i.product?.unitSize ?? null }),
       betragCents: alsCents(i.totalPrice),
       fehlt: i.fehltSeit !== null,
       fehltVorschau: artikelFehltRechnung(rechenStand, i.id),
@@ -382,6 +399,51 @@ export async function barFristSatz(farmId: string, detail: HofBestellDetail, jet
   return bestaetigungOffenSatz(detail.kunde.vorname, `${tagInWorten(bis, jetzt)}, ${uhrzeitInWien(bis)} Uhr`)
 }
 
+// Hinter „Bestellt: …“ bei Zahlung vor Ort (Board w1-bestellung); Karte ist Altbestand.
+const ZAHLUNG_BEI_ABHOLUNG: Record<string, string> = {
+  ONSITE_CASH: 'bar, bezahlt wird bei Abholung',
+  ONSITE_CARD: 'mit Karte, bezahlt wird bei Abholung',
+}
+
+/**
+ * Der Geldsatz nach V1 unter dem Betrag der Bestellung (Liste Lauf 32, bestellung Bild 1/2/4): „Du bekommst die
+ * vollen € … – bis <Gründungsende> zahlst du auf Barverkäufe keine Plattformgebühr.“ bzw. der Satz des Modells —
+ * EINE Anzeige-Hilfe (geldsaetzeFuer, Nr. 248), nur aus dem Snapshot der Bestellung, keine Rechnung. Das Datum
+ * kommt aus den heutigen Hofdaten (einzugAb bzw. wirksames Gründungsende, ladeGruendungBis — dieselben Werte wie
+ * beim Einzug). null im Modell „bisher“ und bei entfallener Gebühr; dann bleibt der Satz der Seite (betragSatz).
+ * Nur der eigene Hof: Bestellung nach ID UND farmId. Ein Ladefehler nimmt nur den Satz weg, nie die Seite.
+ */
+export async function ladeBestellGeldsatz(farmId: string, orderId: string, jetzt: Date): Promise<string | null> {
+  try {
+    const [o, hof, einstellung] = await Promise.all([
+      prisma.order.findFirst({
+        where: { id: orderId, farmId },
+        select: { totalAmount: true, serviceFeeCents: true, serviceFeeRefundedAt: true, paymentMethod: true, gebuehrModell: true, gebuehrEinzug: true },
+      }),
+      prisma.farm.findUnique({ where: { id: farmId }, select: { id: true, einzugAb: true, plattformgebuehrProzent: true } }),
+      ladeHofpreisEinstellung(),
+    ])
+    if (!o || !hof) return null
+    const gruendungBis = hof.einzugAb ? null : await ladeGruendungBis({ id: hof.id })
+    const satz = geldsaetzeFuer(
+      { art: 'bestellung', bestellung: { ...o, gebuehrEinzug: gebuehrEinzugAus(o.gebuehrEinzug) } },
+      hof,
+      einstellung,
+      gruendungBis,
+      jetzt
+    )
+    return satz?.satz ?? null
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'bestellung-geldsatz' }, extra: { farmId, orderId } })
+    return null
+  }
+}
+
+/** `Order.gebuehrEinzug` ist in der DB ein Text — nur die vier Wege gehen an den Geldsatz, alles andere ist null. */
+function gebuehrEinzugAus(wert: string | null): GebuehrEinzug | null {
+  return wert === 'stripe' || wert === 'sepa' || wert === 'ueberweisung' || wert === 'erlassen' ? wert : null
+}
+
 /**
  * Das nächste Abholfenster laut Abholzeiten samt der Zahl seiner Bestellungen —
  * für die leeren Zustände von „Heute abholen" (Bestellungen) und der Packliste
@@ -393,8 +455,18 @@ export async function naechstesFensterMitZahl(farmId: string, jetzt: Date): Prom
     where: { farmId, isActive: true },
     select: { dayOfWeek: true, startTime: true, endTime: true },
   })
-  const fenster = naechstesAbholfenster(slots, jetzt)
-  if (!fenster) return null
-  const anzahl = await prisma.order.count({ where: abholWhere(farmId, wienerTag(fenster.tag)) })
-  return { fenster, anzahl }
+  if (slots.length === 0) return null
+  // Liste Lauf 32 (bestellungen Bild 2, druck Bild 3): ohne Bestellung im nächsten Fenster das nächste Fenster mit
+  // Bestellungen (fensterMitBestellungen) — gezählt über dieselbe Bedingung wie die Packliste (abholWhere).
+  const [anzahlHeute, naechste] = await Promise.all([
+    prisma.order.count({ where: abholWhere(farmId, abholtage(jetzt).heute) }),
+    prisma.order.findFirst({ where: naechsteAbholungWhere(farmId, jetzt), orderBy: { pickupDate: 'asc' }, select: { pickupDate: true } }),
+  ])
+  let naechsteAbholung = null
+  if (naechste) {
+    const tag = wienKalendertag(naechste.pickupDate)
+    const anzahl = await prisma.order.count({ where: abholWhere(farmId, wienerTag(tag)) })
+    naechsteAbholung = { tag, name: abholtagName(wienKalendertag(jetzt), tag), anzahl }
+  }
+  return fensterMitBestellungen(slots, jetzt, anzahlHeute, naechsteAbholung)
 }

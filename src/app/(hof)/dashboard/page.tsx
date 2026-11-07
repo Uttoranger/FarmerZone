@@ -35,8 +35,11 @@ import { WiderrufHeuteKarte } from '@/components/heute/widerruf-karte'
 import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
 import { HofEmailKarte } from '@/components/heute/hof-email-karte'
 import { hofEmailFehlt } from '@/lib/hof-kontakt'
-import { agbFassung } from '@/lib/rechtstexte/agb-datei'
-import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
+import { agbKartenStichtag, brauchtAgbZustimmung, type AgbKartenStichtag } from '@/lib/agb-zustimmung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { ladePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
 import {
   abholTagMitDatum,
@@ -47,6 +50,7 @@ import {
   heuteAufbau,
   naechsteAbholungSatz,
   packlistenStand,
+  selbstEingetragenSatz,
   teilenSatz,
   vergleichText,
   type HeuteBlock,
@@ -128,8 +132,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   ])
   const postfach = heutePostfach(faeden, jetzt)
   // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.
-  const fassung = agbFassung()
-  const agbOffen = brauchtAgbZustimmung(farm, fassung)
+  const fassung = AGB_NEUESTE
+  // N45: Die Karte nennt vor dem Stichtag den Tag — nur geladen, wenn sie steht; null heißt: keine Karte.
+  const agbStichtag = brauchtAgbZustimmung(farm, fassung) ? await ladeAgbKartenStichtag(jetzt, farm.id) : null
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
@@ -189,11 +194,11 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     'zu-tun': (
       <ZuTunKarte
         aufgaben={heute.zuTun.aufgaben}
-        wartetAufFreigabe={heute.wartetAufFreigabe}
         ausblenden={<ErsteSchritteSchalter richtung="aus" />}
       />
     ),
-    'naechste-abholung': (
+    // Ohne Abholzeit keine Karte (Liste Lauf 32, heute Bild 4) — Satz und Knopf stehen in der Packliste.
+    'naechste-abholung': naechstes && (
       <NaechsteAbholungKarte
         fenster={naechstes?.fenster ?? null}
         tag={naechstes ? abholTagMitDatum(heuteTag, naechstes.fenster.tag) : null}
@@ -203,18 +208,24 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     woche: (
       <WocheKarte
         summeCent={heute.woche.dieseWocheCent}
-        vergleich={vergleichText(heute.woche.prozent, jetzt)}
+        vergleich={vergleichText(heute.woche, jetzt)}
         balken={heute.wochenBalken}
+        selbstEingetragen={selbstEingetragenSatz(heute.selbstEingetrageneTage)}
       />
     ),
   }
   // „Zu tun" geht im Raster der Seitenspalte (768–1279 px) über beide Spalten — sonst bliebe neben der Woche ein Loch.
+  // Am Handy steht es nicht im Strom (Liste Lauf 32, heute: Braucht dich → Teilen → Was gibt’s Neues → Nächste
+  // Abholung → Umsatz → Tipp); der Weg zu den offenen Schritten bleibt der Balken bzw. „Hof einrichten“.
+  // Ein Block ohne Inhalt bekommt keine Hülle — sonst stünde im Raster eine leere Zelle.
   const zeige = (ids: HeuteBlock[]) =>
-    ids.map((id) => (
-      <div key={id} className={cn('min-w-0', id === 'zu-tun' && 'md:col-span-2 xl:col-span-1')}>
-        {bloecke[id]}
-      </div>
-    ))
+    ids
+      .filter((id) => Boolean(bloecke[id]))
+      .map((id) => (
+        <div key={id} className={cn('min-w-0', id === 'zu-tun' && 'max-md:hidden md:col-span-2 xl:col-span-1')}>
+          {bloecke[id]}
+        </div>
+      ))
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
@@ -225,12 +236,17 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:gap-5">
           {/* Reihenfolge nach Board s1-heute: Titel und Datum zuerst, dann die Pflicht- und Stripe-Karten,
               dann die Marke „Abholung heute", die Zahlen und die Hauptspalte. */}
-          <HeuteKopf datum={datumLang(jetzt)} hofName={heute.wartetAufFreigabe ? farm.name : null} postfach={ungelesen} />
+          {/* Ab 1280 px bleiben Kopf (samt Balken darunter) und Seitenspalte stehen, nur die Hauptspalte scrollt
+              (Liste Lauf 32, heute Bild 2). Darunter klebt der Kopf als Leiste des Werkzeug-Kopfs selbst
+              (`contents`, damit sein sticky am Handy an der Seite hängt und nicht an dieser Hülle). */}
+          <div className="contents xl:sticky xl:top-0 xl:z-30 xl:-mt-8 xl:block xl:bg-background xl:pt-8">
+            <HeuteKopf datum={datumLang(jetzt)} hofName={heute.wartetAufFreigabe ? farm.name : null} postfach={ungelesen} />
+          </div>
           {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
           {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
           {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
           <WiderrufHeuteKarte widerrufe={widerrufe} />
-          {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
+          {agbStichtag && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} stichtag={agbStichtag} />}
           {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
           {hofEmailFehlt(farm) && <HofEmailKarte />}
           {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
@@ -245,7 +261,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
           />
           {zeige(aufbau.haupt)}
         </div>
-        <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:mt-[76px] xl:w-[360px] xl:shrink-0 xl:grid-cols-1">
+        <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:sticky xl:top-8 xl:mt-[76px] xl:w-[360px] xl:shrink-0 xl:grid-cols-1">
           {zeige(aufbau.seite)}
           {zuTunZeigen === 'zeile' && (
             <p className="text-center md:col-span-2 xl:col-span-1">
@@ -265,4 +281,19 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       )}
     </div>
   )
+}
+
+/**
+ * Der Stichtag für die Karte „AGB bestätigen“ (N45) — aus der gecachten Zeile,
+ * nie über ladeHofpreisEinstellung (deren stille Vorgabe gehört nicht in einen
+ * Rechtstext). Scheitert das Laden, steht der Satz ohne Datum da, gemeldet mit
+ * festem Bereich; Heute bleibt.
+ */
+async function ladeAgbKartenStichtag(jetzt: Date, farmId: string): Promise<AgbKartenStichtag> {
+  try {
+    return agbKartenStichtag(hofpreisModellAb(hofpreisEinstellungAus(await ladePlattformEinstellung())), jetzt)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'agb-karte-stichtag', seite: 'heute' }, extra: { farmId } })
+    return agbKartenStichtag(null, jetzt)
+  }
 }

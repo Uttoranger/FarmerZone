@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
+import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
 
 /*
  * Rahmen und Ladeansichten der Einstellungen (Nachtlauf Nr. 22d) — dieselben
@@ -17,8 +18,9 @@ export const UNTERSEITE_RAHMEN = 'w-full max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt
 export function EinstellungenLaden(): React.JSX.Element {
   return (
     <div className={cn(EINSTELLUNGEN_RAHMEN, 'animate-pulse')} aria-busy="true">
-      <div className="h-8 w-44 rounded-lg bg-border" />
-      <div className="mt-2 h-4 w-64 rounded bg-muted" />
+      {/* Derselbe Kopf wie die fertige Übersicht (Werkzeug-Kopf, Nr. 245) — nichts springt beim Umschalten. */}
+      <WerkzeugKopfLaden />
+      <div className="h-4 w-64 max-w-full rounded bg-muted" />
       <div className="mt-4 flex flex-col md:grid md:gap-3 lg:grid-cols-2">
         {/* So viele Zeilen wie Bereiche (einstellungenBereiche, seit Nr. 30 neun). */}
         {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => (

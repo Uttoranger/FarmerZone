@@ -241,7 +241,7 @@ describe('Zahlungsschritt: Zahlung abgelehnt', () => {
           hofName: HOFNAME,
         }),
         privat: true,
-        kaufknopfSaetze: createElement(KaufknopfSaetze, { privat: true }),
+        kaufknopfSaetze: createElement(KaufknopfSaetze, { privat: true, hofpreis: false, agbPfad: '/agb' }),
       })
     )
   }

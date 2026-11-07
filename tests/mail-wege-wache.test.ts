@@ -67,6 +67,7 @@ const WICHTIG: Record<string, MailArt> = {
   baueOrderConfirmation: 'bestellung-bestaetigung',
   baueOrderPaidToFarmer: 'bestellung-bezahlt-hof',
   baueOrderConfirmedToFarmer: 'bar-bestaetigt-hof',
+  baueBarBestellungAnHof: 'bestellung-bar-hof',
   baueOrderReady: 'abholbereit',
   baueOrderNotReady: 'nicht-abholbereit',
   baueOrderCancelled: 'storniert',

@@ -7,8 +7,11 @@ import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
-import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
-import { gebuehrHinweisFuer, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
+import { agbFassungMitMeldung } from '@/lib/rechtstexte/agb-fassung-melden'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
@@ -597,10 +600,26 @@ function belehrungFuer(order: OrderForEmail): Belehrung | undefined {
   return belehrungMitKostenschaetzung(belehrung, euro)
 }
 
-/** Die AGB als Datei im Anhang (Nr. 207) — erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). */
-async function agbAnhang(): Promise<MailAnhang> {
+/**
+ * Die AGB als Datei im Anhang (Nr. 207) in der Fassung der Bestellung (N45) —
+ * erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). Für 1.0 braucht
+ * der Stand-Vermerk den Stichtag; scheitert das Laden, steht der Ersatzwert
+ * („ab dem Stichtag auf <Domain>/konditionen“) da, es geht eine Meldung an
+ * Sentry, und es wird nie geworfen: Die Bar-Bestätigungsmail geht „Sofort“ und
+ * darf an keinem Nachlauf scheitern (N26).
+ */
+async function agbAnhang(fassung: AgbKennung): Promise<MailAnhang> {
   const { agbAlsHtml, agbDateiname } = await import('@/lib/rechtstexte/agb-datei')
-  return { dateiname: agbDateiname(), inhalt: agbAlsHtml() }
+  let inkrafttreten: Date | null = null
+  if (fassung !== AGB_BISHER) {
+    try {
+      const { ladePlattformEinstellung } = await import('@/server/queries/plattform-einstellung')
+      inkrafttreten = hofpreisModellAb(hofpreisEinstellungAus(await ladePlattformEinstellung()))
+    } catch (err) {
+      Sentry.captureException(err, { tags: { bereich: 'agb-anhang-stichtag' } })
+    }
+  }
+  return { dateiname: agbDateiname(fassung), inhalt: agbAlsHtml(fassung, { inkrafttreten }) }
 }
 
 function routeUrl(order: OrderForEmail): string {
@@ -1012,6 +1031,8 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
   // Der signierte Weg zurück zur Bestellung — der einzige, den die Kundin
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
+  // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
+  const agbFassung = agbFassungMitMeldung(order)
 
   const { OrderConfirmationEmail } = await import('@/emails/order-confirmation')
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
@@ -1032,14 +1053,15 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     orderUrl,
     widerrufUrl: widerrufUrl(order),
     belehrung: belehrungFuer(order),
+    agbFassung,
   }))
 
-  // Nr. 207: die AGB als Datei im Anhang — auch bei „Betrieb“ (nur Belehrung und Formular entfallen).
+  // Nr. 207: die AGB als Datei im Anhang — auch bei „Betrieb“ (nur Belehrung und Formular entfallen); N45: in der Fassung der Bestellung.
   return {
     an: order.customerEmail,
     betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
     html,
-    anhaenge: [await agbAnhang()],
+    anhaenge: [await agbAnhang(agbFassung)],
     ...mitAntwortAn(order.farm),
   }
 }
@@ -1069,6 +1091,8 @@ export async function onsiteConfirmationInhalt(
         pickupTimeStart: order.pickupTimeStart,
       })
     : null
+  // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
+  const agbFassung = agbFassungMitMeldung(order)
 
   const { OnsiteConfirmationEmail } = await import('@/emails/onsite-confirmation')
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
@@ -1086,14 +1110,15 @@ export async function onsiteConfirmationInhalt(
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
     belehrung: belehrungFuer(order),
     widerrufUrl: widerrufUrl(order),
+    agbFassung,
   }))
 
-  // Nr. 207: die AGB als Datei im Anhang, wie in der Bestätigung.
+  // Nr. 207: die AGB als Datei im Anhang, wie in der Bestätigung (N45: Fassung der Bestellung).
   return {
     an: order.customerEmail,
     betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`,
     html,
-    anhaenge: [await agbAnhang()],
+    anhaenge: [await agbAnhang(agbFassung)],
     ...mitAntwortAn(order.farm),
   }
 }
@@ -1148,6 +1173,46 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
   }))
 
   return { an: hofKontaktEmail(order.farm), betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
+}
+
+/**
+ * Neue Barbestellung → Hof (Nr. 256, N46; Board s3/w3-mail-hof-bestellung
+ * Bild 2), solange die Kundin noch bestätigen muss. Ob sie noch passt (Status,
+ * Frist), entscheidet der Renderer `rendereBestellungBarHof` — hier wird nur
+ * gebaut. Ohne Telefonnummer, ohne E-Mail-Adresse und ohne Notiz der Kundin:
+ * Vor ihrer Bestätigung braucht der Hof nur, was er packen und kassieren wird.
+ * Kein Reply-To: Antworten an die Kundin laufen über die Bestellung.
+ */
+export async function baueBarBestellungAnHof(order: OrderForHofMail): Promise<StapelMail> {
+  // „Bar zu kassieren“ allein aus dem Snapshot (barZuKassierenCents) — nie aus dem Warenpreis als Rückfall.
+  const kassierenCents = barZuKassierenCents({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0, paymentMethod: order.paymentMethod })
+  if (kassierenCents === null) throw new Error('Bar-Mail an den Hof für eine Online-Bestellung')
+  // Dieselbe Frist wie die Mail „Bitte bestätige“ an die Kundin und das Verfallen (fristen.ts), als fester Tag mit Uhrzeit (C-Zeile mail-kauf).
+  const frist = order.createdAt
+    ? // Vor Ort, nie online (oben ausgeschlossen): fristVon rechnet bar und Karte vor Ort gleich.
+      fristVon({ paymentMethod: 'ONSITE_CASH', createdAt: order.createdAt, pickupDate: order.pickupDate, pickupTimeStart: order.pickupTimeStart })
+    : null
+
+  const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
+  const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
+    farmerName: order.farm.ownerName,
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
+    paymentLabel: 'Bar bei Abholung',
+    isOnline: false,
+    barZuKassieren: centsAlsEuro(kassierenCents),
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
+    heuteUrl: await heuteUrl(),
+  }))
+
+  return {
+    an: hofKontaktEmail(order.farm),
+    betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (Bar bei Abholung)`,
+    html,
+  }
 }
 
 /** Bar bestätigt → Bauer (alte Bestellungen mit Karte bei Abholung, E5, gehen denselben Weg) */

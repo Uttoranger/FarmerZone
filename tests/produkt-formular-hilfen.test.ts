@@ -105,11 +105,11 @@ describe('fehlendeAngaben und speichernText', () => {
     expect(fehlendeAngaben(heu, productAnlegenSchema)).toBe(3)
   })
 
-  it('Button-Text: Einzahl, Mehrzahl, Anlegen, Speichern', () => {
-    expect(speichernText(2, false)).toBe('Noch 2 Angaben fehlen')
-    expect(speichernText(1, true)).toBe('Noch 1 Angabe fehlt')
-    expect(speichernText(0, false)).toBe('Anlegen')
-    expect(speichernText(0, true)).toBe('Speichern')
+  it('Button-Text: immer „Speichern“ bzw. „Anlegen“, nie ein Zähler (Liste Lauf 32, produkt-neu)', () => {
+    expect(speichernText(false)).toBe('Anlegen')
+    expect(speichernText(true)).toBe('Speichern')
+    expect(speichernText(false, true)).toBe('Speichern')
+    expect(speichernText(true, true)).not.toMatch(/fehl/)
   })
 })
 

@@ -329,11 +329,12 @@ describe('Tokens statt Farbwerte', () => {
 })
 
 describe('Balken der HofShell', () => {
-  it('stillgelegt: Satz und „Hof reaktivieren"; wartet: Hof-ID und Frage per Mail; sonst nichts', async () => {
+  it('stillgelegt: Satz und „Hof reaktivieren"; wartet: Hof-ID im Link und Frage per Mail; sonst nichts', async () => {
     const { HofBalken } = await import('@/components/hofbereich/hof-balken')
     const still = renderToStaticMarkup(createElement(HofBalken, { balken: { art: 'stillgelegt' } }))
     expect(still).toContain('href="/settings/account"')
-    expect(still).toContain('data-ton="orange"')
+    // Seit Nr. 245 (G3) der Hinweiskasten statt der orangen Hinweiskarte.
+    expect(still).toContain('data-hinweiskasten=""')
     const wartet = renderToStaticMarkup(
       createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT', stand: 'einrichten' } })
     )

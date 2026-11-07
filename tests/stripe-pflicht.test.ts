@@ -30,6 +30,8 @@ vi.mock('next/image', () => ({
 vi.mock('@/server/queries/plattform-einstellung', () => ({
   gruendungFuerSeiten: async () => null,
   ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: new Date('2099-01-01T00:00:00Z') }),
+  // N45: /konditionen liest den Stichtag ohne stille Vorgabe über ladePlattformEinstellung — derselbe Tag.
+  ladePlattformEinstellung: async () => ({ hofpreisModellAb: '2099-01-01T00:00:00.000Z' }),
 }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),

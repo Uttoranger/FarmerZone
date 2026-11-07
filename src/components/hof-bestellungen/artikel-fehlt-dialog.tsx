@@ -10,6 +10,7 @@ import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
 import { LEISE, TEXT_ORANGE } from './stil'
 
@@ -138,7 +139,7 @@ export function ArtikelFehltDialog({
       </fieldset>
 
       {letzter && (
-        <p className="rounded-xl border border-primary/45 bg-primary/12 px-4 py-3 text-[14px]">
+        <p className={cn(RUNDUNG.hinweis, 'border border-primary/45 bg-primary/12 px-4 py-3 text-[14px]')}>
           Das ist der letzte Artikel. Ohne ihn bleibt nichts übrig – die ganze Bestellung wird storniert.
         </p>
       )}
