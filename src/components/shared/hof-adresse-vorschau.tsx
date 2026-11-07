@@ -7,7 +7,7 @@ import { frageAdresseAb, type AdressStand } from '@/lib/hof-adresse'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 
 /**
- * „Wird zu deiner Adresse: <Domain>/…" unter dem Hofnamen — auf
+ * „Deine Adresse wird: <Domain>/…" unter dem Hofnamen (Wortlaut Board w2-registrieren, Liste Lauf 32) — auf
  * Registrieren und Einrichten (Nr. 15); die Domain kommt aus PRODUKTION_HOST
  * (Register M1). Ob die Adresse frei ist, fragt dieselbe Aktion wie bisher
  * Einrichten, 400 ms nach dem letzten Tastendruck.
@@ -36,16 +36,16 @@ export function HofAdresseVorschau({ hofname, id }: { hofname: string; id: strin
 
   const frei = stand?.slug === slug ? stand.frei : null
   return (
-    <p id={id} className="mt-1.5 text-[12.5px] break-words text-muted-foreground">
+    <p id={id} className="mt-1.5 text-[13px] break-words text-muted-foreground">
       {!slug ? (
-        `Wird zu deiner Adresse: ${PRODUKTION_HOST}/dein-hof`
+        `Deine Adresse wird: ${PRODUKTION_HOST}/dein-hof`
       ) : frei === false ? (
         <span className="text-status-offen">
           {PRODUKTION_HOST}/{slug} ist schon vergeben – du bekommst eine Adresse mit Zahl dahinter, oder du wählst einen
           anderen Namen.
         </span>
       ) : (
-        <>Wird zu deiner Adresse: {PRODUKTION_HOST}/{slug}</>
+        <>Deine Adresse wird: {PRODUKTION_HOST}/{slug}</>
       )}
     </p>
   )

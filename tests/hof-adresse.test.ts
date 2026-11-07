@@ -2,7 +2,7 @@
  * Die Frei-Prüfung unter dem Hofnamen (HofAdresseVorschau, Registrieren und
  * Einrichten, Nr. 15 Nachbesserung 1): Ein Netzfehler darf nie als
  * unbehandelter Promise-Fehler im Browser enden — die Vorschau bleibt dann
- * neutral („Wird zu deiner Adresse: …"), statt „vergeben" oder „frei" zu
+ * neutral („Deine Adresse wird: …"), statt „vergeben" oder „frei" zu
  * behaupten. Dasselbe gilt, wenn die Prüfung selbst neutral antwortet
  * (null: Eingabe ungültig oder Bremse erreicht, Nr. 17c).
  */

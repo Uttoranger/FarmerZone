@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Check, Info, Mail, MailCheck } from 'lucide-react'
+import { Check, Info, MailCheck } from 'lucide-react'
 import { warteStand, type EinrichtenSchritt, type EinrichtenStand } from '@/lib/einrichten'
 import { KONDITIONEN_UEBERGANG, PRO_MONAT, tarifKarte, vollerWarenpreis, type TarifId } from '@/lib/konditionen'
 import type { GebuehrModell } from '@/lib/plattformgebuehr'
@@ -14,6 +14,7 @@ import type { AgbKartenStichtag } from '@/lib/agb-zustimmung'
 import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WarteBalken } from '@/components/hofbereich/hof-balken'
 import { textlinkKlassen } from '@/components/ui/textlink'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 
 /*
  * „Hof einrichten" (/onboarding, Gate 5 Nr. 15) nach den Mockups
@@ -33,6 +34,11 @@ const KNOPF_BASIS = cn(
 )
 const KNOPF_ORANGE = cn(KNOPF_BASIS, 'border border-primary-foreground/30 bg-primary text-primary-foreground hover:opacity-90')
 const KNOPF_UMRISS = cn(KNOPF_BASIS, 'border border-border font-medium text-foreground hover:bg-muted')
+/** Zweiter Weg über die volle Breite: Umriss in Textfarbe, 52 px, 16 px fett (Board w2-registrieren „E-Mail schreiben“). */
+const KNOPF_UMRISS_KRAEFTIG = cn(
+  'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-[18px] text-[16px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+  FOKUS_RAHMEN
+)
 
 const ZUSTAND_TEXT: Record<EinrichtenSchritt['zustand'], string> = {
   erledigt: 'erledigt',
@@ -53,7 +59,8 @@ function Zeichen({ schritt }: { schritt: EinrichtenSchritt }) {
   // Board s2-/w2-registrieren, Bild 5/6: offen und später als leerer Kreis ohne Ziffer, der Hinweis (Lastschrift) als „i“.
   if (schritt.zustand === 'hinweis') {
     return (
-      <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-border text-muted-foreground">
+      // Liste Lauf 32 (registrieren): eine graue Scheibe statt eines Umrisses.
+      <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Info className="size-4" strokeWidth={2} />
       </span>
     )
@@ -89,7 +96,8 @@ function SchrittKarte({ schritt, person }: { schritt: EinrichtenSchritt; person:
             <Link
               href={aktion.href}
               className={cn(
-                aktion.primaer ? KNOPF_ORANGE : schritt.zustand === 'hinweis' ? textlinkKlassen({ ton: 'gruen' }) : KNOPF_UMRISS,
+                // Der Textlink unterstrichen wie im Board (Liste Lauf 32, registrieren: „Link nicht unterstrichen“).
+                aktion.primaer ? KNOPF_ORANGE : schritt.zustand === 'hinweis' ? cn(textlinkKlassen({ ton: 'gruen' }), 'underline') : KNOPF_UMRISS,
                 'mt-2.5'
               )}
             >
@@ -151,7 +159,7 @@ function TarifKarte({ tarif, gebuehrModell }: { tarif: TarifId | null; gebuehrMo
       <p className="mt-2 text-[13px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
       {/* Das Wort der Gebühr je Modell (N38, Nr. 221): ab dem Stichtag die Plattformgebühr. */}
       <p className="mt-2 text-[13px] text-muted-foreground">{vollerWarenpreis(gebuehrModell)}</p>
-      <Link href="/konditionen" className={cn(textlinkKlassen({ ton: 'gruen' }), 'mt-1')}>
+      <Link href="/konditionen" className={cn(textlinkKlassen({ ton: 'gruen' }), 'mt-1 underline')}>
         Konditionen ansehen
       </Link>
     </section>
@@ -166,11 +174,11 @@ function HilfeKarte() {
       </h2>
       {/* „Rückruf anfordern" (Mockup) braucht RueckrufAnfrage — nicht freigegeben. */}
       <p className="mt-2 text-[13.5px]">Fragen beim Einrichten? Schreib uns, wir melden uns.</p>
+      {/* Liste Lauf 32 (registrieren): kräftiger Rand, fett, ohne Symbol — wie „E-Mail schreiben“ beim Registrieren. */}
       <a
         href={`mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Fragen beim Einrichten')}`}
-        className={cn(KNOPF_UMRISS, 'mt-3 w-full gap-2')}
+        className={cn(KNOPF_UMRISS_KRAEFTIG, 'mt-3')}
       >
-        <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
         E-Mail schreiben
       </a>
     </section>
@@ -230,12 +238,16 @@ export function EinrichtenSeite({
 }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-[1180px] px-4 pt-5 pb-12 md:px-8 md:pt-8">
+      {/* Liste Lauf 32 (registrieren Bild 5): der Werkzeug-Kopf (G1) — am Handy die feste Leiste, im Web h1 und Hofname;
+          darunter in der Inhaltsspalte der Hinweiskasten (G3). Einen Rückweg zeigt er, sobald `elternseite` einen kennt. */}
       {kopf && (
         <header className="mb-4">
-          <h1 className="font-heading text-[24px] leading-tight font-semibold break-words md:text-[28px]">Hof einrichten</h1>
-          <p className="mt-0.5 text-[14px] break-words text-muted-foreground">{kopf.hofName}</p>
+          <WerkzeugKopf
+            titel="Hof einrichten"
+            unterzeile={<p className="truncate text-[13px] leading-snug text-muted-foreground md:text-sm">{kopf.hofName}</p>}
+          />
           {kopf.warten && (
-            <div className="mt-4 print:hidden">
+            <div className="print:hidden">
               <WarteBalken {...kopf.warten} stand={warteStand(stand)} />
             </div>
           )}

@@ -19,12 +19,13 @@ import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { HofAdresseVorschau } from '@/components/shared/hof-adresse-vorschau'
-import { SchonDabei } from '@/components/shared/schon-dabei'
+import Link from 'next/link'
+import { SCHON_DABEI } from '@/lib/kunden-navigation'
 import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
 import { PasswortAnforderungen, PASSWORT_ANFORDERUNGEN_SATZ } from '@/components/anmelden/passwort-anforderungen'
 import { PostfachHinweis } from './postfach-hinweis'
-import { KNOPF_UMRISS } from '@/components/anmelden/stil'
+import { KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
 
 /**
  * Der Honigtopf steht außerhalb des sichtbaren Bereichs statt auf
@@ -239,7 +240,10 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                 {isSubmitting ? 'Einen Moment …' : 'Konto erstellen'}
               </button>
               {/* Register N1: Wer schon einen Hof hat, findet hier den Weg zur Anmeldung — auch am Handy, wo der Kopf nur „Anmelden" zeigt. */}
-              <SchonDabei className="-mt-1" />
+              {/* Liste Lauf 32 (registrieren): der ganze Satz ist der Link, 15 px halbfett wie im Board. */}
+              <Link href={SCHON_DABEI.href} className={cn(TEXTLINK, '-mt-1 text-[15px]')}>
+                {`${SCHON_DABEI.frage} ${SCHON_DABEI.link}`}
+              </Link>
             </form>
           </>
         )}

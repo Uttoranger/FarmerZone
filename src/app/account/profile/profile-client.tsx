@@ -59,9 +59,12 @@ interface Props {
   geraete?: readonly GeraeteZeile[]
 }
 
-/** Zerstörende Aktion: orange Rahmen, oranger Text (text-status-offen hält 4,5:1 in beiden Themes); volle Breite, 14 px Rundung. */
+/**
+ * Zerstörende Aktion: kräftiger oranger Rahmen (1,5 px in `status-offen`, Liste Lauf 32 kundenkonto), oranger Text
+ * (text-status-offen hält 4,5:1 in beiden Themes); volle Breite, 14 px Rundung.
+ */
 const KNOPF_ZERSTOEREND = cn(
-  'inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[14px] border border-primary/60 px-4 text-[15px] font-bold text-status-offen transition-colors duration-[250ms] hover:bg-primary/12',
+  'inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-status-offen px-4 text-[16px] font-bold text-status-offen transition-colors duration-[250ms] hover:bg-primary/12',
   FOKUS_RAHMEN
 )
 
@@ -331,7 +334,8 @@ function ToggleRow({
         )}
       </div>
       {/* Ein Schalter: Rolle „switch" sagt dem Screenreader Zustand und Zweck.
-          Sichtbar 24 px hoch, die Trefferfläche über ::before 44 px. */}
+          Sichtbar 46 × 26 px wie im Board, die Trefferfläche über ::before 44 px. Aus: helle Schiene mit Kontur und
+          grauer Knopf (Kontrast ≥ 3:1 für Bedienelemente, Liste Lauf 32 kundenkonto) statt einer blassen Fläche. */}
       <button
         type="button"
         role="switch"
@@ -341,17 +345,16 @@ function ToggleRow({
         onClick={onToggle}
         disabled={disabled}
         className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-2.5 before:content-[''] disabled:cursor-not-allowed disabled:opacity-40",
-          active ? 'bg-accent' : 'bg-muted-foreground/45',
+          "relative h-[26px] w-[46px] shrink-0 rounded-full border transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-[9px] before:content-[''] disabled:cursor-not-allowed disabled:opacity-40",
+          active ? 'border-accent bg-accent' : 'border-input bg-muted',
           FOKUS_RAHMEN
         )}
       >
-        {/* Der Schieber in Crème (accent-foreground): im neuen Design in beiden
-            Themes hell — er liegt auf grüner wie auf grauer Schiene sichtbar. */}
+        {/* Der Schieber: an in Crème (accent-foreground) auf der grünen Schiene, aus in der Farbe der Feldkontur. */}
         <span
           className={cn(
-            'absolute top-0.5 left-0.5 size-5 rounded-full bg-accent-foreground shadow transition-transform duration-200',
-            active ? 'translate-x-5' : 'translate-x-0'
+            'absolute top-[3px] left-[3px] size-[18px] rounded-full transition-transform duration-200',
+            active ? 'translate-x-5 bg-accent-foreground' : 'translate-x-0 bg-input'
           )}
         />
       </button>
