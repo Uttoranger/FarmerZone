@@ -138,7 +138,7 @@ export function ArtikelFehltDialog({
       </fieldset>
 
       {letzter && (
-        <p className="rounded-xl border border-primary/45 bg-primary/12 px-4 py-3 text-[14px]">
+        <p className="rounded-[12px] border border-primary/45 bg-primary/12 px-4 py-3 text-[14px]">
           Das ist der letzte Artikel. Ohne ihn bleibt nichts übrig – die ganze Bestellung wird storniert.
         </p>
       )}

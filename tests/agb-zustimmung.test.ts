@@ -115,7 +115,8 @@ describe('Karte „AGB bestätigen“ ab dem Stichtag', () => {
     expect(html).toContain('Fassung 1.0')
     expect(html).not.toContain('href="/agb/0.9"')
     expect(html).toContain('wie gewohnt nutzbar')
-    expect(html).toContain('data-ton="orange"')
+    // Seit Nr. 249 zeichnen die Pflichtkarten auf Heute als Hinweiskasten (G3, Liste Lauf 32 heute) statt als oranger Hinweiskarte.
+    expect(html).toContain('data-hinweiskasten=""')
   })
 
   it('nach einer neuen Fassung sagt die Karte, dass sich die AGB geändert haben — Gegenprobe zur ersten Zustimmung', () => {

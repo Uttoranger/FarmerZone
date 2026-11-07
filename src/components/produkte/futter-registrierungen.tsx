@@ -63,7 +63,7 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
   return (
     <div className="flex flex-col gap-3">
       {/* Kopfhinweis über allem, was folgt (E10a). */}
-      <div className="flex gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3">
+      <div className="flex gap-2.5 rounded-[12px] border border-border bg-card px-3.5 py-3">
         <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] leading-snug text-foreground">{ORIENTIERUNG_HINWEIS}</p>
@@ -115,10 +115,10 @@ export function FutterRegistrierungen({ registrierung }: { registrierung: HofReg
         ))}
       </ul>
 
-      <details className="group rounded-xl border border-border">
+      <details className="group rounded-[12px] border border-border">
         <summary
           className={cn(
-            'flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-xl px-3.5 text-[13.5px] font-medium text-brand-text [&::-webkit-details-marker]:hidden',
+            'flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-3.5 text-[13.5px] font-medium text-brand-text [&::-webkit-details-marker]:hidden',
             FOKUS_RAHMEN
           )}
         >
@@ -142,7 +142,7 @@ function FallZeile({ fall, stand, zeile }: { fall: RegistrierungsFall; stand: Fa
   return (
     <li
       className={cn(
-        'flex gap-3 rounded-xl border px-3.5 py-3',
+        'flex gap-3 rounded-[12px] border px-3.5 py-3',
         stand === 'erfuellt' ? 'border-accent/45 bg-accent/8' : stand === 'fehlt' ? 'border-primary/45 bg-primary/8' : 'border-border bg-card'
       )}
     >

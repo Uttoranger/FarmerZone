@@ -31,6 +31,7 @@ import {
   positionenKurz,
   ueberfaelligWhere,
   vergleichText,
+  selbstEingetragenSatz,
   vorwocheBis,
   wochenvergleich,
   type BrauchtDichDaten,
@@ -284,7 +285,7 @@ describe('brauchtDich', () => {
 
   it('ohne Kategorie: eines direkt, mehrere zur Liste', () => {
     expect(brauchtDich({ ...LEER, ohneKategorie: [{ id: 'p9', name: 'Kürbis' }] })).toEqual([
-      { art: 'ohne-kategorie', text: 'Kürbis hat keine Kategorie', href: '/products?edit=p9' },
+      { art: 'ohne-kategorie', text: 'Kürbis hat keine Kategorie', erklaerung: 'Ohne Kategorie bleibt das Produkt nicht im Shop.', href: '/products?edit=p9' },
     ])
     expect(
       brauchtDich({
@@ -294,13 +295,13 @@ describe('brauchtDich', () => {
           { id: 'p2', name: 'B' },
         ],
       })
-    ).toEqual([{ art: 'ohne-kategorie', text: '2 Produkte ohne Kategorie', href: '/products' }])
+    ).toEqual([{ art: 'ohne-kategorie', text: '2 Produkte ohne Kategorie', erklaerung: 'Ohne Kategorie bleiben sie nicht im Shop.', href: '/products' }])
   })
 
   it('Status-Erinnerung nur, wenn fällig', () => {
     expect(brauchtDich({ ...LEER, statusErinnerung: null })).toEqual([])
     expect(brauchtDich({ ...LEER, statusErinnerung: 9 })).toEqual([
-      { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', href: '/status/new' },
+      { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', erklaerung: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.', href: '/status/new' },
     ])
     expect(brauchtDich({ ...LEER, statusErinnerung: 'never' })[0].text).toBe(
       'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
@@ -327,12 +328,19 @@ describe('Kopf in Wiener Zeit', () => {
     expect(vorwocheBis(new Date('2026-09-29T12:30:00Z'))).toBe('bis Dienstag, 14:30')
   })
 
-  it('vergleichText: Vorzeichen, gleich, ohne Vorwoche', () => {
+  it('vergleichText: mehr, weniger, gleich, ohne Vorwoche — in Worten mit dem Betrag der Vorwoche (Board s1-heute, Lauf 32)', () => {
     const jetzt = new Date('2026-09-29T12:30:00Z')
-    expect(vergleichText(20, jetzt)).toBe('+20 % gegenüber der Vorwoche bis Dienstag, 14:30')
-    expect(vergleichText(-7, jetzt)).toBe('−7 % gegenüber der Vorwoche bis Dienstag, 14:30')
-    expect(vergleichText(0, jetzt)).toBe('±0 % gegenüber der Vorwoche bis Dienstag, 14:30')
-    expect(vergleichText(null, jetzt)).toBe('Vorwoche bis Dienstag, 14:30: noch kein Umsatz')
+    expect(vergleichText({ dieseWocheCent: 45000, vorwocheCent: 43120 }, jetzt)).toBe('Mehr als letzte Woche bis Dienstag (€ 431,20).')
+    expect(vergleichText({ dieseWocheCent: 100, vorwocheCent: 43120 }, jetzt)).toBe('Weniger als letzte Woche bis Dienstag (€ 431,20).')
+    expect(vergleichText({ dieseWocheCent: 43120, vorwocheCent: 43120 }, jetzt)).toBe('So viel wie letzte Woche bis Dienstag (€ 431,20).')
+    expect(vergleichText({ dieseWocheCent: 5000, vorwocheCent: 0 }, jetzt)).toBe('Letzte Woche bis Dienstag: noch kein Umsatz.')
+  })
+
+  it('selbstEingetragenSatz: die Tage mit selbst eingetragenen Verkäufen (Board s1-heute Bild 2)', () => {
+    expect(selbstEingetragenSatz([])).toBeNull()
+    expect(selbstEingetragenSatz(['Mo'])).toBe('Mo: Verkäufe, die du selbst eingetragen hast.')
+    expect(selbstEingetragenSatz(['Mo', 'Di'])).toBe('Mo und Di: Verkäufe, die du selbst eingetragen hast.')
+    expect(selbstEingetragenSatz(['Mo', 'Di', 'Fr'])).toBe('Mo, Di und Fr: Verkäufe, die du selbst eingetragen hast.')
   })
 })
 

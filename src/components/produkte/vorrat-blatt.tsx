@@ -129,7 +129,7 @@ export function VorratBlatt({
               disabled={laeuft}
               // Nur das Feld; gespeichert wird erst mit „Speichern".
               onClick={() => setAnzeige(Math.min(anzeige + n, max))}
-              className={cn('h-11 rounded-xl border border-input text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50', FOKUS_RAHMEN)}
+              className={cn('h-11 rounded-[10px] border border-input text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50', FOKUS_RAHMEN)}
             >
               {`+${n}`}
             </button>

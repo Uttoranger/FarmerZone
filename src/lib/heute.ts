@@ -8,16 +8,17 @@
  */
 import type { Prisma } from '@prisma/client'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
-import { wienerMitternacht } from '@/lib/servicegebuehr'
+import { centsAlsEuro, wienerMitternacht } from '@/lib/servicegebuehr'
 import { wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
-import { formatTagKurz, mitAnzahl } from '@/lib/format'
+import { formatEuro, formatTagKurz, mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 import type { MarkeArt } from '@/lib/marke-art'
 import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -249,9 +250,23 @@ export function brauchtDichAnzeige(eintraege: number, packlisteLeer: boolean): '
 export type BrauchtDichEintrag = {
   art: 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
   text: string
+  /** Die leise Erklärzeile unter dem Titel — warum es dich braucht (Liste Lauf 32, heute; Board s1-heute). */
+  erklaerung: string
   href: string
   /** Überfällige Abholungen: jede Bestellung mit eigenem Link. */
   unterpunkte?: { text: string; href: string }[]
+}
+
+/**
+ * Die Erklärzeile je Grund (Board s1-heute Bild 1–3: „Ohne Kategorie bleibt er nicht im Shop.“). Das Board
+ * zeigt nur den Grund „ohne Kategorie“ an einem männlichen Produktnamen; weil der Name hier beliebig ist, steht
+ * „das Produkt“ statt „er“. Die übrigen Sätze folgen derselben Form: ein kurzer Satz, was sonst geschieht.
+ */
+export const BRAUCHT_DICH_ERKLAERUNG: Record<BrauchtDichEintrag['art'], { eins: string; viele: string }> = {
+  ueberfaellig: { eins: 'Erst dann stimmen Bestellungen und Umsatz.', viele: 'Erst dann stimmen Bestellungen und Umsatz.' },
+  ausverkauft: { eins: 'So kann es gerade niemand bestellen.', viele: 'So kann sie gerade niemand bestellen.' },
+  'ohne-kategorie': { eins: 'Ohne Kategorie bleibt das Produkt nicht im Shop.', viele: 'Ohne Kategorie bleiben sie nicht im Shop.' },
+  status: { eins: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.', viele: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.' },
 }
 
 export type BrauchtDichDaten = {
@@ -292,6 +307,7 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
     eintraege.push({
       art: 'ueberfaellig',
       text: `${anzahl} ${mehrzahl(anzahl, 'Abholung', 'Abholungen')} vorbei, noch offen — als abgeholt oder nicht abgeholt markieren`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG.ueberfaellig[anzahl === 1 ? 'eins' : 'viele'],
       href: anzahl === 1 && einzeln.length === 1 ? `/orders/${einzeln[0].id}` : '/orders',
       unterpunkte: [
         ...einzeln.map((b) => ({
@@ -305,12 +321,13 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
 
   const { ausverkauft } = daten
   for (const p of ausverkauft.slice(0, BRAUCHT_DICH_EINZELN)) {
-    eintraege.push({ art: 'ausverkauft', text: `${p.name} ist ausverkauft`, href: `/products?edit=${p.id}` })
+    eintraege.push({ art: 'ausverkauft', text: `${p.name} ist ausverkauft`, erklaerung: BRAUCHT_DICH_ERKLAERUNG.ausverkauft.eins, href: `/products?edit=${p.id}` })
   }
   if (ausverkauft.length > BRAUCHT_DICH_EINZELN) {
     eintraege.push({
       art: 'ausverkauft',
       text: `und ${ausverkauft.length - BRAUCHT_DICH_EINZELN} weitere ausverkauft`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG.ausverkauft.viele,
       href: '/products',
     })
   }
@@ -320,10 +337,16 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
     eintraege.push({
       art: 'ohne-kategorie',
       text: `${ohneKategorie[0].name} hat keine Kategorie`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG['ohne-kategorie'].eins,
       href: `/products?edit=${ohneKategorie[0].id}`,
     })
   } else if (ohneKategorie.length > 1) {
-    eintraege.push({ art: 'ohne-kategorie', text: `${ohneKategorie.length} Produkte ohne Kategorie`, href: '/products' })
+    eintraege.push({
+      art: 'ohne-kategorie',
+      text: `${ohneKategorie.length} Produkte ohne Kategorie`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG['ohne-kategorie'].viele,
+      href: '/products',
+    })
   }
 
   const { statusErinnerung } = daten
@@ -334,6 +357,7 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
         statusErinnerung === 'never'
           ? 'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
           : `Seit ${statusErinnerung} Tagen kein neuer Beitrag`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG.status.eins,
       href: '/status/new',
     })
   }
@@ -388,12 +412,33 @@ export function vorwocheBis(jetzt: Date): string {
   return `bis ${wert('weekday')}, ${wert('hour')}:${wert('minute')}`
 }
 
-/** „+20 % gegenüber der Vorwoche bis Dienstag, 14:30" — ohne Vorwochenumsatz kein Prozent. */
-export function vergleichText(prozent: number | null, jetzt: Date): string {
-  const bis = vorwocheBis(jetzt)
-  if (prozent === null) return `Vorwoche ${bis}: noch kein Umsatz`
-  const zahl = prozent > 0 ? `+${prozent}` : prozent < 0 ? `−${Math.abs(prozent)}` : '±0'
-  return `${zahl} % gegenüber der Vorwoche ${bis}`
+/** „Mittwoch“ — der Wiener Wochentag, bis zu dem die Vorwoche zählt (Board s1-heute: ohne Uhrzeit). */
+function wochentagLang(jetzt: Date): string {
+  return new Intl.DateTimeFormat('de-AT', { timeZone: 'Europe/Vienna', weekday: 'long' }).format(jetzt)
+}
+
+/**
+ * „Mehr als letzte Woche bis Mittwoch (€ 431,20).“ (Board s1-heute Bild 2, Liste Lauf 32): statt eines
+ * Prozents der Vergleich in Worten und der Betrag der Vorwoche bis zum selben Zeitpunkt (dieselbe Zahl wie
+ * bisher, wochenvergleich). Ohne Umsatz in der Vorwoche gibt es nichts zu vergleichen.
+ */
+export function vergleichText(woche: Pick<Wochenvergleich, 'dieseWocheCent' | 'vorwocheCent'>, jetzt: Date): string {
+  const tag = wochentagLang(jetzt)
+  if (woche.vorwocheCent <= 0) return `Letzte Woche bis ${tag}: noch kein Umsatz.`
+  const vorher = formatEuro(centsAlsEuro(woche.vorwocheCent))
+  const wort = woche.dieseWocheCent > woche.vorwocheCent ? 'Mehr als' : woche.dieseWocheCent < woche.vorwocheCent ? 'Weniger als' : 'So viel wie'
+  return `${wort} letzte Woche bis ${tag} (${vorher}).`
+}
+
+/**
+ * „Mo und Di: Verkäufe, die du selbst eingetragen hast.“ (Board s1-heute Bild 2) — die Tage der Woche, an
+ * denen ein selbst eingetragener Verkauf im Balken steckt, damit niemand sie für Bestellungen hält. Die Tage
+ * kommen als Kürzel der Balken (Mo … So), ohne Tag kein Satz.
+ */
+export function selbstEingetragenSatz(tage: readonly string[]): string | null {
+  if (tage.length === 0) return null
+  const liste = tage.length === 1 ? tage[0] : `${tage.slice(0, -1).join(', ')} und ${tage[tage.length - 1]}`
+  return `${liste}: Verkäufe, die du selbst eingetragen hast.`
 }
 
 // ─── Packliste (Gate 5, Nachtlauf Nr. 17) ──────────────────────────────────
@@ -740,11 +785,29 @@ export function heuteAufbau({
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
   const haupt: HeuteBlock[] = ['packliste', 'braucht-dich']
-  if (beitrag) haupt.push('beitrag')
+  // Liste Lauf 32 (heute, Reihenfolge am Handy): Braucht dich → Teilen → „Was gibt’s Neues am Hof?“ (N11-Ergänzung E12).
   if (teilen) haupt.push('teilen')
+  if (beitrag) haupt.push('beitrag')
   if (postfach) haupt.unshift('postfach')
   const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
+}
+
+// ─── Packliste ohne Abholzeit und „Zu tun“ (Liste Lauf 32, heute Bild 4) ──────
+
+/**
+ * Der Satz der leeren Packliste ohne Abholzeit, wörtlich nach Board s1-heute Bild 4. Eigene Konstante für Heute:
+ * `ABHOLZEITEN_FEHLEN.satz` (pickup-slot-rules.ts) nutzen auch Einstellungen und Hof einrichten, deren Boards
+ * den bisherigen Satz zeigen; Titel und Knopf bleiben von dort.
+ */
+export const HEUTE_ABHOLZEITEN_SATZ = 'Ohne Abholzeit kann niemand bei dir bestellen. Trag ein, wann man bei dir abholen kann.'
+
+/**
+ * Der Link einer Aufgabe in „Zu tun“ auf Heute: wie der Titel, nur Abholzeiten heißt dort wie der Knopf
+ * („Abholzeiten eintragen“, Wortliste „eintragen“ statt „festlegen“; Board s1-/w1-heute Bild 4).
+ */
+export function zuTunLinkText(aufgabe: { id: string; titel: string }): string {
+  return aufgabe.id === 'abholzeiten' ? ABHOLZEITEN_FEHLEN.aktion.text : aufgabe.titel
 }
 
 // ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────
@@ -758,7 +821,12 @@ export function heuteAufbau({
  *
  * Greift die Notbremse (onlineZahlungPausiert: Konto da, Stripe lässt es
  * gerade nicht zu), steht stattdessen „Online-Zahlung ist pausiert" — nie
- * beide. Wartende Höfe führt Einrichten, stillgelegte sind vom Netz.
+ * beide. Stillgelegte sind vom Netz.
+ *
+ * Seit Nr. 249 (Liste Lauf 32, heute Bild 4) auch für einen Hof, der noch auf
+ * die Freischaltung wartet: Z1 verlangt Stripe VOR der Freischaltung, die
+ * Karte steht dann in der Hauptspalte und „Zu tun“ nennt die Online-Zahlung
+ * nicht noch einmal (stripeImKasten).
  */
 export function stripeEinrichtenHinweis(hof: {
   approvedAt: Date | null
@@ -767,7 +835,7 @@ export function stripeEinrichtenHinweis(hof: {
   acceptsOnline: boolean
   stripeAccountId: string | null
 }): boolean {
-  return hof.approvedAt !== null && hof.archivedAt === null && !hof.stripeAccountReady && !onlineZahlungPausiert(hof)
+  return hof.archivedAt === null && !hof.stripeAccountReady && !onlineZahlungPausiert(hof)
 }
 
 // ─── Wochenbalken ───────────────────────────────────────────────────────────

@@ -173,7 +173,7 @@ export function abbrechenIn(popup: HTMLElement | null): HTMLElement | true {
 export function DialogFehler({ text }: { text: string | null }): React.JSX.Element | null {
   if (!text) return null
   return (
-    <p role="alert" className="rounded-xl border border-primary/45 bg-primary/12 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
+    <p role="alert" className="rounded-[12px] border border-primary/45 bg-primary/12 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
       {text}
     </p>
   )

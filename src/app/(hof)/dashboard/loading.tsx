@@ -25,14 +25,14 @@ export default function HeuteLaden(): React.JSX.Element {
         {/* Wie Kennzahlen: unter 1024 px 2 + 1, ab 1024 px drei nebeneinander. */}
         <div className="grid grid-cols-2 gap-2.5 md:gap-4 lg:grid-cols-3">
           {KENNZAHL_FORM.map((form, i) => (
-            <div key={i} className={`rounded-2xl border border-border bg-card p-3 md:p-4 lg:h-[117px] ${form}`}>
+            <div key={i} className={`rounded-[12px] border border-border bg-card p-3 md:p-4 lg:h-[117px] ${form}`}>
               <div className="h-3 w-3/4 max-w-28 rounded bg-muted" />
               <div className="mt-3 h-6 w-1/2 max-w-24 rounded bg-border" />
             </div>
           ))}
         </div>
         <div className="flex flex-col gap-4 md:gap-5 xl:flex-row xl:items-start xl:gap-6">
-          <div className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="min-w-0 flex-1 overflow-hidden rounded-[12px] border border-border bg-card">
             <div className="flex h-[60px] items-center gap-3 border-b border-border px-4 md:px-[18px]">
               <div className="h-4 w-36 rounded bg-border" />
               <div className="ml-auto size-11 rounded-full bg-muted md:w-40" />
@@ -49,7 +49,7 @@ export default function HeuteLaden(): React.JSX.Element {
           </div>
           <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:w-[360px] xl:shrink-0 xl:grid-cols-1">
             {[0, 1].map((i) => (
-              <div key={i} className="h-[132px] rounded-2xl border border-border bg-card p-[18px]">
+              <div key={i} className="h-[132px] rounded-[12px] border border-border bg-card p-[18px]">
                 <div className="h-3 w-28 rounded bg-muted" />
                 <div className="mt-3 h-7 w-44 rounded bg-border" />
                 <div className="mt-3 h-3 w-32 rounded bg-muted" />

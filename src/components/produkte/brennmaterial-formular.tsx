@@ -392,7 +392,7 @@ export function BrennmaterialFormular({
           {zeilen.map((z, i) => {
             const pfad = `groessen.${i}`
             return (
-              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
+              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-[12px] border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
@@ -467,7 +467,7 @@ export function BrennmaterialFormular({
         Für Holz brauchst du keine Futtermittel-Registrierung. Den Mehrwertsteuersatz bitte mit deinem Steuerberater abklären.
       </p>
 
-      <section aria-labelledby="brenn-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
+      <section aria-labelledby="brenn-vorschau" className="flex flex-col gap-2 rounded-[12px] border border-border bg-muted/40 p-4">
         <h3 id="brenn-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
           So sehen Kunden dein Holz
         </h3>

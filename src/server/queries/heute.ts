@@ -66,6 +66,8 @@ export type Heute = {
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   wochenBalken: WochenBalken[]
+  /** Die Tage dieser Woche (Kürzel der Balken), an denen ein selbst eingetragener Verkauf steckt (selbstEingetragenSatz). */
+  selbstEingetrageneTage: string[]
   /**
    * „Zu tun" (Nr. 53): Erste Schritte und die Liste der Hofseite als EINE
    * Liste — ohne das, was der Stripe-Kasten oben schon sagt (zuTun).
@@ -265,6 +267,13 @@ export async function getHeute(
     }),
     woche: wochenvergleich(auswertung.summeCent, auswertung.vergleichCent),
     wochenBalken: wochenBalken(auswertung.balken, jetzt),
+    // Dieselbe Regel und dieselben Fenster, nur über die selbst eingetragenen Verkäufe (Board s1-heute Bild 2).
+    selbstEingetrageneTage: auswerten(
+      buchungen.filter((b) => b.quelle === 'verkauf'),
+      wochenfenster
+    )
+      .balken.filter((b) => b.cent > 0)
+      .map((b) => b.label),
     // Was der Kasten oben zeigt, steht nicht noch einmal in der Liste (F4, Vermerk 10.10.2026).
     zuTun: fortschritt
       ? zuTun(ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })), fortschritt, { stripeImKasten })

@@ -72,7 +72,7 @@ export function WiederDaMoment({
       type="button"
       onClick={teilen}
       className={cn(
-        'inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary-foreground/25 bg-primary px-4 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
+        'inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-primary-foreground/25 bg-primary px-4 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
         FOKUS_RAHMEN
       )}
     >
@@ -100,7 +100,7 @@ export function WiederDaMoment({
         aria-live="polite"
         // Schwebt unten rechts: Der Cookie-Hinweis steht darüber, nie darauf (src/lib/cookie-hinweis.ts).
         data-unten-fest=""
-        className="fixed right-9 bottom-[30px] z-50 flex w-[400px] flex-col gap-2.5 rounded-2xl border border-primary/55 bg-card p-4 shadow-2xl shadow-primary-foreground/40"
+        className="fixed right-9 bottom-[30px] z-50 flex w-[400px] flex-col gap-2.5 rounded-[12px] border border-primary/55 bg-card p-4 shadow-2xl shadow-primary-foreground/40"
       >
         <div className="flex items-center gap-2.5">
           {zeichen}

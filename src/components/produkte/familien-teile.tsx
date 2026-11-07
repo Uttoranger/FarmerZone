@@ -56,7 +56,7 @@ export function FamilienDialog({
     <Dialog open={open} onOpenChange={(o) => !o && !speichert && onClose()}>
       <DialogContent
         data-app-palette="neu"
-        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-[16px]"
       >
         <div className="shrink-0 px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
           <DialogTitle className="pr-10 font-heading text-xl font-semibold text-foreground md:text-2xl">{titel}</DialogTitle>
@@ -86,7 +86,7 @@ export function FamilienDialog({
               <Button type="button" variant="ghost" onClick={onClose} disabled={speichert} className="min-h-11">
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={speichert} className="min-h-12 w-full rounded-xl text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
+              <Button type="submit" disabled={speichert} className="min-h-12 w-full rounded-[10px] text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
                 {speichert ? 'Speichere …' : speichernText}
               </Button>
             </div>

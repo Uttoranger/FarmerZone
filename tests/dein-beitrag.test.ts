@@ -70,10 +70,10 @@ const BEITRAG: DeinBeitrag = {
 }
 
 describe('heuteAufbau mit „Dein Beitrag“', () => {
-  it('nach Packliste und „Braucht dich“, vor der Teilen-Zeile — nie oben', () => {
+  it('nach Packliste, „Braucht dich“ und der Teilen-Zeile — nie oben (Liste Lauf 32, heute: Teilen → Was gibt’s Neues)', () => {
     for (const stripeHinweis of [true, false]) {
       const mit = heuteAufbau({ stripeHinweis, teilen: true, zuTun: false, postfach: false, beitrag: true })
-      expect(mit.haupt).toEqual(['packliste', 'braucht-dich', 'beitrag', 'teilen'])
+      expect(mit.haupt).toEqual(['packliste', 'braucht-dich', 'teilen', 'beitrag'])
       expect(mit.oben).not.toContain('beitrag')
       expect(mit.seite).not.toContain('beitrag')
     }

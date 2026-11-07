@@ -371,7 +371,7 @@ export function FutterFormular({
             const pfad = `groessen.${i}`
             const kilo = grundpreisVorschau(z.price, z.nettoMenge)
             return (
-              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
+              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-[12px] border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
@@ -662,7 +662,7 @@ export function KaeuferVorschau({
   const schild = futterSchild({ category, futter: { betriebsnummer: registrierung.betriebsnummer } }, registrierung.betriebsstatus)
 
   return (
-    <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
+    <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-[12px] border border-border bg-muted/40 p-4">
       <h3 id="futter-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         So sehen Kunden dein Futter
       </h3>

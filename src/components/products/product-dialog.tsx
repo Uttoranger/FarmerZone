@@ -987,7 +987,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           --app-*) im Teilbaum die Werte des Design-Systems (DESIGN_SYSTEM „Mein Hof"). */}
       <DialogContent
         data-app-palette="neu"
-        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-[16px]"
       >
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle className="font-heading text-xl font-semibold">{dialogTitel(isEdit, vorwahl)}</DialogTitle>
@@ -1053,7 +1053,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                             onAbbrechen={() => setAusschnittOffen(false)}
                           />
                         ) : previewUrl ? (
-                          <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
+                          <div className="relative overflow-hidden rounded-[12px] border border-border bg-muted/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={previewUrl}
@@ -1387,7 +1387,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                       {/* Im Hofpreis-Modell als grün getönte Zeile wie im Board (s1/w1-produkt-neu, Bild 1). */}
                       {preisVorschau && (
                         <p
-                          className={cn('text-xs -mt-1', preisAnzeige ? 'mt-0 rounded-xl bg-accent/10 px-3 py-2.5 text-[13px] text-foreground' : 'text-muted-foreground')}
+                          className={cn('text-xs -mt-1', preisAnzeige ? 'mt-0 rounded-[12px] bg-accent/10 px-3 py-2.5 text-[13px] text-foreground' : 'text-muted-foreground')}
                           aria-live="polite"
                         >
                           {preisVorschau}
@@ -2077,7 +2077,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                   und springt zum ersten fehlenden Feld (onInvalid). */}
               {/* Solange das Foto geprüft wird, gibt es noch nichts zu speichern —
                   sonst ginge das Produkt ohne (oder mit dem vorigen) Foto hinaus. */}
-              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-h-12 w-full rounded-xl text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
+              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-h-12 w-full rounded-[10px] text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
                 {isSubmitting
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)
@@ -2168,7 +2168,7 @@ function ProduktfotoAusschnitt({
     </div>
   )
   const karte = (rahmen: ReactNode) => (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className="overflow-hidden rounded-[12px] border border-border bg-card">
       {rahmen}
       {zeilen(true)}
     </div>
@@ -2181,8 +2181,8 @@ function ProduktfotoAusschnitt({
       verhaeltnis: PRODUKT_VORSCHAU_LISTE_HANDY,
       // Die Zeile der Hofseite am Handy: Foto 64 × 64, Name, Preis, Plus.
       umgebung: (rahmen) => (
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2">
-          <div className="w-16 shrink-0 overflow-hidden rounded-xl">{rahmen}</div>
+        <div className="flex items-center gap-2.5 rounded-[12px] border border-border bg-card p-2">
+          <div className="w-16 shrink-0 overflow-hidden rounded-[10px]">{rahmen}</div>
           {zeilen(false)}
           <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <Plus className="size-4" strokeWidth={1.7} aria-hidden="true" />
@@ -2207,7 +2207,7 @@ function ProduktfotoAusschnitt({
     },
   ]
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border p-3">
+    <div className="flex flex-col gap-3 rounded-[12px] border border-border p-3">
       <div>
         <h3 className="font-heading text-lg font-semibold text-foreground">{BILD_RAHMEN_TEXT.produkt.titel}</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">

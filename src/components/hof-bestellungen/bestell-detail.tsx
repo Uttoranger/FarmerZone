@@ -269,10 +269,10 @@ export function BestellDetail({
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-5">
           <div className="flex min-w-0 flex-col gap-4">
             <Betrag bestellung={bestellung} />
-            {barFrist && <p className="rounded-xl border border-border bg-card px-3.5 py-2.5 text-[13.5px]">{barFrist}</p>}
+            {barFrist && <p className="rounded-[12px] border border-border bg-card px-3.5 py-2.5 text-[13.5px]">{barFrist}</p>}
 
             {/* Die Packliste als gerahmte Gruppe mit dem Titel auf dem Rand (Board: „Packliste · 1 von 3“). */}
-            <fieldset className="min-w-0 rounded-2xl border border-border bg-card">
+            <fieldset className="min-w-0 rounded-[12px] border border-border bg-card">
               <legend className={cn('ml-3.5 px-1.5 text-[14px] font-bold', LEISE)}>
                 Packliste
                 {zumPacken && vorhanden.length > 0 && (
@@ -376,7 +376,7 @@ export function BestellDetail({
                   : `Die ${gebuehrWortFuer(betrag)} von ${euro(betrag.gebuehrCents)} bekommt ${kunde.vorname} zurück. Der Warenpreis bleibt bei dir.`
                 : 'Am Warenpreis ändert sich nichts.'}
             </p>
-            <p className="rounded-xl border border-border bg-background px-3.5 py-2.5">Das lässt sich nicht rückgängig machen.</p>
+            <p className="rounded-[12px] border border-border bg-background px-3.5 py-2.5">Das lässt sich nicht rückgängig machen.</p>
             <DialogFehler text={offen === 'nichtAbgeholt' ? fehler : null} />
           </div>
         </BestellDialog>
@@ -462,7 +462,7 @@ function Betrag({ bestellung, kompakt = false }: { bestellung: HofBestellDetail;
 
   if (beendet) {
     return (
-      <div className="rounded-xl border border-border bg-muted px-3.5 py-3">
+      <div className="rounded-[12px] border border-border bg-muted px-3.5 py-3">
         <p className="text-[15px] font-bold">{status === 'CANCELLED' ? 'Storniert' : 'Nicht abgeholt'}</p>
         <p className="mt-1 text-[13.5px]">
           {betrag.gebuehrCents > 0 ? `Warenpreis ${euro(betrag.warenCents)} · ${gebuehrWort} ${euro(betrag.gebuehrCents)} entfällt` : `Warenpreis ${euro(betrag.warenCents)}`}
@@ -488,7 +488,7 @@ function Betrag({ bestellung, kompakt = false }: { bestellung: HofBestellDetail;
   if (kompakt) {
     return (
       <div className="flex flex-col gap-2">
-        <p className={cn('flex items-baseline justify-between gap-3 rounded-xl px-3.5 py-2.5', paar)}>
+        <p className={cn('flex items-baseline justify-between gap-3 rounded-[12px] px-3.5 py-2.5', paar)}>
           <span className="text-[15px] font-bold">{titel}</span>
           <span className="text-[20px] font-bold tabular-nums">{euro(betrag.gesamtCents)}</span>
         </p>
@@ -499,7 +499,7 @@ function Betrag({ bestellung, kompakt = false }: { bestellung: HofBestellDetail;
   }
 
   return (
-    <div className={cn('rounded-xl px-3.5 py-3', paar)}>
+    <div className={cn('rounded-[12px] px-3.5 py-3', paar)}>
       <p className="flex items-baseline justify-between gap-3">
         <span className="text-[15px] font-bold">{titel}</span>
         <span className="text-[26px] leading-tight font-bold tabular-nums">{euro(betrag.gesamtCents)}</span>

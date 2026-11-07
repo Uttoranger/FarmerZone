@@ -516,7 +516,7 @@ function Tabelle({
   preisAnzeige: PreisAnzeige
 }): React.JSX.Element {
   return (
-    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
+    <div className="hidden overflow-hidden rounded-[12px] border border-border bg-card lg:block">
       <table className="w-full text-sm">
         <thead>
           {/* Board w1-produkte: Köpfe in normaler Schreibung, 13 px (nie unter 12 px). */}
@@ -538,7 +538,7 @@ function Tabelle({
             return (
               <tr key={product.id} className="border-t border-border align-middle">
                 <td className="py-2.5 pl-3.5">
-                  <ProduktBild product={product} className="size-11 rounded-xl" />
+                  <ProduktBild product={product} className="size-11 rounded-[10px]" />
                 </td>
                 <td className="px-3 py-2.5">
                   <NamenKnopf product={product} onOeffnen={oeffnen(product)} />
@@ -597,7 +597,7 @@ function Zeilen({
 }): React.JSX.Element {
   const id = useId()
   const zeilen = (produkte: ProductData[], ueberschrift?: string) => (
-    <ul aria-labelledby={ueberschrift} className="overflow-hidden rounded-2xl border border-border bg-card">
+    <ul aria-labelledby={ueberschrift} className="overflow-hidden rounded-[12px] border border-border bg-card">
       {produkte.map((product) => (
         <ProduktZeile key={product.id} product={product} preisAnzeige={preisAnzeige} onOeffnen={oeffnen(product)} onVorrat={() => onVorrat(product)} />
       ))}
