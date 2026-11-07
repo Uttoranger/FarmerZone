@@ -56,9 +56,12 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
         unterzeile={<BeitraegeBrotkrumen />}
         aktion={daten ? <div className="hidden md:block"><DruckenKnopf className={KNOPF_ORANGE} /></div> : undefined}
       />
-      <p className="mb-5 text-[15px] leading-relaxed text-muted-foreground md:text-base print:hidden">
-        Zum Aushängen im Hofladen, am Hoftor oder beim Bäcker. Der Code führt direkt zu deiner Hofseite.
-      </p>
+      {/* Ohne Plakat keine Einleitung, nur der Leerzustand (Board Bild 4, Liste Lauf 32 „Einleitung weg“). */}
+      {daten && (
+        <p className="mb-5 text-[15px] leading-relaxed text-muted-foreground md:text-base print:hidden">
+          Zum Aushängen im Hofladen, am Hoftor oder beim Bäcker. Der Code führt direkt zu deiner Hofseite.
+        </p>
+      )}
 
       {daten ? (
         <>
@@ -66,7 +69,7 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
             <QrPlakat daten={daten} />
           </PlakatVorschau>
           <FesteAktionsleiste className="md:hidden">
-            <DruckenKnopf className={AKTIONSLEISTE_KNOPF} />
+            <DruckenKnopf className={cn(AKTIONSLEISTE_KNOPF, 'gap-2')} />
           </FesteAktionsleiste>
         </>
       ) : (
