@@ -79,7 +79,7 @@ export function AnmeldenSeite({ aktiv, ziel }: { aktiv: Anmeldeart; ziel: string
               Hof-Anmeldung
             </h2>
           </div>
-          <HofAnmeldung />
+          <HofAnmeldung nachBoard />
         </section>
       </div>
     </div>

@@ -27,7 +27,7 @@ import { abholZeitText } from '@/lib/bestaetigung'
 import { bestellStatusAnzeige, zahlungsAnzeige } from '@/lib/bestellstatus'
 import { formatEuro, mitAnzahl } from '@/lib/format'
 import type { MarkeArt } from '@/lib/marke-art'
-import { centsAlsEuro, kalendertagInWien } from '@/lib/servicegebuehr'
+import { anzeigeGesamtCents, centsAlsEuro, kalendertagInWien } from '@/lib/servicegebuehr'
 
 /** Die Seite — der Cookie gilt nur für diesen Pfad. */
 export const BESTELLUNGEN_PFAD = '/bestellungen'
@@ -141,8 +141,11 @@ export type ListenBestellung = {
   pickupTimeStart: string
   pickupTimeEnd: string
   createdAt: Date
-  /** Warenpreis + Servicegebühr (Snapshot), in Cent. */
-  gesamtCents: number
+  /**
+   * Der Snapshot für den Betrag (Warenpreis als Decimal-Text, Gebühr in Cent, entfallen am) — den Anzeige-Betrag
+   * bildet `bestellEintrag` über `anzeigeGesamtCents` (Nr. 253).
+   */
+  summen: { totalAmount: string; serviceFeeCents: number; serviceFeeRefundedAt: Date | null }
   artikel: number
 }
 
@@ -203,7 +206,7 @@ export type BestellEintrag = {
 /**
  * Was eine Zeile zeigt. Marke aus `bestellStatusAnzeige`, Zahlung aus
  * `zahlungsAnzeige` (dieselben Worte wie auf der Bestellseite), Betrag über
- * `formatEuro` aus ganzen Cent.
+ * `formatEuro` aus ganzen Cent (`anzeigeGesamtCents`, nur Anzeige).
  */
 export function bestellEintrag(b: ListenBestellung, jetzt: Date, laufend: boolean): BestellEintrag {
   const zahlung = zahlungsAnzeige(b.paymentMethod, b.paymentStatus)
@@ -216,7 +219,8 @@ export function bestellEintrag(b: ListenBestellung, jetzt: Date, laufend: boolea
     marke: anzeige.marke,
     art: anzeige.art,
     wann: laufend ? abholZeitText(b, jetzt) : kurzesDatum(b.pickupDate, jetzt),
-    betrag: formatEuro(centsAlsEuro(b.gesamtCents)),
+    // Wie die verlinkte Bestätigung: Ist die Gebühr entfallen bzw. erstattet, steht der Warenpreis (Nr. 244/253).
+    betrag: formatEuro(centsAlsEuro(anzeigeGesamtCents(b.summen))),
     zahlung: `${zahlung.art} · ${zahlung.zustand}`,
     artikel: mitAnzahl(b.artikel, 'Artikel', 'Artikel'),
   }

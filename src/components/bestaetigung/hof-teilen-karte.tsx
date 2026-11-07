@@ -2,7 +2,7 @@
 
 import { Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ETIKETT, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
+import { ETIKETT, KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { teileHof } from '@/components/shared/hof-teilen'
 
 /**
@@ -17,7 +17,8 @@ import { teileHof } from '@/components/shared/hof-teilen'
 export function HofTeilenKarte({ hofName, hofSlug }: { hofName: string; hofSlug: string }): React.JSX.Element {
   // Board s1-/w1-bestaetigung: „ERZÄHL’S WEITER“ als kleine Überschrift, ein Satz, darunter der Knopf mit Rand über die volle Breite.
   return (
-    <section aria-labelledby="erzaehl-weiter" className="flex min-w-0 flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-4 md:px-[18px]">
+    // Rundung und Innenabstand wie die Neuigkeiten-Karte daneben (KARTE, 16 px wie im Board; Liste Lauf 32, G8).
+    <section aria-labelledby="erzaehl-weiter" className={cn(KARTE, 'flex min-w-0 flex-col gap-2')}>
       <h2 id="erzaehl-weiter" className={ETIKETT}>
         Erzähl&apos;s weiter
       </h2>

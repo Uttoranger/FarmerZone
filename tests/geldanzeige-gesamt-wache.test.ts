@@ -7,7 +7,8 @@
  * Geprüft wird der Syntaxbaum jeder Datei dort: kein Bezeichner und keine Zeichenkette `anzeigeGesamtCents` —
  * weder als benannter Import noch als Zugriff über einen Namensraum-Import (`sg.anzeigeGesamtCents`) noch aus
  * einem dynamischen Import entpackt. Ein Kommentar zählt nicht.
- * Nicht erkannt: eine eigene Hilfe in einem anderen Ordner, die die Funktion umwickelt und dann von dort gerufen wird.
+ * Nicht erkannt: eine eigene Hilfe in einem anderen Ordner, die die Funktion umwickelt und dann von dort gerufen wird —
+ * die bekannte Hülle `zahlzeileFuer` (src/lib/zahlzeile.ts, Nr. 253) steht darum mit unter Aufsicht.
  *
  * Gegenprobe: benannter Import, Namensraum-Zugriff, dynamischer Import und Zugriff mit Klammern schlagen an; ein
  * Kommentar und ein längerer Name nicht.
@@ -20,6 +21,8 @@ import { describe, expect, it } from 'vitest'
 const WURZEL = process.cwd()
 const ORDNER = ['src/server', 'src/app/api']
 const NAME = 'anzeigeGesamtCents'
+/** Hüllen um `anzeigeGesamtCents`, die dieselbe Grenze haben (nur Anzeige). */
+const NAMEN: ReadonlySet<string> = new Set([NAME, 'zahlzeileFuer'])
 
 function* quelldateien(ordner: string): Generator<string> {
   for (const name of readdirSync(ordner)) {
@@ -41,12 +44,12 @@ function beobachteteDateien(): string[] {
 /** Jede Stelle, an der `anzeigeGesamtCents` als Bezeichner oder Zeichenkette steht: Zeilennummern. Leer = in Ordnung. */
 function findeAnzeigeGesamt(quelltext: string): number[] {
   // Schneller Vorfilter: Ohne den Namen im Text kann er auch im Syntaxbaum nicht stehen.
-  if (!quelltext.includes(NAME)) return []
+  if (![...NAMEN].some((n) => quelltext.includes(n))) return []
   const datei = ts.createSourceFile('schnipsel.tsx', quelltext, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const zeilen: number[] = []
   function besuche(knoten: ts.Node): void {
     const text = ts.isIdentifier(knoten) ? knoten.text : ts.isStringLiteralLike(knoten) ? knoten.text : null
-    if (text === NAME) zeilen.push(datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1)
+    if (text !== null && NAMEN.has(text)) zeilen.push(datei.getLineAndCharacterOfPosition(knoten.getStart()).line + 1)
     ts.forEachChild(knoten, besuche)
   }
   besuche(datei)
@@ -78,6 +81,7 @@ describe('anzeigeGesamtCents bleibt Anzeige (Nr. 244)', () => {
     ['Namensraum-Zugriff', `import * as sg from '@/lib/servicegebuehr'\nconst x = sg.anzeigeGesamtCents(b)`],
     ['dynamischer Import', `const { anzeigeGesamtCents: g } = await import('@/lib/servicegebuehr')`],
     ['Zugriff mit Klammern', `const x = sg['anzeigeGesamtCents'](b)`],
+    ['Hülle zahlzeileFuer', `import { zahlzeileFuer } from '@/lib/zahlzeile'`],
   ])('Gegenprobe: %s schlägt an', (_name, schnipsel) => {
     expect(findeAnzeigeGesamt(schnipsel).length).toBeGreaterThan(0)
   })

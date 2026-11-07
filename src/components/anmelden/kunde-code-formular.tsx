@@ -13,7 +13,7 @@ import {
 } from '@/lib/anmeldecode'
 import { codeAnfordernSchema, codeEingabeSchema } from '@/schemas/anmeldecode'
 import { CodeFeld } from '@/components/anmelden/code-feld'
-import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN, TEXTKNOPF } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN_KAUF, TEXTKNOPF } from '@/components/anmelden/stil'
 import { cn } from '@/lib/utils'
 
 /*
@@ -70,16 +70,11 @@ export function CodeEmailSchritt({
       }}
       className="flex flex-col gap-3"
     >
-      <p className={HINWEIS_TEXT}>
-        {variante === 'bestellungen' ? (
-          <>
-            Gib die E-Mail-Adresse ein, mit der du bestellt hast. Wir schicken dir einen {ANMELDECODE_LAENGE}-stelligen
-            Code – ein Konto brauchst du dafür nicht.
-          </>
-        ) : (
-          <>Kein Passwort nötig. Wir schicken dir einen {ANMELDECODE_LAENGE}-stelligen Code an deine E-Mail-Adresse.</>
-        )}
-      </p>
+      {/* „Meine Bestellungen“ (Liste Lauf 32, meine-bestellungen Bild 1): kein Satz in der Karte — „ohne Konto“ sagt
+          die Zeile unter der Überschrift der Seite. */}
+      {variante === 'anmelden' && (
+        <p className={HINWEIS_TEXT}>Kein Passwort nötig. Wir schicken dir einen {ANMELDECODE_LAENGE}-stelligen Code an deine E-Mail-Adresse.</p>
+      )}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={feldId} className={FELD_LABEL}>
           E-Mail
@@ -102,7 +97,7 @@ export function CodeEmailSchritt({
           </p>
         )}
       </div>
-      <button type="submit" disabled={laedt} className={KNOPF_GRUEN}>
+      <button type="submit" disabled={laedt} className={KNOPF_GRUEN_KAUF}>
         {laedt ? (
           <>
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
@@ -160,14 +155,22 @@ export function CodeEingabeSchritt({
       }}
       className="flex flex-col gap-3"
     >
-      <p className={HINWEIS_TEXT}>
-        {variante === 'anmelden' && 'Kein Passwort nötig. '}Wir haben dir einen {ANMELDECODE_LAENGE}-stelligen Code an{' '}
-        <strong className="font-semibold break-words text-foreground">{email}</strong> geschickt.
-      </p>
+      {variante === 'bestellungen' ? (
+        // Liste Lauf 32 (meine-bestellungen Bild 2): der Satz in Textfarbe, die Adresse in normaler Schrift — er erklärt,
+        // woher der Code kommt; das Feld heißt darum nur „Code“.
+        <p className="text-[15px] leading-normal text-foreground">
+          Wir haben dir einen {ANMELDECODE_LAENGE}-stelligen Code an <span className="break-words">{email}</span> geschickt.
+        </p>
+      ) : (
+        <p className={HINWEIS_TEXT}>
+          Kein Passwort nötig. Wir haben dir einen {ANMELDECODE_LAENGE}-stelligen Code an{' '}
+          <strong className="font-semibold break-words text-foreground">{email}</strong> geschickt.
+        </p>
+      )}
       {/* Sichtbar beschriftet (Boards s2-/w2-kundenkonto, Bild 2), Feld und Satz in einer Gruppe wie die E-Mail. */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={feldId} className={FELD_LABEL}>
-          {ANMELDECODE_LAENGE}-stelliger Code aus der E-Mail
+          {variante === 'bestellungen' ? 'Code' : `${ANMELDECODE_LAENGE}-stelliger Code aus der E-Mail`}
         </label>
         <CodeFeld
           id={feldId}
@@ -193,7 +196,7 @@ export function CodeEingabeSchritt({
       >
         {!fehler && hinweis ? hinweis : ''}
       </p>
-      <button type="submit" disabled={laedt} className={KNOPF_GRUEN}>
+      <button type="submit" disabled={laedt} className={KNOPF_GRUEN_KAUF}>
         {laedt ? (
           <>
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
@@ -207,11 +210,12 @@ export function CodeEingabeSchritt({
       </button>
       <LadeStatus laedt={laedt} />
       {/* Untereinander und mittig wie im Board; „Andere E-Mail-Adresse“ in Textfarbe, der Zähler leise, solange er läuft. */}
+      {/* 16 px wie in den Boards (Liste Lauf 32, meine-bestellungen und kundenkonto). */}
       <div className="flex flex-col items-center">
-        <button type="button" onClick={onErneut} disabled={laedt || wartezeit > 0} className={TEXTKNOPF}>
+        <button type="button" onClick={onErneut} disabled={laedt || wartezeit > 0} className={cn(TEXTKNOPF, 'text-[16px]')}>
           {wartezeit > 0 ? `Code erneut senden (${wartezeit} s)` : 'Code erneut senden'}
         </button>
-        <button type="button" onClick={onAndereEmail} disabled={laedt} className={cn(TEXTKNOPF, 'text-foreground')}>
+        <button type="button" onClick={onAndereEmail} disabled={laedt} className={cn(TEXTKNOPF, 'text-[16px] text-foreground')}>
           Andere E-Mail-Adresse
         </button>
       </div>

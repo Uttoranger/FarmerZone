@@ -30,7 +30,7 @@ export function BarBestaetigenKnoepfe({ token }: { token: string }) {
   return (
     // Board s1-/w1-bestellung-link Bild 2: am Handy der grüne Knopf über die volle Breite, darunter leise das
     // Stornieren; im Browser unter einer Linie rechts bündig — Stornieren links neben dem Knopf.
-    <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:justify-start md:gap-4 md:border-t md:border-border md:pt-4">
+    <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:justify-start md:gap-4">
       <form action={bestaetigen} className="md:shrink-0">
         <input type="hidden" name="token" value={token} />
         <Button

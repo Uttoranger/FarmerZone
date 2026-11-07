@@ -452,7 +452,7 @@ describe('Die Marke der Bestellseite ist die Marke der Liste (Art aus bestellSta
           pickupTimeStart: '15:00',
           pickupTimeEnd: '18:00',
           createdAt: new Date('2026-10-09T08:00:00Z'),
-          gesamtCents: 1000,
+          summen: { totalAmount: '10.00', serviceFeeCents: 0, serviceFeeRefundedAt: null },
           artikel: 1,
         },
         jetzt,

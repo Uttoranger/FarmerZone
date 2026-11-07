@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { ADMIN_ANMELDEN_TEXT } from '@/lib/admin-anmeldung'
 import { MARKE } from '@/lib/marke'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { AdminAnmeldungKarte } from './admin-anmeldung-karte'
@@ -27,12 +27,12 @@ export default function AdminAnmeldenPage(): React.JSX.Element {
           <div className="flex items-center gap-2.5">
             <Wortmarke />
             <span className="md:hidden">
-              <StatusBadge status="offen">Admin</StatusBadge>
+              <Marke art="tun" form="schild">Admin</Marke>
             </span>
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden md:inline-flex">
-              <StatusBadge status="offen">Admin</StatusBadge>
+              <Marke art="tun" form="schild">Admin</Marke>
             </span>
             <ThemeUmschalter />
           </div>

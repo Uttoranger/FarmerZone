@@ -22,6 +22,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
+import { bestellSummen } from '@/lib/servicegebuehr'
 import { erstelleHof, erstelleHofMitAnmeldung, intKennung, raeumeAuf } from './setup/basis'
 import type { OrderStatus, PaymentMethod } from '@prisma/client'
 
@@ -272,7 +273,9 @@ describe('die Liste: nur die bewiesene Adresse', () => {
 
     const liste = await instanzA.ladeBestellungenZurAdresse(email)
     expect(liste.map((b) => b.id).sort()).toEqual([eigen.id, grossGeschrieben.id].sort())
-    expect(liste[0]).toMatchObject({ hofName: 'Hof Test', gesamtCents: 1050, artikel: 0 })
+    expect(liste[0]).toMatchObject({ hofName: 'Hof Test', artikel: 0 })
+    // Seit Nr. 253 trägt die Zeile den Snapshot; der Betrag entsteht in bestellEintrag.
+    expect(bestellSummen(liste[0].summen).gesamtCents).toBe(1050)
     expect(liste[0].link).toMatch(new RegExp(`^/${farm.slug}/confirm/[^?]+\\?sig=[0-9a-f]{64}$`))
   })
 
@@ -283,7 +286,7 @@ describe('die Liste: nur die bewiesene Adresse', () => {
     await legeBestellungAn(farm.id, email, { totalAmount: '10.00', serviceFeeCents: -30 })
 
     const liste = await instanzA.ladeBestellungenZurAdresse(email)
-    expect(liste.map((b) => b.gesamtCents).sort((a, b) => a - b)).toEqual([1000, 1300])
+    expect(liste.map((b) => bestellSummen(b.summen).gesamtCents).sort((a, b) => a - b)).toEqual([1000, 1300])
   })
 
   it('„_" ist kein Platzhalter: a_b@ sieht die Bestellungen von axb@ nicht (Gegenprobe: die eigenen schon)', async () => {

@@ -20,14 +20,15 @@ export function PasswortAnforderungen({ passwort, id, className }: { passwort: s
         <li
           key={check.id}
           className={cn(
-            'flex items-center gap-1.5 text-[12.5px] transition-colors duration-150',
+            // Board s2-/w2-passwort (Liste Lauf 32): 14 px, 8 px vom Zeichen, Zeichen in einer 18-px-Spalte.
+            'flex items-center gap-2 text-[14px] leading-snug transition-colors duration-150',
             check.passed ? 'text-status-fertig' : 'text-muted-foreground'
           )}
         >
           {check.passed ? (
-            <Check className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+            <Check className="size-[18px] shrink-0" strokeWidth={2.2} aria-hidden="true" />
           ) : (
-            <Circle className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />
+            <Circle className="size-[18px] shrink-0 p-[3px]" strokeWidth={2} aria-hidden="true" />
           )}
           {check.label}
           <span className="sr-only">{check.passed ? ' – erfüllt' : ' – fehlt noch'}</span>

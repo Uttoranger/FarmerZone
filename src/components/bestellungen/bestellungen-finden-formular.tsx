@@ -40,7 +40,7 @@ export function BestellungenFindenBlock({ ohneSaetze = false }: { ohneSaetze?: b
         <BestellungenFindenFormular schritt={schritt} setSchritt={setSchritt} />
       </section>
       {saetze && (
-        <p className="text-[13px] leading-normal text-muted-foreground">Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.</p>
+        <p className="text-[14px] leading-normal text-muted-foreground">Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.</p>
       )}
     </>
   )

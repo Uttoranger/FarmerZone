@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
-import { bestellSummen } from '@/lib/servicegebuehr'
 import { bestaetigungsPfad } from '@/lib/bestell-link'
 import {
   BESTELLCODE_GUELTIG_SEKUNDEN,
@@ -148,6 +147,8 @@ export async function ladeBestellungenZurAdresse(email: string, jetzt: Date = ne
       createdAt: true,
       totalAmount: true,
       serviceFeeCents: true,
+      // Entfallene bzw. erstattete Gebühr: „Meine Bestellungen“ zeigt dann den Warenpreis wie die Bestätigung (Nr. 253).
+      serviceFeeRefundedAt: true,
       farm: { select: { name: true, slug: true } },
       _count: { select: { items: true } },
     },
@@ -165,8 +166,9 @@ export async function ladeBestellungenZurAdresse(email: string, jetzt: Date = ne
     pickupTimeStart: b.pickupTimeStart,
     pickupTimeEnd: b.pickupTimeEnd,
     createdAt: b.createdAt,
-    // Eine Quelle für „Warenpreis + Gebühr" (schneidet eine Gebühr unter 0 ab).
-    gesamtCents: bestellSummen(b).gesamtCents,
+    // Der Snapshot für den Betrag der Zeile; den Anzeige-Betrag bildet bestellEintrag (anzeigeGesamtCents, nur
+    // Anzeige — die Funktion gehört nicht nach src/server, tests/geldanzeige-gesamt-wache.test.ts).
+    summen: { totalAmount: b.totalAmount.toString(), serviceFeeCents: b.serviceFeeCents, serviceFeeRefundedAt: b.serviceFeeRefundedAt },
     artikel: b._count.items,
   }))
 }
