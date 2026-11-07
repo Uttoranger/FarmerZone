@@ -26,8 +26,12 @@ export default function ResetPasswordPage(): React.JSX.Element {
   return (
     <KundeFokusShell titel="Neues Passwort" zurueck={{ href: '/login', label: 'Zurück zur Anmeldung' }}>
       {/* Ohne Karte und ohne zweiten Rückweg: Den trägt der Kopf der Fokus-Shell (Board s2-/w2-passwort). */}
-      <div className="mx-auto flex w-full max-w-[520px] flex-col gap-3 px-4 pt-5 pb-12 md:pt-10">
-        <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">Neues Passwort wählen</h2>
+      {/* 520 px Inhalt wie im Board (Liste Lauf 32, passwort), darunter die Unterzeile „Für dein Agrilo-Konto.“ */}
+      <div className="mx-auto flex w-full max-w-[552px] flex-col gap-3 px-4 pt-5 pb-12 md:pt-10">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">Neues Passwort wählen</h2>
+          <p className="text-[15px] leading-normal text-muted-foreground">Für dein {MARKE}-Konto.</p>
+        </div>
         {/* useSearchParams verlangt beim Prerendern eine Suspense-Grenze */}
         <Suspense fallback={null}>
           <NeuesPasswortFormular />

@@ -88,7 +88,9 @@ describe('ohne bewiesene Adresse', () => {
     const html = await render()
     expect(html).toContain('Meine Bestellungen')
     expect(html).toContain('Code schicken')
-    expect(html).toContain('ein Konto brauchst du dafür nicht')
+    // Liste Lauf 32 (meine-bestellungen Bild 1): „ohne Konto“ steht unter der Überschrift, nicht mehr in der Karte.
+    expect(html).toContain('ohne Konto, nur für diesen Besuch')
+    expect(html).not.toContain('ein Konto brauchst du dafür nicht')
     expect(html).not.toContain('Kein Passwort nötig')
     expect(html).not.toContain('abgelaufen')
     expect(laden).not.toHaveBeenCalled()

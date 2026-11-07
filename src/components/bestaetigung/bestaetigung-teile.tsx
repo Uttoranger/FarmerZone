@@ -59,7 +59,8 @@ export function BestaetigungKopf({
           {kicker}
         </p>
       )}
-      <h1 className="font-heading text-[26px] leading-tight font-semibold text-balance break-words md:text-[28px]">{kopf.titel}</h1>
+      {/* Liste Lauf 32 (bestaetigung): 26 px in beiden Breiten wie im Board, in der Karte „eingegangen“ 24 px. */}
+      <h1 className={cn('font-heading leading-tight font-semibold text-balance break-words', satzLeise ? 'text-[24px]' : 'text-[26px]')}>{kopf.titel}</h1>
       {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
       {!ohneSatz && (
         <p className={cn('text-[15px] leading-normal [overflow-wrap:anywhere]', satzLeise ? 'text-muted-foreground' : 'text-foreground')}>{kopf.satz}</p>

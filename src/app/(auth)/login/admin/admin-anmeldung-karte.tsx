@@ -96,7 +96,8 @@ export function AdminAnmeldungKarte(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setErsatzOffen(true)}
-              className={cn(TEXTKNOPF, 'text-[15px] font-bold text-foreground')}
+              // Board s2-anmelden Bild 3: 16 px halbfett in Textfarbe.
+              className={cn(TEXTKNOPF, 'text-[16px] font-semibold text-foreground')}
               aria-expanded={false}
             >
               {ADMIN_ANMELDEN_TEXT.ersatzcodeOeffnen}
@@ -106,7 +107,8 @@ export function AdminAnmeldungKarte(): React.JSX.Element {
       ) : (
         <form
           onSubmit={(e) => void mitErsatzcode(e)}
-          className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 dark:ring-0"
+          // 16 px wie die Karten im Board (Liste Lauf 32, anmelden Bild 4 „Mit Ersatzcode“, G8).
+          className="flex flex-col gap-3 rounded-[16px] border border-border bg-card p-3.5 dark:ring-0"
           aria-labelledby="admin-ersatzcode-titel"
         >
           <h2 id="admin-ersatzcode-titel" className="font-heading text-[20px] leading-tight font-semibold text-foreground">

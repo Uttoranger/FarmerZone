@@ -20,7 +20,8 @@ import { BestellungenFindenBlock } from '@/components/bestellungen/bestellungen-
 
 /** Die Spalte: 520 px wie im Board w1-meine-bestellungen (eine Spalte, auch im Browser), am Handy 16 px Rand. */
 const SEITE = 'mx-auto flex w-full max-w-[552px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8'
-const TITEL = 'font-heading text-[26px] leading-tight font-semibold md:text-[28px]'
+// Liste Lauf 32 (meine-bestellungen): 24 px in beiden Breiten wie im Board.
+const TITEL = 'font-heading text-[24px] leading-tight font-semibold'
 /** Knopf mit Rand in Inhaltsbreite (Board s1-/w1-meine-bestellungen: 44 px, Radius 12 px, Feldrand). */
 const KNOPF_KLEIN_RAHMEN = cn(
   'inline-flex min-h-11 shrink-0 items-center justify-center rounded-[12px] border border-input bg-card px-3.5 text-[14px] font-bold text-foreground hover:bg-muted',

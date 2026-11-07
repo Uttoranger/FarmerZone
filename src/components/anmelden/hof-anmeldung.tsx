@@ -113,7 +113,8 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
   return (
     <div className="flex flex-col gap-3">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        {/* Der Fehler steht als Hinweiskarte über den Feldern (Board s2-anmelden, Bild 2); beide Felder verweisen darauf. */}
+        {/* Der Fehler steht als Hinweiskarte über den Feldern (Board s2-anmelden, Bild 2); beide Felder verweisen darauf.
+            Kein oranger Feldrand: Der Fehler gehört zu keinem einzelnen Feld (Liste Lauf 32, anmelden). */}
         {fehler && (
           <div id={fehlerId}>
             <HinweiskarteFehler titel={fehler.titel}>{fehler.satz}</HinweiskarteFehler>
@@ -132,7 +133,6 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
             placeholder="name@beispiel.at"
             autoComplete="email"
             required
-            aria-invalid={fehler ? true : undefined}
             aria-describedby={fehler ? fehlerId : undefined}
             className={FELD}
           />
@@ -148,7 +148,6 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
-            aria-invalid={fehler ? true : undefined}
             aria-describedby={fehler ? fehlerId : undefined}
             feld={FELD}
           />
@@ -187,7 +186,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
         </Link>
       </div>
       {/* Der kleine Weg für Admin-Konten (Register N20, Nr. 115) — sonst ist /login/admin nirgends verlinkt. */}
-      <Link href={ADMIN_PFAD.anmelden} className={cn(TEXTLINK, 'text-[13px] font-medium text-muted-foreground')}>
+      <Link href={ADMIN_PFAD.anmelden} className={cn(TEXTLINK, 'text-[14px] font-normal text-muted-foreground')}>
         {ADMIN_ANMELDEN_TEXT.linkAufLogin}
       </Link>
 

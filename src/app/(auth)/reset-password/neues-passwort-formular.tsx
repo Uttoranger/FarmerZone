@@ -96,7 +96,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
   if (linkUngueltig || tokenVerbraucht) {
     return (
       // Fehlerkarte im Ton „tun“ ohne Symbol, darunter der Ausweg als Umriss über die volle Breite (Board s2-passwort, Bild 5).
-      <HinweiskarteFehler titel="Dieser Link ist ungültig oder abgelaufen.">
+      <HinweiskarteFehler titel="Dieser Link ist ungültig oder abgelaufen." className="rounded-[16px]">
         <p>{`Ein Link gilt ${PASSWORT_LINK_DAUER_TEXT} und einmal. Bitte fordere einen neuen Link an.`}</p>
         <Link
           href="/forgot-password"
@@ -124,7 +124,10 @@ export function NeuesPasswortFormular(): React.JSX.Element {
           required
           aria-invalid={pwHasError || undefined}
           aria-describedby={listeId}
-          onBlur={() => setPasswordTouched(true)}
+          // Ein leeres Feld zeigt beim Verlassen noch keinen Fehler — der kommt erst beim Absenden (Liste Lauf 32, passwort).
+          onBlur={() => {
+            if (password.length > 0) setPasswordTouched(true)
+          }}
         />
 
         <PasswortAnforderungen passwort={password} id={listeId} className="mt-0.5" />

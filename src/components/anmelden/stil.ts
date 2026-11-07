@@ -24,8 +24,9 @@ export const FELD = cn(
   FOKUS_RAHMEN
 )
 
+// 52 px hoch, 16 px fett wie in den Boards (Liste Lauf 32, anmelden „Passkey-Knopf … Schrift nach Board“).
 const KNOPF =
-  'inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] px-[18px] text-[15px] font-bold transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60'
+  'inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[14px] px-[18px] text-[16px] font-bold transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60'
 
 /** Kundenaktion: grün (DESIGN_SYSTEM, „Farbrollen"). */
 export const KNOPF_GRUEN = cn(KNOPF, 'bg-accent text-accent-foreground', FOKUS_RAHMEN)
@@ -36,7 +37,7 @@ export const KNOPF_ORANGE = cn(KNOPF, 'bg-primary text-primary-foreground', FOKU
 /** Zweiter Weg über die volle Breite: Umriss in Textfarbe auf der Fläche (Board s2-anmelden „Mit Passkey anmelden“). */
 export const KNOPF_UMRISS = cn(
   KNOPF,
-  'border border-foreground/70 bg-card text-foreground hover:bg-muted hover:opacity-100',
+  'border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted hover:opacity-100',
   FOKUS_RAHMEN
 )
 

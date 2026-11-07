@@ -53,8 +53,8 @@ export function CodeFeld({
       aria-describedby={beschreibtVon}
       readOnly={gesperrt}
       aria-busy={gesperrt || undefined}
-      // Ziffern mit etwas Abstand, damit „481234“ als Code lesbar bleibt; 16 px am Handy, sonst zoomt iOS.
-      className={cn(FELD, 'tracking-[0.12em] tabular-nums')}
+      // 16 px am Handy, sonst zoomt iOS. Grundschrift ohne Sperrung, nur gleich breite Ziffern (Liste Lauf 32, meine-bestellungen).
+      className={cn(FELD, 'tabular-nums')}
     />
   )
 }
