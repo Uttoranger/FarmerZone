@@ -295,13 +295,13 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 248 | Bausteine Teil 4 (G5, G12–G14, Geldsätze V1) | gemergt (#490) | `nacht/2026-11-06/248-bausteine-4` | #488 | vom Zwischenstand `integration/lauf32` nach 245 | 1 Runde (Varianten statt in place; Geldsatz bei entfallener Gebühr) | 6./7.11.2026 |
 | 249 | Hof-Alltag | gemergt (#490) | `nacht/2026-11-06/249-hof-alltag` | #489 | vom Zwischenstand `integration/lauf32` nach 245–248 und 259 | Container-Neustart, fortgesetzt ab WIP; 1 Runde (formal: Abholzeiten-Satz als Übergang bis 250); Mängel aus dem Zwischen-Durchgang (Abholzettel „inkl.“-Satz) → B | 6./7.11.2026 |
 | 250 | Einstellungen und Teilen | läuft | `nacht/2026-11-06/250-einstellungen` | – | von `integration/lauf32b` | – | 7.11.2026 |
-| 251 | Hof-Werkzeuge | offen | – | – | vom Integrationszweig von B | – | 6.11.2026 |
+| 251 | Hof-Werkzeuge | läuft | `nacht/2026-11-06/251-hof-werkzeuge` | – | von `integration/lauf32b` | – | 7.11.2026 |
 | 252 | Finden | fertig | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
 | 253 | Kauf und Konto | fertig | `nacht/2026-11-06/253-kauf-konto` | #493 | von `integration/lauf32b` | – | 7.11.2026 |
 | 254 | System und Rechtsrahmen | offen | – | – | vom Zwischenstand nach 259 und 251 | – | 6.11.2026 |
 | 255 | E-Mails | offen | – | – | vom Zwischenstand nach 257 | – | 6.11.2026 |
 | 256 | Mail „Neue Bestellung bar“ an den Hof | gemergt (#490) | `nacht/2026-11-06/256-bar-mail-hof` | #485 | vom Zwischenstand `integration/lauf32` nach 259; ohne 259 nach 243 und 244 | 0 Runden; /api/checkout genau ein Aufruf | 6./7.11.2026 |
-| 257 | Abholung nach Absprache | läuft | `nacht/2026-11-06/257-absprache` | – | vom Zwischenstand `integration/lauf32b` nach 249, 249b, 253, 256 und 259 | – | 7.11.2026 |
+| 257 | Abholung nach Absprache | fertig | `nacht/2026-11-06/257-absprache` | #495 | vom Zwischenstand `integration/lauf32b` nach 249, 249b, 253, 256 und 259 | – | 7.11.2026 |
 | 258 | Admin: Geld-Kachel | gemergt (#490) | `nacht/2026-11-06/258-geld-kachel` | #481 | vom Zwischenstand `integration/lauf32` | 0 Runden; Kachel-Wort „Umsatz der Höfe“ als Board-Frage | 6./7.11.2026 |
 | 258b | Admin: messbare Mängel | offen | – | – | vom Zwischenstand nach 243 | – | 6.11.2026 |
 | 259 | „AGB 1.0 mit dem Stichtag (A005)“ | gemergt (#490) | `nacht/2026-11-06/259-agb-1-0` | #483 | von `docs/lauf32` (PR gegen `docs/lauf32`, allein mergebar) | 1 Runde (vier Fälle, serverseitige Meldung, A005 4b wörtlich); allein mergebar nach #479 | 6./7.11.2026 |
