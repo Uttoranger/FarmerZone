@@ -335,7 +335,8 @@ function ToggleRow({
       </div>
       {/* Ein Schalter: Rolle „switch" sagt dem Screenreader Zustand und Zweck.
           Sichtbar 46 × 26 px wie im Board, die Trefferfläche über ::before 44 px. Aus: helle Schiene mit Kontur und
-          grauer Knopf (Kontrast ≥ 3:1 für Bedienelemente, Liste Lauf 32 kundenkonto) statt einer blassen Fläche. */}
+          grauer Knopf (Kontrast ≥ 3:1 für Bedienelemente, Liste Lauf 32 kundenkonto) statt einer blassen Fläche — auch
+          gesperrt nicht verblasst; warum er gesperrt ist, sagt der Satz daneben. */}
       <button
         type="button"
         role="switch"
@@ -345,7 +346,7 @@ function ToggleRow({
         onClick={onToggle}
         disabled={disabled}
         className={cn(
-          "relative h-[26px] w-[46px] shrink-0 rounded-full border transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-[9px] before:content-[''] disabled:cursor-not-allowed disabled:opacity-40",
+          "relative h-[26px] w-[46px] shrink-0 rounded-full border transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-[9px] before:content-[''] disabled:cursor-not-allowed",
           active ? 'border-accent bg-accent' : 'border-input bg-muted',
           FOKUS_RAHMEN
         )}
