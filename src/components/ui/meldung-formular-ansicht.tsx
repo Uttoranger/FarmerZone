@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Camera, Check, Loader2, X } from 'lucide-react'
+import { Check, Loader2, X } from 'lucide-react'
 import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
 import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz, seiteName } from '@/lib/hof-hilfe'
 import { geraetName } from '@/lib/geraete'
@@ -10,6 +10,10 @@ import { stufenText } from '@/components/shared/image-upload'
 import { HONIGTOPF_STIL, type Kontext, type MeldungFormular } from '@/components/shared/use-meldung-formular'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { FELD_FEHLER_RAHMEN } from '@/components/ui/feld-fehler'
+import { AKTIONSLEISTE_KNOPF, FesteAktionsleiste } from '@/components/ui/feste-aktionsleiste'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { meldungEingabeSchema } from '@/schemas/meldung'
 import { cn } from '@/lib/utils'
 
 /** Die zwei Welten (Register N42 b, V51): Kundschaft grün, Hof orange. */
@@ -33,23 +37,29 @@ export const MELDUNG_ANSICHT_TEXT = {
   hof: 'Hof',
   email: 'Deine E-Mail',
   emailZusatz: '· nur für unsere Antwort, optional',
-  bildschirmfoto: 'Bildschirmfoto hinzufügen',
+  bildschirmfoto: '+ Bildschirmfoto hinzufügen',
+  /** Platzhalter der Fehlernummer — nur im Hofbereich (Board s2-/w2-meldungen; das Kunden-Board s3-/w3-problem-melden zeigt keinen). */
+  fehlernummerBeispiel: 'z. B. A7F3',
   bildschirmfotoDa: 'Bildschirmfoto angehängt',
   entfernen: 'Entfernen',
   fehlerTitel: 'Das hat nicht geklappt',
   abbrechen: 'Abbrechen',
   absenden: 'Absenden',
   sendet: 'Einen Moment …',
+  /** Kundschaft wörtlich nach Board s3-/w3-problem-melden (Geviertstrich). */
   dankeTitel: 'Danke — ist angekommen.',
+  /** Hofbereich nach Board s2-/w2-meldungen (Halbgeviertstrich). */
+  dankeTitelHof: 'Danke – ist angekommen.',
   kurznummer: 'Deine Kurznummer:',
   dankeKunde: 'Merk dir die Kurznummer, falls du nachfragen möchtest.',
   dankeHof: 'Den Stand deiner Meldung findest du unter „Meine Meldungen“.',
-  zuMeldungen: 'Zu deinen Meldungen',
+  // Wortliste N8 „Meine Meldungen“ (Liste Lauf 32 meldungen).
+  zuMeldungen: 'Meine Meldungen',
   nochEtwas: 'Noch etwas melden',
 } as const
 
 /** Feld der Ansicht: 48 px, Feldrand (≥ 3:1), auf der Karte. */
-const FELD = cn('w-full min-w-0 rounded-xl border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground', FOKUS_RAHMEN)
+const FELD = cn(RUNDUNG.feld, 'w-full min-w-0 border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground', FOKUS_RAHMEN)
 const LABEL = 'text-[15px] font-semibold text-foreground'
 const RAHMEN_KNOPF = cn(
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border-[1.5px] border-foreground bg-card px-[18px] text-[15px] font-semibold text-foreground hover:bg-muted',
@@ -73,7 +83,7 @@ function MitgeschicktKarte({ kontext, kennung, hofName }: { kontext: Kontext; ke
     ...(hofName?.trim() ? [{ name: T.hof, wert: hofName.trim() }] : []),
   ]
   return (
-    <div data-slot="meldung-mitgeschickt" className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card px-3.5 py-3">
+    <div data-slot="meldung-mitgeschickt" className={cn('flex flex-col gap-0.5 border border-border bg-card px-3.5 py-3', RUNDUNG.karte)}>
       <p className="text-[13px] font-bold tracking-[0.52px] text-muted-foreground uppercase">{T.mitgeschicktTitel}</p>
       <dl className="flex flex-col">
         {zeilen.map((z, i) => (
@@ -109,6 +119,7 @@ export function MeldungFormularAnsicht({
   abbrechenHref,
   titel,
   satz,
+  einleitung,
   hofName,
   className,
 }: {
@@ -121,6 +132,8 @@ export function MeldungFormularAnsicht({
   /** Überschrift in der Karte (h1), wenn die Seite keine eigene trägt. */
   titel?: string
   satz?: string
+  /** Satz über dem Formular (außerhalb der Karte); nach dem Absenden entfällt er (Board s2-/w2-meldungen Bild 3). */
+  einleitung?: string
   /** Name des angemeldeten Hofs für die Zeile „Hof“ in der Karte „Das schicken wir automatisch mit“. */
   hofName?: string
   className?: string
@@ -130,6 +143,21 @@ export function MeldungFormularAnsicht({
   const T = MELDUNG_ANSICHT_TEXT
 
   const dankeRef = useRef<HTMLHeadingElement>(null)
+  const textRef = useRef<HTMLTextAreaElement>(null)
+  // Feldfehler am Textfeld (G6): geprüft beim Absenden, nicht vorher — der Knopf bleibt bedienbar. Der Satz kommt
+  // aus dem Schema, das auch der Server prüft (meldungEingabeSchema), nie aus der Ansicht.
+  const [textFehler, setTextFehler] = useState<string | null>(null)
+  function absenden(e: React.FormEvent) {
+    const pruefung = meldungEingabeSchema.shape.text.safeParse(f.text)
+    if (!pruefung.success) {
+      e.preventDefault()
+      setTextFehler(pruefung.error.issues[0]?.message ?? null)
+      textRef.current?.focus()
+      return
+    }
+    setTextFehler(null)
+    f.absenden(e)
+  }
   useEffect(() => {
     if (f.kurznummer) dankeRef.current?.focus()
   }, [f.kurznummer])
@@ -141,7 +169,7 @@ export function MeldungFormularAnsicht({
         role="status"
         data-slot="meldung-danke"
         data-welt={welt}
-        className={cn('flex w-full max-w-[560px] flex-col items-start gap-2 rounded-2xl border border-zustand-laeuft/30 bg-zustand-laeuft-grund px-4 py-[18px]', className)}
+        className={cn('flex w-full max-w-[560px] flex-col items-start gap-2 border border-zustand-laeuft/30 bg-zustand-laeuft-grund px-4 py-[18px]', RUNDUNG.karte, className)}
       >
         <span aria-hidden="true" className="grid size-10 place-items-center rounded-full bg-accent text-accent-foreground">
           <Check className="size-5" strokeWidth={2.2} aria-hidden="true" />
@@ -149,18 +177,20 @@ export function MeldungFormularAnsicht({
         {/* Trägt die Ansicht die h1 der Seite (`titel`), ist der Dank jetzt sie — sonst stünde die Seite ohne h1 da
             (Abnahme Lauf 31, problem-melden Bild 5; Nr. 242). */}
         <DankeTitel ref={dankeRef} tabIndex={-1} className="font-heading text-[22px] font-semibold text-foreground outline-none">
-          {T.dankeTitel}
+          {welt === 'hof' ? T.dankeTitelHof : T.dankeTitel}
         </DankeTitel>
         <p className="text-[15px] text-zustand-laeuft">
           {T.kurznummer} <strong className="font-mono">{f.kurznummer}</strong>. {alsHof ? T.dankeHof : T.dankeKunde}
         </p>
-        <div className="mt-1 flex flex-wrap gap-2.5">
+        {/* Im Hofbereich beide Knöpfe volle Breite untereinander (Board s2-/w2-meldungen Bild 3); die Kundschaft
+            behält den Umriss-Knopf links (Board s3-/w3-problem-melden). */}
+        <div className={cn('mt-1', welt === 'hof' ? 'flex w-full flex-col gap-2.5' : 'flex flex-wrap gap-2.5')}>
           {alsHof && (
-            <Link href={MEINE_MELDUNGEN_HREF} className={cn('inline-flex min-h-11 items-center rounded-full px-[18px] text-[15px] font-semibold', ton.knopf, FOKUS_RAHMEN)}>
+            <Link href={MEINE_MELDUNGEN_HREF} className={cn('inline-flex min-h-12 w-full items-center justify-center px-[18px] text-[15px] font-semibold', RUNDUNG.feld, ton.knopf, FOKUS_RAHMEN)}>
               {T.zuMeldungen}
             </Link>
           )}
-          <button type="button" onClick={f.nochEtwas} className={RAHMEN_KNOPF}>
+          <button type="button" onClick={f.nochEtwas} className={welt === 'hof' ? cn(RAHMEN_KNOPF, 'min-h-12 w-full', RUNDUNG.feld) : RAHMEN_KNOPF}>
             {T.nochEtwas}
           </button>
         </div>
@@ -172,12 +202,25 @@ export function MeldungFormularAnsicht({
 
   return (
     <div data-slot="meldung-formular" data-welt={welt} className={cn('flex w-full max-w-[560px] flex-col gap-2.5', className)}>
+      {einleitung && <p className="text-sm leading-normal text-muted-foreground">{einleitung}</p>}
       {f.fehler && (
         <HinweiskarteFehler titel={T.fehlerTitel} nochmal={f.nochmal}>
           {f.fehler}
         </HinweiskarteFehler>
       )}
-      <form onSubmit={f.absenden} className="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-[18px]">
+      {/* Im Hofbereich am Handy ohne Karte, frei auf dem Grund (Board s2-meldungen); ab 768 px und bei der Kundschaft die Karte. */}
+      {/* Im Hofbereich prüft nur `absenden` (Feldfehler G6, Board s2-/w2-meldungen); die Kundschaft behält die
+          Browser-Prüfung (required/minLength), das Kunden-Board zeigt keinen Feldfehler. Beide Wege messen am selben
+          Schema wie der Server. */}
+      <form
+        onSubmit={absenden}
+        noValidate={welt === 'hof'}
+        className={cn(
+          'flex flex-col gap-3.5',
+          welt === 'hof' ? 'md:border md:border-border md:bg-card md:p-[18px]' : 'border border-border bg-card p-[18px]',
+          RUNDUNG.karte
+        )}
+      >
         {titel && <h1 className="font-heading text-2xl font-semibold text-foreground">{titel}</h1>}
         {satz && <p className="-mt-2 text-[15px] text-muted-foreground">{satz}</p>}
 
@@ -188,14 +231,16 @@ export function MeldungFormularAnsicht({
 
         <fieldset className="flex flex-col gap-1.5">
           <legend className={cn(LABEL, 'mb-1.5')}>{T.worum}</legend>
-          <div className="grid gap-1.5 sm:grid-cols-3">
+          {/* Drei Zeilen untereinander (beide Boards); im Hofbereich je 64 px (s2-/w2-meldungen), bei der Kundschaft 48 px (s3-/w3-problem-melden). */}
+          <div className="grid gap-1.5">
             {MELDUNG_ARTEN.map((wert) => {
               const aktiv = f.art === wert
               return (
                 <label
                   key={wert}
                   className={cn(
-                    'flex min-h-12 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-solid has-focus-visible:outline-ring',
+                    'flex cursor-pointer items-center py-2 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-solid has-focus-visible:outline-ring',
+                    welt === 'hof' ? cn('min-h-16 gap-2.5 px-3.5', RUNDUNG.feld) : cn('min-h-12 gap-2 px-3', RUNDUNG.karte),
                     aktiv ? ton.gewaehlt : 'border border-input bg-card hover:bg-muted'
                   )}
                 >
@@ -219,36 +264,26 @@ export function MeldungFormularAnsicht({
             {MELDUNG_TEXT_LABEL[f.art]}
           </label>
           <textarea
+            ref={textRef}
             id="meldung-text"
             value={f.text}
             onChange={(e) => f.setText(e.target.value)}
             rows={4}
             maxLength={MELDUNG_TEXT_MAX}
-            minLength={MELDUNG_TEXT_MIN}
+            minLength={welt === 'hof' ? undefined : MELDUNG_TEXT_MIN}
+            required={welt !== 'hof'}
             placeholder={MELDUNG_TEXT_BEISPIEL[f.art]}
-            required
-            aria-describedby="meldung-text-zaehler"
-            className={cn(FELD, 'min-h-[110px] resize-y py-2.5 leading-normal')}
+            aria-invalid={textFehler ? true : undefined}
+            aria-describedby={textFehler ? 'meldung-text-fehler meldung-text-zaehler' : 'meldung-text-zaehler'}
+            className={cn(FELD, FELD_FEHLER_RAHMEN, 'min-h-[110px] resize-y py-2.5 leading-normal')}
           />
+          {textFehler && (
+            <p id="meldung-text-fehler" role="alert" className="text-[14px] leading-snug font-semibold text-status-offen">
+              {textFehler}
+            </p>
+          )}
           <p id="meldung-text-zaehler" className="text-[13px] text-muted-foreground tabular-nums">
             {f.text.length} / {MELDUNG_TEXT_MAX}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="meldung-kennung" className={LABEL}>
-            {T.fehlernummer} <span className="font-normal">{T.optional}</span>
-          </label>
-          <input
-            id="meldung-kennung"
-            value={f.kennung}
-            onChange={(e) => f.setKennung(e.target.value)}
-            maxLength={MELDUNG_KENNUNG_MAX}
-            aria-describedby="meldung-kennung-hinweis"
-            className={cn(FELD, 'h-12 sm:w-56')}
-          />
-          <p id="meldung-kennung-hinweis" className="text-[13px] leading-normal text-muted-foreground">
-            {T.fehlernummerHinweis}
           </p>
         </div>
 
@@ -256,7 +291,7 @@ export function MeldungFormularAnsicht({
         {alsHof && f.upload.fileInput}
         {alsHof &&
           (f.screenshotUrl ? (
-            <div className="flex items-center gap-3 rounded-xl border border-border px-3.5 py-3">
+            <div className={cn('flex items-center gap-3 border border-border px-3.5 py-3', RUNDUNG.feld)}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={f.screenshotUrl} alt="Bildschirmfoto zur Meldung" className="size-16 rounded-lg border border-border object-cover" />
               <span className="min-w-0 flex-1 text-[14px] text-foreground">{T.bildschirmfotoDa}</span>
@@ -271,18 +306,40 @@ export function MeldungFormularAnsicht({
               onClick={f.upload.openFilePicker}
               disabled={f.upload.isUploading}
               className={cn(
-                'flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-foreground bg-card px-3.5 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
+                'flex min-h-[52px] w-full items-center justify-center gap-2 border-[1.5px] border-foreground bg-card px-3.5 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
+                RUNDUNG.feld,
                 FOKUS_RAHMEN
               )}
             >
-              {f.upload.isUploading ? (
-                <Loader2 className="size-[18px] shrink-0 animate-spin" aria-hidden="true" />
+              {f.upload.isUploading && <Loader2 className="size-[18px] shrink-0 animate-spin" aria-hidden="true" />}
+              {f.upload.isUploading && f.upload.progress ? (
+                stufenText(f.upload.progress)
               ) : (
-                <Camera className="size-[18px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                <span>
+                  {T.bildschirmfoto} <span className="font-normal">{T.optional}</span>
+                </span>
               )}
-              {f.upload.isUploading && f.upload.progress ? stufenText(f.upload.progress) : T.bildschirmfoto}
             </button>
           ))}
+
+        {/* Bildschirmfoto zuerst, dann die Fehlernummer in voller Breite (Board s2-/w2-meldungen). */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="meldung-kennung" className={LABEL}>
+            {T.fehlernummer} <span className="font-normal">{T.optional}</span>
+          </label>
+          <input
+            id="meldung-kennung"
+            value={f.kennung}
+            onChange={(e) => f.setKennung(e.target.value)}
+            maxLength={MELDUNG_KENNUNG_MAX}
+            placeholder={welt === 'hof' ? T.fehlernummerBeispiel : undefined}
+            aria-describedby="meldung-kennung-hinweis"
+            className={cn(FELD, 'h-12')}
+          />
+          <p id="meldung-kennung-hinweis" className="text-[13px] leading-normal text-muted-foreground">
+            {T.fehlernummerHinweis}
+          </p>
+        </div>
 
         {!alsHof && (
           <div className="flex flex-col gap-1.5">
@@ -308,7 +365,16 @@ export function MeldungFormularAnsicht({
           <p className="text-[13px] leading-normal text-muted-foreground">{mitgeschicktSatz(f.kennung, alsHof)}</p>
         )}
 
-        <div className="flex gap-2.5 md:justify-end">
+        {/* Im Hofbereich am Handy die feste Leiste „Absenden“ über der Unterleiste (G2, Board s2-meldungen);
+            ab 768 px die Knöpfe am Formularende (V47). */}
+        {welt === 'hof' && (
+          <FesteAktionsleiste className="md:hidden">
+            <button type="submit" disabled={gesperrt} aria-busy={f.isPending || undefined} className={cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60')}>
+              {f.isPending ? T.sendet : T.absenden}
+            </button>
+          </FesteAktionsleiste>
+        )}
+        <div className={cn('gap-2.5 md:justify-end', welt === 'hof' ? 'hidden md:flex' : 'flex')}>
           <Link href={abbrechenHref} className={cn(RAHMEN_KNOPF, 'hidden md:inline-flex')}>
             {T.abbrechen}
           </Link>
@@ -317,7 +383,8 @@ export function MeldungFormularAnsicht({
             disabled={gesperrt}
             aria-busy={f.isPending || undefined}
             className={cn(
-              'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] px-5 text-[16px] font-bold disabled:opacity-60 md:min-h-11 md:w-auto md:rounded-full',
+              'inline-flex min-h-[52px] w-full items-center justify-center px-5 text-[16px] font-bold disabled:opacity-60 md:min-h-11 md:w-auto md:rounded-full',
+              RUNDUNG.feld,
               ton.knopf,
               FOKUS_RAHMEN
             )}

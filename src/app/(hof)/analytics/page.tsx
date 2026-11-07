@@ -1,23 +1,24 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
-import { getKennzahlen, getServicegebuehrenMonat } from '@/server/queries/auswertung'
+import { getKennzahlen, getServicegebuehrenZeitraum } from '@/server/queries/auswertung'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
-import { auswertungSummen, gebuehrenKarteText, grenzeStand, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
+import { auswertungSummen, grenzeStand, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
 import { umsatzfenster, zeitraumImSatz, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
 import { REGION_HREF } from '@/lib/bauern-navigation'
 import { auswertungHref, leseAuswertungZeitraum } from '@/schemas/auswertung'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { Textlink } from '@/components/ui/textlink'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { AUSWERTUNG_RAHMEN, AuswertungFehler } from '@/components/auswertung/auswertung-zustaende'
+import { gebuehrenKarteFuerZeitraum, wocheAusgeschrieben } from '@/components/auswertung/gebuehr-titel'
 import {
   EinsichtZeile,
   GrenzeKarte,
@@ -30,7 +31,6 @@ import {
   ZeitraumWahl,
 } from '@/components/auswertung/auswertung-teile'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
-import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `Auswertung — ${MARKE}` }
@@ -41,9 +41,9 @@ export const dynamic = 'force-dynamic'
  * Auswertung in der HofShell (Nachtlauf Nr. 22c, Gate 8; Mockup
  * web-h5-auswertung-abrechnung-teilen-wirkung): Kennzahlen, Teilen-Wirkung
  * und Umsatz für den gewählten Zeitraum (Woche · Monat · Jahr in der
- * Adresse), daneben die Gebühren DIESES Monats — bis zum SEPA-Start
- * ohne Lastschrift (Register B1, K1); ihr Wort je Stichtag „Hofpreis-Modell ab“
- * (V62, V63; Nr. 225). Darunter wie bisher Kanäle,
+ * Adresse), dazu die Gebühren desselben Zeitraums — Titel, Betrag und Sätze
+ * aus dem gewählten Fenster (Nr. 251), bis zum SEPA-Start ohne Lastschrift
+ * (Register B1, K1); ihr Wort je Stichtag „Hofpreis-Modell ab“ (V62, V63; Nr. 225). Darunter wie bisher Kanäle,
  * Top-Produkte und die Jahresgrenze. Alles nur für den eigenen Hof (farmId
  * aus der Sitzung), nur lesend.
  */
@@ -71,14 +71,15 @@ export default async function AnalyticsPage({
 
   const kopf = (
     <header>
-      <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Auswertung</h1>
-      <HofUnterzeile hofName={farm.name} jetzt={jetzt} />
-      {/* Der Einleitungssatz als eigener Absatz unter der Hofzeile (Board w2-auswertung). */}
-      <p className="mt-2.5 text-[13px] leading-normal text-muted-foreground md:text-sm">
+      {/* Werkzeug-Kopf (G1): am Handy die feste Leiste, im Web Titel und Hofname. */}
+      <WerkzeugKopf titel="Auswertung" unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
+      {/* Der Einleitungssatz als eigener Absatz unter der Hofzeile (Board w2-auswertung); Leerzeichen und Punkt außerhalb des Links. */}
+      <p className="text-[13px] leading-normal text-muted-foreground md:text-sm">
         Deine Zahlen – den Markt rundherum findest du unter{' '}
-        <Link href={REGION_HREF} className={cn('font-semibold text-brand-text underline-offset-4 hover:underline', FOKUS_RAHMEN)}>
+        <Textlink href={REGION_HREF} form="im-satz">
           Region
-        </Link>
+        </Textlink>
+        .
       </p>
       {/* Leise, nur wenn der Stichtag Bestellungen dieser Seite betrifft (Register Z4). */}
       {daten?.testzahlungenHinweis && (
@@ -91,24 +92,40 @@ export default async function AnalyticsPage({
   // Das Wiener Kalenderjahr, wie die Grenzwert-Summe (getYtdRevenue).
   const jahr = new Intl.DateTimeFormat('de-AT', { timeZone: 'Europe/Vienna', year: 'numeric' }).format(jetzt)
 
+  // Woche mit ausgeschriebenem Monat („2.–8. November“, Liste Lauf 32 auswertung); Monat und Jahr wie bisher.
+  const zeitraum = daten ? (periode === 'woche' ? wocheAusgeschrieben(pf) : daten.umsatz.zeitraum) : ''
+  const satzZeitraum = periode === 'woche' ? zeitraum : zeitraumImSatz(pf)
+  const umsatzKarte = daten && (
+    <UmsatzKarte
+      zeitraum={zeitraum}
+      summeCent={daten.umsatz.summeCent}
+      vergleich={daten.umsatz.vergleich}
+      laufend={daten.umsatz.laufend}
+      balken={daten.umsatz.balken}
+      vergleichLabel={daten.umsatz.vergleichLabel}
+    />
+  )
+  const gebuehrenKarte = gebuehrenKarteFuerZeitraum(pf, daten?.hofpreis ?? null)
+  const teilenKarteEl = daten && <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={zeitraum} />
+
   const inhalt = !daten ? (
     <AuswertungFehler nochmal={auswertungHref(periode, zurueck)} />
   ) : (
     <>
-      <ZeitraumWahl periode={periode} zurueck={zurueck} zeitraum={daten.umsatz.zeitraum} />
-      <KennzahlenReihe k={daten.kennzahlen} zeitraum={daten.umsatz.zeitraum} satzZeitraum={zeitraumImSatz(pf)} />
-      <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={daten.umsatz.zeitraum} />
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <UmsatzKarte
-          zeitraum={daten.umsatz.zeitraum}
-          summeCent={daten.umsatz.summeCent}
-          vergleich={daten.umsatz.vergleich}
-          laufend={daten.umsatz.laufend}
-          balken={daten.umsatz.balken}
-          vergleichLabel={daten.umsatz.vergleichLabel}
-        />
-        <GebuehrenKarte monat={daten.gebuehren} text={gebuehrenKarteText(daten.gebuehren.monat, daten.hofpreis, jetzt)} />
-      </div>
+      <ZeitraumWahl periode={periode} zurueck={zurueck} zeitraum={zeitraum} />
+      <KennzahlenReihe k={daten.kennzahlen} zeitraum={zeitraum} satzZeitraum={satzZeitraum} />
+      {/* Woche: das Diagramm direkt unter den Kennzahlen (Board s2-auswertung Bild 3); sonst erst die Links-Karte. */}
+      {periode === 'woche' ? (
+        <>
+          {umsatzKarte}
+          {teilenKarteEl}
+        </>
+      ) : (
+        <>
+          {teilenKarteEl}
+          {umsatzKarte}
+        </>
+      )}
       {daten.umsatz.einsicht && <EinsichtZeile text={daten.umsatz.einsicht} />}
       {(daten.umsatz.kanaele.length > 0 || daten.umsatz.topProdukte.length > 0) && (
         <div className="grid items-start gap-4 md:grid-cols-2">
@@ -116,9 +133,11 @@ export default async function AnalyticsPage({
           {daten.umsatz.topProdukte.length > 0 && <TopProdukteKarte produkte={daten.umsatz.topProdukte} />}
         </div>
       )}
+      {/* Reihenfolge nach Board: Diagramm → Hinweis → Wo kam das Geld her → Was lief am besten → Gebühr + Grenze. */}
+      {/* Titel, Betrag und Sätze aus demselben Zeitraum (Nr. 251 Runde 1) — nie das Modell von heute. */}
+      <GebuehrenKarte titel={gebuehrenKarte.titel} gebuehr={daten.gebuehren} text={gebuehrenKarte} />
       <GrenzeKarte
         jahr={jahr}
-        grenzeText={grenzeText}
         jahresUmsatz={daten.ytdRevenue}
         grenze={PROCESSING_REVENUE_LIMIT}
         prozent={daten.grenze.pct}
@@ -152,10 +171,12 @@ async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number,
     getYtdRevenue(farmId, jetzt),
     getKennzahlen(farmId, pf),
     getTeilenWirkung(farmId, teilenZeitraumAus(pf)),
-    getServicegebuehrenMonat(farmId, jetzt),
+    // Die Gebühr des GEWÄHLTEN Zeitraums (Nr. 251) — Anzeige, dieselbe Regel wie die Abrechnung.
+    getServicegebuehrenZeitraum(farmId, pf.aktuell),
     testzahlungenHinweisFuerHof(farmId, auswertungSummen(pf, jetzt)),
     // Der Stichtag für das Wort der Gebühr; scheitert das Lesen, gilt die Vorgabe (ladeHofpreisEinstellung meldet selbst).
     ladeHofpreisEinstellung(),
   ])
   return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis, hofpreis }
 }
+

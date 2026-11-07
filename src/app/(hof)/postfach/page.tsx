@@ -19,7 +19,12 @@ import {
 } from '@/lib/postfach'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { Textlink } from '@/components/ui/textlink'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { NEUE_MELDUNG_HREF } from '@/lib/hof-hilfe'
 import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
@@ -65,27 +70,21 @@ export default async function PostfachPage({
 
   return (
     <div className={cn(POSTFACH_RAHMEN, 'flex flex-col gap-4')}>
-      {/* Wie im Board s2-/w2-postfach: Titel und Hofzeile links, „n neu“ rechts am Rand der Spalte. */}
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-heading text-[27px] font-semibold md:text-[30px]">{POSTFACH_TEXT.titel}</h1>
-          <HofUnterzeile hofName={farm.name} jetzt={jetzt} />
-        </div>
-        {ungelesen > 0 && <Marke art="tun" className="mt-2 shrink-0">{neuText(ungelesen)}</Marke>}
-      </header>
+      {/* Werkzeug-Kopf (G1) wie im Board s2-/w2-postfach: Titel und Hofzeile, „n neu“ rechts. */}
+      <WerkzeugKopf
+        titel={POSTFACH_TEXT.titel}
+        unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />}
+        aktion={ungelesen > 0 ? <Marke art="tun">{neuText(ungelesen)}</Marke> : undefined}
+      />
 
       {faeden === null ? (
-        // Neutral mit „Neu laden“ wie im Board s2-/w2-postfach Bild 6 — der Link fragt dieselbe Seite neu.
-        <Hinweiskarte
-          ton="neutral"
-          aktion={
-            <a href={postfachFilterHref(filter)} className={KNOPF_RAHMEN}>
-              Neu laden
-            </a>
-          }
-        >
-          {POSTFACH_FEHLER.laden}
-        </Hinweiskarte>
+        // G6 mit Überschrift, Satz und „Neu laden“ (Board s2-/w2-postfach Bild 6) — der Link fragt dieselbe Seite neu.
+        <LadeFehlerKasten
+          titel={POSTFACH_FEHLER.laden.replace(/ Lade die Seite bitte neu\.$/, '')}
+          satz="Lade die Seite bitte neu. Deine Nachrichten sind nicht verloren."
+          knopf="Neu laden"
+          nochmal={postfachFilterHref(filter)}
+        />
       ) : faeden.length === 0 ? (
         <EmptyState
           titel={POSTFACH_LEER.titel}
@@ -94,7 +93,8 @@ export default async function PostfachPage({
         />
       ) : (
         <LadeRahmen>
-          <FilterChipReihe beschriftung={POSTFACH_TEXT.filterBeschriftung}>
+          {/* Polster, damit der Fokusring um „Alle“ nicht abgeschnitten wird (Liste Lauf 32 postfach). */}
+          <FilterChipReihe beschriftung={POSTFACH_TEXT.filterBeschriftung} className="md:-mx-1 md:px-1">
             <FilterChip href={postfachFilterHref('alle')} aktiv={filter === 'alle'} ladePunkt>
               {POSTFACH_TEXT.alle}
             </FilterChip>
@@ -118,7 +118,7 @@ export default async function PostfachPage({
                 }
               />
             ) : (
-              <ul className="overflow-hidden rounded-2xl border border-border bg-card dark:ring-1 dark:ring-border">
+              <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
                 {zeilen.map((zeile) => (
                   <li key={zeile.id} className="border-b border-border last:border-0">
                     <PostfachZeile zeile={zeile} />
@@ -127,10 +127,29 @@ export default async function PostfachPage({
               </ul>
             )}
             {/* Nur mit Fäden: Leer sagt der EmptyState dasselbe (DESIGN_SYSTEM „Leerzustände"). */}
-            <p className="text-[12.5px] leading-relaxed text-muted-foreground">{POSTFACH_TEXT.erklaerung}</p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              <ErklaerungMitLink />
+            </p>
           </LadeInhalt>
         </LadeRahmen>
       )}
     </div>
+  )
+}
+
+/** Der Erklärsatz mit „Problem melden“ als grünem Textlink (Board s2-/w2-postfach); der Satz bleibt EINE Quelle. */
+function ErklaerungMitLink(): React.JSX.Element {
+  // Die Anführungszeichen bleiben außerhalb des Links stehen wie im Board.
+  const wort = PROBLEM_MELDEN
+  const stelle = POSTFACH_TEXT.erklaerung.lastIndexOf(wort)
+  if (stelle < 0) return <>{POSTFACH_TEXT.erklaerung}</>
+  return (
+    <>
+      {POSTFACH_TEXT.erklaerung.slice(0, stelle)}
+      <Textlink href={NEUE_MELDUNG_HREF} form="im-satz">
+        {PROBLEM_MELDEN}
+      </Textlink>
+      {POSTFACH_TEXT.erklaerung.slice(stelle + wort.length)}
+    </>
   )
 }

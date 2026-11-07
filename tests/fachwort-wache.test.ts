@@ -232,7 +232,7 @@ describe('Fachwort-Wache', () => {
     const zeigen = [...quelldateien(join(WURZEL, 'src'))]
       .map((p) => relative(WURZEL, p).split(sep).join('/'))
       .filter((p) => p !== UMSATZGRENZE_QUELLE && /\bJAHRESSUMME_TEXT\b/.test(quelle(p)))
-    expect(zeigen.length).toBeGreaterThan(0)
+    // Seit Nr. 251 zeigt Verkäufe die Jahressumme nicht mehr (Board ohne Karte „Diese Woche“); wer sie wieder zeigt, braucht den Satz.
     for (const datei of zeigen) expect(quelle(datei), datei).toMatch(/\bUMSATZGRENZE_ERKLAERUNG\b/)
   }, 30_000)
 

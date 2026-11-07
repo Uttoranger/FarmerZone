@@ -26,6 +26,8 @@ import { telefonLink } from '@/lib/telefon-anzeige'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
@@ -69,9 +71,9 @@ export function KundenAnsicht({
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
       <header className="min-w-0">
-        <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Kunden</h1>
-        {unterzeile}
-        <p className={cn('text-[13px] leading-normal text-muted-foreground', unterzeile !== undefined && 'mt-2.5')}>
+        {/* Werkzeug-Kopf (G1) mit dem Hof-Balken darunter (G3, Liste Lauf 32 kunden). */}
+        <WerkzeugKopf titel="Kunden" unterzeile={unterzeile} />
+        <p className="text-[13px] leading-normal text-muted-foreground">
           {kunden.length > 0 ? kundenKopfzeile(kunden) : 'Alle, die bisher bei dir bestellt haben'}
         </p>
       </header>
@@ -82,7 +84,7 @@ export function KundenAnsicht({
           satz="Sobald jemand bei dir bestellt, taucht er hier auf. Eine vollständige Hofseite hilft dabei."
           ausweg={
             // Board s2/w2-kunden Bild 5: der Ausweg sagt, was hilft — die Hofseite liegt in Mein Hof.
-            <Link href="/farm-page" className={KNOPF_RAHMEN}>
+            <Link href="/farm-page" className={cn(KNOPF_RAHMEN, 'w-full justify-center border-primary text-status-offen', RUNDUNG.feld)}>
               Hofseite vervollständigen
             </Link>
           }
@@ -125,7 +127,7 @@ export function KundenAnsicht({
                 placeholder="Name, Telefon oder E-Mail"
                 className={cn(
                   // 48 px, leicht gerundet im Feldrand (Board); nie unter 44 px (WCAG 2.5.8).
-                  'h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]',
+                  'h-12 w-full border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]', RUNDUNG.feld,
                   FOKUS_RAHMEN
                 )}
               />
@@ -196,13 +198,13 @@ export function KundenAnsicht({
   )
 }
 
-/** Kreis mit den Initialen — Schmuck, der Name steht daneben. */
+/** Kreis mit den Initialen — Schmuck, der Name steht daneben; grün getönt mit grüner Schrift (Liste Lauf 32 kunden). */
 function Initialen({ name, klein = false }: { name: string; klein?: boolean }): React.JSX.Element {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-foreground',
+        'flex shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund font-semibold text-status-fertig',
         klein ? 'size-8 text-xs' : 'size-10 text-sm'
       )}
     >
@@ -231,7 +233,7 @@ function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string 
     <a
       href={anrufen}
       aria-label={`${kunde.customerName} anrufen`}
-      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
+      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
     >
       <Phone className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
     </a>
@@ -270,7 +272,7 @@ function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
                   <Link
                     href={`/customers/${k.kundeId}`}
                     title={k.customerName}
-                    className={cn('flex min-h-11 min-w-0 items-center gap-2.5 rounded-xl px-1.5 font-semibold text-foreground hover:underline', FOKUS_RAHMEN_INNEN)}
+                    className={cn('flex min-h-11 min-w-0 items-center gap-2.5 px-1.5', RUNDUNG.feld, 'font-semibold text-foreground hover:underline', FOKUS_RAHMEN_INNEN)}
                   >
                     <Initialen name={k.customerName} klein />
                     <span className="min-w-0 truncate">{k.customerName}</span>
@@ -305,11 +307,11 @@ function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
  */
 function Zeilen({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
   return (
-    <ul aria-label="Kunden" className={cn(KARTE, 'overflow-hidden lg:hidden [&>li+li]:border-t [&>li+li]:border-border')}>
+    <ul aria-label="Kunden" className={cn(KARTE, 'overflow-hidden lg:hidden')}>
       {kunden.map((k) => {
         const marke = kundenMarke(k.status)
         return (
-          <li key={k.kundeId} className="flex items-center gap-1 pr-1.5">
+          <li key={k.kundeId} className="flex items-center gap-1 border-t border-border pr-1.5 first:border-t-0">
             <Link
               href={`/customers/${k.kundeId}`}
               title={k.customerName}

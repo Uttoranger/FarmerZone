@@ -1,6 +1,7 @@
 import Link from 'next/link'
+import { Inbox } from 'lucide-react'
 import type { MeinHofReiterAlleId } from '@/lib/bauern-navigation'
-import { PRODUKTE_HREF } from '@/lib/bauern-navigation'
+import { POSTFACH_HREF, PRODUKTE_HREF } from '@/lib/bauern-navigation'
 import { datumLang } from '@/lib/heute'
 import { MEIN_HOF_KOPF_TEXT, kopfSchild, schildTon, zustandsZeile, type ZustandsKnopfArt, type ZustandsZeile } from '@/lib/mein-hof'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
@@ -30,8 +31,9 @@ import { cn } from '@/lib/utils'
  * „Bearbeiten“ (Zeile „Titelbild“).
  *
  * Adresse und „Kopieren“ stehen hier nicht: Den Link gibt „Teilen“ über das
- * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof). Das Postfach
- * des Boards in dieser Zeile gehört der HofShell (eigene Nummer).
+ * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof). Rechts in der
+ * Zeile seit Nr. 251 auch das Postfach als Symbol (Liste Lauf 32 mein-hof und
+ * produkte: „Postfach-Symbol fehlt“).
  */
 
 /** Die Hülle um den Kopf — dieselbe auf /farm-page und /products (tests/mein-hof-kopf.test.ts). */
@@ -49,9 +51,17 @@ const SYMBOL_KNOPF = cn(
  * ruhig auf der Kartenfläche. Kein Punkt mehr davor: Die Bedeutung trägt der Titel.
  */
 const TON_KARTE: Record<ZustandsZeile['ton'], string> = {
-  gruen: 'border-accent/45 bg-accent/12',
-  orange: 'border-primary/45 bg-primary/12',
+  // Die Zustandsflächen statt Grün/Orange zu 12 %: Im Dunkeln wirkten die Karten sonst neutral (Liste Lauf 32 mein-hof).
+  gruen: 'border-zustand-laeuft/30 bg-zustand-laeuft-grund',
+  orange: 'border-zustand-tun/30 bg-zustand-tun-grund',
   grau: 'border-border bg-card',
+}
+
+/** Die Überschrift der Karte in der Farbe ihres Zustands (Board: „mit farbiger Überschrift“). */
+const TON_TITEL: Record<ZustandsZeile['ton'], string> = {
+  gruen: 'text-status-fertig',
+  orange: 'text-status-offen',
+  grau: 'text-foreground',
 }
 
 /** Wohin „Eintragen“, „Abholzeiten“ und „Produkte“ führen — die Adressen aus ihren Quellen, keine zweite. */
@@ -91,7 +101,7 @@ export function MeinHofZustandsKarte({
   return (
     <div className={cn('flex min-h-[70px] items-center gap-3 rounded-[14px] border py-2 pr-2 pl-3.5', TON_KARTE[zeile.ton], className)} data-zustands-karte="">
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] leading-5 font-semibold text-foreground">{zeile.titel}</p>
+        <p className={cn('text-[15px] leading-5 font-semibold', TON_TITEL[zeile.ton])}>{zeile.titel}</p>
         {/* Nie gekürzt: Der Satz bricht um, die Karte hat Platz für zwei Satzzeilen. */}
         {/* Auf der getönten Fläche in der Textfarbe (Kontrast wie die Hinweiskarte), auf Grau leise. */}
         <p className={cn('text-[13px] leading-[1.35]', zeile.ton === 'grau' ? 'text-muted-foreground' : 'text-foreground')}>{zeile.satz}</p>
@@ -138,6 +148,10 @@ export function MeinHofKopf({
         </div>
         {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} label="Teilen" nurSymbol className={SYMBOL_KNOPF} />}
         <KundenansichtKnopf slug={hof.slug} nurSymbol className={SYMBOL_KNOPF} />
+        <Link href={POSTFACH_HREF} className={SYMBOL_KNOPF}>
+          <Inbox className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+          <span className="sr-only">Postfach</span>
+        </Link>
       </div>
 
       {/* Auf /products gibt es die Reiter nur unter md (N3); ab md ist Produkte ein Punkt der Seitenleiste. */}

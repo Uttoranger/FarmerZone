@@ -159,18 +159,12 @@ describe('UnterseitenKopf im Browser und Titel', () => {
     expect(kopf('/orders/bestellung-1', { titel: 'Bestellung FZ-1' })).not.toContain('lg:hidden')
   })
 
-  it('/fehler-melden: am Handy steht der Name nur einmal — die Leiste trägt ihn, die h1 gleichen Wortlauts nur für den Screenreader (Nr. 56)', () => {
-    // Bericht 44: „← Problem melden" in der Leiste und darunter die h1 „Problem melden".
+  it('/fehler-melden: seit Nr. 251 der Werkzeug-Kopf (G1) — die h1 steht in der Leiste, keine zweite h1 (Nr. 56 entfällt)', () => {
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
-    // Der Wortlaut kommt seit Nr. 85 aus PROBLEM_MELDEN (kein Literal) — derselbe wie der Name der Elternseite.
-    const h1 = seite.match(/<h1 className="([^"]+)">\s*\{PROBLEM_MELDEN\}\s*<\/h1>/)
-    expect(h1).not.toBeNull()
+    expect(seite).toContain('<WerkzeugKopf titel={PROBLEM_MELDEN}')
+    expect(seite).not.toMatch(/<h1\b/)
+    expect(seite).not.toContain('UnterseitenKopf')
     expect(PROBLEM_MELDEN).toBe(elternseite('/fehler-melden')?.name)
-    const klassen = h1?.[1].split(/\s+/) ?? []
-    expect(klassen).toContain('sr-only')
-    expect(klassen).toContain('md:not-sr-only')
-    // Die Ladeansicht hält den Titel-Platzhalter ebenso erst ab 768 px bereit — sonst spränge die Seite.
-    expect(quelle('src/components/hof-hilfe/hilfe-laden.tsx')).toContain('hidden h-8 w-64 rounded-lg bg-border md:block')
     // Gegenprobe: Wo Titel und Elternseite verschieden heißen, bleibt die h1 des Kopfs sichtbar.
     expect(kopf('/settings/profile', { titel: 'Hof-Profil' })).toMatch(/<h1 class="(?![^"]*sr-only)[^"]*">Hof-Profil<\/h1>/)
   })

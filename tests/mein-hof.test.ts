@@ -101,8 +101,9 @@ describe('im Kopf (components/mein-hof/seitenkopf.tsx, seit Nr. 22e der einzige)
     expect(kopf).toContain('<AdresseKopierenKnopf url={hof.adresse.url}')
   })
 
-  it('das Schild kommt aus dem Zustand und fehlt, wenn er keins hat', () => {
-    expect(kopf).toContain('if (!hof.zustand.schild) return null')
+  it('das Schild kommt aus dem Zustand; ohne Schild nur „Öffentlich ·“ bei öffentlicher Hofseite (Nr. 251), sonst nichts', () => {
+    expect(kopf).toContain('if (!hof.zustand.schild) {')
+    expect(kopf).toMatch(/return hof\.zustand\.oeffentlich \? \([\s\S]*?Öffentlich[\s\S]*?\) : null/)
     expect(kopf).toContain('{hof.zustand.schild.text}')
   })
 })

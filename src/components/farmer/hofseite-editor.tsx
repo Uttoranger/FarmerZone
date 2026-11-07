@@ -43,6 +43,7 @@ import { HOFSEITE_VOLLSTAENDIG, punkteOffenTitel, schildTon } from '@/lib/mein-h
 import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Der Reiter „Hofseite" von Mein Hof ab lg: links die Hofseite als Liste mit
@@ -115,7 +116,7 @@ function Zeile({
         aria-controls={inhaltId}
         className={cn('flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
+        <span className={cn('flex size-9 shrink-0 items-center justify-center bg-muted text-foreground', RUNDUNG.feld)}>
           <Zeichen className="size-4" strokeWidth={1.7} aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
@@ -196,8 +197,8 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
         className={cn('min-w-0 space-y-6 transition-[width] duration-200 motion-reduce:transition-none', !spalten && 'flex-1')}
         style={spalten ? { width: spalten.liste } : { maxWidth: EDITOR_LISTE_HANDY_MAX }}
       >
-        {/* Fortschritt */}
-        <div className="rounded-2xl border border-border bg-card p-5">
+        {/* Fortschritt ab lg als Zeile mit flachem Balken, ohne Karte und ohne „Es fehlen noch …“ (Liste Lauf 32 mein-hof, Nr. 251). */}
+        <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between gap-3">
             {/* „Noch 1 Punkt offen“ statt Prozent (Boards s1-/w1-mein-hof, Nr. 224) — wie die Liste unter lg. */}
             <h2 className="font-heading text-lg font-semibold text-foreground">
@@ -208,10 +209,9 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
             </p>
           </div>
           {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
             <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${fortschritt.prozent}%` }} />
           </div>
-          <p className="mt-3 text-sm text-muted-foreground">{fortschritt.satz}</p>
         </div>
 
         {aktuell && (
@@ -227,7 +227,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
                 title={`${aktuell.titel}: ${aktuell.wert}`}
                 className={cn('flex min-h-14 min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-status-fertig">
+                <span className={cn('flex size-9 shrink-0 items-center justify-center bg-muted text-status-fertig', RUNDUNG.feld)}>
                   <ZeichenAktuell className="size-4" strokeWidth={1.7} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">

@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
-import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
+import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Ladeansicht der Kunden (Nachtlauf Nr. 22a) — dieselben Maße wie die fertige
@@ -23,10 +24,8 @@ export function KundenLaden({ modus }: { modus: 'liste' | 'detail' }): React.JSX
 function ListeLaden(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
-      <div>
-        <div className="h-8 w-28 rounded-lg bg-border" />
-        <div className="mt-2 h-4 w-44 rounded bg-muted" />
-      </div>
+      <WerkzeugKopfLaden />
+      <div className="h-4 w-44 rounded bg-muted" />
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
         {/* Höchstens zwei Filter (seit Nr. 45): Alle · N, Stammkunden · N. */}
         <div className="flex gap-2 overflow-hidden xl:flex-1">
@@ -41,7 +40,7 @@ function ListeLaden(): React.JSX.Element {
         <div className="h-4 w-20 rounded bg-muted" />
         <div className="h-11 w-[123px] rounded-full bg-muted" />
       </div>
-      <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
+      <div className={cn('hidden overflow-hidden border border-border bg-card lg:block', RUNDUNG.karte)}>
         <div className="h-9 border-b border-border" />
         {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} className="flex h-[53px] items-center gap-4 border-t border-border px-3.5 first:border-t-0">
@@ -53,7 +52,7 @@ function ListeLaden(): React.JSX.Element {
           </div>
         ))}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card lg:hidden">
+      <div className={cn('overflow-hidden border border-border bg-card lg:hidden', RUNDUNG.karte)}>
         {[0, 1, 2, 3, 4].map((i) => (
           <div key={i} className="flex h-[88px] items-center gap-3 border-t border-border px-3.5 first:border-t-0">
             <div className="size-10 rounded-full bg-muted" />
@@ -72,15 +71,12 @@ function ListeLaden(): React.JSX.Element {
 function DetailLaden(): React.JSX.Element {
   return (
     <>
-      <UnterseitenKopfLaden mitTitel={false} />
+      <WerkzeugKopfLaden />
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 md:px-[18px]">
-          <div className="flex items-start gap-3.5">
+        <div className="flex flex-col gap-3.5">
+          <div className="flex items-center gap-3.5">
             <div className="size-14 rounded-full bg-muted" />
-            <div className="flex-1">
-              <div className="h-7 w-56 rounded-lg bg-border" />
-              <div className="mt-2 h-5 w-40 rounded bg-muted" />
-            </div>
+            <div className="h-5 w-40 rounded bg-muted" />
           </div>
           <div className="flex gap-2">
             {[28, 30, 26].map((breite, i) => (
@@ -92,11 +88,11 @@ function DetailLaden(): React.JSX.Element {
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-3 gap-2">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-[72px] rounded-2xl border border-border bg-card" />
+                <div key={i} className={cn('h-[72px] border border-border bg-card', RUNDUNG.karte)} />
               ))}
             </div>
             <div className="h-3 w-36 rounded bg-border" />
-            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <div className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
               {[0, 1, 2].map((i) => (
                 <div key={i} className="flex h-[62px] items-center gap-3 border-t border-border px-3.5 first:border-t-0">
                   <div className="flex-1">
@@ -108,7 +104,7 @@ function DetailLaden(): React.JSX.Element {
               ))}
             </div>
           </div>
-          <div className="h-[132px] rounded-2xl border border-border bg-card" />
+          <div className={cn('h-[132px] border border-border bg-card', RUNDUNG.karte)} />
         </div>
       </div>
     </>
