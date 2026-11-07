@@ -675,22 +675,36 @@ export function KaeuferVorschau({
   }, null)
   const ab = guenstigste?.price != null && guenstigste.nettoMenge != null ? formatGrundpreisNetto(guenstigste.price, guenstigste.nettoMenge, 'KG') : null
   const schild = futterSchild({ category, futter: { betriebsnummer: registrierung.betriebsnummer } }, registrierung.betriebsstatus)
+  // Nur Anzeige: der kleinste Preis einer sichtbaren Größe („ab € 2,65“) — verglichen, nicht gerechnet.
+  const abPreis = sichtbar.reduce<number | null>((best, z) => (z.price !== null && (best === null || z.price < best) ? z.price : best), null)
+  const anzeigeName = name.trim() || 'Dein Futter'
 
   return (
-    <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-[12px] border border-border bg-muted/40 p-4">
+    <section aria-labelledby="futter-vorschau" className={cn('flex flex-col gap-2 border border-border bg-muted/40 p-4', RUNDUNG.karte)}>
       <h3 id="futter-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         So sehen Kunden dein Futter
       </h3>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Futter'}</p>
+      {/* Am Handy eine Zeile (Liste Lauf 32, produkt-neu 390 Bild 3): „<Name> · ab € … · ab € … / kg“, darunter der
+          Gebührensatz des Modells; ab 640 px die ausführliche Vorschau. */}
+      <p className="text-sm text-foreground sm:hidden">
+        <span className="font-semibold">{anzeigeName}</span>
+        {abPreis !== null && <span className="tabular-nums"> · ab {formatEuro(abPreis)}</span>}
+        {ab && <span className="tabular-nums"> · ab {ab}</span>}
+      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 max-sm:hidden">
+        <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{anzeigeName}</p>
         {ab && <p className="text-sm font-semibold text-foreground tabular-nums">ab {ab}</p>}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground max-sm:hidden">
         {sichtbar.length === 1 ? '1 Größe sichtbar' : `${formatZahl(sichtbar.length)} Größen sichtbar`}
       </p>
-      {schild && <FutterSchild text={schild} />}
+      {schild && (
+        <div className="max-sm:hidden">
+          <FutterSchild text={schild} />
+        </div>
+      )}
       {sichtbar.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul className="flex flex-wrap gap-1.5 max-sm:hidden">
           {sichtbar.map((z) => (
             <li key={z.schluessel} className="rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground tabular-nums">
               {gewichtUngefaehr(z.unit) ? '~' : ''}
@@ -701,7 +715,7 @@ export function KaeuferVorschau({
         </ul>
       )}
       <p className="text-xs text-muted-foreground">{vorschauGebuehrSatz(preisAnzeige)}</p>
-      <p className="text-xs text-muted-foreground">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
+      <p className="text-xs text-muted-foreground max-sm:hidden">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
     </section>
   )
 }

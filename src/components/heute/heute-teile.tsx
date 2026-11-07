@@ -353,7 +353,8 @@ export function TeilenKarte({
   /** „14 Besuche über deine Links" der letzten Woche (teilenWirkungSatz). */
   wirkung?: string | null
 }): React.JSX.Element {
-  const knopf = cn(KNOPF_UMRISS, 'w-full')
+  // „Teilen“ ohne Symbol (Liste Lauf 32, heute Bild 2) — die Knöpfe gehören anderen Nummern, das Symbol blendet die Karte aus.
+  const knopf = cn(KNOPF_UMRISS, 'w-full [&>svg]:hidden')
   return (
     <div className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
       <p className="text-[15px] leading-snug font-semibold break-words">Diese Woche bei dir: {satz}</p>
@@ -432,7 +433,8 @@ export function Packliste({
     <section aria-labelledby="heute-packliste" className="flex flex-col gap-2">
       <div className="flex min-h-11 items-center gap-2">
         <h2 id="heute-packliste" className={cn(KOPF, 'min-w-0 flex-1')}>
-          Packliste
+          {/* Board w1-heute: ab 768 px „Packliste für heute“, am Handy kurz „Packliste“ (s1-heute). */}
+          Packliste<span className="max-md:hidden"> für heute</span>
           {zeilen.length > 0 && <> · {stand}</>}
         </h2>
         {zeilen.length > 0 && (
