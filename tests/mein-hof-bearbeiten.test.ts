@@ -241,7 +241,8 @@ describe('Liste „Bearbeiten"', () => {
     const html = liste(VOLLSTAENDIG)
     const titel = [...html.matchAll(/<h2 id="bearbeiten-ort-[a-z-]+"[^>]*>([^<]+)<\/h2>/g)].map((m) => m[1])
     expect(titel).toEqual(['Oben auf der Seite', 'Aufbau und Fotos', 'Abholen und Bezahlen', 'Über uns'])
-    expect(html.match(/<ul class="overflow-hidden rounded-2xl/g)).toHaveLength(4)
+    // Seit Nr. 251 Ecken in Pixeln (G8: Karten 12 px).
+    expect(html.match(/<ul class="overflow-hidden rounded-\[12px\]/g)).toHaveLength(4)
   })
 
   it('jede Zeile ist EIN Knopf: „Titel: Wert. Bearbeiten" — kein Häkchen, Schild nur bei gezählten Zeilen', () => {
@@ -445,13 +446,14 @@ describe('Titelbild — das kleine Logo der Browser-Vorschau (Nr. 108, Runde 1)'
 })
 
 describe('„Aktuell vom Hof“ unter lg (Register E12, Nr. 129, Runde 1)', () => {
-  it('erste Zeile der Liste mit Titel, „läuft noch …“ und „Beiträge ›“; ohne Angabe keine Zeile', () => {
+  it('seit Nr. 251 letzter Abschnitt der Liste (unter „Über uns“) mit Titel, „läuft noch …“ und „Beiträge ›“; ohne Angabe keine Zeile', () => {
     const html = renderToStaticMarkup(
       createElement(AbschnitteListe, { fortschritt: hofseiteFortschritt(STAND), hof: HOF, einstellungen: EINSTELLUNGEN, auftritt: AUFTRITT, aktuell: { titel: 'Aktuell vom Hof', wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage', link: { text: 'Beiträge', href: '/farm-page?reiter=beitraege' } } })
     )
-    // Nach der Karte „offen" (Titelbild, Logo, Fotos), vor den Gruppen (Name als erste übrige Zeile).
+    // Nach der Karte „offen" (Titelbild, Logo, Fotos).
     expect(html.indexOf('data-bearbeiten-zeile="fotos"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="aktuell"'))
-    expect(html.indexOf('data-bearbeiten-zeile="aktuell"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="name"'))
+    // Board s1-mein-hof (Liste Lauf 32): „Aktuell vom Hof“ steht nach allen Gruppen.
+    expect(html.indexOf('data-bearbeiten-zeile="name"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="aktuell"'))
     expect(html).toContain('Die ersten Kürbisse sind da · läuft noch 6 Tage')
     expect(html).toMatch(/<a [^>]*href="\/farm-page\?reiter=beitraege"/)
     expect(liste()).not.toContain('data-bearbeiten-zeile="aktuell"')

@@ -59,7 +59,8 @@ export default async function FehlerMeldenPage({
       {/* Werkzeug-Kopf (G1): Titel in der Leiste, damit entfällt die doppelte h1-Regel aus Nr. 56. */}
       <WerkzeugKopf titel={PROBLEM_MELDEN} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={new Date()} />} />
       <div className="lg:flex lg:items-start lg:gap-8">
-        <div className="flex min-w-0 flex-col gap-3.5 lg:w-[640px] lg:shrink-0">
+        {/* Formular 560 px, die Seitenspalte nimmt den Rest (Liste Lauf 32 meldungen: „Seitenspalte schmal“). */}
+        <div className="flex min-w-0 flex-col gap-3.5 lg:w-[560px] lg:shrink-0">
           {/* Der gemeinsame Baustein in Orange (V51, Board s2/w2-meldungen); „Abbrechen" führt ab 768 px zur Übersicht der eigenen Meldungen. */}
           <MeldungForm
             formToken={generateFormToken('meldung')}

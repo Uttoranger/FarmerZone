@@ -112,7 +112,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/karte/karten-masse.ts': 2,
   'src/components/konto/angemeldete-geraete.tsx': 2,
   'src/components/mein-hof/abschnitt-formulare.tsx': 2,
-  'src/components/mein-hof/abschnitte-liste.tsx': 3,
   'src/components/mein-hof/bild-bausteine.tsx': 3,
   'src/components/mein-hof/gespeichert-ansehen.tsx': 1,
   'src/components/mein-hof/mein-hof-laden.tsx': 3,

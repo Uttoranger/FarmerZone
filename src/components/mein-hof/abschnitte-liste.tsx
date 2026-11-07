@@ -23,8 +23,9 @@ import { cn } from '@/lib/utils'
  * Nr. 143 nach dem Board system-h1-mein-hof-v3, Bildschirme E und F, N4-Ergänzung
  * 22.10.2026): oben der Stand — bei 100 % nur die Zeile „Hofseite vollständig",
  * sonst die Karte „Noch n Punkte offen" mit genau diesen Zeilen (Abholzeiten
- * zuerst) —, dann „Aktuell vom Hof", dann die übrigen Zeilen in vier Gruppen nach
- * dem Ort auf der Seite (zeilenNachOrt), je EINE Karte mit Trennlinien. Die Zeile
+ * zuerst) —, dann die übrigen Zeilen in vier Gruppen nach dem Ort auf der Seite
+ * (zeilenNachOrt), je EINE Karte mit Trennlinien, und seit Nr. 251 zuletzt
+ * „Aktuell vom Hof" (Board s1-mein-hof: letzter Abschnitt). Die Zeile
  * „Bestellungen" (Pause) lebt im Kopf und steht hier nicht.
  *
  * Jede Zeile ist EIN Knopf: Titel, Wert, Schild (nur bei der Marke einer
@@ -146,7 +147,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
   return (
     <div className="flex flex-col gap-2.5">
       {vollstaendig ? (
-        <p className="flex min-h-12 items-center gap-2.5 rounded-[14px] border border-accent/50 bg-accent/15 px-3.5 text-[14px]">
+        <p className="flex min-h-12 items-center gap-2.5 rounded-[12px] border border-accent/50 bg-accent/15 px-3.5 text-[14px]">
           <span aria-hidden="true" className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <Check className="size-3" strokeWidth={2.6} />
           </span>
@@ -156,7 +157,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           </span>
         </p>
       ) : (
-        <section aria-labelledby="bearbeiten-stand" className="overflow-hidden rounded-2xl border border-primary/45 bg-card">
+        <section aria-labelledby="bearbeiten-stand" className="overflow-hidden rounded-[12px] border border-primary/45 bg-card">
           <div className="flex flex-col gap-2.5 px-3.5 pt-3.5 pb-3">
             <div className="flex items-baseline gap-2.5">
               <h2 id="bearbeiten-stand" className="flex-1 font-heading text-[17px] font-semibold text-foreground">
@@ -179,13 +180,26 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
         </section>
       )}
 
+      {gruppen.map((g) => (
+        <section key={g.id} aria-labelledby={`bearbeiten-ort-${g.id}`} className="flex flex-col">
+          <h2 id={`bearbeiten-ort-${g.id}`} className="px-1 pt-3.5 pb-2 text-xs font-bold tracking-[1px] text-muted-foreground uppercase">
+            {g.titel}
+          </h2>
+          <ul className="overflow-hidden rounded-[12px] border border-border bg-card">
+            {g.zeilen.map((z) => (
+              <Zeile key={z.id} zeile={z} umbrechen={false} onOeffne={oeffne} />
+            ))}
+          </ul>
+        </section>
+      ))}
+
       {aktuell && (
-        // Wie auf der Hofseite oben: der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, kein Blatt.
+        // Der letzte Abschnitt, unter „Über uns“ (Board s1-mein-hof, Liste Lauf 32). Der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, kein Blatt.
         <Link
           href={aktuell.link.href}
           data-bearbeiten-zeile="aktuell"
           title={`${aktuell.titel}: ${aktuell.wert}`}
-          className={cn('flex min-h-14 items-center gap-2.5 rounded-2xl border border-border bg-card py-2 pr-2.5 pl-3.5 hover:bg-muted/60', FOKUS_RAHMEN)}
+          className={cn('flex min-h-14 items-center gap-2.5 rounded-[12px] border border-border bg-card py-2 pr-2.5 pl-3.5 hover:bg-muted/60', FOKUS_RAHMEN)}
         >
           <CalendarDays className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -200,18 +214,6 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
         </Link>
       )}
 
-      {gruppen.map((g) => (
-        <section key={g.id} aria-labelledby={`bearbeiten-ort-${g.id}`} className="flex flex-col">
-          <h2 id={`bearbeiten-ort-${g.id}`} className="px-1 pt-3.5 pb-2 text-xs font-bold tracking-[1px] text-muted-foreground uppercase">
-            {g.titel}
-          </h2>
-          <ul className="overflow-hidden rounded-2xl border border-border bg-card">
-            {g.zeilen.map((z) => (
-              <Zeile key={z.id} zeile={z} umbrechen={false} onOeffne={oeffne} />
-            ))}
-          </ul>
-        </section>
-      ))}
 
       <Sheet
         open={offen !== null}
