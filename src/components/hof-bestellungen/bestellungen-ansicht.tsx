@@ -99,8 +99,9 @@ export function BestellungenAnsicht({
   if (modus === 'detail') {
     return (
       <LadeRahmen>
-        {/* Inhalt höchstens 1200 px breit (Liste Lauf 32, bestellung); pt-5 trägt die feste Kopfleiste am Handy (G1). */}
-        <div className="mx-auto w-full max-w-[1200px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
+        {/* Inhalt höchstens 896 px plus Rand, linksbündig neben der Seitenleiste — endet bei 1440 px wie im Board w1-bestellung
+            bei x ≈ 1200 (Liste Lauf 32, bestellung „max-w 1200“; Nr. 249b). pt-5 trägt die feste Kopfleiste am Handy (G1). */}
+        <div className="w-full max-w-[976px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
           <LadeInhalt>
             {detail && <BestellDetail key={detail.id} bestellung={detail} zurueckSuche={suche} widerrufe={widerrufe} barFrist={barFrist} geldsatz={geldsatz} />}
           </LadeInhalt>

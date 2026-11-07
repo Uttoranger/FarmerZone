@@ -351,7 +351,7 @@ export function BestellDetail({
               {/* Am Handy: Hauptaktion oben über die volle Breite, darunter die zwei Knöpfe, dann der Satz (so auch
                   die Reihenfolge beim Tabben). Ab 768 px eine Zeile rechtsbündig: Satz links, die zwei Knöpfe, die
                   Hauptaktion ganz rechts. */}
-              <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-end md:gap-3 md:px-8 xl:px-10">
+              <div className="flex w-full max-w-[976px] flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-end md:gap-3 md:px-8 xl:px-10">
                 {leisteHaupt && (
                   <button type="button" onClick={leisteHaupt.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(LEISTE_HAUPT, 'order-first md:order-last')}>
                     {leisteHaupt.text}
