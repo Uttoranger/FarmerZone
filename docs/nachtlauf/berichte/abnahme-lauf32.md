@@ -98,3 +98,110 @@ Durchgehend (mehrere Boards): Inhaltsbreite 1440 voll statt ~1100–1140 px; Han
 Nachfotos nötig (Zustand nicht hergestellt): freischalten (Dialog „Hof freischalten?“, wartender Hof mit Stripe), zugang Bild 1 (Passkey-Bestätigung vor dem CSV-Export), bestellungen (Bestellung gewählt), postfach (Faden geöffnet), startseite 1440 (Vorschau nach dem Kompilieren).
 
 Fachlich zu prüfen: admin-geld – Kachel „€ 0 · 0 Bestellungen“ gegen Plattformgebühr „€ 2,85 · online € 2,85“ gegen „online (von Stripe einbehalten) € 0,00“; admin-einstellungen – „36 sind schon vergeben“ gegen Kachel „Vergeben 12 · Frei 0“.
+
+## Zwischen-Durchgang A
+
+Stand: Zwischenstand `integration/lauf32` 90ba8d01 (243, 244, 245, 246, 247, 256, 258, 259; 248 ändert keine Seite, 249 folgt unten). Bilder: `.nachtlauf/screens/zwischen-a/<board>/` (App `<bild>-<breite>-<thema>.png` mit `.messung.json`/`.axe.json`, Board `…-board.png`), im Container, nicht committet. Fotograf: Prüfwerkzeug aus Nr. 243 (zwei eigene Bauten: Stichtag in der Vergangenheit, Port 3311; Stichtag in der Zukunft, Port 3312; dev-Fotograf für den Admin mit Prüf-Passkey). Bewertung: pruefer-ui (Opus, je Board ein frischer Agent, nur Bilder, Maßstab §35/§36, Liste mit Q1–Q5, Auftragsabschnitte „Antworten der Projektleitung“, „P-Punkte“, „Nicht herstellbare Bilder“). Boards nicht begonnener Nummern: offen (Abschnitt B).
+
+### Ergebnis (schlechtestes Bild je Fassung: 390 hell · 390 dunkel · 1440 hell · 1440 dunkel; Mails nur hell)
+
+| Board | Nummer(n) dieses Laufs | Schluss Lauf 31 | Zwischen-Durchgang A | Nummer abgeschlossen | gedeckt / offen |
+|---|---|---|---|---|---|
+| bestaetigung | 244 (253 in B) | 3·3·3·3 | 2·2·2·2 (schlechter: Bild 3 ist jetzt eine Bar-Bestellung nach dem Stichtag mit Gebührenzeile; pruefer-ui wertete das als Mangel, der Dirigent als R nach AGB 10.2 – ohne diesen Punkt bliebe Bild 3 wegen der offenen B-Zeilen von 253 bei 2–3) | 244 ja, 253 nein | offene B-Zeilen 253; R: Ware · Plattformgebühr · Gesamt (AGB 10.2) |
+| bestellung-link | 244 (253 in B) | 4·4·4·3 | 4·4·4·4 | 244 ja, 253 nein | offene B-Zeilen 253 |
+| kasse | 259 (253 in B) | 5·5·5·4 | 5·5·4·4 | 259 ja | Spaltenbreite 1440 und Rückweg ohne Listenzeile (Board oder Code) |
+| einstellungen | 245 (250 in B) | 3·3·3·3 | 3·3·3·3 | 245 ja, 250 nein | „‹“ (Frage N1), offene B-Zeilen 250, Abstände |
+| rechtstexte | 259 (254 in B) | 3·3·3·3 | 4·4·3·3 | 259 ja, 254 nein | offene B-Zeilen 254; Mangel 259: Ziel „Frühere Fassung 0.9“ < 44 px |
+| mail-hof-bestellung | 256 (255 in B) | 3 (390) · 3 (600) | Bild 2: 4 (390) · 4 (600) | 256 ja, 255 nein | Uhrzeit, Positionszeile (255) |
+| admin-heute | 258 | Admin n. a. | 2·2·3·3 | 258 ja | Admin zählt nicht zum Kriterium |
+
+(Spalte „Schluss Lauf 31“ aus docs/nachtlauf/berichte/abnahme-lauf31.md, Schluss-Durchgang.)
+
+### Messung
+
+Alle Kunden- und Hof-Bilder dieses Teils: Schrift < 12 px 0, Ziele < 44 px 0 (außer „Frühere Fassung 0.9“ auf /agb, 18 px), h1 genau 1, Felder ohne Beschriftung 0, axe ohne serious/critical. Mail: h1 nicht im HTML (Überschrift sichtbar), axe document-title (Mail-typisch). Admin › Heute: Schrift 11 px an vier Kachel-Überschriften, 390 fünf Kästchen ohne sichtbare Beschriftung.
+
+### DB-Abfragen je Aufruf (Nr. 259, lokal gemessen)
+
+| Seite | 1. Aufruf | 2. Aufruf |
+|---|---|---|
+| /agb | 1 (Tagesmessung BetriebMessung nach dem Start, nicht die Seite) | 0 |
+| /agb/1.0 | 0 | 0 |
+| /konditionen | 3 | 3 |
+
+/konditionen fragt je Aufruf COUNT Farm, PlattformEinstellung und Farm ab (vorher einmal je Stunde); A005 4e: so gelassen, kein neuer Cache.
+
+### Befunde je Board
+
+#### bestaetigung (Nr. 244 gebaut; Seiten-Nummer 253 in B) — Gesamt 2/2/2/2 (Bild 3 ohne den R-Punkt: 2, wegen der offenen B-Zeilen von 253)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Online bezahlt | 3 | 3 | 3 | 3 |
+| 2 weiter unten (in 1) | 3 | 3 | 3 | 3 |
+| 3 Bar, wartet auf Bestätigung | 2 | 2 | 2 | 2 |
+| 4 Ohne gültigen Link | 4 | 4 | 4 | 4 |
+Messung sauber (Schrift 0, Ziele 0, h1 = 1, Felder 0, axe 0).
+- Vom Dirigenten eingeordnet (pruefer-ui wertete „Mangel“): Bild 3 zeigt im Hofpreis-Modell eine eigene Zeile „Plattformgebühr · € 5,56“ und „Gesamt € 98,16“ (Waren € 92,60 + Gebühr) neben „Die Plattformgebühr ist Teil des Preises“ – das verlangen AGB 1.0 Punkt 10.2 („Die Kasse weist sie zur Information getrennt aus (‚Ware · Plattformgebühr · Gesamt‘)“) und N38 → R (Recht/Register vor Board), kein Mangel; Board-Korrektur. Nr. 244 berührt diesen Fall nicht.
+- Mangel, B-Zeilen offen (Nr. 253): Zahlzeilen „Online bezahlt · inkl. Plattformgebühr (n %)“ / „Bar bei Abholung · inkl. …“ (Z. 177, 178), h1-Größe/Kartenbreite (Z. 182), Rundung „Erzähl’s weiter“ (Z. 183), Höhe Neuigkeiten-Karte (Z. 176).
+- Mangel ohne Listenzeile: Abholzeit „15:00–18:00 Uhr“ statt „15–18 Uhr“; Logo im Web-Fuß fehlt (G11 sagt „Web ohne Logo“ – Board-Korrektur?).
+- U/Prüf-Seed: Bild 1 mit Altmodell-Bestellung (TD-0009) statt Hofpreis-Modell → Prüf-Seed um eine Online-Bestellung im Hofpreis-Modell ergänzen.
+- Gedeckt: Z. 175, 179, 180, 181, 184, 185, Q3.
+- Regel Nr. 244 erfüllt: TD-0005 „Servicegebühr (entfällt) · ~~€ 4,75~~“, Gesamt € 95,00 = Warenpreis; TD-0015 (Hofpreis, storniert) ohne Gebührenzeile, Gesamt = Ware. Beobachtung: TD-0005 zeigt den Satz „Für Bereitstellung, Abwicklung …“ trotz entfallener Gebühr; storniert zeigt in der Zahlzeile „Noch offen“ (→ 253).
+
+#### bestellung-link (Nr. 244 gebaut; Seiten-Nummer 253 in B) — Gesamt 4/4/4/4
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Bestellung ansehen | 4 | 4 | 4 | 4 |
+| 2 Bar bestätigen | 4 | 4 | 4 | 4 |
+| 3 verfallen | 5 | 5 | 4 | 4 |
+| 4 Signatur ungültig | 4 | 4 | 4 | 4 |
+Messung sauber (Schrift 0, Ziele 0, h1 = 1, Felder 0, axe 0).
+- Mangel, B-Zeilen offen (Nr. 253): Zahlzeile „Online bezahlt · … inkl. Plattformgebühr“ in Positionsgröße (Z. 192), Link-/h1-Größe (Z. 194), „Bar bei Abholung · inkl. …“ (Z. 191; Prüf-Seed braucht dafür eine Bar-Bestellung MIT Gebühr), Trennlinie und Pfeil (Z. 196).
+- Mangel ohne Listenzeile: Bild 4 mit Seitenfuß (Board ohne) – Pflicht-Links/G11, Board-Korrektur vorgeschlagen.
+- Gedeckt: Gebührenzeile vor dem Stichtag (N38/V63), Q3, Z. 190 (U), „Vertrag widerrufen“ (N39), Uhrzeit-Format (Register Nr. 82, DS V9 – Liste ohne Zeile, Board-Korrektur), Beispieldaten (U).
+- Regel Nr. 244 erfüllt (Gebühr gilt: Gesamt mit Gebühr; TD-0005 entfallen: durchgestrichen, Gesamt = Warenpreis; Gebühr 0: keine Zeile). Nicht in Bildern belegt: online erstattet, NOT_PICKED_UP mit offener Erstattung, Hofpreis mit entfallener Gebühr (durch Tests in 244 belegt).
+- Zur Kenntnis (→ 253): stornierte Bestellung zeigt „Noch offen“ in der Zahlzeile.
+
+#### kasse (Nr. 259 Kassensatz gebaut; Darstellung 253 in B) — Gesamt 5/5/4/4 (nur Board-Bild 1; übrige n. e., Stripe nicht prüfbar)
+Messung sauber (Schrift 0, Ziele 0, h1 = 1, Felder 0, axe 0).
+- Mangel ohne Listenzeile (Board-oder-Code-Frage, Kasse hat nur C/R/U): 1440 Spalten breiter als im Board (Inhalt 1152 statt 1104 px, Hauptspalte 744 statt 680, Abstand 28 statt 64, Übersicht 380 statt 360, Termin-Kacheln 63 statt 70 px); Rückweg „Zurück zum Hof“ mit Symbol statt unterstrichenem „←“ (bei bestellung-link deckt Z. 196 dasselbe als B).
+- Gedeckt: Stripe/Online nicht prüfbar (Auftrag), Z. 202 (Grafik dunkel ungedämpft, R), Z. 203, Z. 204 (U), N10-Bar-Satz, Register vor Board (Reservierungsfrist F9, USt, N38-Satz, „Angaben zum Hof“, „Deine Bestellung“ über dem Knopf, Gewährleistung vor dem Knopf), Beispieldaten (U), Q3. Grundpreis „€ 18,87 / kg“ (N38, ohne Listenzeile – bitte bestätigen).
+- A005 Schritt 6 erfüllt: ab T „Es gelten die AGB von Agrilo. Dein Vertragspartner ist der Hof.“ (Link „AGB“), vor T zusätzlich „Mit dem Bestellen stimmst du zu, dass Agrilo die Vermittlung sofort ausführt.“; Rücktrittssatz unverändert.
+
+#### einstellungen (Nr. 245 Beispiel-Route /settings; Seiten-Nummer 250 in B) — Bild 1: 3/3/3/3 (Bild 2 Fehlerkarte n. e.)
+Messung sauber (Schrift 0, Ziele 0, h1 = 1, Felder 0, axe 0).
+- Mangel, Frage N1: „‹“ vor „Einstellungen“ am Handy fehlt (/settings hat keine Elternseite) – Z. 439 nur halb (Leiste weg, Pfeil fehlt).
+- Mangel, B-Zeilen offen (Nr. 250): Futtermittel-Nummer statt „Eigene Ernte …“ (Z. 442), Gründungshof-Zeile (Z. 443), Spaltenbreite 1440 (Z. 445).
+- Mangel ohne Listenzeile: Abstände unter dem Kopf (1440: erste Karte ~34 px tiefer; 390: 29 statt 17 px, 31 statt 21 px) – Kopf G1 (245) bzw. Seite (250).
+- Erledigt durch 245: Z. 440 (Unterzeile), Leisten-Teil von Z. 439, Z. 446 (Statuspunkt).
+- Gedeckt: Z. 441, Z. 444/Q1, Q3, Seed (U), A1.
+- Ohne die offenen B-Zeilen von 250, das „‹“ und die Abstände wäre Bild 1 in allen Fassungen 5 Sterne.
+
+#### rechtstexte (Nr. 259 gebaut; Rahmen-Nummer 254 in B) — Gesamt 4/4/3/3
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 /agb | 4 | 4 | 3 | 3 |
+| 2 /agb#punkt-15 | 4 | 4 | 3 | 3 |
+| 3 /datenschutz | 4 | 4 | 3 | 3 |
+| 4 /impressum | 4 | 4 | 3 | 3 |
+| 5 /konditionen (P2 ohne Wertung) | 4 | 4 | 3 | 3 |
+| 6 /konditionen#gebuehr | 4 | 4 | 3 | 3 |
+Messung: Schrift 0, h1 = 1, Felder 0, axe ohne serious/critical (heading-order moderate im Rechtstext: R).
+- **Mangel Nr. 259 (Nacharbeit):** Link „Frühere Fassung 0.9 (für Bestellungen bis …)“ steht frei, Ziel 18 px (1440) bzw. 42 px (390) hoch, unter 44 px.
+- Mangel, B-Zeilen offen (Nr. 254): Verzeichnis ohne aktiven Eintrag und ohne Mitscrollen (Z. 847), Teil-Überschriften (Z. 854), h1 (Z. 855), Trennlinien (Z. 856), Fußbreite und Ausrichtung (Z. 850, G11), Impressum/Konditionen mittig statt linksbündig (Z. 850), „Hof registrieren“ volle Breite (Z. 857), Fußlinks am Handy (Z. 859); ohne Listenzeile: Fließtext gedämpft statt Vordergrund, Drucker-Symbol, Impressum-Kopfzeile „RECHTLICHES“.
+- Gedeckt: Z. 845, 846 (P2), 848, 849 (Q2), 851, 852 (Q3), 853, 858, 860, A1; „kontakt@agrilo.at“ ist Inline-Link (Messung ordnet ihn falsch ein).
+- A005 erfüllt: vor T /agb = 0.9 mit „Ab 6. Dezember 2026 gilt Fassung 1.0. Fassung 1.0 lesen“; ab T /agb = 1.0; /agb/0.9 und /agb/1.0 verweisen auf /agb; /konditionen ab T ohne „Entwurf“.
+- DB-Abfragen je Aufruf (lokal gemessen, Server mit Stichtag in der Vergangenheit): /agb 0 (erster Aufruf nach dem Start 1 – Tagesmessung BetriebMessung, nicht die Seite), /agb/1.0 0, /konditionen 3 je Aufruf (COUNT Farm, PlattformEinstellung, Farm) – wie im Bericht 259 aus dem Code abgeleitet; A005 4e: so gelassen, kein neuer Cache.
+
+#### mail-hof-bestellung (Nr. 256 gebaut = Bild 2; übrige Bilder Nr. 255 in B) — Bild 2: 390 hell 4 · 600 hell 4
+- Mangel, B-Zeilen offen (Nr. 255): Abholzeit „09:00–12:00 Uhr“ statt „9:00–12:00 Uhr“ (Z. 961, auch 600); Positionszeile „Bergkäse · 2 × 250 g“ statt „3× Bergkäse (250 g)“ (Z. 959, G14).
+- Nicht sichtbar, für 255 zu prüfen: Die Überschrift „Neue Bestellung eingegangen“ steht nicht in einem `<h1>` (Auftrag 256 nennt „h1“) – vermutlich die ganze Vorlage; Betreff aus dem Bild nicht prüfbar (Test in 256 prüft ihn).
+- Gedeckt: Frist mit Wochentag und Datum (Auftrag), Zeile „Kundin“ nur mit Namen (C Z. 958; ohne Telefon nach Auftrag), Fuß (R Z. 963), Ersatz-Serife (U Z. 962, Q5), gezeichneter Mail-Kopf des Boards.
+- Wie im Board: Reihenfolge, h1-Text, Einleitungssatz, Bestellnummer, Warnkasten, „Bar zu kassieren“ ohne Doppelpunkt, „Bei Heute ansehen →“, „Versandt von Agrilo.“.
+
+#### admin-heute (Nr. 258 gebaut; Admin zählt nicht zum 5-Sterne-Kriterium) — 2/2/3/3 (gleich wie Erstabnahme)
+- Nr. 258: Geld-Kachel und „Woche: n“ sichtbar in allen Fassungen („€ 233 Umsatz der Höfe · Plattformgebühr € 2,85“, „Woche: 6 (+500 % zur Vorwoche)“ im Board-Format); bei der Erstabnahme (gleicher Seed, alte Regel) „€ 0“ und „Woche: 0“ → inhaltlich besser. Zahlen belegt der Integrationstest von 258, nicht das Bild.
+- Wort-Frage (Board): „Umsatz der Höfe“ zählt jetzt auch unbestätigte Bar-Bestellungen – „Bestellwert“?
+- Messbar (→ 258b): Kachel-Überschriften 11 px (4 Stellen); 390: 5 Kästchen ohne sichtbare Beschriftung (vermutlich eingeklappte Montags-Routine).
+- Aufbau/Wortlaut (Liste für eine Admin-Board-oder-Code-Runde): „1 warten“ statt „1 wartet“; Dienste „4 von 4 laufen“ bei fünf Namen; Pillen-Lage; volle Breite; „Braucht dich“-Aufbau; „Läuft von selbst“ mit acht anderen Abläufen; Montags-Routine-Unterzeile; „Bestellungen anhalten …“ orange; 390 Kopf und einspaltige Kacheln am Ende.
+
