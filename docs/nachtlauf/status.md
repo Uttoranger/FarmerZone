@@ -296,7 +296,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 249 | Hof-Alltag | gemergt (#490) | `nacht/2026-11-06/249-hof-alltag` | #489 | vom Zwischenstand `integration/lauf32` nach 245–248 und 259 | Container-Neustart, fortgesetzt ab WIP; 1 Runde (formal: Abholzeiten-Satz als Übergang bis 250); Mängel aus dem Zwischen-Durchgang (Abholzettel „inkl.“-Satz) → B | 6./7.11.2026 |
 | 250 | Einstellungen und Teilen | offen | – | – | vom Integrationszweig von B | – | 6.11.2026 |
 | 251 | Hof-Werkzeuge | offen | – | – | vom Integrationszweig von B | – | 6.11.2026 |
-| 252 | Finden | läuft | `nacht/2026-11-06/252-finden` | – | von `integration/lauf32b` | – | 7.11.2026 |
+| 252 | Finden | fertig | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
 | 253 | Kauf und Konto | läuft | `nacht/2026-11-06/253-kauf-konto` | – | von `integration/lauf32b` | – | 7.11.2026 |
 | 254 | System und Rechtsrahmen | offen | – | – | vom Zwischenstand nach 259 und 251 | – | 6.11.2026 |
 | 255 | E-Mails | offen | – | – | vom Zwischenstand nach 257 | – | 6.11.2026 |
@@ -307,5 +307,5 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 259 | „AGB 1.0 mit dem Stichtag (A005)“ | gemergt (#490) | `nacht/2026-11-06/259-agb-1-0` | #483 | von `docs/lauf32` (PR gegen `docs/lauf32`, allein mergebar) | 1 Runde (vier Fälle, serverseitige Meldung, A005 4b wörtlich); allein mergebar nach #479 | 6./7.11.2026 |
 | Sammel 32 | Sammel-PR Lauf 32 A (243–259) | gemergt (#490) | `integration/lauf32` | #490 | main | A: 243a–249, 256, 258, 259 per --no-ff; voller Lauf 706 Dateien, 13209 Tests; Integration 97 Dateien, 789 Tests; B offen (250–255, 257, 258b, Schluss-Durchgang) | 7.11.2026 |
 | 260 | Doku B: Regelvorschläge Morgenbericht 32 A, Register-Ergänzungen N1/N32/N46 | fertig | `nacht/2026-11-06/260-doku-b` | #491 | von `integration/lauf32b` | – | 7.11.2026 |
-| 249b | Nachbesserung 249: Abholzettel-Kasten (Antwort 8), Mängel Zwischen-Durchgang | offen | – | – | vom Zwischenstand `integration/lauf32b` | – | 7.11.2026 |
+| 249b | Nachbesserung 249: Abholzettel-Kasten (Antwort 8), Mängel Zwischen-Durchgang | läuft | `nacht/2026-11-06/249b-hof-alltag-nach` | – | vom Zwischenstand `integration/lauf32b` | – | 7.11.2026 |
 | Sammel 32b | Sammel-PR Lauf 32 B | offen | `integration/lauf32b` | – | main | – | 7.11.2026 |
