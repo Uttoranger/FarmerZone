@@ -1,28 +1,39 @@
 import Link from 'next/link'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { Plus } from 'lucide-react'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { AKTIONSLEISTE_KNOPF, FesteAktionsleiste } from '@/components/ui/feste-aktionsleiste'
+import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
+import { KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
+import { cn } from '@/lib/utils'
+
+/** Der Weg zum Dialog „Verkauf eintragen“ — dieselbe Adresse wie im Neu-Menü (Register E13). */
+const NEU_HREF = '/sales?neu=1'
 
 /**
- * Fehler beim Laden der Verkäufe — inline als orange Hinweiskarte statt der
- * ganzseitigen 500 (DESIGN_SYSTEM „Zustände"). Der Weg zurück ist ein Link
- * auf dieselbe Seite: Die Seite ist dynamisch, Hinlaufen heißt neu abfragen.
+ * Fehler beim Laden der Verkäufe — inline statt der ganzseitigen 500 (DESIGN_SYSTEM „Zustände"), mit
+ * Werkzeug-Kopf samt Unterzeile (G1) und dem orangen Kasten (G6, Board s2-/w2-verkaeufe Bild 6). Die
+ * Kopf-Aktion „Verkauf eintragen“ bleibt auch im Fehler (Liste Lauf 32 verkaeufe): ein Link, der die Seite
+ * neu lädt und den Dialog öffnet. Der Weg zurück ist ein Link auf dieselbe Seite.
  */
-export function VerkaeufeFehler(): React.JSX.Element {
+export function VerkaeufeFehler({ unterzeile }: { unterzeile?: React.ReactNode }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
-      <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Verkäufe</h1>
-      <Hinweiskarte
-
-        ton="neutral"
-        titel="Wir konnten deine Verkäufe gerade nicht laden."
+      <WerkzeugKopf
+        titel="Verkäufe"
+        unterzeile={unterzeile}
         aktion={
-          <Link href="/sales" className={KNOPF_RAHMEN}>
-            Noch einmal versuchen
+          <Link href={NEU_HREF} className={cn(KNOPF_ORANGE, 'hidden md:inline-flex')}>
+            <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
+            Verkauf eintragen
           </Link>
         }
-      >
-        Es ist nichts verloren gegangen. Versuch es bitte gleich noch einmal.
-      </Hinweiskarte>
+      />
+      <LadeFehlerKasten titel="Wir konnten deine Verkäufe gerade nicht laden." nochmal="/sales" />
+      <FesteAktionsleiste className="md:hidden">
+        <Link href={NEU_HREF} className={AKTIONSLEISTE_KNOPF}>
+          Verkauf eintragen
+        </Link>
+      </FesteAktionsleiste>
     </div>
   )
 }

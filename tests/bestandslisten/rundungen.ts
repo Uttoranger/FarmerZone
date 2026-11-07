@@ -102,7 +102,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/hof-einstellungen/einstellungen-laden.tsx': 7,
   'src/components/hof-einstellungen/konditionen-ansicht.tsx': 2,
   'src/components/hof-einstellungen/teilen-momente-schalter.tsx': 3,
-  'src/components/hof-verkaeufe/verkaeufe-laden.tsx': 4,
   'src/components/hof-verkaeufe/verkauf-dialog.tsx': 2,
   'src/components/hofbereich/hof-laden.tsx': 8,
   'src/components/hofbereich/unterseiten-kopf.tsx': 1,
