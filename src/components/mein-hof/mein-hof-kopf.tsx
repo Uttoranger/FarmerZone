@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Mail } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 import type { MeinHofReiterAlleId } from '@/lib/bauern-navigation'
 import { POSTFACH_HREF, PRODUKTE_HREF } from '@/lib/bauern-navigation'
 import { datumLang } from '@/lib/heute'
@@ -149,7 +149,7 @@ export function MeinHofKopf({
         {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} label="Teilen" nurSymbol className={SYMBOL_KNOPF} />}
         <KundenansichtKnopf slug={hof.slug} nurSymbol className={SYMBOL_KNOPF} />
         <Link href={POSTFACH_HREF} className={SYMBOL_KNOPF}>
-          <Mail className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+          <Inbox className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
           <span className="sr-only">Postfach</span>
         </Link>
       </div>

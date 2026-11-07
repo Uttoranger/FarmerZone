@@ -163,7 +163,7 @@ export function KundenSortieren({
           setEntwurf(blattStart(ansicht))
           setOffen(true)
         }}
-        className={KNOPF_RAHMEN}
+        className={cn(KNOPF_RAHMEN, 'border-input bg-card font-semibold')}
       >
         {SORTIEREN_TEXT}
         <span className="sr-only">, jetzt: {sortierungBeschreibung(ansicht.sortierung, ansicht.richtung)}</span>

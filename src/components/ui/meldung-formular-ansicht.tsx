@@ -203,7 +203,16 @@ export function MeldungFormularAnsicht({
           {f.fehler}
         </HinweiskarteFehler>
       )}
-      <form onSubmit={absenden} noValidate className={cn('flex flex-col gap-3.5 border border-border bg-card p-[18px]', RUNDUNG.karte)}>
+      {/* Im Hofbereich am Handy ohne Karte, frei auf dem Grund (Board s2-meldungen); ab 768 px und bei der Kundschaft die Karte. */}
+      <form
+        onSubmit={absenden}
+        noValidate
+        className={cn(
+          'flex flex-col gap-3.5',
+          welt === 'hof' ? 'md:border md:border-border md:bg-card md:p-[18px]' : 'border border-border bg-card p-[18px]',
+          RUNDUNG.karte
+        )}
+      >
         {titel && <h1 className="font-heading text-2xl font-semibold text-foreground">{titel}</h1>}
         {satz && <p className="-mt-2 text-[15px] text-muted-foreground">{satz}</p>}
 
@@ -286,7 +295,7 @@ export function MeldungFormularAnsicht({
               onClick={f.upload.openFilePicker}
               disabled={f.upload.isUploading}
               className={cn(
-                'flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-dashed border-foreground bg-card px-3.5 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
+                'flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-foreground bg-card px-3.5 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
                 FOKUS_RAHMEN
               )}
             >

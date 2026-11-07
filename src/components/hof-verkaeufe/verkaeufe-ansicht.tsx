@@ -197,7 +197,7 @@ function Vorlagen({ kennung, vorlagen, onWahl }: { kennung: string; vorlagen: Ve
 function Kennzahl({ titel, betrag, satz }: { titel: string; betrag: number; satz: string }): React.JSX.Element {
   return (
     <div className={cn(KARTE, 'min-w-0 p-4 md:p-5')}>
-      <p className={cn('text-[13px]', LEISE)}>{titel}</p>
+      <p className="text-[13px] font-semibold text-foreground">{titel}</p>
       <p className="mt-1 font-heading text-[22px] font-semibold text-foreground tabular-nums md:text-[26px]">{formatEuro(betrag)}</p>
       <p className={cn('mt-1 text-[13px] leading-snug', LEISE)}>{satz}</p>
     </div>
@@ -218,7 +218,8 @@ function Zeile({
   const inhalt = (
     <>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14.5px] font-semibold text-foreground" title={zeile.titel}>
+        {/* Der Titel bricht um statt gekürzt zu werden (Board s2-verkaeufe: „Wochenmarkt Braunau“ zweizeilig). */}
+        <span className="block text-[14.5px] leading-snug font-semibold break-words text-foreground" title={zeile.titel}>
           {zeile.titel}
           {zeile.art === 'bestellung' && ` · ${zeile.nummer}`}
         </span>

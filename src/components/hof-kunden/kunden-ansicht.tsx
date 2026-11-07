@@ -233,7 +233,7 @@ function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string 
     <a
       href={anrufen}
       aria-label={`${kunde.customerName} anrufen`}
-      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
+      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
     >
       <Phone className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
     </a>
