@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { kurznummer } from '@/lib/meldung'
+import { kurznummerAus } from '@/lib/kurznummer'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import { POSTFACH_TEXT } from '@/lib/postfach'
 import { wochenlageGebuehrWort, wochenlageZeilen } from '@/lib/wochenlage'
@@ -144,10 +144,25 @@ export async function rendereNeuerHof(bezug: Record<string, string>): Promise<St
   const { farmId, empfaengerId } = hofBetreiberBezugSchema.parse(bezug)
   const an = await betreiberAdresse(empfaengerId)
   if (!an) return OHNE_EMPFAENGER
-  const hof = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true, name: true, slug: true, createdAt: true, owner: { select: { email: true } } } })
+  // Board s3/w3-mail-betrieb Bild 1 (Nr. 255): PLZ und Ort zum Hof und die Zeile „Fehlt noch“ — beim Versand gelesen, nur Anzeige.
+  const hof = await prisma.farm.findUnique({
+    where: { id: farmId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      createdAt: true,
+      postalCode: true,
+      city: true,
+      stripeAccountReady: true,
+      owner: { select: { email: true } },
+      _count: { select: { products: true, pickupSlots: { where: { isActive: true } } } },
+    },
+  })
   if (!hof) return { verworfen: 'hof_fehlt' }
   const { baueNewFarmNotification } = await import('@/lib/email')
-  return baueNewFarmNotification({ id: hof.id, name: hof.name, slug: hof.slug, ownerEmail: hof.owner.email, createdAt: hof.createdAt }, an)
+  const fehlt = [!hof.stripeAccountReady && 'Stripe', hof._count.products === 0 && 'Produkte', hof._count.pickupSlots === 0 && 'Abholzeit'].filter((x): x is string => typeof x === 'string')
+  return baueNewFarmNotification({ id: hof.id, name: hof.name, slug: hof.slug, ownerEmail: hof.owner.email, createdAt: hof.createdAt, postalCode: hof.postalCode, city: hof.city, fehlt }, an)
 }
 
 export async function rendereMeldung(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
@@ -163,7 +178,8 @@ export async function rendereMeldung(bezug: Record<string, string>): Promise<Sta
   return baueMeldungNotification(
     {
       id: m.id,
-      kurznummer: kurznummer(m.id),
+      // G14 (Nr. 255): die Kurznummer aus dem Ende der ID, wie Bestätigung und Postfach — nie „cmeldung“ aus dem Anfang.
+      kurznummer: kurznummerAus(m.id),
       text: m.text,
       seiteUrl: m.seiteUrl,
       userAgent: m.userAgent,

@@ -40,7 +40,7 @@ export default async function CustomersPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={KUNDEN_RAHMEN}>
-      {kunden ? <KundenAnsicht kunden={kunden} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} /> : <KundenFehler titel="Kunden" nochmal="/customers" />}
+      {kunden ? <KundenAnsicht kunden={kunden} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} /> : <KundenFehler titel="Kunden" nochmal="/customers" unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />}
     </div>
   )
 }

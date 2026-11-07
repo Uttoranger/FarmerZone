@@ -41,7 +41,8 @@ export function UnterDemWerkzeugKopf({ inhalt, children }: { inhalt: ReactNode; 
  * links „‹“ (44 px, für den Screenreader „Zurück zu <Elternseite>“), daneben
  * der Titel als h1 und die Unterzeile, rechts höchstens eine Aktion (Telefon,
  * Postfach). Web: grüner, unterstrichener Textlink „‹ <Elternseite>“, darunter
- * h1 und Unterzeile, die Aktion bündig rechts.
+ * h1 und Unterzeile, die Aktion bündig rechts. Gilt die Elternseite nur am
+ * Handy (`nurHandy`, /settings → „Mehr“), fehlt der Textlink im Web.
  *
  * Wohin der Rückweg führt und wie die Elternseite heißt, entscheidet allein
  * `elternseite` (lib/bauern-navigation.ts); ohne Elternseite (Seiten der Leiste
@@ -97,7 +98,8 @@ export function WerkzeugKopf({
           </Link>
         )}
         <div className={cn(WERKZEUG_KOPF_SPALTE, !ziel && 'pl-3 md:pl-0')}>
-          {eltern && ziel && (
+          {/* `nurHandy`: Die Elternseite gibt es im Web nicht (Mehr-Blatt) — dort kein Textlink (Board w1-einstellungen). */}
+          {eltern && ziel && !eltern.nurHandy && (
             <Link
               href={ziel}
               onClick={beimTipp(ziel)}

@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { INFOSEITE_KICKER, INFOSEITE_STAND, INFOSEITE_TEXT, INFOSEITE_TITEL } from '@/components/shared/infoseite-stil'
 import { SeiteDrucken } from '@/components/rechtstexte/seite-drucken'
 import { RechtstextVerzeichnis, type VerzeichnisGruppe } from '@/components/shared/rechtstext-verzeichnis'
@@ -75,12 +76,14 @@ export function RechtstextVorlage({
   return (
     <div
       className={cn(
-        'mx-auto w-full max-w-2xl px-4 pt-8 pb-12 md:pt-10',
-        // Ab 1024 px: links die Spalte des Verzeichnisses, rechts der Text (höchstens 672 px).
-        verzeichnis && 'lg:grid lg:max-w-[59.5rem] lg:grid-cols-[15rem_minmax(0,42rem)] lg:gap-x-10'
+        // Seit Nr. 254 (Liste Lauf 32, rechtstexte Z. 850): die Spalte der Shell (1000 px wie der Seitenfuß), der
+        // Text links darin statt mittig — auch ohne Verzeichnis (Impressum-Form, Konditionen) beginnt er an der Kante des Fußes.
+        'mx-auto w-full max-w-[1032px] px-4 pt-8 pb-12 md:pt-10',
+        // Ab 1024 px: links die Spalte des Verzeichnisses (260 px), rechts der Text (Board w3-rechtstexte Bild 1).
+        verzeichnis && 'lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-x-6'
       )}
     >
-      <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+      <div className={cn('min-w-0 lg:col-start-2 lg:row-start-1', !verzeichnis && 'max-w-2xl')}>
         <p className={INFOSEITE_KICKER}>{kicker}</p>
         <h1 className={INFOSEITE_TITEL}>{titel}</h1>
         <p className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[13.5px] text-muted-foreground">
@@ -94,10 +97,11 @@ export function RechtstextVorlage({
         )}
 
         {verzeichnis && (
-          <details className="group mt-5 rounded-2xl border border-border bg-card lg:hidden print:hidden">
+          <details className={cn(RUNDUNG.karte, 'group mt-5 border border-border bg-card lg:hidden print:hidden')}>
             <summary
               className={cn(
-                'flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 [&::-webkit-details-marker]:hidden',
+                RUNDUNG.karte,
+                'flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden',
                 FOKUS_RAHMEN
               )}
             >
@@ -123,9 +127,14 @@ export function RechtstextVorlage({
 
       {verzeichnis && (
         <aside className="hidden lg:col-start-1 lg:row-start-1 lg:block print:hidden">
+          {/* Eine geschlossene Karte ohne sichtbaren Rollbalken (Z. 854); ist sie höher als das Fenster, rollt sie
+              innen, und das Verzeichnis holt den gelesenen Eintrag selbst ins Bild (Z. 847). */}
           <nav
             aria-labelledby={`${verzeichnis.kennung}-spalte`}
-            className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-2xl border border-border bg-card px-3 py-3 print:hidden"
+            className={cn(
+              RUNDUNG.karte,
+              'sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto border border-border bg-card p-3.5 [scrollbar-width:none] print:hidden'
+            )}
           >
             <p id={`${verzeichnis.kennung}-spalte`} className={cn(INFOSEITE_KICKER, 'mb-1 px-1')}>
               {RECHTSTEXT_TEXT.inhalt}

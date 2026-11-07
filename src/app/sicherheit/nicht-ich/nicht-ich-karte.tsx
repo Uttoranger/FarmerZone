@@ -25,11 +25,12 @@ import { KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
  * ohne Symbol mit der Überschrift in der Warnfarbe und „Zur Anmeldung“ als
  * Umriss über die volle Breite (Board s2-/w2-systemseiten, Bild 5).
  */
-const KARTE = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px]'
-const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-accent/45 bg-accent/12 p-[18px]'
+// Ecken 12 px (G8) und engere Zeilen wie im Board s2-/w2-systemseiten (Liste Lauf 32, systemseiten „Karte zu rund, Zeilenabstand größer“).
+const KARTE = 'flex max-w-[520px] flex-col gap-2.5 rounded-[12px] border border-border bg-card p-[18px]'
+const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-2.5 rounded-[12px] border border-accent/45 bg-accent/12 p-[18px]'
 
 const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
-const SATZ = 'text-[15px] leading-normal text-foreground'
+const SATZ = 'text-[15px] leading-snug text-foreground'
 
 type Stand = 'offen' | 'ungueltig' | { passwortMail: boolean; passkey?: true }
 
@@ -108,7 +109,7 @@ export function NichtIchKarte({
       )}
       <p className={SATZ}>{NICHT_ICH_TEXT.erklaerung}</p>
       {fehler && (
-        <p role="alert" className="rounded-xl border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground">
+        <p role="alert" className="rounded-[12px] border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground">
           {fehler}
         </p>
       )}

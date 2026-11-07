@@ -12,6 +12,7 @@ import {
   checkConnectStatus,
   schalteOnlineZahlungEin,
 } from '@/server/actions/stripe-connect'
+import { cn } from '@/lib/utils'
 
 interface PaymentsActionsProps {
   hasAccount: boolean
@@ -145,8 +146,10 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <button type="button" onClick={handleSetup} disabled={loading} className={KNOPF_ORANGE}>
+    // Der Hauptknopf über die volle Kartenbreite (Liste Lauf 32, hofdaten-zahlung „Knöpfe schmal“, Nr. 250);
+    // „Status prüfen“ (C-Zeile) darunter.
+    <div className="flex flex-col gap-2">
+      <button type="button" onClick={handleSetup} disabled={loading} className={cn(KNOPF_ORANGE, 'w-full justify-center')}>
         {loading ? (
           <Warten />
         ) : (

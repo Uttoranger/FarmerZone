@@ -3,8 +3,10 @@ import type { Metadata } from 'next'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { ladeTeilenMomente } from '@/server/queries/einstellungen'
 import { teilenMomenteAn, TEILEN_MOMENTE_SATZ, TEILEN_MOMENTE_TITEL } from '@/lib/teilen-momente'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { getFarmForUser } from '@/server/queries/dashboard'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { UNTERSEITE_RAHMEN, UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import { TeilenMomenteSchalter } from '@/components/hof-einstellungen/teilen-momente-schalter'
 import { MARKE } from '@/lib/marke'
 
@@ -19,12 +21,16 @@ export const dynamic = 'force-dynamic'
 export default async function TeilenMomentePage(): Promise<React.JSX.Element> {
   const { userId } = await verlangeHofDerSitzung()
 
-  const hof = await ladeTeilenMomente(userId)
+  // Der Hofname der Unterzeile aus der Abfrage, die das Layout ohnehin stellt.
+  const [hof, kopf] = await Promise.all([ladeTeilenMomente(userId), getFarmForUser(userId)])
   if (!hof) redirect('/onboarding')
+  const jetzt = new Date()
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel={TEILEN_MOMENTE_TITEL} satz={TEILEN_MOMENTE_SATZ} />
+      {/* Werkzeug-Kopf (G1, Nr. 250) mit Hof-Unterzeile, der Satz darunter (Board s2-/w2-konto-hof Bild 5). */}
+      <WerkzeugKopf titel={TEILEN_MOMENTE_TITEL} unterzeile={kopf ? <HofUnterzeile hofName={kopf.name} jetzt={jetzt} /> : undefined} />
+      <p className={UNTERSEITE_SATZ}>{TEILEN_MOMENTE_SATZ}</p>
       <TeilenMomenteSchalter anfangsAn={teilenMomenteAn(hof)} />
     </div>
   )

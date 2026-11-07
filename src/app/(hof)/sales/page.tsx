@@ -52,5 +52,6 @@ export default async function SalesPage(): Promise<React.JSX.Element> {
     Sentry.captureException(err, { tags: { bereich: 'verkaeufe', seite: 'liste' }, extra: { farmId: farm.id } })
   }
 
-  return <div className={VERKAEUFE_RAHMEN}>{daten ? <VerkaeufeAnsicht {...daten} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} /> : <VerkaeufeFehler />}</div>
+  const unterzeile = <HofUnterzeile hofName={farm.name} jetzt={jetzt} />
+  return <div className={VERKAEUFE_RAHMEN}>{daten ? <VerkaeufeAnsicht {...daten} unterzeile={unterzeile} /> : <VerkaeufeFehler unterzeile={unterzeile} />}</div>
 }

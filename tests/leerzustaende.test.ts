@@ -16,6 +16,8 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -30,7 +32,6 @@ vi.mock('@/server/actions/farm', () => ({
 vi.mock('@/server/actions/status-posts', () => ({ setzeWhatsAppGetippt: () => undefined }))
 
 import { ABHOLZEITEN_FEHLEN, ABHOLZEITEN_FORMULAR_ID } from '@/lib/pickup-slot-rules'
-import { HEUTE_ABHOLZEITEN_SATZ } from '@/lib/heute'
 import { UMSATZ_LEER } from '@/lib/auswertung'
 import { WHATSAPP_VERSAND_TEXT } from '@/lib/whatsapp-versand'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
@@ -51,6 +52,7 @@ beforeAll(async () => {
 }, 30_000)
 
 const html = (el: React.ReactElement) => renderToStaticMarkup(el)
+const quelle = (datei: string) => readFileSync(join(process.cwd(), datei), 'utf8')
 const maskiere = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const anzahlEmptyStates = (h: string) => (h.match(/data-slot="empty-state"/g) ?? []).length
 /** Wie oft der Text im Markup steht. */
@@ -67,7 +69,7 @@ describe('Heute — keine Abholzeiten', () => {
     const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, tag: null, anzahl: 0 }))
     // So stehen die beiden Blöcke auf /dashboard untereinander (app/(hof)/dashboard/page.tsx).
     const seite = packliste + karte
-    expect(vorkommen(seite, HEUTE_ABHOLZEITEN_SATZ)).toBe(1)
+    expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.satz)).toBe(1)
     expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.aktion.text)).toBe(1)
     expect(packliste).toMatch(alsLink(ABHOLZEITEN_FEHLEN.aktion.href, ABHOLZEITEN_FEHLEN.aktion.text))
     expect(karte).toBe('')
@@ -88,7 +90,7 @@ describe('Heute — keine Abholzeiten', () => {
       createElement(heute.Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr' } })
     )
     expect(packliste).toContain('Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr')
-    expect(packliste).not.toContain(HEUTE_ABHOLZEITEN_SATZ)
+    expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.satz)
     expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.aktion.text)
   })
 })
@@ -162,15 +164,16 @@ describe('WhatsApp — keine Abonnentin', () => {
   const basis = { postId: 'p1', title: 'Frische Eier', body: 'Heute neu im Shop.', farmSlug: 'hof-test', showOnFarmPage: true, getippt: [] }
   const anzahlH1 = (h: string) => (h.match(/<h1\b/g) ?? []).length
 
-  it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen; sein Titel ist die eine h1', () => {
+  it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen; die h1 „WhatsApp versenden“ trägt der Werkzeug-Kopf der Seite (Nr. 250)', () => {
     const h = html(createElement(whatsapp.WhatsAppTapClient, { ...basis, abonnentinnen: [] }))
     expect(anzahlEmptyStates(h)).toBe(1)
     expect(h).toContain(WHATSAPP_VERSAND_TEXT.leer.satz)
     expect(h).toMatch(alsLink(BEITRAEGE_HREF.replaceAll('&', '&amp;'), WHATSAPP_VERSAND_TEXT.leer.aktion))
-    expect(anzahlH1(h)).toBe(1)
-    expect(h).toMatch(new RegExp(`<h1[^>]*>${maskiere(WHATSAPP_VERSAND_TEXT.leer.titel)}</h1>`))
-    // Keine zweite Fassung der Überschrift (unsichtbar oder nicht) und kein Fachwort.
-    expect(h).not.toContain('WhatsApp versenden')
+    // Board s2-whatsapp-plakat Bild 2: h1 „WhatsApp versenden“ im Kopf, der Leerzustand darunter ohne eigene h1.
+    expect(anzahlH1(h)).toBe(0)
+    expect(h).toContain(WHATSAPP_VERSAND_TEXT.leer.titel)
+    expect(quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')).toContain("WHATSAPP_SEITE_TITEL = 'WhatsApp versenden'")
+    // Kein Fachwort.
     expect(h).not.toContain('Opt-in')
   })
 
@@ -182,7 +185,7 @@ describe('WhatsApp — keine Abonnentin', () => {
     const abonnentinnen = [{ id: 'a1', name: 'Erika Mustermann', phone: '+43 660 0000000' }]
     const h = html(createElement(whatsapp.WhatsAppTapClient, { ...basis, abonnentinnen }))
     expect(anzahlEmptyStates(h)).toBe(0)
-    expect(anzahlH1(h)).toBe(1)
+    expect(anzahlH1(h)).toBe(0)
     expect(h).toContain('Erika')
   })
 })

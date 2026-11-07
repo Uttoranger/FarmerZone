@@ -9,10 +9,9 @@ import { Sheet, SheetBlatt, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
-import { KANAL_SYMBOL } from '@/components/sales/kanal-symbol'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FeldFehler } from '@/components/checkout/kasse-teile'
-import { FELD, FELD_LABEL, KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
 import { createManualSale, updateManualSale } from '@/server/actions/manual-sales'
 import type { VerkaufDaten, VerkaufProdukt } from '@/lib/hof-verkaeufe'
 import { manualSaleFormSchema } from '@/schemas/manual-sale'
@@ -33,6 +32,7 @@ import {
 } from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * „Verkauf eintragen" im neuen Design (Nachtlauf Nr. 22b, Register E13) —
@@ -219,8 +219,19 @@ export function VerkaufFormular({
 
   return (
     <form onSubmit={form.handleSubmit(absenden)} noValidate className={cn('flex min-h-0 flex-col', breit ? 'max-h-[min(92dvh,760px)]' : 'gap-4')}>
-      <div className={cn('flex items-start justify-between gap-3', breit && 'px-6 pt-6')}>
-        <div className="min-w-0">{titel(bearbeiten ? 'Verkauf bearbeiten' : 'Verkauf eintragen')}</div>
+      {/* „Abbrechen“ oben rechts neben dem Titel, darunter der Tag als Chip (V11, Board s2-/w2-verkaeufe Bild 2). */}
+      <div className={cn('flex flex-col items-start gap-2', breit && 'px-6 pt-6')}>
+        <div className="flex w-full items-start justify-between gap-3">
+          <div className="min-w-0 pt-2">{titel(bearbeiten ? 'Verkauf bearbeiten' : 'Verkauf eintragen')}</div>
+          <button
+            type="button"
+            onClick={onAbbrechen}
+            disabled={laeuft}
+            className={cn('-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+          >
+            Abbrechen
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => setDatumOffen((o) => !o)}
@@ -290,8 +301,8 @@ export function VerkaufFormular({
         <fieldset className="min-w-0">
           <legend className="mb-2 text-sm font-semibold text-foreground">Wo verkauft?</legend>
           <div className="grid grid-cols-4 gap-2">
+            {/* Ohne Symbole (Liste Lauf 32 verkaeufe: „Kanal-Knöpfe mit Symbolen“). */}
             {HAUPTKANAELE.map((k) => {
-              const Symbol = KANAL_SYMBOL[k.value]
               const aktiv = werte.channel === k.value
               return (
                 <button
@@ -300,13 +311,12 @@ export function VerkaufFormular({
                   aria-pressed={aktiv}
                   onClick={() => form.setValue('channel', k.value)}
                   className={cn(
-                    'flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-1 py-2.5 text-center transition-colors duration-[250ms]',
+                    'flex min-h-12 min-w-0 items-center justify-center border px-1 py-2 text-center transition-colors duration-[250ms]', RUNDUNG.feld,
                     aktiv ? WAHL_AN : WAHL_AUS,
                     FOKUS_RAHMEN
                   )}
                 >
-                  <Symbol className="size-5" strokeWidth={1.7} aria-hidden="true" />
-                  <span className="max-w-full truncate text-xs font-semibold">{k.label}</span>
+                  <span className="max-w-full truncate text-[13.5px] font-semibold">{k.label}</span>
                 </button>
               )
             })}
@@ -315,15 +325,15 @@ export function VerkaufFormular({
             type="button"
             aria-pressed={werte.channel === 'OTHER'}
             onClick={() => form.setValue('channel', 'OTHER')}
+            // „Anderes“ als Textlink (Liste Lauf 32 verkaeufe); gewählt sagt aria-pressed, der Haken ist nur fürs Auge.
             className={cn(
-              'mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm transition-colors duration-[250ms]',
-              werte.channel === 'OTHER' ? cn(WAHL_AN, 'font-semibold') : cn(WAHL_AUS, 'border-dashed font-medium'),
+              'mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-sm text-[15px] font-semibold text-status-offen underline-offset-2',
+              werte.channel === 'OTHER' ? 'underline' : 'hover:underline',
               FOKUS_RAHMEN
             )}
           >
-            {/* Gewählt sagt aria-pressed — der Haken ist nur fürs Auge. */}
             {werte.channel === 'OTHER' && <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />}
-            Anderer Weg
+            Anderes
           </button>
         </fieldset>
 
@@ -461,33 +471,15 @@ export function VerkaufFormular({
         </div>
 
         <p className="text-[13px] leading-relaxed text-muted-foreground">
-          Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst — auch die mit &bdquo;Bar bei
+          Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst – auch die mit &bdquo;Bar bei
           Abholung&ldquo;.
         </p>
 
         <DialogFehler text={serverFehler} />
       </div>
 
-      {breit ? (
-        <div className="flex flex-wrap justify-end gap-2.5 border-t border-border px-6 py-4">
-          <button type="button" onClick={onAbbrechen} disabled={laeuft} className={KNOPF_RAHMEN}>
-            Abbrechen
-          </button>
-          {hauptKnopf}
-        </div>
-      ) : (
-        <>
-          {hauptKnopf}
-          <button
-            type="button"
-            onClick={onAbbrechen}
-            disabled={laeuft}
-            className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-status-fertig hover:bg-muted', FOKUS_RAHMEN)}
-          >
-            Abbrechen
-          </button>
-        </>
-      )}
+      {/* Genau ein „Abbrechen“ (oben rechts); unten nur der Hauptknopf. */}
+      {breit ? <div className="flex flex-wrap justify-end gap-2.5 border-t border-border px-6 py-4">{hauptKnopf}</div> : hauptKnopf}
     </form>
   )
 }

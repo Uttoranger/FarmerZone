@@ -19,7 +19,6 @@ import {
 } from '@/lib/bestaetigung'
 import { zahlungFortsetzenPfad } from '@/lib/kasse'
 import { positionMengeVorn } from '@/lib/format'
-import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
@@ -66,8 +65,11 @@ export const metadata: Metadata = {
  */
 const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-3 px-4 pt-6 pb-12 md:gap-4 md:px-4 md:pt-8 md:pb-0'
 
-/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen, Erzähl's weiter · Neuigkeiten), am Handy 12 px. */
+/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen), am Handy 12 px. */
 const PAAR = 'grid items-start gap-3 md:grid-cols-2 md:gap-4'
+
+/** Erzähl's weiter · Neuigkeiten: gleich hoch, Inhalt oben (Liste Lauf 32, bestaetigung). */
+const PAAR_GLEICH_HOCH = 'grid items-stretch gap-3 md:grid-cols-2 md:gap-4'
 
 /*
  * Neues Design (Nr. 13): KundeShell ohne Unterleiste — eine Fokus-Seite mit
@@ -89,9 +91,10 @@ function BestellungEingegangen() {
   // Seite den Stand nicht — ein alter Link oder ein Lesezeichen leert keinen neuen Korb.
   return (
     // Board s1-bestaetigung Bild 4: am Handy die Titelzeile „Bestellung“ statt Marke und Knopf.
-    <KundeShellMitSitzung unterleiste={false} handyTitel="Bestellung" fussSpalte="md:max-w-[608px]">
-      {/* Board s1-/w1-bestaetigung Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zu den Höfen. */}
-      <div className={cn(SPALTE, 'max-w-[592px]')}>
+    <KundeShellMitSitzung unterleiste={false} handyTitel="Bestellung" fussSpalte="md:max-w-[568px]">
+      {/* Board s1-/w1-bestaetigung Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zu den Höfen — 520 px breit
+          (Liste Lauf 32, bestaetigung). */}
+      <div className={cn(SPALTE, 'max-w-[552px]')}>
         <div className={cn(KARTE, 'flex flex-col gap-3')}>
           <BestaetigungKopf
             kopf={{
@@ -101,6 +104,7 @@ function BestellungEingegangen() {
               satz: 'Danke – alle Details stehen in deiner E-Mail.',
             }}
             satzLeise
+            titelKlein
           />
           <Link href="/hoefe" className={KNOPF_BREIT_RAHMEN}>
             Höfe entdecken
@@ -125,6 +129,8 @@ async function getOrder(orderId: string) {
       serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       // Keine Personendaten hier (Nr. 153): Den Namen zeigt die Seite nie, die
       // E-Mail holt `adresseSolangeOffen` nur für eine laufende Bestellung.
       createdAt: true,
@@ -205,7 +211,6 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   // „Bezahlt" und „bestätigt" nur aus der Datenbank; redirect_status ist
   // höchstens ein Hinweis (src/lib/bestaetigung.ts).
   const zustand = bestaetigungsZustand(order, redirect_status)
-  const zahlung = zahlungsAnzeige(order.paymentMethod, order.paymentStatus)
   const bloecke = bestaetigungsBloecke(zustand, order.status)
 
   // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
@@ -293,7 +298,6 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         <BestellPositionen
           positionen={positionen}
           summen={order}
-          zahlung={`${zahlung.art} · ${zahlung.zustand}`}
           // Bar offen nennt die Karte mit der Frist Termin und Adresse schon (Board Bild 3: keine Zeile darunter).
           fuss={
             !bloecke.abholkarte &&
@@ -308,7 +312,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         {/* Bar offen zeigt das Board nach der Bestellung nichts mehr (s1-/w1-bestaetigung Bild 3, Lauf 31): Die Karte
             der Neuigkeiten kommt, sobald die Bestellung bestätigt ist — die Seite, auf die der Link der Mail führt. */}
         {(bloecke.teilen || (neuigkeiten && !bloecke.fristHinweis)) && (
-          <div className={PAAR}>
+          <div className={PAAR_GLEICH_HOCH}>
             {/* Nur Name und Slug: geteilt wird die öffentliche Hofseite, nie diese signierte Adresse. */}
             {bloecke.teilen && <HofTeilenKarte hofName={order.farm.name} hofSlug={order.farm.slug} />}
             {/* Register N2 (Nr. 46): die Neuigkeiten-Anmeldung, vorher ein Haken in der Kasse.

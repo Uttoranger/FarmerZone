@@ -22,6 +22,7 @@ export function MeldungForm({
   abbrechenHref,
   titel,
   satz,
+  einleitung,
   kennungVorbelegt = '',
   hofName,
 }: {
@@ -36,6 +37,8 @@ export function MeldungForm({
   /** Überschrift in der Karte, wenn die Seite keine eigene trägt. */
   titel?: string
   satz?: string
+  /** Satz über dem Formular, der nach dem Absenden entfällt. */
+  einleitung?: string
   /**
    * Die Fehlernummer aus der Adresse, schon geprüft (`bereinigeKennung`,
    * src/lib/fehlerseite.ts). Wer von der Fehlerseite kommt, soll sie nicht
@@ -46,5 +49,5 @@ export function MeldungForm({
   hofName?: string
 }): React.JSX.Element {
   const formular = useMeldungFormular({ formToken, alsHof, kennungVorbelegt })
-  return <MeldungFormularAnsicht formular={formular} welt={welt} alsHof={alsHof} abbrechenHref={abbrechenHref} titel={titel} satz={satz} hofName={alsHof ? hofName : undefined} />
+  return <MeldungFormularAnsicht formular={formular} welt={welt} alsHof={alsHof} abbrechenHref={abbrechenHref} titel={titel} satz={satz} einleitung={einleitung} hofName={alsHof ? hofName : undefined} />
 }

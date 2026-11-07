@@ -25,7 +25,8 @@ import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
-import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
+import { BETRIEBSNUMMER_ANKER } from '@/lib/taxonomie'
+import { MARKE } from '@/lib/marke'
 import {
   BAR_GEBUEHR_SEPA_SATZ,
   BAR_OHNE_GEBUEHR_SATZ,
@@ -126,7 +127,12 @@ export const KONTO_TEXT = {
   passwortTitel: 'Passwort ändern',
   stilllegenSatz: 'Deinen Hof dauerhaft schließen.',
   nurVoruebergehend: 'Nur vorübergehend zusperren? Dann nutze lieber',
-  nurHofSchliessen: 'Nur den Hof schließen, dein Konto aber behalten? Dann nutze oben',
+  nurVoruebergehendNach: '– dabei bleibt deine Hofseite mit einem Hinweis sichtbar.',
+  /** Konto löschen wörtlich nach Board s2-/w2-konto-hof Bild 2 (nennt die 7 Jahre Aufbewahrung). */
+  loeschenTitel: 'Konto löschen',
+  loeschenSatz: `Schreib dem ${MARKE}-Support – die Nachricht ist bereits vorausgefüllt. Bestelldaten müssen wir aus steuerrechtlichen Gründen 7 Jahre aufbewahren. Nur den Hof schließen? Dann nutze „Hof stilllegen“ – dabei bleiben alle Daten erhalten.`,
+  loeschenKnopf: 'Support schreiben',
+  anmeldeAdresseNach: '. Die Nachricht ist bereits vorausgefüllt.',
 } as const
 
 export type EinstellungenDaten = {
@@ -165,6 +171,25 @@ function fehlendAuf(zeilen: readonly HofseiteZeile[], ziel: string): string[] {
 
 function esFehlt(teile: readonly string[]): string {
   return `Es ${teile.length === 1 ? 'fehlt' : 'fehlen'}: ${aufzaehlung(teile)}`
+}
+
+/** Nimmt ein führendes „LFBIS“ (mit Leerzeichen, Bindestrich oder Doppelpunkt) weg; bleibt nichts übrig, die Eingabe. */
+function ohneLfbisVorsatz(nummer: string): string {
+  const rest = nummer.trim().replace(/^LFBIS[\s:-]*/i, '')
+  return rest === '' ? nummer.trim() : rest
+}
+
+/**
+ * Die Zeile „Futtermittel-Registrierung“ mit Nummer (Liste Lauf 32, einstellungen „Eigene Ernte“, Nr. 250):
+ * ohne das Fachwort der Betriebsart, immer „Futtermittel-Nummer (LFBIS) …“; ist der Hof beim BAES
+ * registriert oder zugelassen, steht zusätzlich „BAES-Meldung“ dahinter. Ohne zweite Nummer: Der Hof speichert
+ * nur eine (Farm.betriebsnummer), die BAES-Meldung kommt aus dem Status (wie in lib/futter-registrierung.ts).
+ */
+export function futtermittelZeile(betriebsstatus: Betriebsstatus | null, nummer: string): string {
+  // Höfe tragen die Nummer oft samt Vorsatz ein („LFBIS 1234567“); die Beschriftung nennt LFBIS schon,
+  // darum fällt der Vorsatz nur in der Anzeige weg — gespeichert bleibt, was der Hof eingetragen hat.
+  const lfbis = `Futtermittel-Nummer (LFBIS) ${ohneLfbisVorsatz(nummer)}`
+  return betriebsstatus === 'REGISTRIERT' || betriebsstatus === 'ZUGELASSEN' ? `${lfbis} · BAES-Meldung` : lfbis
 }
 
 /**
@@ -228,11 +253,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'futtermittel',
       titel: 'Futtermittel-Registrierung',
-      zeile: nummer
-        ? d.betriebsstatus
-          ? `${BETRIEBSSTATUS[d.betriebsstatus].name} · ${nummer}`
-          : nummer
-        : 'Keine Nummer — brauchst du nur, wenn du Futter verkaufst',
+      zeile: nummer ? futtermittelZeile(d.betriebsstatus, nummer) : 'Keine Nummer — brauchst du nur, wenn du Futter verkaufst',
       ton: nummer ? 'fertig' : 'neutral',
       href: `/settings/profile#${BETRIEBSNUMMER_ANKER}`,
     },
@@ -402,7 +423,14 @@ export function konditionenZeile(hof: TarifHof, jetzt: Date): string {
   const zeile = baueTarifZeile({ tarif: hof.tarif, gruendungBis: hof.gruendungBis, produkteImShop: 0 }, jetzt)
   if (zeile === null) return tarifText('HOFLADEN').name
   // Bei Hoftor nur der Titel: „Produkte im Shop" ohne die Zahl sagte nichts.
-  return zeile.zustand === 'hoftor' ? zeile.titel : `${zeile.titel} · ${zeile.zeile}`
+  if (zeile.zustand === 'hoftor') return zeile.titel
+  // Gründungshof in der Übersicht wörtlich nach Board s1-/w1-einstellungen (Liste Lauf 32, Nr. 250): „Gründungshof
+  // bis <Datum> · ohne Grundgebühr“ — das Datum aus dem Stand wie in der Tarif-Zeile (formatDatumLang); „gruendungshof“
+  // gibt es nur mit gruendungBis. „ohne Grundgebühr“ ohne „bis“ hat in konditionen.ts keinen eigenen Eintrag (Bericht 250).
+  if (zeile.zustand === 'gruendungshof' && hof.gruendungBis) {
+    return `${zeile.titel} bis ${formatDatumLang(hof.gruendungBis)} · ohne Grundgebühr`
+  }
+  return `${zeile.titel} · ${zeile.zeile}`
 }
 
 // ─── Konditionen: Rechenbeispiel ────────────────────────────────────────────

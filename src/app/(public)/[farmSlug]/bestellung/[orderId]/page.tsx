@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellSignatur, widerrufPfad } from '@/lib/bestell-link'
 import { widerrufMoeglich } from '@/lib/widerruf'
 import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
-import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
+import { bestellStatusAnzeige, formatiereAbholtermin } from '@/lib/bestellstatus'
 import { positionMengeVorn } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { cn } from '@/lib/utils'
@@ -68,7 +68,7 @@ function LinkUngueltig() {
       {/* Board s1-/w1-bestellung-link Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zur Hofübersicht. */}
       <div className="mx-auto w-full max-w-[552px] px-4 pt-6 pb-12 md:pt-10">
         <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
-          <h1 className="font-heading text-[24px] leading-tight font-semibold text-foreground md:text-[26px]">
+          <h1 className="font-heading text-[24px] leading-tight font-semibold text-foreground">
             {BESTELLSEITE_LINK_UNGUELTIG.titel}
           </h1>
           <p className="text-[15px] leading-normal text-muted-foreground">{BESTELLSEITE_LINK_UNGUELTIG.satz}</p>
@@ -102,6 +102,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
@@ -139,7 +141,6 @@ export default async function BestellungPage({ params, searchParams }: Props) {
     order.pickupTimeEnd
   )
   const status = bestellStatusAnzeige(order.status, abholtermin, order.paymentMethod)
-  const zahlung = zahlungsAnzeige(order.paymentMethod, order.paymentStatus)
   // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
   const jetzt = new Date()
 
@@ -169,12 +170,13 @@ export default async function BestellungPage({ params, searchParams }: Props) {
             Bestellnummer als h1 mit dem Schild des Status (Art aus bestellStatusAnzeige, Register G5 — dieselbe wie
             die Liste, storniert rot). Den Satz an die Kundin zeigt das Board hier nicht (Lauf 31): Termin und Stand stehen
             in Schild und Abholkarte. */}
-        <div className="flex flex-col gap-1">
-          <Textlink href={`/${order.farm.slug}`} className="self-start text-[14px] font-medium break-words underline">
+        {/* Liste Lauf 32 (bestellung-link): Link 15 px wie der Textlink-Baustein, h1 24 px, 12 px Abstand darunter. */}
+        <div className="flex flex-col gap-3">
+          <Textlink href={`/${order.farm.slug}`} className="self-start break-words underline">
             Deine Bestellung bei {order.farm.name}
           </Textlink>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="min-w-0 font-heading text-[26px] leading-tight font-semibold break-words text-foreground md:text-[28px]">
+            <h1 className="min-w-0 font-heading text-[24px] leading-tight font-semibold break-words text-foreground">
               {order.orderNumber}
             </h1>
             <Marke art={status.art} form="schild">
@@ -209,7 +211,6 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           titel="Positionen"
           positionen={positionen}
           summen={order}
-          zahlung={`${zahlung.art} · ${zahlung.zustand}`}
           summeInZahlzeile
         />
 

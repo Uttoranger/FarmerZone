@@ -11,8 +11,4 @@ export const STARTFOKUS_BESTAND: Readonly<Record<string, { anzahl: number; grund
     anzahl: 1,
     grund: 'Abschnitt „Blatt mit Griff“ der Vorschau (SheetBlatt „Bestellung stornieren?“ ohne Startfokus); in bausteine-vorschau.tsx zieht 246 nur das Prop symbol nach (Auftrag: Vorschau nur in vorschau-<nr>.tsx); das Beispiel mit Startfokus steht in vorschau-246.tsx.',
   },
-  'src/components/mein-hof/pausieren-blatt.tsx': {
-    anzahl: 1,
-    grund: '„Bestellungen pausieren?“ setzt den Startfokus auf den Titel; Seite von Mein Hof, zieht mit ihrer Seiten-Nummer um (246 ändert nur dialog.tsx/sheet.tsx für die Wache).',
-  },
 }

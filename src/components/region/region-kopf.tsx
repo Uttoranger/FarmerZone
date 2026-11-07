@@ -4,6 +4,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
 import type { UmfeldKm } from '@/lib/umfeld'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import type { AbholungWahl } from '@/schemas/hoefe-filter'
 import { regionReiterLink, type FutterAnsichtWahl, type RegionReiter } from '@/schemas/region'
 
@@ -53,9 +54,9 @@ export function RegionKopf({
   return (
     <header className="flex flex-col gap-4">
       <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Region</h1>
-        <HofUnterzeile hofName={hofName} jetzt={jetzt} />
-        <p className="mt-2.5 text-[13.5px] leading-normal text-muted-foreground md:text-sm">{REGION_SATZ}</p>
+        {/* Kopfstreifen mit Linie am Handy (G1, Liste Lauf 32 region). */}
+        <WerkzeugKopf titel="Region" unterzeile={<HofUnterzeile hofName={hofName} jetzt={jetzt} />} />
+        <p className="text-[13.5px] leading-normal text-muted-foreground md:text-sm">{REGION_SATZ}</p>
       </div>
       {/* Zwei gleich breite Reiter über die volle Breite, der gewählte grün unterstrichen (Board s1-/w1-region). */}
       <nav aria-label="Region" className="flex border-b border-border">

@@ -110,7 +110,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
           <label htmlFor={`${id}-satz`} className={FELD_LABEL}>
             Satz in %
           </label>
-          <input id={`${id}-satz`} inputMode="decimal" value={werte.satz} onChange={(e) => setWerte({ ...werte, satz: e.target.value })} className={cn(FELD, FOKUS_RAHMEN)} />
+          <input id={`${id}-satz`} inputMode="decimal" value={werte.satz} onChange={(e) => setWerte({ ...werte, satz: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')} />
         </div>
         <div>
           <label htmlFor={`${id}-tage`} className={FELD_LABEL}>
@@ -123,7 +123,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             max={90}
             value={werte.sperreTage}
             onChange={(e) => setWerte({ ...werte, sperreTage: Number.parseInt(e.target.value || '0', 10) })}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </div>
         <div>
@@ -137,7 +137,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             max={28}
             value={werte.abrechnungsTag}
             onChange={(e) => setWerte({ ...werte, abrechnungsTag: Number.parseInt(e.target.value || '0', 10) })}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </div>
         <div>
@@ -145,7 +145,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             Einzug ab (Vorgabe {daten.einstellungen.vorgabeEinzugAb})
           </label>
           <div className="flex gap-2">
-            <input id={`${id}-einzug`} type="date" value={werte.einzugAb} onChange={(e) => setWerte({ ...werte, einzugAb: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-w-0 flex-1')} />
+            <input id={`${id}-einzug`} type="date" value={werte.einzugAb} onChange={(e) => setWerte({ ...werte, einzugAb: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-h-11 min-w-0 flex-1')} />
             <button type="button" className={KNOPF_RAHMEN} onClick={() => setWerte({ ...werte, einzugAb: '' })} disabled={werte.einzugAb === ''}>
               zurücksetzen
             </button>

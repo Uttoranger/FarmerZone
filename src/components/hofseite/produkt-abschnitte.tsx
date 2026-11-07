@@ -227,7 +227,10 @@ export function ProduktAbschnitte<P extends { id: string }>({
               </h2>
               <ul className={cn(PRODUKT_LISTE, LISTE_SPALTEN[spalten])}>
                 {a.produkte.map((p) => (
-                  <li key={p.id}>{renderKarte(p)}</li>
+                  // Spalte statt Block (Liste Lauf 32, hofseite Bild 3): Die Karte füllt die Zeilenhöhe, ihr Knopf steht mit mt-auto unten.
+                  <li key={p.id} className="md:flex md:flex-col">
+                    {renderKarte(p)}
+                  </li>
                 ))}
               </ul>
             </section>

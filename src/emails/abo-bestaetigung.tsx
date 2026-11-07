@@ -23,7 +23,12 @@ export function AboBestaetigungEmail({ hofName, url, tage }: AboBestaetigungProp
     <EmailLayout fuss={{ art: 'plattform' }} previewText={`Du möchtest Neuigkeiten von ${hofName} per E-Mail bekommen?`}>
       <Text style={h1}>Bitte bestätige deine Anmeldung</Text>
       {/* Board s3/w3-mail-neuigkeiten Bild 1 — aber ehrlich: Der Knopf öffnet nur die Seite, bestätigt wird dort (Link-Scanner). */}
-      <Text style={bodyText}>{`Hallo, du möchtest Neuigkeiten von ${hofName} per E-Mail bekommen? Tipp auf den Knopf und bestätige auf der Seite.`}</Text>
+      {/* Der Hofname fett wie im Board (B-Zeile mail-neuigkeiten Bild 1, Nr. 255). */}
+      <Text style={bodyText}>
+        {'Hallo, du möchtest Neuigkeiten von '}
+        <strong>{hofName}</strong>
+        {' per E-Mail bekommen? Tipp auf den Knopf und bestätige auf der Seite.'}
+      </Text>
 
       <KnopfReihe>
         <Knopf href={url}>Anmeldung bestätigen</Knopf>

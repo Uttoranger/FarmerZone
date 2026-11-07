@@ -117,11 +117,21 @@ function trefferRahmen(breite: number, hoehe: number, bild: string): Pick<L.DivI
   }
 }
 
-/** Die Pille mit dem Namen: in jeder Stufe weiß mit dunkelgrüner Schrift — nur die Scheibe zeigt den Zustand (Board). */
+/**
+ * Das Namensschild: Fläche, Rand und Schrift aus den Tokens (Board w1-hoefe, Liste Lauf 32, Nr. 252) — in jeder
+ * Stufe gleich, nur die Scheibe zeigt den Zustand. Als CSS-Variablen, damit es beiden Themes folgt.
+ */
 const PILLE = {
-  hintergrund: pinDarstellung('normal').hintergrund,
-  schrift: pinDarstellung('hervorgehoben').schrift,
-  rand: pinDarstellung('normal').rand,
+  hintergrund: 'var(--fz-surface)',
+  schrift: 'var(--fz-text)',
+  rand: 'var(--fz-border)',
+}
+
+/** Der Einzel-Pin in Ruhe: dunkler Nummernkreis mit hellem Rand (Board w1-hoefe); gewählt und überfahren bleiben grün. */
+function scheibenStil(zustand: PinZustand): { groesse: number; hintergrund: string; schrift: string; rand: string } {
+  const stil = pinDarstellung(zustand)
+  if (zustand !== 'normal') return stil
+  return { groesse: 30, hintergrund: 'var(--fz-text)', schrift: 'var(--fz-surface)', rand: 'var(--fz-surface)' }
 }
 
 /** Text für das HTML einer Marke — ein Hofname ist Fremdtext. */
@@ -130,18 +140,18 @@ function ohneMarkup(text: string): string {
 }
 
 function scheibe(nummer: number, zustand: PinZustand): string {
-  const stil = pinDarstellung(zustand)
+  const stil = scheibenStil(zustand)
   return (
     `<div style="width:${stil.groesse}px;height:${stil.groesse}px;border-radius:9999px;flex:none;position:relative;z-index:1;` +
     `background:${stil.hintergrund};color:${stil.schrift};` +
     `display:flex;align-items:center;justify-content:center;` +
-    `font-size:13px;font-weight:600;border:2px solid ${stil.rand};` +
+    `font-size:13px;font-weight:700;border:2px solid ${stil.rand};` +
     `box-shadow:0 1px 4px rgba(0,0,0,0.35);">${nummer}</div>`
   )
 }
 
 function pinIcon(nummer: number, zustand: PinZustand, name?: string): L.DivIcon {
-  const stil = pinDarstellung(zustand)
+  const stil = scheibenStil(zustand)
   if (!name) {
     return L.divIcon({ ...trefferRahmen(stil.groesse, stil.groesse, scheibe(nummer, zustand)), className: cn(TREFFER_RUNDUNG, PIN_FOKUS) })
   }
@@ -150,9 +160,9 @@ function pinIcon(nummer: number, zustand: PinZustand, name?: string): L.DivIcon 
   const masse = pinNamenMasse(name)
   const links = masse.ankerX - stil.groesse / 2
   const pille =
-    `<div style="height:${PILLE_HOEHE}px;margin-left:-6px;padding:0 8px 0 12px;border-radius:9999px;white-space:nowrap;` +
+    `<div style="height:${PILLE_HOEHE}px;margin-left:4px;padding:0 6px;border-radius:6px;white-space:nowrap;` +
     `display:flex;align-items:center;background:${PILLE.hintergrund};` +
-    `color:${PILLE.schrift};font-size:12px;font-weight:700;border:1px solid ${PILLE.rand};` +
+    `color:${PILLE.schrift};font-size:12px;font-weight:600;border:1px solid ${PILLE.rand};` +
     `box-shadow:0 1px 4px rgba(0,0,0,0.25);">${ohneMarkup(pinName(name))}</div>`
   return L.divIcon({
     className: cn(TREFFER_RUNDUNG, PIN_FOKUS),

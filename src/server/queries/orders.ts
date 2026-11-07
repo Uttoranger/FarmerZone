@@ -23,11 +23,12 @@ import {
   type BestellAktionen,
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
-import { fristVon, tagInWorten, uhrzeitInWien, zeitpunktFuerMail } from '@/lib/fristen'
-import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAbholungWhere, wienerTag, type NaechstesFenster } from '@/lib/heute'
+import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAbholungWhere, wienerTag, zeitpunktKurz, type NaechstesFenster } from '@/lib/heute'
 import { wienKalendertag } from '@/lib/kalender'
 import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
+import { abspracheOffen, brauchtAbsprache } from '@/lib/abholhinweise'
 import type { MarkeArt } from '@/lib/marke-art'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 
@@ -180,7 +181,8 @@ const DETAIL_AUSWAHL = {
       totalPrice: true,
       fehltSeit: true,
       gebuehrCents: true,
-      product: { select: { unit: true, unitSize: true } },
+      // abholhinweise (N47, Nr. 257): „Abholung absprechen“ im Bestelldetail.
+      product: { select: { unit: true, unitSize: true, abholhinweise: true } },
     },
     orderBy: { id: 'asc' },
   },
@@ -241,6 +243,8 @@ export type HofBestellDetail = {
   aktionen: BestellAktionen
   /** WhatsApp-Erinnerung an die Kundin, nur solange etwas abzuholen ist. */
   erinnernUrl: string | null
+  /** N47 (Nr. 257): offene Bestellung mit „Abholung nach Absprache“ — Marke „Abholung absprechen“ mit Anrufen und Mail schreiben. */
+  absprache?: boolean
 }
 
 export type BestellungenSeite = {
@@ -313,7 +317,8 @@ export async function getHofBestellDetail(
     // „läuft“ (Register G5 kennt keine eigene Art „fertig“); Liste, Admin und Kundendetail bleiben bei bestellMarke.
     marke: o.status === 'PICKED_UP' ? { ...bestellMarke(o.status), art: 'laeuft' } : bestellMarke(o.status),
     abholung: abholungKurz(o.pickupDate, o.pickupTimeStart, o.pickupTimeEnd, jetzt),
-    bestelltAm: zeitpunktFuerMail(o.createdAt),
+    // Kurz wie im Board w1-bestellung: „heute, 07:12“ (Nr. 249b).
+    bestelltAm: zeitpunktKurz(o.createdAt, jetzt),
     kunde: {
       name: o.customerName,
       vorname: vorname(o.customerName),
@@ -323,7 +328,7 @@ export async function getHofBestellDetail(
     },
     zahlart: zahlartText(o.paymentMethod, o.paymentStatus),
     vorOrt: istVorOrtZahlung(o.paymentMethod),
-    bezahltAm: o.paidAt ? zeitpunktFuerMail(o.paidAt) : null,
+    bezahltAm: o.paidAt ? zeitpunktKurz(o.paidAt, jetzt) : null,
     abgeholtUm: o.status === 'PICKED_UP' && o.pickedUpAt ? uhrzeitInWien(o.pickedUpAt) : null,
     zahlungBeiAbholung: ZAHLUNG_BEI_ABHOLUNG[o.paymentMethod] ?? null,
     betrag: {
@@ -376,6 +381,8 @@ export async function getHofBestellDetail(
             pickupTimeEnd: o.pickupTimeEnd,
           })
         : null,
+    // Nur Positionen, die übergeben werden: Fehlt das Produkt mit Absprache, gibt es nichts abzustimmen.
+    absprache: abspracheOffen(o.status, brauchtAbsprache(o.items.filter((i) => i.fehltSeit === null).map((i) => i.product?.abholhinweise))),
   }
 }
 

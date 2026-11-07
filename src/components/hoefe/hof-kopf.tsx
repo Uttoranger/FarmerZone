@@ -21,6 +21,7 @@ export function HofKopf({
   hof,
   als: Name = 'p',
   gedaempft = false,
+  aufTonung = false,
   bild,
 }: {
   hof: HofKopfDaten
@@ -28,6 +29,8 @@ export function HofKopf({
   als?: 'h2' | 'h3' | 'p'
   /** Pausierter Hof: der Name leiser, lesbar bleibt er. */
   gedaempft?: boolean
+  /** Auf der grün getönten Auswahlkarte: Die Zeile steht in Textfarbe zu 80 % — leise wäre dort unter 4,5 : 1 (Nr. 252). */
+  aufTonung?: boolean
   bild?: { foto: string | null; illustration: string; kante: 40 | 48 }
 }): React.JSX.Element {
   const zeilen = (
@@ -41,7 +44,7 @@ export function HofKopf({
         {hof.name}
       </Name>
       {/* Die Entfernung hinter dem Ort, wie in den Boards w1-/s1-hoefe („5280 Braunau am Inn · 3 km"). */}
-      <p className="truncate text-[13px] text-muted-foreground">
+      <p className={cn('truncate text-[13px]', aufTonung ? 'text-foreground/80' : 'text-muted-foreground')}>
         {hof.postalCode} {hof.city}
         {hof.entfernungKm !== null && ` · ${formatiereEntfernung(hof.entfernungKm)}`}
       </p>

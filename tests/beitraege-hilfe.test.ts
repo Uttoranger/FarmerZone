@@ -188,9 +188,10 @@ describe('/status leitet in den Reiter um, Unterseiten unter (hof)', () => {
     const client = quelle('src/app/(hof)/status/new/status-new-client.tsx')
     expect(client).toContain('router.push(BEITRAEGE_HREF)')
     expect(client).not.toContain("router.push('/status')")
-    // Seit Nr. 44 kommt der Rückweg aus dem UnterseitenKopf — Ziel weiter der Reiter.
+    // Seit Nr. 250 kommt der Rückweg aus dem Werkzeug-Kopf (G1; vorher UnterseitenKopf) — Ziel weiter der Reiter.
     const whatsapp = quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')
-    expect(whatsapp).toContain('<UnterseitenKopf')
+    expect(whatsapp).toContain('<WerkzeugKopf')
+    expect(quelle('src/app/(hof)/status/new/page.tsx')).toContain('<WerkzeugKopf')
     expect(elternseite('/status/abc/send-whatsapp')?.href).toBe(BEITRAEGE_HREF)
     expect(elternseite('/status/new')?.href).toBe(BEITRAEGE_HREF)
   })
@@ -344,15 +345,16 @@ describe('Meine Meldungen (gerendert)', () => {
     expect(NEUE_MELDUNG_HREF).toBe('/fehler-melden')
     expect(html).toMatch(/<h1[^>]*>Meine Meldungen<\/h1>/)
     expect(html).toContain(`href="${NEUE_MELDUNG_HREF}"`)
-    expect(html).toContain('data-status="offen"')
+    // Seit Nr. 251 (Board s2-/w2-meldungen Bild 4): die Art als Wort in der Kopfzeile, der Stand als Marke.
     expect(html).toContain('In Arbeit')
+    expect(html).toContain('Antwort lesen')
     expect(html).toContain('Antwort:')
     expect(html).toContain('Liegt am Bildformat')
   })
 
-  it('F6 (22e): je Meldung „Tag · Nr. <Kurznummer>" bleibt', () => {
+  it('F6 (22e): je Meldung die Kurznummer (seit Nr. 251 „· <Kurznummer>“ hinter dem Titel, Board s2-meldungen)', () => {
     expect(zeilen[0].kurznummer).toMatch(/\S/)
-    expect(html).toContain(`Nr. <span class="font-mono">${zeilen[0].kurznummer}</span>`)
+    expect(html).toContain(`· ${zeilen[0].kurznummer}</span>`)
   })
 
   it('Fremdtext bleibt Text', () => {

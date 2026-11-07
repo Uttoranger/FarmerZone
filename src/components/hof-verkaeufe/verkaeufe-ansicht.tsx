@@ -3,13 +3,11 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronRight, ExternalLink, Pencil, Plus, ShoppingCart, Trash2 } from 'lucide-react'
+import { ChevronRight, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { SalesOverview } from '@/server/queries/manual-sales'
 import {
-  JAHRESSUMME_TEXT,
-  UMSATZGRENZE_ERKLAERUNG,
   kanalText,
   wiederholVorlagen,
   type VerkaufDaten,
@@ -21,9 +19,10 @@ import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
-import { KanalSymbol } from '@/components/sales/kanal-symbol'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { AKTIONSLEISTE_KNOPF, FesteAktionsleiste } from '@/components/ui/feste-aktionsleiste'
 import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
-import { KARTE, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_ORANGE, LEISE } from '@/components/hof-bestellungen/stil'
 import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { VerkaufDialog } from './verkauf-dialog'
 import { cn } from '@/lib/utils'
@@ -70,106 +69,86 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
 
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Verkäufe</h1>
-          {/* Wie im Board s2-/w2-verkaeufe: unter der Überschrift der Hof (am Handy mit Stand), dann der Satz. */}
-          {unterzeile}
-          <p className={cn('text-[13px] leading-normal text-muted-foreground md:text-sm', unterzeile !== undefined && 'mt-2.5')}>
-            Was du diese Woche eingenommen hast
-          </p>
-          {/* Leise, nur wenn der Stichtag Bestellungen dieser Seite betrifft (Register Z4). */}
-          {overview.testzahlungenHinweis && (
-            <p className={cn('mt-1 text-[12.5px] leading-snug', LEISE)}>{overview.testzahlungenHinweis}</p>
-          )}
-        </div>
-        <button type="button" onClick={neuerVerkauf} className={KNOPF_ORANGE}>
-          <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
-          Verkauf eintragen
-        </button>
+      <header className="flex flex-col">
+      {/* Werkzeug-Kopf (G1): im Web „Verkauf eintragen“ bündig rechts neben der h1, am Handy die feste Leiste (G2). */}
+      <WerkzeugKopf
+        titel="Verkäufe"
+        unterzeile={unterzeile}
+        aktion={
+          <button type="button" onClick={neuerVerkauf} className={cn(KNOPF_ORANGE, 'hidden md:inline-flex')}>
+            <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
+            Verkauf eintragen
+          </button>
+        }
+      />
+      <div>
+        <p className="text-[13px] leading-normal text-muted-foreground md:text-sm">Was du diese Woche eingenommen hast</p>
+        {/* Leise, nur wenn der Stichtag Bestellungen dieser Seite betrifft (Register Z4). */}
+        {overview.testzahlungenHinweis && <p className={cn('mt-1 text-[12.5px] leading-snug', LEISE)}>{overview.testzahlungenHinweis}</p>}
+      </div>
       </header>
 
-      <section aria-labelledby="verkaeufe-woche" className="grid gap-3 md:grid-cols-3">
-        <h2 id="verkaeufe-woche" className="sr-only">
-          Diese Woche
-        </h2>
-        <div className={cn(KARTE, 'p-4 md:p-5')}>
-          <p className={cn('text-[13px]', LEISE)}>Diese Woche</p>
-          <p className="mt-1 font-heading text-4xl font-semibold text-foreground tabular-nums md:text-[40px]">{formatEuro(overview.weekTotal)}</p>
-          <p className={cn('mt-1 text-[13px]', LEISE)}>
-            {`${JAHRESSUMME_TEXT}: ${formatEuro(overview.ytdTotal)}`}
-          </p>
-          {/* Fachwort mit einem Satz erklärt (Nr. 45). */}
-          <p className={cn('mt-1 text-[12px] leading-snug', LEISE)}>{UMSATZGRENZE_ERKLAERUNG}</p>
+      {/* Web: links die Karten und die Liste, rechts „Noch einmal eintragen“ (Board w2-verkaeufe). */}
+      <div className="grid items-start gap-4 md:gap-[18px] lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="flex min-w-0 flex-col gap-4 md:gap-[18px]">
+          {/* Ohne Karte „Diese Woche“ mit Umsatzgrenze — die steht in der Auswertung (Liste Lauf 32 verkaeufe). */}
+          <section aria-labelledby="verkaeufe-woche" className="grid grid-cols-2 gap-3">
+            <h2 id="verkaeufe-woche" className="sr-only">
+              Diese Woche
+            </h2>
+            <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz={`Über ${MARKE} bezahlte, abgeholte Bestellungen.`} />
+            <Kennzahl titel="Bar kassiert" betrag={overview.weekBar} satz="Vor Ort kassierte Abholungen plus deine Direktverkäufe." />
+          </section>
+
+          {/* Immer eingehängt, auch ohne fertiges Stripe: Meldet der Login-Link
+              „Konto unbekannt", vermerkt die Action den Hof als nicht bereit und
+              rendert die Seite neu (Register Z2). Mit `stripeReady && …` ginge die
+              Meldung samt Komponente verloren. */}
+          <StripeAuszahlungen bereit={stripeReady} />
+
+          {vorlagen.length > 0 && (
+            <div className="lg:hidden">
+              <Vorlagen kennung="verkaeufe-wiederholen" vorlagen={vorlagen} onWahl={(v) => setDialog({ offen: true, verkauf: null, vorlage: v })} />
+            </div>
+          )}
+
+          <section aria-labelledby="verkaeufe-liste" className="flex flex-col gap-2.5">
+            <h2 id="verkaeufe-liste" className={KICKER_12}>
+              Letzte Verkäufe
+            </h2>
+            {overview.zeilen.length === 0 ? (
+              <EmptyState
+                titel="Noch keine Verkäufe"
+                satz="Abgeholte Bestellungen und eingetragene Direktverkäufe erscheinen hier. Was du am Markt oder ab Hof verkaufst, trägst du mit „Verkauf eintragen“ ein."
+                ausweg={{ ohne: 'Der eine Weg „Verkauf eintragen“ steht im Kopf bzw. am Handy in der festen Leiste — ein zweiter Knopf wäre doppelt (Board s2-/w2-verkaeufe Bild 5)' }}
+              />
+            ) : (
+              <ul className={cn(KARTE, 'divide-y divide-border overflow-hidden')}>
+                {overview.zeilen.map((zeile) => (
+                  <li key={zeile.schluessel}>
+                    <Zeile
+                      zeile={zeile}
+                      onBearbeiten={(v) => setDialog({ offen: true, verkauf: v, vorlage: null })}
+                      onLoeschen={setLoeschen}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
-        <Kennzahl titel="Online bezahlt" betrag={overview.weekOnline} satz={`Über ${MARKE} bezahlte, abgeholte Bestellungen.`} />
-        <Kennzahl titel="Bar kassiert" betrag={overview.weekBar} satz="Vor Ort kassierte Abholungen plus deine Direktverkäufe." />
-      </section>
-
-      {/* Immer eingehängt, auch ohne fertiges Stripe: Meldet der Login-Link
-          „Konto unbekannt", vermerkt die Action den Hof als nicht bereit und
-          rendert die Seite neu (Register Z2). Mit `stripeReady && …` ginge die
-          Meldung samt Komponente verloren. */}
-      <StripeAuszahlungen bereit={stripeReady} />
-
-      <section aria-labelledby="verkaeufe-liste" className="flex flex-col gap-2.5">
-        <h2 id="verkaeufe-liste" className={KICKER_12}>
-          Letzte Verkäufe
-        </h2>
-        {overview.zeilen.length === 0 ? (
-          <EmptyState
-            titel="Noch keine Verkäufe"
-            satz="Abgeholte Bestellungen und eingetragene Direktverkäufe erscheinen hier."
-            ausweg={
-              <button type="button" onClick={neuerVerkauf} className={KNOPF_RAHMEN}>
-                Verkauf eintragen
-              </button>
-            }
-          />
-        ) : (
-          <ul className={cn(KARTE, 'divide-y divide-border overflow-hidden')}>
-            {overview.zeilen.map((zeile) => (
-              <li key={zeile.schluessel}>
-                <Zeile
-                  zeile={zeile}
-                  onBearbeiten={(v) => setDialog({ offen: true, verkauf: v, vorlage: null })}
-                  onLoeschen={setLoeschen}
-                />
-              </li>
-            ))}
-          </ul>
+        {vorlagen.length > 0 && (
+          <aside className="hidden lg:block">
+            <Vorlagen kennung="verkaeufe-wiederholen-web" vorlagen={vorlagen} onWahl={(v) => setDialog({ offen: true, verkauf: null, vorlage: v })} />
+          </aside>
         )}
-      </section>
+      </div>
 
-      {/* Board s2/w2-verkaeufe: „Noch einmal eintragen" unter der Liste. */}
-      {vorlagen.length > 0 && (
-        <section aria-labelledby="verkaeufe-wiederholen" className="flex flex-col gap-2.5">
-          <h2 id="verkaeufe-wiederholen" className={KICKER_12}>
-            Noch einmal eintragen
-          </h2>
-          <ul className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            {vorlagen.map((v) => (
-              <li key={v.id} className="min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setDialog({ offen: true, verkauf: null, vorlage: v })}
-                  title={v.productName}
-                  className={cn(KARTE, 'flex min-h-[60px] w-full items-start gap-2.5 p-3 text-left transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
-                >
-                  <KanalSymbol kanal={v.channel} className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0">
-                    <span className="sr-only">Noch einmal eintragen: </span>
-                    <span className="block truncate text-sm font-semibold text-foreground">{v.productName}</span>
-                    <span className={cn('block truncate text-[12.5px]', LEISE)}>
-                      {kanalText(v.channel)} · {formatEuro(v.totalAmount)}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <FesteAktionsleiste className="md:hidden">
+        <button type="button" onClick={neuerVerkauf} className={AKTIONSLEISTE_KNOPF}>
+          Verkauf eintragen
+        </button>
+      </FesteAktionsleiste>
 
       <VerkaufDialog
         offen={dialog.offen}
@@ -184,11 +163,42 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
   )
 }
 
+/** „Noch einmal eintragen“: Chips „Kanal · Betrag“ aus den letzten Einträgen (Board s2-/w2-verkaeufe). */
+function Vorlagen({ kennung, vorlagen, onWahl }: { kennung: string; vorlagen: VerkaufDaten[]; onWahl: (v: VerkaufDaten) => void }): React.JSX.Element {
+  return (
+    <section aria-labelledby={kennung} className="flex flex-col gap-2.5">
+      <h2 id={kennung} className={KICKER_12}>
+        Noch einmal eintragen
+      </h2>
+      <ul className="flex flex-wrap gap-2">
+        {vorlagen.map((v) => (
+          <li key={v.id} className="min-w-0">
+            <button
+              type="button"
+              onClick={() => onWahl(v)}
+              title={v.productName}
+              className={cn(
+                "relative inline-flex h-9 max-w-full items-center rounded-full border border-input bg-card px-4 text-[13.5px] font-medium whitespace-nowrap text-foreground transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-[''] hover:bg-muted",
+                FOKUS_RAHMEN
+              )}
+            >
+              <span className="sr-only">Noch einmal eintragen: {v.productName}, </span>
+              <span className="truncate">
+                {kanalText(v.channel)} · {formatEuro(v.totalAmount)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function Kennzahl({ titel, betrag, satz }: { titel: string; betrag: number; satz: string }): React.JSX.Element {
   return (
-    <div className={cn(KARTE, 'p-4 md:p-5')}>
-      <p className={cn('text-[13px]', LEISE)}>{titel}</p>
-      <p className="mt-1 font-heading text-[26px] font-semibold text-foreground tabular-nums">{formatEuro(betrag)}</p>
+    <div className={cn(KARTE, 'min-w-0 p-4 md:p-5')}>
+      <p className="text-[13px] font-semibold text-foreground">{titel}</p>
+      <p className="mt-1 font-heading text-[22px] font-semibold text-foreground tabular-nums md:text-[26px]">{formatEuro(betrag)}</p>
       <p className={cn('mt-1 text-[13px] leading-snug', LEISE)}>{satz}</p>
     </div>
   )
@@ -204,30 +214,23 @@ function Zeile({
   onBearbeiten: (v: VerkaufDaten) => void
   onLoeschen: (v: VerkaufDaten) => void
 }): React.JSX.Element {
-  const symbol =
-    zeile.art === 'bestellung' ? (
-      <ShoppingCart className="size-[18px] text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-    ) : (
-      <KanalSymbol kanal={zeile.kanal} className="size-[18px] text-muted-foreground" />
-    )
+  // Ohne Symbol; Marke „Eingetragen“/„Bestellung“ unter dem Betrag, „Name · Nummer“ als Titel (Board s2-/w2-verkaeufe).
   const inhalt = (
     <>
-      <span className="hidden size-10 shrink-0 items-center justify-center rounded-full bg-muted sm:flex">{symbol}</span>
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-baseline gap-1.5">
-          <span className="truncate text-[14.5px] font-semibold text-foreground" title={zeile.titel}>
-            {zeile.titel}
-          </span>
-          {zeile.art === 'bestellung' && <span className={cn('shrink-0 text-[12.5px]', LEISE)}>{zeile.nummer}</span>}
+        {/* Der Titel bricht um statt gekürzt zu werden (Board s2-verkaeufe: „Wochenmarkt Braunau“ zweizeilig). */}
+        <span className="block text-[14.5px] leading-snug font-semibold break-words text-foreground" title={zeile.titel}>
+          {zeile.titel}
+          {zeile.art === 'bestellung' && ` · ${zeile.nummer}`}
         </span>
         <span className={cn('block truncate text-[13px]', LEISE)}>
           {zeile.datum} · {zeile.unterzeile}
         </span>
-        <span className="mt-1 flex">
-          <StatusBadge status={zeile.marke.ton}>{zeile.marke.text}</StatusBadge>
-        </span>
       </span>
-      <span className="shrink-0 text-right text-[14.5px] font-semibold text-foreground tabular-nums">{euro(zeile.betragCent)}</span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-right text-[14.5px] font-semibold text-foreground tabular-nums">{euro(zeile.betragCent)}</span>
+        <StatusBadge status={zeile.marke.ton}>{zeile.marke.text}</StatusBadge>
+      </span>
     </>
   )
 

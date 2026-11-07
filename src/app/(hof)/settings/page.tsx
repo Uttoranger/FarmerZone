@@ -6,8 +6,10 @@ import { einstellungenBereiche, EINSTELLUNGEN_TITEL, type EinstellungBereich } f
 import { ladeEinstellungenUebersicht } from '@/server/queries/einstellungen'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
 import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellungen-fehler'
-import { EINSTELLUNGEN_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { UEBERSICHT_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
+import { getFarmForUser } from '@/server/queries/dashboard'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 
 export const metadata: Metadata = { title: `Einstellungen — ${MARKE}` }
 
@@ -37,13 +39,22 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   } catch (err) {
     // Nur Art und Bereich — keine Personendaten.
     Sentry.captureException(err, { tags: { bereich: 'einstellungen', seite: 'uebersicht' } })
+    // Der Hofname für die Unterzeile des Fehlerzustands (Board w1-einstellungen Bild 2) — aus der Abfrage,
+    // die das Layout ohnehin stellt; scheitert auch sie, steht der Kopf ohne Unterzeile da.
+    hofName = (await getFarmForUser(userId).catch(() => null))?.name ?? ''
   }
   // Kein Hof: Das Layout schickt schon nach /onboarding — hier nur zur Sicherheit.
   if (!gefunden) redirect('/onboarding')
 
   return (
-    <div className={EINSTELLUNGEN_RAHMEN}>
-      {bereiche ? <EinstellungenUebersicht bereiche={bereiche} hofName={hofName} jetzt={jetzt} /> : <EinstellungenFehler titel={EINSTELLUNGEN_TITEL} href="/settings" />}
+    <div className={UEBERSICHT_RAHMEN}>
+      {bereiche ? <EinstellungenUebersicht bereiche={bereiche} hofName={hofName} jetzt={jetzt} /> : (
+        <EinstellungenFehler
+          titel={EINSTELLUNGEN_TITEL}
+          href="/settings"
+          unterzeile={hofName ? <HofUnterzeile hofName={hofName} jetzt={jetzt} /> : undefined}
+        />
+      )}
     </div>
   )
 }

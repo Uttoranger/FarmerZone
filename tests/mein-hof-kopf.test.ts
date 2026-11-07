@@ -194,9 +194,11 @@ describe('Zustandszeile', () => {
 
   it('nimmt an: grün getönt ohne Punkt, Titel, Satz mit der nächsten Abholung, Knopf „Pausieren" (öffnet das Blatt)', () => {
     const z = zeile(kopf())
-    expect(z).toMatch(/^<div class="[^"]*\bbg-accent\/12\b[^"]*\bborder-accent\/45\b|^<div class="[^"]*\bborder-accent\/45\b[^"]*\bbg-accent\/12\b/)
+    // Seit Nr. 251 die Zustandsfläche (im Dunkeln sichtbar getönt) mit farbiger Überschrift (Liste Lauf 32 mein-hof).
+    expect(z).toMatch(/^<div class="[^"]*\bborder-zustand-laeuft\/30\b[^"]*\bbg-zustand-laeuft-grund\b/)
+    expect(z).toContain('text-status-fertig">Nimmt Bestellungen an</p>')
     expect(z).not.toMatch(/size-\[9px\]/)
-    expect(z).toContain('>Nimmt Bestellungen an</p>')
+    expect(z).toContain('Nimmt Bestellungen an</p>')
     expect(z).toContain('>Nächste Abholung: Morgen 15:00–18:00</p>')
     // Umriss ohne Symbol wie im Board (Lauf 31).
     expect(z).toMatch(/<button type="button" class="[^"]*\bborder-foreground\b[^"]*">Pausieren<\/button>/)
@@ -210,7 +212,7 @@ describe('Zustandszeile', () => {
     // Derselbe Umriss wie „Pausieren“ (Board s1-mein-hof Bild 4: Rahmenknopf, nicht grün gefüllt).
     expect(z).toMatch(/<button type="button" class="[^"]*\bborder-foreground\b[^"]*">Fortsetzen<\/button>/)
     expect(z).not.toMatch(/\bbg-accent\b[^"]*">Fortsetzen/)
-    expect(z).toMatch(/border-primary\/45/)
+    expect(z).toMatch(/border-zustand-tun\/30/)
   })
 
   it('ohne Abholzeit und ausgebucht: Links nach /settings/pickup-slots; kein Produkt: nach /products', () => {
@@ -243,30 +245,22 @@ describe('Zustandszeile', () => {
   })
 })
 
-describe('Blatt „Bestellungen pausieren?"', () => {
+describe('„Hof pausieren“ (Dialog bzw. Blatt)', () => {
   const blatt = quelle('src/components/mein-hof/pausieren-blatt.tsx')
 
-  it('Form nach DESIGN_SYSTEM: Titel mit Fokus, kein Kreuz, „Pausieren" volle Breite, „Abbrechen" als Textknopf darunter', () => {
-    expect(blatt).toContain('<SheetBlatt initialFocus={titel} finalFocus={knopf}')
-    expect(blatt).toContain('Bestellungen pausieren?')
-    expect(blatt).not.toMatch(/aria-label="Schließen"|<X\b|lucide-react['"];?\s*$.*\bX\b/m)
-    const pausieren = blatt.indexOf("{laeuft ? 'Pausiert …' : 'Pausieren'}")
-    const abbrechen = blatt.indexOf('Abbrechen\n')
-    expect(pausieren).toBeGreaterThan(0)
-    expect(pausieren).toBeLessThan(abbrechen)
+  it('Nr. 251 (Board s1-/w1-mein-hof Bild 3): ab 768 px Dialog in der Mitte, sonst Blatt; „Abbrechen“ oben rechts mit dem Startfokus, kein Kreuz', () => {
+    expect(blatt).toContain('<DialogMitte ref={popup} titel={TITEL} schliessen="Abbrechen" initialFocus={abbrechenFokus} finalFocus={knopf}')
+    expect(blatt).toMatch(/<SheetBlatt ref=\{popup\}[^>]*kopf=\{<SheetKopf titel=\{TITEL\} schliessen="Abbrechen" \/>\}[^>]*initialFocus=\{abbrechenFokus\}/)
+    expect(blatt).toContain("const TITEL = 'Hof pausieren'")
+    expect(blatt).toContain('useMindestbreite(768)')
+    expect(blatt).not.toMatch(/aria-label="Schließen"|<X\b|<Pause\b/)
     expect(blatt).toMatch(/'inline-flex h-12 w-full [^']*bg-primary/)
-    expect(blatt).toMatch(/<SheetClose\s+disabled=\{laeuft\}\s+className=\{cn\('mx-auto min-h-11[^']*text-brand-text/)
   })
 
-  it('drei Sätze, Feld mit Label, Zähler getrimmt ohne maxLength, Vorschau = die echte Hinweiskarte', () => {
-    for (const satz of [
-      'Deine Hofseite bleibt sichtbar, mit deiner Nachricht.',
-      'Bestellen kann gerade niemand, bis du fortsetzt.',
-      'Bestellungen, die schon da sind, bleiben. Die holen deine Kundinnen wie geplant ab.',
-    ]) {
-      expect(blatt).toContain(satz)
-    }
-    expect(blatt).toMatch(/<label htmlFor=\{feldId\}[^>]*>\s*Nachricht an deine Kundinnen <span[^>]*>\(freiwillig\)<\/span>/)
+  it('Feld „Nachricht an deine Kundschaft (freiwillig)“, Kasten „So steht es auf deiner Hofseite“ mit der echten Hinweiskarte, Schluss-Satz', () => {
+    expect(blatt).toMatch(/<label htmlFor=\{feldId\}[^>]*>\s*Nachricht an deine Kundschaft <span[^>]*>\(freiwillig\)<\/span>/)
+    expect(blatt).toContain('So steht es auf deiner Hofseite')
+    expect(blatt).toContain('Offene Bestellungen bleiben bestehen. Neue Bestellungen sind erst nach „Fortsetzen“ möglich.')
     expect(blatt).toContain('<ZeichenZaehler laenge={nachricht.trim().length} max={PAUSENACHRICHT_MAX} />')
     expect(blatt).not.toContain('maxLength')
     expect(blatt).toContain('<KaufSperreHinweis sperre="pause" hofName={hofName} pauseMessage={nachricht} />')

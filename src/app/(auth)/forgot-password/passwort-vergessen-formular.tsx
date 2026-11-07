@@ -5,8 +5,11 @@ import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
-import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE, TEXTLINK } from '@/components/anmelden/stil'
+import { cn } from '@/lib/utils'
+import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE_KAUF, TEXTLINK } from '@/components/anmelden/stil'
 import { ErfolgKasten } from '@/components/ui/erfolg-kasten'
+// 16 px wie im Board (G8): die Rundungen aus einer Quelle statt freier Pixelwerte.
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /**
  * „Passwort vergessen?" — das Formular (seit Nr. 54 in der Fokus-Shell, die
@@ -57,11 +60,12 @@ export function PasswortVergessenFormular(): React.JSX.Element {
     return (
       // Grün getönter Kasten mit Haken, links bündig, ein Absatz (Board s2-/w2-passwort, Bild 2);
       // die Antwort bleibt für jede Adresse gleich.
-      <ErfolgKasten titel="Schau in deine E-Mails">
+      // Liste Lauf 32 (passwort Bild 2): 16 px Rundung, Link 15 px wie im Board.
+      <ErfolgKasten titel="Schau in deine E-Mails" className={RUNDUNG.blatt}>
         <p role="status" aria-live="polite">
           {`Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt. Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig. Schau auch im Spam-Ordner nach.`}
         </p>
-        <Link href="/login" className={TEXTLINK}>
+        <Link href="/login" className={cn(TEXTLINK, 'text-[15px]')}>
           Zurück zur Anmeldung
         </Link>
       </ErfolgKasten>
@@ -101,7 +105,7 @@ export function PasswortVergessenFormular(): React.JSX.Element {
           </p>
         )}
 
-        <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={KNOPF_ORANGE}>
+        <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={KNOPF_ORANGE_KAUF}>
           {laedt ? (
             <>
               <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />

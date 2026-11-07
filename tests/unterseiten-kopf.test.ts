@@ -135,10 +135,11 @@ describe('UnterseitenKopf im Browser und Titel', () => {
   })
 
   it('Gegenprobe: auf einer Seite der Leiste kein Rückweg — nur der Titel', () => {
-    const oben = kopf('/settings', { titel: 'Einstellungen' })
+    // /customers statt /settings: /settings hat seit Nr. 250 am Handy „Mehr“ als Elternseite (N1-Ergänzung).
+    const oben = kopf('/customers', { titel: 'Kunden' })
     expect(oben).not.toContain('<a ')
     expect(oben).not.toContain('sticky')
-    expect(oben).toMatch(/<h1[^>]*>Einstellungen<\/h1>/)
+    expect(oben).toMatch(/<h1[^>]*>Kunden<\/h1>/)
   })
 
   it('ohne Titel nur der Rückweg (die Seite trägt ihre h1 selbst)', () => {
@@ -158,18 +159,12 @@ describe('UnterseitenKopf im Browser und Titel', () => {
     expect(kopf('/orders/bestellung-1', { titel: 'Bestellung FZ-1' })).not.toContain('lg:hidden')
   })
 
-  it('/fehler-melden: am Handy steht der Name nur einmal — die Leiste trägt ihn, die h1 gleichen Wortlauts nur für den Screenreader (Nr. 56)', () => {
-    // Bericht 44: „← Problem melden" in der Leiste und darunter die h1 „Problem melden".
+  it('/fehler-melden: seit Nr. 251 der Werkzeug-Kopf (G1) — die h1 steht in der Leiste, keine zweite h1 (Nr. 56 entfällt)', () => {
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
-    // Der Wortlaut kommt seit Nr. 85 aus PROBLEM_MELDEN (kein Literal) — derselbe wie der Name der Elternseite.
-    const h1 = seite.match(/<h1 className="([^"]+)">\s*\{PROBLEM_MELDEN\}\s*<\/h1>/)
-    expect(h1).not.toBeNull()
+    expect(seite).toContain('<WerkzeugKopf titel={PROBLEM_MELDEN}')
+    expect(seite).not.toMatch(/<h1\b/)
+    expect(seite).not.toContain('UnterseitenKopf')
     expect(PROBLEM_MELDEN).toBe(elternseite('/fehler-melden')?.name)
-    const klassen = h1?.[1].split(/\s+/) ?? []
-    expect(klassen).toContain('sr-only')
-    expect(klassen).toContain('md:not-sr-only')
-    // Die Ladeansicht hält den Titel-Platzhalter ebenso erst ab 768 px bereit — sonst spränge die Seite.
-    expect(quelle('src/components/hof-hilfe/hilfe-laden.tsx')).toContain('hidden h-8 w-64 rounded-lg bg-border md:block')
     // Gegenprobe: Wo Titel und Elternseite verschieden heißen, bleibt die h1 des Kopfs sichtbar.
     expect(kopf('/settings/profile', { titel: 'Hof-Profil' })).toMatch(/<h1 class="(?![^"]*sr-only)[^"]*">Hof-Profil<\/h1>/)
   })
@@ -273,7 +268,8 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     // Ein neuer Versuch räumt den alten Satz weg.
     expect(profil).toMatch(/if \(sucheLaeuft\) return\s*setSpeicherFehler\(null\)/)
     // Seit Nr. 174 die Hinweiskarte mit „Nochmal" am Netz (SpeicherFehler) statt DialogFehler.
-    expect(text).toMatch(/<SpeicherFehler text=\{speicherFehler\}[^>]*\/>\s*\{\/\*[^*]*\*\/\}\s*<Button\s*type="submit"/)
+    // Seit Nr. 250 steht der Knopf in der festen Aktionsleiste (G2), weiter direkt nach dem Fehlerkasten.
+    expect(text).toMatch(/<SpeicherFehler text=\{speicherFehler\}[^>]*\/>\s*\{\/\*[^*]*\*\/\}\s*<FesteAktionsleiste[^>]*>\s*<button type="submit"/)
     // Ohne Fehler steht nichts da.
     expect(renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))).not.toContain('role="alert"')
   })
@@ -383,8 +379,12 @@ describe('Die alten Bausteine sind ersetzt', () => {
 
   it('der Kopf steht direkt im Rahmen der Seite — sonst klebt die Leiste nur, solange ein Kasten um den Kopf reicht', () => {
     // Plakat: der Kopf darf nicht im druckfreien Kasten um Titel und Knopf stehen.
+    // Seit Nr. 250 der Werkzeug-Kopf (G1) direkt im Rahmen; der Satz darunter ist selbst print:hidden.
     const plakat = quelle('src/app/(hof)/status/plakat/page.tsx')
-    expect(plakat.indexOf('<UnterseitenKopf')).toBeLessThan(plakat.indexOf('<div className="print:hidden">'))
+    const rahmen = plakat.indexOf('print:m-0 print:max-w-none')
+    expect(rahmen).toBeGreaterThan(-1)
+    expect(plakat.indexOf('<WerkzeugKopf')).toBeGreaterThan(rahmen)
+    expect(plakat).not.toContain('<div className="print:hidden">')
   })
 })
 

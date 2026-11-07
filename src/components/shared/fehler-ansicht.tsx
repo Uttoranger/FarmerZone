@@ -32,7 +32,8 @@ const KREIS: Record<'gruen' | 'orange', string> = {
   orange: 'bg-zustand-tun-grund text-status-offen',
 }
 
-const WEG = cn('inline-flex h-12 w-full items-center justify-center rounded-xl px-5 text-[15px] font-semibold transition-opacity duration-[250ms]', FOKUS_RAHMEN)
+// 52 px, Ecken 14 px, 16 px fett wie die Knöpfe des Boards s3-/w3-fehlerseiten (Nr. 254).
+const WEG = cn('inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] px-5 text-[16px] font-bold transition-opacity duration-[250ms]', FOKUS_RAHMEN)
 
 /** Der Hauptknopf je Ton — grün in der Kundenwelt, orange im Hofbereich. */
 export const FEHLER_HAUPT: Record<'gruen' | 'orange', string> = {
@@ -41,7 +42,9 @@ export const FEHLER_HAUPT: Record<'gruen' | 'orange', string> = {
 }
 
 /** Der zweite Weg als Umriss auf der Fläche. */
-export const FEHLER_UMRISS = cn(WEG, 'border border-border bg-card text-foreground hover:bg-muted')
+// Rand in Textfarbe, leicht zurückgenommen (Liste Lauf 32, fehlerseiten „Zweitknopf mit schwachem Rand“): Der zweite
+// Weg ist ein Knopf, kein Kasten — mit `border-border` las er sich als Fläche.
+export const FEHLER_UMRISS = cn(WEG, 'border-[1.5px] border-foreground/60 bg-card text-foreground hover:bg-muted')
 
 export function FehlerseiteAufbau({
   zeichen,
@@ -59,7 +62,9 @@ export function FehlerseiteAufbau({
 }): React.JSX.Element {
   const Zeichen = zeichen === 'weg' ? Compass : TriangleAlert
   return (
-    <div className="flex w-full max-w-[420px] flex-col items-center gap-3 text-center">
+    // 544 px wie die Spalte des Boards (560 px mit Rand): Die längste Überschrift („Dieses Produkt gibt es hier
+    // nicht (mehr)“) steht im Web auf einer Zeile, am Handy bricht sie ausgewogen (Liste Lauf 32, fehlerseiten).
+    <div className="flex w-full max-w-[544px] flex-col items-center gap-2.5 text-center">
       <span className={cn('flex size-[72px] items-center justify-center rounded-full', KREIS[FEHLER_KREIS_TON[zeichen]])} aria-hidden="true">
         <Zeichen className="size-8" strokeWidth={1.5} aria-hidden="true" />
       </span>
@@ -68,9 +73,9 @@ export function FehlerseiteAufbau({
           Dateiname: Das wäre für den Menschen ohne Wert und für uns eine
           offene Flanke. */}
       <p className="text-[12.5px] font-bold tracking-[1.6px] text-muted-foreground uppercase">{kicker}</p>
-      <h1 className="font-heading text-[24px] leading-tight font-semibold text-balance break-words text-foreground md:text-[28px]">{titel}</h1>
-      <p className="text-[15px] leading-normal text-muted-foreground">{text}</p>
-      <div className="mt-2 flex w-full max-w-[340px] flex-col gap-2.5">{children}</div>
+      <h1 className="font-heading text-[26px] leading-[1.2] font-semibold text-balance break-words text-foreground">{titel}</h1>
+      <p className="max-w-[440px] text-[15px] leading-normal text-muted-foreground">{text}</p>
+      <div className="flex w-full max-w-[340px] flex-col gap-2">{children}</div>
     </div>
   )
 }

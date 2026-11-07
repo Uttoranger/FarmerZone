@@ -3,16 +3,19 @@
 import { useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Pause } from 'lucide-react'
 import { setPause } from '@/server/actions/farm'
 import { aktionOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { PAUSENACHRICHT_MAX } from '@/lib/eingabegrenzen'
 import { PAUSE_MELDUNG } from '@/lib/shop-pause'
-import { Sheet, SheetBlatt, SheetClose, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetKopf } from '@/components/ui/sheet'
+import { Dialog, DialogMitte } from '@/components/ui/dialog'
+import { abbrechenIn } from '@/components/hof-bestellungen/bestell-dialog'
+import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { Textarea } from '@/components/ui/textarea'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { cn } from '@/lib/utils'
 
 /*
@@ -23,8 +26,12 @@ import { cn } from '@/lib/utils'
  * Knopf bleibt, steht der Fokus nach dem Pausieren auf „Fortsetzen“ und nach
  * „Abbrechen“ wieder auf „Pausieren“ (finalFocus).
  *
- * Form nach DESIGN_SYSTEM „Dialoge und Blätter“, nicht nach dem Board: kein
- * Kreuz, „Pausieren“ über die volle Breite, „Abbrechen“ als Textknopf darunter.
+ * Seit Nr. 251 nach Board s1-/w1-mein-hof Bild 3 (Liste Lauf 32 mein-hof): ab
+ * 768 px ein Dialog in der Mitte (DialogMitte, höchstens 560 px, V11/N41 d),
+ * darunter das Blatt; „Abbrechen“ in beiden oben rechts, der Startfokus darauf
+ * (Regelvorschlag 239: Dialog mit orangem Hauptknopf). Titel „Hof pausieren“,
+ * Kasten „So steht es auf deiner Hofseite“ und der Schluss-Satz zu offenen
+ * Bestellungen; „Pausieren“ ohne Symbol über die volle Breite.
  * Die Vorschau ist die echte Hinweiskarte der Hofseite (KaufSperreHinweis), kein
  * Nachbau. Bestellungen, die schon da sind, berührt setPause nicht.
  */
@@ -38,11 +45,11 @@ const ZEILEN_KNOPF = cn(
   FOKUS_RAHMEN
 )
 
-const BLATT_SAETZE = [
-  'Deine Hofseite bleibt sichtbar, mit deiner Nachricht.',
-  'Bestellen kann gerade niemand, bis du fortsetzt.',
-  'Bestellungen, die schon da sind, bleiben. Die holen deine Kundinnen wie geplant ab.',
-] as const
+/** Der Titel von Dialog und Blatt (Board s1-/w1-mein-hof Bild 3). */
+const TITEL = 'Hof pausieren'
+
+/** Der Schluss-Satz, wörtlich nach Board s1-/w1-mein-hof Bild 3. */
+const SCHLUSS_SATZ = 'Offene Bestellungen bleiben bestehen. Neue Bestellungen sind erst nach „Fortsetzen“ möglich.'
 
 export function PausierenBlatt({
   pausiert,
@@ -63,8 +70,11 @@ export function PausierenBlatt({
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, startTransition] = useTransition()
   const knopf = useRef<HTMLButtonElement>(null)
-  const titel = useRef<HTMLHeadingElement>(null)
+  const popup = useRef<HTMLDivElement>(null)
   const feldId = useId()
+  const breit = useMindestbreite(768)
+  // Der Startfokus auf dem einen „Abbrechen“ oben rechts (Dialog bzw. Blatt) — nie auf „Pausieren“.
+  const abbrechenFokus = () => abbrechenIn(popup.current)
 
   function oeffne() {
     setNachricht(gespeicherteNachricht ?? '')
@@ -100,6 +110,57 @@ export function PausierenBlatt({
     })
   }
 
+  function schliesse(auf: boolean) {
+    // Solange gespeichert wird, schließt nichts (Escape, Tipp daneben, „Abbrechen“).
+    if (!auf && !laeuft) setOffen(false)
+  }
+
+  const inhalt = (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={feldId} className="text-[15px] font-semibold text-foreground">
+          Nachricht an deine Kundschaft <span className="font-normal text-muted-foreground">(freiwillig)</span>
+        </label>
+        <Textarea
+          id={feldId}
+          value={nachricht}
+          onChange={(e) => setNachricht(e.target.value)}
+          rows={2}
+          disabled={laeuft}
+          placeholder="Ich bin im Urlaub bis ..."
+          className="min-h-11 text-base"
+        />
+        {/* Zähler statt einer Grenze am Feld (CODING_STANDARDS §8); gezählt wie im Server, getrimmt. */}
+        <ZeichenZaehler laenge={nachricht.trim().length} max={PAUSENACHRICHT_MAX} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <p className={KICKER_12}>So steht es auf deiner Hofseite</p>
+        <KaufSperreHinweis sperre="pause" hofName={hofName} pauseMessage={nachricht} />
+      </div>
+
+      <p className="text-[14px] leading-normal text-foreground">{SCHLUSS_SATZ}</p>
+
+      {/* Ständig vorhanden, damit der Screenreader die Meldung ansagt, sobald sie kommt. */}
+      <p aria-live="polite" className={cn('text-sm leading-snug font-semibold text-status-offen', !fehler && 'sr-only')}>
+        {fehler}
+      </p>
+
+      <button
+        type="button"
+        onClick={pausieren}
+        disabled={laeuft}
+        aria-busy={laeuft || undefined}
+        className={cn(
+          'inline-flex h-12 w-full items-center justify-center rounded-[10px] bg-primary text-[15px] font-semibold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90 disabled:opacity-60',
+          FOKUS_RAHMEN
+        )}
+      >
+        {laeuft ? 'Pausiert …' : 'Pausieren'}
+      </button>
+    </>
+  )
+
   return (
     <>
       <button
@@ -113,76 +174,19 @@ export function PausierenBlatt({
         {text}
       </button>
 
-      <Sheet
-        open={offen}
-        onOpenChange={(auf) => {
-          // Solange gespeichert wird, schließt nichts (Escape, Tipp daneben, „Abbrechen“).
-          if (!auf && !laeuft) setOffen(false)
-        }}
-      >
-        <SheetBlatt initialFocus={titel} finalFocus={knopf} className="gap-4">
-          <SheetTitle ref={titel} tabIndex={-1} className="font-heading text-xl leading-tight font-semibold break-words outline-none">
-            Bestellungen pausieren?
-          </SheetTitle>
-          <ul className="flex flex-col gap-2 text-[13.5px] leading-normal text-foreground">
-            {BLATT_SAETZE.map((satz) => (
-              <li key={satz} className="flex gap-2.5">
-                <span aria-hidden="true" className="mt-[0.55em] size-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                <span>{satz}</span>
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={feldId} className="text-[13px] font-semibold text-foreground">
-              Nachricht an deine Kundinnen <span className="font-normal text-muted-foreground">(freiwillig)</span>
-            </label>
-            <Textarea
-              id={feldId}
-              value={nachricht}
-              onChange={(e) => setNachricht(e.target.value)}
-              rows={2}
-              disabled={laeuft}
-              placeholder="Ich bin im Urlaub bis ..."
-              className="min-h-11 text-base"
-            />
-            {/* Zähler statt einer Grenze am Feld (CODING_STANDARDS §8); gezählt wie im Server, getrimmt. */}
-            <ZeichenZaehler laenge={nachricht.trim().length} max={PAUSENACHRICHT_MAX} />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <p className="text-[12.5px] text-muted-foreground">So steht es auf deiner Hofseite</p>
-            <KaufSperreHinweis sperre="pause" hofName={hofName} pauseMessage={nachricht} />
-          </div>
-
-          {/* Ständig vorhanden, damit der Screenreader die Meldung ansagt, sobald sie kommt. */}
-          <p aria-live="polite" className={cn('text-sm leading-snug text-status-offen', !fehler && 'sr-only')}>
-            {fehler}
-          </p>
-
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={pausieren}
-              disabled={laeuft}
-              aria-busy={laeuft || undefined}
-              className={cn(
-                'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-primary-foreground/25 bg-primary text-[15px] font-semibold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90 disabled:opacity-60',
-                FOKUS_RAHMEN
-              )}
-            >
-              <Pause className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-              {laeuft ? 'Pausiert …' : 'Pausieren'}
-            </button>
-            <SheetClose
-              disabled={laeuft}
-              className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-brand-text hover:bg-muted disabled:opacity-60', FOKUS_RAHMEN)}
-            >
-              Abbrechen
-            </SheetClose>
-          </div>
-        </SheetBlatt>
-      </Sheet>
+      {breit ? (
+        <Dialog open={offen} onOpenChange={schliesse}>
+          <DialogMitte ref={popup} titel={TITEL} schliessen="Abbrechen" initialFocus={abbrechenFokus} finalFocus={knopf} className="gap-4">
+            {inhalt}
+          </DialogMitte>
+        </Dialog>
+      ) : (
+        <Sheet open={offen} onOpenChange={schliesse}>
+          <SheetBlatt ref={popup} schleier="abgedunkelt" kopf={<SheetKopf titel={TITEL} schliessen="Abbrechen" />} initialFocus={abbrechenFokus} finalFocus={knopf} className="gap-4">
+            {inhalt}
+          </SheetBlatt>
+        </Sheet>
+      )}
     </>
   )
 }

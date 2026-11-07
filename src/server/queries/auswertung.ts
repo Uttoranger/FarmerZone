@@ -8,7 +8,7 @@ import {
   type ServicegebuehrenMonat,
 } from '@/lib/auswertung'
 import { monatsgrenzenWien, monatsschluesselInWien } from '@/lib/servicegebuehr'
-import { umsatzBestellungWhere, type Periodenfenster } from '@/lib/umsatz'
+import { umsatzBestellungWhere, type Periodenfenster, type Umsatzfenster } from '@/lib/umsatz'
 import { centAusDecimal } from './umsatz'
 
 /**
@@ -88,4 +88,59 @@ export async function getServicegebuehrenMonat(
     stripeLiveAb
   )
   return { ...summe, bezeichnung }
+}
+
+/** Die Gebühren des gewählten Zeitraums — dieselben Felder wie die Monatskarte, ohne Monatsschlüssel. */
+export type GebuehrenImZeitraum = Omit<ServicegebuehrenMonat, 'monat'>
+
+/**
+ * Die Gebühren des GEWÄHLTEN Zeitraums der Auswertung (Woche, Monat, Jahr;
+ * Liste Lauf 32 auswertung „Woche zeigt die Gebühr des Monats“, Nr. 251) —
+ * reine Anzeige-Abfrage, nur gelesen. Sie ändert keine Summe der
+ * Monatsabrechnung und rechnet nichts neu: Gezählt wird mit derselben Regel
+ * wie die Monatskarte und die Betreiber-Finanzen, `servicegebuehrenImMonat`
+ * (Topf je Bestellung nach `topfVonBestellung`, gespeicherte
+ * `serviceFeeCents`, Testzahlungen vor `stripeLiveAb` nie). Die Datenbank
+ * liefert nur die Bestellungen, die im Fenster EINGEGANGEN sind (`createdAt`,
+ * wie der Monat der Abrechnung); je Wiener Monat, den das Fenster berührt,
+ * zählt die Regel ihren Teil, und die Teile werden addiert — jede Bestellung
+ * liegt in genau einem Monat, also zählt keine doppelt. Für den ganzen Monat
+ * ergibt das dieselbe Zahl wie `getServicegebuehrenMonat`.
+ */
+export async function getServicegebuehrenZeitraum(
+  farmId: string,
+  fenster: Umsatzfenster,
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<GebuehrenImZeitraum> {
+  const bestellungen = await prisma.order.findMany({
+    where: { farmId, createdAt: { gte: fenster.von, lte: fenster.bis } },
+    select: {
+      createdAt: true,
+      status: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
+      platformFeeAmount: true,
+    },
+  })
+  const zeilen = bestellungen.map((b) => ({
+    createdAt: b.createdAt,
+    status: b.status,
+    paymentMethod: b.paymentMethod,
+    paymentStatus: b.paymentStatus,
+    serviceFeeCents: b.serviceFeeCents,
+    serviceFeeRefundedAt: b.serviceFeeRefundedAt,
+    provisionCents: centAusDecimal(b.platformFeeAmount),
+  }))
+  const summe: GebuehrenImZeitraum = { onlineCents: 0, onlineAnzahl: 0, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 0 }
+  for (const monat of new Set(zeilen.map((z) => monatsschluesselInWien(z.createdAt)))) {
+    const teil = servicegebuehrenImMonat(zeilen, monat, stripeLiveAb)
+    summe.onlineCents += teil.onlineCents
+    summe.onlineAnzahl += teil.onlineAnzahl
+    summe.vorOrtCents += teil.vorOrtCents
+    summe.vorOrtAnzahl += teil.vorOrtAnzahl
+    summe.summeCents += teil.summeCents
+  }
+  return summe
 }

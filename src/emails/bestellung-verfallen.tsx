@@ -1,11 +1,14 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
 import { EmailLayout, BestellnummerKasten, h1, bodyText } from './_layout'
+import { VERFALLEN_TEXT as T } from './texte/verfallen'
 
 export interface BestellungVerfallenProps {
   customerName: string
   orderNumber: string
   farmName: string
+  /** „Mittwoch, 3. März, 09:40 Uhr“ — die verstrichene Frist (fristVon, zeitpunktFuerMail); fehlt sie, „nicht rechtzeitig“. */
+  bestaetigenBis?: string
 }
 
 /**
@@ -16,10 +19,10 @@ export interface BestellungVerfallenProps {
  */
 export function BestellungVerfallenEmail(p: BestellungVerfallenProps) {
   return (
-    <EmailLayout fuss={{ art: 'hof' }} previewText="Dir entstehen keine Kosten.">
-      <Text style={h1}>Bestellung verfallen</Text>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={T.vorschauzeile}>
+      <Text style={h1}>{T.titel}</Text>
       <Text style={bodyText}>
-        {`Du hast deine Bestellung bei ${p.farmName} nicht rechtzeitig bestätigt. Deshalb haben wir die Ware wieder freigegeben – dir entstehen keine Kosten.`}
+        {T.satz(p.farmName, p.bestaetigenBis)}
       </Text>
       <BestellnummerKasten nummer={p.orderNumber} />
     </EmailLayout>

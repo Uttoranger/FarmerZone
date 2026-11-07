@@ -44,7 +44,17 @@ const KNOPF = cn(
 )
 
 function Zustand({ hof }: { hof: MeinHofKopfDaten }) {
-  if (!hof.zustand.schild) return null
+  // Vorsatz „Öffentlich ·“ für eine öffentliche Hofseite ohne Schild (Board w1-mein-hof, Liste Lauf 32 mein-hof).
+  if (!hof.zustand.schild) {
+    return hof.zustand.oeffentlich ? (
+      <span className="flex items-center gap-2.5 text-[15px] font-semibold text-status-fertig">
+        Öffentlich
+        <span aria-hidden="true" className="font-normal text-muted-foreground">
+          ·
+        </span>
+      </span>
+    ) : null
+  }
   return <StatusBadge status={schildTon(hof.zustand.schild.farbe)}>{hof.zustand.schild.text}</StatusBadge>
 }
 

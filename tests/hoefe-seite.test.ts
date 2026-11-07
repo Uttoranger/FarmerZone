@@ -266,15 +266,8 @@ const KURZFORM_VORHER = [
   '<div class="flex flex-col gap-1 p-3.5">',
   '<p class="line-clamp-2 min-w-0 text-[17px] leading-snug font-bold break-words text-foreground">Hof Test</p>',
   '<p class="truncate text-[13px] text-muted-foreground">1010 Wien · 2,1 km</p>',
-  '<p data-abholung="heute" class="flex items-center gap-1.5 text-[13px] text-status-fertig font-semibold">',
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock size-3.5 shrink-0" aria-hidden="true">',
-  '<circle cx="12" cy="12" r="10">',
-  '</circle>',
-  '<path d="M12 6v6l4 2">',
-  '</path>',
-  '</svg>',
-  '<span class="min-w-0">Abholung heute 15:00–18:00</span>',
-  '</p>',
+  // Seit Nr. 252 die Abholzeile fett grün ohne Uhr (Liste Lauf 32, hoefe) — der Rahmen sonst Byte für Byte wie vorher.
+  '<p data-abholung="heute" class="text-[13px] font-semibold text-brand-text">Abholung heute 15:00–18:00</p>',
   '<div class="mt-2 space-y-1.5">',
   '<div class="flex items-center gap-2">',
   '<div class="min-w-0 flex-1">',
@@ -392,7 +385,8 @@ describe('Chips und aktive Filter sind echte Links', () => {
   it('„Aktive Filter" mit Entfernen-Links und „Alle zurücksetzen"', () => {
     const filter: HoefeFilter = { ...LEERER_HOEFE_FILTER, siegel: ['BIO'], suchtext: 'Eier' }
     const zeile = html(createElement(AktiveFilterZeile, { filter }))
-    expect(zeile).toContain('Aktive Filter:')
+    // Seit Nr. 252 ohne sichtbaren Vorsatz — er benennt die Liste nur noch für Vorleser.
+    expect(zeile).toContain('<span id="aktive-filter" class="sr-only">Aktive Filter</span>')
     expect(zeile).toContain('aria-label="Bio entfernen"')
     // Jede Adresse der Seite trägt zum Suchtext die Kennung `t=1`: Der Text ist getippt, nicht abgesendet (abgesendeterSuchtext).
     expect(zeile).toContain('href="/hoefe?q=Eier&amp;t=1"')
@@ -403,7 +397,8 @@ describe('Chips und aktive Filter sind echte Links', () => {
 
   it('der Umkreis steht als eigener Eintrag in „Aktive Filter" — ein Knopf, kein Link (er lebt nicht in der URL)', () => {
     const zeile = html(createElement(AktiveFilterZeile, { filter: LEERER_HOEFE_FILTER, umkreis: 25 }))
-    expect(zeile).toContain('Aktive Filter:')
+    // Seit Nr. 252 ohne sichtbaren Vorsatz — er benennt die Liste nur noch für Vorleser.
+    expect(zeile).toContain('<span id="aktive-filter" class="sr-only">Aktive Filter</span>')
     expect(zeile).toMatch(/<button type="button"[^>]*aria-label="Umkreis: 25 km entfernen"/)
     expect(zeile).toContain('Alle zurücksetzen')
     // Gegenprobe: „Alle" ist kein Filter.
@@ -873,7 +868,7 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
 
   it('der Titel bleibt für Vorleser, die Zeile zeigt Suche, Filter und Liste', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    expect(client).toMatch(/<h1 className="sr-only">\{kopf\.titel\}<\/h1>/)
+    expect(client).toMatch(/<h1 className="sr-only">\{titel\}<\/h1>/)
     expect(client).toMatch(/suchfeld\(true\)/)
     expect(client).toMatch(/filterblatt\(true\)/)
     // „Liste zeigen" — unter 640 px nur „Liste" sichtbar, vorgelesen immer ganz.

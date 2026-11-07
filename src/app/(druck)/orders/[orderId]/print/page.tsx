@@ -5,23 +5,27 @@ import { prisma } from '@/lib/prisma'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getOrderDetail } from '@/server/queries/orders'
 import { PrintButton } from '@/components/orders/print-button'
-import { anzeigeGesamtCents, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
+import { anzeigeGesamtCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { datumLang } from '@/lib/heute'
 import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import { unitSuffix } from '@/lib/order-line'
-import { DRUCK_ABGLEICH, druckGebuehrZeile, druckPreisHinweis, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
+import { DRUCK_ABGLEICH, druckGebuehrZeile, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
+import { druckGesamtHinweis, druckKasse } from '@/components/orders/druck-kasse'
 
 export const dynamic = 'force-dynamic'
 
 /*
  * Der Abholzettel einer Bestellung (Boards s2-druck, w2-druck; nur hell, V44).
  * Papier sagt dasselbe wie der Bildschirm (V57): die Marke der Packliste
- * („Zum Packen“, „Wartet auf Kunde“), „Bar bei Abholung“, „Bar zu kassieren“.
+ * („Zum Packen“, „Wartet auf Kunde“), „Bar bei Abholung“, „Bar zu kassieren“ —
+ * bzw. „Zu kassieren“ (Karte) und „Nichts zu kassieren“ (nicht abgeholt, storniert,
+ * Gebühr entfallen; druckKasse, Nr. 249b).
  * Die Zeile mit der Gebühr steht nur bei Bestellungen im Modell „bisher“ — im
- * Hofpreis-Modell steckt die Plattformgebühr im Preis (N38), darunter steht
- * „Preise inkl. Plattformgebühr.“ (druckGebuehrZeile, druckPreisHinweis).
+ * Hofpreis-Modell steckt die Plattformgebühr im Gesamt (N38), darunter steht
+ * „Gesamt inkl. Plattformgebühr.“ (druckGebuehrZeile, druckGesamtHinweis): Die
+ * Positionen zeigen den Warenpreis ohne Gebühr, „Preise inkl.“ stimmte dort nicht.
  * Ist die Gebühr entfallen bzw. erstattet (Storno, „nicht abgeholt“), steht die Zeile mit „(entfällt)“ bzw.
  * „(erstattet)“ und gestrichenem Betrag da, „Gesamt“ ist der Warenpreis — wie auf der Bestätigung (Nr. 244).
  */
@@ -64,9 +68,9 @@ export default async function OrderPrintPage({
   const summen = bestellSummen(order)
   const gesamtCents = anzeigeGesamtCents(order)
   const vermerk = gebuehrEntfallenVermerk(order)
-  const kassieren = barZuKassierenCents(order)
+  const kasse = druckKasse(order)
   const gebuehrZeile = druckGebuehrZeile(order, summen.gebuehrCents)
-  const preisHinweis = druckPreisHinweis(order)
+  const preisHinweis = druckGesamtHinweis(order)
   const marke = papierMarke(order.status)
 
   // Das Layout der Gruppe (druck) trägt keine Navigation: Papier aus Tokens, die
@@ -178,10 +182,10 @@ export default async function OrderPrintPage({
         </table>
 
         <div className="text-sm">Zahlung: {zahlartText(order.paymentMethod, order.paymentStatus)}</div>
-        {kassieren !== null && (
+        {kasse && (
           <div className="mt-3 rounded-md border-2 border-primary-foreground px-3.5 py-2.5 text-base font-bold md:text-lg">
-            Bar zu kassieren: {formatEuro(centsAlsEuro(kassieren))}
-            {gebuehrZeile && (
+            {kasse.cents === null ? kasse.titel : `${kasse.titel}: ${formatEuro(centsAlsEuro(kasse.cents))}`}
+            {kasse.cents !== null && gebuehrZeile && (
               <span className="text-sm font-normal text-primary-foreground/70">
                 {' '}
                 (davon {gebuehrZeile} {formatEuro(centsAlsEuro(summen.gebuehrCents))})

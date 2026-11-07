@@ -13,9 +13,11 @@ import {
   abholfensterHeute,
   abholtage,
   abholtagName,
+  abspracheKontakt,
   abholWhere,
   brauchtDich,
   fensterMitBestellungen,
+  karteNaechsteAbholung,
   heuteHofSichtbar,
   naechsteAbholungWhere,
   packliste,
@@ -62,6 +64,8 @@ export type Heute = {
   abholfensterHeute: string | null
   /** Das nächste Abholfenster laut Abholzeiten und wie viele Bestellungen dafür offen sind. */
   naechstesFenster: { fenster: NaechstesFenster; anzahl: number } | null
+  /** Was die Karte „Nächste Abholung“ nennt: das Fenster nach dem heutigen, wenn heute schon in der Packliste steht (karteNaechsteAbholung). */
+  naechsteAbholungKarte: { fenster: NaechstesFenster; anzahl: number } | null
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   wochenBalken: WochenBalken[]
@@ -123,8 +127,12 @@ export async function getHeute(
               status: true,
               totalAmount: true,
               serviceFeeCents: true,
-              // Fehlende Artikel (E14) werden nicht gepackt.
-              items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
+              // N47 (Nr. 257): nur gelesen, um „Anrufen“ und „Mail schreiben“ zu füllen — abspracheKontakt unten gibt
+              // sie nur für offene Bestellungen mit Absprache weiter, alle anderen Zeilen tragen keinen Kontakt.
+              customerPhone: true,
+              customerEmail: true,
+              // Fehlende Artikel (E14) werden nicht gepackt — und brauchen keine Absprache.
+              items: { where: { fehltSeit: null }, select: { productName: true, quantity: true, product: { select: { abholhinweise: true } } } },
             },
           }),
           prisma.order.findFirst({
@@ -220,10 +228,12 @@ export async function getHeute(
   }
 
   const zeilen = packliste(
-    heutige.map(({ totalAmount, serviceFeeCents, ...b }) => ({
+    heutige.map(({ totalAmount, serviceFeeCents, customerPhone, customerEmail, items, ...b }) => ({
       ...b,
+      items: items.map(({ productName, quantity }) => ({ productName, quantity })),
       // Der Betrag aus dem Snapshot der Bestellung (Ware + Gebühr), nie neu gerechnet.
       gesamtCents: bestellSummen({ totalAmount, serviceFeeCents }).gesamtCents,
+      absprache: abspracheKontakt({ status: b.status, customerPhone, customerEmail, hinweiseJePosition: items.map((i) => i.product.abholhinweise) }),
     }))
   )
   const slots = hof?.pickupSlots ?? []
@@ -258,6 +268,7 @@ export async function getHeute(
     },
     abholfensterHeute: abholfensterHeute(slots, jetzt),
     naechstesFenster: fensterMitZahl,
+    naechsteAbholungKarte: karteNaechsteAbholung(slots, jetzt, zeilen.length, naechsteAbholung),
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
       ausverkauft,

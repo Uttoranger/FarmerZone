@@ -199,7 +199,7 @@ function Signale({ zeile }: { zeile: HoefeListenZeile }): React.JSX.Element {
 
 /** Ab 1024 px: die Tabelle aus dem Mockup. */
 function Tabelle({ zeilen }: { zeilen: HoefeListenZeile[] }): React.JSX.Element {
-  const kopf = 'px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
+  const kopf = 'px-3.5 py-2.5 text-left text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
       <table className="w-full text-[14px]">

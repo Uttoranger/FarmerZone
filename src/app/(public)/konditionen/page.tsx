@@ -149,11 +149,12 @@ export default async function KonditionenPage(): Promise<React.JSX.Element> {
               </li>
             ))}
           </ol>
-          {/* Orange: Registrieren ist eine Hof-Aktion (DESIGN_SYSTEM „Farbrollen"),
+          {/* Inhaltsbreit, auch am Handy (Board s3-rechtstexte Bild 6, Liste Lauf 32 Z. 857).
+              Orange: Registrieren ist eine Hof-Aktion (DESIGN_SYSTEM „Farbrollen"),
               der eine Hauptknopf dieser Seite. Die Registrierung ist offen —
               der Weg führt direkt in die App, nicht ins Mail-Programm. */}
           <div className="mt-5 flex flex-col items-start gap-2">
-            <Link href="/register" className={cn(KNOPF_ORANGE, 'h-[50px] w-full rounded-[14px] text-[16px] font-bold sm:w-auto md:h-14 md:px-8')}>
+            <Link href="/register" className={cn(KNOPF_ORANGE, 'min-h-[52px] rounded-[14px] px-[22px] text-[16px] font-bold')}>
               Hof registrieren
             </Link>
             <a href={CTA_MAILTO} className={cn(INFOSEITE_LINK, 'inline-flex min-h-11 items-center')}>

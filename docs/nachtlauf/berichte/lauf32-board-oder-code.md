@@ -45,6 +45,8 @@ Boards mit nicht herstellbaren Bildern (meine-bestellungen 3–6, neuigkeiten 1�
 
 ## 2. Entscheidungen je Board
 
+Vermerk Lauf 32 B (7.11.2026): ‚G5‘ in Fehlerkarten-Zeilen zu ‚G6‘ berichtigt (Regelvorschlag 9, Morgenbericht 32 A, freigegeben 7.11.2026).
+
 Spalten: Mangel (kurz) · Fassung · Entsch. · Begründung · Umsetzung (B) bzw. Board-Korrektur (C).
 Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 
@@ -398,7 +400,7 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 | Hinweis als Karte mit Glühbirne | alle, Bild 2 | B | Board. | Grün getönter Streifen, Text grün fett, ohne Symbol. |
 | Bild 5 nicht freigegeben nicht erreicht | alle | U | Testhof freigegeben. | – |
 | Leeres Diagramm mit „€ 0,00“, Symbol, ohne Erklärsatz | 1440, Bild 5 | B | PL; Board. | G4 mit Satz „Verkaufst du auch am Markt …“ und Knopf „Verkauf eintragen“. |
-| Fehler-Karte getönt, kleiner Knopf | alle, Bild 6 | B | Board. | G5. |
+| Fehler-Karte getönt, kleiner Knopf | alle, Bild 6 | B | Board. | G6. |
 | Link „Region“ ohne Unterstrich; Fokus frisst Leerzeichen | alle | B | Board. | `Textlink`, Leerzeichen außerhalb des Links, Punkt am Satzende. |
 | Leere Links-Karte mit Knopf „Hof teilen auf Heute“ | alle | B | Board ohne Knopf. | Knopf weg; Fußsatz „Gezählt werden Besuche, keine Bestellungen.“ – „ohne Cookies“ darf im Satz bleiben. |
 | „Konto · …“, Kürzel „HM“ | 1440 | C / R | Q1; PL „HM“. | – |
@@ -435,7 +437,7 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 
 | Mangel | Fassung | Entsch. | Begründung | Umsetzung / Board-Korrektur |
 |---|---|---|---|---|
-| Fehlerkarte: kleiner Pillen-Knopf, getönt, kleine Überschrift | alle, Bild 2 | B | Board. | G5. |
+| Fehlerkarte: kleiner Pillen-Knopf, getönt, kleine Überschrift | alle, Bild 2 | B | Board. | G6. |
 | Kopf ohne Zurück-Pfeil und Leiste | 390, Bild 1/2 | B | Board. | G1. |
 | Unterzeile „Hof Müller“ fehlt | 1440, Bild 2 | B | Board. | G1. |
 | Zeile „Teilen-Hinweise“ zeigt Zustand | alle, Bild 1 | C | Übersicht zeigt sonst auch Werte (LFBIS, Tarif); Zustand hilft. | Board: „An · wir fragen einmal, ob du teilen willst“. |
@@ -525,8 +527,8 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 | Leer-Kasten zentriert mit Symbol | alle, Bild 4/5 | B | PL. | G4. |
 | Freischalt-Hinweis über der h1, mit Hof-ID | alle, Bild 5 | B | Board. | G3. |
 | Karte „Startphase“ | 1440 | U | Q4. | – |
-| Fehlerzustand: Unterzeile fehlt, kleiner Knopf | alle, Bild 6 | B | Board. | G1 + G5. |
-| Kein Fokus auf „Noch einmal versuchen“ | 1440 d, Bild 6 | B | Nach einem Ladefehler gehört der Fokus auf den Ausweg. | G5 setzt den Fokus. |
+| Fehlerzustand: Unterzeile fehlt, kleiner Knopf | alle, Bild 6 | B | Board. | G1 + G6. |
+| Kein Fokus auf „Noch einmal versuchen“ | 1440 d, Bild 6 | B | Nach einem Ladefehler gehört der Fokus auf den Ausweg. | G6 setzt den Fokus. |
 | Dialog-Hintergrund weichgezeichnet | 1440 | B | DS. | Abdunkeln ohne Weichzeichnen. |
 | „Gepackt“ | alle | R | N9. | – |
 | Maria Huber statt Anna Berger, Weizberghof | alle | U | Beispieldaten. | – |
@@ -582,8 +584,8 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 | Langer Gedankenstrich „—“ | alle | B | Hausstil „–“. | Wache auf „—“ in Nutzertexten. |
 | Knöpfe schmal; Einleitungssatz über der Bestätigung | alle, Bild 3 | B | Board. | Beide volle Breite untereinander; Einleitung weg. |
 | Leerzustand mit Rettungsring | alle, Bild 5 | B | PL. | G4. |
-| Fehlerkasten klein, Einleitungssatz darüber | alle, Bild 6 | B | Board. | G5. |
-| Ränder im Dunkeln kaum sichtbar, Fehlerkarte grünlich | d | B | Board. | G4/G5 dunkel. |
+| Fehlerkasten klein, Einleitungssatz darüber | alle, Bild 6 | B | Board. | G6. |
+| Ränder im Dunkeln kaum sichtbar, Fehlerkarte grünlich | d | B | Board. | G4/G6 dunkel. |
 | Seitenspalte schmal, „Alle ansehen“ mittig, Brief-Symbol | 1440 | B | Board. | Nach Board. |
 | Auswahlzeilen niedriger | 390 | B | Board. | 64 px. |
 | Kasten „Das schicken wir automatisch mit“ | 1440 | R | DS (Board s2-meldungen zeigt ihn). | – |
@@ -598,7 +600,7 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 | „Du hast geantwortet“ als Chip | alle | B | Board. | Graue Unterzeile. |
 | „Problem melden“ im Fußtext ohne Link | alle | B | Board. | Grüner Textlink. |
 | Leer-Zustand zentriert mit Symbol, anderer Text | alle, Bild 5 | B | PL; Board. | G4 mit „… und als Karte auf Heute.“ und „Alle Nachrichten zeigen“. |
-| Fehler ohne Überschrift, Satz fehlt | alle, Bild 6 | B | Board. | G5. |
+| Fehler ohne Überschrift, Satz fehlt | alle, Bild 6 | B | Board. | G6. |
 | Knopf „Ansehen“ | alle, Bild 2–4 | B | Board nennt das Ziel. | Knopftext aus dem Ziel („<Seitenname> ansehen“), eine Zuordnung Route → Name. |
 | Blase mit Absenderzeile, Uhrzeit außerhalb | alle | B | Board. | Uhrzeit in der Blase „8:10 · auch per E-Mail“. |
 | „auch per E-Mail“ fehlt | alle, Bild 4 | B | Board; Daten da (Haken Betriebsmitteilung). | Ergänzen. |
@@ -662,7 +664,7 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 | Schild „Futtermittelbetrieb · LFBIS … · laut Hof“ | alle | R | E9. | Board: Schild nach E9. |
 | „Wo liegt dein Hof?“ als gestrichelter Leer-Kasten | alle, Bild 3 | B | Board. | G4, Knopf orange (Hof) volle Breite. |
 | „So steht dein Hof …“ als volle Hofkarte | alle, Bild 3 | C | DS: `ProduktKurzliste` ist eine Gestalt, auch für die eigene Hofkarte in Region; der Hof sieht echt, was Kundinnen sehen. | Board: volle Hofkarte. |
-| Fehlerkasten grau, kleiner Knopf | alle, Bild 4 | B | Board. | G5. |
+| Fehlerkasten grau, kleiner Knopf | alle, Bild 4 | B | Board. | G6. |
 | Leer-Zustand mit Symbol, anderer Text | alle, Bild 5 | B | PL; Board. | G4: „Gerade verkauft im Umkreis von 10 km kein Hof <Sorte>“, „Mit 25 km ist es 1 Hof.“, „Auf 25 km erweitern“. |
 | Sorten-Chips im Leerzustand auf „Alle“ reduziert, Zählzeile | alle, Bild 5 | B | Board. | Chips bleiben mit gewählter Sorte; Zählzeile weg. |
 | Kartenansicht am Handy mit allen Filterzeilen | 390, Bild 6 | B | Unruhig, Karte rutscht unter den Falz. | In der Kartenansicht nur Umkreis + „Liste / Karte“, übrige Filter im Knopf „Filter“. |
@@ -717,7 +719,7 @@ Verweise G1 … G14 = gemeinsame Bausteine (Abschnitt 3).
 | Hinweis über der h1, Uhr, Hof-ID, Titel neutral | alle, Bild 5 | B | Board. | G3. |
 | Leerzustand mit Überschrift, Symbol, Knopf | 1440, Bild 5 | B | PL; Board. | G4 mit zweitem Satz, ohne zweiten Knopf. |
 | Karte „Startphase“ | 1440 | U | Q4. | – |
-| Fehlerkarte klein; Kopf ohne Unterzeile | alle, Bild 6 | B | Board. | G5 + G1. |
+| Fehlerkarte klein; Kopf ohne Unterzeile | alle, Bild 6 | B | Board. | G6 + G1. |
 | Knopf „Verkauf eintragen“ fehlt im Fehlerzustand | 1440 | B | Board. | Kopf-Aktion unabhängig vom Ladefehler. |
 | „Konto · …“ | 1440 | C | Q1. | – |
 | Knopf mit „+“ tiefer gesetzt | 1440 | B | Board. | Bündig neben der h1 (G1 Aktion rechts). |

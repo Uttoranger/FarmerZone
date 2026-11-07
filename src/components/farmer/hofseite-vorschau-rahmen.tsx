@@ -302,7 +302,7 @@ export function HofseiteVorschauRahmen({
   return (
     <aside className="sticky top-6" aria-label="Vorschau">
       <div className="flex items-center justify-between gap-3 px-1">
-        <p className="text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase">Vorschau</p>
+        <p className="text-xs font-semibold tracking-[1.1px] text-muted-foreground uppercase">Vorschau</p>
         <GeraetUmschalter wert={angezeigt} onWert={waehle} />
       </div>
       <div ref={panel} className="mt-2">

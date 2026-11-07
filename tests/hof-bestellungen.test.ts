@@ -447,7 +447,10 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
     expect(html).toContain(' · bar, bezahlt wird bei Abholung')
     expect(html).toContain('bis 31. Jänner 2028 zahlst du auf Barverkäufe keine Plattformgebühr.')
     expect(html).not.toContain('auf diese Barbestellung zahlst du')
-    expect(html).toContain('max-w-[1200px]')
+    // Nr. 249b: linksbündig neben der Seitenleiste 896 px Inhalt plus Rand — bei 1440 px endet er wie im Board
+    // bei x ≈ 1200 (max-w 1200 mit mx-auto wirkte neben der 264-px-Leiste nicht); die feste Leiste ebenso.
+    expect(html.match(/max-w-\[976px\]/g)?.length).toBe(2)
+    expect(html).not.toContain('mx-auto w-full max-w-[976px]')
   })
 
   it('abgeholt: „· abgeholt um 16:05“, „Packliste · n von n“ und „Abholung rückgängig“ als Textknopf, nicht orange gefüllt', () => {
@@ -470,7 +473,9 @@ describe('Bestellung im Detail: die Nummer der Kundin', () => {
     expect(html).toContain('· 2 von 2')
     const knopf = html.match(/<button[^>]*>Abholung rückgängig<\/button>/)?.[0] ?? ''
     expect(knopf).not.toBe('')
-    expect(knopf).toContain('text-status-offen')
+    // Nr. 249b: in Textfarbe wie im Board w1-bestellung Bild 4, nicht orange.
+    expect(knopf).toContain('text-foreground')
+    expect(knopf).not.toContain('text-status-offen')
     expect(knopf).not.toContain('bg-primary')
     expect(html).toContain('data-art="laeuft"')
   })

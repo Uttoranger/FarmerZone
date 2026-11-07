@@ -25,7 +25,8 @@ export function AbmeldenKarte({
   children: ReactNode
 }): React.JSX.Element {
   return (
-    <div className="mx-auto w-full max-w-[1032px] px-4 pt-4 pb-10">
+    // Unten nur 10 px bis zum Seitenfuß (Board s2-abmelden; Liste Lauf 32, abmelden „Abstand Karte → Fuß 40 statt 10 px“).
+    <div className="mx-auto w-full max-w-[1032px] px-4 pt-4 pb-2.5">
       <div className={cn(KARTE, 'flex max-w-[520px] flex-col gap-2 px-[18px] py-[18px]')}>
         <h1 className={cn('font-heading text-[22px] leading-tight font-semibold', ton === 'orange' && 'text-status-offen')}>{titel}</h1>
         {children}

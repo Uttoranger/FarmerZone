@@ -9,7 +9,7 @@
 import type { Prisma } from '@prisma/client'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { centsAlsEuro, wienerMitternacht } from '@/lib/servicegebuehr'
-import { wienerZeitpunkt } from '@/lib/fristen'
+import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { formatEuro, formatTagKurz, mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
@@ -19,6 +19,8 @@ import type { MarkeArt } from '@/lib/marke-art'
 import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import { abspracheOffen, brauchtAbsprache } from '@/lib/abholhinweise'
+import { telefonLink } from '@/lib/telefon-anzeige'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +142,18 @@ export function abholTagMitDatum(heuteKalendertag: string, kalendertag: string):
   const vorsatz =
     kalendertag === heuteKalendertag ? 'Heute' : kalendertag === tagVersetzt(heuteKalendertag, 1) ? 'Morgen' : kalendertag === tagVersetzt(heuteKalendertag, -1) ? 'Gestern' : null
   return vorsatz ? `${vorsatz}, ${kurz.replace(', ', ' ')}` : kurz
+}
+
+/**
+ * Ein Zeitpunkt kurz, wie das Board w1-bestellung ihn bei der Kundin zeigt: „heute, 07:12“, „gestern, 18:40“,
+ * sonst „Mi, 3. März, 07:12“ (Nr. 249b; vorher die lange Mail-Fassung „Samstag, 7. November, 02:50 Uhr“).
+ * Tag und Uhrzeit in Wiener Zeit; `jetzt` ist Parameter.
+ */
+export function zeitpunktKurz(zeitpunkt: Date, jetzt: Date): string {
+  const tag = wienKalendertag(zeitpunkt)
+  const heute = wienKalendertag(jetzt)
+  const vorsatz = tag === heute ? 'heute' : tag === tagVersetzt(heute, -1) ? 'gestern' : formatTagKurz(tag)
+  return `${vorsatz}, ${uhrzeitInWien(zeitpunkt)}`
 }
 
 /** Die grüne Marke unter dem Kopf von Heute: „Abholung heute, Mi 3. März, 15–18 Uhr" (Board s1-heute). */
@@ -458,9 +472,31 @@ export const PACK_MARKE: Record<AbholChip, { text: string; art: MarkeArt }> = {
 // Was Arbeit macht, steht oben: erst packen, dann warten, zuletzt Erledigtes.
 const PACK_RANG: Record<AbholChip, number> = { vorbereiten: 0, wartet: 1, bereit: 2 }
 
-/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen). */
-export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number }
-export type PacklistenZeile = AbholZeile & { gesamtCents: number }
+/**
+ * Abholung nach Absprache (Register N47, Nr. 257): die Ziele von „Anrufen“
+ * (tel:-Link, ohne lesbare Nummer null) und „Mail schreiben“. Nur Ziele, nie
+ * Text zum Anzeigen — auf Heute steht der Kontakt nicht sichtbar in der Zeile.
+ */
+export type AbspracheKontakt = { anrufen: string | null; email: string }
+
+/**
+ * Datensparsam: Kontakt nur für eine offene Bestellung mit Absprache, für jede
+ * andere null — dann verlässt die Nummer den Server gar nicht erst (auch nicht
+ * in den Seitendaten). Bedingung aus src/lib/abholhinweise.ts.
+ */
+export function abspracheKontakt(b: {
+  status: string
+  customerPhone: string
+  customerEmail: string
+  hinweiseJePosition: readonly (readonly string[] | null | undefined)[]
+}): AbspracheKontakt | null {
+  if (!abspracheOffen(b.status, brauchtAbsprache(b.hinweiseJePosition))) return null
+  return { anrufen: telefonLink(b.customerPhone), email: b.customerEmail }
+}
+
+/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen); Kontakt nur mit Absprache. */
+export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number; absprache?: AbspracheKontakt | null }
+export type PacklistenZeile = AbholZeile & { gesamtCents: number; absprache?: AbspracheKontakt }
 
 /**
  * Die Packliste auf Heute: dieselben Bestellungen wie „Heute abholen" und das
@@ -469,8 +505,13 @@ export type PacklistenZeile = AbholZeile & { gesamtCents: number }
  */
 export function packliste(bestellungen: readonly PacklistenBestellung[]): PacklistenZeile[] {
   const cents = new Map(bestellungen.map((b) => [b.id, b.gesamtCents]))
+  const kontakt = new Map(bestellungen.flatMap((b) => (b.absprache ? [[b.id, b.absprache] as const] : [])))
   return abholZeilen(bestellungen)
-    .map((z) => ({ ...z, gesamtCents: cents.get(z.id) ?? 0 }))
+    .map((z) => {
+      const absprache = kontakt.get(z.id)
+      // Ohne Absprache fehlt das Feld ganz — keine leeren Kontaktfelder in den Seitendaten.
+      return absprache ? { ...z, gesamtCents: cents.get(z.id) ?? 0, absprache } : { ...z, gesamtCents: cents.get(z.id) ?? 0 }
+    })
     .toSorted((a, b) => PACK_RANG[a.chip] - PACK_RANG[b.chip])
 }
 
@@ -713,6 +754,31 @@ export function fensterMitBestellungen(
 }
 
 /**
+ * Welches Fenster die Karte „Nächste Abholung“ in der Seitenspalte von Heute nennt (Nr. 249b, Board s1/w1-heute
+ * Bild 1: Packliste „Heute“, Karte „Sa, 6. März, 9–12 Uhr · 2 Bestellungen“). Steht das heutige Fenster schon in
+ * der Packliste (heute Bestellungen), nennt die Karte das Fenster DANACH: den nächsten Abholtag mit Bestellungen
+ * samt Zahl, sonst das nächste Fenster ab morgen (Zahl, wenn an dem Tag bestellt ist). Ist heute nichts bestellt,
+ * dasselbe wie die Zeile unter der leeren Packliste (fensterMitBestellungen). Ohne aktive Abholzeit null.
+ */
+export function karteNaechsteAbholung(
+  slots: readonly HeuteFenster[],
+  jetzt: Date,
+  anzahlHeute: number,
+  naechsteAbholung: NaechsteAbholung | null
+): { fenster: NaechstesFenster; anzahl: number } | null {
+  const mitZahl = fensterMitBestellungen(slots, jetzt, anzahlHeute, naechsteAbholung)
+  const heute = wienKalendertag(jetzt)
+  if (!mitZahl || mitZahl.fenster.tag !== heute) return mitZahl
+  if (naechsteAbholung && naechsteAbholung.anzahl > 0) {
+    const mitBestellungen = abholfensterAm(slots, naechsteAbholung.tag, heute)
+    if (mitBestellungen) return { fenster: mitBestellungen, anzahl: naechsteAbholung.anzahl }
+  }
+  const ab = naechstesAbholfenster(slots, wienerTag(tagVersetzt(heute, 1)).von)
+  if (!ab) return mitZahl
+  return { fenster: { ...ab, name: abholtagName(heute, ab.tag) }, anzahl: naechsteAbholung?.tag === ab.tag ? naechsteAbholung.anzahl : 0 }
+}
+
+/**
  * Wie viele Bestellungen auf das nächste Fenster warten: liegt es heute, die
  * Packliste (ohne Abgeholte, Stornierte, Nicht-Abgeholte — packliste); liegt
  * es später, die Zahl des nächsten Abholtags mit Bestellungen, aber nur, wenn
@@ -830,14 +896,6 @@ export function heuteAufbau({
 }
 
 // ─── Packliste ohne Abholzeit und „Zu tun“ (Liste Lauf 32, heute Bild 4) ──────
-
-/**
- * Der Satz der leeren Packliste ohne Abholzeit, wörtlich nach Board s1-heute Bild 4. Eigene Konstante für Heute:
- * `ABHOLZEITEN_FEHLEN.satz` (pickup-slot-rules.ts) nutzen auch Einstellungen und Hof einrichten, deren Boards
- * den bisherigen Satz zeigen; Titel und Knopf bleiben von dort.
- */
-// Übergang bis Nr. 250: gleiche Aussage wie ABHOLZEITEN_FEHLEN.satz, Liste heute Z. 296
-export const HEUTE_ABHOLZEITEN_SATZ = 'Ohne Abholzeit kann niemand bei dir bestellen. Trag ein, wann man bei dir abholen kann.'
 
 /**
  * Der Link einer Aufgabe in „Zu tun“ auf Heute: wie der Titel, nur Abholzeiten heißt dort wie der Knopf

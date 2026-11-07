@@ -58,7 +58,7 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
       <BestellnummerKasten nummer={p.orderNumber} />
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
       <Trenner />
-      <BetragsZeile stark links="Bar zu kassieren:" rechts={formatEuro(kassieren)} />
+      <BetragsZeile stark links="Bar zu kassieren" rechts={formatEuro(kassieren)} />
       {gebuehrSatz && <Text style={{ ...kleinText, marginTop: '6px' }}>{gebuehrSatz}</Text>}
       {/* Die Nummer der Kundin bleibt (Nr. 81): Der Hof ruft an, wenn etwas fehlt. */}
       <BetragsZeile

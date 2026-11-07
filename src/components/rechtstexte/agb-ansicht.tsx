@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { INFOSEITE_ABSCHNITT, INFOSEITE_LINK } from '@/components/shared/infoseite-stil'
 import { AgbStuecke } from '@/components/rechtstexte/agb-stuecke'
 import {
@@ -153,7 +154,7 @@ function Punkt({ punkt, kontext }: { punkt: AgbPunkt; kontext: AgbKontext }): Re
 export function TeilAbschnitt({ teil, kontext }: { teil: AgbTeil; kontext: AgbKontext }): React.JSX.Element {
   const anker = agbTeilAnker(teil.id)
   return (
-    <section aria-labelledby={anker} className="border-t border-border pt-8">
+    <section aria-labelledby={anker}>
       <h2 id={anker} className={cn(INFOSEITE_ABSCHNITT, 'scroll-mt-20 text-[20px]')}>
         {teil.titel}
       </h2>
@@ -169,7 +170,7 @@ export function TeilAbschnitt({ teil, kontext }: { teil: AgbTeil; kontext: AgbKo
 /** Ein Anhang (0.9: das Muster-Rücktrittsformular; 1.0: Belehrung, Formular, Auftragsverarbeitung), beim Drucken auf einer eigenen Seite. */
 export function AnhangAbschnitt({ anhang, kontext }: { anhang: AgbAnhang; kontext: AgbKontext }): React.JSX.Element {
   return (
-    <section aria-labelledby={anhang.anker} className="border-t border-border pt-8 print:break-before-page">
+    <section aria-labelledby={anhang.anker} className="print:break-before-page">
       <h2 id={anhang.anker} className={cn(INFOSEITE_ABSCHNITT, 'scroll-mt-20 text-[20px]')}>
         {anhang.titel}
       </h2>
@@ -189,7 +190,7 @@ export function AnhangAbschnitt({ anhang, kontext }: { anhang: AgbAnhang; kontex
  */
 export function KurzErklaert({ kurzErklaert, kontext }: { kurzErklaert: AgbKurzErklaert; kontext: AgbKontext }): React.JSX.Element {
   return (
-    <section aria-labelledby={KURZ_ERKLAERT_ANKER} className="rounded-2xl border border-border bg-card px-4 py-3.5 text-[14px] text-foreground">
+    <section aria-labelledby={KURZ_ERKLAERT_ANKER} className={cn(RUNDUNG.karte, 'border border-border bg-card px-4 py-3.5 text-[14px] text-foreground')}>
         <h2 id={KURZ_ERKLAERT_ANKER} className="scroll-mt-20 font-heading text-[16px] font-semibold text-foreground">
           {kurzErklaert.titel} <span className="font-sans text-[12.5px] font-normal text-muted-foreground">({kurzErklaert.zusatz})</span>
         </h2>
@@ -220,7 +221,7 @@ export function agbVerzeichnis(fassung: AgbFassungDaten): RechtstextVerzeichnisD
         titel: teil.titel,
         eintraege: teil.punkte.map((punkt) => ({ anker: agbAnker(punkt.nummer), text: punkt.titel, nummer: punkt.nummer })),
       })),
-      { eintraege: fassung.anhaenge.map((anhang) => ({ anker: anhang.anker, text: anhang.titel })), betont: true },
+      { eintraege: fassung.anhaenge.map((anhang) => ({ anker: anhang.anker, text: anhang.titel })) },
     ],
   }
 }

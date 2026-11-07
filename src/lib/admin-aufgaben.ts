@@ -875,7 +875,7 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       id: 'geld',
       titel: 'Geld · Woche',
       wert: formatEuro(centsAlsEuro(lage.woche.umsatzCents), 0),
-      einheit: 'Umsatz der Höfe',
+      einheit: 'Bestellwert',
       // „stimmt“ nur nach einem erfolgreichen Abgleich (Nr. 191); „Auszahlung Do“ hat keine Quelle im Code und fehlt weiter.
       marke: lage.geldAbgleichOk ? (abweichungen === 0 ? { wort: 'stimmt', art: 'laeuft' } : { wort: mitAnzahlWort(abweichungen, 'Abweichung', 'Abweichungen'), art: 'tun' }) : null,
       zeilen: [

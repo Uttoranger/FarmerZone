@@ -41,7 +41,9 @@ export default async function RegisterPage(): Promise<React.JSX.Element> {
       titel="Hof registrieren"
       zurueck={{ href: '/fuer-hoefe', label: 'Zurück zu Für Höfe' }}
       rechts={
-        <span className="flex items-center gap-3">
+        // Am Handy ohne Knopf (Liste Lauf 32, registrieren/Q2): Den Weg zur Anmeldung trägt dort „Schon dabei? Anmelden“
+        // unter dem Formular.
+        <span className="hidden items-center gap-3 md:flex">
           <span className="hidden md:inline">{SCHON_DABEI.frage}</span>
           <Link
             href={SCHON_DABEI.href}

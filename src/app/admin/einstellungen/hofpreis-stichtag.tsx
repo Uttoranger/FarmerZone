@@ -88,7 +88,7 @@ export function HofpreisStichtag({
             onChange={(e) => setTag(e.target.value)}
             disabled={daten.erreicht || laeuft}
             aria-describedby={satzId}
-            className={cn(FELD, FOKUS_RAHMEN, daten.erreicht && 'cursor-default bg-muted')}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11', daten.erreicht && 'cursor-default bg-muted')}
           />
         </div>
         {!daten.erreicht && (

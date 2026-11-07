@@ -53,7 +53,6 @@ import {
   abholungHeuteText,
   brauchtDichAnzeige,
   HEUTE_ABHOLEN,
-  HEUTE_ABHOLZEITEN_SATZ,
   KENNZAHL_TEXT,
   PACK_MARKE,
   abholfensterHeute,
@@ -65,6 +64,8 @@ import {
   mitTrennstellen,
   naechstesAbholfenster,
   fensterMitBestellungen,
+  karteNaechsteAbholung,
+  zeitpunktKurz,
   naechsteAbholungSatz,
   onlinePausiertDaten,
   stripeEinrichtenHinweis,
@@ -77,6 +78,7 @@ import {
   type PacklistenZeile,
 } from '@/lib/heute'
 import { onlinePausiertHinweis, onlineZahlungPausiert } from '@/lib/stripe-konto'
+import { formatTagKurz } from '@/lib/format'
 import { umsatzBestellungWhere } from '@/lib/umsatz'
 import {
   FREISCHALT_MOMENT_TAGE,
@@ -198,6 +200,31 @@ describe('Abholfenster — Wiener Wochentag', () => {
     // Bestellungen an einem Tag ohne Abholzeit (Abholzeit inzwischen gelöscht): Gegenprobe, das nächste Fenster ab morgen.
     expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, { tag: '2026-10-08', name: 'Donnerstag', anzahl: 1 })?.fenster.tag).toBe('2026-10-10')
     expect(fensterMitBestellungen([], vorher, 0, null)).toBeNull()
+  })
+
+  it('zeitpunktKurz: „heute, 07:12“, „gestern, 18:40“, sonst Tag mit Datum — Wiener Zeit (Nr. 249b, Board w1-bestellung)', () => {
+    const jetzt = new Date('2026-11-07T10:00:00Z') // Sa 11:00 Wien
+    expect(zeitpunktKurz(new Date('2026-11-07T06:12:00Z'), jetzt)).toBe('heute, 07:12')
+    expect(zeitpunktKurz(new Date('2026-11-06T17:40:00Z'), jetzt)).toBe('gestern, 18:40')
+    // 23:30 UTC am Vortag ist in Wien schon heute (00:30).
+    expect(zeitpunktKurz(new Date('2026-11-06T23:30:00Z'), jetzt)).toBe('heute, 00:30')
+    expect(zeitpunktKurz(new Date('2026-11-04T08:05:00Z'), jetzt)).toBe(`${formatTagKurz('2026-11-04')}, 09:05`)
+    expect(zeitpunktKurz(new Date('2026-11-04T08:05:00Z'), jetzt)).toMatch(/^Mi, 4\./)
+  })
+
+  it('Karte „Nächste Abholung“: steht heute in der Packliste, nennt sie das Fenster danach mit seiner Zahl (Nr. 249b, Board s1/w1-heute Bild 1)', () => {
+    const vorher = new Date('2026-10-06T12:00:00Z') // Di 14:00 Wien, Fenster heute 15–18 Uhr
+    const samstagZwei = { tag: '2026-10-10', name: 'Samstag', anzahl: 2 }
+    // Heute drei in der Packliste, Samstag zwei: die Karte nennt Samstag mit zwei — nicht das heutige Fenster.
+    expect(karteNaechsteAbholung([dienstag, samstag], vorher, 3, samstagZwei)).toEqual({
+      fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' },
+      anzahl: 2,
+    })
+    // Heute drei, danach noch nichts bestellt: das nächste Fenster ab morgen mit 0 (Karte: „Noch keine Bestellungen“).
+    expect(karteNaechsteAbholung([dienstag, samstag], vorher, 3, null)).toEqual({ fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' }, anzahl: 0 })
+    // Heute leer: wie die Zeile unter der Packliste (fensterMitBestellungen).
+    expect(karteNaechsteAbholung([dienstag, samstag], vorher, 0, samstagZwei)).toEqual(fensterMitBestellungen([dienstag, samstag], vorher, 0, samstagZwei))
+    expect(karteNaechsteAbholung([], vorher, 3, null)).toBeNull()
   })
 })
 
@@ -874,7 +901,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })
     )
     expect(ohneAbholzeit).toContain('href="/orders/o1"')
-    expect(ohneAbholzeit).toContain(HEUTE_ABHOLZEITEN_SATZ)
+    expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.satz)
     expect(ohneAbholzeit).toContain(`href="${ABHOLZEITEN_FEHLEN.aktion.href}"`)
     expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.aktion.text)
     const mitAbholzeit = html(

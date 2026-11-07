@@ -10,7 +10,7 @@ import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tok
 import { fristVon } from '@/lib/fristen'
 import { abholTerminZeile, barBestaetigenSatz, barVerfallenSatz } from '@/lib/bestaetigung'
 import { KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
-import { zahlungsAnzeige } from '@/lib/bestellstatus'
+import { barBestaetigenZahlzeile } from '@/lib/zahlzeile'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
@@ -68,6 +68,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       id: true,
       status: true,
       paymentMethod: true,
+      paymentStatus: true,
       cancelReason: true,
       createdAt: true,
       pickupDate: true,
@@ -75,8 +76,11 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       pickupTimeEnd: true,
       totalAmount: true,
       serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true, geschlossenAm: true } },
       items: {
         select: {
@@ -111,7 +115,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
           ) : (
             <XCircle className="size-7 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
           )}
-          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground md:text-[26px]">
+          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">
             {ansicht === 'verfallen' ? 'Bestellung verfallen' : 'Bestellung storniert'}
           </h2>
           <p className="text-[15px] leading-normal text-muted-foreground">
@@ -135,7 +139,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
     // Board s1-/w1-bestellung-link Bild 2: genau eine Hauptaktion — am Handy die feste Leiste der Fokus-Shell.
     <Rahmen hofSlug={order.farm.slug} hofName={order.farm.name} aktion={<BarBestaetigenKnoepfe token={token} />}>
       <div className="flex flex-col gap-1.5">
-        <h2 className="font-heading text-[24px] leading-tight font-semibold break-words text-foreground md:text-[26px]">
+        <h2 className="font-heading text-[24px] leading-tight font-semibold break-words text-foreground">
           Bestellung bei {order.farm.name} bestätigen
         </h2>
         {/* Die Frist aus fristen.ts (V87: 2 Stunden ab Bestellung, spätestens Beginn des Abholfensters). */}
@@ -165,7 +169,9 @@ export default async function BarBestaetigenSeite({ params }: Props) {
             <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
           )}
         </ul>
-        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{zahlungsAnzeige(order.paymentMethod, 'PENDING').art}</p>
+        {/* Hofpreis: dieselbe Zahlzeile wie Bestätigung und Bestellseite (Liste Lauf 32 bestellung-link Bild 2);
+            „bisher“ bzw. null: die bisherige Zeile, nur die Zahlart (Freigabe §36 „Seiten“). */}
+        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{barBestaetigenZahlzeile(order)}</p>
         <p className="mt-0.5 text-[17px] font-bold text-foreground">
           Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
         </p>
@@ -228,7 +234,8 @@ function Rahmen({
       aktionKlebtImBrowser
       spalte={schmal ? 'max-w-[552px]' : 'max-w-[704px]'}
       // Die Leiste der Shell ist im Browser so breit wie ihr Kopf; die Knöpfe stehen in der Spalte der Seite.
-      aktion={aktion && <div className="mx-auto w-full max-w-[672px]">{aktion}</div>}
+      // Liste Lauf 32 (bestellung-link, 1440): die Linie über den Knöpfen so breit wie die Karte samt Rand (752 px).
+      aktion={aktion && <div className="mx-auto w-full max-w-[672px] md:max-w-[752px] md:border-t md:border-border md:px-10 md:pt-4">{aktion}</div>}
     >
       <div className={cn(SPALTE, schmal && 'max-w-[552px]')}>{children}</div>
     </KundeFokusShell>
@@ -247,7 +254,7 @@ function LinkUngueltig() {
       <div className="mx-auto w-full max-w-[592px] px-4 pt-6 pb-8 md:pt-10">
         <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
           <LinkIcon className="size-7 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground md:text-[26px]">{LINK_UNGUELTIG_TITEL}</h2>
+          <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">{LINK_UNGUELTIG_TITEL}</h2>
           {/* Derselbe Satz wie in den Knöpfen — seit Nr. 151 ersetzt ein neu angeforderter Link den alten. */}
           <p className="text-[15px] leading-normal text-muted-foreground">{LINK_UNGUELTIG_SATZ}</p>
           <Link href="/hoefe" className={cn(KNOPF_BREIT_RAHMEN, 'mt-1')}>

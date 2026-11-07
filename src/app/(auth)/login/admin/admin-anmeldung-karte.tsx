@@ -6,7 +6,9 @@ import { Loader2 } from 'lucide-react'
 import { ADMIN_ANMELDEN_TEXT, ADMIN_PFAD, passkeyFehlerText } from '@/lib/admin-anmeldung'
 import { meldeMitErsatzcodeAn, passkeySignIn } from '@/lib/auth-client-passkey'
 import { cn } from '@/lib/utils'
-import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_GRUEN, TEXTKNOPF } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_GRUEN_KAUF, TEXTKNOPF } from '@/components/anmelden/stil'
+// 16 px wie im Board (G8): die Rundungen aus einer Quelle statt freier Pixelwerte.
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Die Karte auf /login/admin (Register N20; Mockup system-admin-anmeldung-
@@ -80,7 +82,7 @@ export function AdminAnmeldungKarte(): React.JSX.Element {
             onClick={() => void mitPasskey()}
             disabled={laeuft !== null}
             aria-busy={laeuft === 'passkey' || undefined}
-            className={KNOPF_GRUEN}
+            className={KNOPF_GRUEN_KAUF}
           >
             {laeuft === 'passkey' && <Loader2 className="size-[19px] animate-spin" strokeWidth={1.8} aria-hidden="true" />}
             {laeuft === 'passkey' ? ADMIN_ANMELDEN_TEXT.knopfLaeuft : ADMIN_ANMELDEN_TEXT.knopf}
@@ -96,7 +98,8 @@ export function AdminAnmeldungKarte(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setErsatzOffen(true)}
-              className={cn(TEXTKNOPF, 'text-[15px] font-bold text-foreground')}
+              // Board s2-anmelden Bild 3: 16 px halbfett in Textfarbe.
+              className={cn(TEXTKNOPF, 'text-[16px] font-semibold text-foreground')}
               aria-expanded={false}
             >
               {ADMIN_ANMELDEN_TEXT.ersatzcodeOeffnen}
@@ -106,7 +109,8 @@ export function AdminAnmeldungKarte(): React.JSX.Element {
       ) : (
         <form
           onSubmit={(e) => void mitErsatzcode(e)}
-          className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 dark:ring-0"
+          // 16 px wie die Karten im Board (Liste Lauf 32, anmelden Bild 4 „Mit Ersatzcode“, G8).
+          className={cn('flex flex-col gap-3 border border-border bg-card p-3.5 dark:ring-0', RUNDUNG.blatt)}
           aria-labelledby="admin-ersatzcode-titel"
         >
           <h2 id="admin-ersatzcode-titel" className="font-heading text-[20px] leading-tight font-semibold text-foreground">
@@ -151,7 +155,7 @@ export function AdminAnmeldungKarte(): React.JSX.Element {
               {fehler}
             </p>
           )}
-          <button type="submit" disabled={laeuft !== null} aria-busy={laeuft === 'ersatzcode' || undefined} className={KNOPF_GRUEN}>
+          <button type="submit" disabled={laeuft !== null} aria-busy={laeuft === 'ersatzcode' || undefined} className={KNOPF_GRUEN_KAUF}>
             {laeuft === 'ersatzcode' && <Loader2 className="size-4 animate-spin" strokeWidth={1.8} aria-hidden="true" />}
             {ADMIN_ANMELDEN_TEXT.ersatzcodeKnopf}
           </button>

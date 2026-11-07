@@ -14,7 +14,6 @@ import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   BRAUCHT_DICH_LEER,
-  HEUTE_ABHOLZEITEN_SATZ,
   brauchtDichAnzeige,
   zuTunLinkText,
   HEUTE_KEINE_BESTELLUNGEN,
@@ -38,6 +37,7 @@ import { DIAGRAMM_BALKEN, DIAGRAMM_LEER } from '@/components/ui/diagramm-farbe'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { AbspracheKnoepfe, AbspracheMarke } from '@/components/heute/absprache'
 
 /*
  * Die Bausteine von „Heute" im neuen Design (Gate 5, Nachtlauf Nr. 17;
@@ -210,7 +210,7 @@ function Kennzahl({
 }) {
   return (
     // Jede Karte ist ein Container: Die Zahl misst sich an ihrer Breite (cqw).
-    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-4', className)}>
+    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-3', className)}>
       {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst
           (kennzahlBreiteEm), nie unter 12 px — passt er dann nicht, bricht er um, statt über den Rand zu laufen. */}
       <p
@@ -402,6 +402,14 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
           </Marke>
         </span>
       </Link>
+      {/* N47 (Nr. 257): Abholung nach Absprache — Marke und Knöpfe UNTER der Zeile, nicht im Zeilen-Link;
+          der Kontakt steht nur als Ziel der Knöpfe da, nie als Text. */}
+      {zeile.absprache && (
+        <div className="-mt-1 flex flex-wrap items-center gap-2 px-4 pb-3 md:px-[18px]">
+          <AbspracheMarke />
+          <AbspracheKnoepfe anrufen={zeile.absprache.anrufen} email={zeile.absprache.email} name={zeile.kunde} />
+        </div>
+      )}
     </li>
   )
 }
@@ -467,7 +475,7 @@ export function Packliste({
           // dem allgemeinen EmptyState vor).
           <div className={cn(KARTE, 'flex flex-col gap-2 px-3.5 py-3')}>
             <p className="text-base font-semibold">{ABHOLZEITEN_FEHLEN.titel}</p>
-            <p className={cn('text-sm', LEISE)}>{HEUTE_ABHOLZEITEN_SATZ}</p>
+            <p className={cn('text-sm', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
             <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'h-auto min-h-[52px] w-full rounded-[14px] text-base font-bold')}>
               {ABHOLZEITEN_FEHLEN.aktion.text}
             </Link>
@@ -483,7 +491,7 @@ export function Packliste({
           {!leer.naechsteAbholung && (
             // Bestellungen für heute, aber keine aktive Abholzeit: Satz und Knopf stehen trotzdem (sonst nur im ausblendbaren „Zu tun").
             <div className="flex flex-col gap-2.5 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-[18px]">
-              <p className={cn('text-[13px]', LEISE)}>{HEUTE_ABHOLZEITEN_SATZ}</p>
+              <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
               <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'shrink-0 self-start sm:self-auto')}>
                 {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>

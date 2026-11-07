@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowDownUp } from 'lucide-react'
 import { BestellDialog } from '@/components/hof-bestellungen/bestell-dialog'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import {
   KUNDEN_FILTER_LABEL,
   ZEIGEN_REIHENFOLGE,
@@ -26,6 +26,7 @@ import {
   type KundenSortierung,
 } from '@/schemas/hof-kunden'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Die Sortierung der Kundenliste hinter EINEM Knopf „Sortieren"
@@ -39,16 +40,18 @@ import { cn } from '@/lib/utils'
  * blattAdresse, Wortlaute).
  */
 
-const WAHL_ZEILE =
-  'flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-medium text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring'
+const WAHL_ZEILE = cn(
+  'flex min-h-12 cursor-pointer items-center gap-3 border px-3.5 py-2.5 text-sm font-semibold text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+  RUNDUNG.feld
+)
 
 function wahlKlassen(gewaehlt: boolean): string {
-  // Gewählt grün umrandet und getönt wie die Wahl im Dialog „Artikel fehlt"; Text in normaler Textfarbe.
-  return cn(WAHL_ZEILE, gewaehlt ? 'border-accent/60 bg-accent/12' : 'border-border hover:bg-muted')
+  // Gewählt orange umrandet und getönt (V51: Hofbereich orange; Liste Lauf 32 kunden); Text in normaler Textfarbe.
+  return cn(WAHL_ZEILE, gewaehlt ? 'border-primary bg-primary/12' : 'border-border hover:bg-muted')
 }
 
-const LEGENDE = 'mb-2 text-[13px] font-semibold text-muted-foreground'
-const RADIO = 'size-4 shrink-0 cursor-pointer accent-accent outline-none'
+const LEGENDE = cn(KICKER_12, 'mb-2')
+const RADIO = 'size-4 shrink-0 cursor-pointer accent-primary outline-none'
 
 /**
  * Der Inhalt des Blatts: wonach sortiert wird, in welcher Reihenfolge und wen
@@ -74,9 +77,10 @@ export function SortierFelder({
     <div className="flex min-w-0 flex-col gap-4">
       <fieldset className="min-w-0">
         <legend className={LEGENDE}>Sortieren nach</legend>
-        <div className="flex flex-col gap-2">
+        {/* Zweispaltig (Board s2-/w2-kunden Bild 2). */}
+        <div className="grid grid-cols-2 gap-2">
           {KUNDEN_SORTIERUNG_WERTE.map((s) => (
-            <label key={s} className={wahlKlassen(s === sortierung)}>
+            <label key={s} className={cn(wahlKlassen(s === sortierung), 'min-w-0')}>
               <input
                 type="radio"
                 name="kunden-sortierung"
@@ -92,9 +96,9 @@ export function SortierFelder({
       </fieldset>
       <fieldset className="min-w-0">
         <legend className={LEGENDE}>Reihenfolge</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           {richtungenFuer(sortierung).map((r) => (
-            <label key={r} className={wahlKlassen(r === richtung)}>
+            <label key={r} className={cn(wahlKlassen(r === richtung), 'min-w-0')}>
               <input
                 type="radio"
                 name="kunden-richtung"
@@ -162,9 +166,8 @@ export function KundenSortieren({
           setEntwurf(blattStart(ansicht))
           setOffen(true)
         }}
-        className={KNOPF_RAHMEN}
+        className={cn(KNOPF_RAHMEN, 'border-input bg-card font-semibold')}
       >
-        <ArrowDownUp className="size-4" strokeWidth={1.7} aria-hidden="true" />
         {SORTIEREN_TEXT}
         <span className="sr-only">, jetzt: {sortierungBeschreibung(ansicht.sortierung, ansicht.richtung)}</span>
       </button>
@@ -172,7 +175,9 @@ export function KundenSortieren({
         offen={offen}
         onOffenChange={(auf) => (auf ? setOffen(true) : schliesse('abbrechen'))}
         titel={SORTIEREN_TEXT}
-        hauptaktion={{ text: 'Übernehmen', ton: 'gruen', onClick: () => schliesse('uebernehmen') }}
+        // „Abbrechen“ oben rechts mit dem Startfokus, abgedunkelt statt weichgezeichnet, Hauptknopf orange (Liste Lauf 32 kunden).
+        mitte
+        hauptaktion={{ text: 'Übernehmen', ton: 'haupt', onClick: () => schliesse('uebernehmen') }}
       >
         <SortierFelder
           {...entwurf}

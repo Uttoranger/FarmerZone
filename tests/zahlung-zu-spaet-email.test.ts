@@ -67,7 +67,7 @@ describe('baueZahlungZuSpaet', () => {
     expect(call.html).toContain('Hof Test')
     // Cent → Euro an der Grenze, deutsch formatiert.
     expect(call.html).toContain('21,37')
-    expect(call.html).toContain('schon storniert war')
+    expect(call.html).toContain('schon abgelaufen war')
     // Ohne Aufruf zur nächsten Bestellung (S11, Board s3/w3-mail-storno Bild 4).
     expect(call.html).not.toContain('bestell einfach neu')
   })

@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Sprout } from 'lucide-react'
+import { ChevronRight, Sprout } from 'lucide-react'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ADMIN_POSTFACH_TEXT, POSTFACH_TEXT, type FadenEintrag, type FadenZeile, type Seite } from '@/lib/postfach'
+import { seiteName } from '@/lib/hof-hilfe'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { cn } from '@/lib/utils'
 
 /*
@@ -23,64 +25,71 @@ import { cn } from '@/lib/utils'
 /** Liste und Faden: eine Spalte bis 760 px (Mockups mobil-h6-*), am Handy 16 px Rand. */
 export const POSTFACH_RAHMEN = 'w-full max-w-[760px] px-4 pt-5 pb-12 md:px-8 md:pt-7'
 
-/** Das Zeichen des Teams: ein Keimling auf heller Fläche (die Bildmarke steht für die Plattform). */
+/** Das Zeichen des Teams: ein grünes Quadrat mit Keimling (Liste Lauf 32 postfach: „Grünes Quadrat“ statt rund). */
 export function TeamZeichen({ groesse = 'mittel' }: { groesse?: 'klein' | 'mittel' }): React.JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/12',
-        groesse === 'klein' ? 'size-8' : 'size-10'
-      )}
+      className={cn('flex shrink-0 items-center justify-center bg-accent', RUNDUNG.feld, groesse === 'klein' ? 'size-8' : 'size-10')}
     >
-      <Sprout className={cn('text-brand-text', groesse === 'klein' ? 'size-4' : 'size-5')} strokeWidth={1.9} />
+      <Sprout className={cn('text-accent-foreground', groesse === 'klein' ? 'size-4' : 'size-5')} strokeWidth={1.9} />
     </span>
   )
 }
 
-/** Eine Zeile der Liste beim Hof: Absender, wann, Marke Wichtig und Titel, „Du hast geantwortet · …", Punkt bei Ungelesenem. */
+/**
+ * Eine Zeile der Liste beim Hof (Board s2-/w2-postfach Bild 1): Kopfzeile „Absender · wann (· Wichtig)“,
+ * darunter der Betreff fett und mehrzeilig, „Du hast geantwortet · …“ als graue Unterzeile, Punkt bei
+ * Ungelesenem und „›“.
+ */
 export function PostfachZeile({ zeile }: { zeile: FadenZeile }): React.JSX.Element {
   return (
     <Link
       href={zeile.href}
-      className={cn('flex min-h-11 items-start gap-3 px-4 py-3 transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
+      className={cn('flex min-h-11 items-center gap-3 px-4 py-3 transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
     >
       <TeamZeichen />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-baseline justify-between gap-2">
-          <span className={cn('truncate text-[15px] text-foreground', zeile.ungelesen ? 'font-semibold' : 'font-medium')}>{POSTFACH_TEXT.absender}</span>
-          <span className="shrink-0 text-xs text-muted-foreground">{zeile.wann}</span>
-        </span>
-        <span className="mt-0.5 flex min-w-0 items-center gap-1.5">
-          {zeile.wichtig && (
-            <Marke art="tun" className="shrink-0">
-              {POSTFACH_TEXT.wichtig}
-            </Marke>
-          )}
-          <span
-            className={cn('truncate text-[13.5px]', zeile.ungelesen ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground')}
-            title={zeile.titel}
-          >
-            {zeile.titel}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground">
+          <span>
+            {POSTFACH_TEXT.absender} · {zeile.wann}
           </span>
+          {zeile.wichtig && (
+            <>
+              <span aria-hidden="true">·</span>
+              <Marke art="tun" className="shrink-0">
+                {POSTFACH_TEXT.wichtig}
+              </Marke>
+            </>
+          )}
+        </span>
+        <span className={cn('text-[15px] leading-snug break-words text-foreground', zeile.ungelesen ? 'font-bold' : 'font-semibold')}>
+          {zeile.titel}
         </span>
         {zeile.eigeneAntwort && (
-          <span className="mt-1.5 flex max-w-full">
-            <span className="truncate rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground">
-              {POSTFACH_TEXT.duHastGeantwortet} · {zeile.eigeneAntwort}
-            </span>
+          <span className="truncate text-[13px] text-muted-foreground">
+            {POSTFACH_TEXT.duHastGeantwortet} · {zeile.eigeneAntwort}
           </span>
         )}
       </span>
-      {zeile.ungelesen ? (
-        <span className="mt-1.5 size-[9px] shrink-0 rounded-full bg-primary">
+      {zeile.ungelesen && (
+        <span className="size-[9px] shrink-0 rounded-full bg-primary">
           <span className="sr-only">{POSTFACH_TEXT.ungelesenSr}</span>
         </span>
-      ) : (
-        <span aria-hidden="true" className="w-[9px] shrink-0" />
       )}
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
     </Link>
   )
+}
+
+/**
+ * Der Text des Knopfs zum Link einer Nachricht: das Ziel beim Namen („Verkäufe ansehen“, Liste Lauf 32
+ * postfach), aus derselben Zuordnung Route → Name wie „Das schicken wir automatisch mit“ (`seiteName`).
+ * Ohne Treffer bleibt „Ansehen“.
+ */
+export function linkKnopfText(href: string): string {
+  const name = seiteName(href)
+  return name.startsWith('/') || name === '–' ? POSTFACH_TEXT.linkKnopf : `${name} ansehen`
 }
 
 /** Der Knopf zum Link einer Nachricht — 44 px, Umriss-Pille wie im Board s2/w2-postfach (V51: im Hofbereich kein grüner Knopf). */
@@ -93,7 +102,7 @@ function LinkKnopf({ href }: { href: string }): React.JSX.Element {
         FOKUS_RAHMEN
       )}
     >
-      {POSTFACH_TEXT.linkKnopf}
+      {linkKnopfText(href)}
     </Link>
   )
 }
@@ -138,15 +147,20 @@ export function FadenVerlauf({
         } else if (nameAndereSeite && !istErste) {
           fuss.push(nameAndereSeite)
         }
+        // Beim Hof steht die Uhrzeit in der Blase („8:10 · auch per E-Mail“, Board s2-/w2-postfach); der Admin wie bisher darunter.
+        const fussInBlase = seite === 'HOF'
+        const fussText = istErste && fussErste && fussInBlase ? [...fuss, fussErste].join(' · ') : fuss.join(' · ')
         return (
           <li key={e.id} className={cn('flex max-w-[min(100%,34rem)] flex-col', eigene ? 'self-end' : 'self-start')}>
             <div
               className={cn(
-                'rounded-2xl px-3 py-2.5',
+                'px-3 py-2.5',
+                RUNDUNG.karte,
                 istErste
                   ? 'border border-accent/60 bg-card text-foreground'
                   : eigene && seite === 'HOF'
-                    ? 'bg-accent text-accent-foreground'
+                    ? // Zart grün getönt, dunkle Schrift (Liste Lauf 32 postfach).
+                      'bg-zustand-laeuft-grund text-foreground'
                     : 'border border-border bg-card text-foreground'
               )}
             >
@@ -163,16 +177,12 @@ export function FadenVerlauf({
               )}
               <p className="text-sm leading-relaxed break-words whitespace-pre-line">{e.text}</p>
               {e.link && <LinkKnopf href={e.link} />}
-              {istErste && fussErste && <p className="mt-1.5 text-xs text-muted-foreground">{fussErste}</p>}
+              {!fussInBlase && istErste && fussErste && <p className="mt-1.5 text-xs text-muted-foreground">{fussErste}</p>}
+              {fussInBlase && <p className="mt-1.5 text-xs text-muted-foreground">{fussText}</p>}
             </div>
-            <p
-              className={cn(
-                'mt-1 px-1 text-xs text-muted-foreground',
-                eigene ? 'text-right' : 'text-left'
-              )}
-            >
-              {fuss.join(' · ')}
-            </p>
+            {!fussInBlase && (
+              <p className={cn('mt-1 px-1 text-xs text-muted-foreground', eigene ? 'text-right' : 'text-left')}>{fussText}</p>
+            )}
           </li>
         )
       })}

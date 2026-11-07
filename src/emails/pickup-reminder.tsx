@@ -1,8 +1,9 @@
 import * as React from 'react'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, leiseZeile, textLink, woZeile } from './_layout'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, leiseZeile, textLink, woZeile } from './_layout'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
+import { ABHOLBEREIT_TEXT as T } from './texte/abholbereit'
 
 export interface OrderReadyProps {
   orderNumber: string
@@ -16,7 +17,6 @@ export interface OrderReadyProps {
   pickupTime: string
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
-  reorderUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
   /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
@@ -34,29 +34,28 @@ export interface OrderReadyProps {
 export function OrderReadyEmail(p: OrderReadyProps) {
   const anrufen = telefonLink(p.farmPhone)
   return (
-    <EmailLayout fuss={{ art: 'hof' }} previewText={`Deine Bestellung bei ${p.farmName} liegt bereit`}>
-      <Text style={h1}>Deine Bestellung liegt bereit</Text>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={T.vorschauzeile(p.farmName)}>
+      <Text style={h1}>{T.titel}</Text>
       {/* Board s3/w3-mail-kauf Bild 4: kein Einleitungssatz — Abholung, Ort und die Nummer zum Nennen. */}
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
       <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
       <BestellnummerKasten nummer={p.orderNumber} />
 
       <KnopfReihe>
-        <Knopf href={p.routeUrl}>Route planen</Knopf>
+        <Knopf href={p.routeUrl}>{T.knopfRoute}</Knopf>
         {/* Positionen, Status und Kalendereintrag — ohne Anmeldung, signiert. */}
         {p.orderUrl && (
           <Knopf href={p.orderUrl} art="rahmen">
-            Bestellung ansehen
+            {T.knopfBestellung}
           </Knopf>
         )}
       </KnopfReihe>
 
       <Text style={bodyText}>
-        Du schaffst es nicht? Gib dem Hof kurz Bescheid:{' '}
+        {T.schaffstDuNicht}{' '}
         {anrufen ? (
           <Link href={anrufen} style={textLink}>
-            {/* Ein Textknoten: Die Textfassung der Mail schriebe sonst „Anrufen ( +43 … )“. */}
-            {`Anrufen (${formatiereTelefon(p.farmPhone)})`}
+            {T.anrufen(formatiereTelefon(p.farmPhone))}
           </Link>
         ) : (
           p.farmPhone
@@ -68,17 +67,6 @@ export function OrderReadyEmail(p: OrderReadyProps) {
         <Text style={leiseZeile}>
           <Link href={p.widerrufUrl} style={textLink}>
             {WIDERRUF_TEXT.knopfWiderrufen}
-          </Link>
-        </Text>
-      )}
-
-      {/* Leise am Ende statt als Knopf über der Mail. Offene Ausnahme von
-          „Vertragsmails ohne Werbung" (S11, DESIGN_SYSTEM „E-Mails"): Ob der
-          Link bleibt, entscheidet der Mensch (Bericht Nr. 13). */}
-      {p.reorderUrl && (
-        <Text style={kleinText}>
-          <Link href={p.reorderUrl} style={textLink}>
-            Dieselbe Bestellung nochmal aufgeben
           </Link>
         </Text>
       )}

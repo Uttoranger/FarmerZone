@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ChevronRight, Mail } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
 import { KARTE, KNOPF_RAHMEN, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
@@ -42,7 +42,8 @@ export function HilfeSeitenspalte({
         ) : (
           <p className="text-[13px] text-muted-foreground">Den Stand konnten wir gerade nicht laden.</p>
         )}
-        <Link href={MEINE_MELDUNGEN_HREF} className={cn(TEXT_GRUEN, 'self-center')}>
+        {/* Linksbündig (Liste Lauf 32 meldungen: „Alle ansehen“ nicht mittig). */}
+        <Link href={MEINE_MELDUNGEN_HREF} className={cn(TEXT_GRUEN, 'self-start')}>
           Alle ansehen
           <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
         </Link>
@@ -52,9 +53,9 @@ export function HilfeSeitenspalte({
         <h2 id="hilfe-email" className="font-heading text-[17px] font-semibold text-foreground">
           Lieber per E-Mail?
         </h2>
-        <p className="text-[13px] leading-normal text-muted-foreground">Schreib uns direkt — wir antworten dir so bald wie möglich.</p>
+        <p className="text-[13px] leading-normal text-muted-foreground">Schreib uns direkt – wir antworten dir so bald wie möglich.</p>
+        {/* Ohne Brief-Symbol (Board w2-meldungen). */}
         <a href={mailto} className={KNOPF_RAHMEN}>
-          <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
           E-Mail schreiben
         </a>
       </section>

@@ -705,7 +705,9 @@ describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 
   it('zeigt Bild, Name und Preis mit denselben Helfern wie die Kaufkarte', () => {
     const html = vorschau(VORSCHAU)
     expect(html).toContain('Bergkäse')
-    expect(html).toContain('€ 12,90 für 0,5 kg')
+    // Seit Nr. 252: Name mit Gebinde, Preis fett, Grundpreis darunter (Board s1-/w1-hofseite).
+    expect(html).toContain('Bergkäse, 0,5 kg')
+    expect(html).toContain('€ 12,90')
     expect(html).toContain('€ 25,80 / kg')
     expect(html).toContain('src="/categories/milch.webp"')
   })
@@ -729,7 +731,8 @@ describe('ProduktKarte: Vorschau-Variante (muster) ohne Link und ohne Korb (Nr. 
     const lang = 'Bergkäse '.repeat(12).slice(0, 100)
     const html = vorschau({ ...VORSCHAU, name: lang })
     expect(html).toMatch(new RegExp(`title="${lang}"`))
-    expect(html).toMatch(new RegExp(`<span[^>]*line-clamp-2[^>]*>${lang}</span>`))
+    // Seit Nr. 252 hängt das Gebinde am Namen („…, 0,5 kg“) — der volle Name steht weiter im title.
+    expect(html).toMatch(new RegExp(`<span[^>]*line-clamp-2[^>]*>${lang}, 0,5 kg</span>`))
   })
 
   it('Gegenprobe: die Kaufkarte hat weiter Link und Korb-Knopf', () => {

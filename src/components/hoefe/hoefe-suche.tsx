@@ -172,7 +172,8 @@ export function HoefeSuche({
               // Wer das Feld verlässt (Tab, Antippen eines Chips), schließt die
               // Liste — sonst schöbe sie die Chips weiter nach unten. Das Antippen
               // eines Vorschlags nimmt dem Feld den Fokus nicht (onMouseDown unten).
-              onFocus={() => setVorschlagsLage((l) => ({ ...l, offen: true }))}
+              // Kein Öffnen beim Fokus: Die Vorschläge erscheinen nur beim Tippen und schließen nach dem Absenden
+              // (Liste Lauf 32, hoefe Bild 2, Nr. 252) — sonst stünde die Liste nach der Suche offen über den Ergebnissen.
               onBlur={() => setVorschlagsLage({ offen: false, markiert: null })}
               enterKeyHint="search"
               placeholder={kompakt ? SUCHFELD_TEXT.platzhalter : undefined}

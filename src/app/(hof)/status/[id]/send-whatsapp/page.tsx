@@ -1,13 +1,17 @@
 import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { BeitraegeBrotkrumen } from '../../beitraege-brotkrumen'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostForWhatsApp } from '@/server/queries/status-posts'
 import { WhatsAppTapClient } from './whatsapp-tap-client'
 import { MARKE } from '@/lib/marke'
 
-export const metadata: Metadata = { title: `WhatsApp versenden — ${MARKE}` }
+/** Die h1 der Seite und der Tab — eine Schreibweise (Board s2-/w2-whatsapp-plakat). */
+const WHATSAPP_SEITE_TITEL = 'WhatsApp versenden'
+
+export const metadata: Metadata = { title: `${WHATSAPP_SEITE_TITEL} — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 
@@ -38,8 +42,9 @@ export default async function SendWhatsAppPage({ params }: Props) {
   if (!data) notFound()
 
   return (
-    <div className="mx-auto max-w-xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
-      <UnterseitenKopf />
+    <div className="w-full max-w-[750px] px-4 pt-5 pb-12 md:px-8 md:pt-7 xl:px-10">
+      {/* Werkzeug-Kopf (G1, Nr. 250): h1 „WhatsApp versenden“ in jedem Zustand, Unterzeile „Mein Hof › Beiträge“. */}
+      <WerkzeugKopf titel={WHATSAPP_SEITE_TITEL} unterzeile={<BeitraegeBrotkrumen />} />
       <WhatsAppTapClient
         postId={data.id}
         title={data.title}

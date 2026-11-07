@@ -537,7 +537,6 @@ describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
     ['/orders/bestellung-1', 'bestellungen'],
     ['/fehler-melden', 'hilfe'],
     ['/analytics/umfeld', 'auswertung'],
-    ['/status/plakat', 'heute'],
   ])('%s → %s (Name und Ziel aus der Navigation)', (pfad, id) => {
     expect(elternseite(pfad)).toEqual(punkt(id))
   })
@@ -548,11 +547,11 @@ describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
     expect(elternseite('/orders/abc')).toEqual({ href: '/orders', name: 'Bestellungen' })
     expect(elternseite('/fehler-melden')).toEqual({ href: '/meldungen', name: 'Problem melden' })
     expect(elternseite('/analytics/umfeld')).toEqual({ href: '/analytics', name: 'Auswertung' })
-    expect(elternseite('/status/plakat')).toEqual({ href: '/dashboard', name: 'Heute' })
   })
 
-  it('/status/new und WhatsApp fortsetzen → der Reiter „Beiträge" von Mein Hof (E12)', () => {
+  it('/status/new, WhatsApp fortsetzen und das Plakat → der Reiter „Beiträge" von Mein Hof (E12; Plakat seit Nr. 250)', () => {
     expect(elternseite('/status/new')).toEqual({ href: BEITRAEGE_HREF, name: 'Beiträge' })
+    expect(elternseite('/status/plakat')).toEqual({ href: BEITRAEGE_HREF, name: 'Beiträge' })
     expect(elternseite('/status/beitrag-1/send-whatsapp')).toEqual({ href: beitraege.href, name: beitraege.label })
   })
 
@@ -565,7 +564,22 @@ describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
     ]
     // Gegenprobe: alle Ziele beider Teile sind dabei.
     expect(ziele).toEqual(expect.arrayContaining(['/dashboard', '/orders', '/products', '/farm-page', '/customers', '/sales', '/analytics', '/region', '/settings', '/meldungen', '/admin', BEITRAEGE_HREF]))
-    for (const ziel of ziele) expect(elternseite(ziel), ziel).toBeNull()
+    // Einzige Ausnahme: /settings hat am Handy „Mehr“ (N1-Ergänzung 7.11.2026), eigener Fall darunter.
+    for (const ziel of ziele) if (ziel !== '/settings') expect(elternseite(ziel), ziel).toBeNull()
+  })
+
+  it('/settings hat nur am Handy „Mehr“ als Elternseite; der Rückweg führt nach Heute (N1-Ergänzung 7.11.2026)', () => {
+    expect(elternseite('/settings')).toEqual({ href: '/dashboard', name: 'Mehr', nurHandy: true })
+    expect(elternseite('/settings/')).toEqual({ href: '/dashboard', name: 'Mehr', nurHandy: true })
+    // Gegenprobe: die Unterseiten führen weiter in die Übersicht, im Web wie am Handy.
+    expect(elternseite('/settings/profile')).toEqual({ href: '/settings', name: 'Einstellungen' })
+    expect(zielNachSpeichern('/settings')).toBeNull()
+  })
+
+  it('/teilen (ohne HofShell) führt nach Heute (Nr. 250, Board s2-/w2-teilen)', () => {
+    expect(elternseite('/teilen')).toEqual({ href: '/dashboard', name: 'Heute' })
+    // Gegenprobe: tiefer trifft nichts.
+    expect(elternseite('/teilen/x')).toBeNull()
   })
 
   it('Suche, Anker und Schrägstrich am Ende ändern nichts; tiefer als die Route trifft nichts', () => {
@@ -599,6 +613,8 @@ describe('elternseite — wohin der Rückweg einer Unterseite führt', () => {
     for (const pfad of seiten) {
       // /status leitet nur in den Reiter „Beiträge" um (E12) und zeigt nie einen Kopf.
       if (pfad === '/status') continue
+      // /settings: Ziel der Navigation und am Handy „Mehr“ als Elternseite (N1-Ergänzung 7.11.2026).
+      if (pfad === '/settings') continue
       if (ziele.has(pfad)) expect(elternseite(pfad), pfad).toBeNull()
       else expect(elternseite(pfad), pfad).not.toBeNull()
     }

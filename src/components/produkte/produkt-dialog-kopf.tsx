@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
 
 /**
  * Der Kopf der Produkt-Formulare (Lebensmittel, Futter, Brennmaterial), Liste Lauf 32 (produkt-neu 390):
- * am Handy „‹“ links, Titel, darunter die Produktart; der Erklärsatz entfällt dort. Ab 640 px Titel und
- * Erklärsatz wie bisher mit dem Kreuz rechts. Der Aufrufer setzt am DialogContent `showCloseButton={false}` —
+ * am Handy „‹“ links, Titel, darunter die Produktart; ab 640 px Titel und Produktart mit dem Kreuz rechts
+ * (Nr. 249b; der Erklärsatz ist nur noch Beschreibung für Screenreader). Der Aufrufer setzt am DialogContent `showCloseButton={false}` —
  * beide Wege zum Schließen stellt dieser Kopf, je nach Breite einer.
  */
 export function ProduktDialogKopf({
@@ -19,9 +19,9 @@ export function ProduktDialogKopf({
   zurueckGesperrt = false,
 }: {
   titel: string
-  /** „Lebensmittel“, „Futtermittel“, „Brennmaterial“ — die Unterzeile am Handy. */
+  /** „Lebensmittel“, „Futtermittel“, „Brennmaterial“ — die Unterzeile unter dem Titel. */
   art: string
-  /** Der Erklärsatz ab 640 px; am Handy steht stattdessen die Produktart. */
+  /** Der Erklärsatz — nur noch als Beschreibung des Dialogs für Screenreader (sr-only). */
   satz?: string
   /** Während des Speicherns schließt der Pfeil nicht (wie „Abbrechen“). */
   zurueckGesperrt?: boolean
@@ -41,8 +41,10 @@ export function ProduktDialogKopf({
       </DialogClose>
       <div className="min-w-0 flex-1">
         <DialogTitle className="font-heading text-lg font-semibold text-foreground sm:text-xl md:text-2xl">{titel}</DialogTitle>
-        <p className="text-[13px] text-muted-foreground sm:hidden">{art}</p>
-        {satz && <DialogDescription className="mt-1 text-[13px] text-muted-foreground max-sm:hidden">{satz}</DialogDescription>}
+        {/* Die Produktart in jeder Breite (Board w1-produkt-neu: „Futtermittel“ unter dem Titel, Nr. 249b); der
+            Erklärsatz steht nicht mehr sichtbar da, bleibt aber die Beschreibung des Dialogs für Screenreader. */}
+        <p className="text-[13px] text-muted-foreground sm:mt-0.5 sm:text-sm">{art}</p>
+        {satz && <DialogDescription className="sr-only">{satz}</DialogDescription>}
       </div>
       {/* Ab 640 px das Kreuz oben rechts, wie es der Dialog sonst selbst zeichnet (44 px, sichtbarer Kreis 28 px). */}
       <DialogClose

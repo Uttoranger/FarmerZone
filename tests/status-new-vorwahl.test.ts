@@ -21,9 +21,9 @@ const assistent = (props: Partial<ComponentProps<typeof StatusNewClient>> = {}):
     createElement(StatusNewClient, { products: [], emailCount: 0, recentEmailSentAt: null, jetzt: '2026-10-20T10:00:00.000Z', farmSlug: 'farm-a', ...props })
   )
 
-/** Das Wort des gewählten Anlasses (aria-pressed="true"). */
+/** Das Wort des gewählten Anlasses (aria-pressed="true"); seit Nr. 250 ein Chip nur mit dem Wort. */
 function gewaehlt(html: string): string | undefined {
-  return html.match(/<button[^>]*aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*?<span class="flex-1">([^<]+)<\/span>/)?.[1]
+  return html.match(/<button[^>]*aria-pressed="true"[^>]*>([^<]+)<\/button>/)?.[1]
 }
 
 describe('Vorwahl des Anlasses', () => {

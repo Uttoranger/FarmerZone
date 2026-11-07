@@ -417,10 +417,11 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain('<h1')
     expect(html).toContain('Verkäufe')
     expect(html).toContain('Verkauf eintragen')
-    expect(html).toContain('€ 64,29')
+    // Seit Nr. 251 ohne Karte „Diese Woche“ mit Umsatzgrenze (Board s2-/w2-verkaeufe; die Grenze steht in der Auswertung).
+    expect(html).not.toContain('€ 64,29')
     expect(html).toContain('€ 19,99')
     expect(html).toContain('€ 44,30')
-    expect(html).toContain(formatEuro(1234.5))
+    expect(html).not.toContain(formatEuro(1234.5))
     expect(html).toContain('Noch einmal eintragen')
     expect(html).toContain('href="/orders/o1"')
     expect(html).toContain('Online')
@@ -433,23 +434,24 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|green-|amber-|red-|app-ink/)
   })
 
-  it('F6 (22b): unter der Wochenzahl „Dieses Jahr (für die Umsatzgrenze)" statt „Gesamt"', () => {
+  it('Nr. 251: die Karte „Diese Woche“ mit Jahressumme und Umsatzgrenze entfällt — doppelt zur Auswertung (Board ohne)', () => {
     const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props()))
     expect(JAHRESSUMME_TEXT).toBe('Dieses Jahr (für die Umsatzgrenze)')
-    expect(html).toContain(`${JAHRESSUMME_TEXT}: ${formatEuro(1234.5)}`)
-    // Nr. 45: Das Fachwort steht nicht ohne Erklärung da — der Satz direkt darunter.
-    expect(html).toContain(UMSATZGRENZE_ERKLAERUNG)
+    expect(html).not.toContain(JAHRESSUMME_TEXT)
+    expect(html).not.toContain(UMSATZGRENZE_ERKLAERUNG)
     expect(html).not.toContain('Gesamt')
   })
 
-  it('F6 (22b): „Verkauf eintragen" steht in allen Breiten als Knopf im Kopf, auch am Handy', () => {
+  it('Nr. 251: „Verkauf eintragen" im Web als Knopf im Kopf, am Handy in der festen Leiste (G1, G2)', () => {
     const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props()))
     const kopf = html.slice(html.indexOf('<header'), html.indexOf('</header>'))
     const knopf = kopf.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Verkauf eintragen<\/button>/)
     expect(knopf, 'Knopf im Kopf').not.toBeNull()
-    // Keine Klasse, die ihn unter einer Breite versteckt (wie „+ Neues Produkt" erst ab 768 px).
-    expect(knopf![0]).not.toMatch(/(?:^|[\s"])(?:hidden|sr-only|max-md:hidden|max-sm:hidden)(?=[\s"])/)
+    expect(knopf![0]).toContain('md:inline-flex')
     expect(knopf![0]).toContain('bg-primary')
+    // Am Handy trägt die feste Aktionsleiste den einen Hauptknopf.
+    const leiste = html.slice(html.indexOf('data-aktionsleiste'))
+    expect(leiste).toMatch(/<button[^>]*>Verkauf eintragen<\/button>/)
     // Gegenprobe: Die Suche fände ein verstecktes Element.
     expect('<button class="hidden md:inline-flex">').toMatch(/(?:^|[\s"])(?:hidden|sr-only|max-md:hidden|max-sm:hidden)(?=[\s"])/)
   })
@@ -482,7 +484,8 @@ describe('Ansicht /sales — vier Zustände, lange Namen, Tokens', () => {
   it('leer: EmptyState mit Ausweg, kein Wiederholen', () => {
     const html = renderToStaticMarkup(createElement(VerkaeufeAnsicht, props({ zeilen: [], weekTotal: 0, weekOnline: 0, weekBar: 0, ytdTotal: 0 })))
     expect(html).toContain('Noch keine Verkäufe')
-    expect(html.match(/Verkauf eintragen/g)?.length).toBe(2)
+    // Kopf (Web), feste Leiste (Handy) und der Satz des Leerzustands — kein zweiter Knopf im Leerzustand (Nr. 251).
+    expect(html.match(/Verkauf eintragen/g)?.length).toBe(3)
     expect(html).not.toContain('Noch einmal eintragen')
   })
 
@@ -514,12 +517,13 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
       })
     )
 
-  it('neu: Betrag zuerst, vier Wege und „Anderer Weg", Produkt-Chips mit langem Namen, Knopf grau ohne Betrag', () => {
+  it('neu: Betrag zuerst, vier Wege und „Anderes", Produkt-Chips mit langem Namen, Knopf grau ohne Betrag', () => {
     const html = formular()
     expect(html).toContain('<h2>Verkauf eintragen</h2>')
     expect(html).toContain('Betrag in Euro')
     expect(html).toContain('Wo verkauft?')
-    for (const weg of ['Hofladen', 'Markt', 'WhatsApp', 'Betrieb', 'Anderer Weg']) expect(html).toContain(weg)
+    // Seit Nr. 251 „Anderes“ als Textlink (Board s2-/w2-verkaeufe).
+    for (const weg of ['Hofladen', 'Markt', 'WhatsApp', 'Betrieb', 'Anderes']) expect(html).toContain(weg)
     expect(html.match(/aria-pressed="true"/g)?.length).toBe(1)
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain('Menge oder Notiz ergänzen')

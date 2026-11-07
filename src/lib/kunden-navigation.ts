@@ -169,8 +169,12 @@ export function kundenNavigation({ sitzung }: { sitzung: KundenSitzung }): Kunde
   return { web: WEB_LINKS, knopf: kopfKnopf(sitzung), handy: HANDY_LEISTE }
 }
 
-// Die Anmelde- und die Registrierseite selbst (Liste Lauf 32, Q2).
-const OHNE_KNOPF_AM_HANDY: readonly string[] = [ANMELDEN.href, '/register']
+/**
+ * Die Seiten, die selbst die Anmeldung sind (Liste Lauf 32, Q2): /login, /register und die Anmeldung der Kundschaft
+ * /account/login (Projektleitung 7.11.2026, Nr. 253). Unterpfade zählen mit (/login/admin, /account/login/…), ein
+ * Pfad, der nur so anfängt (/loginhilfe, /account/loginx), nicht.
+ */
+const OHNE_KNOPF_AM_HANDY: readonly string[] = [ANMELDEN.href, '/register', '/account/login']
 
 /**
  * Ob der Knopf rechts oben am Handy entfällt (Liste Lauf 32, Q2 und G9): auf
@@ -188,9 +192,9 @@ export function ohneKopfKnopfAmHandy(pfad: string): boolean {
  * Hofs — zwei feste Leisten übereinander waren unruhig. Die Shell erkennt die
  * beiden Seiten an `aktiv` = `entdecken`: Nur sie setzen den Punkt selbst
  * (Nr. 177), ihr Pfad sagt ihn nicht — so bleiben die Props der Shell gleich.
- * Die Shell wendet es nur mit Unterleiste an: Die Produktseite (ohne) hat noch
- * keinen klebenden Hof-Kopf, ihr Kopf bleibt der Weg zum Korb. Produktseite
- * folgt mit Nr. 252.
+ * Seit Nr. 252 auch auf der Produktseite (ohne Unterleiste): Dort klebt am
+ * Handy die Zeile „‹ Alle Produkte von <Hof>“ mit dem Warenkorb — der Weg zum
+ * Korb bleibt, ohne dass der Kopf der Shell kleben muss.
  */
 export function kopfScrolltWegAmHandy(aktiv: KundenNavId | undefined): boolean {
   return aktiv === ENTDECKEN.id

@@ -214,8 +214,14 @@ describe('Kopf am Handy (G9, Liste Lauf 32)', () => {
     expect(ohneKopfKnopfAmHandy('/register')).toBe(true)
   })
 
+  it('auch auf /account/login und seinen Unterpfaden (Projektleitung 7.11.2026, Nr. 253)', () => {
+    for (const pfad of ['/account/login', '/account/login/', '/account/login/code', '/login/admin']) {
+      expect(ohneKopfKnopfAmHandy(pfad), pfad).toBe(true)
+    }
+  })
+
   it('Gegenprobe: überall sonst steht er, auch auf Pfaden, die nur so anfangen', () => {
-    for (const pfad of ['/', '/hoefe', '/account/login', '/loginhilfe', '/registrieren', '/hof-test']) {
+    for (const pfad of ['/', '/hoefe', '/account', '/account/profile', '/account/loginx', '/loginhilfe', '/registrieren', '/hof-test']) {
       expect(ohneKopfKnopfAmHandy(pfad), pfad).toBe(false)
     }
   })

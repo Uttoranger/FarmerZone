@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ComponentProps, type ComponentType, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { meldungEingabeSchema } from '@/schemas/meldung'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -201,7 +202,7 @@ const FAELLE: Fall[] = [
   {
     name: 'Problem melden — Danke',
     element: createElement(MeldungFormularAnsicht, { formular: formular({ kurznummer: 'AB12' }), welt: 'hof', alsHof: true, abbrechenHref: '/meldungen' }),
-    merkmale: ['role="status"', MELDUNG_ANSICHT_TEXT.dankeTitel, '>AB12<', MELDUNG_ANSICHT_TEXT.zuMeldungen, MELDUNG_ANSICHT_TEXT.nochEtwas],
+    merkmale: ['role="status"', MELDUNG_ANSICHT_TEXT.dankeTitelHof, '>AB12<', MELDUNG_ANSICHT_TEXT.zuMeldungen, MELDUNG_ANSICHT_TEXT.nochEtwas],
     nie: ['<form'],
   },
 ]
@@ -320,5 +321,47 @@ describe('Quelltext der neuen Bausteine', () => {
     }
     expect(seite).toMatch(/<SheetBlatt seite="rechts"/)
     expect(seite).not.toMatch(/useMeldungFormular\(/)
+  })
+})
+
+// Nr. 251 Runde 1: Die Hof-Bausteine des Meldeformulars (Board s2-/w2-meldungen) gelten nur für `welt="hof"`;
+// /problem-melden bleibt beim Kunden-Board s3-/w3-problem-melden.
+describe('Meldeformular — Hof-Bausteine nur im Hofbereich', () => {
+  const ansicht = (welt: 'hof' | 'kunde', teil: Partial<MeldungFormular> = {}) =>
+    renderToStaticMarkup(
+      createElement(MeldungFormularAnsicht, { formular: formular(teil), welt, alsHof: welt === 'hof', abbrechenHref: welt === 'hof' ? '/meldungen' : '/' })
+    )
+
+  it('Kundschaft: Browser-Prüfung (required/minlength), 48-px-Arten, keine Fehlernummer-Vorlage', () => {
+    const html = ansicht('kunde')
+    expect(html).not.toMatch(/novalidate/i)
+    expect(html).toMatch(/<textarea[^>]*minLength="10"[^>]*required=""/)
+    expect(html).toContain('min-h-12 gap-2 px-3')
+    expect(html).not.toContain('min-h-16')
+    expect(html).not.toContain(MELDUNG_ANSICHT_TEXT.fehlernummerBeispiel)
+    const danke = ansicht('kunde', { kurznummer: 'AB12' })
+    expect(danke).toContain(MELDUNG_ANSICHT_TEXT.dankeTitel)
+    expect(danke).not.toContain('w-full flex-col gap-2.5')
+  })
+
+  it('Hof: eigene Prüfung beim Absenden (noValidate), 64-px-Arten, Vorlage „z. B. A7F3“, Knöpfe volle Breite', () => {
+    const html = ansicht('hof')
+    expect(html).toMatch(/<form[^>]*noValidate=""/)
+    expect(html).not.toMatch(/<textarea[^>]*(required|minLength)/)
+    expect(html).toContain('min-h-16')
+    expect(html).toContain(`placeholder="${MELDUNG_ANSICHT_TEXT.fehlernummerBeispiel}"`)
+    const danke = ansicht('hof', { kurznummer: 'AB12' })
+    expect(danke).toContain(MELDUNG_ANSICHT_TEXT.dankeTitelHof)
+    expect(danke).toContain('w-full flex-col gap-2.5')
+  })
+
+  it('Hof ohne Browser-Prüfung: die Längenprüfung vor dem Absenden misst am Server-Schema und hält zu Kurzes auf', () => {
+    // Dasselbe Schema wie die Action (src/server/actions/meldung.ts) — unverändert.
+    expect(meldungEingabeSchema.shape.text.safeParse('zu kurz').success).toBe(false)
+    expect(meldungEingabeSchema.shape.text.safeParse('          ').success).toBe(false)
+    expect(meldungEingabeSchema.shape.text.safeParse('Der Knopf reagiert nicht.').success).toBe(true)
+    const quelle = readFileSync('src/components/ui/meldung-formular-ansicht.tsx', 'utf8')
+    expect(quelle).toMatch(/const pruefung = meldungEingabeSchema\.shape\.text\.safeParse\(f\.text\)\s+if \(!pruefung\.success\) \{\s+e\.preventDefault\(\)/)
+    expect(quelle).toMatch(/onSubmit=\{absenden\}/)
   })
 })

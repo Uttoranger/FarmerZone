@@ -73,7 +73,8 @@ export function StatusUpdateEmail({
       {/* Board s3/w3-mail-neuigkeiten Bild 2 und 3: Absender, dann das Foto (falls da), Titel, Text, Knopf links. */}
       <Text style={{ ...bodyText, color: MAIL_FARBE.textLeise, fontSize: '13px', margin: '0 0 10px' }}>Neuer Beitrag von {farmName}</Text>
 
-      {photoUrl && <Img src={photoUrl} alt={title} style={{ width: '100%', borderRadius: '12px', margin: '0 0 16px', objectFit: 'cover' }} />}
+      {/* Board Bild 2 (1440): Fotofläche 180 px hoch, der Ausschnitt per object-fit (Nr. 255). */}
+      {photoUrl && <Img src={photoUrl} alt={title} style={{ width: '100%', height: '180px', borderRadius: '12px', margin: '0 0 16px', objectFit: 'cover' }} />}
 
       <Text style={h1}>{title}</Text>
 

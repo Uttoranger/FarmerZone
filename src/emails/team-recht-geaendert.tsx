@@ -20,11 +20,14 @@ export function TeamRechtGeaendertEmail({ anlass, name, rechte }: { anlass: Team
       {anlass !== 'entfernt' && rechte.length > 0 && (
         <>
           <Text style={zwischenTitel}>{t.rechteTitel}</Text>
-          {rechte.map((r) => (
-            <Text key={r} style={{ ...bodyText, margin: '0 0 2px', paddingLeft: '4px' }}>
-              {`• ${r}`}
-            </Text>
-          ))}
+          {/* Board Bild 3 (B-Zeile „Rechte-Liste Einzug“, Nr. 255): eine echte Liste mit Einzug 18 px. */}
+          <ul style={{ margin: '0 0 14px', paddingLeft: '18px' }}>
+            {rechte.map((r) => (
+              <li key={r} style={{ ...bodyText, margin: '0 0 2px' }}>
+                {r}
+              </li>
+            ))}
+          </ul>
         </>
       )}
       <Text style={{ ...leiseZeile, marginTop: '14px' }}>{t.nichtDu}</Text>
