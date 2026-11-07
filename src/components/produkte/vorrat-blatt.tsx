@@ -9,7 +9,7 @@ import { Stepper } from '@/components/ui/stepper'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useVorratSetzen } from '@/components/produkte/use-vorrat-setzen'
 import { VORRAT_MAX } from '@/lib/eingabegrenzen'
-import { bestandLabel, formatZahl, hofVorratText } from '@/lib/format'
+import { bestandLabel, hofVorratText } from '@/lib/format'
 import {
   VORRAT_AUSVERKAUFT_KNOPF,
   VORRAT_DAZU,
@@ -70,8 +70,6 @@ export function VorratBlatt({
   // Ein Altbestand über der Grenze bleibt sichtbar und darf sinken (src/schemas/vorrat.ts).
   const max = Math.max(VORRAT_MAX, bestaetigt)
   const vorratText = (n: number) => hofVorratText(n, produkt.unit, produkt.unitSize)
-  // Die Einheit neben der großen Zahl: der Text ohne die Zahl davor („Pakete", „Paket", „kg").
-  const einheit = vorratText(anzeige).slice(formatZahl(anzeige).length + 1)
 
   async function speichern(ziel: number): Promise<void> {
     const ausgang = await senden(ziel)
@@ -105,10 +103,13 @@ export function VorratBlatt({
         {vorratFrage(produkt.unit, produkt.unitSize)}
       </p>
       <div className="flex flex-col items-center gap-1">
-        {/* G13 (Liste Lauf 32, produkte Bild 2): die gerahmte Pille „− n +“ statt zweier runder Knöpfe. */}
+        {/* G13 (Liste Lauf 32, produkte Bild 2): die gerahmte Pille „− n +“ statt zweier runder Knöpfe. Die Zahl
+            22 px in einem 56-px-Feld und ohne Einheit daneben wie im Board s1-produkte — die Frage darüber nennt sie
+            schon (Nr. 249b: die Pille war mit 32 px, 80 px und „Pakete“ zu breit). */}
         <Stepper
           gross
           form="pille"
+          eingabeClassName="w-14 text-[22px] leading-none"
           beschriftung={bestandLabel(produkt.unit, produkt.unitSize)}
           wert={anzeige}
           onWertChange={setAnzeige}
@@ -116,7 +117,6 @@ export function VorratBlatt({
           max={max}
           laeuft={laeuft}
           inputMode="numeric"
-          einheit={einheit}
         />
         {/* Hat inzwischen jemand bestellt, zeigt das Feld den Stand des Servers — „vorher" sagt, wovon es ausgeht. */}
         {bestaetigt !== produkt.stock && <p className="text-[12.5px] text-muted-foreground">vorher {vorratText(bestaetigt)}</p>}

@@ -168,6 +168,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // Tage immer mit Wochentag und Datum (V9): „Heute, Mi 3. März", „Sa, 6. März".
   const heuteTag = wienKalendertag(jetzt)
   const naechstes = heute.naechstesFenster
+  const karte = heute.naechsteAbholungKarte
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
     postfach: postfach && <PostfachKarte nachricht={postfach.nachricht} weitere={postfach.weitere} />,
@@ -198,12 +199,9 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       />
     ),
     // Ohne Abholzeit keine Karte (Liste Lauf 32, heute Bild 4) — Satz und Knopf stehen in der Packliste.
-    'naechste-abholung': naechstes && (
-      <NaechsteAbholungKarte
-        fenster={naechstes?.fenster ?? null}
-        tag={naechstes ? abholTagMitDatum(heuteTag, naechstes.fenster.tag) : null}
-        anzahl={naechstes?.anzahl ?? 0}
-      />
+    // Steht heute schon in der Packliste, nennt die Karte das Fenster danach (karteNaechsteAbholung, Nr. 249b).
+    'naechste-abholung': karte && (
+      <NaechsteAbholungKarte fenster={karte.fenster} tag={abholTagMitDatum(heuteTag, karte.fenster.tag)} anzahl={karte.anzahl} />
     ),
     woche: (
       <WocheKarte

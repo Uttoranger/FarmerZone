@@ -9,7 +9,7 @@
 import type { Prisma } from '@prisma/client'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
 import { centsAlsEuro, wienerMitternacht } from '@/lib/servicegebuehr'
-import { wienerZeitpunkt } from '@/lib/fristen'
+import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { formatEuro, formatTagKurz, mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
@@ -140,6 +140,18 @@ export function abholTagMitDatum(heuteKalendertag: string, kalendertag: string):
   const vorsatz =
     kalendertag === heuteKalendertag ? 'Heute' : kalendertag === tagVersetzt(heuteKalendertag, 1) ? 'Morgen' : kalendertag === tagVersetzt(heuteKalendertag, -1) ? 'Gestern' : null
   return vorsatz ? `${vorsatz}, ${kurz.replace(', ', ' ')}` : kurz
+}
+
+/**
+ * Ein Zeitpunkt kurz, wie das Board w1-bestellung ihn bei der Kundin zeigt: „heute, 07:12“, „gestern, 18:40“,
+ * sonst „Mi, 3. März, 07:12“ (Nr. 249b; vorher die lange Mail-Fassung „Samstag, 7. November, 02:50 Uhr“).
+ * Tag und Uhrzeit in Wiener Zeit; `jetzt` ist Parameter.
+ */
+export function zeitpunktKurz(zeitpunkt: Date, jetzt: Date): string {
+  const tag = wienKalendertag(zeitpunkt)
+  const heute = wienKalendertag(jetzt)
+  const vorsatz = tag === heute ? 'heute' : tag === tagVersetzt(heute, -1) ? 'gestern' : formatTagKurz(tag)
+  return `${vorsatz}, ${uhrzeitInWien(zeitpunkt)}`
 }
 
 /** Die grüne Marke unter dem Kopf von Heute: „Abholung heute, Mi 3. März, 15–18 Uhr" (Board s1-heute). */
@@ -710,6 +722,31 @@ export function fensterMitBestellungen(
     if (ab) return { fenster: { ...ab, name: abholtagName(heute, ab.tag) }, anzahl: 0 }
   }
   return { fenster, anzahl: 0 }
+}
+
+/**
+ * Welches Fenster die Karte „Nächste Abholung“ in der Seitenspalte von Heute nennt (Nr. 249b, Board s1/w1-heute
+ * Bild 1: Packliste „Heute“, Karte „Sa, 6. März, 9–12 Uhr · 2 Bestellungen“). Steht das heutige Fenster schon in
+ * der Packliste (heute Bestellungen), nennt die Karte das Fenster DANACH: den nächsten Abholtag mit Bestellungen
+ * samt Zahl, sonst das nächste Fenster ab morgen (Zahl, wenn an dem Tag bestellt ist). Ist heute nichts bestellt,
+ * dasselbe wie die Zeile unter der leeren Packliste (fensterMitBestellungen). Ohne aktive Abholzeit null.
+ */
+export function karteNaechsteAbholung(
+  slots: readonly HeuteFenster[],
+  jetzt: Date,
+  anzahlHeute: number,
+  naechsteAbholung: NaechsteAbholung | null
+): { fenster: NaechstesFenster; anzahl: number } | null {
+  const mitZahl = fensterMitBestellungen(slots, jetzt, anzahlHeute, naechsteAbholung)
+  const heute = wienKalendertag(jetzt)
+  if (!mitZahl || mitZahl.fenster.tag !== heute) return mitZahl
+  if (naechsteAbholung && naechsteAbholung.anzahl > 0) {
+    const mitBestellungen = abholfensterAm(slots, naechsteAbholung.tag, heute)
+    if (mitBestellungen) return { fenster: mitBestellungen, anzahl: naechsteAbholung.anzahl }
+  }
+  const ab = naechstesAbholfenster(slots, wienerTag(tagVersetzt(heute, 1)).von)
+  if (!ab) return mitZahl
+  return { fenster: { ...ab, name: abholtagName(heute, ab.tag) }, anzahl: naechsteAbholung?.tag === ab.tag ? naechsteAbholung.anzahl : 0 }
 }
 
 /**
