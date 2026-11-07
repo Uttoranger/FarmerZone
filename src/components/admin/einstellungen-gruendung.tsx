@@ -264,7 +264,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
             </label>
             <span className="text-[12.5px] text-muted-foreground">{TEXT.feldGesperrt}</span>
           </div>
-          <input id={bisId} type="text" value={gruendungTagKurz(g.bisTag)} readOnly className={cn(FELD, GESPERRT)} />
+          <input id={bisId} type="text" value={gruendungTagKurz(g.bisTag)} readOnly className={cn(FELD, GESPERRT, 'min-h-11')} />
         </div>
       )}
 
