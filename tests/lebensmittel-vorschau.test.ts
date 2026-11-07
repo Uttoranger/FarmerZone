@@ -50,7 +50,9 @@ describe('„So sehen Kunden dein Produkt" — die echte Produktkarte, live aus 
     const html = vorschau(KAESE)
     expect(html).toContain(KAEUFER_VORSCHAU.titel)
     expect(html).toContain('Bergkäse')
-    expect(html).toContain('€ 12,90 für 0,5 kg')
+    // Seit Nr. 252: Name mit Gebinde, Preis fett, Grundpreis darunter (Board s1-/w1-hofseite).
+    expect(html).toContain('Bergkäse, 0,5 kg')
+    expect(html).toContain('€ 12,90')
     expect(html).toContain('€ 25,80 / kg')
     expect(html).toContain('src="/categories/milch.webp"')
   })

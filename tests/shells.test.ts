@@ -307,10 +307,14 @@ describe('KundeShell', () => {
     const sonst = kunde('gast', '/hof-beispiel')
     expect(abschnitt(sonst, '<header', '>')).not.toMatch(/max-md:relative/)
     expect(sonst).not.toContain('data-kopf-scrollt')
-    // Gegenprobe Produktseite (unterleiste = false, aktiv = entdecken): kein eigener Hof-Kopf bis Nr. 252, der Kopf klebt weiter.
+    // Seit Nr. 252 auch die Produktseite (unterleiste = false, aktiv = entdecken): Dort klebt die Hofzeile mit dem Warenkorb.
     const produktseite = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', aktiv: 'entdecken', unterleiste: false }))
-    expect(abschnitt(produktseite, '<header', '>')).not.toMatch(/max-md:relative/)
-    expect(produktseite).not.toContain('data-kopf-scrollt')
+    expect(abschnitt(produktseite, '<header', '>')).toMatch(/\bmax-md:relative\b/)
+    expect(produktseite).toContain('data-kopf-scrollt=""')
+    // Gegenprobe: eine andere Fokus-Seite ohne Unterleiste (Kasse) behält den klebenden Kopf.
+    const kasse = renderToStaticMarkup(el(KundeShell, { sitzung: 'gast', unterleiste: false }))
+    expect(abschnitt(kasse, '<header', '>')).not.toMatch(/max-md:relative/)
+    expect(kasse).not.toContain('data-kopf-scrollt')
   })
 
   // Nr. 41: Am Handy braucht „Anmelden" den Platz oben rechts — Hell/Dunkel steht dort am Seitenfuß.

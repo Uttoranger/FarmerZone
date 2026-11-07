@@ -458,20 +458,21 @@ describe('Titelbild', () => {
   // Feste Höhen: Nach dem Laden springt nichts (Register N13).
   it('mit Foto wird der Rahmen mit der Breite höher: 220 px am Handy, 300 ab 768, 360 ab 1 280, 420 ab 1 536', () => {
     const k = klassen(rahmen(zeige('/foto.jpg')))
-    expect(k).toEqual(expect.arrayContaining(['h-[220px]', 'md:h-[300px]', 'xl:h-[360px]', '2xl:h-[420px]', 'w-full', 'overflow-hidden', 'rounded-2xl']))
+    expect(k).toEqual(expect.arrayContaining(['h-[220px]', 'md:h-[300px]', 'xl:h-[360px]', '2xl:h-[420px]', 'w-full', 'overflow-hidden', 'rounded-[12px]']))
   })
 
   it('ohne Foto die ruhige Fläche der Boards w1-/s1-hofseite: 98 px, ab 768 px 170 px (Nr. 235) — Gegenprobe: keine Foto-Höhen', () => {
     const k = klassen(rahmen(zeige(null)))
-    expect(k).toEqual(expect.arrayContaining(['h-[98px]', 'md:h-[170px]', 'w-full', 'overflow-hidden', 'rounded-2xl']))
+    expect(k).toEqual(expect.arrayContaining(['h-[98px]', 'md:h-[170px]', 'w-full', 'overflow-hidden', 'rounded-[12px]']))
     expect(k).not.toContain('h-[220px]')
   })
 
-  it('ohne Foto im Hellen nur ein Hauch des Verlaufs über `muted` (Board: blasse Fläche), im Dunkeln voll und gedämpft (Nr. 235, UI-Runde 3)', () => {
+  it('ohne Foto im Hellen nur ein Hauch des Verlaufs über `muted` (Board: blasse Fläche), im Dunkeln nur die gedämpfte Fläche (G12, Nr. 252)', () => {
     const html = zeige(null)
     const verlauf = tag(html, /data-verlauf=""/)
     expect(verlauf).toContain('linear-gradient(1deg, red, blue)')
-    expect(klassen(verlauf)).toEqual(expect.arrayContaining(['opacity-[0.14]', 'dark:opacity-100', 'dark:brightness-[0.5]']))
+    expect(klassen(verlauf)).toEqual(expect.arrayContaining(['opacity-[0.14]', 'dark:hidden']))
+    expect(klassen(verlauf)).not.toContain('dark:opacity-100')
     expect(klassen(rahmen(html))).toContain('bg-muted')
     // Gegenprobe: Mit Foto gibt es keine Verlaufsfläche.
     expect(zeige('/foto.jpg')).not.toContain('data-verlauf')
