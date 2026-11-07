@@ -59,7 +59,8 @@ const BESTELLUNG_FUER_MAIL = {
       gebuehrCents: true,
       // Einheit nur für die Anzeige in der Mail
       // ruecksendekostenCents (Nr. 214): Schätzung für den 5-b-Satz der Belehrung in der Bestätigung.
-      product: { select: { unit: true, unitSize: true, ruecksendekostenCents: true } },
+      // abholhinweise (N47, Nr. 257): „Abholung nach Absprache“ sagt die Bestätigung im Abholblock.
+      product: { select: { unit: true, unitSize: true, ruecksendekostenCents: true, abholhinweise: true } },
     },
   },
 } satisfies Prisma.OrderSelect

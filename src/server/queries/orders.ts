@@ -28,6 +28,7 @@ import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAb
 import { wienKalendertag } from '@/lib/kalender'
 import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
+import { abspracheOffen, brauchtAbsprache } from '@/lib/abholhinweise'
 import type { MarkeArt } from '@/lib/marke-art'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 
@@ -180,7 +181,8 @@ const DETAIL_AUSWAHL = {
       totalPrice: true,
       fehltSeit: true,
       gebuehrCents: true,
-      product: { select: { unit: true, unitSize: true } },
+      // abholhinweise (N47, Nr. 257): „Abholung absprechen“ im Bestelldetail.
+      product: { select: { unit: true, unitSize: true, abholhinweise: true } },
     },
     orderBy: { id: 'asc' },
   },
@@ -241,6 +243,8 @@ export type HofBestellDetail = {
   aktionen: BestellAktionen
   /** WhatsApp-Erinnerung an die Kundin, nur solange etwas abzuholen ist. */
   erinnernUrl: string | null
+  /** N47 (Nr. 257): offene Bestellung mit „Abholung nach Absprache“ — Marke „Abholung absprechen“ mit Anrufen und Mail schreiben. */
+  absprache?: boolean
 }
 
 export type BestellungenSeite = {
@@ -377,6 +381,8 @@ export async function getHofBestellDetail(
             pickupTimeEnd: o.pickupTimeEnd,
           })
         : null,
+    // Nur Positionen, die übergeben werden: Fehlt das Produkt mit Absprache, gibt es nichts abzustimmen.
+    absprache: abspracheOffen(o.status, brauchtAbsprache(o.items.filter((i) => i.fehltSeit === null).map((i) => i.product?.abholhinweise))),
   }
 }
 

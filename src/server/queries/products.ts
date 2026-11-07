@@ -250,6 +250,21 @@ export async function getNurBetriebeProduktIds(farmId: string): Promise<string[]
 }
 
 /**
+ * IDs der Produkte eines Hofs mit dem Abholhinweis „Abholung nach Absprache"
+ * (Register N47, Nr. 257). Für die Kasse: Liegt eines davon im Korb, steht
+ * über der Terminwahl der Hinweis, und das Notizfeld heißt „Notiz zur
+ * Abholung" (korbBrauchtAbsprache). Öffentliche Angabe des Produkts — nur
+ * Anzeige, Termin, Preis und Zahlung bleiben unverändert.
+ */
+export async function getAbspracheProduktIds(farmId: string): Promise<string[]> {
+  const produkte = await prisma.product.findMany({
+    where: { farmId, abholhinweise: { has: 'NACH_ABSPRACHE' } },
+    select: { id: true },
+  })
+  return produkte.map((p) => p.id)
+}
+
+/**
  * Vorbelegung des Checkout-Abschnitts „Betrieb" (Konzept 6.4): Ist der
  * Besteller selbst ein Hof, kauft er vermutlich als Betrieb — mit der
  * Betriebsnummer aus seinen Hof-Einstellungen (Rückfrage F6). Vorbelegung,

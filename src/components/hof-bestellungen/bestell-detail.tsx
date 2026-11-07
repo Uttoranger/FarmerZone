@@ -34,6 +34,7 @@ import { ArtikelFehltDialog } from './artikel-fehlt-dialog'
 import { WiderrufKarte } from './widerruf-karte'
 import type { HofWiderruf } from '@/server/widerruf'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { AbspracheKnoepfe, AbspracheMarke } from '@/components/heute/absprache'
 import { RUNDUNG } from '@/components/ui/rundung'
 import type { Positionszeile } from '@/lib/positionszeile'
 import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE, TEXT_ORANGE } from './stil'
@@ -223,6 +224,7 @@ export function BestellDetail({
             <Marke art={bestellung.marke.art} form="schild">
               {bestellung.marke.text}
             </Marke>
+            {bestellung.absprache && <AbspracheMarke />}
           </div>
           <p className={cn('text-[13.5px]', LEISE)}>
             Bestellnummer {bestellung.nummer} · {bestellung.abholung}
@@ -275,12 +277,19 @@ export function BestellDetail({
             <Marke art={bestellung.marke.art} form="schild">
               {bestellung.marke.text}
             </Marke>
+            {bestellung.absprache && <AbspracheMarke />}
           </div>
           <p className="text-[15px]">
             {bestellung.abholung}
             {bestellung.abgeholtUm && <> · abgeholt um {bestellung.abgeholtUm}</>}
           </p>
           <p className={cn('text-[13.5px]', LEISE)}>Bestellnummer {bestellung.nummer} – nur zum Abgleich, prüf bei der Abholung den Namen.</p>
+          {/* N47 (Nr. 257): offene Bestellung mit „Abholung nach Absprache“ — die Wege zur Kundin gleich unter dem Kopf. */}
+          {bestellung.absprache && (
+            <div className="mt-2">
+              <AbspracheKnoepfe anrufen={anrufen} email={kunde.email} name={kunde.name} />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-5">

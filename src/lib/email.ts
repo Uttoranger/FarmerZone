@@ -7,6 +7,7 @@ import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
+import { abspracheMailSatz, brauchtAbsprache } from '@/lib/abholhinweise'
 import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
@@ -476,7 +477,8 @@ export type OrderForEmail = {
     // fehlt sie, bleibt die Darstellung wie bisher. ruecksendekostenCents
     // (Nr. 214): die Schätzung des Hofs für den Satz aus Gestaltungshinweis 5 b
     // in der Belehrung — die Lader der drei Bestätigungsmails lesen sie mit.
-    product?: (NonNullable<OrderLineProduct> & { ruecksendekostenCents?: number | null }) | null
+    // abholhinweise (N47, Nr. 257): Trägt eine Position „Abholung nach Absprache“, sagt die Bestätigung es im Abholblock.
+    product?: (NonNullable<OrderLineProduct> & { ruecksendekostenCents?: number | null; abholhinweise?: readonly string[] }) | null
   }>
 }
 
@@ -565,6 +567,17 @@ function antwortAnHof(farm: { email: string }): string | undefined {
 function mitAntwortAn(farm: { email: string }): { antwortAn?: string } {
   const adresse = antwortAnHof(farm)
   return adresse ? { antwortAn: adresse } : {}
+}
+
+/**
+ * Abholung nach Absprache in der Bestätigung (N47, Nr. 257): Bedingung und
+ * „Antwort an“ aus EINER Stelle — der Satz verspricht „einfach antworten“ nur,
+ * wenn der Kopf der Mail wirklich die Hof-E-Mail als Antwort-Adresse trägt.
+ */
+function bestaetigungMitAbsprache(order: OrderForEmail): { abspracheSatz?: string; kopf: { antwortAn?: string } } {
+  const kopf = mitAntwortAn(order.farm)
+  if (!brauchtAbsprache(order.items.map((i) => i.product?.abholhinweise))) return { kopf }
+  return { abspracheSatz: abspracheMailSatz(kopf.antwortAn !== undefined), kopf }
 }
 
 /** Das Wort für die Gebühr in den Hof-Mails (N8): „Plattformgebühr“ im Hofpreis-Modell, sonst „Servicegebühr“. */
@@ -1033,6 +1046,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
   // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
   const agbFassung = agbFassungMitMeldung(order)
+  const { abspracheSatz, kopf } = bestaetigungMitAbsprache(order)
 
   const { OrderConfirmationEmail } = await import('@/emails/order-confirmation')
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
@@ -1044,6 +1058,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    abspracheSatz,
     zahlart: mailZahlart(order.paymentMethod),
     items: mailPositionen(order),
     ...kundenGebuehr(order),
@@ -1062,7 +1077,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
     html,
     anhaenge: [await agbAnhang(agbFassung)],
-    ...mitAntwortAn(order.farm),
+    ...kopf,
   }
 }
 

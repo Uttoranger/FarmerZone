@@ -36,7 +36,7 @@ vi.mock('@/server/queries/seo', () => ({
 vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => null) }))
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(async () => []) }))
 vi.mock('@/server/queries/farm', () => ({ getPublicFarmGeteilt: vi.fn() }))
-vi.mock('@/server/queries/products', () => ({ getNurBetriebeProduktIds: vi.fn(async () => []), getBetriebsVorbelegung: vi.fn(async () => null) }))
+vi.mock('@/server/queries/products', () => ({ getNurBetriebeProduktIds: vi.fn(async () => []), getAbspracheProduktIds: vi.fn(async () => []), getBetriebsVorbelegung: vi.fn(async () => null) }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn(async () => {}) }))
 vi.mock('@/server/abholfenster', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/server/abholfenster')>()),

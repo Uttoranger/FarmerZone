@@ -19,6 +19,8 @@ import type { MarkeArt } from '@/lib/marke-art'
 import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import { abspracheOffen, brauchtAbsprache } from '@/lib/abholhinweise'
+import { telefonLink } from '@/lib/telefon-anzeige'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -470,9 +472,31 @@ export const PACK_MARKE: Record<AbholChip, { text: string; art: MarkeArt }> = {
 // Was Arbeit macht, steht oben: erst packen, dann warten, zuletzt Erledigtes.
 const PACK_RANG: Record<AbholChip, number> = { vorbereiten: 0, wartet: 1, bereit: 2 }
 
-/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen). */
-export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number }
-export type PacklistenZeile = AbholZeile & { gesamtCents: number }
+/**
+ * Abholung nach Absprache (Register N47, Nr. 257): die Ziele von „Anrufen“
+ * (tel:-Link, ohne lesbare Nummer null) und „Mail schreiben“. Nur Ziele, nie
+ * Text zum Anzeigen — auf Heute steht der Kontakt nicht sichtbar in der Zeile.
+ */
+export type AbspracheKontakt = { anrufen: string | null; email: string }
+
+/**
+ * Datensparsam: Kontakt nur für eine offene Bestellung mit Absprache, für jede
+ * andere null — dann verlässt die Nummer den Server gar nicht erst (auch nicht
+ * in den Seitendaten). Bedingung aus src/lib/abholhinweise.ts.
+ */
+export function abspracheKontakt(b: {
+  status: string
+  customerPhone: string
+  customerEmail: string
+  hinweiseJePosition: readonly (readonly string[] | null | undefined)[]
+}): AbspracheKontakt | null {
+  if (!abspracheOffen(b.status, brauchtAbsprache(b.hinweiseJePosition))) return null
+  return { anrufen: telefonLink(b.customerPhone), email: b.customerEmail }
+}
+
+/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen); Kontakt nur mit Absprache. */
+export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number; absprache?: AbspracheKontakt | null }
+export type PacklistenZeile = AbholZeile & { gesamtCents: number; absprache?: AbspracheKontakt }
 
 /**
  * Die Packliste auf Heute: dieselben Bestellungen wie „Heute abholen" und das
@@ -481,8 +505,13 @@ export type PacklistenZeile = AbholZeile & { gesamtCents: number }
  */
 export function packliste(bestellungen: readonly PacklistenBestellung[]): PacklistenZeile[] {
   const cents = new Map(bestellungen.map((b) => [b.id, b.gesamtCents]))
+  const kontakt = new Map(bestellungen.flatMap((b) => (b.absprache ? [[b.id, b.absprache] as const] : [])))
   return abholZeilen(bestellungen)
-    .map((z) => ({ ...z, gesamtCents: cents.get(z.id) ?? 0 }))
+    .map((z) => {
+      const absprache = kontakt.get(z.id)
+      // Ohne Absprache fehlt das Feld ganz — keine leeren Kontaktfelder in den Seitendaten.
+      return absprache ? { ...z, gesamtCents: cents.get(z.id) ?? 0, absprache } : { ...z, gesamtCents: cents.get(z.id) ?? 0 }
+    })
     .toSorted((a, b) => PACK_RANG[a.chip] - PACK_RANG[b.chip])
 }
 

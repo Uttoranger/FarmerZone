@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { getPublicFarmGeteilt, type PublicFarm } from '@/server/queries/farm'
-import { getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
+import { getAbspracheProduktIds, getBetriebsVorbelegung, getNurBetriebeProduktIds } from '@/server/queries/products'
 import { CheckoutForm, KassePausiert, ZahlungFortsetzen, type Zahlung } from '@/components/checkout/checkout-form'
 import type { KorbPosition } from '@/components/checkout/kasse-teile'
 import { alsAbholFenster, ausgebuchteSchluessel, ausgebuchteTage } from '@/server/abholfenster'
@@ -195,8 +195,10 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
     )
   }
 
-  const [nurBetriebeIds, ausHof, volleTage] = await Promise.all([
+  const [nurBetriebeIds, abspracheIds, ausHof, volleTage] = await Promise.all([
     getNurBetriebeProduktIds(farm.id),
+    // N47 (Nr. 257): Produkte mit „Abholung nach Absprache“ — nur für Hinweis und Wort am Notizfeld.
+    getAbspracheProduktIds(farm.id),
     session?.user ? getBetriebsVorbelegung(session.user.id) : Promise.resolve(null),
     ausgebuchteTage([farm.id], jetzt),
   ])
@@ -220,6 +222,7 @@ export default async function CheckoutPage({ params, searchParams }: Props) {
     <CheckoutForm
       farm={farm}
       nurBetriebeIds={nurBetriebeIds}
+      abspracheIds={abspracheIds}
       vorbelegung={kassenVorbelegung(ausHof, kaeufer)}
       ausgebuchteAbholfenster={ausgebuchteSchluessel(voll)}
       sperre={sperre}
