@@ -21,8 +21,9 @@ Wie viele Testdateien es gibt, zählt `pnpm vitest list --filesOnly | wc -l` (Un
 | `e2e/` | E2E (noch nicht vorhanden) | außerhalb von `tests/` |
 | `tests/fabrik/` | Fabriken für nachgebaute Typen (keine Tests, §5) | `<typ>.ts` |
 | `tests/fixtures/` | Beispieldateien, die ein Test liest (keine Tests) | beliebig |
+| `tests/bestandslisten/` | Bestandslisten der Wachen, die nur schrumpfen (keine Tests, nur Daten und Selektoren) | `<thema>.ts` |
 
-Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es flach; `tests/integration/setup/`, `tests/fabrik/` und `tests/fixtures/` enthalten nur Hilfsmittel, keine Tests. **Lose Hilfsdateien** in `tests/` (`*.ts` ohne `.test`) sind erlaubt und stehen mit Namen da: `admin-sitzung.ts`, `element-suche.ts`, `finanzen-jahr-daten.ts`, `geld-namen.ts`, `hofseiten-zeile.ts` (eine Datenbankzeile der Hofseite für die Tests des Teilen-Bilds, Nr. 196), `hydrieren-hilfe.ts`, `yaml-lader.ts`; eine neue kommt in diese Liste. Nach `tests/fabrik/` gehören nur Fabriken nachgebauter Typen (Inventur 14, Morgenbericht 20 §3, freigegeben 21.10.2026).
+Keine weiteren Unterordner, kein `.spec.ts`. Innerhalb eines Ordners bleibt es flach; `tests/integration/setup/`, `tests/fabrik/`, `tests/bestandslisten/` und `tests/fixtures/` enthalten nur Hilfsmittel, keine Tests. **Lose Hilfsdateien** in `tests/` (`*.ts` ohne `.test`) sind erlaubt und stehen mit Namen da: `admin-sitzung.ts`, `element-suche.ts`, `finanzen-jahr-daten.ts`, `geld-namen.ts`, `hofseiten-zeile.ts` (eine Datenbankzeile der Hofseite für die Tests des Teilen-Bilds, Nr. 196), `hydrieren-hilfe.ts`, `yaml-lader.ts`; eine neue kommt in diese Liste. Nach `tests/fabrik/` gehören nur Fabriken nachgebauter Typen (Inventur 14, Morgenbericht 20 §3, freigegeben 21.10.2026).
 
 **Der `exclude` in `vitest.config.ts` ist Pflicht, keine Geschmacksfrage:**
 `tests/**/*.test.ts` passt auch auf `tests/integration/*.int.test.ts`. Ohne
@@ -237,6 +238,7 @@ in einen ungültigen Schlüssel statt in echtes Geld.
 - Ein Verhalten je Test. Keine Testdatei, die einen Ablauf über zehn `it` hinweg aufbaut.
 - Keine gemeinsame veränderliche Variable zwischen Tests. `beforeEach` zum Zurücksetzen (`vi.clearAllMocks()`).
 - Reihenfolge-Unabhängigkeit: Jeder Test muss allein laufen.
+- **Der Test der Vorschau-Einhängepunkte prüft je Nummer nur deren eigene Datei**, damit parallele Nummern nicht dieselbe Testzeile ändern (drei Merge-Konflikte in `bausteine-245.test.ts`). (Morgenbericht 32 A, freigegeben 7.11.2026)
 - **Schwere Module echt importieren** (z. B. `@/lib/email` mit React und allen Vorlagen): einmal je Datei in `beforeAll` mit eigenem Timeout (`30_000`), nie in jedem Test. Ein kalter Import im Test zählt gegen das 5-s-Limit und reißt es, sobald parallel gearbeitet wird. `vi.resetModules()` nur, wo ein Modul Umgebungswerte auf Modulebene liest oder dort veränderlichen Zustand hält (etwa einen gemerkten Abruf) — dann ebenfalls in `beforeAll`, eine Instanz je Variante (Vorbild: `tests/email-sendraw.test.ts`, `tests/upload-ursache.test.ts`). Das Testlimit nie global anheben.
 - **Statische Wachen, die ganz `src/` lesen und parsen** (TypeScript-Parser über jede Datei): eigenes Limit `30_000` nur an genau diesem `it`, mit einem Satz, warum. Eine Wache, die nur wenige Dateien liest, bleibt beim Standard. (geprüft von tests/zeitgrenzen-wache.test.ts; Regelvorschlag Sammel 19, 21.10.2026)
 - **Eine Laufzeitprüfung in einem Unit-Test hat mindestens doppelten Abstand zur gemessenen Zeit oder läuft nur allein; der Dirigent wiederholt einmal.** (Regelvorschlag Dirigent, Morgenbericht 25, freigegeben 26.10.2026)
