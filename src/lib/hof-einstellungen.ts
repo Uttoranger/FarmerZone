@@ -173,6 +173,12 @@ function esFehlt(teile: readonly string[]): string {
   return `Es ${teile.length === 1 ? 'fehlt' : 'fehlen'}: ${aufzaehlung(teile)}`
 }
 
+/** Nimmt ein führendes „LFBIS“ (mit Leerzeichen, Bindestrich oder Doppelpunkt) weg; bleibt nichts übrig, die Eingabe. */
+function ohneLfbisVorsatz(nummer: string): string {
+  const rest = nummer.trim().replace(/^LFBIS[\s:-]*/i, '')
+  return rest === '' ? nummer.trim() : rest
+}
+
 /**
  * Die Zeile „Futtermittel-Registrierung“ mit Nummer (Liste Lauf 32, einstellungen „Eigene Ernte“, Nr. 250):
  * ohne das Fachwort der Betriebsart, immer „Futtermittel-Nummer (LFBIS) …“; ist der Hof beim BAES
@@ -180,7 +186,9 @@ function esFehlt(teile: readonly string[]): string {
  * nur eine (Farm.betriebsnummer), die BAES-Meldung kommt aus dem Status (wie in lib/futter-registrierung.ts).
  */
 export function futtermittelZeile(betriebsstatus: Betriebsstatus | null, nummer: string): string {
-  const lfbis = `Futtermittel-Nummer (LFBIS) ${nummer}`
+  // Höfe tragen die Nummer oft samt Vorsatz ein („LFBIS 1234567“); die Beschriftung nennt LFBIS schon,
+  // darum fällt der Vorsatz nur in der Anzeige weg — gespeichert bleibt, was der Hof eingetragen hat.
+  const lfbis = `Futtermittel-Nummer (LFBIS) ${ohneLfbisVorsatz(nummer)}`
   return betriebsstatus === 'REGISTRIERT' || betriebsstatus === 'ZUGELASSEN' ? `${lfbis} · BAES-Meldung` : lfbis
 }
 
