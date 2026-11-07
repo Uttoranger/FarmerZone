@@ -209,7 +209,7 @@ function Kennzahl({
 }) {
   return (
     // Jede Karte ist ein Container: Die Zahl misst sich an ihrer Breite (cqw).
-    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-4', className)}>
+    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-3', className)}>
       {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst
           (kennzahlBreiteEm), nie unter 12 px — passt er dann nicht, bricht er um, statt über den Rand zu laufen. */}
       <p

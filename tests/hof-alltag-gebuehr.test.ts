@@ -162,17 +162,19 @@ function bestellungFuerDruck(gebuehrModell: string | null, paymentMethod: 'ONLIN
 }
 
 describe('Druck: Abholzettel und Packliste', () => {
-  it('Abholzettel im Hofpreis-Modell: kein „Servicegebühr“, dafür „Preise inkl. Plattformgebühr.“ und „Bar zu kassieren“', async () => {
+  it('Abholzettel im Hofpreis-Modell: kein „Servicegebühr“, dafür „Gesamt inkl. Plattformgebühr.“ und „Bar zu kassieren“', async () => {
     m.bestellung = bestellungFuerDruck(HOFPREIS, 'ONSITE_CASH')
     const html = renderToStaticMarkup(await OrderPrintPage({ params: Promise.resolve({ orderId: 'order-1' }) }))
     expect(html).not.toContain(WORT_BISHER)
-    expect(html).toContain('Preise inkl. Plattformgebühr.')
+    // Nr. 249b: die Positionen stehen ohne Gebühr — der Satz spricht vom Gesamt (druckGesamtHinweis).
+    expect(html).toContain('Gesamt inkl. Plattformgebühr.')
+    expect(html).not.toContain('Preise inkl. Plattformgebühr.')
     expect(html).toContain('Bar zu kassieren: € 19,12')
     // V57: Papier = Bildschirm.
     expect(html).toContain('Zum Packen')
     expect(html).toContain('Zahlung: Bar bei Abholung')
-    // Liste Lauf 32 (druck Bild 1): „Preise inkl. …“ voran im Fuß, E-Mail bricht nach dem „@“, Tabellenkopf fett.
-    expect(html).toMatch(/Preise inkl\. Plattformgebühr\. Bestellnummer nur zum Abgleich/)
+    // Liste Lauf 32 (druck Bild 1): der Satz zur Gebühr voran im Fuß, E-Mail bricht nach dem „@“, Tabellenkopf fett.
+    expect(html).toMatch(/Gesamt inkl\. Plattformgebühr\. Bestellnummer nur zum Abgleich/)
     expect(html).toContain('erika@<wbr/>example.com')
     expect(html).not.toContain('[overflow-wrap:anywhere]')
     expect(html).toMatch(/<th class="[^"]*font-bold[^"]*">Produkt<\/th>/)
@@ -182,7 +184,7 @@ describe('Druck: Abholzettel und Packliste', () => {
     m.bestellung = bestellungFuerDruck(null, 'ONSITE_CASH')
     const html = renderToStaticMarkup(await OrderPrintPage({ params: Promise.resolve({ orderId: 'order-1' }) }))
     expect(html).toContain(WORT_BISHER)
-    expect(html).not.toContain('Preise inkl. Plattformgebühr.')
+    expect(html).not.toContain('inkl. Plattformgebühr.')
   })
 
   it('Packliste im Hofpreis-Modell: kein „Servicegebühr“, „Bar bei Abholung“ statt „Barzahlung vor Ort“; Gegenprobe „bisher“', async () => {

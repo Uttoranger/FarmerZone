@@ -23,8 +23,8 @@ import {
   type BestellAktionen,
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
-import { fristVon, tagInWorten, uhrzeitInWien, zeitpunktFuerMail } from '@/lib/fristen'
-import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAbholungWhere, wienerTag, type NaechstesFenster } from '@/lib/heute'
+import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAbholungWhere, wienerTag, zeitpunktKurz, type NaechstesFenster } from '@/lib/heute'
 import { wienKalendertag } from '@/lib/kalender'
 import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
@@ -313,7 +313,8 @@ export async function getHofBestellDetail(
     // „läuft“ (Register G5 kennt keine eigene Art „fertig“); Liste, Admin und Kundendetail bleiben bei bestellMarke.
     marke: o.status === 'PICKED_UP' ? { ...bestellMarke(o.status), art: 'laeuft' } : bestellMarke(o.status),
     abholung: abholungKurz(o.pickupDate, o.pickupTimeStart, o.pickupTimeEnd, jetzt),
-    bestelltAm: zeitpunktFuerMail(o.createdAt),
+    // Kurz wie im Board w1-bestellung: „heute, 07:12“ (Nr. 249b).
+    bestelltAm: zeitpunktKurz(o.createdAt, jetzt),
     kunde: {
       name: o.customerName,
       vorname: vorname(o.customerName),
@@ -323,7 +324,7 @@ export async function getHofBestellDetail(
     },
     zahlart: zahlartText(o.paymentMethod, o.paymentStatus),
     vorOrt: istVorOrtZahlung(o.paymentMethod),
-    bezahltAm: o.paidAt ? zeitpunktFuerMail(o.paidAt) : null,
+    bezahltAm: o.paidAt ? zeitpunktKurz(o.paidAt, jetzt) : null,
     abgeholtUm: o.status === 'PICKED_UP' && o.pickedUpAt ? uhrzeitInWien(o.pickedUpAt) : null,
     zahlungBeiAbholung: ZAHLUNG_BEI_ABHOLUNG[o.paymentMethod] ?? null,
     betrag: {

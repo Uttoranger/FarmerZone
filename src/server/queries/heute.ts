@@ -16,6 +16,7 @@ import {
   abholWhere,
   brauchtDich,
   fensterMitBestellungen,
+  karteNaechsteAbholung,
   heuteHofSichtbar,
   naechsteAbholungWhere,
   packliste,
@@ -62,6 +63,8 @@ export type Heute = {
   abholfensterHeute: string | null
   /** Das nächste Abholfenster laut Abholzeiten und wie viele Bestellungen dafür offen sind. */
   naechstesFenster: { fenster: NaechstesFenster; anzahl: number } | null
+  /** Was die Karte „Nächste Abholung“ nennt: das Fenster nach dem heutigen, wenn heute schon in der Packliste steht (karteNaechsteAbholung). */
+  naechsteAbholungKarte: { fenster: NaechstesFenster; anzahl: number } | null
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   wochenBalken: WochenBalken[]
@@ -258,6 +261,7 @@ export async function getHeute(
     },
     abholfensterHeute: abholfensterHeute(slots, jetzt),
     naechstesFenster: fensterMitZahl,
+    naechsteAbholungKarte: karteNaechsteAbholung(slots, jetzt, zeilen.length, naechsteAbholung),
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
       ausverkauft,

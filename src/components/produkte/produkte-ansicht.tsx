@@ -329,8 +329,9 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                       key={f}
                       href={adresse}
                       aktiv={ansicht.filter === f}
-                      // Chip 15 px wie das Board (Liste Lauf 32, produkte) — die Höhe bleibt die der Chip-Reihe.
-                      className="text-[15px]"
+                      // Chip 15 px wie das Board (Liste Lauf 32, produkte), sichtbar 44 px hoch mit 14 px Rand (Board
+                      // w1-produkte; Nr. 249b) — ui/chip.tsx bleibt bei 36 px, die Höhe gilt nur hier.
+                      className="h-11 px-3.5 text-[15px]"
                       onNavigate={(e) => {
                         e.preventDefault()
                         schreibeAdresse(adresse)
