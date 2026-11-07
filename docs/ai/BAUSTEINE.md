@@ -337,6 +337,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/region
 
+- src/components/region/ansicht-chips.tsx · AnsichtChips, type AnsichtWahl · „Liste / Karte“ auf /region als Chips wie im Board s1-/w1-region (G11, Liste Lauf 32 region): gewählt dunkel gefüllt, sonst Umriss. · genutzt
 - src/components/region/erklaer-knopf.tsx · ErklaerKnopf · „So rechnen wir" als Baustein (Register N23, Board system-h5-region-eigene- teile §4): ein echter Knopf mit (i), dessen `aria-label` der Titel ist (Trefferfläche 44 px), öffnet einen Dialog mit … · genutzt
 - src/components/region/futter-abholhinweise.tsx · AbholhinweisZeile, type AbholhinweisEintrag · Ein Kennzeichen: der Hinweis und — wenn nicht alle Größen ihn tragen — die Größen davor. · genutzt
 - src/components/region/futter-karte-ansicht.tsx · default · Die Karte von „Futter kaufen" (Register N23; Board system-h5-region-v2, Handy 4) — die Kartenkomponente von /hoefe, nicht eine zweite: Pins sind die Höfe der gezeigten Angebote mit Namen nach der … · genutzt
