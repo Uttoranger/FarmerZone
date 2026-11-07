@@ -10,7 +10,7 @@ import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tok
 import { fristVon } from '@/lib/fristen'
 import { abholTerminZeile, barBestaetigenSatz, barVerfallenSatz } from '@/lib/bestaetigung'
 import { KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
-import { zahlungsAnzeige } from '@/lib/bestellstatus'
+import { zahlzeileFuer } from '@/lib/zahlzeile'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
@@ -68,6 +68,7 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       id: true,
       status: true,
       paymentMethod: true,
+      paymentStatus: true,
       cancelReason: true,
       createdAt: true,
       pickupDate: true,
@@ -75,8 +76,11 @@ export default async function BarBestaetigenSeite({ params }: Props) {
       pickupTimeEnd: true,
       totalAmount: true,
       serviceFeeCents: true,
+      serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       farm: { select: { slug: true, name: true, address: true, postalCode: true, city: true, archivedAt: true, geschlossenAm: true } },
       items: {
         select: {
@@ -165,7 +169,8 @@ export default async function BarBestaetigenSeite({ params }: Props) {
             <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
           )}
         </ul>
-        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{zahlungsAnzeige(order.paymentMethod, 'PENDING').art}</p>
+        {/* Dieselbe Zahlzeile wie Bestätigung und Bestellseite (zahlzeileFuer, Liste Lauf 32 bestellung-link Bild 2). */}
+        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{zahlzeileFuer(order)}</p>
         <p className="mt-0.5 text-[17px] font-bold text-foreground">
           Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
         </p>

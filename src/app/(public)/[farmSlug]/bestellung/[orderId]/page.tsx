@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellSignatur, widerrufPfad } from '@/lib/bestell-link'
 import { widerrufMoeglich } from '@/lib/widerruf'
 import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
-import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
+import { bestellStatusAnzeige, formatiereAbholtermin } from '@/lib/bestellstatus'
 import { positionMengeVorn } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { cn } from '@/lib/utils'
@@ -102,6 +102,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
@@ -139,7 +141,6 @@ export default async function BestellungPage({ params, searchParams }: Props) {
     order.pickupTimeEnd
   )
   const status = bestellStatusAnzeige(order.status, abholtermin, order.paymentMethod)
-  const zahlung = zahlungsAnzeige(order.paymentMethod, order.paymentStatus)
   // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
   const jetzt = new Date()
 
@@ -209,7 +210,6 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           titel="Positionen"
           positionen={positionen}
           summen={order}
-          zahlung={`${zahlung.art} · ${zahlung.zustand}`}
           summeInZahlzeile
         />
 

@@ -72,7 +72,7 @@ function bestellung(teil: Partial<ListenBestellung> = {}): ListenBestellung {
     pickupTimeStart: '15:00',
     pickupTimeEnd: '18:00',
     createdAt: new Date(Date.now() - 60 * 60 * 1000),
-    gesamtCents: 1082,
+    summen: { totalAmount: '10.22', serviceFeeCents: 60, serviceFeeRefundedAt: null },
     artikel: 2,
     ...teil,
   }

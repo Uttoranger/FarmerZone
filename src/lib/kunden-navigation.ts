@@ -169,8 +169,12 @@ export function kundenNavigation({ sitzung }: { sitzung: KundenSitzung }): Kunde
   return { web: WEB_LINKS, knopf: kopfKnopf(sitzung), handy: HANDY_LEISTE }
 }
 
-// Die Anmelde- und die Registrierseite selbst (Liste Lauf 32, Q2).
-const OHNE_KNOPF_AM_HANDY: readonly string[] = [ANMELDEN.href, '/register']
+/**
+ * Die Seiten, die selbst die Anmeldung sind (Liste Lauf 32, Q2): /login, /register und die Anmeldung der Kundschaft
+ * /account/login (Projektleitung 7.11.2026, Nr. 253). Unterpfade zählen mit (/login/admin, /account/login/…), ein
+ * Pfad, der nur so anfängt (/loginhilfe, /account/loginx), nicht.
+ */
+const OHNE_KNOPF_AM_HANDY: readonly string[] = [ANMELDEN.href, '/register', '/account/login']
 
 /**
  * Ob der Knopf rechts oben am Handy entfällt (Liste Lauf 32, Q2 und G9): auf

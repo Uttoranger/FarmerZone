@@ -19,7 +19,6 @@ import {
 } from '@/lib/bestaetigung'
 import { zahlungFortsetzenPfad } from '@/lib/kasse'
 import { positionMengeVorn } from '@/lib/format'
-import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { buildMapsUrl } from '@/lib/customer-links'
 import { bestaetigungsParameterSchema } from '@/schemas/bestaetigung'
 import { ClearCartOnMount } from '@/components/checkout/clear-cart-on-mount'
@@ -125,6 +124,8 @@ async function getOrder(orderId: string) {
       serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       // Keine Personendaten hier (Nr. 153): Den Namen zeigt die Seite nie, die
       // E-Mail holt `adresseSolangeOffen` nur für eine laufende Bestellung.
       createdAt: true,
@@ -205,7 +206,6 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
   // „Bezahlt" und „bestätigt" nur aus der Datenbank; redirect_status ist
   // höchstens ein Hinweis (src/lib/bestaetigung.ts).
   const zustand = bestaetigungsZustand(order, redirect_status)
-  const zahlung = zahlungsAnzeige(order.paymentMethod, order.paymentStatus)
   const bloecke = bestaetigungsBloecke(zustand, order.status)
 
   // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
@@ -293,7 +293,6 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
         <BestellPositionen
           positionen={positionen}
           summen={order}
-          zahlung={`${zahlung.art} · ${zahlung.zustand}`}
           // Bar offen nennt die Karte mit der Frist Termin und Adresse schon (Board Bild 3: keine Zeile darunter).
           fuss={
             !bloecke.abholkarte &&

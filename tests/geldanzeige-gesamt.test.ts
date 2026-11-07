@@ -23,8 +23,8 @@ function positionen(summen: Summen, summeInZahlzeile = false): string {
   return renderToStaticMarkup(
     createElement(BestellPositionen, {
       positionen: [{ text: '2 × Freilandeier', betragCents: 980 }],
-      summen,
-      zahlung: summen.paymentMethod === 'ONLINE' ? 'Online · Bezahlt' : 'Bar bei Abholung · Noch offen',
+      // Die Zahlzeile entsteht seit Nr. 253 in zahlzeileFuer aus Zahlart und Zahlstand der Bestellung.
+      summen: { ...summen, paymentStatus: summen.paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING' },
       summeInZahlzeile,
     })
   ).replace(/<!-- -->/g, '')

@@ -5,6 +5,7 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { formatEuro } from '@/lib/format'
 import { anzeigeGesamtCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer, gebuehrHinweisFuer } from '@/lib/plattformgebuehr'
+import { zahlzeileFuer, type ZahlzeilenBestellung } from '@/lib/zahlzeile'
 import type { BestaetigungsKopf, BestellSchritt } from '@/lib/bestaetigung'
 import { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 
@@ -191,32 +192,24 @@ export function StatusSchritte({ schritte }: { schritte: readonly BestellSchritt
 /**
  * Positionen, Servicegebühr als eigene Zeile und Gesamt (anzeigeGesamtCents) — alles aus dem
  * Snapshot der Bestellung (bestellSummen), angezeigt über formatEuro.
- * `zahlung` ist die Zeile aus zahlungsAnzeige („Online · Bezahlt",
- * „Bar bei Abholung · Noch offen") — nie pauschal „bezahlt". Dahinter
- * „inkl. <Gebühr>“ (Boards s1-/w1-bestaetigung: „… · inkl. Plattformgebühr“).
+ * Darunter die Zahlzeile aus der EINEN Hilfe `zahlzeileFuer` (src/lib/zahlzeile.ts, Nr. 253): im Hofpreis-Modell
+ * „Online bezahlt · inkl. Plattformgebühr (6 %)“ bzw. „Bar bei Abholung · inkl. …“, Wort und Satz aus der
+ * Bestellung; im Modell „bisher“ die bisherige Zeile — nie pauschal „bezahlt".
  * `summeInZahlzeile` (Bestellseite, Board s1-/w1-bestellung-link Bild 1): keine
- * eigene Zeile „Gesamt“ — derselbe Betrag steht in der Zahlzeile
- * („Online · Bezahlt · € 19,12 inkl. Plattformgebühr“). Nur Anzeige.
+ * eigene Zeile „Gesamt“ — derselbe Betrag steht in der Zahlzeile, in Positionsgröße
+ * („Online bezahlt · € 19,12 inkl. Plattformgebühr (6 %)“). Nur Anzeige.
  */
 export function BestellPositionen({
   positionen,
   summen,
-  zahlung,
   fuss,
   titel = 'Deine Bestellung',
   summeInZahlzeile = false,
 }: {
   /** `fehlt`: Der Hof hat die Position als fehlend gemeldet (E14) — sie ist nicht mehr im Betrag. */
   positionen: ReadonlyArray<{ text: string; betragCents: number; fehlt?: boolean }>
-  summen: {
-    totalAmount: number | string | { toString(): string }
-    serviceFeeCents: number
-    serviceFeeRefundedAt: Date | string | null
-    paymentMethod: string
-    /** N38: 'hofpreis' — dann heißt die Zeile „Plattformgebühr“ mit dem Satz aus konditionen.ts. */
-    gebuehrModell?: string | null
-  }
-  zahlung: string
+  /** Der Snapshot der Bestellung; N38: gebuehrModell 'hofpreis' — dann heißt die Zeile „Plattformgebühr“. */
+  summen: ZahlzeilenBestellung
   fuss?: ReactNode
   /** Die kleine Überschrift über der Karte: „Deine Bestellung“ (Bestätigung), „Positionen“ (Bestellseite). */
   titel?: string
@@ -230,10 +223,7 @@ export function BestellPositionen({
   // Ist die Gebühr entfallen bzw. erstattet, zählt „Gesamt“ sie nicht mit (Nr. 244) — sonst stünde die gestrichene
   // Zeile darüber und die volle Summe darunter.
   const gesamt = formatEuro(centsAlsEuro(anzeigeGesamtCents(summen)))
-  // „inkl. <Gebühr>“ nur, solange die Gebühr gilt: Ist sie entfallen bzw. erstattet, sagt das die eigene Zeile darüber.
-  const inkl = s.gebuehrCents > 0 && !entfallen ? `inkl. ${gebuehrBezeichnungFuer(summen)}` : null
-  const betragZeile = summeInZahlzeile ? [gesamt, inkl].filter(Boolean).join(' ') : inkl
-  const zahlzeile = [zahlung, betragZeile].filter(Boolean).join(' · ')
+  const zahlzeile = zahlzeileFuer(summen, { mitBetrag: summeInZahlzeile })
   return (
     // Board: die kleine Überschrift über der Karte, darin die Zeilen, „Gesamt“ und darunter Zahlart und Gebühr leise.
     <section aria-label={titel} className="flex flex-col gap-2">
@@ -276,7 +266,8 @@ export function BestellPositionen({
           Gesamt <span className="whitespace-nowrap tabular-nums">{gesamt}</span>
         </p>
       )}
-      <p className="text-[13px] leading-normal text-muted-foreground">{zahlzeile}</p>
+      {/* Bestellseite (Liste Lauf 32, bestellung-link): die Zahlzeile trägt den Betrag und steht in Positionsgröße. */}
+      <p className={cn('leading-normal', summeInZahlzeile ? 'text-[15px] text-foreground' : 'text-[13px] text-muted-foreground')}>{zahlzeile}</p>
       {s.gebuehrCents > 0 && <p className="mt-1 text-[12px] leading-normal text-muted-foreground">{gebuehrHinweisFuer(summen)}</p>}
       {fuss && <div className="mt-2">{fuss}</div>}
       </div>
