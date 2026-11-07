@@ -25,7 +25,6 @@ export const KIND_SELEKTOR_BESTAND: Readonly<Record<string, number>> = {
   'src/components/farm/cart-sheet.tsx': 24,
   'src/components/hof-einstellungen/barzahlung.tsx': 2,
   'src/components/hof-einstellungen/einstellungen-uebersicht.tsx': 2,
-  'src/components/hof-kunden/kunden-ansicht.tsx': 2,
   'src/components/produkte/wieder-da-moment.tsx': 3,
   'src/components/shells/kunde-shell.tsx': 1,
   'src/components/ui/badge.tsx': 2,

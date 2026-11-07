@@ -21,7 +21,5 @@ export const UNTERSEITEN_KOPF_BESTAND: readonly string[] = [
   'src/app/(hof)/status/plakat/page.tsx',
   'src/components/hof-einstellungen/einstellungen-laden.tsx',
   'src/components/hof-einstellungen/konditionen-ansicht.tsx',
-  'src/components/hof-kunden/kunden-detail.tsx',
-  'src/components/hof-kunden/kunden-laden.tsx',
   'src/components/hofbereich/hof-laden.tsx',
 ]

@@ -12,7 +12,7 @@ import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { KICKER_12 } from '@/components/mein-hof/kicker-12'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { cn } from '@/lib/utils'
 
 /*
@@ -49,45 +49,40 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
 
   return (
     <>
-      {/* Rückweg „Kunden" (Nr. 44): am Handy feste Leiste, im Browser die Zeile „‹ …". Die h1 ist der Name in der Kopfkarte. */}
-      <UnterseitenKopf />
-      <article aria-labelledby="kundin-name" className="flex flex-col gap-4">
-        <header className={cn(KARTE, 'flex flex-col gap-4 p-4 md:px-[18px]')}>
-          <div className="flex items-start gap-3.5">
-            <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-muted font-heading text-xl font-semibold text-foreground">
+      {/* Werkzeug-Kopf (G1, Liste Lauf 32 kunden): Rückweg „Kunden“, die h1 ist der Name. */}
+      <WerkzeugKopf titel={<span title={kunde.customerName}>{kunde.customerName}</span>} unterzeile={<p className={cn('text-[13px] md:text-sm', LEISE)}>{kundeSeitText(kunde.firstOrderDate)}</p>} />
+      <article aria-label={kunde.customerName} className="flex flex-col gap-4">
+        {/* Profil frei auf dem Grund, Marke daneben, drei Kontaktknöpfe in einer Zeile (Board s2-/w2-kunden Bild 3). */}
+        <header className="flex flex-col gap-3.5">
+          <div className="flex items-center gap-3.5">
+            <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund font-heading text-xl font-semibold text-status-fertig">
               {initialen(kunde.customerName)}
             </span>
-            <div className="min-w-0 flex-1">
-              <h1 id="kundin-name" title={kunde.customerName} className="line-clamp-2 font-heading text-[22px] leading-tight font-semibold break-words md:text-[26px]">
-                {kunde.customerName}
-              </h1>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
-                {marke && <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>}
-                <span className={LEISE}>{kundeSeitText(kunde.firstOrderDate)}</span>
-                {kunde.isSubscribed && (
-                  <span className="inline-flex items-center gap-1 text-status-fertig">
-                    <Bell className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
-                    bekommt Neuigkeiten
-                  </span>
-                )}
-              </div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px]">
+              {marke && <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>}
+              {kunde.isSubscribed && (
+                <span className="inline-flex items-center gap-1 text-status-fertig">
+                  <Bell className="size-3.5" strokeWidth={1.7} aria-hidden="true" />
+                  bekommt Neuigkeiten
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:flex-wrap">
             {anrufen && (
-              <a href={anrufen} className={cn(KNOPF_ORANGE, FOKUS_RAHMEN)}>
+              <a href={anrufen} className={cn(KNOPF_ORANGE, 'px-3', FOKUS_RAHMEN)}>
                 <Phone className="size-4" strokeWidth={1.7} aria-hidden="true" />
                 Anrufen
               </a>
             )}
             {whatsApp && (
-              <a href={whatsApp} target="_blank" rel="noopener noreferrer" className={KNOPF_RAHMEN}>
+              <a href={whatsApp} target="_blank" rel="noopener noreferrer" className={cn(KNOPF_RAHMEN, 'justify-center px-3 whitespace-nowrap')}>
                 <MessageCircle className="size-4" strokeWidth={1.7} aria-hidden="true" />
                 WhatsApp
               </a>
             )}
-            <a href={`mailto:${kunde.customerEmail}`} className={KNOPF_RAHMEN}>
+            <a href={`mailto:${kunde.customerEmail}`} className={cn(KNOPF_RAHMEN, 'justify-center px-3 whitespace-nowrap')}>
               <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
               E-Mail
             </a>
@@ -151,23 +146,31 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
               <h2 id="kundin-kontakt" className={KICKER_12}>
                 Kontakt
               </h2>
-              {anrufen ? (
-                <a href={anrufen} className={cn('inline-flex min-h-11 w-fit items-center gap-2 rounded-md text-[14px] font-medium text-status-fertig hover:underline', FOKUS_RAHMEN)}>
-                  <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                  {formatiereTelefon(telefon)}
-                </a>
-              ) : (
-                telefon !== '' && (
-                  <p className="flex min-h-11 items-center gap-2 text-[14px] font-medium">
-                    <Phone className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                    <span className="min-w-0 [overflow-wrap:anywhere]">{formatiereTelefon(telefon)}</span>
-                  </p>
-                )
-              )}
-              <a href={`mailto:${kunde.customerEmail}`} className={cn('inline-flex min-h-11 min-w-0 items-center gap-2 rounded-md text-[14px] font-medium break-all text-status-fertig hover:underline', FOKUS_RAHMEN)}>
-                <Mail className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                {kunde.customerEmail}
-              </a>
+              {/* Beschriftung links, Wert rechts unterstrichen (Board w2-kunden Bild 3). */}
+              <dl className="flex flex-col text-[14px]">
+                {telefon !== '' && (
+                  <div className="flex min-h-11 items-center justify-between gap-3">
+                    <dt className={LEISE}>Telefon</dt>
+                    <dd className="min-w-0 text-right">
+                      {anrufen ? (
+                        <a href={anrufen} className={cn('rounded-sm font-medium text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
+                          {formatiereTelefon(telefon)}
+                        </a>
+                      ) : (
+                        <span className="[overflow-wrap:anywhere]">{formatiereTelefon(telefon)}</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
+                <div className="flex min-h-11 items-center justify-between gap-3 border-t border-border first:border-t-0">
+                  <dt className={LEISE}>E-Mail</dt>
+                  <dd className="min-w-0 text-right">
+                    <a href={`mailto:${kunde.customerEmail}`} className={cn('rounded-sm font-medium break-all text-foreground underline underline-offset-2', FOKUS_RAHMEN)}>
+                      {kunde.customerEmail}
+                    </a>
+                  </dd>
+                </div>
+              </dl>
             </section>
 
             {kunde.topProducts.length > 0 && (
@@ -175,16 +178,14 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
                 <h2 id="kundin-lieblinge" className={KICKER_12}>
                   Lieblingsprodukte
                 </h2>
-                <ol className="flex flex-col gap-2">
-                  {kunde.topProducts.map((p, i) => (
-                    <li key={p.name} className="flex items-center gap-3 text-[14px]">
-                      <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
-                        {i + 1}
-                      </span>
+                {/* Name links, Menge rechts („9×“, Board w2-kunden Bild 3). */}
+                <ol className="flex flex-col">
+                  {kunde.topProducts.map((p) => (
+                    <li key={p.name} className="flex min-h-10 items-center gap-3 border-t border-border text-[14px] first:border-t-0">
                       <span className="min-w-0 flex-1 truncate" title={p.name}>
                         {p.name}
                       </span>
-                      <span className={cn('shrink-0 text-[12.5px]', LEISE)}>{formatZahl(p.count)}× bestellt</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{formatZahl(p.count)}×</span>
                     </li>
                   ))}
                 </ol>
@@ -196,7 +197,7 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
                 <h2 id="kundin-neuigkeiten" className={KICKER_12}>
                   Neuigkeiten von dir
                 </h2>
-                <dl className="flex flex-col gap-1.5 text-[14px]">
+                <dl className="flex flex-col text-[14px]">
                   <Einwilligung symbol={Mail} name="E-Mail-Neuigkeiten" an={abo.optInEmail} />
                   <Einwilligung symbol={MessageCircle} name="WhatsApp-Neuigkeiten" an={abo.optInWhatsApp} />
                 </dl>
@@ -209,20 +210,22 @@ export function KundenDetail({ kunde, jetzt }: { kunde: CustomerDetail; jetzt: D
   )
 }
 
+/** Beschriftung oben links, Wert darunter (Liste Lauf 32 kunden: „Kennzahl-Kacheln zentriert“). */
 function Kennzahl({ wert, beschriftung }: { wert: string; beschriftung: string }): React.JSX.Element {
   return (
-    <div className={cn(KARTE, 'flex min-w-0 flex-col-reverse items-center gap-0.5 px-2 py-3 text-center')}>
+    <div className={cn(KARTE, 'flex min-w-0 flex-col gap-0.5 px-3 py-3 text-left')}>
       <dt className={cn('text-[12px]', LEISE)}>{beschriftung}</dt>
       <dd className="font-heading text-lg leading-tight font-semibold break-words tabular-nums md:text-xl">{wert}</dd>
     </div>
   )
 }
 
+/** Eine Zeile „Neuigkeiten von dir“: Kanal links, Zustand rechts (Board w2-kunden Bild 3). */
 function Einwilligung({ symbol: Symbol, name, an }: { symbol: typeof Mail; name: string; an: boolean }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-h-10 items-center gap-2 border-t border-border first:border-t-0">
       <Symbol className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-      <dt>{name}:</dt>
+      <dt className="flex-1">{name}</dt>
       <dd className={an ? 'font-semibold text-status-fertig' : LEISE}>{an ? 'an' : 'aus'}</dd>
     </div>
   )
