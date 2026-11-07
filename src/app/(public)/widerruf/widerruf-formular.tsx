@@ -2,12 +2,13 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { Check, Loader2 } from 'lucide-react'
-import { WIDERRUF_GRENZEN, WIDERRUF_TEXT, eingangZeitpunkt, type WiderrufUmfang } from '@/lib/widerruf'
+import { WIDERRUF_GRENZEN, WIDERRUF_TEXT, type WiderrufUmfang } from '@/lib/widerruf'
 import { reicheWiderrufMitLinkEin, reicheWiderrufOhneLinkEin, type WiderrufAntwort } from '@/server/actions/widerruf'
 import { FELD, FELD_LABEL, KNOPF_GRUEN, KNOPF_UMRISS } from '@/components/anmelden/stil'
-import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { eingangZeitpunktSeite } from './eingang-zeit'
 
 /** Was die Seite über eine Bestellung mit signiertem Link zeigt — gekürzt, ohne Beträge. */
 export type WiderrufBestellAnsicht = {
@@ -108,16 +109,17 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
         setFehler(antwort.error)
         return
       }
-      setEingegangenAm(eingangZeitpunkt(new Date(antwort.eingegangenAm)))
+      setEingegangenAm(eingangZeitpunktSeite(new Date(antwort.eingegangenAm)))
       setSchritt('eingegangen')
       requestAnimationFrame(() => kopfRef.current?.focus())
     })
   }
 
   if (schritt === 'eingegangen' && eingegangenAm) {
-    // Grün getönt wie die Hinweiskarte der Kundenwelt (Board w3-widerruf Bild 4).
+    // Grün getönt wie die Hinweiskarte der Kundenwelt (Board w3-widerruf Bild 4). `data-widerruf-eingegangen` blendet
+    // in page.tsx Titel und Einleitung der Seite aus (Liste Lauf 32, widerruf „Seitentitel … über der Bestätigung“).
     return (
-      <section aria-labelledby="widerruf-kopf" className="flex flex-col gap-3.5 rounded-[16px] border border-zustand-laeuft/30 bg-zustand-laeuft-grund px-4 py-4 md:px-[18px]">
+      <section data-widerruf-eingegangen aria-labelledby="widerruf-kopf" className="flex flex-col gap-2 rounded-[16px] border border-zustand-laeuft/30 bg-zustand-laeuft-grund px-4 py-4 md:px-[18px]">
         <span className="flex size-9 items-center justify-center rounded-full bg-accent text-accent-foreground" aria-hidden="true">
           <Check className="size-5" strokeWidth={2} aria-hidden="true" />
         </span>
@@ -136,7 +138,8 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
         </ol>
         {/* Der Beleg zum Drucken: was eingegangen ist (über das Board hinaus, Bericht 231). */}
         <Zusammenfassung bestellung={bestellung} nummer={nummer} name={name} email={email} umfangZeilen={umfangZeilen} aufGruen />
-        <button type="button" onClick={() => window.print()} className={cn(KNOPF_UMRISS, 'print:hidden')}>
+        {/* Im Web textbreit und links (Board w3-widerruf Bild 4). */}
+        <button type="button" onClick={() => window.print()} className={cn(KNOPF_UMRISS, 'mt-1 lg:w-auto lg:self-start lg:px-[18px] print:hidden')}>
           {WIDERRUF_TEXT.speichern}
         </button>
       </section>
@@ -280,7 +283,8 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
         </Feld>
       )}
 
-      <div aria-live="polite">{fehler && <Hinweiskarte ton="orange">{fehler}</Hinweiskarte>}</div>
+      {/* Fehlerkasten mit 12 px Ecken (G8) wie im zweiten Schritt. */}
+      <div aria-live="polite">{fehler && <HinweiskarteFehler>{fehler}</HinweiskarteFehler>}</div>
       <button type="submit" className={KNOPF_GRUEN}>
         {WIDERRUF_TEXT.knopfWiderrufen}
       </button>

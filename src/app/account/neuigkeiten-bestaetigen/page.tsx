@@ -86,8 +86,9 @@ export default async function NeuigkeitenBestaetigenPage({
 
   return (
     <KundeFokusShell titel={ABO_TEXT.seitenTitel} zurueck={{ href: '/', label: 'Zur Startseite' }}>
-      {/* Ohne Karte direkt auf der Seite, höchstens 520 px (Board s2-/w2-neuigkeiten). */}
-      <div className="mx-auto w-full max-w-[520px] px-4 pt-5 pb-12 md:pt-10">{inhalt}</div>
+      {/* Ohne Karte direkt auf der Seite, Inhalt höchstens 520 px; im Web 16 px unter dem Kopf (Board s2-/w2-neuigkeiten;
+          Liste Lauf 32, neuigkeiten „Spalte schmaler, Überschrift tiefer“, Nr. 254). */}
+      <div className="mx-auto w-full max-w-[552px] px-4 pt-5 pb-12 md:pt-4">{inhalt}</div>
     </KundeFokusShell>
   )
 }
