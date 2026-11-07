@@ -93,3 +93,5 @@ Auftrag „Nachtlauf 32 fortsetzen“ der Projektleitung vom 7.11.2026 mit den A
 - 13:40 257 geprüft: Gegenlesen „Daten“ 6 von 6, keine Blocker, keine Sollte; tester grün (354 Dateien, 6485 Tests). Keine Runde. PR #495, gemergt (ohne Konflikt). Voller Lauf (n=1, 3 Worker): 713 Dateien, 13294 Tests grün (471 s).
 - 13:50 250 Runde 1 (13ed49e2): Web ohne Rückweg auf /settings (Grenz-Erweiterung werkzeug-kopf.tsx nur `nurHandy`), LFBIS-Zeile nach Liste, eine Quelle für Stilllegen; voller Lauf 711 Dateien, 13270 Tests. pruefer Rundendiff läuft.
 - 13:50 251 gestartet (Opus, /home/user/wt/251, Platz von 257). Läuft: 250 (Prüfung), 251.
+- 14:10 250 pruefer Rundendiff ohne Blocker. PR #496, gemergt (ce7c12c1; Konflikte DEVELOPMENT.md – beide Einträge – und BAUSTEINE.md – neu erzeugt). Voller Lauf (n=1, 3 Worker): 713 Dateien, 13299 Tests grün (273 s).
+- 14:15 255 gestartet (Opus, /home/user/wt/255, Platz von 250; Abschluss spätestens 16:15). Läuft: 251, 255. 254 (nach 251) und 258b können nach Stunde 8 (16:19) voraussichtlich nicht mehr beginnen.
