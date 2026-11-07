@@ -140,7 +140,9 @@ export function BestellungenAnsicht({
           {liste.hatBestellungen && (
             <FilterChipReihe beschriftung="Bestellungen filtern">
               {liste.chips.map((chip) => (
-                <FilterChip key={chip.filter} href={bestellListeHref(chip.filter)} aktiv={chip.filter === filter} ladePunkt>
+                // Sichtbar 44 px hoch, 14 px Schrift und Rand wie in den Boards s1-/w1-bestellungen (Nr. 249b) — nur hier,
+                // ui/chip.tsx bleibt bei 36 px.
+                <FilterChip key={chip.filter} href={bestellListeHref(chip.filter)} aktiv={chip.filter === filter} ladePunkt className="h-11 px-3.5 text-[14px]">
                   {chip.text}
                 </FilterChip>
               ))}
