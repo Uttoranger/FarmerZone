@@ -17,7 +17,6 @@ import {
 } from '@/lib/startseite'
 import type { AbschnittArt } from '@/lib/startseite-gestalten'
 import { SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
-import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
@@ -34,7 +33,7 @@ import { NeuBeiDenHoefen } from '@/components/startseite/neu-bei-den-hoefen'
 import { ladeNeuigkeiten } from '@/server/queries/neuigkeiten'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
 import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
-import { gebuehrModellFuer, type GebuehrModell } from '@/lib/plattformgebuehr'
+import { GEBUEHR_MODELL_HOFPREIS, gebuehrBezeichnungFuer, gebuehrModellFuer, type GebuehrModell } from '@/lib/plattformgebuehr'
 
 /*
  * Die Abschnitte der Startseite unter „Höfe in deiner Nähe", in der Reihenfolge
@@ -275,13 +274,15 @@ export function FuerHoefeBandInhalt({ gruendung = null }: { gruendung?: Gruendun
 export function gutZuWissen(jetzt: Date, modell: GebuehrModell, rechnung: Beispielrechnung): readonly Frage[] {
   const fragen = startseitenFragen(jetzt, modell)
   const bezahlen = fragen.find((f) => f.frage === 'Wie bezahle ich?')
-  const gebuehr =
-    modell === 'hofpreis'
-      ? { frage: `Was ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG}?`, antwort: rechnung.satz ?? '' }
-      : {
-          frage: `Was ist die ${SERVICEGEBUEHR_BEZEICHNUNG}?`,
-          antwort: `Für dich kommen ${rechnung.prozent} % ${SERVICEGEBUEHR_BEZEICHNUNG} dazu, mindestens ${formatEuro(centsAlsEuro(rechnung.mindestCents))} – offen ausgewiesen. Der Hof bekommt den vollen Preis.`,
-        }
+  // Das Wort der Gebühr je Modell aus derselben Quelle wie Bestellungen (gebuehrBezeichnungFuer, V62).
+  const wort = gebuehrBezeichnungFuer({ gebuehrModell: modell === 'hofpreis' ? GEBUEHR_MODELL_HOFPREIS : null })
+  const gebuehr = {
+    frage: `Was ist die ${wort}?`,
+    antwort:
+      modell === 'hofpreis'
+        ? (rechnung.satz ?? '')
+        : `Für dich kommen ${rechnung.prozent} % ${wort} dazu, mindestens ${formatEuro(centsAlsEuro(rechnung.mindestCents))} – offen ausgewiesen. Der Hof bekommt den vollen Preis.`,
+  }
   return [
     ...(bezahlen ? [bezahlen] : []),
     gebuehr,

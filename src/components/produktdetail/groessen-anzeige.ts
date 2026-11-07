@@ -50,7 +50,10 @@ const RAUMMASS_JE: Record<string, string> = {
   SCHUETTRAUMMETER: 'je Schüttraummeter',
 }
 
-/** „€ 100,70 je Raummeter“ — nur für ein Raummaß ohne Gebinde; sonst null (dann gilt formatGrundpreis). */
+/**
+ * „€ 100,70 je Raummeter“ — nur für ein Raummaß ohne Gebinde; sonst null (dann gilt formatGrundpreis). Der Preis
+ * kommt schon als Anzeigepreis (mitEndpreis, N38) von der Produktseite — hier wird nur formatiert.
+ */
 export function preisJeRaummass(price: number, unit: string, unitSize: number | null): string | null {
   const je = RAUMMASS_JE[unit]
   if (!je || (unitSize !== null && unitSize !== 1)) return null
