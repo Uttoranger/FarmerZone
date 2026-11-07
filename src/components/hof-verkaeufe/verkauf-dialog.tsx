@@ -9,7 +9,6 @@ import { Sheet, SheetBlatt, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
-import { KANAL_SYMBOL } from '@/components/sales/kanal-symbol'
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { FeldFehler } from '@/components/checkout/kasse-teile'
 import { FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
@@ -301,8 +300,8 @@ export function VerkaufFormular({
         <fieldset className="min-w-0">
           <legend className="mb-2 text-sm font-semibold text-foreground">Wo verkauft?</legend>
           <div className="grid grid-cols-4 gap-2">
+            {/* Ohne Symbole (Liste Lauf 32 verkaeufe: „Kanal-Knöpfe mit Symbolen“). */}
             {HAUPTKANAELE.map((k) => {
-              const Symbol = KANAL_SYMBOL[k.value]
               const aktiv = werte.channel === k.value
               return (
                 <button
@@ -311,13 +310,12 @@ export function VerkaufFormular({
                   aria-pressed={aktiv}
                   onClick={() => form.setValue('channel', k.value)}
                   className={cn(
-                    'flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-1 py-2.5 text-center transition-colors duration-[250ms]',
+                    'flex min-h-12 min-w-0 items-center justify-center rounded-[10px] border px-1 py-2 text-center transition-colors duration-[250ms]',
                     aktiv ? WAHL_AN : WAHL_AUS,
                     FOKUS_RAHMEN
                   )}
                 >
-                  <Symbol className="size-5" strokeWidth={1.7} aria-hidden="true" />
-                  <span className="max-w-full truncate text-xs font-semibold">{k.label}</span>
+                  <span className="max-w-full truncate text-[13.5px] font-semibold">{k.label}</span>
                 </button>
               )
             })}
@@ -326,15 +324,15 @@ export function VerkaufFormular({
             type="button"
             aria-pressed={werte.channel === 'OTHER'}
             onClick={() => form.setValue('channel', 'OTHER')}
+            // „Anderes“ als Textlink (Liste Lauf 32 verkaeufe); gewählt sagt aria-pressed, der Haken ist nur fürs Auge.
             className={cn(
-              'mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm transition-colors duration-[250ms]',
-              werte.channel === 'OTHER' ? cn(WAHL_AN, 'font-semibold') : cn(WAHL_AUS, 'border-dashed font-medium'),
+              'mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-sm text-[15px] font-semibold text-status-offen underline-offset-2',
+              werte.channel === 'OTHER' ? 'underline' : 'hover:underline',
               FOKUS_RAHMEN
             )}
           >
-            {/* Gewählt sagt aria-pressed — der Haken ist nur fürs Auge. */}
             {werte.channel === 'OTHER' && <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />}
-            Anderer Weg
+            Anderes
           </button>
         </fieldset>
 

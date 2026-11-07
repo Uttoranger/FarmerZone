@@ -196,8 +196,8 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
         className={cn('min-w-0 space-y-6 transition-[width] duration-200 motion-reduce:transition-none', !spalten && 'flex-1')}
         style={spalten ? { width: spalten.liste } : { maxWidth: EDITOR_LISTE_HANDY_MAX }}
       >
-        {/* Fortschritt */}
-        <div className="rounded-2xl border border-border bg-card p-5">
+        {/* Fortschritt ab lg als Zeile mit flachem Balken, ohne Karte und ohne „Es fehlen noch …“ (Liste Lauf 32 mein-hof, Nr. 251). */}
+        <div className="flex flex-col gap-2">
           <div className="flex items-baseline justify-between gap-3">
             {/* „Noch 1 Punkt offen“ statt Prozent (Boards s1-/w1-mein-hof, Nr. 224) — wie die Liste unter lg. */}
             <h2 className="font-heading text-lg font-semibold text-foreground">
@@ -208,10 +208,9 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
             </p>
           </div>
           {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
             <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${fortschritt.prozent}%` }} />
           </div>
-          <p className="mt-3 text-sm text-muted-foreground">{fortschritt.satz}</p>
         </div>
 
         {aktuell && (

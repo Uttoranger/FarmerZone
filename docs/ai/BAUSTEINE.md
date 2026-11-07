@@ -348,7 +348,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/sales
 
-- src/components/sales/kanal-symbol.tsx · KANAL_SYMBOL, KanalSymbol · Das Symbol eines Verkaufswegs — EINE Zuordnung für den Dialog „Verkauf eintragen" und die Listen der Verkäufe. · genutzt
+- src/components/sales/kanal-symbol.tsx · KANAL_SYMBOL, KanalSymbol · Das Symbol eines Verkaufswegs — EINE Zuordnung für den Dialog „Verkauf eintragen" und die Listen der Verkäufe. · unbenutzt
 
 ## src/components/settings
 

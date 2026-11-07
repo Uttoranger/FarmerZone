@@ -517,12 +517,13 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
       })
     )
 
-  it('neu: Betrag zuerst, vier Wege und „Anderer Weg", Produkt-Chips mit langem Namen, Knopf grau ohne Betrag', () => {
+  it('neu: Betrag zuerst, vier Wege und „Anderes", Produkt-Chips mit langem Namen, Knopf grau ohne Betrag', () => {
     const html = formular()
     expect(html).toContain('<h2>Verkauf eintragen</h2>')
     expect(html).toContain('Betrag in Euro')
     expect(html).toContain('Wo verkauft?')
-    for (const weg of ['Hofladen', 'Markt', 'WhatsApp', 'Betrieb', 'Anderer Weg']) expect(html).toContain(weg)
+    // Seit Nr. 251 „Anderes“ als Textlink (Board s2-/w2-verkaeufe).
+    for (const weg of ['Hofladen', 'Markt', 'WhatsApp', 'Betrieb', 'Anderes']) expect(html).toContain(weg)
     expect(html.match(/aria-pressed="true"/g)?.length).toBe(1)
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain('Menge oder Notiz ergänzen')
