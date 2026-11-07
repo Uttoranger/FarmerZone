@@ -32,6 +32,7 @@ import {
 } from '@/lib/verkauf-eintragen'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * „Verkauf eintragen" im neuen Design (Nachtlauf Nr. 22b, Register E13) —
@@ -310,7 +311,7 @@ export function VerkaufFormular({
                   aria-pressed={aktiv}
                   onClick={() => form.setValue('channel', k.value)}
                   className={cn(
-                    'flex min-h-12 min-w-0 items-center justify-center rounded-[10px] border px-1 py-2 text-center transition-colors duration-[250ms]',
+                    'flex min-h-12 min-w-0 items-center justify-center border px-1 py-2 text-center transition-colors duration-[250ms]', RUNDUNG.feld,
                     aktiv ? WAHL_AN : WAHL_AUS,
                     FOKUS_RAHMEN
                   )}

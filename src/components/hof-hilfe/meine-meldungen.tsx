@@ -29,7 +29,7 @@ export function MeineMeldungen({ zeilen, unterzeile }: { zeilen: MeldungZeile[] 
       <p className="text-[13.5px] leading-normal text-muted-foreground">Hier siehst du, was aus deinen Meldungen geworden ist.</p>
       {zeilen !== null && zeilen.length > 0 && (
         // Board s2/w2-meldungen: Umriss mit Feldrand (V51: im Hofbereich kein grüner Knopf).
-        <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full rounded-[10px] border-input bg-card font-semibold sm:w-auto sm:self-start')}>
+        <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full border-input bg-card font-semibold sm:w-auto sm:self-start', RUNDUNG.feld)}>
           <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
           Neue Meldung
         </Link>
@@ -42,7 +42,7 @@ export function MeineMeldungen({ zeilen, unterzeile }: { zeilen: MeldungZeile[] 
           titel="Noch keine Meldungen"
           satz="Wenn etwas klemmt oder dir etwas fehlt, schreib uns – hier siehst du dann, was daraus geworden ist."
           ausweg={
-            <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full justify-center rounded-[10px] border-primary text-status-offen')}>
+            <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full justify-center border-primary text-status-offen', RUNDUNG.feld)}>
               Meldung schreiben
             </Link>
           }

@@ -26,6 +26,7 @@ import {
   type KundenSortierung,
 } from '@/schemas/hof-kunden'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Die Sortierung der Kundenliste hinter EINEM Knopf „Sortieren"
@@ -39,8 +40,10 @@ import { cn } from '@/lib/utils'
  * blattAdresse, Wortlaute).
  */
 
-const WAHL_ZEILE =
-  'flex min-h-12 cursor-pointer items-center gap-3 rounded-[10px] border px-3.5 py-2.5 text-sm font-semibold text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring'
+const WAHL_ZEILE = cn(
+  'flex min-h-12 cursor-pointer items-center gap-3 border px-3.5 py-2.5 text-sm font-semibold text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+  RUNDUNG.feld
+)
 
 function wahlKlassen(gewaehlt: boolean): string {
   // Gewählt orange umrandet und getönt (V51: Hofbereich orange; Liste Lauf 32 kunden); Text in normaler Textfarbe.

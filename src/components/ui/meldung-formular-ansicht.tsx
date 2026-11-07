@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Check, Loader2, X } from 'lucide-react'
-import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX } from '@/lib/meldung'
+import { MELDUNG_ARTEN, MELDUNG_ART_SATZ, MELDUNG_KENNUNG_MAX, MELDUNG_TEXT_MAX, MELDUNG_TEXT_MIN } from '@/lib/meldung'
 import { MEINE_MELDUNGEN_HREF, MELDUNG_TEXT_BEISPIEL, MELDUNG_TEXT_LABEL, OHNE_IP_UND_COOKIES, mitgeschicktSatz, seiteName } from '@/lib/hof-hilfe'
 import { geraetName } from '@/lib/geraete'
 import { stufenText } from '@/components/shared/image-upload'
@@ -38,6 +38,7 @@ export const MELDUNG_ANSICHT_TEXT = {
   email: 'Deine E-Mail',
   emailZusatz: '· nur für unsere Antwort, optional',
   bildschirmfoto: '+ Bildschirmfoto hinzufügen',
+  /** Platzhalter der Fehlernummer — nur im Hofbereich (Board s2-/w2-meldungen; das Kunden-Board s3-/w3-problem-melden zeigt keinen). */
   fehlernummerBeispiel: 'z. B. A7F3',
   bildschirmfotoDa: 'Bildschirmfoto angehängt',
   entfernen: 'Entfernen',
@@ -45,7 +46,10 @@ export const MELDUNG_ANSICHT_TEXT = {
   abbrechen: 'Abbrechen',
   absenden: 'Absenden',
   sendet: 'Einen Moment …',
-  dankeTitel: 'Danke – ist angekommen.',
+  /** Kundschaft wörtlich nach Board s3-/w3-problem-melden (Geviertstrich). */
+  dankeTitel: 'Danke — ist angekommen.',
+  /** Hofbereich nach Board s2-/w2-meldungen (Halbgeviertstrich). */
+  dankeTitelHof: 'Danke – ist angekommen.',
   kurznummer: 'Deine Kurznummer:',
   dankeKunde: 'Merk dir die Kurznummer, falls du nachfragen möchtest.',
   dankeHof: 'Den Stand deiner Meldung findest du unter „Meine Meldungen“.',
@@ -173,19 +177,20 @@ export function MeldungFormularAnsicht({
         {/* Trägt die Ansicht die h1 der Seite (`titel`), ist der Dank jetzt sie — sonst stünde die Seite ohne h1 da
             (Abnahme Lauf 31, problem-melden Bild 5; Nr. 242). */}
         <DankeTitel ref={dankeRef} tabIndex={-1} className="font-heading text-[22px] font-semibold text-foreground outline-none">
-          {T.dankeTitel}
+          {welt === 'hof' ? T.dankeTitelHof : T.dankeTitel}
         </DankeTitel>
         <p className="text-[15px] text-zustand-laeuft">
           {T.kurznummer} <strong className="font-mono">{f.kurznummer}</strong>. {alsHof ? T.dankeHof : T.dankeKunde}
         </p>
-        {/* Beide Knöpfe volle Breite untereinander (Board s2-/w2-meldungen Bild 3). */}
-        <div className="mt-1 flex w-full flex-col gap-2.5">
+        {/* Im Hofbereich beide Knöpfe volle Breite untereinander (Board s2-/w2-meldungen Bild 3); die Kundschaft
+            behält den Umriss-Knopf links (Board s3-/w3-problem-melden). */}
+        <div className={cn('mt-1', welt === 'hof' ? 'flex w-full flex-col gap-2.5' : 'flex flex-wrap gap-2.5')}>
           {alsHof && (
             <Link href={MEINE_MELDUNGEN_HREF} className={cn('inline-flex min-h-12 w-full items-center justify-center px-[18px] text-[15px] font-semibold', RUNDUNG.feld, ton.knopf, FOKUS_RAHMEN)}>
               {T.zuMeldungen}
             </Link>
           )}
-          <button type="button" onClick={f.nochEtwas} className={cn(RAHMEN_KNOPF, 'min-h-12 w-full', RUNDUNG.feld)}>
+          <button type="button" onClick={f.nochEtwas} className={welt === 'hof' ? cn(RAHMEN_KNOPF, 'min-h-12 w-full', RUNDUNG.feld) : RAHMEN_KNOPF}>
             {T.nochEtwas}
           </button>
         </div>
@@ -204,9 +209,12 @@ export function MeldungFormularAnsicht({
         </HinweiskarteFehler>
       )}
       {/* Im Hofbereich am Handy ohne Karte, frei auf dem Grund (Board s2-meldungen); ab 768 px und bei der Kundschaft die Karte. */}
+      {/* Im Hofbereich prüft nur `absenden` (Feldfehler G6, Board s2-/w2-meldungen); die Kundschaft behält die
+          Browser-Prüfung (required/minLength), das Kunden-Board zeigt keinen Feldfehler. Beide Wege messen am selben
+          Schema wie der Server. */}
       <form
         onSubmit={absenden}
-        noValidate
+        noValidate={welt === 'hof'}
         className={cn(
           'flex flex-col gap-3.5',
           welt === 'hof' ? 'md:border md:border-border md:bg-card md:p-[18px]' : 'border border-border bg-card p-[18px]',
@@ -223,7 +231,7 @@ export function MeldungFormularAnsicht({
 
         <fieldset className="flex flex-col gap-1.5">
           <legend className={cn(LABEL, 'mb-1.5')}>{T.worum}</legend>
-          {/* Drei Zeilen untereinander, je 64 px (Board s2-/w2-meldungen). */}
+          {/* Drei Zeilen untereinander (beide Boards); im Hofbereich je 64 px (s2-/w2-meldungen), bei der Kundschaft 48 px (s3-/w3-problem-melden). */}
           <div className="grid gap-1.5">
             {MELDUNG_ARTEN.map((wert) => {
               const aktiv = f.art === wert
@@ -231,7 +239,8 @@ export function MeldungFormularAnsicht({
                 <label
                   key={wert}
                   className={cn(
-                    'flex min-h-16 cursor-pointer items-center gap-2.5 rounded-[10px] px-3.5 py-2 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-solid has-focus-visible:outline-ring',
+                    'flex cursor-pointer items-center py-2 text-[14px] font-semibold text-foreground transition-colors duration-[250ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-solid has-focus-visible:outline-ring',
+                    welt === 'hof' ? cn('min-h-16 gap-2.5 px-3.5', RUNDUNG.feld) : cn('min-h-12 gap-2 px-3', RUNDUNG.karte),
                     aktiv ? ton.gewaehlt : 'border border-input bg-card hover:bg-muted'
                   )}
                 >
@@ -261,6 +270,8 @@ export function MeldungFormularAnsicht({
             onChange={(e) => f.setText(e.target.value)}
             rows={4}
             maxLength={MELDUNG_TEXT_MAX}
+            minLength={welt === 'hof' ? undefined : MELDUNG_TEXT_MIN}
+            required={welt !== 'hof'}
             placeholder={MELDUNG_TEXT_BEISPIEL[f.art]}
             aria-invalid={textFehler ? true : undefined}
             aria-describedby={textFehler ? 'meldung-text-fehler meldung-text-zaehler' : 'meldung-text-zaehler'}
@@ -295,7 +306,8 @@ export function MeldungFormularAnsicht({
               onClick={f.upload.openFilePicker}
               disabled={f.upload.isUploading}
               className={cn(
-                'flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-foreground bg-card px-3.5 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
+                'flex min-h-[52px] w-full items-center justify-center gap-2 border-[1.5px] border-foreground bg-card px-3.5 text-[16px] font-bold text-foreground hover:bg-muted disabled:opacity-60',
+                RUNDUNG.feld,
                 FOKUS_RAHMEN
               )}
             >
@@ -320,7 +332,7 @@ export function MeldungFormularAnsicht({
             value={f.kennung}
             onChange={(e) => f.setKennung(e.target.value)}
             maxLength={MELDUNG_KENNUNG_MAX}
-            placeholder={T.fehlernummerBeispiel}
+            placeholder={welt === 'hof' ? T.fehlernummerBeispiel : undefined}
             aria-describedby="meldung-kennung-hinweis"
             className={cn(FELD, 'h-12')}
           />
@@ -371,7 +383,8 @@ export function MeldungFormularAnsicht({
             disabled={gesperrt}
             aria-busy={f.isPending || undefined}
             className={cn(
-              'inline-flex min-h-[52px] w-full items-center justify-center rounded-[10px] px-5 text-[16px] font-bold disabled:opacity-60 md:min-h-11 md:w-auto md:rounded-full',
+              'inline-flex min-h-[52px] w-full items-center justify-center px-5 text-[16px] font-bold disabled:opacity-60 md:min-h-11 md:w-auto md:rounded-full',
+              RUNDUNG.feld,
               ton.knopf,
               FOKUS_RAHMEN
             )}

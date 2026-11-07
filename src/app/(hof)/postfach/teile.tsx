@@ -30,7 +30,7 @@ export function TeamZeichen({ groesse = 'mittel' }: { groesse?: 'klein' | 'mitte
   return (
     <span
       aria-hidden="true"
-      className={cn('flex shrink-0 items-center justify-center rounded-[10px] bg-accent', groesse === 'klein' ? 'size-8' : 'size-10')}
+      className={cn('flex shrink-0 items-center justify-center bg-accent', RUNDUNG.feld, groesse === 'klein' ? 'size-8' : 'size-10')}
     >
       <Sprout className={cn('text-accent-foreground', groesse === 'klein' ? 'size-4' : 'size-5')} strokeWidth={1.9} />
     </span>

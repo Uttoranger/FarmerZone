@@ -85,7 +85,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 - src/components/auswertung/auswertung-teile.tsx · EinsichtZeile, GebuehrenKarte, GrenzeKarte, KanaeleKarte, KennzahlenReihe, TEILEN_FUSS, TeilenWirkungKarte, TopProdukteKarte, UMSATZ_LEER_SATZ, UmsatzKarte, ZeitraumWahl · Fußsatz der Teilen-Karte, wörtlich nach Board s2-/w2-auswertung (Liste Lauf 32 auswertung). · genutzt
 - src/components/auswertung/auswertung-zustaende.tsx · AUSWERTUNG_RAHMEN, AuswertungFehler · Rahmen und Ladefehler der Auswertung (Nachtlauf Nr. 22c). · genutzt
-- src/components/auswertung/gebuehr-titel.ts · gebuehrTitel, wocheAusgeschrieben · „2.–8. November“, über die Monatsgrenze „30. November – 6. Dezember“ (Wiener Kalendertage aus dem Fenster). · genutzt
+- src/components/auswertung/gebuehr-titel.ts · gebuehrTitel, gebuehrenKarteFuerZeitraum, wocheAusgeschrieben · „2.–8. November“, über die Monatsgrenze „30. November – 6. Dezember“ (Wiener Kalendertage aus dem Fenster). · genutzt
 
 ## src/components/bestaetigung
 

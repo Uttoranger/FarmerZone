@@ -242,7 +242,7 @@ describe('Liste „Bearbeiten"', () => {
     const titel = [...html.matchAll(/<h2 id="bearbeiten-ort-[a-z-]+"[^>]*>([^<]+)<\/h2>/g)].map((m) => m[1])
     expect(titel).toEqual(['Oben auf der Seite', 'Aufbau und Fotos', 'Abholen und Bezahlen', 'Über uns'])
     // Seit Nr. 251 Ecken in Pixeln (G8: Karten 12 px).
-    expect(html.match(/<ul class="overflow-hidden rounded-\[12px\]/g)).toHaveLength(4)
+    expect(html.match(/<ul class="overflow-hidden [^"]*rounded-\[12px\]"/g)).toHaveLength(4)
   })
 
   it('jede Zeile ist EIN Knopf: „Titel: Wert. Bearbeiten" — kein Häkchen, Schild nur bei gezählten Zeilen', () => {

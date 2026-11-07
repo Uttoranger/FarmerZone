@@ -43,6 +43,7 @@ import { HOFSEITE_VOLLSTAENDIG, punkteOffenTitel, schildTon } from '@/lib/mein-h
 import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Der Reiter „Hofseite" von Mein Hof ab lg: links die Hofseite als Liste mit
@@ -115,7 +116,7 @@ function Zeile({
         aria-controls={inhaltId}
         className={cn('flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-foreground">
+        <span className={cn('flex size-9 shrink-0 items-center justify-center bg-muted text-foreground', RUNDUNG.feld)}>
           <Zeichen className="size-4" strokeWidth={1.7} aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
@@ -226,7 +227,7 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
                 title={`${aktuell.titel}: ${aktuell.wert}`}
                 className={cn('flex min-h-14 min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-status-fertig">
+                <span className={cn('flex size-9 shrink-0 items-center justify-center bg-muted text-status-fertig', RUNDUNG.feld)}>
                   <ZeichenAktuell className="size-4" strokeWidth={1.7} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">

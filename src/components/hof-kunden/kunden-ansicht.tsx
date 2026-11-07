@@ -84,7 +84,7 @@ export function KundenAnsicht({
           satz="Sobald jemand bei dir bestellt, taucht er hier auf. Eine vollständige Hofseite hilft dabei."
           ausweg={
             // Board s2/w2-kunden Bild 5: der Ausweg sagt, was hilft — die Hofseite liegt in Mein Hof.
-            <Link href="/farm-page" className={cn(KNOPF_RAHMEN, 'w-full justify-center rounded-[10px] border-primary text-status-offen')}>
+            <Link href="/farm-page" className={cn(KNOPF_RAHMEN, 'w-full justify-center border-primary text-status-offen', RUNDUNG.feld)}>
               Hofseite vervollständigen
             </Link>
           }
@@ -127,7 +127,7 @@ export function KundenAnsicht({
                 placeholder="Name, Telefon oder E-Mail"
                 className={cn(
                   // 48 px, leicht gerundet im Feldrand (Board); nie unter 44 px (WCAG 2.5.8).
-                  'h-12 w-full rounded-[10px] border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]',
+                  'h-12 w-full border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]', RUNDUNG.feld,
                   FOKUS_RAHMEN
                 )}
               />

@@ -17,6 +17,7 @@ import { Sheet, SheetBlatt, SheetClose, SheetTitle } from '@/components/ui/sheet
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * „Bearbeiten" in Mein Hof unter lg (Nachtlauf Nr. 50, Register N4; seit
@@ -147,7 +148,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
   return (
     <div className="flex flex-col gap-2.5">
       {vollstaendig ? (
-        <p className="flex min-h-12 items-center gap-2.5 rounded-[12px] border border-accent/50 bg-accent/15 px-3.5 text-[14px]">
+        <p className={cn('flex min-h-12 items-center gap-2.5 border border-accent/50 bg-accent/15 px-3.5 text-[14px]', RUNDUNG.karte)}>
           <span aria-hidden="true" className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <Check className="size-3" strokeWidth={2.6} />
           </span>
@@ -157,7 +158,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           </span>
         </p>
       ) : (
-        <section aria-labelledby="bearbeiten-stand" className="overflow-hidden rounded-[12px] border border-primary/45 bg-card">
+        <section aria-labelledby="bearbeiten-stand" className={cn('overflow-hidden border border-primary/45 bg-card', RUNDUNG.karte)}>
           <div className="flex flex-col gap-2.5 px-3.5 pt-3.5 pb-3">
             <div className="flex items-baseline gap-2.5">
               <h2 id="bearbeiten-stand" className="flex-1 font-heading text-[17px] font-semibold text-foreground">
@@ -185,7 +186,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           <h2 id={`bearbeiten-ort-${g.id}`} className="px-1 pt-3.5 pb-2 text-xs font-bold tracking-[1px] text-muted-foreground uppercase">
             {g.titel}
           </h2>
-          <ul className="overflow-hidden rounded-[12px] border border-border bg-card">
+          <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
             {g.zeilen.map((z) => (
               <Zeile key={z.id} zeile={z} umbrechen={false} onOeffne={oeffne} />
             ))}
@@ -199,7 +200,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           href={aktuell.link.href}
           data-bearbeiten-zeile="aktuell"
           title={`${aktuell.titel}: ${aktuell.wert}`}
-          className={cn('flex min-h-14 items-center gap-2.5 rounded-[12px] border border-border bg-card py-2 pr-2.5 pl-3.5 hover:bg-muted/60', FOKUS_RAHMEN)}
+          className={cn('flex min-h-14 items-center gap-2.5 border border-border bg-card py-2 pr-2.5 pl-3.5 hover:bg-muted/60', RUNDUNG.karte, FOKUS_RAHMEN)}
         >
           <CalendarDays className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">

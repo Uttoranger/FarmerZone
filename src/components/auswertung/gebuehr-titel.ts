@@ -1,5 +1,7 @@
 import { gebuehrWortFuerZeitraum, hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { zeitraumImSatz, type Periodenfenster } from '@/lib/umsatz'
+import { gebuehrenKarteText, type GebuehrenKarteText } from '@/lib/auswertung'
+import { monatsschluesselInWien } from '@/lib/servicegebuehr'
 
 /*
  * Wörter der Auswertung für den gewählten Zeitraum (Nr. 251, Liste Lauf 32 auswertung) — reine
@@ -31,4 +33,17 @@ export function gebuehrTitel(pf: Periodenfenster, einstellung: HofpreisEinstellu
   const wort = gebuehrWortFuerZeitraum(pf.aktuellGanz.von, pf.aktuellGanz.bis, hofpreisModellAb(einstellung))
   if (pf.periode === 'woche') return `${wort} ${pf.laufend ? 'diese Woche' : wocheAusgeschrieben(pf)}`
   return `${wort} ${zeitraumImSatz(pf)}`
+}
+
+/**
+ * Titel UND Sätze der Gebühren-Karte für den gewählten Zeitraum (Nr. 251 Runde 1): Betrag und Titel
+ * gelten für das Fenster der Seite, also gelten auch Erklärung, Bar-Satz und Bar-Zeile für dieses
+ * Fenster — nicht für heute. Bezug ist der letzte gezählte Augenblick (`pf.aktuell.bis`: jetzt in der
+ * laufenden Periode, sonst ihr Ende); dort fragen `gebuehrenKarteText` → `gebuehrModellFuer` (Stichtag
+ * „Hofpreis-Modell ab“) und `vorBarStichtag` (B1) — keine zweite Datumsregel, nur Anzeige. Über den
+ * Stichtag hinweg („Gebühren …“) stehen die Sätze des Modells am Ende des Fensters.
+ */
+export function gebuehrenKarteFuerZeitraum(pf: Periodenfenster, einstellung: HofpreisEinstellung | null): GebuehrenKarteText {
+  const bezug = pf.aktuell.bis
+  return { ...gebuehrenKarteText(monatsschluesselInWien(bezug), einstellung, bezug), titel: gebuehrTitel(pf, einstellung) }
 }

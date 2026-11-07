@@ -10,7 +10,7 @@ export default function FadenLaden(): React.JSX.Element {
       <WerkzeugKopfLaden />
       <div className="flex animate-pulse flex-col gap-3" aria-busy="true">
         <div className="mb-2 flex items-start gap-3">
-          <div className="size-10 shrink-0 rounded-[10px] bg-muted" />
+          <div className={cn('size-10 shrink-0 bg-muted', RUNDUNG.feld)} />
           <div className="flex flex-1 flex-col gap-2">
             <div className="h-7 w-3/4 max-w-sm rounded-lg bg-border" />
             <div className="h-3.5 w-48 rounded bg-app-chip" />
