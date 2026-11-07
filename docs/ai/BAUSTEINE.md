@@ -83,8 +83,9 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 ## src/components/auswertung
 
-- src/components/auswertung/auswertung-teile.tsx · EinsichtZeile, GebuehrenKarte, GrenzeKarte, KanaeleKarte, KennzahlenReihe, TeilenWirkungKarte, TopProdukteKarte, UmsatzKarte, ZeitraumWahl · Die Teile der Auswertung im neuen Design (Nachtlauf Nr. 22c, Mockup web-h5-auswertung-abrechnung-teilen-wirkung). · genutzt
+- src/components/auswertung/auswertung-teile.tsx · EinsichtZeile, GebuehrenKarte, GrenzeKarte, KanaeleKarte, KennzahlenReihe, TEILEN_FUSS, TeilenWirkungKarte, TopProdukteKarte, UMSATZ_LEER_SATZ, UmsatzKarte, ZeitraumWahl · Fußsatz der Teilen-Karte, wörtlich nach Board s2-/w2-auswertung (Liste Lauf 32 auswertung). · genutzt
 - src/components/auswertung/auswertung-zustaende.tsx · AUSWERTUNG_RAHMEN, AuswertungFehler · Rahmen und Ladefehler der Auswertung (Nachtlauf Nr. 22c). · genutzt
+- src/components/auswertung/gebuehr-titel.ts · gebuehrTitel, wocheAusgeschrieben · „2.–8. November“, über die Monatsgrenze „30. November – 6. Dezember“ (Wiener Kalendertage aus dem Fenster). · genutzt
 
 ## src/components/bestaetigung
 
@@ -216,21 +217,22 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 - src/components/hof-hilfe/hilfe-laden.tsx · MELDEN_RAHMEN, MELDUNGEN_RAHMEN, MeineMeldungenLaden, MeldungAbgebenLaden · Rahmen und Ladeansichten von „Hilfe und Rückmeldung" (/fehler-melden) und „Meine Meldungen" (/meldungen) in der HofShell (Nachtlauf Nr. 22e). · genutzt
 - src/components/hof-hilfe/hilfe-seitenspalte.tsx · HilfeSeitenspalte · Die Seitenspalte von „Hilfe und Rückmeldung" ab 1024 px (Nachtlauf Nr. 22e, Mockup web-h6-meldung-abgeben): „Deine Meldungen" mit Offen/Beantwortet und dem Weg zu „Meine Meldungen", darunter der … · genutzt
-- src/components/hof-hilfe/meine-meldungen.tsx · MeineMeldungen · „Meine Meldungen" in der HofShell (Nachtlauf Nr. 22e; Mockups web-h6-meine-meldungen, mobil-h6-meine-meldungen): nur die eigenen Meldungen des Hofs, nur die Felder der Sichtbarkeitsregel (fuerHof). · genutzt
+- src/components/hof-hilfe/lade-fehler-kasten.tsx · LADE_FEHLER_SATZ, LadeFehlerKasten · Ladefehler der Hof-Werkzeuge (Baustein G6, Liste Lauf 32 auswertung, kunden, postfach, region, verkaeufe „Fehler-Karte getönt, kleiner Knopf“; Nr. 251): derselbe orange Kasten wie … · genutzt
+- src/components/hof-hilfe/meine-meldungen.tsx · MeineMeldungen · „Meine Meldungen" in der HofShell (Nachtlauf Nr. 22e; seit Nr. 251 nach Board s2-/w2-meldungen Bild 4–6): nur die eigenen Meldungen des Hofs, nur die Felder der Sichtbarkeitsregel (fuerHof). · genutzt
 
 ## src/components/hof-kunden
 
 - src/components/hof-kunden/kunden-ansicht.tsx · KundenAnsicht · Kunden des Hofs in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf Nr. 22a) — gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt „Kunden". · genutzt
 - src/components/hof-kunden/kunden-detail.tsx · KundenDetail · Eine Kundin des Hofs (/customers/[kundeId], Gate 8 „Code ohne Mockup", Nachtlauf Nr. 22a) — gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt „Kunden". · genutzt
-- src/components/hof-kunden/kunden-fehler.tsx · KundenFehler · Fehler beim Laden der Kunden — inline als orange Hinweiskarte statt der ganzseitigen 500 (DESIGN_SYSTEM „Zustände"). · genutzt
+- src/components/hof-kunden/kunden-fehler.tsx · KundenFehler · Fehler beim Laden der Kunden — inline statt der ganzseitigen 500 (DESIGN_SYSTEM „Zustände"), mit dem Werkzeug-Kopf samt Unterzeile (G1) und dem orangen Kasten mit Fokus auf dem Ausweg (G6, Liste Lauf … · genutzt
 - src/components/hof-kunden/kunden-laden.tsx · KUNDEN_RAHMEN, KundenLaden · Ladeansicht der Kunden (Nachtlauf Nr. 22a) — dieselben Maße wie die fertige Seite. · genutzt
 - src/components/hof-kunden/kunden-sortieren.tsx · KundenSortieren, SortierFelder · Die Sortierung der Kundenliste hinter EINEM Knopf „Sortieren" (freigabe.md §12 Nr. 45) — vorher standen Auswahlliste und Richtungsknopf offen neben den Filtern. · genutzt
 
 ## src/components/hof-verkaeufe
 
 - src/components/hof-verkaeufe/verkaeufe-ansicht.tsx · VerkaeufeAnsicht · Verkäufe in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf Nr. 22b) — gebaut nach docs/ai/DESIGN_SYSTEM.md, Abschnitt „Verkäufe", ohne neue Funktion: Kennzahlen der Woche (Online/Bar mit … · genutzt
-- src/components/hof-verkaeufe/verkaeufe-fehler.tsx · VerkaeufeFehler · Fehler beim Laden der Verkäufe — inline als orange Hinweiskarte statt der ganzseitigen 500 (DESIGN_SYSTEM „Zustände"). · genutzt
-- src/components/hof-verkaeufe/verkaeufe-laden.tsx · VERKAEUFE_RAHMEN, VerkaeufeLaden · Ladeansicht der Verkäufe (Nachtlauf Nr. 22b) — dieselben Maße wie die fertige Seite: Kopf mit Knopf, drei Kennzahlen, Überschrift und Liste. · genutzt
+- src/components/hof-verkaeufe/verkaeufe-fehler.tsx · VerkaeufeFehler · Fehler beim Laden der Verkäufe — inline statt der ganzseitigen 500 (DESIGN_SYSTEM „Zustände"), mit Werkzeug-Kopf samt Unterzeile (G1) und dem orangen Kasten (G6, Board s2-/w2-verkaeufe Bild 6). Die … · genutzt
+- src/components/hof-verkaeufe/verkaeufe-laden.tsx · VERKAEUFE_RAHMEN, VerkaeufeLaden · Ladeansicht der Verkäufe (Nachtlauf Nr. 22b; seit Nr. 251 mit dem Werkzeug-Kopf, G1) — dieselben Maße wie die fertige Seite: Kopf, zwei Kennzahlen nebeneinander, Überschrift und Liste. · genutzt
 - src/components/hof-verkaeufe/verkauf-dialog.tsx · VerkaufDialog, VerkaufFormular · „Verkauf eintragen" im neuen Design (Nachtlauf Nr. 22b, Register E13) — dieselbe Funktion wie vorher, nur nach docs/ai/DESIGN_SYSTEM.md gezeichnet: ab 768 px ein Dialog (Titel links, Aktionen rechts … · genutzt
 
 ## src/components/hofbereich
@@ -340,7 +342,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/region/futter-karte-ansicht.tsx · default · Die Karte von „Futter kaufen" (Register N23; Board system-h5-region-v2, Handy 4) — die Kartenkomponente von /hoefe, nicht eine zweite: Pins sind die Höfe der gezeigten Angebote mit Namen nach der … · genutzt
 - src/components/region/futter-karte.tsx · FutterKarte · Die Futterkarte (Register N23, Board system-h5-region-v2 §3 „Futterkarte" und system-h5-region-eigene-teile §3 „wählen, dann ein Knopf"): Bild 48 px, `HofKopf` (Name in Serif, Entfernung, PLZ und … · genutzt
 - src/components/region/futter-kaufen-ansicht.tsx · FutterKaufenAnsicht · Region › Futter kaufen (Nachtlauf Nr. 22c; seit Nr. 123 nach Board system-h5-region-v2 §3 und system-h5-region-eigene-teile §3/§4, N23): Kopf mit Umkreis samt Zahl je Stufe, Futterart, Menge und … · genutzt
-- src/components/region/km-wahl.tsx · KmWahl · Umkreis 10 · 25 · 50 km als Wanne mit Pillen (Mockups web-h5-region-*, Board system-h5-region-eigene-teile §4). Jede Stufe ist ein Link mit eigener Adresse — der Server rechnet neu, und Zurück führt … · genutzt
+- src/components/region/km-wahl.tsx · KmWahl · Umkreis 10 · 25 · 50 km als Chip-Gruppe (G11, Liste Lauf 32 region; vorher eine Wanne mit Pillen). · genutzt
 - src/components/region/region-kopf.tsx · REGION_RAHMEN, REGION_SATZ, RegionKopf · Kopf von /region (Nachtlauf Nr. 22c, Mockups web-h5-region-preise und web-h5-region-futter-kaufen): h1 „Region", ein Satz, darunter die Reiter „Preise vergleichen" | „Futter kaufen". · genutzt
 - src/components/region/region-zustaende.tsx · RegionFehler, RegionLaden, StandortFehlt, type EigeneKarte · Zustände von /region (DESIGN_SYSTEM „Zustände"): ohne eigenen Standort ein Leerzustand mit Ausweg zur Karte im Hofprofil samt der eigenen Hofkarte (Board v2 §4, N23), ein Ladefehler inline als orange … · genutzt
 
@@ -358,7 +360,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 ## src/components/shared
 
 - src/components/shared/analytics-gefiltert.tsx · AnalyticsGefiltert · Vercel Web Analytics mit Filter. · genutzt
-- src/components/shared/bereich-umschalter.tsx · BereichUmschalter · „Hofladen | Futtermittel" — EIN Umschalter für /hoefe und die Hofseite (Konzept 6.0): volle Breite, zwei gleich breite Hälften, mindestens 44 px hoch, direkt über dem Inhalt, nicht klebend. · genutzt
+- src/components/shared/bereich-umschalter.tsx · BereichUmschalter · „Hofladen | Futtermittel" — EIN Umschalter für /hoefe und die Hofseite (Konzept 6.0): volle Breite, zwei gleich breite Hälften, mindestens 44 px hoch, direkt über dem Inhalt, nicht klebend. · unbenutzt
 - src/components/shared/bild-ausschnitt.tsx · BildAusschnitt, type BildRahmen, type BildVorschau, type BildVorschauRahmen · Der Bild-Baustein (Register N17, Nachtlauf Nr. 97; Mockups system-h1-bild-baustein, web-/mobil-h1-titelbild-ausschnitt): Ausschnitt (Fokus + Zoom) und Filter eines hochgeladenen Fotos wählen und … · genutzt
 - src/components/shared/bild-masse.ts · useBildmasse · Die Maße des Bilds `quelle`, sobald der Browser es geladen hat (`beimLaden` ans Bild hängen). · genutzt
 - src/components/shared/bildmarke.tsx · Bildmarke · Die Bildmarke (Register M1, Ergänzung 14.10.2026): EINE Marke in zwei Fassungen derselben Form — `voll` ab 48 px, `klein` darunter (Kopfzeile 32, Favicon). · genutzt
@@ -849,7 +851,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/server/queries/admin.ts · getAdminFarms, isAdminUser, ladeGruendungBis, ladeHoefeFuerFestschreiben, ladeHoefeFuerGruendung, leseGruendungEinstellung, zaehleWartendeHoefe, type AdminFarmRow, type AdminMonatsSpalten, type HofFuerFestschreiben, type HofFuerGruendung · Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der Monatsabrechnung (Sprint 3). Alle Beträge in Cent, Bezugsmonat = laufender Kalendermonat in Wiener Zeit, Stichtag = … · genutzt
 - src/server/queries/analytics.ts · getTopProdukte, getUmsatzAuswertung, getYtdRevenue, type UmsatzAuswertung · Alles für den Reiter „Umsatz" — nur Zahlen in Cent und fertige Sätze, nichts, was nicht serialisierbar ist. · genutzt
 - src/server/queries/appearance.ts · DEFAULT_SECTIONS, getAppearanceData, type AppearanceData, type FarmPhotoData, type FarmValueData, type SectionConfig · kein Zweck vermerkt · genutzt
-- src/server/queries/auswertung.ts · getKennzahlen, getServicegebuehrenMonat, type ServicegebuehrenDiesesMonats · Die Abfragen der Auswertung im neuen Design (Nachtlauf Nr. 22c). · genutzt
+- src/server/queries/auswertung.ts · getKennzahlen, getServicegebuehrenMonat, getServicegebuehrenZeitraum, type GebuehrenImZeitraum, type ServicegebuehrenDiesesMonats · Die Abfragen der Auswertung im neuen Design (Nachtlauf Nr. 22c). · genutzt
 - src/server/queries/betrieb.ts · ladeAeltesteWichtige, ladeAlleMessungen, ladeBetriebHinweis, ladeGroessteTabellen, ladeLaeufe, ladeMessungenFuerPruefung, ladeMessungenFuerSeite, ladeWarnungen, letzteMessungAm, summeImMonat, type TabellenZeile, type WarnZeile · Lesen für Admin › Betrieb (Register N18, Nr. 103). · genutzt
 - src/server/queries/customers.ts · findeKundenAdressen, getCustomerDetail, getCustomersForFarm, kundeIdFuer, type CustomerDetail, type CustomerOrderSummary, type CustomerSummary · Kunden des Hofs (/customers, /customers/[kundeId]). · genutzt
 - src/server/queries/dashboard.ts · getFarmForUser, ladeDeinenBeitrag, ladeLaufendenBeitrag · Der laufende Beitrag des eigenen Hofs (Register E12, Ergänzung Nr. 129): der neueste nach AKTIVER_BEITRAG — ein Beitrag nur per Mail zählt nicht, denn Heute sagt „steht oben auf deiner Hofseite“ und … · genutzt
