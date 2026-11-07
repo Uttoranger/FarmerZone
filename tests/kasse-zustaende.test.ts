@@ -305,13 +305,13 @@ describe('Positionen: Zahlzeile wie in den Boards (UI-Runde 3, nur Anzeige derse
   it('Bestätigung (s1-/w1-bestaetigung): „Gesamt“ fett, darunter „Online bezahlt · inkl. Plattformgebühr (6 %)“', () => {
     const html = positionen()
     expect(html).toMatch(/Gesamt <span[^>]*>€\s10,40<\/span>/)
-    expect(html).toContain('>Online bezahlt · inkl. Plattformgebühr (6 %)</p>')
+    expect(html).toMatch(/>Online bezahlt · inkl\. Plattformgebühr \(6\s%\)<\/p>/)
   })
 
   it('Bestellseite (s1-/w1-bestellung-link Bild 1): kein eigenes „Gesamt“, derselbe Betrag in der Zahlzeile', () => {
     const html = positionen({ summeInZahlzeile: true })
     expect(html).not.toContain('Gesamt')
-    expect(html).toMatch(/>Online bezahlt · €\s10,40 inkl\. Plattformgebühr \(6 %\)<\/p>/)
+    expect(html).toMatch(/>Online bezahlt · €\s10,40 inkl\. Plattformgebühr \(6\s%\)<\/p>/)
     // Die Gebühr bleibt eine eigene Zeile (N38).
     expect(html).toMatch(/Plattformgebühr · <span[^>]*>€\s0,60<\/span>/)
   })

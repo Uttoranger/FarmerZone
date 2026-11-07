@@ -22,15 +22,15 @@ function bestellung(teil: Partial<ZahlzeilenBestellung> = {}): ZahlzeilenBestell
 }
 
 // Formatierer setzen ein festes Leerzeichen zwischen € und Betrag.
-const ohneFest = (s: string): string => s.replace(/ /g, ' ')
+const ohneFest = (s: string): string => s.replace(/\u00a0/g, ' ')
 
 describe('Modell hofpreis: Wortlaut der Boards', () => {
   it('online bezahlt: „Online bezahlt · inkl. Plattformgebühr (6 %)“', () => {
-    expect(zahlzeileFuer(bestellung())).toBe('Online bezahlt · inkl. Plattformgebühr (6 %)')
+    expect(ohneFest(zahlzeileFuer(bestellung()))).toBe('Online bezahlt · inkl. Plattformgebühr (6 %)')
   })
 
   it('bar: „Bar bei Abholung · inkl. Plattformgebühr (6 %)“, ohne „Noch offen“', () => {
-    expect(zahlzeileFuer(bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING' }))).toBe(
+    expect(ohneFest(zahlzeileFuer(bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING' })))).toBe(
       'Bar bei Abholung · inkl. Plattformgebühr (6 %)'
     )
   })
@@ -40,39 +40,39 @@ describe('Modell hofpreis: Wortlaut der Boards', () => {
   })
 
   it('der Satz kommt aus dem Snapshot der Bestellung: 6,5 % bleibt 6,5 %', () => {
-    expect(zahlzeileFuer(bestellung({ serviceFeePercentApplied: '6.50' }))).toBe('Online bezahlt · inkl. Plattformgebühr (6,5 %)')
+    expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: '6.50' })))).toBe('Online bezahlt · inkl. Plattformgebühr (6,5 %)')
   })
 
   it('Gegenprobe: ein anderer Satz der Bestellung ergibt eine andere Zeile (kein fester Text „6 %“)', () => {
-    expect(zahlzeileFuer(bestellung({ serviceFeePercentApplied: '4.00' }))).toContain('(4 %)')
-    expect(zahlzeileFuer(bestellung({ serviceFeePercentApplied: '4.00' }))).not.toContain('6 %')
+    expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: '4.00' })))).toContain('(4 %)')
+    expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: '4.00' })))).not.toContain('6 %')
   })
 
   it('ohne gespeicherten Satz keine Klammer — nie die Vorgabe des Hofs einsetzen', () => {
-    expect(zahlzeileFuer(bestellung({ serviceFeePercentApplied: null }))).toBe('Online bezahlt · inkl. Plattformgebühr')
+    expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: null })))).toBe('Online bezahlt · inkl. Plattformgebühr')
   })
 
   it('entfallene bzw. erstattete Gebühr: kein „inkl.“, Betrag ohne Gebühr', () => {
     const b = bestellung({ serviceFeeRefundedAt: ENTFALLEN_AM })
-    expect(zahlzeileFuer(b)).toBe('Online bezahlt')
+    expect(ohneFest(zahlzeileFuer(b))).toBe('Online bezahlt')
     expect(ohneFest(zahlzeileFuer(b, { mitBetrag: true }))).toBe('Online bezahlt · € 18,04')
     const bar = bestellung({ paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING', serviceFeeRefundedAt: ENTFALLEN_AM })
-    expect(zahlzeileFuer(bar)).toBe('Bar bei Abholung')
+    expect(ohneFest(zahlzeileFuer(bar))).toBe('Bar bei Abholung')
   })
 
   it('Gebühr 0: kein „inkl.“', () => {
-    expect(zahlzeileFuer(bestellung({ serviceFeeCents: 0, serviceFeePercentApplied: null }))).toBe('Online bezahlt')
+    expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeeCents: 0, serviceFeePercentApplied: null })))).toBe('Online bezahlt')
   })
 
   it('online nicht bezahlt: der Stand bleibt sichtbar (nie „bezahlt“ ohne Zahlung)', () => {
-    expect(zahlzeileFuer(bestellung({ paymentStatus: 'REFUNDED' }))).toBe('Online · Rückerstattet · inkl. Plattformgebühr (6 %)')
-    expect(zahlzeileFuer(bestellung({ paymentStatus: 'PENDING' }))).not.toContain('bezahlt')
+    expect(ohneFest(zahlzeileFuer(bestellung({ paymentStatus: 'REFUNDED' })))).toBe('Online · Rückerstattet · inkl. Plattformgebühr (6 %)')
+    expect(ohneFest(zahlzeileFuer(bestellung({ paymentStatus: 'PENDING' })))).not.toContain('bezahlt')
   })
 })
 
 describe('Modell bisher bzw. null: die bisherige Zahlzeile', () => {
   it('gebuehrModell null: „Online · Bezahlt · inkl. Servicegebühr“, ohne Satz', () => {
-    expect(zahlzeileFuer(bestellung({ gebuehrModell: null, serviceFeePercentApplied: '5.00' }))).toBe('Online · Bezahlt · inkl. Servicegebühr')
+    expect(ohneFest(zahlzeileFuer(bestellung({ gebuehrModell: null, serviceFeePercentApplied: '5.00' })))).toBe('Online · Bezahlt · inkl. Servicegebühr')
   })
 
   it('„bisher“ bar: „Bar bei Abholung · Noch offen · inkl. Servicegebühr“', () => {
@@ -86,6 +86,6 @@ describe('Modell bisher bzw. null: die bisherige Zahlzeile', () => {
   })
 
   it('bisher entfallen: kein „inkl.“', () => {
-    expect(zahlzeileFuer(bestellung({ gebuehrModell: null, serviceFeeRefundedAt: ENTFALLEN_AM }))).toBe('Online · Bezahlt')
+    expect(ohneFest(zahlzeileFuer(bestellung({ gebuehrModell: null, serviceFeeRefundedAt: ENTFALLEN_AM })))).toBe('Online · Bezahlt')
   })
 })

@@ -42,7 +42,8 @@ function zahlartHofpreis(paymentMethod: string, paymentStatus: string): string {
 /** „ (6 %)“ aus dem Snapshot der Bestellung; ohne gespeicherten Satz nichts (nie die Vorgabe des Hofs einsetzen). */
 function satzKlammer(b: ZahlzeilenBestellung): string {
   if (b.serviceFeePercentApplied === null || b.serviceFeePercentApplied === undefined) return ''
-  return ` (${satzText(satzHundertstel({ plattformgebuehrProzent: b.serviceFeePercentApplied }))} %)`
+  // Festes Leerzeichen vor „%“: Die Klammer bricht nie zwischen Zahl und Zeichen um.
+  return ` (${satzText(satzHundertstel({ plattformgebuehrProzent: b.serviceFeePercentApplied }))}\u00a0%)`
 }
 
 /**
