@@ -445,15 +445,6 @@ function gebuehrEinzugAus(wert: string | null): GebuehrEinzug | null {
 }
 
 /**
- * Wartet der Hof noch auf die Freischaltung? Für den Leerzustand von Bestellungen (Board s1-bestellungen Bild 3):
- * Vor der Freischaltung kann er seine Hofseite noch nicht teilen, der Weg führt zu dem, was noch fehlt.
- */
-export async function hofWartetAufFreigabe(farmId: string): Promise<boolean> {
-  const hof = await prisma.farm.findUnique({ where: { id: farmId }, select: { approvedAt: true } })
-  return hof?.approvedAt == null
-}
-
-/**
  * Das nächste Abholfenster laut Abholzeiten samt der Zahl seiner Bestellungen —
  * für die leeren Zustände von „Heute abholen" (Bestellungen) und der Packliste
  * auf Papier (Boards s1-bestellungen, s2-druck). Gezählt über abholWhere,

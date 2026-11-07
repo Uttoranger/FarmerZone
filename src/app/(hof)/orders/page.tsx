@@ -2,12 +2,13 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { barFristSatz, getBestellungenSeite, getHofBestellDetail, hofWartetAufFreigabe, ladeBestellGeldsatz, naechstesFensterMitZahl } from '@/server/queries/orders'
+import { getFarmBannerState } from '@/server/queries/farm'
+import { barFristSatz, getBestellungenSeite, getHofBestellDetail, ladeBestellGeldsatz, naechstesFensterMitZahl } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { hofBestellFilterAus, hofBestellWunschAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import { MARKE } from '@/lib/marke'
-import { naechsteAbholungSatz } from '@/lib/heute'
+import { hofWartetAufFreigabe, naechsteAbholungSatz } from '@/lib/heute'
 import { wienKalendertag } from '@/lib/kalender'
 
 export const metadata: Metadata = {
@@ -65,7 +66,8 @@ export default async function OrdersPage({
   const naechsteAbholung = naechstes ? naechsteAbholungSatz(naechstes.fenster, naechstes.anzahl, wienKalendertag(jetzt)) : null
 
   // Noch nie eine Bestellung: der Leerzustand je Stand (Board s1-bestellungen Bild 3) — nur dann gefragt.
-  const wartet = seite.hatBestellungen ? false : await hofWartetAufFreigabe(farm.id)
+  // Der vorhandene Baustein liefert Freigabe UND Stilllegung; ein stillgelegter Hof wartet nicht auf die Freischaltung.
+  const wartet = seite.hatBestellungen ? false : hofWartetAufFreigabe(await getFarmBannerState(userId))
 
   return (
     <BestellungenAnsicht

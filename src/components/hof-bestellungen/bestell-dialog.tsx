@@ -6,6 +6,7 @@ import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle 
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { KNOPF_GRUEN, KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from './stil'
 
 export type Hauptaktion = {
@@ -174,7 +175,7 @@ export function abbrechenIn(popup: HTMLElement | null): HTMLElement | true {
 export function DialogFehler({ text }: { text: string | null }): React.JSX.Element | null {
   if (!text) return null
   return (
-    <p role="alert" className="rounded-[12px] border border-primary/45 bg-primary/12 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
+    <p role="alert" className={cn(RUNDUNG.hinweis, 'border border-primary/45 bg-primary/12 px-3.5 py-2.5 text-[13px] font-medium text-foreground')}>
       {text}
     </p>
   )

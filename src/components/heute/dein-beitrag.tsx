@@ -10,6 +10,7 @@ import { beitragLink } from '@/lib/teilen-fenster'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { BeitragTeilenKnopf } from '@/components/teilen/beitrag-teilen'
 
 /*
@@ -22,7 +23,7 @@ import { BeitragTeilenKnopf } from '@/components/teilen/beitrag-teilen'
  * Anlässen. Was erscheint, entscheidet beitragBlock (src/lib/heute.ts).
  */
 
-const KARTE = 'rounded-[12px] border border-border bg-card'
+const KARTE = `${RUNDUNG.karte} border border-border bg-card`
 const KNOPF = 'inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-[13.5px] font-semibold transition-colors duration-[250ms]'
 // Orange gefüllte Pille = Hof-Aktion (Farbrollen), wie die Teilen-Zeile.
 const KNOPF_ORANGE = cn(KNOPF, 'border border-primary-foreground/25 bg-primary text-primary-foreground hover:opacity-90', FOKUS_RAHMEN)

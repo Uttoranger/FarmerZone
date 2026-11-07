@@ -56,7 +56,7 @@ import {
   vorname,
   zahlartText,
 } from '@/lib/hof-bestellungen'
-import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, HEUTE_NIEMAND } from '@/lib/heute'
+import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, HEUTE_NIEMAND, hofWartetAufFreigabe } from '@/lib/heute'
 import { HOF_BESTELL_FILTER_WERTE, hofBestellFilterAus } from '@/schemas/hof-bestellungen'
 import { BESTELLUNGEN_LEER, BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
 import type { BestellungenSeite, HofBestellDetail } from '@/server/queries/orders'
@@ -352,6 +352,15 @@ describe('Ansicht /orders — die Filterreihe', () => {
     expect(frei).toContain('href="/farm-page"')
     // Der Kopf ist der Werkzeug-Kopf (G1): der Balken (G3) steht darunter.
     expect(frei).toContain('data-werkzeug-kopf')
+  })
+
+  it('wartet auf Freigabe nur ein nicht freigeschalteter, nicht stillgelegter Hof', () => {
+    const zeit = new Date('2026-01-01T00:00:00Z')
+    expect(hofWartetAufFreigabe({ approvedAt: null, archivedAt: null })).toBe(true)
+    expect(hofWartetAufFreigabe({ approvedAt: zeit, archivedAt: null })).toBe(false)
+    // Gegenprobe stillgelegt: kein „Sobald dein Hof freigeschaltet ist …“.
+    expect(hofWartetAufFreigabe({ approvedAt: null, archivedAt: zeit })).toBe(false)
+    expect(hofWartetAufFreigabe(null)).toBe(false)
   })
 
   it('leer bei „Noch offen": „Alles erledigt" mit Weg zu den erledigten; nie ein Link auf ?filter=alle', () => {

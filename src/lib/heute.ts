@@ -836,6 +836,7 @@ export function heuteAufbau({
  * `ABHOLZEITEN_FEHLEN.satz` (pickup-slot-rules.ts) nutzen auch Einstellungen und Hof einrichten, deren Boards
  * den bisherigen Satz zeigen; Titel und Knopf bleiben von dort.
  */
+// Übergang bis Nr. 250: gleiche Aussage wie ABHOLZEITEN_FEHLEN.satz, Liste heute Z. 296
 export const HEUTE_ABHOLZEITEN_SATZ = 'Ohne Abholzeit kann niemand bei dir bestellen. Trag ein, wann man bei dir abholen kann.'
 
 /**
@@ -997,4 +998,12 @@ export function entferneBeitragErinnerung(eintraege: readonly BrauchtDichEintrag
 /** Die vier Anlässe des Anstoßes als Links auf „Neuer Beitrag“, in der Reihenfolge des Assistenten. */
 export function anstossLinks(): { anlass: BeitragAnlass; href: string }[] {
   return BEITRAG_ANLAESSE.map((anlass) => ({ anlass, href: neuerBeitragHref(anlass) }))
+}
+
+/**
+ * Wartet der Hof noch auf die Freischaltung? Für den Leerzustand von Bestellungen (Board s1-bestellungen Bild 3).
+ * Ein stillgelegter Hof wartet nicht: ihm gilt der Stilllegungs-Balken, nicht „Sobald dein Hof freigeschaltet ist …“.
+ */
+export function hofWartetAufFreigabe(hof: { approvedAt: Date | null; archivedAt: Date | null } | null): boolean {
+  return hof != null && hof.archivedAt == null && hof.approvedAt == null
 }

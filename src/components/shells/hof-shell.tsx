@@ -270,13 +270,19 @@ function NeuInhalt({ punkt, blatt = false }: { punkt: HofNeuPunkt; blatt?: boole
 /**
  * Ein Eintrag im Menü „Neu“ am Computer: 64 px hoch und 2 px Abstand — im Board w1-mehr-neu (Bild 3) stehen die
  * Einträge 66 px auseinander (UI-Runde 3; vorher 52 px ohne Abstand).
+ * Dazu an jedem Eintrag FOKUS_RAHMEN_INNEN (Liste Lauf 32, mehr-neu Bild 3): per Tastatur geöffnet trägt der erste
+ * Eintrag die Hervorhebung UND einen sichtbaren Fokusrahmen (innen, das Menü schneidet ab) — die Tönung kommt nur dazu.
  */
-// Dazu an jedem Eintrag FOKUS_RAHMEN_INNEN (Liste Lauf 32, mehr-neu Bild 3): per Tastatur geöffnet trägt der erste
-// Eintrag die Hervorhebung UND einen sichtbaren Fokusrahmen (innen, das Menü schneidet ab) — die Tönung kommt nur dazu.
 const NEU_MENUE_EINTRAG = 'min-h-16 px-3.5 py-1.5'
 
 /** Die Gruppen des Menüs „Neu“ mit dem Abstand des Boards (2 px) zwischen den Einträgen. */
 const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'
+
+/** Fokus-Seiten ohne Unterleiste am Handy: das Bestelldetail /orders/<id> (nicht die Liste /orders). */
+const HOF_FOKUS_SEITE = /^\/orders\/[^/]+\/?$/
+
+/** Dieselbe Grenze wie Tailwinds `md:` (48rem). */
+const MD_ABFRAGE = '(min-width: 48rem)'
 
 /**
  * Ab 48rem (md, bei 16 px Grundschrift 768 px) gilt die Seitenleiste, darunter die Unterleiste. In `rem`,
@@ -284,12 +290,6 @@ const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'
  * (Knopf sichtbar, Menü in der noch verborgenen Seitenleiste).
  * null, wo es kein Fenster zum Fragen gibt (Server, Test): dann bleibt jeder Knopf bei seiner eigenen Form.
  */
-/** Fokus-Seiten ohne Unterleiste am Handy: das Bestelldetail /orders/<id> (nicht die Liste /orders). */
-const HOF_FOKUS_SEITE = /^\/orders\/[^/]+\/?$/
-
-/** Dieselbe Grenze wie Tailwinds `md:` (48rem). */
-const MD_ABFRAGE = '(min-width: 48rem)'
-
 function fensterBreit(): boolean | null {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
   return window.matchMedia(MD_ABFRAGE).matches
