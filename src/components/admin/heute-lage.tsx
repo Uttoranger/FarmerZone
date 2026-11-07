@@ -21,7 +21,7 @@ export function HeuteLage({ kacheln, className }: { kacheln: readonly LageKachel
           const Symbol = SYMBOL[k.id]
           return (
             <li key={k.id} className={cn(KARTE, 'flex min-w-0 flex-col gap-1.5 p-4')}>
-              <span className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+              <span className="flex items-center gap-2 text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase">
                 <Symbol className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
                 {k.titel}
               </span>
