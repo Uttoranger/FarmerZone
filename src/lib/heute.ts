@@ -898,14 +898,6 @@ export function heuteAufbau({
 // ─── Packliste ohne Abholzeit und „Zu tun“ (Liste Lauf 32, heute Bild 4) ──────
 
 /**
- * Der Satz der leeren Packliste ohne Abholzeit, wörtlich nach Board s1-heute Bild 4. Eigene Konstante für Heute:
- * `ABHOLZEITEN_FEHLEN.satz` (pickup-slot-rules.ts) nutzen auch Einstellungen und Hof einrichten, deren Boards
- * den bisherigen Satz zeigen; Titel und Knopf bleiben von dort.
- */
-// Übergang bis Nr. 250: gleiche Aussage wie ABHOLZEITEN_FEHLEN.satz, Liste heute Z. 296
-export const HEUTE_ABHOLZEITEN_SATZ = 'Ohne Abholzeit kann niemand bei dir bestellen. Trag ein, wann man bei dir abholen kann.'
-
-/**
  * Der Link einer Aufgabe in „Zu tun“ auf Heute: wie der Titel, nur Abholzeiten heißt dort wie der Knopf
  * („Abholzeiten eintragen“, Wortliste „eintragen“ statt „festlegen“; Board s1-/w1-heute Bild 4).
  */

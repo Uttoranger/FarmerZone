@@ -3,8 +3,9 @@ import type { Metadata } from 'next'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmSettings } from '@/server/queries/farm'
 import { PickupSlotsClient } from '@/components/settings/pickup-slots-client'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { UNTERSEITE_RAHMEN, UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
 
 /** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
@@ -24,13 +25,13 @@ export default async function PickupSlotsPage(): Promise<React.JSX.Element> {
 
   const farm = await getFarmSettings(userId)
   if (!farm) redirect('/onboarding')
+  const jetzt = new Date()
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf
-        titel={TITEL}
-        satz="Lege fest, wann Kunden ihre Bestellungen abholen können. Deine Abholzeiten gelten dauerhaft jede Woche. Kundinnen können Termine bis zu 14 Tage im Voraus wählen."
-      />
+      {/* Werkzeug-Kopf (G1, Nr. 250) mit Hof-Unterzeile, der Satz darunter (Boards s2-/w2-hofdaten-zahlung). */}
+      <WerkzeugKopf titel={TITEL} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
+      <p className={UNTERSEITE_SATZ}>Lege fest, wann Kunden ihre Bestellungen abholen können. Deine Abholzeiten gelten dauerhaft jede Woche. Kundinnen können Termine bis zu 14 Tage im Voraus wählen.</p>
       <div data-app-palette="neu">
         <PickupSlotsClient initialSlots={farm.pickupSlots} />
       </div>

@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import {
   ladeFotoHoch,
   stufenText,
@@ -19,13 +18,19 @@ import { EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
 import { MARKE } from '@/lib/marke'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
 import { cn } from '@/lib/utils'
 
 /** Rückweg und Ausweg (Board s2/w2-teilen): dieselbe Startseite des Hofbereichs, dasselbe Wort. */
 const HEUTE_HREF = '/dashboard'
 const ZU_HEUTE = 'Zu Heute'
-const TEILEN_FEHLER_TITEL = 'Die Fotos sind nicht hochgeladen – sie liegen noch hier.'
+/** Board s2/w2-teilen Bild 3: ein Absatz ohne eigene Überschrift (Nr. 250); davor stehen die Meldungen der Fotos mit Kürzel (C-Zeile „[S139]“). */
+const TEILEN_FEHLER_SATZ = 'Die Fotos sind nicht hochgeladen, sie liegen noch hier. Prüf den Empfang und tippe auf „Nochmal“.'
 const TEILEN_FEHLER_AUSWEG = 'Du kannst sie auch später unter Mein Hof › Hofseite hochladen.'
+const TEILEN_TITEL = 'Geteilte Fotos'
 
 type Ziel = 'banner' | 'gallery'
 
@@ -61,6 +66,8 @@ export function TeilenClient({
     prozent: number
   } | null>(null)
   const [ergebnisse, setErgebnisse] = useState<Ergebnis[] | null>(null)
+  // Nach dem Hochladen gehört der Fokus auf das Ergebnis (Liste Lauf 32, teilen „Fokus nach Erfolg“).
+  const zuHeuteNachErfolg = useRef<HTMLAnchorElement>(null)
 
   useEffect(() => {
     // Die Android-Version für die Diagnose — asynchron, vor dem ersten Upload.
@@ -156,21 +163,18 @@ export function TeilenClient({
 
   const fertigOhneFehler = ergebnisse !== null && ergebnisse.every((e) => e.ok)
 
+  useEffect(() => {
+    if (fertigOhneFehler) zuHeuteNachErfolg.current?.focus()
+  }, [fertigOhneFehler])
+
   return (
-    <main data-design="neu" className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-md">
-        {/* Board s2/w2-teilen: der Rückweg heißt „Zu Heute“ wie der Ausweg (die Seite steht ohne Shell). */}
-        <Link
-          href={HEUTE_HREF}
-          className={cn('-ml-2 mb-2 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-sm font-semibold text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
-        >
-          <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          {ZU_HEUTE}
-        </Link>
-        <h1 className="font-heading text-2xl font-semibold text-foreground mb-1">
-          Geteilte Fotos
-        </h1>
-        <p className="text-sm text-muted-foreground mb-6">
+    <main data-design="neu" className="min-h-screen bg-background px-4 pt-5 pb-8 md:px-8 md:pt-8">
+      {/* 520 px wie im Board w2-teilen (vorher 448), linksbündig. */}
+      <div className="max-w-[520px]">
+        {/* Werkzeug-Kopf (G1, Nr. 250): am Handy die feste Leiste mit „‹“ nach Heute (Elternseite in
+            bauern-navigation.ts), im Web der Textlink „‹ Heute“ über der h1; die Seite steht ohne Shell. */}
+        <WerkzeugKopf titel={TEILEN_TITEL} />
+        <p className="mb-6 text-[15px] leading-[1.45] text-muted-foreground">
           Fotos, die du aus der Galerie an {MARKE} teilst, landen hier.
         </p>
 
@@ -180,9 +184,9 @@ export function TeilenClient({
         {/* Aufgerufen ohne geteilte Datei: der dezente Hinweis */}
         {fotos !== null && fotos.length === 0 && !ergebnisse && (
           // Board s2/w2-teilen Bild 2: gestrichelter Kasten ohne Symbol, Titel fett in eigener Zeile, „Zu Heute“ als Umriss über die Breite.
-          <div className="flex flex-col gap-2 rounded-[14px] border-[1.5px] border-dashed border-input p-5">
+          <div className={cn('flex flex-col gap-2 border border-border bg-card p-5', RUNDUNG.karte)}>
             <p className="text-[16px] font-bold text-foreground">Gerade wurde nichts geteilt</p>
-            <p className="text-sm leading-relaxed text-foreground">
+            <p className="text-sm leading-[1.45] text-muted-foreground">
               So geht’s: {MARKE} über das Browser-Menü als App installieren, dann in der Galerie ein Foto wählen und über
               „Teilen“ an {MARKE} schicken – das funktioniert auch mit Cloud-Fotos.
             </p>
@@ -212,7 +216,7 @@ export function TeilenClient({
                   key={url}
                   src={url}
                   alt={fotos[i]?.name || `Foto ${i + 1}`}
-                  className="aspect-[4/3] w-full rounded-xl object-cover bg-muted"
+                  className={cn('aspect-[4/3] w-full bg-muted object-cover', RUNDUNG.feld, FOTO_HUELLE)}
                 />
               ))}
             </div>
@@ -223,7 +227,8 @@ export function TeilenClient({
                 {fotos.length} Fotos – sie gehen in die Hofgalerie.
               </p>
             ) : (
-              <div className="flex gap-2 mb-4" role="radiogroup" aria-label="Wohin damit?">
+              // Zwei Radio-Karten mit Kreis links (Liste Lauf 32, teilen „Auswahl Titelbild / Hofgalerie“).
+              <div className="mb-4 flex flex-col gap-2" role="radiogroup" aria-label="Wohin damit?">
                 {(
                   [
                     ['banner', 'Titelbild'],
@@ -236,12 +241,22 @@ export function TeilenClient({
                     role="radio"
                     aria-checked={ziel === wert}
                     onClick={() => setZiel(wert)}
-                    className={`flex-1 min-h-11 rounded-xl border text-sm font-medium transition-colors ${
-                      ziel === wert
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-card text-foreground hover:bg-muted/40'
-                    }`}
+                    className={cn(
+                      'flex min-h-[52px] w-full items-center gap-3 border-[1.5px] bg-card px-3.5 text-left text-[16px] font-semibold text-foreground transition-colors hover:bg-muted',
+                      RUNDUNG.karte,
+                      ziel === wert ? 'border-foreground' : 'border-border',
+                      FOKUS_RAHMEN
+                    )}
                   >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'grid size-5 shrink-0 place-items-center rounded-full border-2',
+                        ziel === wert ? 'border-foreground' : 'border-muted-foreground'
+                      )}
+                    >
+                      {ziel === wert && <span className="size-2.5 rounded-full bg-foreground" />}
+                    </span>
                     {label}
                   </button>
                 ))}
@@ -250,39 +265,39 @@ export function TeilenClient({
 
             {/* Fehlgeschlagene aus dem letzten Lauf: orange Karte mit „Nochmal“ (V17, Board s2/w2-teilen Bild 3) — die Fotos bleiben in der Ablage. */}
             {ergebnisse && !laeuft ? (
-              <HinweiskarteFehler titel={TEILEN_FEHLER_TITEL} nochmal={hochladen} laeuft={laeuft}>
-                <ul className="space-y-1">
-                  {/* Gleiche Meldungen nur einmal — zwei Fotos mit demselben Netzfehler sagten sonst zweimal dasselbe. */}
-                  {[...new Set(ergebnisse.filter((e) => !e.ok).map((e) => e.meldung))].map((meldung) => (
-                    <li key={meldung}>{meldung}</li>
-                  ))}
-                </ul>
-                <p className="mt-1">{TEILEN_FEHLER_AUSWEG}</p>
+              <HinweiskarteFehler nochmal={hochladen} laeuft={laeuft}>
+                {/* Gleiche Meldungen nur einmal — zwei Fotos mit demselben Netzfehler sagten sonst zweimal dasselbe. */}
+                <p>
+                  {[...new Set(ergebnisse.filter((e) => !e.ok).map((e) => e.meldung))].join(' ')} {TEILEN_FEHLER_SATZ}{' '}
+                  {TEILEN_FEHLER_AUSWEG}
+                </p>
               </HinweiskarteFehler>
             ) : (
-            <button
-              type="button"
-              onClick={hochladen}
-              disabled={laeuft}
-              className={cn('w-full min-h-12 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60', FOKUS_RAHMEN)}
-            >
-              {laeuft && laufend
-                ? fotos.length > 1
-                  ? `Foto ${laufend.index + 1} von ${fotos.length} — ${stufenText(laufend)}`
-                  : stufenText(laufend)
-                : wirksamesZiel === 'banner'
-                  ? 'Als Titelbild übernehmen'
-                  : 'In die Hofgalerie laden'}
-            </button>
+              // Am Handy fest unten (G2, ohne Unterleiste: die Seite hat keine Shell), im Web schmal und linksbündig.
+              <FesteAktionsleiste ueberUnterleiste={false}>
+                <button
+                  type="button"
+                  onClick={hochladen}
+                  aria-busy={laeuft || undefined}
+                  className={cn(AKTIONSLEISTE_KNOPF, 'md:w-auto md:px-6 aria-busy:opacity-60')}
+                >
+                  {laeuft && laufend
+                    ? fotos.length > 1
+                      ? `Foto ${laufend.index + 1} von ${fotos.length} — ${stufenText(laufend)}`
+                      : stufenText(laufend)
+                    : wirksamesZiel === 'banner'
+                      ? 'Als Titelbild übernehmen'
+                      : 'In die Hofgalerie laden'}
+                </button>
+              </FesteAktionsleiste>
             )}
           </div>
         )}
 
         {/* Alles angekommen */}
         {fertigOhneFehler && (
-          <div className="rounded-2xl bg-card p-6 shadow-sm">
-            <CheckCircle2 className="size-6 text-brand-text mb-3" aria-hidden="true" />
-            <p className="text-sm leading-relaxed text-foreground mb-4">
+          <div role="status" className={cn('flex flex-col gap-3 border border-border bg-card p-5', RUNDUNG.karte)}>
+            <p className="text-[15px] leading-relaxed font-semibold text-foreground">
               {ergebnisse.length === 1
                 ? wirksamesZiel === 'banner'
                   ? 'Das Foto ist dein neues Titelbild.'
@@ -291,14 +306,21 @@ export function TeilenClient({
             </p>
             <div className="flex flex-col gap-1">
               <Link
+                ref={zuHeuteNachErfolg}
+                href={HEUTE_HREF}
+                className={cn('inline-flex min-h-11 w-fit items-center text-sm font-semibold text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
+              >
+                {ZU_HEUTE}
+              </Link>
+              <Link
                 href={`/${hofSlug}`}
-                className="inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
+                className={cn('inline-flex min-h-11 w-fit items-center text-sm font-medium text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
               >
                 Zur Hofseite
               </Link>
               <Link
                 href={EINSTELLUNG_MEIN_AUFTRITT.href}
-                className="inline-flex min-h-11 items-center text-sm font-medium text-brand-text underline underline-offset-4"
+                className={cn('inline-flex min-h-11 w-fit items-center text-sm font-medium text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
               >
                 Zu „{EINSTELLUNG_MEIN_AUFTRITT.label}“
               </Link>

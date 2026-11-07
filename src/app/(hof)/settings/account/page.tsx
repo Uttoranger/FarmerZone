@@ -1,15 +1,17 @@
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
-import { Mail, Shield, Trash2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { verlangeHofDerSitzung, zurHofAnmeldung } from '@/server/hofbereich'
 import { getFarmArchiveState } from '@/server/queries/farm'
+import { getFarmForUser } from '@/server/queries/dashboard'
+import { getOpenOrdersCount } from '@/server/queries/orders'
 import { ladeAngemeldeteGeraete } from '@/server/geraete'
 import { AngemeldeteGeraete } from '@/components/konto/angemeldete-geraete'
 import { supportMailto } from '@/lib/support'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
 import { EINSTELLUNG_KONTO } from '@/lib/bauern-navigation'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { KONTO_TEXT } from '@/lib/hof-einstellungen'
@@ -23,6 +25,9 @@ import { passkeyAnzeigeName } from '@/lib/hof-passkey'
 import { PasskeyKarte, type HofPasskeyZeile } from './passkey-karte'
 
 export const metadata: Metadata = { title: `${EINSTELLUNG_KONTO.label} — ${MARKE}` }
+
+/** Der Satz unter dem Kopf, wörtlich nach Board s2-/w2-konto-hof. */
+const KONTO_SATZ = 'Anmeldung, Passwort, Geräte, Darstellung und dein Hof.'
 
 /** Links im Fließtext: grüner Text (Hof-Links wie im Editor), nie oranger Text. */
 const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break-words'
@@ -39,19 +44,25 @@ const TEXTLINK = 'font-medium text-brand-text underline underline-offset-2 break
  * den Weg in den Admin-Bereich, N20).
  */
 export default async function AccountPage(): Promise<React.JSX.Element> {
-  const { userId } = await verlangeHofDerSitzung()
+  const { userId, farmId } = await verlangeHofDerSitzung()
   // Login-Adresse und Kennung dieser Sitzung (Geräte) braucht nur diese Seite —
   // die Wache gibt bewusst nur userId und farmId heraus.
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return zurHofAnmeldung()
 
-  const [farm, geraete, konto] = await Promise.all([
+  const jetzt = new Date()
+  // Offene Bestellungen mit derselben Zählung wie der Server beim Stilllegen (getOpenOrdersCount in
+  // archiveFarm): Solange welche da sind, steht der Hinweis statt des Knopfs (Liste Lauf 32, konto-hof).
+  const [farm, geraete, konto, hof, offeneBestellungen] = await Promise.all([
     getFarmArchiveState(userId),
-    ladeAngemeldeteGeraete(userId, session.session.id, new Date()),
+    ladeAngemeldeteGeraete(userId, session.session.id, jetzt),
     prisma.user.findUnique({
       where: { id: userId },
       select: { isAdmin: true, passkeys: { select: { id: true, name: true, createdAt: true }, orderBy: { createdAt: 'asc' } } },
     }),
+    // Der Hofname der Unterzeile — dieselbe Abfrage, die das Layout stellt.
+    getFarmForUser(userId),
+    getOpenOrdersCount(farmId),
   ])
   const fuerAdmin = konto?.isAdmin === true
   // Ein Admin verwaltet seine Passkeys im Admin-Bereich — hier keine Liste.
@@ -76,44 +87,42 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel={EINSTELLUNG_KONTO.label} satz="Anmeldung, Passwort, Geräte, Darstellung und dein Hof." />
+      {/* Werkzeug-Kopf (G1) mit der Hof-Unterzeile; der Satz steht darunter (Board s2-/w2-konto-hof). */}
+      <WerkzeugKopf titel={EINSTELLUNG_KONTO.label} unterzeile={hof ? <HofUnterzeile hofName={hof.name} jetzt={jetzt} /> : undefined} />
+      <p className="mb-5 text-[15px] leading-relaxed text-muted-foreground md:mb-6 md:text-base">{KONTO_SATZ}</p>
 
       <div data-app-palette="neu" className="space-y-4">
         <PasskeyKarte passkeys={passkeys} fuerAdmin={fuerAdmin} />
 
+        {/* Ohne Symbole vor den Überschriften und ohne Unterzeile (Liste Lauf 32, konto-hof). */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Mail className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-              <CardTitle>{KONTO_TEXT.anmeldeAdresseTitel}</CardTitle>
-            </div>
-            <CardDescription>
-              {KONTO_TEXT.anmeldeAdresse} <strong className="break-all text-foreground">{session.user.email}</strong>
-            </CardDescription>
+            <CardTitle>{KONTO_TEXT.anmeldeAdresseTitel}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            {/* Die Adresse in eigener Zeile, fett (Board s2-konto-hof Bild 1). */}
+            <div className="text-sm">
+              <p className="text-muted-foreground">{KONTO_TEXT.anmeldeAdresse}</p>
+              <p className="font-bold break-all text-foreground">{session.user.email}</p>
+            </div>
             <p className="text-sm text-muted-foreground">
               {KONTO_TEXT.anmeldeAdresseAendern}{' '}
               <a href={emailChangeMailto} className={TEXTLINK}>
                 schreib dem {MARKE}-Support
               </a>
-              . Die Nachricht ist bereits vorausgefüllt.
+              {KONTO_TEXT.anmeldeAdresseNach}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <Shield className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-              <CardTitle>{KONTO_TEXT.passwortTitel}</CardTitle>
-            </div>
-            <CardDescription>Passwort für dein {MARKE}-Konto</CardDescription>
+            <CardTitle>{KONTO_TEXT.passwortTitel}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <PasswordForm />
-            <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-              Passwort vergessen? Melde dich ab und nutze &bdquo;Passwort vergessen&ldquo; auf der Anmeldeseite — dann bekommst du
+            <p className="text-sm text-muted-foreground">
+              Passwort vergessen? Melde dich ab und nutze &bdquo;Passwort vergessen&ldquo; auf der Anmeldeseite – dann bekommst du
               einen Link per E-Mail.
             </p>
           </CardContent>
@@ -124,21 +133,20 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
 
         <DarstellungKarte />
 
-        {farm && <ArchiveFarmCard farmSlug={farm.slug} isArchived={farm.archivedAt !== null} />}
+        {farm && <ArchiveFarmCard farmSlug={farm.slug} isArchived={farm.archivedAt !== null} offeneBestellungen={offeneBestellungen} />}
 
-        <Hinweiskarte ton="orange" symbol={Trash2} titel="Konto löschen">
-          <p>
-            Wenn du dein Konto löschen möchtest,{' '}
-            <a href={accountDeleteMailto} className="font-semibold underline underline-offset-2 break-words">
-              schreib dem {MARKE}-Support
-            </a>{' '}
-            — die Nachricht ist bereits vorausgefüllt. Die Löschung wird innerhalb weniger Werktage bearbeitet.
-            Beachte: Bestelldaten müssen aus steuerrechtlichen Gründen 7 Jahre aufbewahrt werden.
-          </p>
-          <p className="mt-2">
-            {KONTO_TEXT.nurHofSchliessen} &bdquo;Hof stilllegen&ldquo; — dabei bleiben alle Daten erhalten.
-          </p>
-        </Hinweiskarte>
+        {/* Konto löschen wörtlich nach Board, Knopf „Support schreiben“ statt Textlink (Liste Lauf 32, konto-hof). */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{KONTO_TEXT.loeschenTitel}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">{KONTO_TEXT.loeschenSatz}</p>
+            <a href={accountDeleteMailto} className={HELLER_KNOPF}>
+              {KONTO_TEXT.loeschenKnopf}
+            </a>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

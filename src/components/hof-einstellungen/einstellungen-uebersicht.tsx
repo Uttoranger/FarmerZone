@@ -1,17 +1,12 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { EINSTELLUNGEN_SATZ, EINSTELLUNGEN_TITEL, TON_TEXT, einstellungenGruppen, type EinstellungBereich, type EinstellungTon } from '@/lib/hof-einstellungen'
 import { cn } from '@/lib/utils'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
-
-/** „Problem melden“ als Umriss über die volle Spalte, 52 px, 14 px rund (Board; volle Breite → kein Pill). */
-const PROBLEM_MELDEN_KNOPF = cn(
-  'mt-1 flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-4 text-[16px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
 
 /** Der Punkt neben dem Titel: Zustandsfarbe des Themes, grau = nur zur Info. */
 const PUNKT: Record<EinstellungTon, string> = {
@@ -44,8 +39,8 @@ export function EinstellungenUebersicht({
 }): React.JSX.Element {
   return (
     <div className="flex max-w-[1000px] flex-col gap-2.5">
-      {/* Werkzeug-Kopf (G1, Nr. 245): am Handy die feste Leiste mit Titel und „<Hof> · Stand …“, im Web h1 und
-          Hofname; /settings hat keine Elternseite, also keinen Rückweg. Der Hof-Balken (G3) steht darunter. */}
+      {/* Werkzeug-Kopf (G1, Nr. 245): am Handy die feste Leiste mit „‹“ (Elternseite „Mehr“, N1-Ergänzung
+          7.11.2026, Nr. 250), Titel und „<Hof> · Stand …“, im Web h1 und Hofname. Der Hof-Balken (G3) steht darunter. */}
       <WerkzeugKopf titel={EINSTELLUNGEN_TITEL} unterzeile={<HofUnterzeile hofName={hofName} jetzt={jetzt} />} />
       <p className="text-[15px] leading-relaxed text-muted-foreground md:text-base">{EINSTELLUNGEN_SATZ}</p>
 
@@ -62,19 +57,21 @@ export function EinstellungenUebersicht({
                   <Link
                     href={b.href}
                     className={cn(
-                      'flex min-h-14 items-center gap-3 px-3 py-1.5 transition-colors duration-[250ms] hover:bg-muted',
+                      'flex min-h-14 items-start gap-3 px-3 py-1.5 transition-colors duration-[250ms] hover:bg-muted',
                       FOKUS_RAHMEN_INNEN
                     )}
                   >
-                    <span data-ton={b.ton} className={cn('size-3 shrink-0 rounded-full', PUNKT[b.ton])} aria-hidden="true" />
+                    {/* Der Punkt steht auf der Höhe der Titelzeile, nicht mittig über beide Zeilen (Liste Lauf 32,
+                        einstellungen „Statuspunkt“): 6 px Polster + (22 px Zeile − 12 px Punkt) / 2 = 11 px. */}
+                    <span data-ton={b.ton} className={cn('mt-[11px] size-3 shrink-0 rounded-full', PUNKT[b.ton])} aria-hidden="true" />
                     <span className="sr-only">{TON_TEXT[b.ton]}:</span>
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5 py-1.5">
-                      <span className="text-[15px] font-semibold text-foreground">{b.titel}</span>
+                      <span className="text-[15px] leading-[22px] font-semibold text-foreground">{b.titel}</span>
                       <span className="line-clamp-2 text-[13px] leading-normal break-words text-muted-foreground" title={b.zeile}>
                         {b.zeile}
                       </span>
                     </span>
-                    <ChevronRight className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+                    <ChevronRight className="size-[18px] shrink-0 self-center text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                   </Link>
                 </li>
               ))}
@@ -82,7 +79,7 @@ export function EinstellungenUebersicht({
             {/* Unter der Karte „Konto“ über die volle Spalte (Board s1-/w1-einstellungen); Abmelden steht in
                 der Seitenleiste bzw. im Mehr-Blatt — hier nur der Weg zur Hilfe. */}
             {gruppe.id === 'konto' && (
-              <Link href="/meldungen" className={PROBLEM_MELDEN_KNOPF}>
+              <Link href="/meldungen" className={cn(HELLER_KNOPF, 'mt-1')}>
                 {PROBLEM_MELDEN}
               </Link>
             )}

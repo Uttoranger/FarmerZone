@@ -3,8 +3,9 @@ import type { Metadata } from 'next'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmSettings } from '@/server/queries/farm'
 import { ProfileForm } from '@/components/settings/profile-form'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { UEBERSICHT_RAHMEN, UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
 import { HOFDATEN_TEXT } from '@/lib/hof-einstellungen'
 
@@ -26,10 +27,14 @@ export default async function ProfileSettingsPage(): Promise<React.JSX.Element> 
 
   const farm = await getFarmSettings(userId)
   if (!farm) redirect('/onboarding')
+  const jetzt = new Date()
 
   return (
-    <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel={TITEL} satz={HOFDATEN_TEXT.satz} />
+    // So breit wie die Übersicht (Board w2-hofdaten-zahlung: zwei Spalten in 1000 px, Nr. 250).
+    <div className={UEBERSICHT_RAHMEN}>
+      {/* Werkzeug-Kopf (G1, Nr. 250) mit Hof-Unterzeile, der Satz darunter (Boards s2-/w2-hofdaten-zahlung). */}
+      <WerkzeugKopf titel={TITEL} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
+      <p className={UNTERSEITE_SATZ}>{HOFDATEN_TEXT.satz}</p>
       <div data-app-palette="neu">
         <ProfileForm farm={farm} />
       </div>

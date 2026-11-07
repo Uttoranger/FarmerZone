@@ -3,11 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import {
-  Home, Mail,
-  ArrowRight, CheckCircle, Check,
-  Camera, Crop, Loader2, X,
-} from 'lucide-react'
+import { Check, Camera, Crop, Loader2, X } from 'lucide-react'
 import { publishStatusPost } from '@/server/actions/status-posts'
 import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import { BildAusschnitt } from '@/components/shared/bild-ausschnitt'
@@ -24,6 +20,8 @@ import { NETZ_SATZ } from '@/lib/netz'
 import { cn } from '@/lib/utils'
 import { BEITRAG_ABLAUF_TEXT, BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF, AKTIONSLEISTE_ZURUECK } from '@/components/ui/feste-aktionsleiste'
 import { formatEuro } from '@/lib/format'
 import { renderStatusBodyWithChip } from '@/lib/status-body'
 import { MAILABSTAND_TAGE, mailVersandMeldung } from '@/lib/beitrag-mailabstand'
@@ -35,16 +33,6 @@ import type { TeilenFensterBeitrag } from '@/lib/teilen-fenster'
 
 // Wort und Symbol je Anlass kommen aus BEITRAG_ANLASS (Register F8) — dieselben wie an der Marke über dem Beitrag.
 const ANLASS_OPTIONS = BEITRAG_ANLAESSE.map((value) => ({ value, ...BEITRAG_ANLASS[value] }))
-
-// Marke in der Vorschau (nur Anzeige). Seit Nr. 22e in der HofShell: Tokens
-// statt Tailwind-Palette — Schrift in der Zustandsfarbe des Themes, Fläche
-// getönt (wie StatusBadge), damit sie in beiden Themes 4,5:1 hält.
-const ANLASS_COLOR: Record<BeitragAnlass, string> = {
-  FRESH_PRODUCT: 'text-status-fertig bg-accent/15',
-  NEW_SEASON:    'text-status-fertig bg-accent/15',
-  PROMOTION:     'text-status-offen bg-primary/15',
-  ANNOUNCEMENT:  'text-foreground bg-muted',
-}
 
 interface Props {
   products: { id: string; name: string; price: number }[]
@@ -62,45 +50,45 @@ interface Props {
   anlass?: BeitragAnlass | null
 }
 
-// ── Visual stepper ──────────────────────────────────────────────────────────
+// ── Schrittzeiger ──────────────────────────────────────────────────────────
+/*
+ * Ohne Linien, zentriert; erledigt grün mit Haken, der aktuelle Schritt dunkel (Liste Lauf 32, beitraege
+ * „Schrittzeiger“, Nr. 250). Die h1 „Neuer Beitrag“ trägt der Werkzeug-Kopf der Seite in jedem Schritt.
+ */
 function Stepper({ step }: { step: number }) {
   const steps = ['Inhalt', 'Empfänger', 'Versand']
   return (
-    <div className="flex items-start mb-7">
+    <ol className="mb-6 flex items-start justify-center gap-6" aria-label="Schritte">
       {steps.map((label, i) => {
         const num = i + 1
         const isDone = step > num
         const isActive = step === num
-        const isLast = i === steps.length - 1
         return (
-          <div key={label} className="contents">
-            <div className="flex flex-col items-center gap-1.5">
-              <div
-                className={cn(
-                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shrink-0',
-                  isDone || isActive
-                    ? 'bg-foreground border-foreground text-background'
+          <li key={label} className="flex flex-col items-center gap-1.5" aria-current={isActive ? 'step' : undefined}>
+            <div
+              className={cn(
+                'flex size-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold',
+                isDone
+                  ? 'border-status-fertig bg-status-fertig text-background'
+                  : isActive
+                    ? 'border-foreground bg-foreground text-background'
                     : 'border-input bg-card text-muted-foreground',
-                )}
-              >
-                {isDone ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : num}
-              </div>
-              <span
-                className={cn(
-                  'text-xs font-medium leading-none',
-                  isActive ? 'font-bold text-foreground' : isDone ? 'text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {label}
-              </span>
+              )}
+            >
+              {isDone ? <Check className="size-3.5" aria-hidden="true" /> : num}
             </div>
-            {!isLast && (
-              <div className={cn('flex-1 h-0.5 mt-3.5 mx-1', isDone ? 'bg-foreground/50' : 'bg-border')} />
-            )}
-          </div>
+            <span
+              className={cn(
+                'text-xs leading-none font-medium',
+                isActive ? 'font-bold text-foreground' : isDone ? 'text-status-fertig' : 'text-muted-foreground',
+              )}
+            >
+              {label}
+            </span>
+          </li>
         )
       })}
-    </div>
+    </ol>
   )
 }
 
@@ -223,25 +211,23 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
     })
   }
 
-  const AnlassSymbol = BEITRAG_ANLASS[anlass].symbol
-
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="rounded-2xl border border-border bg-card p-5 md:p-8">
+    // Linksbündig, nicht mehr mittig (Liste Lauf 32, beitraege „Web: Karte mittig“).
+    <div className="max-w-2xl">
+      <div className={cn('border border-border bg-card p-5 md:p-8', RUNDUNG.karte)}>
         <Stepper step={step} />
 
         {/* ── Step 1: Content ─────────────────────────────────────────── */}
         {step === 1 && (
           <div>
-            <div className="mb-6">
-              <h1 className="font-heading text-xl font-semibold text-foreground">Neuer Beitrag</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Inhalt erstellen</p>
-            </div>
+            {/* „Inhalt erstellen“ als Abschnittsüberschrift statt Unterzeile (Liste Lauf 32, beitraege). */}
+            <h2 className="mb-5 font-heading text-[20px] font-semibold text-foreground">Inhalt erstellen</h2>
 
             {/* Anlass — gewählt in umgekehrter Textfarbe wie der gewählte Filter-Chip (Board w2-beitraege, V51: im Hofbereich nie grün). */}
             <div className="mb-5">
               <label className="block text-sm font-medium text-foreground mb-2">Anlass</label>
-              <div className="grid grid-cols-2 gap-2">
+              {/* Einzeilige Chips ohne Symbol (Liste Lauf 32, beitraege „Anlass als 2×2-Kacheln“). */}
+              <div className="flex flex-wrap gap-2">
                 {ANLASS_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -249,16 +235,14 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                     onClick={() => setAnlass(opt.value)}
                     aria-pressed={anlass === opt.value}
                     className={cn(
-                      'relative flex min-h-11 items-center gap-2.5 p-3 rounded-xl border-2 text-sm font-medium transition-all text-left',
+                      'flex min-h-11 items-center rounded-full border-[1.5px] px-4 text-[15px] font-semibold transition-colors',
                       FOKUS_RAHMEN,
                       anlass === opt.value
                         ? 'bg-foreground border-foreground text-background'
                         : 'border-input text-foreground hover:bg-muted/40',
                     )}
                   >
-                    <opt.symbol className="size-5" aria-hidden="true" />
-                    <span className="flex-1">{opt.wort}</span>
-                    {anlass === opt.value && <Check className="size-4 shrink-0" aria-hidden="true" />}
+                    {opt.wort}
                   </button>
                 ))}
               </div>
@@ -287,10 +271,10 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   e.preventDefault()
                   document.getElementById('status-body')?.focus()
                 }}
-                placeholder="z.B. Frisches Rindfleisch ab Samstag"
                 {...feldFehlerAttribute('status-title', Boolean(fieldErrors.title))}
                 className={cn(
-                  'w-full h-11 px-3 rounded-xl border bg-card text-base focus:outline-none focus:ring-2 transition-colors',
+                  RUNDUNG.feld,
+                  'w-full h-11 px-3 border bg-card text-base focus:outline-none focus:ring-2 transition-colors',
                   fieldErrors.title
                     ? 'border-status-offen focus:ring-status-offen/30'
                     : 'border-border focus:ring-ring/50',
@@ -314,12 +298,12 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   setBody(e.target.value.slice(0, 500))
                   if (fieldErrors.body) setFieldErrors((p) => ({ ...p, body: false }))
                 }}
-                placeholder="Schreibe hier deinen Beitrag…"
                 rows={5}
                 enterKeyHint={enterTaste(true, 'send')}
                 {...feldFehlerAttribute('status-body', Boolean(fieldErrors.body))}
                 className={cn(
-                  'w-full px-3 py-2.5 rounded-xl border bg-card text-base focus:outline-none focus:ring-2 resize-none transition-colors',
+                  RUNDUNG.feld,
+                  'w-full px-3 py-2.5 border bg-card text-base focus:outline-none focus:ring-2 resize-none transition-colors',
                   fieldErrors.body
                     ? 'border-status-offen focus:ring-status-offen/30'
                     : 'border-border focus:ring-ring/50',
@@ -430,57 +414,46 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                         )
                       }
                       className={cn(
-                        'min-h-11 text-xs px-3 py-1.5 rounded-full border transition-colors',
+                        // Nur der Name, kräftig (Liste Lauf 32, beitraege „Produkt-Chips mit Preis“).
+                        'min-h-11 rounded-full border-[1.5px] px-4 py-1.5 text-[15px] font-semibold transition-colors',
                         FOKUS_RAHMEN,
                         linkedProductIds.includes(p.id)
                           ? 'bg-foreground text-background border-foreground'
-                          : 'border-border text-muted-foreground hover:border-foreground/30',
+                          : 'border-border text-foreground hover:border-foreground/30',
                       )}
                     >
-                      {p.name} — {formatEuro(p.price)}
+                      {p.name}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* A2: orange CTA, A3: always clickable — validates on click */}
-            <button
-              onClick={handleTryNext}
-              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors', FOKUS_RAHMEN)}
-            >
-              Weiter zu Empfängern
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </button>
+            {/* Am Handy fest über der Unterleiste (G2), im Web am Ende des Formulars; immer bedienbar, prüft beim Tipp. */}
+            <FesteAktionsleiste>
+              <button type="button" onClick={handleTryNext} className={cn(AKTIONSLEISTE_KNOPF, WEB_HAUPTKNOPF)}>
+                Weiter zu Empfängern
+              </button>
+            </FesteAktionsleiste>
           </div>
         )}
 
         {/* ── Step 2: Channels ────────────────────────────────────────── */}
         {step === 2 && (
           <div>
-            <div className="mb-6">
-              <button
-                onClick={() => setStep(1)}
-                className={cn('mb-2 -ml-2 inline-flex min-h-11 items-center rounded-full px-2 text-sm text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
-              >
-                ← Zurück
-              </button>
-              <h1 className="font-heading text-xl font-semibold text-foreground">
-                Empfänger wählen
-              </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Kanäle auswählen</p>
+            <div className="mb-5">
+              <h2 className="font-heading text-[20px] font-semibold text-foreground">Empfänger wählen</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">Kanäle auswählen</p>
             </div>
 
             <div className="space-y-3 mb-5">
               <ChannelCard
-                icon={<Home className="size-5" aria-hidden="true" />}
                 title={BEITRAG_ABLAUF_TEXT.hofseiteTitel}
                 subtitle={BEITRAG_ABLAUF_TEXT.hofseiteSatz}
                 checked={showOnFarmPage}
                 onChange={setShowOnFarmPage}
               />
               <ChannelCard
-                icon={<Mail className="size-5" aria-hidden="true" />}
                 title={BEITRAG_ABLAUF_TEXT.mailTitel}
                 subtitle={
                   emailBlocked
@@ -495,48 +468,26 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               />
             </div>
 
-            <div className="bg-muted rounded-xl p-4 mb-5 text-sm text-muted-foreground">
-              {BEITRAG_ABLAUF_TEXT.zustimmung}
-            </div>
+            {/* Einfacher Text statt grauem Kasten (Liste Lauf 32, beitraege). */}
+            <p className="mb-5 text-sm text-muted-foreground">{BEITRAG_ABLAUF_TEXT.zustimmung}</p>
 
-            {/* A2: orange CTA */}
-            <button
-              onClick={() => setStep(3)}
-              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors', FOKUS_RAHMEN)}
-            >
-              Vorschau ansehen
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </button>
+            {/* „Vorschau ansehen“ ohne Pfeil; „← Zurück“ am Handy darunter, im Web umrandet links daneben (G2). */}
+            <FesteAktionsleiste className={WEB_KNOPFREIHE} zurueck={<ZurueckKnopf onClick={() => setStep(1)} />}>
+              <button type="button" onClick={() => setStep(3)} className={cn(AKTIONSLEISTE_KNOPF, WEB_HAUPTKNOPF)}>
+                Vorschau ansehen
+              </button>
+            </FesteAktionsleiste>
           </div>
         )}
 
         {/* ── Step 3: Preview + Send ──────────────────────────────────── */}
         {step === 3 && (
           <div>
-            <div className="mb-6">
-              <button
-                onClick={() => setStep(2)}
-                className={cn('mb-2 -ml-2 inline-flex min-h-11 items-center rounded-full px-2 text-sm text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
-              >
-                ← Zurück
-              </button>
-              <h1 className="font-heading text-xl font-semibold text-foreground">
-                {BEITRAG_ABLAUF_TEXT.vorschauSchritt}
-              </h1>
-            </div>
+            <h2 className="mb-5 font-heading text-[20px] font-semibold text-foreground">{BEITRAG_ABLAUF_TEXT.vorschauSchritt}</h2>
 
-            {/* Preview card */}
-            <div className="bg-card rounded-xl border border-border p-4 mb-5">
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1.5 text-xs rounded-full px-2.5 py-1 font-medium mb-3',
-                  ANLASS_COLOR[anlass],
-                )}
-              >
-                <AnlassSymbol className="size-5" aria-hidden="true" />
-                {BEITRAG_ANLASS[anlass].wort}
-              </span>
-              <h2 className="font-heading text-lg font-semibold text-foreground mb-2">{title}</h2>
+            {/* Vorschau ohne Marke über dem Titel (Liste Lauf 32, beitraege „Vorschau“). */}
+            <div className={cn('mb-5 border border-border bg-card p-4', RUNDUNG.karte)}>
+              <h3 className="mb-2 font-heading text-lg font-semibold text-foreground">{title}</h3>
               {/* Owner-Vorschau zeigt den Platzhalter als Chip (Status-Paket E) —
                   kundenseitig wird weiterhin gestrippt */}
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{renderStatusBodyWithChip(body)}</p>
@@ -545,11 +496,9 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                   {products
                     .filter((p) => linkedProductIds.includes(p.id))
                     .map((p) => (
-                      <span
-                        key={p.id}
-                        className="text-xs bg-muted rounded-full px-3 py-1 text-foreground"
-                      >
-                        {p.name} — {formatEuro(p.price)}
+                      // Umrandete Pille „Bergkäse · € 6,58“ (Liste Lauf 32, beitraege).
+                      <span key={p.id} className="rounded-full border-[1.5px] border-border px-3 py-1 text-[14px] font-semibold text-foreground">
+                        {p.name} · {formatEuro(p.price)}
                       </span>
                     ))}
                 </div>
@@ -557,32 +506,35 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             </div>
 
             {/* Recipient summary */}
-            <div className="bg-muted rounded-xl p-4 mb-5 space-y-2">
-              <h3 className="text-sm font-semibold text-foreground mb-2">Empfänger</h3>
+            {/* Weiße Karte, Kopf „EMPFÄNGER“, Haken als Symbol (Liste Lauf 32, beitraege). */}
+            <div className={cn('mb-5 space-y-2 border border-border bg-card p-4', RUNDUNG.karte)}>
+              <h3 className="mb-2 text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">Empfänger</h3>
               {showOnFarmPage && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
+                <p className="flex items-center gap-2 text-sm text-foreground">
+                  <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={2.5} aria-hidden="true" />
                   {BEITRAG_ABLAUF_TEXT.hofseiteZusammenfassung}
-                </div>
+                </p>
               )}
               {sendEmail && !emailBlocked && emailCount > 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="size-4 text-status-fertig shrink-0" aria-hidden="true" />
+                <p className="flex items-center gap-2 text-sm text-foreground">
+                  <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={2.5} aria-hidden="true" />
                   {emailCount} E-Mails werden automatisch versendet
-                </div>
+                </p>
               )}
             </div>
 
             <SpeicherFehler text={publishFehler} nochmal={publishFehler === NETZ_SATZ} onNochmal={handlePublish} laeuft={pending} className="mb-3" />
 
-            {/* A2: orange CTA */}
-            <button
-              onClick={handlePublish}
-              disabled={pending || veroeffentlicht}
-              className={cn('w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2', FOKUS_RAHMEN)}
-            >
-              {pending ? 'Wird versendet…' : 'Versand starten'}
-            </button>
+            <FesteAktionsleiste className={WEB_KNOPFREIHE} zurueck={<ZurueckKnopf onClick={() => setStep(2)} />}>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={pending || veroeffentlicht}
+                className={cn(AKTIONSLEISTE_KNOPF, WEB_HAUPTKNOPF, 'disabled:opacity-60')}
+              >
+                {pending ? 'Wird versendet…' : 'Versand starten'}
+              </button>
+            </FesteAktionsleiste>
           </div>
         )}
       </div>
@@ -601,54 +553,64 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
   )
 }
 
+/** Im Web der Hauptknopf so breit wie sein Wort, nicht über die ganze Karte (V47). */
+const WEB_HAUPTKNOPF = 'md:w-auto md:px-6'
+
+/** Im Web „Zurück“ links neben dem Hauptknopf (Liste Lauf 32, beitraege „Zurück als kleiner Link“). */
+const WEB_KNOPFREIHE = 'md:flex-row-reverse md:justify-end md:gap-3'
+
+/** „← Zurück“: am Handy der Textknopf unter dem Hauptknopf, im Web umrandet. */
+function ZurueckKnopf({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={cn(AKTIONSLEISTE_ZURUECK, 'md:min-h-[52px] md:w-auto md:rounded-[14px] md:border-[1.5px] md:border-foreground md:px-6')}>
+      ← Zurück
+    </button>
+  )
+}
+
+/** Ein Kanal als Karte mit Checkbox links, ohne Symbol (Liste Lauf 32, beitraege „Empfänger-Karten“). */
 function ChannelCard({
-  icon,
   title,
   subtitle,
   checked,
   onChange,
   disabled = false,
 }: {
-  icon: React.ReactNode
   title: string
   subtitle: string
   checked: boolean
   onChange?: (v: boolean) => void
   disabled?: boolean
 }) {
+  const an = checked && !disabled
   return (
     <button
       type="button"
+      role="checkbox"
       onClick={() => !disabled && onChange?.(!checked)}
-      disabled={disabled}
-      aria-pressed={checked && !disabled}
+      aria-checked={an}
+      aria-disabled={disabled || undefined}
       className={cn(
-        'w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all',
+        'flex w-full items-start gap-3 border-[1.5px] p-4 text-left transition-colors',
+        RUNDUNG.karte,
         FOKUS_RAHMEN,
-        checked && !disabled ? 'border-zustand-tun bg-zustand-tun-grund' : 'border-input hover:bg-muted/40',
-        disabled && 'opacity-50 cursor-not-allowed',
+        an ? 'border-foreground bg-card' : 'border-border bg-card hover:bg-muted/40',
+        disabled && 'cursor-not-allowed opacity-60',
       )}
     >
-      <div
+      <span
+        aria-hidden="true"
         className={cn(
-          'size-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5',
-          checked && !disabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-[5px] border-2',
+          an ? 'border-foreground bg-foreground text-background' : 'border-input',
         )}
       >
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-foreground">{title}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
-      </div>
-      <div
-        className={cn(
-          'size-5 rounded-md border-2 flex items-center justify-center shrink-0 mt-1 transition-colors',
-          checked && !disabled ? 'bg-primary border-primary' : 'border-input',
-        )}
-      >
-        {checked && !disabled && <CheckCircle className="size-3.5 text-primary-foreground" aria-hidden="true" />}
-      </div>
+        {an && <Check className="size-3.5" strokeWidth={3} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-[13px] text-muted-foreground">{subtitle}</span>
+      </span>
     </button>
   )
 }

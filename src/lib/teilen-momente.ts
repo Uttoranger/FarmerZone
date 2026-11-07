@@ -21,6 +21,14 @@ export const TEILEN_MOMENTE_SATZ =
   'Wenn dein Hof online geht, du ein neues Produkt anlegst oder etwas wieder da ist, fragen wir dich einmal, ob du es teilen willst.'
 export const TEILEN_MOMENTE_SCHALTER = 'Teilen-Hinweise zeigen'
 
+/**
+ * Der Satz, wenn das Umschalten scheiterte — wörtlich nach Board s2-konto-hof Bild 6 (Nr. 250): Er nennt den
+ * Stand, der weiter gilt (`bleibtAn`), damit niemand rätselt, ob es doch geklappt hat.
+ */
+export function teilenMomenteFehler(bleibtAn: boolean): string {
+  return `Wir konnten die Einstellung nicht speichern. Die Teilen-Hinweise sind weiter ${bleibtAn ? 'an' : 'aus'}.`
+}
+
 /** Der Satz unter dem Moment „gespeichert" (Mockup mobil-h2-gespeichert-teilen). */
 export const GESPEICHERT_HINWEIS = 'Fragt nur einmal pro Produkt. Abschalten unter Einstellungen.'
 

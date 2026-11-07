@@ -44,6 +44,7 @@ import {
   TON_TEXT,
   baueKonditionenSeite,
   einstellungenBereiche,
+  futtermittelZeile,
   zahlungHinweis,
   konditionenRechenbeispiel,
   konditionenZeile,
@@ -355,10 +356,19 @@ describe('einstellungenBereiche', () => {
 
   it('Futtermittel: Nummer mit Betriebsart grün und Sprung zum Abschnitt; ohne Nummer nur zur Info', () => {
     const mit = bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'futtermittel')
-    expect(mit).toMatchObject({ ton: 'fertig', zeile: 'Eigene Ernte (Primärproduktion) · AT 1234567', href: `/settings/profile#${BETRIEBSNUMMER_ANKER}` })
+    expect(mit).toMatchObject({ ton: 'fertig', zeile: 'Futtermittel-Nummer (LFBIS) AT 1234567', href: `/settings/profile#${BETRIEBSNUMMER_ANKER}` })
     expect(quelle('src/components/settings/profile-form.tsx')).toContain('BETRIEBSNUMMER_ANKER')
     const ohne = bereich(einstellungenBereiche(daten({ betriebsnummer: '  ' }), VOR_STICHTAG), 'futtermittel')
     expect(ohne.ton).toBe('neutral')
+  })
+
+  it('Futtermittel (Nr. 250): ohne Fachwort der Betriebsart — immer LFBIS, beim BAES-Fall zusätzlich BAES-Meldung', () => {
+    expect(futtermittelZeile('PRIMAERPRODUKTION', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1')
+    expect(futtermittelZeile(null, 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1')
+    expect(futtermittelZeile('REGISTRIERT', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1 · BAES-Meldung')
+    expect(futtermittelZeile('ZUGELASSEN', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1 · BAES-Meldung')
+    // Gegenprobe: das Fachwort der Liste steht in keiner Zeile mehr.
+    expect(bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'futtermittel').zeile).not.toContain('Primärproduktion')
   })
 
   it('Teilen-Hinweise (Nr. 30): grau, sagt an oder aus und führt nach /settings/teilen', () => {
@@ -382,7 +392,7 @@ describe('einstellungenBereiche', () => {
     // Vor dem Stichtag gilt die Startphase auch nach einer Wahl — wie in der Tarif-Zeile.
     expect(konditionenZeile({ ...ohne, tarif: 'HOFLADEN' }, VOR_STICHTAG)).toBe(konditionenZeile(ohne, VOR_STICHTAG))
     expect(normal(konditionenZeile({ ...ohne, gruendungBis: BIS_SILVESTER_2027 }, NACH_STICHTAG))).toBe(
-      'Gründungshof · ohne Grundgebühr bis 31. Dezember 2027'
+      'Gründungshof bis 31. Dezember 2027 · ohne Grundgebühr'
     )
     expect(konditionenZeile(ohne, NACH_STICHTAG)).toBe('Hoftor · kostenlos')
     expect(konditionenZeile({ ...ohne, tarif: 'HOFLADEN' }, NACH_STICHTAG)).toBe('Hofladen')
@@ -390,7 +400,7 @@ describe('einstellungenBereiche', () => {
 
   it('die Zeile nimmt den Gründungshof aus den Daten der Übersicht (gruendungBis, ab Nr. 62 gesetzt) — grauer Punkt, keine Warnfarbe', () => {
     const b = bereich(einstellungenBereiche(daten({ gruendungBis: BIS_SILVESTER_2027 }), VOR_STICHTAG), 'konditionen')
-    expect(normal(b.zeile)).toBe('Gründungshof · ohne Grundgebühr bis 31. Dezember 2027')
+    expect(normal(b.zeile)).toBe('Gründungshof bis 31. Dezember 2027 · ohne Grundgebühr')
     expect(b.ton).toBe('neutral')
   })
 })
@@ -663,9 +673,17 @@ describe('Kopf, Fehler, Laden', () => {
     expect(k.match(/<h1\b/g)).toHaveLength(1)
   })
 
-  it('Fehler inline als neutrale Hinweiskarte mit „Neu laden" (Board s1-/w1-einstellungen Bild 2, Lauf 31)', () => {
-    const f = html(createElement(EinstellungenFehler, { titel: 'Einstellungen', href: '/settings' }))
-    expect(f).toContain('data-ton="neutral"')
+  it('Fehler inline nach G6 als Kasten in der Warnfarbe mit „Neu laden" und Werkzeug-Kopf (Board s1-/w1-einstellungen Bild 2, Nr. 250)', () => {
+    navigation.pfad = '/settings'
+    const f = html(createElement(EinstellungenFehler, { titel: 'Einstellungen', href: '/settings', unterzeile: 'Hof Test' }))
+    navigation.pfad = '/settings/konditionen'
+    expect(f).toContain('data-slot="hinweiskarte-fehler"')
+    expect(f).toContain('Wir konnten deine Einstellungen gerade nicht laden.')
+    expect(f).toContain('data-werkzeug-kopf')
+    expect(f).toContain('Hof Test')
+    expect(f.match(/<h1\b/g)).toHaveLength(1)
+    // Gegenprobe: nicht mehr die neutrale Hinweiskarte von Lauf 31.
+    expect(f).not.toContain('data-ton="neutral"')
     expect(f).toContain('Neu laden')
     expect(f).toContain('Deine Angaben sind nicht verloren. Versuch es noch einmal.')
     expect(f).toContain('href="/settings"')

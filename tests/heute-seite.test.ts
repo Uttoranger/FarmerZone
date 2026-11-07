@@ -53,7 +53,6 @@ import {
   abholungHeuteText,
   brauchtDichAnzeige,
   HEUTE_ABHOLEN,
-  HEUTE_ABHOLZEITEN_SATZ,
   KENNZAHL_TEXT,
   PACK_MARKE,
   abholfensterHeute,
@@ -902,7 +901,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
       createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })
     )
     expect(ohneAbholzeit).toContain('href="/orders/o1"')
-    expect(ohneAbholzeit).toContain(HEUTE_ABHOLZEITEN_SATZ)
+    expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.satz)
     expect(ohneAbholzeit).toContain(`href="${ABHOLZEITEN_FEHLEN.aktion.href}"`)
     expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.aktion.text)
     const mitAbholzeit = html(

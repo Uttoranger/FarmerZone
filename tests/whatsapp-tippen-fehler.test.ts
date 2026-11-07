@@ -150,16 +150,15 @@ describe('Tipp-Liste: kein Link ohne Ziffern', () => {
   })
 })
 
-describe('Tipp-Liste: die Nummer einheitlich', () => {
-  it('unter dem Namen steht die Nummer als „+43 660 000 0000“ (Nr. 81, N8) — Unlesbares unverändert', () => {
+describe('Tipp-Liste: keine Nummer in der Liste', () => {
+  it('die Liste zeigt Namen, keine Telefonnummer (Liste Lauf 32, whatsapp-plakat „Nummer weg“, Nr. 250) — die Nummer steckt nur im Link', () => {
     const ROH: Abonnentin = { id: 'cabo00000000000000000004', name: 'Dora Muster', phone: '0660 0000000' }
-    const OHNE: Abonnentin = { id: 'cabo00000000000000000003', name: 'Carla Muster', phone: 'keine Angabe' }
-    const zeilen = elemente(rendere([ROH, OHNE], []))
-      .filter((e) => e.type === 'p')
-      .map((e) => e.props?.children)
-    expect(zeilen).toContain('+43 660 000 0000')
-    expect(zeilen).toContain('keine Angabe')
-    expect(zeilen).not.toContain('0660 0000000')
+    const baum = rendere([ROH], [])
+    const texte = elemente(baum).flatMap((e) => (typeof e.props?.children === 'string' ? [e.props.children] : []))
+    expect(texte.join(' ')).not.toMatch(/0660|\+43/)
+    expect(texte).toContain('Dora Muster')
+    // Gegenprobe: der wa.me-Link trägt die Nummer weiter.
+    expect(elemente(baum).find((e) => e.type === 'a')?.props?.href).toMatch(/^https:\/\/wa\.me\/436600000000/)
   })
 })
 
