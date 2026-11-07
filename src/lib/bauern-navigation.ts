@@ -465,8 +465,12 @@ export function hofHandyAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 
 // Mehr-Blatt, damit es keine zweite Schreibweise gibt („‹ Alle Kunden",
 // „Zu den Beiträgen" und „Meine Meldungen" hießen vorher je Seite anders).
 
-/** Wohin der Rückweg einer Unterseite führt und wie die Elternseite heißt. */
-export type Elternseite = { href: string; name: string }
+/**
+ * Wohin der Rückweg einer Unterseite führt und wie die Elternseite heißt.
+ * `nurHandy`: Der Rückweg gilt nur unter 768 px — die Elternseite gibt es im
+ * Web nicht (das Mehr-Blatt; dort steht die Seite selbst in der Seitenleiste).
+ */
+export type Elternseite = { href: string; name: string; nurHandy?: true }
 
 /** Der sichtbare Name steht neben dem Pfeil; der Screenreader hört „Zurück zu …". */
 export const RUECKWEG_PRAEFIX = 'Zurück zu'
@@ -486,21 +490,42 @@ function beitraegeReiter(): MeinHofReiter {
 }
 
 /**
+ * „Mehr“ als Elternseite der Einstellungen am Handy (Register N1, Ergänzung
+ * 7.11.2026; Board s1-einstellungen „‹“). Das Mehr-Blatt hat keine eigene
+ * Adresse — es liegt über der Seite, von der aus man es öffnet. Der Rückweg
+ * führt deshalb nach Heute, der Startseite des Hofbereichs, von der aus das
+ * Blatt meist geöffnet wird; kam man von dort, ist der Tipp ein Schritt im
+ * Verlauf (`beimTipp`, ui/rueckweg-tipp.ts) und Heute steht da, wie man es
+ * verlassen hat. Nur am Handy: Im Web steht Einstellungen in der Seitenleiste
+ * und hat keinen Rückweg (Board w1-einstellungen „ohne Zurück“).
+ */
+function mehrBlatt(): Elternseite {
+  return { href: navPunkt('heute').href, name: HOF_MEHR_TITEL, nurHandy: true }
+}
+
+/**
  * Die Unterseiten mit Rückweg (freigabe.md §12 Nr. 44). Ein Muster je Route,
  * genau so tief wie die Route — /orders/today/print (Druckansicht ohne
  * HofShell) trifft deshalb nichts. /analytics/umfeld leitet seit Nr. 22c auf
  * /region um und zeigt den Kopf nie; die Zuordnung bleibt trotzdem, wie sie
- * beauftragt ist.
+ * beauftragt ist. Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg
+ * — einzige Ausnahme ist /settings am Handy (`mehrBlatt`, N1-Ergänzung
+ * 7.11.2026). Das Plakat gehört seit Nr. 250 zu den Beiträgen (Liste Lauf 32,
+ * whatsapp-plakat „Zurück-Ziel“; vorher Heute).
  */
 const UNTERSEITEN: readonly { muster: RegExp; eltern: () => Elternseite }[] = [
+  { muster: /^\/settings$/, eltern: mehrBlatt },
   { muster: /^\/settings\/.+$/, eltern: () => alsElternseite(navPunkt('einstellungen')) },
   { muster: /^\/customers\/[^/]+$/, eltern: () => alsElternseite(navPunkt('kunden')) },
   { muster: /^\/orders\/[^/]+$/, eltern: () => alsElternseite(navPunkt('bestellungen')) },
   { muster: /^\/postfach\/[^/]+$/, eltern: () => alsElternseite(navPunkt('postfach')) },
   { muster: /^\/status\/new$/, eltern: () => alsElternseite(beitraegeReiter()) },
   { muster: /^\/status\/[^/]+\/send-whatsapp$/, eltern: () => alsElternseite(beitraegeReiter()) },
-  { muster: /^\/status\/plakat$/, eltern: () => alsElternseite(navPunkt('heute')) },
+  { muster: /^\/status\/plakat$/, eltern: () => alsElternseite(beitraegeReiter()) },
   { muster: /^\/fehler-melden$/, eltern: () => alsElternseite(navPunkt('hilfe')) },
+  // /teilen steht ohne HofShell (Ziel des Teilens-Menüs), Rückweg nach Heute wie der Ausweg „Zu Heute“
+  // (Board s2-/w2-teilen, Liste Lauf 32 teilen „Kopfleiste fehlt“, Nr. 250).
+  { muster: /^\/teilen$/, eltern: () => alsElternseite(navPunkt('heute')) },
   { muster: /^\/analytics\/umfeld$/, eltern: () => alsElternseite(navPunkt('auswertung')) },
 ]
 
@@ -513,7 +538,8 @@ function nurPfad(pfad: string): string {
 /**
  * Die Elternseite zu einem Pfad — null für alles, was keine Unterseite ist:
  * Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg (dorthin führt
- * die Navigation selbst), ebenso unbekannte Pfade.
+ * die Navigation selbst), ebenso unbekannte Pfade. Ausnahme: /settings hat am
+ * Handy „Mehr“ (`nurHandy`, Register N1, Ergänzung 7.11.2026).
  */
 export function elternseite(pfad: string | null | undefined): Elternseite | null {
   if (!pfad) return null

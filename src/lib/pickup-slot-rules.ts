@@ -108,7 +108,7 @@ export function findBatchSlotError(candidates: SlotKey[], ctx: SlotContext): str
  */
 export const ABHOLZEITEN_FEHLEN = {
   titel: 'Noch keine Abholzeiten',
-  satz: 'Trag deine Abholzeiten ein, damit deine Kundinnen bei dir bestellen können.',
+  satz: 'Ohne Abholzeit kann niemand bei dir bestellen. Trag ein, wann man bei dir abholen kann.',
   aktion: { text: 'Abholzeiten eintragen', href: '/settings/pickup-slots' },
 } as const
 

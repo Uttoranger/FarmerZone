@@ -8,8 +8,9 @@ import { prisma } from '@/lib/prisma'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { KARTE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { UNTERSEITE_RAHMEN, UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import { cn } from '@/lib/utils'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { BAR_KARTE_TEXT, ONLINE_AUS_SATZ, ONLINE_AUS_TITEL, barKarte, zahlungHinweis, type BarKarte } from '@/lib/hof-einstellungen'
@@ -27,6 +28,8 @@ async function getFarmPaymentData(userId: string) {
   return prisma.farm.findUnique({
     where: { ownerId: userId },
     select: {
+      // Der Hofname der Unterzeile im Werkzeug-Kopf (G1, Nr. 250).
+      name: true,
       stripeAccountId: true,
       stripeAccountReady: true,
       acceptsOnline: true,
@@ -89,7 +92,9 @@ export default async function PaymentsPage({
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf titel="Zahlung" satz="Verwalte, wie Kundinnen bezahlen können." />
+      {/* Werkzeug-Kopf (G1, Nr. 250) mit Hof-Unterzeile, der Satz darunter (Boards s2-/w2-hofdaten-zahlung). */}
+      <WerkzeugKopf titel={"Zahlung"} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
+      <p className={UNTERSEITE_SATZ}>Verwalte, wie Kundinnen bezahlen können.</p>
 
       <div className="flex flex-col gap-4">
         {hinweis === 'geschafft' && (
@@ -124,9 +129,10 @@ export default async function PaymentsPage({
         )}
 
         <section aria-labelledby="online-titel" className={cn(KARTE, 'p-5')}>
-          <div className="flex flex-wrap items-start justify-between gap-2">
+          {/* Titel in der Serifenschrift, die Marke rechts daneben statt darunter (Liste Lauf 32, hofdaten-zahlung). */}
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 id="online-titel" className="text-[15.5px] font-semibold text-foreground">
+              <h2 id="online-titel" className="font-heading text-[18px] font-semibold text-foreground">
                 Online-Zahlung (Stripe)
               </h2>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
@@ -168,19 +174,19 @@ export default async function PaymentsPage({
         </section>
 
         <section aria-labelledby="bar-titel" className={cn(KARTE, 'p-5')}>
-          <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 id="bar-titel" className="text-[15.5px] font-semibold text-foreground">
+              <h2 id="bar-titel" className="font-heading text-[18px] font-semibold text-foreground">
                 {BAR_KARTE_TEXT.titel}
               </h2>
               <p className="mt-0.5 text-[13px] text-muted-foreground">{BAR_KARTE_TEXT.beschreibung}</p>
             </div>
-            {bar && <StatusBadge status={bar.ton}>{bar.marke}</StatusBadge>}
+            {bar && <StatusBadge status={bar.ton} className="shrink-0">{bar.marke}</StatusBadge>}
           </div>
           {bar?.satz && <p className="mt-3 text-[13.5px] leading-snug text-foreground">{bar.satz}</p>}
           {(bar?.lastschrift || bar?.zuKonditionen) && (
             <div className="mt-4">
-              <Link href={BAR_KARTE_TEXT.einrichtenHref} className={KNOPF_RAHMEN}>
+              <Link href={BAR_KARTE_TEXT.einrichtenHref} className={cn(KNOPF_RAHMEN, 'w-full justify-center')}>
                 {bar.lastschrift ? BAR_KARTE_TEXT.einrichten : BAR_KARTE_TEXT.zuKonditionen}
               </Link>
             </div>

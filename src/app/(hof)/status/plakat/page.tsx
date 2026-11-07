@@ -4,8 +4,11 @@ import { redirect } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
+import { BeitraegeBrotkrumen } from '../beitraege-brotkrumen'
 import { QrPlakat } from '@/components/teilen/qr-plakat'
+import { PlakatVorschau } from '@/components/teilen/plakat-vorschau'
 import { DruckenKnopf } from '@/components/teilen/drucken-knopf'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -41,26 +44,31 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
   const daten = await getPlakatDaten(farm.id)
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 print:m-0 print:max-w-none print:p-0">
+    <div className="w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10 print:m-0 print:max-w-none print:p-0">
       {/* A4 ohne Druckrand: Das Blatt bringt seinen eigenen Rand mit. */}
       <style>{'@page { size: A4; margin: 0; }'}</style>
-      {/* Direkt im Rahmen, nicht im Kasten um den Titel: Die Leiste am Handy
-          klebt nur, solange ihr Elternelement reicht. Gedruckt wird sie nie. */}
-      <UnterseitenKopf />
-      <div className="print:hidden">
-        <div className="mb-5 flex flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-[26px] font-semibold md:text-[30px]">QR-Plakat</h1>
-            <p className="mt-1 text-[13.5px] text-muted-foreground">
-              Zum Aushängen im Hofladen, am Hoftor oder beim Bäcker. Der Code führt direkt zu deiner Hofseite.
-            </p>
-          </div>
-          {daten && <DruckenKnopf className={KNOPF_ORANGE} />}
-        </div>
-      </div>
+      {/* Werkzeug-Kopf (G1, Nr. 250): Elternseite „Beiträge“ (N1), Unterzeile „Mein Hof › Beiträge“; im Web
+          „Drucken“ bündig rechts neben der h1 (Liste Lauf 32, whatsapp-plakat), am Handy in der festen Leiste
+          unten (G2). Direkt im Rahmen: Die Leiste am Handy klebt nur, solange ihr Elternelement reicht. Gedruckt
+          wird nichts davon (print:hidden im Baustein). */}
+      <WerkzeugKopf
+        titel="QR-Plakat"
+        unterzeile={<BeitraegeBrotkrumen />}
+        aktion={daten ? <div className="hidden md:block"><DruckenKnopf className={KNOPF_ORANGE} /></div> : undefined}
+      />
+      <p className="mb-5 text-[15px] leading-relaxed text-muted-foreground md:text-base print:hidden">
+        Zum Aushängen im Hofladen, am Hoftor oder beim Bäcker. Der Code führt direkt zu deiner Hofseite.
+      </p>
 
       {daten ? (
-        <QrPlakat daten={daten} />
+        <>
+          <PlakatVorschau>
+            <QrPlakat daten={daten} />
+          </PlakatVorschau>
+          <FesteAktionsleiste className="md:hidden">
+            <DruckenKnopf className={AKTIONSLEISTE_KNOPF} />
+          </FesteAktionsleiste>
+        </>
       ) : (
         <EmptyState
           titel="Das Plakat gibt es, sobald dein Hof online ist"

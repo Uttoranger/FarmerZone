@@ -14,7 +14,6 @@ import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
 import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   BRAUCHT_DICH_LEER,
-  HEUTE_ABHOLZEITEN_SATZ,
   brauchtDichAnzeige,
   zuTunLinkText,
   HEUTE_KEINE_BESTELLUNGEN,
@@ -467,7 +466,7 @@ export function Packliste({
           // dem allgemeinen EmptyState vor).
           <div className={cn(KARTE, 'flex flex-col gap-2 px-3.5 py-3')}>
             <p className="text-base font-semibold">{ABHOLZEITEN_FEHLEN.titel}</p>
-            <p className={cn('text-sm', LEISE)}>{HEUTE_ABHOLZEITEN_SATZ}</p>
+            <p className={cn('text-sm', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
             <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'h-auto min-h-[52px] w-full rounded-[14px] text-base font-bold')}>
               {ABHOLZEITEN_FEHLEN.aktion.text}
             </Link>
@@ -483,7 +482,7 @@ export function Packliste({
           {!leer.naechsteAbholung && (
             // Bestellungen für heute, aber keine aktive Abholzeit: Satz und Knopf stehen trotzdem (sonst nur im ausblendbaren „Zu tun").
             <div className="flex flex-col gap-2.5 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-[18px]">
-              <p className={cn('text-[13px]', LEISE)}>{HEUTE_ABHOLZEITEN_SATZ}</p>
+              <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
               <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'shrink-0 self-start sm:self-auto')}>
                 {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>

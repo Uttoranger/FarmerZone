@@ -53,6 +53,7 @@ import { barMoeglich, bestellGebuehr, type GebuehrLage } from '@/lib/plattformge
 import { BAR_GEBUEHR_SEPA_SATZ, BAR_SERVICEGEBUEHR_AB, LASTSCHRIFT_TEXT } from '@/lib/konditionen'
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
+import { farmArchiveBlockedMessage } from '@/lib/farm-archive'
 import { ArchiveFarmCard } from '@/app/(hof)/settings/account/archive-farm-card'
 import { Barzahlung, type BarzahlungAnzeige } from '@/components/hof-einstellungen/barzahlung'
 import { formatDatumLang } from '@/lib/format'
@@ -258,12 +259,27 @@ describe('Wörter der Boards', () => {
   })
 
   it('Stilllegen sagt „Hof“, nie „Hofladen“, und verweist auf „Urlaub und Pause“ (V55)', () => {
-    const markup = html(createElement(ArchiveFarmCard, { farmSlug: 'hof-test', isArchived: false }))
+    const markup = html(createElement(ArchiveFarmCard, { farmSlug: 'hof-test', isArchived: false, offeneBestellungen: 0 }))
     expect(markup).toContain(KONTO_TEXT.stilllegenSatz)
     expect(markup).toContain('Deinen Hof dauerhaft schließen.')
     expect(markup).toContain(URLAUB_UND_PAUSE)
     expect(markup).not.toMatch(/Hofladen|Urlaubsmodus/)
     // Gegenprobe: Die Suche schlägt am alten Satz an.
     expect('Deinen Hofladen dauerhaft schließen.').toMatch(/Hofladen/)
+  })
+
+  it('„Hof stilllegen“ steht nur ohne offene Bestellungen; sonst der Hinweis mit „Zu den Bestellungen“ (Liste Lauf 32, konto-hof, Nr. 250)', () => {
+    const frei = html(createElement(ArchiveFarmCard, { farmSlug: 'hof-test', isArchived: false, offeneBestellungen: 0 }))
+    const gesperrt = html(createElement(ArchiveFarmCard, { farmSlug: 'hof-test', isArchived: false, offeneBestellungen: 6 }))
+    const knopf = />Hof stilllegen<\/button>/
+    expect(frei).toMatch(knopf)
+    expect(frei).not.toContain('Zu den Bestellungen')
+    expect(gesperrt).not.toMatch(knopf)
+    expect(gesperrt).toContain('Du hast noch 6 offene Bestellungen.')
+    expect(gesperrt).toContain('Schließe sie ab oder storniere sie, dann kannst du den Hof stilllegen.')
+    expect(gesperrt).toContain('href="/orders"')
+    // Dieselbe Wortwahl wie die Antwort des Servers (farmArchiveBlockedMessage), nur in zwei Teilen.
+    expect(farmArchiveBlockedMessage(6)).toBe('Du hast noch 6 offene Bestellungen. Schließe sie ab oder storniere sie, dann kannst du den Hof stilllegen.')
+    expect(farmArchiveBlockedMessage(1)).toBe('Du hast noch 1 offene Bestellung. Schließe sie ab oder storniere sie, dann kannst du den Hof stilllegen.')
   })
 })

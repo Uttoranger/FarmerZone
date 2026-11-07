@@ -7,7 +7,8 @@ import { prisma } from '@/lib/prisma'
 import { WERBEMAIL_EMPFAENGER } from '@/server/abo-anmeldung'
 import { mailSperreWo } from '@/lib/beitrag-mailabstand'
 import { anlassParameterSchema } from '@/schemas/beitrag-anlass'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { BeitraegeBrotkrumen } from '../beitraege-brotkrumen'
 import { StatusNewClient } from './status-new-client'
 import { MARKE } from '@/lib/marke'
 
@@ -65,8 +66,10 @@ export default async function StatusNewPage({
   ])
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
-      <UnterseitenKopf />
+    <div className="w-full max-w-[752px] px-4 pt-5 pb-12 md:px-8 md:pt-7 xl:px-10">
+      {/* Werkzeug-Kopf (G1, Nr. 250): h1 „Neuer Beitrag“ in jedem Schritt, Unterzeile „Mein Hof › Beiträge“; im Web
+          linksbündig mit „‹ Beiträge“ (Liste Lauf 32, beitraege). */}
+      <WerkzeugKopf titel="Neuer Beitrag" unterzeile={<BeitraegeBrotkrumen />} />
       <StatusNewClient
         products={products.map((p) => ({ id: p.id, name: p.name, price: Number(p.price) }))}
         emailCount={emailCount}

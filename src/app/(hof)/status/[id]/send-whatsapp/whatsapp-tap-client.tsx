@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Check, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
 import { whatsAppLink } from '@/lib/whatsapp'
-import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
@@ -114,121 +113,86 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
   }
 
   if (stand.gesamt === 0) {
+    // Die h1 „WhatsApp versenden“ trägt der Werkzeug-Kopf der Seite (G1); hier Beitrag und Leerzustand (G4).
     return (
-      <div>
-        {/* Der Titel ist hier die eine Überschrift der Seite: eine zweite, unsichtbare mit dem Seitennamen wäre eine zweite Fassung desselben Textes. */}
+      <div className="max-w-[670px]">
+        <p className="mb-4 text-[15px] font-semibold text-foreground">{title}</p>
         <EmptyState
           titel={TEXT.leer.titel}
-          titelStufe={1}
           satz={TEXT.leer.satz}
           ausweg={
             <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>
               {TEXT.leer.aktion}
             </Link>
           }
-          className="mt-6"
         />
       </div>
     )
   }
 
   return (
-    <div>
-      {stand.fertig ? (
-        // Abschluss nur mit dem ehrlichen Satz; die Liste bleibt darunter, damit sich jede Person zurücksetzen lässt.
-        <div className="text-center pt-6 pb-8">
-          <div className="size-16 rounded-full bg-accent/18 flex items-center justify-center mx-auto mb-4">
-            <Check className="size-8 text-status-fertig" aria-hidden="true" />
-          </div>
-          <h1 className="font-heading text-xl font-semibold text-foreground">{TEXT.abschluss(stand.gesamt)}</h1>
-        </div>
-      ) : (
-        <>
-          <div className="mb-5">
-            <h1 className="font-heading text-2xl font-semibold text-foreground">WhatsApp versenden</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{TEXT.hinweis}</p>
-          </div>
-
-          {/* Preview */}
-          <div className="bg-muted rounded-xl p-4 mb-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Dein Beitrag</p>
-            <p className="text-sm font-semibold text-foreground">{title}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{body}</p>
-          </div>
-
-          {/* Progress */}
-          <div className="mb-5">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="font-medium text-foreground">{TEXT.stand(stand.geoeffnet, stand.gesamt)}</span>
-              <span className="text-muted-foreground">{TEXT.offen(stand.gesamt - stand.geoeffnet)}</span>
-            </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent rounded-full transition-all duration-300"
-                style={{ width: `${(stand.geoeffnet / stand.gesamt) * 100}%` }}
-              />
-            </div>
-          </div>
-        </>
-      )}
+    // Linksbündig an der Seitenleiste, höchstens 670 px (Liste Lauf 32, whatsapp-plakat „Inhalt mittig“).
+    <div className="max-w-[670px]">
+      {/* Statt der Karte „DEIN BEITRAG“ mit Balken nur der Titel und der Stand (Board s2-/w2-whatsapp-plakat Bild 1). */}
+      <div className="mb-4 flex flex-col gap-1">
+        <p className="text-[16px] font-semibold text-foreground">{title}</p>
+        {stand.fertig ? (
+          <p role="status" className="text-[15px] font-bold text-status-fertig">
+            {TEXT.abschluss(stand.gesamt)}
+          </p>
+        ) : (
+          <p className="text-[14px] text-muted-foreground">
+            <strong className="font-bold text-foreground">{TEXT.stand(stand.geoeffnet, stand.gesamt)}</strong>
+            {' · '}
+            <strong className="font-bold text-status-fertig">{TEXT.offen(stand.gesamt - stand.geoeffnet)}</strong>
+          </p>
+        )}
+      </div>
 
       {fehler && (
-        <p role="alert" className="mb-3 text-[13px] font-medium text-status-offen">
+        <p role="alert" className="mb-3 text-[14px] font-semibold text-status-offen">
           {fehler}
         </p>
       )}
 
-      {/* Subscriber list */}
-      <ul className="flex flex-col gap-2">
-        {stand.personen.map((person) => {
+      {/* Eine Karte mit Linien zwischen den Personen, ohne Telefonnummer (Board). */}
+      <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
+        {stand.personen.map((person, index) => {
           const link = person.geoeffnet ? null : buildWaUrl(person)
           // Board s2/w2-whatsapp-plakat (V51): nur die nächste offene Person trägt den orangen Hauptknopf, die übrigen sind Umrisse.
           const naechste = stand.personen.find((p) => !p.geoeffnet)?.id === person.id
           return (
-            <li
-              key={person.id}
-              className={cn(
-                'flex items-center gap-3 p-3 rounded-xl border border-border transition-colors',
-                person.geoeffnet ? 'bg-muted/40' : 'bg-card'
-              )}
-            >
-              {/* Avatar */}
+            <li key={person.id} className={cn('flex items-center gap-3 px-3.5 py-3', index > 0 && 'border-t border-border')}>
+              {/* Initialen in jedem Zustand (Board); „Geöffnet“ steht als Wort rechts. */}
               <div
-                className={cn(
-                  'size-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                  person.geoeffnet ? 'bg-accent/18 text-status-fertig' : 'bg-muted text-muted-foreground'
-                )}
+                aria-hidden="true"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[13px] font-bold text-muted-foreground"
               >
-                {person.geoeffnet ? <Check className="size-4" aria-hidden="true" /> : person.name.charAt(0).toUpperCase()}
+                {initialen(person.name)}
               </div>
 
-              {/* Name + phone */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate" title={person.name}>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold text-foreground" title={person.name}>
                   {person.name}
                 </p>
-                <p className="text-xs text-muted-foreground">{formatiereTelefon(person.phone)}</p>
                 {person.geoeffnet && (
-                  <p className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                  // Ein Link „Doch nicht gesendet?“ statt Frage und Knopf (Board).
+                  <button
+                    type="button"
+                    onClick={() => speichere(person.id, false)}
+                    className={cn('-my-2 min-h-11 text-[14px] font-semibold text-foreground underline underline-offset-2', RUNDUNG.feld, FOKUS_RAHMEN)}
+                  >
                     {TEXT.zuruecksetzenFrage}
-                    <button
-                      type="button"
-                      onClick={() => speichere(person.id, false)}
-                      className={cn(
-                        'min-h-11 -my-2 px-1 font-semibold text-foreground underline underline-offset-2 rounded-md',
-                        FOKUS_RAHMEN
-                      )}
-                    >
-                      {TEXT.zuruecksetzen}
-                      <span className="sr-only">: {person.name}</span>
-                    </button>
-                  </p>
+                    <span className="sr-only"> {TEXT.zuruecksetzen}: {person.name}</span>
+                  </button>
                 )}
               </div>
 
-              {/* Action */}
               {person.geoeffnet ? (
-                <span className="text-xs text-status-fertig font-medium shrink-0">{TEXT.geoeffnet}</span>
+                <span className="shrink-0 self-start text-[14px] font-bold text-status-fertig">
+                  <span aria-hidden="true">✓ </span>
+                  <span>{TEXT.geoeffnet}</span>
+                </span>
               ) : (
                 link && (
                   <a
@@ -239,14 +203,13 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
                       rueckkehr.current = { id: person.id, verlassen: false }
                     }}
                     className={cn(
-                      'flex items-center gap-1.5 min-h-11 px-4 rounded-full text-sm font-semibold transition-colors shrink-0',
+                      'flex min-h-11 shrink-0 items-center rounded-[14px] px-4 text-[15px] font-bold transition-colors',
                       naechste
                         ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                         : 'border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted',
                       FOKUS_RAHMEN
                     )}
                   >
-                    <MessageSquare className="size-3.5" aria-hidden="true" />
                     Öffnen
                     <span className="sr-only"> – Nachricht an {person.name} in WhatsApp</span>
                   </a>
@@ -256,6 +219,17 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
           )
         })}
       </ul>
+
+      {/* Der Hinweis unter der Liste statt unter der h1 (Liste Lauf 32, whatsapp-plakat). */}
+      <p className="mt-4 text-[14px] leading-normal text-muted-foreground">{TEXT.hinweis}</p>
     </div>
   )
+}
+
+/** Zwei Buchstaben aus Vor- und Nachname (Board „MH“, „ES“); ein Name allein gibt einen. */
+function initialen(name: string): string {
+  const teile = name.trim().split(/\s+/).filter(Boolean)
+  const erste = teile[0]?.charAt(0) ?? ''
+  const letzte = teile.length > 1 ? (teile[teile.length - 1]?.charAt(0) ?? '') : ''
+  return (erste + letzte).toUpperCase()
 }

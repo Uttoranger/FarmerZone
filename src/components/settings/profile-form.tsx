@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,7 +15,9 @@ import {
   type ProfileFormData,
 } from '@/server/actions/farm'
 import { aktionOhneWurf, meldeGescheitertesSpeichern, speichereProfil, speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
-import { FeldFehlerSatz, SpeicherFehler, feldFehlerAttribute, hilfeKennung } from '@/components/shared/formular-meldungen'
+import { FeldFehlerSatz, FormularPruefen, SpeicherFehler, feldFehlerAttribute, hilfeKennung } from '@/components/shared/formular-meldungen'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
 import { FELD_ATTRIBUTE, enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
 import { FREIWILLIG, HOF_EMAIL_HILFE } from '@/lib/profil-meldungen'
 import { HOF_EMAIL_ANKER, HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
@@ -64,6 +65,17 @@ const GRENZE: Partial<Record<keyof ProfileFormData, number>> = {
   phone: TELEFON_MAX,
   email: EMAIL_MAX,
 }
+
+/** Abschnittsüberschrift als Kicker in Großbuchstaben (Liste Lauf 32, hofdaten-zahlung „Abschnittsüberschriften“). */
+const KICKER = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
+/** Beschriftungen fett in Textfarbe (dieselbe Zeile). */
+const BESCHRIFTUNG = 'mb-1 block text-sm font-semibold text-foreground'
+/** Felder 10 px rund (G8) statt Pille; der Fokus als Rahmen außen, auch um den Fehlerrand (Liste Lauf 32, hofdaten-zahlung). */
+const FELD = cn('min-h-11', RUNDUNG.feld, FOKUS_RAHMEN)
+/** Fehlerrand orange in beiden Themes (`status-offen`, V17) — vorher im Dunkeln dunkelrot (`destructive` aus ui/input). */
+const FELD_FEHLER = 'border-status-offen aria-invalid:border-status-offen aria-invalid:ring-status-offen/25 dark:aria-invalid:ring-status-offen/40'
+/** Je Abschnitt eine Karte, 12 px rund (G8). */
+const KARTE_ABSCHNITT = cn('space-y-4 border border-border bg-card p-4', RUNDUNG.karte)
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
@@ -266,7 +278,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     const attribute = istAttributFeld(id) ? FELD_ATTRIBUTE[id] : undefined
     return (
       <div>
-        <Label htmlFor={id} className="text-sm text-muted-foreground mb-1 block">{label}</Label>
+        <Label htmlFor={id} className={BESCHRIFTUNG}>{label}</Label>
         <Input
           id={id}
           {...register(id)}
@@ -274,7 +286,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           enterKeyHint={enterTaste(letztes === true)}
           placeholder={placeholder}
           {...feldFehlerAttribute(id, Boolean(errors[id]), Boolean(hilfe))}
-          className={errors[id] ? 'min-h-11 scroll-mt-6 border-status-offen' : 'min-h-11 scroll-mt-6'}
+          className={cn(FELD, 'scroll-mt-6', errors[id] && FELD_FEHLER)}
         />
         {max !== undefined && <FeldZaehler control={control} name={id} max={max} />}
         {hilfe && (
@@ -289,33 +301,38 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
   // noValidate: Mit type="email" prüfte sonst der Browser zuerst – mit englischer Blase und ohne unsere Sätze am Feld.
   return (
-    <form noValidate onSubmit={handleSubmit(onSubmit)} onKeyDown={weiterMitEnter} className="space-y-6">
-      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-        <h2 className="font-medium text-foreground">Hof-Informationen</h2>
+    <form noValidate onSubmit={handleSubmit(onSubmit)} onKeyDown={weiterMitEnter} className="flex flex-col gap-4">
+      {/* „Bitte prüfe das markierte Feld.“ über dem Formular, solange das Schema Felder markiert (G6). */}
+      <FormularPruefen anzahl={Object.keys(errors).length} />
+      {/* Ab 1024 px zwei Spalten wie im Board w2-hofdaten-zahlung: links Hof und Adresse, rechts Kontakt und Betriebsnummer. */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+      <div className="flex min-w-0 flex-col gap-4">
+      <div className={KARTE_ABSCHNITT}>
+        <h2 className={KICKER}>Hof-Informationen</h2>
         {field('name', 'Hof-Name', { placeholder: 'Hof Müller' })}
         {field('ownerName', 'Name des Inhabers', { placeholder: 'Klaus Müller' })}
         <div>
-          <Label htmlFor="description" className="text-sm text-muted-foreground mb-1 block">Beschreibung {FREIWILLIG}</Label>
+          <Label htmlFor="description" className={BESCHRIFTUNG}>Beschreibung {FREIWILLIG}</Label>
           <Textarea
             id="description"
             {...register('description')}
             rows={4}
             placeholder="Beschreibe deinen Hof für Kunden..."
             {...feldFehlerAttribute('description', Boolean(errors.description))}
-            className={errors.description ? 'border-status-offen' : ''}
+            className={cn(RUNDUNG.feld, FOKUS_RAHMEN, errors.description && FELD_FEHLER)}
           />
           <FeldFehlerSatz feldId="description" text={errors.description?.message} />
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-        <h2 className="font-medium text-foreground">Adresse</h2>
+      <div className={KARTE_ABSCHNITT}>
+        <h2 className={KICKER}>Adresse</h2>
 
         {/* Das Land ÜBER den Adressfeldern: Es entscheidet, wie PLZ und Ort
             gelesen werden (vier- oder fünfstellig, Nominatim-Anker) — es
             danach zu fragen, wäre die falsche Reihenfolge. */}
         <div>
-          <Label htmlFor="country" className="text-sm text-muted-foreground mb-1 block">Land</Label>
+          <Label htmlFor="country" className={BESCHRIFTUNG}>Land</Label>
           {/* Der eigene onChange DARF den von react-hook-form nicht
               ersetzen: `register` gibt beide Handler unter demselben Namen
               zurück, das spätere JSX-Prop gewänne — der Formularwert käme
@@ -330,7 +347,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               landFeld.onChange(e)
               setLand(alsLand(e.target.value))
             }}
-            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-base text-foreground"
+            className={cn('min-h-11 w-full border border-border bg-card px-3 text-base text-foreground', RUNDUNG.feld)}
           >
             {LAENDER.map((wert) => (
               <option key={wert} value={wert}>
@@ -354,11 +371,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         )}
 
         {field('address', 'Straße und Hausnummer', { placeholder: 'Dorfstraße 12' })}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Steht an PLZ oder Ort ein Fehler, untereinander — nebeneinander bräche der Satz in schmale Zeilen
+            (Liste Lauf 32, hofdaten-zahlung „PLZ und Ort im Fehlerfall“). */}
+        <div className={cn('grid gap-3', !(errors.postalCode || errors.city) && 'grid-cols-2')}>
           <div>
             {/* Neutral beschriftet und ohne länderfestes Beispiel: „3400" wäre
                 für einen deutschen Hof eine falsche Vorgabe. */}
-            <Label htmlFor="postalCode" className="text-sm text-muted-foreground mb-1 block">Postleitzahl</Label>
+            <Label htmlFor="postalCode" className={BESCHRIFTUNG}>Postleitzahl</Label>
             {/* Das Beispiel folgt dem Land — „3400" wäre für einen
                 deutschen Hof eine falsche Vorgabe, gar keines wäre für
                 beide eine verlorene Ausfüllhilfe. */}
@@ -369,12 +388,12 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               enterKeyHint={enterTaste(false)}
               placeholder={land === 'DE' ? '84359' : '3400'}
               {...feldFehlerAttribute('postalCode', Boolean(errors.postalCode))}
-              className={errors.postalCode ? 'min-h-11 border-status-offen' : 'min-h-11'}
+              className={cn(FELD, errors.postalCode && FELD_FEHLER)}
             />
             <FeldFehlerSatz feldId="postalCode" text={errors.postalCode?.message} />
           </div>
           <div>
-            <Label htmlFor="city" className="text-sm text-muted-foreground mb-1 block">Ort</Label>
+            <Label htmlFor="city" className={BESCHRIFTUNG}>Ort</Label>
             <Input
               id="city"
               {...register('city')}
@@ -382,7 +401,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               enterKeyHint={enterTaste(false)}
               placeholder={land === 'DE' ? 'Simbach am Inn' : 'Klosterneuburg'}
               {...feldFehlerAttribute('city', Boolean(errors.city))}
-              className={errors.city ? 'min-h-11 border-status-offen' : 'min-h-11'}
+              className={cn(FELD, errors.city && FELD_FEHLER)}
             />
             <FeldFehlerSatz feldId="city" text={errors.city?.message} />
           </div>
@@ -394,7 +413,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           type="button"
           onClick={aufKarteSuchen}
           disabled={sucheLaeuft || isPending}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors disabled:opacity-60"
+          // Volle Breite, fett (Liste Lauf 32, hofdaten-zahlung „Auf der Karte suchen“).
+          className={cn('inline-flex min-h-11 w-full items-center justify-center gap-2 border-[1.5px] border-foreground bg-card px-4 text-[15px] font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-60', RUNDUNG.feld, FOKUS_RAHMEN)}
         >
           {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
           Auf der Karte suchen
@@ -418,8 +438,10 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
-        <h2 className="font-medium text-foreground">Kontakt</h2>
+      </div>
+      <div className="flex min-w-0 flex-col gap-4">
+      <div className={KARTE_ABSCHNITT}>
+        <h2 className={KICKER}>Kontakt</h2>
         {field('phone', 'Telefon', { placeholder: '+43 660 000 0000' })}
         {/* Ziel der Karte in Heute (HOF_EMAIL_TEXT.einstellungenPfad, Nr. 212): Das Feld trägt die id des Ankers. */}
         {field(HOF_EMAIL_ANKER, HOF_EMAIL_TEXT.profilLabel, { placeholder: 'hof@beispiel.at', hilfe: HOF_EMAIL_HILFE })}
@@ -429,15 +451,15 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           Produkt. Die Futter-Kennzeichnung zeigt sie an, der Checkout belegt
           sie vor, wenn du selbst Futter „nur an Betriebe" kaufst. */}
       {/* Ziel der Zeile „Futtermittel-Registrierung" der Übersicht (/settings, Nr. 22d). */}
-      <div id={BETRIEBSNUMMER_ANKER} className="scroll-mt-6 bg-card rounded-xl border border-border p-4 space-y-4">
+      <div id={BETRIEBSNUMMER_ANKER} className={cn('scroll-mt-6', KARTE_ABSCHNITT)}>
         <div>
-          <h2 className="font-medium text-foreground">Betriebsnummer</h2>
+          <h2 className={KICKER}>Betriebsnummer</h2>
           <p className="text-xs text-muted-foreground">
             Freiwillig. Brauchst du, wenn du Futter verkaufst oder bei einem anderen Hof als Betrieb einkaufst.
           </p>
         </div>
         <div>
-          <Label htmlFor="betriebsstatus" className="text-sm text-muted-foreground mb-1 block">Was für ein Betrieb bist du?</Label>
+          <Label htmlFor="betriebsstatus" className={BESCHRIFTUNG}>Was für ein Betrieb bist du?</Label>
           {/* Wie beim Land: erst der Handler von register, dann unserer. */}
           <select
             id="betriebsstatus"
@@ -446,7 +468,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               statusFeld.onChange(e)
               setStatus(e.target.value === '' ? null : (e.target.value as BetriebsstatusValue))
             }}
-            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-base text-foreground"
+            className={cn('min-h-11 w-full border border-border bg-card px-3 text-base text-foreground', RUNDUNG.feld)}
           >
             <option value="">Keine Angabe</option>
             {BETRIEBSSTATUS_VALUES.map((s) => (
@@ -478,16 +500,18 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         — dort lädst du Bilder direkt vom Gerät hoch.
       </p>
 
+      </div>
+      </div>
+
       <SpeicherFehler text={speicherFehler} nochmal={speicherFehler === NETZ_SATZ} onNochmal={nochmalSpeichern} laeuft={isPending} />
 
-      {/* Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
-      <Button
-        type="submit"
-        disabled={isPending || sucheLaeuft}
-        className="w-full h-12 bg-primary text-primary-foreground hover:opacity-90 font-semibold"
-      >
-        {isPending ? <Loader2 className="size-4 animate-spin" /> : sucheLaeuft ? 'Suche läuft noch …' : HOFDATEN_TEXT.speichern}
-      </Button>
+      {/* Am Handy fest über der Unterleiste (G2), im Web am Formularende rechts (Board w2-hofdaten-zahlung).
+          Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
+      <FesteAktionsleiste className="md:items-end">
+        <button type="submit" disabled={isPending || sucheLaeuft} className={cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60 md:w-auto md:px-6')}>
+          {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Wird gespeichert" /> : sucheLaeuft ? 'Suche läuft noch …' : HOFDATEN_TEXT.speichern}
+        </button>
+      </FesteAktionsleiste>
     </form>
   )
 }
