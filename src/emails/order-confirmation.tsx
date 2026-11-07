@@ -26,9 +26,10 @@ import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
 import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+import { BESTAETIGUNG_TEXT as T, type BestaetigungZahlart } from './texte/bestaetigung'
 
 /** Wie bezahlt wird — entscheidet nur der Satz und die Gesamtzeile, nie der Betrag. */
-export type MailZahlart = 'online' | 'bar' | 'karte'
+export type MailZahlart = BestaetigungZahlart
 
 export interface OrderConfirmationProps {
   orderNumber: string
@@ -76,11 +77,7 @@ export interface OrderConfirmationProps {
   appUrl?: string
 }
 
-const GESAMT_LABEL: Record<MailZahlart, string> = {
-  online: 'Online bezahlt',
-  bar: 'Bar bei Abholung',
-  karte: 'Karte bei Abholung',
-}
+const GESAMT_LABEL: Record<MailZahlart, string> = T.gesamt
 
 /**
  * „Danke für deine Bestellung!" — Mail 1 aus dem Mockup
@@ -92,15 +89,12 @@ const GESAMT_LABEL: Record<MailZahlart, string> = {
 export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Element {
   const anrufen = telefonLink(p.farmPhone)
   const gebuehr = p.gebuehrZeile && p.gebuehrZeile.betrag > 0 ? p.gebuehrZeile : null
-  const satz =
-    p.zahlart === 'online'
-      ? `Deine Zahlung ist angekommen – ${p.farmName} packt deine Sachen.`
-      : `Deine Bestellung ist bestätigt – ${p.farmName} packt deine Sachen.`
+  const satz = T.satz(p.zahlart, p.farmName)
 
   return (
-    <EmailLayout fuss={{ art: 'hof' }} previewText={`Bestellung ${p.orderNumber} – Abholung ${p.pickupDate}, ${p.pickupTime} Uhr`} manageUrl={p.manageUrl}>
-      <Text style={h1}>Danke für deine Bestellung!</Text>
-      <Text style={bodyText}>{`${satz} Nenn bei der Abholung einfach deine Bestellnummer:`}</Text>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={T.vorschauzeile(p.orderNumber, `${p.pickupDate}, ${p.pickupTime} Uhr`)} manageUrl={p.manageUrl}>
+      <Text style={h1}>{T.titel}</Text>
+      <Text style={bodyText}>{`${satz} ${T.nenneNummer}`}</Text>
 
       <BestellnummerKasten nummer={p.orderNumber} />
 
@@ -118,12 +112,16 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {/* Board s3/w3-mail-kauf Bild 3: was die Kundin mitbringt, als grüne Karte direkt unter dem Betrag. */}
       {p.zahlart === 'bar' && (
         <HinweisKasten art="gruen">
-          Bring bitte <strong>{formatEuro(p.total)}</strong> in bar mit.
+          {T.barMitbringen[0]}
+          <strong>{formatEuro(p.total)}</strong>
+          {T.barMitbringen[1]}
         </HinweisKasten>
       )}
       {p.zahlart === 'karte' && (
         <HinweisKasten art="gruen">
-          Bitte zahle <strong>{formatEuro(p.total)}</strong> bei der Abholung mit Karte.
+          {T.karteZahlen[0]}
+          <strong>{formatEuro(p.total)}</strong>
+          {T.karteZahlen[1]}
         </HinweisKasten>
       )}
       {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
@@ -132,9 +130,9 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       <KnopfReihe>
         {/* Der Weg zurück zur Bestellung, wenn der Tab längst zu ist: Status,
             Abholzeit, Positionen und Kalendereintrag — ohne Anmeldung. */}
-        {p.orderUrl && <Knopf href={p.orderUrl}>Bestellung ansehen</Knopf>}
+        {p.orderUrl && <Knopf href={p.orderUrl}>{T.knopfBestellung}</Knopf>}
         <Knopf href={p.routeUrl} art={p.orderUrl ? 'rahmen' : 'gruen'}>
-          Route planen
+          {T.knopfRoute}
         </Knopf>
       </KnopfReihe>
 
@@ -153,7 +151,8 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
         )}
       </Text>
       <Text style={leiseZeile}>
-        Fragen? Ruf direkt beim Hof an: <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.farmPhone) : p.farmPhone} />
+        {T.fragen}
+        <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.farmPhone) : p.farmPhone} />
       </Text>
       {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. Mit Belehrung steht er unter ihr. */}
       {p.widerrufUrl && !p.belehrung && (

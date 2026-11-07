@@ -23,6 +23,7 @@ import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
 import type { Belehrung } from '@/lib/widerruf'
 import { BelehrungTeil } from './belehrung-teil'
+import { BITTE_BESTAETIGE_TEXT as T } from './texte/bitte-bestaetige'
 
 export interface OnsiteConfirmationProps {
   orderNumber: string
@@ -73,25 +74,25 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
   const gebuehr = p.gebuehrZeile && p.gebuehrZeile.betrag > 0 ? p.gebuehrZeile : null
 
   return (
-    <EmailLayout fuss={{ art: 'hof' }} previewText={`Bestellung bei ${p.farmName} bestätigen – Abholung ${p.pickupDate}`}>
-      <Text style={h1}>Bitte bestätige deine Bestellung</Text>
-      <Text style={bodyText}>Erst mit deiner Bestätigung packt der Hof deine Sachen.</Text>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={T.vorschauzeile(p.farmName, p.pickupDate)}>
+      <Text style={h1}>{T.titel}</Text>
+      <Text style={bodyText}>{T.einleitung}</Text>
 
       {/* Die Frist mit Tag und Uhrzeit (V87, fristVon) — als orange Karte, denn die Kundin muss handeln. */}
       <HinweisKasten art="orange">
         {p.bestaetigenBis ? (
           <>
-            <strong>{`Bitte bestätige bis ${p.bestaetigenBis}.`}</strong>
+            <strong>{T.fristBis(p.bestaetigenBis)}</strong>
             <br />
-            Danach geben wir die Ware wieder frei – ohne Kosten für dich.
+            {T.fristFolge}
           </>
         ) : (
-          <strong>Bitte bestätige bald – sonst geben wir die Ware wieder frei.</strong>
+          <strong>{T.fristOhneZeit}</strong>
         )}
       </HinweisKasten>
 
       <KnopfReihe>
-        <Knopf href={p.confirmationUrl}>Bestellung bestätigen</Knopf>
+        <Knopf href={p.confirmationUrl}>{T.knopf}</Knopf>
       </KnopfReihe>
 
       <BestellnummerKasten nummer={p.orderNumber} />
@@ -103,7 +104,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       ))}
       {gebuehr && <GebuehrBetragsZeile zeile={gebuehr} betrag={formatEuro(gebuehr.betrag)} />}
       <Trenner />
-      <BetragsZeile stark links="Bar bei Abholung" rechts={formatEuro(p.total)} />
+      <BetragsZeile stark links={T.gesamt} rechts={formatEuro(p.total)} />
 
       {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
       {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
