@@ -31,6 +31,8 @@ const BESTELLUNG_FUER_MAIL = {
   customerPhone: true,
   totalAmount: true,
   serviceFeeCents: true,
+  // Nr. 255: Ist die Gebühr entfallen, zeigt das „Gesamt“ der Kunden-Mails (auch in der Admin-Vorschau) nur den Warenpreis — nur Anzeige.
+  serviceFeeRefundedAt: true,
   // N38 (Nr. 197): Modell und Einzug — die Kunden-Mails zeigen im Hofpreis-Modell Endpreise inkl. Plattformgebühr.
   gebuehrModell: true,
   gebuehrEinzug: true,

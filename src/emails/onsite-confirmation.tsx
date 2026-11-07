@@ -4,6 +4,8 @@ import {
   EmailLayout,
   BestellnummerKasten,
   BetragsZeile,
+  GebuehrBetragsZeile,
+  type MailGebuehrZeile,
   HinweisKasten,
   Knopf,
   KnopfReihe,
@@ -39,10 +41,10 @@ export interface OnsiteConfirmationProps {
    * Betrag in Euro aus dem Snapshot. Fehlt sie, gibt es keine Zeile — im
    * Hofpreis-Modell steckt die Gebühr in den Preisen (`plattformgebuehr`).
    */
-  gebuehrZeile?: { wort: string; betrag: number; hinweis: string }
+  gebuehrZeile?: MailGebuehrZeile
   /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
   plattformgebuehr?: number
-  /** Was die Kundin vor Ort bezahlt: Warenpreis + Gebühr. */
+  /** Das „Gesamt“: Warenpreis + Gebühr; ist die Gebühr entfallen bzw. erstattet, nur der Warenpreis (anzeigeGesamtCents in src/lib/email.ts, Nr. 255). */
   total: number
   /** Zur Seite mit dem Knopf (/{hof}/bestaetigen/{token}) — der Link selbst bestätigt nichts. */
   confirmationUrl: string
@@ -99,7 +101,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
-      {gebuehr && <BetragsZeile links={gebuehr.wort} rechts={formatEuro(gebuehr.betrag)} />}
+      {gebuehr && <GebuehrBetragsZeile zeile={gebuehr} betrag={formatEuro(gebuehr.betrag)} />}
       <Trenner />
       <BetragsZeile stark links="Bar bei Abholung" rechts={formatEuro(p.total)} />
 

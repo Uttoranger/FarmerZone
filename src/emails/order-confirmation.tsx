@@ -6,6 +6,8 @@ import {
   EmailLayout,
   BestellnummerKasten,
   BetragsZeile,
+  GebuehrBetragsZeile,
+  type MailGebuehrZeile,
   HinweisKasten,
   Knopf,
   KnopfReihe,
@@ -50,10 +52,10 @@ export interface OrderConfirmationProps {
    * Betrag in Euro aus dem Snapshot. Fehlt sie, gibt es keine Zeile — im
    * Hofpreis-Modell steckt die Gebühr in den Preisen (`plattformgebuehr`).
    */
-  gebuehrZeile?: { wort: string; betrag: number; hinweis: string }
+  gebuehrZeile?: MailGebuehrZeile
   /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
   plattformgebuehr?: number
-  /** Was die Kundin zahlt bzw. gezahlt hat: Warenpreis + Gebühr. */
+  /** Das „Gesamt“: Warenpreis + Gebühr; ist die Gebühr entfallen bzw. erstattet, nur der Warenpreis (anzeigeGesamtCents in src/lib/email.ts, Nr. 255). */
   total: number
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
@@ -109,7 +111,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
       ))}
-      {gebuehr && <BetragsZeile links={gebuehr.wort} rechts={formatEuro(gebuehr.betrag)} />}
+      {gebuehr && <GebuehrBetragsZeile zeile={gebuehr} betrag={formatEuro(gebuehr.betrag)} />}
       <Trenner />
       <BetragsZeile stark links={GESAMT_LABEL[p.zahlart]} rechts={formatEuro(p.total)} />
 

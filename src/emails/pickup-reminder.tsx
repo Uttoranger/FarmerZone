@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { Text, Link } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, kleinText, leiseZeile, textLink, woZeile } from './_layout'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, h1, bodyText, leiseZeile, textLink, woZeile } from './_layout'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
 export interface OrderReadyProps {
@@ -16,7 +16,6 @@ export interface OrderReadyProps {
   pickupTime: string
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
-  reorderUrl?: string
   /** Der signierte Link zur Bestellseite — der Weg zurück zur Bestellung. */
   orderUrl?: string
   /** „Vertrag widerrufen“ (Nr. 200): signierter Link, nur bei Verbraucherinnen. */
@@ -68,17 +67,6 @@ export function OrderReadyEmail(p: OrderReadyProps) {
         <Text style={leiseZeile}>
           <Link href={p.widerrufUrl} style={textLink}>
             {WIDERRUF_TEXT.knopfWiderrufen}
-          </Link>
-        </Text>
-      )}
-
-      {/* Leise am Ende statt als Knopf über der Mail. Offene Ausnahme von
-          „Vertragsmails ohne Werbung" (S11, DESIGN_SYSTEM „E-Mails"): Ob der
-          Link bleibt, entscheidet der Mensch (Bericht Nr. 13). */}
-      {p.reorderUrl && (
-        <Text style={kleinText}>
-          <Link href={p.reorderUrl} style={textLink}>
-            Dieselbe Bestellung nochmal aufgeben
           </Link>
         </Text>
       )}

@@ -3,12 +3,11 @@ import * as React from 'react'
 import * as Sentry from '@sentry/nextjs'
 import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { generateReorderToken } from '@/lib/reorder-token'
 import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { abspracheMailSatz, brauchtAbsprache } from '@/lib/abholhinweise'
-import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, anzeigeGesamtCents, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
@@ -432,6 +431,12 @@ export type OrderForEmail = {
   totalAmount: { toString(): string } | number
   /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
   serviceFeeCents?: number
+  /**
+   * Gesetzt, wenn die Gebühr entfallen bzw. erstattet ist (Storno, „nicht abgeholt“, verfallen) — dann zeigt
+   * das „Gesamt“ der Kunden-Mails nur den Warenpreis (anzeigeGesamtCents, Nr. 255). Das betrifft fast nur
+   * die Admin-Vorschau: Die echten Mails gehen vorher hinaus. Fehlt es, gilt die Gebühr.
+   */
+  serviceFeeRefundedAt?: Date | string | null
   /** Gebührenmodell aus dem Snapshot (N38): 'hofpreis' oder null/fehlend = bisher. */
   gebuehrModell?: string | null
   /** Einzugsweg aus dem Snapshot (N38): 'erlassen' heißt, die Bargebühr bleibt beim Hof. */
@@ -545,10 +550,18 @@ function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: num
  * keine Zeile — sie steckt in den Endpreisen, der Satz darunter nennt sie
  * (`plattformgebuehr`).
  */
-function kundenGebuehr(order: OrderForEmail): { gebuehrZeile?: { wort: string; betrag: number; hinweis: string }; plattformgebuehr: number } {
+function kundenGebuehr(order: OrderForEmail): {
+  gebuehrZeile?: { wort: string; betrag: number; hinweis: string; vermerk?: 'erstattet' | 'entfällt' }
+  plattformgebuehr: number
+} {
   const { gebuehr } = betraege(order)
   if (imHofpreis(order)) return { plattformgebuehr: gebuehr }
-  return { gebuehrZeile: { wort: gebuehrWort(order), betrag: gebuehr, hinweis: gebuehrHinweisFuer({ gebuehrModell: order.gebuehrModell ?? null }) }, plattformgebuehr: 0 }
+  // Nr. 255: „erstattet“/„entfällt“ wie Bestätigungsseite und Abholzettel (gebuehrEntfallenVermerk) — sonst zählte die Zeile über „Gesamt“ scheinbar mit.
+  const vermerk = gebuehrEntfallenVermerk({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null, paymentMethod: order.paymentMethod })
+  return {
+    gebuehrZeile: { wort: gebuehrWort(order), betrag: gebuehr, hinweis: gebuehrHinweisFuer({ gebuehrModell: order.gebuehrModell ?? null }), ...(vermerk ? { vermerk } : {}) },
+    plattformgebuehr: 0,
+  }
 }
 
 /**
@@ -640,16 +653,21 @@ function routeUrl(order: OrderForEmail): string {
 }
 
 /**
- * Die drei Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
+ * Die Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
  * (src/lib/servicegebuehr.ts), damit Mail, Bestellseite und Checkout dieselbe
  * Rechnung zeigen: Warenpreis, Servicegebühr, Gesamt (= was die Kundin zahlt).
+ * `anzeigeGesamt` ist das „Gesamt“ der Kunden-Mails (Nr. 255): wie Bestätigung
+ * und Bestellseite ohne entfallene Gebühr (anzeigeGesamtCents) — NUR Anzeige;
+ * „Bar zu kassieren“ und „Die Kundin hat … bezahlt“ bleiben `gesamt`.
  */
-function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number } {
-  const s = bestellSummen({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 })
+function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number; anzeigeGesamt: number } {
+  const summen = { totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 }
+  const s = bestellSummen(summen)
   return {
     warenpreis: centsAlsEuro(s.warenpreisCents),
     gebuehr: centsAlsEuro(s.gebuehrCents),
     gesamt: centsAlsEuro(s.gesamtCents),
+    anzeigeGesamt: centsAlsEuro(anzeigeGesamtCents({ ...summen, serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })),
   }
 }
 
@@ -1062,7 +1080,7 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     zahlart: mailZahlart(order.paymentMethod),
     items: mailPositionen(order),
     ...kundenGebuehr(order),
-    total: betraege(order).gesamt,
+    total: betraege(order).anzeigeGesamt,
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
     orderUrl,
@@ -1120,7 +1138,7 @@ export async function onsiteConfirmationInhalt(
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     items: mailPositionen(order),
     ...kundenGebuehr(order),
-    total: betraege(order).gesamt,
+    total: betraege(order).anzeigeGesamt,
     confirmationUrl,
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
     belehrung: belehrungFuer(order),
@@ -1270,8 +1288,8 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
 
 /** Bauer markiert als bereit → Kunde */
 export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> {
-  const reorderToken = generateReorderToken(order.id, order.farm.id)
-  const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+  // Antwort 8 (Lauf 32, Nr. 255): kein „Dieselbe Bestellung nochmal aufgeben“ mehr — Vertragsmail ohne Werbung (S11).
+  // Die Route ?reorder= bleibt für Links in alten Mails.
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const { OrderReadyEmail } = await import('@/emails/pickup-reminder')
@@ -1285,7 +1303,6 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
-    reorderUrl,
     orderUrl,
     widerrufUrl: widerrufUrl(order),
   }))

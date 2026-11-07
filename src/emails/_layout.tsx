@@ -207,6 +207,14 @@ export const h1: React.CSSProperties = {
   lineHeight: '1.3',
 }
 
+/**
+ * Die Überschrift einer Mail als echtes `<h1>` (Nr. 255) — Bildschirmleser und die Textfassung erkennen sie als
+ * Überschrift; `<Text style={h1}>` ergäbe nur einen Absatz. Aussehen genau wie `h1`.
+ */
+export function Ueberschrift({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <h1 style={h1}>{children}</h1>
+}
+
 export const bodyText: React.CSSProperties = {
   // Das Mockup tönt Fließtext zwischen text und textLeise; die Palette kennt
   // nur Tokens — text ist der nächste und liest sich am besten (15:1).
@@ -339,6 +347,19 @@ export function BetragsZeile({
       </Column>
     </Row>
   )
+}
+
+/**
+ * Die Gebührenzeile der Kunden-Mails im Modell „bisher“ (N38): Wort, Erklärsatz und Betrag aus dem Snapshot.
+ * `vermerk` steht, wenn die Gebühr entfallen bzw. erstattet ist (gebuehrEntfallenVermerk, Nr. 255) — dann
+ * „Servicegebühr (entfällt)“ mit durchgestrichenem Betrag, und „Gesamt“ darunter zählt sie nicht mit.
+ */
+export type MailGebuehrZeile = { wort: string; betrag: number; hinweis: string; vermerk?: 'erstattet' | 'entfällt' }
+
+/** Eine Gebührenzeile nach `MailGebuehrZeile` — dieselbe Schreibweise wie Bestätigungsseite und Abholzettel (Nr. 244). */
+export function GebuehrBetragsZeile({ zeile, betrag }: { zeile: MailGebuehrZeile; betrag: string }): React.JSX.Element {
+  if (!zeile.vermerk) return <BetragsZeile links={zeile.wort} rechts={betrag} />
+  return <BetragsZeile links={`${zeile.wort} (${zeile.vermerk})`} rechts={<span style={{ color: MAIL_FARBE.textLeise, textDecoration: 'line-through' }}>{betrag}</span>} />
 }
 
 /** Trennlinie in der Randfarbe. */

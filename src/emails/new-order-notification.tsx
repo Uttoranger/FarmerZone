@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, Text } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, textLink, zwischenTitel } from './_layout'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, Ueberschrift, bodyText, kleinText, textLink, zwischenTitel } from './_layout'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
@@ -59,7 +59,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
   const anrufen = p.customerPhone === undefined ? null : telefonLink(p.customerPhone)
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={p.isOnline ? `${p.customerName} hat bestellt und online bezahlt.` : `${p.customerName} hat bestellt, bar bei Abholung.`}>
-      <Text style={h1}>{p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}</Text>
+      <Ueberschrift>{p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}</Ueberschrift>
       <Text style={bodyText}>
         {`Hallo ${p.farmerName}, ${p.customerName} hat eine Bestellung aufgegeben.`}
         {p.isOnline ? ' Die Zahlung wurde bereits online abgewickelt.' : ` Die Zahlung (${p.paymentLabel}) erfolgt bei der Abholung.`}
