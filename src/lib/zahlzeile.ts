@@ -18,7 +18,7 @@
 import { formatEuro } from '@/lib/format'
 import { zahlungsAnzeige } from '@/lib/bestellstatus'
 import { anzeigeGesamtCents, bestellSummen, centsAlsEuro, gebuehrEntfallen, type BestellungMitGebuehr } from '@/lib/servicegebuehr'
-import { gebuehrBezeichnungFuer, istHofpreisBestellung, satzHundertstel, satzText } from '@/lib/plattformgebuehr'
+import { gebuehrBezeichnungFuer, istHofpreisBestellung, satzText } from '@/lib/plattformgebuehr'
 
 /** Was die Zahlzeile aus der gespeicherten Bestellung liest — nur Snapshots. */
 export type ZahlzeilenBestellung = BestellungMitGebuehr & {
@@ -39,11 +39,24 @@ function zahlartHofpreis(paymentMethod: string, paymentStatus: string): string {
   return art
 }
 
-/** „ (6 %)“ aus dem Snapshot der Bestellung; ohne gespeicherten Satz nichts (nie die Vorgabe des Hofs einsetzen). */
+/**
+ * Der gespeicherte Satz als Hundertstel-Prozent über die Ziffern („6.50“ → 650), nie über eine Gleitkommazahl.
+ * Unlesbares ergibt null. Absichtlich NICHT `satzHundertstel`: das fällt bei Unlesbarem auf die Vorgabe
+ * (PLATTFORMGEBUEHR_PROZENT) zurück — die Zahlzeile darf nur den Snapshot der Bestellung nennen (Freigabe §36).
+ */
+function snapshotHundertstel(wert: { toString(): string } | null | undefined): number | null {
+  if (wert === null || wert === undefined) return null
+  const treffer = /^(\d{1,3})(?:\.(\d{1,2})\d*)?$/.exec(wert.toString().trim())
+  if (!treffer) return null
+  return Number.parseInt(treffer[1], 10) * 100 + Number.parseInt((treffer[2] ?? '').padEnd(2, '0'), 10)
+}
+
+/** „ (6 %)“ aus dem Snapshot der Bestellung; ohne gespeicherten oder lesbaren Satz nichts (nie die Vorgabe einsetzen). */
 function satzKlammer(b: ZahlzeilenBestellung): string {
-  if (b.serviceFeePercentApplied === null || b.serviceFeePercentApplied === undefined) return ''
+  const hundertstel = snapshotHundertstel(b.serviceFeePercentApplied)
+  if (hundertstel === null) return ''
   // Festes Leerzeichen vor „%“: Die Klammer bricht nie zwischen Zahl und Zeichen um.
-  return ` (${satzText(satzHundertstel({ plattformgebuehrProzent: b.serviceFeePercentApplied }))}\u00a0%)`
+  return ` (${satzText(hundertstel)}\u00a0%)`
 }
 
 /**
@@ -60,4 +73,14 @@ export function zahlzeileFuer(b: ZahlzeilenBestellung, { mitBetrag = false }: { 
   const { art, zustand } = zahlungsAnzeige(b.paymentMethod, b.paymentStatus)
   const zahlart = hofpreis ? zahlartHofpreis(b.paymentMethod, b.paymentStatus) : `${art} · ${zustand}`
   return [zahlart, betragZeile].filter(Boolean).join(' · ')
+}
+
+/**
+ * Die Zahlzeile auf Bar-Bestätigen (/{hof}/bestaetigen/…). Modell „hofpreis“: dieselbe Zeile wie Bestätigung und
+ * Bestellseite. Modell „bisher“ bzw. null: die bisherige Zeile dieser Seite — nur die Zahlart („Bar bei Abholung“),
+ * wie vor Nr. 253 (Freigabe §36 „Seiten“: „bisher“ behält seine alte Zeile).
+ */
+export function barBestaetigenZahlzeile(b: ZahlzeilenBestellung): string {
+  if (istHofpreisBestellung({ gebuehrModell: b.gebuehrModell ?? null })) return zahlzeileFuer(b)
+  return zahlungsAnzeige(b.paymentMethod, 'PENDING').art
 }

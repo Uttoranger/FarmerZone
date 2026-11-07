@@ -104,6 +104,7 @@ function BestellungEingegangen() {
               satz: 'Danke – alle Details stehen in deiner E-Mail.',
             }}
             satzLeise
+            titelKlein
           />
           <Link href="/hoefe" className={KNOPF_BREIT_RAHMEN}>
             Höfe entdecken

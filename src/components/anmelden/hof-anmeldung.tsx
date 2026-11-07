@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { PasswordInput } from '@/components/ui/password-input'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
-import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE, KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE, KNOPF_ORANGE_KAUF, KNOPF_UMRISS, KNOPF_UMRISS_KRAEFTIG, TEXTLINK } from '@/components/anmelden/stil'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 
@@ -40,7 +40,17 @@ const DEV_ACCOUNTS = [
  * Seit Nr. 179 (E7, Ergänzung) darunter „Mit Passkey anmelden" für Höfe mit
  * Passkey — ohne E-Mail-Feld, den Rest fragt der Browser; das Passwort bleibt.
  */
-export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}): React.JSX.Element {
+export function HofAnmeldung({
+  ziel,
+  nachBoard = false,
+}: {
+  ziel?: '/onboarding' | '/verify'
+  /**
+   * Die Anmeldeseite nach der Abnahme Lauf 32 (Nr. 253): Knöpfe 52 px/16 px, kein oranger Feldrand beim
+   * gemeinsamen Fehler, Admin-Link 14 px. Ohne (E-Mail bestätigen, Nr. 254) bleibt alles wie bisher.
+   */
+  nachBoard?: boolean
+} = {}): React.JSX.Element {
   const router = useRouter()
   const emailId = useId()
   const passwortId = useId()
@@ -114,7 +124,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
     <div className="flex flex-col gap-3">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         {/* Der Fehler steht als Hinweiskarte über den Feldern (Board s2-anmelden, Bild 2); beide Felder verweisen darauf.
-            Kein oranger Feldrand: Der Fehler gehört zu keinem einzelnen Feld (Liste Lauf 32, anmelden). */}
+            Nach Board kein oranger Feldrand: Der Fehler gehört zu keinem einzelnen Feld (Liste Lauf 32, anmelden). */}
         {fehler && (
           <div id={fehlerId}>
             <HinweiskarteFehler titel={fehler.titel}>{fehler.satz}</HinweiskarteFehler>
@@ -133,6 +143,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
             placeholder="name@beispiel.at"
             autoComplete="email"
             required
+            aria-invalid={fehler && !nachBoard ? true : undefined}
             aria-describedby={fehler ? fehlerId : undefined}
             className={FELD}
           />
@@ -148,12 +159,13 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
+            aria-invalid={fehler && !nachBoard ? true : undefined}
             aria-describedby={fehler ? fehlerId : undefined}
             feld={FELD}
           />
         </div>
 
-        <button type="submit" disabled={laedt || passkeyLaeuft} className={KNOPF_ORANGE}>
+        <button type="submit" disabled={laedt || passkeyLaeuft} className={nachBoard ? KNOPF_ORANGE_KAUF : KNOPF_ORANGE}>
           {laedt ? (
             <>
               <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
@@ -166,7 +178,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
       </form>
 
       {/* Ohne Trennzeile und ohne Symbol direkt unter „Anmelden“ (Board s2-anmelden); „Anmelden“ bleibt die eine Hauptaktion. */}
-      <button type="button" onClick={() => void mitPasskey()} disabled={laedt || passkeyLaeuft} aria-busy={passkeyLaeuft || undefined} className={KNOPF_UMRISS}>
+      <button type="button" onClick={() => void mitPasskey()} disabled={laedt || passkeyLaeuft} aria-busy={passkeyLaeuft || undefined} className={nachBoard ? KNOPF_UMRISS_KRAEFTIG : KNOPF_UMRISS}>
         {passkeyLaeuft && <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />}
         {passkeyLaeuft ? HOF_PASSKEY_ANMELDEN.laeuft : HOF_PASSKEY_ANMELDEN.knopf}
       </button>
@@ -186,7 +198,7 @@ export function HofAnmeldung({ ziel }: { ziel?: '/onboarding' | '/verify' } = {}
         </Link>
       </div>
       {/* Der kleine Weg für Admin-Konten (Register N20, Nr. 115) — sonst ist /login/admin nirgends verlinkt. */}
-      <Link href={ADMIN_PFAD.anmelden} className={cn(TEXTLINK, 'text-[14px] font-normal text-muted-foreground')}>
+      <Link href={ADMIN_PFAD.anmelden} className={cn(TEXTLINK, nachBoard ? 'text-[14px] font-normal' : 'text-[13px] font-medium', 'text-muted-foreground')}>
         {ADMIN_ANMELDEN_TEXT.linkAufLogin}
       </Link>
 

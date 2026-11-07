@@ -15,6 +15,8 @@ import type { AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WarteBalken } from '@/components/hofbereich/hof-balken'
 import { textlinkKlassen } from '@/components/ui/textlink'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+// Umriss 52 px, 16 px fett (Board w2-registrieren „E-Mail schreiben“) — dieselbe Quelle wie Anmelden und Passwort.
+import { KNOPF_UMRISS_KRAEFTIG } from '@/components/anmelden/stil'
 
 /*
  * „Hof einrichten" (/onboarding, Gate 5 Nr. 15) nach den Mockups
@@ -34,12 +36,6 @@ const KNOPF_BASIS = cn(
 )
 const KNOPF_ORANGE = cn(KNOPF_BASIS, 'border border-primary-foreground/30 bg-primary text-primary-foreground hover:opacity-90')
 const KNOPF_UMRISS = cn(KNOPF_BASIS, 'border border-border font-medium text-foreground hover:bg-muted')
-/** Zweiter Weg über die volle Breite: Umriss in Textfarbe, 52 px, 16 px fett (Board w2-registrieren „E-Mail schreiben“). */
-const KNOPF_UMRISS_KRAEFTIG = cn(
-  'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-[18px] text-[16px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
-
 const ZUSTAND_TEXT: Record<EinrichtenSchritt['zustand'], string> = {
   erledigt: 'erledigt',
   offen: 'offen',

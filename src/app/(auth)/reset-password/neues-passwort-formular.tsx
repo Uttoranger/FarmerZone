@@ -10,12 +10,12 @@ import { validatePassword } from '@/lib/password-rules'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { resetPasswordSchema } from '@/schemas/reset-password'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
-import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE_KAUF, KNOPF_UMRISS_KRAEFTIG } from '@/components/anmelden/stil'
 import { PasswortAnforderungen } from '@/components/anmelden/passwort-anforderungen'
-import { KNOPF_UMRISS } from '@/components/anmelden/stil'
+// 16 px wie im Board (G8): die Rundungen aus einer Quelle statt freier Pixelwerte.
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /**
  * „Neues Passwort wählen" — das Formular (seit Nr. 54 in der Fokus-Shell, die
@@ -96,11 +96,11 @@ export function NeuesPasswortFormular(): React.JSX.Element {
   if (linkUngueltig || tokenVerbraucht) {
     return (
       // Fehlerkarte im Ton „tun“ ohne Symbol, darunter der Ausweg als Umriss über die volle Breite (Board s2-passwort, Bild 5).
-      <HinweiskarteFehler titel="Dieser Link ist ungültig oder abgelaufen." className="rounded-[16px]">
+      <HinweiskarteFehler titel="Dieser Link ist ungültig oder abgelaufen." className={RUNDUNG.blatt}>
         <p>{`Ein Link gilt ${PASSWORT_LINK_DAUER_TEXT} und einmal. Bitte fordere einen neuen Link an.`}</p>
         <Link
           href="/forgot-password"
-          className={cn(KNOPF_UMRISS, 'mt-2')}
+          className={cn(KNOPF_UMRISS_KRAEFTIG, 'mt-2')}
         >
           Neuen Link anfordern
         </Link>
@@ -167,7 +167,7 @@ export function NeuesPasswortFormular(): React.JSX.Element {
         </p>
       )}
 
-      <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={cn(KNOPF_ORANGE, 'mt-1')}>
+      <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={cn(KNOPF_ORANGE_KAUF, 'mt-1')}>
         {laedt ? (
           <>
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />

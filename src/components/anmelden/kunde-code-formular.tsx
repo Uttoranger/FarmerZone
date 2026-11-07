@@ -13,7 +13,7 @@ import {
 } from '@/lib/anmeldecode'
 import { codeAnfordernSchema, codeEingabeSchema } from '@/schemas/anmeldecode'
 import { CodeFeld } from '@/components/anmelden/code-feld'
-import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN, TEXTKNOPF } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_GRUEN_KAUF, TEXTKNOPF } from '@/components/anmelden/stil'
 import { cn } from '@/lib/utils'
 
 /*
@@ -97,7 +97,7 @@ export function CodeEmailSchritt({
           </p>
         )}
       </div>
-      <button type="submit" disabled={laedt} className={KNOPF_GRUEN}>
+      <button type="submit" disabled={laedt} className={KNOPF_GRUEN_KAUF}>
         {laedt ? (
           <>
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
@@ -196,7 +196,7 @@ export function CodeEingabeSchritt({
       >
         {!fehler && hinweis ? hinweis : ''}
       </p>
-      <button type="submit" disabled={laedt} className={KNOPF_GRUEN}>
+      <button type="submit" disabled={laedt} className={KNOPF_GRUEN_KAUF}>
         {laedt ? (
           <>
             <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />

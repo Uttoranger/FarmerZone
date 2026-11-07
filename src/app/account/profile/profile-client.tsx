@@ -19,7 +19,7 @@ import { Dialog, DialogDescription, DialogMitte } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { textlinkKlassen } from '@/components/ui/textlink'
-import { KNOPF_GRUEN, KNOPF_UMRISS } from '@/components/anmelden/stil'
+import { KNOPF_GRUEN_KAUF, KNOPF_UMRISS_KRAEFTIG } from '@/components/anmelden/stil'
 
 /*
  * „Mein Konto" der freiwilligen Kunden-Anmeldung — seit Nr. 14 im neuen Design
@@ -190,7 +190,7 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
               titel="Du hast noch keine Neuigkeiten abonniert."
               satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
               ausweg={
-                <Link href="/hoefe" className={KNOPF_GRUEN}>
+                <Link href="/hoefe" className={KNOPF_GRUEN_KAUF}>
                   Höfe entdecken
                 </Link>
               }
@@ -272,7 +272,7 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
             initialFocus={abbrechenRef}
             aktionen={
               <>
-                <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_UMRISS}>
+                <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_UMRISS_KRAEFTIG}>
                   Abbrechen
                 </button>
                 {loeschenKnopf}
@@ -288,7 +288,7 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
             <SheetTitle className="font-heading text-[21px] leading-tight font-semibold">Konto wirklich löschen?</SheetTitle>
             <SheetDescription className="text-[15px] leading-normal text-foreground">{loeschenSatz}</SheetDescription>
             <div className="mt-1 grid grid-cols-2 gap-2.5">
-              <SheetClose ref={abbrechenRef} disabled={isDeleting} className={KNOPF_UMRISS}>
+              <SheetClose ref={abbrechenRef} disabled={isDeleting} className={KNOPF_UMRISS_KRAEFTIG}>
                 Abbrechen
               </SheetClose>
               {loeschenKnopf}

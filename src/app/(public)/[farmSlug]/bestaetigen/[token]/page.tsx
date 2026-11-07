@@ -10,7 +10,7 @@ import { LINK_UNGUELTIG_SATZ, LINK_UNGUELTIG_TITEL, barBestaetigungsAnsicht, tok
 import { fristVon } from '@/lib/fristen'
 import { abholTerminZeile, barBestaetigenSatz, barVerfallenSatz } from '@/lib/bestaetigung'
 import { KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
-import { zahlzeileFuer } from '@/lib/zahlzeile'
+import { barBestaetigenZahlzeile } from '@/lib/zahlzeile'
 import { bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 import { barBestaetigungsTokenSchema } from '@/schemas/bar-bestaetigung'
@@ -169,8 +169,9 @@ export default async function BarBestaetigenSeite({ params }: Props) {
             <Zeile titel={gebuehrBezeichnungFuer(order)}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</Zeile>
           )}
         </ul>
-        {/* Dieselbe Zahlzeile wie Bestätigung und Bestellseite (zahlzeileFuer, Liste Lauf 32 bestellung-link Bild 2). */}
-        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{zahlzeileFuer(order)}</p>
+        {/* Hofpreis: dieselbe Zahlzeile wie Bestätigung und Bestellseite (Liste Lauf 32 bestellung-link Bild 2);
+            „bisher“ bzw. null: die bisherige Zeile, nur die Zahlart (Freigabe §36 „Seiten“). */}
+        <p className="mt-0.5 text-[15px] leading-normal text-muted-foreground">{barBestaetigenZahlzeile(order)}</p>
         <p className="mt-0.5 text-[17px] font-bold text-foreground">
           Gesamt <span className="whitespace-nowrap tabular-nums">{formatEuro(centsAlsEuro(summen.gesamtCents))}</span>
         </p>

@@ -4,7 +4,7 @@
  * Modell „bisher“ bzw. null behält die bisherige Zeile; entfallene Gebühr ohne „inkl.“.
  */
 import { describe, expect, it } from 'vitest'
-import { zahlzeileFuer, type ZahlzeilenBestellung } from '@/lib/zahlzeile'
+import { barBestaetigenZahlzeile, zahlzeileFuer, type ZahlzeilenBestellung } from '@/lib/zahlzeile'
 
 const ENTFALLEN_AM = new Date('2026-11-05T10:00:00.000Z')
 
@@ -52,6 +52,18 @@ describe('Modell hofpreis: Wortlaut der Boards', () => {
     expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: null })))).toBe('Online bezahlt · inkl. Plattformgebühr')
   })
 
+  it('unlesbarer Satz: keine Klammer — nie die Vorgabe (6 %) als Rückfall', () => {
+    for (const unlesbar of ['abc', '', '6,00', '-6.00']) {
+      const zeile = ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: unlesbar })))
+      expect(zeile).toBe('Online bezahlt · inkl. Plattformgebühr')
+      expect(zeile).not.toContain('%')
+    }
+    // Gegenprobe: ein lesbarer Decimal-artiger Wert ergibt die Klammer.
+    expect(ohneFest(zahlzeileFuer(bestellung({ serviceFeePercentApplied: { toString: () => '7.25' } })))).toBe(
+      'Online bezahlt · inkl. Plattformgebühr (7,25 %)'
+    )
+  })
+
   it('entfallene bzw. erstattete Gebühr: kein „inkl.“, Betrag ohne Gebühr', () => {
     const b = bestellung({ serviceFeeRefundedAt: ENTFALLEN_AM })
     expect(ohneFest(zahlzeileFuer(b))).toBe('Online bezahlt')
@@ -87,5 +99,18 @@ describe('Modell bisher bzw. null: die bisherige Zahlzeile', () => {
 
   it('bisher entfallen: kein „inkl.“', () => {
     expect(ohneFest(zahlzeileFuer(bestellung({ gebuehrModell: null, serviceFeeRefundedAt: ENTFALLEN_AM })))).toBe('Online · Bezahlt')
+  })
+})
+
+describe('Bar-Bestätigen: Hofpreis mit Zahlzeile, bisher mit der alten Zeile', () => {
+  const bar = { paymentMethod: 'ONSITE_CASH', paymentStatus: 'PENDING' }
+
+  it('gebuehrModell null bzw. „bisher“: nur „Bar bei Abholung“ wie vor Nr. 253', () => {
+    expect(barBestaetigenZahlzeile(bestellung({ ...bar, gebuehrModell: null, serviceFeePercentApplied: '5.00' }))).toBe('Bar bei Abholung')
+    expect(barBestaetigenZahlzeile(bestellung({ ...bar, gebuehrModell: 'bisher', serviceFeePercentApplied: '5.00' }))).toBe('Bar bei Abholung')
+  })
+
+  it('Gegenprobe Hofpreis: die volle Zahlzeile mit Satz aus dem Snapshot', () => {
+    expect(ohneFest(barBestaetigenZahlzeile(bestellung({ ...bar, serviceFeePercentApplied: '6.00' })))).toBe('Bar bei Abholung · inkl. Plattformgebühr (6 %)')
   })
 })

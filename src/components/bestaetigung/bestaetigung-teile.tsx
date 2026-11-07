@@ -43,12 +43,15 @@ export function BestaetigungKopf({
   kicker,
   ohneSatz = false,
   satzLeise = false,
+  titelKlein = false,
 }: {
   kopf: BestaetigungsKopf
   kicker?: string
   ohneSatz?: boolean
   /** Der Satz gedämpft (Board s1-/w1-bestaetigung Bild 4: „Danke – alle Details stehen in deiner E-Mail.“). */
   satzLeise?: boolean
+  /** Die Überschrift 24 statt 26 px (Liste Lauf 32, bestaetigung: in der Karte „eingegangen“). */
+  titelKlein?: boolean
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
@@ -60,7 +63,7 @@ export function BestaetigungKopf({
         </p>
       )}
       {/* Liste Lauf 32 (bestaetigung): 26 px in beiden Breiten wie im Board, in der Karte „eingegangen“ 24 px. */}
-      <h1 className={cn('font-heading leading-tight font-semibold text-balance break-words', satzLeise ? 'text-[24px]' : 'text-[26px]')}>{kopf.titel}</h1>
+      <h1 className={cn('font-heading leading-tight font-semibold text-balance break-words', titelKlein ? 'text-[24px]' : 'text-[26px]')}>{kopf.titel}</h1>
       {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
       {!ohneSatz && (
         <p className={cn('text-[15px] leading-normal [overflow-wrap:anywhere]', satzLeise ? 'text-muted-foreground' : 'text-foreground')}>{kopf.satz}</p>
