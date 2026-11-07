@@ -57,6 +57,14 @@ describe('WerkzeugKopf (G1)', () => {
     expect(anzahl(markup, 'href="/orders?filter=heute"')).toBe(2)
   })
 
+  it('Elternseite nur am Handy (/settings → Mehr): „‹“ am Handy, im Web kein Textlink', () => {
+    const markup = html(createElement(WerkzeugKopf, { titel: 'Einstellungen', pfad: '/settings' }))
+    expect(anzahl(markup, '<a')).toBe(1)
+    expect(markup).toContain(`${RUECKWEG_PRAEFIX} Mehr`)
+    expect(markup).toContain('md:hidden')
+    expect(markup).not.toContain('md:inline-flex')
+  })
+
   it('ohne Elternseite (Seite der Leiste): kein Rückweg, nur Titel', () => {
     // /customers statt /settings: /settings hat seit Nr. 250 am Handy „Mehr“ als Elternseite (N1-Ergänzung).
     const markup = html(createElement(WerkzeugKopf, { titel: 'Kunden', pfad: '/customers' }))

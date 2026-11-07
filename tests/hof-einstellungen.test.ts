@@ -362,11 +362,11 @@ describe('einstellungenBereiche', () => {
     expect(ohne.ton).toBe('neutral')
   })
 
-  it('Futtermittel (Nr. 250): ohne Fachwort der Betriebsart — LFBIS bei eigener Ernte oder ohne Angabe, sonst BAES-Meldung', () => {
+  it('Futtermittel (Nr. 250): ohne Fachwort der Betriebsart — immer LFBIS, beim BAES-Fall zusätzlich BAES-Meldung', () => {
     expect(futtermittelZeile('PRIMAERPRODUKTION', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1')
     expect(futtermittelZeile(null, 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1')
-    expect(futtermittelZeile('REGISTRIERT', 'AT 1')).toBe('BAES-Meldung AT 1')
-    expect(futtermittelZeile('ZUGELASSEN', 'AT 1')).toBe('BAES-Meldung AT 1')
+    expect(futtermittelZeile('REGISTRIERT', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1 · BAES-Meldung')
+    expect(futtermittelZeile('ZUGELASSEN', 'AT 1')).toBe('Futtermittel-Nummer (LFBIS) AT 1 · BAES-Meldung')
     // Gegenprobe: das Fachwort der Liste steht in keiner Zeile mehr.
     expect(bereich(einstellungenBereiche(daten(), VOR_STICHTAG), 'futtermittel').zeile).not.toContain('Primärproduktion')
   })

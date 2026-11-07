@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { archiveFarm, reactivateFarm } from '@/server/actions/farm-archive'
 import {
   FARM_ARCHIVE_TITLE,
+  FARM_ARCHIVE_EXPLANATION,
   FARM_ARCHIVED_EXPLANATION,
   FARM_ARCHIVE_BLOCKED_SATZ,
   farmArchiveBlockedTitel,
@@ -105,9 +106,9 @@ export function ArchiveFarmCard({ farmSlug, isArchived, offeneBestellungen }: Pr
           <CardTitle>{FARM_ARCHIVE_TITLE}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Ein Absatz wörtlich nach Board s2-/w2-konto-hof (vorher drei). */}
+          {/* Ein Absatz wörtlich nach Board s2-/w2-konto-hof (vorher drei); der Erklärtext kommt aus farm-archive.ts. */}
           <p className="text-sm text-muted-foreground">
-            {KONTO_TEXT.stilllegenSatz} {KONTO_TEXT.stilllegenAbsatz} {KONTO_TEXT.nurVoruebergehend}{' '}
+            {KONTO_TEXT.stilllegenSatz} {FARM_ARCHIVE_EXPLANATION} {KONTO_TEXT.nurVoruebergehend}{' '}
             <Link href="/settings/pause" className="font-medium text-brand-text underline underline-offset-2">
               {URLAUB_UND_PAUSE}
             </Link>{' '}

@@ -23,11 +23,10 @@ export const FARM_ARCHIVED_OWNER_BANNER =
 /** Überschrift des Selbstbedienungs-Kastens auf /settings/account. */
 export const FARM_ARCHIVE_TITLE = 'Hof stilllegen'
 
-/** Erklärtext im Kasten, solange der Hof aktiv ist. */
+/** Erklärtext im Kasten, solange der Hof aktiv ist — wörtlich nach Board s2-/w2-konto-hof Bild 2 (Nr. 250). */
 export const FARM_ARCHIVE_EXPLANATION =
   'Deine Hofseite verschwindet aus dem Netz und es sind keine Bestellungen mehr möglich. ' +
-  'Deine Daten bleiben vollständig erhalten — Bestellungen, Produkte, Kundinnen und Auswertungen. ' +
-  'Du kannst dich weiterhin anmelden und alles einsehen, und den Hof jederzeit selbst wieder aktivieren.'
+  'Deine Daten bleiben vollständig erhalten, und du kannst den Hof jederzeit selbst wieder aktivieren.'
 
 /** Erklärtext im Kasten, wenn der Hof bereits stillgelegt ist. */
 export const FARM_ARCHIVED_EXPLANATION =

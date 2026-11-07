@@ -273,7 +273,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 }}
                 {...feldFehlerAttribute('status-title', Boolean(fieldErrors.title))}
                 className={cn(
-                  'w-full h-11 px-3 rounded-[10px] border bg-card text-base focus:outline-none focus:ring-2 transition-colors',
+                  RUNDUNG.feld,
+                  'w-full h-11 px-3 border bg-card text-base focus:outline-none focus:ring-2 transition-colors',
                   fieldErrors.title
                     ? 'border-status-offen focus:ring-status-offen/30'
                     : 'border-border focus:ring-ring/50',
@@ -301,7 +302,8 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
                 enterKeyHint={enterTaste(true, 'send')}
                 {...feldFehlerAttribute('status-body', Boolean(fieldErrors.body))}
                 className={cn(
-                  'w-full px-3 py-2.5 rounded-[10px] border bg-card text-base focus:outline-none focus:ring-2 resize-none transition-colors',
+                  RUNDUNG.feld,
+                  'w-full px-3 py-2.5 border bg-card text-base focus:outline-none focus:ring-2 resize-none transition-colors',
                   fieldErrors.body
                     ? 'border-status-offen focus:ring-status-offen/30'
                     : 'border-border focus:ring-ring/50',

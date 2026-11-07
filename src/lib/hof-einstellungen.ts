@@ -47,7 +47,6 @@ import {
   barGebuehrSepaSatz,
   baueDeinStand,
   baueTarifZeile,
-  TARIF_ZEILE,
   bestimmeTarifZustand,
   tarifText,
   type DeinStand,
@@ -127,9 +126,6 @@ export const KONTO_TEXT = {
   anmeldeAdresseAendern: 'Um sie zu ändern,',
   passwortTitel: 'Passwort ändern',
   stilllegenSatz: 'Deinen Hof dauerhaft schließen.',
-  /** Wörtlich nach Board s2-/w2-konto-hof Bild 2 (Liste Lauf 32, konto-hof „Hof stilllegen drei Absätze“, Nr. 250). */
-  stilllegenAbsatz:
-    'Deine Hofseite verschwindet aus dem Netz und es sind keine Bestellungen mehr möglich. Deine Daten bleiben vollständig erhalten, und du kannst den Hof jederzeit selbst wieder aktivieren.',
   nurVoruebergehend: 'Nur vorübergehend zusperren? Dann nutze lieber',
   nurVoruebergehendNach: '– dabei bleibt deine Hofseite mit einem Hinweis sichtbar.',
   /** Konto löschen wörtlich nach Board s2-/w2-konto-hof Bild 2 (nennt die 7 Jahre Aufbewahrung). */
@@ -179,11 +175,13 @@ function esFehlt(teile: readonly string[]): string {
 
 /**
  * Die Zeile „Futtermittel-Registrierung“ mit Nummer (Liste Lauf 32, einstellungen „Eigene Ernte“, Nr. 250):
- * ohne das Fachwort der Betriebsart, nur was die Nummer ist — eigene Ernte (oder noch keine Angabe) heißt
- * „Futtermittel-Nummer (LFBIS) …“, gemeldet, registriert oder zugelassen beim BAES „BAES-Meldung …“.
+ * ohne das Fachwort der Betriebsart, immer „Futtermittel-Nummer (LFBIS) …“; ist der Hof beim BAES
+ * registriert oder zugelassen, steht zusätzlich „BAES-Meldung“ dahinter. Ohne zweite Nummer: Der Hof speichert
+ * nur eine (Farm.betriebsnummer), die BAES-Meldung kommt aus dem Status (wie in lib/futter-registrierung.ts).
  */
 export function futtermittelZeile(betriebsstatus: Betriebsstatus | null, nummer: string): string {
-  return betriebsstatus === null || betriebsstatus === 'PRIMAERPRODUKTION' ? `Futtermittel-Nummer (LFBIS) ${nummer}` : `BAES-Meldung ${nummer}`
+  const lfbis = `Futtermittel-Nummer (LFBIS) ${nummer}`
+  return betriebsstatus === 'REGISTRIERT' || betriebsstatus === 'ZUGELASSEN' ? `${lfbis} · BAES-Meldung` : lfbis
 }
 
 /**
@@ -419,10 +417,10 @@ export function konditionenZeile(hof: TarifHof, jetzt: Date): string {
   // Bei Hoftor nur der Titel: „Produkte im Shop" ohne die Zahl sagte nichts.
   if (zeile.zustand === 'hoftor') return zeile.titel
   // Gründungshof in der Übersicht wörtlich nach Board s1-/w1-einstellungen (Liste Lauf 32, Nr. 250): „Gründungshof
-  // bis <Datum> · ohne Grundgebühr“ — dasselbe Datum wie die Tarif-Zeile, nur umgestellt; die Seitenleiste bleibt.
-  if (zeile.zustand === 'gruendungshof') {
-    const datum = zeile.zeile.slice(TARIF_ZEILE.gruendungshof.zeile.length).trim()
-    return `${zeile.titel} bis ${datum} · ohne Grundgebühr`
+  // bis <Datum> · ohne Grundgebühr“ — das Datum aus dem Stand wie in der Tarif-Zeile (formatDatumLang); „gruendungshof“
+  // gibt es nur mit gruendungBis. „ohne Grundgebühr“ ohne „bis“ hat in konditionen.ts keinen eigenen Eintrag (Bericht 250).
+  if (zeile.zustand === 'gruendungshof' && hof.gruendungBis) {
+    return `${zeile.titel} bis ${formatDatumLang(hof.gruendungBis)} · ohne Grundgebühr`
   }
   return `${zeile.titel} · ${zeile.zeile}`
 }

@@ -16,8 +16,6 @@ import { cn } from '@/lib/utils'
 
 /** Der Satz am Feld „Aktuelles Passwort“, wörtlich nach Board s2-konto-hof Bild 3. */
 export const AKTUELLES_PASSWORT_FALSCH = 'Das aktuelle Passwort ist nicht korrekt.'
-/** Fehlt das aktuelle Passwort beim Absenden (G6: Prüfung beim Absenden, der Knopf ist nie gesperrt). */
-export const AKTUELLES_PASSWORT_FEHLT = 'Bitte gib dein aktuelles Passwort ein.'
 
 /*
  * Passwort ändern (Konto und Sicherheit). Seit Nr. 250 (Liste Lauf 32, konto-hof „Passwort falsch“): Ein
@@ -57,7 +55,11 @@ export function PasswordForm() {
     if (!canSubmit) {
       // Beim Absenden zeigen, was fehlt — statt eines gesperrten Knopfs (G6).
       setPasswordTouched(true)
-      setAktuellFehler(currentPassword.length === 0 ? AKTUELLES_PASSWORT_FEHLT : '')
+      // Fehlt das aktuelle Passwort, steht die Meldung des Schemas am Feld — eine Quelle (schemas/change-password.ts).
+      const fehltAktuell = changePasswordSchema
+        .safeParse({ currentPassword, password, passwordConfirm })
+        .error?.issues.find((i) => i.path[0] === 'currentPassword')
+      setAktuellFehler(fehltAktuell?.message ?? '')
       return
     }
     setFehler('')

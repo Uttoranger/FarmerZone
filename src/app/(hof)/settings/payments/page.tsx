@@ -93,7 +93,7 @@ export default async function PaymentsPage({
   return (
     <div className={UNTERSEITE_RAHMEN}>
       {/* Werkzeug-Kopf (G1, Nr. 250) mit Hof-Unterzeile, der Satz darunter (Boards s2-/w2-hofdaten-zahlung). */}
-      <WerkzeugKopf titel={"Zahlung"} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
+      <WerkzeugKopf titel="Zahlung" unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
       <p className={UNTERSEITE_SATZ}>Verwalte, wie Kundinnen bezahlen können.</p>
 
       <div className="flex flex-col gap-4">

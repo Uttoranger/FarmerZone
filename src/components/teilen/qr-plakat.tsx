@@ -2,6 +2,8 @@ import { qrPfad } from '@/lib/qr-code'
 import { Bildmarke } from '@/components/shared/bildmarke'
 import type { PlakatDaten } from '@/server/queries/teilen-bild'
 import { MARKE } from '@/lib/marke'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { cn } from '@/lib/utils'
 
 /*
  * Das QR-Plakat (Gate 7 Aufgabe 3; Mockup web-h4-qr-plakat-zum-drucken):
@@ -28,7 +30,10 @@ export function QrPlakat({ daten }: { daten: PlakatDaten }): React.JSX.Element {
   return (
     <article
       aria-label={`Plakat von ${daten.hofName}`}
-      className="@container mx-auto aspect-[210/297] w-full max-w-[794px] overflow-hidden rounded-[12px] border border-border bg-accent-foreground text-primary-foreground [print-color-adjust:exact] print:aspect-auto print:h-[297mm] print:w-[210mm] print:max-w-none print:rounded-none print:border-0"
+      className={cn(
+        '@container mx-auto aspect-[210/297] w-full max-w-[794px] overflow-hidden border border-border bg-accent-foreground text-primary-foreground [print-color-adjust:exact] print:aspect-auto print:h-[297mm] print:w-[210mm] print:max-w-none print:rounded-none print:border-0',
+        RUNDUNG.karte
+      )}
     >
       <div className="flex h-full flex-col items-center gap-[3cqw] px-[8.8cqw] py-[7cqw] text-center">
         {/* Die Bildmarke über der Wortmarke — die volle Fassung als Bild, Rundung per CSS (Register M1, Nr. 92;

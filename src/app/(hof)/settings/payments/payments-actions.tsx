@@ -1,7 +1,5 @@
 'use client'
 
-import { cn } from '@/lib/utils'
-
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExternalLink, Loader2 } from 'lucide-react'
@@ -14,6 +12,7 @@ import {
   checkConnectStatus,
   schalteOnlineZahlungEin,
 } from '@/server/actions/stripe-connect'
+import { cn } from '@/lib/utils'
 
 interface PaymentsActionsProps {
   hasAccount: boolean
