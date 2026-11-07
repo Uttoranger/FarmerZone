@@ -353,8 +353,9 @@ export function TeilenKarte({
   /** „14 Besuche über deine Links" der letzten Woche (teilenWirkungSatz). */
   wirkung?: string | null
 }): React.JSX.Element {
-  // „Teilen“ ohne Symbol (Liste Lauf 32, heute Bild 2) — die Knöpfe gehören anderen Nummern, das Symbol blendet die Karte aus.
-  const knopf = cn(KNOPF_UMRISS, 'w-full [&>svg]:hidden')
+  // „Teilen“ ohne Symbol (Liste Lauf 32, heute Bild 2) — die Knöpfe gehören anderen Nummern, das Symbol blendet die
+  // Karte aus (Nachfahre statt Kind-Selektor, die Kind-Selektoren-Wache lässt `[&>` nur an Bausteinen zu).
+  const knopf = cn(KNOPF_UMRISS, 'w-full [&_svg]:hidden')
   return (
     <div className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
       <p className="text-[15px] leading-snug font-semibold break-words">Diese Woche bei dir: {satz}</p>

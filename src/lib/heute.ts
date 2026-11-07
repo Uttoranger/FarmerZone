@@ -424,7 +424,7 @@ function wochentagLang(jetzt: Date): string {
  */
 export function vergleichText(woche: Pick<Wochenvergleich, 'dieseWocheCent' | 'vorwocheCent'>, jetzt: Date): string {
   const tag = wochentagLang(jetzt)
-  if (woche.vorwocheCent <= 0) return `Letzte Woche bis ${tag}: noch kein Umsatz.`
+  if (woche.vorwocheCent <= 0) return `Letzte Woche bis ${tag}: noch kein Umsatz`
   const vorher = formatEuro(centsAlsEuro(woche.vorwocheCent))
   const wort = woche.dieseWocheCent > woche.vorwocheCent ? 'Mehr als' : woche.dieseWocheCent < woche.vorwocheCent ? 'Weniger als' : 'So viel wie'
   return `${wort} letzte Woche bis ${tag} (${vorher}).`

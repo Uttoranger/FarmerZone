@@ -776,3 +776,31 @@ describe('Produktdialog im neuen Design', () => {
     expect(quelle('src/app/(hof)/layout.tsx')).toMatch(muster)
   })
 })
+
+describe('Produkt anlegen nach der Liste Lauf 32 (Nr. 249)', () => {
+  it('der Bar-Hinweis im grünen Kasten kommt aus der Geldsatz-Hilfe (geldsaetzeFuer), nie als fester Text', () => {
+    const abfrage = quelle('src/server/queries/products.ts')
+    expect(abfrage).toMatch(/geldsaetzeFuer\(\{ art: 'angebot', positionen: \[\] \}, hof, einstellung, gruendungBis, jetzt\)\?\.barOhneGebuehr/)
+    const dialog = quelle('src/components/products/product-dialog.tsx')
+    expect(dialog).toContain('{barOhneGebuehr && <p className="text-muted-foreground">{barOhneGebuehr}</p>}')
+    // Kein fester Satz „Bar bis … ohne Gebühr“ im Formular selbst.
+    expect(dialog).not.toMatch(/['"`]Bar bis /)
+  })
+
+  it('der Kopf am Handy: Pfeil zurück links, Produktart darunter, Kreuz erst ab 640 px (alle drei Formulare)', () => {
+    const kopf = quelle('src/components/produkte/produkt-dialog-kopf.tsx')
+    expect(kopf).toMatch(/<DialogClose[\s\S]*?sm:hidden[\s\S]*?<ChevronLeft/)
+    expect(kopf).toMatch(/<DialogClose[\s\S]*?max-sm:hidden[\s\S]*?<XIcon/)
+    for (const datei of ['src/components/products/product-dialog.tsx', 'src/components/produkte/familien-teile.tsx']) {
+      const q = quelle(datei)
+      expect(q, datei).toContain('showCloseButton={false}')
+      expect(q, datei).toContain('<ProduktDialogKopf')
+    }
+  })
+
+  it('„Nur an landwirtschaftliche Betriebe“ ist im Futter-Formular ein Schalter mit dem Satz des Boards', () => {
+    const q = quelle('src/components/produkte/futter-formular.tsx')
+    expect(q).toMatch(/<Switch\s+id="futter-nur-betriebe"/)
+    expect(q).toContain('Dann fragt die Kasse nach der Betriebsnummer.')
+  })
+})

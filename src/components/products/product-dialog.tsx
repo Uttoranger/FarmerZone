@@ -128,7 +128,7 @@ import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
-import { KREUZ_NUR_AB_SM, ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
+import { ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
 import { RUNDUNG } from '@/components/ui/rundung'
 import {
   FUTTER_BESTAETIGUNG_AUSNAHME,
@@ -991,10 +991,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           --app-*) im Teilbaum die Werte des Design-Systems (DESIGN_SYSTEM „Mein Hof"). */}
       <DialogContent
         data-app-palette="neu"
-        className={cn(
-          'flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-[16px]',
-          KREUZ_NUR_AB_SM
-        )}
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-[16px]"
+        showCloseButton={false}
       >
         {/* Liste Lauf 32 (produkt-neu 390): am Handy „‹“ links, Titel, Produktart darunter. */}
         <ProduktDialogKopf titel={dialogTitel(isEdit, vorwahl)} art={PRODUKTE_FILTER_LABEL[produktBereich(category)]} zurueckGesperrt={isSubmitting} />
@@ -1283,9 +1281,13 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                           fester Text. Im Modell „bisher“ die leise Zeile „Kunden sehen: …“ (dort stimmt sie noch). */}
                       {preisVorschau &&
                         (preisAnzeige ? (
-                          <div className={cn('bg-accent/10 px-3 py-2.5 text-[13px] text-foreground', RUNDUNG.hinweis)} aria-live="polite">
+                          // Form wie der Geld-Kasten der Vorschau /intern/bausteine (Nr. 248, DESIGN_SYSTEM).
+                          <div
+                            className={cn('flex flex-col gap-0.5 border border-status-fertig/40 bg-status-fertig/10 px-3.5 py-2.5 text-[14px] text-foreground', RUNDUNG.hinweis)}
+                            aria-live="polite"
+                          >
                             <p className="font-semibold">{preisVorschau}</p>
-                            {barOhneGebuehr && <p className="mt-0.5 text-muted-foreground">{barOhneGebuehr}</p>}
+                            {barOhneGebuehr && <p className="text-muted-foreground">{barOhneGebuehr}</p>}
                           </div>
                         ) : (
                           <p className="-mt-1 text-xs text-muted-foreground" aria-live="polite">

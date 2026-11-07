@@ -358,7 +358,7 @@ export function BrennmaterialFormular({
             <span className="text-[15px] font-semibold text-foreground" aria-hidden="true">
               Lagerung
             </span>
-            <label htmlFor="brenn-ueberdacht" className={cn('flex min-h-11 cursor-pointer items-center gap-3 border border-border px-3', RUNDUNG.feld)}>
+            <label htmlFor="brenn-ueberdacht" className={cn('flex min-h-11 items-center gap-3 border border-border px-3', RUNDUNG.feld)}>
               <Switch id="brenn-ueberdacht" checked={ueberdacht} onCheckedChange={setUeberdacht} className={cn(TREFFER_44, 'data-checked:bg-accent')} />
               <span className="text-sm text-foreground">Überdacht gelagert</span>
             </label>

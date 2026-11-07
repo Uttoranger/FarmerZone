@@ -333,7 +333,7 @@ describe('Kopf in Wiener Zeit', () => {
     expect(vergleichText({ dieseWocheCent: 45000, vorwocheCent: 43120 }, jetzt)).toBe('Mehr als letzte Woche bis Dienstag (€ 431,20).')
     expect(vergleichText({ dieseWocheCent: 100, vorwocheCent: 43120 }, jetzt)).toBe('Weniger als letzte Woche bis Dienstag (€ 431,20).')
     expect(vergleichText({ dieseWocheCent: 43120, vorwocheCent: 43120 }, jetzt)).toBe('So viel wie letzte Woche bis Dienstag (€ 431,20).')
-    expect(vergleichText({ dieseWocheCent: 5000, vorwocheCent: 0 }, jetzt)).toBe('Letzte Woche bis Dienstag: noch kein Umsatz.')
+    expect(vergleichText({ dieseWocheCent: 5000, vorwocheCent: 0 }, jetzt)).toBe('Letzte Woche bis Dienstag: noch kein Umsatz')
   })
 
   it('selbstEingetragenSatz: die Tage mit selbst eingetragenen Verkäufen (Board s1-heute Bild 2)', () => {

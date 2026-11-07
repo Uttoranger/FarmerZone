@@ -3,7 +3,7 @@
 import { cloneElement, isValidElement } from 'react'
 import { Check, Lock, Plus, X } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { KREUZ_NUR_AB_SM, ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
+import { ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
 import { Button } from '@/components/ui/button'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
@@ -60,10 +60,8 @@ export function FamilienDialog({
     <Dialog open={open} onOpenChange={(o) => !o && !speichert && onClose()}>
       <DialogContent
         data-app-palette="neu"
-        className={cn(
-          'flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-[16px]',
-          KREUZ_NUR_AB_SM
-        )}
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-[16px]"
+        showCloseButton={false}
       >
         <ProduktDialogKopf titel={titel} art={art} satz={satz} zurueckGesperrt={speichert} />
         <form

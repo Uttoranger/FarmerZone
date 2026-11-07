@@ -359,19 +359,7 @@ export function FutterFormular({
       </Feld>
 
       <Abschnitt id="futter-groessen" titel="Verkaufsgrößen" satz="Tipp an, was du abgibst – vom Sackerl für den Hasen bis zum Rundballen.">
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-groessen" data-feld="groessen">
-          {FUTTER_VORLAGEN.map((v) => {
-            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
-            return (
-              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
-                {v.bezeichnung}
-              </Wahl>
-            )
-          })}
-          <EigeneGroesseKnopf onClick={eigeneGroesse} disabled={zeilen.length >= GROESSEN_MAX} />
-        </div>
-        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
-
+        {/* Erst die gewählten Größen, dann die Schnellwahl (Liste Lauf 32, produkt-neu: Reihenfolge Board). */}
         <ul className="flex flex-col gap-2.5">
           {zeilen.map((z, i) => {
             const pfad = `groessen.${i}`
@@ -454,6 +442,19 @@ export function FutterFormular({
             )
           })}
         </ul>
+
+        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-groessen" data-feld="groessen">
+          {FUTTER_VORLAGEN.map((v) => {
+            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
+            return (
+              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
+                {v.bezeichnung}
+              </Wahl>
+            )
+          })}
+          <EigeneGroesseKnopf onClick={eigeneGroesse} disabled={zeilen.length >= GROESSEN_MAX} />
+        </div>
+        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
         <p className="text-[12.5px] leading-snug text-muted-foreground">
           € / kg rechnet sich automatisch und wird deinen Kundinnen zum Vergleichen gezeigt. Sackerl und Säcke gelten als abgepacktes Heimtierfutter,
           Ballen als lose Ernte – siehe Registrierungen unten. Jede Größe hat ihren eigenen Vorrat.
