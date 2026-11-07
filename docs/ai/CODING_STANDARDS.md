@@ -331,10 +331,11 @@ Keine neuen Bedeutungs-Tokens erfinden, ohne zu fragen — das wäre ein neues
 Farbschema.
 
 ### Was dem Modus NICHT folgt
-Fotos und Hof-Banner werden nicht abgedunkelt. Schleier über Fotos, weiße
-Schrift auf Fotos, Kartenkacheln samt Pins und Gruppen-Pins (siehe `hoefe-karte.tsx`), die Karte der Region auf der Startseite (`RegionsKarte`, nur Tokens, die im neuen Design in beiden Themes gleich sind), die
+Fotos und Hof-Banner werden nicht abgedunkelt, nur leicht gedämpft (`FOTO_HUELLE`, auch das Video). Schleier über Fotos, weiße
+Schrift auf Fotos, Pins und Gruppen-Pins (siehe `hoefe-karte.tsx`), die
 Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
 wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
+**Kartenkacheln und die Regionskarte der Startseite (`RegionsKarte`) werden im Dunkeln gedämpft** (Regelvorschlag Morgenbericht 31, übernommen in Lauf 32, Nr. 248): Die Kachel-Ebene wird mit der Fläche der Hülle multipliziert (`KARTE_KACHELN` auf der Kachel-Ebene, `KARTE_HUELLE` auf der Hülle) — Pins und Beschriftungen liegen darüber und bleiben. **Jede Bildfläche und jeder Platzhalter ohne Foto nimmt die Klassen aus `src/components/ui/bild-dunkel.ts`** (`FOTO_HUELLE`, `ILLUSTRATION_HUELLE`/`ILLUSTRATION_BILD`, `PLATZHALTER_FLAECHE`, `KARTE_HUELLE`/`KARTE_KACHELN`), nie eine eigene `dark:`-Kopie (G12; Wache `tests/bausteine-242.test.ts`).
 Ausnahme: Die Kategorie-Illustrationen (`public/categories/`) sind keine Fotos,
 ihr heller Crème-Grund würde nachts als Fläche leuchten. Jede NEUE Stelle, die
 eine Illustration zeigt, dämpft sie im Dunkeln (`dark:brightness-[…]

@@ -156,15 +156,15 @@ describe('FesteAktionsleiste (G2)', () => {
 })
 
 describe('Vorschau /intern/bausteine', () => {
-  it('Einhängepunkte 246–248 sind eigene Dateien, eingebunden in bausteine-vorschau.tsx, zunächst leer', () => {
+  it('Einhängepunkte 246–248 sind eigene Dateien, eingebunden in bausteine-vorschau.tsx, zunächst leer (248 gefüllt)', () => {
     const vorschau = readFileSync(join(process.cwd(), 'src/app/intern/bausteine/bausteine-vorschau.tsx'), 'utf8')
     for (const nr of [246, 247, 248]) {
       expect(vorschau).toContain(`from '@/app/intern/bausteine/vorschau-${nr}'`)
       expect(vorschau).toContain(`<Vorschau${nr} />`)
     }
-    // Nr. 246 und 247 füllen ihre Einhängepunkte (geprüft in tests/bausteine-246.test.ts und tests/bausteine-247.test.ts); 248 bleibt leer, bis ihre Nummer kommt.
+    // Nr. 246, 247 und 248 füllen ihre Einhängepunkte (geprüft in tests/bausteine-246.test.ts, -247.test.ts und -248.test.ts).
     expect(html(createElement(Vorschau246))).toContain('<section')
     expect(html(createElement(Vorschau247))).toContain('id="chip-gruppe-titel"')
-    expect(html(createElement(Vorschau248))).toBe('')
+    expect(html(createElement(Vorschau248))).not.toBe('')
   })
 })
