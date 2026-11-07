@@ -7,17 +7,17 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
-import { formatGrundpreis } from '@/lib/format'
 import { knappText, ruhenderKnopfText, type KartenZustand } from '@/lib/bereiche-anzeige'
 import { KAEUFER_VORSCHAU, type KartenVorschau } from '@/lib/hofseite-kunde'
-import { zweitePreiszeile } from '@/lib/produktdetail'
+import { nameMitGebinde, preisZeilen } from '@/components/hofseite/preis-zeilen'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { AusverkauftMarke } from '@/components/ui/marke'
-import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /**
  * Die Liste der Produktkarten (Boards s1-/w1-hofseite): am Handy EINE Karte mit Zeilen
@@ -38,11 +38,12 @@ function Preis({ preis: roh, className }: { preis: PreisAngabe; className?: stri
     // Ruhiger Platzhalter statt „€ 0,00" oder „NaN" (Nr. 51).
     return <span className={cn('flex min-w-0 flex-col text-[15px] text-muted-foreground', className)}>{KAEUFER_VORSCHAU.preisFehlt}</span>
   }
-  const zweite = zweitePreiszeile(preis)
+  // Preis fett, Grundpreis grau darunter (Liste Lauf 32, hofseite; dieselbe Hilfe wie die Produktseite, Nr. 252).
+  const zeilen = preisZeilen(preis)
   return (
     <span className={cn('flex min-w-0 flex-col', className)}>
-      <span className="text-[15px] text-foreground tabular-nums">{formatGrundpreis(preis.price, preis.unit, preis.unitSize)}</span>
-      {zweite && <span className="text-[13px] text-muted-foreground tabular-nums">{zweite}</span>}
+      <span className="text-[15px] font-bold text-foreground tabular-nums">{zeilen.preis}</span>
+      {zeilen.grundpreis && <span className="text-[13px] text-muted-foreground tabular-nums">{zeilen.grundpreis}</span>}
     </span>
   )
 }
@@ -189,7 +190,9 @@ function KartenAufbau({
           (CODING_STANDARDS §7). */}
       <span
         className={cn(
-          'relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted md:h-24 md:w-full md:rounded-[10px]',
+          'relative flex size-14 shrink-0 items-center justify-center overflow-hidden border border-border md:h-24 md:w-full',
+          RUNDUNG.feld,
+          PLATZHALTER_FLAECHE,
           bild && !istFoto ? ILLUSTRATION_HUELLE : FOTO_HUELLE
         )}
       >
@@ -208,13 +211,13 @@ function KartenAufbau({
             style={istFoto ? bildStil(ausschnitt, { filter: !ausgegraut }) : undefined}
           />
         ) : (
-          <span aria-hidden="true" className="font-heading text-xl font-semibold text-brand-text">
+          <span aria-hidden="true" className="font-heading text-xl font-semibold text-muted-foreground">
             {produktInitiale(name)}
           </span>
         )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="line-clamp-2 text-[15px] font-bold break-words text-foreground">{name}</span>
+        <span className="line-clamp-2 text-[15px] font-bold break-words text-foreground">{preis ? nameMitGebinde(name, preis) : name}</span>
         <Preis preis={preis} />
         {hinweis && <span className="text-[13px] font-medium text-muted-foreground">{hinweis}</span>}
       </span>
@@ -223,7 +226,8 @@ function KartenAufbau({
   const anordnung = 'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-1.5'
 
   return (
-    <article className="flex items-center gap-3 px-2.5 py-2 md:h-full md:flex-col md:items-stretch md:gap-1.5 md:rounded-2xl md:border md:border-border md:bg-card md:p-2.5">
+    // Die Rundung gilt bei jeder Breite (RUNDUNG.karte, G8); sichtbar wird sie erst ab 768 px mit Rand und Fläche.
+    <article className={cn('flex items-center gap-3 px-2.5 py-2 md:flex-1 md:flex-col md:items-stretch md:gap-1.5 md:border md:border-border md:bg-card md:p-2.5', RUNDUNG.karte)}>
       {href ? (
         <Link href={href} title={name} className={cn(anordnung, FOKUS_RAHMEN)}>
           {bildUndName}

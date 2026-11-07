@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
-import { HOEFE_LEER, KARTE_ADRESSE, abholzeileDerKarte, STARTSEITE_CHIPS, STARTSEITE_HOEFE_DECKEL, STARTSEITE_HOEFE_TITEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
+import { HOEFE_LEER, KARTE_ADRESSE, KARTE_KNOPF, abholzeileDerKarte, STARTSEITE_HOEFE_DECKEL, STARTSEITE_HOEFE_TITEL, hoefeAdresse, type StartseitenHof } from '@/lib/startseite'
+import { SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
+import { Kicker } from '@/components/startseite/kicker'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -29,45 +30,51 @@ import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
  * „Höfe aus der Region" sagt es schon, der Kicker wiederholte es.
  */
 
+/**
+ * „Oder direkt suchen:“ — Produkte statt Kategorien, wörtlich nach dem Board (Liste Lauf 32, startseite 1440 Bild 2).
+ * Jeder Chip sucht wie das Suchfeld oben (nur `q`), /hoefe löst den Suchtext beim Ankommen auf.
+ */
+export const STARTSEITE_SUCH_CHIPS = ['Eier', 'Heumilch', 'Heu', 'Brennholz', 'Honig'] as const
+
+/** Die Adresse eines Such-Chips: dieselbe wie das abgesendete Suchfeld der Startseite. */
+export function suchAdresse(wort: string): string {
+  return `/hoefe?${new URLSearchParams({ [SUCHTEXT_PARAMETER]: wort }).toString()}`
+}
+
 export function HoefeInDerNaehe({ children }: { children: ReactNode }): React.JSX.Element {
   return (
     // group/hoefe: Ohne Höfe (Leerzustand mit data-hoefe-leer) entfällt „Oder direkt suchen" (Board Bild 5) —
     // die Karten laden hinter Suspense, also entscheidet das CSS, nicht der Server.
-    <section aria-labelledby="hoefe-titel" className="group/hoefe pt-5 pb-[52px] md:pb-[72px]">
-      <div className="mx-auto flex max-w-[1200px] flex-col gap-[22px] px-4 md:gap-[26px] md:px-6">
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <h2 id="hoefe-titel" className="font-heading text-[22px] font-semibold md:text-[32px]">
-              {STARTSEITE_HOEFE_TITEL}
-            </h2>
-          </div>
-          <span className="flex-1" />
-          <Link
-            href={KARTE_ADRESSE}
-            className={cn(
-              'inline-flex h-11 items-center gap-1 rounded-full border border-border px-[18px] text-sm font-medium text-foreground transition-colors duration-[250ms] hover:bg-muted',
-              FOKUS_RAHMEN
-            )}
-          >
-            Alle Höfe auf der Karte
-            <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          </Link>
-        </div>
+    <section aria-labelledby="hoefe-titel" className="group/hoefe pt-5 pb-8 md:pb-12">
+      <div className="mx-auto flex max-w-[1146px] flex-col gap-3 px-4 md:gap-4 md:px-6">
+        {/* Die leise Überzeile statt der großen Serifen-h2 (Liste Lauf 32, startseite Bild 1/2/5). */}
+        <Kicker ton="leise" als="h2" id="hoefe-titel">
+          {STARTSEITE_HOEFE_TITEL}
+        </Kicker>
 
         {children}
 
-        {/* Am Handy EINE Zeile zum Wischen (Board s1-startseite, Bild 2), im Browser neben dem Satz. */}
-        <div className="flex flex-col gap-2 group-has-[[data-hoefe-leer]]/hoefe:hidden md:flex-row md:items-center md:gap-3">
-          <span aria-hidden="true" className="text-sm font-semibold text-foreground">
-            Oder direkt suchen:
-          </span>
-          <FilterChipReihe beschriftung="Oder direkt suchen" className="min-w-0 md:flex-1">
-            {STARTSEITE_CHIPS.map((chip) => (
-              <FilterChip key={chip.label} href={hoefeAdresse(chip.filter)}>
-                {chip.label}
-              </FilterChip>
-            ))}
-          </FilterChipReihe>
+        {/* Unter den Karten: links der Textlink zur Karte, daneben „Oder direkt suchen:“ mit den Such-Chips (Board Bild 2).
+            Am Handy die Chips in EINER Zeile zum Wischen. Ohne Höfe entfällt die Zeile (Board Bild 5). */}
+        <div className="flex flex-col gap-2 group-has-[[data-hoefe-leer]]/hoefe:hidden md:flex-row md:items-center md:gap-4">
+          <Link
+            href={KARTE_ADRESSE}
+            className={cn('inline-flex min-h-11 w-fit shrink-0 items-center rounded-md text-[15px] font-semibold text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
+          >
+            {KARTE_KNOPF} →
+          </Link>
+          <div className="flex min-w-0 flex-col gap-2 md:flex-1 md:flex-row md:items-center md:gap-3">
+            <span aria-hidden="true" className="text-sm font-semibold text-foreground">
+              Oder direkt suchen:
+            </span>
+            <FilterChipReihe beschriftung="Oder direkt suchen" className="min-w-0 md:flex-1">
+              {STARTSEITE_SUCH_CHIPS.map((wort) => (
+                <FilterChip key={wort} href={suchAdresse(wort)}>
+                  {wort}
+                </FilterChip>
+              ))}
+            </FilterChipReihe>
+          </div>
         </div>
       </div>
     </section>
@@ -139,13 +146,18 @@ export function HofKarten({ hoefe, jetzt }: { hoefe: readonly StartseitenHof[]; 
         const pausiert = hof.pausiert === true
         return (
           <li key={hof.slug} className="min-w-0">
-            <HofkarteRahmen pausiert={pausiert} className="h-full hover:border-foreground/30">
+            {/* Der Fokus umschließt die ganze Karte (Liste Lauf 32, startseite Bild 2): Der Rahmen schneidet mit
+                overflow-hidden ab, darum zeichnet ihn die Karte selbst, sobald ihr Link den Fokus hat. */}
+            <HofkarteRahmen
+              pausiert={pausiert}
+              className="h-full overflow-visible hover:border-foreground/30 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ring has-[a:focus-visible]:outline-solid"
+            >
               <Link
                 href={`/${hof.slug}`}
                 title={hof.name}
                 // Der Satz der Marke für den Screenreader hängt am einen Link der Karte.
                 aria-describedby={jetzt !== undefined && hof.neuerBeitrag ? `beitrag-marke-startseite-${hof.slug}` : undefined}
-                className={cn('flex h-full flex-col rounded-2xl', FOKUS_RAHMEN_INNEN)}
+                className="flex h-full flex-col overflow-hidden rounded-[inherit] outline-none"
               >
                 <span className="relative block">
                   <HofBild hof={hof} sizes="(min-width: 1024px) 380px, (min-width: 768px) 50vw, 100vw" className="h-24 w-full" />

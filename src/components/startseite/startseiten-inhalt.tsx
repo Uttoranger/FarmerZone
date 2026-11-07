@@ -131,7 +131,7 @@ function Eintrag({ eintrag, jetzt }: { eintrag: RenderEintrag; jetzt: Date }) {
 /** Futter und Brennmaterial als Paar: EIN Rahmen der Breite, zwei Spalten ab 768 px. */
 function KurzkartenPaar({ eintraege }: { eintraege: RenderEintrag[] }) {
   return (
-    <div className="mx-auto grid max-w-[1200px] gap-5 px-4 pb-8 md:grid-cols-2 md:gap-4 md:px-6 md:pb-12">
+    <div className="mx-auto grid max-w-[1146px] gap-5 px-4 pb-8 md:grid-cols-2 md:gap-4 md:px-6 md:pb-12">
       {eintraege.map((e) => (e.art === 'FUTTER' ? <FutterAbschnitt key="FUTTER" imPaar /> : <BrennmaterialBand key="BRENNMATERIAL" imPaar />))}
     </div>
   )

@@ -1,5 +1,8 @@
 'use client'
 
+import { KATEGORIE_LABEL } from '@/lib/taxonomie'
+import type { ProductCategoryValue } from '@/schemas/product'
+
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
@@ -17,6 +20,7 @@ import {
 } from '@/lib/hofuebersicht'
 import {
   ABHOLUNG_TEXT,
+  ENTDECKEN_KOPF,
   MENGEN_HINWEIS,
   abholungReihe,
   aktiveFilter,
@@ -228,12 +232,25 @@ export function HoefeClient({
   }, [gefiltert, uhr])
   const zahlZeilenText = zahlZeile({ filter, anzahl, holenHeute, mitBezugspunkt: bezugspunkt !== null, jetzt: uhr })
   const kopf = entdeckenKopf(filter)
-  const leer = leerzustand({
+  // Typografische Anführungszeichen „…“ (Liste Lauf 32, hoefe): Der Titel der Suche endet sonst mit einem geraden ".
+  const titel = typografischerTitel(kopf.titel)
+  // Bei einer Produktsuche steht unter „Standort nutzen“ der Satz „Produkte statt Höfe, …“ (auch im Web), die
+  // Unterzeile unter der h1 entfällt dann; am Handy weichen Chip-Reihen und Reihenfolge-Satz (Board s1-hoefe Bild 2).
+  const produktSuche = alsProdukte && kopf.unterzeile === ENTDECKEN_KOPF.sucheUnterzeile
+  const leerGrund = leerzustand({
     sucheLeertDieListe,
     umkreis,
     filter,
     abholung: abholungLeertDieListe ? { naechster: naechsterAbholtag(abholBasis, uhr) } : null,
   })
+  // „Mit 25 km sind es 2 Höfe mit Fleisch.“ (Liste Lauf 32, hoefe Bild 4): dieselbe Ableitung wie die Liste, nur mit
+  // der nächsten Umkreis-Stufe — so stimmt die Zahl mit dem, was der Knopf zeigt. Ohne Treffer bleibt der allgemeine Satz.
+  const naechsteStufe = leerGrund.ausweg.art === 'umkreis' ? leerGrund.ausweg.stufe : null
+  const mitNaechsterStufe = useMemo(
+    () => (naechsteStufe === null || alsProdukte ? 0 : berechneHofAuswahl(hoefe, { ...filter, bezugspunkt, umkreis: naechsteStufe, jetzt: uhr }).gefiltert.length),
+    [hoefe, filter, bezugspunkt, naechsteStufe, alsProdukte, uhr]
+  )
+  const leer = naechsteStufe !== null && mitNaechsterStufe > 0 ? { ...leerGrund, satz: umkreisSatz(naechsteStufe, mitNaechsterStufe, filter.kategorien) } : leerGrund
 
   const reihen = useMemo(
     () => ({
@@ -276,6 +293,11 @@ export function HoefeClient({
     // Der Name an der Pille — die Karte zeigt ihn ab Zoom 12 oder bei höchstens 12 Pins im Bild (Register N22).
     name: hof.name,
   }))
+
+  // Standort-Marke „Du“ und gestrichelter Kreis, sobald ein Umkreis gilt (Liste Lauf 32, hoefe Bild 4) — dieselbe
+  // Zeichnung wie die Umfeld-Karte der Region; der Kreis bestimmt dann den Ausschnitt.
+  const kartenZentrum =
+    bezugspunkt && aktiverUmkreis !== null ? { lat: bezugspunkt.lat, lon: bezugspunkt.lon, radiusKm: aktiverUmkreis, titel: 'Dein Standort' } : undefined
 
   /** Die Pin-Vorschau am Computer (HofKurzkarte): zwei Produktzeilen, Auswahl wie auf der Hofkarte. */
   const pinVorschau = (slug: string, id: string) => {
@@ -404,6 +426,7 @@ export function HoefeClient({
                 ausgewaehlt={sichtbareLage.ausgewaehlt === hof.slug}
                 onAuswaehlen={() => hofAnfahren(hof.slug)}
                 onFotoTipp={() => router.push(hofseitenLink(hof.slug, bereich))}
+                fliess
               />
             </li>
           )
@@ -422,6 +445,7 @@ export function HoefeClient({
       <p role="status" className="sr-only">
         {zahlZeilenText}
       </p>
+      {/* Pflichtangabe (§ 4a FAGG): bei jeder Breite und auch bei der Produktsuche — nie ausblenden (Runde 1 Nr. 252). */}
       {anzahl > 0 && <p className="text-[13px] text-muted-foreground">{REIHENFOLGE_HINWEIS}</p>}
     </>
   )
@@ -518,7 +542,7 @@ export function HoefeClient({
    * Futtersorte und Sorte erscheinen im Browser unter der Reihe, sobald es sie gibt (am Handy im Blatt).
    */
   const filterReihen = (
-    <div className="flex flex-col gap-2">
+    <div className={cn('flex flex-col gap-2', produktSuche && 'max-md:hidden')}>
       <ChipReihe beschriftung="Kategorie" chips={kurzeKategorieReihe(reihen.kategorien)} onWahl={schreibeUrl} />
       {(reihen.futter.length > 0 || reihen.sorten.length > 0) && (
         <div className="hidden flex-col gap-2 lg:flex">
@@ -537,21 +561,24 @@ export function HoefeClient({
   )
 
   const kopfbereich = (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 pt-5 md:px-6 md:pt-7">
-      <div className="flex items-start gap-3">
+    <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 md:px-6 md:pt-7">
+      {/* Am Handy ein Kopfstreifen mit Linie und h1 20 px (Liste Lauf 32, hoefe 390), ab 768 px wie bisher. */}
+      <div className="-mx-4 flex items-start gap-3 border-b border-border bg-card px-4 py-3 md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0">
         <div className="min-w-0 flex-1">
           {/* break-words + line-clamp: Ein Suchbegriff darf 100 Zeichen lang sein. */}
-          <h1 className="line-clamp-3 font-heading text-[26px] leading-tight font-semibold break-words text-foreground md:text-[30px]">
-            {kopf.titel}
+          <h1 className="line-clamp-3 font-heading text-[20px] leading-tight font-semibold break-words text-foreground md:text-[30px]">
+            {titel}
           </h1>
-          {/* Die Unterzeile nur am Handy — im Browser zeigt das Board keine (w1-hoefe, Bild 1). */}
-          <p className="mt-1 text-[14px] text-muted-foreground lg:hidden">{kopf.unterzeile}</p>
+          {/* Die Unterzeile nur am Handy — im Browser zeigt das Board keine (w1-hoefe, Bild 1); bei der Suche steht ihr Satz unter dem Feld. */}
+          {!produktSuche && <p className="mt-1 text-[14px] text-muted-foreground lg:hidden">{kopf.unterzeile}</p>}
         </div>
       </div>
       {suchfeld(false)}
+      {produktSuche && <p className="text-[14px] text-muted-foreground">{`${kopf.unterzeile}.`}</p>}
       {filterReihen}
       {futterHinweis}
-      <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} />
+      {/* Der getippte Suchtext steht im Feld — keine Zeile „Aktive Filter: Suche“ (Liste Lauf 32, hoefe Bild 2). */}
+      <AktiveFilterZeile filter={filter} onWahl={schreibeUrl} umkreis={aktiverUmkreis} onUmkreisAufheben={umkreisAufheben} suchtextImFeld />
     </div>
   )
 
@@ -562,6 +589,7 @@ export function HoefeClient({
         lage={sichtbareLage}
         fokus={fokus}
         hinweis={kartenHinweis}
+        zentrum={kartenZentrum}
         kurzkarte={pinVorschau}
         hoeheKlasse="h-full"
         onAuswahl={pinGewaehlt}
@@ -620,7 +648,7 @@ export function HoefeClient({
             Karussell im Querformat (740 × 360) hinter die Leiste. */}
         <div ref={kartenmodus} className={cn('flex flex-col md:min-h-[280px]', KUNDE_PLATZ_HOEHE)}>
           {/* Titel und Unterzeile weichen der Werkzeugzeile — der Titel bleibt für Vorleser. */}
-          <h1 className="sr-only">{kopf.titel}</h1>
+          <h1 className="sr-only">{titel}</h1>
           {/* 44 px Bedienteile plus je 4 px Luft: Im Querformat (844 × 390) bleiben der Karte 70 %. */}
           <div className="mx-auto flex w-full max-w-[1200px] shrink-0 items-start gap-2 px-4 py-1 md:px-6">
             <div className="min-w-0 flex-1">{suchfeld(true)}</div>
@@ -676,6 +704,7 @@ export function HoefeClient({
               polsterUnten={bandHoehe}
               polsterOhneAuswahl={hinweisPlatz}
               hinweis={kartenHinweis}
+              zentrum={kartenZentrum}
               onAuswahl={pinGewaehlt}
               onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
             />
@@ -719,4 +748,16 @@ export function HoefeClient({
       </div>
     </div>
   )
+}
+
+/** „„Eier" in deiner Nähe“ → „„Eier“ in deiner Nähe“: das schließende Anführungszeichen typografisch (Liste Lauf 32, hoefe). */
+export function typografischerTitel(titel: string): string {
+  return titel.replace(/"( in deiner Nähe)$/, '“$1')
+}
+
+/** „Mit 25 km sind es 2 Höfe mit Fleisch & Wurst.“ — mit Kategorie nur, wenn genau eine gewählt ist. */
+export function umkreisSatz(km: number, anzahl: number, kategorien: readonly ProductCategoryValue[]): string {
+  const hoefe = anzahl === 1 ? '1 Hof' : `${anzahl} Höfe`
+  const mit = kategorien.length === 1 ? ` mit ${KATEGORIE_LABEL[kategorien[0]!]}` : ''
+  return `Mit ${km} km sind es ${hoefe}${mit}.`
 }

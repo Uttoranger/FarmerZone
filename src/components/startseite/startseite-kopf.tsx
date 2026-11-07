@@ -1,25 +1,21 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, House, LocateFixed, Map as MapIcon, Search, Sprout } from 'lucide-react'
+import { Check, Search } from 'lucide-react'
 import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 import {
   KARTE_ADRESSE,
   KARTE_KNOPF,
-  KARTE_OEFFNEN,
   KARTE_UEBERSCHRIFT,
   hoefeAdresse,
   SUCHE_BESCHRIFTUNG,
   SUCHE_PLATZHALTER,
   benenneKartenLink,
-  formatiereRegionsZaehler,
   type StartseitenKarte,
 } from '@/lib/startseite'
 import {
-  HOFKARTE_ANTEIL,
   REGIONSKARTE_MASSE,
   REGIONS_NAMEN,
-  platziereHofkarte,
   rundeAufZehntel,
   zeichneLand,
   zeichneMarken,
@@ -30,6 +26,7 @@ import type { StrassenArt } from '@/lib/regionskarte-daten'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HeroVideo } from '@/components/startseite/hero-video'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 
 /*
  * Der Kopf der Startseite (Mockups web-k0-startseite, mobil-k0-startseite;
@@ -47,6 +44,12 @@ import { HeroVideo } from '@/components/startseite/hero-video'
 
 /** Der Fokus auf dem Foto: weiß, denn das Grün des Fokusrings trägt am Tag auf dem dunklen Bild nicht. */
 const FOKUS_AUF_FOTO = cn(FOKUS_RAHMEN, 'focus-visible:outline-white')
+
+/** Der Satz unter der h1, wörtlich nach der Liste Lauf 32 (startseite). */
+export const STARTSEITE_UNTERTITEL = 'Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen.'
+
+/** Der Link unter der Regionskarte (Board w1-/s1-startseite). */
+export const KARTE_LINK = `${KARTE_KNOPF} →`
 
 const VERSPRECHEN = ['Bar oder online bezahlen', 'Keine Lieferkosten – du holst ab', 'Der Hof bekommt den vollen Preis'] as const
 
@@ -66,7 +69,7 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
         {/* Drei Schichten wie bisher: (1) das Standbild — immer da, es ist die
             Darstellung bei „Bewegung reduzieren" und der LCP-Kandidat (priority);
             (2) darüber das Video, rein per CSS eingeblendet; (3) der Schleier. */}
-        <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className="-z-10 object-cover" />
+        <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className={cn('-z-10 object-cover', FOTO_HUELLE)} />
 
         {/* Das Video samt Pause-Knopf (Nr. 176): hero-video.tsx. */}
         <HeroVideo />
@@ -74,7 +77,7 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-tr from-black/65 via-black/30 via-45% to-black/5" />
         <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-12 bg-linear-to-b from-transparent to-background md:h-20" />
 
-        <div className="mx-auto flex max-w-[1200px] items-center gap-[60px] px-4 pt-8 pb-14 md:px-6 md:pt-[84px] md:pb-24">
+        <div className="mx-auto flex max-w-[1146px] items-center gap-[60px] px-4 pt-8 pb-14 md:px-6 md:pt-[84px] md:pb-24">
           <div className="flex min-w-0 flex-1 flex-col gap-[18px] md:gap-5">
             <p className="text-[12.5px] font-bold tracking-[1.6px] text-white/85 uppercase">Direkt vom Hof in deiner Nähe</p>
             <h1
@@ -86,13 +89,8 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               Online bestellen, <br className="hidden md:inline lg:hidden" />
               am Hof abholen.
             </h1>
-            <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">
-              <span className="md:hidden">Eier, Gemüse, Brot – und Heu für die Hasen. Von Höfen aus deiner Gegend.</span>
-              <span className="hidden md:inline">
-                Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen. Von Bäuerinnen und Bauern aus deiner Gegend,
-                ohne Umweg über den Supermarkt.
-              </span>
-            </p>
+            {/* Wörtlich nach dem Board (Liste Lauf 32, startseite), in jeder Breite derselbe Satz. */}
+            <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">{STARTSEITE_UNTERTITEL}</p>
 
             {/* Die Suche schickt den Suchtext `q` — derselbe Weg wie die Suche der
                 404 und der KundeShell. /hoefe löst ihn beim Ankommen auf (Nr. 84):
@@ -108,8 +106,9 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               <label htmlFor="startseite-suche" className="w-fit text-[14px] font-semibold text-white">
                 {SUCHE_BESCHRIFTUNG}
               </label>
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-2.5 md:rounded-full md:border md:border-border md:bg-card md:py-2 md:pr-2 md:pl-[18px]">
-              <div className="flex h-[50px] min-w-0 items-center gap-2.5 rounded-full border border-border bg-card px-4 md:h-auto md:flex-1 md:border-0 md:bg-transparent md:px-0">
+              {/* Feld und „Höfe finden“ nebeneinander, auch am Handy (Liste Lauf 32, startseite 390 Bild 1). */}
+              <div className="flex flex-row items-center gap-2 rounded-full border border-border bg-card py-1.5 pr-1.5 pl-4 md:gap-2.5 md:py-2 md:pr-2 md:pl-[18px]">
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
                 <Search className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
                 <input
                   id="startseite-suche"
@@ -126,7 +125,7 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               <button
                 type="submit"
                 className={cn(
-                  'h-[50px] shrink-0 rounded-[14px] bg-accent px-[18px] text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:rounded-full',
+                  'h-11 shrink-0 rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:px-[18px]',
                   FOKUS_AUF_FOTO
                 )}
               >
@@ -135,18 +134,21 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               </div>
             </form>
 
+            {/* Unterstrichener Textlink ohne Symbol (Board). Auf dem Video bleibt er weiß: Das Grün der Boards trägt
+                auf dem dunklen Bild nicht (A1, das Video bleibt; DESIGN_SYSTEM „Bild-Overlays“). Ohne Höfe entfallen
+                Link und Häkchenliste (Board Bild 5) — die Höfe laden hinter Suspense, also entscheidet das CSS. */}
             <Link
               href={hoefeAdresse()}
               className={cn(
-                'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-[13.5px] font-semibold text-white underline-offset-4 hover:underline',
+                'inline-flex min-h-11 w-fit items-center rounded-md text-[14px] font-medium text-white underline underline-offset-4 [:root:has([data-hoefe-leer])_&]:hidden',
                 FOKUS_AUF_FOTO
               )}
             >
-              <LocateFixed className="size-4" strokeWidth={1.7} aria-hidden="true" />
               In deiner Nähe suchen – mit Postleitzahl oder Standort
             </Link>
 
-            <ul className="flex flex-col gap-[7px] md:mt-1.5 md:flex-row md:flex-wrap md:gap-[22px]">
+            {/* Einspaltig wie im Board (Liste Lauf 32, startseite 1440). */}
+            <ul className="flex flex-col gap-[7px] md:mt-1.5 [:root:has([data-hoefe-leer])_&]:hidden">
               {VERSPRECHEN.map((text) => (
                 <li key={text} className="flex items-center gap-[7px] text-[13.5px] text-white/85">
                   <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
@@ -156,8 +158,11 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
             </ul>
           </div>
 
-          {/* Die Karte rechts (ab 1024 px), so breit wie bisher. */}
-          <div className="hidden w-[420px] shrink-0 lg:block xl:w-[520px]">{karte('web')}</div>
+          {/* Die Karte rechts (ab 1024 px), darunter „Alle Höfe auf der Karte →“ (Board w1-startseite Bild 1). */}
+          <div className="hidden w-[420px] shrink-0 flex-col gap-2 lg:flex xl:w-[520px]">
+            {karte('web')}
+            <KartenLink aufFoto />
+          </div>
         </div>
       </section>
 
@@ -169,27 +174,31 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
           als 440 px wird die Karte nicht: Am Tablett füllte sie sonst den Schirm.
           Nach unten der Abstand der übrigen Abschnitte; das Mockup zeigt darunter
           nichts mehr. */}
-      <section aria-labelledby="region-titel" className="pt-[18px] pb-[52px] md:pb-[72px] lg:hidden">
-        <div className="mx-auto max-w-[1200px] px-4 md:px-6">
-          <div className="flex max-w-[440px] flex-col gap-2.5">
-            <h2 id="region-titel" className="font-heading text-xl font-semibold text-foreground">
-              {KARTE_UEBERSCHRIFT}
-            </h2>
+      <section aria-label={KARTE_UEBERSCHRIFT} className="pt-[18px] pb-8 md:pb-12 lg:hidden">
+        <div className="mx-auto max-w-[1146px] px-4 md:px-6">
+          <div className="flex max-w-[440px] flex-col gap-2">
+            {/* Die Karte direkt unter der Häkchenliste, ohne eigene Überschrift und Pille, der Link darunter (Board s1-startseite Bild 1). */}
             {karte('handy')}
-            <Link
-              href={KARTE_ADRESSE}
-              className={cn(
-                'mt-[22px] flex h-12 items-center justify-center gap-2 rounded-[14px] bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-                FOKUS_RAHMEN
-              )}
-            >
-              <MapIcon className="size-[17px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-              {KARTE_KNOPF}
-            </Link>
+            <KartenLink />
           </div>
         </div>
       </section>
     </>
+  )
+}
+
+/** „Alle Höfe auf der Karte →“ unter der Regionskarte (Board w1-/s1-startseite) — der Weg in die Kartenansicht von /hoefe. */
+function KartenLink({ aufFoto = false }: { aufFoto?: boolean }) {
+  return (
+    <Link
+      href={KARTE_ADRESSE}
+      className={cn(
+        'inline-flex min-h-11 w-fit items-center rounded-md text-[15px] font-semibold underline underline-offset-4',
+        aufFoto ? cn('text-white', FOKUS_AUF_FOTO) : cn('text-brand-text', FOKUS_RAHMEN)
+      )}
+    >
+      {KARTE_LINK}
+    </Link>
   )
 }
 
@@ -257,8 +266,6 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
   const hof = karte?.hervorgehoben ?? null
   const marken = zeichneMarken(karte?.pins ?? [], mass, hof?.slug ?? null)
   const land = zeichneLand(mass, marken)
-  const markeDesHofs = marken.find((m) => m.hervorgehoben)
-  const lage = hof && markeDesHofs ? platziereHofkarte(markeDesHofs, mass, HOFKARTE_ANTEIL[form]) : null
 
   return (
     <Link
@@ -344,68 +351,13 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
             {name.text}
           </text>
         ))}
-        {lage && (
-          <line
-            x1={rundeAufZehntel(lage.linie.x1)}
-            y1={rundeAufZehntel(lage.linie.y1)}
-            x2={rundeAufZehntel(lage.linie.x2)}
-            y2={rundeAufZehntel(lage.linie.y2)}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            className="stroke-accent"
-          />
-        )}
         {/* Der hervorgehobene Hof zuletzt: Er liegt über seinen Nachbarn. */}
         {[...marken.filter((m) => !m.hervorgehoben), ...marken.filter((m) => m.hervorgehoben)].map((marke) => (
           <Marke key={marke.schluessel} marke={marke} />
         ))}
       </svg>
 
-      {anzahl > 0 && (
-        <span className="absolute top-3.5 left-3.5 flex h-[34px] items-center gap-[7px] rounded-full bg-accent-foreground px-[13px] text-[13px] font-semibold text-primary-foreground shadow-md dark:bg-background dark:text-foreground dark:ring-1 dark:ring-border">
-          <House className="size-[15px] shrink-0 text-accent dark:text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-          {formatiereRegionsZaehler(anzahl)}
-        </span>
-      )}
-
-      {form === 'web' && (
-        <span className="absolute right-3.5 bottom-3.5 flex h-[38px] items-center gap-1.5 rounded-full bg-accent px-[15px] text-[13.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] group-hover:opacity-90">
-          <MapIcon className="size-[15px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          {KARTE_OEFFNEN}
-        </span>
-      )}
-
-      {hof && lage && (
-        <span
-          className="absolute flex items-center gap-2.5 rounded-2xl bg-accent-foreground p-2.5 text-primary-foreground shadow-xl dark:bg-background dark:text-foreground dark:ring-1 dark:ring-border"
-          style={{
-            left: `${lage.links}%`,
-            width: `${HOFKARTE_ANTEIL[form] * 100}%`,
-            ...(lage.senkrecht.kante === 'oben' ? { top: `${lage.senkrecht.abstand}%` } : { bottom: `${lage.senkrecht.abstand}%` }),
-          }}
-        >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-accent/15 text-accent dark:bg-accent/30 dark:text-status-fertig">
-            <Sprout className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span title={hof.name} className="truncate font-heading text-[15px] font-semibold">
-              {hof.name}
-            </span>
-            {hof.zeile && <span className="truncate text-[12px] text-primary-foreground/70 dark:text-muted-foreground">{hof.zeile}</span>}
-            {hof.abholung && (
-              // Die Abholzeit darf umbrechen statt abzubrechen — abgeschnitten fehlte genau die Uhrzeit.
-              <span
-                className={cn(
-                  'line-clamp-2 text-[12px] break-words',
-                  hof.abholungIstTermin ? 'font-semibold text-accent dark:text-status-fertig' : 'text-primary-foreground/70 dark:text-muted-foreground'
-                )}
-              >
-                {hof.abholungIstTermin ? `Abholung: ${hof.abholung}` : hof.abholung}
-              </span>
-            )}
-          </span>
-        </span>
-      )}
+      {/* Keine Pille „n Höfe“ und kein „Karte öffnen“ mehr (Liste Lauf 32, startseite): Der Link darunter führt zur Karte. */}
     </Link>
   )
 }

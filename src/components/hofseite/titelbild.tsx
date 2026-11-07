@@ -7,6 +7,8 @@ import { useBildmasse } from '@/components/shared/bild-masse'
 import { bildStil, filterMit, nurFilterStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
+import { FOTO_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Das Titelbild der Hofseite (Register N6, Nachtlauf Nr. 72; am Computer
@@ -177,14 +179,16 @@ export function Titelbild({
         // Seit Nr. 235 steht der Rahmen in der Inhaltsspalte (Board w1-hofseite): gerundet und gerahmt
         // wie eine Karte, der Name steht darunter, nicht mehr auf dem Bild. Mit Foto die Höhen aus
         // Register N13; ohne Foto die ruhige Fläche der Boards (98 px am Handy, 170 px ab 768).
-        'relative w-full overflow-hidden rounded-2xl border border-border bg-muted',
+        'relative w-full overflow-hidden border border-border',
+        RUNDUNG.karte,
+        PLATZHALTER_FLAECHE,
         foto ? 'h-[220px] md:h-[300px] xl:h-[360px] 2xl:h-[420px]' : flach ? 'h-[98px] md:h-[90px]' : 'h-[98px] md:h-[170px]'
       )}
     >
       {foto ? (
         // Im Dunkeln leicht gedämpft (Freigabe Lauf 31, Maßstab Punkt 4) — über die Hülle: Der Filter des
         // Hofs steht inline am Bild und bliebe sonst die einzige Angabe.
-        <div className="absolute inset-0 dark:brightness-[0.82]">
+        <div className={cn('absolute inset-0', FOTO_HUELLE)}>
           <TitelbildBilder
             foto={foto}
             ausschnitt={ausschnitt}
@@ -196,11 +200,11 @@ export function Titelbild({
       ) : (
         // Der Verlauf ist ein Wert des Hofs (Titelbild-Einstellung), kein Farbliteral im Code. Im Hellen nur als
         // Hauch über der Fläche `muted`: Das Board zeigt ohne Foto eine blasse Fläche (crème bis hellgrün), der
-        // volle Verlauf stünde als kräftiger dunkler Block über dem Namen. Im Dunkeln voll, aber gedämpft — sein
-        // helles Ende leuchtete dort sonst als Fleck.
+        // volle Verlauf stünde als kräftiger dunkler Block über dem Namen. Im Dunkeln nur die gedämpfte Fläche
+        // (G12, PLATZHALTER_FLAECHE, Nr. 252) — der Verlauf ließ dort einen hellen Fleck.
         <div
           data-verlauf=""
-          className="absolute inset-0 opacity-[0.14] dark:opacity-100 dark:brightness-[0.5] dark:saturate-[0.75]"
+          className="absolute inset-0 opacity-[0.14] dark:hidden"
           style={{ background: verlauf }}
         />
       )}

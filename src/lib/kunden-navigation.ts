@@ -188,9 +188,9 @@ export function ohneKopfKnopfAmHandy(pfad: string): boolean {
  * Hofs — zwei feste Leisten übereinander waren unruhig. Die Shell erkennt die
  * beiden Seiten an `aktiv` = `entdecken`: Nur sie setzen den Punkt selbst
  * (Nr. 177), ihr Pfad sagt ihn nicht — so bleiben die Props der Shell gleich.
- * Die Shell wendet es nur mit Unterleiste an: Die Produktseite (ohne) hat noch
- * keinen klebenden Hof-Kopf, ihr Kopf bleibt der Weg zum Korb. Produktseite
- * folgt mit Nr. 252.
+ * Seit Nr. 252 auch auf der Produktseite (ohne Unterleiste): Dort klebt am
+ * Handy die Zeile „‹ Alle Produkte von <Hof>“ mit dem Warenkorb — der Weg zum
+ * Korb bleibt, ohne dass der Kopf der Shell kleben muss.
  */
 export function kopfScrolltWegAmHandy(aktiv: KundenNavId | undefined): boolean {
   return aktiv === ENTDECKEN.id

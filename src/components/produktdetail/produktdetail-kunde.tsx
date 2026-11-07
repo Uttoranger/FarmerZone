@@ -1,15 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PreisAnzeigeRahmen } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChevronLeft, Leaf } from 'lucide-react'
+import { ChevronLeft, Handbag, Leaf } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PublicProduct } from '@/server/queries/farm'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
-import { formatEuro, formatGrundpreis } from '@/lib/format'
+import { formatEuro } from '@/lib/format'
 import { kartenZustand, knappText, ruhenderKnopfText, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { gebuehrHinweisFuerHof, mengeAbgelehntText, zahlungsarten } from '@/lib/hofseite-kunde'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
@@ -29,7 +29,6 @@ import {
   produktLink,
   sichtbaresProdukt,
   vorratText,
-  zweitePreiszeile,
 } from '@/lib/produktdetail'
 import { produktInitiale } from '@/lib/hofuebersicht'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
@@ -41,19 +40,22 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { AusverkauftMarke, Marke } from '@/components/ui/marke'
+import { AUSVERKAUFT_WORT, Marke } from '@/components/ui/marke'
+import { Zaehler } from '@/components/ui/zaehler'
+import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { Stepper } from '@/components/ui/stepper'
 import { useRueckwegKlick } from '@/components/shared/kunden-kopf'
 import { CartSheet } from '@/components/farm/cart-sheet'
 import type { HofseiteHof } from '@/components/hofseite/hofseite-kunde'
 import { HofseiteSeitenspalte, SPALTEN_KARTE } from '@/components/hofseite/hofseite-seitenspalte'
+import { preisZeilen } from '@/components/hofseite/preis-zeilen'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-band'
 import { sperreMitBestellstopp } from '@/lib/notbremse'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
-import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
-import { RaummassErklaerung } from '@/components/shared/raummass-erklaerung'
-import { raummassErklaeren } from '@/lib/verkaufsgroessen'
+import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
+import { ausverkauftSatz, groessenAufsteigend, groessenVorrat, preisJeRaummass, raummassZeile } from '@/components/produktdetail/groessen-anzeige'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { FutterSchild } from '@/components/produkte/futter-schild'
@@ -109,7 +111,8 @@ export function ProduktdetailKunde({
 }): React.JSX.Element | null {
   const produkte = farm.products
   const einstieg = useMemo(() => sichtbaresProdukt(produkte, produktId), [produkte, produktId])
-  const familie = useMemo(() => (einstieg ? produktFamilie(produkte, einstieg) : []), [produkte, einstieg])
+  // Klein nach groß (Board s1-/w1-produkt Bild 1, Nr. 252) — die Reihenfolge der Kacheln und der Familie sind eine.
+  const familie = useMemo(() => (einstieg ? groessenAufsteigend(produktFamilie(produkte, einstieg)) : []), [produkte, einstieg])
   const [gewaehlt, setGewaehlt] = useState(gewaehltId)
   const [menge, setMenge] = useState(1)
   const [fehler, setFehler] = useState<string | null>(null)
@@ -127,6 +130,29 @@ export function ProduktdetailKunde({
   const kundenSeite: KundenSeite = { art: 'produkt', hofSlug: farm.slug }
   const zurueck = alleProdukteLink(farm.slug, alsVorschau)
   const beimZurueckZeile = useRueckwegKlick(kundenSeite, 'zeile')
+  // G9 (Nr. 252): Am Handy scrollt der Kopf der Shell hier weg, es klebt nur die Hofzeile — mit dem Warenkorb,
+  // damit der Weg zum Korb bleibt (vorher stand er im Kopf der Shell).
+  const korbKopf = useWarenkorbKopf()
+  const [klebeZeile, setKlebeZeile] = useState<HTMLDivElement | null>(null)
+  // Der Fokus scrollt nie unter die klebende Zeile (WCAG 2.4.11): Die Shell setzt am Handy scroll-padding-top 0
+  // (data-kopf-scrollt), die Höhe der Zeile kennt nur die Seite — sie steht deshalb als Stil an der Wurzel.
+  useEffect(() => {
+    if (!klebeZeile || typeof ResizeObserver === 'undefined' || typeof window.matchMedia !== 'function') return
+    const wurzel = document.documentElement
+    const handy = window.matchMedia('(max-width: 767px)')
+    const setze = () => {
+      if (handy.matches) wurzel.style.scrollPaddingTop = `${klebeZeile.offsetHeight}px`
+      else wurzel.style.removeProperty('scroll-padding-top')
+    }
+    const beobachter = new ResizeObserver(setze)
+    beobachter.observe(klebeZeile)
+    handy.addEventListener('change', setze)
+    return () => {
+      beobachter.disconnect()
+      handy.removeEventListener('change', setze)
+      wurzel.style.removeProperty('scroll-padding-top')
+    }
+  }, [klebeZeile])
 
   // Die Seite prüft vorher (notFound); hier nur die Absicherung für den Typ.
   if (!einstieg) return null
@@ -187,14 +213,15 @@ export function ProduktdetailKunde({
   const schild = futterSchild(produkt, farm.betriebsstatus)
   const brennmaterial = produkt.brennmaterial ? brennmaterialZeilen(produkt.brennmaterial) : []
   const beschreibung = produkt.description?.trim() ?? ''
-  const zweite = zweitePreiszeile(mitEndpreis(produkt, farm.preisAnzeige))
+  const einzelPreis = preisZeilen(preisProdukt)
   // Größen mit Endpreis (N38) — die Kacheln zeigen nur Text, gekauft wird über die Kennung.
   const kacheln = groessenKacheln(familie.map((p) => mitEndpreis(p, farm.preisAnzeige)), kaufSperre)
   const mitGrundpreis = kacheln.some((k) => k.grundpreis)
   const vorrat = vorratText(produkt, zustand)
   const mitnehmen = gleichMitAbholen(produkte, produkt, kaufSperre)
-  // Raummeter und Schüttraummeter erklärt die Seite beim ersten Vorkommen (DESIGN_SYSTEM, Nr. 20).
-  const raummass = raummassErklaeren((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
+  // Raummeter und Schüttraummeter: eine Erklärzeile unter dem Preis (Board Bild 3, Nr. 252), Wortlaut aus RAUMMASS_ERKLAERUNG.
+  const raummass = raummassZeile((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
+  const preisJe = preisJeRaummass(preisProdukt.price, preisProdukt.unit, preisProdukt.unitSize)
   // Bei jedem Futter der Verantwortungs-Hinweis (E10a), bei „nur an Betriebe" mit Zusatz.
   // Über die ganze Familie: Die Abgabe kann je Größe abweichen, der Zusatz
   // „nur an Betriebe" darf auf der Seite nicht fehlen, wenn eine Größe ihn braucht.
@@ -214,21 +241,40 @@ export function ProduktdetailKunde({
   return (
     // Die Preisanzeige (N38, Nr. 197) für Preis, Korb und Seitenspalte dieser Seite.
     <PreisAnzeigeRahmen anzeige={farm.preisAnzeige}>
-      <div className="mx-auto max-w-[1152px] px-4 pt-2 pb-12 md:px-6 md:pt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-x-16">
+      <div className="mx-auto max-w-[1152px] px-4 pt-0 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:px-6 md:pt-4 md:pb-12 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-x-16">
         <div className="flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-1">
-          {/* Rückweg (Board w1-/s1-produkt): am Handy „‹ Alle Produkte von <Hof>“, im Browser „‹ Zurück zu allen Produkten“. */}
+          {/* Rückweg (Board w1-/s1-produkt): am Handy „‹ Alle Produkte von <Hof>“, im Browser „‹ Zurück zu allen Produkten“.
+              Am Handy klebt die Zeile oben (G9, Nr. 252: der Kopf der Shell scrollt weg) und trägt den Warenkorb. */}
+          <div
+            ref={setKlebeZeile}
+            data-klebe-zeile=""
+            className="sticky top-0 z-30 -mx-4 flex items-center gap-2 bg-background px-4 max-md:border-b max-md:border-border md:static md:mx-0 md:px-0"
+          >
           <Link
             href={zurueck}
             onClick={beimZurueckZeile}
             className={cn(
-              'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-[16px] font-semibold text-foreground md:text-[15px] md:text-brand-text md:underline md:underline-offset-4',
+              'inline-flex min-h-11 min-w-0 w-fit items-center gap-1.5 rounded-md text-[16px] font-semibold text-foreground md:text-[15px] md:text-brand-text md:underline md:underline-offset-4',
               FOKUS_RAHMEN
             )}
           >
             <ChevronLeft className="size-5 md:hidden" strokeWidth={1.9} aria-hidden="true" />
-            <span className="md:hidden">Alle Produkte von {farm.name}</span>
+            <span className="truncate md:hidden">Alle Produkte von {farm.name}</span>
             <span className="hidden md:inline">‹ Zurück zu allen Produkten</span>
           </Link>
+          {/* An korbKopf allein (wie vorher die Shell: korb !== null): Wer einen Korb hat, behält am Handy den Weg dorthin,
+              auch auf einer Seite ohne Kaufen (Runde 1 Nr. 252). */}
+          {korbKopf && (
+            <Link
+              href={korbKopf.href}
+              aria-label={`Warenkorb, ${korbKopf.anzahl} Artikel`}
+              className={cn('relative ml-auto flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted md:hidden', FOKUS_RAHMEN)}
+            >
+              <Handbag className="size-5" strokeWidth={1.7} aria-hidden="true" />
+              <Zaehler anzahl={korbKopf.anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className="absolute -top-0.5 -right-0.5 h-5 min-w-5 px-1 text-[12px]" />
+            </Link>
+          )}
+          </div>
 
           {/* ── Bild und Angaben ── */}
           <section aria-labelledby="produkt-titel" className="flex flex-col gap-3">
@@ -237,7 +283,9 @@ export function ProduktdetailKunde({
                 Im Dunkeln gedämpft (Freigabe Lauf 31), damit kein heller Fleck bleibt. */}
             <div
               className={cn(
-                'relative aspect-[390/200] w-full shrink-0 overflow-hidden rounded-2xl border border-border bg-muted md:aspect-auto md:h-[160px]',
+                'relative aspect-[390/200] w-full shrink-0 overflow-hidden border border-border md:aspect-auto md:h-[160px]',
+                RUNDUNG.karte,
+                PLATZHALTER_FLAECHE,
                 bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE
               )}
             >
@@ -257,7 +305,7 @@ export function ProduktdetailKunde({
                   style={produkt.imageUrl ? bildStil(produkt.bildAusschnitt, { filter: !ausverkauft }) : undefined}
                 />
               ) : (
-                <span aria-hidden="true" className="flex h-full items-center justify-center font-heading text-5xl font-semibold text-brand-text">
+                <span aria-hidden="true" className="flex h-full items-center justify-center font-heading text-5xl font-semibold text-muted-foreground">
                   {produktInitiale(produkt.name)}
                 </span>
               )}
@@ -268,7 +316,12 @@ export function ProduktdetailKunde({
                 <h1 id="produkt-titel" className="font-heading text-[26px] leading-[1.1] font-semibold break-words text-foreground md:text-[28px]" title={produkt.name}>
                   {titel}
                 </h1>
-                {ausverkauft && <AusverkauftMarke />}
+                {/* V19: neutrale graue Pille mit Fläche (Liste produkt, 1440 hell). */}
+                {ausverkauft && (
+                  <span className="inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2.5 text-[12px] font-bold whitespace-nowrap text-foreground">
+                    {AUSVERKAUFT_WORT}
+                  </span>
+                )}
               </div>
               {/* Rücktritt je Produkt (Nr. 214): Angaben des Hofs unter dem Namen — nicht bei Ware nur für Betriebe (kein Rücktritt für Unternehmer). */}
               {produkt.abgabe !== 'NUR_BETRIEBE' && <RuecktrittHinweis angabe={produkt} className="text-[13px]" />}
@@ -316,7 +369,7 @@ export function ProduktdetailKunde({
               {brennmaterial.length > 0 && (
                 <dl className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
                   {brennmaterial.map((z) => (
-                    <div key={z.titel} className="rounded-xl border border-border bg-card px-2.5 py-2">
+                    <div key={z.titel} className={cn('border border-border bg-card px-2.5 py-2', RUNDUNG.karte)}>
                       <dt className="text-[13px] text-muted-foreground">{z.titel}</dt>
                       <dd className="text-[15px] font-bold break-words text-foreground">{z.wert}</dd>
                     </div>
@@ -330,7 +383,6 @@ export function ProduktdetailKunde({
                 </p>
               )}
 
-              {beschreibung && <p className="text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground">{beschreibung}</p>}
             </div>
           </section>
 
@@ -348,7 +400,7 @@ export function ProduktdetailKunde({
                   Größe wählen
                 </h2>
                 {/* Untereinander über die volle Breite (Board w1-/s1-produkt Bild 1). */}
-                <GroessenWahl beschriftung="Größe wählen" wert={produkt.id} onWertChange={waehleGroesse} className="grid-cols-1">
+                <GroessenWahl beschriftung="Größe wählen" wert={produkt.id} onWertChange={waehleGroesse} form="zeile">
                   {kacheln.map((k) => (
                     <Groessenkachel
                       key={k.id}
@@ -357,22 +409,24 @@ export function ProduktdetailKunde({
                       hinweis={k.hinweis ?? undefined}
                       preis={k.preis}
                       grundpreis={k.grundpreis ?? undefined}
-                      vorrat={k.vorrat ?? undefined}
+                      vorrat={groessenVorrat(familie.find((p) => p.id === k.id)?.stock ?? 0, k.zustand, k.vorrat !== null)}
                       zustand={k.zustand}
+                      form="zeile"
                     />
                   ))}
                 </GroessenWahl>
-                {raummass && <RaummassErklaerung />}
+                {raummass && <p className="text-[13px] text-muted-foreground">{raummass}</p>}
               </>
             ) : (
               <div className="flex flex-col gap-1">
                 <h2 id="kaufen-titel" className="sr-only">
                   Preis und Menge
                 </h2>
-                <p className="text-[16px] font-bold text-foreground tabular-nums">{formatGrundpreis(preisProdukt.price, preisProdukt.unit, preisProdukt.unitSize)}</p>
-                {zweite && <p className="text-[13px] text-muted-foreground tabular-nums">{zweite}</p>}
+                {/* Preis fett, Grundpreis grau darunter — dieselbe Hilfe wie die Hofseite (preisZeilen, Nr. 252); Raummaße ausgeschrieben. */}
+                <p className="text-[16px] font-bold text-foreground tabular-nums">{preisJe ?? einzelPreis.preis}</p>
+                {!preisJe && einzelPreis.grundpreis && <p className="text-[13px] text-muted-foreground tabular-nums">{einzelPreis.grundpreis}</p>}
                 {vorrat && zustand.art === 'kaufbar' && <p className="text-[13px] text-muted-foreground">Vorrat: {vorrat}</p>}
-                {raummass && <RaummassErklaerung className="mt-1" />}
+                {raummass && <p className="text-[13px] text-muted-foreground">{raummass}</p>}
               </div>
             )}
 
@@ -392,7 +446,7 @@ export function ProduktdetailKunde({
               <div className={cn(SPALTEN_KARTE, 'gap-1.5')}>
                 <p className="text-[15px] font-bold text-foreground">Gerade ausverkauft</p>
                 <p className="text-[14px] break-words text-muted-foreground">
-                  Bei {farm.name} ist {produkt.name} gerade aus. Schau, was es sonst gibt.
+                  {ausverkauftSatz(farm.name, produkt.name)}
                 </p>
                 <Link
                   href={zurueck}
@@ -409,6 +463,9 @@ export function ProduktdetailKunde({
 
           {/* Ausverkauft ohne andere Größe zeigt das Board weder Kennzeichnung noch „Gleich mit abholen“ (Bild 3):
               Gekauft wird hier nichts, die Karte darüber führt zum Angebot. */}
+          {/* Die Beschreibung unter den Größen, vor der Kennzeichnung (Board s1-/w1-produkt Bild 2, Nr. 252). */}
+          {beschreibung && <p className="text-[15px] leading-relaxed break-words whitespace-pre-line text-foreground">{beschreibung}</p>}
+
           {!ausverkauftKarte && <Kennzeichnung zeilen={produktAngaben(produkt, farm)} bestaetigtAm={produkt.futter?.bestaetigtAm ?? null} />}
           {/* Bei jedem Futter der Verantwortungs-Hinweis (E10a) — unter der Kennzeichnung, wo das Board seinen Futter-Satz zeigt
               (w1-/s1-produkt Bild 2); der Wortlaut ist der aus E10a (futterVerantwortung, „Register vor Board“). */}
@@ -437,18 +494,18 @@ export function ProduktdetailKunde({
               <div className="mx-auto flex max-w-[1152px] items-center gap-3 md:flex-row-reverse">
                 {kaufbar ? (
                   <>
-                    {/* Die Menge als Pille mit grünem Rand; Knöpfe und Zahl je 44 px. */}
-                    <span className="inline-flex shrink-0 rounded-full border border-accent">
-                      <Stepper
-                        beschriftung={`Menge ${produkt.name}`}
-                        wert={mengeJetzt}
-                        min={1}
-                        max={Math.max(1, nochMoeglich)}
-                        disabled={nochMoeglich === 0}
-                        onWertChange={setMenge}
-                        eingabeClassName="w-11"
-                      />
-                    </span>
+                    {/* Die Menge als gerahmte Pille „− n +“ (G13, form="pille", Nr. 252). */}
+                    <Stepper
+                      beschriftung={`Menge ${produkt.name}`}
+                      wert={mengeJetzt}
+                      min={1}
+                      max={Math.max(1, nochMoeglich)}
+                      disabled={nochMoeglich === 0}
+                      onWertChange={setMenge}
+                      eingabeClassName="w-11"
+                      className="shrink-0"
+                      form="pille"
+                    />
                     <button
                       type="button"
                       onClick={() => void inDenKorb(produkt, mengeJetzt)}
