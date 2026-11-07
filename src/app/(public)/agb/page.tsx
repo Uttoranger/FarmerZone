@@ -12,6 +12,7 @@ import { hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { formatDatumLang } from '@/lib/format'
 import { ladePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { MARKE } from '@/lib/marke'
+import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: `AGB — ${MARKE}`, alternates: { canonical: '/agb' } }
 
@@ -55,7 +56,8 @@ export default async function AgbPage(): Promise<React.JSX.Element> {
         {kennung === AGB_NEUESTE && (
           <p className="border-t border-border pt-8 print:hidden">
             {/* Der Vortag: die letzte Millisekunde vor dem Stichtag, als Wiener Kalendertag. */}
-            <Link href={agbFassungPfad(AGB_BISHER)} className={INFOSEITE_LINK}>
+            {/* Als Ziel mindestens 44 px hoch (Zwischen-Durchgang A, Nacharbeit aus Nr. 259): Der Link steht frei, nicht im Fließtext. */}
+            <Link href={agbFassungPfad(AGB_BISHER)} className={cn(INFOSEITE_LINK, 'inline-flex min-h-11 items-center py-2')}>
               {AGB_SEITE_TEXT.frueher(formatDatumLang(new Date(stichtag.getTime() - 1)))}
             </Link>
           </p>

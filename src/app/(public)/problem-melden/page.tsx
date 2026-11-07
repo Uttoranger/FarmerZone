@@ -44,8 +44,10 @@ export default async function ProblemMeldenPage({
 
   return (
     <KundeShellMitSitzung>
-      {/* Board s3/w3-problem-melden: die Karte (höchstens 560 px) zeichnet der gemeinsame Baustein, grün in der KundeShell (V52). */}
-      <div className="mx-auto flex w-full max-w-[592px] justify-center px-4 pt-8 pb-12 md:pt-[60px]">
+      {/* Board s3/w3-problem-melden: die Karte (höchstens 560 px) zeichnet der gemeinsame Baustein, grün in der KundeShell (V52).
+          Seit Nr. 254 links in der 1000-px-Spalte der Shell, an der Kante des Seitenfußes, 16 px unter dem Kopf
+          (Liste Lauf 32, problem-melden „Karten mittig statt in der Inhaltsspalte“). */}
+      <div className="mx-auto flex w-full max-w-[1032px] px-4 pt-4 pb-12">
         <MeldungForm
           formToken={generateFormToken('meldung')}
           alsHof={farm !== null}

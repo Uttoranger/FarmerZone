@@ -21,11 +21,12 @@ import { KNOPF_UMRISS } from '@/components/anmelden/stil'
  * Karte 520 px links in der Inhaltsspalte, Text in voller Textfarbe, der
  * ungültige Link ohne Symbol mit Warnfarbe und Umriss-Knopf.
  */
-const KARTE = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-border bg-card p-[18px]'
-const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-3 rounded-2xl border border-accent/45 bg-accent/12 p-[18px]'
+// Ecken 12 px (G8) und engere Zeilen wie im Board s2-/w2-systemseiten (Liste Lauf 32, systemseiten „Karte zu rund, Zeilenabstand größer“).
+const KARTE = 'flex max-w-[520px] flex-col gap-2.5 rounded-[12px] border border-border bg-card p-[18px]'
+const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-2.5 rounded-[12px] border border-accent/45 bg-accent/12 p-[18px]'
 
 const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
-const SATZ = 'text-[15px] leading-normal text-foreground'
+const SATZ = 'text-[15px] leading-snug text-foreground'
 
 type Stand = 'offen' | 'ungueltig' | 'fertig'
 
