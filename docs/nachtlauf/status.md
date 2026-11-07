@@ -294,7 +294,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 247 | Bausteine Teil 3 (G9–G11) | gemergt (#490) | `nacht/2026-11-06/247-bausteine-3` | #486 | vom Zwischenstand `integration/lauf32` nach 245 | 1 Runde (Produktseite klebt bis 252); /account/login als Frage | 6./7.11.2026 |
 | 248 | Bausteine Teil 4 (G5, G12–G14, Geldsätze V1) | gemergt (#490) | `nacht/2026-11-06/248-bausteine-4` | #488 | vom Zwischenstand `integration/lauf32` nach 245 | 1 Runde (Varianten statt in place; Geldsatz bei entfallener Gebühr) | 6./7.11.2026 |
 | 249 | Hof-Alltag | gemergt (#490) | `nacht/2026-11-06/249-hof-alltag` | #489 | vom Zwischenstand `integration/lauf32` nach 245–248 und 259 | Container-Neustart, fortgesetzt ab WIP; 1 Runde (formal: Abholzeiten-Satz als Übergang bis 250); Mängel aus dem Zwischen-Durchgang (Abholzettel „inkl.“-Satz) → B | 6./7.11.2026 |
-| 250 | Einstellungen und Teilen | fertig | `nacht/2026-11-06/250-einstellungen` | #496 | von `integration/lauf32b` | – | 7.11.2026 |
+| 250 | Einstellungen und Teilen (2 Runden, Runde 2 nach Integration im Sammelstand) | fertig | `nacht/2026-11-06/250-einstellungen` | #496 | von `integration/lauf32b` | – | 7.11.2026 |
 | 251 | Hof-Werkzeuge | fertig | `nacht/2026-11-06/251-hof-werkzeuge` | #498 | von `integration/lauf32b` | – | 7.11.2026 |
 | 252 | Finden | fertig | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
 | 253 | Kauf und Konto | fertig | `nacht/2026-11-06/253-kauf-konto` | #493 | von `integration/lauf32b` | – | 7.11.2026 |
@@ -308,4 +308,4 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | Sammel 32 | Sammel-PR Lauf 32 A (243–259) | gemergt (#490) | `integration/lauf32` | #490 | main | A: 243a–249, 256, 258, 259 per --no-ff; voller Lauf 706 Dateien, 13209 Tests; Integration 97 Dateien, 789 Tests; B offen (250–255, 257, 258b, Schluss-Durchgang) | 7.11.2026 |
 | 260 | Doku B: Regelvorschläge Morgenbericht 32 A, Register-Ergänzungen N1/N32/N46 | fertig | `nacht/2026-11-06/260-doku-b` | #491 | von `integration/lauf32b` | – | 7.11.2026 |
 | 249b | Nachbesserung 249: Abholzettel-Kasten (Antwort 8), Mängel Zwischen-Durchgang | fertig | `nacht/2026-11-06/249b-hof-alltag-nach` | #494 | vom Zwischenstand `integration/lauf32b` | – | 7.11.2026 |
-| Sammel 32b | Sammel-PR Lauf 32 B | offen | `integration/lauf32b` | – | main | – | 7.11.2026 |
+| Sammel 32b | Sammel-PR Lauf 32 B (260, 252, 253, 249b, 250, 257, 255, 251, 258b, 254) | bereit | `integration/lauf32b` | #501 | main | per --no-ff in Wellen-Reihenfolge; voller Lauf 717 Dateien, 13351 Tests; Integration 98 Dateien, 798 Tests; Schluss-Durchgang in abnahme-lauf32.md | 7.11.2026 |
