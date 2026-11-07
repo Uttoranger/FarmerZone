@@ -205,3 +205,113 @@ Messung: Schrift 0, h1 = 1, Felder 0, axe ohne serious/critical (heading-order m
 - Messbar (→ 258b): Kachel-Überschriften 11 px (4 Stellen); 390: 5 Kästchen ohne sichtbare Beschriftung (vermutlich eingeklappte Montags-Routine).
 - Aufbau/Wortlaut (Liste für eine Admin-Board-oder-Code-Runde): „1 warten“ statt „1 wartet“; Dienste „4 von 4 laufen“ bei fünf Namen; Pillen-Lage; volle Breite; „Braucht dich“-Aufbau; „Läuft von selbst“ mit acht anderen Abläufen; Montags-Routine-Unterzeile; „Bestellungen anhalten …“ orange; 390 Kopf und einspaltige Kacheln am Ende.
 
+
+### Zwischen-Durchgang A, Teil 2 (Nr. 249, Hof-Alltag; Stand 39bb825f)
+
+Fotograf: ein Bau, Stichtag in der Vergangenheit, Port 3321, Wegwerf-DB und eine DB-Kopie für „neuer Hof“ (Achleitenhof ohne Abholzeiten und Produkte). 97 App-Bilder; Dialoge und Blätter als Fensterbilder.
+
+| Board | Nummer(n) | Schluss Lauf 31 | Zwischen-Durchgang A | Nummer abgeschlossen | gedeckt / offen |
+|---|---|---|---|---|---|
+| heute | 249 | 2·2·2·2 | 4·4·4·4 | ja | Mängel Nr. 249 (Nächste Abholung, Kacheln, Spalte) |
+| bestellungen | 249 | 3·3·2·2 | 2·2·2·2 (Bild 1/2: 4·4·4·4) | ja | Bild 3 „nicht freigeschaltet“ nicht aufgenommen (Nachfoto) |
+| bestellung | 249 | 2·2·3·3 | 4·4·3·3 | ja | Breite 1440, Datumsformat |
+| druck | 249, 244 | 3·–·3·– | 4 (390) · 4 (1440), nur hell | ja | Mangel 249: „Preise inkl. Plattformgebühr“ bei Positionen ohne Gebühr; Frage „Bar zu kassieren“ bei nicht abgeholt/Karte |
+| produkte | 249 | 3·3·3·3 | 3·3·3·3 | ja | Chips, Stepper-Pille, Tabelle |
+| produkt-neu | 249 | 2·2·2·2 | 3·3·3·3 | ja | Verkaufsgrößen-Karte, Vorschau, Holz-Karte offen |
+| mehr-neu | 249 | 5·5·4·3 | **5·5·5·5** (Bild 2 n. e.) | ja | alles gedeckt |
+
+Messung (alle 97 Bilder): Schrift < 12 px 0, Ziele < 44 px 0, axe ohne serious/critical; h1 = 0 nur bei offenen Dialogen/Blättern (Seite inert); Felder ohne sichtbare Beschriftung nur die Vorrat-Felder der Größen (produkt-neu Bild 2/4, produkte Bild 2).
+
+#### heute (Nr. 249 gebaut) — Gesamt 4/4/4/4 (Schluss Lauf 31: 2·2·2·2)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Abholtag mit Packliste | 4 | 4 | 4 | 4 |
+| 2 weiter unten | 4 | 4 | 4 | 4 |
+| 3 Online-Zahlung pausiert | n. e. (Stripe) | n. e. | n. e. | n. e. |
+| 4 Neuer Hof ohne Abholzeiten | 4 | 4 | 4 | 4 |
+| 5 Pflichtkarte AGB oben | 4 | 4 | 4 | 4 |
+Messung sauber (h1 = 1, Schrift 0, Ziele 0, Felder 0, axe 0); dunkel ohne helle Flecken, Balken hellmint (Z. 307 erledigt).
+- Erfüllt: Antwort 2 (Packliste „Maria H.“ ohne Uhrzeit, Positionen zweizeilig; Z. 290/291), Z. 289, 296, 299, 302, 306, 311; AGB-Karte (259, Z. 293).
+- Mangel Nr. 249: rechte Spalte klebt beim Scrollen höher als im Board (Z. 287 halb); „Nächste Abholung“ ohne „· n Bestellungen“ (Z. 273) und zeigt das heutige statt des nächsten Fensters; Text der Karte „Online-Zahlung einrichten“ (Board: „Kundschaft“, „Google Pay“; falls Google Pay absichtlich fehlt, fehlt eine R-Zeile); „Packliste für heute“ statt „Packliste“ (Z. 305) in Bild 4; Kennzahl-Kacheln 92 statt 80 px (Z. 308); Tagesname „heute“ fett im Diagramm; Unterzeile „<Hof> · <Datum>“ (Board widerspricht sich).
+- Gedeckt: Z. 288 (R), 295, 298, 300 (C), 303 (U), 309/Q1, 310/Q4, 312, Antwort 5, Q3, P2, U (Prüfdaten, anderer Hof in Bild 4).
+
+#### bestellungen (Nr. 249 gebaut) — Gesamt 2/2/2/2 (Bild 1 und 2: 4/4/4/4; Schluss Lauf 31: 3·3·2·2)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Noch offen | 4 | 4 | 4 | 4 |
+| 2 Ruhiger Tag | 4 (Zustand n. p.) | 4 | 4 | 4 |
+| 3 Neuer Hof | 2 | 2 | 2 | 2 |
+Messung sauber.
+- Bild 3: Der Prüfhof (Achleitenhof, DB-Kopie ohne Abholzeiten/Produkte) ist offenbar freigeschaltet – der Board-Zustand „nicht freigeschaltet“ (Hof-Balken, Konstante je Stand, Link auf /onboarding; Z. 266–270) ist nicht aufgenommen → Nachfoto in B mit nicht freigeschaltetem Hof, dann bewerten; Leer-Karte am Web schmal statt volle Breite (Z. 269, Mangel).
+- Mangel: Unterleiste (Z. 277, 247-Dateien); Kopf 1440 lockerer, „Packliste drucken“ nicht auf h1-Höhe (Z. 275); Chips 36 statt 44 px hoch (ohne Listenzeile); Positionsformat in der Vorschau (G14 noch nicht genutzt).
+- Erfüllt: Z. 264/265, Chip-Rand dunkel sichtbar (Z. 278 für die Chips), Rundung 12 px (Z. 279).
+- Gedeckt: Antwort 5 („HM“), Q1/Z. 276, P2, Q4/Z. 271, U (Prüfdaten Z. 272; Bild 2 mit Bestellung des Fotografen), R Z. 280; Bildmarke statt Board-Platzhalter (A1).
+
+#### bestellung (Hof) (Nr. 249 gebaut) — Gesamt 4/4/3/3 (Schluss Lauf 31: 2·2·3·3)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Bar, zu packen (App: „Bestätigung offen“) | 4 | 4 | 3 | 3 |
+| 2 Gepackt | 4 | 4 | 3 | 3 |
+| 3 „Artikel fehlt“ (Dialog) | 4 | 4 | 3 | 3 |
+| 4 Online bezahlt, abgeholt | 4 | 4 | 3 | 3 |
+Messung sauber (axe 0; h1 = 0 im Dialogbild ist Messartefakt).
+- Erfüllt: Z. 236, 237, 238 (Textknopf), 240, 242, 243, 244, 245, 246, 247, 250, 251 (Aktionsleiste unter dem Schleier abgedunkelt), 252.
+- Mangel Nr. 249: 1440 Inhalt und Aktionsleiste bis x ≈ 1400 statt ≈ 1197 (Z. 249, `max-w` wirkt nicht); „Bestellt: Samstag, 7. November, 02:50 Uhr“ statt Kurzformat „heute, 07:12“; „Abholung rückgängig“ orange statt Textfarbe (Z. 238); im Dialog kein sichtbarer Fokus (Board: „Abbrechen“) – bis zur Messung von activeElement.
+- Prüf-Seed (243): Bild 2 und 3 mit Online-Bestellungen statt bar, Toast nicht ausgelöst – Zustände des Boards nur teilweise.
+- Gedeckt: U Bestätigungslink nur per Mail (Bild 1), Z. 241 (U), Z. 245 (G14), Z. 246, 248, 255, 256/Q1, 257 (C), Z. 258 (R), Q3, Antwort 5.
+
+#### druck (Nr. 249 und 244 gebaut; nur hell) — 390 hell 4 · 1440 hell 4
+| Bild | 390 hell | 1440 hell |
+|---|---|---|
+| 1 Abholzettel | 4 | 4 |
+| 2 Packliste | 4 | 4 |
+| 3 Packliste leer | 4 (Vorbehalt) | – (kein Board-Bild) |
+Messung: Schrift 0, Ziele 0, h1 = 1, Felder 0; axe nur moderate (kein main-Element).
+- Erfüllt: Z. 928 („Preise inkl. Plattformgebühr.“), Z. 929, Z. 934; Z. 932 (U), Z. 933 (R); Packliste mit Kurzname ohne Uhrzeit (Antwort 2).
+- **Mangel Nr. 249 (Geld-Anzeige, nur Text):** Abholzettel Bild 1 – Positionen € 1,40 + € 10,80 = € 12,20, „Gesamt“ und „Bar zu kassieren“ € 12,95, darunter „Preise inkl. Plattformgebühr.“ – die Positionen stehen ohne Gebühr, der Satz behauptet „inkl.“; im Board ergibt die Summe der Positionen genau „Gesamt“. Entweder Positionen inkl. Gebühr anzeigen (Anzeige, keine Rechnung) oder den Satz anders fassen → Nacharbeit 249 in B; Geld-Gegenlesen nötig.
+- Mangel: Packliste Bild 2 zeigt den Satz „Preise inkl. Plattformgebühr.“ zusätzlich (Board nicht) – oder Z. 928 per Board-Korrektur auf Bild 2 ausweiten.
+- Nicht belegt: Bild 3 „Die nächste Abholung ist …“ (Z. 931) – Prüfhof ohne solches Fenster.
+- Zusatzbild TD-0005 (Karte bei Abholung, nicht abgeholt, Gebühr entfallen): Regel aus 244 erfüllt („Gesamt € 95,00“, „Servicegebühr (entfällt)“ durchgestrichen). Widersprüchlich für den Hof: darunter „**Bar** zu kassieren: € 99,75 (davon Servicegebühr € 4,75)“ bei „Zahlung: Karte bei Abholung“ und Status „Nicht abgeholt“ – „Bar zu kassieren“ ist laut Auftrag der Snapshot (unverändert). Frage an die Projektleitung: bei „Nicht abgeholt“/entfallener Gebühr den Kasten ausblenden oder „Nichts mehr zu kassieren“, bei Karte „Zu kassieren“ statt „Bar“? Dazu zwei Wörter (Servicegebühr bei Altbestellungen vor dem Stichtag, V63).
+
+#### produkte (Nr. 249 gebaut) — Gesamt 3/3/3/3 (Schluss Lauf 31: 3·3·3·3)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Liste | 4 | 4 | 3 | 3 |
+| 2 Vorrat ändern | 3 | 3 | 4 | 4 |
+| 3 Neuer Hof ohne Produkte | 4 | 4 | 5* | 5* |
+| 4 Suche ohne Treffer | 4 | 4 | 4 | 4 |
+\* unter Vorbehalt: Prüfhof freigeschaltet, Zustand „nicht freigeschaltet“ (Z. 362/364) nicht aufgenommen.
+Messung sauber (Dialog h1 = 0 Messartefakt).
+- Mangel, B-Zeilen offen/teilweise: Postfach-Zähler im Handy-Kopf (Z. 367, Mein-Hof-Kopf außerhalb der Grenze); Chips 36 statt 44 px, Such-Knopf am Handy (Z. 372 teilweise); Tabelle stark gerundet (Z. 372, G8); Blatt-Hintergrund unscharf (Z. 371); Stepper-Pille zu breit und neutral statt grün (Z. 370 teilweise).
+- Mangel ohne Listenzeile: Tabellenkopf blass/klein; zweite Preiszeile kleiner; Vorrat-Knopf getönt; Einheit „je L“ statt „1 L“ (Beispieldaten prüfen).
+- Erfüllt: Z. 356, 365 (G4), 375, G12; gedeckt: R Z. 354, 376; C Z. 363, 369/Q3, 374/Q1; Q4/Z. 366; Antwort 5; U (Seed ohne „Braucht dich“).
+
+#### produkt-neu (Nr. 249 gebaut) — Gesamt 3/3/3/3 (Schluss Lauf 31: 2·2·2·2)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Lebensmittel | 4 | 4 | 4 | 4 |
+| 2 Futtermittel mit Größen | 3 | 3 | 3 | 3 |
+| 3 Futter, Kennzeichnung | n. e. | n. e. | n. e. | n. e. |
+| 4 Brennmaterial | 3 | 3 | 3 | 3 |
+| 5 Feldfehler | 4 | 4 | 4 | 4 |
+| 6 Speichern fehlgeschlagen | n. e. | n. e. | n. e. | n. e. |
+Messung: Schrift 0, Ziele 0, axe 0; Felder ohne sichtbare Beschriftung: Vorrat-Felder der Größen (Bild 2: 4, Bild 4: 3) – Teil der offenen Zeilen Z. 335/347.
+- Erfüllt: Z. 319 (Handy-Kopf), 326, 329, 330, 332, 334, 345; ohne „Nochmal“ (C).
+- Mangel, B-Zeilen offen (Nr. 249 bzw. B): Verkaufsgrößen als Karte mit Zeilen + „+ Größe hinzufügen“ (Z. 335), Beschriftung Vorrat (Z. 347), Vorschau auf eine Zeile (Z. 341), Holz-Angaben aufklappbar (Z. 343), Größen-Reihenfolge am Handy (Z. 346).
+- Mangel ohne Listenzeile: Fußzeile „n Größen sind sofort sichtbar …“; 1440 Erklärsatz statt Unterzeile „Futtermittel/Brennmaterial“ und fehlende Unterzeile „Lebensmittel“; Abstand Fehlerkasten; „Abbrechen“ nicht halbfett.
+- Nicht beurteilbar: leere statt gefüllte Dialoge (Z. 321 Geld-Kasten, Z. 324), anderer Fehlerfall (Z. 331), Kästchen dunkel (Z. 348), Bild 3/6.
+- Gedeckt: Q3, R Z. 349/320, C Z. 327, 328, 333, 344.
+
+#### mehr-neu (Nr. 249 gebaut) — Gesamt 5/5/5/5 (Bild 2 n. e.; Schluss Lauf 31: 5·5·4·3) – erstes Board mit 5 Sternen in allen Fassungen (soweit hergestellt)
+| Bild | 390 h | 390 d | 1440 h | 1440 d |
+|---|---|---|---|---|
+| 1 Blatt „Mehr“ / Seitenleiste | 5 | 5 | 5 | 5 |
+| 2 „ans Ende gescrollt“ | n. e. | n. e. | n. e. | n. e. |
+| 3 „Was legst du an?“ / Menü „Neu“ | 5 | 5 | 5 | 5 |
+Messung sauber (h1 = 0 bei offenem Blatt: Seite inert, Messartefakt).
+- Alle Abweichungen gedeckt: U (Prüfdaten ohne ungelesene Nachricht, Tarif-Datum, Aufnahmehöhe), Z. 55 (R), 56 (G13 erfüllt), 57 (erfüllt; kein Eintrag mehr fälschlich hervorgehoben), 58, 59, 60/Q1, 61, 62, Antwort 5, Antwort 2, Q3, Stripe nicht prüfbar.
+- Offen: Bild 2 (inneres Scrollen) und der Tastatur-Fokus der Blatt- und Menüzustände (Aufnahme mit Tab + Enter).
+
+### Boards nicht begonnener Nummern
+
+offen (Abschnitt B): startseite, hoefe, hofseite, produkt (252); korb, meine-bestellungen, kundenkonto, anmelden, passwort, registrieren (253; bestaetigung, bestellung-link, kasse oben nur für 244/259); einstellungen (übrige Bilder), hofdaten-zahlung, konto-hof, teilen, whatsapp-plakat, beitraege (250); auswertung, kunden, verkaeufe, postfach, meldungen, region, mein-hof (251); abmelden, neuigkeiten, systemseiten, widerruf, fehlerseiten, problem-melden (254); alle übrigen mail-* (255); Abholung nach Absprache (257); Admin außer heute (258b nur messbare Mängel).
