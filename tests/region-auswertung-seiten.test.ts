@@ -46,13 +46,13 @@ import { umfeldLink, umfeldUmleitung } from '@/schemas/umfeld-filter'
 import UmfeldUmleitung from '@/app/(hof)/analytics/umfeld/page'
 import { RegionKopf } from '@/components/region/region-kopf'
 import { FutterKaufenAnsicht } from '@/components/region/futter-kaufen-ansicht'
-import { GebuehrenKarte, KennzahlenReihe, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
+import { GebuehrenKarte, KennzahlenReihe, TEILEN_FUSS, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
+import { gebuehrTitel } from '@/components/auswertung/gebuehr-titel'
 import { baueFutterKaufen } from '@/lib/futter-kaufen'
 import { PLATTFORMGEBUEHR_KARTE_BAR, PLATTFORMGEBUEHR_KARTE_ERKLAERUNG, gebuehrenKarteText, kennzahlen, teilenKarte } from '@/lib/auswertung'
-import { UMSATZ_TEXT } from '@/lib/umsatz'
+import { UMSATZ_TEXT, umsatzfenster } from '@/lib/umsatz'
 import { KENNZAHL_TEXT } from '@/lib/heute'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
-import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -144,7 +144,8 @@ describe('Routen und Navigation', () => {
   it('Gebühren-Karte: keine Zahl, kein Datum, kein SEPA-Abschnitt und kein Gebühren-Wort im Quelltext der Karte', () => {
     const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
     const karte = teile.slice(teile.indexOf('export function GebuehrenKarte'), teile.indexOf('// ─── Kanäle'))
-    expect(karte).toContain('{text.titel}')
+    // Den Titel baut gebuehrTitel (auswertung/gebuehr-titel.ts) aus gebuehrWortFuerZeitraum; die Karte nimmt ihn nur entgegen.
+    expect(karte).toContain('{titel}')
     expect(karte).not.toMatch(/2027|Februar|Lastschrift|SEPA|\d+ ?%|Servicegebühr|Plattformgebühr/)
   })
 })
@@ -247,27 +248,33 @@ describe('Karten im neuen Design', () => {
     const jetzt = new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 30 * 24 * 3600 * 1000)
     const html = renderToStaticMarkup(
       createElement(GebuehrenKarte, {
-        monat: { monat: '2027-01', onlineCents: 153, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 153, bezeichnung: 'Jänner 2027' },
+        titel: gebuehrTitel(umsatzfenster('monat', jetzt), { hofpreisModellAb: null }),
+        gebuehr: { onlineCents: 153, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 153 },
         text: gebuehrenKarteText('2027-01', { hofpreisModellAb: null }, jetzt),
       })
     )
-    expect(html).toContain('Servicegebühren dieses Monats')
+    expect(html).toMatch(/Servicegebühr im (Dezember|Jänner)/)
     expect(html).toContain('€ 1,53')
     expect(html).toContain(BAR_OHNE_GEBUEHR_SATZ)
     expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt|Bar bei Abholung/)
   })
 
   // Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag“ (V62, V63; Lauf 30, Nr. 225): die Auswertung im Hofpreis-Modell.
-  it('Gebühren-Karte nach dem Stichtag: „Plattformgebühren dieses Monats“, nirgends „Servicegebühr“, Bar-Zeile mit Lastschrift', () => {
+  it('Gebühren-Karte nach dem Stichtag: „Plattformgebühr im März“, nirgends „Servicegebühr“, Bar-Zeile mit Lastschrift', () => {
     const stichtag = new Date('2027-02-01T00:00:00+01:00')
     const jetzt = new Date('2027-03-03T10:00:00+01:00')
     const html = renderToStaticMarkup(
       createElement(GebuehrenKarte, {
-        monat: { monat: '2027-03', onlineCents: 4982, onlineAnzahl: 22, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 4982, bezeichnung: 'März 2027' },
+        titel: gebuehrTitel(umsatzfenster('monat', jetzt), { hofpreisModellAb: stichtag }),
+        gebuehr: { onlineCents: 4982, onlineAnzahl: 22, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 4982 },
         text: gebuehrenKarteText('2027-03', { hofpreisModellAb: stichtag }, jetzt),
       })
     )
-    expect(html).toContain('Plattformgebühren dieses Monats')
+    expect(html).toContain('Plattformgebühr im März')
+    // Gewählter Zeitraum (Nr. 251): die laufende Woche heißt „diese Woche“, eine frühere ausgeschrieben.
+    expect(gebuehrTitel(umsatzfenster('woche', jetzt), { hofpreisModellAb: stichtag })).toBe('Plattformgebühr diese Woche')
+    expect(gebuehrTitel(umsatzfenster('woche', jetzt, 1), { hofpreisModellAb: stichtag })).toBe('Plattformgebühr 22.–28. Februar')
+    expect(gebuehrTitel(umsatzfenster('jahr', jetzt), { hofpreisModellAb: stichtag })).toBe('Gebühren im Jahr 2027')
     expect(html).toContain('Bar bei Abholung (0 Bestellungen)')
     expect(html).toContain(PLATTFORMGEBUEHR_KARTE_ERKLAERUNG)
     expect(html).toContain(PLATTFORMGEBUEHR_KARTE_BAR)
@@ -329,7 +336,7 @@ describe('Karten im neuen Design', () => {
     expect('UMSATZ_TEXT.mitHofladen').not.toMatch(suche)
   })
 
-  it('Teilen-Karte: Kanäle mit Balken, ohne Besuche ein Ausweg nach Heute', () => {
+  it('Teilen-Karte: Kanäle mit Balken, ohne Besuche ohne Knopf (Board)', () => {
     const voll = renderToStaticMarkup(
       createElement(TeilenWirkungKarte, {
         karte: teilenKarte(fasseTeilenWirkungZusammen([{ kanal: 'QR', besuche: 9 }])),
@@ -339,11 +346,13 @@ describe('Karten im neuen Design', () => {
     expect(voll).toContain('Über deine geteilten Links')
     expect(voll).toContain('9 Besuche')
     // T1: nur Besuche — keine Bestellungen, kein Euro-Betrag; der Satz zur Zählung aus der einen Quelle.
-    expect(voll).not.toMatch(/Bestellung|€/)
-    expect(voll).toContain(TEILEN_ZAEHLUNG_HINWEIS)
+    // Der Fußsatz nach Board (Liste Lauf 32 auswertung) sagt ausdrücklich „keine Bestellungen“ — außer ihm keine.
+    expect(voll.replace(TEILEN_FUSS, '')).not.toMatch(/Bestellung|€/)
+    expect(voll).toContain(TEILEN_FUSS)
     const leer = renderToStaticMarkup(createElement(TeilenWirkungKarte, { karte: { kopf: null, zeilen: [] }, zeitraum: 'Diese Woche' }))
-    expect(leer).toContain('href="/dashboard"')
-    expect(leer).toContain(TEILEN_ZAEHLUNG_HINWEIS)
-    expect(leer).not.toMatch(/Bestellung|€/)
+    // Ohne Knopf „Hof teilen auf Heute“ (Board ohne Knopf).
+    expect(leer).not.toContain('href="/dashboard"')
+    expect(leer).toContain(TEILEN_FUSS)
+    expect(leer.replace(TEILEN_FUSS, '')).not.toMatch(/Bestellung|€/)
   })
 })
