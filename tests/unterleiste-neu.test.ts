@@ -133,7 +133,8 @@ describe('Unterleiste Hof: 11 px unter 360 px Breite (Entscheidung 6, Nr. 195)',
     expect(ELF).toContain('max-[359px]')
     expect(quelle('src/components/ui/bottom-nav.tsx')).toContain('engUnter360')
     // Seit Nr. 220 liegen die Blätter über der Leiste (Board s1-mehr-neu) — die Leiste bleibt auf ihrer Ebene, ohne ueberSchleier.
-    expect(quelle('src/components/shells/hof-shell.tsx')).toContain('<BottomNav engUnter360 ton="orange">')
+    // Seit Nr. 249 mit className (Fokus-Seite Bestelldetail ohne Unterleiste) — die Stufe bleibt.
+    expect(quelle('src/components/shells/hof-shell.tsx')).toMatch(/<BottomNav engUnter360 ton="orange"[ >]/)
   })
 })
 

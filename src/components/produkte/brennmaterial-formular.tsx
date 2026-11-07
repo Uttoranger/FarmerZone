@@ -6,6 +6,10 @@ import { istNetzFehler } from '@/lib/netz'
 import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
+import { Switch } from '@/components/ui/switch'
+import { TREFFER_44 } from '@/components/ui/button'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { cn } from '@/lib/utils'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeBrennmaterialFamilieAn } from '@/server/actions/produktfamilie'
 import {
@@ -246,75 +250,79 @@ export function BrennmaterialFormular({
           )}
         </div>
 
-        <div className="flex flex-col gap-2" data-feld="holzart">
-          <p id="brenn-holzart" className="text-[15px] font-semibold text-foreground">
-            Holzart
-          </p>
-          <div role="radiogroup" aria-labelledby="brenn-holzart" className="flex flex-wrap gap-2">
-            {HOLZARTEN.map((h) => (
-              <Wahl key={h} rolle="radio" aktiv={holzart === h} onClick={() => setHolzart(h)}>
-                {h}
-              </Wahl>
-            ))}
-          </div>
-          <label htmlFor={feldId('holzart')} className="text-[13px] font-semibold text-foreground">
-            Andere Holzart
-          </label>
-          <input
-            id={feldId('holzart')}
-            value={holzart}
-            onChange={(e) => setHolzart(e.target.value)}
-            placeholder="z. B. Esche"
-            autoComplete="off"
-            className={EINGABE}
-          />
-          {fehler.holzart && <FeldFehler>{fehler.holzart}</FeldFehler>}
-        </div>
-
-        {!hackschnitzel ? (
-          <div className="flex flex-col gap-2" data-feld="scheitlaengeCm">
-            <p id="brenn-scheit" className="text-[15px] font-semibold text-foreground">
-              Scheitlänge{art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}
+        {/* Holzart und Scheitlänge nebeneinander (Liste Lauf 32, produkt-neu Bild 4), am Handy untereinander. */}
+        <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 sm:gap-4">
+          <div className="flex flex-col gap-2" data-feld="holzart">
+            <p id="brenn-holzart" className="text-[15px] font-semibold text-foreground">
+              Holzart
             </p>
-            <div role="radiogroup" aria-labelledby="brenn-scheit" className="flex flex-wrap gap-2">
-              {SCHEITLAENGEN_CM.map((cm) => (
-                <Wahl key={cm} rolle="radio" aktiv={scheitlaengeCm === cm} onClick={() => setScheitlaengeCm(scheitlaengeCm === cm ? null : cm)}>
-                  {cm === 100 ? '1 m' : `${cm} cm`}
+            <div role="radiogroup" aria-labelledby="brenn-holzart" className="flex flex-wrap gap-2">
+              {HOLZARTEN.map((h) => (
+                <Wahl key={h} rolle="radio" aktiv={holzart === h} onClick={() => setHolzart(h)}>
+                  {h}
                 </Wahl>
               ))}
             </div>
-            {fehler.scheitlaengeCm && <FeldFehler>{fehler.scheitlaengeCm}</FeldFehler>}
+            {/* Alle Feldbeschriftungen gleich (Liste Lauf 32, produkt-neu 1440): 15 px fett wie Feld. */}
+            <label htmlFor={feldId('holzart')} className="text-[15px] font-semibold text-foreground">
+              Andere Holzart
+            </label>
+            <input
+              id={feldId('holzart')}
+              value={holzart}
+              onChange={(e) => setHolzart(e.target.value)}
+              placeholder="z. B. Esche"
+              autoComplete="off"
+              className={EINGABE}
+            />
+            {fehler.holzart && <FeldFehler>{fehler.holzart}</FeldFehler>}
           </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-2" data-feld="wassergehalt">
-              <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
-                Wassergehalt
+
+          {!hackschnitzel ? (
+            <div className="flex flex-col gap-2" data-feld="scheitlaengeCm">
+              <p id="brenn-scheit" className="text-[15px] font-semibold text-foreground">
+                Scheitlänge{art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}
               </p>
-              <div role="radiogroup" aria-labelledby="brenn-w" className="flex flex-wrap gap-2">
-                {WASSERGEHALT_KLASSEN.map((w) => (
-                  <Wahl key={w} rolle="radio" aktiv={wassergehalt === w} onClick={() => setWassergehalt(w)}>
-                    W{w}
+              <div role="radiogroup" aria-labelledby="brenn-scheit" className="flex flex-wrap gap-2">
+                {SCHEITLAENGEN_CM.map((cm) => (
+                  <Wahl key={cm} rolle="radio" aktiv={scheitlaengeCm === cm} onClick={() => setScheitlaengeCm(scheitlaengeCm === cm ? null : cm)}>
+                    {cm === 100 ? '1 m' : `${cm} cm`}
                   </Wahl>
                 ))}
               </div>
-              {fehler.wassergehalt && <FeldFehler>{fehler.wassergehalt}</FeldFehler>}
+              {fehler.scheitlaengeCm && <FeldFehler>{fehler.scheitlaengeCm}</FeldFehler>}
             </div>
-            <div className="flex flex-col gap-2" data-feld="koernung">
-              <p id="brenn-p" className="text-[15px] font-semibold text-foreground">
-                Körnung
-              </p>
-              <div role="radiogroup" aria-labelledby="brenn-p" className="flex flex-wrap gap-2">
-                {KOERNUNG_KLASSEN.map((p) => (
-                  <Wahl key={p} rolle="radio" aktiv={koernung === p} onClick={() => setKoernung(p)}>
-                    P{p}
-                  </Wahl>
-                ))}
+          ) : (
+            <>
+              <div className="flex flex-col gap-2" data-feld="wassergehalt">
+                <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
+                  Wassergehalt
+                </p>
+                <div role="radiogroup" aria-labelledby="brenn-w" className="flex flex-wrap gap-2">
+                  {WASSERGEHALT_KLASSEN.map((w) => (
+                    <Wahl key={w} rolle="radio" aktiv={wassergehalt === w} onClick={() => setWassergehalt(w)}>
+                      W{w}
+                    </Wahl>
+                  ))}
+                </div>
+                {fehler.wassergehalt && <FeldFehler>{fehler.wassergehalt}</FeldFehler>}
               </div>
-              {fehler.koernung && <FeldFehler>{fehler.koernung}</FeldFehler>}
-            </div>
-          </>
-        )}
+              <div className="flex flex-col gap-2" data-feld="koernung">
+                <p id="brenn-p" className="text-[15px] font-semibold text-foreground">
+                  Körnung
+                </p>
+                <div role="radiogroup" aria-labelledby="brenn-p" className="flex flex-wrap gap-2">
+                  {KOERNUNG_KLASSEN.map((p) => (
+                    <Wahl key={p} rolle="radio" aktiv={koernung === p} onClick={() => setKoernung(p)}>
+                      P{p}
+                    </Wahl>
+                  ))}
+                </div>
+                {fehler.koernung && <FeldFehler>{fehler.koernung}</FeldFehler>}
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2" data-feld="trocknung">
           <p id="brenn-trocknung" className="text-[15px] font-semibold text-foreground">
@@ -345,13 +353,14 @@ export function BrennmaterialFormular({
               ))}
             </select>
           </Feld>
+          {/* Liste Lauf 32 (produkt-neu Bild 4): Schalter „Überdacht gelagert“ statt Kästchen (das im Dunkeln hellgrau stand). */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-foreground" aria-hidden="true">
+            <span className="text-[15px] font-semibold text-foreground" aria-hidden="true">
               Lagerung
             </span>
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border px-3">
-              <input type="checkbox" checked={ueberdacht} onChange={(e) => setUeberdacht(e.target.checked)} className="size-4 shrink-0 accent-primary" />
-              <span className="text-sm text-foreground">überdacht gelagert</span>
+            <label htmlFor="brenn-ueberdacht" className={cn('flex min-h-11 cursor-pointer items-center gap-3 border border-border px-3', RUNDUNG.feld)}>
+              <Switch id="brenn-ueberdacht" checked={ueberdacht} onCheckedChange={setUeberdacht} className={cn(TREFFER_44, 'data-checked:bg-accent')} />
+              <span className="text-sm text-foreground">Überdacht gelagert</span>
             </label>
           </div>
         </div>
@@ -368,28 +377,7 @@ export function BrennmaterialFormular({
       </Feld>
 
       <Abschnitt id="brenn-groessen" titel="Verkaufsgrößen" satz="Jede Größe mit eigenem Preis und Vorrat.">
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="brenn-groessen" data-feld="groessen">
-          {vorlagen.map((v) => {
-            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
-            return (
-              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
-                {v.bezeichnung}
-              </Wahl>
-            )
-          })}
-          <EigeneGroesseKnopf
-            onClick={() =>
-              setZeilen((alt) =>
-                alt.length >= GROESSEN_MAX
-                  ? alt
-                  : [...alt, { schluessel: neuerSchluessel(), vorlageId: null, bezeichnung: '', unit: hackschnitzel ? 'SCHUETTRAUMMETER' : 'STUECK', price: null, stock: 0 }]
-              )
-            }
-            disabled={zeilen.length >= GROESSEN_MAX}
-          />
-        </div>
-        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
-
+        {/* Erst die gewählten Größen, dann die Schnellwahl (Liste Lauf 32, produkt-neu 390: Reihenfolge Board). */}
         <ul className="flex flex-col gap-2.5">
           {zeilen.map((z, i) => {
             const pfad = `groessen.${i}`
@@ -430,7 +418,7 @@ export function BrennmaterialFormular({
                     <DezimalFeld id={feldId(`${pfad}.price`)} value={z.price} praefix="€" stellen={2} onChange={(w) => zeileAendern(z.schluessel, { price: w })} />
                   </Feld>
                   <div className="flex flex-col gap-1.5" data-feld={`${pfad}.stock`}>
-                    <span className="text-[13px] font-medium text-foreground" aria-hidden="true">
+                    <span className="text-[15px] font-semibold text-foreground" aria-hidden="true">
                       Vorrat
                     </span>
                     <Stepper
@@ -454,6 +442,28 @@ export function BrennmaterialFormular({
             )
           })}
         </ul>
+
+        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="brenn-groessen" data-feld="groessen">
+          {vorlagen.map((v) => {
+            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
+            return (
+              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
+                {v.bezeichnung}
+              </Wahl>
+            )
+          })}
+          <EigeneGroesseKnopf
+            onClick={() =>
+              setZeilen((alt) =>
+                alt.length >= GROESSEN_MAX
+                  ? alt
+                  : [...alt, { schluessel: neuerSchluessel(), vorlageId: null, bezeichnung: '', unit: hackschnitzel ? 'SCHUETTRAUMMETER' : 'STUECK', price: null, stock: 0 }]
+              )
+            }
+            disabled={zeilen.length >= GROESSEN_MAX}
+          />
+        </div>
+        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
 
         {raummassErklaeren(zeilen.map((z) => z.unit)) && <RaummassErklaerung />}
       </Abschnitt>

@@ -1,5 +1,9 @@
 'use client'
 
+import { Switch } from '@/components/ui/switch'
+import { TREFFER_44 } from '@/components/ui/button'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { cn } from '@/lib/utils'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { istNetzFehler } from '@/lib/netz'
@@ -461,11 +465,20 @@ export function FutterFormular({
           <Wahl aktiv={bio} onClick={() => setBio((b) => !b)}>
             Bio
           </Wahl>
-          <Wahl aktiv={nurBetriebe} onClick={() => setNurBetriebe((n) => !n)}>
-            Nur an landwirtschaftliche Betriebe
-          </Wahl>
         </div>
-        {nurBetriebe && <p className="text-xs text-muted-foreground">Wer bestellt, muss in der Kasse eine Betriebsnummer angeben.</p>}
+        {/* Liste Lauf 32 (produkt-neu Bild 3): eine Einstellung mit Folge in der Kasse — ein Schalter mit Satz, kein Chip. */}
+        <label htmlFor="futter-nur-betriebe" className={cn('flex min-h-14 items-center gap-3 border border-border p-3', RUNDUNG.feld)}>
+          <Switch
+            id="futter-nur-betriebe"
+            checked={nurBetriebe}
+            onCheckedChange={setNurBetriebe}
+            className={cn(TREFFER_44, 'data-checked:bg-accent')}
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-semibold text-foreground">Nur an landwirtschaftliche Betriebe</span>
+            <span className="text-[13px] text-muted-foreground">Dann fragt die Kasse nach der Betriebsnummer.</span>
+          </span>
+        </label>
       </Abschnitt>
 
       <AbholhinweisWahl wert={abholhinweise} onWert={setAbholhinweise} />

@@ -271,6 +271,8 @@ function NeuInhalt({ punkt, blatt = false }: { punkt: HofNeuPunkt; blatt?: boole
  * Ein Eintrag im Menü „Neu“ am Computer: 64 px hoch und 2 px Abstand — im Board w1-mehr-neu (Bild 3) stehen die
  * Einträge 66 px auseinander (UI-Runde 3; vorher 52 px ohne Abstand).
  */
+// Dazu an jedem Eintrag FOKUS_RAHMEN_INNEN (Liste Lauf 32, mehr-neu Bild 3): per Tastatur geöffnet trägt der erste
+// Eintrag die Hervorhebung UND einen sichtbaren Fokusrahmen (innen, das Menü schneidet ab) — die Tönung kommt nur dazu.
 const NEU_MENUE_EINTRAG = 'min-h-16 px-3.5 py-1.5'
 
 /** Die Gruppen des Menüs „Neu“ mit dem Abstand des Boards (2 px) zwischen den Einträgen. */
@@ -282,6 +284,9 @@ const NEU_MENUE_GRUPPE = 'flex flex-col gap-0.5'
  * (Knopf sichtbar, Menü in der noch verborgenen Seitenleiste).
  * null, wo es kein Fenster zum Fragen gibt (Server, Test): dann bleibt jeder Knopf bei seiner eigenen Form.
  */
+/** Fokus-Seiten ohne Unterleiste am Handy: das Bestelldetail /orders/<id> (nicht die Liste /orders). */
+const HOF_FOKUS_SEITE = /^\/orders\/[^/]+\/?$/
+
 /** Dieselbe Grenze wie Tailwinds `md:` (48rem). */
 const MD_ABFRAGE = '(min-width: 48rem)'
 
@@ -307,6 +312,9 @@ export function HofShell({
   children,
 }: HofShellProps): React.JSX.Element {
   const pathname = usePathname()
+  // Das Bestelldetail ist am Handy eine Fokus-Seite wie die Kasse (Liste Lauf 32, bestellung 390): ohne Unterleiste,
+  // nur die Aktionsleiste unten — sonst stünden zwei feste Leisten übereinander. Zurück führt der Werkzeug-Kopf.
+  const fokusSeite = HOF_FOKUS_SEITE.test(pathname)
   const nav = hofNavigation({ isAdmin })
   const neuAnlegen = nav.neu.filter((p) => p.gruppe === 'anlegen')
   const neuAnderes = nav.neu.filter((p) => p.gruppe === 'anderes')
@@ -432,7 +440,7 @@ export function HofShell({
                 <DropdownMenuGroup className={NEU_MENUE_GRUPPE}>
                   <DropdownMenuLabel className="px-3.5 pt-1.5 pb-0.5 font-heading text-[17px] font-semibold text-foreground">{HOF_NEU_TITEL}</DropdownMenuLabel>
                   {neuAnlegen.map((punkt) => (
-                    <DropdownMenuLinkItem key={punkt.id} className={NEU_MENUE_EINTRAG} render={<Link href={punkt.href} />}>
+                    <DropdownMenuLinkItem key={punkt.id} className={cn(NEU_MENUE_EINTRAG, FOKUS_RAHMEN_INNEN)} render={<Link href={punkt.href} />}>
                       <NeuInhalt punkt={punkt} />
                     </DropdownMenuLinkItem>
                   ))}
@@ -442,7 +450,7 @@ export function HofShell({
                   {/* Im Web trennt nur die Linie (Board w1-mehr-neu, Bild 3); der Name der Gruppe bleibt für den Screenreader. */}
                   <DropdownMenuLabel className="sr-only">{HOF_NEU_ANDERES_TITEL}</DropdownMenuLabel>
                   {neuAnderes.map((punkt) => (
-                    <DropdownMenuLinkItem key={punkt.id} className={NEU_MENUE_EINTRAG} render={<Link href={punkt.href} />}>
+                    <DropdownMenuLinkItem key={punkt.id} className={cn(NEU_MENUE_EINTRAG, FOKUS_RAHMEN_INNEN)} render={<Link href={punkt.href} />}>
                       <NeuInhalt punkt={punkt} />
                     </DropdownMenuLinkItem>
                   ))}
@@ -505,7 +513,7 @@ export function HofShell({
         </aside>
       </MenueZielAnbieter>
 
-      <main id={INHALT_ID} tabIndex={-1} className="min-w-0 pb-28 outline-none md:pb-0 md:pl-[264px] print:pb-0 print:pl-0">
+      <main id={INHALT_ID} tabIndex={-1} className={cn('min-w-0 pb-28 outline-none md:pb-0 md:pl-[264px] print:pb-0 print:pl-0', fokusSeite && 'max-md:pb-0')}>
         {/* Kein Netz (Register N29): Die HofShell hat keinen eigenen Kopf, die Zeile steht über dem Inhalt — bis das Netz zurück ist. */}
         <NetzHinweis />
         {children}
@@ -514,7 +522,7 @@ export function HofShell({
       {/* ===== Handy: Unterleiste ===== */}
       {/* Die Blätter „Neu“ und „Mehr“ liegen seit Nr. 220 über der Leiste bis zum unteren Rand (Board s1-mehr-neu);
           geschlossen wird oben im Kopf des Blatts, die Leiste bleibt unter dem Schleier. */}
-      <BottomNav engUnter360 ton="orange">
+      <BottomNav engUnter360 ton="orange" className={cn(fokusSeite && 'hidden')}>
         {nav.handyLeiste.map((platz) => {
           if (platz.art === 'punkt') {
             const { punkt } = platz

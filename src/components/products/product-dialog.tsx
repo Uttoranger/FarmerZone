@@ -2006,7 +2006,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                               <SchalterZeile
                                 id="nur-betriebe"
                                 titel="Nur an landwirtschaftliche Betriebe"
-                                untertitel="Wer bestellt, muss in der Kasse eine Betriebsnummer angeben."
+                                untertitel="Dann fragt die Kasse nach der Betriebsnummer."
                                 checked={field.value === 'NUR_BETRIEBE'}
                                 onCheckedChange={(an) => field.onChange(an ? 'NUR_BETRIEBE' : 'ALLE')}
                               />

@@ -345,8 +345,9 @@ export function BestellDetail({
           <>
             {/* Platz für die feste Leiste, damit sie das Ende der Seite nicht verdeckt. */}
             <div aria-hidden="true" className={cn(nichtAbgeholtInLeiste ? 'h-40' : 'h-32', 'md:h-24')} />
-            {/* data-unten-fest: Der Cookie-Hinweis misst die Leiste und steht darüber (src/lib/cookie-hinweis.ts). */}
-            <div data-unten-fest="" className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card md:bottom-0 md:left-[264px] print:hidden">
+            {/* data-unten-fest: Der Cookie-Hinweis misst die Leiste und steht darüber (src/lib/cookie-hinweis.ts).
+                Am Handy ganz unten: Das Detail ist eine Fokus-Seite ohne Unterleiste (HofShell, Liste Lauf 32). */}
+            <div data-unten-fest="" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:left-[264px] md:pb-0 print:hidden">
               {/* Am Handy: Hauptaktion oben über die volle Breite, darunter die zwei Knöpfe, dann der Satz (so auch
                   die Reihenfolge beim Tabben). Ab 768 px eine Zeile rechtsbündig: Satz links, die zwei Knöpfe, die
                   Hauptaktion ganz rechts. */}
