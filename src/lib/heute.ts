@@ -676,6 +676,42 @@ export function naechstesAbholfenster(slots: readonly HeuteFenster[], jetzt: Dat
   return null
 }
 
+/** Das Abholfenster an einem bestimmten Kalendertag laut Abholzeiten (ganzer Tag), sonst null. */
+export function abholfensterAm(slots: readonly HeuteFenster[], kalendertag: string, heuteKalendertag: string): NaechstesFenster | null {
+  const fenster = aktiveAm(slots, kalendertag)
+  if (fenster.length === 0) return null
+  return { tag: kalendertag, name: kalendertag === heuteKalendertag ? 'Heute' : abholtagName(heuteKalendertag, kalendertag), zeit: fensterText(fenster) }
+}
+
+/**
+ * Welches Fenster „Nächste Abholung“ nennt, wenn es leer ist (Liste Lauf 32, bestellungen Bild 2 und druck
+ * Bild 3): Unter „Heute holt niemand etwas ab.“ las sich „Nächste Abholung: Heute …“ wie ein Widerspruch. Darum:
+ * Hat das nächste Fenster Bestellungen, dieses mit seiner Zahl (V40). Sonst das Fenster des nächsten Abholtags
+ * mit Bestellungen (naechsteAbholung, nach abholWhere gezählt), sofern dort laut Abholzeiten eines liegt. Gibt
+ * es keine, und läge das nächste Fenster heute, das nächste Fenster ab morgen. Ohne aktive Abholzeit null.
+ */
+export function fensterMitBestellungen(
+  slots: readonly HeuteFenster[],
+  jetzt: Date,
+  anzahlHeute: number,
+  naechsteAbholung: NaechsteAbholung | null
+): { fenster: NaechstesFenster; anzahl: number } | null {
+  const fenster = naechstesAbholfenster(slots, jetzt)
+  if (!fenster) return null
+  const heute = wienKalendertag(jetzt)
+  const anzahl = fenster.tag === heute ? anzahlHeute : naechsteAbholung?.tag === fenster.tag ? naechsteAbholung.anzahl : 0
+  if (anzahl > 0) return { fenster, anzahl }
+  if (naechsteAbholung && naechsteAbholung.anzahl > 0) {
+    const mitBestellungen = abholfensterAm(slots, naechsteAbholung.tag, heute)
+    if (mitBestellungen) return { fenster: mitBestellungen, anzahl: naechsteAbholung.anzahl }
+  }
+  if (fenster.tag === heute) {
+    const ab = naechstesAbholfenster(slots, wienerTag(tagVersetzt(heute, 1)).von)
+    if (ab) return { fenster: { ...ab, name: abholtagName(heute, ab.tag) }, anzahl: 0 }
+  }
+  return { fenster, anzahl: 0 }
+}
+
 /**
  * Wie viele Bestellungen auf das nächste Fenster warten: liegt es heute, die
  * Packliste (ohne Abgeholte, Stornierte, Nicht-Abgeholte — packliste); liegt

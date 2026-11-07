@@ -89,9 +89,10 @@ export function BestellDialog({
         <DialogMitte ref={popup} titel={titel} schliessen="Abbrechen" className="gap-4" initialFocus={startfokus}>
           {unterzeile && <DialogDescription className="-mt-2 text-[13px] break-words text-muted-foreground">{unterzeile}</DialogDescription>}
           {children}
-          <div className="flex flex-wrap items-center justify-end gap-2.5">
-            {nebenaktion && <span className="mr-auto">{nebenaktion}</span>}
+          {/* Hauptknopf rechts, der zweite Weg darunter (Liste Lauf 32, bestellung Bild 3: „Ganze Bestellung stornieren …“). */}
+          <div className="flex flex-col items-end gap-1.5">
             {hauptKnopf}
+            {nebenaktion}
           </div>
         </DialogMitte>
       </Dialog>

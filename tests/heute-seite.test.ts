@@ -64,6 +64,7 @@ import {
   kennzahlBreiteEm,
   mitTrennstellen,
   naechstesAbholfenster,
+  fensterMitBestellungen,
   naechsteAbholungSatz,
   onlinePausiertDaten,
   stripeEinrichtenHinweis,
@@ -181,6 +182,22 @@ describe('Abholfenster — Wiener Wochentag', () => {
     expect(naechstesAbholfenster([dienstag], danach)).toEqual({ tag: '2026-10-13', name: 'Dienstag, 13. Oktober', zeit: '15–18 Uhr' })
     expect(naechstesAbholfenster([{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }], danach)?.name).toBe('Morgen')
     expect(naechstesAbholfenster([], vorher)).toBeNull()
+  })
+
+  it('leer: das nächste Fenster MIT Bestellungen, nie „Heute …“ unter „Heute holt niemand etwas ab.“ (Liste Lauf 32, bestellungen/druck)', () => {
+    const vorher = new Date('2026-10-06T12:00:00Z') // Di 14:00 Wien, Fenster heute 15–18 Uhr
+    // Heute Bestellungen: das heutige Fenster mit seiner Zahl.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 3, null)).toEqual({ fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 3 })
+    // Heute keine, Samstag zwei: Samstag mit zwei.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, { tag: '2026-10-10', name: 'Samstag', anzahl: 2 })).toEqual({
+      fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' },
+      anzahl: 2,
+    })
+    // Gar keine Bestellung: das nächste Fenster ab morgen, nicht heute.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, null)).toEqual({ fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' }, anzahl: 0 })
+    // Bestellungen an einem Tag ohne Abholzeit (Abholzeit inzwischen gelöscht): Gegenprobe, das nächste Fenster ab morgen.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, { tag: '2026-10-08', name: 'Donnerstag', anzahl: 1 })?.fenster.tag).toBe('2026-10-10')
+    expect(fensterMitBestellungen([], vorher, 0, null)).toBeNull()
   })
 })
 

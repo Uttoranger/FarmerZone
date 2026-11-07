@@ -33,8 +33,10 @@ import { StornoDialog } from './storno-dialog'
 import { ArtikelFehltDialog } from './artikel-fehlt-dialog'
 import { WiderrufKarte } from './widerruf-karte'
 import type { HofWiderruf } from '@/server/widerruf'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE } from './stil'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
+import type { Positionszeile } from '@/lib/positionszeile'
+import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE, TEXT_ORANGE } from './stil'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
 
@@ -46,6 +48,9 @@ type Aktion = { schluessel: string; text: string; onClick: () => void }
 // Die feste Leiste unten (Boards s1-/w1-bestellung): Hauptaktion orange, die anderen als Umriss, 52 bzw. 48 px.
 const LEISTE_HAUPT = cn(KNOPF_ORANGE, 'min-h-[52px] w-full rounded-[14px] text-[15px] font-bold md:w-auto md:min-w-[196px] md:px-5')
 const LEISTE_NEBEN = cn(KNOPF_RAHMEN, 'min-h-12 w-full rounded-[14px] border-foreground/60 bg-card px-3 font-semibold md:w-auto md:min-w-[172px]')
+// „Abholung rückgängig“ ist eine Nebenaktion (N1: eine Hauptaktion je Ansicht) — Textknopf statt orangem Knopf
+// (Liste Lauf 32, bestellung Bild 4).
+const LEISTE_TEXT = cn(TEXT_ORANGE, 'min-h-12 w-full text-[15px] font-semibold md:w-auto')
 
 /**
  * Die Bestellung (Boards s1-/w1-bestellung, Lauf 31). Zwei Ansichten aus
@@ -71,9 +76,12 @@ export function BestellDetail({
   zurueckSuche,
   widerrufe = [],
   barFrist = null,
+  geldsatz = null,
   ansicht = 'voll',
 }: {
   bestellung: HofBestellDetail
+  /** Der Geldsatz nach V1 unter dem Betrag (ladeBestellGeldsatz) — null: der Satz der Seite (betragSatz). */
+  geldsatz?: string | null
   /** Bar-Bestellung mit „Bestätigung offen“: bis wann die Kundin bestätigt (bestaetigungOffenSatz, aus fristVon). */
   barFrist?: string | null
   /** Offene Widerrufe dieser Bestellung (Nr. 200) — Knöpfe „Rückgabe erhalten – erstatten …“ und „Ablehnen …“. */
@@ -83,7 +91,11 @@ export function BestellDetail({
   /** voll = eigene Seite der Bestellung; kompakt = Vorschau neben der Liste (/orders ab 1024 px). */
   ansicht?: 'voll' | 'kompakt'
 }): React.JSX.Element {
-  const [abgehakt, setAbgehakt] = useState<ReadonlySet<string>>(new Set())
+  // Gepackt oder abgeholt: alles ist schon in der Tasche (Board s1-bestellung Bild 2 und 4: „Packliste · 3 von 3“).
+  const schonGepackt = bestellung.status === 'READY' || bestellung.status === 'PICKED_UP'
+  const [abgehakt, setAbgehakt] = useState<ReadonlySet<string>>(() =>
+    schonGepackt ? new Set(bestellung.positionen.filter((p) => !p.fehlt).map((p) => p.id)) : new Set()
+  )
   const [offen, setOffen] = useState<Offen>(null)
   const [fehler, setFehler] = useState<string | null>(null)
   const [kundinInformieren, setKundinInformieren] = useState(true)
@@ -194,14 +206,15 @@ export function BestellDetail({
   if (aktionen.dochNichtGepackt) neben.push({ schluessel: 'doch-nicht', text: 'Doch nicht gepackt', onClick: () => oeffneRueckweg('dochNicht') })
   if (aktionen.stornieren) neben.push({ schluessel: 'storno', text: 'Stornieren …', onClick: () => setOffen('storno') })
   // Ohne Hauptaktion (abgeholt) steht der Rückweg selbst in der Leiste (Board Bild 4: „Abholung rückgängig“).
-  const leisteHaupt = hauptaktion ?? (aktionen.abholungZurueck ? { text: 'Abholung rückgängig', onClick: () => oeffneRueckweg('abholungZurueck') } : null)
+  const leisteHaupt = hauptaktion ?? null
+  const leisteRueckweg = !hauptaktion && aktionen.abholungZurueck ? { text: 'Abholung rückgängig', onClick: () => oeffneRueckweg('abholungZurueck') } : null
   const [zweite, ...weitere] = neben
   // „Nicht abgeholt kostet dich nichts.“ steht dort, wo der Knopf sichtbar ist — in der Leiste oder sonst bei der Kundin.
   const nichtAbgeholtInLeiste = zweite?.schluessel === 'nicht-abgeholt'
 
   if (ansicht === 'kompakt') {
     return (
-      <article aria-labelledby={`bestellung-${bestellung.id}`} className={cn(KARTE, 'flex flex-col gap-3 rounded-[14px] p-4 md:px-[18px]')}>
+      <article aria-labelledby={`bestellung-${bestellung.id}`} className={cn(KARTE, 'flex flex-col gap-3 p-4 md:px-[18px]', RUNDUNG.karte)}>
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <h2 id={`bestellung-${bestellung.id}`} className="line-clamp-2 min-w-0 font-heading text-[24px] leading-tight font-semibold break-words" title={kunde.name}>
@@ -215,7 +228,7 @@ export function BestellDetail({
             Bestellnummer {bestellung.nummer} · {bestellung.abholung}
           </p>
         </div>
-        <Betrag bestellung={bestellung} kompakt />
+        <Betrag bestellung={bestellung} geldsatz={geldsatz} kompakt />
         {barFrist && <p className="text-[13.5px]">{barFrist}</p>}
         {bestellung.positionen.length > 0 && (
           <p className="text-[14px] break-words">{bestellung.positionen.filter((p) => !p.fehlt).map((p) => p.zeile).join(' · ')}</p>
@@ -238,11 +251,12 @@ export function BestellDetail({
   return (
     <>
       {/*
-        Rückweg „Bestellungen" (Nr. 44 — am Handy feste Leiste, darüber hinaus die Zeile „‹ …"),
-        darunter die h1 „Bestellung <Nummer>“ und am Handy Anrufen (Boards s1-/w1-bestellung).
+        Werkzeug-Kopf (G1, seit Nr. 249): am Handy feste Leiste mit „‹“, h1 „Bestellung <Nummer>“, Unterzeile
+        „Bestellungen“ und rechts Anrufen; im Web der grüne Textlink „‹ Bestellungen“ (Boards s1-/w1-bestellung).
       */}
-      <UnterseitenKopf
+      <WerkzeugKopf
         titel={`Bestellung ${bestellung.nummer}`}
+        unterzeile={<p className={cn('truncate text-[13px] md:text-sm', LEISE)}>Bestellungen</p>}
         suche={zurueckSuche}
         aktion={
           anrufen ? (
@@ -262,20 +276,23 @@ export function BestellDetail({
               {bestellung.marke.text}
             </Marke>
           </div>
-          <p className="text-[15px]">{bestellung.abholung}</p>
+          <p className="text-[15px]">
+            {bestellung.abholung}
+            {bestellung.abgeholtUm && <> · abgeholt um {bestellung.abgeholtUm}</>}
+          </p>
           <p className={cn('text-[13.5px]', LEISE)}>Bestellnummer {bestellung.nummer} – nur zum Abgleich, prüf bei der Abholung den Namen.</p>
         </div>
 
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-5">
           <div className="flex min-w-0 flex-col gap-4">
-            <Betrag bestellung={bestellung} />
+            <Betrag bestellung={bestellung} geldsatz={geldsatz} />
             {barFrist && <p className="rounded-[12px] border border-border bg-card px-3.5 py-2.5 text-[13.5px]">{barFrist}</p>}
 
             {/* Die Packliste als gerahmte Gruppe mit dem Titel auf dem Rand (Board: „Packliste · 1 von 3“). */}
             <fieldset className="min-w-0 rounded-[12px] border border-border bg-card">
               <legend className={cn('ml-3.5 px-1.5 text-[14px] font-bold', LEISE)}>
                 Packliste
-                {zumPacken && vorhanden.length > 0 && (
+                {(zumPacken || schonGepackt) && vorhanden.length > 0 && (
                   <span aria-live="polite">
                     {' '}
                     · {erledigtZahl} von {vorhanden.length}
@@ -293,14 +310,18 @@ export function BestellDetail({
                         className={cn('flex min-h-14 w-full items-center gap-3.5 px-3.5 py-2 text-left md:px-4', FOKUS_RAHMEN_INNEN)}
                       >
                         <Kaestchen an={abgehakt.has(p.id)} />
-                        <span className="min-w-0 flex-1 text-[15px] break-words">{p.zeile}</span>
+                        <span className="min-w-0 flex-1 text-[15px] break-words">
+                          <PositionsText zeile={p.zeile} teile={p.teile} />
+                        </span>
                         <span className={cn('shrink-0 text-[14px] tabular-nums', LEISE)}>{euro(p.betragCents)}</span>
                       </button>
                     ) : (
                       <div className="flex min-h-14 items-center gap-3.5 px-3.5 py-2 md:px-4">
                         {/* Abgeholt: alle Positionen gehakt (Board Bild 4), fehlende durchgestrichen mit Marke. */}
                         {!p.fehlt && <Kaestchen an={bestellung.status === 'PICKED_UP'} />}
-                        <span className={cn('min-w-0 flex-1 text-[15px] break-words', p.fehlt && 'text-muted-foreground line-through')}>{p.zeile}</span>
+                        <span className={cn('min-w-0 flex-1 text-[15px] break-words', p.fehlt && 'text-muted-foreground line-through')}>
+                          <PositionsText zeile={p.zeile} teile={p.teile} />
+                        </span>
                         {p.fehlt && <StatusBadge status="offen">fehlt</StatusBadge>}
                         <span className={cn('shrink-0 text-[14px] tabular-nums', LEISE, p.fehlt && 'line-through')}>{euro(p.betragCents)}</span>
                       </div>
@@ -320,7 +341,7 @@ export function BestellDetail({
           <DialogFehler text={offen ? null : fehler} />
         </div>
 
-        {(leisteHaupt || zweite) && (
+        {(leisteHaupt || leisteRueckweg || zweite) && (
           <>
             {/* Platz für die feste Leiste, damit sie das Ende der Seite nicht verdeckt. */}
             <div aria-hidden="true" className={cn(nichtAbgeholtInLeiste ? 'h-40' : 'h-32', 'md:h-24')} />
@@ -329,10 +350,15 @@ export function BestellDetail({
               {/* Am Handy: Hauptaktion oben über die volle Breite, darunter die zwei Knöpfe, dann der Satz (so auch
                   die Reihenfolge beim Tabben). Ab 768 px eine Zeile rechtsbündig: Satz links, die zwei Knöpfe, die
                   Hauptaktion ganz rechts. */}
-              <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-end md:gap-3 md:px-8 xl:px-10">
+              <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-end md:gap-3 md:px-8 xl:px-10">
                 {leisteHaupt && (
                   <button type="button" onClick={leisteHaupt.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(LEISTE_HAUPT, 'order-first md:order-last')}>
                     {leisteHaupt.text}
+                  </button>
+                )}
+                {leisteRueckweg && (
+                  <button type="button" onClick={leisteRueckweg.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(LEISTE_TEXT, 'order-first md:order-last')}>
+                    {leisteRueckweg.text}
                   </button>
                 )}
                 {(zweite || weitere.length > 0) && (
@@ -409,6 +435,17 @@ export function BestellDetail({
   )
 }
 
+/** Eine Position nach G14: die Anzahl fett vorn („**4** × Heumilch frisch (1 L)“); ohne Teile die alte Zeile. */
+function PositionsText({ zeile, teile }: { zeile: string; teile?: Positionszeile }): React.JSX.Element {
+  if (!teile) return <>{zeile}</>
+  return (
+    <>
+      <span className="font-bold">{teile.anzahl}</span> × {teile.name}
+      {teile.gebinde && <> ({teile.gebinde})</>}
+    </>
+  )
+}
+
 /** Das eckige Kästchen der Packliste (Board): leer mit Feldrand, abgehakt grün mit Haken. */
 function Kaestchen({ an }: { an: boolean }): React.JSX.Element {
   return (
@@ -453,11 +490,12 @@ function gebuehrWortFuer(betrag: { hofpreis: boolean }): string {
  * vor Ort im Paar „tun“ (orange), online im Paar „läuft“ (grün), beide ≥ 4,5:1 in beiden Themes.
  * `kompakt` (Vorschau neben der Liste): nur die Zeile getönt, der Satz leise darunter.
  */
-function Betrag({ bestellung, kompakt = false }: { bestellung: HofBestellDetail; kompakt?: boolean }): React.JSX.Element {
+function Betrag({ bestellung, geldsatz = null, kompakt = false }: { bestellung: HofBestellDetail; geldsatz?: string | null; kompakt?: boolean }): React.JSX.Element {
   const { betrag, status, vorOrt } = bestellung
   const beendet = status === 'CANCELLED' || status === 'NOT_PICKED_UP'
-  // Was beim Hof bleibt und wie sich der Betrag zusammensetzt — Wort je Modell (betragSatz, Helfer aus 221).
-  const zusammensetzung = betragSatz(betrag, vorOrt)
+  // Was beim Hof bleibt und wie sich der Betrag zusammensetzt: der Geldsatz nach V1 (geldsaetzeFuer, mit dem
+  // Gründungsende bzw. dem Satz des Modells; Liste Lauf 32, bestellung), ohne ihn der Satz je Modell (betragSatz).
+  const zusammensetzung = geldsatz ?? betragSatz(betrag, vorOrt)
   const gebuehrWort = gebuehrWortFuer(betrag)
 
   if (beendet) {
@@ -550,7 +588,7 @@ function Kundin({ bestellung, nichtAbgeholtSatz }: { bestellung: HofBestellDetai
       {kunde.notiz && <p className="text-[14px] break-words">Notiz: „{kunde.notiz}“</p>}
       <p className={cn('text-[13px]', LEISE)}>
         Bestellt: {bestellung.bestelltAm}
-        {bestellung.bezahltAm ? ` · bezahlt: ${bestellung.bezahltAm}` : ''}
+        {bestellung.bezahltAm ? ` · bezahlt: ${bestellung.bezahltAm}` : bestellung.zahlungBeiAbholung ? ` · ${bestellung.zahlungBeiAbholung}` : ''}
       </p>
       {nichtAbgeholtSatz && <p className={cn('text-[13px]', LEISE)}>„Nicht abgeholt“ kostet dich nichts.</p>}
       <Link

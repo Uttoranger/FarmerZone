@@ -362,8 +362,15 @@ describe('Die alten Bausteine sind ersetzt', () => {
     ['/fehler-melden', 'src/app/(hof)/fehler-melden/page.tsx'],
   ]
 
-  it.each(MIT_KOPF)('%s trägt den UnterseitenKopf', (_route, datei) => {
+  // Seit Lauf 32 löst der Werkzeug-Kopf (G1, ui/werkzeug-kopf.tsx) den UnterseitenKopf Route für Route ab
+  // (tests/werkzeug-kopf-wache.test.ts) — eine umgestellte Seite trägt dann ihn.
+  it.each(MIT_KOPF)('%s trägt den UnterseitenKopf bzw. seinen Nachfolger, den Werkzeug-Kopf', (_route, datei) => {
     const text = quelle(datei)
+    if (text.includes('<WerkzeugKopf')) {
+      expect(text).toContain("from '@/components/ui/werkzeug-kopf'")
+      expect(text).not.toContain('<UnterseitenKopf')
+      return
+    }
     expect(text).toContain("from '@/components/hofbereich/unterseiten-kopf'")
     expect(text).toContain('<UnterseitenKopf')
   })

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { barFristSatz, getBestellungenSeite, getHofBestellDetail, naechstesFensterMitZahl } from '@/server/queries/orders'
+import { barFristSatz, getBestellungenSeite, getHofBestellDetail, hofWartetAufFreigabe, ladeBestellGeldsatz, naechstesFensterMitZahl } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { hofBestellFilterAus, hofBestellWunschAus } from '@/schemas/hof-bestellungen'
 import { BestellungenAnsicht } from '@/components/hof-bestellungen/bestellungen-ansicht'
@@ -58,11 +58,26 @@ export default async function OrdersPage({
   const inListe = seite.gruppen.flatMap((g) => g.bestellungen)
   const gewaehlt = inListe.find((b) => b.id === wunsch) ?? inListe[0]
   const detail = gewaehlt ? await getHofBestellDetail(farm, gewaehlt.id, jetzt) : null
-  const barFrist = detail ? await barFristSatz(farm.id, detail, jetzt) : null
+  const [barFrist, geldsatz] = detail ? await Promise.all([barFristSatz(farm.id, detail, jetzt), ladeBestellGeldsatz(farm.id, detail.id, jetzt)]) : [null, null]
 
   // „Heute abholen" leer (Board s1-bestellungen, Bild 2): die nächste Abholung samt ihrer Zahl, wie auf Heute.
   const naechstes = filter === 'heute' && seite.gruppen.length === 0 && seite.hatBestellungen ? await naechstesFensterMitZahl(farm.id, jetzt) : null
   const naechsteAbholung = naechstes ? naechsteAbholungSatz(naechstes.fenster, naechstes.anzahl, wienKalendertag(jetzt)) : null
 
-  return <BestellungenAnsicht seite={seite} filter={filter} detail={detail} modus="liste" hofName={farm.name} barFrist={barFrist} naechsteAbholung={naechsteAbholung} />
+  // Noch nie eine Bestellung: der Leerzustand je Stand (Board s1-bestellungen Bild 3) — nur dann gefragt.
+  const wartet = seite.hatBestellungen ? false : await hofWartetAufFreigabe(farm.id)
+
+  return (
+    <BestellungenAnsicht
+      seite={seite}
+      filter={filter}
+      detail={detail}
+      modus="liste"
+      hofName={farm.name}
+      barFrist={barFrist}
+      naechsteAbholung={naechsteAbholung}
+      wartetAufFreigabe={wartet}
+      geldsatz={geldsatz}
+    />
+  )
 }

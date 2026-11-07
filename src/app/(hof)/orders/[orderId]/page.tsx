@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
-import { barFristSatz, getHofBestellDetail } from '@/server/queries/orders'
+import { barFristSatz, getHofBestellDetail, ladeBestellGeldsatz } from '@/server/queries/orders'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ladeOffeneWiderrufe } from '@/server/widerruf'
 import { hofBestellFilterAus } from '@/schemas/hof-bestellungen'
@@ -57,12 +57,25 @@ export default async function OrderDetailPage({
   if (!detail) notFound()
 
   const filter = hofBestellFilterAus((await searchParams).filter)
-  const [widerrufe, barFrist] = await Promise.all([
+  const [widerrufe, barFrist, geldsatz] = await Promise.all([
     // Nr. 200 (N39): die offenen Widerrufe dieser Bestellung — ein Fehler hier nimmt dem Hof nie die Bestellung.
     ladeOffeneWiderrufe(farm.id, detail.id).catch(() => []),
     // V87: bis wann die Kundin eine Bar-Bestellung bestätigt (fristVon).
     barFristSatz(farm.id, detail, jetzt),
+    // V1 (Liste Lauf 32, bestellung): der Geldsatz unter dem Betrag — wirft nie, im Zweifel bleibt der Satz der Seite.
+    ladeBestellGeldsatz(farm.id, detail.id, jetzt),
   ])
 
-  return <BestellungenAnsicht seite={null} filter={filter} detail={detail} modus="detail" widerrufe={widerrufe} hofName={farm.name} barFrist={barFrist} />
+  return (
+    <BestellungenAnsicht
+      seite={null}
+      filter={filter}
+      detail={detail}
+      modus="detail"
+      widerrufe={widerrufe}
+      hofName={farm.name}
+      barFrist={barFrist}
+      geldsatz={geldsatz}
+    />
+  )
 }

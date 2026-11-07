@@ -15,10 +15,9 @@ import {
   abholtagName,
   abholWhere,
   brauchtDich,
-  fensterAnzahl,
+  fensterMitBestellungen,
   heuteHofSichtbar,
   naechsteAbholungWhere,
-  naechstesAbholfenster,
   packliste,
   packlistenZahlen,
   ueberfaelligWhere,
@@ -228,8 +227,8 @@ export async function getHeute(
     }))
   )
   const slots = hof?.pickupSlots ?? []
-  const fenster = naechstesAbholfenster(slots, jetzt)
-  const fensterZahl = fensterAnzahl(fenster, wienKalendertag(jetzt), zeilen, naechsteAbholung)
+  // Leer nennt „Nächste Abholung“ das nächste Fenster MIT Bestellungen (Liste Lauf 32, heute Bild 3).
+  const fensterMitZahl = fensterMitBestellungen(slots, jetzt, zeilen.length, naechsteAbholung)
   const auswertung = auswerten(buchungen, wochenfenster)
   const sektionen = hof?.sectionsConfig
   const fortschritt = hof
@@ -258,7 +257,7 @@ export async function getHeute(
       umsatzHeuteCent: umsatzHeuteCent(buchungen, jetzt),
     },
     abholfensterHeute: abholfensterHeute(slots, jetzt),
-    naechstesFenster: fenster ? { fenster, anzahl: fensterZahl } : null,
+    naechstesFenster: fensterMitZahl,
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
       ausverkauft,
