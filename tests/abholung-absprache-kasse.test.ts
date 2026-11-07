@@ -38,13 +38,7 @@ vi.mock('next/image', () => ({ default: (p: { src: string; alt: string }) => cre
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
-// Stripes Zahlungsfeld braucht ein DOM; der Zahlungsschritt kommt hier nicht vor.
-vi.mock('@stripe/react-stripe-js', () => ({
-  Elements: ({ children }: { children?: ReactNode }) => children,
-  PaymentElement: () => null,
-  useStripe: () => null,
-  useElements: () => null,
-}))
+// Stripe bleibt echt (Wache tests/paket-mock-wache.test.ts): Der Zahlungsschritt kommt hier nicht vor.
 vi.mock('@/lib/stripe-client', () => ({ getStripePromise: () => null }))
 
 import { CheckoutForm } from '@/components/checkout/checkout-form'
