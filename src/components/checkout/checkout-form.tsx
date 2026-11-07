@@ -67,6 +67,7 @@ import { AGB_PFAD, kasseAgbSatz } from '@/lib/rechtstexte/agb-einbindung'
 import { agbFassungPfad, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { cn } from '@/lib/utils'
+import { ABHOLHINWEIS_SYMBOL, ABSPRACHE_TEXT, korbBrauchtAbsprache } from '@/lib/abholhinweise'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -178,6 +179,7 @@ export type Zahlung = {
 export function CheckoutForm({
   farm,
   nurBetriebeIds,
+  abspracheIds = [],
   vorbelegung,
   ausgebuchteAbholfenster,
   sperre,
@@ -201,6 +203,11 @@ export function CheckoutForm({
   sperre: KaufSperre
   /** Produkte dieses Hofs mit abgabe = NUR_BETRIEBE — aus der DB, nicht aus dem Korb. */
   nurBetriebeIds: string[]
+  /**
+   * Produkte dieses Hofs mit „Abholung nach Absprache“ (N47, Nr. 257) — aus der DB, nicht aus dem Korb.
+   * Nur Anzeige: Hinweis über der Terminwahl und das Wort am Notizfeld; Feld, Termin-Pflicht und Prüfung bleiben.
+   */
+  abspracheIds?: string[]
   /** Ist der Besteller selbst ein Hof: Käuferart Betrieb und seine Nummer (Konzept 6.4). */
   vorbelegung: { kaeuferArt: 'BETRIEB'; betriebsnummer: string } | null
   /** Register Z2: Die Produktion läuft mit Test-Schlüssel — nur der Wahrheitswert, nie der Schlüssel. */
@@ -336,6 +343,8 @@ export function CheckoutForm({
 
   // Abschnitt „Betrieb" nur, wenn eine NUR_BETRIEBE-Position im Korb liegt.
   const betriebAbschnitt = nachweisVomServer || cart.some((i) => nurBetriebeIds.includes(i.productId))
+  // N47: Liegt ein Produkt mit „Abholung nach Absprache“ im Korb, meldet sich der Hof — gewählt wird trotzdem ein Termin.
+  const absprache = korbBrauchtAbsprache(cart, abspracheIds)
   // Der Wert fließt in die Komfortprüfung des Formulars (pruefeKasseFormular);
   // verbindlich prüft der Checkout-Handler mit seinen eigenen Daten.
   useEffect(() => {
@@ -769,6 +778,12 @@ export function CheckoutForm({
             </h2>
             {/* Mit Kaufsperre nennt die Karte oben den Grund schon — hier nur noch der Weg zum Hof
                 (DESIGN_SYSTEM: Ein Zustand hat eine Fassung, auf der ganzen Seite). */}
+            {/* N47 (Nr. 257): über der Terminwahl, als Hinweis-Baustein (G3) — grün, weil es die Kundin betrifft. */}
+            {absprache && (
+              <Hinweiskarte ton="gruen" symbol={ABHOLHINWEIS_SYMBOL.NACH_ABSPRACHE}>
+                {ABSPRACHE_TEXT.kasseHinweis}
+              </Hinweiskarte>
+            )}
             {kacheln.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">
                 {sperre === null ? `Gerade gibt es keine Abholzeiten. ${KONTAKT_UNTER_ANGABEN_ZUM_HOF}` : KONTAKT_UNTER_ANGABEN_ZUM_HOF}
@@ -836,7 +851,7 @@ export function CheckoutForm({
                   Nur für Rückfragen des Hofs.
                 </p>
               </Feld>
-              <Feld id="customerNote" label="Notiz an den Hof (freiwillig)" fehler={fehlerAm.customerNote?.message}>
+              <Feld id="customerNote" label={absprache ? ABSPRACHE_TEXT.notizMitAbsprache : ABSPRACHE_TEXT.notizOhneAbsprache} fehler={fehlerAm.customerNote?.message}>
                 {/* Am Handy zwei Zeilen hoch wie im Board (s1-kasse, 66 px), ab 768 px einzeilig wie die anderen Felder
                     (w1-kasse, 48 px; Register N10 „Notiz einzeilig und wächst“). Wächst mit dem Text (field-sizing),
                     wo der Browser das nicht kann, lässt sie sich größer ziehen. */}

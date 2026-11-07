@@ -38,6 +38,8 @@ export interface OrderConfirmationProps {
   farmPostalCode?: string
   pickupDate: string
   pickupTime: string
+  /** N47 (Nr. 257): der Satz zur Abholung nach Absprache im Abholblock — je nach „Antwort an“ (src/lib/email.ts); fehlt er, kein Satz. */
+  abspracheSatz?: string
   /** Online bezahlt (Webhook) oder vor Ort bestätigt (Bar-Knopf, alte Karte-Bestellungen). */
   zahlart: MailZahlart
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
@@ -102,6 +104,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
 
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
       <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
+      {p.abspracheSatz && <Text style={bodyText}>{p.abspracheSatz}</Text>}
       <Trenner />
       {p.items.map((item, i) => (
         <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />

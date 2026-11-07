@@ -1,4 +1,5 @@
 import { Calendar, Caravan, Tractor, type LucideIcon } from 'lucide-react'
+import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'
 
 /**
  * Abholhinweise eines Futters (Register N23, Nr. 123; Board
@@ -49,4 +50,58 @@ export function ordneAbholhinweise(hinweise: readonly AbholhinweisValue[]): Abho
 /** Ein Hinweis an- oder abwählen (Chips im Formular) — die Liste bleibt geordnet. */
 export function schalteAbholhinweis(hinweise: readonly AbholhinweisValue[], hinweis: AbholhinweisValue): AbholhinweisValue[] {
   return hinweise.includes(hinweis) ? hinweise.filter((h) => h !== hinweis) : ordneAbholhinweise([...hinweise, hinweis])
+}
+
+// ─── Abholung nach Absprache (Register N47, Nr. 257) ────────────────────────
+
+/**
+ * Die Wörter rund um „Abholung nach Absprache" an allen drei Orten (Kasse,
+ * Bestätigungsmail, Hofbereich), wörtlich aus N47. „(freiwillig)" ist Hausstil
+ * an jedem freiwilligen Feld und bleibt deshalb am Notizfeld stehen.
+ */
+export const ABSPRACHE_TEXT = {
+  kasseHinweis: 'Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.',
+  notizMitAbsprache: 'Notiz zur Abholung (freiwillig)',
+  notizOhneAbsprache: 'Notiz an den Hof (freiwillig)',
+  mailMitAntwort: 'Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.',
+  mailOhneAntwort: 'Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.',
+  marke: 'Abholung absprechen',
+  anrufen: 'Anrufen',
+  mailSchreiben: 'Mail schreiben',
+} as const
+
+/**
+ * Die EINE Regel für alle drei Orte: Ein Korb bzw. eine Bestellung braucht
+ * eine Absprache, sobald mindestens eine Position den Hinweis „Abholung nach
+ * Absprache" trägt. Je Position kommen ihre Abholhinweise (fehlt das Produkt
+ * oder die Angabe, zählt die Position nicht).
+ */
+export function brauchtAbsprache(hinweiseJePosition: readonly (readonly string[] | null | undefined)[]): boolean {
+  return hinweiseJePosition.some((hinweise) => hinweise?.includes('NACH_ABSPRACHE') === true)
+}
+
+/**
+ * Dieselbe Regel für den Korb der Kasse: Der Browser kennt nur die IDs im
+ * Korb, die Seite lädt die IDs der Produkte mit Absprache auf dem Server.
+ */
+export function korbBrauchtAbsprache(korb: readonly { productId: string }[], abspracheIds: readonly string[]): boolean {
+  return brauchtAbsprache(korb.map((p) => (abspracheIds.includes(p.productId) ? ['NACH_ABSPRACHE'] : [])))
+}
+
+/**
+ * Zeigt der Hofbereich Marke und Kontakt? Nur bei offenen Bestellungen mit
+ * Absprache — abgeholt, storniert oder nicht abgeholt gibt es nichts mehr
+ * abzusprechen. Offen heißt dasselbe wie überall im Hofbereich (OPEN_STATUSES).
+ */
+export function abspracheOffen(status: string, absprache: boolean): boolean {
+  const offen: readonly string[] = OPEN_STATUSES
+  return absprache && offen.includes(status)
+}
+
+/**
+ * Der Satz im Abholblock der Bestätigungsmail: Mit „Antwort an" (Hof-E-Mail
+ * im Profil) kann die Kundin einfach antworten, sonst meldet sich der Hof.
+ */
+export function abspracheMailSatz(mitAntwortAn: boolean): string {
+  return mitAntwortAn ? ABSPRACHE_TEXT.mailMitAntwort : ABSPRACHE_TEXT.mailOhneAntwort
 }

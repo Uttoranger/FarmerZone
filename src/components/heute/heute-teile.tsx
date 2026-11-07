@@ -38,6 +38,7 @@ import { DIAGRAMM_BALKEN, DIAGRAMM_LEER } from '@/components/ui/diagramm-farbe'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { AbspracheKnoepfe, AbspracheMarke } from '@/components/heute/absprache'
 
 /*
  * Die Bausteine von „Heute" im neuen Design (Gate 5, Nachtlauf Nr. 17;
@@ -402,6 +403,14 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
           </Marke>
         </span>
       </Link>
+      {/* N47 (Nr. 257): Abholung nach Absprache — Marke und Knöpfe UNTER der Zeile, nicht im Zeilen-Link;
+          der Kontakt steht nur als Ziel der Knöpfe da, nie als Text. */}
+      {zeile.absprache && (
+        <div className="-mt-1 flex flex-wrap items-center gap-2 px-4 pb-3 md:px-[18px]">
+          <AbspracheMarke />
+          <AbspracheKnoepfe anrufen={zeile.absprache.anrufen} email={zeile.absprache.email} name={zeile.kunde} />
+        </div>
+      )}
     </li>
   )
 }
