@@ -84,7 +84,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/analytics/umfeld-karte.tsx': 2,
   'src/components/anmelden/anmelden-seite.tsx': 1,
   'src/components/anmelden/hof-anmeldung.tsx': 2,
-  'src/components/auswertung/auswertung-teile.tsx': 2,
   'src/components/checkout/angaben-zum-hof.tsx': 1,
   'src/components/checkout/kasse-skelett.tsx': 7,
   'src/components/checkout/stripe-payment.tsx': 1,
@@ -108,7 +107,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/hof-einstellungen/einstellungen-laden.tsx': 7,
   'src/components/hof-einstellungen/konditionen-ansicht.tsx': 2,
   'src/components/hof-einstellungen/teilen-momente-schalter.tsx': 3,
-  'src/components/hof-hilfe/hilfe-laden.tsx': 6,
   'src/components/hof-kunden/kunden-ansicht.tsx': 2,
   'src/components/hof-kunden/kunden-laden.tsx': 6,
   'src/components/hof-kunden/kunden-sortieren.tsx': 1,
@@ -161,5 +159,4 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/ui/hofkarte-rahmen.tsx': 1,
   'src/components/ui/input.tsx': 1,
   'src/components/ui/list-row.tsx': 1,
-  'src/components/ui/meldung-formular-ansicht.tsx': 6,
 }

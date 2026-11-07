@@ -344,15 +344,16 @@ describe('Meine Meldungen (gerendert)', () => {
     expect(NEUE_MELDUNG_HREF).toBe('/fehler-melden')
     expect(html).toMatch(/<h1[^>]*>Meine Meldungen<\/h1>/)
     expect(html).toContain(`href="${NEUE_MELDUNG_HREF}"`)
-    expect(html).toContain('data-status="offen"')
+    // Seit Nr. 251 (Board s2-/w2-meldungen Bild 4): die Art als Wort in der Kopfzeile, der Stand als Marke.
     expect(html).toContain('In Arbeit')
+    expect(html).toContain('Antwort lesen')
     expect(html).toContain('Antwort:')
     expect(html).toContain('Liegt am Bildformat')
   })
 
-  it('F6 (22e): je Meldung „Tag · Nr. <Kurznummer>" bleibt', () => {
+  it('F6 (22e): je Meldung die Kurznummer (seit Nr. 251 „· <Kurznummer>“ hinter dem Titel, Board s2-meldungen)', () => {
     expect(zeilen[0].kurznummer).toMatch(/\S/)
-    expect(html).toContain(`Nr. <span class="font-mono">${zeilen[0].kurznummer}</span>`)
+    expect(html).toContain(`· ${zeilen[0].kurznummer}</span>`)
   })
 
   it('Fremdtext bleibt Text', () => {
