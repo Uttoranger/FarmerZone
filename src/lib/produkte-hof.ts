@@ -35,8 +35,12 @@ export type ProduktStatus = { text: string; ton: ProduktStatusTon }
  * „N Größen warten auf Meldung" gehört zu Gate 6 (Futter-Sperre je Gebinde)
  * und kommt mit Nr. 20.
  */
-export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null }): ProduktStatus {
+export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null; category?: string | null }): ProduktStatus {
   const zustand = produktZustand(p)
+  // Liste Lauf 32 (produkte 1440): Ohne Kategorie steht das Produkt nicht im Shop (Board, Heute „Braucht dich“) —
+  // das Schild sagt, was zu tun ist; der Vorschlag mit „Übernehmen“ bleibt darunter (Hinweise). Nur wenn die
+  // Kategorie ausdrücklich fehlt (null); Aufrufer ohne das Feld bekommen das Schild wie bisher.
+  if (zustand.art === 'im-shop' && p.category === null) return { text: 'Kategorie ergänzen', ton: 'offen' }
   switch (zustand.art) {
     case 'nicht-im-shop':
       return { text: NICHT_IM_SHOP, ton: 'neutral' }

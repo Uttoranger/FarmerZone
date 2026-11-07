@@ -169,6 +169,15 @@ describe('produktStatus — vier Zustände wie im Mockup', () => {
     expect(produktStatus(p({ isAvailable: false, stock: 24 }))).toEqual({ text: 'Nicht im Shop', ton: 'neutral' })
   })
 
+  it('ohne Kategorie im Shop: „Kategorie ergänzen“ (orange) statt „Im Shop“ (Liste Lauf 32, produkte 1440); ausverkauft und nicht im Shop bleiben', () => {
+    expect(produktStatus({ ...p({ stock: 24 }), category: null })).toEqual({ text: 'Kategorie ergänzen', ton: 'offen' })
+    expect(produktStatus({ ...p({ stock: 0 }), category: null }).text).toBe('Ausverkauft')
+    expect(produktStatus({ ...p({ isAvailable: false, stock: 24 }), category: null }).text).toBe('Nicht im Shop')
+    // Gegenprobe: mit Kategorie bzw. ohne das Feld wie bisher.
+    expect(produktStatus({ ...p({ stock: 24 }), category: 'GEMUESE' }).text).toBe('Im Shop')
+    expect(produktStatus({ isAvailable: true, stock: 24, unit: 'KG', unitSize: null }).text).toBe('Im Shop')
+  })
+
   it('Nicht im Shop sticht Ausverkauft — ausgeblendet ist für Kunden gar nicht da', () => {
     expect(produktStatus(p({ isAvailable: false, stock: 0 })).text).toBe('Nicht im Shop')
   })

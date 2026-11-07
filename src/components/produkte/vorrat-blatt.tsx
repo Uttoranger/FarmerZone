@@ -105,8 +105,10 @@ export function VorratBlatt({
         {vorratFrage(produkt.unit, produkt.unitSize)}
       </p>
       <div className="flex flex-col items-center gap-1">
+        {/* G13 (Liste Lauf 32, produkte Bild 2): die gerahmte Pille „− n +“ statt zweier runder Knöpfe. */}
         <Stepper
           gross
+          form="pille"
           beschriftung={bestandLabel(produkt.unit, produkt.unitSize)}
           wert={anzeige}
           onWertChange={setAnzeige}
