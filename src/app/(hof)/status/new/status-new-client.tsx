@@ -504,18 +504,18 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             </div>
 
             {/* Recipient summary */}
-            {/* Weiße Karte, Kopf „EMPFÄNGER“, Haken „✓“ (Liste Lauf 32, beitraege). */}
+            {/* Weiße Karte, Kopf „EMPFÄNGER“, Haken als Symbol (Liste Lauf 32, beitraege). */}
             <div className={cn('mb-5 space-y-2 border border-border bg-card p-4', RUNDUNG.karte)}>
               <h3 className="mb-2 text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">Empfänger</h3>
               {showOnFarmPage && (
                 <p className="flex items-center gap-2 text-sm text-foreground">
-                  <span className="font-bold text-status-fertig" aria-hidden="true">✓</span>
+                  <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={2.5} aria-hidden="true" />
                   {BEITRAG_ABLAUF_TEXT.hofseiteZusammenfassung}
                 </p>
               )}
               {sendEmail && !emailBlocked && emailCount > 0 && (
                 <p className="flex items-center gap-2 text-sm text-foreground">
-                  <span className="font-bold text-status-fertig" aria-hidden="true">✓</span>
+                  <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={2.5} aria-hidden="true" />
                   {emailCount} E-Mails werden automatisch versendet
                 </p>
               )}

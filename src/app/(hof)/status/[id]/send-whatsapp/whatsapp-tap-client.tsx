@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { setzeWhatsAppGetippt } from '@/server/actions/status-posts'
 import { speichernOhneWurf } from '@/components/mein-hof/abschnitt-speichern'
@@ -189,8 +190,9 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
               </div>
 
               {person.geoeffnet ? (
-                <span className="shrink-0 self-start text-[14px] font-bold text-status-fertig">
-                  <span aria-hidden="true">✓ </span>
+                <span className="flex shrink-0 items-center gap-1 self-start text-[14px] font-bold text-status-fertig">
+                  {/* Haken als Symbol statt Zeichen (tests/keine-emojis.test.ts). */}
+                  <Check className="size-4" strokeWidth={2.5} aria-hidden="true" />
                   <span>{TEXT.geoeffnet}</span>
                 </span>
               ) : (
