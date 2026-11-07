@@ -95,7 +95,7 @@ function Rahmen({
   const fenster = useRef(new Map<string, HTMLIFrameElement>())
 
   const bandZeile = (
-    <p className={cn('flex h-[22px] items-center justify-center px-2 text-center text-[10px] font-bold tracking-[0.08em]', BAND[band].klasse)}>
+    <p className={cn('flex min-h-[22px] items-center justify-center px-2 py-0.5 text-center text-xs leading-tight font-bold tracking-[0.04em]', BAND[band].klasse)}>
       {BAND[band].text}
     </p>
   )

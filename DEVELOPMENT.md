@@ -6481,6 +6481,10 @@ Die Belehrung nennt die Adresse des Betriebs, nicht das Anmelde-Konto der Inhabe
 - **Abholzettel mitgezogen (Gegenlesen „Geld“, Runde 1):** Der Zettel ist auch für stornierte und nicht abgeholte Bestellungen erreichbar und zeigte dort „Gesamt“ mit Gebühr. Er nimmt jetzt `anzeigeGesamtCents` und markiert die Zeile mit `gebuehrEntfallenVermerk` — dasselbe Wort wie `BestellPositionen`. „Bar zu kassieren“ bleibt der Snapshot (Auftrag).
 - **Nicht mitgezogen:** Mail-„Gesamt“ und Admin-Vorschau der Mails (Nr. 255, Dateien von Nr. 259), Packliste, Hof-Liste, Admin-Bestellliste und „Meine Bestellungen“ — Liste mit Begründung im Bericht `docs/nachtlauf/berichte/244.md`.
 
+## Admin: messbare Mängel nach der Erstabnahme (Register N32, N46; Nr. 258b, Lauf 32, 7.11.2026)
+
+Die Admin-Erstabnahme (abnahme-lauf32.md) fand nur drei messbare Mängel: Schrift 10–11 px an Kachel- und Tabellenköpfen und am Entwurfsband der Startseite, Eingabefelder mit 43,75 px Höhe (FELD ohne Mindesthöhe bei 14,5 px Schrift) und Kästchen „ohne Beschriftung“ am Handy. Letzteres war kein fehlendes Label: In geschlossenem `<details>` meldet Chromium das Kästchen mit Maß, das Label aber ohne Text — der Inhalt ist jetzt ohne `open` `hidden`. Messung vorher/nachher mit dem dev-Fotografen: alle sieben Seiten in allen vier Fassungen 0 Befunde. Dazu das Kachel-Wort „Bestellwert“ (Antwort 3 der Projektleitung), weil die Kachel seit Nr. 258 auch unbestätigte Bar-Bestellungen zählt; /admin/geld behält „Umsatz der Höfe“. Aufbau und Wortlaut sonst unverändert.
+
 ## Zählregel der Geld-Kachel in Admin › Heute (Register N32, Ergänzung N46; Nr. 258, Lauf 32, 6.11.2026)
 
 - **Was sich ändert:** Die Geld-Kachel und „Woche: n“ zählen jetzt alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen (Antwort 1 der Projektleitung auf Morgenbericht 31, bestätigt mit „Geld-Kachel-Regel bestätigt“). Das ersetzt die Zählweise nach Nr. 240 (nur abgeholte Bestellungen, „Woche: n“ nach Abholung).

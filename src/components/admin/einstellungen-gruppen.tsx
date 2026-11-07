@@ -149,7 +149,7 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
                   </span>
                   <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
-                <section aria-label={titel} className="flex flex-col gap-3.5 border-t border-border p-3.5 lg:border-t-0 lg:p-5">
+                <section aria-label={titel} className="hidden flex-col gap-3.5 border-t border-border p-3.5 group-open:flex lg:border-t-0 lg:p-5">
                   <div className="hidden flex-wrap items-center gap-2.5 lg:flex">
                     <h2 className={H2}>{titel}</h2>
                     {gruppe === 'gruendung' && <Chip>{EINSTELLUNGEN_TEXT.gruendung.register}</Chip>}
