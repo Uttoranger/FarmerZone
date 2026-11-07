@@ -298,7 +298,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 251 | Hof-Werkzeuge | fertig | `nacht/2026-11-06/251-hof-werkzeuge` | #498 | von `integration/lauf32b` | – | 7.11.2026 |
 | 252 | Finden | fertig | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
 | 253 | Kauf und Konto | fertig | `nacht/2026-11-06/253-kauf-konto` | #493 | von `integration/lauf32b` | – | 7.11.2026 |
-| 254 | System und Rechtsrahmen | läuft | `nacht/2026-11-06/254-system` | – | vom Zwischenstand `integration/lauf32b` nach 259 und 251 | – | 7.11.2026 |
+| 254 | System und Rechtsrahmen | fertig | `nacht/2026-11-06/254-system` | #500 | vom Zwischenstand `integration/lauf32b` nach 259 und 251 | – | 7.11.2026 |
 | 255 | E-Mails | fertig | `nacht/2026-11-06/255-mails` | #497 | vom Zwischenstand `integration/lauf32b` nach 257 | – | 7.11.2026 |
 | 256 | Mail „Neue Bestellung bar“ an den Hof | gemergt (#490) | `nacht/2026-11-06/256-bar-mail-hof` | #485 | vom Zwischenstand `integration/lauf32` nach 259; ohne 259 nach 243 und 244 | 0 Runden; /api/checkout genau ein Aufruf | 6./7.11.2026 |
 | 257 | Abholung nach Absprache | fertig | `nacht/2026-11-06/257-absprache` | #495 | vom Zwischenstand `integration/lauf32b` nach 249, 249b, 253, 256 und 259 | – | 7.11.2026 |
