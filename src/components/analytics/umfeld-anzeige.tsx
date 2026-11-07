@@ -4,7 +4,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Segment } from '@/components/ui/segment'
+import { AnsichtChips } from '@/components/region/ansicht-chips'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { UmfeldKopf } from '@/components/analytics/umfeld-kopf'
 import { UmfeldListe } from '@/components/analytics/umfeld-liste'
@@ -18,11 +18,6 @@ const UmfeldKarteAnsicht = dynamic(() => import('@/components/analytics/umfeld-k
   ssr: false,
   loading: () => <div className="h-[60vh] min-h-[320px] animate-pulse rounded-[12px] bg-muted" aria-hidden="true" />,
 })
-
-const ANSICHTEN = [
-  { wert: 'liste', label: 'Liste' },
-  { wert: 'karte', label: 'Karte' },
-] as const
 
 /**
  * Der Inhalt des Reiters „Preise vergleichen" auf /region (bis Nr. 22c „In
@@ -58,15 +53,8 @@ export function UmfeldAnzeige({
   return (
     <div className="flex flex-col gap-4">
       <UmfeldKopf bereich={bereich} km={km} ansicht={wahl} />
-      {/* Liste | Karte ist Zustand der Seite (replaceState), kein Filter — deshalb
-          der Baustein Segment, nicht FilterChips. */}
       {/* „Liste / Karte“ in eigener Zeile unter dem Umkreis, der Hinweis darunter mit Punkt (Liste Lauf 32 region). */}
-      <Segment
-        beschriftung="Ansicht wählen"
-        optionen={ANSICHTEN}
-        wert={wahl}
-        onWertChange={(neu) => waehle(neu === 'karte' ? 'karte' : 'liste')}
-      />
+      <AnsichtChips wert={wahl} onWahl={waehle} />
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-[13px] leading-normal text-muted-foreground">
           Luftlinie ab deinem Hof · nur Höfe, die gerade verkaufen · je Hof zählt sein günstigstes Angebot.

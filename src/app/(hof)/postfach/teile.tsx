@@ -48,6 +48,7 @@ export function PostfachZeile({ zeile }: { zeile: FadenZeile }): React.JSX.Eleme
       href={zeile.href}
       className={cn('flex min-h-11 items-center gap-3 px-4 py-3 transition-colors duration-[250ms] hover:bg-muted', FOKUS_RAHMEN)}
     >
+      <TeamZeichen />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-muted-foreground">
           <span>

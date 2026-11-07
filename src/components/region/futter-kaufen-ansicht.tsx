@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
-import { Segment } from '@/components/ui/segment'
+import { AnsichtChips } from '@/components/region/ansicht-chips'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { KmWahl } from '@/components/region/km-wahl'
 import { ErklaerKnopf } from '@/components/region/erklaer-knopf'
@@ -34,11 +34,6 @@ const FutterKarteAnsicht = dynamic(() => import('@/components/region/futter-kart
   ssr: false,
   loading: () => <div className="h-[60vh] min-h-[320px] animate-pulse rounded-[12px] bg-muted" aria-hidden="true" />,
 })
-
-const ANSICHTEN = [
-  { wert: 'liste', label: 'Liste' },
-  { wert: 'karte', label: 'Karte' },
-] as const
 
 /*
  * Region › Futter kaufen (Nachtlauf Nr. 22c; seit Nr. 123 nach Board
@@ -109,16 +104,9 @@ export function FutterKaufenAnsicht({
         </FilterChipReihe>
       </div>
 
-      {/* Liste | Karte ist Zustand der Seite (replaceState), kein Filter — deshalb Segment, nicht FilterChips. */}
-      {/* „Liste / Karte“ in eigener Zeile, der Hinweis darunter (Liste Lauf 32 region). */}
-      <Segment
-        beschriftung="Ansicht wählen"
-        optionen={ANSICHTEN}
-        wert={wahl}
-        onWertChange={(neu) => waehle(neu === 'karte' ? 'karte' : 'liste')}
-      />
-      <div>
-        <div className="flex min-w-0 flex-col gap-1">
+      {/* Zählzeile und „Liste / Karte“ in einer Zeile wie im Board s1-region Bild 2 (Chips statt Segment, G11). */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <p className="flex items-center gap-2 text-[13px] leading-normal text-muted-foreground">
             {/* Am Handy die Zeile mit der Zahl (Board v2, Handy 3), am Computer der Satz (Board v3) — beide mit (i). */}
             <span className="min-w-0 md:hidden">{ansicht.zahlZeile}</span>
@@ -131,6 +119,7 @@ export function FutterKaufenAnsicht({
             </p>
           ))}
         </div>
+        <AnsichtChips wert={wahl} onWahl={waehle} />
       </div>
 
       {ansicht.leer && <FutterLeerzustand leer={ansicht.leer} filter={filter} link={link} />}
