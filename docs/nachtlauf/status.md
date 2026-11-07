@@ -295,10 +295,10 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 248 | Bausteine Teil 4 (G5, G12–G14, Geldsätze V1) | gemergt (#490) | `nacht/2026-11-06/248-bausteine-4` | #488 | vom Zwischenstand `integration/lauf32` nach 245 | 1 Runde (Varianten statt in place; Geldsatz bei entfallener Gebühr) | 6./7.11.2026 |
 | 249 | Hof-Alltag | gemergt (#490) | `nacht/2026-11-06/249-hof-alltag` | #489 | vom Zwischenstand `integration/lauf32` nach 245–248 und 259 | Container-Neustart, fortgesetzt ab WIP; 1 Runde (formal: Abholzeiten-Satz als Übergang bis 250); Mängel aus dem Zwischen-Durchgang (Abholzettel „inkl.“-Satz) → B | 6./7.11.2026 |
 | 250 | Einstellungen und Teilen | fertig | `nacht/2026-11-06/250-einstellungen` | #496 | von `integration/lauf32b` | – | 7.11.2026 |
-| 251 | Hof-Werkzeuge | läuft | `nacht/2026-11-06/251-hof-werkzeuge` | – | von `integration/lauf32b` | – | 7.11.2026 |
+| 251 | Hof-Werkzeuge | fertig | `nacht/2026-11-06/251-hof-werkzeuge` | #498 | von `integration/lauf32b` | – | 7.11.2026 |
 | 252 | Finden | fertig | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
 | 253 | Kauf und Konto | fertig | `nacht/2026-11-06/253-kauf-konto` | #493 | von `integration/lauf32b` | – | 7.11.2026 |
-| 254 | System und Rechtsrahmen | offen | – | – | vom Zwischenstand nach 259 und 251 | – | 6.11.2026 |
+| 254 | System und Rechtsrahmen | läuft | `nacht/2026-11-06/254-system` | – | vom Zwischenstand `integration/lauf32b` nach 259 und 251 | – | 7.11.2026 |
 | 255 | E-Mails | fertig | `nacht/2026-11-06/255-mails` | #497 | vom Zwischenstand `integration/lauf32b` nach 257 | – | 7.11.2026 |
 | 256 | Mail „Neue Bestellung bar“ an den Hof | gemergt (#490) | `nacht/2026-11-06/256-bar-mail-hof` | #485 | vom Zwischenstand `integration/lauf32` nach 259; ohne 259 nach 243 und 244 | 0 Runden; /api/checkout genau ein Aufruf | 6./7.11.2026 |
 | 257 | Abholung nach Absprache | fertig | `nacht/2026-11-06/257-absprache` | #495 | vom Zwischenstand `integration/lauf32b` nach 249, 249b, 253, 256 und 259 | – | 7.11.2026 |
