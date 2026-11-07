@@ -7,7 +7,8 @@
  *  (a) bar, Gebühr entfallen: „Bar bei Abholung“ = Warenpreis, Zeile „Servicegebühr (entfällt)“ durchgestrichen;
  *  (b) online, Gebühr erstattet: „Online bezahlt“ = Warenpreis, „(erstattet)“;
  *  (c) Erstattung offen (serviceFeeRefundedAt leer): Gesamt MIT Gebühr, nichts gestrichen;
- *  (d) Hofpreis-Modell, entfallen: Gesamt = Warenpreis, keine Gebührenzeile (die Gebühr steckt in den Preisen);
+ *  (d) Hofpreis-Modell, entfallen: Zeilen mit Warenpreis, Zeilensumme = Gesamt = Warenpreis, kein „inkl.“-Satz
+ *      (Nr. 255 Runde 1); Gegenprobe: gilt die Gebühr, Endpreise, Gesamt mit Gebühr und „inkl.“-Satz;
  *  (e) Gebühr 0: Gesamt = Warenpreis, keine Zeile;
  *  (f) Snapshot bleibt: „Bar zu kassieren“ und „Die Kundin hat … bezahlt“ in den Hof-Mails zählen die Gebühr
  *      weiter mit, auch wenn sie entfallen ist (nur Anzeige geändert, nichts an Buchung oder Kasse).
@@ -120,17 +121,47 @@ describe('Kunden-Mails: „Gesamt“ ohne entfallene Gebühr', () => {
     expect(klartext(html)).toContain('Bar bei Abholung € 10,40')
   })
 
-  it('(d) Hofpreis-Modell mit entfallener Gebühr: Gesamt ist der Warenpreis, keine Gebührenzeile', async () => {
-    const { html } = await email.baueOrderConfirmation(
-      bestellung({
-        gebuehrModell: 'hofpreis',
-        serviceFeeRefundedAt: ENTFALLEN_AM,
-        items: [{ productName: 'Freilandeier', quantity: 2, unitPrice: '4.90', totalPrice: '9.80', gebuehrCents: 30, product: { unit: 'STUECK', unitSize: null } }],
-      })
-    )
+  // Stimmige Hofpreis-Bestellung: Summe der gebuehrCents der Zeilen = serviceFeeCents (0,45 + 0,15 = 0,60).
+  const HOFPREIS = {
+    gebuehrModell: 'hofpreis',
+    items: [
+      { productName: 'Freilandeier', quantity: 1, unitPrice: '4.90', totalPrice: '4.90', gebuehrCents: 45, product: { unit: 'STUECK', unitSize: null } },
+      { productName: 'Heumilch', quantity: 1, unitPrice: '4.90', totalPrice: '4.90', gebuehrCents: 15, product: { unit: 'LITER', unitSize: 1 } },
+    ],
+  } as Partial<OrderForEmail>
+
+  it.each(MAILS)('(d) %s, Hofpreis-Modell mit entfallener Gebühr: kein „inkl.“-Satz, Zeilen mit Warenpreis, Zeilensumme = Gesamt', async (_name, baue) => {
+    const { html } = await baue(bestellung({ ...HOFPREIS, serviceFeeRefundedAt: ENTFALLEN_AM }))
     const text = klartext(html)
+    expect(text).toContain('Freilandeier · 1 Stück € 4,90')
+    expect(text).toContain('Heumilch · 1 L € 4,90')
     expect(text).toContain('Bar bei Abholung € 9,80')
+    expect(text).not.toContain('inkl. Plattformgebühr')
     expect(text).not.toMatch(/Plattformgebühr \((entfällt|erstattet)\)/)
+    expect(text).not.toContain('€ 10,40')
+  })
+
+  it.each(MAILS)('(d) %s, Gegenprobe Hofpreis-Modell, Gebühr gilt: Endpreise, Gesamt mit Gebühr, „inkl.“-Satz', async (_name, baue) => {
+    const { html } = await baue(bestellung({ ...HOFPREIS }))
+    const text = klartext(html)
+    expect(text).toContain('Freilandeier · 1 Stück € 5,35')
+    expect(text).toContain('Heumilch · 1 L € 5,05')
+    expect(text).toContain('Bar bei Abholung € 10,40')
+    expect(text).toContain('inkl. Plattformgebühr (darin € 0,60)')
+  })
+
+  it('(d) Bestätigung online, Hofpreis-Modell, Gebühr erstattet: Zeilensumme = „Online bezahlt“, kein „inkl.“', async () => {
+    const { html } = await email.baueOrderConfirmation(bestellung({ ...HOFPREIS, paymentMethod: 'ONLINE', serviceFeeRefundedAt: ENTFALLEN_AM }))
+    const text = klartext(html)
+    expect(text).toContain('Online bezahlt € 9,80')
+    expect(text).not.toContain('inkl. Plattformgebühr')
+  })
+
+  it('„Bring bitte … in bar mit“: der zu kassierende Betrag aus dem Snapshot; bei entfallener Gebühr kein Kasten', async () => {
+    expect(klartext((await email.baueOrderConfirmation(bestellung())).html)).toContain('Bring bitte € 10,40 in bar mit.')
+    expect(klartext((await email.baueOrderConfirmation(bestellung({ ...HOFPREIS }))).html)).toContain('Bring bitte € 10,40 in bar mit.')
+    const entfallen = klartext((await email.baueOrderConfirmation(bestellung({ serviceFeeRefundedAt: ENTFALLEN_AM }))).html)
+    expect(entfallen).not.toContain('Bring bitte')
   })
 
   it('(e) Gebühr 0: Gesamt ist der Warenpreis, keine Gebührenzeile', async () => {

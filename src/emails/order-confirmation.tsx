@@ -58,6 +58,12 @@ export interface OrderConfirmationProps {
   plattformgebuehr?: number
   /** Das „Gesamt“: Warenpreis + Gebühr; ist die Gebühr entfallen bzw. erstattet, nur der Warenpreis (anzeigeGesamtCents in src/lib/email.ts, Nr. 255). */
   total: number
+  /**
+   * Der Betrag in „Bring bitte … in bar mit“ bzw. „Bitte zahle … mit Karte“: was der Hof kassiert, aus dem
+   * Snapshot (barZuKassierenCents, wie „Bar zu kassieren“ in der Hof-Mail). Fehlt er, gilt `total`; null =
+   * kein Kasten (Gebühr entfallen: bei der Abholung ist nichts mehr zu zahlen).
+   */
+  vorOrtBetrag?: number | null
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
   manageUrl?: string
@@ -90,6 +96,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
   const anrufen = telefonLink(p.farmPhone)
   const gebuehr = p.gebuehrZeile && p.gebuehrZeile.betrag > 0 ? p.gebuehrZeile : null
   const satz = T.satz(p.zahlart, p.farmName)
+  const vorOrt = p.vorOrtBetrag === undefined ? p.total : p.vorOrtBetrag
 
   return (
     <EmailLayout fuss={{ art: 'hof' }} previewText={T.vorschauzeile(p.orderNumber, `${p.pickupDate}, ${p.pickupTime} Uhr`)} manageUrl={p.manageUrl}>
@@ -110,17 +117,17 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       <BetragsZeile stark links={GESAMT_LABEL[p.zahlart]} rechts={formatEuro(p.total)} />
 
       {/* Board s3/w3-mail-kauf Bild 3: was die Kundin mitbringt, als grüne Karte direkt unter dem Betrag. */}
-      {p.zahlart === 'bar' && (
+      {p.zahlart === 'bar' && vorOrt !== null && (
         <HinweisKasten art="gruen">
           {T.barMitbringen[0]}
-          <strong>{formatEuro(p.total)}</strong>
+          <strong>{formatEuro(vorOrt)}</strong>
           {T.barMitbringen[1]}
         </HinweisKasten>
       )}
-      {p.zahlart === 'karte' && (
+      {p.zahlart === 'karte' && vorOrt !== null && (
         <HinweisKasten art="gruen">
           {T.karteZahlen[0]}
-          <strong>{formatEuro(p.total)}</strong>
+          <strong>{formatEuro(vorOrt)}</strong>
           {T.karteZahlen[1]}
         </HinweisKasten>
       )}

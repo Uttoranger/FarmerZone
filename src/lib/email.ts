@@ -7,7 +7,7 @@ import { formatEuro, formatPosition } from '@/lib/format'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { abspracheMailSatz, brauchtAbsprache } from '@/lib/abholhinweise'
-import { SERVICEGEBUEHR_BEZEICHNUNG, anzeigeGesamtCents, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, anzeigeGesamtCents, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallen, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
 import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
@@ -534,14 +534,30 @@ function imHofpreis(order: OrderForEmail): boolean {
   return istHofpreisBestellung({ gebuehrModell: order.gebuehrModell ?? null })
 }
 
+/** Ist die Gebühr dieser Bestellung entfallen bzw. erstattet (gebuehrEntfallen)? Fehlt das Feld, gilt sie. NUR Anzeige. */
+function mailGebuehrEntfallen(order: OrderForEmail): boolean {
+  return gebuehrEntfallen({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })
+}
+
 /**
- * Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise,
- * Betrag fertig gerechnet — im Hofpreis-Modell der Endpreis inkl.
- * Plattformgebühr (N38), sonst der Warenpreis.
+ * Positionen für die Mails: Zeile in der gemeinsamen Schreibweise, Betrag
+ * fertig gerechnet — im Hofpreis-Modell der Endpreis inkl. Plattformgebühr
+ * (N38), sonst der Warenpreis. `mitGebuehr` überschreibt das für die
+ * Kunden-Mails (`kundenPositionen`); die Hof-Mails rufen ohne.
  */
-function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
-  const hofpreis = imHofpreis(order)
-  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) }))
+function mailPositionen(order: OrderForEmail, mitGebuehr: boolean = imHofpreis(order)): Array<{ name: string; betrag: number }> {
+  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, mitGebuehr) }))
+}
+
+/**
+ * Positionen der Kunden-Mails mit „Gesamt“ (Bestätigung, „Bitte bestätige“):
+ * Endpreise inkl. Gebühr nur, solange die Gebühr gilt. Ist sie entfallen,
+ * zeigt „Gesamt“ den Warenpreis (anzeigeGesamtCents) — dann auch die Zeilen,
+ * sonst wäre die Zeilensumme größer als „Gesamt“ (Nr. 255 Runde 1, wie die
+ * Bestätigungsseite). NUR Anzeige; gespeicherte Beträge bleiben.
+ */
+function kundenPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
+  return mailPositionen(order, imHofpreis(order) && !mailGebuehrEntfallen(order))
 }
 
 /**
@@ -555,7 +571,8 @@ function kundenGebuehr(order: OrderForEmail): {
   plattformgebuehr: number
 } {
   const { gebuehr } = betraege(order)
-  if (imHofpreis(order)) return { plattformgebuehr: gebuehr }
+  // Hofpreis-Modell: bei entfallener Gebühr kein „inkl.“-Satz (freigabe §36 „Seiten“, wie zahlzeile.ts) — 0 heißt „kein Satz“.
+  if (imHofpreis(order)) return { plattformgebuehr: mailGebuehrEntfallen(order) ? 0 : gebuehr }
   // Nr. 255: „erstattet“/„entfällt“ wie Bestätigungsseite und Abholzettel (gebuehrEntfallenVermerk) — sonst zählte die Zeile über „Gesamt“ scheinbar mit.
   const vermerk = gebuehrEntfallenVermerk({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null, paymentMethod: order.paymentMethod })
   return {
@@ -669,6 +686,21 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
     gesamt: centsAlsEuro(s.gesamtCents),
     anzeigeGesamt: centsAlsEuro(anzeigeGesamtCents({ ...summen, serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })),
   }
+}
+
+/**
+ * Der Betrag in „Bring bitte … in bar mit“ / „Bitte zahle … mit Karte“: was der
+ * Hof kassiert, aus dem Snapshot (barZuKassierenCents) — dieselbe Zahl wie
+ * „Bar zu kassieren“ in der Hof-Mail, nie das Anzeige-Gesamt (Nr. 255 Runde 1).
+ * Online gibt es nichts zu kassieren: dann das Gesamt aus dem Snapshot.
+ * null = kein Kasten: Ist die Gebühr entfallen (Storno, „nicht abgeholt“,
+ * verfallen — nur die Admin-Vorschau), ist bei der Abholung nichts mehr zu
+ * zahlen; der Snapshot-Betrag stünde sonst neben „Servicegebühr (entfällt)“.
+ */
+function vorOrtBetrag(order: OrderForEmail): number | null {
+  if (mailGebuehrEntfallen(order)) return null
+  const cents = barZuKassierenCents({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0, paymentMethod: order.paymentMethod })
+  return cents === null ? betraege(order).gesamt : centsAlsEuro(cents)
 }
 
 // ─── Send-Funktionen ──────────────────────────────────────────────────────────
@@ -1085,9 +1117,10 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     abspracheSatz,
     zahlart: mailZahlart(order.paymentMethod),
-    items: mailPositionen(order),
+    items: kundenPositionen(order),
     ...kundenGebuehr(order),
     total: betraege(order).anzeigeGesamt,
+    vorOrtBetrag: vorOrtBetrag(order),
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
     orderUrl,
@@ -1143,7 +1176,7 @@ export async function onsiteConfirmationInhalt(
     farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: mailPositionen(order),
+    items: kundenPositionen(order),
     ...kundenGebuehr(order),
     total: betraege(order).anzeigeGesamt,
     confirmationUrl,
