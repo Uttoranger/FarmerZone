@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -58,12 +57,12 @@ export function EntdeckenFilterblatt({
       {kompakt ? (
         <SheetTrigger
           className={cn(
-            'relative inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted sm:px-4',
+            'relative inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-4 text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
             FOKUS_RAHMEN
           )}
         >
-          <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          <span className="max-sm:sr-only">Filter</span>
+          {/* Ohne Regler-Symbol, das Wort trägt (Liste Lauf 32, hoefe; Nr. 252). */}
+          <span>Filter</span>
           <Zaehler anzahl={anzahlFilter} wofuer="gesetzt" ton="gruen" klein className="absolute -top-1.5 -right-1.5" />
         </SheetTrigger>
       ) : (
@@ -73,7 +72,6 @@ export function EntdeckenFilterblatt({
             FOKUS_RAHMEN
           )}
         >
-          <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
           Filter
           {anzahlFilter > 0 && (
             <>

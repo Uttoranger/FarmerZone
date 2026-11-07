@@ -903,7 +903,8 @@ describe('Nr. 234: Hofkarten der Startseite mit drei Preisen, Abholzeile, kurze 
     const text = html(createElement(HofKarten, { hoefe: mit }))
     expect(text.match(/<li class="flex items-baseline justify-between/g)).toHaveLength(3)
     expect(text).toContain('€ 4,20 / Stück')
-    expect(text).toContain('€ 50,00 für 2 kg')
+    // Seit Nr. 252 trägt der Name das Gebinde, daneben der Preis des Gebindes (kurzPreis).
+    expect(text).toMatch(/, 2 kg<\/span><span[^>]*>€ 50,00</)
     expect(text.match(/inkl\. Plattformgebühr/g)).toHaveLength(1)
     // Gegenprobe: ohne Endpreise kein Satz.
     const ohne = waehleStartseitenHoefe([hof({ slug: 'y', produkte: [produkt('a')] })])

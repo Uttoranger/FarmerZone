@@ -1,6 +1,5 @@
 'use client'
 
-import { Clock } from 'lucide-react'
 import { ABHOLZEILE_TEXT, abholLage, abholzeileText, type AbholFenster } from '@/lib/hofuebersicht'
 import { cn } from '@/lib/utils'
 import { useUhr } from '@/components/hoefe/use-uhr'
@@ -44,12 +43,9 @@ export function Abholzeile({
     return <p className={cn('text-[13px] text-muted-foreground', className)}>{ABHOLZEILE_TEXT.nichtBestellbar}</p>
   }
   return (
-    <p
-      data-abholung={lage.art}
-      className={cn('flex items-center gap-1.5 text-[13px] text-status-fertig', lage.art === 'heute' && 'font-semibold', className)}
-    >
-      <Clock className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-      <span className="min-w-0">{text}</span>
+    // Fett in der grünen Schrift, ohne Uhr (Liste Lauf 32, hoefe; Nr. 252).
+    <p data-abholung={lage.art} className={cn('text-[13px] font-semibold text-brand-text', className)}>
+      {text}
     </p>
   )
 }

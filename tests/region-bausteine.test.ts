@@ -230,7 +230,7 @@ describe('HofKopf — ein Kopf für Hofkarte, Pin-Karte und Region', () => {
 
   it('Gegenprobe: eine Kopie des alten Kopfs in HofKarte fällt auf', () => {
     const kopie = teile.replace(
-      '<HofKopf hof={hof} als="h2" gedaempft={hof.isPaused} />',
+      '<HofKopf hof={hof} als="h2" gedaempft={hof.isPaused} aufTonung={ausgewaehlt} />',
       '<span className="shrink-0">{hof.entfernungKm !== null && formatiereEntfernung(hof.entfernungKm)}</span>'
     )
     expect(kopie).not.toBe(teile)
