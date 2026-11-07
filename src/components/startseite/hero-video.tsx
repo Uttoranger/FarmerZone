@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Pause, Play } from 'lucide-react'
 import { HERO_VIDEO_SCHLUESSEL, heroVideoSpielt } from '@/lib/startseite'
 import { cn } from '@/lib/utils'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 /*
@@ -61,7 +62,8 @@ export function HeroVideo({ anfang = null }: { anfang?: boolean | null }): React
           hat; ein poster lud dasselbe Foto ein zweites Mal im Original. */}
       {spielt === true && (
         <video
-          className="absolute inset-0 -z-10 hidden h-full w-full object-cover motion-safe:block"
+          // Im Dunkeln gedämpft wie jedes Foto (G12, FOTO_HUELLE; Liste Lauf 32, startseite) — das Video bleibt (A1).
+          className={cn('absolute inset-0 -z-10 hidden h-full w-full object-cover motion-safe:block', FOTO_HUELLE)}
           autoPlay
           muted
           loop

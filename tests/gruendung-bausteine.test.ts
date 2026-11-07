@@ -114,18 +114,20 @@ describe('die vier Bausteine', () => {
 })
 
 describe('Startseite: Für-Höfe-Band', () => {
-  it('mit Zahlen: der Satz nach der Beschreibung — weiter genau ein oranger Knopf', () => {
+  // Seit Nr. 252 (Liste Lauf 32, startseite): schlichte Karte mit EINEM breiten Knopf „Für Höfe“, kein oranger Knopf.
+  it('mit Zahlen: der Satz nach der Überschrift, vor dem Knopf „Für Höfe“ — kein oranger Knopf', () => {
     const band = html(createElement(FuerHoefeBandInhalt, { gruendung: ZEIGEN }))
     expect(band).toContain('Noch 5 von 12 Gründungsplätzen frei')
-    expect(band.indexOf('Schnell eingerichtet')).toBeLessThan(band.indexOf('Gründungsplätzen'))
-    expect(anzahl(band, ORANGE_KNOPF)).toBe(1)
+    expect(band.indexOf('Dein Hofladen, online.')).toBeLessThan(band.indexOf('Gründungsplätzen'))
+    expect(band.indexOf('Gründungsplätzen')).toBeLessThan(band.indexOf('>Für Höfe</a>'))
+    expect(anzahl(band, ORANGE_KNOPF)).toBe(0)
   })
 
-  it('ohne Zahlen bzw. ohne `zeigen`: das Band wie vorher', () => {
+  it('ohne Zahlen bzw. ohne `zeigen`: das Band ohne den Satz', () => {
     for (const gruendung of [null, AUS]) {
       const band = html(createElement(FuerHoefeBandInhalt, { gruendung }))
       expect(band).not.toContain('Gründungsplätze')
-      expect(anzahl(band, ORANGE_KNOPF)).toBe(1)
+      expect(band).toMatch(/<a href="\/fuer-hoefe"[^>]*>Für Höfe<\/a>/)
     }
   })
 

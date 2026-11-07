@@ -74,10 +74,10 @@ describe('Kopf der KundeShell — Platz für „Anmelden"', () => {
 describe('„Schon dabei? Anmelden" (→ /login)', () => {
   const MUSTER = new RegExp(`${SCHON_DABEI.frage.replace('?', '\\?')}[\\s\\S]{0,400}?<a [^>]*href="\\/login"[^>]*>${SCHON_DABEI.link}<\\/a>`)
 
-  it('im Band „Für Höfe" der Startseite — neben „Hof registrieren"', () => {
+  it('im Band „Für Höfe" der Startseite — unter dem Knopf „Für Höfe" (seit Nr. 252)', () => {
     const html = renderToStaticMarkup(createElement(FuerHoefeBandInhalt))
     expect(html).toMatch(MUSTER)
-    expect(html).toContain('href="/register"')
+    expect(html).toContain('href="/fuer-hoefe"')
   })
 
   it('auf /fuer-hoefe oben (Einstieg) und unten (Abschluss) — je einmal', async () => {
