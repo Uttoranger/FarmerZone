@@ -279,8 +279,8 @@ describe('/hoefe: der Satz zur Reihenfolge über der Liste (Board w1-/s1-hoefe, 
   it('im Browser (ab 1024 px) steht er über der Liste im linken Teil; der Kartenmodus am Handy hat keine Liste und keinen Satz', () => {
     // Der Server rendert die schmale Gestalt; den Splitscreen sieht erst der Browser — darum am Quelltext.
     expect(quelle).toMatch(/\{reihenfolgeHinweis\}\s+\{ergebnisse\(true\)\}/)
-    // Seit Nr. 252 weicht er am Handy bei einer Produktsuche (Liste Lauf 32, hoefe Bild 2) — im Browser bleibt er.
-    expect(quelle).toMatch(/\{anzahl > 0 && <p className=\{cn\('text-\[13px\] text-muted-foreground', produktSuche && 'max-md:hidden'\)\}>\{REIHENFOLGE_HINWEIS\}<\/p>\}/)
+    // Ohne Breiten- oder Suchbedingung: Die Pflichtangabe weicht auch bei der Produktsuche am Handy nicht.
+    expect(quelle).toMatch(/\{anzahl > 0 && <p className="text-\[13px\] text-muted-foreground">\{REIHENFOLGE_HINWEIS\}<\/p>\}/)
     // Splitscreen, Karte im Browser und Liste am Handy — der Kartenmodus am Handy nicht.
     expect(quelle.match(/\{reihenfolgeHinweis\}/g)).toHaveLength(3)
     // Gegenprobe: Ohne die Zeile fände die Suche den Satz nicht.

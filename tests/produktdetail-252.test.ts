@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
-  RAUMMASS_ZEILE,
+  raummassZeile,
   ausverkauftSatz,
   groessenAufsteigend,
   groessenVorrat,
   preisJeRaummass,
 } from '@/components/produktdetail/groessen-anzeige'
+import { RAUMMASS_ERKLAERUNG } from '@/lib/verkaufsgroessen'
 
 /*
  * Produktseite nach der Abnahme Lauf 32 (Nr. 252, Liste lauf32-board-oder-code.md,
@@ -64,8 +65,11 @@ describe('preisJeRaummass', () => {
     expect(preisJeRaummass(95, 'RAUMMETER', 2)).toBeNull()
   })
 
-  it('die Erklärzeile wörtlich nach dem Board', () => {
-    expect(RAUMMASS_ZEILE.RAUMMETER).toBe('1 Raummeter = 1 m × 1 m × 1 m geschlichtetes Holz mit Zwischenräumen.')
+  it('die Erklärzeile kommt aus der einen Quelle RAUMMASS_ERKLAERUNG (wie im Brennmaterial-Formular)', () => {
+    expect(raummassZeile(['KG', 'RAUMMETER'])).toBe(`${RAUMMASS_ERKLAERUNG[0].kurz} – ${RAUMMASS_ERKLAERUNG[0].text}`)
+    expect(raummassZeile(['SCHUETTRAUMMETER'])).toBe(`${RAUMMASS_ERKLAERUNG[1].kurz} – ${RAUMMASS_ERKLAERUNG[1].text}`)
+    // Gegenprobe: ohne Raummaß keine Zeile.
+    expect(raummassZeile(['KG', 'STUECK'])).toBeNull()
   })
 })
 
@@ -86,6 +90,9 @@ describe('Produktseite (Quelle)', () => {
     expect(quelle).toContain('data-klebe-zeile=""')
     expect(quelle).toMatch(/sticky top-0[^"]*md:static/)
     expect(quelle).toContain('useWarenkorbKopf()')
+    // Das Symbol hängt am Korb allein, nicht am Kaufen der Seite: Wer einen Korb hat, findet ihn nach dem Wegscrollen.
+    expect(quelle).toMatch(/\{korbKopf && \(\s*<Link\s+href=\{korbKopf\.href\}/)
+    expect(quelle).not.toMatch(/mitKorb && korbKopf/)
   })
 
   it('die Beschreibung steht nach den Größen, vor der Kennzeichnung', () => {

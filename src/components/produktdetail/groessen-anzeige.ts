@@ -1,4 +1,5 @@
 import { formatEuro, formatZahl } from '@/lib/format'
+import { RAUMMASS_ERKLAERUNG, raummassErklaeren } from '@/lib/verkaufsgroessen'
 
 /*
  * Anzeige-Hilfen der Produktseite nach der Abnahme Lauf 32 (Nr. 252, Liste
@@ -16,6 +17,8 @@ type GroesseMitMenge = {
 function sortierMenge(p: GroesseMitMenge): number {
   const roh = p.futter?.nettoMenge ?? p.unitSize
   if (roh === null || roh === undefined) return Number.POSITIVE_INFINITY
+  // Nur zum Sortieren (klein vor groß), gerechnet und angezeigt wird mit der Zahl nichts: Ein Rundungsfehler
+  // der Dezimal-Nettomenge könnte höchstens zwei fast gleich große Gebinde vertauschen.
   const menge = typeof roh === 'number' ? roh : Number.parseFloat(roh.toString())
   return Number.isFinite(menge) ? menge : Number.POSITIVE_INFINITY
 }
@@ -60,10 +63,20 @@ export function preisJeRaummass(price: number, unit: string, unitSize: number | 
   return `${formatEuro(price)} ${je}`
 }
 
-/** Die Erklärzeile unter dem Preis (Board s1-/w1-produkt Bild 3), eine Quelle je Raummaß. */
-export const RAUMMASS_ZEILE: Record<string, string> = {
-  RAUMMETER: '1 Raummeter = 1 m × 1 m × 1 m geschlichtetes Holz mit Zwischenräumen.',
-  SCHUETTRAUMMETER: '1 Schüttraummeter = 1 m × 1 m × 1 m lose geschüttetes Holz.',
+/** Je Raummaß sein Eintrag aus der einen Quelle der Erklärung (RAUMMASS_ERKLAERUNG, auch im Brennmaterial-Formular). */
+const RAUMMASS_EINTRAG: Record<string, (typeof RAUMMASS_ERKLAERUNG)[number]> = {
+  RAUMMETER: RAUMMASS_ERKLAERUNG[0],
+  SCHUETTRAUMMETER: RAUMMASS_ERKLAERUNG[1],
+}
+
+/**
+ * Die Erklärzeile unter dem Preis (Board s1-/w1-produkt Bild 3): das erste Raummaß der Familie, im Wortlaut
+ * von RAUMMASS_ERKLAERUNG und in der Form der Erklärbox („Raummeter (rm) – …“); ohne Raummaß null.
+ */
+export function raummassZeile(units: readonly string[]): string | null {
+  if (!raummassErklaeren(units)) return null
+  const eintrag = units.map((u) => RAUMMASS_EINTRAG[u]).find(Boolean)
+  return eintrag ? `${eintrag.kurz} – ${eintrag.text}` : null
 }
 
 /** Der Satz der Karte „Gerade ausverkauft“, wörtlich nach der Liste: „<Hof> hat gerade kein <Produkt>. Schau, was es sonst gibt.“ */

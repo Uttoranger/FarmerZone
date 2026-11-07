@@ -226,7 +226,8 @@ function KartenAufbau({
   const anordnung = 'flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left md:flex-none md:flex-col md:items-stretch md:gap-1.5'
 
   return (
-    <article className="flex items-center gap-3 px-2.5 py-2 md:flex-1 md:flex-col md:items-stretch md:gap-1.5 md:rounded-[12px] md:border md:border-border md:bg-card md:p-2.5">
+    // Die Rundung gilt bei jeder Breite (RUNDUNG.karte, G8); sichtbar wird sie erst ab 768 px mit Rand und Fläche.
+    <article className={cn('flex items-center gap-3 px-2.5 py-2 md:flex-1 md:flex-col md:items-stretch md:gap-1.5 md:border md:border-border md:bg-card md:p-2.5', RUNDUNG.karte)}>
       {href ? (
         <Link href={href} title={name} className={cn(anordnung, FOKUS_RAHMEN)}>
           {bildUndName}

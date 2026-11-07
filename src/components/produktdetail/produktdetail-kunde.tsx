@@ -55,7 +55,7 @@ import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-ban
 import { sperreMitBestellstopp } from '@/lib/notbremse'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
 import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
-import { RAUMMASS_ZEILE, ausverkauftSatz, groessenAufsteigend, groessenVorrat, preisJeRaummass } from '@/components/produktdetail/groessen-anzeige'
+import { ausverkauftSatz, groessenAufsteigend, groessenVorrat, preisJeRaummass, raummassZeile } from '@/components/produktdetail/groessen-anzeige'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { FutterSchild } from '@/components/produkte/futter-schild'
@@ -219,8 +219,8 @@ export function ProduktdetailKunde({
   const mitGrundpreis = kacheln.some((k) => k.grundpreis)
   const vorrat = vorratText(produkt, zustand)
   const mitnehmen = gleichMitAbholen(produkte, produkt, kaufSperre)
-  // Raummeter und Schüttraummeter: eine Erklärzeile unter dem Preis (Board Bild 3, Nr. 252), aus RAUMMASS_ZEILE.
-  const raummass = (familie.length > 0 ? familie : [produkt]).map((p) => RAUMMASS_ZEILE[p.unit]).find(Boolean) ?? null
+  // Raummeter und Schüttraummeter: eine Erklärzeile unter dem Preis (Board Bild 3, Nr. 252), Wortlaut aus RAUMMASS_ERKLAERUNG.
+  const raummass = raummassZeile((familie.length > 0 ? familie : [produkt]).map((p) => p.unit))
   const preisJe = preisJeRaummass(preisProdukt.price, preisProdukt.unit, preisProdukt.unitSize)
   // Bei jedem Futter der Verantwortungs-Hinweis (E10a), bei „nur an Betriebe" mit Zusatz.
   // Über die ganze Familie: Die Abgabe kann je Größe abweichen, der Zusatz
@@ -262,7 +262,9 @@ export function ProduktdetailKunde({
             <span className="truncate md:hidden">Alle Produkte von {farm.name}</span>
             <span className="hidden md:inline">‹ Zurück zu allen Produkten</span>
           </Link>
-          {mitKorb && korbKopf && (
+          {/* An korbKopf allein (wie vorher die Shell: korb !== null): Wer einen Korb hat, behält am Handy den Weg dorthin,
+              auch auf einer Seite ohne Kaufen (Runde 1 Nr. 252). */}
+          {korbKopf && (
             <Link
               href={korbKopf.href}
               aria-label={`Warenkorb, ${korbKopf.anzahl} Artikel`}

@@ -218,8 +218,9 @@ export function warumPunkte(modell: GebuehrModell | undefined): readonly string[
 }
 
 /**
- * Das Band „Für Höfe" — der eine orange Knopf der Seite (Hofwelt, DESIGN_SYSTEM
- * „Farbrollen"). Es trägt die Sprungmarke #fuer-hoefe für die Navigation.
+ * Das Band „Für Höfe" — seit Nr. 252 ohne Orange: ein Umriss-Knopf „Für Höfe" auf
+ * einer schlichten Karte (Liste Lauf 32, startseite Bild 3/4); der orange Knopf
+ * der Hofwelt steht erst auf /fuer-hoefe. Es trägt die Sprungmarke #fuer-hoefe für die Navigation.
  * „Mehr für Höfe" führt seit Nr. 15 auf die eigene Seite /fuer-hoefe. Preise
  * nennt das Band keine — die stehen nur dort und auf /konditionen
  * (src/lib/konditionen.ts). Darunter „Schon dabei? Anmelden" für Höfe, die

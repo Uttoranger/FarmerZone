@@ -445,7 +445,8 @@ export function HoefeClient({
       <p role="status" className="sr-only">
         {zahlZeilenText}
       </p>
-      {anzahl > 0 && <p className={cn('text-[13px] text-muted-foreground', produktSuche && 'max-md:hidden')}>{REIHENFOLGE_HINWEIS}</p>}
+      {/* Pflichtangabe (§ 4a FAGG): bei jeder Breite und auch bei der Produktsuche — nie ausblenden (Runde 1 Nr. 252). */}
+      {anzahl > 0 && <p className="text-[13px] text-muted-foreground">{REIHENFOLGE_HINWEIS}</p>}
     </>
   )
 
