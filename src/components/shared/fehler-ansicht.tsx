@@ -15,6 +15,7 @@ import {
   type FehlerZeichen,
 } from '@/lib/fehlerseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { MARKE } from '@/lib/marke'
 import { cn } from '@/lib/utils'
 
 /*
@@ -81,6 +82,12 @@ export function FehlerseiteAufbau({
 }
 
 /**
+ * Der Seitentitel der 500 (Nr. 266, axe „document-title“): Die Fehlergrenzen sind Client-Komponenten ohne `metadata`,
+ * deshalb trägt die Ansicht ihn selbst — React 19 hebt ein `<title>` aus dem Baum in den Kopf des Dokuments.
+ */
+export const FEHLER_SEITENTITEL = `Fehler — ${MARKE}`
+
+/**
  * Die 500 — einmal gebaut, von allen Fehlergrenzen benutzt.
  *
  * `src/app/error.tsx` fängt einen Fehler innerhalb des Root-Layouts,
@@ -132,6 +139,7 @@ export function FehlerAnsicht({
         imLayout ? 'min-h-[70dvh] py-12' : 'min-h-dvh py-16'
       )}
     >
+      <title>{FEHLER_SEITENTITEL}</title>
       <FehlerseiteAufbau zeichen="warnung" kicker={fehlerKicker(fehlernummer)} titel={FEHLER_TITEL} text={text}>
         <button type="button" onClick={nochmal} className={FEHLER_HAUPT[FEHLER_KNOPF_TON[welt]]}>
           {NOCHMAL_VERSUCHEN}

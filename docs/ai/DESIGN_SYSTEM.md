@@ -1216,6 +1216,11 @@ Liste Lauf 32, Abschnitte abmelden, neuigkeiten, systemseiten, widerruf, rechtst
 - **Fehlerseiten:** Spalte 544 px, h1 26 px (Zeilenhöhe 1,2, ausgewogen umbrochen), Satz höchstens 440 px; Wege 52 px, Ecken 14 px, 16 px fett, der zweite Weg mit Rand in Textfarbe (`border-foreground/60`, 1,5 px).
 - **Problem melden (Kundschaft):** die Karte links in der Spalte der Shell, 16 px unter dem Kopf (x wie der Seitenfuß). **Die Bot-Bremse mit stillem Scheinerfolg ist gewollt** (Antwort 10 der Projektleitung auf Morgenbericht 31, Register N46): Füllt ein Bot den Honigtopf oder schickt er zu schnell bzw. mit gefälschtem Zeitstempel, zeigt die Seite den gewöhnlichen Dank mit einer Schein-Kurznummer und speichert nichts (`meldungAbsenden`, `scheinKurznummer`) — der Bot lernt so nicht, woran er gescheitert ist. Nur ein abgelaufener Zeitstempel ohne Honigtopf bekommt einen Satz (`FORM_EXPIRED_MESSAGE`), weil das auch Menschen passiert.
 
+### Kleine Fehler nach der Abnahme Lauf 32 (Nr. 266: Seitentitel der 500, h1 auf /widerruf)
+
+- **Die 500 trägt einen Seitentitel:** „Fehler — <Marke>“ (`FEHLER_SEITENTITEL` neben `FehlerAnsicht`, Marke aus `src/lib/marke.ts`) als React-19-`<title>` im Baum der Ansicht — die Fehlergrenzen sind Client-Komponenten ohne `metadata`. Jede Grenze über `FehlerAnsicht` hat ihn damit, auch `global-error.tsx`.
+- **/widerruf nach dem Absenden:** Die Überschrift der Eingangsbestätigung ist die eine h1 der Seite und Fokus-Ziel. Der ausgeblendete Kopf der Seite geht per `group-has-…:hidden` (`display:none`), nie nur unsichtbar — so verlässt er auch den Barrierebaum.
+
 ### Dialoge und Blätter
 
 Register N41 d (seit Nr. 219, Lauf 30; Boards w1-mehr-neu, w1-korb, w1-bestellung, w1-produkte):
