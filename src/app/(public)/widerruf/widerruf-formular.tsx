@@ -124,9 +124,10 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
           <Check className="size-5" strokeWidth={2} aria-hidden="true" />
         </span>
         <div className="flex flex-col gap-1">
-          <h2 id="widerruf-kopf" ref={kopfRef} tabIndex={-1} className={KOPF}>
+          {/* Die h1 der Seite (Nr. 266): Nach dem Absenden ist der Kopf der Seite ausgeblendet (display:none). */}
+          <h1 id="widerruf-kopf" ref={kopfRef} tabIndex={-1} className={KOPF}>
             {WIDERRUF_TEXT.eingangTitel}
-          </h2>
+          </h1>
           <p className="text-[14.5px] text-foreground">
             {WIDERRUF_TEXT.eingangAm(eingegangenAm)} {WIDERRUF_TEXT.eingangMail}
           </p>

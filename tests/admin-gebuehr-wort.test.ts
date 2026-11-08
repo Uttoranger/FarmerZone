@@ -198,6 +198,15 @@ describe('Bestell-Detail: das Wort der Bestellung (V63, gebuehrBezeichnungFuer)'
     expect(html).toMatch(/<span>Servicegebühr<\/span>/)
   })
 
+  // Nr. 266 (Lauf 33): „Servicegebühr“ im Admin-Bestelldetail war kein Code-Fehler — die Seed-Bestellungen stehen im
+  // Modell „bisher“. Beide Stellen der Seite (Zahlung und Zeile) nehmen das Wort der Bestellung, auch ausdrücklich „bisher“.
+  it('Gegenprobe Bestellung mit gebuehrModell „bisher“: beide Stellen „Servicegebühr“, nirgends „Plattformgebühr“', async () => {
+    const html = await bestellSeite('bisher')
+    expect(html).toContain('inkl. € 1,12 Servicegebühr')
+    expect(html).toMatch(/<span>Servicegebühr<\/span>/)
+    expect(html).not.toContain('Plattformgebühr')
+  })
+
   it('„‹ Zur Liste“ nur am Handy: unter 768 px, ab 768 px stehen Liste und Detail', async () => {
     const html = await bestellSeite('hofpreis')
     const link = html.slice(html.lastIndexOf('<a', html.indexOf('Zur Liste')), html.indexOf('Zur Liste'))
