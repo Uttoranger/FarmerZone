@@ -14,7 +14,7 @@
  * Zahl im Stand-Band.
  */
 import type { MarkeArt } from '@/lib/marke-art'
-import { kurznummerAus, passtZurKurznummer } from '@/lib/kurznummer'
+import { ALTE_LAENGE, kurznummerAus, waehleZurKurznummer } from '@/lib/kurznummer'
 
 export const MELDUNG_ARTEN = ['FEHLER', 'WUNSCH', 'FRAGE'] as const
 export type MeldungArt = (typeof MELDUNG_ARTEN)[number]
@@ -234,7 +234,7 @@ export function kiBegruendung(notiz: string | null): string | null {
  * /api/triage, die bei ihr bleiben (Nr. 263). Was Hof, Kundschaft oder Admin sehen, nennt `kurznummerAus`.
  */
 export function kurznummer(id: string): string {
-  return id.slice(0, 8)
+  return id.slice(0, ALTE_LAENGE)
 }
 
 /** Die erste Textzeile, gekürzt — für Listen. */
@@ -871,13 +871,23 @@ export function kannHauptmeldungSein(status: MeldungStatus): boolean {
   return status !== 'DUPLIKAT' && status !== 'KEIN_FEHLER'
 }
 
+export type MeldungSuchErgebnis = {
+  treffer: SuchMeldung[]
+  /** Die Eingabe passt als Nummer zu mehreren Meldungen — die Ansicht sagt `KURZNUMMER_MEHRDEUTIG`. */
+  mehrdeutig: boolean
+}
+
 /**
  * Treffer nach Nummer oder Wort im Kurztitel — höchstens `max`, ohne die ausgeschlossenen. Die Nummer nach DER
- * Regel (`passtZurKurznummer`: neue, alte, volle; ein Stück unter sechs Zeichen trifft keine Nummer); passt sie
- * zu mehreren, stehen alle zur Auswahl in der Liste — gewählt wird nie eine beliebige.
+ * Regel (`waehleZurKurznummer`: neue, alte, volle; ein Stück unter sechs Zeichen trifft keine Nummer). Passt sie zu
+ * mehreren Meldungen der Liste (auch zu ausgeschlossenen), kommt keine davon als Nummern-Treffer, sondern
+ * `mehrdeutig` — wie Admin-Suche und Duplikat-Verweis (Nr. 263). Die Wortsuche im Kurztitel bleibt davon unberührt.
  */
-export function sucheMeldungen(liste: readonly SuchMeldung[], wort: string, erlaubt: (m: SuchMeldung) => boolean, max = 8): SuchMeldung[] {
+export function sucheMeldungen(liste: readonly SuchMeldung[], wort: string, erlaubt: (m: SuchMeldung) => boolean, max = 8): MeldungSuchErgebnis {
   const w = wort.trim().toLowerCase()
-  if (w === '') return []
-  return liste.filter((m) => erlaubt(m) && (passtZurKurznummer(m.id, wort) || m.ersteZeile.toLowerCase().includes(w))).slice(0, max)
+  if (w === '') return { treffer: [], mehrdeutig: false }
+  const nummer = waehleZurKurznummer(liste, wort)
+  const nummerId = nummer.art === 'eine' ? nummer.meldung.id : null
+  const treffer = liste.filter((m) => erlaubt(m) && (m.id === nummerId || m.ersteZeile.toLowerCase().includes(w))).slice(0, max)
+  return { treffer, mehrdeutig: nummer.art === 'mehrdeutig' }
 }

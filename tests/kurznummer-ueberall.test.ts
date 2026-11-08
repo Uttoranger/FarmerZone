@@ -133,23 +133,42 @@ describe('sucheMeldungen (Zusammenfassen, Dazunehmen)', () => {
   const liste = [zeile('cmw4fc4j0000aaaaaaa4f8m2q', 'Foto lädt nicht hoch'), zeile('cmx9zz1k0000bbbbbbb4f8m2q', 'Abholzeit fehlt'), zeile('cmy7aa2m0000ccccccc9k3l7p', 'Knopf grau')]
   const alle = (): boolean => true
 
+  const titel = (wort: string, erlaubt: (m: SuchMeldung) => boolean = alle) => {
+    const { treffer, mehrdeutig } = sucheMeldungen(liste, wort, erlaubt)
+    return { titel: treffer.map((m) => m.ersteZeile), mehrdeutig }
+  }
+
   it('Wortsuche im Kurztitel bleibt: „Foto“ findet die Meldung mit „Foto“ im Kurztitel', () => {
-    expect(sucheMeldungen(liste, 'Foto', alle).map((m) => m.ersteZeile)).toEqual(['Foto lädt nicht hoch'])
+    expect(titel('Foto')).toEqual({ titel: ['Foto lädt nicht hoch'], mehrdeutig: false })
   })
 
-  it('Nummer nach DER Regel; passt sie zu mehreren, stehen alle zur Auswahl', () => {
-    expect(sucheMeldungen(liste, '9K3L7P', alle).map((m) => m.ersteZeile)).toEqual(['Knopf grau'])
-    expect(sucheMeldungen(liste, 'cmy7aa2m', alle).map((m) => m.ersteZeile)).toEqual(['Knopf grau'])
-    expect(sucheMeldungen(liste, '4f8m2q', alle)).toHaveLength(2)
-    expect(sucheMeldungen(liste, 'cm', alle)).toEqual([])
+  it('Nummer nach DER Regel: neue, alte und volle finden genau eine', () => {
+    for (const nummer of ['9K3L7P', 'cmy7aa2m', 'cmy7aa2m0000ccccccc9k3l7p']) expect(titel(nummer)).toEqual({ titel: ['Knopf grau'], mehrdeutig: false })
+    expect(titel('cm')).toEqual({ titel: [], mehrdeutig: false })
+  })
+
+  it('passt die Nummer zu mehreren: keine Auswahl aus ihnen, sondern mehrdeutig (der Dialog sagt den Satz)', () => {
+    expect(titel('4f8m2q')).toEqual({ titel: [], mehrdeutig: true })
+    // Auch wenn eine der beiden im Dialog ausgeschlossen ist: Die Nummer bleibt mehrdeutig, keine wird still genommen.
+    expect(titel('4F8M2Q', (m) => m.ersteZeile !== 'Abholzeit fehlt')).toEqual({ titel: [], mehrdeutig: true })
+    // Der Ausweg: die volle Nummer.
+    expect(titel('cmx9zz1k0000bbbbbbb4f8m2q')).toEqual({ titel: ['Abholzeit fehlt'], mehrdeutig: false })
   })
 })
 
 describe('Wachen', () => {
   const quelle = (pfad: string): string => readFileSync(join(process.cwd(), pfad), 'utf8')
 
-  /** Ruft der Text die alte Kurznummer auf (`kurznummer(`, nicht `kurznummerAus(`)? */
-  const alteNummerIn = (text: string): boolean => /(?<![\w.])kurznummer\(/.test(text.replace(/export function kurznummer\(/g, ''))
+  /**
+   * Nutzt der Text die alte Kurznummer? Ein Aufruf `kurznummer(` bzw. `.kurznummer(` (nicht `kurznummerAus(`) oder ein
+   * Import von `kurznummer` aus '@/lib/meldung', auch unter anderem Namen (`kurznummer as …`).
+   */
+  const alteNummerIn = (text: string): boolean => {
+    const ohneDefinition = text.replace(/export function kurznummer\(/g, '')
+    if (/(?<!\w)kurznummer\(/.test(ohneDefinition)) return true
+    const importe = [...text.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"]@\/lib\/meldung['"]/g)]
+    return importe.some((i) => (i[1] ?? '').split(',').some((name) => name.trim().split(/\s+/)[0] === 'kurznummer'))
+  }
 
   it('die alte Kurznummer nennen unter src/ nur noch der CLI-Export und /api (bleiben bei ihr, Nr. 263)', () => {
     const dateien = execFileSync('git', ['ls-files', 'src'], { encoding: 'utf8' }).split('\n').filter((d) => /\.(ts|tsx)$/.test(d))
@@ -159,6 +178,10 @@ describe('Wachen', () => {
     expect(alteNummerIn(quelle('src/lib/briefkasten-export.ts'))).toBe(true)
     expect(alteNummerIn('zeile: `Nr. ${kurznummer(m.id)}`')).toBe(true)
     expect(alteNummerIn('zeile: `Nr. ${kurznummerAus(m.id)}`')).toBe(false)
+    expect(alteNummerIn("import { MELDUNG_ART_LABEL, kurznummer as nr } from '@/lib/meldung'\nconst t = nr(id)")).toBe(true)
+    expect(alteNummerIn("import {\n  ersteZeile,\n  kurznummer,\n} from '@/lib/meldung'")).toBe(true)
+    expect(alteNummerIn('const n = meldung.kurznummer(id)')).toBe(true)
+    expect(alteNummerIn("import { kurznummerAus } from '@/lib/kurznummer'\nconst k = z.kurznummer")).toBe(false)
   })
 
   /** Kommt die Scheinnummer aus crypto statt aus Math.random? */

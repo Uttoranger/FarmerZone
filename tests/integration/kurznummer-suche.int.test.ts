@@ -63,7 +63,7 @@ describe('Suche über die Kurznummer (eine Regel)', () => {
   it('findet die Meldung über neue, alte und volle Nummer', async () => {
     const id = await legeMeldungAn('q7w3z9')
     for (const eingabe of [kurznummerAus(id), 'q7w3z9', '#Q7W3Z9', id.slice(0, 8), id.slice(0, 8).toUpperCase(), id]) {
-      expect((await getMeldungDetail(eingabe))?.id).toBe(id)
+      expect(await getMeldungDetail(eingabe)).toMatchObject({ art: 'eine', meldung: { id } })
     }
   })
 
@@ -72,11 +72,11 @@ describe('Suche über die Kurznummer (eine Regel)', () => {
     const b = await legeMeldungAn('k2m8p4')
     expect(kurznummerAus(a)).toBe(kurznummerAus(b))
     expect(await findeMeldungZurKurznummer('K2M8P4')).toEqual({ art: 'mehrdeutig' })
-    expect(await getMeldungDetail('K2M8P4')).toBeNull()
-    expect((await getMeldungDetail(a))?.id).toBe(a)
-    expect((await getMeldungDetail(b))?.id).toBe(b)
+    expect(await getMeldungDetail('K2M8P4')).toEqual({ art: 'mehrdeutig' })
+    expect(await getMeldungDetail(a)).toMatchObject({ art: 'eine', meldung: { id: a } })
+    expect(await getMeldungDetail(b)).toMatchObject({ art: 'eine', meldung: { id: b } })
     // Die alte Nummer ist bei beiden eine andere — sie findet je genau eine.
-    expect((await getMeldungDetail(b.slice(0, 8)))?.id).toBe(b)
+    expect(await getMeldungDetail(b.slice(0, 8))).toMatchObject({ art: 'eine', meldung: { id: b } })
   })
 
   it('ein Stück unter sechs Zeichen und LIKE-Platzhalter treffen nichts', async () => {

@@ -21,6 +21,7 @@ import {
   type TriageStand,
 } from '@/lib/meldung'
 import { eingangMeldungAdresse } from '@/lib/postfach'
+import { KURZNUMMER_MEHRDEUTIG } from '@/lib/kurznummer'
 import { cn } from '@/lib/utils'
 import { Marke } from '@/components/ui/marke'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
@@ -120,16 +121,18 @@ function MeldungKasten({ m }: { m: SuchMeldung }): React.JSX.Element {
 /** Suchfeld mit Trefferliste unter dem Feld (CODING_STANDARDS §8: Liste im Fluss, erst beim Tippen). */
 function MeldungSuche({ beschriftung, liste, erlaubt, onWahl }: { beschriftung: string; liste: SuchMeldung[]; erlaubt: (m: SuchMeldung) => boolean; onWahl: (m: SuchMeldung) => void }): React.JSX.Element {
   const [wort, setWort] = useState('')
-  const treffer = sucheMeldungen(liste, wort, erlaubt)
+  const { treffer, mehrdeutig } = sucheMeldungen(liste, wort, erlaubt)
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor="meldung-suche" className={FELD_LABEL}>
         {beschriftung}
       </label>
       <input id="meldung-suche" value={wort} onChange={(e) => setWort(e.target.value)} autoComplete="off" className={FELD} />
+      {/* Nr. 263: Passt die Nummer zu mehreren Meldungen, keine Auswahl aus ihnen — der Satz mit dem Ausweg. */}
+      {wort.trim() !== '' && mehrdeutig && <p className={cn('text-[13px]', LEISE)}>{KURZNUMMER_MEHRDEUTIG}</p>}
       {wort.trim() !== '' &&
         (treffer.length === 0 ? (
-          <p className={cn('text-[13px]', LEISE)}>{MELDUNG_KLICK_TEXT.sucheKeinTreffer}</p>
+          !mehrdeutig && <p className={cn('text-[13px]', LEISE)}>{MELDUNG_KLICK_TEXT.sucheKeinTreffer}</p>
         ) : (
           <ul className="flex flex-col rounded-xl border border-border [&>li+li]:border-t [&>li+li]:border-border">
             {treffer.map((m) => (

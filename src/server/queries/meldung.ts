@@ -19,7 +19,7 @@ import {
   type MeldungStand,
   type MeldungStatus,
 } from '@/lib/meldung'
-import { KURZNUMMER_LAENGE, kurznummerAus, kurznummerEingabe, waehleZurKurznummer, type KurznummerWahl } from '@/lib/kurznummer'
+import { ALTE_LAENGE, KURZNUMMER_LAENGE, kurznummerAus, kurznummerEingabe, waehleZurKurznummer, type KurznummerWahl } from '@/lib/kurznummer'
 
 /**
  * Lesezugriffe des Fehlerbriefkastens. Zwei Sichten, streng getrennt:
@@ -221,9 +221,6 @@ export type AdminMeldungDetail = {
   farm: { id: string; name: string; slug: string } | null
 }
 
-/** Länge der alten Kurznummer (Anfang der ID) — nur für die Vorauswahl in der Datenbank. */
-const ALTE_KURZNUMMER_LAENGE = 8
-
 /**
  * Die Vorauswahl in der Datenbank für eine Nummer: volle ID, Ende (neue Kurznummer) oder Anfang (alte). Nur ein
  * Sieb — entschieden wird danach in `waehleZurKurznummer` nach DER Regel (`passtZurKurznummer`). Ein Stück der ID
@@ -238,7 +235,7 @@ function kurznummerVorauswahl(eingabe: string): Prisma.MeldungWhereInput | null 
       { id: eingabe.trim().replace(/^#/, '') },
       { id: wert },
       ...(stueck && wert.length === KURZNUMMER_LAENGE ? [{ id: { endsWith: wert, mode: 'insensitive' as const } }] : []),
-      ...(stueck && wert.length === ALTE_KURZNUMMER_LAENGE ? [{ id: { startsWith: wert, mode: 'insensitive' as const } }] : []),
+      ...(stueck && wert.length === ALTE_LAENGE ? [{ id: { startsWith: wert, mode: 'insensitive' as const } }] : []),
     ],
   }
 }
@@ -257,17 +254,17 @@ export async function findeMeldungZurKurznummer(eingabe: string): Promise<Kurznu
 
 /**
  * Detail für den Admin — per voller ID, Kurznummer oder alter Kurznummer (Lesezeichen, ältere Mails). Passt die
- * Nummer zu mehreren Meldungen, öffnet sie keine (nie eine beliebige).
+ * Nummer zu mehreren Meldungen, öffnet sie keine (nie eine beliebige): `mehrdeutig`, ohne IDs und ohne Anzahl.
  */
-export async function getMeldungDetail(idOderKurz: string): Promise<AdminMeldungDetail | null> {
+export async function getMeldungDetail(idOderKurz: string): Promise<KurznummerWahl<AdminMeldungDetail>> {
   const wahl = await findeMeldungZurKurznummer(idOderKurz)
-  if (wahl.art !== 'eine') return null
+  if (wahl.art !== 'eine') return wahl
   const zeile = await prisma.meldung.findUnique({
     where: { id: wahl.meldung.id },
     include: { farm: { select: { id: true, name: true, slug: true } } },
   })
-  if (!zeile) return null
-  return { ...zeile, kurznummer: kurznummerAus(zeile.id) }
+  if (!zeile) return { art: 'keine' }
+  return { art: 'eine', meldung: { ...zeile, kurznummer: kurznummerAus(zeile.id) } }
 }
 
 /**

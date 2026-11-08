@@ -125,7 +125,7 @@ describe('Admin-Filter', () => {
     findMany.mockResolvedValue([{ id: ZEILE.id, status: 'NEU' }] as never)
     vi.mocked(prisma.meldung.findUnique).mockResolvedValue({ ...ZEILE, farm: null } as never)
     for (const nummer of ['001ABC', '#001abc', 'cmfmeldu', 'CMFMELDU', ZEILE.id]) {
-      expect((await getMeldungDetail(nummer))?.id).toBe(ZEILE.id)
+      expect(await getMeldungDetail(nummer)).toMatchObject({ art: 'eine', meldung: { id: ZEILE.id, kurznummer: '001ABC' } })
     }
     expect(findMany.mock.calls[0][0]?.where).toEqual({ OR: [{ id: '001ABC' }, { id: '001abc' }, { id: { endsWith: '001abc', mode: 'insensitive' } }] })
     expect(vi.mocked(prisma.meldung.findUnique).mock.calls[0][0]?.where).toEqual({ id: ZEILE.id })
@@ -136,12 +136,13 @@ describe('Admin-Filter', () => {
       { id: ZEILE.id, status: 'NEU' },
       { id: 'cmfandere00000000001abc', status: 'NEU' },
     ] as never)
-    expect(await getMeldungDetail('001ABC')).toBeNull()
-    expect(await getMeldungDetail('01abc')).toBeNull()
+    // Ohne Kennungen und ohne Anzahl.
+    expect(await getMeldungDetail('001ABC')).toEqual({ art: 'mehrdeutig' })
+    expect(await getMeldungDetail('01abc')).toEqual({ art: 'keine' })
     expect(vi.mocked(prisma.meldung.findUnique)).not.toHaveBeenCalled()
     // Die volle Nummer ist der Ausweg.
     vi.mocked(prisma.meldung.findUnique).mockResolvedValue({ ...ZEILE, farm: null } as never)
-    expect((await getMeldungDetail(ZEILE.id))?.id).toBe(ZEILE.id)
+    expect(await getMeldungDetail(ZEILE.id)).toMatchObject({ art: 'eine', meldung: { id: ZEILE.id } })
   })
 })
 

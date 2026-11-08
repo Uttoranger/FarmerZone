@@ -9,8 +9,8 @@
  * Warum sechs Zeichen (Board auf diese Länge angleichen): Aus 36 Zeichen ergeben vier nur 1,7 Mio. Nummern —
  * bei 1.000 Meldungen hätten zwei mit etwa 25 % Wahrscheinlichkeit dieselbe. Sechs ergeben 2,2 Mrd.; dann liegt
  * die Wahrscheinlichkeit bei 1.000 Meldungen bei etwa 0,2 ‰, bei 10.000 um 2 %. Gleich werden können sie trotzdem —
- * darum findet `passtZurKurznummer` ALLE Treffer: Eine Liste zeigt die Auswahl, wer EINE Meldung braucht
- * (`waehleZurKurznummer`), nimmt bei mehreren keine beliebige, sondern meldet `KURZNUMMER_MEHRDEUTIG`.
+ * darum findet `passtZurKurznummer` ALLE Treffer, und `waehleZurKurznummer` nimmt bei mehreren keine beliebige,
+ * sondern meldet `KURZNUMMER_MEHRDEUTIG` — in der Admin-Suche, im Duplikat-Verweis und in der Suche der Dialoge.
  *
  * Die alte Nummer (`kurznummer` in meldung.ts, die ersten acht Zeichen) nennen nur noch der CLI-Export
  * (briefkasten-export.ts) und /api/triage — beide bleiben bei ihr (Sperrzone /api, Nr. 263). Die Suche nimmt sie
@@ -19,9 +19,9 @@
 
 export const KURZNUMMER_LAENGE = 6
 
-/** Länge der alten Kurznummer (`kurznummer` in meldung.ts: Anfang der ID). Hier abgeschrieben statt importiert,
- *  damit meldung.ts `kurznummerAus` nutzen kann, ohne dass sich beide Module gegenseitig laden. */
-const ALTE_LAENGE = 8
+/** Länge der alten Kurznummer (`kurznummer` in meldung.ts: Anfang der ID) — die einzige Stelle dieser Zahl. Hier statt
+ *  in meldung.ts, damit meldung.ts `kurznummerAus` nutzen kann, ohne dass sich beide Module gegenseitig laden. */
+export const ALTE_LAENGE = 8
 
 /** Der Satz, wenn eine Kurznummer zu mehreren Meldungen passt — nie wird dann eine beliebige genommen. */
 export const KURZNUMMER_MEHRDEUTIG = 'Diese Kurznummer passt zu mehreren Meldungen – gib die volle Nummer ein.'
