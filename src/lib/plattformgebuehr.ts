@@ -414,8 +414,18 @@ export type GeldsatzHof = HofMitSatz & { einzugAb: Date | null }
 
 const geldText = (cents: number): string => formatEuro(centsAlsEuro(cents), 2, { geschuetztesLeerzeichen: true })
 
-/** Der letzte Tag ohne Bargebühr: der Wiener Tag vor dem Einzugsbeginn (`einzugAbFuer` liefert Mitternacht danach). */
-const letzterFreierTag = (einzugAb: Date): string => formatDatumLang(new Date(einzugAb.getTime() - 1))
+/**
+ * Nur Anzeige, nie für Buchung, Abrechnung, Einzug, Versand.
+ *
+ * Der letzte Tag ohne Bargebühr als Text („31. Dezember 2027“): der Wiener Tag vor dem Einzugsbeginn
+ * (`einzugAbFuer` liefert Mitternacht in Wien am Tag danach). Ein Satz „bis <Tag>“ nennt diesen Tag, inklusiv
+ * (Register N48, K2/E-018: „bis 31.1.2028“); ein Satz „ab <Tag>“ nennt `einzugAb` selbst. Gibt bewusst nur Text
+ * zurück, nie ein Datum: Ob eine Gebühr anfällt, entscheidet allein `einzugFuer` mit `einzugAb`. Wo die Hilfe
+ * stehen darf, hält `tests/letzter-freier-tag-wache.test.ts` fest (nie in Actions, API, Abrechnung, Mail-Arten).
+ */
+export function letzterFreierTag(einzugAb: Date): string {
+  return formatDatumLang(new Date(einzugAb.getTime() - 1))
+}
 
 /**
  * Die Geldsätze nach V1 (Entscheidungsliste Lauf 32, 3.2) — EINE Anzeige-Hilfe, keine neue Rechnung:

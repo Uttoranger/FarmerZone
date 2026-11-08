@@ -6,9 +6,10 @@
  *    `barMoeglich` nein sagt — keine neue Regel (Gegenprobe über dieselben
  *    Lagen); „Lastschrift einrichten“ nur, wenn keine Sperre der Grund ist
  *    (gesperrt: „Bar gesperrt“ mit dem Weg zu „Deine Konditionen“). Ist die
- *    Bargebühr erlassen, nennt der Satz den Einzugstag `einzugAb` aus der Lage
- *    (Runde 1: nie `gruendungBis` daneben; Runde 2: derselbe Tag wie die Karte
- *    „Barzahlung“, Beweis unten am gerenderten „Deine Konditionen“);
+ *    Bargebühr erlassen, nennt der Satz „Bis <Tag>“ den letzten freien Tag, den
+ *    Wiener Tag vor `einzugAb` aus der Lage (Nr. 264, Register N48; Runde 1: nie
+ *    `gruendungBis` daneben; Runde 2: derselbe Tag wie die Karte „Barzahlung“,
+ *    Beweis unten am gerenderten „Deine Konditionen“);
  *    „Gründungshof“ nur, wenn Farm.einzugAb leer ist; im Modell „bisher“ kein Satz.
  *  - Das Rechenbeispiel von „Deine Konditionen“ rechnet im Hofpreis-Modell über
  *    `bestellGebuehr` (wie Kasse und /api/checkout), sagt „Plattformgebühr“ und
@@ -49,7 +50,7 @@ import {
   type KonditionenHof,
   type EinstellungBereich,
 } from '@/lib/hof-einstellungen'
-import { barMoeglich, bestellGebuehr, type GebuehrLage } from '@/lib/plattformgebuehr'
+import { barMoeglich, bestellGebuehr, letzterFreierTag, type GebuehrLage } from '@/lib/plattformgebuehr'
 import { BAR_GEBUEHR_SEPA_SATZ, BAR_SERVICEGEBUEHR_AB, LASTSCHRIFT_TEXT } from '@/lib/konditionen'
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
@@ -97,17 +98,17 @@ describe('Bar bei Abholung: Marke aus barMoeglich (N42 g, V71)', () => {
     expect(BAR_KARTE_TEXT.einrichten).toBe('Lastschrift einrichten')
   })
 
-  it('Gründungshof vor seinem Einzug: „Aktiv“ und der Satz mit dem Einzugstag aus der Lage', () => {
+  it('Gründungshof vor seinem Einzug: „Aktiv“ und der Satz mit dem letzten Tag vor dem Einzug aus der Lage', () => {
     const karte = barKarte(lage({ einzugAb: EINZUG_NACH_GRUENDUNG }), NACH, OHNE_EINTRAG)
     expect(karte.marke).toBe('Aktiv')
     expect(karte.lastschrift).toBe(false)
-    expect(normal(karte.satz)).toBe('Bis 1. Februar 2028 zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.')
+    expect(normal(karte.satz)).toBe('Bis 31. Jänner 2028 zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.')
   })
 
-  it('Farm.einzugAb eingetragen (Sommerzeit): der Tag ist dieser Einzugstag in Wien, ohne „Gründungshof“ (nie gruendungBis)', () => {
+  it('Farm.einzugAb eingetragen (Sommerzeit): der Tag ist der Wiener Tag vor diesem Einzugstag, ohne „Gründungshof“ (nie gruendungBis)', () => {
     const karte = barKarte(lage({ einzugAb: EINZUG_EINGETRAGEN }), NACH, { einzugAb: EINZUG_EINGETRAGEN })
     expect(karte.marke).toBe('Aktiv')
-    expect(normal(karte.satz)).toBe('Bis 1. Juni 2027 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
+    expect(normal(karte.satz)).toBe('Bis 31. Mai 2027 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
     // Gegenprobe: Ab dem eingetragenen Tag ist nichts mehr erlassen — kein Satz.
     expect(barKarte(lage({ einzugAb: EINZUG_EINGETRAGEN, sepaMandatAm: STICHTAG }), EINZUG_EINGETRAGEN, { einzugAb: EINZUG_EINGETRAGEN }).satz).toBeNull()
   })
@@ -177,7 +178,7 @@ describe('Rechenbeispiel im Hofpreis-Modell', () => {
     const b = bar(lage({ einzugAb: EINZUG_NACH_GRUENDUNG }))
     expect(b.zeilen['Du kassierst („Bar zu kassieren“)']).toBe('€ 21,20')
     expect(b.zeilen['Dir bleibt']).toBe('€ 21,20')
-    expect(b.satz).toBe('Bis 1. Februar 2028 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
+    expect(b.satz).toBe('Bis 31. Jänner 2028 behältst du die Plattformgebühr aus Barbestellungen – wir verzichten darauf.')
     expect(b.satz).not.toContain('SEPA')
   })
 
@@ -228,15 +229,25 @@ describe('„Deine Konditionen“ gerendert: kein „Servicegebühr“ nach dem 
 })
 
 describe('„Deine Konditionen“: Rechenbeispiel und Karte „Barzahlung“ nennen denselben Tag (Runde 2)', () => {
-  /** Die Karte bekommt den Tag als Text aus ladeBarzahlung: formatDatumLang(einzugAbFuer(…)) — hier derselbe Einzug. */
+  /** Die Karte bekommt die Tage als Text aus ladeBarzahlung (formatDatumLang bzw. letzterFreierTag von einzugAbFuer(…)) — hier derselbe Einzug. */
   function karte(einzugAb: Date): BarzahlungAnzeige {
-    return { satzText: '6', einzugAbText: formatDatumLang(einzugAb), einzugBegonnen: false, mandat: false, mandatPflicht: true, bank: null, letzte4: null, abrechnungen: [] }
+    return {
+      satzText: '6',
+      einzugAbText: formatDatumLang(einzugAb),
+      letzterFreierTagText: letzterFreierTag(einzugAb),
+      einzugBegonnen: false,
+      mandat: false,
+      mandatPflicht: true,
+      bank: null,
+      letzte4: null,
+      abrechnungen: [],
+    }
   }
   const tage = (markup: string): string[] => [...normal(markup).matchAll(/Bis ([^<]+?) behältst du/g)].map((m) => m[1])
 
   it.each([
-    ['Winterzeit, Gründungshof', EINZUG_NACH_GRUENDUNG, '1. Februar 2028'],
-    ['Sommerzeit, eingetragener Einzug', EINZUG_EINGETRAGEN, '1. Juni 2027'],
+    ['Winterzeit, Gründungshof', EINZUG_NACH_GRUENDUNG, '31. Jänner 2028'],
+    ['Sommerzeit, eingetragener Einzug', EINZUG_EINGETRAGEN, '31. Mai 2027'],
   ])('%s', (_fall, einzugAb, tag) => {
     const seite =
       html(createElement(KonditionenAnsicht, { hof: hof(), jetzt: NACH, gebuehr: { lage: lage({ einzugAb }), stichtag: STICHTAG } })) +
@@ -245,8 +256,8 @@ describe('„Deine Konditionen“: Rechenbeispiel und Karte „Barzahlung“ nen
     // Zwei Stellen: die Bar-Spalte des Rechenbeispiels und die Karte „Barzahlung“.
     expect(genannt).toHaveLength(2)
     expect(new Set(genannt)).toEqual(new Set([tag]))
-    // Gegenprobe: Der Vortag (die alte Rechnung des Beispiels) steht nirgends.
-    expect(normal(seite)).not.toContain(formatDatumLang(new Date(einzugAb.getTime() - 1)).replace(/\u00a0/g, ' '))
+    // Gegenprobe: Der Einzugstag selbst steht nie hinter „Bis“ (der alte, um einen Tag zu großzügige Satz, Nr. 264).
+    expect(normal(seite)).not.toContain(`Bis ${normal(formatDatumLang(einzugAb))}`)
   })
 })
 

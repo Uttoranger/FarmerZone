@@ -19,6 +19,8 @@ const T = LASTSCHRIFT_TEXT
 export type BarzahlungAnzeige = {
   satzText: string
   einzugAbText: string
+  /** Der letzte Tag ohne Bargebühr (Wiener Tag vor dem Einzug) — für „Bis <Tag> behältst du …“, Register N48. */
+  letzterFreierTagText: string
   einzugBegonnen: boolean
   mandat: boolean
   mandatPflicht: boolean
@@ -67,7 +69,7 @@ export function Barzahlung({ daten }: { daten: BarzahlungAnzeige }): React.JSX.E
         </h2>
         <ul className="flex flex-col gap-1.5 text-[14px] leading-snug text-foreground md:text-[13.5px]">
           <li>{T.satz(daten.satzText)}</li>
-          <li>{daten.einzugBegonnen ? T.einzugAb(daten.einzugAbText) : `${T.einzugAb(daten.einzugAbText)} · ${T.erlassen(daten.einzugAbText)}`}</li>
+          <li>{daten.einzugBegonnen ? T.einzugAb(daten.einzugAbText) : `${T.einzugAb(daten.einzugAbText)} · ${T.erlassen(daten.letzterFreierTagText)}`}</li>
           <li className="flex flex-wrap items-center gap-2">
             <StatusBadge status={daten.mandat ? 'fertig' : 'neutral'}>{daten.mandat ? 'eingerichtet' : 'fehlt'}</StatusBadge>
             <span>{daten.mandat ? T.mandatDa(daten.bank, daten.letzte4) : T.mandatFehlt}</span>

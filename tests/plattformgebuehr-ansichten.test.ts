@@ -31,6 +31,7 @@ const html = (el: React.ReactElement): string => renderToStaticMarkup(el).replac
 const DATEN: BarzahlungAnzeige = {
   satzText: '6',
   einzugAbText: '1. Februar 2028',
+  letzterFreierTagText: '31. Jänner 2028',
   einzugBegonnen: true,
   mandat: true,
   mandatPflicht: true,
@@ -60,7 +61,8 @@ describe('Hof › Deine Konditionen: Barzahlung und Monatsabrechnungen', () => {
     const h = html(createElement(Barzahlung, { daten: { ...DATEN, mandat: false, bank: null, letzte4: null, einzugBegonnen: false, abrechnungen: [] } }))
     expect(h).toContain(LASTSCHRIFT_TEXT.mandatFehlt)
     expect(h).toContain(LASTSCHRIFT_TEXT.mandatPflicht)
-    expect(h).toContain(LASTSCHRIFT_TEXT.erlassen('1. Februar 2028'))
+    // „Bis“ nennt den letzten freien Tag, „Einzug ab“ den Einzugstag (Nr. 264, Register N48).
+    expect(h).toContain(`${LASTSCHRIFT_TEXT.einzugAb('1. Februar 2028')} · ${LASTSCHRIFT_TEXT.erlassen('31. Jänner 2028')}`)
     expect(h).toContain('>Lastschrift einrichten<')
     expect(h).toContain(LASTSCHRIFT_TEXT.abrechnungenLeer)
     expect(h).toContain('data-slot="empty-state"')
