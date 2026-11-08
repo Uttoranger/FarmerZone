@@ -4,7 +4,9 @@
  * `--stichtag vergangenheit` (Vorgabe): Hofpreis-Modell ab 1. Oktober 2026 —
  * der Stand der Boards (März 2027, nach dem Stichtag).
  * `--stichtag zukunft`: heute + 30 Tage — für eine zweite Prüf-DB vor T.
- * Gründung und gruendungPlaetze bleiben unberührt (P2, freigabe.md §36).
+ * Gründungsplätze stellt der Prüf-Seed in der Wegwerf-DB immer auf 100
+ * (E-026, Nr. 262). `--gruendung-fest`: Zusagen zusätzlich festschreiben, mit
+ * derselben Regel wie die Admin-Aktion — für die Aktion-Karte auf /konditionen.
  */
 
 export type StichtagArt = 'vergangenheit' | 'zukunft'
@@ -18,12 +20,15 @@ export type SeedOptionen = {
   links: string
   /** Wohin der private Schlüssel des Prüf-Passkeys geht (unter .nachtlauf/). */
   passkey: string
+  /** Zusagen der Gründungshöfe festschreiben (`--gruendung-fest`, ohne Wert). */
+  gruendungFest: boolean
 }
 
 export const SEED_VORGABEN: SeedOptionen = {
   stichtag: 'vergangenheit',
   links: '.nachtlauf/pruef-links.json',
   passkey: '.nachtlauf/admin-passkey.json',
+  gruendungFest: false,
 }
 
 export function stichtagFuer(art: StichtagArt, jetzt: Date): Date {
@@ -45,6 +50,10 @@ export function leseSeedOptionen(argv: readonly string[]): SeedOptionen | string
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i]
     const wert = argv[i + 1]
+    if (name === '--gruendung-fest') {
+      optionen.gruendungFest = true
+      continue
+    }
     if (name === '--stichtag') {
       if (wert !== 'vergangenheit' && wert !== 'zukunft') return '--stichtag braucht „vergangenheit“ oder „zukunft“.'
       optionen.stichtag = wert

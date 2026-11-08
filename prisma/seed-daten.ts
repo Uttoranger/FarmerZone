@@ -971,7 +971,7 @@ const HOF_E: SeedHof = {
 const PILOTHOF: SeedHof = {
   slug: 'hof-mueller',
   name: 'Hof Müller',
-  inhaber: { email: 'bauer@example.com', name: 'Franz Müller', telefon: '+43 664 123 4567' },
+  inhaber: { email: 'bauer@example.com', name: 'Franz Müller', telefon: '+43 660 0000004' },
   adresse: 'Hofgasse 12',
   plz: '5280',
   ort: 'Braunau am Inn',

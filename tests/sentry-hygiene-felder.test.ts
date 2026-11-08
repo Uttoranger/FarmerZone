@@ -22,6 +22,7 @@
  *
  * Der Filter ist eine reine Funktion — kein Mock.
  */
+import { availableParallelism } from 'node:os'
 import { describe, it, expect } from 'vitest'
 import type { ErrorEvent } from '@sentry/nextjs'
 import { bereinigeEreignis, ohneAnfrage } from '@/lib/sentry-hygiene'
@@ -339,8 +340,11 @@ describe('Nachrichten — event.message und message der Brotkrumen (Nachbesserun
 describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung 2)', () => {
   // Alles läuft synchron in beforeSend, und das SDK kürzt vorher nichts. Die
   // alten Muster brauchten für jeden dieser Texte Sekunden (quadratisch);
-  // jetzt sind es Millisekunden. Die Grenze lässt Luft für eine volle Maschine.
-  const GRENZE_MS = 500
+  // jetzt sind es Millisekunden. Die Grenze lässt Luft für eine volle Maschine
+  // und wächst mit der Zahl der Worker (TESTING_GUIDELINES §4, A-1): `--maxWorkers`
+  // aus dem Zustand des Workers, ohne Angabe die Vorgabe von Vitest (Kerne − 1).
+  const gesetzt = (globalThis as { __vitest_worker__?: { config?: { maxWorkers?: unknown } } }).__vitest_worker__?.config?.maxWorkers
+  const GRENZE_MS = 500 * (typeof gesetzt === 'number' && gesetzt > 0 ? gesetzt : Math.max(1, availableParallelism() - 1))
   const N = 50_000
   const lang: [string, object][] = [
     ['Query-Text unter suchQuery', { extra: { suchQuery: 'a='.repeat(N) + ' x' } }],
