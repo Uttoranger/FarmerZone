@@ -301,11 +301,17 @@ describe('Suche in Zusammenfassen und Dazunehmen', () => {
 
   it('findet nach Kurznummer und Wort; Hauptmeldung kann nur eine offene oder erledigte Meldung sein, nicht die eigene', () => {
     const erlaubt = (m: (typeof liste)[number]) => kannHauptmeldungSein(m.status) && m.id !== 'cmaaaa1111'
-    expect(sucheMeldungen(liste, 'foto', () => true).map((m) => m.id)).toEqual(['cmaaaa1111', 'cmbbbb2222'])
-    expect(sucheMeldungen(liste, 'foto', erlaubt)).toEqual([])
-    expect(sucheMeldungen(liste, 'cmcc', () => true).map((m) => m.id)).toEqual(['cmcccc3333'])
-    expect(sucheMeldungen(liste, 'cmcc', erlaubt)).toEqual([])
-    expect(sucheMeldungen(liste, '  ', () => true)).toEqual([])
+    expect(sucheMeldungen(liste, 'foto', () => true).treffer.map((m) => m.id)).toEqual(['cmaaaa1111', 'cmbbbb2222'])
+    expect(sucheMeldungen(liste, 'foto', erlaubt).treffer).toEqual([])
+    // Nummer nach DER Regel (Nr. 263): neue (Ende, groß oder klein), alte (Anfang, acht Zeichen), volle.
+    for (const nummer of ['CC3333', 'cc3333', 'cmcccc33', 'CMCCCC33', 'cmcccc3333']) {
+      expect(sucheMeldungen(liste, nummer, () => true).treffer.map((m) => m.id)).toEqual(['cmcccc3333'])
+    }
+    expect(sucheMeldungen(liste, 'CC3333', erlaubt).treffer).toEqual([])
+    // Ein Stück unter sechs Zeichen trifft keine Nummer mehr (früher traf „cm“ jede).
+    expect(sucheMeldungen(liste, 'cmcc', () => true).treffer).toEqual([])
+    expect(sucheMeldungen(liste, 'c3333', () => true).treffer).toEqual([])
+    expect(sucheMeldungen(liste, '  ', () => true)).toEqual({ treffer: [], mehrdeutig: false })
   })
 })
 
