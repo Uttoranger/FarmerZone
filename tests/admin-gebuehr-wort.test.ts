@@ -196,6 +196,7 @@ describe('Bestell-Detail: das Wort der Bestellung (V63, gebuehrBezeichnungFuer)'
     const html = await bestellSeite(null)
     expect(html).toContain('inkl. € 1,12 Servicegebühr')
     expect(html).toMatch(/<span>Servicegebühr<\/span>/)
+    expect(html).not.toContain('Plattformgebühr')
   })
 
   // Nr. 266 (Lauf 33): „Servicegebühr“ im Admin-Bestelldetail war kein Code-Fehler — die Seed-Bestellungen stehen im
