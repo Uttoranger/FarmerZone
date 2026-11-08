@@ -10,9 +10,16 @@
 #       startet `next start` darin.
 #   fotograf.sh dev <db> [<commit>]
 #       Der Admin- und Mail-Code-Fotograf: eigener git-Worktree unter
-#       $HOME/nachtlauf32-dev (fester Pfad fürs Aufräumen), `next dev` auf
-#       Port 3000 (Herkunft http://localhost:3000, rpId localhost).
+#       $HOME/nachtlauf-dev (fester, laufneutraler Pfad fürs Aufräumen, Nr. 262),
+#       `next dev` auf Port 3000 (Herkunft http://localhost:3000, rpId localhost).
 #   fotograf.sh stopp <n|dev>
+#       Beendet den Server und räumt seinen Ordner weg: den dev-Worktree mit
+#       `git worktree remove --force`, einen start-Ordner (kein git-Worktree)
+#       mit seiner .next-Kopie und dem Serverprotokoll.
+#   fotograf.sh db-aus <kopie> | db-an <kopie>
+#       Sperrt bzw. öffnet NUR eine DB-Kopie eines Fotografen (Präfix kopie_,
+#       nie die Prüf-Haupt-DB, nur localhost, Sperre zuerst; db-schalter.ts) —
+#       so entstehen Ladefehler und „Speichern fehlgeschlagen“.
 #
 # Vor dem Start: Sperre (sperre-cli.ts --db) mit genau der Umgebung des
 # Servers; Abbruch bei .env-Dateien im Worktree oder Fotograf-Ordner. Im
@@ -23,7 +30,7 @@ set -euo pipefail
 
 WT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TSX="$WT/node_modules/.bin/tsx"
-DEV_WT="$HOME/nachtlauf32-dev"
+DEV_WT="$HOME/nachtlauf-dev"
 MODUS="${1:-}"
 
 sperre() {
@@ -90,10 +97,26 @@ case "$MODUS" in
       kill "$PID" 2>/dev/null || true
       rm -f "$PID_DATEI"
     fi
-    echo "Fotograf $N beendet."
+    if [ "$N" = dev ]; then
+      if git -C "$WT" worktree list --porcelain | grep -qx "worktree $DEV_WT"; then
+        git -C "$WT" worktree remove --force "$DEV_WT"
+      fi
+      rm -rf "$WT/.nachtlauf/fotograf/dev"
+    else
+      [[ "$N" =~ ^[0-9a-z-]+$ ]] || { echo "fotograf.sh: Nummer nur a-z, 0-9, -" >&2; exit 1; }
+      rm -rf "$WT/.nachtlauf/fotograf/$N"
+    fi
+    echo "Fotograf $N beendet und weggeräumt."
+    ;;
+  db-aus|db-an)
+    KOPIE="${2:?Kopie fehlt}"
+    [ $# -eq 2 ] || { echo "fotograf.sh: $MODUS <kopie> — sonst nichts" >&2; exit 1; }
+    # Die Liste für genau diese Kopie; db-schalter.ts prüft Name, Adressen und Server.
+    mapfile -t L < <("$WT/scripts/pruefung/pruef-env.sh" liste --db "$KOPIE" --port 3000)
+    env -i "${L[@]}" "$TSX" "$WT/scripts/pruefung/db-schalter.ts" "${MODUS#db-}" "$KOPIE"
     ;;
   *)
-    echo "Aufruf: fotograf.sh start <n> <port> <db> | dev <db> [<commit>] | stopp <n|dev>" >&2
+    echo "Aufruf: fotograf.sh start <n> <port> <db> | dev <db> [<commit>] | stopp <n|dev> | db-aus <kopie> | db-an <kopie>" >&2
     exit 1
     ;;
 esac

@@ -186,7 +186,7 @@ type Ausnahme = { datei: string; kennungen: string[]; grund: string }
 
 // Nummern, die in mehreren Dateien stehen
 const BAES = 'idkkihnkmhmm' // die öffentliche Nummer des BAES
-const MOBIL_A = 'gbmgfejcfpof' // erfundene Mobilnummer der Sentry-Hygiene, auch im Seed
+const MOBIL_A = 'gbmgfejcfpof' // erfundene Mobilnummer der Sentry-Hygiene
 const MOBIL_B = 'jjnagakledba' // zweite erfundene Mobilnummer der Sentry-Hygiene
 
 const AUSNAHMEN: Ausnahme[] = [
@@ -210,8 +210,6 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'docs/nachtlauf/morgenbericht-2026-10-13-lauf12.md', kennungen: ['foemjlcpdjfh'], grund: 'Morgenbericht eines früheren Laufs (Historie): eine Testnummer bis auf drei Ziffern genullt' },
   { datei: 'docs/mockups/web-k3-kasse-glatt.html', kennungen: ['bhojpaabapgd'], grund: 'Mockup, wird nur gelesen, nie geändert: Nummer bis auf die letzte Ziffer genullt' },
   { datei: 'docs/mockups/mobil-k3-kasse-glatt.html', kennungen: ['bhojpaabapgd'], grund: 'Mockup, wird nur gelesen, nie geändert: Nummer bis auf die letzte Ziffer genullt' },
-  // Seed: Der Wert steht in der Datenbank jeder Entwicklungsumgebung
-  { datei: 'tests/seed-idempotenz.test.ts', kennungen: [MOBIL_A], grund: 'Prüft den Wert, den der Seed (prisma/, außerhalb der Wache) seit dem ersten Lauf schreibt; ändert sich nur mit dem Seed' },
 ]
 
 const deckt = (a: Ausnahme, f: Fund): boolean => a.datei === f.datei && a.kennungen.includes(f.kennung)
