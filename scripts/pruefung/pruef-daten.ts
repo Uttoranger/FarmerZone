@@ -236,7 +236,9 @@ export type PruefBestellung = {
 /** Alle neuen Bestellungen am Pilothof (Modell nach Stichtag, beim Prüf-Seed „vergangenheit“ das Hofpreis-Modell). */
 export const PRUEF_BESTELLUNGEN: readonly PruefBestellung[] = [
   // (f) Hofpreis-Modell: offene Barbestellung (Frist in der Zukunft) und eine online bezahlte.
-  { nummer: 'TP-HP-BAR', zustand: 'bar, wartet auf Bestätigung', kundenEmail: 'kundin@example.com', positionen: [{ produktId: 'prod-eier', menge: 3 }, { produktId: 'prod-milch', menge: 2 }], zahlart: 'ONSITE_CASH', status: 'PENDING_CONFIRMATION', eingangVorStunden: 1, abholTag: 2 },
+  // Eingang 5 Minuten vor dem Seed: Die Bestätigungsfrist (fristVon, höchstens zwei Stunden) läuft
+  // noch knapp zwei Stunden — sonst storniert das erste Lesen die Bestellung (Frist beim Lesen).
+  { nummer: 'TP-HP-BAR', zustand: 'bar, wartet auf Bestätigung', kundenEmail: 'kundin@example.com', positionen: [{ produktId: 'prod-eier', menge: 3 }, { produktId: 'prod-milch', menge: 2 }], zahlart: 'ONSITE_CASH', status: 'PENDING_CONFIRMATION', eingangVorStunden: 5 / 60, abholTag: 2 },
   { nummer: 'TP-HP-ONLINE', zustand: 'online bezahlt', kundenEmail: 'kunde@example.com', positionen: [{ produktId: 'prod-pruef-heu-klein', menge: 4 }], zahlart: 'ONLINE', status: 'CONFIRMED', eingangVorStunden: 5, abholTag: 3 },
   // (h) Abholtag heute mit vier Bestellungen …
   { nummer: 'TP-HEUTE-1', zustand: 'heute, bestätigt', kundenEmail: 'kundin@example.com', positionen: [{ produktId: 'prod-milch', menge: 8 }], zahlart: 'ONSITE_CASH', status: 'CONFIRMED', eingangVorStunden: 30, abholTag: 0 },

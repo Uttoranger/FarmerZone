@@ -68,24 +68,36 @@ async function main(): Promise<void> {
   const url = process.env['DATABASE_URL'] as string
   const { default: pg } = await import('pg')
   const client = new pg.Client({ connectionString: verwaltungsAdresse(url) })
-  await client.connect()
+  try {
+    await client.connect()
+  } catch {
+    abbruch(`Verbindung zur Datenbank gescheitert (${hostUndPort(url)}).`)
+  }
+  // Abbrechen erst nach client.end(): process.exit im try ließe die Verbindung offen.
+  let fehler: string | null = null
   try {
     const adresse = (await client.query<{ a: string | null }>('SELECT inet_server_addr()::text AS a')).rows[0]?.a ?? null
-    if (!istLoopbackServerAdresse(adresse)) abbruch(`Der Server meldet keine Loopback-Adresse (${hostUndPort(url)}).`)
-    const da = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [kopie])
-    if (da.rowCount !== 1) abbruch(`Die Kopie ${kopie} gibt es nicht.`)
-    // Der Name ist oben auf [a-z0-9_] geprüft; ALTER DATABASE nimmt keinen Parameter.
-    await client.query(`ALTER DATABASE "${kopie}" WITH ALLOW_CONNECTIONS ${modus === 'an' ? 'true' : 'false'}`)
-    if (modus === 'aus') {
-      await client.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()', [kopie])
+    if (!istLoopbackServerAdresse(adresse)) fehler = `Der Server meldet keine Loopback-Adresse (${hostUndPort(url)}).`
+    else if ((await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [kopie])).rowCount !== 1) fehler = `Die Kopie ${kopie} gibt es nicht.`
+    else {
+      // Der Name ist oben auf [a-z0-9_] geprüft; ALTER DATABASE nimmt keinen Parameter.
+      await client.query(`ALTER DATABASE "${kopie}" WITH ALLOW_CONNECTIONS ${modus === 'an' ? 'true' : 'false'}`)
+      if (modus === 'aus') {
+        await client.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()', [kopie])
+      }
     }
+  } catch (err) {
+    // Nur der SQLSTATE-Code, nie der Text: Er kann Namen oder Adressen tragen.
+    const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code: unknown }).code) : 'unbekannt'
+    fehler = `Befehl auf dem Datenbank-Server gescheitert (Code ${code}).`
   } finally {
     await client.end().catch(() => undefined)
   }
+  if (fehler) abbruch(fehler)
   console.log(`DB-Schalter: ${kopie} ${modus === 'an' ? 'offen' : 'gesperrt'} (${hostUndPort(url)}).`)
 }
 
 // Nur als Befehl ausführen, nicht beim Import in Tests.
 if (process.argv[1]?.endsWith('db-schalter.ts')) {
-  main().catch(() => abbruch('Verbindung zur Datenbank gescheitert.'))
+  main().catch((err: unknown) => abbruch(`Unerwarteter Fehler (${err instanceof Error ? err.name : 'unbekannt'}).`))
 }

@@ -112,6 +112,11 @@ describe('messung.js – h1', () => {
     expect(miss(body).h1).toBe(1)
   })
 
+  it('die h1 in der <summary> eines geschlossenen <details> zählt mit (Rückfall ohne checkVisibility)', () => {
+    const body = knoten('body', {}, [knoten('details', {}, [knoten('summary', {}, [knoten('h1')]), knoten('p')])])
+    expect(miss(body).h1).toBe(1)
+  })
+
   it('im offenen <details> zählt sie mit', () => {
     const body = knoten('body', {}, [knoten('h1'), knoten('details', { open: '' }, [knoten('summary'), knoten('h1')])])
     expect(miss(body).h1).toBe(2)

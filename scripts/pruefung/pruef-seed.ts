@@ -30,7 +30,6 @@ import { randomBytes } from 'node:crypto'
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { leseSeedOptionen, stichtagFuer, type SeedOptionen } from './optionen'
-import { erwarteteKonten } from './pruef-daten'
 import {
   hostUndPort,
   istLoopbackServerAdresse,
@@ -68,7 +67,9 @@ async function main(): Promise<void> {
   const url = process.env['DATABASE_URL'] as string
   console.log(`Prüf-Seed gegen ${hostUndPort(url)} (Stichtag: ${optionen.stichtag}).`)
 
-  // 2. Verbinden und Server-Adresse prüfen — mit pg, noch ohne Prisma.
+  // 2. Verbinden und Server-Adresse prüfen — mit pg, noch ohne Prisma. Die
+  //    Prüfdaten (rechnen mit Funktionen der App) erst nach der Sperre laden.
+  const { erwarteteKonten } = await import('./pruef-daten')
   const { SEED_KONTEN, SEED_HOEFE, SEED_PASSWORT } = await import('../../prisma/seed-daten')
   // Aus den Listen des Seeds und des Prüf-Seeds, nie eine feste Zahl.
   const seedKonten = erwarteteKonten({ konten: SEED_KONTEN, hoefe: SEED_HOEFE })

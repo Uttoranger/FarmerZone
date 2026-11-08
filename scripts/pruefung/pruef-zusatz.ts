@@ -243,7 +243,7 @@ function fensterFuer(hof: Hof, abholung: Date): { von: string; bis: string } {
   return slot ? { von: slot.startTime, bis: slot.endTime } : { von: '15:00', bis: '18:00' }
 }
 
-/** (f, h, i) Eine Bestellung mit dem Snapshot der Kasse; null, wenn die Kasse sie abgelehnt hätte. */
+/** (f, h, i) Eine Bestellung mit dem Snapshot der Kasse; `{ grund }`, wenn die Kasse sie abgelehnt hätte. */
 async function bestellung(db: Db, hof: Hof, b: PruefBestellung, jetzt: Date): Promise<{ id: string; farmId: string; token: string | null } | { grund: string }> {
   const eingang = vor(jetzt, b.eingangVorStunden)
   const produkte = await db.product.findMany({ where: { id: { in: b.positionen.map((p) => p.produktId) } }, select: { id: true, name: true, price: true, vatRate: true } })
@@ -337,7 +337,12 @@ function mailArten(b: PruefBestellung): Array<Parameters<typeof bestellMailAuftr
   return arten
 }
 
-/** Wartet, bis der Worker der Warteschlange (startet in Skripten sofort) die Aufträge losgelassen hat. */
+/**
+ * stelleMailEin startet außerhalb von Next den Worker sofort (nachDerAntwort
+ * ohne Anfrage). Der Seed wartet, bis keiner seiner Aufträge mehr in Arbeit
+ * ist. Ohne RESEND_API_KEY verschickt der Worker nichts; in der Probe blieben
+ * alle Aufträge „offen“.
+ */
 async function warteAufWorker(db: Db, ids: readonly string[]): Promise<void> {
   const ende = Date.now() + 60_000
   let ruhig = 0

@@ -15,6 +15,7 @@ import {
 } from '../scripts/pruefung/pruef-daten'
 import { bestellGebuehr, type GebuehrLage } from '@/lib/plattformgebuehr'
 import { berechneServicegebuehr } from '@/lib/servicegebuehr'
+import { fristVon } from '@/lib/fristen'
 
 /**
  * Die Daten des Prüf-Seeds (Nr. 262, Auftrag Lauf 33 6.1) ohne Datenbank:
@@ -88,6 +89,17 @@ describe('Bestellungen (6.1 f, h, i)', () => {
     expect(fehlt?.zahlart).toBe('ONLINE')
     expect(fehlt?.positionen).toHaveLength(2)
     expect(fehlt?.fehlt).toBe(1)
+  })
+})
+
+describe('offene Barbestellung TP-HP-BAR – Frist nach dem Seed', () => {
+  it('ist nach dem Seed-Lauf noch über eine Stunde offen (Frist gilt beim Lesen)', () => {
+    const b = PRUEF_BESTELLUNGEN.find((x) => x.nummer === 'TP-HP-BAR')
+    if (!b) throw new Error('TP-HP-BAR fehlt')
+    const createdAt = new Date(jetzt.getTime() - b.eingangVorStunden * 60 * 60 * 1000)
+    const pickupDate = new Date(jetzt.getTime() + b.abholTag * 24 * 60 * 60 * 1000)
+    const frist = fristVon({ paymentMethod: 'ONSITE_CASH', createdAt, pickupDate, pickupTimeStart: '15:00' })
+    expect(frist.getTime() - jetzt.getTime()).toBeGreaterThan(60 * 60 * 1000)
   })
 })
 
