@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { meldung: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() } },
+  prisma: { meldung: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), count: vi.fn() } },
 }))
 
 import {
@@ -67,7 +67,7 @@ describe('Hof-Sicht', () => {
       ['antwortAnMelder', 'art', 'createdAt', 'id', 'kurznummer', 'offen', 'status', 'statusTon', 'text'].sort()
     )
     expect(m.status).toBe('Kein Fehler — Antwort lesen')
-    expect(m.kurznummer).toBe('cmfmeldu')
+    expect(m.kurznummer).toBe('001ABC')
     expect(m.antwortAnMelder).toBe(ZEILE.antwortAnMelder)
     expect(m).not.toHaveProperty('triageNotiz')
     expect(m).not.toHaveProperty('clusterKey')
@@ -112,7 +112,7 @@ describe('Admin-Filter', () => {
     const zeilen = await getMeldungenFuerAdmin({ status: ['NEU'], art: 'FEHLER' })
     expect(findMany.mock.calls[0][0]?.where).toEqual({ status: { in: ['NEU'] }, art: 'FEHLER' })
     expect(zeilen[0]).toMatchObject({
-      kurznummer: 'cmfmeldu',
+      kurznummer: '001ABC',
       hofName: 'Biohof',
       ersteZeile: 'Abholzeiten speichern geht nicht.',
       diagKennung: 'S71',
@@ -121,12 +121,27 @@ describe('Admin-Filter', () => {
     })
   })
 
-  it('löst im Detail eine Kurznummer als Präfix und eine volle ID exakt auf', async () => {
-    findFirst.mockResolvedValue(null)
-    await getMeldungDetail('cmfmeldu')
-    expect(findFirst.mock.calls[0][0]?.where).toEqual({ id: { startsWith: 'cmfmeldu' } })
-    await getMeldungDetail(ZEILE.id)
-    expect(findFirst.mock.calls[1][0]?.where).toEqual({ id: ZEILE.id })
+  it('löst im Detail neue, alte und volle Nummer nach DER Regel auf (Nr. 263)', async () => {
+    findMany.mockResolvedValue([{ id: ZEILE.id, status: 'NEU' }] as never)
+    vi.mocked(prisma.meldung.findUnique).mockResolvedValue({ ...ZEILE, farm: null } as never)
+    for (const nummer of ['001ABC', '#001abc', 'cmfmeldu', 'CMFMELDU', ZEILE.id]) {
+      expect((await getMeldungDetail(nummer))?.id).toBe(ZEILE.id)
+    }
+    expect(findMany.mock.calls[0][0]?.where).toEqual({ OR: [{ id: '001ABC' }, { id: '001abc' }, { id: { endsWith: '001abc', mode: 'insensitive' } }] })
+    expect(vi.mocked(prisma.meldung.findUnique).mock.calls[0][0]?.where).toEqual({ id: ZEILE.id })
+  })
+
+  it('öffnet bei einer mehrdeutigen Nummer keine Meldung und bei einem Stück unter sechs Zeichen nichts', async () => {
+    findMany.mockResolvedValue([
+      { id: ZEILE.id, status: 'NEU' },
+      { id: 'cmfandere00000000001abc', status: 'NEU' },
+    ] as never)
+    expect(await getMeldungDetail('001ABC')).toBeNull()
+    expect(await getMeldungDetail('01abc')).toBeNull()
+    expect(vi.mocked(prisma.meldung.findUnique)).not.toHaveBeenCalled()
+    // Die volle Nummer ist der Ausweg.
+    vi.mocked(prisma.meldung.findUnique).mockResolvedValue({ ...ZEILE, farm: null } as never)
+    expect((await getMeldungDetail(ZEILE.id))?.id).toBe(ZEILE.id)
   })
 })
 
@@ -173,7 +188,7 @@ describe('gruppiereWuensche', () => {
     ])
     expect(cluster[0].anzahl).toBe(4)
     expect(cluster[0].beispiele.map((b) => b.id)).toEqual(['a4', 'a3', 'a2'])
-    expect(cluster[0].beispiele[0].kurznummer).toBe('a4')
+    expect(cluster[0].beispiele[0].kurznummer).toBe('A4')
   })
 
   it('sortiert gleich große Bündel nach Namen', () => {

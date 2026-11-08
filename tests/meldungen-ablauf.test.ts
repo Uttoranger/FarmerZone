@@ -303,8 +303,14 @@ describe('Suche in Zusammenfassen und Dazunehmen', () => {
     const erlaubt = (m: (typeof liste)[number]) => kannHauptmeldungSein(m.status) && m.id !== 'cmaaaa1111'
     expect(sucheMeldungen(liste, 'foto', () => true).map((m) => m.id)).toEqual(['cmaaaa1111', 'cmbbbb2222'])
     expect(sucheMeldungen(liste, 'foto', erlaubt)).toEqual([])
-    expect(sucheMeldungen(liste, 'cmcc', () => true).map((m) => m.id)).toEqual(['cmcccc3333'])
-    expect(sucheMeldungen(liste, 'cmcc', erlaubt)).toEqual([])
+    // Nummer nach DER Regel (Nr. 263): neue (Ende, groß oder klein), alte (Anfang, acht Zeichen), volle.
+    for (const nummer of ['CC3333', 'cc3333', 'cmcccc33', 'CMCCCC33', 'cmcccc3333']) {
+      expect(sucheMeldungen(liste, nummer, () => true).map((m) => m.id)).toEqual(['cmcccc3333'])
+    }
+    expect(sucheMeldungen(liste, 'CC3333', erlaubt)).toEqual([])
+    // Ein Stück unter sechs Zeichen trifft keine Nummer mehr (früher traf „cm“ jede).
+    expect(sucheMeldungen(liste, 'cmcc', () => true)).toEqual([])
+    expect(sucheMeldungen(liste, 'c3333', () => true)).toEqual([])
     expect(sucheMeldungen(liste, '  ', () => true)).toEqual([])
   })
 })

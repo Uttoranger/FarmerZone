@@ -20,7 +20,7 @@ vi.mock('@/lib/prisma', async () => ({
     ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     farm: { findUnique: vi.fn(), update: vi.fn() },
-    meldung: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
+    meldung: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     // Mit Verweis schreibt EINE SQL-Anweisung samt Bedingung an die Hauptmeldung (Nr. 105).
     $executeRaw: vi.fn(),
   },
@@ -31,11 +31,13 @@ import { triageMeldungAction } from '@/server/actions/admin'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { adminSitzung } from './admin-sitzung'
+import { KURZNUMMER_MEHRDEUTIG, kurznummerAus } from '@/lib/kurznummer'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
 const meldungFindUnique = vi.mocked(prisma.meldung.findUnique)
-const meldungFindFirst = vi.mocked(prisma.meldung.findFirst)
+// Der Duplikat-Verweis sucht seit Nr. 263 alle Kandidaten und entscheidet nach DER Regel (kurznummer.ts).
+const meldungFindMany = vi.mocked(prisma.meldung.findMany)
 // Bedingtes Schreiben (Sprint Briefkasten-Rückkopplung): die Action nimmt updateMany.
 const meldungUpdate = vi.mocked(prisma.meldung.updateMany)
 const executeRaw = vi.mocked(prisma.$executeRaw)
@@ -64,7 +66,7 @@ beforeEach(() => {
   getSession.mockResolvedValue(adminSitzung('admin_1') as never)
   userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   meldungFindUnique.mockResolvedValue({ id: ID } as never)
-  meldungFindFirst.mockResolvedValue(null)
+  meldungFindMany.mockResolvedValue([])
   meldungUpdate.mockResolvedValue({ count: 1 })
 })
 
@@ -114,40 +116,79 @@ describe('triageMeldungAction — Eingabe', () => {
 
 describe('triageMeldungAction — Duplikat', () => {
   it('lehnt den Verweis auf eine nicht existierende Meldung ab', async () => {
-    meldungFindFirst.mockResolvedValue(null)
+    meldungFindMany.mockResolvedValue([])
     const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: 'gibtsnix' })
     expect(result).toEqual({ error: 'Duplikat-Verweis: diese Meldung gibt es nicht.' })
     expect(meldungUpdate).not.toHaveBeenCalled()
   })
 
   it('lehnt den Verweis auf sich selbst ab', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ID } as never)
-    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ID.slice(0, 8) })
+    meldungFindMany.mockResolvedValue([{ id: ID, status: 'NEU' }] as never)
+    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: kurznummerAus(ID) })
     expect(result).toEqual({ error: 'Eine Meldung kann nicht ihr eigenes Duplikat sein.' })
     expect(meldungUpdate).not.toHaveBeenCalled()
   })
 
-  it('löst eine Kurznummer als Präfix auf und speichert die volle ID', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'GEPRUEFT' } as never)
+  it('löst die Kurznummer (Ende, groß) auf und speichert die volle ID', async () => {
+    meldungFindMany.mockResolvedValue([{ id: ORIGINAL, status: 'GEPRUEFT' }] as never)
     executeRaw.mockResolvedValue(1)
-    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL.slice(0, 8) })
+    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: kurznummerAus(ORIGINAL) })
     expect(result).toEqual({})
-    expect(meldungFindFirst.mock.calls[0][0]?.where).toEqual({ id: { startsWith: ORIGINAL.slice(0, 8) } })
+    expect(meldungFindMany.mock.calls[0][0]?.where).toEqual({
+      OR: [{ id: '002XYZ' }, { id: '002xyz' }, { id: { endsWith: '002xyz', mode: 'insensitive' } }],
+    })
     const { werte } = letzteAnweisung()
     expect(werte).toContain('DUPLIKAT')
     expect(werte.filter((w) => w === ORIGINAL)).toHaveLength(2)
     expect(meldungUpdate).not.toHaveBeenCalled()
   })
 
-  it('sucht eine volle ID exakt', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'GEPRUEFT' } as never)
+  it('findet auch die alte Kurznummer (Anfang, acht Zeichen, klein oder groß)', async () => {
+    meldungFindMany.mockResolvedValue([{ id: ORIGINAL, status: 'GEPRUEFT' }] as never)
     executeRaw.mockResolvedValue(1)
-    await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
-    expect(meldungFindFirst.mock.calls[0][0]?.where).toEqual({ id: ORIGINAL })
+    expect(await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL.slice(0, 8) })).toEqual({})
+    expect(await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL.slice(0, 8).toUpperCase() })).toEqual({})
+    expect(meldungFindMany.mock.calls[0][0]?.where).toEqual({
+      OR: [{ id: 'cmforigi' }, { id: 'cmforigi' }, { id: { startsWith: 'cmforigi', mode: 'insensitive' } }],
+    })
+    expect(executeRaw).toHaveBeenCalledTimes(2)
+  })
+
+  it('sucht eine volle ID exakt', async () => {
+    meldungFindMany.mockResolvedValue([{ id: ORIGINAL, status: 'GEPRUEFT' }] as never)
+    executeRaw.mockResolvedValue(1)
+    expect(await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })).toEqual({})
+    expect(meldungFindMany.mock.calls[0][0]?.where).toEqual({ OR: [{ id: ORIGINAL }, { id: ORIGINAL }] })
+  })
+
+  it('passt die Nummer zu mehreren Meldungen: Fehler mit Ausweg, kein Verweis auf eine beliebige', async () => {
+    const zwilling = 'cmfanderer00000000002xyz'
+    meldungFindMany.mockResolvedValue([
+      { id: ORIGINAL, status: 'GEPRUEFT' },
+      { id: zwilling, status: 'GEPRUEFT' },
+    ] as never)
+    const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: '002XYZ' })
+    expect(result).toEqual({ error: KURZNUMMER_MEHRDEUTIG })
+    expect(result.error).toBe('Diese Kurznummer passt zu mehreren Meldungen – gib die volle Nummer ein.')
+    expect(executeRaw).not.toHaveBeenCalled()
+    expect(meldungUpdate).not.toHaveBeenCalled()
+    // Der Ausweg: Die volle Nummer findet genau eine.
+    executeRaw.mockResolvedValue(1)
+    expect(await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: zwilling })).toEqual({})
+    expect(letzteAnweisung().werte).toContain(zwilling)
+  })
+
+  it('ein Stück der Nummer unter sechs Zeichen trifft nichts — auch wenn die Datenbank etwas liefert', async () => {
+    meldungFindMany.mockResolvedValue([{ id: ORIGINAL, status: 'GEPRUEFT' }] as never)
+    for (const stueck of ['2xyz', '02xyz', 'cmfor', 'c']) {
+      const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: stueck })
+      expect(result).toEqual({ error: 'Duplikat-Verweis: diese Meldung gibt es nicht.' })
+    }
+    expect(executeRaw).not.toHaveBeenCalled()
   })
 
   it('keine Kette: Ist die Hauptmeldung selbst ein Duplikat, wird nichts geschrieben', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'DUPLIKAT' } as never)
+    meldungFindMany.mockResolvedValue([{ id: ORIGINAL, status: 'DUPLIKAT' }] as never)
     const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
     expect(result).toEqual({ error: 'Diese Meldung ist selbst ein Duplikat – nimm ihre Hauptmeldung.' })
     expect(executeRaw).not.toHaveBeenCalled()
@@ -155,7 +196,7 @@ describe('triageMeldungAction — Duplikat', () => {
   })
 
   it('keine Kette beim Schreiben: wird die Hauptmeldung dazwischen Duplikat, trifft die Anweisung nichts — Satz mit Ausweg', async () => {
-    meldungFindFirst.mockResolvedValue({ id: ORIGINAL, status: 'GEPRUEFT' } as never)
+    meldungFindMany.mockResolvedValue([{ id: ORIGINAL, status: 'GEPRUEFT' }] as never)
     executeRaw.mockResolvedValue(0)
     const result = await triageMeldungAction(ID, { ...GUELTIG, status: 'DUPLIKAT', duplikatVonId: ORIGINAL })
     expect(result).toEqual({ error: 'Die Meldung oder ihre Hauptmeldung hat sich inzwischen geändert — lade die Seite neu und entscheide noch einmal.' })
