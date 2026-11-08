@@ -198,6 +198,16 @@ export function mittelknopfMitWortKlassen(): string {
 export const WARENKORB_ZAEHLER =
   'absolute -top-1 -right-1.5 h-[22px] min-w-[22px] border-2 border-status-fertig bg-card px-[5px] text-[12px] text-status-fertig'
 
+/**
+ * Das Taschen-Symbol des Warenkorbs der Kundschaft (G10, Nr. 267; Boards s2-anmelden, s1-hofseite): im Kreis der
+ * Unterleiste und im Kopf der Fokus-Seiten gleich groß. Das Board zeichnet die Tasche 13 × 14 px in einem
+ * 22-px-Symbol mit 1,8 px Strich; Lucide `Handbag` füllt sein Feld fast ganz — mit 24 px (vorher) stand sie
+ * 20 × 19 px groß im Kreis (Abnahme Lauf 32, anmelden). Mit 16 px ist die Tasche so groß wie im Board, der Strich
+ * 2,5 Einheiten (1,7 px) so kräftig wie dort. Nur die Kundschaft: Die Leisten von Hof und Admin tragen kein
+ * Taschen-Symbol und bleiben unverändert.
+ */
+export const WARENKORB_SYMBOL = { className: 'size-4', strokeWidth: 2.5 } as const
+
 /** Der Kreis im Mittelknopf mit Wort — Gestalt wie `mittelknopfKlassen`, Hover über den ganzen Knopf. */
 export function mittelkreisKlassen(ton: 'gruen' | 'orange'): string {
   return cn(

@@ -91,7 +91,7 @@ function BestellungEingegangen() {
   // Seite den Stand nicht — ein alter Link oder ein Lesezeichen leert keinen neuen Korb.
   return (
     // Board s1-bestaetigung Bild 4: am Handy die Titelzeile „Bestellung“ statt Marke und Knopf.
-    <KundeShellMitSitzung unterleiste={false} handyTitel="Bestellung" fussSpalte="md:max-w-[568px]">
+    <KundeShellMitSitzung unterleiste={false} handyTitel="Bestellung">
       {/* Board s1-/w1-bestaetigung Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zu den Höfen — 520 px breit
           (Liste Lauf 32, bestaetigung). */}
       <div className={cn(SPALTE, 'max-w-[552px]')}>
@@ -260,7 +260,7 @@ export default async function ConfirmPage({ params, searchParams }: Props) {
     // Boards s1-/w1-bestaetigung (Lauf 31): am Handy die Titelzeile „Bestellung bei <Hof>“, im Browser der Seitenfuß in
     // der Spalte der Seite (896 px Inhalt).
     // Ab 768 px steht die Hauptaktion fest unten (w1-bestaetigung, Runde 2): Der Seitenfuß hält darunter Platz frei.
-    <KundeShellMitSitzung unterleiste={false} handyTitel={`Bestellung bei ${order.farm.name}`} fussSpalte="md:max-w-[944px]" platzFuerLeiste>
+    <KundeShellMitSitzung unterleiste={false} handyTitel={`Bestellung bei ${order.farm.name}`} platzFuerLeiste>
       {/* Nur, wenn die Bestellung steht oder bar wartet (korbLeeren, Nr. 202): Nach gescheiterter Zahlung bleibt der Korb. */}
       {korbLeeren(zustand) && <ClearCartOnMount />}
       <div className={SPALTE}>

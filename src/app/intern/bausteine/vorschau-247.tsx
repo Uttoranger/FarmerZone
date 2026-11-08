@@ -105,7 +105,7 @@ export function Vorschau247(): React.JSX.Element {
       <Abschnitt247
         id="kunde-kopf"
         titel="Kopf der Kunden-Shell (G9)"
-        satz="In jeder Sitzung vier Links, „Warenkorb · n“ (nur gefüllt), Sonne/Mond und rechts EINE Umriss-Pille; kein Suchfeld. Am Handy Marke und Pille, auf /login und /register nur die Marke; auf der Hofseite scrollt der Kopf am Handy weg (Produktseite folgt mit Nr. 252)."
+        satz="In jeder Sitzung vier Links, „Warenkorb · n“ (nur gefüllt), Sonne/Mond und rechts EINE Umriss-Pille; kein Suchfeld. Am Handy Marke und Pille, auf /login und /register nur die Marke; auf Hof- und Produktseite scrollt der Kopf am Handy weg (Produktseite seit Nr. 252)."
       >
         <ul className="flex flex-col gap-0.5">
           {KOPF_VARIANTEN.map((v) => (
