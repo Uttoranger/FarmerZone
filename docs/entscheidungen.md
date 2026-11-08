@@ -331,6 +331,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Verhältnis zu N21 (19.10.2026):** Ein Testhof ist immer auch ausgenommen; ‚ausgenommen‘ heißt ab N21 nur noch: zählt nicht für die Gründungsplätze (ein ausgenommener echter Hof ist normal sichtbar und wird indexiert).
 - **Ergänzung (uttoranger, im Chat, 26.10.2026):** „Gründungshöfe zahlen die Bargebühr aus N38 erst nach ihrer Laufzeit; bis dahin brauchen sie für Barbestellungen kein Mandat. Die Zusage ‚Hofladen ohne Grundgebühr‘ bleibt unverändert.“
 - **Umsetzung (Ergänzung 26.10.2026):** Nr. 197 und Nr. 198 (freigabe.md §30); `einzugAb` je Hof aus Nr. 188.
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; E-026, N48):** Es bleibt bei 100 Gründungsplätzen (Nr. 116). Die Zahl kommt aus Admin › Einstellungen › Gründungshöfe; den Wert in Produktion stellt die Projektleitung vor dem ersten Festschreiben auf 100. Der Spalten-Default 12 und der Standardwert im Code bleiben (keine Migration; sie gelten nur ohne Zeile). Boards mit 12 werden korrigiert.
 
 ### K3 · Unterhaltungen zwischen Höfen (13.10.2026)
 - **Stand:** beschlossen 13.10.2026, **Bau nach Signal**, nicht in Lauf 13.
@@ -553,6 +554,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Begründung:** Befund vom 08.10.2026 (Handy, 390 px): Bestehende Höfe finden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe"); im Kopf der KundeShell ist „Anmelden" unter 768 px ausgeblendet; ein angemeldeter Hof sieht auf öffentlichen Seiten keinen Weg in seinen Bereich. Im Hofbereich ist der Rückweg auf Unterseiten klein und nach dem Scrollen weg.
 - **Dateien:** KundeShell und KundenKopf, AdminShell, `src/lib/kunden-navigation.ts`, `src/lib/kunden-menue.ts`, `src/lib/admin-navigation.ts`, `src/lib/bauern-navigation.ts`, Hofbereich-Unterseiten; Umsetzung Nr. 41 und 44 (freigabe.md §12).
 - **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** /settings bekommt am Handy „Mehr“ als Elternseite („‹ Mehr“ im Kopf).
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; N48, B-Zeilen der Liste Lauf 32):** Wie /settings bekommen am Handy auch Auswertung, Kunden, Verkäufe, Postfach und Meine Meldungen einen Rückweg; Ziel und Name nach dem Board, eine Quelle in src/lib/bauern-navigation.ts.
 
 ### N2 · Kasse ohne Zusatz-Haken (08.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
@@ -996,6 +998,11 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Enthält eine Bestellung ein Produkt mit dem Abholhinweis ‚Abholung nach Absprache‘, sagt die Kasse über der Terminwahl ‚Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.‘ und das Notizfeld heißt ‚Notiz zur Abholung‘. Die Bestätigungsmail sagt ‚Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.‘ (mit Reply-To auf die Profil-E-Mail des Hofs) bzw. ‚Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.‘ Der Hof sieht in Bestellung und Heute die Marke ‚Abholung absprechen‘ mit ‚Anrufen‘ und ‚Mail schreiben‘, nur bei offenen Bestellungen. Kein neues Feld, Preis und Zahlung unverändert.“
 - **Umsetzung:** Nr. 257 (freigabe.md §36); keine Migration.
 
+### N48 · Antworten auf Morgenbericht 32 und Gründungsplätze (7.11.2026)
+- **Entscheidung (uttoranger, im Chat, 7.11.2026):** „Das Feld ‚Hof-E-Mail‘ auf den Hofdaten bleibt; es ist die Kontaktangabe für den Rücktritt. Ist ein Produkt gerade ausverkauft, sagt die Produktseite ‚<Produkt> gibt es gerade nicht.‘ Der Abholzettel sagt ‚Nichts zu kassieren‘ auch bei stornierten Bestellungen ohne Erstattungszeitpunkt. Die Packliste nennt die Plattformgebühr nur, wo ein gezeigter Betrag sie enthält, wie der Abholzettel. /onboarding hat die Inhaltsbreite des Boards. Die Mail im Hofpreis-Modell zeigt bei entfallener Gebühr keinen Kasten ‚Bring bitte … mit‘. Eine h1 hinter einem offenen Dialog oder Blatt fehlt nicht. Es gibt 100 Gründungsplätze; die Zahl kommt aus Admin › Einstellungen, den Wert in Produktion setzt die Projektleitung. Steht ‚bis <Tag>‘ beim Ende der Gründungszeit oder der erlassenen Bargebühr, ist es der letzte Tag ohne diese Gebühr; der Einzug der Bargebühr beginnt am Tag danach, außer der Hof hat im Admin einen eigenen Einzugstag. Kurznummern von Meldungen haben sechs Zeichen in Großbuchstaben; alte achtstellige werden weiter gefunden. Admin › Betrieb › Mails zeigt zusätzlich ‚Beispiele‘: jede Mail-Art mit erfundenen Daten, Codes als Nullen, Links unkenntlich; kein Versand, kein Mail-Auftrag, nichts gespeichert. Die Vorschau echter Mails (N27) bleibt, wie sie ist.“
+- **Verhältnis zu anderen Einträgen:** bestätigt K2 (Änderung Nr. 116, 100 Plätze) und schließt die offene Frage „Zahl der Gründungsplätze“; ergänzt N38 und N44 (nur die Anzeige des Endes, nicht, wann eine Gebühr anfällt), N46 (Abholzettel) und N1 (siehe Ergänzung dort).
+- **Umsetzung:** Nr. 261–281 (freigabe.md §37); keine Migration.
+
 ---
 
 ## I – Illustrationen
@@ -1078,3 +1085,5 @@ Stand Lauf 29 (uttoranger, 1.11.2026): Die Ergänzungen zu N2/O4, N2 (Handy-Reih
 Stand Lauf 30 (uttoranger, 3.11.2026): N41–N44 entschieden; Redesign nach den Mockups November 2026 in Nr. 219–232 (freigabe.md §34). Keine Migration, kein Paket, keine Variable. Nicht: Ab Hof, Willkommenszeit, Zahl der Gründungsplätze, Kartenquelle, Tarife als Abrechnung, Preise vergleichen v2 (PR #329), AGB 1.0, Impressum (A001).
 
 Stand Lauf 32 (uttoranger, 6.11.2026): N46 und N47 entschieden; Abnahme nach der Board-oder-Code-Liste, gemeinsame Bausteine G1–G14 und die B-Zeilen je Board in Nr. 243–258b, dazu AGB 1.0 mit dem Stichtag in Nr. 259 (N45, A005), in zwei Abschnitten (freigabe.md §36). Keine Migration, kein Paket, keine neue Variable. Nicht: P1 (O9, Anwältin), Zahl der Gründungsplätze (offen), Recht-Texte außer AGB 1.0 nach A005 (Datenschutz A006, Impressum A004), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F030), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien.
+
+Stand Lauf 33 (uttoranger, 7.11.2026): N48 entschieden (Antworten auf Morgenbericht 32, 100 Gründungsplätze, Ende der Gründungszeit als letzter Tag, Kurznummer); Ergänzungen bei K2 und N1. Gemeinsame Ursachen, echte Fehler und die Boards unter 5 Sternen in Nr. 261–281, in drei Abschnitten (freigabe.md §37). Keine Migration, kein Paket, keine neue Variable. Nicht: Recht-Wortlaut (P1/O9, Anwältin), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F035), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien, Toast-Token.

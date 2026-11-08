@@ -294,18 +294,40 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 247 | Bausteine Teil 3 (G9–G11) | gemergt (#490) | `nacht/2026-11-06/247-bausteine-3` | #486 | vom Zwischenstand `integration/lauf32` nach 245 | 1 Runde (Produktseite klebt bis 252); /account/login als Frage | 6./7.11.2026 |
 | 248 | Bausteine Teil 4 (G5, G12–G14, Geldsätze V1) | gemergt (#490) | `nacht/2026-11-06/248-bausteine-4` | #488 | vom Zwischenstand `integration/lauf32` nach 245 | 1 Runde (Varianten statt in place; Geldsatz bei entfallener Gebühr) | 6./7.11.2026 |
 | 249 | Hof-Alltag | gemergt (#490) | `nacht/2026-11-06/249-hof-alltag` | #489 | vom Zwischenstand `integration/lauf32` nach 245–248 und 259 | Container-Neustart, fortgesetzt ab WIP; 1 Runde (formal: Abholzeiten-Satz als Übergang bis 250); Mängel aus dem Zwischen-Durchgang (Abholzettel „inkl.“-Satz) → B | 6./7.11.2026 |
-| 250 | Einstellungen und Teilen (2 Runden, Runde 2 nach Integration im Sammelstand) | fertig | `nacht/2026-11-06/250-einstellungen` | #496 | von `integration/lauf32b` | – | 7.11.2026 |
-| 251 | Hof-Werkzeuge | fertig | `nacht/2026-11-06/251-hof-werkzeuge` | #498 | von `integration/lauf32b` | – | 7.11.2026 |
-| 252 | Finden | fertig | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
-| 253 | Kauf und Konto | fertig | `nacht/2026-11-06/253-kauf-konto` | #493 | von `integration/lauf32b` | – | 7.11.2026 |
-| 254 | System und Rechtsrahmen | fertig | `nacht/2026-11-06/254-system` | #500 | vom Zwischenstand `integration/lauf32b` nach 259 und 251 | – | 7.11.2026 |
-| 255 | E-Mails | fertig | `nacht/2026-11-06/255-mails` | #497 | vom Zwischenstand `integration/lauf32b` nach 257 | – | 7.11.2026 |
+| 250 | Einstellungen und Teilen (2 Runden, Runde 2 nach Integration im Sammelstand) | gemergt (#501) | `nacht/2026-11-06/250-einstellungen` | #496 | von `integration/lauf32b` | – | 7.11.2026 |
+| 251 | Hof-Werkzeuge | gemergt (#501) | `nacht/2026-11-06/251-hof-werkzeuge` | #498 | von `integration/lauf32b` | – | 7.11.2026 |
+| 252 | Finden | gemergt (#501) | `nacht/2026-11-06/252-finden` | #492 | von `integration/lauf32b` | – | 7.11.2026 |
+| 253 | Kauf und Konto | gemergt (#501) | `nacht/2026-11-06/253-kauf-konto` | #493 | von `integration/lauf32b` | – | 7.11.2026 |
+| 254 | System und Rechtsrahmen | gemergt (#501) | `nacht/2026-11-06/254-system` | #500 | vom Zwischenstand `integration/lauf32b` nach 259 und 251 | – | 7.11.2026 |
+| 255 | E-Mails | gemergt (#501) | `nacht/2026-11-06/255-mails` | #497 | vom Zwischenstand `integration/lauf32b` nach 257 | – | 7.11.2026 |
 | 256 | Mail „Neue Bestellung bar“ an den Hof | gemergt (#490) | `nacht/2026-11-06/256-bar-mail-hof` | #485 | vom Zwischenstand `integration/lauf32` nach 259; ohne 259 nach 243 und 244 | 0 Runden; /api/checkout genau ein Aufruf | 6./7.11.2026 |
-| 257 | Abholung nach Absprache | fertig | `nacht/2026-11-06/257-absprache` | #495 | vom Zwischenstand `integration/lauf32b` nach 249, 249b, 253, 256 und 259 | – | 7.11.2026 |
+| 257 | Abholung nach Absprache | gemergt (#501) | `nacht/2026-11-06/257-absprache` | #495 | vom Zwischenstand `integration/lauf32b` nach 249, 249b, 253, 256 und 259 | – | 7.11.2026 |
 | 258 | Admin: Geld-Kachel | gemergt (#490) | `nacht/2026-11-06/258-geld-kachel` | #481 | vom Zwischenstand `integration/lauf32` | 0 Runden; Kachel-Wort „Umsatz der Höfe“ als Board-Frage | 6./7.11.2026 |
-| 258b | Admin: messbare Mängel | fertig | `nacht/2026-11-06/258b-admin-maengel` | #499 | von `integration/lauf32b` | – | 7.11.2026 |
+| 258b | Admin: messbare Mängel | gemergt (#501) | `nacht/2026-11-06/258b-admin-maengel` | #499 | von `integration/lauf32b` | – | 7.11.2026 |
 | 259 | „AGB 1.0 mit dem Stichtag (A005)“ | gemergt (#490) | `nacht/2026-11-06/259-agb-1-0` | #483 | von `docs/lauf32` (PR gegen `docs/lauf32`, allein mergebar) | 1 Runde (vier Fälle, serverseitige Meldung, A005 4b wörtlich); allein mergebar nach #479 | 6./7.11.2026 |
 | Sammel 32 | Sammel-PR Lauf 32 A (243–259) | gemergt (#490) | `integration/lauf32` | #490 | main | A: 243a–249, 256, 258, 259 per --no-ff; voller Lauf 706 Dateien, 13209 Tests; Integration 97 Dateien, 789 Tests; B offen (250–255, 257, 258b, Schluss-Durchgang) | 7.11.2026 |
-| 260 | Doku B: Regelvorschläge Morgenbericht 32 A, Register-Ergänzungen N1/N32/N46 | fertig | `nacht/2026-11-06/260-doku-b` | #491 | von `integration/lauf32b` | – | 7.11.2026 |
-| 249b | Nachbesserung 249: Abholzettel-Kasten (Antwort 8), Mängel Zwischen-Durchgang | fertig | `nacht/2026-11-06/249b-hof-alltag-nach` | #494 | vom Zwischenstand `integration/lauf32b` | – | 7.11.2026 |
-| Sammel 32b | Sammel-PR Lauf 32 B (260, 252, 253, 249b, 250, 257, 255, 251, 258b, 254) | bereit | `integration/lauf32b` | #501 | main | per --no-ff in Wellen-Reihenfolge; voller Lauf 717 Dateien, 13351 Tests; Integration 98 Dateien, 798 Tests; Schluss-Durchgang in abnahme-lauf32.md | 7.11.2026 |
+| 260 | Doku B: Regelvorschläge Morgenbericht 32 A, Register-Ergänzungen N1/N32/N46 | gemergt (#501) | `nacht/2026-11-06/260-doku-b` | #491 | von `integration/lauf32b` | – | 7.11.2026 |
+| 249b | Nachbesserung 249: Abholzettel-Kasten (Antwort 8), Mängel Zwischen-Durchgang | gemergt (#501) | `nacht/2026-11-06/249b-hof-alltag-nach` | #494 | vom Zwischenstand `integration/lauf32b` | – | 7.11.2026 |
+| Sammel 32b | Sammel-PR Lauf 32 B (260, 252, 253, 249b, 250, 257, 255, 251, 258b, 254) | gemergt (#501) | `integration/lauf32b` | #501 | main | per --no-ff in Wellen-Reihenfolge; voller Lauf 717 Dateien, 13351 Tests; Integration 98 Dateien, 798 Tests; Schluss-Durchgang in abnahme-lauf32.md | 7.11.2026 |
+| 261 | Doku: Freigabe §37, Register N48, Ergänzungsliste, Warteschlange (nur Doku; von `main`) | läuft | `docs/lauf33` | – | von `main` | – | 8.11.2026 |
+| 262 | Prüfwerkzeug 2: Prüf-Seed, Messung, Browser, Fehlerzustand | offen | `nacht/2026-11-08/262-pruefwerkzeug-2` | – | von `docs/lauf33` | – | 8.11.2026 |
+| 263 | Kurznummer überall gleich | offen | `nacht/2026-11-08/263-kurznummer` | – | vom Zwischenstand `integration/lauf33` nach 261 | – | 8.11.2026 |
+| 264 | Ende der Gründungszeit in der Anzeige | offen | `nacht/2026-11-08/264-gruendungsende` | – | von `docs/lauf33` | – | 8.11.2026 |
+| 265 | Gründungsplätze aus der Einstellung, eine Zählregel | offen | `nacht/2026-11-08/265-gruendungsplaetze` | – | vom Zwischenstand `integration/lauf33` nach 263 und 264 | – | 8.11.2026 |
+| 266 | Kleine echte Fehler | offen | `nacht/2026-11-08/266-kleine-fehler` | – | vom Zwischenstand `integration/lauf33` nach 261 | – | 8.11.2026 |
+| 267 | Kunden-Bausteine: G11 Seitenfuß, G10 Rest | offen | `nacht/2026-11-08/267-kunden-bausteine` | – | vom Zwischenstand `integration/lauf33` nach 261 | – | 8.11.2026 |
+| 268 | Meldungen: problem-melden und meldungen | offen | `nacht/2026-11-08/268-meldungen` | – | vom Zwischenstand `integration/lauf33` nach 263 und 269 | – | 8.11.2026 |
+| 269 | Hof-Bausteine: Rückweg, Hinweis, Knopf, Feld, Spalte, Ladefehler | offen | `nacht/2026-11-08/269-hof-bausteine` | – | vom Zwischenstand `integration/lauf33` nach 264 | – | 8.11.2026 |
+| 270 | Mail-Vorschau mit Beispieldaten im Admin | offen | `nacht/2026-11-08/270-mail-beispiele` | – | vom Zwischenstand `integration/lauf33` nach 263 und 264 | – | 8.11.2026 |
+| 271 | Finden: hoefe, startseite, hofseite, produkt | offen | `nacht/2026-11-08/271-finden` | – | vom Integrationszweig von B | – | 8.11.2026 |
+| 272 | Region und Verkäufe | offen | `nacht/2026-11-08/272-region-verkaeufe` | – | vom Integrationszweig von B | – | 8.11.2026 |
+| 273 | Kunden und Auswertung | offen | `nacht/2026-11-08/273-kunden-auswertung` | – | vom Integrationszweig von B | – | 8.11.2026 |
+| 274 | Mein Hof und Postfach | offen | `nacht/2026-11-08/274-mein-hof-postfach` | – | vom Integrationszweig von B | – | 8.11.2026 |
+| 275 | Konto und Einrichten: registrieren/onboarding, meine-bestellungen, kundenkonto, anmelden, passwort | offen | `nacht/2026-11-08/275-konto-einrichten` | – | vom Integrationszweig von B | – | 8.11.2026 |
+| 276 | Kauf: korb, kasse, bestaetigung, bestellung-link | offen | `nacht/2026-11-08/276-kauf` | – | vom Integrationszweig von B nach 271 | – | 8.11.2026 |
+| 277 | Hof-Alltag: heute, bestellungen, bestellung, druck, produkte, produkt-neu | offen | `nacht/2026-11-08/277-hof-alltag` | – | vom Integrationszweig von C nach 274 und 275 | – | 8.11.2026 |
+| 278 | Einstellungen und Teilen: hofdaten-zahlung, konto-hof, teilen, whatsapp-plakat, beitraege | offen | `nacht/2026-11-08/278-einstellungen-teilen` | – | vom Integrationszweig von C | – | 8.11.2026 |
+| 279 | System: neuigkeiten, abmelden, systemseiten, widerruf, fehlerseiten, rechtstexte | offen | `nacht/2026-11-08/279-system` | – | vom Integrationszweig von B nach 275 | – | 8.11.2026 |
+| 280 | Mails | offen | `nacht/2026-11-08/280-mails` | – | vom Integrationszweig von C nach 274, 275, 278 und 279 | – | 8.11.2026 |
+| 281 | Admin: messbare Mängel und Schrift-Wache | offen | `nacht/2026-11-08/281-admin-maengel` | – | vom Integrationszweig von C nach 263, 265 und 270 | – | 8.11.2026 |
+| Sammel 33 | Sammel-PR Lauf 33 (261–281) | offen | `integration/lauf33` | – | main | – | 8.11.2026 |
