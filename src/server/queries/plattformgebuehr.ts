@@ -3,7 +3,7 @@ import { formatDatumLang } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { bestimmeGruendungBis } from '@/lib/gruendungshof'
-import { abrechnungSperrtBar, einzugAbFuer, folgemonat, gebuehrModellFuer, monatText, satzHundertstel, satzText } from '@/lib/plattformgebuehr'
+import { abrechnungSperrtBar, einzugAbFuer, folgemonat, gebuehrModellFuer, letzterFreierTag, monatText, satzHundertstel, satzText } from '@/lib/plattformgebuehr'
 import type { PlattformgebuehrStand } from '@/lib/admin-aufgaben'
 import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
@@ -90,7 +90,10 @@ const ZEILE_SELECT = { id: true, monat: true, servicegebuehrBarCents: true, serv
 export type BarzahlungDaten = {
   modellAktiv: boolean
   satzText: string
+  /** „Einzug ab <Tag>“: der Einzugsbeginn selbst. */
   einzugAbText: string
+  /** „Bis <Tag> behältst du …“: der letzte Tag ohne Bargebühr, der Wiener Tag vor dem Einzugsbeginn (Register N48). */
+  letzterFreierTagText: string
   einzugBegonnen: boolean
   mandat: boolean
   mandatPflicht: boolean
@@ -122,6 +125,7 @@ export async function ladeBarzahlung(farmId: string, jetzt: Date): Promise<Barza
     modellAktiv: gebuehrModellFuer(e, jetzt) === 'hofpreis',
     satzText: satzText(satzHundertstel(hof)),
     einzugAbText: formatDatumLang(ab),
+    letzterFreierTagText: letzterFreierTag(ab),
     einzugBegonnen: jetzt.getTime() >= ab.getTime(),
     mandat: hof.sepaMandatAm !== null,
     mandatPflicht: hof.barMandatPflicht,
