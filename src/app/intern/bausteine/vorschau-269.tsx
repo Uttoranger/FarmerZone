@@ -9,6 +9,7 @@ import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { FELD, FELD_LABEL, KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /**
  * Einhängepunkt der Nr. 269 (Lauf 33) in der Bausteine-Vorschau: Rückweg der Mehr-Blatt-Seiten am Handy (G1-Rest),
@@ -39,7 +40,7 @@ export function Vorschau269(): React.JSX.Element {
       <Abschnitt269
         id="rueckweg-mehr-269"
         titel="Rückweg der Mehr-Blatt-Seiten (G1)"
-        satz="Kunden, Verkäufe, Auswertung und Postfach haben am Handy „‹“ zurück nach „Mehr“ (Ziel Heute), Meine Meldungen nach „Problem melden“; im Web kein Textlink. Die Leiste steht am Handy fest oben — hier im Kasten scrollen."
+        satz={`Kunden, Verkäufe, Auswertung und Postfach haben am Handy „‹“ zurück nach „Mehr“ (Ziel Heute), Meine Meldungen nach „${PROBLEM_MELDEN}“; im Web kein Textlink. Die Leiste steht am Handy fest oben — hier im Kasten scrollen.`}
       >
         {/* transform-gpu macht den äußeren Kasten zum Bezug der festen Leiste (sonst stünde sie am Fenster). */}
         <div className={cn('relative h-56 transform-gpu overflow-hidden border border-border', RUNDUNG.karte)}>
