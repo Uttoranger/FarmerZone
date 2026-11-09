@@ -20,6 +20,10 @@
 #       Sperrt bzw. öffnet NUR eine DB-Kopie eines Fotografen (Präfix kopie_,
 #       nie die Prüf-Haupt-DB, nur localhost, Sperre zuerst; db-schalter.ts) —
 #       so entstehen Ladefehler und „Speichern fehlgeschlagen“.
+#   fotograf.sh tabelle-aus <kopie> <Tabelle…> | tabelle-an <kopie> <Tabelle…>
+#       Teilausfall (Nr. 262c): verschiebt in NUR einer Kopie einzelne Tabellen
+#       (Modellnamen aus prisma/schema.prisma) in das Schema pruef_gesperrt
+#       bzw. zurück — die Seite lädt, nur ihr Ladefehler-Kasten erscheint.
 #
 # Vor dem Start: Sperre (sperre-cli.ts --db) mit genau der Umgebung des
 # Servers; Abbruch bei .env-Dateien im Worktree oder Fotograf-Ordner. Im
@@ -115,8 +119,15 @@ case "$MODUS" in
     mapfile -t L < <("$WT/scripts/pruefung/pruef-env.sh" liste --db "$KOPIE" --port 3000)
     env -i "${L[@]}" "$TSX" "$WT/scripts/pruefung/db-schalter.ts" "${MODUS#db-}" "$KOPIE"
     ;;
+  tabelle-aus|tabelle-an)
+    KOPIE="${2:?Kopie fehlt}"
+    [ $# -ge 3 ] || { echo "fotograf.sh: $MODUS <kopie> <Tabelle…>" >&2; exit 1; }
+    # Dieselbe Liste wie db-aus; db-schalter.ts prüft Name, Adressen, Server und Tabellen.
+    mapfile -t L < <("$WT/scripts/pruefung/pruef-env.sh" liste --db "$KOPIE" --port 3000)
+    env -i "${L[@]}" "$TSX" "$WT/scripts/pruefung/db-schalter.ts" "$MODUS" "$KOPIE" "${@:3}"
+    ;;
   *)
-    echo "Aufruf: fotograf.sh start <n> <port> <db> | dev <db> [<commit>] | stopp <n|dev> | db-aus <kopie> | db-an <kopie>" >&2
+    echo "Aufruf: fotograf.sh start <n> <port> <db> | dev <db> [<commit>] | stopp <n|dev> | db-aus <kopie> | db-an <kopie> | tabelle-aus <kopie> <Tabelle…> | tabelle-an <kopie> <Tabelle…>" >&2
     exit 1
     ;;
 esac
