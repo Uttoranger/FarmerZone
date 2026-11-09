@@ -82,7 +82,8 @@ describe('Maße der KundeShell', () => {
 
   it('unter md keine Mindesthöhe: Sie schöbe die Karte im Querformat hinter die Unterleiste (Runde 1)', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    expect(client).toContain("cn('flex flex-col md:min-h-[280px]', KUNDE_PLATZ_HOEHE)")
+    // Seit Nr. 271 wächst der Bereich in niedrigen Fenstern mit dem Kopf der Liste (die Karte behält dort die volle Höhe).
+    expect(client).toContain("cn('flex flex-col md:min-h-[280px] [@media(max-height:500px)]:h-auto', KUNDE_PLATZ_HOEHE)")
     expect(client).not.toMatch(/(?<!md:)min-h-\[280px\]/)
     // Gegenprobe: die alte Klasse fiele auf.
     expect("cn('flex min-h-[280px] flex-col', KUNDE_PLATZ_HOEHE)").toMatch(/(?<!md:)min-h-\[280px\]/)

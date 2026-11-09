@@ -10,6 +10,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ComponentProps, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { Search } from 'lucide-react'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} }),
@@ -57,6 +58,7 @@ import {
   type KartenHof,
   type TrefferHof,
   kurzeKategorieReihe,
+  OhneKartenpunkt,
 } from '@/components/hoefe/entdecken-teile'
 import { HoefeSuche, StandortUngefaehr } from '@/components/hoefe/hoefe-suche'
 import { HoefeProduktzeilen } from '@/components/hoefe/hoefe-produktzeilen'
@@ -349,6 +351,18 @@ describe('Produktzeile — die Suche zeigt Produkte statt Höfe', () => {
     expect(zeile).toContain('aria-label="Bauernbrot bei Hof Test ansehen"')
   })
 
+  it('Hof, Entfernung und Abholung stehen in EINER grauen Meta-Zeile (Board s1-/w1-hoefe Bild 2; Nr. 271)', () => {
+    const zeile = html(createElement(ProduktZeile, { treffer: { hof: TREFFER_HOF, produkt: BROT }, bereich: 'LEBENSMITTEL', jetzt: JETZT }))
+    expect(zeile).toMatch(/<p class="[^"]*text-muted-foreground"[^>]*>Hof Test · 4,2 km · <span data-abholung="[^"]+">Abholung heute 15:00–18:00<\/span><\/p>/)
+    // Gegenprobe: keine eigene grüne Abholzeile mehr in der Produktzeile.
+    expect(zeile).not.toContain('text-brand-text">Abholung')
+  })
+
+  it('„Nicht auf der Karte“ ohne Symbol (Abnahme Lauf 32, hoefe 6; Nr. 271)', () => {
+    const zeile = html(createElement(OhneKartenpunkt))
+    expect(zeile).toBe('<p class="text-[13px] text-muted-foreground">Nicht auf der Karte</p>')
+  })
+
   it('ohne Standort steht der Ort statt der Entfernung; Futter zeigt den Kilopreis aus der Kennzeichnung', () => {
     const heu: AngebotsProdukt = { ...BROT, name: 'Heu', category: 'HEU_STROH', labels: [], price: 45, unit: 'BALLEN', grundpreis: { wert: 0.15, einheit: 'KG', preis: 45, menge: 300 } }
     const zeile = html(createElement(ProduktZeile, { treffer: { hof: HOF, produkt: heu }, bereich: 'FUTTERMITTEL', jetzt: JETZT }))
@@ -580,6 +594,15 @@ describe('gültiges HTML und Grenzen der Felder', () => {
     expect(suche).toContain(`maxLength="${SUCHTEXT_MAX}"`)
     // Gegenprobe: ein längerer Suchtext fiele beim Lesen der Adresse weg.
     expect(SUCHTEXT_MAX).toBe(100)
+  })
+
+  it('das Feld steht ohne Lupe (Board w1-/s1-hoefe; Abnahme Lauf 32, hoefe 2; Nr. 271)', () => {
+    const suche = html(createElement(HoefeSuche, SUCHE))
+    const feld = suche.slice(suche.indexOf('<form'), suche.indexOf('</form>'))
+    expect(feld).not.toContain('lucide-search')
+    expect(feld).toMatch(/<input[^>]*class="[^"]*\bpl-4\b/)
+    // Gegenprobe: das Symbol von lucide trägt diese Klasse — die Suche fände es.
+    expect(html(createElement(Search))).toContain('lucide-search')
   })
 })
 
@@ -839,19 +862,23 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
     expect(zeile).not.toContain('Suche: Eier')
     // Gegenprobe: in der Liste steht der Eintrag.
     expect(html(createElement(AktiveFilterZeile, { filter: { ...LEERER_HOEFE_FILTER, suchtext: 'Eier' } }))).toContain('aria-label="Suche: Eier entfernen"')
-    const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    const kartenmodus = client.slice(client.indexOf("if (ansicht === 'karte') {"), client.lastIndexOf('return ('))
-    expect(kartenmodus).toMatch(/<AktiveFilterZeile[\s\S]*?suchtextImFeld[\s\S]*?\/>/)
-    expect(kartenmodus).toContain(".some((f) => f.schluessel !== 'suchtext')")
-  })
-
-  it('die Seite gibt den Bezugspunkt nur im Kartenmodus in „Aktive Filter" — die Liste zeigt ihn mit „Ort ändern"', () => {
+    // Seit Nr. 271 zeigt der Kartenmodus den Kopf der Liste — dessen Zeile lässt den getippten Text ebenso weg.
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
     const kopf = client.slice(client.indexOf('const kopfbereich = ('), client.indexOf('if (istBreit) {'))
     const kartenmodus = client.slice(client.indexOf("if (ansicht === 'karte') {"), client.lastIndexOf('return ('))
-    expect(kartenmodus).toMatch(/<AktiveFilterZeile[\s\S]*?ort=\{bezugspunkt\}[\s\S]*?onOrtAufheben=\{ortAufheben\}[\s\S]*?\/>/)
-    expect(kartenmodus).toContain('aktiveFilter(filter, aktiverUmkreis, bezugspunkt).some(')
-    // Gegenprobe: der Kopf der Liste übergibt ihn nicht.
+    expect(kopf).toMatch(/<AktiveFilterZeile[\s\S]*?suchtextImFeld[\s\S]*?\/>/)
+    expect(kartenmodus).toContain('{kopfbereich}')
+  })
+
+  it('Kartenmodus und Liste zeigen den Bezugspunkt gleich: mit „Ort ändern“ unter dem Feld, nicht in „Aktive Filter“ (Nr. 271)', () => {
+    const client = quelle('src/components/hoefe/hoefe-client.tsx')
+    const kopf = client.slice(client.indexOf('const kopfbereich = ('), client.indexOf('if (istBreit) {'))
+    const kartenmodus = client.slice(client.indexOf("if (ansicht === 'karte') {"), client.lastIndexOf('return ('))
+    // Board s1-hoefe Bild 5: derselbe Kopf wie die Liste, mit dem vollen Suchfeld (darin die Karte „Wir zeigen Höfe rund um …“).
+    expect(kartenmodus).toContain('{kopfbereich}')
+    expect(kartenmodus).not.toContain('<AktiveFilterZeile')
+    expect(kopf).toContain('suchfeld(false)')
+    // Gegenprobe: der Kopf übergibt den Bezugspunkt nicht an „Aktive Filter“.
     expect(kopf).toContain('<AktiveFilterZeile')
     expect(kopf).not.toContain('ort={bezugspunkt}')
   })
@@ -866,13 +893,15 @@ describe('Kartenmodus am Handy: Suche · Filter · Liste in einer Zeile (Nr. 52)
     expect(element(client.slice(client.indexOf("if (ansicht === 'karte') {")))).toMatch(/\brandlos\b/)
   })
 
-  it('der Titel bleibt für Vorleser, die Zeile zeigt Suche, Filter und Liste', () => {
+  it('im Kartenmodus sichtbar: h1 mit Unterzeile, beschriftetes Feld, Chips und „Filter · Liste · Karte“ (Board s1-hoefe Bild 5, Nr. 271)', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    expect(client).toMatch(/<h1 className="sr-only">\{titel\}<\/h1>/)
-    expect(client).toMatch(/suchfeld\(true\)/)
-    expect(client).toMatch(/filterblatt\(true\)/)
-    // „Liste zeigen" — unter 640 px nur „Liste" sichtbar, vorgelesen immer ganz.
-    expect(client).toMatch(/Liste<span className="max-sm:sr-only"> zeigen<\/span>/)
+    const kopf = client.slice(client.indexOf('const kopfbereich = ('), client.indexOf('if (istBreit) {'))
+    expect(kopf).toMatch(/<h1 className="[^"]*font-heading[^"]*">/)
+    expect(kopf).toContain('{filterReihen}')
+    // Gegenprobe: die alte Werkzeugzeile (Titel nur für Vorleser, kompakte Suche, „≡ Liste“) gibt es nicht mehr.
+    expect(client).not.toMatch(/<h1 className="sr-only">\{titel\}<\/h1>/)
+    expect(client).not.toMatch(/suchfeld\(true\)/)
+    expect(client).not.toMatch(/Liste<span className="max-sm:sr-only"> zeigen<\/span>/)
   })
 })
 
@@ -1050,10 +1079,10 @@ describe('Filter-Links auf /hoefe tragen rel="nofollow" (Register N19)', () => {
     expect(links[0]).toContain('rel="nofollow"')
   })
 
-  it('die Seite selbst: „Zurücksetzen" und „Liste zeigen" — „Liste | Karte" sind seit Nr. 234 Chips der Reihe (ChipReihe, oben)', () => {
+  it('die Seite selbst: „Zurücksetzen" — „Liste | Karte" sind seit Nr. 234 Chips der Reihe (ChipReihe, oben), „Liste zeigen" entfällt mit Nr. 271', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
     const links = [...client.matchAll(/<Link\s[^>]*?href=\{hoefeHref\([\s\S]*?>/g)].map((m) => m[0])
-    expect(links).toHaveLength(2)
+    expect(links).toHaveLength(1)
     expect(client).toContain('<ChipReihe beschriftung="Ansicht" chips={ansichtChips} onWahl={schreibeUrl} umbrechen />')
     for (const link of links) expect(link, link).toContain('rel="nofollow"')
   })

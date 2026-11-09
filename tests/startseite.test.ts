@@ -319,6 +319,14 @@ describe('Kopf — Video, Standbild und Suche', () => {
   const kopfMitVideo = html(createElement(HeroVideo, { anfang: true }))
   const video = kopfMitVideo.slice(kopfMitVideo.indexOf('<video'), kopfMitVideo.indexOf('</video>'))
 
+  it('Suche: ein eigenes gerahmtes Feld ohne Symbol, daneben ein eigener Knopf „Höfe finden“ (Board Bild 1; Nr. 271)', () => {
+    const form = kopf.slice(kopf.indexOf('<form role="search"'), kopf.indexOf('</form>'))
+    // Feld und Knopf sind Geschwister in einer Reihe — der Knopf liegt nicht im Rahmen des Felds.
+    expect(form).toMatch(/<div class="flex flex-row[^"]*"><input [^>]*class="[^"]*border border-border[^"]*"[^>]*\/><button type="submit"[^>]*>Höfe finden<\/button><\/div>/)
+    expect(form).not.toContain('lucide-search')
+    expect(form).not.toContain('rounded-full')
+  })
+
   it('das Video läuft stumm, in Schleife, im Bild (playsInline), ohne Ton und Bedienung', () => {
     expect(video).toMatch(/<video [^>]*autoPlay=""/)
     expect(video).toMatch(/<video [^>]*muted=""/)
