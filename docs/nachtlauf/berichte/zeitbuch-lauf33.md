@@ -141,3 +141,9 @@ Start Abschnitt B: 9.11.2026 08:02 UTC (aus `date -u`) auf „Nachtlauf 33 forts
 - 20:45 281 Runde 1 zurück: Commit 8403d5d012fd (Wache erkennt Ternär und Style-Objekt, Tests der Beschriftungen, „Ab Monat Monat“ gelöst), voller Lauf des Umsetzers 748 Dateien, 13827 Tests, 393 s. 20:46 tester 281 Runde 1 und pruefer gezielt Runde 1 gestartet.
 - 20:46 pruefer gezielt 281 Runde 1: ohne Blocker (zwei Hinweise, stehen im PR-Text unter „Nacharbeit“).
 - 20:47 tester 278 Runde 2 grün: 746 Dateien, 13815 Tests, 183 s, Lint 0 Fehler, `pnpm pruefen:doku` grün (Lauf 20:42–20:47). Danach Push, PR und Merge von 278.
+- 20:50 Push 278 (9ed8182dc6e9), PR #525 gegen integration/lauf33 angelegt.
+- 20:51 tester 281 Runde 1 grün: 748 Dateien, 13827 Tests, 186 s, Lint 0 Fehler, `pnpm pruefen:doku` grün (Lauf 20:45–20:51).
+- 20:54 Merge 278 in integration/lauf33 (acdd1ab6828f; Konflikt nur in DEVELOPMENT.md, beide Einträge behalten, BAUSTEINE.md neu erzeugt). Voller Lauf des Zwischenstands 20:54–20:58: 749 Dateien, 13859 Tests, 190 s, Typecheck, Lint und `pnpm pruefen:doku` grün.
+- 20:55 Push 281 (8403d5d012fd), PR #526 gegen integration/lauf33 angelegt.
+- 21:00 Umsetzer 280 (Mails) gestartet, Worktree von acdd1ab6828f, Budget 2,5 Stunden, hartes Ende 23:30. Wiederaufnahme 280: Worktree /home/user/wt/280, Branch `nacht/2026-11-08/280-mails`, Auftrag 23.1–23.4 in der Reihenfolge 23.3, 23.2, 23.1, 23.4; nach dem Umsetzer folgen tester, pruefer (voller Durchgang), Gegenlesen „Recht“, „Sicherheit“, „Geld“.
+- 21:00 Merge 281 in integration/lauf33 (44930a894e9f; Konflikt nur in DEVELOPMENT.md, beide Einträge behalten, BAUSTEINE.md neu erzeugt). Voller Lauf folgt.
