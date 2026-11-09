@@ -180,7 +180,8 @@ const FAELLE: Fall[] = [
       'max-w-[560px]',
       '<h1',
       /<button type="submit"[^>]*bg-accent[^>]*>Absenden<\/button>/,
-      'border-accent bg-accent/15',
+      // Seit Nr. 268 das Zustandspaar „läuft“ des Boards s3/w3 (vorher accent zu 15 %).
+      'border-zustand-laeuft bg-zustand-laeuft-grund',
       /<input type="radio"[^>]*name="meldung-art" checked="" value="FEHLER"/,
       MELDUNG_ART_SATZ.WUNSCH,
       'id="meldung-email"',
@@ -191,7 +192,7 @@ const FAELLE: Fall[] = [
   {
     name: 'Problem melden — Hof (orange)',
     element: createElement(MeldungFormularAnsicht, { formular: formular(), welt: 'hof', alsHof: true, abbrechenHref: '/meldungen' }),
-    merkmale: ['data-welt="hof"', /<button type="submit"[^>]*bg-primary[^>]*>Absenden<\/button>/, 'border-primary bg-primary/15', MELDUNG_ANSICHT_TEXT.bildschirmfoto],
+    merkmale: ['data-welt="hof"', /<button type="submit"[^>]*bg-primary[^>]*>Absenden<\/button>/, 'border-status-offen bg-zustand-tun-grund', MELDUNG_ANSICHT_TEXT.bildschirmfoto],
     nie: ['bg-accent text-accent-foreground', 'id="meldung-email"', '<h1'],
   },
   {
@@ -332,12 +333,12 @@ describe('Meldeformular — Hof-Bausteine nur im Hofbereich', () => {
       createElement(MeldungFormularAnsicht, { formular: formular(teil), welt, alsHof: welt === 'hof', abbrechenHref: welt === 'hof' ? '/meldungen' : '/' })
     )
 
-  it('Kundschaft: Browser-Prüfung (required/minlength), 48-px-Arten, keine Fehlernummer-Vorlage', () => {
+  it('Kundschaft: Browser-Prüfung (required/minlength), 64-px-Arten (seit Nr. 268), keine Fehlernummer-Vorlage', () => {
     const html = ansicht('kunde')
     expect(html).not.toMatch(/novalidate/i)
     expect(html).toMatch(/<textarea[^>]*minLength="10"[^>]*required=""/)
-    expect(html).toContain('min-h-12 gap-2 px-3')
-    expect(html).not.toContain('min-h-16')
+    expect(html).toContain('min-h-16 gap-2 px-3')
+    expect(html).not.toContain('min-h-12 gap-2 px-3')
     expect(html).not.toContain(MELDUNG_ANSICHT_TEXT.fehlernummerBeispiel)
     const danke = ansicht('kunde', { kurznummer: 'AB12' })
     expect(danke).toContain(MELDUNG_ANSICHT_TEXT.dankeTitel)

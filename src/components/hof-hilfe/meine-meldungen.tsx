@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
-import { FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
 import { cn } from '@/lib/utils'
@@ -18,18 +18,35 @@ import { cn } from '@/lib/utils'
  * Antwort des Betreibers klappt in der Zeile auf („Antwort lesen“).
  *
  * Meldungstext und Antwort sind Fremdtext: React setzt sie als Text, nie als
- * Markup. „+ Neue Meldung" bleibt über der Liste (Liste Lauf 32: C, sonst kein
- * Weg zur neuen Meldung); im Leerzustand nur „Meldung schreiben“.
+ * Markup. „Neue Meldung" steht im Web oben rechts im Kopf (Board w2-meldungen
+ * Bild 4, Abnahme Lauf 32 meldungen Punkt 5; Nr. 268), am Handy über der Liste
+ * (Liste Lauf 32: C, sonst kein Weg zur neuen Meldung); im Leerzustand nur
+ * „Meldung schreiben“. Die Art steht als Marke vor dem Tag (Punkt 4).
  */
 
 export function MeineMeldungen({ zeilen, unterzeile }: { zeilen: MeldungZeile[] | null; unterzeile?: React.ReactNode }): React.JSX.Element {
+  const mitListe = zeilen !== null && zeilen.length > 0
   return (
     <div className="flex flex-col gap-3.5">
-      <WerkzeugKopf titel="Meine Meldungen" unterzeile={unterzeile} />
-      <p className="text-[13.5px] leading-normal text-muted-foreground">Hier siehst du, was aus deinen Meldungen geworden ist.</p>
-      {zeilen !== null && zeilen.length > 0 && (
-        // Board s2/w2-meldungen: Umriss mit Feldrand (V51: im Hofbereich kein grüner Knopf).
-        <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full border-input bg-card font-semibold sm:w-auto sm:self-start', RUNDUNG.feld)}>
+      <WerkzeugKopf
+        titel="Meine Meldungen"
+        unterzeile={unterzeile}
+        aktion={
+          mitListe ? (
+            // Web: Pille mit Feldrand oben rechts neben der h1 (Board w2-meldungen Bild 4); eine Kopf-Aktion steht nur im Web.
+            <Link
+              href={NEUE_MELDUNG_HREF}
+              className={cn('hidden min-h-11 items-center justify-center rounded-full border border-input bg-card px-4 text-[14px] font-semibold text-foreground hover:bg-muted md:inline-flex', FOKUS_RAHMEN)}
+            >
+              Neue Meldung
+            </Link>
+          ) : undefined
+        }
+      />
+      <p className="text-[15px] leading-normal text-muted-foreground">Hier siehst du, was aus deinen Meldungen geworden ist.</p>
+      {mitListe && (
+        // Am Handy über der Liste (Liste Lauf 32 meldungen: C). Umriss mit Feldrand (V51: im Hofbereich kein grüner Knopf).
+        <Link href={NEUE_MELDUNG_HREF} className={cn(KNOPF_RAHMEN, 'w-full border-input bg-card font-semibold md:hidden', RUNDUNG.feld)}>
           <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
           Neue Meldung
         </Link>
@@ -63,8 +80,9 @@ export function MeineMeldungen({ zeilen, unterzeile }: { zeilen: MeldungZeile[] 
 function MeldungInhalt({ z }: { z: MeldungZeile }): React.JSX.Element {
   const kopf = (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <p className="text-[13px] text-muted-foreground">
-        <span className="font-semibold text-foreground">{z.art}</span> · {z.datum}
+      <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <StatusBadge status={z.artTon}>{z.art}</StatusBadge>
+        <span>{z.datum}</span>
       </p>
       <p className="line-clamp-2 text-[15px] font-semibold break-words text-foreground" title={z.titel}>
         {z.titel} <span className="font-mono text-[13px] font-normal text-muted-foreground">· {z.kurznummer}</span>
