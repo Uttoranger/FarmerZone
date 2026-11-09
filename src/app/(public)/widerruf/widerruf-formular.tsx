@@ -244,15 +244,13 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
         </label>
       </fieldset>
 
-      {/* Die ganze Bestellung: die Positionen als Liste mit Häkchen darunter (Board s3-/w3-widerruf Bild 1; Abnahme
-          Lauf 32, widerruf) — nur gezeigt, kein Feld: Abgeschickt wird wie bisher `umfang: 'ganz'` ohne Positionen. */}
+      {/* Die ganze Bestellung: die Positionen als reine Textliste darunter (Board s3-/w3-widerruf Bild 1; Abnahme
+          Lauf 32, widerruf) — nur gezeigt, kein Feld: Abgeschickt wird wie bisher `umfang: 'ganz'` ohne Positionen.
+          Ohne Häkchen-Kästchen (Antwort 1c, Zwischen-Morgenbericht 33 B, Nr. 282): Es sah wie eine Auswahl aus. */}
       {umfang === 'ganz' && bestellung && bestellung.positionen.length > 0 && (
         <ul className="flex flex-col" aria-label={WIDERRUF_TEXT.ganz}>
           {bestellung.positionen.map((p) => (
             <li key={p.id} className={POSITION}>
-              <span aria-hidden="true" className="grid size-[22px] shrink-0 place-items-center rounded-[6px] bg-kaestchen-flaeche text-kaestchen-haken">
-                <Check className="size-4" strokeWidth={3} />
-              </span>
               <PositionText text={p.text} hinweis={p.hinweis} />
             </li>
           ))}

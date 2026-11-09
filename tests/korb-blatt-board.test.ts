@@ -269,8 +269,8 @@ describe('Korb-Blatt: Zeile mit Menge und Grundpreis je Einheit (Abnahme Lauf 32
     for (const p of [EIER, KAESE, GEWUERZ, MILCH, BROT]) {
       expect(korbZeileGrundpreis(p)).toBe(preisZeilen({ price: p.price, unit: p.unit, unitSize: p.unitSize, futter: null } as Parameters<typeof preisZeilen>[0]).grundpreis)
     }
-    // 12,5 g zu € 1,00: € 0,08 / g wie auf der Produktseite — keine eigene Umrechnung auf kg mehr (vorher € 76,92 / kg).
-    expect(korbZeileGrundpreis(GEWUERZ)).toBe('€ 0,08 / g')
+    // 12,5 g zu € 1,00: € 80,00 / kg wie auf der Produktseite — über die gemeinsame Hilfe, keine eigene Umrechnung (Nr. 282; bis dahin € 0,08 / g).
+    expect(korbZeileGrundpreis(GEWUERZ)).toBe('€ 80,00 / kg')
     expect(korbZeileGrundpreis(KAESE)).toBe('€ 26,32 / kg')
   })
 

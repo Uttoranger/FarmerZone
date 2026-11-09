@@ -7,8 +7,8 @@
  *    der ungültige Link bleibt die Karte mit Warnüberschrift.
  *  - neuigkeiten Bild 2: Nach „Anmeldung bestätigen“ steht der Erfolgskasten, „Zu <Hof>“ ist ein Textlink (kein
  *    Knopf) und der Fokus liegt auf dem Kasten, der wie seine Überschrift heißt.
- *  - widerruf Bild 1: Unter „Die ganze Bestellung“ die Positionen als Liste mit Häkchen — nur gezeigt, kein Feld
- *    (kein `input`); ohne Link keine Liste.
+ *  - widerruf Bild 1: Unter „Die ganze Bestellung“ die Positionen als reine Textliste — nur gezeigt, kein Feld
+ *    (kein `input`) und seit Nr. 282 kein Häkchen (Antwort 1c, Zwischen-Morgenbericht 33 B); ohne Link keine Liste.
  *  - fehlerseiten Bild 5: Die Fehlergrenze des Hofbereichs zeigt am Handy den Kopf des Bereichs („Heute“) — ohne
  *    zweite h1; auf einem Pfad außerhalb der Ordnung keinen.
  *  - rechtstexte: „Drucken/Speichern“ ohne Symbol, „Inhalt“ mit Dreieck statt Chevron, die Verzeichnis-Karte rollt
@@ -109,7 +109,7 @@ describe('neuigkeiten: Erfolgskasten und „Zu <Hof>“ als Textlink (Bild 2)', 
   })
 })
 
-describe('widerruf: Positionsliste mit Häkchen unter „Die ganze Bestellung“ (Bild 1)', () => {
+describe('widerruf: Positionsliste als reiner Text unter „Die ganze Bestellung“ (Bild 1, Nr. 282)', () => {
   const bestellung = {
     bestellung: 'b',
     sig: 's',
@@ -121,13 +121,16 @@ describe('widerruf: Positionsliste mit Häkchen unter „Die ganze Bestellung“
       { id: 'p2', text: '4× Heumilch frisch (1 L)', hinweis: 'H2' },
     ],
   }
-  it('mit Link: die Positionen als Liste mit Häkchen, ohne Eingabefeld', () => {
+  it('mit Link: die Positionen als reine Textliste, ohne Häkchen und ohne Eingabefeld', () => {
     const ziel = document.createElement('div')
     ziel.innerHTML = renderToStaticMarkup(createElement(WiderrufFormular, { bestellung }))
     const liste = ziel.querySelector(`ul[aria-label="${WIDERRUF_TEXT.ganz}"]`)
     expect(liste).not.toBeNull()
     expect([...liste!.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['2× Bergkäse (250 g)H1', '4× Heumilch frisch (1 L)H2'])
-    expect(liste!.querySelectorAll('.lucide-check')).toHaveLength(2)
+    // Antwort 1c: Ein Häkchen-Kästchen sähe wie eine Auswahl aus — die Positionen stehen als reiner Text da.
+    expect(liste!.querySelector('svg')).toBeNull()
+    expect(liste!.querySelector('.bg-kaestchen-flaeche')).toBeNull()
+    expect([...liste!.querySelectorAll('li')].map((li) => li.children.length)).toEqual([1, 1])
     expect(liste!.querySelector('input')).toBeNull()
     // Kein Kästchen, solange die ganze Bestellung gewählt ist.
     expect(ziel.querySelector('input[type="checkbox"]')).toBeNull()
