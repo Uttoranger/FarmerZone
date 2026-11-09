@@ -20,8 +20,13 @@ export const EINSTELLUNGEN_RAHMEN = 'w-full max-w-[1000px] px-4 pt-5 pb-12 md:px
  */
 export const UEBERSICHT_RAHMEN = 'w-full max-w-[1064px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:max-w-[1080px] xl:px-10'
 
-/** Unterseiten: eine Spalte mit Formularen, so breit wie bisher. */
-export const UNTERSEITE_RAHMEN = 'w-full max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-8'
+/**
+ * Unterseiten: eine Spalte mit Formularen, der Inhalt selbst 672 px breit, das Polster kommt dazu (Boards
+ * w2-konto-hof, -hofdaten-zahlung: `main` 672 px plus 40 px je Seite; Abnahme Lauf 32 „Spalte 605 px statt 671“,
+ * Nr. 269) — vorher zählte das Polster in die 672 px (`max-w-2xl`). Die EINE Stelle der Spaltenbreite aller
+ * Einstellungs-Unterseiten; 736 = 672 + 2 × 32 (md:px-8), 752 = 672 + 2 × 40 (xl:px-10).
+ */
+export const UNTERSEITE_RAHMEN = 'w-full max-w-[736px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:max-w-[752px] xl:px-10'
 
 /** Der Satz unter dem Werkzeug-Kopf einer Unterseite (Boards s2-/w2-konto-hof, -hofdaten-zahlung; Nr. 250). */
 export const UNTERSEITE_SATZ = 'mb-5 text-[15px] leading-relaxed text-muted-foreground md:mb-6 md:text-base'

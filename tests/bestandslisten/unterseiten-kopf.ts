@@ -10,5 +10,4 @@
 export const UNTERSEITEN_KOPF_BESTAND: readonly string[] = [
   'src/components/hof-einstellungen/einstellungen-laden.tsx',
   'src/components/hof-einstellungen/konditionen-ansicht.tsx',
-  'src/components/hofbereich/hof-laden.tsx',
 ]

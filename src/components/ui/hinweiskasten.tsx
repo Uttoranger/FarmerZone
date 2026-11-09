@@ -11,10 +11,11 @@ import { cn } from '@/lib/utils'
  *
  * Braun getönte Fläche (`bg-zustand-tun-grund`, Rand `zustand-tun` zu 30 %),
  * Radius 12 px (`RUNDUNG.hinweis`), Titel in `text-status-offen` etwas größer
- * als der Satz, der Satz dunkel in Textfarbe. Ohne Symbol, ohne Uhr — Titel
- * und Satz tragen die Bedeutung. Kontrast: `status-offen` auf
+ * als der Satz, der Satz im selben Warnton (seit Nr. 269, Abnahme Lauf 32
+ * „Fließtext neutral statt Warnton“; vorher Textfarbe). Ohne Symbol, ohne
+ * Uhr — Titel und Satz tragen die Bedeutung. Kontrast: `status-offen` auf
  * `zustand-tun-grund` ≥ 4,5:1 in beiden Themes (dasselbe Paar wie
- * `HinweiskarteFehler`, tests/design-tokens.test.ts).
+ * `HinweiskarteFehler`; gerechnet aus globals.css in tests/bausteine-269.test.ts).
  *
  * Additiv neben `Hinweiskarte` (hinweiskarte.tsx bleibt unverändert, Nr. 246
  * stellt dort um). `role="status"`: der Zustand des Hofs, keine Störung.
@@ -36,14 +37,17 @@ export function Hinweiskasten({
     <div
       role="status"
       data-hinweiskasten=""
-      className={cn('flex flex-col gap-1 border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-foreground', RUNDUNG.hinweis, className)}
+      className={cn('flex flex-col gap-1 border border-zustand-tun/30 bg-zustand-tun-grund px-3.5 py-3 text-status-offen', RUNDUNG.hinweis, className)}
     >
-      <p className="text-[16px] leading-snug font-bold text-status-offen">{titel}</p>
-      {children && <div className="text-[14px] leading-normal">{children}</div>}
+      <p className="text-[16px] leading-snug font-bold">{titel}</p>
+      {children && <div className={HINWEISKASTEN_SATZ}>{children}</div>}
       {aktion && <div className="flex flex-wrap gap-2">{aktion}</div>}
     </div>
   )
 }
+
+/** Der Satz im Hinweiskasten: 14 px im Warnton wie der Titel (G3, Nr. 269) — die Farbe erbt er vom Kasten. */
+export const HINWEISKASTEN_SATZ = 'text-[14px] leading-normal text-status-offen'
 
 /** Der Link im Hinweiskasten: 15 px halbfett, unterstrichen, im Ton des Titels, 44 px hoch (V16). */
 export const HINWEISKASTEN_LINK = cn(

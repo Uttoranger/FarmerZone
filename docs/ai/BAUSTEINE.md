@@ -218,7 +218,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 
 - src/components/hof-hilfe/hilfe-laden.tsx · MELDEN_RAHMEN, MELDUNGEN_RAHMEN, MeineMeldungenLaden, MeldungAbgebenLaden · Rahmen und Ladeansichten von „Hilfe und Rückmeldung" (/fehler-melden) und „Meine Meldungen" (/meldungen) in der HofShell (Nachtlauf Nr. 22e). · genutzt
 - src/components/hof-hilfe/hilfe-seitenspalte.tsx · HilfeSeitenspalte · Die Seitenspalte von „Hilfe und Rückmeldung" ab 1024 px (Nachtlauf Nr. 22e, Mockup web-h6-meldung-abgeben): „Deine Meldungen" mit Offen/Beantwortet und dem Weg zu „Meine Meldungen", darunter der … · genutzt
-- src/components/hof-hilfe/lade-fehler-kasten.tsx · LADE_FEHLER_SATZ, LadeFehlerKasten · Ladefehler der Hof-Werkzeuge (Baustein G6, Liste Lauf 32 auswertung, kunden, postfach, region, verkaeufe „Fehler-Karte getönt, kleiner Knopf“; Nr. 251): derselbe orange Kasten wie … · genutzt
+- src/components/hof-hilfe/lade-fehler-kasten.tsx · LADE_FEHLER_SATZ, LadeFehlerKasten · Alter Ort des Ladefehler-Kastens der Hof-Werkzeuge (Nr. 251). · Altbestand → LadeFehlerKasten (ui/lade-fehler-kasten.tsx, Nr. 269) — neue Aufrufer importieren von dort; die
 - src/components/hof-hilfe/meine-meldungen.tsx · MeineMeldungen · „Meine Meldungen" in der HofShell (Nachtlauf Nr. 22e; seit Nr. 251 nach Board s2-/w2-meldungen Bild 4–6): nur die eigenen Meldungen des Hofs, nur die Felder der Sichtbarkeitsregel (fuerHof). · genutzt
 
 ## src/components/hof-kunden
@@ -348,10 +348,6 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/region/region-kopf.tsx · REGION_RAHMEN, REGION_SATZ, RegionKopf · Kopf von /region (Nachtlauf Nr. 22c, Mockups web-h5-region-preise und web-h5-region-futter-kaufen): h1 „Region", ein Satz, darunter die Reiter „Preise vergleichen" | „Futter kaufen". · genutzt
 - src/components/region/region-zustaende.tsx · RegionFehler, RegionLaden, StandortFehlt, type EigeneKarte · Zustände von /region (DESIGN_SYSTEM „Zustände"): ohne eigenen Standort ein Leerzustand mit Ausweg zur Karte im Hofprofil samt der eigenen Hofkarte (Board v2 §4, N23), ein Ladefehler inline als orange … · genutzt
 
-## src/components/sales
-
-- src/components/sales/kanal-symbol.tsx · KANAL_SYMBOL, KanalSymbol · Das Symbol eines Verkaufswegs — EINE Zuordnung für den Dialog „Verkauf eintragen" und die Listen der Verkäufe. · unbenutzt
-
 ## src/components/settings
 
 - src/components/settings/pause-client.tsx · PauseClient · Pause — unter /settings/pause und in Mein Hof (ab lg im Editor, unter lg seit Nr. 50 im Blatt), das über `onGespeichert` nach jeder Änderung Vorschau bzw. Seite neu lädt. · genutzt
@@ -456,10 +452,12 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/form.tsx · Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage, useFormField · kein Zweck vermerkt · genutzt
 - src/components/ui/groessenkachel.tsx · GROESSE_NICHT_DA, GroessenWahl, Groessenkachel, groessenName, groessenUnterzeile, type GroessenForm · GroessenWahl + Groessenkachel: Verkaufsgrößen als Kacheln (Futter, Brennmaterial, alles mit Gebinden) — Größe, Hinweis, Preis, Grundpreis, Vorrat (docs/ai/DESIGN_SYSTEM.md, „Kaufstrecke"). · genutzt
 - src/components/ui/hinweiskarte.tsx · Hinweiskarte, HinweiskarteFehler, NOCHMAL_KNOPF · Hinweiskarte: ein ruhiger Hinweis auf getönter Fläche mit Rahmen — Grün für Kundensachen und Gutes („Wir zeigen Höfe rund um …", „Registrierter Futtermittelbetrieb"), Orange für Hofsachen und Offenes … · genutzt
-- src/components/ui/hinweiskasten.tsx · HINWEISKASTEN_LINK, Hinweiskasten · Hinweiskasten (Baustein G3, Nr. 245; Liste Lauf 32, Abschnitt 3.2) — die Gestalt des Hof-Balkens und jedes Hinweises auf Offenes beim Hof, der unter dem Seitenkopf in der Inhaltsspalte steht (nie … · genutzt
+- src/components/ui/hinweiskasten.tsx · HINWEISKASTEN_LINK, HINWEISKASTEN_SATZ, Hinweiskasten · Hinweiskasten (Baustein G3, Nr. 245; Liste Lauf 32, Abschnitt 3.2) — die Gestalt des Hof-Balkens und jedes Hinweises auf Offenes beim Hof, der unter dem Seitenkopf in der Inhaltsspalte steht (nie … · genutzt
 - src/components/ui/hofkarte-rahmen.tsx · HofkarteRahmen, hofkarteKlassen · Die Klassen einer Hofkarte in Listen (/hoefe, Startseite) je Zustand (V18; Board s1-hoefe, „Hof am Weiher"): Ein pausierter Hof ist ausgegraut, nicht versteckt — Fläche `bg-muted` statt `bg-card`, … · genutzt
 - src/components/ui/input.tsx · Input · kein Zweck vermerkt · genutzt
+- src/components/ui/kaestchen.tsx · KAESTCHEN_FELD, KAESTCHEN_HAKEN, Kaestchen · Kästchen (A-8, Morgenbericht 32 A, freigegeben 7.11.2026; Nr. 269) — das EINE Ankreuzfeld des neuen Designs mit eigenen Tokens (globals.css, `--fz-kaestchen-rand`, `-flaeche`, `-haken`; DESIGN_SYSTEM … · genutzt
 - src/components/ui/label.tsx · Label · kein Zweck vermerkt · genutzt
+- src/components/ui/lade-fehler-kasten.tsx · LADE_FEHLER_SATZ, LadeFehlerKasten · Ladefehler der Hof-Werkzeuge (Baustein G6, Liste Lauf 32 auswertung, kunden, postfach, region, verkaeufe „Fehler-Karte getönt, kleiner Knopf“; Nr. 251): derselbe orange Kasten wie … · genutzt
 - src/components/ui/lade-punkt.tsx · LadeInhalt, LadePunkt, LadeRahmen · Laden ohne Ladebild (Register N14, Ergänzung; Nr. 105; Mockup admin-postfach-ruhig): Ein Wechsel über einen Link lässt den bisherigen Inhalt stehen, bis der neue da ist. · genutzt
 - src/components/ui/list-row.tsx · ListGruppe, ListRow · ListGruppe: Zeilen auf einer Karte, durch feine Linien getrennt — wie das Mehr-Blatt und die Bestellliste in den Mockups. · genutzt
 - src/components/ui/marke.tsx · AUSVERKAUFT_WORT, AusverkauftMarke, Marke · Die Marke: ein Zustand als kurzes Wort auf seiner Bedeutungsfarbe (Register G5) — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen. · genutzt
@@ -483,7 +481,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/tabs.tsx · Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants · kein Zweck vermerkt · unbenutzt
 - src/components/ui/textarea.tsx · Textarea · kein Zweck vermerkt · genutzt
 - src/components/ui/textlink.tsx · Textlink, textlinkKlassen · Die Klassen eines Textlinks mit Trefferfläche ≥ 44 px (V16; Boards w1-korb „Route planen →", w1-mehr-neu „Hofseite ansehen"). · genutzt
-- src/components/ui/werkzeug-kopf-stil.ts · WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL · Maße des Werkzeug-Kopfs (werkzeug-kopf.tsx, G1, Nr. 245) — EINE Quelle für den Kopf und seine Ladeansicht, damit beim Umschalten nichts springt. · genutzt
+- src/components/ui/werkzeug-kopf-stil.ts · WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_PLATZ, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL · Maße des Werkzeug-Kopfs (werkzeug-kopf.tsx, G1, Nr. 245) — EINE Quelle für den Kopf und seine Ladeansicht, damit beim Umschalten nichts springt. · genutzt
 - src/components/ui/werkzeug-kopf.tsx · UnterDemWerkzeugKopf, WerkzeugKopf, WerkzeugKopfLaden · Werkzeug-Kopf (Baustein G1, Nr. 245): der Kopf der Hof-Werkzeuge am Handy (feste Leiste) und im Web in einem Baustein, mit dem Hof-Balken (G3) darunter; löst UnterseitenKopf ab. · genutzt
 - src/components/ui/zaehler.tsx · Zaehler · Eine kleine Zahl an einem Eintrag: offene Bestellungen, Meldungen zu entscheiden, Artikel im Korb. · genutzt
 

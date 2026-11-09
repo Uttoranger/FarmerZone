@@ -82,14 +82,18 @@ const ZUSTAND_PAARE: [string, string][] = MARKE_ARTEN.map((art) => [`zustand-${a
 /** Schrift und Fläche des Abzeichens „Gründungshof“ (Register K2, Nr. 116). */
 const ABZEICHEN_PAAR: [string, string] = ['abzeichen', 'abzeichen-grund']
 
+/** Rand, Fläche und Haken des Kästchens (A-8, Nr. 269); den Kontrast rechnet tests/bausteine-269.test.ts. */
+const KAESTCHEN_TOKENS = ['kaestchen-rand', 'kaestchen-flaeche', 'kaestchen-haken']
+
 describe('Tabelle und CSS decken sich', () => {
-  it('die Tabelle im Design-System hat zweiundzwanzig Tokens — elf Grundfarben, acht Bedeutungsfarben, das Abzeichen, der Feldrand', () => {
+  it('die Tabelle im Design-System hat fünfundzwanzig Tokens — elf Grundfarben, acht Bedeutungsfarben, das Abzeichen, der Feldrand, das Kästchen', () => {
     expect([...soll.keys()].toSorted()).toEqual(
       [
         'accent', 'bg', 'border', 'on-accent', 'on-primary', 'primary', 'status-fertig', 'status-offen', 'surface', 'text', 'text-muted',
         ...ZUSTAND_PAARE.flat(),
         ...ABZEICHEN_PAAR,
         'feldrand',
+        ...KAESTCHEN_TOKENS,
       ].toSorted()
     )
   })
@@ -314,6 +318,8 @@ describe('Kontrast in beiden Modi (≥ 4,5:1)', () => {
     ...ZUSTAND_PAARE,
     // Das Abzeichen ebenso (Nr. 116).
     ABZEICHEN_PAAR,
+    // Der Haken auf der angehakten Fläche des Kästchens (A-8, Nr. 269).
+    ['kaestchen-haken', 'kaestchen-flaeche'],
   ]
 
   it.each(paare)('%s auf %s', (vorne, hinten) => {
