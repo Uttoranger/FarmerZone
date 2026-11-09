@@ -796,7 +796,7 @@ export function GallerySection({
         />
         {/* Läuft die Serie weiter, sagt eine Zeile, wo sie steht — die Liste kommt nach dem Baustein. */}
         {progress && progress.total > 1 && (
-          <p className="mt-3 text-xs text-muted-foreground">{`Foto ${progress.current} von ${progress.total} — ${stufenText(progress)}`}</p>
+          <p className="mt-3 text-xs text-muted-foreground">{`Foto ${progress.current} von ${progress.total} – ${stufenText(progress)}`}</p>
         )}
       </div>
     )
@@ -806,7 +806,7 @@ export function GallerySection({
     <div>
       {fileInput}
       <p className="mb-3 flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
-        <span>Bis zu {GALERIE_MAX} Fotos vom Hof — sie stehen auf deiner Hofseite.</span>
+        <span>Bis zu {GALERIE_MAX} Fotos vom Hof – sie stehen auf deiner Hofseite.</span>
         <span className="shrink-0 tabular-nums">
           {photos.length}/{GALERIE_MAX}
         </span>
@@ -844,14 +844,14 @@ export function GallerySection({
               die Leitung (6–8 MB). Ohne bewegte Zahl sieht das nach Absturz aus. */}
           {progress
             ? progress.total > 1
-              ? `Foto ${progress.current} von ${progress.total} — ${stufenText(progress)}`
+              ? `Foto ${progress.current} von ${progress.total} – ${stufenText(progress)}`
               : stufenText(progress)
             : isUploading
               ? 'Wird hochgeladen…'
               : 'Fotos hinzufügen'}
         </button>
       ) : (
-        <p className="py-2 text-center text-xs text-muted-foreground">Mehr als {GALERIE_MAX} Fotos gehen nicht — lösche erst eins.</p>
+        <p className="py-2 text-center text-xs text-muted-foreground">Mehr als {GALERIE_MAX} Fotos gehen nicht – lösche erst eins.</p>
       )}
     </div>
   )

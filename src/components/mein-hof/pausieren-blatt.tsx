@@ -13,9 +13,10 @@ import { abbrechenIn } from '@/components/hof-bestellungen/bestell-dialog'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { Textarea } from '@/components/ui/textarea'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
-import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
+import { PAUSIERT_GERADE } from '@/components/hofseite/kauf-sperre-hinweis'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KICKER_12 } from '@/components/mein-hof/kicker-12'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { cn } from '@/lib/utils'
 
 /*
@@ -32,8 +33,11 @@ import { cn } from '@/lib/utils'
  * (Regelvorschlag 239: Dialog mit orangem Hauptknopf). Titel „Hof pausieren“,
  * Kasten „So steht es auf deiner Hofseite“ und der Schluss-Satz zu offenen
  * Bestellungen; „Pausieren“ ohne Symbol über die volle Breite.
- * Die Vorschau ist die echte Hinweiskarte der Hofseite (KaufSperreHinweis), kein
- * Nachbau. Bestellungen, die schon da sind, berührt setPause nicht.
+ * Seit Nr. 274 (Abnahme Lauf 32 mein-hof 11) ist der Kasten „So steht es auf
+ * deiner Hofseite“ neutral wie im Board: Karte ohne Tönung und Symbol, der Satz
+ * der Hofseite („<Hof> pausiert gerade.“, PAUSIERT_GERADE aus der Hinweiskarte der
+ * Hofseite) und die Nachricht in „…“; „Pausieren“ ab 768 px rechtsbündig.
+ * Bestellungen, die schon da sind, berührt setPause nicht.
  */
 
 /**
@@ -134,12 +138,13 @@ export function PausierenBlatt({
         <ZeichenZaehler laenge={nachricht.trim().length} max={PAUSENACHRICHT_MAX} />
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className={cn('flex flex-col gap-2 border border-border bg-card px-3 py-2.5', RUNDUNG.blatt)}>
         <p className={KICKER_12}>So steht es auf deiner Hofseite</p>
-        <KaufSperreHinweis sperre="pause" hofName={hofName} pauseMessage={nachricht} />
+        <p className="text-[15px] font-bold break-words text-foreground">{`${hofName} ${PAUSIERT_GERADE}.`}</p>
+        {nachricht.trim() && <p className="text-[14px] break-words text-muted-foreground">{`„${nachricht.trim()}“`}</p>}
       </div>
 
-      <p className="text-[14px] leading-normal text-foreground">{SCHLUSS_SATZ}</p>
+      <p className="text-[14px] leading-normal text-muted-foreground">{SCHLUSS_SATZ}</p>
 
       {/* Ständig vorhanden, damit der Screenreader die Meldung ansagt, sobald sie kommt. */}
       <p aria-live="polite" className={cn('text-sm leading-snug font-semibold text-status-offen', !fehler && 'sr-only')}>
@@ -152,7 +157,8 @@ export function PausierenBlatt({
         disabled={laeuft}
         aria-busy={laeuft || undefined}
         className={cn(
-          'inline-flex h-12 w-full items-center justify-center rounded-[10px] bg-primary text-[15px] font-semibold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90 disabled:opacity-60',
+          // Am Handy über die volle Breite, ab 768 px (Dialog) rechtsbündig wie im Board w1-mein-hof Bild 3.
+          'inline-flex min-h-12 w-full items-center justify-center rounded-[14px] bg-primary px-5 text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90 disabled:opacity-60 md:w-auto md:self-end',
           FOKUS_RAHMEN
         )}
       >

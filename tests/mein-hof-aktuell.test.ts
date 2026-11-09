@@ -64,7 +64,7 @@ vi.mock('@/lib/hofseite-fortschritt', () => ({ hofseiteStand: () => ({}), hofsei
 vi.mock('@/components/farmer/hofseite-editor', () => ({ HofseiteEditor: () => null }))
 vi.mock('@/components/mein-hof/abschnitte-liste', () => ({ AbschnitteListe: () => null }))
 vi.mock('@/components/mein-hof/seitenkopf', () => ({ MeinHofSeitenkopf: () => null }))
-vi.mock('@/components/mein-hof/mein-hof-kopf', () => ({ MEIN_HOF_KOPF_HUELLE: 'huelle' }))
+vi.mock('@/components/mein-hof/mein-hof-kopf', () => ({ MEIN_HOF_KOPF_HUELLE: 'huelle', MEIN_HOF_KOPF_KLEBT: 'klebt', MeinHofZustandsKarte: () => null }))
 vi.mock('@/components/mein-hof/beitraege-reiter', () => ({ BeitraegeReiter: () => null }))
 vi.mock('@/components/mein-hof/mein-hof-ansicht', () => ({ MeinHofAnsicht: ({ children }: { children: unknown }) => children }))
 
@@ -119,6 +119,7 @@ describe('Mein Hof › Hofseite — „Aktuell vom Hof“', () => {
       titel: 'Aktuell vom Hof',
       wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage',
       link: { text: 'Beiträge', href: BEITRAEGE_HREF },
+      beitrag: { titel: 'Die ersten Kürbisse sind da', stand: 'läuft noch 6 Tage' },
     }
     expect(liste).toEqual(erwartet)
     expect(editor).toEqual(erwartet)
@@ -130,7 +131,7 @@ describe('Mein Hof › Hofseite — „Aktuell vom Hof“', () => {
   it('ohne laufenden Beitrag: „Kein Beitrag“ mit „Neuer Beitrag ›“', async () => {
     ladeLaufendenBeitrag.mockResolvedValue(null)
     const { liste, editor } = await zeilen()
-    const erwartet = { titel: 'Aktuell vom Hof', wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: NEUER_BEITRAG_HREF } }
+    const erwartet = { titel: 'Aktuell vom Hof', wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: NEUER_BEITRAG_HREF }, beitrag: null }
     expect(liste).toEqual(erwartet)
     expect(editor).toEqual(erwartet)
   })

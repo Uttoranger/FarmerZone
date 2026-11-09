@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Eye } from 'lucide-react'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import { MEIN_HOF_ANSICHT_PARAMETER } from '@/schemas/mein-hof-ansicht'
 import { MEIN_HOF_ANSICHT_TEXT, ansichtAdresse, meinHofAnsichtAus } from '@/lib/mein-hof-ansicht'
@@ -79,9 +78,9 @@ const TITEL_ID = 'kundenansicht-titel'
 const BESCHREIBUNG_ID = 'kundenansicht-beschreibung'
 
 /**
- * Das Band oben (Mockup system-h1-kundenansicht-handy): Hofwelt-Orange als
- * Tönung wie die Hinweise des Hofbereichs (primary 12 %, Rand 45 %), Schrift
- * in `status-offen` — in beiden Themes ≥ 4,5:1 auf der Tönung. „Fertig" ist
+ * Das Band oben nach Board s1-mein-hof Bild 6 (Nr. 274; Liste Lauf 32 mein-hof
+ * „Kundenansicht: … oranger Balken“): neutral auf der Kartenfläche mit Linie
+ * unten, ohne Symbol, Titel in der Serife, darunter der Satz leise. „Fertig" ist
  * eine Pille in der Textfarbe, 44 px hoch.
  */
 export function KundenansichtBand({
@@ -92,14 +91,13 @@ export function KundenansichtBand({
   fertigRef?: RefObject<HTMLButtonElement | null>
 }): React.JSX.Element {
   return (
-    <div className="shrink-0 border-b border-primary/45 bg-primary/12 pt-[env(safe-area-inset-top)]">
-      <div className="flex h-14 items-center gap-2.5 pr-2 pl-4">
-        <Eye className="size-5 shrink-0 text-status-offen" strokeWidth={1.8} aria-hidden="true" />
+    <div className="shrink-0 border-b border-border bg-card pt-[env(safe-area-inset-top)]">
+      <div className="flex min-h-16 items-center gap-2.5 py-2 pr-3 pl-4">
         <div className="min-w-0 flex-1">
-          <h2 id={TITEL_ID} className="truncate text-[14px] leading-tight font-bold text-status-offen">
+          <h2 id={TITEL_ID} className="truncate font-heading text-[18px] leading-tight font-semibold text-foreground">
             {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
           </h2>
-          <p id={BESCHREIBUNG_ID} className="truncate text-xs text-foreground">
+          <p id={BESCHREIBUNG_ID} className="truncate text-[13px] text-muted-foreground">
             {MEIN_HOF_ANSICHT_TEXT.kundschaft}
           </p>
         </div>
@@ -108,7 +106,7 @@ export function KundenansichtBand({
           type="button"
           onClick={onFertig}
           className={cn(
-            'inline-flex h-11 shrink-0 items-center rounded-full bg-foreground px-4 text-[14px] font-bold text-background transition-opacity duration-[250ms] hover:opacity-90',
+            'inline-flex h-11 shrink-0 items-center rounded-full bg-foreground px-[18px] text-[15px] font-bold text-background transition-opacity duration-[250ms] hover:opacity-90',
             FOKUS_RAHMEN
           )}
         >

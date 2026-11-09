@@ -2,9 +2,10 @@ import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import type { BeitraegeUebersicht } from '@/lib/mein-hof-beitraege'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ListGruppe } from '@/components/ui/list-row'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { BeitragZeile } from '@/components/mein-hof/beitrag-zeile'
+import { MEIN_HOF_GRUPPE_TITEL } from '@/components/mein-hof/zeilen-stil'
 import { cn } from '@/lib/utils'
 
 /*
@@ -18,10 +19,21 @@ import { cn } from '@/lib/utils'
  * Was angeboten wird, entscheidet src/lib/mein-hof-beitraege.ts.
  *
  * Genau ein orange gefüllter Knopf (Hof-Aktion „erstellen"), der Rest Umriss.
+ *
+ * Seit Nr. 274 nach Board s1-/w1-mein-hof Bild 5: Einleitungssatz und „Neuer
+ * Beitrag“ (volle Breite) in einer Karte, Gruppen „Läuft · n“ / „Früher · n“, je
+ * Beitrag eine Zeile mit „›“; die Handlungen klappen in der Zeile auf (E12: alles,
+ * was /status konnte, bleibt).
  */
 
 const HAUPTKNOPF = cn(
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
+  FOKUS_RAHMEN
+)
+
+/** „Neuer Beitrag“ in der Karte: über die volle Breite, 52 px, 16 px fett (Board s1-/w1-mein-hof Bild 5). */
+const NEU_KNOPF = cn(
+  'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-primary px-3 text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
   FOKUS_RAHMEN
 )
 
@@ -31,7 +43,7 @@ export function BeitraegeReiter({ uebersicht }: { uebersicht: BeitraegeUebersich
       <EmptyState
         className="max-w-3xl"
         titel="Noch kein Beitrag"
-        satz="Mit einem Beitrag erzählst du deinen Kunden, was es gerade gibt — er steht auf deiner Hofseite."
+        satz="Mit einem Beitrag erzählst du deinen Kunden, was es gerade gibt – er steht auf deiner Hofseite."
         ausweg={
           <Link href="/status/new" className={HAUPTKNOPF}>
             <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
@@ -43,29 +55,26 @@ export function BeitraegeReiter({ uebersicht }: { uebersicht: BeitraegeUebersich
   }
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">Was du deinen Kunden erzählst – auf der Hofseite und auf Wunsch per E-Mail oder WhatsApp.</p>
-        <Link href="/status/new" className={cn(HAUPTKNOPF, 'shrink-0 self-start sm:self-auto')}>
-          <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
+    <div className="flex max-w-3xl flex-col gap-2.5">
+      <div className={cn('flex flex-col gap-2 border border-border bg-card px-3.5 py-3', RUNDUNG.blatt)}>
+        <p className="text-[15px] text-muted-foreground">Was du deinen Kunden erzählst – auf der Hofseite und auf Wunsch per E-Mail oder WhatsApp.</p>
+        <Link href="/status/new" className={NEU_KNOPF}>
           Neuer Beitrag
         </Link>
       </div>
 
-      <div className="mt-6 flex flex-col gap-6">
-        {uebersicht.gruppen.map((gruppe) => (
-          <section key={gruppe.id} aria-labelledby={`beitraege-${gruppe.id}`}>
-            <h2 id={`beitraege-${gruppe.id}`} className="px-1 text-xs font-semibold tracking-[1.1px] text-muted-foreground uppercase">
-              {gruppe.titel}
-            </h2>
-            <ListGruppe className="mt-2">
-              {gruppe.eintraege.map((eintrag) => (
-                <BeitragZeile key={eintrag.id} eintrag={eintrag} />
-              ))}
-            </ListGruppe>
-          </section>
-        ))}
-      </div>
+      {uebersicht.gruppen.map((gruppe) => (
+        <section key={gruppe.id} aria-labelledby={`beitraege-${gruppe.id}`} className="flex flex-col">
+          <h2 id={`beitraege-${gruppe.id}`} className={MEIN_HOF_GRUPPE_TITEL}>
+            {gruppe.titel} · {gruppe.eintraege.length}
+          </h2>
+          <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
+            {gruppe.eintraege.map((eintrag) => (
+              <BeitragZeile key={eintrag.id} eintrag={eintrag} />
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   )
 }

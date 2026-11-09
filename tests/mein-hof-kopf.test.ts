@@ -76,10 +76,11 @@ describe('ein Kopf, eine Hülle (Reiter an derselben Stelle)', () => {
   it('/farm-page (beide Reiter) und /products stecken den Kopf in dieselbe Hülle', () => {
     const farmPage = quelle('src/app/(hof)/farm-page/page.tsx')
     const produkte = quelle('src/app/(hof)/products/page.tsx')
-    expect(farmPage.match(/<div className=\{MEIN_HOF_KOPF_HUELLE\}>\s*<MeinHofSeitenkopf /g)).toHaveLength(2)
+    // Seit Nr. 274 klebt der Kopf auf /farm-page unter lg (MEIN_HOF_KOPF_KLEBT); die Hülle bleibt dieselbe.
+    expect(farmPage.match(/<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, MEIN_HOF_KOPF_KLEBT\)\}>\s*<MeinHofSeitenkopf /g)).toHaveLength(2)
     expect(produkte).toMatch(/<div className=\{cn\(MEIN_HOF_KOPF_HUELLE, 'md:hidden'\)\}>\s*<MeinHofKopf /)
     // Unter lg rendert der Seitenkopf genau diesen Baustein, ohne eigenen Abstand davor.
-    expect(quelle('src/components/mein-hof/seitenkopf.tsx')).toMatch(/<header className="print:hidden lg:mb-6">\s*\{[^}]*\}\s*<div className="lg:hidden">\s*<MeinHofKopf /)
+    expect(quelle('src/components/mein-hof/seitenkopf.tsx')).toMatch(/<header className="print:hidden lg:mb-6">\s*\{[^}]*\}\s*<div className="lg:hidden">\s*\{[^}]*\}\s*<MeinHofKopf /)
     // Gegenprobe am echten Quelltext: Eine eigene Hülle auf /products (wie bis Nr. 142) fiele auf.
     const eigeneHuelle = produkte.replace("<div className={cn(MEIN_HOF_KOPF_HUELLE, 'md:hidden')}>", '<div className="px-4 pt-5 md:hidden">')
     expect(eigeneHuelle).not.toBe(produkte)
@@ -254,16 +255,21 @@ describe('„Hof pausieren“ (Dialog bzw. Blatt)', () => {
     expect(blatt).toContain("const TITEL = 'Hof pausieren'")
     expect(blatt).toContain('useMindestbreite(768)')
     expect(blatt).not.toMatch(/aria-label="Schließen"|<X\b|<Pause\b/)
-    expect(blatt).toMatch(/'inline-flex h-12 w-full [^']*bg-primary/)
+    // Am Handy volle Breite, ab 768 px rechtsbündig (Board w1-mein-hof Bild 3, Nr. 274).
+    expect(blatt).toMatch(/'inline-flex min-h-12 w-full [^']*bg-primary[^']*md:w-auto md:self-end/)
   })
 
-  it('Feld „Nachricht an deine Kundschaft (freiwillig)“, Kasten „So steht es auf deiner Hofseite“ mit der echten Hinweiskarte, Schluss-Satz', () => {
+  it('Feld „Nachricht an deine Kundschaft (freiwillig)“, Kasten „So steht es auf deiner Hofseite“ neutral, Schluss-Satz', () => {
     expect(blatt).toMatch(/<label htmlFor=\{feldId\}[^>]*>\s*Nachricht an deine Kundschaft <span[^>]*>\(freiwillig\)<\/span>/)
     expect(blatt).toContain('So steht es auf deiner Hofseite')
     expect(blatt).toContain('Offene Bestellungen bleiben bestehen. Neue Bestellungen sind erst nach „Fortsetzen“ möglich.')
     expect(blatt).toContain('<ZeichenZaehler laenge={nachricht.trim().length} max={PAUSENACHRICHT_MAX} />')
     expect(blatt).not.toContain('maxLength')
-    expect(blatt).toContain('<KaufSperreHinweis sperre="pause" hofName={hofName} pauseMessage={nachricht} />')
+    // Seit Nr. 274 neutral wie im Board (Abnahme Lauf 32 mein-hof 11): der Satz der Hofseite aus derselben Quelle, die Nachricht in „…“.
+    expect(blatt).not.toContain('<KaufSperreHinweis')
+    expect(blatt).toContain('{`${hofName} ${PAUSIERT_GERADE}.`}')
+    expect(blatt).toContain('{`„${nachricht.trim()}“`}')
+    expect(blatt).not.toMatch(/bg-zustand-tun|<Pause|<Hinweiskarte/)
   })
 
   it('Pausieren schreibt die Nachricht mit, Fortsetzen die gespeicherte; Meldungen aus EINER Quelle', () => {
