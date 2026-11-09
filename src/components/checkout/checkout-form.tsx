@@ -17,6 +17,7 @@ import {
 import { formatEuro, positionMengeVorn } from '@/lib/format'
 import { BAR_NICHT_MOEGLICH_SATZ, INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
+import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
@@ -292,8 +293,10 @@ export function CheckoutForm({
         setReserviertBis(typeof befund.reserviertBis === 'string' ? befund.reserviertBis : null)
         setJetzt(new Date())
         if (!befund.meldung) return
-        uebernehmeBerichtigung(positionen, befund.items ?? [], { farmId: farm.id, farmSlug: farm.slug }, setCart)
-        setKorbHinweis(befund.meldung)
+        const nachher = uebernehmeBerichtigung(positionen, befund.items ?? [], { farmId: farm.id, farmSlug: farm.slug }, setCart)
+        // Board s1-/w1-korb Bild 2 (Nr. 276): Die Antwort kennt keine Produktnamen, der Korb vorher schon — der Satz zu
+        // entfernten Positionen nennt sie; alles andere in `meldung` bleibt wörtlich (korbHinweisMitNamen).
+        setKorbHinweis(korbHinweisMitNamen(befund.meldung, entfernteNamen(positionen, nachher)))
       } catch {
         // Kein Netz oder Serverfehler: Der Warenkorb bleibt, wie er ist.
         // Der Checkout prüft ohnehin noch einmal verbindlich.
@@ -454,11 +457,16 @@ export function CheckoutForm({
         // auf den geprüften Stand gebracht und bleibt SICHTBAR (Befund 3).
         if (err.code === CODE_RESERVIERUNG_ABGELAUFEN || err.code === 'WARENKORB_GEAENDERT') {
           let stand = cart
-          if (Array.isArray(err.items)) stand = uebernehmeBerichtigung(stand, err.items, hof, setCart)
+          // Die Namen der entfernten Positionen (Nr. 276) — nur, wenn die Antwort den berichtigten Korb mitbringt.
+          let namen: string[] | null = null
+          if (Array.isArray(err.items)) {
+            stand = uebernehmeBerichtigung(stand, err.items, hof, setCart)
+            namen = entfernteNamen(cart, stand)
+          }
           // Preis geändert: den gültigen Preis übernehmen, damit die neue
           // Summe sichtbar ist, bevor erneut abgeschickt wird.
           if (Array.isArray(err.preise)) stand = uebernehmePreise(stand, err.preise, hof, setCart)
-          setKorbHinweis(err.error ?? 'Dein Warenkorb hat sich geändert.')
+          setKorbHinweis(typeof err.error === 'string' ? korbHinweisMitNamen(err.error, namen) : 'Dein Warenkorb hat sich geändert.')
           // Die Halte neu setzen (wie beim Öffnen der Kasse) — sonst lehnte
           // der Server jeden weiteren Versuch wieder als abgelaufen ab.
           if (err.code === CODE_RESERVIERUNG_ABGELAUFEN) await pruefeKorb(stand, sessionId)

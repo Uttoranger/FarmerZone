@@ -13,6 +13,7 @@ import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, C
 import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
+import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { MONTH_SHORT, centsAlsEuro, formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl, seasonLabel } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
@@ -628,7 +629,9 @@ export function ProductGrid({
     let satz = null as string | null
     ersetzeKorb((vorher) => {
       const abgleich = gleicheKorbMitHofseite(vorher, products, sperre)
-      satz = abgleich?.satz ?? null
+      // Board s1-/w1-korb Bild 2 (Nr. 276): der Satz zu entfernten Positionen mit dem Produktnamen — die Quelle kennt
+      // keine Namen, der Korb vorher schon. Alles andere im Satz bleibt wörtlich (korbHinweisMitNamen).
+      satz = abgleich?.satz ? korbHinweisMitNamen(abgleich.satz, entfernteNamen(vorher, abgleich.positionen)) : null
       return abgleich?.positionen ?? vorher
     })
     if (satz) zeigeKorbHinweis(farmId, satz)
