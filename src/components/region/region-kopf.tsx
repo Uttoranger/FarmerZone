@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { REGION_SATZ_KARTE } from '@/components/region/region-spalten'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
 import type { UmfeldKm } from '@/lib/umfeld'
@@ -23,7 +24,11 @@ import { regionReiterLink, type FutterAnsichtWahl, type RegionReiter } from '@/s
 /** Der Satz unter der Überschrift, wörtlich wie im Board s1-/w1-region (mit Punkt). */
 export const REGION_SATZ = 'Rund um deinen Hof – Preise vergleichen und Futter kaufen.'
 
-export const REGION_RAHMEN = 'w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
+/**
+ * Der Rahmen der Seite: bis 1024 px eine Spalte, ab 1024 px Liste und Karte nebeneinander mit Inhalt bis 1400 px
+ * (Liste Lauf 32 region, Nr. 272). `group/region` trägt die Kartenansicht am Handy zum Satz im Kopf (region-spalten.ts).
+ */
+export const REGION_RAHMEN = 'group/region w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 lg:max-w-[1400px] xl:px-10'
 
 const REITER: readonly { id: RegionReiter; label: string }[] = [
   { id: 'preise', label: 'Preise vergleichen' },
@@ -56,7 +61,8 @@ export function RegionKopf({
       <div>
         {/* Kopfstreifen mit Linie am Handy (G1, Liste Lauf 32 region). */}
         <WerkzeugKopf titel="Region" unterzeile={<HofUnterzeile hofName={hofName} jetzt={jetzt} />} />
-        <p className="text-[13.5px] leading-normal text-muted-foreground md:text-sm">{REGION_SATZ}</p>
+        {/* In der Kartenansicht am Handy fällt der Satz weg (Board s1-region Bild 6). */}
+        <p className={cn('text-[13.5px] leading-normal text-muted-foreground md:text-sm', REGION_SATZ_KARTE)}>{REGION_SATZ}</p>
       </div>
       {/* Zwei gleich breite Reiter über die volle Breite, der gewählte grün unterstrichen (Board s1-/w1-region). */}
       <nav aria-label="Region" className="flex border-b border-border">

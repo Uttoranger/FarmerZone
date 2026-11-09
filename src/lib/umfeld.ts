@@ -456,6 +456,15 @@ export function guenstigsterGrundpreis(produkte: readonly UmfeldProdukt[], berei
   return bester?.text ?? null
 }
 
+
+/**
+ * „Hof am Bach · 4 km“ — der Kopf der Futterkarte in Region (Board s1-/w1-region Bild 2, Liste Lauf 32 region:
+ * Produkt als Titel, darunter Hof und Entfernung, ohne PLZ und Ort; Nr. 272). Die Entfernung formatiert dieselbe
+ * Quelle wie HofKopf (`formatiereEntfernung`).
+ */
+export function hofMitEntfernung(hof: { name: string; entfernungKm: number }): string {
+  return `${hof.name} · ${formatiereEntfernung(hof.entfernungKm)}`
+}
 /** Pins und Mittelpunkt der Karte — die Pins sind genau die gezählten Höfe. */
 export function baueUmfeldKarte(eingabe: UmfeldEingabe & { eigenerStandort: { lat: number; lon: number } }): UmfeldKarte {
   return {

@@ -8,6 +8,13 @@ import { cn } from '@/lib/utils'
  * sicher kommt (Stripe-Link und Wiederholen hängen von den Daten ab). Farbstaffelung wie die anderen
  * Hof-Routen im neuen Design: bg-border für Überschriften, bg-muted für Zweitzeilen und Flächen.
  */
+/**
+ * Die Kopf-Aktion „Verkauf eintragen“ im Web: ohne „+“ und auf Höhe der h1 (Board w2-verkaeufe Bild 1, Liste
+ * Lauf 32 „Knopf mit ‚+‘ tiefer gesetzt“). Der Werkzeug-Kopf richtet seine Aktion im Web unten aus (an der
+ * Unterzeile); der Abstand unten hebt den Knopf um die Höhe der Unterzeile zur Mitte der h1.
+ */
+export const KOPF_AKTION = 'hidden md:mb-[22px] md:inline-flex'
+
 export const VERKAEUFE_RAHMEN = 'w-full max-w-5xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
 
 export function VerkaeufeLaden(): React.JSX.Element {

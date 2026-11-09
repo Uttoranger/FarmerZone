@@ -2,15 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { X } from 'lucide-react'
 import HoefeKarte, { type KartenHof } from '@/components/hoefe/hoefe-karte'
 import { LEERE_LAGE, nachLeerTipp, nachPinTipp, type AuswahlLage } from '@/lib/hoefe-anzeige'
 import type { UmfeldKarte } from '@/lib/umfeld'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KARTE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { REGION_KARTE_HOEHE } from '@/components/region/region-spalten'
 import { cn } from '@/lib/utils'
-
-/** Ungefähre Höhe der Karte unter dem Pin (Name, Entfernung, Preis, Link). */
-const PIN_KARTE_HOEHE = 160
 
 /**
  * Die Karte des Umfelds — die Kartenkomponente von /hoefe, nicht eine zweite.
@@ -23,6 +21,11 @@ const PIN_KARTE_HOEHE = 160
  *
  * Welche Pins es gibt, hat baueUmfeldKarte (src/lib/umfeld.ts) entschieden:
  * genau die Höfe, die die Liste zählt. Hier wird nichts mehr gefiltert.
+ *
+ * Seit Nr. 272 (Liste Lauf 32 region, Board s1-/w1-region Bild 6): die
+ * Quellenangabe unten rechts, der gewählte Hof als Feld UNTER der Karte mit
+ * „Schließen“ statt eines Kastens über den Pins — so verdeckt nichts die
+ * südlichen Höfe, und der Ausschnitt braucht kein Polster unten.
  */
 export default function UmfeldKarteAnsicht({ karte, eigenerName }: { karte: UmfeldKarte; eigenerName: string }) {
   const [lage, setLage] = useState<AuswahlLage>(LEERE_LAGE)
@@ -30,42 +33,33 @@ export default function UmfeldKarteAnsicht({ karte, eigenerName }: { karte: Umfe
   const gewaehlt = karte.pins.find((p) => p.slug === lage.ausgewaehlt) ?? null
 
   return (
-    // `isolate`: eine eigene Stapelebene. Sonst stünden Leaflets Ebenen (400)
-    // und Bedienteile (1000) im selben Stapel wie die feste Bauern-Leiste
-    // (z-50) und lägen beim Scrollen über ihr.
-    <div className="relative isolate overflow-hidden rounded-2xl">
-      <HoefeKarte
-        hoefe={hoefe}
-        lage={lage}
-        fokus={0}
-        attributionOben
-        hoeheKlasse="h-[60vh] min-h-[320px]"
-        // So viel hält der Ausschnitt unten frei, wie die Karte unter dem
-        // Pin hoch ist — sonst lägen die südlichsten Höfe dahinter.
-        polsterUnten={PIN_KARTE_HOEHE}
-        zentrum={{ ...karte.zentrum, titel: `${eigenerName} (dein Hof)` }}
-        onAuswahl={(slug) => setLage((l) => nachPinTipp(l, slug))}
-        onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
-      />
+    <div className="flex flex-col gap-3">
+      {/* `isolate`: eine eigene Stapelebene. Sonst stünden Leaflets Ebenen (400) und Bedienteile (1000) im selben
+          Stapel wie die feste Bauern-Leiste (z-50) und lägen beim Scrollen über ihr. */}
+      <div className="relative isolate overflow-hidden rounded-2xl">
+        <HoefeKarte
+          hoefe={hoefe}
+          lage={lage}
+          fokus={0}
+          hoeheKlasse={REGION_KARTE_HOEHE}
+          zentrum={{ ...karte.zentrum, titel: `${eigenerName} (dein Hof)` }}
+          onAuswahl={(slug) => setLage((l) => nachPinTipp(l, slug))}
+          onLeerTipp={() => setLage((l) => nachLeerTipp(l))}
+        />
+      </div>
       {gewaehlt && (
-        // Über den Leaflet-Ebenen (400) und unter den Bedienteilen (1000).
-        <div
-          role="region"
-          aria-label={gewaehlt.name}
-          className="absolute inset-x-3 bottom-3 z-[500] rounded-xl border border-border bg-card p-4 shadow-lg dark:ring-1 dark:ring-border"
-        >
+        // Unter der Karte, nicht über den Pins (Liste Lauf 32 region, Bild 6).
+        <div role="region" aria-label={gewaehlt.name} className={cn(KARTE, 'p-4')}>
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate font-semibold text-foreground" title={gewaehlt.name}>{gewaehlt.name}</p>
-              <p className="text-sm text-muted-foreground tabular-nums">{gewaehlt.entfernung}</p>
-            </div>
-            <button
-              type="button"
-              aria-label="Schließen"
-              onClick={() => setLage((l) => nachLeerTipp(l))}
-              className={cn('-mr-2 -mt-2 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)}
-            >
-              <X className="size-4" aria-hidden="true" />
+            <p className="min-w-0 pt-2 text-[15px] font-semibold text-foreground tabular-nums">
+              <span className="truncate" title={gewaehlt.name}>
+                {gewaehlt.nummer} · {gewaehlt.name}
+              </span>{' '}
+              · {gewaehlt.entfernung}
+            </p>
+            {/* „Schließen“ als Wort statt „×“ (Register N23: der Bereich geht mit „Schließen“ auf). */}
+            <button type="button" onClick={() => setLage((l) => nachLeerTipp(l))} className={cn(KNOPF_RAHMEN, 'min-h-11 shrink-0 px-4')}>
+              Schließen
             </button>
           </div>
           <p className="mt-2 text-sm text-foreground tabular-nums">
