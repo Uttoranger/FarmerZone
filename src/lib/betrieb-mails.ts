@@ -1226,6 +1226,81 @@ export const ALLE_MAILS_TEXT = {
     'Nochmal schicken geht für Mails zu Bestellungen und an Höfe, immer an die hinterlegte Adresse und mit dem heutigen Stand – höchstens 3-mal je Mail am Tag. Codes und Passwort-Links fordert die Person selbst neu an; Beiträge und Rundschreiben gehen nie ein zweites Mal hinaus. Eine andere Adresse gibt es hier bewusst nicht.',
 } as const
 
+// ─── Beispiele (Register N48, Nr. 270) ───────────────────────────────────────
+
+/**
+ * Die Gruppen der Beispiele in Admin › Betrieb › Mails — je Mail-Board eine
+ * (docs/mockups/redesign-2026-11/s3-mail-*): Codes und Links, Sicherheit,
+ * Admin-Konto und Team, Betrieb, Konto und Geld an den Hof, Neuigkeiten.
+ */
+export const BEISPIEL_GRUPPEN = [
+  { id: 'zugang', name: 'Codes und Links' },
+  { id: 'sicherheit', name: 'Sicherheit' },
+  { id: 'team', name: 'Admin-Konto und Team' },
+  { id: 'betrieb', name: 'An das Team (Betrieb)' },
+  { id: 'hof-konto', name: 'Konto und Geld an den Hof' },
+  { id: 'neuigkeiten', name: 'Neuigkeiten mit Einwilligung' },
+] as const
+
+export type BeispielGruppe = (typeof BEISPIEL_GRUPPEN)[number]['id']
+
+/**
+ * Jede Mail der sechs Boards als Beispiel, in der Reihenfolge ihrer Bilder.
+ * Nur Namen — was ein Beispiel baut, steht in src/server/mail-arten/beispiele.ts.
+ */
+export const MAIL_BEISPIELE = [
+  { id: 'anmeldecode', gruppe: 'zugang', name: 'Anmeldecode' },
+  { id: 'bestellcode', gruppe: 'zugang', name: 'Code für deine Bestellungen' },
+  { id: 'passwort-link', gruppe: 'zugang', name: 'Passwort zurücksetzen' },
+  { id: 'email-bestaetigung', gruppe: 'zugang', name: 'E-Mail-Adresse bestätigen' },
+  { id: 'neue-anmeldung', gruppe: 'sicherheit', name: 'Neue Anmeldung' },
+  { id: 'zu-viele-codes', gruppe: 'sicherheit', name: 'Zu viele falsche Codes' },
+  { id: 'zu-viele-passwoerter', gruppe: 'sicherheit', name: 'Zu viele falsche Passwörter' },
+  { id: 'email-aendern-link', gruppe: 'sicherheit', name: 'Neue Anmelde-Adresse bestätigen' },
+  { id: 'email-geaendert-hinweis', gruppe: 'sicherheit', name: 'Anmelde-Adresse geändert' },
+  { id: 'registrierungs-hinweis', gruppe: 'sicherheit', name: 'Registrierungs-Hinweis' },
+  { id: 'einrichtungscode', gruppe: 'team', name: 'Code für die Einrichtung' },
+  { id: 'passkey-hinzugefuegt', gruppe: 'team', name: 'Neuer Passkey' },
+  { id: 'team-recht-geaendert', gruppe: 'team', name: 'Team: Recht geändert' },
+  { id: 'betreiber-bestaetigung', gruppe: 'team', name: 'Empfänger bestätigen' },
+  { id: 'betreiber-testmail', gruppe: 'team', name: 'Testmail' },
+  { id: 'neuer-hof', gruppe: 'betrieb', name: 'Neuer Hof wartet' },
+  { id: 'meldung', gruppe: 'betrieb', name: 'Fehlermeldung' },
+  { id: 'erstattung-offen', gruppe: 'betrieb', name: 'Erstattung offen' },
+  { id: 'wochenbericht', gruppe: 'betrieb', name: 'Wochenlage' },
+  { id: 'antwort-an-team', gruppe: 'betrieb', name: 'Ein Hof hat geantwortet' },
+  { id: 'betrieb-warnung', gruppe: 'betrieb', name: 'Betrieb-Warnung' },
+  { id: 'freischaltung', gruppe: 'hof-konto', name: 'Freischaltung' },
+  { id: 'plattformgebuehr-ankuendigung', gruppe: 'hof-konto', name: 'Plattformgebühr ankündigen' },
+  { id: 'lastschrift-gescheitert', gruppe: 'hof-konto', name: 'Lastschrift gescheitert' },
+  { id: 'rundschreiben', gruppe: 'hof-konto', name: 'Rundschreiben' },
+  { id: 'postfach-antwort', gruppe: 'hof-konto', name: 'Antwort vom Team' },
+  { id: 'abo-bestaetigung', gruppe: 'neuigkeiten', name: 'Anmeldung bestätigen' },
+  { id: 'beitrag-mit-foto', gruppe: 'neuigkeiten', name: 'Beitrag mit Foto' },
+  { id: 'beitrag-ohne-foto', gruppe: 'neuigkeiten', name: 'Beitrag ohne Foto' },
+  { id: 'bescheid', gruppe: 'neuigkeiten', name: 'Bescheid an Kundinnen' },
+] as const satisfies readonly { id: string; gruppe: BeispielGruppe; name: string }[]
+
+export type MailBeispielId = (typeof MAIL_BEISPIELE)[number]['id']
+
+export const MAIL_BEISPIEL_IDS = MAIL_BEISPIELE.map((b) => b.id) as [MailBeispielId, ...MailBeispielId[]]
+
+/** Der Name eines Beispiels für Knopf und Rahmen. */
+export function beispielName(id: MailBeispielId): string {
+  return MAIL_BEISPIELE.find((b) => b.id === id)?.name ?? id
+}
+
+export const BEISPIELE_TEXT = {
+  titel: 'Beispiele',
+  zusatz: 'erfundene Daten · Codes als Nullen · Links unkenntlich',
+  satz: 'Jede Mail-Art mit erfundenen Daten. Nichts wird verschickt, nichts gespeichert.',
+  knopf: 'Beispiel ansehen',
+  knopfLabel: (name: string): string => `Beispiel ansehen: ${name}`,
+  schliessen: 'Beispiel schließen',
+  rahmenTitel: (name: string): string => `Beispiel der Mail ${name} mit erfundenen Daten, Links unkenntlich`,
+  betreff: 'Betreff',
+} as const
+
 /**
  * Warum eine Mail in ihrem Stand nicht nochmal geht — null, wenn der Stand
  * passt (`NOCHMAL_STAENDE`). Die EINE Quelle für das Detail und die Action.
