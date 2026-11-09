@@ -102,6 +102,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ablagen des Prüfwerkzeugs (gitignored): Ein laufender Fotograf legt dort eine Kopie von .next ab,
+    // die sonst mitgeprüft würde (Zwischen-Morgenbericht 33 B, Regelvorschlag 1, freigegeben 9.11.2026;
+    // tests/eslint-nachtlauf-ausnahme.test.ts).
+    ".nachtlauf/**",
   ]),
 ]);
 

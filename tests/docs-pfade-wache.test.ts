@@ -25,7 +25,8 @@
  * und ein Muster mit Treffer nicht; ein Muster ohne Treffer, ein Zweig ohne Datei schlagen an; ein Platzhalter
  * wird nicht geprüft.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -34,8 +35,12 @@ const WURZEL = process.cwd()
 const ANFAENGE = ['tests/', 'src/', 'scripts/', 'prisma/', '.claude/', '.github/']
 /** Dateien im Wurzelordner, die Regeltexte nennen. */
 const WURZEL_DATEIEN = ['eslint.config.mjs', 'vitest.config.ts', 'vitest.integration.config.ts', 'next.config.ts', 'package.json']
-/** Ordner, die kein Teil des Repositorys sind (Pakete, Build, Git). */
-const UEBERSPRINGEN = new Set(['node_modules', '.git', '.next', '.vercel'])
+/**
+ * Ordner, die kein Teil des Repositorys sind (Pakete, Build, Git). `.nachtlauf` (gitignored) hält die Ablagen
+ * des Prüfwerkzeugs — Fotograf-Ordner mit `.next`-Kopie, Browser-Profile mit toten Links, an denen `statSync`
+ * mit ENOENT abbrach (Zwischen-Morgenbericht 33 B, Regelvorschlag 1, freigegeben 9.11.2026).
+ */
+const UEBERSPRINGEN = new Set(['node_modules', '.git', '.next', '.vercel', '.nachtlauf'])
 
 /** Funde, die bleiben dürfen: `datei: pfad` → Grund. Nur schrumpfen. */
 const BESTAND: Record<string, string> = {}
@@ -75,18 +80,18 @@ function musterZuRegex(muster: string): RegExp {
 }
 
 /** Alle Dateien und Ordner des Repositorys (relativ, mit `/`), ohne Pakete und Build. */
-function alleEintraege(): string[] {
+function alleEintraege(wurzel: string = WURZEL): string[] {
   const liste: string[] = []
   const gehe = (ordner: string): void => {
     for (const name of readdirSync(ordner)) {
       if (UEBERSPRINGEN.has(name)) continue
       const pfad = join(ordner, name)
-      const rel = relative(WURZEL, pfad).split(sep).join('/')
+      const rel = relative(wurzel, pfad).split(sep).join('/')
       liste.push(rel)
       if (statSync(pfad).isDirectory()) gehe(pfad)
     }
   }
-  gehe(WURZEL)
+  gehe(wurzel)
   return liste
 }
 
@@ -143,6 +148,26 @@ describe('Pfade in den Regeltexten zeigen auf Dateien, die es gibt', () => {
       expect(urteile(pfad, eintraege, existiert), schluessel).toBe('fehlt')
     }
   }, 30_000)
+})
+
+describe('Pfade in den Regeltexten — die Ablagen des Prüfwerkzeugs', () => {
+  it('überspringt .nachtlauf/ samt totem Link im Browser-Profil und Fotograf-Kopie, liest den Rest', () => {
+    // Arrange: ein Temp-Ordner wie ein Worktree mit laufendem Fotografen und Prüf-Browser — nie im Repo.
+    const wurzel = mkdtempSync(join(tmpdir(), 'docs-pfade-nachtlauf-'))
+    try {
+      mkdirSync(join(wurzel, 'tests'))
+      writeFileSync(join(wurzel, 'tests', 'a.test.ts'), '')
+      mkdirSync(join(wurzel, '.nachtlauf', 'browser', 'b1'), { recursive: true })
+      symlinkSync(join(wurzel, 'gibt-es-nicht'), join(wurzel, '.nachtlauf', 'browser', 'b1', 'SingletonLock'))
+      mkdirSync(join(wurzel, '.nachtlauf', 'fotograf', '1', '.next'), { recursive: true })
+      // Act
+      const eintraege = alleEintraege(wurzel)
+      // Assert
+      expect(eintraege).toEqual(['tests', 'tests/a.test.ts'])
+    } finally {
+      rmSync(wurzel, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('Pfade in den Regeltexten — Gegenprobe: die Erkennung schlägt an', () => {
