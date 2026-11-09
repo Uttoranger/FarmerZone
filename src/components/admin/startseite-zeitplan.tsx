@@ -37,7 +37,7 @@ export type ZeitplanAktion =
   | { art: 'zurueckziehen'; id: string }
   | { art: 'uebernehmen'; id: string }
 
-const KICKER = 'mb-2 ml-8 text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase'
+const KICKER = 'mb-2 ml-8 text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase'
 
 function Punkt({ ton }: { ton: 'tun' | 'laeuft' | 'leise' }): React.JSX.Element {
   return (

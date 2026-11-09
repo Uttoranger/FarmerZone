@@ -70,7 +70,7 @@ export function FadenSpalte({ faden, akte = null, jetzt }: { faden: AdminFaden; 
       </div>
       <div className="flex flex-col gap-3 px-4 py-4 md:px-5">
         {faden.rundschreiben && (
-          <p className="self-center text-[11.5px] text-muted-foreground">
+          <p className="self-center text-xs text-muted-foreground">
             {wannText(faden.rundschreiben.gesendetAm, jetzt)} · {ADMIN_POSTFACH_TEXT.rundschreibenAn(faden.rundschreiben.empfaenger)}
           </p>
         )}
