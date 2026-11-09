@@ -57,13 +57,37 @@ describe('einrichtenStand — ohne Hof', () => {
   })
 })
 
+describe('einrichtenStand — der eine orange Knopf (Liste Lauf 32, registrieren; Nr. 275)', () => {
+  const primaer = (daten: EinrichtenDaten) =>
+    einrichtenStand(daten)
+      .schritte.filter((s) => s.aktion?.art === 'link' && s.aktion.primaer)
+      .map((s) => s.id)
+
+  it('liegt am ersten offenen Schritt — bei offener Hofseite „Weiter“, nicht „Mit Stripe einrichten“', () => {
+    expect(primaer(mitHof())).toEqual(['hofseite'])
+    expect(schritt(mitHof(), 'zahlung').aktion).toMatchObject({ primaer: false })
+  })
+
+  it('wandert mit: Hofseite fertig → Produkte, dann Zahlung', () => {
+    const fertig = { erledigt: 11, gesamt: 11, fehlend: [] }
+    expect(primaer(mitHof({ hofseite: fertig }))).toEqual(['produkte'])
+    expect(primaer(mitHof({ hofseite: fertig, produkte: 2 }))).toEqual(['zahlung'])
+  })
+
+  it('nie an gesperrten Schritten oder dem Hinweis; ohne offenen Link-Schritt kein oranger Knopf', () => {
+    const fertig = { erledigt: 11, gesamt: 11, fehlend: [] }
+    expect(primaer(mitHof({ hofseite: fertig, produkte: 2, stripeBereit: true }))).toEqual([])
+    expect(primaer(OHNE_HOF)).toEqual([])
+  })
+})
+
 describe('einrichtenStand — mit Hof', () => {
   it('Hofseite: Stand aus „Mein Hof", Link dorthin, solange etwas fehlt', () => {
     const s = schritt(mitHof(), 'hofseite')
     expect(s.zustand).toBe('offen')
     expect(s.text).toBe('7 von 11 – es fehlen Logo, Über uns, Fotos und Titelbild')
     expect(s.textKurz).toBe('7 von 11 fertig')
-    expect(s.aktion).toEqual({ art: 'link', href: '/farm-page', label: 'Weiter', primaer: false })
+    expect(s.aktion).toEqual({ art: 'link', href: '/farm-page', label: 'Weiter', primaer: true })
   })
 
   it('Hofseite vollständig: erledigt, ohne Aktion', () => {
@@ -77,10 +101,7 @@ describe('einrichtenStand — mit Hof', () => {
     expect(schritt(mitHof({ produkte: 2 }), 'produkte').text).toBe('2 Produkte angelegt')
   })
 
-  it('Zahlung: führt nur in die bestehende Stripe-Einrichtung — der eine orange Knopf', () => {
-    const stand = einrichtenStand(mitHof())
-    const primaer = stand.schritte.filter((s) => s.aktion?.art === 'link' && s.aktion.primaer)
-    expect(primaer.map((s) => s.id)).toEqual(['zahlung'])
+  it('Zahlung: führt nur in die bestehende Stripe-Einrichtung', () => {
     expect(schritt(mitHof(), 'zahlung').aktion).toMatchObject({ href: '/settings/payments', label: 'Mit Stripe einrichten' })
     expect(schritt(mitHof({ stripeBereit: true }), 'zahlung')).toMatchObject({ zustand: 'erledigt', aktion: null })
   })

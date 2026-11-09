@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { beendeBestellAnsicht } from '@/server/actions/bestellungen-finden'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { ETIKETT, KARTE, KNOPF_BREIT_GRUEN, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { BestellungenFindenBlock } from '@/components/bestellungen/bestellungen-finden-formular'
@@ -19,7 +20,8 @@ import { BestellungenFindenBlock } from '@/components/bestellungen/bestellungen-
  */
 
 /** Die Spalte: 520 px wie im Board w1-meine-bestellungen (eine Spalte, auch im Browser), am Handy 16 px Rand. */
-const SEITE = 'mx-auto flex w-full max-w-[552px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8'
+// Unten 20 px bis zum Seitenfuß im Web (pruefer-ui Lauf 33: 67 statt 40 px vom letzten Kasten bis zur Fußlinie; Nr. 275).
+const SEITE = 'mx-auto flex w-full max-w-[552px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8 md:pb-5'
 // Liste Lauf 32 (meine-bestellungen): 24 px in beiden Breiten wie im Board.
 const TITEL = 'font-heading text-[24px] leading-tight font-semibold'
 /** Knopf mit Rand in Inhaltsbreite (Board s1-/w1-meine-bestellungen: 44 px, Radius 12 px, Feldrand). */
@@ -115,8 +117,8 @@ export function BestellungenListe({
         <EmptyState
           titel="Keine Bestellungen gefunden"
           satz="Zu dieser Adresse gibt es bei uns keine Bestellung. Vielleicht hast du mit einer anderen bestellt?"
-          // Board Bild 4: die Wege über die volle Breite der Karte; das Symbol bleibt mittig (Register N9).
-          className="items-stretch rounded-[16px] border-solid py-6 [&>span]:self-center"
+          // Board Bild 4: Polster 12/14 px, 16 px Rundung, die Wege über die volle Breite (Liste Lauf 32, Mangel Leerkarte; Nr. 275).
+          className={cn('px-3.5 py-3', RUNDUNG.blatt)}
           ausweg={
             <div className="flex w-full flex-col gap-1">
               <Link href="/hoefe" className={KNOPF_BREIT_GRUEN}>
@@ -125,7 +127,7 @@ export function BestellungenListe({
               <form action={beendeBestellAnsicht}>
                 <button
                   type="submit"
-                  className={cn('inline-flex min-h-11 w-full items-center justify-center rounded-full px-3 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+                  className={cn('inline-flex min-h-11 w-full items-center justify-center rounded-full px-3 text-[16px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
                 >
                   Andere E-Mail-Adresse
                 </button>
@@ -155,7 +157,9 @@ export function BestellungenListe({
           </h2>
           <ListGruppe>
             {frueher.map((eintrag) => (
+              // Hofname fett 15 px, Zeile 13 px wie im Board (Liste Lauf 32, Mangel „Hofname normal statt fett“).
               <ListRow
+                gross
                 key={eintrag.id}
                 href={eintrag.link}
                 titel={eintrag.hofName}

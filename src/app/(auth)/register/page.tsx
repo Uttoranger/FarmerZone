@@ -58,7 +58,7 @@ export default async function RegisterPage(): Promise<React.JSX.Element> {
         </span>
       }
     >
-      <RegisterForm formToken={generateFormToken()} gruendungSatz={<GruendungZeile gruendung={gruendung} className="-mt-2 mb-5" />} />
+      <RegisterForm formToken={generateFormToken()} gruendungSatz={<GruendungZeile gruendung={gruendung} className="mb-2.5" />} />
     </KundeFokusShell>
   )
 }

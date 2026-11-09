@@ -1,6 +1,7 @@
 import { Star } from 'lucide-react'
 import { GRUENDUNG_TEXT, type GruendungSeiten } from '@/lib/gruendungshof'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { SatzTeile } from '@/components/gruendung/satz-teile'
 
 /**
@@ -16,7 +17,9 @@ export function GruendungZeile({ gruendung, className }: { gruendung: GruendungS
   return (
     <p
       className={cn(
-        'flex items-start gap-[9px] rounded-xl border border-border bg-muted/50 px-3 py-2.5 text-[13px] leading-[1.45] text-muted-foreground md:text-[13.5px]',
+        // Nach Board w2-registrieren (Nr. 275): 12 px Rundung (G8), getönte Fläche, 14 px in Textfarbe.
+        'flex items-start gap-[9px] border border-border bg-muted px-3.5 py-2.5 text-[14px] leading-[1.45] text-foreground',
+        RUNDUNG.karte,
         className
       )}
     >

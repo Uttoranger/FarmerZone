@@ -25,6 +25,8 @@ import {
   bestellCodeFehlerText,
   bestellCodeKennung,
   bestellEintrag,
+  listenTag,
+  listenTermin,
   codeWert,
   entscheideCodeVersuch,
   leseCodeWert,
@@ -227,13 +229,36 @@ describe('teileBestellungen', () => {
   })
 })
 
+describe('Zeilentexte im Format des Boards s1-/w1-meine-bestellungen (Liste Lauf 32; Nr. 275)', () => {
+  const termin = (iso: string, von = '15:00', bis = '18:00') => ({ pickupDate: new Date(iso), pickupTimeStart: von, pickupTimeEnd: bis })
+
+  it('heute und morgen klein vorn, immer Wochentag und Datum, volle Stunden ohne „:00“', () => {
+    expect(listenTermin(termin('2026-10-05T10:00:00.000Z'), JETZT)).toBe('heute, Mo 5.\u00a0Oktober, 15–18 Uhr')
+    expect(listenTermin(termin('2026-10-06T10:00:00.000Z'), JETZT)).toBe('morgen, Di 6.\u00a0Oktober, 15–18 Uhr')
+    expect(listenTermin(termin('2026-10-07T10:00:00.000Z'), JETZT)).toBe('Mi 7.\u00a0Oktober, 15–18 Uhr')
+  })
+
+  it('halbe Stunden bleiben stehen', () => {
+    expect(listenTermin(termin('2026-10-07T10:00:00.000Z', '09:30', '12:00'), JETZT)).toBe('Mi 7.\u00a0Oktober, 09:30–12 Uhr')
+  })
+
+  it('der Wiener Kalendertag zählt: 23:30 UTC am 5. ist in Wien schon der 6. (morgen)', () => {
+    expect(listenTermin(termin('2026-10-05T22:30:00.000Z'), JETZT)).toMatch(/^morgen, Di 6\./)
+  })
+
+  it('früher: Wochentag mit Komma, Monat ausgeschrieben, Jahr nur außerhalb des laufenden', () => {
+    expect(listenTag(new Date('2026-02-20T10:00:00.000Z'), JETZT)).toBe('Fr, 20.\u00a0Februar')
+    expect(listenTag(new Date('2025-12-31T10:00:00.000Z'), JETZT)).toBe('Mi, 31.\u00a0Dezember 2025')
+  })
+})
+
 describe('bestellEintrag', () => {
   it('laufend: Marke und Art aus dem Status, Abholzeit, Betrag über formatEuro, Zahlung in Kundinnen-Sprache', () => {
     const eintrag = bestellEintrag(bestellung({ status: 'READY' }), JETZT, true)
     expect(eintrag).toMatchObject({
       marke: 'Abholbereit',
       art: 'laeuft',
-      wann: 'Morgen, 15:00–18:00 Uhr',
+      wann: 'morgen, Di 6.\u00a0Oktober, 15–18 Uhr',
       betrag: '€ 10,82',
       zahlung: 'Online · Bezahlt',
       artikel: '2 Artikel',
@@ -254,11 +279,11 @@ describe('bestellEintrag', () => {
 
   it('früher: festes Datum des Abholtags, ohne Jahr im laufenden Jahr; abgeholt erledigt, storniert abgebrochen', () => {
     const eintrag = bestellEintrag(bestellung({ status: 'PICKED_UP', pickupDate: new Date('2026-09-26T10:00:00.000Z') }), JETZT, false)
-    expect(eintrag.wann).toBe('26. Sep.')
+    expect(eintrag.wann).toBe('Sa, 26.\u00a0September')
     expect(eintrag.art).toBe('erledigt')
     expect(eintrag.marke).toBe('Abgeholt')
     const letztesJahr = bestellEintrag(bestellung({ status: 'CANCELLED', pickupDate: new Date('2025-01-10T10:00:00.000Z') }), JETZT, false)
-    expect(letztesJahr.wann).toBe('10. Jän. 2025')
+    expect(letztesJahr.wann).toBe('Fr, 10.\u00a0Jänner 2025')
     expect(letztesJahr.art).toBe('abgebrochen')
   })
 
