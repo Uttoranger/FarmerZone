@@ -178,7 +178,9 @@ describe('Diagrammfarbe (G13) und Bilder im Dunkeln (G12)', () => {
 
   it('Platzhalter auf der gedämpften Fläche, Kartenkacheln mit der Fläche der Hülle multipliziert', () => {
     expect(PLATZHALTER_FLAECHE).toBe('bg-muted')
-    expect(KARTE_KACHELN).toBe(ILLUSTRATION_BILD)
+    // F041: Kartenkacheln bleiben mit der Fläche verrechnet, die Illustration nicht mehr.
+    expect(KARTE_KACHELN).toBe('dark:mix-blend-multiply')
+    expect(ILLUSTRATION_BILD).not.toContain('mix-blend')
     expect(KARTE_HUELLE).toContain('isolate')
     expect(KARTE_HUELLE).toContain('dark:bg-muted')
     expect(FOTO_HUELLE).toBe('dark:brightness-[0.85]')

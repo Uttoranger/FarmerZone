@@ -80,7 +80,8 @@ import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
  * Produktseite (Nr. 11). In der Übersicht steht zuerst „Aktuell vom Hof“
  * (Register F8/N5, Nr. 128: die aktiven Beiträge, aktuell-vom-hof.tsx), danach
  * das Schaufenster (Register N5, Nr. 51): Fotos, bis zu vier Produkte, am Handy
- * „Alle Produkte (n)"; unter lg danach die Spalte und Über uns.
+ * „Alle Produkte (n)" — offen wie pausiert, der einzige Knopf dieses Namens (Nr. 271);
+ * unter lg danach die Spalte und Über uns.
  *
  * Was entschieden wird (Reiter, Abschnitte, Zustände, Zahlung, Gebühr), steht
  * in src/lib/hofseite-kunde.ts und bereiche-anzeige.ts.
@@ -131,7 +132,10 @@ function hofzeileKlein(ort: string, sperre: KaufSperre, bestellstopp: boolean): 
   return klein ? `${zeile.slice(0, trenner + 3)}${zustand.charAt(0).toLocaleLowerCase('de')}${zustand.slice(1)}` : zeile
 }
 
-/** „Alle Produkte (n)" unter dem Schaufenster am Handy — über die volle Breite, darum Radius 14 statt Pille (DESIGN_SYSTEM). */
+/**
+ * „Alle Produkte (n)" unter dem Schaufenster am Handy (Register N5), offen wie pausiert — über die volle Breite, darum
+ * Radius 14 statt Pille (DESIGN_SYSTEM). „Alle ansehen“ über der Liste ist ein Textlink, kein zweiter Knopf.
+ */
 const ALLE_PRODUKTE_KNOPF = cn(
   'flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[14px] border border-input bg-card px-4 text-[14px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
@@ -619,7 +623,10 @@ export function HofseiteKunde({
             />
           </div>
 
-          {/* Derselbe Reiterwechsel wie die Reiterleiste (reiterAdresse, zeigeReiter) — am Handy unter dem Schaufenster (Register N5). */}
+          {/* Derselbe Reiterwechsel wie die Reiterleiste (reiterAdresse, zeigeReiter) — am Handy unter dem Schaufenster
+              (Register N5: „bis zu vier Produkte, dazu ‚Alle Produkte (n)‘“), auch bei geöffnetem Hof. Es ist der EINE
+              „Alle Produkte“-Knopf der Seite; „Alle ansehen“ über der Liste ist ein Textlink. Das Board s1-hofseite Bild 1
+              zeigt ihn nicht (Abnahme Lauf 32, hofseite 5) — Register vor Board, Frage an die Projektleitung (Nr. 271). */}
           {schaufenster && (
             <Link
               href={reiterAdresse(pfad, suche.toString(), 'produkte')}

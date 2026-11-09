@@ -7,12 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { List } from 'lucide-react'
 import { leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import {
   berechneHofAuswahl,
   holtAbAnTagen,
-  suchForm,
   tageDerAbholwahl,
   waehleVorschauImBereich,
   type Bezugspunkt,
@@ -23,7 +21,6 @@ import {
   ENTDECKEN_KOPF,
   MENGEN_HINWEIS,
   abholungReihe,
-  aktiveFilter,
   alleZuruecksetzen,
   entdeckenKopf,
   ergebnisZahl,
@@ -311,14 +308,13 @@ export function HoefeClient({
     )
   }
 
-  /** Vorschlag übernommen → Such-Marke, das Feld wird frei für den nächsten Begriff. */
+  /**
+   * Vorschlag übernommen → der Name steht im Feld, keine eigene Zeile „Suche: …“ darunter (Liste Lauf 32, hoefe
+   * Bild 2: „Suche steht im Feld“; Abnahme Lauf 32, hoefe 9). Such-Marken aus einer älteren Adresse bleiben als
+   * Einträge stehen und lassen sich entfernen; neue entstehen hier nicht mehr (Nr. 271).
+   */
   function suchMarkeHinzufuegen(name: string) {
-    setzeFilter({
-      suchMarken: filter.suchMarken.some((m) => suchForm(m) === suchForm(name))
-        ? filter.suchMarken
-        : [...filter.suchMarken, name],
-      suchtext: '',
-    })
+    setzeFilter({ suchtext: name })
   }
 
   /** Pin angetippt → Eintrag hervorheben und in den Blick rollen. */
@@ -561,7 +557,8 @@ export function HoefeClient({
   )
 
   const kopfbereich = (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 md:px-6 md:pt-7">
+    // Inhalt 1098 px wie im Board (1440 − 2 × 171 px Rand; Abnahme Lauf 32, hoefe 8) — alle Spalten dieser Seite.
+    <div className="mx-auto flex max-w-[1146px] flex-col gap-4 px-4 md:px-6 md:pt-7">
       {/* Am Handy ein Kopfstreifen mit Linie und h1 20 px (Liste Lauf 32, hoefe 390), ab 768 px wie bisher. */}
       <div className="-mx-4 flex items-start gap-3 border-b border-border bg-card px-4 py-3 md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0">
         <div className="min-w-0 flex-1">
@@ -602,7 +599,7 @@ export function HoefeClient({
       return (
         <div>
           {kopfbereich}
-          <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-6 pb-12">
+          <div className="mx-auto mt-4 flex max-w-[1146px] flex-col gap-3 px-6 pb-12">
             {reihenfolgeHinweis}
             {anzahl === 0 && ergebnisse(true)}
             <div className="h-[calc(100dvh-6rem)] min-h-[420px]">{karte}</div>
@@ -615,7 +612,7 @@ export function HoefeClient({
     return (
       <div data-ansicht="split">
         {kopfbereich}
-        <div className="mx-auto mt-4 grid max-w-[1200px] grid-cols-[minmax(0,480px)_minmax(0,1fr)] items-start gap-4 px-6 pb-12">
+        <div className="mx-auto mt-4 grid max-w-[1146px] grid-cols-[minmax(0,480px)_minmax(0,1fr)] items-start gap-4 px-6 pb-12">
           <div className="flex min-w-0 flex-col gap-3">
             {reihenfolgeHinweis}
             {ergebnisse(true)}
@@ -630,75 +627,33 @@ export function HoefeClient({
   const karussellHoefe = mitPunkt.map(({ hof }) => hof)
   const auswahlMitPunkt =
     sichtbareLage.ausgewaehlt !== null && karussellHoefe.some((h) => h.slug === sichtbareLage.ausgewaehlt)
-  const zurListe = { ...filter, ansicht: 'liste' as const }
 
   if (ansicht === 'karte') {
-    // KARTENMODUS AM HANDY (unter lg, Nr. 52; kein Mockup — Regeln in
-    // DESIGN_SYSTEM „Entdecken"): oben EINE Zeile Suche · Filter · Liste,
-    // darunter die Karte über die volle Breite bis genau zur Oberkante der
-    // Unterleiste (ab md bis zum Fensterrand). Die Höhe ist 100dvh ohne Kopf
-    // und Unterleiste (Maße aus der KundeShell); die Werkzeugzeile zieht die
-    // Karte als Flex-Zeile ab — Zeile und Karte zusammen füllen genau den Platz.
-    // Ohne den getippten Suchtext: Er steht im Feld (suchtextImFeld unten) — die Zeile darf beim Tippen nicht erscheinen.
-    const hatAktiveFilter = aktiveFilter(filter, aktiverUmkreis, bezugspunkt).some((f) => f.schluessel !== 'suchtext')
+    // KARTENMODUS AM HANDY (unter lg, Nr. 52; seit Nr. 271 nach Board s1-hoefe Bild 5): oben der Kopf der
+    // Liste (kopfbereich), darunter die Karte über die volle Breite bis genau zur Oberkante der Unterleiste
+    // (ab md bis zum Fensterrand). Die Höhe ist 100dvh ohne Kopf und Unterleiste (Maße aus der KundeShell);
+    // der Kopf zieht die Karte als Flex-Zeile ab — Kopf und Karte zusammen füllen genau den Platz.
     return (
       <>
         {/* Eine Mindesthöhe erst ab md: Darunter steht die Unterleiste fest am
             Fensterrand — eine Mindesthöhe über dem Platz schöbe die Karte samt
             Karussell im Querformat (740 × 360) hinter die Leiste. */}
-        <div ref={kartenmodus} className={cn('flex flex-col md:min-h-[280px]', KUNDE_PLATZ_HOEHE)}>
-          {/* Titel und Unterzeile weichen der Werkzeugzeile — der Titel bleibt für Vorleser. */}
-          <h1 className="sr-only">{titel}</h1>
-          {/* 44 px Bedienteile plus je 4 px Luft: Im Querformat (844 × 390) bleiben der Karte 70 %. */}
-          <div className="mx-auto flex w-full max-w-[1200px] shrink-0 items-start gap-2 px-4 py-1 md:px-6">
-            <div className="min-w-0 flex-1">{suchfeld(true)}</div>
-            {filterblatt(true)}
-            <Link
-              href={hoefeHref(zurListe)}
-              onNavigate={beimNavigieren(zurListe, schreibeUrl)}
-              prefetch={false}
-              rel="nofollow"
-              className={cn(
-                'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[13.5px] font-semibold text-foreground hover:bg-muted',
-                FOKUS_RAHMEN
-              )}
-            >
-              <List className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              {/* Unter 640 px nur „Liste" — Platz für das Suchfeld; vorgelesen wird immer „Liste zeigen". */}
-              <span>
-                Liste<span className="max-sm:sr-only"> zeigen</span>
-              </span>
-            </Link>
-          </div>
-          {/* Gesetzte Filter, Such-Marken und der Bezugspunkt („Rund um …",
-              statt der Karte „Wir zeigen Höfe rund um …" der Liste) bleiben
-              sichtbar und entfernbar — nur dann, sonst bleibt es bei der einen
-              Zeile. Der getippte Text nicht: Er steht im Feld, und die Karte
-              soll beim Tippen nicht schrumpfen. Die zweite Zeile kostet die
-              Karte Höhe (im Querformat 844 × 390 unter 70 %). */}
-          {hatAktiveFilter && (
-            <div className="mx-auto w-full max-w-[1200px] shrink-0 px-4 pb-2 md:px-6">
-              <AktiveFilterZeile
-                filter={filter}
-                onWahl={schreibeUrl}
-                umkreis={aktiverUmkreis}
-                onUmkreisAufheben={umkreisAufheben}
-                ort={bezugspunkt}
-                onOrtAufheben={ortAufheben}
-                suchtextImFeld
-              />
-            </div>
-          )}
+        {/* In niedrigen Fenstern (Handy quer, Höhe bis 500 px) bliebe neben dem Kopf keine Karte: Dort wächst der
+            Bereich mit, und die Karte selbst nimmt den ganzen Platz zwischen Kopfzeile und Unterleiste (darunter). */}
+        <div ref={kartenmodus} className={cn('flex flex-col md:min-h-[280px] [@media(max-height:500px)]:h-auto', KUNDE_PLATZ_HOEHE)}>
+          {/* Seit Nr. 271 derselbe Kopf wie die Liste (Board s1-hoefe Bild 5; Abnahme Lauf 32, hoefe 12): sichtbare h1
+              mit Unterzeile, das beschriftete Suchfeld, die Kategorie-Chips und die Reihe „Filter · Liste · Karte“,
+              darunter die Karte im übrigen Platz. Vorher eine Werkzeugzeile mit kompakter Suche und „≡ Liste“. */}
+          <div className="shrink-0 pb-3">{kopfbereich}</div>
           {/* `isolate`: Karussell, Hinweis und Leermeldung (z-[900]) bleiben in
               dieser Stapelebene, sonst lägen sie beim Scrollen über der
               Kopfzeile; `overflow-hidden` clippt das hinausgeglittene Karussell. */}
-          <div className="relative isolate min-h-0 flex-1 overflow-hidden">
+          <div className="relative isolate min-h-0 flex-1 overflow-hidden [@media(max-height:500px)]:h-[calc(100dvh-var(--kunde-kopf)-var(--kunde-unterleiste))] [@media(max-height:500px)]:flex-none">
             <HoefeKarte
               hoefe={kartenHoefe}
               lage={sichtbareLage}
               fokus={fokus}
               sanft
-              attributionOben
               randlos
               hoeheKlasse="h-full"
               polsterUnten={bandHoehe}
@@ -712,7 +667,7 @@ export function HoefeClient({
             {!auswahlMitPunkt && kartenHoefe.length > 0 && (
               <p
                 ref={hinweisMessen}
-                className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--kunde-ueberstand)+0.5rem)] z-[900] mx-auto w-fit rounded-full bg-card px-4 py-2 text-sm text-foreground shadow-md md:bottom-4"
+                className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--kunde-ueberstand)+2.75rem)] z-[900] mx-auto w-fit rounded-full bg-card px-4 py-2 text-sm text-foreground shadow-md md:bottom-4"
                 aria-hidden="true"
               >
                 Tippe einen Hof an
@@ -742,7 +697,7 @@ export function HoefeClient({
   return (
     <div>
       {kopfbereich}
-      <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-4 pb-10 md:px-6">
+      <div className="mx-auto mt-4 flex max-w-[1146px] flex-col gap-3 px-4 pb-10 md:px-6">
         {reihenfolgeHinweis}
         {ergebnisse(false)}
       </div>

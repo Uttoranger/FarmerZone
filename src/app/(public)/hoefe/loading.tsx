@@ -25,7 +25,7 @@ export default function HoefeLaden() {
     <div data-design="neu" className="min-h-dvh animate-pulse bg-background" aria-busy="true" aria-label="Höfe werden geladen">
       <div className="h-14 border-b border-border bg-background md:h-16" />
 
-      <main className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 pt-5 pb-28 md:px-6 md:pt-7">
+      <main className="mx-auto flex max-w-[1146px] flex-col gap-4 px-4 pt-5 pb-28 md:px-6 md:pt-7">
         {/* Überschrift und Unterzeile */}
         <div>
           <div className="h-8 w-64 rounded-lg bg-border md:h-9 md:w-80" />

@@ -39,6 +39,7 @@ import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
@@ -192,21 +193,16 @@ function ProductImageArea({
       {fileInput}
 
       {/* Gedimmter Bildrahmen — Foto ?? Illustration (Unterkategorie, sonst Kategorie, sonst „Sonstiges", categoryImageUrl) ?? Sand-Platzhalter */}
-      <div className="absolute inset-0" style={{ opacity: dim }}>
+      <div className={cn('absolute inset-0', !product.imageUrl && product.categoryImageUrl && 'dark:ring-1 dark:ring-border dark:ring-inset')} style={{ opacity: dim }}>
         {(product.imageUrl ?? product.categoryImageUrl) ? (
           <Image
             src={(product.imageUrl ?? product.categoryImageUrl)!}
             alt={product.name}
             fill
             sizes="(min-width: 768px) 33vw, 50vw"
-            // Nur die Kategorie-Illustration wird im Dunkeln gedämpft, sonst
-            // leuchtet ihr Crème-Grund als Fläche; Fotos bleiben, wie sie sind
-            // (CODING_STANDARDS §7, Altlast aus ARCHITECTURE §6 beim Anfassen
-            // nachgezogen — Werte wie in components/produkte/produkte-ansicht.tsx).
-            className={cn(
-              'object-contain',
-              !product.imageUrl && 'dark:brightness-[0.85] dark:saturate-[0.9]'
-            )}
+            // Die Kategorie-Illustration steht im Dunkeln wie ein Foto: gedämpft aus der einen Quelle
+            // (ILLUSTRATION_HUELLE, F041) und gerahmt; Fotos bleiben, wie sie sind (CODING_STANDARDS §7).
+            className={cn('object-contain', !product.imageUrl && ILLUSTRATION_HUELLE)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

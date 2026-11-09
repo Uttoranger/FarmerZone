@@ -74,8 +74,11 @@ describe('preisJeRaummass', () => {
 })
 
 describe('ausverkauftSatz', () => {
-  it('wörtlich nach der Liste', () => {
-    expect(ausverkauftSatz('Hof Müller', 'Brennholz Buche')).toBe('Hof Müller hat gerade kein Brennholz Buche. Schau, was es sonst gibt.')
+  it('nennt das Produkt ohne Hof, wörtlich nach Antwort 2 der Projektleitung (N48)', () => {
+    expect(ausverkauftSatz('Brennholz Buche')).toBe('Brennholz Buche gibt es gerade nicht. Schau, was es sonst gibt.')
+    // Gegenprobe: ein weiblicher Name bekommt keinen falschen Artikel mehr („hat gerade kein Milch“).
+    expect(ausverkauftSatz('Heumilch')).toBe('Heumilch gibt es gerade nicht. Schau, was es sonst gibt.')
+    expect(ausverkauftSatz('Heumilch')).not.toContain('kein')
   })
 })
 

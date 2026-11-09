@@ -15,7 +15,6 @@ import { KAEUFER_PARAMETER, leseKaeuferVorbelegung } from '@/schemas/kaeufer-vor
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { ProduktdetailKunde } from '@/components/produktdetail/produktdetail-kunde'
 import { TesthofHinweis } from '@/components/hofseite/testhof-hinweis'
-import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
 import { ProduktSkelett } from './produkt-skelett'
 
 /*
@@ -128,7 +127,7 @@ async function Produktseite({ farmSlug, id, suche }: { farmSlug: string; id: str
       />
       {/* Strukturierte Daten (Nr. 117): Preis und Verfügbarkeit des Einstiegs, auf dem Server gebaut. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(produktJsonLd(einstieg, farm, metadatenBasis(UMGEBUNG.appUrl))) }} />
-      <StartseiteFuss jahr={jetzt.getFullYear()} />
+      {/* Kein Fuß der Startseite: am Handy der Seitenfuß der Shell wie auf /hoefe (Abnahme Lauf 32, produkt 12). */}
     </KundeShellMitSitzung>
   )
 }

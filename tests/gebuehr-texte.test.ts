@@ -18,10 +18,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   BEISPIEL_GLEICH,
+  BEISPIEL_HOFPREIS,
   beispielRechnung,
+  startseitenBeispiel,
 } from '@/lib/startseite'
 import {
   GEBUEHREN_WORT,
+  GEBUEHR_MODELL_HOFPREIS,
   bestellGebuehr,
   gebuehrBezeichnungFuer,
   gebuehrErstattungOffenHinweisFuer,
@@ -30,6 +33,7 @@ import {
   gebuehrenMehrzahl,
   gebuehrJeStueckCents,
   mindestbestellwertHinweis,
+  satzHundertstel,
 } from '@/lib/plattformgebuehr'
 import {
   KONDITIONEN_DERZEIT,
@@ -219,6 +223,19 @@ describe('Startseite „Beispiel“ ab dem Stichtag (Board w1-startseite)', () =
     expect(r.gebuehrCents).toBe(bestellGebuehr([{ preisCents: 2000, menge: 1 }], 600).gebuehrCents)
     expect(r).toMatchObject({ gebuehrCents: 120, duZahlstCents: 2120, hofBekommtCents: 2000, prozent: 6, modell: 'hofpreis', fussnote: BEISPIEL_GLEICH })
     expect(lang(r.satz ?? '')).toBe('Der Hof verlangt € 20,00 für deinen Einkauf. Du zahlst € 21,20 – darin stecken 6 % Plattformgebühr. Der Hof bekommt seine vollen € 20,00.')
+  })
+
+  it('die Startseite zeigt das Beispiel des Boards wörtlich: € 4,50 für 10 Eier → € 4,77, gerechnet, nie getippt (Nr. 271)', () => {
+    const r = startseitenBeispiel(JETZT, 'hofpreis')
+    // Dieselben Funktionen wie Kasse und /api/checkout: Satz der Hof-Einstellung ohne eigenen Wert, Gebühr je Stück.
+    const satz = satzHundertstel({ plattformgebuehrProzent: null })
+    expect(r.duZahlstCents).toBe(bestellGebuehr([{ preisCents: BEISPIEL_HOFPREIS.warenpreisCents, menge: 1 }], satz).gesamtCents)
+    expect(r).toMatchObject({ warenpreisCents: 450, gebuehrCents: 27, duZahlstCents: 477, hofBekommtCents: 450 })
+    expect(lang(r.satz ?? '')).toBe('Der Hof verlangt € 4,50 für 10 Eier. Du zahlst € 4,77 – darin stecken 6 % Plattformgebühr. Der Hof bekommt seine vollen € 4,50.')
+    // Das Wort kommt aus gebuehrBezeichnungFuer — dieselbe Quelle wie Bestellungen im Hofpreis-Modell.
+    expect(r.satz).toContain(` % ${gebuehrBezeichnungFuer({ gebuehrModell: GEBUEHR_MODELL_HOFPREIS })}.`)
+    // Gegenprobe: Vor dem Stichtag bleibt die Rechnung über € 20,00 ohne Satz.
+    expect(startseitenBeispiel(JETZT, 'bisher')).toEqual(beispielRechnung(JETZT, 2000, 'bisher'))
   })
 
   it('ohne Modell bleibt das Beispiel genau das bisherige (kein Feld dazu)', () => {

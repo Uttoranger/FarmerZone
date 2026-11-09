@@ -338,12 +338,14 @@ Fotos und Hof-Banner werden nicht abgedunkelt, nur leicht gedämpft (`FOTO_HUELL
 Schrift auf Fotos, Pins und Gruppen-Pins (siehe `hoefe-karte.tsx`), die
 Bildmarke und fremde Markenfarben (WhatsApp-Grün, Stripes Eingabemaske) bleiben,
 wie sie sind. Wo das so ist, gehört ein Kommentar daneben, der es begründet.
-**Kartenkacheln und die Regionskarte der Startseite (`RegionsKarte`) werden im Dunkeln gedämpft** (Regelvorschlag Morgenbericht 31, übernommen in Lauf 32, Nr. 248): Die Kachel-Ebene wird mit der Fläche der Hülle multipliziert (`KARTE_KACHELN` auf der Kachel-Ebene, `KARTE_HUELLE` auf der Hülle) — Pins und Beschriftungen liegen darüber und bleiben. **Jede Bildfläche und jeder Platzhalter ohne Foto nimmt die Klassen aus `src/components/ui/bild-dunkel.ts`** (`FOTO_HUELLE`, `ILLUSTRATION_HUELLE`/`ILLUSTRATION_BILD`, `PLATZHALTER_FLAECHE`, `KARTE_HUELLE`/`KARTE_KACHELN`), nie eine eigene `dark:`-Kopie (G12; Wache `tests/bausteine-242.test.ts`).
-Ausnahme: Die Kategorie-Illustrationen (`public/categories/`) sind keine Fotos,
-ihr heller Crème-Grund würde nachts als Fläche leuchten. Jede NEUE Stelle, die
-eine Illustration zeigt, dämpft sie im Dunkeln (`dark:brightness-[…]
-dark:saturate-[…]`) und rahmt sie statt eines Schattens — Vorbild
-`Illustration` in `src/components/startseite/startseite-abschnitte.tsx`. Ältere Stellen gibt es seit Nr. 18 nicht mehr (die Produktliste war die letzte).
+**Kartenkacheln und die Regionskarte der Startseite (`RegionsKarte`) werden im Dunkeln gedämpft** (Regelvorschlag Morgenbericht 31, übernommen in Lauf 32, Nr. 248): Die Kachel-Ebene wird mit der Fläche der Hülle multipliziert (`KARTE_KACHELN` auf der Kachel-Ebene, `KARTE_HUELLE` auf der Hülle) — Pins und Beschriftungen liegen darüber und bleiben. **Jede Bildfläche und jeder Platzhalter ohne Foto nimmt die Klassen aus `src/components/ui/bild-dunkel.ts`** (`FOTO_HUELLE`, `ILLUSTRATION_HUELLE`, `PLATZHALTER_FLAECHE`, `KARTE_HUELLE`/`KARTE_KACHELN`), nie eine eigene `dark:`-Kopie (G12; Wachen `tests/bausteine-242.test.ts` und `tests/bild-dunkel-wache.test.ts`: kein `dark:brightness-`/`dark:saturate-` unter `src/components` außerhalb von `bild-dunkel.ts`).
+Die Kategorie-Illustrationen (`public/categories/`) sind keine Fotos, stehen im Dunkeln
+aber wie eines (F041, Projektleitung 9.11.2026; freigabe.md §37.1, Register N48): auf ihrem
+eigenen hellen Grund, gedämpft über `ILLUSTRATION_HUELLE` (= `FOTO_HUELLE`) und gerahmt
+(`border` bzw. `dark:ring-1 dark:ring-border`) statt eines Schattens — keine Verrechnung mit
+der Fläche (`ILLUSTRATION_BILD` ist leer und bleibt nur als Export). Jede NEUE Stelle, die eine
+Illustration zeigt, nimmt genau das — Vorbild `Illustration` in
+`src/components/startseite/startseite-abschnitte.tsx`.
 
 ### Diagramme
 Recharts schreibt Farben als SVG-Attribute — `var(--token)` greift dort **nicht**.

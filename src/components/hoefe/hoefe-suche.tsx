@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react'
+import { Loader2, LocateFixed, MapPin, X } from 'lucide-react'
 import { tasteInVorschlaegen, type Bezugspunkt, type ProduktVorschlag, type VorschlagsLage } from '@/lib/hofuebersicht'
 import {
   ORT_VORSCHLAG,
@@ -144,14 +144,9 @@ export function HoefeSuche({
             {SUCHFELD_TEXT.beschriftung}
           </label>
           <div className="relative">
-            {ort.laeuft ? (
+            {/* Ohne Lupe (Board w1-/s1-hoefe; Abnahme Lauf 32, hoefe 2) — nur während der Ortssuche das Ladezeichen. */}
+            {ort.laeuft && (
               <Loader2 className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden="true" />
-            ) : (
-              <Search
-                className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground"
-                strokeWidth={1.7}
-                aria-hidden="true"
-              />
             )}
             <input
               ref={feld}
@@ -186,7 +181,8 @@ export function HoefeSuche({
               aria-busy={ort.laeuft}
               // 16 px: iOS zoomt bei kleinerer Schrift ins Feld.
               className={cn(
-                'w-full rounded-full border border-border bg-card pr-4 pl-11 text-base text-foreground placeholder:text-muted-foreground md:text-sm',
+                'w-full rounded-full border border-border bg-card pr-4 text-base text-foreground placeholder:text-muted-foreground md:text-sm',
+                ort.laeuft ? 'pl-11' : 'pl-4',
                 kompakt ? 'h-11 text-ellipsis' : 'h-12 md:h-11',
                 'outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring'
               )}

@@ -26,7 +26,10 @@ export const LEAFLET_BEDIENTEILE = [
   '[&_.leaflet-control-zoom_a:hover]:bg-muted! [&_.leaflet-control-zoom_a.leaflet-disabled]:text-muted-foreground! [&_.leaflet-control-zoom_a:focus-visible]:outline-2 [&_.leaflet-control-zoom_a:focus-visible]:outline-offset-2 [&_.leaflet-control-zoom_a:focus-visible]:outline-ring [&_.leaflet-control-zoom_a:focus-visible]:outline-solid',
   "[&_.leaflet-control-attribution_a]:relative [&_.leaflet-control-attribution_a]:before:absolute [&_.leaflet-control-attribution_a]:before:-inset-x-1 [&_.leaflet-control-attribution_a]:before:-inset-y-[15px] [&_.leaflet-control-attribution_a]:before:content-['']",
   // Quellenhinweis auf der Kartenfläche in der Textfarbe (Kontrast in beiden Themes, kein heller Fleck; aus Nr. 238).
+  // Mit 8 px Luft zum Rand und eigener Rundung: In der gerundeten Ecke der Karte wurde „Mitwirkende“ sonst
+  // abgeschnitten (Abnahme Lauf 32, hoefe 8; Nr. 271).
   '[&_.leaflet-control-attribution]:bg-card/90! [&_.leaflet-control-attribution]:text-foreground! [&_.leaflet-control-attribution_a]:text-foreground!',
+  '[&_.leaflet-control-attribution]:m-2! [&_.leaflet-control-attribution]:rounded-md!',
   'dark:[&_.leaflet-tile-pane]:brightness-[0.62] dark:[&_.leaflet-tile-pane]:saturate-[0.7] dark:[&_.leaflet-marker-pane]:brightness-[0.88]',
 ].join(' ')
 

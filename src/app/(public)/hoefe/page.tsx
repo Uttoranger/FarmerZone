@@ -71,7 +71,7 @@ async function ladeHoefe(): Promise<HofUebersichtEintrag[] | 'fehler'> {
 /** Kopf und Zustand ohne Liste — Fehler oder noch kein Hof. */
 function OhneListe({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-5 px-4 pt-5 pb-12 md:px-6 md:pt-7">
+    <div className="mx-auto flex max-w-[1146px] flex-col gap-5 px-4 pt-5 pb-12 md:px-6 md:pt-7">
       <div>
         <h1 className="font-heading text-[26px] leading-tight font-semibold text-foreground md:text-[30px]">
           {ENTDECKEN_KOPF.hoefe.titel}
