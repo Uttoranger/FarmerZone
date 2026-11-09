@@ -42,8 +42,8 @@ export function MonatWahl({
   bezug: Monatsschluessel
   idPraefix: string
   /**
-   * Die sichtbare Beschriftung darüber („Ab Monat"): Beide Auswahlfelder nennen sie zuerst und dann
-   * ihr eigenes Wort. Die versteckten Labels allein zählt die Messung als „ohne Beschriftung" (Nr. 281).
+   * Die sichtbare Beschriftung darüber („Ab Monat"): Das Monatsfeld heißt wie sie (sonst „Ab Monat Monat“),
+   * das Jahresfeld nennt sie zuerst und dann sein Wort („Ab Monat Jahr“). Die versteckten Labels allein zählt die Messung als „ohne Beschriftung" (Nr. 281).
    */
   beschriftungId?: string
 }) {
@@ -69,7 +69,7 @@ export function MonatWahl({
       </label>
       <select
         id={`${idPraefix}-monat`}
-        aria-labelledby={beschriftungId ? `${beschriftungId} ${idPraefix}-monat-wort` : undefined}
+        aria-labelledby={beschriftungId}
         value={teile.monat}
         onChange={(e) => onChange(monatsschluessel(teile.jahr, Number(e.target.value)))}
         className={`${FELD} flex-1`}

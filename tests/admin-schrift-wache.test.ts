@@ -45,24 +45,48 @@ function alsPx(zahl: string, einheit: string | undefined): number {
 }
 
 const TAILWIND = /(?<![A-Za-z0-9_-])text-\[(?:length:)?(\d*\.?\d+)(px|rem|em)\]/g
-const FONT_SIZE_WERT = /fontSize\s*(?:=|:)\s*\{?\s*['"`]?(\d*\.?\d+)(px|rem|em)?/g
-const FONT_SIZE_NAME = /fontSize\s*=\s*\{\s*([A-Za-z_$][\w$]*)\s*\}/g
+/** `fontSize={…}` (JSX, ohne verschachtelte Klammern) und `fontSize: …` (Style-Objekt, bis Komma, `}` oder Zeilenende). */
+const FONT_SIZE_JSX = /fontSize\s*=\s*\{([^{}]*)\}/g
+const FONT_SIZE_TEXT = /fontSize\s*=\s*(['"])([^'"]*)\1/g
+const FONT_SIZE_OBJEKT = /fontSize\s*:\s*([^,}\n;]+)/g
 const CSS = /font-size\s*:\s*(\d*\.?\d+)(px|rem|em)/g
+const ZAHL = /(?<![\w.$])(\d*\.?\d+)(px|rem|em)?(?![\w.])/g
+const NAME = /(?<![\w.$'"`])([A-Za-z_$][\w$]*)(?![\w$])/g
+
+/** Liegt eine Zahl des Ausdrucks unter 12 px? */
+const zahlUnterGrenze = (ausdruck: string): boolean =>
+  [...ausdruck.matchAll(ZAHL)].some((z) => {
+    const px = alsPx(z[1]!, z[2])
+    return px > 0 && px < GRENZE_PX
+  })
+
+/**
+ * Ein fontSize-Ausdruck ist zu klein, wenn er selbst eine Zahl unter 12 nennt (`schmal ? 10 : 12`)
+ * oder eine Konstante derselben Datei, deren Wert eine nennt (`const schrift = schmal ? 10 : 12`).
+ */
+function ausdruckZuKlein(ausdruck: string, text: string): string | null {
+  if (zahlUnterGrenze(ausdruck)) return ''
+  for (const n of ausdruck.matchAll(NAME)) {
+    const name = n[1]!
+    const zeile = new RegExp(`(?:const|let)\\s+${name.replace(/\$/g, '\\$')}\\s*=\\s*([^\\n;]+)`).exec(text)
+    if (zeile && zahlUnterGrenze(zeile[1]!)) return ` (${zeile[0].trim()})`
+  }
+  return null
+}
 
 /** Die Stellen unter 12 px eines Quelltexts, in der Reihenfolge der Suche. */
 function kleineSchrift(quelltext: string): string[] {
   const text = ohneKommentare(quelltext)
   const funde: string[] = []
-  for (const muster of [TAILWIND, FONT_SIZE_WERT, CSS]) {
+  for (const muster of [TAILWIND, CSS]) {
     for (const t of text.matchAll(muster)) if (alsPx(t[1]!, t[2]) < GRENZE_PX) funde.push(t[0])
   }
-  // fontSize={schrift}: der Wert steht in einer Konstante derselben Datei (`const schrift = schmal ? 10 : 12`).
-  for (const t of text.matchAll(FONT_SIZE_NAME)) {
-    const name = t[1]!
-    const zeile = new RegExp(`(?:const|let)\\s+${name.replace(/\$/g, '\\$')}\\s*=\\s*([^\\n;]+)`).exec(text)
-    if (!zeile) continue
-    const zahlen = [...zeile[1]!.matchAll(/(?<![\w.])(\d*\.?\d+)(?![\w.])/g)].map((z) => Number.parseFloat(z[1]!))
-    if (zahlen.some((z) => z > 0 && z < GRENZE_PX)) funde.push(`${t[0]} (${zeile[0].trim()})`)
+  for (const t of text.matchAll(FONT_SIZE_TEXT)) if (zahlUnterGrenze(t[2]!)) funde.push(t[0])
+  for (const muster of [FONT_SIZE_JSX, FONT_SIZE_OBJEKT]) {
+    for (const t of text.matchAll(muster)) {
+      const zusatz = ausdruckZuKlein(t[1]!, text)
+      if (zusatz !== null) funde.push(`${t[0].trim()}${zusatz}`)
+    }
   }
   return funde
 }
@@ -113,6 +137,12 @@ describe('Admin-Schrift-Wache — Gegenprobe: die Suche schlägt an', () => {
       'const stil = { fontSize: 11 }',
       '<style>p{font-size:11px}</style>',
       'const schrift = schmal ? 10 : 12\n<text fontSize={schrift}>',
+      '<text fontSize={schmal ? 10 : 12}>',
+      '<text fontSize={schmal ? 12 : 11.5}>',
+      '<span style={{ fontSize: 11 }}>',
+      '<span style={{ fontSize: "0.65rem" }}>',
+      'const groesse = 10\n<span style={{ fontSize: groesse }}>',
+      'const groesse = eng ? 11 : 13\n<span style={{ fontSize: groesse, color: x }}>',
     ]) {
       expect(kleineSchrift(text), text).toHaveLength(1)
     }
@@ -125,6 +155,10 @@ describe('Admin-Schrift-Wache — Gegenprobe: die Suche schlägt an', () => {
       '<text fontSize={12}>',
       'const schrift = schmal ? 12 : 14\n<text fontSize={schrift}>',
       '<text fontSize={groesse}>',
+      '<text fontSize={schmal ? 12 : 14}>',
+      '<span style={{ fontSize: 12 }}>',
+      'const groesse = 13\n<span style={{ fontSize: groesse }}>',
+      '<span style={{ fontSize: groesse }}>',
       '// früher text-[11px]\nconst x = 1',
       '/* fontSize={10} */ const y = 2',
       '<div className="w-[11px] h-[10px] tracking-[0.1em]">',
