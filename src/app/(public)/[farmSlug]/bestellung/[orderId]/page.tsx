@@ -62,7 +62,7 @@ const HANDY_TITEL = 'Deine Bestellung'
 
 function LinkUngueltig() {
   return (
-    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL} fussSpalte="md:max-w-[600px]">
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL}>
       {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
           Ausweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
       {/* Board s1-/w1-bestellung-link Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zur Hofübersicht. */}
@@ -162,7 +162,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
   }))
 
   return (
-    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL} fussSpalte="md:max-w-[944px]">
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL}>
       {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer
           Mail. Die Wege hinaus sind echte Links: zum Hof und über die Shell. */}
       <div className={SPALTE}>

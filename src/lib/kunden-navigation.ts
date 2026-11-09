@@ -284,3 +284,70 @@ export function kundenHandyAriaAktuell(pfad: string, punkt: KundenNavPunkt, akti
   if (!aktiv && pfad === '/') return punkt.id === ENTDECKEN.id ? 'true' : undefined
   return kundenAriaAktuell(pfad, punkt, aktiv)
 }
+
+/**
+ * Die Spalte, in der der Seitenfuß im Browser steht (G11, Liste Lauf 32 §3.2; Nr. 267): so breit wie die
+ * Inhaltsspalte der Seite, benannt nach deren Breite — `schmal` 520 px (Meine Bestellungen, Passwort, Neuigkeiten),
+ * `mittel` 896 px (Anmelden, Bestellseite, Bestätigung, Registrieren), `seite` 1000 px (Konto, Rechtstexte,
+ * Systemseiten, Widerruf, Problem melden, Fehlerseiten), `breit` 1200 px (Startseite, /hoefe, Hofseite, Produktseite,
+ * Für Höfe). Am Handy steht der Fuß immer über die volle Breite. Die Klassen je Art zeichnet der Fuß
+ * (components/shells/kunde-fuss.tsx); hier steht nur die Zuordnung.
+ */
+export type FussSpalte = 'schmal' | 'mittel' | 'seite' | 'breit'
+
+/**
+ * Route → Spalte, EINE Quelle für KundeShell (Seitenfuß) und KundeFokusShell (Zeile „Vertrag widerrufen“).
+ * Ein Muster passt Segment für Segment; `*` steht für genau ein Segment (Hof, Bestellung), `/**` am Ende auch für
+ * alle Unterseiten (/login/admin, /agb/<fassung>). Die Seiten der Spalte kommen aus ihren eigenen Klassen
+ * (z. B. `max-w-[1032px] px-4` = 1000 px Inhalt); wer eine Spalte ändert, zieht diese Liste nach.
+ */
+export const SPALTE_JE_ROUTE: readonly (readonly [muster: string, spalte: FussSpalte])[] = [
+  ['/', 'breit'],
+  ['/hoefe', 'breit'],
+  ['/fuer-hoefe', 'breit'],
+  ['/startseite-vorschau', 'breit'],
+  ['/login/**', 'mittel'],
+  ['/account/login', 'mittel'],
+  ['/register', 'mittel'],
+  ['/*/bestellung/*', 'mittel'],
+  ['/*/confirm/*', 'mittel'],
+  ['/bestellungen', 'schmal'],
+  ['/forgot-password', 'schmal'],
+  ['/reset-password', 'schmal'],
+  ['/account/neuigkeiten-bestaetigen', 'schmal'],
+  ['/account/profile', 'seite'],
+  ['/account/unsubscribe', 'seite'],
+  ['/konto/email-bestaetigen', 'seite'],
+  ['/sicherheit/nicht-ich', 'seite'],
+  ['/widerruf', 'seite'],
+  ['/agb/**', 'seite'],
+  ['/datenschutz', 'seite'],
+  ['/impressum', 'seite'],
+  ['/konditionen', 'seite'],
+  ['/problem-melden', 'seite'],
+]
+
+function segmente(pfad: string): string[] {
+  return pfad.split('/').filter(Boolean)
+}
+
+function passt(muster: string, pfad: readonly string[]): boolean {
+  const teile = segmente(muster)
+  const mitUnterseiten = teile.at(-1) === '**'
+  const feste = mitUnterseiten ? teile.slice(0, -1) : teile
+  if (mitUnterseiten ? pfad.length < feste.length : pfad.length !== feste.length) return false
+  return feste.every((teil, i) => teil === '*' || teil === pfad[i])
+}
+
+/**
+ * Die Spalte einer Kundenseite (G11, Nr. 267) — `null`, wenn die Route nicht in der Liste steht; dann entscheidet
+ * die Shell (KundeShell: `seite` wie die Fehlerseiten, deren Adresse beliebig ist; KundeFokusShell: `breit` wie
+ * bisher). Hof- und Produktseite erkennt die Shell an `aktiv` = `entdecken` wie bei kopfScrolltWegAmHandy: Ihr
+ * Pfad (/<hof>) sähe aus wie eine unbekannte Adresse, deren 404 in der Spalte der Fehlerseiten steht.
+ */
+export function spalteDerSeite(pfad: string | null, aktiv?: KundenNavId): FussSpalte | null {
+  if (aktiv === ENTDECKEN.id) return 'breit'
+  if (pfad === null) return null
+  const teile = segmente(pfad)
+  return SPALTE_JE_ROUTE.find(([muster]) => passt(muster, teile))?.[1] ?? null
+}

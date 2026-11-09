@@ -11,6 +11,8 @@ import {
   kundenNavigation,
   kopfScrolltWegAmHandy,
   ohneKopfKnopfAmHandy,
+  spalteDerSeite,
+  type FussSpalte,
   type KundenNavId,
   type KundenSitzung,
 } from '@/lib/kunden-navigation'
@@ -18,12 +20,20 @@ import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { TREFFER_44 } from '@/components/ui/button'
-import { BottomNav, BottomNavLink, BottomNavMitte, WARENKORB_ZAEHLER, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
+import {
+  BottomNav,
+  BottomNavLink,
+  BottomNavMitte,
+  WARENKORB_SYMBOL,
+  WARENKORB_ZAEHLER,
+  mittelknopfMitWortKlassen,
+  mittelkreisKlassen,
+} from '@/components/ui/bottom-nav'
 import { Zaehler } from '@/components/ui/zaehler'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
 import { INHALT_ID, SprungLink } from '@/components/shells/sprung-link'
-import { KundeFuss } from '@/components/shells/kunde-fuss'
+import { KundeFuss, fussSpalteKlasse } from '@/components/shells/kunde-fuss'
 import { KUNDE_KOPF_ZEILE, KUNDE_SHELL_MASSE } from '@/lib/kunde-shell-masse'
 import { MARKE } from '@/lib/marke'
 import { WIDERRUF_PFAD, WIDERRUF_TEXT } from '@/lib/widerruf'
@@ -114,7 +124,8 @@ function WarenkorbKopf({ anzahl, href }: { anzahl: number; href: string }) {
       aria-label={`Warenkorb, ${anzahl} Artikel`}
       className={cn('relative flex size-11 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN)}
     >
-      <Handbag className="size-5" strokeWidth={1.7} aria-hidden="true" />
+      {/* So groß wie die Tasche in der Unterleiste (G10, Nr. 267): eine Gestalt, ein Maß. */}
+      <Handbag {...WARENKORB_SYMBOL} aria-hidden="true" />
       {/* 12 px wie jede Schrift der Kundschaft (Lauf 31, vorher 9,5 px); der Zähler ragt über den Rand des Symbols. */}
       <Zaehler anzahl={anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className="absolute -top-0.5 -right-0.5 h-5 min-w-5 px-1 text-[12px]" />
     </Link>
@@ -189,11 +200,6 @@ export type KundeShellProps = {
    */
   handyTitel?: string
   /**
-   * Breite der Spalte, in der der Seitenfuß im Browser steht (Boards w1-bestaetigung, w1-meine-bestellungen):
-   * so breit wie der Inhalt der Seite, z. B. `md:max-w-[928px]`. Ohne Angabe 1200 px.
-   */
-  fussSpalte?: string
-  /**
    * Die Seite hat auch im Browser eine feste Leiste unten (Bestätigung, `Hauptaktion`; Board w1-bestaetigung): Der
    * Seitenfuß hält dann auch ab 768 px darunter Platz frei, damit die Leiste ihn am Ende der Seite nicht verdeckt.
    */
@@ -201,7 +207,13 @@ export type KundeShellProps = {
   children: ReactNode
 }
 
-export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fussSpalte, platzFuerLeiste = false, children }: KundeShellProps): React.JSX.Element {
+/**
+ * Die Spalte des Seitenfußes auf einer Adresse, die nicht in der Liste steht (spalteDerSeite): Das sind die
+ * Fehlerseiten (404 unter beliebiger Adresse) — sie stehen in der Spalte von 1000 px (Board w3-fehlerseiten).
+ */
+const SPALTE_UNBEKANNT: FussSpalte = 'seite'
+
+export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, platzFuerLeiste = false, children }: KundeShellProps): React.JSX.Element {
   const pathname = usePathname()
   const nav = kundenNavigation({ sitzung })
   const korb = useWarenkorbKopf()
@@ -305,7 +317,11 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
           feste Leiste einer Fokus-Seite frei — vorher tat das der Inhalt.
           G10 (V28): aus den Maßen der Shell samt Home-Indicator und 24 px Luft — mit festen 112 px lag
           „Darstellung“ auf Geräten mit Home-Indicator noch unter dem Warenkorb-Knopf. */}
-      <KundeFuss className={cn(FUSS_PLATZ_UNTEN, 'print:pb-0', platzFuerLeiste ? 'md:pb-28' : 'md:pb-0')} spalte={fussSpalte} />
+      {/* Im Browser in der Spalte der Seite (G11, Nr. 267): EINE Quelle, die Zuordnung Route → Spalte (spalteDerSeite). */}
+      <KundeFuss
+        className={cn(FUSS_PLATZ_UNTEN, 'print:pb-0', platzFuerLeiste ? 'md:pb-28' : 'md:pb-0')}
+        spalte={spalteDerSeite(pathname, aktiv) ?? SPALTE_UNBEKANNT}
+      />
 
       {unterleiste && (
         // In der Vorschau im Rahmen ohne Wirkung — keine Klicks nach außen (VorschauLeisteSperre).
@@ -325,7 +341,8 @@ export function KundeShell({ sitzung, unterleiste = true, aktiv, handyTitel, fus
                     >
                       <span className={cn(mittelkreisKlassen('gruen'), 'relative')}>
                         {/* Die Tasche der Boards (s1-startseite, s1-meine-bestellungen), dieselbe wie im Kopf der Fokus-Seiten. */}
-                        <Handbag className="size-6" strokeWidth={1.7} aria-hidden="true" />
+                        {/* In Board-Größe (G10, Nr. 267, Board s2-anmelden): vorher 24 px, die Tasche stand deutlich größer im Kreis. */}
+                        <Handbag {...WARENKORB_SYMBOL} aria-hidden="true" />
                         {/* G10: grün mit hellem Ring (Board s1-hofseite), Gestalt aus der Unterleiste. */}
                         {korb && <Zaehler anzahl={korb.anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className={WARENKORB_ZAEHLER} />}
                       </span>
@@ -385,13 +402,36 @@ export type KundeFokusShellProps = {
    * am Fenster, über einer Linie) — auch bei kurzer Seite, nicht mitten im Bild. Der Inhalt hält darunter Platz frei.
    */
   aktionKlebtImBrowser?: boolean
-  /** Breite der Zeile „Vertrag widerrufen“ am Ende — so breit wie die Spalte der Seite (Board w1-bestellung-link). */
+  /**
+   * Breite der Zeile „Vertrag widerrufen“ am Ende — so breit wie die Spalte der Seite (Board w1-bestellung-link),
+   * für Ansichten mit eigener Spalte (Kasse, Bestätigen). Ohne Angabe die Spalte der Route (spalteDerSeite, G11,
+   * Nr. 267), auf einer Route außerhalb der Liste 1200 px wie bisher.
+   */
   spalte?: string
   children: ReactNode
 }
 
-/** Die Spalte einer Fokus-Seite ohne eigene Angabe — so breit wie die zweispaltige Kasse. */
-const FOKUS_SPALTE = 'max-w-[1200px]'
+/** Die Spalte einer Fokus-Seite, deren Route nicht in der Liste steht — so breit wie die zweispaltige Kasse. */
+const FOKUS_SPALTE: FussSpalte = 'breit'
+
+const WIDERRUF_ZEILE = 'mx-auto px-4 pt-2 pb-4 print:hidden'
+
+/** Die Zeile „Vertrag widerrufen“ in der Spalte der Route (spalteDerSeite) — nur sie liest den Pfad. */
+function WiderrufZeileDerRoute({ children }: { children: ReactNode }): React.JSX.Element {
+  const pathname = usePathname()
+  return <p className={cn(WIDERRUF_ZEILE, fussSpalteKlasse(spalteDerSeite(pathname) ?? FOKUS_SPALTE))}>{children}</p>
+}
+
+/**
+ * Die Zeile „Vertrag widerrufen“ am Ende einer Fokus-Seite: mit eigener Spalte der Ansicht (Kasse, Bestätigen) in
+ * dieser, sonst in der Spalte der Route (G11, Nr. 267, Abnahme Lauf 32: passwort, registrieren, neuigkeiten — vorher
+ * stand sie 1200 px breit links außerhalb des Inhalts). Den Pfad liest ein eigenes Kind, damit die Fokus-Shell selbst
+ * ohne Hook bleibt.
+ */
+function WiderrufZeile({ spalte, children }: { spalte?: string; children: ReactNode }): React.JSX.Element {
+  if (spalte === undefined) return <WiderrufZeileDerRoute>{children}</WiderrufZeileDerRoute>
+  return <p className={cn(WIDERRUF_ZEILE, spalte)}>{children}</p>
+}
 
 /** Der runde Zurück-Pfeil am Handy und der Textlink „← Zurück …“ im Browser — dasselbe Ziel. */
 function FokusZurueck({ zurueck, form }: { zurueck: KundeFokusShellProps['zurueck']; form: 'pfeil' | 'text' }): React.JSX.Element {
@@ -443,7 +483,7 @@ export function KundeFokusShell({
   rechts,
   aktion,
   aktionKlebtImBrowser = false,
-  spalte = FOKUS_SPALTE,
+  spalte,
   children,
 }: KundeFokusShellProps): React.JSX.Element {
   return (
@@ -493,8 +533,8 @@ export function KundeFokusShell({
         {children}
         {/* Nr. 200 (N39): Auch Fokus-Seiten ohne Seitenfuß tragen den Weg zum Widerruf — eine Zeile am Ende, als grüner
             Textlink mit Unterstrich wie die übrigen Links der Boards (w1-bestellung-link, Lauf 31). */}
-        {/* Links bündig mit dem Inhalt darüber: dieselbe Spalte und derselbe Rand (16 px, in der breiten Kasse ab 768 px 24 px). */}
-        <p className={cn('mx-auto px-4 pt-2 pb-4 print:hidden', spalte === FOKUS_SPALTE && 'md:px-6', spalte)}>
+        {/* Links bündig mit dem Inhalt darüber: dieselbe Spalte und derselbe Rand (16 px, in der breiten Spalte ab 768 px 24 px). */}
+        <WiderrufZeile spalte={spalte}>
           <Link
             href={WIDERRUF_PFAD}
             className={cn(
@@ -505,7 +545,7 @@ export function KundeFokusShell({
           >
             {WIDERRUF_TEXT.fussLink}
           </Link>
-        </p>
+        </WiderrufZeile>
       </main>
 
       {aktion && (

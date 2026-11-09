@@ -39,6 +39,7 @@ import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { Vorschau246 } from '@/app/intern/bausteine/vorschau-246'
 import { Vorschau247 } from '@/app/intern/bausteine/vorschau-247'
 import { Vorschau248 } from '@/app/intern/bausteine/vorschau-248'
+import { Vorschau267 } from '@/app/intern/bausteine/vorschau-267'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { KaufZusammenfassung, type ZusammenfassungPosition } from '@/components/checkout/kauf-zusammenfassung'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
@@ -604,6 +605,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           <Vorschau246 />
           <Vorschau247 />
           <Vorschau248 />
+          <Vorschau267 />
         </div>
       </main>
     </div>
