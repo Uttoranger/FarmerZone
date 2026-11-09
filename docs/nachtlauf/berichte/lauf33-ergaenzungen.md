@@ -15,3 +15,4 @@ Gilt mit docs/nachtlauf/berichte/lauf32-board-oder-code.md. Jede Zeile ist kein 
 | kunden | Bild 2, 390 | „Sortieren nach“ zweispaltig | C | Liste: „Zweispaltig bzw. nebeneinander“ (Morgenbericht 32 B) |
 | rechtstexte und alle Boards mit „12“ Gründungsplätzen | alle | Zahl aus Admin › Einstellungen (100) | R | K2 Nr. 116, E-026 (N48) |
 | kasse | Bild 1, 3 | Unterzeile der Bar-Option „Du bestätigst per E-Mail.“ | R | Register N10 (Ergänzung Freigabe Lauf 13) |
+| alle Boards mit Kategorie-Illustration | dunkel | Illustration hell auf eigenem Grund, gedämpft wie ein Foto, gerahmt | C | Projektleitung, 9.11.2026 (F041; freigabe.md §37.1, N48) |

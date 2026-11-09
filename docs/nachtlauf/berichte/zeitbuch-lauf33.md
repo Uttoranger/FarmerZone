@@ -53,3 +53,11 @@ main bfe1f9dc277d = 5fe822b9c853 (Merge #501) + nur docs/nachtlauf/berichte/a010
 - 06:42 269 Arbeitsstand rot (Typecheck und Lint grün; 6 von 13471 Tests rot: admin-knopf-kontrast, bausteine-verzeichnis, docs-pfade-wache, ladeansichten, meldungen-ki-knoepfe zweimal) → nach §5 nur lokaler WIP-Commit 248823aa7543, nicht gepusht. In einer neuen Sitzung ist er nicht vorhanden; 269 beginnt in B neu.
 - 06:43 Aufräumen bestätigt: keine Prüf-Server, kein Prüf-Browser, kein Passkey-Browser, kein dev-Worktree, keine Fotograf-Worktrees; Prüf- und Integrations-DBs gelöscht (pruef33a, kopie_a1, fz_int_*); pruef-env, pruef-links.json, admin-passkey.json, Serverprotokolle und .next im Zwischenstand gelöscht.
 - Haltepunkt A: Zwischen-Morgenbericht docs/nachtlauf/morgenbericht-2026-11-09-lauf33-a.md, Sammel-PR integration/lauf33 → main als Entwurf. Danach endet die Sitzung.
+
+## Abschnitt B (9.11.2026)
+
+Start Abschnitt B: 9.11.2026 08:02 UTC (aus `date -u`) auf „Nachtlauf 33 fortsetzen“ der Projektleitung. Haltepunkt B spätestens 20:02 UTC; keine neue Nummer nach Stunde 7 (15:02 UTC). Gleicher Container wie A (Worktrees und der lokale WIP-Commit von 269 erhalten), aber neu gestartet (Postgres neu gestartet).
+
+- Antworten der Projektleitung auf den Zwischen-Morgenbericht A: (1) ONLINE_ZAHLUNG_EINRICHTEN_SATZ: Code bleibt, Board korrigieren; (2) Karte „Deine Bestellung“ bleibt; (3) /api/triage und CLI-Export bleiben in diesem Lauf bei der alten Nummer; (4) ja, „[TEST]“-Vorsatz auch auf dem Seitentitel der 500; Regelvorschläge 1–5 angenommen. #501 ist bereits gemergt.
+- Integrationszweig: Sammel-PR #508 (A) ist nicht gemergt, main unverändert bfe1f9dc277d → weiter auf integration/lauf33 (2e33a9920c65), #508 wird fortgeschrieben. GitHub hat #505 (266) und #507 (263) beim Push des Zwischenstands am 9.11. 06:28 UTC als gemergt markiert und ihre Branches gelöscht (ihre Commits liegen in integration/lauf33); #503, #504, #506 sind offen.
+- Nachtrag F041: eingetragen in diesem Doku-Commit (freigabe.md §37.1 wörtlich, Register-Ergänzung unter N48, Zeile der Ergänzungsliste); der 12-stellige Kurzwert steht in der nächsten Zeitbuch-Zeile, weil ein Commit seinen eigenen Wert nicht enthalten kann.
