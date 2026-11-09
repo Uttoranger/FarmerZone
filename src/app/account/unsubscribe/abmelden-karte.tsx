@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { KARTE } from '@/components/bestaetigung/bestaetigung-teile'
+import { ErfolgKasten } from '@/components/ui/erfolg-kasten'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /*
  * Die Karte der Abmelde-Seite (/account/unsubscribe) im neuen Design (Nr. 14),
  * seit Nr. 239 nach Board s2-/w2-abmelden: ohne Symbol, links bündig, im
  * Browser an der linken Kante der Inhaltsspalte (wie der Seitenfuß), höchstens
  * 520 px. Ein ungültiger Link trägt die Überschrift in der Warnfarbe
- * (`text-status-offen`). Nur Gestalt; Ablauf und Texte stehen in page.tsx bzw.
+ * (`text-status-offen`). Seit Nr. 279 ist „Erfolgreich abgemeldet“ der grün getönte
+ * Erfolgskasten mit Häkchen-Kreis (Board s2-/w2-abmelden Bild 2, Abnahme Lauf 32;
+ * `ErfolgKasten`, Ecken 12 px nach G8). Nur Gestalt; Ablauf und Texte stehen in page.tsx bzw.
  * unsubscribe-client.tsx.
  */
 
@@ -19,7 +23,7 @@ export function AbmeldenKarte({
   titel,
   children,
 }: {
-  /** `orange`: Überschrift in der Warnfarbe (ungültiger Link); sonst Textfarbe. */
+  /** `orange`: Überschrift in der Warnfarbe (ungültiger Link); `gruen`: Erfolgskasten mit Häkchen; sonst Textfarbe. */
   ton?: 'leise' | 'gruen' | 'orange'
   titel: string
   children: ReactNode
@@ -27,10 +31,16 @@ export function AbmeldenKarte({
   return (
     // Unten nur 10 px bis zum Seitenfuß (Board s2-abmelden; Liste Lauf 32, abmelden „Abstand Karte → Fuß 40 statt 10 px“).
     <div className="mx-auto w-full max-w-[1032px] px-4 pt-4 pb-2.5">
-      <div className={cn(KARTE, 'flex max-w-[520px] flex-col gap-2 px-[18px] py-[18px]')}>
-        <h1 className={cn('font-heading text-[22px] leading-tight font-semibold', ton === 'orange' && 'text-status-offen')}>{titel}</h1>
-        {children}
-      </div>
+      {ton === 'gruen' ? (
+        <ErfolgKasten titel={titel} titelStufe={1} className={cn(RUNDUNG.hinweis, 'max-w-[520px] px-[18px] py-[18px]')}>
+          {children}
+        </ErfolgKasten>
+      ) : (
+        <div className={cn(KARTE, 'flex max-w-[520px] flex-col gap-2 px-[18px] py-[18px]')}>
+          <h1 className={cn('font-heading text-[22px] leading-tight font-semibold', ton === 'orange' && 'text-status-offen')}>{titel}</h1>
+          {children}
+        </div>
+      )}
     </div>
   )
 }

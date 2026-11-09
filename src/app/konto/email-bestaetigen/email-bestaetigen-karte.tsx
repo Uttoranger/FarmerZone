@@ -4,10 +4,10 @@ import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { EMAIL_BESTAETIGEN_TEXT as T } from '@/lib/konto-anfragen'
 import { EMAIL_MAX } from '@/lib/eingabegrenzen'
 import { bestaetigeEmailAenderung } from '@/server/actions/konto-anfragen'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FELD, FELD_LABEL, KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
 import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
@@ -22,8 +22,8 @@ import { KNOPF_UMRISS } from '@/components/anmelden/stil'
  * ungültige Link ohne Symbol mit Warnfarbe und Umriss-Knopf.
  */
 // Ecken 12 px (G8) und engere Zeilen wie im Board s2-/w2-systemseiten (Liste Lauf 32, systemseiten „Karte zu rund, Zeilenabstand größer“).
-const KARTE = 'flex max-w-[520px] flex-col gap-2.5 rounded-[12px] border border-border bg-card p-[18px]'
-const KARTE_GRUEN = 'flex max-w-[520px] flex-col gap-2.5 rounded-[12px] border border-accent/45 bg-accent/12 p-[18px]'
+const KARTE = cn(RUNDUNG.karte, 'flex max-w-[520px] flex-col gap-2.5 border border-border bg-card p-[18px]')
+const KARTE_GRUEN = cn(RUNDUNG.hinweis, 'flex max-w-[520px] flex-col gap-2.5 border border-accent/45 bg-accent/12 p-[18px]')
 
 const TITEL = 'font-heading text-[22px] leading-tight font-semibold outline-none'
 const SATZ = 'text-[15px] leading-snug text-foreground'

@@ -11,6 +11,7 @@ import { WIDERRUF_TEXT, ausnahmeHinweis, belehrungHof, belehrungMitHof, widerruf
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { WiderrufFormular, type WiderrufBestellAnsicht } from './widerruf-formular'
 
 // Private Seite (signierter Link) — nie in Suchmaschinen, und die Adresse mit
@@ -119,9 +120,10 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
 
   return (
     <KundeShellMitSitzung>
-      {/* Karten höchstens 600 px (Board w3-widerruf). Nach dem Absenden stehen Titel und Einleitung nicht mehr über
+      {/* Im Web 16 px unter dem Kopf wie die Spalte des Boards (pruefer-ui Lauf 33: h1 25 px zu tief, Nr. 279).
+          Karten höchstens 600 px (Board w3-widerruf). Nach dem Absenden stehen Titel und Einleitung nicht mehr über
           der Bestätigung (Board Bild 4): Der Eingang trägt `data-widerruf-eingegangen`, die Gruppe blendet den Kopf aus. */}
-      <div className="group/widerruf mx-auto flex w-full max-w-[1032px] flex-col gap-4 px-4 pt-8 pb-12 *:max-w-[600px] md:pt-10 print:pt-0">
+      <div className="group/widerruf mx-auto flex w-full max-w-[1032px] flex-col gap-4 px-4 pt-8 pb-12 *:max-w-[600px] md:pt-4 print:pt-0">
         <div className="flex flex-col gap-1.5 group-has-[[data-widerruf-eingegangen]]/widerruf:hidden print:hidden">
           <h1 className="font-heading text-[26px] leading-tight font-semibold text-foreground md:text-[28px]">{WIDERRUF_TEXT.titel}</h1>
           <p className="text-[14.5px] leading-normal text-muted-foreground">{WIDERRUF_TEXT.einleitung}</p>
@@ -186,7 +188,7 @@ function BelehrungAbschnitt({ hof }: { hof: BelehrungHof | null }): React.JSX.El
       </ul>
       <p className="text-[14px] leading-normal text-muted-foreground">{b.teilB.fussnote}</p>
       {/* Getrennt vom Muster und als Hinweis gekennzeichnet (Auftrag 207). */}
-      <aside aria-label={b.hinweisTitel} className="mt-3 rounded-[12px] border border-border bg-muted px-3.5 py-3 text-[14px] leading-normal text-foreground">
+      <aside aria-label={b.hinweisTitel} className={cn(RUNDUNG.hinweis, 'mt-3 border border-border bg-muted px-3.5 py-3 text-[14px] leading-normal text-foreground')}>
         <span className="font-semibold">{b.hinweisTitel}: </span>
         {b.hinweis}
       </aside>

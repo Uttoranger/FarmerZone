@@ -29,7 +29,8 @@ export function UnsubscribeClient({ token }: { token: string }): React.JSX.Eleme
   if (state === 'done') {
     return (
       <AbmeldenKarte ton="gruen" titel="Erfolgreich abgemeldet">
-        <p className={KARTEN_TEXT}>Du erhältst keine Neuigkeiten mehr von diesem Hof.</p>
+        {/* Auf der grünen Fläche in deren Schrift (Paar „läuft“, ErfolgKasten), nicht in KARTEN_TEXT. */}
+        <p>Du erhältst keine Neuigkeiten mehr von diesem Hof.</p>
         <Link href="/account/profile" className={TEXTLINK}>
           Abonnements verwalten
         </Link>

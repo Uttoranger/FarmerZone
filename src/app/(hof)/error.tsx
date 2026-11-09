@@ -1,9 +1,23 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { FehlerAnsicht } from '@/components/shared/fehler-ansicht'
 import { HOF_FEHLER_TEXT, ZU_HEUTE } from '@/lib/fehlerseite'
+import { hofAktiverPunkt, hofNavigation } from '@/lib/bauern-navigation'
+
+/**
+ * Der Name des Bereichs, in dem der Fehler kam („Heute“, „Mein Hof“ …) — aus derselben Ordnung wie die Seitenleiste.
+ * Ohne Treffer kein Kopf: Lieber nichts als ein falscher Name.
+ */
+function bereichDesFehlers(pfad: string | null): string | null {
+  if (!pfad) return null
+  const id = hofAktiverPunkt(pfad)
+  if (id === null) return null
+  const n = hofNavigation({ isAdmin: true })
+  return [...n.haupt, ...n.verkaufUndKunden, ...n.unten].find((p) => p.id === id)?.label ?? null
+}
 
 /**
  * Die Fehlergrenze des Hofbereichs (Nr. 175, Board system-sterne-kein-netz,
@@ -31,6 +45,7 @@ export default function HofFehler({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const bereich = bereichDesFehlers(usePathname())
   useEffect(() => {
     Sentry.captureException(error)
     // Wie src/app/error.tsx: auf die Konsole nur außerhalb der Produktion.
@@ -38,14 +53,24 @@ export default function HofFehler({
   }, [error])
 
   return (
-    <FehlerAnsicht
-      fehlernummer={error.digest}
-      nochmal={reset}
-      ziel={{ href: '/dashboard', text: ZU_HEUTE }}
-      text={HOF_FEHLER_TEXT}
-      meldenPfad="/fehler-melden"
-      imLayout
-      welt="hof"
-    />
+    <>
+      {/* Am Handy der Kopf des Bereichs über der Fehlerkarte (Board s3-fehlerseiten Bild 5; Liste Lauf 32, fehlerseiten
+          „Kopf ‚Heute‘ fehlt auf der Hof-Fehlerseite“, Nr. 279): Der Hof soll sehen, wo er ist. Keine Überschrift (die h1
+          ist „Da ist etwas schiefgelaufen“), kein Hofname: Die Grenze lädt nichts — die Zeile „<Hof> · Stand …“ fehlt. */}
+      {bereich && (
+        <div className="flex min-h-14 items-center border-b border-border bg-card px-4 md:hidden print:hidden">
+          <p className="font-heading text-[20px] leading-tight font-semibold text-foreground">{bereich}</p>
+        </div>
+      )}
+      <FehlerAnsicht
+        fehlernummer={error.digest}
+        nochmal={reset}
+        ziel={{ href: '/dashboard', text: ZU_HEUTE }}
+        text={HOF_FEHLER_TEXT}
+        meldenPfad="/fehler-melden"
+        imLayout
+        welt="hof"
+      />
+    </>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
 import { Compass, TriangleAlert } from 'lucide-react'
 import {
   FEHLER_KNOPF_TON,
@@ -16,6 +17,7 @@ import {
 } from '@/lib/fehlerseite'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { MARKE } from '@/lib/marke'
+import { TITEL_VORSATZ_ATTRIBUT, vorsatzAusAttribut } from '@/lib/titel-vorsatz'
 import { cn } from '@/lib/utils'
 
 /*
@@ -74,7 +76,9 @@ export function FehlerseiteAufbau({
           Dateiname: Das wäre für den Menschen ohne Wert und für uns eine
           offene Flanke. */}
       <p className="text-[12.5px] font-bold tracking-[1.6px] text-muted-foreground uppercase">{kicker}</p>
-      <h1 className="font-heading text-[26px] leading-[1.2] font-semibold text-balance break-words text-foreground">{titel}</h1>
+      {/* Ohne `text-balance`: Das Board bricht gierig („Diesen Hof gibt es hier / nicht (mehr)“), ausgewogen stand am
+          Handy „… gibt es / hier nicht (mehr)“ (Abnahme Lauf 32, fehlerseiten Bild 1–3, Nr. 279). */}
+      <h1 className="font-heading text-[26px] leading-[1.2] font-semibold break-words text-foreground">{titel}</h1>
       <p className="max-w-[440px] text-[15px] leading-normal text-muted-foreground">{text}</p>
       <div className="flex w-full max-w-[340px] flex-col gap-2">{children}</div>
     </div>
@@ -86,6 +90,23 @@ export function FehlerseiteAufbau({
  * deshalb trägt die Ansicht ihn selbst — React 19 hebt ein `<title>` aus dem Baum in den Kopf des Dokuments.
  */
 export const FEHLER_SEITENTITEL = `Fehler — ${MARKE}`
+
+/** Der Attributwert ändert sich nach dem Laden nie — nichts zu abonnieren. */
+const nieAendern = (): (() => void) => () => {}
+
+/**
+ * Der Testvorsatz (TEST_VORSATZ) für den Titel der 500 (Antwort der Projektleitung, 9.11.2026, Punkt 4; Nr. 279): Das
+ * Wurzel-Layout legt ihn an <html> ab (src/lib/titel-vorsatz.ts, eine Quelle mit der Titel-Vorlage aller Seiten).
+ * `useSyncExternalStore` mit leerem Server-Wert, damit Server-HTML und erstes Bild im Browser gleich sind; danach
+ * steht der Vorsatz. global-error hat kein Wurzel-Layout und damit keinen Vorsatz.
+ */
+function useTitelVorsatz(): string {
+  return useSyncExternalStore(
+    nieAendern,
+    () => vorsatzAusAttribut(document.documentElement.getAttribute(TITEL_VORSATZ_ATTRIBUT)),
+    () => ''
+  )
+}
 
 /**
  * Die 500 — einmal gebaut, von allen Fehlergrenzen benutzt.
@@ -131,15 +152,22 @@ export function FehlerAnsicht({
   /** Die Welt: im Hofbereich ist der Hauptknopf orange (V51). */
   welt?: FehlerWelt
 }) {
+  const vorsatz = useTitelVorsatz()
   return (
     <div
       data-design="neu"
       className={cn(
-        'flex items-center justify-center bg-background px-6 text-foreground',
-        imLayout ? 'min-h-[70dvh] py-12' : 'min-h-dvh py-16'
+        'flex justify-center bg-background text-foreground',
+        // In der Shell oben wie das Board (s3-/w3-fehlerseiten Bild 4/5: 36 bzw. 40 px unter dem Kopf), nicht mitten in
+        // 70 % der Fensterhöhe — sonst stand der Block im Web rund 70 px zu tief und am Handy weit über dem Fuß
+        // (Abnahme Lauf 32, fehlerseiten „Lage und Größen“, Nr. 279). Ohne Shell (global-error) bleibt er mittig.
+        imLayout ? 'w-full px-[22px] pt-9 pb-12 md:pt-10' : 'min-h-dvh items-center px-6 py-16',
+        // Im Hofbereich in der Inhaltsspalte (Board w3-fehlerseiten Bild 5: 760 px plus 40 px Rand), nicht mittig in
+        // der ganzen Fläche neben der Seitenleiste.
+        imLayout && welt === 'hof' && 'md:max-w-[840px] md:px-10'
       )}
     >
-      <title>{FEHLER_SEITENTITEL}</title>
+      <title>{`${vorsatz}${FEHLER_SEITENTITEL}`}</title>
       <FehlerseiteAufbau zeichen="warnung" kicker={fehlerKicker(fehlernummer)} titel={FEHLER_TITEL} text={text}>
         <button type="button" onClick={nochmal} className={FEHLER_HAUPT[FEHLER_KNOPF_TON[welt]]}>
           {NOCHMAL_VERSUCHEN}
@@ -153,7 +181,8 @@ export function FehlerAnsicht({
         </a>
         <a
           href={meldungLinkMitKennung(fehlernummer, meldenPfad)}
-          className={cn('inline-flex min-h-11 items-center justify-center rounded-full px-4 text-[14px] font-semibold text-foreground underline-offset-4 hover:underline', FOKUS_RAHMEN)}
+          // 16 px wie die Knöpfe darüber, unterstrichen (Board s3-/w3-fehlerseiten; Abnahme Lauf 32: „Problem melden“ kleiner als im Board).
+          className={cn('inline-flex min-h-11 w-full items-center justify-center rounded-[3px] px-4 text-[16px] font-semibold text-foreground underline underline-offset-4 hover:opacity-80', FOKUS_RAHMEN)}
         >
           {PROBLEM_MELDEN}
         </a>

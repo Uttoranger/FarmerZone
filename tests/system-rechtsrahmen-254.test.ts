@@ -37,11 +37,10 @@ import { RechtstextVorlage } from '@/components/shared/rechtstext-vorlage'
 import { RechtstextVerzeichnis, abschnittAnDerLeselinie, VERZEICHNIS_LESELINIE_PX } from '@/components/shared/rechtstext-verzeichnis'
 import { INFOSEITE_SPALTE, INFOSEITE_TITEL } from '@/components/shared/infoseite-stil'
 import { FEHLER_UMRISS, FehlerseiteAufbau } from '@/components/shared/fehler-ansicht'
-import { eingangZeitpunktSeite } from '@/app/(public)/widerruf/eingang-zeit'
 import { eingangZeitpunkt } from '@/lib/widerruf'
 import { AGB_SEITE_TEXT } from '@/lib/rechtstexte/agb-einbindung'
 import { PLATTFORM_EINSTELLUNG_STANDARD } from '@/lib/plattform-einstellung'
-import { formatDatumLang } from '@/lib/format'
+import { formatDatumLang, formatZeitpunktMitWochentag } from '@/lib/format'
 
 const quelle = (pfad: string): string => readFileSync(pfad, 'utf8')
 
@@ -128,7 +127,7 @@ describe('/agb: „Frühere Fassung 0.9“ als Ziel 44 px', () => {
 
 describe('Rücktrittsrecht', () => {
   it('Zeitpunkt der Seite mit Wochentag und ohne „Uhr“ (Wiener Zeit)', () => {
-    expect(eingangZeitpunktSeite(new Date('2027-03-03T18:40:00Z'))).toBe('Mi, 3. März 2027, 19:40')
+    expect(formatZeitpunktMitWochentag(new Date('2027-03-03T18:40:00Z'))).toBe('Mi, 3. März 2027, 19:40')
   })
   it('Gegenprobe: Mails und Admin behalten eingangZeitpunkt mit „Uhr“', () => {
     expect(eingangZeitpunkt(new Date('2027-03-03T18:40:00Z'))).toMatch(/ Uhr$/)
@@ -144,10 +143,12 @@ describe('Rücktrittsrecht', () => {
 })
 
 describe('Fehlerseiten', () => {
-  it('h1 26 px, ausgewogen umbrochen; zweiter Weg mit Rand in Textfarbe', () => {
+  // Seit Nr. 279 gierig umbrochen wie das Board („Diesen Hof gibt es hier / nicht (mehr)“), nicht mehr ausgewogen.
+  it('h1 26 px, gierig umbrochen (ohne text-balance); zweiter Weg mit Rand in Textfarbe', () => {
     const props = { zeichen: 'weg' as const, kicker: 'Fehler 404', titel: 'Titel', text: 'Satz', children: null }
     const html = renderToStaticMarkup(createElement(FehlerseiteAufbau, props))
-    expect(html).toMatch(/<h1 class="[^"]*text-\[26px\][^"]*text-balance/)
+    expect(html).toMatch(/<h1 class="[^"]*text-\[26px\]/)
+    expect(html).not.toContain('text-balance')
     expect(html).toContain('max-w-[544px]')
     expect(FEHLER_UMRISS).toContain('border-foreground/60')
     expect(FEHLER_UMRISS).not.toContain('border-border')

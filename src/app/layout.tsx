@@ -7,6 +7,7 @@ import { CookieBanner } from '@/components/cookie-banner'
 import { UmgebungsBanner, UmgebungsBannerLink } from '@/components/shared/umgebungs-banner'
 import { RueckwegMerker } from '@/components/shared/rueckweg-merker'
 import { UMGEBUNG, ZEIGE_UMGEBUNGSBANNER } from '@/lib/umgebung-server'
+import { TITEL_VORSATZ_ATTRIBUT, titelVorsatz } from '@/lib/titel-vorsatz'
 import { metadatenBasis } from '@/lib/vorschaubild'
 import { OG_LOCALE } from '@/lib/json-ld'
 import './globals.css'
@@ -49,7 +50,8 @@ const instrumentSans = Instrument_Sans({
 // In der Testumgebung trägt JEDER Browser-Tab das Präfix „[TEST] " — auch
 // Seiten mit festem Titel, weil das Präfix hier als Vorlage wirkt und nicht in
 // jeder Seite einzeln stehen muss. Das Banner scrollt weg, der Tab bleibt.
-const TITEL_PRAEFIX = ZEIGE_UMGEBUNGSBANNER ? '[TEST] ' : ''
+// Der Wortlaut kommt aus src/lib/titel-vorsatz.ts — dieselbe Quelle nimmt die 500 (Nr. 279).
+const TITEL_PRAEFIX = titelVorsatz(ZEIGE_UMGEBUNGSBANNER)
 
 export function generateMetadata(): Metadata {
   return {
@@ -110,6 +112,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
     <html
       lang="de-AT"
       suppressHydrationWarning
+      // Für die 500: Ihr Titel steht ohne Vorlage im Baum und liest den Vorsatz von hier (Nr. 279).
+      {...(TITEL_PRAEFIX ? { [TITEL_VORSATZ_ATTRIBUT]: TITEL_PRAEFIX } : {})}
       className={`${geist.variable} ${fraunces.variable} ${instrumentSans.variable} h-full antialiased`}
     >
       <body className="min-h-full font-sans">

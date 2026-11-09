@@ -7,8 +7,10 @@ import { reicheWiderrufMitLinkEin, reicheWiderrufOhneLinkEin, type WiderrufAntwo
 import { FELD, FELD_LABEL, KNOPF_GRUEN, KNOPF_UMRISS } from '@/components/anmelden/stil'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { Kaestchen } from '@/components/ui/kaestchen'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { formatZeitpunktMitWochentag } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { eingangZeitpunktSeite } from './eingang-zeit'
 
 /** Was die Seite über eine Bestellung mit signiertem Link zeigt — gekürzt, ohne Beträge. */
 export type WiderrufBestellAnsicht = {
@@ -31,10 +33,19 @@ type Schritt = 'eingabe' | 'zusammenfassung' | 'eingegangen'
 const KARTE = 'flex flex-col gap-3.5 rounded-[16px] border border-border bg-card px-4 py-4 md:px-[18px]'
 /** Mehrzeiliges Feld: die Feldform ohne die feste Höhe. */
 const FELD_MEHRZEILIG = cn(FELD, 'h-auto min-h-[88px] resize-y py-3 leading-normal')
+/*
+ * Die zwei Auswahlkarten „Die ganze Bestellung“ / „Einzelne Artikel“ nach Board s3-/w3-widerruf (Abnahme Lauf 32,
+ * widerruf Bild 1/2, Nr. 279): 52 px hoch, Beschriftung fett, Punkt 22 px, gewählt mit Rand 2 px in Grün auf grün
+ * getönter Fläche (der zweite Pixel als Ring nach innen, damit nichts springt), Ecken 12 px (G8).
+ */
 const AUSWAHL = cn(
-  'flex min-h-11 cursor-pointer items-start gap-3 rounded-[12px] border border-input px-3.5 py-3 text-[15px] text-foreground has-[:checked]:border-accent has-[:checked]:bg-accent/10',
+  'flex min-h-[52px] cursor-pointer items-center gap-3 border border-input bg-card px-3 py-2 text-[15px] font-semibold text-foreground',
+  'has-[:checked]:border-accent has-[:checked]:bg-accent/10 has-[:checked]:ring-1 has-[:checked]:ring-accent has-[:checked]:ring-inset',
+  RUNDUNG.karte,
   FOKUS_RAHMEN
 )
+/** Eine Zeile der Positionsliste (Board s3-/w3-widerruf Bild 1): Linie oben, Kästchen 22 px, Text 15 px. */
+const POSITION = 'flex gap-2.5 border-t border-border py-2 text-[15px] text-foreground'
 /** „Schritt 1 von 2" über der Karte (Board w3-widerruf). */
 const SCHRITT = 'text-[12.5px] font-semibold text-muted-foreground'
 const KOPF = 'font-heading text-[20px] font-semibold text-foreground outline-none'
@@ -109,7 +120,7 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
         setFehler(antwort.error)
         return
       }
-      setEingegangenAm(eingangZeitpunktSeite(new Date(antwort.eingegangenAm)))
+      setEingegangenAm(formatZeitpunktMitWochentag(new Date(antwort.eingegangenAm)))
       setSchritt('eingegangen')
       requestAnimationFrame(() => kopfRef.current?.focus())
     })
@@ -224,31 +235,42 @@ export function WiderrufFormular({ bestellung }: { bestellung: WiderrufBestellAn
       <fieldset className="flex flex-col gap-2">
         <legend className={cn(FELD_LABEL, 'mb-2')}>{WIDERRUF_TEXT.positionenTitel}</legend>
         <label className={AUSWAHL}>
-          <input type="radio" name="umfang" value="ganz" checked={umfang === 'ganz'} onChange={() => setUmfang('ganz')} className="mt-1 size-4 accent-accent" />
+          <input type="radio" name="umfang" value="ganz" checked={umfang === 'ganz'} onChange={() => setUmfang('ganz')} className="size-[22px] shrink-0 accent-accent" />
           <span>{WIDERRUF_TEXT.ganz}</span>
         </label>
         <label className={AUSWAHL}>
-          <input type="radio" name="umfang" value="teil" checked={umfang === 'teil'} onChange={() => setUmfang('teil')} className="mt-1 size-4 accent-accent" />
+          <input type="radio" name="umfang" value="teil" checked={umfang === 'teil'} onChange={() => setUmfang('teil')} className="size-[22px] shrink-0 accent-accent" />
           <span>{WIDERRUF_TEXT.teil}</span>
         </label>
       </fieldset>
 
+      {/* Die ganze Bestellung: die Positionen als Liste mit Häkchen darunter (Board s3-/w3-widerruf Bild 1; Abnahme
+          Lauf 32, widerruf) — nur gezeigt, kein Feld: Abgeschickt wird wie bisher `umfang: 'ganz'` ohne Positionen. */}
+      {umfang === 'ganz' && bestellung && bestellung.positionen.length > 0 && (
+        <ul className="flex flex-col" aria-label={WIDERRUF_TEXT.ganz}>
+          {bestellung.positionen.map((p) => (
+            <li key={p.id} className={POSITION}>
+              <span aria-hidden="true" className="grid size-[22px] shrink-0 place-items-center rounded-[6px] bg-kaestchen-flaeche text-kaestchen-haken">
+                <Check className="size-4" strokeWidth={3} />
+              </span>
+              <PositionText text={p.text} hinweis={p.hinweis} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Einzelne Artikel: dieselbe Liste zum Ankreuzen, seit Nr. 279 mit dem Kästchen-Baustein (A-8) — nur das Aussehen
+          ist neu; Zustand, Klick und übermittelte Auswahl belegt tests/widerruf-kaestchen-verhalten.test.ts. */}
       {umfang === 'teil' && bestellung && (
-        <fieldset className="flex flex-col gap-2">
+        <fieldset className="flex flex-col">
           <legend className="sr-only">{WIDERRUF_TEXT.teil}</legend>
           {bestellung.positionen.map((p) => (
-            <label key={p.id} className={AUSWAHL}>
-              <input
-                type="checkbox"
+            <label key={p.id} className={cn(POSITION, 'cursor-pointer')}>
+              <Kaestchen
                 checked={gewaehlt.includes(p.id)}
                 onChange={(e) => setGewaehlt((alt) => (e.target.checked ? [...alt, p.id] : alt.filter((id) => id !== p.id)))}
-                className="mt-1 size-4 accent-accent"
               />
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="break-words">{p.text}</span>
-                {/* Nur ein Hinweis (§ 18 FAGG) — entscheiden tut der Hof im Einzelfall. */}
-                <span className="text-[12.5px] leading-normal text-muted-foreground">{p.hinweis}</span>
-              </span>
+              <PositionText text={p.text} hinweis={p.hinweis} />
             </label>
           ))}
         </fieldset>
@@ -306,6 +328,17 @@ function Feld({ id, label, hinweis, children }: { id: string; label: string; hin
         </p>
       )}
     </div>
+  )
+}
+
+/** Text einer Position mit dem Hinweis darunter — in der Liste „ganze Bestellung“ und beim Ankreuzen gleich. */
+function PositionText({ text, hinweis }: { text: string; hinweis: string }) {
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="break-words">{text}</span>
+      {/* Nur ein Hinweis (§ 18 FAGG) — entscheiden tut der Hof im Einzelfall. */}
+      <span className="text-[12.5px] leading-normal text-muted-foreground">{hinweis}</span>
+    </span>
   )
 }
 

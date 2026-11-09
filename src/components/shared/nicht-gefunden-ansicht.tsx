@@ -57,7 +57,9 @@ export function NichtGefundenAnsicht({
   const params = useParams()
   const haupt = hauptVorgabe === 'zum-hof' ? wegZumHof(params?.farmSlug) : hauptVorgabe
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col items-center px-[22px] pt-[70px] pb-16 md:pt-[110px]">
+    // Im Web 40 px unter dem Kopf wie das Board w3-fehlerseiten Bild 1–3 (vorher 110 px: Block 69 px zu tief, pruefer-ui
+    // Lauf 33, Nr. 279); am Handy unverändert.
+    <div className="mx-auto flex w-full max-w-[640px] flex-col items-center px-[22px] pt-[70px] pb-16 md:pt-10">
       <FehlerseiteAufbau zeichen="weg" kicker={NICHT_GEFUNDEN_KICKER} titel={titel} text={text}>
         <Link href={haupt.href} className={FEHLER_HAUPT.gruen}>
           {haupt.text}
