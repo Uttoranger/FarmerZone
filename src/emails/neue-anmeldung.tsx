@@ -39,7 +39,8 @@ export function NeueAnmeldungEmail({ hof, name, geraet, wann, tag, link }: NeueA
       <Text style={bodyText}>{`${text.anrede(name)} ${text.vorher} ${tag} ${text.nachher}`}</Text>
       <BetragsZeile umbrechen links="Wann" rechts={wann} />
       <BetragsZeile umbrechen links="Gerät" rechts={geraet} />
-      <Text style={{ ...bodyText, marginTop: '12px' }}>{text.warstDu}</Text>
+      {/* Board Bild 1: der Satz rückt nah an die Zeile „Gerät“ (B-Zeile „Abstand unter Gerät“, Nr. 280). */}
+      <Text style={{ ...bodyText, marginTop: '4px' }}>{text.warstDu}</Text>
       <KnopfReihe>
         <Knopf href={link} art="rahmen">
           {text.knopf}

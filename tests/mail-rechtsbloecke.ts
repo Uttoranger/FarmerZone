@@ -23,6 +23,8 @@
 import { createHash } from 'node:crypto'
 import { BELEHRUNG, WIDERRUF_TEXT } from '@/lib/widerruf'
 import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
+import { MARKE } from '@/lib/marke'
+import { PRODUKTION_HOST } from '@/lib/umgebung'
 
 export type Rechtsblock = { anfang: string; sha256: string }
 
@@ -52,7 +54,9 @@ function saetze(wert: unknown): string[] {
 const WIDERRUF_SAETZE = saetze(WIDERRUF_TEXT)
 
 function block(html: string): Rechtsblock {
-  return { anfang: klartext(html).slice(0, 60), sha256: createHash('sha256').update(html).digest('hex') }
+  // Marke und Domain als Platzhalter (tests/marke-name-wache.test.ts); der Hash nimmt das HTML, wie es ist.
+  const anfang = klartext(html).slice(0, 60).replaceAll(PRODUKTION_HOST, '{{DOMAIN}}').replaceAll(MARKE, '{{MARKE}}')
+  return { anfang, sha256: createHash('sha256').update(html).digest('hex') }
 }
 
 function istRecht(element: string): boolean {

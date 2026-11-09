@@ -21,6 +21,7 @@ vi.mock('resend', () => ({
 }))
 
 import type { OrderForEmail, OrderForHofMail } from '@/lib/email'
+import { MARKE } from '@/lib/marke'
 
 let email: typeof import('@/lib/email')
 
@@ -138,7 +139,7 @@ describe('Sicherheit und Team: Sätze der Boards, Zeiten nach V9', () => {
     const { betreff, html } = await email.neueAnmeldungInhalt({ hof: true, name: 'Franz Müller', geraet: 'Windows · Edge', zeitpunkt: ZEIT, link: 'https://example.org/sicherheit' })
     const t = klartext(html)
     expect(betreff).toContain('Neue Anmeldung bei deinem Hof-Konto')
-    expect(t).toContain('Agrilo Neue Anmeldung Hallo Franz Müller, am Di, 2. März 2027 hat sich jemand mit deinem Konto angemeldet:')
+    expect(t).toContain(`${MARKE} Neue Anmeldung Hallo Franz Müller, am Di, 2. März 2027 hat sich jemand mit deinem Konto angemeldet:`)
     expect(t).toContain('Wann Di, 2. März 2027, 21:14 Uhr')
     expect(t).not.toContain('2.3. um 21:14')
   })
@@ -162,7 +163,7 @@ describe('Sicherheit und Team: Sätze der Boards, Zeiten nach V9', () => {
     const { betreff, html } = await email.emailAendernLinkInhalt({ hof: 'Hof Müller', link: 'https://example.org/konto/email' })
     const t = klartext(html)
     expect(betreff).toContain('Bestätige deine neue Anmelde-Adresse')
-    expect(t).toContain('Neue Anmelde-Adresse bestätigen Hallo Hof Müller, das Team von Agrilo hat auf deinen Wunsch eine neue Anmelde-Adresse eingetragen. Bitte bestätige sie:')
+    expect(t).toContain(`Neue Anmelde-Adresse bestätigen Hallo Hof Müller, das Team von ${MARKE} hat auf deinen Wunsch eine neue Anmelde-Adresse eingetragen. Bitte bestätige sie:`)
     expect(t).toContain('Der Link gilt 24 Stunden und einmal. Bis dahin meldest du dich mit der alten Adresse an.')
   })
 
@@ -186,6 +187,19 @@ describe('Sicherheit und Team: Sätze der Boards, Zeiten nach V9', () => {
   it('Einrichtungscode: typografische Anführungszeichen um „Admin-Zugang absichern“', async () => {
     const t = klartext((await email.adminSicherheitInhalt({ anlass: 'einrichtungscode', geraet: 'Laptop · Chrome', zeitpunkt: ZEIT, code: '0'.repeat(6) })).html)
     expect(t).toContain('auf der Seite „Admin-Zugang absichern“ ein:')
+  })
+})
+
+describe('Team: Einladung mit Knopf (Board s3/w3-mail-team Bild 3)', () => {
+  it('eingeladen: Knopf „Admin-Zugang absichern“ auf /admin/einrichten, ohne Token', async () => {
+    const { html } = await email.teamRechtGeaendertInhalt({ anlass: 'eingeladen', name: 'Jonas Pichler', rechte: ['Startseite'] })
+    expect(html).toMatch(/<a href="[^"]*\/admin\/einrichten"[^>]*>Admin-Zugang absichern<\/a>/)
+    expect(html).not.toMatch(/einrichten\?/)
+  })
+
+  it('Gegenprobe: andere Anlässe ohne Knopf', async () => {
+    const { html } = await email.teamRechtGeaendertInhalt({ anlass: 'entfernt', name: 'Jonas Pichler', rechte: [] })
+    expect(html).not.toContain('Admin-Zugang absichern')
   })
 })
 

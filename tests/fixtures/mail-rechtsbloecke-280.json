@@ -9,11 +9,11 @@
       "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -27,11 +27,11 @@
       "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -45,11 +45,11 @@
       "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -59,7 +59,7 @@
       "sha256": "4a8b5108fa590aaf90d2e6dcf56b39a902804b25443a8c080cae772acf231480"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -69,7 +69,7 @@
       "sha256": "4a8b5108fa590aaf90d2e6dcf56b39a902804b25443a8c080cae772acf231480"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -83,31 +83,31 @@
       "sha256": "4a8b5108fa590aaf90d2e6dcf56b39a902804b25443a8c080cae772acf231480"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:storniert-online": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:storniert-bar": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:verfallen": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:zahlung-zu-spaet": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -121,7 +121,7 @@
       "sha256": "e16c31d59bc9d4af1310dbbc3fca61156cbbf0e46e6651cb3a0bb2c13759c147"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -131,7 +131,7 @@
       "sha256": "ede863635f9c2699563535a6695c82fc19f4bfc74e64e9e9501e52eaa2904f18"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -145,116 +145,116 @@
       "sha256": "bcc7acc63dd368e426fd9612e03a6ca3007317d72a22343efda20d55834ddfce"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:anmeldecode": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:bestellcode": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:passwort-link": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:email-bestaetigung": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:neue-anmeldung": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:zu-viele-versuche-code": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:zu-viele-versuche-passwort": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:email-aendern-link": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:email-geaendert-hinweis": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:registrierungs-hinweis": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:admin-sicherheit-einrichtungscode": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:admin-sicherheit-passkey": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:team-recht-geaendert": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:betreiber-bestaetigung": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:betreiber-testmail": [],
   "vorschau:abo-bestaetigung": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:beitrag": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:beitrag-ohne-foto": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:bescheid": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -264,13 +264,13 @@
       "sha256": "eb4b15163d8174c1f3d7743b5026f89a2381991eef3ab7c219f54867c445053d"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:bestellung-neu-bar-hof": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -280,7 +280,7 @@
       "sha256": "667a594a28966b151d79216d055527c7c10b9e1c694cdfa691e73716de1cac7b"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -298,13 +298,13 @@
       "sha256": "d5d1656a83ff1f978fcace6ddc46616f8959e07edb9569feba05f1c6593301b4"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:freischaltung": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -314,19 +314,19 @@
       "sha256": "0a96b140cf7466ae645888d453f92037a10d032a565d9b6abdd43999b3a5e654"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:lastschrift-gescheitert": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:rundschreiben": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -336,7 +336,7 @@
       "sha256": "ce5d1122a95d19a13dae78b7f658b3b7aa74c5c9950d1e3b401eebeb0bed1ead"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -366,11 +366,11 @@
       "sha256": "b33d49d9cfd1e17bf58a816c084cbd03771bc1716f2b3d3effe48c8954cb0ae8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "403f9edf2eeb001c22f46d2f043a427688bd8f20d5d8a0b35152013d37196d84"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -384,11 +384,11 @@
       "sha256": "b33d49d9cfd1e17bf58a816c084cbd03771bc1716f2b3d3effe48c8954cb0ae8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "403f9edf2eeb001c22f46d2f043a427688bd8f20d5d8a0b35152013d37196d84"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -398,11 +398,11 @@
       "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -416,11 +416,11 @@
       "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -434,17 +434,17 @@
       "sha256": "b33d49d9cfd1e17bf58a816c084cbd03771bc1716f2b3d3effe48c8954cb0ae8"
     },
     {
-      "anfang": "Es gelten die AGB von Agrilo. Du findest sie auch als Datei ",
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
       "sha256": "403f9edf2eeb001c22f46d2f043a427688bd8f20d5d8a0b35152013d37196d84"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
   "vorschau:abholbereit-betrieb": [
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -454,7 +454,7 @@
       "sha256": "9185d8a0fabdc6c9a324fe07ca3db8ffdf2975e4a435d0684436da13931768f1"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
@@ -464,7 +464,7 @@
       "sha256": "bffd022d8e99a259e88feaee111df0ad6f66eb6f80ea484afc8503f5a2e68ce9"
     },
     {
-      "anfang": "Agrilo · agrilo.at/impressum",
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
