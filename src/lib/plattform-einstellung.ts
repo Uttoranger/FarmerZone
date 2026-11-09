@@ -25,6 +25,8 @@ import {
   aktionLaeuft,
   bildeGruendungBis,
   gruendungTagKurz,
+  seitenZahlen,
+  vergebeneGruendungsplaetzeAus,
   type GruendungEinstellung,
   type GruendungZahlen,
 } from '@/lib/gruendungshof'
@@ -212,6 +214,30 @@ export function pruefeGruendungEingabe(eingabe: GruendungEingabe, bisher: Gruend
     return GRUENDUNG_EINSTELLUNG_FEHLER.monateVorbei
   }
   return null
+}
+
+/** Was das Formular der Gruppe Gründungshöfe über die Höfe bekommt (ladeGruendungStandAdmin) — nur Zahlen, keine Hofliste. */
+export type GruendungZaehlung = { vergeben: number; inDerVergabe: number }
+
+/**
+ * Was das Formular der Gruppe Gründungshöfe aus der Eingabe rechnet (Nr. 265):
+ * den ersten verletzten Satz — geprüft mit `vergeben`, derselben Zahl wie die
+ * Action — und für Kachel und Vorschau „vergeben“ samt den Zahlen der Seiten,
+ * mit den eingegebenen Plätzen, solange die Eingabe gilt, sonst mit dem
+ * gespeicherten Stand. EINE Zählregel (`vergebeneGruendungsplaetzeAus`): Beim
+ * gespeicherten Stand nennen Kachel, Hinweis und Action dieselbe Zahl; beim
+ * Tippen von 100 zeigt die Kachel, was nach dem Speichern vergeben ist.
+ */
+export function gruendungFormularStand(
+  gespeichert: GruendungEinstellung,
+  zaehlung: GruendungZaehlung,
+  eingabe: GruendungEingabe,
+  jetzt: Date
+): { fehler: string | null; vergeben: number; zahlen: GruendungZahlen } {
+  const fehler = pruefeGruendungEingabe(eingabe, gespeichert, zaehlung.vergeben, jetzt)
+  const stand: GruendungEinstellung = fehler === null ? { ...gespeichert, ...eingabe } : gespeichert
+  const vergeben = vergebeneGruendungsplaetzeAus(zaehlung.inDerVergabe, stand.plaetze, stand.festAm !== null)
+  return { fehler, vergeben, zahlen: seitenZahlen(stand, vergeben, jetzt) }
 }
 
 // ─── Texte der Seite ─────────────────────────────────────────────────────────
