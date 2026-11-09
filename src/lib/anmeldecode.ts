@@ -300,15 +300,15 @@ export const ZU_VIELE_VERSUCHE_MAIL: Record<
     betreff: 'Zu viele falsche Codes',
     titel: 'Zu viele falsche Codes',
     text: (bis) =>
-      `für deine E-Mail-Adresse wurde zu oft ein falscher Code eingegeben. Deshalb nehmen wir für diese Adresse bis ${bis} keinen Code mehr an.`,
+      `Für deine Adresse wurde mehrmals ein falscher Code eingegeben. Zum Schutz nehmen wir für diese Adresse bis ${bis} keinen Code mehr an.`,
     ausweg:
-      'Warst du das nicht? Dann musst du nichts tun: Ohne den Code aus deiner E-Mail kommt niemand weiter. Gib Codes nie an andere weiter – wir fragen dich nie danach.',
+      'Warst du das nicht? Dann musst du nichts tun – ohne Code kommt niemand in dein Konto. Gib Codes nie an andere weiter – wir fragen dich nie danach.',
   },
   passwort: {
     betreff: 'Zu viele falsche Passwörter',
     titel: 'Zu viele falsche Passwörter',
     text: (bis) =>
-      `bei deinem Konto wurde zu oft ein falsches Passwort eingegeben. Deshalb ist die Anmeldung mit Passwort bis ${bis} pausiert.`,
+      `Für dein Konto wurde mehrmals ein falsches Passwort eingegeben. Deshalb ist die Anmeldung mit Passwort bis ${bis} pausiert.`,
     ausweg:
       'Über „Passwort vergessen" kannst du dein Passwort jederzeit zurücksetzen – danach geht die Anmeldung sofort wieder. Warst du das nicht? Dann setz zur Sicherheit ein neues Passwort fest. Wir fragen dich nie per E-Mail nach deinem Passwort.',
   },

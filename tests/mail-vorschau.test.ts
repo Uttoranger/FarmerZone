@@ -694,7 +694,7 @@ describe('Gebühren-Wort in den Kunden-Mails (V63)', () => {
 /** Die Fuß-Art je Vorlage in der Reihenfolge ihrer EmailLayout-Aufrufe — die Liste aus dem Auftrag (Nr. 232, Punkt 1). */
 const FUSS_JE_VORLAGE: Record<string, MailFussArt[]> = {
   'abo-bestaetigung.tsx': ['plattform'],
-  'admin-sicherheit.tsx': ['plattform', 'plattform'],
+  'admin-sicherheit.tsx': ['plattform', 'plattform', 'plattform'],
   'anmeldecode.tsx': ['plattform'],
   'artikel-fehlt.tsx': ['hof'],
   'bescheid.tsx': ['postfach'],

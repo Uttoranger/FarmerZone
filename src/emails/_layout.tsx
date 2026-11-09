@@ -4,6 +4,7 @@ import { MARKE } from '@/lib/marke'
 import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
 import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
+import type { Positionszeile } from '@/lib/positionszeile'
 
 /**
  * Die Mail-Palette — die EINZIGE Stelle mit Farbwerten unter src/emails/
@@ -50,8 +51,12 @@ export const SCHRIFT_UEBERSCHRIFT = "Fraunces,Georgia,'Times New Roman',serif"
  * Am Handy (Board s3-mail-*) steht die Karte mit 10 px Rand und 18 px Innenabstand,
  * im Web (w3-mail-*, Karte bis 600 px) mit 12 px und 26 px. Inline steht die Web-Fassung —
  * Mailprogramme ohne Media Queries zeigen sie; die übrigen nehmen am Handy die schmale.
+ * Werte mit Datum oder Adresse (`BetragsZeile umbrechen`) stehen am Handy mit 13 px und engerem
+ * Abstand zur Beschriftung, damit „Hof Müller, Dorfstraße 12, 5280 Braunau am Inn“ bei 390 px in
+ * einer Zeile bleibt (Board s3-mail-kauf Bild 1, Nr. 280); längere Werte brechen weiter um, statt
+ * über den Rand zu laufen.
  */
-const SCHMAL_CSS = `@media only screen and (max-width:480px){.fz-grund>table>tbody>tr>td{padding:16px 10px !important}.fz-kopf{padding:20px 18px 0 !important}.fz-inhalt{padding:18px 18px 22px !important}}`
+const SCHMAL_CSS = `@media only screen and (max-width:480px){.fz-grund>table>tbody>tr>td{padding:16px 10px !important}.fz-kopf{padding:20px 18px 0 !important}.fz-inhalt{padding:18px 18px 22px !important}.fz-wert{font-size:13px !important;letter-spacing:-0.1px}.fz-wert-name{padding-right:8px !important}}`
 
 const body: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.seite,
@@ -339,10 +344,10 @@ export function BetragsZeile({
   return (
     <Row style={{ width: '100%' }}>
       {/* Bei Zeilen mit Datum oder Adresse ist die Beschriftung kurz („Wo“): Sie nimmt nur ihre Breite, der Wert den Rest (Board: eine Zeile bei 390 px). */}
-      <Column style={{ color: leise ? MAIL_FARBE.textLeise : MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 12px 3px 0', verticalAlign: 'top', ...(umbrechen ? { width: '1%', whiteSpace: 'nowrap' as const } : {}) }}>
+      <Column className={umbrechen ? 'fz-wert-name' : undefined} style={{ color: leise ? MAIL_FARBE.textLeise : MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 12px 3px 0', verticalAlign: 'top', ...(umbrechen ? { width: '1%', whiteSpace: 'nowrap' as const } : {}) }}>
         {links}
       </Column>
-      <Column align="right" style={{ color: MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 0', textAlign: 'right' as const, verticalAlign: 'top', whiteSpace: umbrechen ? ('normal' as const) : ('nowrap' as const) }}>
+      <Column align="right" className={umbrechen ? 'fz-wert' : undefined} style={{ color: MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 0', textAlign: 'right' as const, verticalAlign: 'top', whiteSpace: umbrechen ? ('normal' as const) : ('nowrap' as const) }}>
         {rechts}
       </Column>
     </Row>
@@ -458,6 +463,22 @@ export function TelefonFett({ href, nummer }: { href: string | null; nummer: str
     </Link>
   ) : (
     <strong style={{ color: MAIL_FARBE.text }}>{nummer}</strong>
+  )
+}
+
+/**
+ * Eine Position nach G14 (Nr. 280): die Anzahl fett vorn, das Gebinde in Klammern — „**4** × Heumilch frisch
+ * (1 L)“, wie Packliste und Abholzettel (`positionszeile`, src/lib/positionszeile.ts). Der Text ist derselbe
+ * wie `name`; ohne Teile steht `name`, wie er kommt.
+ */
+export function PositionsName({ name, teile }: { name: string; teile?: Positionszeile }): React.JSX.Element {
+  if (!teile) return <>{name}</>
+  // Ein Textknoten nach der Anzahl: Sonst setzt React einen Kommentar zwischen die Teile.
+  return (
+    <>
+      <strong style={{ fontWeight: '700' }}>{teile.anzahl}</strong>
+      {` × ${teile.name}${teile.gebinde ? ` (${teile.gebinde})` : ''}`}
+    </>
   )
 }
 

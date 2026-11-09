@@ -133,8 +133,8 @@ describe('Kunden-Mails: „Gesamt“ ohne entfallene Gebühr', () => {
   it.each(MAILS)('(d) %s, Hofpreis-Modell mit entfallener Gebühr: kein „inkl.“-Satz, Zeilen mit Warenpreis, Zeilensumme = Gesamt', async (_name, baue) => {
     const { html } = await baue(bestellung({ ...HOFPREIS, serviceFeeRefundedAt: ENTFALLEN_AM }))
     const text = klartext(html)
-    expect(text).toContain('Freilandeier · 1 Stück € 4,90')
-    expect(text).toContain('Heumilch · 1 L € 4,90')
+    expect(text).toContain('1 × Freilandeier € 4,90')
+    expect(text).toContain('1 × Heumilch (1 L) € 4,90')
     expect(text).toContain('Bar bei Abholung € 9,80')
     expect(text).not.toContain('inkl. Plattformgebühr')
     expect(text).not.toMatch(/Plattformgebühr \((entfällt|erstattet)\)/)
@@ -144,8 +144,8 @@ describe('Kunden-Mails: „Gesamt“ ohne entfallene Gebühr', () => {
   it.each(MAILS)('(d) %s, Gegenprobe Hofpreis-Modell, Gebühr gilt: Endpreise, Gesamt mit Gebühr, „inkl.“-Satz', async (_name, baue) => {
     const { html } = await baue(bestellung({ ...HOFPREIS }))
     const text = klartext(html)
-    expect(text).toContain('Freilandeier · 1 Stück € 5,35')
-    expect(text).toContain('Heumilch · 1 L € 5,05')
+    expect(text).toContain('1 × Freilandeier € 5,35')
+    expect(text).toContain('1 × Heumilch (1 L) € 5,05')
     expect(text).toContain('Bar bei Abholung € 10,40')
     expect(text).toContain('inkl. Plattformgebühr (darin € 0,60)')
   })
@@ -162,6 +162,19 @@ describe('Kunden-Mails: „Gesamt“ ohne entfallene Gebühr', () => {
     expect(klartext((await email.baueOrderConfirmation(bestellung({ ...HOFPREIS }))).html)).toContain('Bring bitte € 10,40 in bar mit.')
     const entfallen = klartext((await email.baueOrderConfirmation(bestellung({ serviceFeeRefundedAt: ENTFALLEN_AM }))).html)
     expect(entfallen).not.toContain('Bring bitte')
+  })
+
+  it('„Bitte zahle … mit Karte“ (Karte bei Abholung, E5): derselbe Betrag aus dem Snapshot; bei entfallener Gebühr kein Kasten (Nr. 280)', async () => {
+    const karte = { paymentMethod: 'ONSITE_CARD' }
+    expect(klartext((await email.baueOrderConfirmation(bestellung(karte))).html)).toContain('Bitte zahle € 10,40 bei der Abholung mit Karte.')
+    expect(klartext((await email.baueOrderConfirmation(bestellung({ ...karte, ...HOFPREIS }))).html)).toContain('Bitte zahle € 10,40 bei der Abholung mit Karte.')
+    const entfallen = klartext((await email.baueOrderConfirmation(bestellung({ ...karte, serviceFeeRefundedAt: ENTFALLEN_AM }))).html)
+    expect(entfallen).not.toContain('Bitte zahle')
+    // Gegenprobe: bar bleibt beim eigenen Satz, online gibt es keinen Kasten.
+    expect(klartext((await email.baueOrderConfirmation(bestellung())).html)).not.toContain('Bitte zahle')
+    const online = klartext((await email.baueOrderConfirmation(bestellung({ paymentMethod: 'ONLINE' }))).html)
+    expect(online).not.toContain('Bitte zahle')
+    expect(online).not.toContain('Bring bitte')
   })
 
   it('(e) Gebühr 0: Gesamt ist der Warenpreis, keine Gebührenzeile', async () => {

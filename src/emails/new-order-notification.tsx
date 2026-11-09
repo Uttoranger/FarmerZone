@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { Link, Text } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, Ueberschrift, bodyText, kleinText, textLink, zwischenTitel } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, Ueberschrift, bodyText, kleinText, zwischenTitel, PositionsName, TelefonFett } from './_layout'
+import type { Positionszeile } from '@/lib/positionszeile'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
@@ -17,7 +18,7 @@ type GemeinsameProps = {
   pickupDate: string
   pickupTime: string
   /** Positionen; mit `betrag` (Endpreis der Zeile in Euro, gerechnet in src/lib/email.ts) steht er rechts. */
-  items: Array<{ name: string; quantity: number; betrag?: number }>
+  items: Array<{ name: string; teile?: Positionszeile; quantity: number; betrag?: number }>
   paymentLabel: string
   /** Zu Heute im Hofbereich (Wortliste N42 c: „Heute“, nie „Dashboard“). */
   heuteUrl: string
@@ -79,7 +80,7 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
 
       {p.isOnline && <Text style={{ ...zwischenTitel, margin: '12px 0 4px' }}>Bestellte Produkte</Text>}
       {p.items.map((item, i) => (
-        <BetragsZeile key={i} links={item.name} rechts={item.betrag !== undefined ? formatEuro(item.betrag) : ''} />
+        <BetragsZeile key={i} links={<PositionsName name={item.name} teile={item.teile} />} rechts={item.betrag !== undefined ? formatEuro(item.betrag) : ''} />
       ))}
       <Trenner />
       {p.isOnline ? <OnlineBetraege {...p} /> : <BetragsZeile stark links="Bar zu kassieren" rechts={formatEuro(p.barZuKassieren)} />}
@@ -94,13 +95,8 @@ export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
           ) : (
             <>
               {`${p.customerName} · `}
-              {anrufen ? (
-                <Link href={anrufen} style={textLink}>
-                  {formatiereTelefon(p.customerPhone)}
-                </Link>
-              ) : (
-                p.customerPhone
-              )}
+              {/* Telefonnummer fett wie in den Mails an die Kundin (Nr. 280): ein Tippen wählt. */}
+              <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.customerPhone) : p.customerPhone} />
             </>
           )
         }

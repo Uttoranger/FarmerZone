@@ -469,7 +469,7 @@ export const ADMIN_SICHERHEIT_MAIL = {
     'passkey-hinzugefuegt': 'wurde bei deinem Admin-Konto ein neuer Passkey eingerichtet:',
     'passkey-entfernt': 'wurde bei deinem Admin-Konto ein Passkey entfernt:',
     'ersatzcode-benutzt': 'hat sich jemand mit einem Ersatzcode bei deinem Admin-Konto angemeldet:',
-    einrichtungscode: 'gib diesen Code auf der Seite „Admin-Zugang absichern" ein:',
+    einrichtungscode: 'gib diesen Code auf der Seite „Admin-Zugang absichern“ ein:',
   },
   anrede: 'Hallo,',
   vorher: 'am',

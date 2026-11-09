@@ -65,7 +65,7 @@ describe('sendNeueAnmeldungEmail', () => {
     expect(aufruf.to).toBe('hof@example.com')
     expect(aufruf.subject).toBe(`Neue Anmeldung bei deinem Hof-Konto · ${MARKE}`)
     expect(aufruf.html).toContain('Hallo Testhof A,')
-    expect(aufruf.html).toContain('19.10. um 14:32')
+    expect(aufruf.html).toContain('Mo, 19. Oktober 2026, 14:32 Uhr')
     expect(aufruf.html).toContain('Windows · Chrome')
     // Board s3/w3-mail-sicherheit Bild 1: Gerät als Zeile, ohne Erklärsatz darunter.
     expect(aufruf.html).toContain('Gerät')

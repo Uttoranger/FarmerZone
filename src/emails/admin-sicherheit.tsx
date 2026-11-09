@@ -13,6 +13,9 @@ export interface AdminSicherheitProps {
   code?: string
 }
 
+/** Die Überschrift der Passkey-Mail nach Board s3/w3-mail-team Bild 2; der Betreff bleibt „Neuer Passkey bei deinem Admin-Konto“. */
+const PASSKEY_UEBERSCHRIFT = 'Neuer Passkey'
+
 /**
  * „Admin-Sicherheit" (Register N20; Nr. 115) — eine Vorlage für die Mails an
  * ein Admin-Konto: Passkey hinzugefügt, Passkey entfernt, Ersatzcode benutzt
@@ -33,6 +36,16 @@ export function AdminSicherheitEmail({ anlass, geraet, wann, code }: AdminSicher
         {/* Ungegliedert: Das Feld der Einrichtung nimmt nur sechs Ziffern ohne Leerzeichen (einrichtungscodeSchema). */}
         {code && <CodeKasten code={code} gruppiert={false} />}
         <Text style={leiseZeile}>{text.codeGilt}</Text>
+      </EmailLayout>
+    )
+  }
+  // Board s3/w3-mail-team Bild 2 (Nr. 280): „Neuer Passkey“, der Passkey in Anführungszeichen, der Zeitpunkt in Klammern.
+  if (anlass === 'passkey-hinzugefuegt') {
+    return (
+      <EmailLayout fuss={{ art: 'plattform' }} previewText={`${betreff} · ${geraet}`}>
+        <Text style={h1}>{PASSKEY_UEBERSCHRIFT}</Text>
+        <Text style={bodyText}>{`Bei deinem Admin-Konto wurde der Passkey „${geraet}“ hinzugefügt (${wann}).`}</Text>
+        <Text style={bodyText}>{text.warstDu}</Text>
       </EmailLayout>
     )
   }

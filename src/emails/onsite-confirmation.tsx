@@ -15,7 +15,9 @@ import {
   kleinText,
   textLink,
   woZeile,
+  PositionsName,
 } from './_layout'
+import type { Positionszeile } from '@/lib/positionszeile'
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
@@ -35,7 +37,7 @@ export interface OnsiteConfirmationProps {
   pickupDate: string
   pickupTime: string
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
-  items: Array<{ name: string; betrag: number }>
+  items: Array<{ name: string; teile?: Positionszeile; betrag: number }>
   /**
    * Die Gebührenzeile im Modell „bisher“ (N38): Wort und Erklärsatz der
    * Bestellung (gebuehrWort, gebuehrHinweisFuer in src/lib/email.ts) und der
@@ -100,7 +102,7 @@ export function OnsiteConfirmationEmail(p: OnsiteConfirmationProps) {
       <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
       <Trenner />
       {p.items.map((item, i) => (
-        <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
+        <BetragsZeile key={i} links={<PositionsName name={item.name} teile={item.teile} />} rechts={formatEuro(item.betrag)} />
       ))}
       {gebuehr && <GebuehrBetragsZeile zeile={gebuehr} betrag={formatEuro(gebuehr.betrag)} />}
       <Trenner />

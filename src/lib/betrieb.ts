@@ -1830,7 +1830,7 @@ export type BetriebMailAnlass =
 export type BetriebMail = { betreff: string; titel: string; absaetze: string[]; hilft: string | null; knopf: string; fuss: string }
 
 /** Die festen Wörter der Warn-Mail (Mockup email-betrieb-warnung). */
-export const BETRIEB_MAIL_TEXT = { kopf: 'Betrieb', hilft: 'Was hilft:', knopf: 'Betrieb ansehen' } as const
+export const BETRIEB_MAIL_TEXT = { kopf: 'Betrieb', hilft: 'Was hilft:', knopf: 'In Betrieb ansehen →' } as const
 
 const FUSS_SPEICHER = `Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und noch einmal, wenn der Wert wieder unter ${ENTWARNUNG_UNTER} % liegt. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.`
 const FUSS_MONAT = 'Diese Mail kommt einmal je Stufe (80 %, 95 %, voll) und Monat; der neue Monat beginnt still bei 0. Abschalten lässt sie sich nicht – es geht um den Betrieb der Plattform.'
