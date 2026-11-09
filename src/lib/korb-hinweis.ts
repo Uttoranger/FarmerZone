@@ -76,6 +76,19 @@ export function entfernteNamen(
 export function korbHinweisMitNamen(satzDerQuelle: string, namen: readonly string[] | null): string {
   if (!namen || namen.length === 0) return satzDerQuelle
   const alt = quellSatzEntfernt(namen.length)
-  if (!alt || !satzDerQuelle.includes(alt)) return satzDerQuelle
-  return satzDerQuelle.replace(alt, () => ausverkauftHinweis(namen))
+  if (!alt) return satzDerQuelle
+  const stelle = satzAnfang(satzDerQuelle, alt)
+  if (stelle === -1) return satzDerQuelle
+  return satzDerQuelle.slice(0, stelle) + ausverkauftHinweis(namen) + satzDerQuelle.slice(stelle + alt.length)
+}
+
+/**
+ * Wo `satz` als ganzer Satz in `text` steht: am Anfang oder nach einem Leerzeichen — sonst -1. Ohne diese Grenze fände
+ * „2 Positionen sind …“ sich in „12 Positionen sind …“, und zwei Namen ersetzten einen Satz über zwölf Positionen.
+ */
+function satzAnfang(text: string, satz: string): number {
+  for (let i = text.indexOf(satz); i !== -1; i = text.indexOf(satz, i + 1)) {
+    if (i === 0 || text[i - 1] === ' ') return i
+  }
+  return -1
 }

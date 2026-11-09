@@ -70,6 +70,12 @@ describe('korbHinweisMitNamen', () => {
     expect(korbHinweisMitNamen(KORB_PREIS_GEAENDERT, ['Bergkäse'])).toBe(KORB_PREIS_GEAENDERT)
   })
 
+  it('Wortgrenze: Quelle über 12 Positionen, Korb kennt 2 Namen → Satz der Quelle', () => {
+    const zwoelf = befund(Array.from({ length: 12 }, () => 'weg' as const))
+    expect(zwoelf.startsWith('12 ')).toBe(true)
+    expect(korbHinweisMitNamen(zwoelf, ['A', 'B'])).toBe(zwoelf)
+  })
+
   it('ohne Namen: Satz der Quelle unverändert', () => {
     const quelle = befund(['weg'])
     expect(korbHinweisMitNamen(quelle, null)).toBe(quelle)
