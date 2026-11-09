@@ -113,7 +113,9 @@ export function BestellungenAnsicht({
   return (
     <LadeRahmen>
       <div className="mx-auto w-full max-w-7xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
-        <div className="flex flex-col gap-4 md:gap-[18px]">
+        {/* Kopf enger (Abnahme Lauf 32, bestellungen 1440: Unterzeile → Chips etwa 29 statt 50 px): 12 px unter dem
+            Rand des Werkzeug-Kopfs statt 18 px. */}
+        <div className="flex flex-col gap-4 md:gap-3">
           {/* Seit Nr. 249 der Werkzeug-Kopf (G1) ohne Rückweg — Bestellungen ist eine Seite der Leiste; der
               Freischalt-Balken (G3) steht damit unter dem Kopf statt über der h1 (Liste Lauf 32, bestellungen). */}
           <WerkzeugKopf
@@ -125,10 +127,11 @@ export function BestellungenAnsicht({
                   href="/orders/today/print"
                   target="_blank"
                   aria-label="Packliste für heute drucken"
-                  // Am Handy das freistehende Symbol (Board s1-bestellungen), ab 768 px der Umriss mit Wort.
-                  className={cn(KNOPF_RAHMEN, 'size-11 border-transparent px-0 md:w-auto md:border-input md:px-[18px]')}
+                  // Am Handy das freistehende Symbol (Board s1-bestellungen), ab 768 px der Umriss mit Wort — nach Board
+                  // w1-bestellungen 16 px halbfett mit 20-px-Symbol (Abnahme Lauf 32: „Packliste drucken“ war kleiner).
+                  className={cn(KNOPF_RAHMEN, 'size-11 border-transparent px-0 md:w-auto md:border md:border-input md:px-4 md:text-base md:font-semibold')}
                 >
-                  <Printer className="size-5 md:size-4" strokeWidth={1.7} aria-hidden="true" />
+                  <Printer className="size-5" strokeWidth={2} aria-hidden="true" />
                   <span className="hidden md:inline" aria-hidden="true">
                     Packliste drucken
                   </span>
@@ -151,7 +154,9 @@ export function BestellungenAnsicht({
         </div>
 
         <LadeInhalt className="mt-4 lg:mt-5 lg:flex lg:items-start lg:gap-5 xl:gap-6">
-          <div className="lg:w-[360px] lg:shrink-0 xl:w-[440px] 2xl:w-[520px]">
+          {/* Ohne Bestellung in der Liste steht der Leerzustand über die volle Breite (Abnahme Lauf 32, bestellungen
+              1440 Bild 3: die Karte war in der Spalte der Liste nur 440 px breit). */}
+          <div className={liste.gruppen.length > 0 ? 'lg:w-[360px] lg:shrink-0 xl:w-[440px] 2xl:w-[520px]' : 'min-w-0 lg:flex-1'}>
             <BestellListe seite={liste} filter={filter} gewaehlt={detail?.id ?? null} suche={suche} naechsteAbholung={naechsteAbholung} wartetAufFreigabe={wartetAufFreigabe} />
           </div>
           {detail && (

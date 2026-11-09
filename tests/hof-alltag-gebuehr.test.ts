@@ -60,7 +60,7 @@ import OrderPrintPage from '@/app/(druck)/orders/[orderId]/print/page'
 import PrintPacklistPage from '@/app/(druck)/orders/today/print/page'
 import { BestellDetail } from '@/components/hof-bestellungen/bestell-detail'
 import { Kennzahlen, Packliste } from '@/components/heute/heute-teile'
-import { betragSatz, bestellAktionen, druckGebuehrZeile, druckPreisHinweis, type BetragFuerSatz } from '@/lib/hof-bestellungen'
+import { betragSatz, bestellAktionen, druckGebuehrZeile, type BetragFuerSatz } from '@/lib/hof-bestellungen'
 import { stornoGebuehrSatz, stornoGeldSaetze, stornoZusammensetzung, type StornoBetraege } from '@/lib/storno'
 import type { HofBestellDetail } from '@/server/queries/orders'
 import { MARKE } from '@/lib/marke'
@@ -128,12 +128,10 @@ describe('Storno-Dialog je Modell (Geldweg aus stornieren.ts in beiden Modellen 
 })
 
 describe('Papier: die Zeile „Servicegebühr“ nur bei Bestellungen im Modell „bisher“', () => {
-  it('druckGebuehrZeile und druckPreisHinweis', () => {
+  it('druckGebuehrZeile', () => {
     expect(druckGebuehrZeile({ gebuehrModell: HOFPREIS }, 112)).toBeNull()
-    expect(druckPreisHinweis({ gebuehrModell: HOFPREIS })).toBe('Preise inkl. Plattformgebühr.')
     expect(druckGebuehrZeile({ gebuehrModell: null }, 50)).toBe(WORT_BISHER)
     expect(druckGebuehrZeile({ gebuehrModell: null }, 0)).toBeNull()
-    expect(druckPreisHinweis({ gebuehrModell: null })).toBeNull()
   })
 })
 
@@ -194,7 +192,9 @@ describe('Druck: Abholzettel und Packliste', () => {
     expect(html).not.toContain('Barzahlung vor Ort')
     expect(html).toContain('Bar bei Abholung')
     expect(html).toContain('Wartet auf Kunde')
-    expect(html).toContain('Preise inkl. Plattformgebühr.')
+    // Nr. 277 (Antwort 4): der Satz spricht vom Gesamt und steht je Bestellung — „Preise inkl.“ nie mehr.
+    expect(html).toContain('Gesamt inkl. Plattformgebühr.')
+    expect(html).not.toContain('Preise inkl. Plattformgebühr.')
 
     // Seit Nr. 249 (Liste Lauf 32, druck Bild 2) zeigt die Packliste nur den Betrag, ohne „inkl. € … <Gebühr>“ —
     // auch im Modell „bisher“; die Aufteilung steht auf dem Abholzettel (Gegenprobe dort).
@@ -208,6 +208,90 @@ describe('Druck: Abholzettel und Packliste', () => {
   it('leere Packliste: der Satz des Boards', async () => {
     const html = renderToStaticMarkup(await PrintPacklistPage())
     expect(html).toContain('Heute keine Bestellungen zur Abholung.')
+  })
+})
+
+/**
+ * Packliste, Antwort 4 der Projektleitung (Nr. 277): „Gesamt inkl. Plattformgebühr.“ steht je Bestellung an
+ * ihrem gezeigten Betrag und nur, wenn DIESES Gesamt die Gebühr enthält (druckGesamtHinweis) — nie mehr einmal
+ * „Preise inkl. Plattformgebühr.“ für die ganze Seite. Nur Anzeige: Die Beträge bleiben dieselben.
+ */
+describe('Packliste: Satz zum Gesamt je Bestellung (Nr. 277, Antwort 4)', () => {
+  const SATZ = 'Gesamt inkl. Plattformgebühr.'
+  const anzahl = (html: string): number => html.split(SATZ).length - 1
+  /** Der Block einer Bestellung auf dem Papier — vom Namen bis zum nächsten Namen bzw. zum Fuß. */
+  const blockVon = (html: string, nummer: string): string => {
+    const start = html.indexOf(nummer)
+    const ende = html.indexOf('HT-', start + nummer.length)
+    return html.slice(start, ende === -1 ? html.indexOf('Gedruckt am', start) : ende)
+  }
+
+  it('(a) nur Bestellungen im Modell „bisher“: kein Satz', async () => {
+    m.bestellungen = [bestellungFuerDruck(null, 'ONSITE_CASH'), { ...bestellungFuerDruck(null, 'ONLINE'), id: 'order-2', orderNumber: 'HT-0306-B5C1' }]
+    const html = renderToStaticMarkup(await PrintPacklistPage())
+    expect(anzahl(html)).toBe(0)
+    expect(html).not.toMatch(/inkl\. Plattformgebühr/)
+    // Gegenprobe: Die Beträge stehen unverändert da.
+    expect(html).toContain('Bar zu kassieren € 19,12')
+    expect(html).toContain('€ 19,12')
+  })
+
+  it('(b) eine Bestellung im Hofpreis-Modell mit Gebühr: der Satz zum Gesamt an ihrem Betrag', async () => {
+    m.bestellungen = [bestellungFuerDruck(HOFPREIS, 'ONSITE_CASH')]
+    const html = renderToStaticMarkup(await PrintPacklistPage())
+    expect(anzahl(html)).toBe(1)
+    // Direkt unter dem Betrag, nicht als Satz unter der Liste.
+    expect(html).toMatch(/Bar zu kassieren € 19,12<\/span><span[^>]*>Gesamt inkl\. Plattformgebühr\.<\/span>/)
+    expect(html).not.toContain('Preise inkl.')
+  })
+
+  it('(c) Hofpreis-Modell mit entfallener Gebühr: kein Satz', async () => {
+    m.bestellungen = [
+      { ...bestellungFuerDruck(HOFPREIS, 'ONSITE_CASH'), serviceFeeRefundedAt: new Date('2027-03-03T08:00:00Z') },
+      { ...bestellungFuerDruck(HOFPREIS, 'ONLINE'), id: 'order-2', orderNumber: 'HT-0306-B5C1', serviceFeeCents: 0 },
+    ]
+    const html = renderToStaticMarkup(await PrintPacklistPage())
+    expect(anzahl(html)).toBe(0)
+    // Auch kein „Preise inkl. …“ mehr über Positionen ohne Gebühr (vorher stand er hier).
+    expect(html).not.toMatch(/inkl\. Plattformgebühr/)
+    // Gegenprobe: Die Beträge kommen weiter unverändert aus dem Snapshot (bestellSummen, barZuKassierenCents).
+    expect(html).toContain('Bar zu kassieren € 19,12')
+    expect(html).toContain('€ 18,00')
+  })
+
+  it('gemischte Bestellungen: der Satz steht nur an den Bestellungen, deren Gesamt die Gebühr enthält', async () => {
+    m.bestellungen = [
+      { ...bestellungFuerDruck(HOFPREIS, 'ONSITE_CASH'), id: 'a', orderNumber: 'HT-0306-AAAA' },
+      { ...bestellungFuerDruck(null, 'ONSITE_CASH'), id: 'b', orderNumber: 'HT-0306-BBBB' },
+      { ...bestellungFuerDruck(HOFPREIS, 'ONLINE'), id: 'c', orderNumber: 'HT-0306-CCCC' },
+      { ...bestellungFuerDruck(HOFPREIS, 'ONLINE'), id: 'd', orderNumber: 'HT-0306-DDDD', serviceFeeRefundedAt: new Date('2027-03-03T08:00:00Z') },
+    ]
+    const html = renderToStaticMarkup(await PrintPacklistPage())
+    expect(anzahl(html)).toBe(2)
+    expect(blockVon(html, 'HT-0306-AAAA')).toContain(SATZ)
+    expect(blockVon(html, 'HT-0306-BBBB')).not.toContain(SATZ)
+    expect(blockVon(html, 'HT-0306-CCCC')).toContain(SATZ)
+    expect(blockVon(html, 'HT-0306-DDDD')).not.toContain(SATZ)
+    // Kein Satz für die ganze Seite unter der Liste.
+    expect(html.slice(html.lastIndexOf('HT-0306-DDDD'))).not.toContain(SATZ)
+  })
+
+  it('Einheiten wie die Bestellseite: „(1 L)“ und „(6 Pakete)“ statt „(1 l)“ und „(6 Pak.)“, Anzahl fett vorn (G14)', async () => {
+    m.bestellungen = [
+      {
+        ...bestellungFuerDruck(null, 'ONSITE_CASH'),
+        items: [
+          { id: 'i1', productName: 'Heumilch frisch', quantity: 4, totalPriceCents: 596, fehltSeit: null, product: { unit: 'LITER', unitSize: '1' } },
+          { id: 'i2', productName: 'Bio-Freilandeier', quantity: 1, totalPriceCents: 477, fehltSeit: null, product: { unit: 'PAKET', unitSize: '6' } },
+        ],
+      },
+    ]
+    const html = renderToStaticMarkup(await PrintPacklistPage())
+    expect(html).toContain('(1 L)')
+    expect(html).toContain('(6 Pakete)')
+    expect(html).not.toContain('(1 l)')
+    expect(html).not.toContain('Pak.)')
+    expect(html).toMatch(/<span class="font-bold[^"]*">4<\/span> × Heumilch frisch \(1 L\)/)
   })
 })
 
