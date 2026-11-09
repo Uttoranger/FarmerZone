@@ -80,6 +80,12 @@ const GELD_FLIESSKOMMA_BESTAND: readonly BestandEintrag[] = [
     grund: 'nur Anzeige: Grundpreis-Vergleich (€/kg, €/rm), die Ausnahme in CODING_STANDARDS §2; wird nie gespeichert oder abgerechnet',
   },
   {
+    datei: 'src/lib/format.ts',
+    ausdruck: '2 * preisCents * 1000 * jeBasis',
+    anzahl: 1,
+    grund: 'ganze Zahlen: Cent (Int) × ganzzahliger Faktor g → kg bzw. ml → L in grundpreisCents, der einen Rundungsstelle der Grundpreis-Anzeige (Nr. 282); nie Abrechnung',
+  },
+  {
     datei: 'src/app/admin/finanzen/jahr-monate.tsx',
     ausdruck: '(cents / obergrenze) * (BASIS - OBEN)',
     anzahl: 1,

@@ -163,7 +163,7 @@ describe('Grundpreis centgenau', () => {
   })
 
   it('Gegenprobe: dieselben Werte wie bisher, wo Fließkomma nicht stolpert', () => {
-    expect(formatGrundpreisZeile(3, 'G', 500)).toBe('€ 0,01 / g')
+    expect(formatGrundpreisZeile(3, 'G', 500)).toBe('€ 6,00 / kg')
     expect(formatGrundpreisZeile(50, 'KG', 2)).toBe('€ 25,00 / kg')
     expect(grundpreisJeEinheit(10, 3)).toBe(3.33)
     expect(formatGrundpreisNetto(0, 5, 'KG')).toBeNull()
@@ -172,7 +172,7 @@ describe('Grundpreis centgenau', () => {
 
   it('die zweite Preiszeile: Kilopreis bei Futter, sonst Grundpreis, bei Stück keine', () => {
     expect(zweitePreiszeile(produkt('f', { price: 8, futter: futter({ nettoMenge: 5 }) }))).toBe('€ 1,60 / kg')
-    expect(zweitePreiszeile(produkt('h', { price: 6, unit: 'G', unitSize: 500 }))).toBe('€ 0,01 / g')
+    expect(zweitePreiszeile(produkt('h', { price: 6, unit: 'G', unitSize: 500 }))).toBe('€ 12,00 / kg')
     expect(zweitePreiszeile(produkt('k', { price: 7, unit: 'KG', unitSize: 2 }))).toBe('€ 3,50 / kg')
     expect(zweitePreiszeile(produkt('s'))).toBeNull()
   })

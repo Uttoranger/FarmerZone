@@ -28,7 +28,8 @@ describe('preisZeilen (Hofseite und Produktseite)', () => {
 
   it('Maß-Gebinde wie bisher über formatGrundpreisZeile, Stück-Gebinde je Stück', () => {
     expect(preisZeilen(produkt({ price: 6.58, unit: 'G', unitSize: 250 })).preis).toBe('€ 6,58')
-    expect(preisZeilen(produkt({ price: 6.58, unit: 'G', unitSize: 250 })).grundpreis).toMatch(/^€ [\d,]+ \/ g$/)
+    // Seit Nr. 282 je kg (Antwort 3, Zwischen-Morgenbericht 33 B): € 6,58 für 250 g = € 26,32 / kg wie das Board.
+    expect(preisZeilen(produkt({ price: 6.58, unit: 'G', unitSize: 250 })).grundpreis).toBe('€ 26,32 / kg')
     expect(preisZeilen(produkt({ price: 4.8, unit: 'STUECK', unitSize: 10 }))).toEqual({ preis: '€ 4,80', grundpreis: '€ 0,48 / Stück' })
   })
 })
