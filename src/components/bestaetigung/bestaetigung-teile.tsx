@@ -62,8 +62,10 @@ export function BestaetigungKopf({
           {kicker}
         </p>
       )}
-      {/* Liste Lauf 32 (bestaetigung): 26 px in beiden Breiten wie im Board, in der Karte „eingegangen“ 24 px. */}
-      <h1 className={cn('font-heading leading-tight font-semibold text-balance break-words', titelKlein ? 'text-[24px]' : 'text-[26px]')}>{kopf.titel}</h1>
+      {/* Liste Lauf 32 (bestaetigung): 26 px in beiden Breiten wie im Board, in der Karte „eingegangen“ 24 px. Umbruch wie
+          im Board (Nr. 276): Zeile für Zeile gefüllt („Danke, deine Bestellung ist / da!“), ohne `text-balance`, das bei
+          390 px „Danke, deine / Bestellung ist da!“ setzte. */}
+      <h1 className={cn('font-heading leading-tight font-semibold break-words', titelKlein ? 'text-[24px]' : 'text-[26px]')}>{kopf.titel}</h1>
       {/* E-Mail-Adressen sind bis 254 Zeichen lang und haben keine Leerzeichen. */}
       {!ohneSatz && (
         <p className={cn('text-[15px] leading-normal [overflow-wrap:anywhere]', satzLeise ? 'text-muted-foreground' : 'text-foreground')}>{kopf.satz}</p>

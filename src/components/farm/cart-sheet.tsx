@@ -14,10 +14,10 @@ import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { BildPlatzhalter } from '@/components/ui/bild-platzhalter'
 import { textlinkKlassen } from '@/components/ui/textlink'
 import { cn } from '@/lib/utils'
-import { centsAlsEuro, formatEuro, formatGrundpreis } from '@/lib/format'
+import { centsAlsEuro, einheitLabel, formatEuro, formatGrundpreis, formatGrundpreisNetto, formatZahl, gebindeGroesse, grundpreisJeEinheit } from '@/lib/format'
+import { preisJeRaummass } from '@/components/produktdetail/groessen-anzeige'
 import { korbBetraege } from '@/lib/hofseite-kunde'
 import { RESERVIERUNG_MINUTEN } from '@/lib/kasse'
-import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { KaufGrund } from '@/components/hofseite/kauf-grund'
 import { useBestellstopp } from '@/components/notbremse-band'
@@ -115,6 +115,41 @@ export function neueMengenFolge(): {
 export function korbStartfokus(blatt: HTMLElement | null, art: string): HTMLElement | true | null {
   if (art === 'touch') return blatt
   return blatt?.querySelector<HTMLElement>('[data-slot="sheet-close"]') ?? true
+}
+
+/** Gramm und Milliliter: der Grundpreis steht je Kilo bzw. Liter. */
+const KLEINE_EINHEIT_BASIS: Record<string, 'KG' | 'LITER'> = { G: 'KG', ML: 'LITER' }
+
+/** Was Titel und Grundpreis einer Korbzeile brauchen — Preis schon als Anzeigepreis (mitEndpreis, N38). */
+type KorbZeile = { name: string; price: number; unit: string; unitSize: number | null }
+
+/**
+ * Der Titel einer Korbzeile nach Board s1-/w1-korb Bild 1 (Nr. 276): „Name, Menge“ — „Heumilch frisch, 1 L“,
+ * „Bio-Freilandeier, 6 Pakete“. Dieselbe Form wie die Korbzeilen der Kasse (`positionMengeVorn`, ohne „Anzahl ×“, die
+ * Anzahl steht in der Pille): beim Stück ohne Gebinde nur der Name („Bergkäse“ statt „Bergkäse, 1 Stück“).
+ */
+export function korbZeileTitel(p: KorbZeile): string {
+  const gebinde = gebindeGroesse(p.unitSize) ?? 1
+  if (p.unit === 'STUECK' && gebinde === 1) return p.name
+  return `${p.name}, ${formatZahl(gebinde)} ${einheitLabel(p.unit, gebinde)}`
+}
+
+/**
+ * Die Zeile unter dem Titel: der Grundpreis je EINER Einheit (Board: „€ 1,49 / L“, Abnahme Lauf 32 korb 2: „€ 0,64 /
+ * Paket“ statt „€ 3,82 für 6 Pakete“). Raummaße ausgeschrieben (E11, „€ 98,00 je Raummeter“). Nur Anzeige, gerundet
+ * über `grundpreisJeEinheit` — gerechnet wird nie damit; ohne brauchbaren Grundpreis der Preis des Gebindes.
+ */
+export function korbZeileGrundpreis(p: KorbZeile): string {
+  const raummass = preisJeRaummass(p.price, p.unit, p.unitSize)
+  if (raummass) return raummass
+  const gebinde = gebindeGroesse(p.unitSize) ?? 1
+  // Gramm und Milliliter je Kilo bzw. Liter (Board „Bergkäse, 250 g · € 26,32 / kg“) — „€ 0,03 / g“ sagte nichts.
+  const basis = KLEINE_EINHEIT_BASIS[p.unit]
+  const jeBasis = basis ? formatGrundpreisNetto(p.price, gebinde / 1000, basis) : null
+  if (jeBasis) return jeBasis
+  const je = grundpreisJeEinheit(p.price, gebinde)
+  if (je === null) return formatGrundpreis(p.price, p.unit, p.unitSize)
+  return `${formatEuro(je)} / ${einheitLabel(p.unit)}`
 }
 
 /** Ein Mengen-Knopf in der Pille: 44 × 44 px, das Zeichen in der Mitte (Board s1-/w1-korb). */
@@ -250,11 +285,11 @@ export function CartSheet({ open, onOpenChange, items, total, farmSlug, kasseHre
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[15px] font-semibold break-words text-foreground" title={item.name}>
-                    {item.name}
+                  {/* Board s1-/w1-korb Bild 1 (Nr. 276): „Name, Menge“ und darunter EINE Zeile mit dem Grundpreis je Einheit. */}
+                  <p className="line-clamp-2 text-[15px] font-semibold break-words text-foreground" title={korbZeileTitel(item)}>
+                    {korbZeileTitel(item)}
                   </p>
-                  <p className="text-[12.5px] text-muted-foreground">{formatGrundpreis(item.price, item.unit, item.unitSize)}</p>
-                  <GrundpreisZeile price={item.price} unit={item.unit} unitSize={item.unitSize} className="text-[12px] text-muted-foreground" />
+                  <p className="text-[12.5px] text-muted-foreground">{korbZeileGrundpreis(item)}</p>
                   {/* Mit Kaufsperre lehnt /api/reserve jede neue Menge ab (Nr. 145): Dann steht die Menge nur als
                       Zahl da, Entfernen bleibt — sonst brächte jeder Tipp auf „+“ oder „−“ eine Ablehnung. */}
                   {ruht ? (
