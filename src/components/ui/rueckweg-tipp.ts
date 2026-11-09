@@ -4,11 +4,10 @@ import { tippAufZiel } from '@/lib/kunden-kopf'
 import { eigenerVorgaengerJetzt, merkeHinauf } from '@/components/shared/rueckweg-merker'
 
 /*
- * Der Rückweg der Hof-Köpfe — EINE Quelle für UnterseitenKopf
- * (hofbereich/unterseiten-kopf.tsx, seit Nr. 44/177) und WerkzeugKopf
- * (ui/werkzeug-kopf.tsx, Nr. 245). Aus unterseiten-kopf.tsx herausgezogen,
- * nicht neu geschrieben: Beide Köpfe führen gleich zurück, bis der alte Kopf
- * mit der leeren Bestandsliste wegfällt.
+ * Der Rückweg des Werkzeug-Kopfs (ui/werkzeug-kopf.tsx, Nr. 245) in eigener
+ * Datei: Handy-Leiste und Web-Zeile führen über dieselbe Regel zurück (ein
+ * Schritt im Verlauf, wenn die Elternseite direkt davor stand, seit Nr. 177),
+ * damit Filter, Suche und Scrollstelle der Elternseite erhalten bleiben.
  */
 
 /** Das Ziel samt Filter der Elternseite (z. B. /orders?filter=heute). */

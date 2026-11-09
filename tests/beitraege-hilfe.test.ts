@@ -188,7 +188,7 @@ describe('/status leitet in den Reiter um, Unterseiten unter (hof)', () => {
     const client = quelle('src/app/(hof)/status/new/status-new-client.tsx')
     expect(client).toContain('router.push(BEITRAEGE_HREF)')
     expect(client).not.toContain("router.push('/status')")
-    // Seit Nr. 250 kommt der Rückweg aus dem Werkzeug-Kopf (G1; vorher UnterseitenKopf) — Ziel weiter der Reiter.
+    // Der Rückweg kommt aus dem Werkzeug-Kopf (G1, seit Nr. 250) — Ziel ist der Reiter.
     const whatsapp = quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')
     expect(whatsapp).toContain('<WerkzeugKopf')
     expect(quelle('src/app/(hof)/status/new/page.tsx')).toContain('<WerkzeugKopf')
@@ -428,7 +428,6 @@ describe('Tokens statt Farbwerte (neue und umgezogene Dateien)', () => {
     'src/components/shared/meldung-form.tsx',
     'src/components/hof-hilfe/hilfe-seitenspalte.tsx',
     'src/components/hof-hilfe/hilfe-laden.tsx',
-    'src/components/hofbereich/unterseiten-kopf.tsx',
     'src/app/(hof)/fehler-melden/page.tsx',
     'src/app/(hof)/meldungen/page.tsx',
     'src/app/(hof)/status/new/status-new-client.tsx',

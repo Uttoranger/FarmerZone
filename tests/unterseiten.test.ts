@@ -1,16 +1,11 @@
 /**
- * Rückweg im Hofbereich (Nachtlauf Nr. 44, Register N1, freigabe.md §12).
+ * Unterseiten im Hofbereich: Rückweg und Speichern (Nachtlauf Nr. 44, Register N1, freigabe.md §12).
  *
  * Beweist:
- *  - UnterseitenKopf: am Handy eine feste Leiste oben (sticky, 56 px) mit
- *    Pfeil und dem Namen der Elternseite (15 px halbfett); der Link ist die
- *    ganze Fläche (≥ 44 px), hat sichtbaren Fokus und heißt „Zurück zu …".
- *    Im Browser die Zeile „‹ …", darunter der Titel als h1. Name und Ziel
- *    kommen aus elternseite(); auf einer Seite der Leiste gibt es keinen
- *    Rückweg (Gegenprobe).
+ *  - Jede Unterseite trägt den Werkzeug-Kopf (ui/werkzeug-kopf.tsx, G1); Name und Ziel des
+ *    Rückwegs kommen aus elternseite(). /fehler-melden hat genau eine h1, die im Kopf.
  *  - Die alten Bausteine (EinstellungenKopf, ZurueckZuEinstellungen,
- *    ZurueckLink) gibt es nicht mehr, keine Datei bindet sie ein; jede
- *    genannte Unterseite trägt den neuen Kopf.
+ *    ZurueckLink) gibt es nicht mehr, keine Datei bindet sie ein.
  *  - Speichern: auf Einstellungs-Unterseiten Toast „Gespeichert" und zurück
  *    zur Übersicht, nur nach Erfolg; Abholzeiten bleibt; derselbe Baustein im
  *    Hofseiten-Editor behält seine Meldung. Mein Auftritt verlässt die Seite
@@ -18,7 +13,7 @@
  *    Ortssuche läuft (Nachbesserung Runde 1). Ein Fehler des Hof-Profils
  *    steht im Formular, auch eine gescheiterte Anfrage (Runde 2).
  *  - Tab-Titel und Seitentitel der Unterseiten haben eine Schreibweise.
- *  - Hof-Profil: „Einstellungen → Mein Auftritt" ist ein Link.
+ *  - Hof-Profil: „Mein Hof › Hofseite" ist ein Link.
  *  - Mehr-Blatt: die Person ist ein Link auf „Konto und Sicherheit" (Name, Ziel als Unterzeile).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -54,132 +49,30 @@ vi.mock('@/server/actions/farm', () => ({
 vi.mock('@/server/actions/appearance', () => ({ saveAppearanceAction: vi.fn() }))
 vi.mock('@/lib/auth-client', () => ({ signOut: vi.fn() }))
 
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
 import { ProfileForm } from '@/components/settings/profile-form'
 import { PersonZeile } from '@/components/shells/hof-shell'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
-import { EINSTELLUNG_KONTO, GESPEICHERT_TEXT, RUECKWEG_PRAEFIX, elternseite } from '@/lib/bauern-navigation'
+import { EINSTELLUNG_KONTO, GESPEICHERT_TEXT, elternseite } from '@/lib/bauern-navigation'
 import type { FarmSettings } from '@/server/queries/farm'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
-
-function kopf(pfad: string, props: Parameters<typeof UnterseitenKopf>[0] = {}): string {
-  navigation.pfad = pfad
-  return renderToStaticMarkup(createElement(UnterseitenKopf, props))
-}
-
-/** Die Klassen des Elements, das unmittelbar vor `marke` geöffnet wird. */
-function klassenVor(html: string, marke: string): string {
-  const stelle = html.indexOf(marke)
-  expect(stelle, marke).toBeGreaterThanOrEqual(0)
-  const davor = html.slice(0, stelle)
-  const treffer = [...davor.matchAll(/class="([^"]*)"/g)]
-  return treffer[treffer.length - 1]?.[1] ?? ''
-}
 
 beforeEach(() => {
   vi.clearAllMocks()
   navigation.pfad = '/settings/profile'
 })
 
-// ─── Der Baustein ───────────────────────────────────────────────────────────
+// ─── Der Kopf der Unterseiten ───────────────────────────────────────────────
 
-describe('UnterseitenKopf am Handy', () => {
-  const html = kopf('/settings/profile', { titel: 'Hof-Profil', satz: 'Informationen für deine Hofseite.' })
-  const leiste = html.slice(0, html.indexOf('</div>') + 6)
-
-  it('eine feste Leiste oben: sticky, 56 px hoch, eigene Fläche — nur unter 768 px', () => {
-    const klassen = leiste.match(/^<div class="([^"]*)"/)?.[1] ?? ''
-    for (const k of ['sticky', 'top-0', 'h-14', 'bg-card', 'border-b', 'md:hidden', 'print:hidden']) expect(klassen.split(' '), k).toContain(k)
-  })
-
-  it('Pfeil plus Name der Elternseite (15 px halbfett); die ganze Fläche ist EIN Link mit mindestens 44 px', () => {
-    expect(leiste.match(/<a /g)).toHaveLength(1)
-    expect(leiste).toContain('href="/settings"')
-    const link = leiste.match(/<a href="\/settings" class="([^"]*)"/)?.[1] ?? ''
-    for (const k of ['min-h-11', 'text-[15px]', 'font-semibold']) expect(link.split(' '), k).toContain(k)
-    expect(leiste).toContain('>Einstellungen</span>')
-    expect(leiste).toMatch(/<svg[^>]*lucide-arrow-left[^>]*aria-hidden="true"|<svg[^>]*aria-hidden="true"[^>]*lucide-arrow-left/)
-  })
-
-  it('heißt für den Screenreader „Zurück zu Einstellungen" und hat einen sichtbaren Fokus', () => {
-    expect(leiste).toContain(`<span class="sr-only">${RUECKWEG_PRAEFIX} </span>`)
-    expect(RUECKWEG_PRAEFIX).toBe('Zurück zu')
-    const link = leiste.match(/<a href="\/settings" class="([^"]*)"/)?.[1] ?? ''
-    for (const k of FOKUS_RAHMEN.split(' ')) expect(link.split(' '), k).toContain(k)
-  })
-
-  it('ein langer Name sprengt die Leiste nicht', () => {
-    expect(klassenVor(leiste, '>Einstellungen</span>')).toContain('truncate')
-  })
-})
-
-describe('UnterseitenKopf im Browser und Titel', () => {
-  const html = kopf('/settings/profile', { titel: 'Hof-Profil', satz: 'Informationen für deine Hofseite.' })
-
-  it('ab 768 px die bisherige Zeile „‹ …" mit Chevron, 44 px, ebenfalls „Zurück zu …"', () => {
-    const links = [...html.matchAll(/<a href="\/settings" class="([^"]*)"/g)].map((t) => t[1])
-    expect(links).toHaveLength(2)
-    expect(klassenVor(html, links[1] ? `<a href="/settings" class="${links[1]}"` : '')).toContain('md:flex')
-    expect(links[1].split(' ')).toContain('min-h-11')
-    expect(html).toMatch(/lucide-chevron-left/)
-    expect(html.match(new RegExp(`${RUECKWEG_PRAEFIX} </span>`, 'g'))).toHaveLength(2)
-  })
-
-  it('darunter der Titel als einzige h1, mit dem Satz', () => {
-    expect(html.match(/<h1\b/g)).toHaveLength(1)
-    expect(html).toMatch(/<h1[^>]*>Hof-Profil<\/h1>/)
-    expect(html).toContain('Informationen für deine Hofseite.')
-  })
-
-  it('Gegenprobe: auf einer Seite der Leiste kein Rückweg — nur der Titel', () => {
-    // /orders: /settings (Nr. 250) und die übrigen Seiten des Mehr-Blatts (Nr. 269) haben am Handy „Mehr“ als Elternseite.
-    const oben = kopf('/orders', { titel: 'Bestellungen' })
-    expect(oben).not.toContain('<a ')
-    expect(oben).not.toContain('sticky')
-    expect(oben).toMatch(/<h1[^>]*>Bestellungen<\/h1>/)
-  })
-
-  it('ohne Titel nur der Rückweg (die Seite trägt ihre h1 selbst)', () => {
-    const neu = kopf('/status/new')
-    expect(neu).not.toContain('<h1')
-    expect(neu).toContain('href="/farm-page?reiter=beitraege"')
-    expect(neu).toContain('>Beiträge</span>')
-  })
-
-  it('der Filter der Elternseite bleibt erhalten; ab 1024 px steht die Liste daneben', () => {
-    const detail = kopf('/orders/bestellung-1', { titel: 'Bestellung FZ-1', suche: '?filter=heute', listeDaneben: true })
-    expect(detail.match(/href="\/orders\?filter=heute"/g)).toHaveLength(2)
-    // Der Titelblock (um die h1) und die Browser-Zeile entfallen ab 1024 px.
-    expect(detail).toMatch(/<div class="[^"]*\blg:hidden\b[^"]*"><div class="min-w-0"><h1/)
-    expect(detail).toMatch(/md:flex[^"]*lg:hidden|lg:hidden[^"]*md:flex/)
-    // Gegenprobe: ohne listeDaneben bleiben beide.
-    expect(kopf('/orders/bestellung-1', { titel: 'Bestellung FZ-1' })).not.toContain('lg:hidden')
-  })
-
+describe('Der Kopf der Unterseiten', () => {
   it('/fehler-melden: seit Nr. 251 der Werkzeug-Kopf (G1) — die h1 steht in der Leiste, keine zweite h1 (Nr. 56 entfällt)', () => {
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
     expect(seite).toContain('<WerkzeugKopf titel={PROBLEM_MELDEN}')
     expect(seite).not.toMatch(/<h1\b/)
     expect(seite).not.toContain('UnterseitenKopf')
     expect(PROBLEM_MELDEN).toBe(elternseite('/fehler-melden')?.name)
-    // Gegenprobe: Wo Titel und Elternseite verschieden heißen, bleibt die h1 des Kopfs sichtbar.
-    expect(kopf('/settings/profile', { titel: 'Hof-Profil' })).toMatch(/<h1 class="(?![^"]*sr-only)[^"]*">Hof-Profil<\/h1>/)
-  })
-
-  it('zeileImBrowser={false}: nur die Leiste am Handy', () => {
-    const melden = kopf('/fehler-melden', { zeileImBrowser: false })
-    expect(melden.match(/<a /g)).toHaveLength(1)
-    expect(melden).toContain('href="/meldungen"')
-    expect(melden).toContain('>Problem melden</span>')
-  })
-
-  it('nur Tokens, keine Farbwerte', () => {
-    const text = quelle('src/components/hofbereich/unterseiten-kopf.tsx') + quelle('src/components/hofbereich/unterseiten-kopf-stil.ts')
-    expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|oklch)\(/)
-    expect(text).not.toMatch(/\b(bg|text|border)-(white|black|gray|slate|green|amber|red)\b/)
   })
 })
 
@@ -360,17 +253,12 @@ describe('Die alten Bausteine sind ersetzt', () => {
     ['/fehler-melden', 'src/app/(hof)/fehler-melden/page.tsx'],
   ]
 
-  // Seit Lauf 32 löst der Werkzeug-Kopf (G1, ui/werkzeug-kopf.tsx) den UnterseitenKopf Route für Route ab
-  // (tests/werkzeug-kopf-wache.test.ts) — eine umgestellte Seite trägt dann ihn.
-  it.each(MIT_KOPF)('%s trägt den UnterseitenKopf bzw. seinen Nachfolger, den Werkzeug-Kopf', (_route, datei) => {
+  // Seit 26.1 (Lauf 33) gibt es nur noch den Werkzeug-Kopf (G1, ui/werkzeug-kopf.tsx) — er liest den Pfad
+  // selbst, die Seite schreibt kein Ziel; dass niemand den alten Kopf zurückholt, prüft tests/werkzeug-kopf-wache.test.ts.
+  it.each(MIT_KOPF)('%s trägt den Werkzeug-Kopf', (_route, datei) => {
     const text = quelle(datei)
-    if (text.includes('<WerkzeugKopf')) {
-      expect(text).toContain("from '@/components/ui/werkzeug-kopf'")
-      expect(text).not.toContain('<UnterseitenKopf')
-      return
-    }
-    expect(text).toContain("from '@/components/hofbereich/unterseiten-kopf'")
-    expect(text).toContain('<UnterseitenKopf')
+    expect(text).toContain("from '@/components/ui/werkzeug-kopf'")
+    expect(text).toContain('<WerkzeugKopf')
   })
 
   it('die eigenen Rückwege von Kunden- und Bestelldetail sind weg (eine Schreibweise)', () => {

@@ -21,8 +21,8 @@ export const dynamic = 'force-dynamic'
  * Nr. 22e; seit Nr. 66 ehrlich und fortsetzbar, Register W1): Hof der
  * Sitzung, fremde ID → 404; die Empfängerinnen live, dazu, wer schon
  * geöffnet bekam — gespeichert je Person über setzeWhatsAppGetippt. Zurück
- * führt in den Reiter „Beiträge" (UnterseitenKopf, seit Nr. 44 am Handy fest
- * oben).
+ * führt in den Reiter „Beiträge" (WerkzeugKopf, am Handy fest oben, damit
+ * der Rückweg beim Scrollen bleibt).
  * Das Teilen über das Telefon (Mockup mobil-h4-teilen-ueber-das-telefon)
  * kommt mit Gate 7 (Nr. 21).
  */

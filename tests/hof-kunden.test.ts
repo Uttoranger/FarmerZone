@@ -666,7 +666,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
 })
 
 describe('Kundendetail', () => {
-  // Der Rückweg (UnterseitenKopf, Nr. 44) hängt am Pfad der Seite.
+  // Der Rückweg (Werkzeug-Kopf, G1) hängt am Pfad der Seite.
   beforeEach(() => {
     navigation.pfad = '/customers/k-1'
   })

@@ -80,7 +80,6 @@ import { formatEuro } from '@/lib/format'
 import { ladeKonditionenHof } from '@/server/queries/einstellungen'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
 import { EinstellungenFehler } from '@/components/hof-einstellungen/einstellungen-fehler'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import {
   EinstellungenLaden,
@@ -669,15 +668,6 @@ describe('Konditionen gerendert', () => {
 })
 
 describe('Kopf, Fehler, Laden', () => {
-  it('Unterseiten-Kopf (seit Nr. 44 UnterseitenKopf): Rückweg zu den Einstellungen mit 44 px, eine h1', () => {
-    navigation.pfad = '/settings/pickup-slots'
-    const k = html(createElement(UnterseitenKopf, { titel: 'Abholzeiten', satz: 'Wann Kunden abholen.' }))
-    navigation.pfad = '/settings/konditionen'
-    expect(k).toContain('href="/settings"')
-    expect(k).toContain('min-h-11')
-    expect(k.match(/<h1\b/g)).toHaveLength(1)
-  })
-
   it('Fehler inline nach G6 als Kasten in der Warnfarbe mit „Neu laden" und Werkzeug-Kopf (Board s1-/w1-einstellungen Bild 2, Nr. 250)', () => {
     navigation.pfad = '/settings'
     const f = html(createElement(EinstellungenFehler, { titel: 'Einstellungen', href: '/settings', unterzeile: 'Hof Test' }))
@@ -705,7 +695,6 @@ describe('Quelltext', () => {
   const DATEIEN = [
     'src/components/hof-einstellungen/einstellungen-uebersicht.tsx',
     'src/components/hof-einstellungen/konditionen-ansicht.tsx',
-    'src/components/hofbereich/unterseiten-kopf.tsx',
     'src/app/(hof)/settings/page.tsx',
     'src/app/(hof)/settings/payments/page.tsx',
     'src/app/(hof)/settings/account/page.tsx',

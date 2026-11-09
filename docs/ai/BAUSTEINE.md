@@ -242,11 +242,9 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 ## src/components/hofbereich
 
 - src/components/hofbereich/hof-balken.tsx · HofBalken, WarteBalken, type HofBalkenLage · Die Balken der HofShell (stillgelegt, wartet auf Freigabe) — seit Nr. 245 als Hinweiskasten (G3), oben über der Seite oder unter dem Werkzeug-Kopf. · genutzt
-- src/components/hofbereich/hof-laden.tsx · BeitragNeuLaden, HofSeiteLaden, UnterseitenKopfLaden, WhatsAppVersandLaden · Ladeansichten im Hofbereich für Routen ohne eigenes Bauteil (Nachtlauf Nr. 31): der Rückfall der Routengruppe (hof) und die beiden Unterseiten der Beiträge. · genutzt
+- src/components/hofbereich/hof-laden.tsx · BeitragNeuLaden, HofSeiteLaden, WhatsAppVersandLaden · Ladeansichten im Hofbereich für Routen ohne eigenes Bauteil (Nachtlauf Nr. 31): der Rückfall der Routengruppe (hof) und die beiden Unterseiten der Beiträge. · genutzt
 - src/components/hofbereich/neu-symbol.ts · NEU_SYMBOL · Das Symbol je Eintrag des Neu-Menüs — EINE Zuordnung für die HofShell (Aufklappmenü, Blatt) und den Dialog „Was legst du an?" auf /products (components/produkte/was-legst-du-an.tsx, Nachtlauf Nr. 18). · genutzt
 - src/components/hofbereich/tarif-zeile.tsx · TarifZeile · kein Zweck vermerkt · genutzt
-- src/components/hofbereich/unterseiten-kopf-stil.ts · LEISTE_HANDY, ZEILE_BROWSER · Maße des Unterseiten-Kopfs (unterseiten-kopf.tsx) — EINE Quelle für den Kopf und die Ladeansichten der Unterseiten (hof-laden.tsx), damit beim Umschalten nichts springt. · genutzt
-- src/components/hofbereich/unterseiten-kopf.tsx · UnterseitenKopf · Kopf einer Unterseite im Hofbereich (Nachtlauf Nr. 44, Register N1). · Altbestand → WerkzeugKopf (ui/werkzeug-kopf.tsx, G1, Nr. 245) — neue Seiten
 
 ## src/components/hofseite
 
@@ -475,7 +473,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/netz-hinweis.tsx · NetzHinweis, NetzZeile · Die Netz-Zeile unter dem Kopf der Shells (Register N29; Board system-sterne-kein-netz, Punkt 1): Geht dem Browser das Netz verloren, steht hier „Keine Verbindung – du siehst den letzten Stand.", bis … · genutzt
 - src/components/ui/password-input.tsx · PasswordInput · Passwortfeld mit Auge-Knopf — die EINE Umsetzung für alle Formulare (Nr. 173; vorher je eine Kopie in Registrierung und neuem Passwort). · genutzt
 - src/components/ui/progress-bar.tsx · ProgressBar · ProgressBar: Fortschritt als Balken, z. B. „Deine Hofseite · 64 %". · genutzt
-- src/components/ui/rueckweg-tipp.ts · beimTipp, zielMitSuche · Der Rückweg der Hof-Köpfe — EINE Quelle für UnterseitenKopf (hofbereich/unterseiten-kopf.tsx, seit Nr. 44/177) und WerkzeugKopf (ui/werkzeug-kopf.tsx, Nr. 245). · genutzt
+- src/components/ui/rueckweg-tipp.ts · beimTipp, zielMitSuche · Der Rückweg des Werkzeug-Kopfs (ui/werkzeug-kopf.tsx, Nr. 245) in eigener Datei: Handy-Leiste und Web-Zeile führen über dieselbe Regel zurück (ein Schritt im Verlauf, wenn die Elternseite direkt … · genutzt
 - src/components/ui/rundung.ts · RUNDUNG, RUNDUNG_PX, type RundungArt · Rundungen in Pixeln (Baustein G8, Nr. 245; Liste Lauf 32, Abschnitt 3.2). · genutzt
 - src/components/ui/segment.tsx · CHIP_GRUPPE_GEWAEHLT, CHIP_GRUPPE_OFFEN, CHIP_GRUPPE_PILLE, ChipGruppe, Segment, chipGruppeText, type ChipGruppeOption, type SegmentOption · Segment: ein Umschalter mit genau einer Wahl („Handy | Web"). · genutzt
 - src/components/ui/select.tsx · Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectScrollDownButton, SelectScrollUpButton, SelectSeparator, SelectTrigger, SelectValue · kein Zweck vermerkt · genutzt
@@ -491,7 +489,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 - src/components/ui/textarea.tsx · Textarea · kein Zweck vermerkt · genutzt
 - src/components/ui/textlink.tsx · Textlink, textlinkKlassen · Die Klassen eines Textlinks mit Trefferfläche ≥ 44 px (V16; Boards w1-korb „Route planen →", w1-mehr-neu „Hofseite ansehen"). · genutzt
 - src/components/ui/werkzeug-kopf-stil.ts · WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_PLATZ, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL · Maße des Werkzeug-Kopfs (werkzeug-kopf.tsx, G1, Nr. 245) — EINE Quelle für den Kopf und seine Ladeansicht, damit beim Umschalten nichts springt. · genutzt
-- src/components/ui/werkzeug-kopf.tsx · UnterDemWerkzeugKopf, WerkzeugKopf, WerkzeugKopfLaden · Werkzeug-Kopf (Baustein G1, Nr. 245): der Kopf der Hof-Werkzeuge am Handy (feste Leiste) und im Web in einem Baustein, mit dem Hof-Balken (G3) darunter; löst UnterseitenKopf ab. · genutzt
+- src/components/ui/werkzeug-kopf.tsx · UnterDemWerkzeugKopf, WerkzeugKopf, WerkzeugKopfLaden · Werkzeug-Kopf (Baustein G1, Nr. 245): der Kopf der Hof-Werkzeuge am Handy (feste Leiste) und im Web in einem Baustein, mit dem Hof-Balken (G3) darunter. · genutzt
 - src/components/ui/zaehler.tsx · Zaehler · Eine kleine Zahl an einem Eintrag: offene Bestellungen, Meldungen zu entscheiden, Artikel im Korb. · genutzt
 
 ## src/lib

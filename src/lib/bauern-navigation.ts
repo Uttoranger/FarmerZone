@@ -460,7 +460,7 @@ export function hofHandyAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 
 // ─── Rückweg auf Unterseiten (Nachtlauf Nr. 44, Register N1) ────────────────
 //
 // Am Handy hat jede Unterseite des Hofbereichs einen festen Kopf mit dem Weg
-// zur Elternseite (components/hofbereich/unterseiten-kopf.tsx). Wohin er führt
+// zur Elternseite (components/ui/werkzeug-kopf.tsx). Wohin er führt
 // und wie er heißt, steht nur hier — aus denselben Punkten wie Leiste und
 // Mehr-Blatt, damit es keine zweite Schreibweise gibt („‹ Alle Kunden",
 // „Zu den Beiträgen" und „Meine Meldungen" hießen vorher je Seite anders).

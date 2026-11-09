@@ -84,7 +84,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/hof-einstellungen/konditionen-ansicht.tsx': 2,
   'src/components/hof-verkaeufe/verkauf-dialog.tsx': 1,
   'src/components/hofbereich/hof-laden.tsx': 8,
-  'src/components/hofbereich/unterseiten-kopf.tsx': 1,
   'src/components/hofseite/aktuell-vom-hof.tsx': 3,
   'src/components/hofseite/hofseite-kunde.tsx': 3,
   'src/components/hofseite/hofseite-seitenspalte.tsx': 1,

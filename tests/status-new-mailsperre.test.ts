@@ -15,7 +15,6 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn(async () => ({ u
 vi.mock('@/server/hofbereich', () => ({ verlangeHofDerSitzung: vi.fn(async () => ({ userId: 'user_1', farmId: 'farm_1' })) }))
 vi.mock('@/server/queries/dashboard', () => ({ getFarmForUser: vi.fn(async () => ({ id: 'farm_1' })) }))
 vi.mock('@/server/queries/status-posts', () => ({ getStatusTemplate: vi.fn(async () => null) }))
-vi.mock('@/components/hofbereich/unterseiten-kopf', () => ({ UnterseitenKopf: () => null }))
 vi.mock('@/app/(hof)/status/new/status-new-client', () => ({ StatusNewClient: () => createElement('div') }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {

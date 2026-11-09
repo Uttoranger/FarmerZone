@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * Werkzeug-Kopf (Baustein G1, Nr. 245): der Kopf der Hof-Werkzeuge am Handy (feste Leiste) und im Web in
- * einem Baustein, mit dem Hof-Balken (G3) darunter; löst UnterseitenKopf ab.
+ * einem Baustein, mit dem Hof-Balken (G3) darunter.
  */
 
 /*
@@ -34,8 +34,8 @@ export function UnterDemWerkzeugKopf({ inhalt, children }: { inhalt: ReactNode; 
 /**
  * Werkzeug-Kopf (Baustein G1, Nr. 245; Liste Lauf 32, Abschnitt 3.2) — der
  * Kopf der Hof-Werkzeuge und ihrer Unterseiten, am Handy und im Web in EINEM
- * Baustein. Löst `UnterseitenKopf` ab (hofbereich/unterseiten-kopf.tsx); die
- * alten Aufrufer stehen in tests/bestandslisten/unterseiten-kopf.ts.
+ * Baustein — EIN Kopf, damit Maße und Rückweg überall gleich sind
+ * (tests/werkzeug-kopf-wache.test.ts hält den alten Unterseiten-Kopf fern).
  *
  * Handy (unter 768 px): feste Leiste oben (`fixed`, hängt an keinem
  * Elternelement, Nr. 269), 56 px, `bg-card`, Linie unten;
@@ -48,8 +48,8 @@ export function UnterDemWerkzeugKopf({ inhalt, children }: { inhalt: ReactNode; 
  * Wohin der Rückweg führt und wie die Elternseite heißt, entscheidet allein
  * `elternseite` (lib/bauern-navigation.ts); ohne Elternseite (Seiten der Leiste
  * und des Mehr-Blatts) gibt es keinen Rückweg, nur Titel und Unterzeile. Der
- * Tipp auf den Rückweg folgt derselben Regel wie beim alten Kopf
- * (`beimTipp`, ui/rueckweg-tipp.ts).
+ * Tipp auf den Rückweg folgt der Regel der Kundenseiten, damit Filter und
+ * Scrollstelle der Elternseite bleiben (`beimTipp`, ui/rueckweg-tipp.ts).
  *
  * Die h1 steht immer sichtbar, auch wenn sie wie die Elternseite heißt — die
  * Regel „h1 sr-only, wenn Titel = Elternseite“ (Nr. 56) gilt hier nicht mehr:

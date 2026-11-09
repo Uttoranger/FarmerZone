@@ -1,6 +1,4 @@
-import { LEISTE_HANDY, ZEILE_BROWSER } from '@/components/hofbereich/unterseiten-kopf-stil'
 import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
-import { cn } from '@/lib/utils'
 
 /*
  * Ladeansichten im Hofbereich für Routen ohne eigenes Bauteil (Nachtlauf
@@ -10,39 +8,6 @@ import { cn } from '@/lib/utils'
  * Farbstaffelung im neuen Design: bg-border für Überschriften, bg-muted für
  * Zweitzeilen und Flächen (DESIGN_SYSTEM „Ladeansicht einer Route").
  */
-
-/**
- * Der Unterseiten-Kopf im Wartezustand (Nr. 44), in denselben Maßen wie
- * UnterseitenKopf (unterseiten-kopf-stil.ts): am Handy die feste Leiste
- * (56 px) mit dem Platz für Pfeil und Namen, im Browser die Zeile „‹ …"
- * (44 px). Der Titel ist Sache der jeweiligen Ladeansicht. Nur noch für die
- * Einstellungen (einstellungen-laden.tsx, Bestandsliste unterseiten-kopf);
- * die Beiträge laden seit Nr. 269 mit `WerkzeugKopfLaden` wie ihre Seiten.
- */
-export function UnterseitenKopfLaden({
-  mitTitel = true,
-  zeileImBrowser = true,
-  listeDaneben = false,
-}: {
-  /** Folgt ein Titel (h1) — dann 4 px statt 8 px Abstand unter der Zeile im Browser. */
-  mitTitel?: boolean
-  zeileImBrowser?: boolean
-  /** Ab 1024 px steht die Elternseite als Liste daneben (Bestellungen). */
-  listeDaneben?: boolean
-}): React.JSX.Element {
-  return (
-    <>
-      <div className={LEISTE_HANDY}>
-        <div className="ml-2 h-5 w-36 rounded bg-muted" />
-      </div>
-      {zeileImBrowser && (
-        <div className={cn(ZEILE_BROWSER, 'min-h-11 items-center', mitTitel ? 'md:mb-1' : 'md:mb-2', listeDaneben && 'lg:hidden')}>
-          <div className="h-4 w-28 rounded bg-muted" />
-        </div>
-      )}
-    </>
-  )
-}
 
 /**
  * Rückfall der Gruppe (hof) — für eine Route, die (noch) keine eigene

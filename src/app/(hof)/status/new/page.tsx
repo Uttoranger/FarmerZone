@@ -24,8 +24,7 @@ export const dynamic = 'force-dynamic'
  * (Register T5, Nr. 67) mit den WhatsApp-Abonnentinnen als erster Karte —
  * ein WhatsApp-Häkchen gibt es hier nicht mehr, E-Mail bleibt eines.
  * Zurück führt in den Reiter „Beiträge" von Mein Hof
- * (UnterseitenKopf, seit Nr. 44 am Handy fest oben; die h1 trägt der
- * Assistent je Schritt selbst).
+ * (WerkzeugKopf, am Handy fest oben, damit der Rückweg beim Scrollen bleibt).
  */
 
 export default async function StatusNewPage({

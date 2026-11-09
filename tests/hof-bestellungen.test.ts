@@ -20,7 +20,7 @@ vi.mock('next/link', () => ({
   // Der Ladepunkt (Nr. 105/121) fragt den Zustand des Links — beim Rendern auf dem Server lädt nichts.
   useLinkStatus: () => ({ pending: false }),
 }))
-// Die Bestellung im Detail trägt den Kopf mit dem Rückweg (UnterseitenKopf liest den Pfad).
+// Die Bestellung im Detail trägt den Kopf mit dem Rückweg (der Werkzeug-Kopf liest den Pfad).
 vi.mock('next/navigation', () => ({
   usePathname: () => '/orders/order-1',
   useRouter: () => ({ refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} }),
