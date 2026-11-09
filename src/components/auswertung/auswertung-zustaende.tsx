@@ -1,4 +1,4 @@
-import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
+import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
 
 /*
  * Rahmen und Ladefehler der Auswertung (Nachtlauf Nr. 22c). Ein Skelett gibt

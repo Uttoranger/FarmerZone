@@ -6,7 +6,7 @@ import { LadePunkt } from '@/components/ui/lade-punkt'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { DIAGRAMM_BALKEN, DIAGRAMM_VERGLEICH } from '@/components/ui/diagramm-farbe'
 import { RUNDUNG } from '@/components/ui/rundung'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { Marke } from '@/components/ui/marke'
 import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { centsAlsEuro, einheitLabel, formatEuro, formatZahl, mitAnzahl } from '@/lib/format'
 import { UMSATZ_LEER, zahlartZeile, type GebuehrenKarteText, type GrenzeStand, type Kennzahlen, type TeilenKarte as TeilenKarteDaten } from '@/lib/auswertung'
@@ -21,6 +21,14 @@ const TOP_PRODUKTE_FUSS = `Nur Bestellungen über ${MARKE}, Warenpreis.`
 
 /** Fußsatz der Teilen-Karte, wörtlich nach Board s2-/w2-auswertung (Liste Lauf 32 auswertung). */
 export const TEILEN_FUSS = 'Gezählt werden Besuche, keine Bestellungen.'
+
+/** Nachsatz der leeren Links-Karte, solange der Hof nicht freigegeben ist (Board s2-/w2-auswertung Bild 4, Nr. 273). */
+export const TEILEN_OHNE_FREIGABE = 'Teilen geht, sobald dein Hof online ist.'
+
+/** Ohne Umsatz und ohne Vergleich zeigt die Umsatzkarte den Leerzustand statt der Balken (G4). */
+export function umsatzLeer(balken: readonly Balken[]): boolean {
+  return balken.every((b) => b.cent === 0 && b.vergleichCent === 0)
+}
 
 /** Der Satz im leeren Diagramm (G4, Board s2-/w2-auswertung Bild 4). */
 export const UMSATZ_LEER_SATZ = 'Verkaufst du auch am Markt oder ab Hof? Trag es ein, dann siehst du hier alles zusammen.'
@@ -140,9 +148,20 @@ export function KennzahlenReihe({
  * nach Besuchen. Nur Besuche, kein Euro-Betrag (Register T1); der Satz zur
  * Zählung kommt aus `TEILEN_ZAEHLUNG_HINWEIS`, damit er überall gleich lautet.
  */
-export function TeilenWirkungKarte({ karte, zeitraum }: { karte: TeilenKarteDaten; zeitraum: string }): React.JSX.Element {
+export function TeilenWirkungKarte({
+  karte,
+  zeitraum,
+  ohneFreigabe = false,
+  className,
+}: {
+  karte: TeilenKarteDaten
+  zeitraum: string
+  /** Hof noch nicht freigegeben: der leere Satz bekommt „Teilen geht, sobald dein Hof online ist.“ */
+  ohneFreigabe?: boolean
+  className?: string
+}): React.JSX.Element {
   return (
-    <section aria-labelledby="auswertung-teilen" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
+    <section aria-labelledby="auswertung-teilen" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]', className)}>
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <h2 id="auswertung-teilen" className={KARTEN_TITEL}>
           Über deine geteilten Links
@@ -153,7 +172,9 @@ export function TeilenWirkungKarte({ karte, zeitraum }: { karte: TeilenKarteDate
       </div>
       {karte.zeilen.length === 0 ? (
         // Ohne Knopf „Hof teilen“ (Liste Lauf 32 auswertung: Board ohne Knopf).
-        <p className="text-[13.5px] text-foreground">In diesem Zeitraum kam noch niemand über einen geteilten Link.</p>
+        <p className="text-[13.5px] text-foreground">
+          In diesem Zeitraum kam noch niemand über einen geteilten Link.{ohneFreigabe && ` ${TEILEN_OHNE_FREIGABE}`}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
           {karte.zeilen.map((z) => (
@@ -188,6 +209,9 @@ export function UmsatzKarte({
   laufend,
   balken,
   vergleichLabel,
+  vergleichCent = null,
+  fussSatz = null,
+  className,
 }: {
   zeitraum: string
   summeCent: number
@@ -195,10 +219,15 @@ export function UmsatzKarte({
   laufend: boolean
   balken: Balken[]
   vergleichLabel: string
+  /** Die Vorperiode bis zum selben Zeitpunkt in Cent — steht in Klammern hinter dem Vergleich (Nr. 273). */
+  vergleichCent?: number | null
+  /** „Mo und Di: Verkäufe, die du selbst eingetragen hast. …“ unter dem Diagramm (umsatzFussSatz). */
+  fussSatz?: string | null
+  className?: string
 }): React.JSX.Element {
-  const leer = balken.every((b) => b.cent === 0 && b.vergleichCent === 0)
+  const leer = umsatzLeer(balken)
   return (
-    <section aria-labelledby="auswertung-umsatz" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
+    <section aria-labelledby="auswertung-umsatz" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]', className)}>
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         {/* Der Titel sagt, was zählt (Board s2-/w2-auswertung); der Zeitraum steht über den Kennzahlen. */}
         <h2 id="auswertung-umsatz" className={KARTEN_TITEL}>
@@ -215,8 +244,13 @@ export function UmsatzKarte({
           )}
         >
           {vergleich.text}
-          {/* „+n % · verglichen bis zum selben Zeitpunkt“ in einer Zeile (Board s2-/w2-auswertung Bild 3). */}
-          {laufend && vergleich.richtung !== 'keiner' && <span className={cn('font-normal', LEISE)}> · verglichen bis zum selben Zeitpunkt</span>}
+          {/* „+n % · verglichen bis zum selben Zeitpunkt (€ …)“ in einer Zeile (Board s2-/w2-auswertung Bild 1 und 3, Nr. 273). */}
+          {vergleich.richtung !== 'keiner' && (laufend || vergleichCent !== null) && (
+            <span className={cn('font-normal', LEISE)}>
+              {laufend && ' · verglichen bis zum selben Zeitpunkt'}
+              {vergleichCent !== null && ` (${euro(vergleichCent)})`}
+            </span>
+          )}
         </p>
       </div>
       {leer ? (
@@ -233,6 +267,7 @@ export function UmsatzKarte({
       ) : (
         <BalkenDiagramm balken={balken} zeitraum={zeitraum} vergleichLabel={vergleichLabel} />
       )}
+      {!leer && fussSatz && <p className={cn('text-xs leading-normal', LEISE)}>{fussSatz}</p>}
     </section>
   )
 }
@@ -317,13 +352,15 @@ export function GebuehrenKarte({
   titel,
   gebuehr,
   text,
+  className,
 }: {
   titel: string
   gebuehr: GebuehrenImZeitraum
   text: GebuehrenKarteText
+  className?: string
 }): React.JSX.Element {
   return (
-    <section aria-labelledby="auswertung-gebuehren" className={cn(KARTE, 'flex flex-col gap-2 px-4 py-4 md:px-[18px]')}>
+    <section aria-labelledby="auswertung-gebuehren" className={cn(KARTE, 'flex flex-col gap-2 px-4 py-4 md:px-[18px]', className)}>
       <h2 id="auswertung-gebuehren" className={KARTEN_TITEL}>
         {titel}
       </h2>
@@ -344,10 +381,10 @@ export function GebuehrenKarte({
 
 // ─── Kanäle, Top-Produkte, Einsicht ─────────────────────────────────────────
 
-export function EinsichtZeile({ text }: { text: string }): React.JSX.Element {
+export function EinsichtZeile({ text, className }: { text: string; className?: string }): React.JSX.Element {
   return (
     // Grün getönter Streifen, Text grün fett, ohne Symbol (Liste Lauf 32 auswertung).
-    <p className={cn('bg-zustand-laeuft-grund px-4 py-3 text-[14px] leading-normal font-semibold text-status-fertig', RUNDUNG.hinweis)}>{text}</p>
+    <p className={cn('bg-zustand-laeuft-grund px-4 py-3 text-[14px] leading-normal font-semibold text-status-fertig', RUNDUNG.hinweis, className)}>{text}</p>
   )
 }
 
@@ -415,7 +452,9 @@ export function GrenzeKarte({
   prozent,
   spielraum,
   stand,
+  className,
 }: {
+  className?: string
   jahr: string
   jahresUmsatz: number
   grenze: number
@@ -425,12 +464,15 @@ export function GrenzeKarte({
 }): React.JSX.Element {
   // Titel ohne Betrag, Marke rechts, „€ … von € 55.000“ in einer Zeile (Liste Lauf 32 auswertung); „Anteil 0 %“ entfällt.
   return (
-    <section aria-labelledby="auswertung-grenze" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]')}>
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-        <h2 id="auswertung-grenze" className={KARTEN_TITEL}>
+    <section aria-labelledby="auswertung-grenze" className={cn(KARTE, 'flex flex-col gap-3 px-4 py-4 md:px-[18px]', className)}>
+      {/* Marke immer rechts neben dem Titel, auch am Handy — der Titel bricht um, nicht die Zeile (Abnahme Lauf 32 Punkt 6, Nr. 273). */}
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="auswertung-grenze" className={cn(KARTEN_TITEL, 'min-w-0')}>
           Grenze Be- &amp; Verarbeitung {jahr}
         </h2>
-        <StatusBadge status={stand.ton === 'gruen' ? 'fertig' : 'offen'}>{stand.marke}</StatusBadge>
+        <Marke art={stand.ton === 'gruen' ? 'laeuft' : 'tun'} form="schild" className="mt-0.5 shrink-0">
+          {stand.marke}
+        </Marke>
       </div>
       <p className="text-[15px] font-semibold text-foreground tabular-nums">
         {formatEuro(jahresUmsatz, 0)} <span className={cn('font-normal', LEISE)}>von {formatEuro(grenze, 0)}</span>

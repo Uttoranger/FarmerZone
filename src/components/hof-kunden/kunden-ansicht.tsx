@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bell, Phone } from 'lucide-react'
+import { Phone } from 'lucide-react'
 import type { CustomerSummary } from '@/server/queries/customers'
 import {
   KUNDEN_FILTER_LABEL,
@@ -28,11 +28,11 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { RUNDUNG } from '@/components/ui/rundung'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 import { KundenSortieren } from './kunden-sortieren'
+import { KundenMarke } from './kunden-marke'
 
 /*
  * Kunden des Hofs in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf
@@ -92,9 +92,9 @@ export function KundenAnsicht({
       ) : (
         <>
           {/* Werkzeugzeile wie im Board s2-/w2-kunden: Chips und „Sortieren“ in einer Zeile, am Handy die Suche
-              darunter, im Web zwischen Chips und „Sortieren“. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
-            <FilterChipReihe beschriftung="Kunden filtern" className="order-1 min-w-0 flex-1">
+              darunter, im Web direkt nach den Chips und „Sortieren“ rechts außen (Liste Lauf 32 kunden, Nr. 273). */}
+          <div className="flex flex-wrap items-end gap-x-2 gap-y-3 xl:gap-x-3">
+            <FilterChipReihe beschriftung="Kunden filtern" className="order-1 min-w-0 flex-1 xl:flex-none">
               {sichtbareKundenFilter(ansicht.filter).map((f) => {
                 const adresse = kundenAdresse({ ...aktuell, filter: f })
                 return (
@@ -102,6 +102,8 @@ export function KundenAnsicht({
                     key={f}
                     href={adresse}
                     aktiv={ansicht.filter === f}
+                    // 44 px hoch, 14 px halbfett wie die Chips im Board s2-/w2-kunden (Befund pruefer-ui Lauf 33: 36 px).
+                    className="h-11 px-3.5 text-sm font-semibold"
                     onNavigate={(e) => {
                       e.preventDefault()
                       schreibeAdresse(adresse)
@@ -113,7 +115,7 @@ export function KundenAnsicht({
                 )
               })}
             </FilterChipReihe>
-            <label className="relative order-3 block w-full xl:order-2 xl:w-[360px] xl:shrink-0">
+            <label className="relative order-3 block w-full xl:order-2 xl:w-auto xl:max-w-[360px] xl:flex-1">
               <span className="mb-1 block text-sm font-semibold text-foreground">Kundin suchen</span>
               <input
                 type="search"
@@ -134,7 +136,7 @@ export function KundenAnsicht({
             </label>
             {/* Ein Knopf, kein Link: Sortierung und Filter im Blatt sind Seitenzustand;
                 die Adresse bekommt sie trotzdem mit (Neuladen, Teilen). */}
-            <div className="order-2 shrink-0 xl:order-3">
+            <div className="order-2 shrink-0 xl:order-3 xl:ml-auto">
               <KundenSortieren ansicht={aktuell} zahlen={zahlen} onAdresse={schreibeAdresse} />
             </div>
           </div>
@@ -213,17 +215,6 @@ function Initialen({ name, klein = false }: { name: string; klein?: boolean }): 
   )
 }
 
-/** Die Glocke für „bekommt Neuigkeiten" — Bedeutung im Screenreader-Text. */
-function Neuigkeiten({ an }: { an: boolean }): React.JSX.Element | null {
-  if (!an) return null
-  return (
-    <>
-      <Bell className="size-3.5 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-      <span className="sr-only">bekommt Neuigkeiten</span>
-    </>
-  )
-}
-
 function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string }): React.JSX.Element | null {
   // Wie im Detail: nur eine lesbare Nummer bekommt den Knopf (telefonLink) — ein
   // Telefon aus Leerzeichen ist keins, zwei Nummern in einem Feld wählten falsch.
@@ -276,12 +267,12 @@ function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
                   >
                     <Initialen name={k.customerName} klein />
                     <span className="min-w-0 truncate">{k.customerName}</span>
-                    <Neuigkeiten an={k.isSubscribed} />
                   </Link>
                 </td>
-                <td className="px-2.5 py-1 xl:px-3.5 whitespace-nowrap">{marke && <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>}</td>
+                <td className="px-2.5 py-1 xl:px-3.5 whitespace-nowrap">{marke && <KundenMarke ton={marke.ton}>{marke.text}</KundenMarke>}</td>
                 <td className="px-2.5 py-1 xl:px-3.5 text-right tabular-nums">{k.orderCount}</td>
-                <td className="px-2.5 py-1 xl:px-3.5 text-right font-semibold whitespace-nowrap tabular-nums">{euro(k.umsatzCents)}</td>
+                {/* Umsatz in normaler Schrift wie im Board w2-kunden (Abnahme Lauf 32 kunden Punkt 13). */}
+                <td className="px-2.5 py-1 xl:px-3.5 text-right whitespace-nowrap tabular-nums">{euro(k.umsatzCents)}</td>
                 <td className={cn('px-2.5 py-1 xl:px-3.5 whitespace-nowrap', LEISE)}>{vorTagenText(k.daysSinceLastOrder)}</td>
                 <td className={cn('hidden px-3.5 py-1 xl:table-cell', LEISE)}>
                   <span className="block max-w-[180px] truncate" title={k.topProducts[0]?.name}>
@@ -323,10 +314,9 @@ function Zeilen({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
                     ohne Betrag (den zeigt die Tabelle ab 1024 px und die Kundin-Seite). */}
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="min-w-0 truncate text-[15px] font-semibold">{k.customerName}</span>
-                  <Neuigkeiten an={k.isSubscribed} />
                   {marke && (
                     <span className="shrink-0">
-                      <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>
+                      <KundenMarke ton={marke.ton}>{marke.text}</KundenMarke>
                     </span>
                   )}
                 </span>

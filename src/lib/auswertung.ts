@@ -16,13 +16,24 @@
  * Geld in ganzen Cent (CODING_STANDARDS §2), Tage und Monate in Wiener Zeit.
  */
 import { GEZAEHLTE_TOEPFE, gebuehrWortFuerMonat, topfVonBestellung, type BestellungFuerFinanzen, type EinnahmenTopf } from '@/lib/finanzen'
-import { gebuehrModellFuer, gebuehrenMehrzahl, hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
+import {
+  einzugAbFuer,
+  gebuehrModellFuer,
+  gebuehrenMehrzahl,
+  geldsaetzeFuer,
+  hofpreisModellAb,
+  letzterFreierTag,
+  satzHundertstel,
+  satzText,
+  type GeldsatzHof,
+  type HofpreisEinstellung,
+} from '@/lib/plattformgebuehr'
 import { istVorOrtZahlung, monatsgrenzenWien, monatsschluesselInWien, type Monatsschluessel, type Zahlungsart } from '@/lib/servicegebuehr'
 import type { GezeigteSummen } from '@/lib/testzahlung'
 import { BAR_OHNE_GEBUEHR_SATZ, barGebuehrSepaSatz, vorBarStichtag } from '@/lib/konditionen'
 import { mitAnzahl } from '@/lib/format'
 import { wienKalendertag } from '@/lib/kalender'
-import { wienerTag, type Zeitraum } from '@/lib/heute'
+import { selbstEingetragenSatz, wienerTag, type Zeitraum } from '@/lib/heute'
 import { umsatzfenster, type Periodenfenster } from '@/lib/umsatz'
 import type { TeilenWirkung, TeilenZeitraum } from '@/lib/teilen-wirkung'
 
@@ -182,6 +193,38 @@ export const PLATTFORMGEBUEHR_KARTE_ERKLAERUNG = 'Sie wird je Stück aufgerundet
 export const PLATTFORMGEBUEHR_KARTE_BAR =
   'Die Gebühr aus Barverkäufen ziehen wir einmal im Monat per Lastschrift ein – als Gründungshof erst nach deiner Gründungszeit.'
 
+/**
+ * Was die Gebühren-Karte über den eigenen Hof wissen muss, um ihren Erklärsatz je Stand zu bilden (Nr. 273,
+ * Liste Lauf 32 auswertung „Erklärsatz je Stand“): Satz und Einzugsbeginn aus `Farm` (`GeldsatzHof`) und das
+ * WIRKSAME Gründungsende (null ohne Gründungsplatz oder mit eigenem Einzugsbeginn) — dieselben Werte, mit denen
+ * `einzugFuer` beim Bestellen entscheidet (wie getProdukteSeite). Nur Anzeige.
+ */
+export type GebuehrHofStand = { hof: GeldsatzHof; gruendungBis: Date | null }
+
+/** „6 % je Stück, aufgerundet – …“ — der Satz des Hofs (`satzHundertstel`), nie eine feste Zahl (Board s2-/w2-auswertung). */
+export function plattformgebuehrKarteErklaerung(hundertstel: number): string {
+  return `${satzText(hundertstel)} % je Stück, aufgerundet – sie steckt im Preis der Kundin; online behält Stripe sie gleich ein.`
+}
+
+/** Bar nach dem Ende der Befreiung (Board s2-/w2-auswertung Bild 4): die Monatsabrechnung zieht die Gebühr ein. */
+export const PLATTFORMGEBUEHR_KARTE_BAR_EINZUG = 'Die Gebühr aus Barverkäufen ziehen wir einmal im Monat per Lastschrift ein.'
+
+/**
+ * Der Bar-Satz der Karte je Stand (Board s2-/w2-auswertung Bild 1–4): solange die Bargebühr erlassen ist
+ * „Bar zahlst du als Gründungshof bis 31. Jänner 2028 keine.“ (ohne Gründungsplatz, mit eigenem Einzugsbeginn
+ * ohne „als Gründungshof“), danach der Lastschrift-Satz. OB erlassen ist, sagt die Geldsatz-Hilfe
+ * (`geldsaetzeFuer`, `barOhneGebuehr` des Angebots: `bezug < einzugAbFuer(…)`), den Tag `letzterFreierTag` —
+ * der letzte Tag ohne Gebühr, inklusiv (Nr. 264, Register N48). Keine Rechnung, keine zweite Datumsregel.
+ */
+export function plattformgebuehrKarteBar(stand: GebuehrHofStand, einstellung: HofpreisEinstellung | null, bezug: Date): string {
+  const angebot = geldsaetzeFuer({ art: 'angebot', positionen: [] }, stand.hof, einstellung, stand.gruendungBis, bezug)
+  if (!angebot?.barOhneGebuehr) return PLATTFORMGEBUEHR_KARTE_BAR_EINZUG
+  const tag = letzterFreierTag(einzugAbFuer(stand.hof, einstellung, stand.gruendungBis))
+  // „als Gründungshof“ nur, wenn das Gründungsende den Tag setzt — ein eigener Einzugsbeginn aus dem Admin geht vor.
+  const alsGruendungshof = stand.hof.einzugAb === null && stand.gruendungBis !== null ? ' als Gründungshof' : ''
+  return `Bar zahlst du${alsGruendungshof} bis ${tag} keine.`
+}
+
 /** Titel und Sätze der Gebühren-Karte der Auswertung. */
 export type GebuehrenKarteText = {
   /** „Servicegebühren dieses Monats“, „Plattformgebühren dieses Monats“ oder „Gebühren dieses Monats“. */
@@ -200,12 +243,39 @@ export type GebuehrenKarteText = {
  * jetzt gilt (`gebuehrModellFuer`) — keine zweite Datumsregel. Vor dem Stichtag bleibt
  * alles wie bisher (`servicegebuehrenSaetze`).
  */
-export function gebuehrenKarteText(monat: Monatsschluessel, einstellung: HofpreisEinstellung | null, jetzt: Date): GebuehrenKarteText {
+export function gebuehrenKarteText(
+  monat: Monatsschluessel,
+  einstellung: HofpreisEinstellung | null,
+  jetzt: Date,
+  /** Der eigene Hof (Nr. 273): mit ihm nennt die Karte Satz und Bar-Stand; ohne ihn die allgemeinen Sätze. */
+  stand: GebuehrHofStand | null = null
+): GebuehrenKarteText {
   const titel = `${gebuehrenMehrzahl(gebuehrWortFuerMonat(monat, hofpreisModellAb(einstellung)))} dieses Monats`
   if (gebuehrModellFuer(einstellung, jetzt) === 'hofpreis') {
+    if (stand) {
+      return {
+        titel,
+        erklaerung: plattformgebuehrKarteErklaerung(satzHundertstel(stand.hof)),
+        bar: plattformgebuehrKarteBar(stand, einstellung, jetzt),
+        barZeile: true,
+      }
+    }
     return { titel, erklaerung: PLATTFORMGEBUEHR_KARTE_ERKLAERUNG, bar: PLATTFORMGEBUEHR_KARTE_BAR, barZeile: true }
   }
   return { titel, ...servicegebuehrenSaetze(jetzt), barZeile: !vorBarStichtag(jetzt) }
+}
+
+// ─── Fußsatz der Umsatzkarte ───────────────────────────────────────────────
+
+/**
+ * Der Fußsatz unter dem Diagramm (Board s2-/w2-auswertung Bild 3, Nr. 273): „Mo und Di: Verkäufe, die du selbst
+ * eingetragen hast. Heute holen 4 Bestellungen ab.“ — der erste Teil wie auf Heute (`selbstEingetragenSatz`),
+ * der zweite nur in der laufenden Woche und nur, wenn heute jemand abholt. Ohne beides kein Satz.
+ */
+export function umsatzFussSatz(selbstEingetrageneTage: readonly string[], heuteAbholen: number | null): string | null {
+  const heute = heuteAbholen && heuteAbholen > 0 ? (heuteAbholen === 1 ? 'Heute holt 1 Bestellung ab.' : `Heute holen ${heuteAbholen} Bestellungen ab.`) : null
+  const teile = [selbstEingetragenSatz(selbstEingetrageneTage), heute].filter((t): t is string => t !== null)
+  return teile.length ? teile.join(' ') : null
 }
 
 // ─── Teilen-Wirkung ─────────────────────────────────────────────────────────

@@ -51,6 +51,10 @@ export interface CustomerOrderSummary {
   betragCents: number
   status: string
   items: { productName: string; quantity: number }[]
+  /** Abholtag (ISO, 12:00 des Wiener Tags) und Fenster „15:00“–„18:00“ — die Zeile zeigt den Abholtermin (Nr. 273). */
+  pickupDate: string
+  pickupTimeStart: string
+  pickupTimeEnd: string
 }
 
 export interface CustomerDetail extends CustomerSummary {
@@ -151,7 +155,8 @@ export async function getCustomerDetail(
   const [orders, abos] = await Promise.all([
     prisma.order.findMany({
       where: { farmId, customerEmail: { in: [...adressen] } },
-      select: { ...BESTELL_FELDER, id: true, orderNumber: true },
+      // Nur lesend und nur mit der farmId der Sitzung; der Abholtermin kommt für die Bestellzeilen dazu (Nr. 273).
+      select: { ...BESTELL_FELDER, id: true, orderNumber: true, pickupDate: true, pickupTimeStart: true, pickupTimeEnd: true },
       orderBy: { createdAt: 'desc' },
     }),
     // Dieselbe Zuordnung wie die Liste (kundenSchluessel: klein, ohne Rand) —
@@ -177,6 +182,9 @@ export async function getCustomerDetail(
       betragCents: alsCents(o.totalAmount),
       status: o.status,
       items: o.items,
+      pickupDate: o.pickupDate.toISOString(),
+      pickupTimeStart: o.pickupTimeStart,
+      pickupTimeEnd: o.pickupTimeEnd,
     })),
     subscription,
   }
