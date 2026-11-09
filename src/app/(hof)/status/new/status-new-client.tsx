@@ -18,7 +18,7 @@ import { enterTaste } from '@/lib/feld-attribute'
 import { FREIWILLIG } from '@/lib/profil-meldungen'
 import { NETZ_SATZ } from '@/lib/netz'
 import { cn } from '@/lib/utils'
-import { BEITRAG_ABLAUF_TEXT, BEITRAG_ANLAESSE, BEITRAG_ANLASS, beitragVorschauText, type BeitragAnlass } from '@/lib/beitrag-anlass'
+import { BEITRAG_ABLAUF_TEXT, BEITRAG_ANLAESSE, BEITRAG_ANLASS, beitragVorschauText, enthaeltVorname, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { FELD_LABEL } from '@/components/hof-bestellungen/stil'
@@ -488,12 +488,11 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
             {/* Vorschau ohne Marke über dem Titel (Liste Lauf 32, beitraege „Vorschau“). */}
             <div className={cn('mb-5 border border-border bg-card p-4', RUNDUNG.karte)}>
               <h3 className="mb-2 font-heading text-[19px] leading-snug font-semibold text-foreground">{title}</h3>
-              {/* Owner-Vorschau zeigt den Platzhalter als Chip (Status-Paket E) —
-                  kundenseitig wird weiterhin gestrippt */}
-              {/* Text in Textfarbe, 15 px, so wie er ankommt (Board Bild 4; Abnahme Lauf 32 „Vorschau-Text grau/klein“). */}
+              {/* Der Hof soll sehen, wie der Beitrag bei einer Kundin ankommt: Textfarbe, 15 px, Beispielname statt
+                  Platzhalter (Board Bild 4; Liste Lauf 32 Z. 430). Abgeschickt wird der Text mit Platzhalter. */}
               <p className="text-[15px] leading-normal whitespace-pre-wrap text-foreground">{beitragVorschauText(body)}</p>
               {/* Beispielname statt Marke „{Vorname}“, der Hinweis klein darunter (Liste Lauf 32 Z. 430; Runde 1). */}
-              {body.includes('{Vorname}') && (
+              {enthaeltVorname(body) && (
                 <p className="mt-1.5 text-[13px] text-muted-foreground">{BEITRAG_ABLAUF_TEXT.vorschauNameHinweis}</p>
               )}
               {linkedProductIds.length > 0 && (

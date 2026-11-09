@@ -53,7 +53,7 @@ export const BEITRAG_ABLAUF_TEXT = {
   zustimmung:
     'Nur Kundinnen, die selbst zugestimmt haben, bekommen E-Mail oder WhatsApp. WhatsApp verschickst du nach dem Veröffentlichen selbst – mit einem Tipp je Person.',
   hofseiteZusammenfassung: 'Auf deiner Hofseite für 7 Tage oben',
-  /** Empfänger-Zeile der Vorschau mit Einzahl und Mehrzahl (Nr. 278 Runde 1; vorher „1 E-Mails werden …“). */
+  /** Empfänger-Zeile der Vorschau: Bei genau einer Empfängerin steht die Einzahl, sonst liest es sich falsch. */
   mailZusammenfassung: (anzahl: number): string =>
     `${anzahl} ${anzahl === 1 ? 'E-Mail wird' : 'E-Mails werden'} automatisch versendet`,
   /** Klein unter der Vorschau: Der Beispielname steht nur hier (Liste Lauf 32 Z. 430). */
@@ -69,5 +69,16 @@ export const VORSCHAU_BEISPIELNAME = 'Anna'
  * Nur Anzeige — abgeschickt wird der Text mit Platzhalter, ersetzt wird je Empfängerin beim Versand.
  */
 export function beitragVorschauText(body: string): string {
-  return body.replaceAll('{Vorname}', VORSCHAU_BEISPIELNAME)
+  return body.replace(VORNAME_MUSTER, VORSCHAU_BEISPIELNAME)
+}
+
+/**
+ * Dasselbe Muster wie beim Versand (`setzeVorname`, src/server/beitrag-vorname.ts: Groß- und Kleinschreibung
+ * egal) — sonst zeigte die Vorschau „{vorname}“, während die Mail den Namen einsetzt.
+ */
+const VORNAME_MUSTER = /\{Vorname\}/gi
+
+/** Steht ein Platzhalter im Text? Dann nennt die Vorschau darunter, dass der Name je Person eingesetzt wird. */
+export function enthaeltVorname(body: string): boolean {
+  return /\{Vorname\}/i.test(body)
 }

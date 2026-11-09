@@ -6,12 +6,18 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { BEITRAG_ABLAUF_TEXT, beitragVorschauText } from '@/lib/beitrag-anlass'
+import { BEITRAG_ABLAUF_TEXT, beitragVorschauText, enthaeltVorname } from '@/lib/beitrag-anlass'
 
 describe('Vorschau „Neuer Beitrag“', () => {
   it('ersetzt {Vorname} durch den Beispielnamen, jedes Vorkommen', () => {
     expect(beitragVorschauText('Hallo {Vorname}! Bis bald, {Vorname}.')).toBe('Hallo Anna! Bis bald, Anna.')
     expect(beitragVorschauText('Ohne Anrede.')).toBe('Ohne Anrede.')
+  })
+
+  it('ersetzt wie der Versand ohne Rücksicht auf Groß- und Kleinschreibung (setzeVorname)', () => {
+    expect(beitragVorschauText('Hallo {vorname}! Servus {VORNAME}.')).toBe('Hallo Anna! Servus Anna.')
+    expect(enthaeltVorname('Hallo {vorname}!')).toBe(true)
+    expect(enthaeltVorname('Hallo!')).toBe(false)
   })
 
   it('der Hinweis darunter nennt das Einsetzen', () => {
