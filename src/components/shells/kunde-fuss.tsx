@@ -50,24 +50,6 @@ function FussLinks({
 }
 
 /**
- * Die Spalte des Fußes im Browser je Art (G11, Nr. 267; welche Seite welche Art hat, sagt `spalteDerSeite` in
- * src/lib/kunden-navigation.ts): Breite samt Rand so, dass der Inhalt des Fußes genau unter dem Inhalt der Seite
- * steht — die Seiten tragen `max-w-[…] px-4` (z. B. 1032 px = 1000 px Inhalt). `breit` bleibt, wie der Fuß vor
- * Nr. 267 überall stand (1200 px, Rand 24 px). Am Handy gilt keine davon: Dort reicht der Fuß über die volle Breite.
- */
-const SPALTE_KLASSE: Record<FussSpalte, string> = {
-  schmal: 'md:max-w-[552px] md:px-4',
-  mittel: 'md:max-w-[928px] md:px-4',
-  seite: 'md:max-w-[1032px] md:px-4',
-  breit: 'md:max-w-[1200px] md:px-6',
-}
-
-/** Die Klassen der Spalte einer Art — auch für die Zeile „Vertrag widerrufen“ der KundeFokusShell (dieselbe Spalte). */
-export function fussSpalteKlasse(spalte: FussSpalte): string {
-  return SPALTE_KLASSE[spalte]
-}
-
-/**
  * Der Seitenfuß (Register N22, Wortliste: „Seitenfuß", nicht „Footer"; Board
  * system-k1-entdecken-v2): Impressum, Datenschutz, AGB und „Problem melden"
  * auf jeder Seite der KundeShell — das erfüllt „AGB-Link in jeder Fußzeile"
@@ -106,4 +88,22 @@ export function KundeFuss({ className, spalte = 'breit' }: { className?: string;
       </div>
     </footer>
   )
+}
+
+/**
+ * Die Spalte des Fußes im Browser je Art (G11, Nr. 267; welche Seite welche Art hat, sagt `spalteDerSeite` in
+ * src/lib/kunden-navigation.ts): Breite samt Rand so, dass der Inhalt des Fußes genau unter dem Inhalt der Seite
+ * steht — die Seiten tragen `max-w-[…] px-4` (z. B. 1032 px = 1000 px Inhalt). `breit` bleibt, wie der Fuß vor
+ * Nr. 267 überall stand (1200 px, Rand 24 px). Am Handy gilt keine davon: Dort reicht der Fuß über die volle Breite.
+ */
+const SPALTE_KLASSE: Record<FussSpalte, string> = {
+  schmal: 'md:max-w-[552px] md:px-4',
+  mittel: 'md:max-w-[928px] md:px-4',
+  seite: 'md:max-w-[1032px] md:px-4',
+  breit: 'md:max-w-[1200px] md:px-6',
+}
+
+/** Die Klassen der Spalte einer Art — auch für die Zeile „Vertrag widerrufen“ der KundeFokusShell (dieselbe Spalte). */
+export function fussSpalteKlasse(spalte: FussSpalte): string {
+  return SPALTE_KLASSE[spalte]
 }
