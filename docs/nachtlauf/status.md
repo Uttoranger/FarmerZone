@@ -309,16 +309,16 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 260 | Doku B: Regelvorschläge Morgenbericht 32 A, Register-Ergänzungen N1/N32/N46 | gemergt (#501) | `nacht/2026-11-06/260-doku-b` | #491 | von `integration/lauf32b` | – | 7.11.2026 |
 | 249b | Nachbesserung 249: Abholzettel-Kasten (Antwort 8), Mängel Zwischen-Durchgang | gemergt (#501) | `nacht/2026-11-06/249b-hof-alltag-nach` | #494 | vom Zwischenstand `integration/lauf32b` | – | 7.11.2026 |
 | Sammel 32b | Sammel-PR Lauf 32 B (260, 252, 253, 249b, 250, 257, 255, 251, 258b, 254) | gemergt (#501) | `integration/lauf32b` | #501 | main | per --no-ff in Wellen-Reihenfolge; voller Lauf 717 Dateien, 13351 Tests; Integration 98 Dateien, 798 Tests; Schluss-Durchgang in abnahme-lauf32.md | 7.11.2026 |
-| 261 | Doku: Freigabe §37, Register N48, Ergänzungsliste, Warteschlange (nur Doku; von `main`) | läuft | `docs/lauf33` | – | von `main` | – | 8.11.2026 |
-| 262 | Prüfwerkzeug 2: Prüf-Seed, Messung, Browser, Fehlerzustand | offen | `nacht/2026-11-08/262-pruefwerkzeug-2` | – | von `docs/lauf33` | – | 8.11.2026 |
-| 263 | Kurznummer überall gleich | offen | `nacht/2026-11-08/263-kurznummer` | – | vom Zwischenstand `integration/lauf33` nach 261 | – | 8.11.2026 |
-| 264 | Ende der Gründungszeit in der Anzeige | offen | `nacht/2026-11-08/264-gruendungsende` | – | von `docs/lauf33` | – | 8.11.2026 |
-| 265 | Gründungsplätze aus der Einstellung, eine Zählregel | offen | `nacht/2026-11-08/265-gruendungsplaetze` | – | vom Zwischenstand `integration/lauf33` nach 263 und 264 | – | 8.11.2026 |
-| 266 | Kleine echte Fehler | offen | `nacht/2026-11-08/266-kleine-fehler` | – | vom Zwischenstand `integration/lauf33` nach 261 | – | 8.11.2026 |
-| 267 | Kunden-Bausteine: G11 Seitenfuß, G10 Rest | offen | `nacht/2026-11-08/267-kunden-bausteine` | – | vom Zwischenstand `integration/lauf33` nach 261 | – | 8.11.2026 |
-| 268 | Meldungen: problem-melden und meldungen | offen | `nacht/2026-11-08/268-meldungen` | – | vom Zwischenstand `integration/lauf33` nach 263 und 269 | – | 8.11.2026 |
-| 269 | Hof-Bausteine: Rückweg, Hinweis, Knopf, Feld, Spalte, Ladefehler | offen | `nacht/2026-11-08/269-hof-bausteine` | – | vom Zwischenstand `integration/lauf33` nach 264 | – | 8.11.2026 |
-| 270 | Mail-Vorschau mit Beispieldaten im Admin | offen | `nacht/2026-11-08/270-mail-beispiele` | – | vom Zwischenstand `integration/lauf33` nach 263 und 264 | – | 8.11.2026 |
+| 261 | Doku: Freigabe §37, Register N48, Ergänzungsliste, Warteschlange (nur Doku; von `main`) | fertig | `docs/lauf33` | #503 | von `main` (bfe1f9dc277d) | ohne N49 (Startsatz fehlt) | 8.11.2026 |
+| 262 | Prüfwerkzeug 2: Prüf-Seed, Messung, Browser, Fehlerzustand | fertig | `nacht/2026-11-08/262-pruefwerkzeug-2` | #506 | von `docs/lauf33` | 1 Runde (Herkunftsvermerke); db-aus ergibt 500 statt Ladefehler-Kasten; DEVELOPMENT.md Nacharbeit | 8.11.2026 |
+| 263 | Kurznummer überall gleich | fertig | `nacht/2026-11-08/263-kurznummer` | #507 | vom Zwischenstand `integration/lauf33` (55e84b78ede1) | 1 Runde (Satz bei mehrdeutiger Nummer); /api/triage und CLI-Export bei der alten Nummer (Frage) | 8.11.2026 |
+| 264 | Ende der Gründungszeit in der Anzeige | fertig | `nacht/2026-11-08/264-gruendung-ende` | #504 | von `docs/lauf33` | 0 Runden | 8.11.2026 |
+| 265 | Gründungsplätze aus der Einstellung, eine Zählregel | verschoben nach B | `nacht/2026-11-08/265-gruendungsplaetze` | – | vom Zwischenstand nach 263 und 264 | nicht begonnen (Wochenlimit der API, Haltepunkt A) | 9.11.2026 |
+| 266 | Kleine echte Fehler | fertig | `nacht/2026-11-08/266-kleine-fehler` | #505 | vom Zwischenstand `integration/lauf33` (943b3adf476c) | 1 Runde (Doku-Abschnitt); Wort-Test grün → kein Fix (U) | 8.11.2026 |
+| 267 | Kunden-Bausteine: G11 Seitenfuß, G10 Rest | WIP (gepusht 25bebf94a5c6, läuft in B zuerst weiter) | `nacht/2026-11-08/267-kunden-bausteine` | – | vom Zwischenstand `integration/lauf33` (233564092734) | Abbruch durch das Wochenlimit der API | 9.11.2026 |
+| 268 | Meldungen: problem-melden und meldungen | verschoben nach B | `nacht/2026-11-08/268-meldungen` | – | vom Zwischenstand nach 263 und 269 | nicht begonnen | 9.11.2026 |
+| 269 | Hof-Bausteine: Rückweg, Hinweis, Knopf, Feld, Spalte, Ladefehler | WIP (nur lokal, rot; in B neu) | `nacht/2026-11-08/269-hof-bausteine` | – | vom Zwischenstand `integration/lauf33` (73a5f1f1fcd4) | Abbruch durch das Wochenlimit der API | 9.11.2026 |
+| 270 | Mail-Vorschau mit Beispieldaten im Admin | verschoben nach B | `nacht/2026-11-08/270-mail-beispiele` | – | vom Zwischenstand nach 263 und 264 | nicht begonnen | 9.11.2026 |
 | 271 | Finden: hoefe, startseite, hofseite, produkt | offen | `nacht/2026-11-08/271-finden` | – | vom Integrationszweig von B | – | 8.11.2026 |
 | 272 | Region und Verkäufe | offen | `nacht/2026-11-08/272-region-verkaeufe` | – | vom Integrationszweig von B | – | 8.11.2026 |
 | 273 | Kunden und Auswertung | offen | `nacht/2026-11-08/273-kunden-auswertung` | – | vom Integrationszweig von B | – | 8.11.2026 |
@@ -330,4 +330,4 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 279 | System: neuigkeiten, abmelden, systemseiten, widerruf, fehlerseiten, rechtstexte | offen | `nacht/2026-11-08/279-system` | – | vom Integrationszweig von B nach 275 | – | 8.11.2026 |
 | 280 | Mails | offen | `nacht/2026-11-08/280-mails` | – | vom Integrationszweig von C nach 274, 275, 278 und 279 | – | 8.11.2026 |
 | 281 | Admin: messbare Mängel und Schrift-Wache | offen | `nacht/2026-11-08/281-admin-maengel` | – | vom Integrationszweig von C nach 263, 265 und 270 | – | 8.11.2026 |
-| Sammel 33 | Sammel-PR Lauf 33 (261–281) | offen | `integration/lauf33` | – | main | – | 8.11.2026 |
+| Sammel 33 | Sammel-PR Lauf 33 (261–281) | Entwurf (Haltepunkt A) | `integration/lauf33` | #508 | main | A: 261–264, 266 per --no-ff; B und C offen | 9.11.2026 |

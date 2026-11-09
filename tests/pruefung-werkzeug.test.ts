@@ -49,12 +49,20 @@ describe('leseSeedOptionen', () => {
   it('lehnt Unbekanntes und Ausgaben außerhalb von .nachtlauf/ ab', () => {
     expect(typeof leseSeedOptionen(['--stichtag', 'morgen'])).toBe('string')
     expect(typeof leseSeedOptionen(['--gruendung'])).toBe('string')
+    expect(typeof leseSeedOptionen(['--gruendung-fest=ja'])).toBe('string')
     expect(typeof leseSeedOptionen(['--links', 'docs/links.json'])).toBe('string')
     expect(typeof leseSeedOptionen(['--passkey', '.nachtlauf/../schluessel.json'])).toBe('string')
     expect(leseSeedOptionen(['--links', '.nachtlauf/b/links.json'])).toMatchObject({ links: '.nachtlauf/b/links.json' })
     // Keine Angabe lenkt die .env-Prüfung auf einen anderen Ordner (Runde 2).
     expect(typeof leseSeedOptionen(['--wt', '/tmp/leer'])).toBe('string')
-    expect(Object.keys(SEED_VORGABEN).sort()).toEqual(['links', 'passkey', 'stichtag'])
+    expect(Object.keys(SEED_VORGABEN).sort()).toEqual(['gruendungFest', 'links', 'passkey', 'stichtag'])
+  })
+
+  it('--gruendung-fest schreibt die Zusagen fest – ohne Wert, ohne die Angabe nie', () => {
+    expect(SEED_VORGABEN.gruendungFest).toBe(false)
+    expect(leseSeedOptionen(['--gruendung-fest'])).toMatchObject({ gruendungFest: true, stichtag: 'vergangenheit' })
+    expect(leseSeedOptionen(['--stichtag', 'zukunft', '--gruendung-fest'])).toMatchObject({ gruendungFest: true, stichtag: 'zukunft' })
+    expect(leseSeedOptionen(['--gruendung-fest', '--links', '.nachtlauf/l.json'])).toMatchObject({ gruendungFest: true, links: '.nachtlauf/l.json' })
   })
 
   it('liegtUnterNachtlauf', () => {

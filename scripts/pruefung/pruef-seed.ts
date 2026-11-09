@@ -2,21 +2,27 @@
  * Der Prüf-Seed (freigabe.md §36, Nr. 243) — nur auf einer frischen
  * Wegwerf-DB auf localhost.
  *
- *   pnpm pruefen:seed [--stichtag vergangenheit|zukunft] [--links <pfad>] [--passkey <pfad>]
+ *   pnpm pruefen:seed [--stichtag vergangenheit|zukunft] [--links <pfad>] [--passkey <pfad>] [--gruendung-fest]
  *
  * Ohne .env-Datei müssen immer der Worktree dieses Skripts und der
  * Arbeitsordner sein — keine Angabe lenkt das um.
  *
  * Läuft unter `env -i` mit der Liste aus pruef-env.sh (DATABASE_URL und
  * DIRECT_URL gleich, auf localhost; LINK_SECRET des Laufs). Schritte:
- *  1. Sperre (sperre.ts) — VOR jedem Import von Prisma, auth oder env.
+ *  1. Sperre (sperre.ts) — VOR jedem Import von Prisma, auth oder env; dazu
+ *     harter Abbruch bei Dienst-Schlüsseln (RESEND, Sentry, VERCEL*, Stripe
+ *     ohne „_pruefung“).
  *  2. Verbinden, `inet_server_addr()` prüfen, Wegwerf-DB prüfen.
  *  3. Seed wie prisma/seed.ts (seed-lauf.ts), ohne dessen Abschlussausgabe —
  *     die nennt das Seed-Passwort, und das gehört in keine Datei.
  *  4. Stichtag hofpreisModellAb setzen; Gründung bleibt unberührt (P2).
  *  5. Admin: adminSeit, Inhaberin und die Zeile „Prüf-Passkey“; der private Schlüssel nur
  *     nach .nachtlauf/admin-passkey.json (chmod 600).
- *  6. Signierte Links je Zustand mit den Signier-Funktionen der App nach
+ *  6. Ergänzungen (Nr. 262, pruef-zusatz.ts): 100 Gründungsplätze (mit
+ *     `--gruendung-fest` die Zusagen festgeschrieben), Futter-Familie,
+ *     Brennholz je Raummeter, Postfach, WhatsApp-Abo, wartender Hof,
+ *     Bestellungen im Hofpreis-Modell mit Mail-Aufträgen.
+ *  7. Signierte Links je Zustand mit den Signier-Funktionen der App nach
  *     .nachtlauf/pruef-links.json (chmod 600).
  * Schreibt keine Codes und keine Passwörter; gibt nur Host und Port aus.
  */
@@ -31,6 +37,7 @@ import {
   pruefWerteAus,
   pruefeDatenbankZustand,
   pruefeOhneEnvDateien,
+  pruefeDienstSchluessel,
   pflichtOrdner,
 } from './sperre'
 
@@ -53,14 +60,19 @@ async function main(): Promise<void> {
   if (typeof optionen === 'string') abbruch(optionen)
   const adressen = pruefeDatenbankAdressen(pruefWerteAus(process.env))
   if (adressen) abbruch(adressen)
+  const dienste = pruefeDienstSchluessel(process.env)
+  if (dienste) abbruch(dienste)
   const env = pruefeOhneEnvDateien(pflichtOrdner(process.cwd()))
   if (env) abbruch(env)
   const url = process.env['DATABASE_URL'] as string
   console.log(`Prüf-Seed gegen ${hostUndPort(url)} (Stichtag: ${optionen.stichtag}).`)
 
-  // 2. Verbinden und Server-Adresse prüfen — mit pg, noch ohne Prisma.
-  const { SEED_KONTEN, SEED_HOEFE } = await import('../../prisma/seed-daten')
-  const seedKonten = SEED_KONTEN.length + SEED_HOEFE.length
+  // 2. Verbinden und Server-Adresse prüfen — mit pg, noch ohne Prisma. Die
+  //    Prüfdaten (rechnen mit Funktionen der App) erst nach der Sperre laden.
+  const { erwarteteKonten } = await import('./pruef-daten')
+  const { SEED_KONTEN, SEED_HOEFE, SEED_PASSWORT } = await import('../../prisma/seed-daten')
+  // Aus den Listen des Seeds und des Prüf-Seeds, nie eine feste Zahl.
+  const seedKonten = erwarteteKonten({ konten: SEED_KONTEN, hoefe: SEED_HOEFE })
   const { default: pg } = await import('pg')
   const roh = new pg.Client({ connectionString: url })
   await roh.connect()
@@ -84,8 +96,8 @@ async function main(): Promise<void> {
   try {
     const jetzt = new Date()
     const ergebnis = await seed(prisma, auth, jetzt)
-    const nachher = await prisma.user.count()
-    if (nachher !== ergebnis.konten.length) abbruch(`Nach dem Seed ${nachher} Konten statt ${ergebnis.konten.length}.`)
+    const nachSeed = await prisma.user.count()
+    if (nachSeed !== ergebnis.konten.length) abbruch(`Nach dem Seed ${nachSeed} Konten statt ${ergebnis.konten.length}.`)
 
     // 4. Stichtag.
     const stichtag = stichtagFuer(optionen.stichtag, jetzt)
@@ -98,11 +110,21 @@ async function main(): Promise<void> {
     // 5. Admin-Passkey.
     await legePasskeyAn(prisma, jetzt, optionen)
 
-    // 6. Signierte Links.
-    await schreibeLinks(prisma, jetzt, optionen)
-    console.log(`Fertig: ${ergebnis.konten.length} Konten, Stichtag ${stichtag.toISOString().slice(0, 10)}, Passkey und Links unter .nachtlauf/.`)
+    // 6. Ergänzungen (Nr. 262) — die Module der App erst jetzt laden.
+    const { ergaenzePruefDaten } = await import('./pruef-zusatz')
+    const zusatz = await ergaenzePruefDaten(prisma, auth, jetzt, { gruendungFest: optionen.gruendungFest, seedPasswort: SEED_PASSWORT })
+    const nachher = await prisma.user.count()
+    if (nachher !== seedKonten) abbruch(`Nach dem Prüf-Seed ${nachher} Konten statt ${seedKonten}.`)
+
+    // 7. Signierte Links.
+    await schreibeLinks(prisma, jetzt, optionen, zusatz.links)
+    for (const zeile of zusatz.zeilen) console.log(`  ${zeile}`)
+    console.log(`Fertig: ${nachher} Konten, Stichtag ${stichtag.toISOString().slice(0, 10)}, Passkey und Links unter .nachtlauf/.`)
   } finally {
     await prisma.$disconnect()
+    // Der Client der App (src/lib/prisma.ts), den die Lader der Ergänzungen benutzt haben.
+    const app = await import('../../src/lib/prisma').catch(() => null)
+    await app?.prisma.$disconnect()
   }
 }
 
@@ -124,7 +146,7 @@ async function legePasskeyAn(prisma: Prisma, jetzt: Date, optionen: SeedOptionen
 
 type LinkEintrag = { pfad: string | null; zustand: string; hinweis?: string }
 
-async function schreibeLinks(prisma: Prisma, jetzt: Date, optionen: SeedOptionen): Promise<void> {
+async function schreibeLinks(prisma: Prisma, jetzt: Date, optionen: SeedOptionen, zusatz: Record<string, LinkEintrag>): Promise<void> {
   const { bestellungPfad, bestaetigungsPfad, barBestaetigungsPfad, widerrufPfad } = await import('../../src/lib/bestell-link')
   const { generateUnsubscribeToken } = await import('../../src/lib/unsubscribe')
   const { abmeldeSeitenPfad } = await import('../../src/lib/abmelde-link')
@@ -234,11 +256,13 @@ async function schreibeLinks(prisma: Prisma, jetzt: Date, optionen: SeedOptionen
   for (const name of ['sicherheit-nicht-ich', 'konto-email-bestaetigen']) {
     links[name] = { pfad: null, zustand: 'nicht erzeugt', hinweis: 'Token von Better Auth, nicht mit den Signier-Funktionen der App herstellbar' }
   }
-  schreibeGeheim(optionen.links, { erzeugtAm: jetzt.toISOString(), links })
+  schreibeGeheim(optionen.links, { erzeugtAm: jetzt.toISOString(), links: { ...links, ...zusatz } })
 }
 
-main().catch((fehler: unknown) => {
-  // Nur Art und Text des Fehlers, nie die Umgebung: Ein Prisma-Fehler kann die Adresse enthalten.
-  const text = fehler instanceof Error ? fehler.message.replace(/postgres(ql)?:\/\/\S+/g, '(Adresse)') : 'unbekannter Fehler'
-  abbruch(text)
-})
+main()
+  .then(() => process.exit(0))
+  .catch((fehler: unknown) => {
+    // Nur Art und Text des Fehlers, nie die Umgebung: Ein Prisma-Fehler kann die Adresse enthalten.
+    const text = fehler instanceof Error ? fehler.message.replace(/postgres(ql)?:\/\/\S+/g, '(Adresse)') : 'unbekannter Fehler'
+    abbruch(text)
+  })

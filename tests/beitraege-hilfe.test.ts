@@ -297,7 +297,7 @@ describe('Meldungen: Ton, Zähler, Zeilen', () => {
       status: 'In Arbeit',
       statusTon: 'fertig',
       antwort: 'Liegt am Bildformat — eine Umwandlung kommt.',
-      kurznummer: 'cmabcdef',
+      kurznummer: '456789',
     })
     // 23:30 Uhr in Wien am Folgetag = schon „Gestern" (Wiener Tag, nie UTC).
     expect(meldungZeilen([fuerHof(VOLL)], new Date('2026-10-07T21:30:00.000Z'))[0].datum).toBe('Gestern')

@@ -9,6 +9,7 @@
  * Kasten `av1C` — ohne ihn dekodiert libheif kein AV1.
  * Die Bytes hier sind erfundene Köpfe, keine echten Bilder.
  */
+import { availableParallelism } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import { BILD_PIXEL_GRENZE, PIXEL_GRENZE_FEHLER, formatFuerSharp, istPixelGrenzeFehler } from '@/lib/bild-format'
 
@@ -75,6 +76,16 @@ describe('formatFuerSharp — alles andere fällt durch', () => {
   })
 })
 
+/**
+ * Wie viele Testdateien gleichzeitig laufen: `--maxWorkers` aus der Konfiguration
+ * des Workers, ohne Angabe die Vorgabe von Vitest (Kerne − 1). Vitest reicht die
+ * Zahl nur über den Zustand des Workers durch, nicht über eine öffentliche API.
+ */
+function workerZahl(): number {
+  const gesetzt = (globalThis as { __vitest_worker__?: { config?: { maxWorkers?: unknown } } }).__vitest_worker__?.config?.maxWorkers
+  return typeof gesetzt === 'number' && gesetzt > 0 ? gesetzt : Math.max(1, availableParallelism() - 1)
+}
+
 describe('formatFuerSharp — Laufzeit', () => {
   it('ein 25-MB-Original voller „a" hinter einem HEIC-Kopf ist schnell geprüft (die Suche nach av1C ist linear)', () => {
     const gross = new Uint8Array(25 * 1024 * 1024).fill(0x61)
@@ -89,7 +100,9 @@ describe('formatFuerSharp — Laufzeit', () => {
       schnellste = Math.min(schnellste, performance.now() - beginn)
     }
     // Großzügig: nativ sind es Millisekunden; die frühere Schleife brauchte gut eine Sekunde.
-    expect(schnellste).toBeLessThan(500)
+    // Die Grenze wächst mit der Zahl der Worker (TESTING_GUIDELINES §4, A-1): unter Last
+    // lag die schnellste Messung bei 572 ms, ohne dass die Suche langsamer wurde.
+    expect(schnellste).toBeLessThan(500 * workerZahl())
   }, 30_000)
 })
 

@@ -29,7 +29,8 @@ import {
   type ZustellRegeln,
 } from '@/lib/zustellung'
 import { PLATTFORM_EINSTELLUNG_ID } from '@/lib/plattform-einstellung'
-import { MELDUNG_STATUS, STATUS_INTERN, kurznummer } from '@/lib/meldung'
+import { MELDUNG_STATUS, STATUS_INTERN } from '@/lib/meldung'
+import { kurznummerAus } from '@/lib/kurznummer'
 import { hatRegistrierung } from '@/lib/futter-registrierung'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
@@ -507,7 +508,7 @@ async function ladeMeldungenEingang(filter: EingangFilter): Promise<EingangMeldu
     createdAt: m.createdAt,
     ersteZeile: m.ersteZeile,
     wer: meldungVon(m),
-    zeile: `${STATUS_INTERN[m.status]} · Nr. ${kurznummer(m.id)}`,
+    zeile: `${STATUS_INTERN[m.status]} · Nr. ${kurznummerAus(m.id)}`,
   }))
 }
 

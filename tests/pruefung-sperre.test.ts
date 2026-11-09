@@ -10,7 +10,10 @@ import {
   pruefeDatenbankAdressen,
   pruefeDatenbankZustand,
   pruefeOhneEnvDateien,
+  pruefeDienstSchluessel,
 } from '../scripts/pruefung/sperre'
+import { erwarteteKonten, PRUEF_KONTEN } from '../scripts/pruefung/pruef-daten'
+import { SEED_HOEFE, SEED_KONTEN } from '../prisma/seed-daten'
 
 /**
  * Die Loopback-Sperre des Prüfwerkzeugs (freigabe.md §36, Nr. 243): Prüf-Seed,
@@ -86,6 +89,62 @@ describe('pruefeDatenbankZustand', () => {
   it('nimmt eine frische oder schon geseedete DB an', () => {
     expect(pruefeDatenbankZustand({ passkeys: 0, konten: 0, seedKonten: 30 })).toBeNull()
     expect(pruefeDatenbankZustand({ passkeys: 0, konten: 30, seedKonten: 30 })).toBeNull()
+  })
+})
+
+describe('nicht mehr Konten als der Seed – Zahl aus den Listen', () => {
+  const erwartet = erwarteteKonten({ konten: SEED_KONTEN, hoefe: SEED_HOEFE })
+
+  it('rechnet Seed-Konten, Seed-Höfe und die Konten des Prüf-Seeds', () => {
+    expect(erwartet).toBe(SEED_KONTEN.length + SEED_HOEFE.length + PRUEF_KONTEN.length)
+    expect(PRUEF_KONTEN.length).toBeGreaterThan(0)
+  })
+
+  it('ein zusätzliches Konto lässt die Sperre anschlagen', () => {
+    expect(pruefeDatenbankZustand({ passkeys: 0, konten: erwartet, seedKonten: erwartet })).toBeNull()
+    expect(pruefeDatenbankZustand({ passkeys: 0, konten: erwartet + 1, seedKonten: erwartet })).toContain('keine Wegwerf-DB')
+  })
+
+  it('ein neues Konto in der Liste des Prüf-Seeds wächst mit, ohne Zahl im Code', () => {
+    const mitNeuem = erwarteteKonten({ konten: SEED_KONTEN, hoefe: SEED_HOEFE }, [...PRUEF_KONTEN, { email: 'neu@example.com' }])
+    expect(mitNeuem).toBe(erwartet + 1)
+  })
+})
+
+describe('pruefeDienstSchluessel – harter Abbruch bei echten Diensten', () => {
+  const sauber = { PATH: '/usr/bin', STRIPE_SECRET_KEY: 'sk_test_pruefung', STRIPE_WEBHOOK_SECRET: 'whsec_pruefung' }
+
+  it('nimmt die Liste aus pruef-env.sh an', () => {
+    expect(pruefeDienstSchluessel(sauber)).toBeNull()
+  })
+
+  it.each([
+    ['RESEND_API_KEY', 're_nicht_echt'],
+    ['RESEND_WEBHOOK_SECRET', 'whsec_nicht_echt'],
+    ['NEXT_PUBLIC_SENTRY_DSN', 'https://nicht-echt.invalid/1'],
+    ['SENTRY_AUTH_TOKEN', 'nicht-echt'],
+    ['VERCEL', '1'],
+    ['VERCEL_ENV', 'preview'],
+    ['VERCEL_OIDC_TOKEN', 'nicht-echt'],
+    ['RESEND_API_KEY', ''],
+  ])('bricht ab bei %s', (name, wert) => {
+    const grund = pruefeDienstSchluessel({ ...sauber, [name]: wert })
+    expect(grund).toContain(name)
+  })
+
+  it.each([
+    ['STRIPE_SECRET_KEY', 'sk_live_nichtecht'],
+    ['STRIPE_SECRET_KEY', 'sk_test_nichtecht'],
+    ['STRIPE_WEBHOOK_SECRET', 'whsec_nichtecht'],
+    ['NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', 'pk_test_nichtecht'],
+  ])('bricht ab bei %s ohne „_pruefung“', (name, wert) => {
+    expect(pruefeDienstSchluessel({ ...sauber, [name]: wert })).toContain(name)
+  })
+
+  it('nennt nur Namen, nie Werte', () => {
+    const grund = pruefeDienstSchluessel({ ...sauber, RESEND_API_KEY: 're_geheim_xyz', STRIPE_SECRET_KEY: 'sk_live_geheim_abc' }) ?? ''
+    expect(grund).toContain('RESEND_API_KEY')
+    expect(grund).not.toContain('geheim')
   })
 })
 

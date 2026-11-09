@@ -15,7 +15,8 @@ import {
 } from '@/lib/betrieb'
 import { artName, fehlerText, wegName, type ProblemAuftrag } from '@/lib/betrieb-mails'
 import { eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } from '@/lib/postfach'
-import { MELDUNG_ART_LABEL, kurznummer } from '@/lib/meldung'
+import { MELDUNG_ART_LABEL } from '@/lib/meldung'
+import { kurznummerAus } from '@/lib/kurznummer'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { TARIFE_AB_TAG } from '@/lib/konditionen'
 import { wienWochenbeginn, wienWochenMontag } from '@/lib/kalender'
@@ -359,7 +360,7 @@ function meldungNeu(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       'meldung_neu',
       {
         titel: meldungTitel(m),
-        bezug: { kennung: m.id, text: `${m.von} · ${MELDUNG_ART_LABEL[m.art]} · Nr. ${kurznummer(m.id)}` },
+        bezug: { kennung: m.id, text: `${m.von} · ${MELDUNG_ART_LABEL[m.art]} · Nr. ${kurznummerAus(m.id)}` },
         satz: 'Lesen, einordnen und dem Hof antworten.',
         seit: m.createdAt,
         wasTun: 'oeffnen',
