@@ -207,8 +207,19 @@ export function istGruendungshof(hofId: string, hoefe: readonly HofFuerPlatz[], 
 
 /** Wie viele der Plätze vergeben sind — höchstens `plaetze` (Standard: die Plätze an den Zeilen); festgeschrieben alle gespeicherten. */
 export function vergebeneGruendungsplaetze(hoefe: readonly HofFuerPlatz[], plaetze: number = plaetzeDerVergabe(hoefe)): number {
-  const vergeben = gruendungsplaetze(hoefe).size
-  return vergabeFest(hoefe) ? vergeben : Math.min(vergeben, plaetze)
+  return vergebeneGruendungsplaetzeAus(gruendungsplaetze(hoefe).size, plaetze, vergabeFest(hoefe))
+}
+
+/**
+ * Dieselbe Zählregel aus Zahlen (Nr. 265): `inDerVergabe` = Höfe mit Platz in
+ * der Vergabe (`gruendungsplaetze(hoefe).size`, vor dem Festschreiben alle im
+ * Rennen). Für das Formular in Admin › Einstellungen, das keine Hofliste
+ * bekommt und „vergeben“ beim Tippen mit den eingegebenen Plätzen vorausrechnet.
+ * Vor dem Festschreiben höchstens die Plätze — 36 Höfe im Rennen bei 12 Plätzen
+ * sind 12 vergebene; danach die festgeschriebenen Nummern.
+ */
+export function vergebeneGruendungsplaetzeAus(inDerVergabe: number, plaetze: number, fest: boolean): number {
+  return fest ? inDerVergabe : Math.min(inDerVergabe, plaetze)
 }
 
 /**

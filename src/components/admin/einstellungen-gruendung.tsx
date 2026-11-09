@@ -3,8 +3,8 @@
 import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { bildeGruendungBis, gruendungTagKurz, seitenZahlen, type FestschreibenZeile, type GruendungEinstellung, type GruendungSeiten } from '@/lib/gruendungshof'
-import { EINSTELLUNGEN_TEXT, GRUENDUNG_EINSTELLUNG_FEHLER, pruefeGruendungEingabe } from '@/lib/plattform-einstellung'
+import { bildeGruendungBis, gruendungTagKurz, type FestschreibenZeile, type GruendungEinstellung, type GruendungSeiten } from '@/lib/gruendungshof'
+import { EINSTELLUNGEN_TEXT, GRUENDUNG_EINSTELLUNG_FEHLER, gruendungFormularStand } from '@/lib/plattform-einstellung'
 import { speichereGruendungEinstellung } from '@/server/actions/plattform-einstellung'
 import { schreibeZusagenFest } from '@/server/actions/gruendung'
 import { cn } from '@/lib/utils'
@@ -33,8 +33,10 @@ export type GruendungFormularDaten = {
     /** Wann festgeschrieben wurde (ISO-Text), null = noch nicht. */
     festAm: string | null
   }
-  /** Vergebene Plätze: vor dem Festschreiben die Höfe im Rennen (ohne ausgenommene), danach die festgeschriebenen Nummern. */
+  /** Vergebene Plätze nach der einen Zählregel (vergebeneGruendungsplaetze, Nr. 265): vor dem Festschreiben höchstens die gespeicherten Plätze, danach die festgeschriebenen Nummern — wie die Action. */
   vergeben: number
+  /** Höfe mit Platz in der Vergabe (vor dem Festschreiben alle im Rennen, ohne ausgenommene) — für Kachel und Vorschau beim Tippen. */
+  inDerVergabe: number
   /** Freigeschaltete Höfe, die nicht für die Gründungsplätze zählen (Register K2, Nr. 109). */
   ausgenommen: number
   /** Der Zeitpunkt der Seite als ISO-Text — „Datum vorbei" entscheidet sich daran, nicht an der Uhr des Browsers. */
@@ -96,7 +98,8 @@ function Feld({
  * festgeschrieben ist — der Knopf „Zusagen festschreiben …“ mit der Liste im
  * Dialog. Kacheln und Vorschau folgen dem Formular, bevor gespeichert ist —
  * gerechnet mit derselben Regel wie die Seiten (`seitenZahlen`), geprüft mit
- * derselben wie die Action (`pruefeGruendungEingabe`); den Schutz gibt die
+ * derselben wie die Action (`pruefeGruendungEingabe`), „vergeben“ überall nach
+ * einer Zählregel (`gruendungFormularStand`, Nr. 265); den Schutz gibt die
  * Action unter der Sperre.
  */
 export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDaten }): React.JSX.Element {
@@ -132,13 +135,11 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
     festAm: g.festAm ? new Date(g.festAm) : null,
   }
   const eingabe = { plaetze: ganzeZahl(plaetzeText), monate: ganzeZahl(monateText), aktionBisTag: aktionBisTag === '' ? null : aktionBisTag, anzeige }
-  const eingabeFehler = pruefeGruendungEingabe(eingabe, gespeichert, daten.vergeben, jetzt)
+  // Hinweis, Prüfung, Kachel und Beispiel aus EINER Zählregel (Nr. 265) — die Prüfung mit derselben Zahl wie die Action.
+  const { fehler: eingabeFehler, vergeben, zahlen } = gruendungFormularStand(gespeichert, daten, eingabe, jetzt)
   const geaendert =
     eingabe.plaetze !== g.plaetze || eingabe.monate !== g.monate || eingabe.aktionBisTag !== g.aktionBisTag || anzeige !== g.anzeige
 
-  // Kacheln und Beispiel: mit der Eingabe, solange sie gilt, sonst mit dem gespeicherten Stand.
-  const stand: GruendungEinstellung = eingabeFehler === null ? { ...gespeichert, ...eingabe } : gespeichert
-  const zahlen = seitenZahlen(stand, daten.vergeben, jetzt)
   const aufSeiten: GruendungSeiten = { ...zahlen, voraussichtlicherPlatz: null }
 
   function verwerfen() {
@@ -197,7 +198,7 @@ export function EinstellungenGruendung({ daten }: { daten: GruendungFormularDate
         <Kachel titel={TEXT.kachelPlaetze} wert={zahlen.gesamt} />
         <Kachel
           titel={TEXT.kachelVergeben}
-          wert={zahlen.gesamt - zahlen.frei}
+          wert={vergeben}
           zeile={
             g.festAm !== null
               ? TEXT.kachelVergebenFest

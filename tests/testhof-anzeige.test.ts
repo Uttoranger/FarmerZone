@@ -140,6 +140,7 @@ describe('Satz beim Festschreiben (Nr. 119)', () => {
   const daten: GruendungFormularDaten = {
     gespeichert: { plaetze: 12, monate: 24, aktionBisTag: null, anzeige: true, bisTag: '2027-12-31', festAm: null },
     vergeben: 0,
+    inDerVergabe: 0,
     ausgenommen: 0,
     jetzt: '2026-10-14T08:00:00.000Z',
     protokoll: 'Noch nie geändert – es gelten die Standardwerte.',

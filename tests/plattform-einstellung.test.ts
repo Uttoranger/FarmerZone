@@ -317,6 +317,7 @@ describe('EinstellungenGruendung — Felder der Aktion und „Zusagen festschrei
   const daten: GruendungFormularDaten = {
     gespeichert: { plaetze: 12, monate: 24, aktionBisTag: null, anzeige: true, bisTag: '2027-12-31', festAm: null },
     vergeben: 7,
+    inDerVergabe: 7,
     ausgenommen: 0,
     jetzt: JETZT.toISOString(),
     protokoll: 'Noch nie geändert – es gelten die Standardwerte.',

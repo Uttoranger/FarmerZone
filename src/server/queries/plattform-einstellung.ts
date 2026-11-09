@@ -10,6 +10,7 @@ import {
   gruendungSeitenDaten,
   gruendungsplaetze,
   seitenZahlen,
+  vergebeneGruendungsplaetze,
   zaehleAusgenommene,
   type AbzeichenBlatt,
   type FestschreibenZeile,
@@ -145,8 +146,14 @@ export async function ladeAbzeichenBlatt(): Promise<AbzeichenBlatt | null> {
 
 /** Was Admin › Einstellungen › Gründungshöfe über die Höfe braucht — nur Zahlen und die Liste fürs Festschreiben. */
 export type GruendungStandAdmin = {
-  /** Vergebene Plätze: vor dem Festschreiben die Höfe im Rennen, danach die festgeschriebenen Nummern. */
+  /**
+   * Vergebene Plätze nach der EINEN Zählregel (`vergebeneGruendungsplaetze`, Nr. 265) mit den
+   * gespeicherten Plätzen: vor dem Festschreiben höchstens die Plätze, danach die festgeschriebenen
+   * Nummern — dieselbe Zahl, mit der die Action prüft.
+   */
   vergeben: number
+  /** Höfe mit Platz in der Vergabe (vor dem Festschreiben alle im Rennen) — nur, damit das Formular „vergeben“ für eingetippte Plätze vorausrechnet. */
+  inDerVergabe: number
   ausgenommen: number
   /** Die Liste „Zusagen festschreiben“ — leer, sobald festgeschrieben ist. */
   festschreiben: FestschreibenZeile[]
@@ -167,7 +174,8 @@ export async function ladeGruendungStandAdmin(einstellung: PlattformEinstellung)
     regeln.festAm === null ? ladeHoefeFuerFestschreiben() : Promise.resolve([]),
   ])
   return {
-    vergeben: gruendungsplaetze(hoefe).size,
+    vergeben: vergebeneGruendungsplaetze(hoefe, regeln.plaetze),
+    inDerVergabe: gruendungsplaetze(hoefe).size,
     ausgenommen: zaehleAusgenommene(hoefe),
     festschreiben: regeln.festAm === null ? festschreibenListe(alle, regeln) : [],
     festschreibenPlaetze: regeln.festAm === null ? festschreibenBrauchtPlaetze(alle, regeln) : null,
