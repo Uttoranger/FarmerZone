@@ -21,3 +21,4 @@ Gilt mit docs/nachtlauf/berichte/lauf32-board-oder-code.md. Jede Zeile ist kein 
 | bestellung-link | Bild 1 | Marke nach dem Status: „Bezahlt“ erst bei bezahlter Online-Bestellung, sonst „Bestätigt“ | C | Antwort 6 zum Zwischen-Morgenbericht 33 B, 9.11.2026: Code bleibt, Board wird korrigiert |
 | meldungen, problem-melden | Rückweg | /meldungen und /fehler-melden verweisen aufeinander | C | Antwort 7 zum Zwischen-Morgenbericht 33 B, 9.11.2026: gewollt |
 | fehlerseiten | global-error | kein „[TEST]“-Vorsatz auf global-error | C | Antwort 2 zum Zwischen-Morgenbericht 33 B, 9.11.2026: so lassen, keine neue Variable |
+| widerruf | „Die ganze Bestellung“ | Positionen als reine Textliste, ohne angehaktes Kästchen | C | Antwort 1 (c) zum Zwischen-Morgenbericht 33 B, 9.11.2026: Häkchen-Anzeige durch reinen Text ersetzen; Board wird korrigiert (Nr. 282) |
