@@ -1,5 +1,5 @@
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
-import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
+import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
 
 /**
  * Fehler beim Laden der Kunden — inline statt der ganzseitigen 500 (DESIGN_SYSTEM „Zustände"),
