@@ -16,7 +16,8 @@ export default function ForgotPasswordPage(): React.JSX.Element {
   return (
     <KundeFokusShell titel="Passwort vergessen" zurueck={{ href: '/login', label: 'Zurück zur Anmeldung' }}>
       {/* Ohne Karte direkt auf der Seite (Board s2-/w2-passwort); nur Erfolg und Fehler stehen gerahmt. */}
-      <div className="mx-auto w-full max-w-[552px] px-4 pt-5 pb-12 md:pt-10">
+      {/* Im Browser 16 px unter dem Kopf wie im Board w2-passwort (pruefer-ui Lauf 33: h1 24 px zu tief; Nr. 275). */}
+      <div className="mx-auto w-full max-w-[552px] px-4 pt-5 pb-12 md:pt-4">
         <PasswortVergessenFormular />
       </div>
     </KundeFokusShell>

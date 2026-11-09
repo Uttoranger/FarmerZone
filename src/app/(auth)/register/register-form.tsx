@@ -16,6 +16,7 @@ import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX } from '@/lib/eingabegrenzen'
 import { registrierenFormularSchema, type RegistrierenFormular } from '@/schemas/register'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
@@ -122,13 +123,14 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
         ) : (
           <>
             {/* Die Fokus-Shell trägt die h1 „Hof registrieren“; die Karte wiederholt den Titel als h2 (Board w2-registrieren). */}
-            <h2 className="mb-2 font-heading text-[24px] leading-tight font-semibold">Hof registrieren</h2>
+            <h2 className="mb-2.5 font-heading text-[24px] leading-tight font-semibold">Hof registrieren</h2>
             {/* Der Übergang aus konditionen.ts (Register K1) statt eines Tarifs, der heute gälte. */}
-            <p className="mb-5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
+            <p className="mb-2.5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
             {/* Der Satz der Gründungsaktion ohne Platznummer (Lauf 30) — die Seite rendert ihn, ohne Aktion nichts. */}
             {gruendungSatz}
 
-            <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-4">
+            {/* 10 px zwischen den Feldern und 6 px von der Beschriftung zum Feld wie im Board (Nr. 275: das Formular war etwa 85 px länger). */}
+            <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-2.5">
               {/* Honigtopf — unsichtbar für Menschen, verlockend für Skripte.
                   aria-hidden hält ihn aus dem Screenreader heraus, tabIndex -1
                   aus der Tab-Reihenfolge, autoComplete="off" aus dem Ausfüllen
@@ -173,6 +175,8 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                   id={feldId('name')}
                   type="text"
                   autoComplete="name"
+                  // Platzhalter wie im Board w2-registrieren (Bild 1); der Name bleibt dort leer.
+                  placeholder="Vor- und Nachname"
                   aria-invalid={errors.name ? true : undefined}
                   aria-describedby={errors.name ? fehlerId('name') : undefined}
                   className={FELD}
@@ -213,7 +217,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                   {...form.register('password')}
                 />
                 {/* Die Regeln haken sich beim Tippen ab (Board w2-registrieren) — wie beim neuen Passwort. */}
-                <p id={`${id}-passwort-satz`} className="mt-1.5 text-[12.5px] text-muted-foreground">
+                <p id={`${id}-passwort-satz`} className="mt-1.5 text-[13px] text-muted-foreground">
                   {PASSWORT_ANFORDERUNGEN_SATZ}
                 </p>
                 <PasswortAnforderungen passwort={password} id={`${id}-regeln`} className="mt-1" />
@@ -227,7 +231,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
               {/* Register O4 (geändert 13.10.2026): AGB und Konditionen werden mit diesem
                   Satz einbezogen — Links, kein Haken. Beide öffnen in einem neuen Tab,
                   damit das ausgefüllte Formular stehen bleibt. */}
-              <AgbSatz stuecke={REGISTRIERUNG_AGB_SATZ} neuerTab className="text-[13.5px] leading-snug text-muted-foreground" />
+              <AgbSatz stuecke={REGISTRIERUNG_AGB_SATZ} neuerTab className="text-[14px] leading-snug text-muted-foreground" />
 
               {fehler && (
                 <div role="alert">
@@ -235,7 +239,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                 </div>
               )}
 
-              <button type="submit" disabled={isSubmitting} aria-busy={isSubmitting || undefined} className={cn(KNOPF_ORANGE, 'mt-1')}>
+              <button type="submit" disabled={isSubmitting} aria-busy={isSubmitting || undefined} className={KNOPF_ORANGE}>
                 {isSubmitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
                 {isSubmitting ? 'Einen Moment …' : 'Konto erstellen'}
               </button>
@@ -252,22 +256,23 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
       {/* Seitenspalte als EINE Karte (Board w2-registrieren): Serifen-Titel, die Schritte mit grün getönten Ziffern,
           „Fragen vorab?“ und „E-Mail schreiben“ darin. StartSchritte (fuer-hoefe) zeichnet orange Ringe für /fuer-hoefe;
           eine grüne Variante dort wäre Sache jener Nummer — darum die Liste hier aus derselben Quelle. */}
-      <aside aria-labelledby={`${id}-weiter`} className="flex flex-col gap-3 self-start rounded-[16px] border border-border bg-card p-4">
-        <h2 id={`${id}-weiter`} className="font-heading text-[19px] leading-tight font-semibold">
+      {/* Maße nach Board (Nr. 275): Titel 18 px, Ziffern 26 px mit 14 px, Text 14 px, 10 px Abstand. */}
+      <aside aria-labelledby={`${id}-weiter`} className={cn('flex flex-col gap-2.5 self-start border border-border bg-card p-4', RUNDUNG.blatt)}>
+        <h2 id={`${id}-weiter`} className="font-heading text-[18px] leading-tight font-semibold">
           So geht’s weiter
         </h2>
-        <ol className="flex flex-col gap-3">
+        <ol className="flex flex-col gap-2.5">
           {REGISTRIEREN_SCHRITTE.map((s, i) => (
             <li key={s.titel} className="flex gap-2.5">
               <span
                 aria-hidden="true"
-                className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund text-[12.5px] font-bold text-zustand-laeuft"
+                className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund text-[14px] font-bold text-zustand-laeuft"
               >
                 {i + 1}
               </span>
               <span className="min-w-0">
-                <span className="block text-[15px] font-semibold">{s.titel}</span>
-                <span className="block text-[13.5px] leading-snug text-muted-foreground">{s.text}</span>
+                <span className="block text-[15px] font-bold">{s.titel}</span>
+                <span className="block text-[14px] leading-snug text-muted-foreground">{s.text}</span>
               </span>
             </li>
           ))}

@@ -336,8 +336,12 @@ export const ONLINE_ZAHLUNG_START_SCHRITT = {
   text: 'Über Stripe, dauert etwa 10 Minuten. Gehört zum Start – ohne sie schalten wir keinen Hof frei.',
 } as const
 
-/** Dasselbe kurz — neben dem Registrieren-Formular. */
-export const ONLINE_ZAHLUNG_START_KURZ = 'über Stripe, etwa 10 Minuten – gehört zum Start'
+/**
+ * Dasselbe kurz — neben dem Registrieren-Formular (nur dort, REGISTRIEREN_SCHRITTE). Wortlaut nach Board
+ * w2-registrieren, Seitenspalte Schritt 3 (Liste Lauf 32, registrieren; Nr. 275): „mit Stripe, etwa 10 Minuten“;
+ * den Nachsatz „für SEPA ist jetzt nichts zu tun“ hängt fuer-hoefe.ts an.
+ */
+export const ONLINE_ZAHLUNG_START_KURZ = 'mit Stripe, etwa 10 Minuten'
 
 // ─── Servicegebühr ──────────────────────────────────────────────────────────
 

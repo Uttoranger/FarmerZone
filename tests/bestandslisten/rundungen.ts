@@ -9,8 +9,6 @@
  * Nummern von Lauf 32 die Wache selbst nicht anfassen müssen.
  */
 export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
-  'src/app/(auth)/onboarding/loading.tsx': 4,
-  'src/app/(auth)/register/gruendung-zeile.tsx': 1,
   'src/app/(auth)/verify/loading.tsx': 1,
   'src/app/(auth)/verify/page.tsx': 1,
   'src/app/(hof)/settings/account/passkey-karte.tsx': 5,
@@ -65,13 +63,11 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/admin/startseite-zeitplan.tsx': 1,
   'src/components/admin/testhof-dialog.tsx': 1,
   'src/components/analytics/umfeld-karte.tsx': 1,
-  'src/components/anmelden/anmelden-seite.tsx': 1,
   'src/components/anmelden/hof-anmeldung.tsx': 2,
   'src/components/checkout/angaben-zum-hof.tsx': 1,
   'src/components/checkout/kasse-skelett.tsx': 7,
   'src/components/checkout/stripe-payment.tsx': 1,
   'src/components/cookie-banner.tsx': 2,
-  'src/components/einrichten/einrichten-seite.tsx': 4,
   'src/components/farm/product-grid.tsx': 3,
   'src/components/farmer/archived-farm-banner.tsx': 1,
   'src/components/farmer/hofseite-editor.tsx': 3,
