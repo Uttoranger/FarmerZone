@@ -30,6 +30,9 @@ Alle Farben kommen aus CSS-Custom-Properties auf `:root`, umgeschaltet über `da
 | --abzeichen (Abzeichen „Gründungshof“, Schrift) | #24412F | #F3EDE0 |
 | --abzeichen-grund (Fläche) | #F3EDE0 | #2D5F3F |
 | --feldrand (Feldränder, Schalter aus) | #687567 | #798678 |
+| --kaestchen-rand (Kästchen, Rand) | #9AA899 | #5D6A5C |
+| --kaestchen-flaeche (Kästchen angehakt, Fläche) | #9FD0AF | #2D5F3F |
+| --kaestchen-haken (Kästchen angehakt, Haken) | #131B14 | #FBF9F2 |
 
 - **Bedeutungsfarben (Register G5, seit Nr. 79):** Die vier Zustände einer Marke — tun (die Kundin oder der Hof muss etwas tun), läuft, erledigt, abgebrochen — haben je ein Text- und ein Flächen-Token in beiden Modi (`--fz-zustand-<art>`, `--fz-zustand-<art>-grund`), als Utility `text-zustand-<art>`/`bg-zustand-<art>-grund` (Brücke im `@theme`). Gezeichnet werden sie nur vom Baustein `Marke` (Abschnitt „Komponenten“). Die Schrift steht auf der eigenen Fläche, ≥ 4,5:1 in beiden Modi, gleich ob die Marke auf Karte oder Seitengrund liegt — `tests/design-tokens.test.ts` rechnet jedes Paar nach. Dunkel nimmt die Schrift die Zustandsfarben bzw. die leise Textfarbe, die Flächen sind aus demselben Farbton dunkel abgeleitet.
 - **Abzeichen (Register K2, Änderung Nr. 116):** Schrift und Fläche des Etiketts „Gründungshof“ als eigenes Paar in beiden Modi (`--fz-abzeichen`, `--fz-abzeichen-grund`; Utility `text-abzeichen`/`bg-abzeichen-grund`) — hell Creme auf Markengrün (6,4:1), dunkel Tannengrün auf Creme (9,6:1); `tests/design-tokens.test.ts` rechnet das Paar nach. Gezeichnet nur vom Baustein `Abzeichen` (Abschnitt „Komponenten“), kein Bedeutungs-Token: Es sagt nichts über einen Zustand.

@@ -8,7 +8,7 @@ import { RUECKWEG_PRAEFIX, elternseite } from '@/lib/bauern-navigation'
 import { beimTipp, zielMitSuche } from '@/components/ui/rueckweg-tipp'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
-import { WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL } from '@/components/ui/werkzeug-kopf-stil'
+import { WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_PLATZ, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL } from '@/components/ui/werkzeug-kopf-stil'
 import { cn } from '@/lib/utils'
 
 /**
@@ -37,7 +37,8 @@ export function UnterDemWerkzeugKopf({ inhalt, children }: { inhalt: ReactNode; 
  * Baustein. Löst `UnterseitenKopf` ab (hofbereich/unterseiten-kopf.tsx); die
  * alten Aufrufer stehen in tests/bestandslisten/unterseiten-kopf.ts.
  *
- * Handy (unter 768 px): feste Leiste oben, 56 px, `bg-card`, Linie unten;
+ * Handy (unter 768 px): feste Leiste oben (`fixed`, hängt an keinem
+ * Elternelement, Nr. 269), 56 px, `bg-card`, Linie unten;
  * links „‹“ (44 px, für den Screenreader „Zurück zu <Elternseite>“), daneben
  * der Titel als h1 und die Unterzeile, rechts höchstens eine Aktion (Telefon,
  * Postfach). Web: grüner, unterstrichener Textlink „‹ <Elternseite>“, darunter
@@ -81,7 +82,9 @@ export function WerkzeugKopf({
     <>
       {/* data-werkzeug-kopf: Das Layout blendet den Balken über der Seite aus, sobald ein Werkzeug-Kopf ihn trägt
           (hof-balken.tsx). data-unterseiten-leiste: Der Fokus scrollt am Handy nie unter diese Leiste
-          (scroll-padding in globals.css). */}
+          (scroll-padding in globals.css). Am Handy steht die Leiste fest oben, der Platz davor hält ihre Höhe im Fluss
+          (werkzeug-kopf-stil.ts, Nr. 269). */}
+      <div className={WERKZEUG_KOPF_PLATZ} aria-hidden="true" data-werkzeug-kopf-platz="" />
       <div className={WERKZEUG_KOPF_LEISTE} data-werkzeug-kopf="" data-unterseiten-leiste="">
         {eltern && ziel && (
           <Link
@@ -128,6 +131,7 @@ export function WerkzeugKopfLaden(): React.JSX.Element {
   const unterKopf = useContext(UnterKopfKontext)
   return (
     <>
+      <div className={WERKZEUG_KOPF_PLATZ} aria-hidden="true" data-werkzeug-kopf-platz="" />
       <div className={WERKZEUG_KOPF_LEISTE} data-werkzeug-kopf="">
         <div className={cn(WERKZEUG_KOPF_SPALTE, 'gap-1.5 pl-3 md:gap-2 md:pl-0')}>
           <div className="h-5 w-36 rounded bg-border md:h-8 md:w-48" />

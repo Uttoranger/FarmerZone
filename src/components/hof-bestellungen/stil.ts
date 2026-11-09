@@ -1,4 +1,5 @@
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { cn } from '@/lib/utils'
 
 /*
@@ -17,17 +18,30 @@ const PILLE =
 export const KNOPF_GRUEN = cn(PILLE, 'bg-accent text-accent-foreground hover:bg-accent/90', FOKUS_RAHMEN)
 /** Orange gefüllt = Hof-Aktion (erstellen, eintragen; Farbrollen) — höchstens einmal je Ansicht (Nr. 22b). */
 export const KNOPF_ORANGE = cn(PILLE, 'border border-primary-foreground/25 bg-primary text-primary-foreground hover:bg-primary/90', FOKUS_RAHMEN)
-/** Umriss für Nebenaktionen. */
-export const KNOPF_RAHMEN = cn(PILLE, 'border border-border font-medium text-foreground hover:bg-muted', FOKUS_RAHMEN)
+/**
+ * Umriss für Nebenaktionen — nach Board (Nr. 269, Abnahme Lauf 32 heute „Teilen“, produkte, whatsapp-plakat,
+ * hofdaten-zahlung, beitraege: „niedrig, dünn, blass“): 52 px hoch, 15 px fett, Rand 1,5 px in Textfarbe wie
+ * „So geht’s“ auf Heute (Board s1-/w1-heute). Gilt überall, wo die Konstante steht, auch im Admin.
+ */
+export const KNOPF_RAHMEN = cn(PILLE, 'min-h-[52px] border-[1.5px] border-foreground text-[15px] font-bold text-foreground hover:bg-muted', FOKUS_RAHMEN)
 /** Zerstörend: Orange-Umriss, nie Grün (DESIGN_SYSTEM „Dialoge und Blätter"). */
 export const KNOPF_ORANGE_RAHMEN = cn(PILLE, 'border border-primary/70 bg-primary/18 text-foreground hover:bg-primary/25', FOKUS_RAHMEN)
 /** Textknöpfe ohne Fläche: „Nicht abgeholt" (grüne Schrift), „Stornieren" (orange Schrift). */
 export const TEXT_GRUEN = cn(PILLE, 'px-3 text-status-fertig hover:bg-muted', FOKUS_RAHMEN)
 export const TEXT_ORANGE = cn(PILLE, 'px-3 text-status-offen hover:bg-muted', FOKUS_RAHMEN)
 
-export const FELD_LABEL = 'mb-1 block text-[12.5px] font-semibold text-muted-foreground'
+/**
+ * Beschriftung eines Felds nach Board (Nr. 269; Boards s2-/w2-hofdaten-zahlung, -beitraege: 15 px halbfett in
+ * Textfarbe, 6 px über dem Feld) — vorher 12,5 px leise.
+ */
+export const FELD_LABEL = 'mb-1.5 block text-[15px] font-semibold text-foreground'
+/**
+ * Eingabefeld nach Board (Nr. 269): 48 px, Rand im Feldrand-Token (`border-input`, ≥ 3:1, Nr. 173) statt des
+ * Kartenrands, Fläche der Karte, Rundung `RUNDUNG.feld` (10 px, G8), Schrift 16 px auch im Web.
+ */
 export const FELD = cn(
-  'w-full min-w-0 rounded-[11px] border border-border bg-background px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-status-offen md:text-[14.5px]',
+  'min-h-12 w-full min-w-0 border border-input bg-card px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground aria-[invalid=true]:border-status-offen',
+  RUNDUNG.feld,
   FOKUS_RAHMEN
 )
 

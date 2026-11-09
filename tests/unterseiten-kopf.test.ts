@@ -135,11 +135,11 @@ describe('UnterseitenKopf im Browser und Titel', () => {
   })
 
   it('Gegenprobe: auf einer Seite der Leiste kein Rückweg — nur der Titel', () => {
-    // /customers statt /settings: /settings hat seit Nr. 250 am Handy „Mehr“ als Elternseite (N1-Ergänzung).
-    const oben = kopf('/customers', { titel: 'Kunden' })
+    // /orders: /settings (Nr. 250) und die übrigen Seiten des Mehr-Blatts (Nr. 269) haben am Handy „Mehr“ als Elternseite.
+    const oben = kopf('/orders', { titel: 'Bestellungen' })
     expect(oben).not.toContain('<a ')
     expect(oben).not.toContain('sticky')
-    expect(oben).toMatch(/<h1[^>]*>Kunden<\/h1>/)
+    expect(oben).toMatch(/<h1[^>]*>Bestellungen<\/h1>/)
   })
 
   it('ohne Titel nur der Rückweg (die Seite trägt ihre h1 selbst)', () => {

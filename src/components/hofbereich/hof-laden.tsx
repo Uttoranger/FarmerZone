@@ -1,4 +1,5 @@
 import { LEISTE_HANDY, ZEILE_BROWSER } from '@/components/hofbereich/unterseiten-kopf-stil'
+import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
 import { cn } from '@/lib/utils'
 
 /*
@@ -14,7 +15,9 @@ import { cn } from '@/lib/utils'
  * Der Unterseiten-Kopf im Wartezustand (Nr. 44), in denselben Maßen wie
  * UnterseitenKopf (unterseiten-kopf-stil.ts): am Handy die feste Leiste
  * (56 px) mit dem Platz für Pfeil und Namen, im Browser die Zeile „‹ …"
- * (44 px). Der Titel ist Sache der jeweiligen Ladeansicht.
+ * (44 px). Der Titel ist Sache der jeweiligen Ladeansicht. Nur noch für die
+ * Einstellungen (einstellungen-laden.tsx, Bestandsliste unterseiten-kopf);
+ * die Beiträge laden seit Nr. 269 mit `WerkzeugKopfLaden` wie ihre Seiten.
  */
 export function UnterseitenKopfLaden({
   mitTitel = true,
@@ -67,7 +70,7 @@ export function HofSeiteLaden(): React.JSX.Element {
 }
 
 /**
- * „Neuer Beitrag" (/status/new): Unterseiten-Kopf, darunter die Karte des ersten
+ * „Neuer Beitrag" (/status/new): Werkzeug-Kopf wie die Seite (G1, Nr. 250), darunter die Karte des ersten
  * Schritts — Stepper, Überschrift, vier Anlässe (2 × 2), Titel, Nachricht
  * (fünf Zeilen), Foto-Knopf und „Weiter zu Empfängern".
  */
@@ -75,7 +78,7 @@ export function BeitragNeuLaden(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
       <div className="animate-pulse" aria-busy="true">
-        <UnterseitenKopfLaden mitTitel={false} />
+        <WerkzeugKopfLaden />
         <div className="rounded-2xl border border-border bg-card p-5 md:p-8">
           <div className="mb-7 flex items-start">
             {[0, 1, 2].map((i) => (
@@ -118,18 +121,14 @@ export function BeitragNeuLaden(): React.JSX.Element {
 }
 
 /**
- * „WhatsApp versenden" (/status/[id]/send-whatsapp): Unterseiten-Kopf, Überschrift,
- * der Beitrag als Vorschau, der Fortschritt und drei Zeilen der Abonnentinnen.
+ * „WhatsApp versenden" (/status/[id]/send-whatsapp): Werkzeug-Kopf wie die Seite (G1, Nr. 250; h1 und
+ * Unterzeile darin), der Beitrag als Vorschau, der Fortschritt und drei Zeilen der Abonnentinnen.
  */
 export function WhatsAppVersandLaden(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-xl px-4 pt-5 pb-12 md:px-8 md:pt-7">
       <div className="animate-pulse" aria-busy="true">
-        <UnterseitenKopfLaden mitTitel={false} />
-        <div className="mb-5">
-          <div className="h-8 w-52 rounded-lg bg-border" />
-          <div className="mt-1 h-4 w-full max-w-sm rounded bg-muted" />
-        </div>
+        <WerkzeugKopfLaden />
         <div className="mb-4 h-[76px] rounded-xl bg-muted" />
         <div className="mb-5">
           <div className="mb-2 flex justify-between">

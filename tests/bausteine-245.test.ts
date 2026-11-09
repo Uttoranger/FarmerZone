@@ -66,9 +66,9 @@ describe('WerkzeugKopf (G1)', () => {
   })
 
   it('ohne Elternseite (Seite der Leiste): kein Rückweg, nur Titel', () => {
-    // /customers statt /settings: /settings hat seit Nr. 250 am Handy „Mehr“ als Elternseite (N1-Ergänzung).
-    const markup = html(createElement(WerkzeugKopf, { titel: 'Kunden', pfad: '/customers' }))
-    expect(markup).toContain('>Kunden</h1>')
+    // /orders: /settings (Nr. 250) und die übrigen Seiten des Mehr-Blatts (Nr. 269) haben am Handy „Mehr“ als Elternseite.
+    const markup = html(createElement(WerkzeugKopf, { titel: 'Bestellungen', pfad: '/orders' }))
+    expect(markup).toContain('>Bestellungen</h1>')
     expect(markup).not.toContain('<a')
     expect(markup).not.toContain(RUECKWEG_PRAEFIX)
   })
