@@ -149,7 +149,7 @@ function Rahmen({
           <span className="size-2.5 rounded-full bg-muted-foreground/50" />
           <span className="size-2.5 rounded-full bg-muted-foreground/50" />
         </span>
-        <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-[11.5px] text-muted-foreground ring-1 ring-border">/</span>
+        <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-xs text-muted-foreground ring-1 ring-border">/</span>
         <span className="w-9" />
       </div>
       {bandZeile}

@@ -311,7 +311,7 @@ function Diagramm({
           return (
             <g key={c}>
               <line x1={LINKS} x2={breite - RECHTS} y1={y} y2={y} className="stroke-border" strokeWidth={1} />
-              <text x={LINKS - 8} y={y + 4} textAnchor="end" fontSize={11} className="fill-muted-foreground">
+              <text x={LINKS - 8} y={y + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground">
                 {formatEuro(centsAlsEuro(c), 0)}
               </text>
             </g>
@@ -340,7 +340,7 @@ function Diagramm({
                     className="stroke-muted-foreground/60"
                   />
                   {!schmal && (
-                    <text x={mitte} y={BASIS - 66} textAnchor="middle" fontSize={10.5} className="fill-muted-foreground">
+                    <text x={mitte} y={BASIS - 66} textAnchor="middle" fontSize={12} className="fill-muted-foreground">
                       offen
                     </text>
                   )}
@@ -378,7 +378,7 @@ function Diagramm({
                       x={rechts ? kostenX + balkenBreite : kostenX}
                       y={BASIS - kostenHoehe - 6}
                       textAnchor={rechts ? 'end' : 'start'}
-                      fontSize={10.5}
+                      fontSize={12}
                       className="fill-status-offen"
                     >
                       {`${kuerze(m.ausreisser, 24)} (${FINANZEN_JAHR_TEXT.einmaligZusatz})`}

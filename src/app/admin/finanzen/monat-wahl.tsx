@@ -35,11 +35,17 @@ export function MonatWahl({
   /** Jahre um diesen Monat herum zur Wahl stellen. */
   bezug,
   idPraefix,
+  beschriftungId,
 }: {
   wert: Monatsschluessel
   onChange: (monat: Monatsschluessel) => void
   bezug: Monatsschluessel
   idPraefix: string
+  /**
+   * Die sichtbare Beschriftung darüber („Ab Monat"): Das Monatsfeld heißt wie sie (sonst „Ab Monat Monat“),
+   * das Jahresfeld nennt sie zuerst und dann sein Wort („Ab Monat Jahr“). Die versteckten Labels allein zählt die Messung als „ohne Beschriftung" (Nr. 281).
+   */
+  beschriftungId?: string
 }) {
   // `!` sicher: `bezug` kommt von der Seite und ist dort schon durch
   // istMonatsschluessel gegangen. Der Rückfall greift nur, wenn `wert` Unsinn
@@ -58,11 +64,12 @@ export function MonatWahl({
 
   return (
     <div className="flex gap-2">
-      <label className="sr-only" htmlFor={`${idPraefix}-monat`}>
+      <label id={`${idPraefix}-monat-wort`} className="sr-only" htmlFor={`${idPraefix}-monat`}>
         Monat
       </label>
       <select
         id={`${idPraefix}-monat`}
+        aria-labelledby={beschriftungId}
         value={teile.monat}
         onChange={(e) => onChange(monatsschluessel(teile.jahr, Number(e.target.value)))}
         className={`${FELD} flex-1`}
@@ -74,11 +81,12 @@ export function MonatWahl({
         ))}
       </select>
 
-      <label className="sr-only" htmlFor={`${idPraefix}-jahr`}>
+      <label id={`${idPraefix}-jahr-wort`} className="sr-only" htmlFor={`${idPraefix}-jahr`}>
         Jahr
       </label>
       <select
         id={`${idPraefix}-jahr`}
+        aria-labelledby={beschriftungId ? `${beschriftungId} ${idPraefix}-jahr-wort` : undefined}
         value={teile.jahr}
         onChange={(e) => onChange(monatsschluessel(Number(e.target.value), teile.monat))}
         className={`${FELD} w-28`}
