@@ -129,6 +129,8 @@ type FormularProps = {
   /** Nur im Blatt: Titel und „Abbrechen“ stehen im Formular. Im Dialog trägt `DialogMitte` beides. */
   kopf?: { titel: (text: string) => ReactNode; onAbbrechen: () => void }
   onFertig: () => void
+  /** Meldet, solange gespeichert wird — der Rahmen lässt sich dann nicht schließen (kein unsichtbarer Doppel-Eintrag). */
+  onSpeichern?: (laeuft: boolean) => void
   /** Ab 768 px: Hauptknopf rechts am Ende statt über die volle Breite. */
   breit: boolean
   betragRef?: RefObject<HTMLInputElement | null>
@@ -141,6 +143,7 @@ export function VerkaufFormular({
   topProduktIds,
   kopf,
   onFertig,
+  onSpeichern,
   breit,
   betragRef,
 }: FormularProps): React.JSX.Element {
@@ -151,6 +154,8 @@ export function VerkaufFormular({
   const [notizOffen, setNotizOffen] = useState(start.note !== '')
   const [datumOffen, setDatumOffen] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
+  // Synchrone Sperre gegen ein zweites Absenden, solange das erste läuft (Prüfung und Speichern).
+  const sperre = useRef(false)
   const [serverFehler, setServerFehler] = useState<string | null>(null)
 
   const form = useForm<FormWerte>({ defaultValues: start })
@@ -177,8 +182,6 @@ export function VerkaufFormular({
   }
 
   async function absenden(w: FormWerte, formular: HTMLFormElement) {
-    // Der Knopf ist nie deaktiviert (G6): Solange gespeichert wird, schluckt er den Tipp — sonst bucht ein Doppeltipp zweimal.
-    if (laeuft) return
     setServerFehler(null)
     const geprueft = manualSaleFormSchema.safeParse({
       productId: w.productId,
@@ -210,6 +213,7 @@ export function VerkaufFormular({
     }
 
     setLaeuft(true)
+    onSpeichern?.(true)
     try {
       const antwort = bearbeiten ? await updateManualSale(verkauf.id, geprueft.data) : await createManualSale(geprueft.data)
       if ('error' in antwort) {
@@ -225,6 +229,7 @@ export function VerkaufFormular({
       setServerFehler(VERKAUF_SPEICHERN_FEHLER)
     } finally {
       setLaeuft(false)
+      onSpeichern?.(false)
     }
   }
 
@@ -241,9 +246,18 @@ export function VerkaufFormular({
   return (
     <form
       onSubmit={(e) => {
+        // Der Knopf ist nie deaktiviert (G6). Die Sperre greift deshalb synchron beim ersten Absenden — ein State käme
+        // erst nach der (asynchronen) Prüfung, und ein Doppeltipp buchte zweimal und zöge den Vorrat zweimal ab (D1).
+        if (sperre.current) {
+          e.preventDefault()
+          return
+        }
+        sperre.current = true
         // Das Formular vorher festhalten: Nach der Prüfung (asynchron) ist currentTarget des Ereignisses schon leer.
         const formular = e.currentTarget
-        return form.handleSubmit((w) => absenden(w, formular))(e)
+        return form.handleSubmit((w) => absenden(w, formular))(e).finally(() => {
+          sperre.current = false
+        })
       }}
       noValidate className="flex flex-col gap-4">
       {/* Im Blatt: „Abbrechen“ oben rechts neben dem Titel (V11). Im Dialog trägt DialogMitte Titel und „Abbrechen“. */}
@@ -540,6 +554,12 @@ export function VerkaufDialog({
 }): React.JSX.Element {
   const breit = useMindestbreite(768)
   const betragRef = useRef<HTMLInputElement>(null)
+  // Solange gespeichert wird, schließen weder „Abbrechen“ noch Escape noch ein Tipp daneben: Wer schließt und neu öffnet,
+  // trüge sonst ein zweites Mal ein, und ein Fehlschlag bliebe unsichtbar. Sichtbar gesperrt wird nichts (G6).
+  const [speichert, setSpeichert] = useState(false)
+  const schliessen = (): void => {
+    if (!speichert) onSchliessen()
+  }
   const fokus = verkauf ? undefined : betragRef
   // Ein anderer Verkauf ist ein anderes Formular — nie Werte des vorigen.
   const schluessel = `${verkauf?.id ?? ''}|${vorlage?.id ?? ''}`
@@ -552,6 +572,7 @@ export function VerkaufDialog({
       topProduktIds={topProduktIds}
       kopf={kopf}
       onFertig={onSchliessen}
+      onSpeichern={setSpeichert}
       breit={breit}
       betragRef={betragRef}
     />
@@ -559,7 +580,7 @@ export function VerkaufDialog({
 
   if (breit) {
     return (
-      <Dialog open={offen} onOpenChange={(o) => !o && onSchliessen()}>
+      <Dialog open={offen} onOpenChange={(o) => !o && schliessen()}>
         <DialogMitte titel={verkauf ? 'Verkauf bearbeiten' : 'Verkauf eintragen'} schliessen="Abbrechen" initialFocus={fokus} className="max-w-[560px]">
           {formular()}
         </DialogMitte>
@@ -568,11 +589,11 @@ export function VerkaufDialog({
   }
 
   return (
-    <Sheet open={offen} onOpenChange={(o) => !o && onSchliessen()}>
+    <Sheet open={offen} onOpenChange={(o) => !o && schliessen()}>
       <SheetBlatt initialFocus={fokus} className="max-h-[86dvh]">
         {formular({
           titel: (text) => <SheetTitle className="font-heading text-xl leading-tight font-semibold break-words">{text}</SheetTitle>,
-          onAbbrechen: onSchliessen,
+          onAbbrechen: schliessen,
         })}
       </SheetBlatt>
     </Sheet>
