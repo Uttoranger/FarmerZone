@@ -331,4 +331,4 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 280 | Mails | offen | `nacht/2026-11-08/280-mails` | – | vom Integrationszweig von C nach 274, 275, 278 und 279 | – | 8.11.2026 |
 | 281 | Admin: messbare Mängel und Schrift-Wache | offen | `nacht/2026-11-08/281-admin-maengel` | – | vom Integrationszweig von C nach 263, 265 und 270 | – | 8.11.2026 |
 | 262b | Werkzeug-Nacharbeit: Leistungstests ohne Parallelität, Messung bei role="dialog" | fertig (B) | `nacht/2026-11-08/262b-werkzeug` | #513 | vom Zwischenstand `integration/lauf33` | 0 Runden; vorher rot: tests/pruefung-messung.test.ts | 9.11.2026 |
-| Sammel 33 | Sammel-PR Lauf 33 (261–281) | Entwurf (Haltepunkt A) | `integration/lauf33` | #508 | main | A: 261–264, 266 per --no-ff; B und C offen | 9.11.2026 |
+| Sammel 33 | Sammel-PR Lauf 33 (261–281) | Entwurf (Haltepunkt B) | `integration/lauf33` | #508 | main | A: 261–264, 266; B: 267, 269, 265, 270, 262b, 268, 272, 271, 273, 274, 275, 276, 279, 277 per --no-ff; voller Lauf 745 Dateien, 13806 Tests; Integration 101 Dateien, 810 Tests; C offen (278, 280, 281, Schluss-Durchgang) | 9.11.2026 |
