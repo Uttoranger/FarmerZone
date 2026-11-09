@@ -296,34 +296,32 @@ export function BrennmaterialFormular({
 
         {hackschnitzel && (
           <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 sm:gap-4">
-            <>
-              <div className="flex flex-col gap-2" data-feld="wassergehalt">
-                <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
-                  Wassergehalt
-                </p>
-                <div role="radiogroup" aria-labelledby="brenn-w" className="flex flex-wrap gap-2">
-                  {WASSERGEHALT_KLASSEN.map((w) => (
-                    <Wahl key={w} rolle="radio" aktiv={wassergehalt === w} onClick={() => setWassergehalt(w)}>
-                      W{w}
-                    </Wahl>
-                  ))}
-                </div>
-                {fehler.wassergehalt && <FeldFehler>{fehler.wassergehalt}</FeldFehler>}
+            <div className="flex flex-col gap-2" data-feld="wassergehalt">
+              <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
+                Wassergehalt
+              </p>
+              <div role="radiogroup" aria-labelledby="brenn-w" className="flex flex-wrap gap-2">
+                {WASSERGEHALT_KLASSEN.map((w) => (
+                  <Wahl key={w} rolle="radio" aktiv={wassergehalt === w} onClick={() => setWassergehalt(w)}>
+                    W{w}
+                  </Wahl>
+                ))}
               </div>
-              <div className="flex flex-col gap-2" data-feld="koernung">
-                <p id="brenn-p" className="text-[15px] font-semibold text-foreground">
-                  Körnung
-                </p>
-                <div role="radiogroup" aria-labelledby="brenn-p" className="flex flex-wrap gap-2">
-                  {KOERNUNG_KLASSEN.map((p) => (
-                    <Wahl key={p} rolle="radio" aktiv={koernung === p} onClick={() => setKoernung(p)}>
-                      P{p}
-                    </Wahl>
-                  ))}
-                </div>
-                {fehler.koernung && <FeldFehler>{fehler.koernung}</FeldFehler>}
+              {fehler.wassergehalt && <FeldFehler>{fehler.wassergehalt}</FeldFehler>}
+            </div>
+            <div className="flex flex-col gap-2" data-feld="koernung">
+              <p id="brenn-p" className="text-[15px] font-semibold text-foreground">
+                Körnung
+              </p>
+              <div role="radiogroup" aria-labelledby="brenn-p" className="flex flex-wrap gap-2">
+                {KOERNUNG_KLASSEN.map((p) => (
+                  <Wahl key={p} rolle="radio" aktiv={koernung === p} onClick={() => setKoernung(p)}>
+                    P{p}
+                  </Wahl>
+                ))}
               </div>
-            </>
+              {fehler.koernung && <FeldFehler>{fehler.koernung}</FeldFehler>}
+            </div>
           </div>
         )}
 

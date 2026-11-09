@@ -57,13 +57,6 @@ export function produktStatus(p: { isAvailable: boolean; stock: number; unit: st
 
 // ─── Preis je Modell (N38; Boards s1/w1-produkte, s1/w1-produkt-neu) ────────
 
-/**
- * „Du bekommst € 7,50" und „die Kundin zahlt € 7,95" — nur im Hofpreis-Modell
- * (`anzeige` gesetzt, preisAnzeigeFuer). Gerechnet wird nichts Neues: Der
- * Endpreis kommt aus `endpreisEuro` (je Stück aufgerundet, wie /api/checkout).
- * Im Modell „bisher" null — dann zahlt die Kundin die Servicegebühr erst in der
- * Kasse dazu, und die Zeile zeigt den Preis wie bisher.
- */
 /** Kürzel der Einheit in der Produktliste des Hofs, wo das Board vom allgemeinen Label abweicht (s1-/w1-produkte). */
 const EINHEIT_LISTE: Readonly<Record<string, { kurz: string; lang: string }>> = {
   STUECK: { kurz: 'Stk.', lang: 'Stk.' },
@@ -82,6 +75,13 @@ export function produktEinheit(unit: string, unitSize: number | { toString(): st
   return `${formatZahl(groesse)} ${label}`
 }
 
+/**
+ * „Du bekommst € 7,50" und „die Kundin zahlt € 7,95" — nur im Hofpreis-Modell
+ * (`anzeige` gesetzt, preisAnzeigeFuer). Gerechnet wird nichts Neues: Der
+ * Endpreis kommt aus `endpreisEuro` (je Stück aufgerundet, wie /api/checkout).
+ * Im Modell „bisher" null — dann zahlt die Kundin die Servicegebühr erst in der
+ * Kasse dazu, und die Zeile zeigt den Preis wie bisher.
+ */
 export function hofpreisTeile(preis: number, anzeige: PreisAnzeige): { bekommst: string; zahlt: string } | null {
   if (!anzeige || !Number.isFinite(preis) || preis < 0) return null
   return {

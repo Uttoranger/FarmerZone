@@ -69,6 +69,17 @@ describe('KlappKarte — Kennzeichnung und Holz-Angaben als aufklappbare Karte (
     expect(html).not.toMatch(/-inhalt" hidden/)
   })
 
+  it('geöffnet bleibt der Erklärsatz oben im Inhalt stehen (freigabe.md §12: Fachwort „Kennzeichnung“ mit einem Satz erklären)', () => {
+    for (const offen of [{ immerOffen: true }, { anfangsOffen: true }]) {
+      const html = karte(offen)
+      expect(html).toContain('aria-expanded="true"')
+      // Der Satz steht im sichtbaren Inhalt, vor den Feldern — nicht nur im zugeklappten Kopf.
+      expect(html).toMatch(/<div id="[^"]*-inhalt" class="[^"]*"><p[^>]*>Ein Satz zur Kennzeichnung\.<\/p><input id="feld-x"/)
+    }
+    // Gegenprobe zugeklappt: der Satz steht genau einmal (über dem Öffnen-Knopf), nicht doppelt.
+    expect(karte().split('Ein Satz zur Kennzeichnung.').length - 1).toBe(1)
+  })
+
   it('Holz-Angaben: anfangs offen, ohne Öffnen-Knopf', () => {
     const html = karte({ titel: 'Holz-Angaben', stand: 'Die drei Fragen, die jede Kundin stellt.', satz: undefined, oeffnenText: undefined, anfangsOffen: true })
     expect(html).toContain('aria-expanded="true"')

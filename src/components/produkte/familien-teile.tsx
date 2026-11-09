@@ -4,6 +4,7 @@ import { cloneElement, isValidElement, useId, useState } from 'react'
 import { Check, ChevronDown, Lock, Plus, X } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
+import { PFLICHT_KNOPF_RAHMEN } from '@/components/heute/pflicht-karte'
 import { Button } from '@/components/ui/button'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
@@ -124,10 +125,13 @@ export function Abschnitt({
   )
 }
 
+const KLAPP_SATZ = 'text-[14px] leading-snug text-muted-foreground'
+
 /**
  * Eine aufklappbare Karte wie die Abschnitte des Produktdialogs (Board s1-/w1-produkt-neu, Bild 3 und 4; Abnahme
  * Lauf 32, Nr. 277): Kopf als Knopf mit Titel und Kurzstand („Pflicht · noch offen“), darunter der Inhalt. Zu
- * steht unter dem Kopf ein Satz und der Knopf, der sie öffnet („Angaben eintragen“). `immerOffen` öffnet sie
+ * steht unter dem Kopf ein Satz und der Knopf, der sie öffnet („Angaben eintragen“; Form `PFLICHT_KNOPF_RAHMEN`), offen
+ * steht derselbe Satz oben im Inhalt. `immerOffen` öffnet sie
  * von außen — nach einem Fehler darin muss das Feld sichtbar sein, sonst findet der Sprung zum Feld nichts.
  * Der Inhalt bleibt eingehängt (nur `hidden`), damit Eingaben beim Zuklappen nie verloren gehen.
  */
@@ -176,22 +180,18 @@ export function KlappKarte({
       </h3>
       {!offen && (satz || oeffnenText) && (
         <div className="flex flex-col gap-3 pb-4">
-          {satz && <p className="text-[14px] leading-snug text-muted-foreground">{satz}</p>}
+          {satz && <p className={KLAPP_SATZ}>{satz}</p>}
           {oeffnenText && (
-            <button
-              type="button"
-              onClick={() => setOffenGewaehlt(true)}
-              className={cn(
-                'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-                FOKUS_RAHMEN
-              )}
-            >
+            <button type="button" onClick={() => setOffenGewaehlt(true)} className={PFLICHT_KNOPF_RAHMEN}>
               {oeffnenText}
             </button>
           )}
         </div>
       )}
       <div id={`${id}-inhalt`} hidden={!offen} className="flex flex-col gap-4 pb-4">
+        {/* Geöffnet bleibt die Erklärung oben im Inhalt stehen — gerade beim Ausfüllen braucht der Hof sie (freigabe.md
+            §12: Fachwörter wie „Kennzeichnung“ mit einem Satz erklären). Zugeklappt steht sie über dem Knopf, nie doppelt. */}
+        {offen && satz && <p className={KLAPP_SATZ}>{satz}</p>}
         {children}
       </div>
     </section>

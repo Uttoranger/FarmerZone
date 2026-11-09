@@ -143,13 +143,13 @@ function zeileAus(vorlage: FutterVorlage, schluessel: string): Zeile {
   }
 }
 
-/** Bei genau einer erlaubten Futtermittelart steht sie fest (Tabelle 2.4). */
 /** „Pflicht · noch offen“ bzw. „Pflicht · eingetragen“; nach einem Speicherversuch mit Fehler „Bitte prüfen“. */
 function kennzeichnungStand(fehler: boolean, offen: boolean): string {
   if (fehler) return 'Pflicht · Bitte prüfen'
   return offen ? 'Pflicht · noch offen' : 'Pflicht · eingetragen'
 }
 
+/** Bei genau einer erlaubten Futtermittelart steht sie fest (Tabelle 2.4). */
 function artFuer(kategorie: (typeof FUTTER_KATEGORIEN)[number]): FuttermittelartValue | null {
   const erlaubt = futtermittelartenFuer(kategorie)
   return erlaubt.length === 1 ? erlaubt[0] : null

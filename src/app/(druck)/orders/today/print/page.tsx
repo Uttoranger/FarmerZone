@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
 import { positionszeile } from '@/lib/positionszeile'
+import { PositionsText } from '@/components/hof-bestellungen/positions-text'
 import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
@@ -60,17 +61,6 @@ type PacklistenPosition = {
 
 function zeileVon(item: PacklistenPosition): ReturnType<typeof positionszeile> {
   return positionszeile({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })
-}
-
-/** „**4** × Heumilch frisch (1 L)“ — Positionszeile G14, die Anzahl fett vorn wie auf der Bestellseite. */
-function PositionsText({ item }: { item: PacklistenPosition }) {
-  const zeile = zeileVon(item)
-  return (
-    <>
-      <span className="font-bold text-primary-foreground">{zeile.anzahl}</span> × {zeile.name}
-      {zeile.gebinde && <> ({zeile.gebinde})</>}
-    </>
-  )
 }
 
 export default async function PrintPacklistPage() {
@@ -194,7 +184,8 @@ export default async function PrintPacklistPage() {
                         <div key={k} className="text-sm text-primary-foreground/90">
                           {/* Ein Kästchen zum Abhaken mit dem Stift — Schmuck für den Bildschirm, Zweck auf dem Papier. */}
                           <span aria-hidden="true">☐ </span>
-                          <PositionsText item={item} />
+                          {/* „**4** × Heumilch frisch (1 L)“ — dieselbe Positionszeile G14 wie die Bestellseite. */}
+                          <PositionsText zeile={item.productName} teile={zeileVon(item)} anzahlKlasse="text-primary-foreground" />
                         </div>
                       ))}
                     </div>

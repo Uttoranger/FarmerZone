@@ -71,6 +71,7 @@ import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
 import { FOTO_HUELLE, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { RUNDUNG } from '@/components/ui/rundung'
 
 type Props = {
@@ -408,11 +409,9 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                     setSuche('')
                     schreibeAdresse(adresse)
                   }}
-                  // Board s1-produkte Bild 4: dieselbe Form wie „So geht’s“ auf Heute — 52 px, Rand 1,5 px, fett.
-                  className={cn(
-                    'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground/70 bg-card px-5 text-base font-bold text-foreground hover:bg-muted',
-                    FOKUS_RAHMEN
-                  )}
+                  // Board s1-produkte Bild 4: dieselbe Form wie „So geht’s“ auf Heute — der Umriss-Knopf des Hofbereichs
+                  // (KNOPF_RAHMEN: 52 px, Rand 1,5 px, fett) über die volle Breite.
+                  className={cn(KNOPF_RAHMEN, 'w-full rounded-[14px] border-foreground/70 bg-card')}
                 >
                   {suche.trim() ? PRODUKTE_KEIN_TREFFER.sucheKnopf : PRODUKTE_KEIN_TREFFER.filterKnopf}
                 </Link>
