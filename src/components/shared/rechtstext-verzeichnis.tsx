@@ -58,7 +58,7 @@ function alleAnker(gruppen: readonly VerzeichnisGruppe[]): string[] {
   return gruppen.flatMap((g) => g.eintraege.map((e) => e.anker))
 }
 
-/** Schiebt nur die eigene Spalte (nicht die Seite), bis der Eintrag ganz im Bild ist. */
+/** Schiebt nur die eigene Spalte (nicht die Seite), bis der Eintrag ganz im Bild ist — rollt keine (Karte seit Nr. 279 ohne Innenrollen), tut es nichts. */
 function insBild(link: HTMLElement): void {
   let rahmen = link.parentElement
   while (rahmen && rahmen.scrollHeight <= rahmen.clientHeight + 1) rahmen = rahmen.parentElement

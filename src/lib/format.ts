@@ -141,6 +141,19 @@ export function formatDatumLang(zeitpunkt: Date): string {
   return datumLangFormat.format(zeitpunkt).replace(/^(\d+\.) /, '$1\u00a0')
 }
 
+/**
+ * „Mi, 3. März 2027, 19:40" — ein Zeitpunkt mit Wochentag, ohne „Uhr" (V9; Boards s3-/w3-widerruf Bild 4), in
+ * Wiener Zeit. Seit Nr. 279 hier statt in src/app/(public)/widerruf/eingang-zeit.ts (Nacharbeit 254): Die
+ * Eingangsbestätigung auf /widerruf schreibt ihn so, die Mails (Nr. 280) nehmen denselben Helfer. Der Wortlaut der
+ * Mails und des Admins nach N39 (`eingangZeitpunkt` in src/lib/widerruf.ts) bleibt davon unberührt.
+ */
+export function formatZeitpunktMitWochentag(am: Date): string {
+  const wochentag = am.toLocaleDateString('de-AT', { weekday: 'short', timeZone: 'Europe/Vienna' }).replace(/\.$/, '')
+  const datum = am.toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna' })
+  const zeit = am.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })
+  return `${wochentag}, ${datum}, ${zeit}`
+}
+
 // Fester Wortlaut statt Intl „short": Je nach ICU-Stand schreibt Intl „Sa" oder
 // „Sa." und „Okt" oder „Okt." — ein Abholtermin soll überall gleich aussehen.
 const WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const

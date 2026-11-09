@@ -9,7 +9,6 @@
  * ein Kästchen nicht verhaltensgleich umstellen, bleibt die Datei hier stehen.
  */
 export const KAESTCHEN_BESTAND: readonly string[] = [
-  'src/app/(public)/widerruf/widerruf-formular.tsx',
   'src/app/admin/bestellungen/page.tsx',
   'src/app/admin/betrieb/mails-alle.tsx',
   'src/app/admin/betrieb/protokoll-ansicht.tsx',
