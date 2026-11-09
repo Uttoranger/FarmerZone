@@ -3,13 +3,12 @@
 import { useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
-import { CalendarDays, Check, ChevronDown } from 'lucide-react'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogMitte } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
-import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
+import { SpeicherFehler, fokussiereErstesFehlerfeld } from '@/components/shared/formular-meldungen'
 import { FeldFehler } from '@/components/checkout/kasse-teile'
 import { FELD, FELD_LABEL, KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
 import { createManualSale, updateManualSale } from '@/server/actions/manual-sales'
@@ -19,6 +18,7 @@ import { UNIT_LABELS } from '@/schemas/product'
 import { verkaufskanalSchema, type Verkaufskanal } from '@/schemas/verkaufskanal'
 import { NOTIZ_MAX, PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
 import { wienKalendertag } from '@/lib/kalender'
+import { formatTagKurz } from '@/lib/format'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { STANDARD_KANAL, kanalSpeicher, kanalVorauswahl, merkeKanal } from '@/lib/verkaufskanal-speicher'
 import {
@@ -37,11 +37,12 @@ import { RUNDUNG } from '@/components/ui/rundung'
 /*
  * „Verkauf eintragen" im neuen Design (Nachtlauf Nr. 22b, Register E13) —
  * dieselbe Funktion wie vorher, nur nach docs/ai/DESIGN_SYSTEM.md gezeichnet:
- * ab 768 px ein Dialog (Titel links, Aktionen rechts unten), darunter ein
- * Blatt von unten mit dem Hauptknopf über die volle Breite und „Abbrechen"
- * als Textknopf („Dialoge und Blätter"). Betrag zuerst (Vorbild GoPay,
- * Expensify, KOHO): oben groß der Betrag, darunter der Weg, alles andere
- * freiwillig. Der Knopf nennt den Betrag.
+ * ab 768 px der zentrierte Dialog (`DialogMitte`: abgedunkelt, nicht
+ * verwischt, „Abbrechen“ oben rechts, keine Fußleiste), darunter ein Blatt von
+ * unten (höchstens 86 % hoch) mit dem Hauptknopf über die volle Breite. Betrag
+ * zuerst (Vorbild GoPay, Expensify, KOHO): oben groß der Betrag, darunter der
+ * Weg, alles andere freiwillig. Der Knopf nennt den Betrag und ist nie
+ * deaktiviert (G6) — geprüft wird beim Absenden (Nr. 272, Board s2-/w2-verkaeufe).
  *
  * Das Formular hängt nur, solange Dialog bzw. Blatt offen sind — jedes
  * Öffnen beginnt mit frischen Werten (auch der gemerkte Weg, der erst im
@@ -99,7 +100,23 @@ function startWerte(verkauf: VerkaufDaten | null, vorlage: VerkaufDaten | null, 
 
 const WAHL_AN = 'border-foreground bg-foreground text-background'
 const WAHL_AUS = 'border-border bg-card text-foreground hover:bg-muted'
-const KLAPPER = cn('inline-flex min-h-11 items-center gap-1.5 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground', FOKUS_RAHMEN)
+/** Unterstrichener Textknopf in Textfarbe („Anderes“ neben „Wo verkauft?“, „Notiz ergänzen“; Board s2-/w2-verkaeufe Bild 2). */
+const TEXT_LINK = cn('inline-flex min-h-11 items-center rounded-sm text-[15px] font-semibold text-foreground underline decoration-1 underline-offset-4', FOKUS_RAHMEN)
+
+/**
+ * Der Tag als Chip unter dem Titel (Board s2-/w2-verkaeufe Bild 2: „Heute, Mi 3. März“): bei heute und gestern
+ * das Wort vorn, danach Wochentag und Datum; sonst nur Wochentag und Datum. Nur Anzeige, der Tag steht schon fest.
+ */
+export function datumChipText(tag: string, heute: string): string {
+  const wort = datumKurz(tag, heute)
+  // formatTagKurz schreibt „Mi, 3. Mär“ — im Chip ohne Komma nach dem Wochentag, damit nur eines dasteht.
+  const datum = formatTagKurz(tag).replace(', ', ' ')
+  return wort === 'Heute' || wort === 'Gestern' ? `${wort}, ${datum}` : datum
+}
+
+/** Der Satz, wenn das Speichern scheitert: kein „Nochmal“ — ein zweiter Versuch könnte doppelt buchen (D1, Liste Lauf 32 C). */
+export const VERKAUF_SPEICHERN_FEHLER =
+  'Wir konnten den Verkauf nicht speichern. Deine Angaben sind noch da. Schau in der Liste nach, ob er schon dasteht, bevor du es noch einmal versuchst.'
 
 type FormularProps = {
   /** Gesetzt = Bearbeiten. */
@@ -109,11 +126,10 @@ type FormularProps = {
   produkte: VerkaufProdukt[]
   /** Die meistverkauften Produkte des Hofs, meistverkauft zuerst (getMeistverkaufteProduktIds). */
   topProduktIds: string[]
-  /** Dialog- bzw. Blatt-Titel — er benennt das Fenster für den Screenreader. */
-  titel: (text: string) => ReactNode
+  /** Nur im Blatt: Titel und „Abbrechen“ stehen im Formular. Im Dialog trägt `DialogMitte` beides. */
+  kopf?: { titel: (text: string) => ReactNode; onAbbrechen: () => void }
   onFertig: () => void
-  onAbbrechen: () => void
-  /** Ab 768 px: Aktionen rechts unten statt Hauptknopf über die volle Breite. */
+  /** Ab 768 px: Hauptknopf rechts am Ende statt über die volle Breite. */
   breit: boolean
   betragRef?: RefObject<HTMLInputElement | null>
 }
@@ -123,9 +139,8 @@ export function VerkaufFormular({
   vorlage,
   produkte,
   topProduktIds,
-  titel,
+  kopf,
   onFertig,
-  onAbbrechen,
   breit,
   betragRef,
 }: FormularProps): React.JSX.Element {
@@ -133,7 +148,7 @@ export function VerkaufFormular({
   // Der Tag des Browsers beim Öffnen: Wer die Seite über Nacht offen lässt, trägt morgens trotzdem „heute" ein.
   const [heute] = useState(() => wienKalendertag(new Date()))
   const [start] = useState(() => startWerte(verkauf, vorlage, heute))
-  const [mehrOffen, setMehrOffen] = useState(start.note !== '' || (start.quantity !== null && start.quantity !== 1))
+  const [notizOffen, setNotizOffen] = useState(start.note !== '')
   const [datumOffen, setDatumOffen] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
   const [serverFehler, setServerFehler] = useState<string | null>(null)
@@ -150,7 +165,8 @@ export function VerkaufFormular({
   // D1 regelt nur das Eintragen: Beim Bearbeiten gibt es den Schalter nicht (und keine Gegenbuchung).
   const vorratSchalter = !bearbeiten && gewaehlt !== undefined
   const vorratTextId = useId()
-  const datumText = datumKurz(werte.saleDate, heute)
+  const woId = useId()
+  const datumText = datumChipText(werte.saleDate, heute)
 
   function waehleProdukt(produkt: VerkaufProdukt | null) {
     const abwaehlen = produkt ? werte.productId === produkt.id : werte.freierName
@@ -160,7 +176,9 @@ export function VerkaufFormular({
     form.setValue('unit', abwaehlen || !produkt ? null : produkt.unit)
   }
 
-  async function absenden(w: FormWerte) {
+  async function absenden(w: FormWerte, formular: HTMLFormElement) {
+    // Der Knopf ist nie deaktiviert (G6): Solange gespeichert wird, schluckt er den Tipp — sonst bucht ein Doppeltipp zweimal.
+    if (laeuft) return
     setServerFehler(null)
     const geprueft = manualSaleFormSchema.safeParse({
       productId: w.productId,
@@ -174,16 +192,20 @@ export function VerkaufFormular({
       vorratAbziehen: vorratSchalter && w.vorratAbziehen,
     })
     if (!geprueft.success) {
+      let feldFehler = false
       for (const issue of geprueft.error.issues) {
         const feld = issue.path[0]
         if (feld === 'totalAmount' || feld === 'quantity' || feld === 'productName' || feld === 'note') {
           form.setError(feld, { message: issue.message })
-          if (feld === 'quantity' || feld === 'note') setMehrOffen(true)
+          if (feld === 'note') setNotizOffen(true)
+          feldFehler = true
         } else {
           if (feld === 'saleDate') setDatumOffen(true)
           setServerFehler(issue.message)
         }
       }
+      // G6: Fokus ins erste markierte Feld — erst nach dem Zeichnen, dann trägt es aria-invalid.
+      if (feldFehler) requestAnimationFrame(() => fokussiereErstesFehlerfeld(formular))
       return
     }
 
@@ -200,7 +222,7 @@ export function VerkaufFormular({
       else toast.success(antwort.vorrat?.text ?? (bearbeiten ? 'Verkauf gespeichert' : 'Verkauf eingetragen'))
       onFertig()
     } catch {
-      setServerFehler('Wir konnten den Verkauf nicht speichern. Deine Angaben sind noch da. Schau in der Liste nach, ob er schon dasteht, bevor du es noch einmal versuchst.')
+      setServerFehler(VERKAUF_SPEICHERN_FEHLER)
     } finally {
       setLaeuft(false)
     }
@@ -209,284 +231,297 @@ export function VerkaufFormular({
   const hauptKnopf = (
     <button
       type="submit"
-      disabled={laeuft || !knopf.aktiv}
       aria-busy={laeuft || undefined}
-      className={cn(KNOPF_ORANGE, 'min-w-[150px] tabular-nums', !breit && 'w-full rounded-[14px]')}
+      className={cn(KNOPF_ORANGE, 'min-w-[150px] tabular-nums', breit ? 'self-end' : 'w-full rounded-[14px]')}
     >
       {laeuft ? 'Einen Moment …' : knopf.text}
     </button>
   )
 
   return (
-    <form onSubmit={form.handleSubmit(absenden)} noValidate className={cn('flex min-h-0 flex-col', breit ? 'max-h-[min(92dvh,760px)]' : 'gap-4')}>
-      {/* „Abbrechen“ oben rechts neben dem Titel, darunter der Tag als Chip (V11, Board s2-/w2-verkaeufe Bild 2). */}
-      <div className={cn('flex flex-col items-start gap-2', breit && 'px-6 pt-6')}>
+    <form
+      onSubmit={(e) => {
+        // Das Formular vorher festhalten: Nach der Prüfung (asynchron) ist currentTarget des Ereignisses schon leer.
+        const formular = e.currentTarget
+        return form.handleSubmit((w) => absenden(w, formular))(e)
+      }}
+      noValidate className="flex flex-col gap-4">
+      {/* Im Blatt: „Abbrechen“ oben rechts neben dem Titel (V11). Im Dialog trägt DialogMitte Titel und „Abbrechen“. */}
+      {kopf && (
         <div className="flex w-full items-start justify-between gap-3">
-          <div className="min-w-0 pt-2">{titel(bearbeiten ? 'Verkauf bearbeiten' : 'Verkauf eintragen')}</div>
+          <div className="min-w-0 pt-2">{kopf.titel(bearbeiten ? 'Verkauf bearbeiten' : 'Verkauf eintragen')}</div>
           <button
             type="button"
-            onClick={onAbbrechen}
-            disabled={laeuft}
+            onClick={kopf.onAbbrechen}
             className={cn('-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[15px] font-semibold text-foreground hover:bg-muted', FOKUS_RAHMEN)}
           >
             Abbrechen
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setDatumOffen((o) => !o)}
-          aria-expanded={datumOffen}
-          aria-controls="verkauf-datum-feld"
-          aria-label={`Tag: ${datumText} — ändern`}
-          className={cn('inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-[13px] font-medium text-foreground hover:bg-muted', FOKUS_RAHMEN)}
+      )}
+      {/* Der Tag als Chip unter dem Titel, ohne Symbole (Board s2-/w2-verkaeufe Bild 2); ein Tipp öffnet das Datumsfeld. */}
+      <button
+        type="button"
+        onClick={() => setDatumOffen((o) => !o)}
+        aria-expanded={datumOffen}
+        aria-controls="verkauf-datum-feld"
+        aria-label={`Tag: ${datumText} — ändern`}
+        className={cn(
+          'inline-flex min-h-11 w-fit shrink-0 items-center rounded-full border border-input bg-card px-4 text-[14px] font-semibold text-foreground hover:bg-muted',
+          FOKUS_RAHMEN
+        )}
+      >
+        {datumText}
+      </button>
+
+      {datumOffen && (
+        <div id="verkauf-datum-feld">
+          <label htmlFor="verkauf-datum" className={FELD_LABEL}>
+            An welchem Tag?
+          </label>
+          <input
+            id="verkauf-datum"
+            type="date"
+            max={heute}
+            value={werte.saleDate}
+            onChange={(e) => e.target.value && form.setValue('saleDate', e.target.value)}
+            className={cn(FELD, 'min-h-11 appearance-none')}
+          />
+        </div>
+      )}
+
+      {/* Der Betrag — groß in der Grundschrift, nur mit Unterstrich (Board: kein Kasten, keine Serife); Komma oder Punkt (DezimalFeld). */}
+      <div>
+        <label htmlFor="verkauf-betrag" className="mb-1 block text-[15px] font-semibold text-foreground">
+          Betrag in Euro
+        </label>
+        <div
+          className={cn(
+            'flex items-center gap-2 border-b-2 border-status-fertig px-1 transition-colors',
+            fehler.totalAmount && 'border-status-offen'
+          )}
         >
-          <CalendarDays className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          {datumText}
-          <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', datumOffen && 'rotate-180')} strokeWidth={1.7} aria-hidden="true" />
-        </button>
+          <span aria-hidden="true" className="text-[30px] font-bold text-foreground">
+            €
+          </span>
+          <DezimalFeld
+            id="verkauf-betrag"
+            ref={betragRef}
+            value={werte.totalAmount}
+            onChange={(wert) => {
+              form.setValue('totalAmount', wert)
+              form.clearErrors('totalAmount')
+            }}
+            stellen={2}
+            placeholder="0,00"
+            aria-invalid={fehler.totalAmount ? true : undefined}
+            aria-describedby={fehler.totalAmount ? 'verkauf-betrag-fehler' : undefined}
+            className="h-16 rounded-none border-0 bg-transparent px-1 font-sans text-[34px] font-bold text-foreground tabular-nums shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring focus-visible:outline-solid md:text-[34px] dark:bg-transparent"
+          />
+        </div>
+        {fehler.totalAmount?.message && <FeldFehler id="verkauf-betrag-fehler">{fehler.totalAmount.message}</FeldFehler>}
       </div>
 
-      <div className={cn('flex flex-col gap-5', breit && 'min-h-0 flex-1 overflow-y-auto px-6 py-5')}>
-        {datumOffen && (
-          <div id="verkauf-datum-feld">
-            <label htmlFor="verkauf-datum" className={FELD_LABEL}>
-              An welchem Tag?
-            </label>
-            <input
-              id="verkauf-datum"
-              type="date"
-              max={heute}
-              value={werte.saleDate}
-              onChange={(e) => e.target.value && form.setValue('saleDate', e.target.value)}
-              className={cn(FELD, 'min-h-11 appearance-none')}
-            />
-          </div>
-        )}
-
-        {/* Der Betrag — groß, mit Komma oder Punkt (DezimalFeld). Der Fokus liegt am Rahmen um Feld und Zeichen. */}
-        <div>
-          {/* Sichtbar beschriftet wie im Board s2-/w2-verkaeufe (Felder mit sichtbarer Beschriftung, Lauf 31). */}
-          <label htmlFor="verkauf-betrag" className="mb-1 block text-sm font-semibold text-foreground">
-            Betrag in Euro
-          </label>
-          <div
-            className={cn(
-              'flex items-center gap-2 border-b-2 border-border px-1 transition-colors focus-within:border-status-fertig',
-              'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring focus-within:outline-solid',
-              fehler.totalAmount && 'border-status-offen'
-            )}
-          >
-            <span aria-hidden="true" className="font-heading text-3xl font-semibold text-muted-foreground">
-              €
-            </span>
-            <DezimalFeld
-              id="verkauf-betrag"
-              ref={betragRef}
-              value={werte.totalAmount}
-              onChange={(wert) => {
-                form.setValue('totalAmount', wert)
-                form.clearErrors('totalAmount')
-              }}
-              stellen={2}
-              placeholder="0,00"
-              aria-invalid={fehler.totalAmount ? true : undefined}
-              aria-describedby={fehler.totalAmount ? 'verkauf-betrag-fehler' : undefined}
-              className="h-16 rounded-none border-0 bg-transparent px-0 font-heading text-4xl font-bold text-foreground tabular-nums shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-4xl dark:bg-transparent"
-            />
-          </div>
-          {fehler.totalAmount?.message && <FeldFehler id="verkauf-betrag-fehler">{fehler.totalAmount.message}</FeldFehler>}
-        </div>
-
-        {/* Wo verkauft? */}
-        <fieldset className="min-w-0">
-          <legend className="mb-2 text-sm font-semibold text-foreground">Wo verkauft?</legend>
-          <div className="grid grid-cols-4 gap-2">
-            {/* Ohne Symbole (Liste Lauf 32 verkaeufe: „Kanal-Knöpfe mit Symbolen“). */}
-            {HAUPTKANAELE.map((k) => {
-              const aktiv = werte.channel === k.value
-              return (
-                <button
-                  key={k.value}
-                  type="button"
-                  aria-pressed={aktiv}
-                  onClick={() => form.setValue('channel', k.value)}
-                  className={cn(
-                    'flex min-h-12 min-w-0 items-center justify-center border px-1 py-2 text-center transition-colors duration-[250ms]', RUNDUNG.feld,
-                    aktiv ? WAHL_AN : WAHL_AUS,
-                    FOKUS_RAHMEN
-                  )}
-                >
-                  <span className="max-w-full truncate text-[13.5px] font-semibold">{k.label}</span>
-                </button>
-              )
-            })}
-          </div>
+      {/* Wo verkauft? — „Anderes“ als unterstrichener Link rechts neben der Frage (Board s2-/w2-verkaeufe Bild 2). */}
+      <div role="group" aria-labelledby={woId} className="min-w-0">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <p id={woId} className="text-[15px] font-semibold text-foreground">
+            Wo verkauft?
+          </p>
           <button
             type="button"
             aria-pressed={werte.channel === 'OTHER'}
             onClick={() => form.setValue('channel', 'OTHER')}
-            // „Anderes“ als Textlink (Liste Lauf 32 verkaeufe); gewählt sagt aria-pressed, der Haken ist nur fürs Auge.
+            className={cn(TEXT_LINK, werte.channel === 'OTHER' && 'decoration-2')}
+          >
+            Anderes
+          </button>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {/* Ohne Symbole (Liste Lauf 32 verkaeufe: „Kanal-Knöpfe mit Symbolen“). */}
+          {HAUPTKANAELE.map((k) => {
+            const aktiv = werte.channel === k.value
+            return (
+              <button
+                key={k.value}
+                type="button"
+                aria-pressed={aktiv}
+                onClick={() => form.setValue('channel', k.value)}
+                className={cn(
+                  'flex min-h-12 min-w-0 items-center justify-center border px-1 py-2 text-center transition-colors duration-[250ms]',
+                  RUNDUNG.feld,
+                  aktiv ? WAHL_AN : WAHL_AUS,
+                  FOKUS_RAHMEN
+                )}
+              >
+                <span className="max-w-full truncate text-[14px] font-semibold">{k.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Was hast du verkauft? — optional (Board s2/w2-verkaeufe) */}
+      <fieldset className="min-w-0">
+        <legend className="mb-2 text-[15px] font-semibold text-foreground">
+          Was hast du verkauft? <span className="font-normal text-muted-foreground">(optional)</span>
+        </legend>
+        <div className="flex flex-wrap gap-2">
+          {chips.map((p) => {
+            const aktiv = werte.productId === p.id
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={aktiv}
+                title={p.name}
+                onClick={() => waehleProdukt(p)}
+                className={cn('min-h-11 max-w-full truncate rounded-full border px-4 text-sm font-semibold transition-colors duration-[250ms]', aktiv ? WAHL_AN : WAHL_AUS, FOKUS_RAHMEN)}
+              >
+                {p.name}
+              </button>
+            )
+          })}
+          <button
+            type="button"
+            aria-pressed={werte.freierName}
+            onClick={() => waehleProdukt(null)}
             className={cn(
-              'mt-1 inline-flex min-h-11 items-center gap-1.5 rounded-sm text-[15px] font-semibold text-status-offen underline-offset-2',
-              werte.channel === 'OTHER' ? 'underline' : 'hover:underline',
+              'min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors duration-[250ms]',
+              werte.freierName ? WAHL_AN : cn(WAHL_AUS, 'border-dashed'),
               FOKUS_RAHMEN
             )}
           >
-            {werte.channel === 'OTHER' && <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />}
             Anderes
           </button>
-        </fieldset>
+        </div>
+        {werte.freierName && (
+          <div className="mt-2.5">
+            <label htmlFor="verkauf-name" className="sr-only">
+              Was hast du verkauft?
+            </label>
+            <input
+              id="verkauf-name"
+              autoFocus
+              placeholder="Was hast du verkauft?"
+              aria-invalid={fehler.productName ? true : undefined}
+              aria-describedby={fehler.productName ? 'verkauf-name-fehler' : undefined}
+              className={cn(FELD, 'min-h-11')}
+              {...form.register('productName', { onChange: () => form.clearErrors('productName') })}
+            />
+            <ZeichenZaehler laenge={werte.productName.length} max={PRODUKTNAME_MAX} />
+            {fehler.productName?.message && <FeldFehler id="verkauf-name-fehler">{fehler.productName.message}</FeldFehler>}
+          </div>
+        )}
+      </fieldset>
 
-        {/* Was hast du verkauft? — optional (Board s2/w2-verkaeufe) */}
-        <fieldset className="min-w-0">
-          <legend className="mb-2 text-sm font-semibold text-foreground">
-            Was hast du verkauft? <span className="font-normal text-muted-foreground">(optional)</span>
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {chips.map((p) => {
-              const aktiv = werte.productId === p.id
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  aria-pressed={aktiv}
-                  title={p.name}
-                  onClick={() => waehleProdukt(p)}
-                  className={cn('min-h-11 max-w-full truncate rounded-full border px-4 text-sm font-medium transition-colors duration-[250ms]', aktiv ? WAHL_AN : WAHL_AUS, FOKUS_RAHMEN)}
-                >
-                  {p.name}
-                </button>
-              )
-            })}
+      {/* Menge vor dem Vorrat und ohne Klappe: schmales Feld, daneben „Stück · Notiz ergänzen“ (Board s2-/w2-verkaeufe Bild 2). */}
+      <div>
+        <label htmlFor="verkauf-menge" className={FELD_LABEL}>
+          Menge
+        </label>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <DezimalFeld
+            id="verkauf-menge"
+            value={werte.quantity}
+            onChange={(wert) => {
+              form.setValue('quantity', wert)
+              form.clearErrors('quantity')
+            }}
+            aria-invalid={fehler.quantity ? true : undefined}
+            aria-describedby={fehler.quantity ? 'verkauf-menge-fehler' : undefined}
+            className={cn(FELD, 'w-[120px] shadow-none focus-visible:ring-0 dark:bg-background')}
+          />
+          <span className="flex items-center gap-1.5 text-[14px] text-muted-foreground">
+            {einheit && (
+              <>
+                <span>{einheit}</span>
+                <span aria-hidden="true">·</span>
+              </>
+            )}
             <button
               type="button"
-              aria-pressed={werte.freierName}
-              onClick={() => waehleProdukt(null)}
-              className={cn(
-                'min-h-11 rounded-full border px-4 text-sm font-medium transition-colors duration-[250ms]',
-                werte.freierName ? WAHL_AN : cn(WAHL_AUS, 'border-dashed'),
-                FOKUS_RAHMEN
-              )}
+              aria-expanded={notizOffen}
+              aria-controls="verkauf-notiz-feld"
+              onClick={() => setNotizOffen((o) => !o)}
+              className={cn(TEXT_LINK, 'text-[14px]')}
             >
-              Anderes
+              Notiz ergänzen
             </button>
-          </div>
-          {werte.freierName && (
-            <div className="mt-2.5">
-              <label htmlFor="verkauf-name" className="sr-only">
-                Was hast du verkauft?
-              </label>
-              <input
-                id="verkauf-name"
-                autoFocus
-                placeholder="Was hast du verkauft?"
-                aria-invalid={fehler.productName ? true : undefined}
-                aria-describedby={fehler.productName ? 'verkauf-name-fehler' : undefined}
-                className={cn(FELD, 'min-h-11')}
-                {...form.register('productName', { onChange: () => form.clearErrors('productName') })}
-              />
-              <ZeichenZaehler laenge={werte.productName.length} max={PRODUKTNAME_MAX} />
-              {fehler.productName?.message && <FeldFehler id="verkauf-name-fehler">{fehler.productName.message}</FeldFehler>}
-            </div>
-          )}
-        </fieldset>
-
-        {/* Vorrat abziehen (D1) — nur beim Eintragen mit einem Produkt aus dem Sortiment. Die ganze Zeile ist der
-            Schalter (44 px, role="switch") wie „Teilen-Hinweise zeigen"; fester Name, der Satz darunter beschreibt. */}
-        {vorratSchalter && (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={werte.vorratAbziehen}
-            aria-label={VORRAT_ABZIEHEN}
-            aria-describedby={vorratTextId}
-            onClick={() => form.setValue('vorratAbziehen', !werte.vorratAbziehen)}
-            className={cn('-my-1 flex min-h-11 w-full items-center gap-3 rounded-xl py-1 text-left', FOKUS_RAHMEN)}
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-foreground">{VORRAT_ABZIEHEN}</span>
-              <span id={vorratTextId} className="block text-[13px] leading-normal break-words text-muted-foreground">
-                {vorratSchalterText(werte.vorratAbziehen, gewaehlt, werte.quantity, werte.unit)}
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className={cn('relative block h-6 w-10 shrink-0 rounded-full transition-colors duration-[250ms]', werte.vorratAbziehen ? 'bg-accent' : 'bg-border')}
-            >
-              <span
-                className={cn(
-                  'absolute top-[3px] block size-[18px] rounded-full transition-transform duration-[250ms]',
-                  werte.vorratAbziehen ? 'translate-x-[19px] bg-accent-foreground' : 'translate-x-[3px] bg-muted-foreground'
-                )}
-              />
-            </span>
-          </button>
-        )}
-
-        {/* Menge oder Notiz — zugeklappt */}
-        <div>
-          <button type="button" aria-expanded={mehrOffen} aria-controls="verkauf-mehr" onClick={() => setMehrOffen((o) => !o)} className={KLAPPER}>
-            <ChevronDown className={cn('size-4 transition-transform', mehrOffen && 'rotate-180')} strokeWidth={1.7} aria-hidden="true" />
-            Menge oder Notiz ergänzen
-          </button>
-          {mehrOffen && (
-            <div id="verkauf-mehr" className="mt-2 flex flex-col gap-3">
-              <div>
-                <label htmlFor="verkauf-menge" className={FELD_LABEL}>
-                  Menge
-                </label>
-                <DezimalFeld
-                  id="verkauf-menge"
-                  value={werte.quantity}
-                  onChange={(wert) => {
-                    form.setValue('quantity', wert)
-                    form.clearErrors('quantity')
-                  }}
-                  suffix={einheit}
-                  placeholder="z. B. 2,5"
-                  aria-invalid={fehler.quantity ? true : undefined}
-                  aria-describedby={fehler.quantity ? 'verkauf-menge-fehler' : undefined}
-                  className={cn(FELD, 'h-11 shadow-none focus-visible:ring-0 dark:bg-background')}
-                />
-                {fehler.quantity?.message && <FeldFehler id="verkauf-menge-fehler">{fehler.quantity.message}</FeldFehler>}
-              </div>
-              <div>
-                <label htmlFor="verkauf-notiz" className={FELD_LABEL}>
-                  Notiz
-                </label>
-                <textarea
-                  id="verkauf-notiz"
-                  placeholder="z. B. Stammkundin, Rechnung folgt"
-                  rows={2}
-                  aria-invalid={fehler.note ? true : undefined}
-                  aria-describedby={fehler.note ? 'verkauf-notiz-fehler' : undefined}
-                  className={cn(FELD, 'resize-none')}
-                  {...form.register('note', { onChange: () => form.clearErrors('note') })}
-                />
-                <ZeichenZaehler laenge={werte.note.length} max={NOTIZ_MAX} />
-                {fehler.note?.message && <FeldFehler id="verkauf-notiz-fehler">{fehler.note.message}</FeldFehler>}
-              </div>
-            </div>
-          )}
+          </span>
         </div>
-
-        <p className="text-[13px] leading-relaxed text-muted-foreground">
-          Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst – auch die mit &bdquo;Bar bei
-          Abholung&ldquo;.
-        </p>
-
-        <DialogFehler text={serverFehler} />
+        {fehler.quantity?.message && <FeldFehler id="verkauf-menge-fehler">{fehler.quantity.message}</FeldFehler>}
+        {notizOffen && (
+          <div id="verkauf-notiz-feld" className="mt-3">
+            <label htmlFor="verkauf-notiz" className={FELD_LABEL}>
+              Notiz
+            </label>
+            <textarea
+              id="verkauf-notiz"
+              placeholder="z. B. Stammkundin, Rechnung folgt"
+              rows={2}
+              aria-invalid={fehler.note ? true : undefined}
+              aria-describedby={fehler.note ? 'verkauf-notiz-fehler' : undefined}
+              className={cn(FELD, 'h-auto resize-none py-2.5')}
+              {...form.register('note', { onChange: () => form.clearErrors('note') })}
+            />
+            <ZeichenZaehler laenge={werte.note.length} max={NOTIZ_MAX} />
+            {fehler.note?.message && <FeldFehler id="verkauf-notiz-fehler">{fehler.note.message}</FeldFehler>}
+          </div>
+        )}
       </div>
 
-      {/* Genau ein „Abbrechen“ (oben rechts); unten nur der Hauptknopf. */}
-      {breit ? <div className="flex flex-wrap justify-end gap-2.5 border-t border-border px-6 py-4">{hauptKnopf}</div> : hauptKnopf}
+      {/* Vorrat abziehen (D1) — nur beim Eintragen mit einem Produkt aus dem Sortiment, nach der Menge. Die ganze Zeile
+          ist der Schalter (44 px, role="switch") wie „Teilen-Hinweise zeigen"; fester Name, der Satz darunter beschreibt. */}
+      {vorratSchalter && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={werte.vorratAbziehen}
+          aria-label={VORRAT_ABZIEHEN}
+          aria-describedby={vorratTextId}
+          onClick={() => form.setValue('vorratAbziehen', !werte.vorratAbziehen)}
+          className={cn('-my-1 flex min-h-11 w-full items-center gap-3 rounded-xl py-1 text-left', FOKUS_RAHMEN)}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold text-foreground">{VORRAT_ABZIEHEN}</span>
+            <span id={vorratTextId} className="block text-[13px] leading-normal break-words text-muted-foreground">
+              {vorratSchalterText(werte.vorratAbziehen, gewaehlt, werte.quantity, werte.unit)}
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className={cn('relative block h-6 w-10 shrink-0 rounded-full transition-colors duration-[250ms]', werte.vorratAbziehen ? 'bg-accent' : 'bg-border')}
+          >
+            <span
+              className={cn(
+                'absolute top-[3px] block size-[18px] rounded-full transition-transform duration-[250ms]',
+                werte.vorratAbziehen ? 'translate-x-[19px] bg-accent-foreground' : 'translate-x-[3px] bg-muted-foreground'
+              )}
+            />
+          </span>
+        </button>
+      )}
+
+      <p className="text-[13px] leading-normal text-muted-foreground">
+        Nur Verkäufe, die nicht über {MARKE} bestellt wurden. Bestellungen zählt die Auswertung von selbst – auch die mit &bdquo;Bar bei
+        Abholung&ldquo;.
+      </p>
+
+      {/* Speicherfehler als Kasten in der Warnfarbe (G6), ohne „Nochmal“ (D1, Liste Lauf 32 C). */}
+      <SpeicherFehler text={serverFehler} />
+
+      {/* Genau ein „Abbrechen“ (oben rechts); unten nur der Hauptknopf, ohne abgesetzte Fußleiste. Im Blatt bleibt er
+          beim Scrollen unten stehen (Board s2-verkaeufe Bild 2: der Knopf ist immer zu sehen). */}
+      {breit ? hauptKnopf : <div className="sticky bottom-0 -mx-1 bg-popover px-1 pt-2">{hauptKnopf}</div>}
     </form>
   )
 }
 
 /**
- * Der Rahmen um das Formular: ab 768 px Dialog, darunter Blatt. Neu trägt der
- * Fokus gleich ins Betragsfeld (am Handy geht die Zifferntastatur auf).
+ * Der Rahmen um das Formular: ab 768 px der zentrierte Dialog (`DialogMitte`), darunter das Blatt (höchstens
+ * 86 % hoch, DESIGN_SYSTEM „Dialoge und Blätter“). Neu trägt der Fokus gleich ins Betragsfeld (am Handy geht die
+ * Zifferntastatur auf).
  */
 export function VerkaufDialog({
   offen,
@@ -508,16 +543,15 @@ export function VerkaufDialog({
   const fokus = verkauf ? undefined : betragRef
   // Ein anderer Verkauf ist ein anderes Formular — nie Werte des vorigen.
   const schluessel = `${verkauf?.id ?? ''}|${vorlage?.id ?? ''}`
-  const formular = (titel: FormularProps['titel']) => (
+  const formular = (kopf?: FormularProps['kopf']) => (
     <VerkaufFormular
       key={schluessel}
       verkauf={verkauf}
       vorlage={vorlage}
       produkte={produkte}
       topProduktIds={topProduktIds}
-      titel={titel}
+      kopf={kopf}
       onFertig={onSchliessen}
-      onAbbrechen={onSchliessen}
       breit={breit}
       betragRef={betragRef}
     />
@@ -526,21 +560,20 @@ export function VerkaufDialog({
   if (breit) {
     return (
       <Dialog open={offen} onOpenChange={(o) => !o && onSchliessen()}>
-        <DialogContent initialFocus={fokus} showCloseButton={false} className="gap-0 overflow-hidden p-0 sm:max-w-[520px]">
-          {formular((text) => (
-            <DialogTitle className="font-heading text-[22px] leading-tight font-semibold break-words">{text}</DialogTitle>
-          ))}
-        </DialogContent>
+        <DialogMitte titel={verkauf ? 'Verkauf bearbeiten' : 'Verkauf eintragen'} schliessen="Abbrechen" initialFocus={fokus} className="max-w-[560px]">
+          {formular()}
+        </DialogMitte>
       </Dialog>
     )
   }
 
   return (
     <Sheet open={offen} onOpenChange={(o) => !o && onSchliessen()}>
-      <SheetBlatt initialFocus={fokus}>
-        {formular((text) => (
-          <SheetTitle className="font-heading text-xl leading-tight font-semibold break-words">{text}</SheetTitle>
-        ))}
+      <SheetBlatt initialFocus={fokus} className="max-h-[86dvh]">
+        {formular({
+          titel: (text) => <SheetTitle className="font-heading text-xl leading-tight font-semibold break-words">{text}</SheetTitle>,
+          onAbbrechen: onSchliessen,
+        })}
       </SheetBlatt>
     </Sheet>
   )

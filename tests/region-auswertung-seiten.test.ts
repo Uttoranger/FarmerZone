@@ -213,8 +213,11 @@ describe('Karten im neuen Design', () => {
     // Seit Nr. 29 mit `?kaeufer=betrieb`: Die Kasse belegt „Betrieb" vor. Vorgewählt ist die erste kaufbare Größe.
     expect(html).toContain('href="/testhof/produkt/p?kaeufer=betrieb"')
     expect(html).toContain('Bestellen · Kleinballen · € 4,50')
-    expect(html).toMatch(/<fieldset[^>]*><legend[^>]*>Größe<\/legend>/)
-    expect(html).toContain('günstigster Kilopreis')
+    // Seit Nr. 272 die Größen als Optionen über die Größenkachel G5 (Radiogruppe „Größe“, Zeilen mit Kilopreis).
+    expect(html).toMatch(/role="radiogroup"[^>]*aria-label="Größe"|aria-label="Größe"[^>]*role="radiogroup"/)
+    expect(html).toContain('data-form="zeile"')
+    // Kopf der Futterkarte: Produkt als Titel, darunter „Hof · km“ ohne PLZ und Ort (Board s1-/w1-region Bild 2).
+    expect(html).toContain('>Testhof A · 3,0 km</p>')
     expect(html).toContain('Anhänger nötig')
     expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;art=HEU_STROH"')
     expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;abholung=morgen"')

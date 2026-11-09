@@ -105,7 +105,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/mein-hof/mein-hof-laden.tsx': 3,
   'src/components/produktdetail/produktdetail-teile.tsx': 5,
   'src/components/region/futter-karte-ansicht.tsx': 1,
-  'src/components/region/futter-karte.tsx': 1,
   'src/components/settings/pause-client.tsx': 2,
   'src/components/settings/pickup-slots-client.tsx': 2,
   'src/components/shared/bereich-umschalter.tsx': 1,

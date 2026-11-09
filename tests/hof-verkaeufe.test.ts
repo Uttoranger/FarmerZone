@@ -76,8 +76,9 @@ import { formatEuro } from '@/lib/format'
 import { umsatzfenster } from '@/lib/umsatz'
 import { getSalesOverview, type SalesOverview } from '@/server/queries/manual-sales'
 import { createManualSale, deleteManualSale, updateManualSale } from '@/server/actions/manual-sales'
-import { VerkaeufeAnsicht } from '@/components/hof-verkaeufe/verkaeufe-ansicht'
-import { VerkaufFormular } from '@/components/hof-verkaeufe/verkauf-dialog'
+import { VerkaeufeAnsicht, zeilenAnzeige } from '@/components/hof-verkaeufe/verkaeufe-ansicht'
+import { VERKAUF_SPEICHERN_FEHLER, VerkaufFormular, datumChipText } from '@/components/hof-verkaeufe/verkauf-dialog'
+import { KOPF_AKTION } from '@/components/hof-verkaeufe/verkaeufe-laden'
 import { VerkaeufeFehler } from '@/components/hof-verkaeufe/verkaeufe-fehler'
 
 function quelle(pfad: string): string {
@@ -509,15 +510,14 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
         vorlage: null,
         produkte: [{ id: 'p1', name: LANG, unit: 'KG', unitSize: null, stock: 12 }],
         topProduktIds: ['p1'],
-        titel: (text: string) => createElement('h2', null, text),
+        kopf: { titel: (text: string) => createElement('h2', null, text), onAbbrechen: () => {} },
         onFertig: () => {},
-        onAbbrechen: () => {},
         breit: true,
         ...teil,
       })
     )
 
-  it('neu: Betrag zuerst, vier Wege und „Anderes", Produkt-Chips mit langem Namen, Knopf grau ohne Betrag', () => {
+  it('neu: Betrag zuerst, vier Wege und „Anderes", Produkt-Chips mit langem Namen, Knopf ohne Betrag nie deaktiviert (G6, Nr. 272)', () => {
     const html = formular()
     expect(html).toContain('<h2>Verkauf eintragen</h2>')
     expect(html).toContain('Betrag in Euro')
@@ -526,9 +526,12 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
     for (const weg of ['Hofladen', 'Markt', 'WhatsApp', 'Betrieb', 'Anderes']) expect(html).toContain(weg)
     expect(html.match(/aria-pressed="true"/g)?.length).toBe(1)
     expect(html).toContain(`title="${LANG}"`)
-    expect(html).toContain('Menge oder Notiz ergänzen')
+    // Seit Nr. 272: Menge ohne Klappe, nur die Notiz klappt auf; „Eintragen“ ist nie deaktiviert (G6).
+    expect(html).not.toContain('Menge oder Notiz ergänzen')
+    expect(html).toContain('Notiz ergänzen')
     expect(html).toContain('aria-expanded="false"')
-    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""[^>]*>Eintragen</)
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Eintragen</)
+    expect(html).not.toMatch(/<button[^>]*type="submit"[^>]*disabled=""/)
     expect(html).toContain('Abbrechen')
     expect(html).not.toContain('maxlength')
     expect(symboleVersteckt(html)).toBe(true)
@@ -580,5 +583,117 @@ describe('Formular „Verkauf eintragen" im neuen Design', () => {
     expect(html).toContain('€ 24,50 speichern')
     expect(html).toContain('Stammkundin')
     expect(html).toContain('aria-expanded="true"')
+  })
+})
+
+describe('Verkäufe nach der Abnahme Lauf 32 (Nr. 272)', () => {
+  const formular = (teil: Record<string, unknown> = {}) =>
+    renderToStaticMarkup(
+      createElement(VerkaufFormular, {
+        verkauf: null,
+        vorlage: null,
+        produkte: [{ id: 'p1', name: 'Bergkäse', unit: 'STUECK', unitSize: null, stock: 18 }],
+        topProduktIds: ['p1'],
+        onFertig: () => {},
+        breit: true,
+        ...teil,
+      })
+    )
+
+  it('Tag als Chip „Heute, Mi 3. März“ ohne Symbole, sonst Wochentag und Datum', () => {
+    expect(datumChipText('2027-03-03', '2027-03-03')).toBe('Heute, Mi 3. März')
+    expect(datumChipText('2027-03-02', '2027-03-03')).toBe('Gestern, Di 2. März')
+    expect(datumChipText('2027-02-27', '2027-03-03')).toBe('Sa 27. Feb')
+    const html = formular()
+    const chip = html.match(/<button[^>]*aria-controls="verkauf-datum-feld"[^>]*>(.*?)<\/button>/)?.[1] ?? ''
+    expect(chip).not.toContain('<svg')
+    expect(chip).toMatch(/^Heute, /)
+  })
+
+  it('Dialog (breit): kein eigener Titel und kein zweites „Abbrechen“ im Formular — DialogMitte trägt beides', () => {
+    const html = formular()
+    expect(html).not.toContain('Abbrechen')
+    expect(html).not.toContain('<h2')
+    const dialog = quelle('src/components/hof-verkaeufe/verkauf-dialog.tsx')
+    expect(dialog).toContain('<DialogMitte')
+    expect(dialog).toContain('schliessen="Abbrechen"')
+    // Kein Weichzeichnen, keine Fußleiste: DialogContent (verwischter Schleier) und die Leiste mit Linie sind weg.
+    expect(dialog).not.toContain('DialogContent')
+    expect(dialog).not.toMatch(/border-t border-border px-6 py-4/)
+  })
+
+  it('Blatt höchstens 86 % hoch', () => {
+    expect(quelle('src/components/hof-verkaeufe/verkauf-dialog.tsx')).toMatch(/<SheetBlatt[^>]*className="max-h-\[86dvh\]"/)
+  })
+
+  it('„Anderes“ steht als Link neben „Wo verkauft?“, vor den vier Wegen', () => {
+    const html = formular()
+    const frage = html.indexOf('Wo verkauft?')
+    const anderes = html.indexOf('>Anderes<', frage)
+    expect(frage).toBeGreaterThan(-1)
+    expect(anderes).toBeGreaterThan(frage)
+    expect(anderes).toBeLessThan(html.indexOf('>Hofladen<'))
+    expect(html.slice(frage, anderes)).toContain('underline')
+  })
+
+  it('Betrag in der Grundschrift, nur mit Unterstrich (keine Serife, kein Kasten)', () => {
+    const html = formular()
+    const feld = html.match(/<input id="verkauf-betrag"[^>]*>/)?.[0] ?? ''
+    expect(feld).toContain('font-sans')
+    expect(feld).not.toContain('font-heading')
+    expect(html).toContain('border-b-2')
+  })
+
+  it('Menge vor dem Vorrat, ohne Klappe, mit Einheit und „Notiz ergänzen“ daneben', () => {
+    const html = formular({ vorlage: daten({ productId: 'p1', productName: 'Bergkäse', unit: 'STUECK', quantity: 4, totalAmount: 24.8 }) })
+    const menge = html.indexOf('id="verkauf-menge"')
+    expect(menge).toBeGreaterThan(-1)
+    expect(menge).toBeLessThan(html.indexOf('role="switch"'))
+    expect(html.slice(menge, html.indexOf('role="switch"'))).toMatch(/Stück<\/span>.*Notiz ergänzen/)
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*>€ 24,80 eintragen</)
+  })
+
+  it('Speicherfehler: Kasten in der Warnfarbe ohne „Nochmal“ (D1), Satz des Codes', () => {
+    const dialog = quelle('src/components/hof-verkaeufe/verkauf-dialog.tsx')
+    expect(dialog).toContain('<SpeicherFehler text={serverFehler} />')
+    expect(dialog).not.toMatch(/SpeicherFehler[^>]*nochmal/)
+    expect(VERKAUF_SPEICHERN_FEHLER).toContain('Deine Angaben sind noch da.')
+  })
+
+  it('Listenzeilen: Marke „Eingetragen“/„Bestellung“, Unterzeile „Tag · Weg“, Menge im Titel', () => {
+    const zeilen = verkaufsZeilen(
+      mergeSalesFeed(
+        [feedBestellung()],
+        [
+          feedVerkauf({ id: 'v1', productId: 'p1', productName: 'Bergkäse', quantity: 4, channel: 'MARKT' }),
+          feedVerkauf({ id: 'v2', productId: null, productName: 'Wochenmarkt Braunau', quantity: 1, channel: 'MARKT' }),
+        ],
+        10
+      ),
+      JETZT
+    )
+    const bestellung = zeilen.find((z) => z.art === 'bestellung')!
+    const verkauf = zeilen.find((z) => z.art === 'verkauf' && z.verkauf.id === 'v1')!
+    const einzeln = zeilen.find((z) => z.art === 'verkauf' && z.verkauf.id === 'v2')!
+    expect(zeilenAnzeige(bestellung).marke).toEqual({ text: 'Bestellung', ton: 'fertig' })
+    expect(zeilenAnzeige(bestellung).titel).toMatch(/ · /)
+    expect(zeilenAnzeige(verkauf)).toMatchObject({ titel: '4 × Bergkäse', unterzeile: `${verkauf.datum} · Markt`, marke: { text: 'Eingetragen', ton: 'neutral' } })
+    expect(zeilenAnzeige(einzeln).titel).toBe('Wochenmarkt Braunau')
+  })
+
+  it('Kopf-Aktion „Verkauf eintragen“ ohne „+“, auf Höhe der h1', () => {
+    for (const datei of ['src/components/hof-verkaeufe/verkaeufe-ansicht.tsx', 'src/components/hof-verkaeufe/verkaeufe-fehler.tsx']) {
+      const text = quelle(datei)
+      expect(text).not.toContain('<Plus')
+      expect(text).toContain('KOPF_AKTION')
+    }
+    expect(KOPF_AKTION).toContain('md:mb-')
+    const html = renderToStaticMarkup(createElement(VerkaeufeFehler))
+    const knopf = html.match(/<a[^>]*href="\/sales\?neu=1"[^>]*>(.*?)<\/a>/)?.[1] ?? ''
+    expect(knopf).toBe('Verkauf eintragen')
+  })
+
+  it('Ladefehler nimmt den LadeFehlerKasten aus ui/', () => {
+    expect(quelle('src/components/hof-verkaeufe/verkaeufe-fehler.tsx')).toContain("from '@/components/ui/lade-fehler-kasten'")
   })
 })

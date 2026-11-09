@@ -1,10 +1,10 @@
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { AKTIONSLEISTE_KNOPF, FesteAktionsleiste } from '@/components/ui/feste-aktionsleiste'
-import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
+import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
 import { KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
+import { KOPF_AKTION } from './verkaeufe-laden'
 
 /** Der Weg zum Dialog „Verkauf eintragen“ — dieselbe Adresse wie im Neu-Menü (Register E13). */
 const NEU_HREF = '/sales?neu=1'
@@ -22,8 +22,7 @@ export function VerkaeufeFehler({ unterzeile }: { unterzeile?: React.ReactNode }
         titel="Verkäufe"
         unterzeile={unterzeile}
         aktion={
-          <Link href={NEU_HREF} className={cn(KNOPF_ORANGE, 'hidden md:inline-flex')}>
-            <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
+          <Link href={NEU_HREF} className={cn(KNOPF_ORANGE, KOPF_AKTION)}>
             Verkauf eintragen
           </Link>
         }

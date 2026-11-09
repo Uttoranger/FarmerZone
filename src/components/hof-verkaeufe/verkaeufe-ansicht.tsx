@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ChevronRight, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, ExternalLink, Pencil, Trash2 } from 'lucide-react'
 import { createStripeDashboardLinkAction } from '@/server/actions/stripe-connect'
 import { deleteManualSale } from '@/server/actions/manual-sales'
 import type { SalesOverview } from '@/server/queries/manual-sales'
@@ -15,6 +15,8 @@ import {
   type VerkaufsZeile,
 } from '@/lib/hof-verkaeufe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
+import { positionszeile } from '@/lib/positionszeile'
+import { istOhneProdukt } from '@/lib/verkauf-eintragen'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -25,6 +27,7 @@ import { BestellDialog, DialogFehler } from '@/components/hof-bestellungen/beste
 import { KARTE, KNOPF_ORANGE, LEISE } from '@/components/hof-bestellungen/stil'
 import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { VerkaufDialog } from './verkauf-dialog'
+import { KOPF_AKTION } from './verkaeufe-laden'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 
@@ -39,6 +42,23 @@ import { MARKE } from '@/lib/marke'
  */
 
 const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
+
+
+/**
+ * Was eine Zeile der Liste zeigt (Board s2-/w2-verkaeufe Bild 1, Liste Lauf 32 „Listenzeilen anders“): die Marke
+ * „Bestellung“ bzw. „Eingetragen“ unter dem Betrag, darunter „<Tag> · <Weg>“ statt des Kanal-Chips; ein
+ * Direktverkauf mit Menge heißt „4 × Bergkäse“ (Positionszeile, G14). Nur Anzeige aus den fertigen Feldern der
+ * Zeile (src/lib/hof-verkaeufe.ts) — kein Betrag wird hier gerechnet.
+ */
+export function zeilenAnzeige(zeile: VerkaufsZeile): { titel: string; unterzeile: string; marke: { text: string; ton: 'fertig' | 'neutral' } } {
+  if (zeile.art === 'bestellung') {
+    return { titel: `${zeile.titel} · ${zeile.nummer}`, unterzeile: `${zeile.datum} · ${zeile.marke.text}`, marke: { text: 'Bestellung', ton: 'fertig' } }
+  }
+  const v = zeile.verkauf
+  // „1“ ist bei einem Verkauf ohne Produkt nur der Platzhalter der Datenbank; eine einzelne Menge sagt nichts Neues.
+  const titel = v.quantity !== 1 && !istOhneProdukt(v) ? positionszeile({ name: v.productName, quantity: v.quantity }).text : zeile.titel
+  return { titel, unterzeile: `${zeile.datum} · ${kanalText(zeile.kanal)}`, marke: { text: 'Eingetragen', ton: 'neutral' } }
+}
 
 type Props = {
   overview: SalesOverview
@@ -75,8 +95,7 @@ export function VerkaeufeAnsicht({ overview, produkte, topProduktIds, stripeRead
         titel="Verkäufe"
         unterzeile={unterzeile}
         aktion={
-          <button type="button" onClick={neuerVerkauf} className={cn(KNOPF_ORANGE, 'hidden md:inline-flex')}>
-            <Plus className="size-4" strokeWidth={2} aria-hidden="true" />
+          <button type="button" onClick={neuerVerkauf} className={cn(KNOPF_ORANGE, KOPF_AKTION)}>
             Verkauf eintragen
           </button>
         }
@@ -215,21 +234,19 @@ function Zeile({
   onLoeschen: (v: VerkaufDaten) => void
 }): React.JSX.Element {
   // Ohne Symbol; Marke „Eingetragen“/„Bestellung“ unter dem Betrag, „Name · Nummer“ als Titel (Board s2-/w2-verkaeufe).
+  const anzeige = zeilenAnzeige(zeile)
   const inhalt = (
     <>
       <span className="min-w-0 flex-1">
         {/* Der Titel bricht um statt gekürzt zu werden (Board s2-verkaeufe: „Wochenmarkt Braunau“ zweizeilig). */}
-        <span className="block text-[14.5px] leading-snug font-semibold break-words text-foreground" title={zeile.titel}>
-          {zeile.titel}
-          {zeile.art === 'bestellung' && ` · ${zeile.nummer}`}
+        <span className="block text-[15px] leading-snug font-semibold break-words text-foreground" title={anzeige.titel}>
+          {anzeige.titel}
         </span>
-        <span className={cn('block truncate text-[13px]', LEISE)}>
-          {zeile.datum} · {zeile.unterzeile}
-        </span>
+        <span className={cn('block truncate text-[13px]', LEISE)}>{anzeige.unterzeile}</span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
-        <span className="text-right text-[14.5px] font-semibold text-foreground tabular-nums">{euro(zeile.betragCent)}</span>
-        <StatusBadge status={zeile.marke.ton}>{zeile.marke.text}</StatusBadge>
+        <span className="text-right text-[15px] font-semibold text-foreground tabular-nums">{euro(zeile.betragCent)}</span>
+        <StatusBadge status={anzeige.marke.ton}>{anzeige.marke.text}</StatusBadge>
       </span>
     </>
   )
