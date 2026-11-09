@@ -90,9 +90,10 @@ const RAHMEN_KNOPF = cn(
  * Mit `accent-color` malt der Browser den gewählten Punkt im Dunkeln als hellen Ring mit dunkler Mitte. Hier ein
  * Kreis im Feldrand; gewählt Rand und Fläche im Ton der Welt mit einem Spalt in der Kartenfarbe — der gefüllte
  * Punkt der Boards in beiden Themes. `appearance-none` nimmt nur die Zeichnung, das native Optionsfeld bleibt
- * (Tastatur, Vorleser, Formularwert).
+ * (Tastatur, Vorleser, Formularwert). Im Kontrastmodus (`forced-colors`) setzt der Browser Flächen auf
+ * Systemfarben, der gezeichnete Punkt verschwände — dort zeichnet er das Optionsfeld wieder selbst.
  */
-const PUNKT = 'shrink-0 cursor-pointer appearance-none rounded-full border-2 border-kaestchen-rand bg-card transition-colors duration-[250ms] checked:shadow-[inset_0_0_0_3px_var(--color-card)]'
+const PUNKT = 'shrink-0 cursor-pointer appearance-none rounded-full border-2 border-kaestchen-rand bg-card transition-colors duration-[250ms] checked:shadow-[inset_0_0_0_3px_var(--color-card)] forced-colors:appearance-auto'
 
 /**
  * „Das schicken wir automatisch mit“ (Board s2-/w2-meldungen, Nacharbeit 225):

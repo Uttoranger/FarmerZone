@@ -47,6 +47,7 @@ import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { Vorschau269 } from '@/app/intern/bausteine/vorschau-269'
+import { Vorschau268 } from '@/app/intern/bausteine/vorschau-268'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -613,6 +614,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           <Vorschau248 />
           <Vorschau267 />
           <Vorschau269 />
+          <Vorschau268 />
         </div>
       </main>
     </div>

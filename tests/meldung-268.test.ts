@@ -16,6 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/intern/bausteine', useParams: () => ({}) }))
 vi.mock('@/server/actions/meldung', () => ({ meldungAbsenden: vi.fn() }))
 vi.mock('@/components/shared/image-upload', () => ({
   useImageUpload: () => ({ fileInput: null, openFilePicker: () => {}, isUploading: false, progress: null }),
@@ -28,6 +29,7 @@ import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
 import { meldungEingabeSchema } from '@/schemas/meldung'
 import { RUNDUNG } from '@/components/ui/rundung'
 import type { MeldungZeile } from '@/lib/hof-hilfe'
+import { MeldungVariante268, Vorschau268 } from '@/app/intern/bausteine/vorschau-268'
 
 function formular(teil: Partial<MeldungFormular> = {}): MeldungFormular {
   return {
@@ -191,6 +193,49 @@ describe('Meldeformular nach den Boards (Nr. 268)', () => {
 
   it('Bot-Bremse bleibt (Register N46): Honigtopf im Formular beider Welten', () => {
     for (const welt of ['kunde', 'hof'] as const) expect(ansicht(welt, welt === 'hof'), welt).toContain('name="website"')
+  })
+
+  it('Kontrastmodus: der Auswahlpunkt fällt auf das Optionsfeld des Browsers zurück (forced-colors)', () => {
+    expect(ansicht('kunde', false).match(/forced-colors:appearance-auto/g)).toHaveLength(3)
+  })
+})
+
+describe('Vorschau /intern/bausteine (Nr. 268)', () => {
+  const zeichne = (variante: 'kunde' | 'kunde-hof' | 'hof') => renderToStaticMarkup(createElement(MeldungVariante268, { variante }))
+
+  it('Kundschaft ohne Sitzung: Karte, E-Mail, Satz, kein Bildschirmfoto', () => {
+    const html = zeichne('kunde')
+    expect(html).toContain('data-welt="kunde"')
+    expect(html).toContain('id="meldung-email"')
+    expect(html).toContain('Mitgeschickt: Fehlernummer 3141592653, Seite und Gerät.')
+    expect(html).not.toContain(MELDUNG_ANSICHT_TEXT.bildschirmfoto)
+  })
+
+  it('Kundschaft mit Hof-Sitzung: Satz statt Karte, gestricheltes Bildschirmfoto nach der Nummer', () => {
+    const html = zeichne('kunde-hof')
+    expect(html).toContain('Seite, Gerät und dein Hof')
+    expect(html).not.toContain(MELDUNG_ANSICHT_TEXT.mitgeschicktTitel)
+    expect(html).toContain('border-dashed')
+    expect(html.indexOf('id="meldung-kennung"')).toBeLessThan(html.indexOf(MELDUNG_ANSICHT_TEXT.bildschirmfoto))
+  })
+
+  it('Hof: Karte „Das schicken wir automatisch mit“ mit dem Hof, Bildschirmfoto vor der Nummer', () => {
+    const html = zeichne('hof')
+    expect(html).toContain('data-welt="hof"')
+    expect(html).toContain(MELDUNG_ANSICHT_TEXT.mitgeschicktTitel)
+    expect(html).toMatch(/<dd[^>]*>Hof Müller<\/dd>/)
+    expect(html.indexOf(MELDUNG_ANSICHT_TEXT.bildschirmfoto)).toBeLessThan(html.indexOf('id="meldung-kennung"'))
+  })
+
+  it('Gesamtvorschau: Variantenwahl, Meine Meldungen mit Art-Marke und Kopf-Aktion; eingehängt mit einer Import- und einer Einhäng-Zeile', () => {
+    const html = renderToStaticMarkup(createElement(Vorschau268))
+    expect(html).toContain('Kundschaft mit Hof-Sitzung')
+    expect(html).toMatch(/data-slot="status-badge" data-status="offen"/)
+    expect(html).toMatch(/<a href="\/fehler-melden"[^>]*hidden[^>]*md:inline-flex[^>]*>Neue Meldung<\/a>/)
+    const seite = readFileSync('src/app/intern/bausteine/bausteine-vorschau.tsx', 'utf8')
+    expect(seite.match(/vorschau-268'/g)).toHaveLength(1)
+    expect(seite.match(/<Vorschau268 \/>/g)).toHaveLength(1)
+    expect(readFileSync('src/app/intern/bausteine/vorschau-268.tsx', 'utf8')).not.toMatch(/meldungAbsenden|useMeldungFormular\(/)
   })
 })
 
