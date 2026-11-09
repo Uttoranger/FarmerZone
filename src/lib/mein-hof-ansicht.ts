@@ -132,7 +132,16 @@ export function gespeichertHinweisId(abschnitt: GespeichertAbschnitt | null): st
 // ─── „Aktuell vom Hof“ in Mein Hof › Hofseite (Register E12, Nr. 129) ───────
 
 /** Die Zeile „Aktuell vom Hof“, wie Liste (unter lg) und Editor (ab lg) sie zeichnen. */
-export type AktuellZeile = { titel: string; wert: string; link: { text: string; href: string } }
+export type AktuellZeile = {
+  titel: string
+  wert: string
+  link: { text: string; href: string }
+  /**
+   * Die Zeile unter der Überschrift „Aktuell vom Hof“ nach den Boards s1-/w1-mein-hof (Nr. 274):
+   * Titel des laufenden Beitrags, darunter „läuft noch …“ und die Marke „Läuft“; null ohne Beitrag.
+   */
+  beitrag: { titel: string; stand: string } | null
+}
 
 /**
  * Die erste Zeile der Teile der Hofseite: Die Hofseite zeigt den laufenden
@@ -144,10 +153,12 @@ export type AktuellZeile = { titel: string; wert: string; link: { text: string; 
  * hofseiteZeileIdSchema (Freigabe 129.4, Runde 2) — wie jede Zeile.
  */
 export function aktuellZeile(beitrag: Pick<DeinBeitrag, 'titel' | 'endet'> | null, jetzt: Date): AktuellZeile {
-  if (!beitrag) return { titel: AKTUELL_VOM_HOF_TEXT.titel, wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: NEUER_BEITRAG_HREF } }
+  if (!beitrag) return { titel: AKTUELL_VOM_HOF_TEXT.titel, wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: NEUER_BEITRAG_HREF }, beitrag: null }
+  const stand = laeuftNochText(beitrag.endet, jetzt)
   return {
     titel: AKTUELL_VOM_HOF_TEXT.titel,
-    wert: `${beitrag.titel} · ${laeuftNochText(beitrag.endet, jetzt)}`,
+    wert: `${beitrag.titel} · ${stand}`,
     link: { text: 'Beiträge', href: BEITRAEGE_HREF },
+    beitrag: { titel: beitrag.titel, stand },
   }
 }

@@ -39,6 +39,14 @@ import { cn } from '@/lib/utils'
 /** Die Hülle um den Kopf — dieselbe auf /farm-page und /products (tests/mein-hof-kopf.test.ts). */
 export const MEIN_HOF_KOPF_HUELLE = 'mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none'
 
+/**
+ * Auf /farm-page kleben Titelzeile und Reiter unter lg oben (Board s1-mein-hof Bild 2, Liste Lauf 32
+ * mein-hof „Kopf und Reiter scrollen weg“, Nr. 274). Die Zustandskarte steht dort im Inhalt und
+ * scrollt mit (`ohneKarte`) — sonst klebte ein Drittel des Schirms. `sticky` reicht, weil die Hülle
+ * direkt im Inhalt der Seite steht (ihr Elternelement ist so hoch wie die Seite).
+ */
+export const MEIN_HOF_KOPF_KLEBT = 'max-lg:sticky max-lg:top-0 max-lg:z-30 max-lg:bg-background max-lg:pb-1 print:static'
+
 /** Teilen und Kundenansicht als Symbol, 44 px — wie im Board; das Wort trägt der Screenreader. */
 const SYMBOL_KNOPF = cn(
   'inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground transition-colors duration-[250ms] hover:bg-muted',
@@ -117,6 +125,7 @@ export function MeinHofKopf({
   aktiv,
   jetzt,
   titelAlsH1 = false,
+  ohneKarte = false,
 }: {
   hof: MeinHofKopfDaten
   /** Aus ladeMeinHofZustand; null ohne Daten — dann steht keine Zustandskarte da. */
@@ -129,6 +138,8 @@ export function MeinHofKopf({
    * auf /products trägt die Seite ihre eigene h1, dort bleibt der Titel ein Absatz.
    */
   titelAlsH1?: boolean
+  /** Die Zustandskarte steht im Inhalt statt im Kopf (auf /farm-page, wo der Kopf klebt). */
+  ohneKarte?: boolean
 }): React.JSX.Element {
   const schild = kopfSchild(hof.zustand)
   const Titel = titelAlsH1 ? 'h1' : 'p'
@@ -158,7 +169,7 @@ export function MeinHofKopf({
       <MeinHofReiterLeiste aktiv={aktiv} nurUnterMd={aktiv === 'produkte'} gleichBreit />
 
       {/* Unter den Reitern wie im Board; auf Beiträge zeigt das Board keine Karte. */}
-      {aktiv !== 'beitraege' && <MeinHofZustandsKarte hof={hof} zustand={zustand} className="mt-1.5" />}
+      {aktiv !== 'beitraege' && !ohneKarte && <MeinHofZustandsKarte hof={hof} zustand={zustand} className="mt-1.5" />}
     </div>
   )
 }

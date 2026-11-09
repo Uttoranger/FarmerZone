@@ -260,10 +260,12 @@ describe('Mein Hof › Hofseite: die Zeile „Aktuell vom Hof“', () => {
       titel: 'Aktuell vom Hof',
       wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage',
       link: { text: 'Beiträge', href: BEITRAEGE_HREF },
+      // Für die Zeile unter der Überschrift (Boards s1-/w1-mein-hof, Nr. 274).
+      beitrag: { titel: 'Die ersten Kürbisse sind da', stand: 'läuft noch 6 Tage' },
     })
   })
 
   it('ohne Beitrag: „Kein Beitrag“ und „Neuer Beitrag“', () => {
-    expect(aktuellZeile(null, JETZT)).toEqual({ titel: 'Aktuell vom Hof', wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: '/status/new' } })
+    expect(aktuellZeile(null, JETZT)).toEqual({ titel: 'Aktuell vom Hof', wert: 'Kein Beitrag', link: { text: 'Neuer Beitrag', href: '/status/new' }, beitrag: null })
   })
 })

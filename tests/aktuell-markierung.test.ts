@@ -49,6 +49,7 @@ vi.mock('@/components/farmer/hofseite-vorschau-rahmen', () => ({ HofseiteVorscha
 
 import { HofseiteEditor } from '@/components/farmer/hofseite-editor'
 import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
+import { AktuellBlock } from '@/components/mein-hof/aktuell-block'
 import { VorschauImRahmen } from '@/components/farm/vorschau-im-rahmen'
 import { aktuellZeile, type AktuellZeile } from '@/lib/mein-hof-ansicht'
 import { AKTUELL_ANKER } from '@/lib/hofseite-kunde'
@@ -93,9 +94,16 @@ function editor(aktuell: AktuellZeile): unknown {
 /** Was der Editor gerade an die Vorschau gibt. */
 const markiert = (baum: unknown) => findeElement(baum, HofseiteVorschauRahmen)?.props.markiert
 
+/** Die Zeile „Aktuell vom Hof“ im Editor: AktuellBlock mit seinen Angaben ausgerollt (der Editor wird flach gerufen). */
+function aktuellZeileIm(baum: unknown): unknown {
+  const block = findeElement(baum, AktuellBlock)
+  if (!block) throw new Error('Die Zeile „Aktuell vom Hof“ fehlt im Editor')
+  return AktuellBlock(block.props as Parameters<typeof AktuellBlock>[0])
+}
+
 /** Tippt auf die Zeile „Aktuell vom Hof“. */
 function tippeAufAktuell(baum: unknown): void {
-  const zeile = suche(baum, (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
+  const zeile = suche(aktuellZeileIm(baum), (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
   const knopf = suche(zeile?.props?.children, (k) => k.type === 'button')
   if (!knopf) throw new Error('Die Zeile „Aktuell vom Hof“ hat keinen Knopf, der die Vorschau markiert')
   ;(knopf.props?.onClick as () => void)()
@@ -136,7 +144,7 @@ describe('Editor ab lg: die Zeile schickt `aktuell` — derselbe Weg wie jede Ze
   })
 
   it('der Link zu Mein Hof › Beiträge bleibt — die Markierung nimmt ihm nichts', () => {
-    const zeile = suche(editor(MIT_BEITRAG), (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
+    const zeile = suche(aktuellZeileIm(editor(MIT_BEITRAG)), (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
     expect(suche(zeile?.props?.children, (k) => k.props?.href === MIT_BEITRAG.link.href)).not.toBeNull()
   })
 

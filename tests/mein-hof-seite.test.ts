@@ -93,7 +93,7 @@ describe('Beiträge-Übersicht', () => {
     whatsappGetippt: [],
   }
 
-  it('ordnet Aktiv · Entwürfe · Vergangen, leere Gruppen fallen weg', () => {
+  it('ordnet Läuft · Entwürfe · Früher (Board, Nr. 274), leere Gruppen fallen weg', () => {
     const u = beitraegeUebersicht(
       [
         { ...basis, id: 'alt', publishedAt: '2026-10-01T10:00:00.000Z' },
@@ -104,9 +104,9 @@ describe('Beiträge-Übersicht', () => {
       0
     )
     expect(u.gruppen.map((g) => [g.titel, g.eintraege.map((e) => e.id)])).toEqual([
-      ['Aktiv', ['aktiv']],
+      ['Läuft', ['aktiv']],
       ['Entwürfe', ['entwurf']],
-      ['Vergangen', ['alt']],
+      ['Früher', ['alt']],
     ])
     expect(u.anzahl).toBe(3)
     expect(beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt, 0).gruppen.map((g) => g.titel)).toEqual(['Entwürfe'])
@@ -115,7 +115,7 @@ describe('Beiträge-Übersicht', () => {
 
   it('Marke je Zustand: aktiv grün, Entwurf und abgelaufen neutral', () => {
     const [aktiv] = beitraegeUebersicht([{ ...basis, isActive: true, publishedAt: jetzt }], jetzt, 0).gruppen[0].eintraege
-    expect(aktiv.marke).toEqual({ text: 'Aktiv', ton: 'fertig' })
+    expect(aktiv.marke).toEqual({ text: 'Läuft', ton: 'fertig' })
     const [entwurf] = beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt, 0).gruppen[0].eintraege
     expect(entwurf.marke).toEqual({ text: 'Entwurf', ton: 'neutral' })
     const [alt] = beitraegeUebersicht([{ ...basis, publishedAt: '2026-09-01T10:00:00.000Z' }], jetzt, 0).gruppen[0].eintraege
@@ -280,7 +280,11 @@ describe('Reiter „Beiträge"', () => {
     expect(html).toContain('Erdbeeren sind da')
     expect(html).toContain('href="/status/new"')
     expect(html).not.toContain('href="/status"')
-    expect(html).toContain('Aktiv')
+    // Seit Nr. 274 nach Board s1-/w1-mein-hof Bild 5: „Läuft · 1“, eine Zeile mit „›“, die Handlungen klappen darin auf.
+    expect(html).toContain('Läuft · 1')
+    expect(html).toMatch(/<button type="button" aria-expanded="false" aria-controls="beitrag-handlungen-b1"/)
+    expect(html).toMatch(/<div id="beitrag-handlungen-b1" hidden=""/)
+    expect(html).toMatch(/<a href="\/status\/new" class="[^"]*w-full[^"]*">Neuer Beitrag<\/a>/)
     // F6 (22e): die Zahl der E-Mail-Empfänger steht in der Zeile.
     expect(html).toContain('Hofseite und 7 per E-Mail')
   })

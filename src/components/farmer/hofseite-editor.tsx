@@ -3,28 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlignLeft,
-  BadgeCheck,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  Clock3,
-  CreditCard,
-  ImageIcon,
-  Images,
-  LayoutList,
-  MapPin,
-  PenLine,
-  Phone,
-  Quote,
-  ShoppingBag,
-  Stamp,
-  type LucideIcon,
-} from 'lucide-react'
+import { Check, ChevronRight } from 'lucide-react'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
-import { type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
+import { ZEILE_TITEL, type HofseiteFortschritt } from '@/lib/hofseite-fortschritt'
+import { meinHofListe, type MeinHofZeile } from '@/lib/mein-hof-liste'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import {
@@ -40,6 +23,14 @@ import { AbschnittInhalt, SOFORT_GESPEICHERT, type AbschnittHof } from '@/compon
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HOFSEITE_VOLLSTAENDIG, punkteOffenTitel, schildTon } from '@/lib/mein-hof'
+import { AktuellBlock } from '@/components/mein-hof/aktuell-block'
+import {
+  FORTSCHRITT_FUELLUNG,
+  FORTSCHRITT_SPUR,
+  MEIN_HOF_GRUPPE_TITEL,
+  MEIN_HOF_ZEILE_TITEL,
+  MEIN_HOF_ZEILE_WERT,
+} from '@/components/mein-hof/zeilen-stil'
 import { HofseiteVorschauRahmen } from '@/components/farmer/hofseite-vorschau-rahmen'
 import { useElementGroesse } from '@/lib/use-element-groesse'
 import { cn } from '@/lib/utils'
@@ -57,6 +48,10 @@ import { RUNDUNG } from '@/components/ui/rundung'
  * Gespeichert wird ausschließlich über die vorhandenen Server-Aktionen, jeder
  * Abschnitt mit frischem Stand vom Server (components/mein-hof/abschnitt-speichern.ts).
  *
+ * Seit Nr. 274 nach Board w1-mein-hof: dieselben Zeilen und Gruppen nach dem Ort
+ * wie unter lg (meinHofListe), ohne Symbole, Häkchen rechts; der Fortschritt als
+ * Zeile mit flachem Balken; „Aktuell vom Hof“ als erste Zeile vor den Gruppen (Register E12).
+ *
  * Die Breiten der beiden Spalten kommen aus EINER Regel (editorSpalten in
  * src/lib/hofseite-vorschau.ts, Register N7): Der Editor ist auf 2 000 px
  * begrenzt und zentriert, die Vorschau nie breiter als die Seite (1 440 px),
@@ -73,25 +68,6 @@ type Props = {
   aktuell?: AktuellZeile
 }
 
-const SYMBOL: Record<HofseiteZeileId, LucideIcon> = {
-  titelbild: ImageIcon,
-  logo: Stamp,
-  name: PenLine,
-  tagline: Quote,
-  'ueber-uns': AlignLeft,
-  werte: BadgeCheck,
-  fotos: Images,
-  adresse: MapPin,
-  abholzeiten: Clock3,
-  zahlung: CreditCard,
-  kontakt: Phone,
-  bestellungen: ShoppingBag,
-  abschnitte: LayoutList,
-  aktuell: CalendarDays,
-}
-
-const ZeichenAktuell = SYMBOL.aktuell
-
 // ── Zeile und Gruppe ──────────────────────────────────────────────────────────
 
 function Zeile({
@@ -100,12 +76,11 @@ function Zeile({
   onToggle,
   children,
 }: {
-  zeile: HofseiteZeile
+  zeile: MeinHofZeile
   offen: boolean
   onToggle: () => void
   children: React.ReactNode
 }) {
-  const Zeichen = SYMBOL[zeile.id]
   const inhaltId = `hofseite-zeile-${zeile.id}`
   return (
     <li className={cn('border-t border-border first:border-t-0', offen && 'bg-muted/30')}>
@@ -114,30 +89,29 @@ function Zeile({
         onClick={onToggle}
         aria-expanded={offen}
         aria-controls={inhaltId}
-        className={cn('flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
+        title={`${zeile.titel}: ${zeile.wert}`}
+        className={cn('flex min-h-14 w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
       >
-        <span className={cn('flex size-9 shrink-0 items-center justify-center bg-muted text-foreground', RUNDUNG.feld)}>
-          <Zeichen className="size-4" strokeWidth={1.7} aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-foreground">{zeile.titel}</span>
-          <span className="block truncate text-[13px] text-muted-foreground">{zeile.wert}</span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className={MEIN_HOF_ZEILE_TITEL}>{zeile.titel}</span>
+          <span className={cn('truncate', MEIN_HOF_ZEILE_WERT)}>{zeile.wert}</span>
         </span>
         {zeile.marke ? (
           <StatusBadge status={schildTon(zeile.marke.farbe)}>{zeile.marke.text}</StatusBadge>
         ) : (
           <>
-            <Check className="size-4 shrink-0 text-brand-text" strokeWidth={2.2} aria-hidden="true" />
-            <span className="sr-only">fertig</span>
+            <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={2.6} aria-hidden="true" />
+            <span className="sr-only">erledigt</span>
           </>
         )}
         <ChevronRight
-          className={cn('size-4 shrink-0 text-muted-foreground transition-transform', offen && 'rotate-90')}
+          className={cn('size-[18px] shrink-0 text-muted-foreground transition-transform', offen && 'rotate-90')}
+          strokeWidth={2}
           aria-hidden="true"
         />
       </button>
       {offen && (
-        <div id={inhaltId} className="px-4 pb-5 pl-16">
+        <div id={inhaltId} className="flex flex-col gap-5 px-3 pb-5">
           {children}
         </div>
       )}
@@ -167,11 +141,14 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
   // Formulare schließen sich nach dem Speichern: Der Refresh liefert neue
   // Startwerte, und ein offenes Formular hielte die alten fest. Was sofort
   // speichert (Bilder, Abholzeiten, Pause), bleibt offen.
-  function gespeichert(id: HofseiteZeileId) {
+  // Eine Zeile mit mehreren Teilen (Titelbild und Logo, …) bleibt nach dem Speichern offen: Man ändert oft beide.
+  function gespeichert(zeile: MeinHofZeile, teil: HofseiteZeileId) {
     setStand((s) => s + 1)
     router.refresh()
-    if (!SOFORT_GESPEICHERT.has(id)) setOffen(null)
+    if (zeile.teile.length === 1 && !SOFORT_GESPEICHERT.has(teil)) setOffen(null)
   }
+
+  const liste = meinHofListe(fortschritt)
 
   function umschalten(id: HofseiteZeileId) {
     if (hochladen) return
@@ -194,80 +171,51 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
           Frame) füllt sie den Rest neben der Vorschau, höchstens so breit wie neben
           Handy — dieselbe Regel in CSS, damit beim Hydrieren nichts springt. */}
       <div
-        className={cn('min-w-0 space-y-6 transition-[width] duration-200 motion-reduce:transition-none', !spalten && 'flex-1')}
+        className={cn('flex min-w-0 flex-col gap-2.5 transition-[width] duration-200 motion-reduce:transition-none', !spalten && 'flex-1')}
         style={spalten ? { width: spalten.liste } : { maxWidth: EDITOR_LISTE_HANDY_MAX }}
       >
-        {/* Fortschritt ab lg als Zeile mit flachem Balken, ohne Karte und ohne „Es fehlen noch …“ (Liste Lauf 32 mein-hof, Nr. 251). */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-baseline justify-between gap-3">
-            {/* „Noch 1 Punkt offen“ statt Prozent (Boards s1-/w1-mein-hof, Nr. 224) — wie die Liste unter lg. */}
-            <h2 className="font-heading text-lg font-semibold text-foreground">
-              {fortschritt.gesamt > fortschritt.erledigt ? punkteOffenTitel(fortschritt.gesamt - fortschritt.erledigt) : HOFSEITE_VOLLSTAENDIG}
-            </h2>
-            <p className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
-              {fortschritt.erledigt} von {fortschritt.gesamt}
-            </p>
-          </div>
-          {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
-            <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${fortschritt.prozent}%` }} />
+        {/* Fortschritt ab lg als Zeile mit flachem Balken (Board w1-mein-hof, Liste Lauf 32 mein-hof): Satz, darunter der Balken;
+            den Stand „8 von 11“ trägt der Balken für den Screenreader. */}
+        <div className="flex flex-col gap-1">
+          <p className="text-[15px] font-semibold text-foreground">
+            {liste.anzahlOffen > 0 ? punkteOffenTitel(liste.anzahlOffen) : HOFSEITE_VOLLSTAENDIG}
+          </p>
+          <div role="img" aria-label={`${fortschritt.erledigt} von ${fortschritt.gesamt} Punkten erledigt`} className={FORTSCHRITT_SPUR}>
+            <div className={cn(FORTSCHRITT_FUELLUNG, 'transition-[width] duration-500')} style={{ width: `${fortschritt.prozent}%` }} />
           </div>
         </div>
 
+        {/* Register E12 (Ergänzungen 20.10. und 22.10.2026): den laufenden Beitrag nennt die erste Zeile von Mein Hof ›
+            Hofseite — vor den Gruppen (Register vor Liste und Board, Runde 1 Nr. 274). Ein Tipp markiert den Abschnitt in
+            der Vorschau, ein zweiter gibt ihn frei (Freigabe 129.4); der Link führt zu Mein Hof › Beiträge. */}
         {aktuell && (
-          // Wie auf der Hofseite oben: der laufende Beitrag. Ein Tipp auf die Zeile markiert den Abschnitt in der
-          // Vorschau — wie jede Zeile über `offen` (Kennung `aktuell`, Freigabe 129.4, Runde 2). Verwaltet wird
-          // unter Mein Hof › Beiträge: darum daneben der Link statt eines Bausteins zum Aufklappen.
-          <ul aria-label={aktuell.titel} className="overflow-hidden rounded-2xl border border-border bg-card">
-            <li data-bearbeiten-zeile="aktuell" className={cn('flex min-h-14 items-center gap-1 pr-3', offen === 'aktuell' && 'bg-muted/30')}>
-              <button
-                type="button"
-                onClick={() => umschalten('aktuell')}
-                aria-pressed={offen === 'aktuell'}
-                title={`${aktuell.titel}: ${aktuell.wert}`}
-                className={cn('flex min-h-14 min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left transition-colors hover:bg-muted', FOKUS_RAHMEN_INNEN)}
-              >
-                <span className={cn('flex size-9 shrink-0 items-center justify-center bg-muted text-status-fertig', RUNDUNG.feld)}>
-                  <ZeichenAktuell className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-foreground">{aktuell.titel}</span>
-                  <span className="block truncate text-[13px] text-muted-foreground">{aktuell.wert}</span>
-                </span>
-              </button>
-              <Link
-                href={aktuell.link.href}
-                className={cn(
-                  'inline-flex min-h-11 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-sm font-semibold whitespace-nowrap text-brand-text',
-                  FOKUS_RAHMEN
-                )}
-              >
-                <span className="sr-only">{aktuell.titel}: </span>
-                {aktuell.link.text}
-                <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              </Link>
-            </li>
-          </ul>
+          <AktuellBlock aktuell={aktuell} kennung="hofseite-editor-aktuell" markiert={offen === 'aktuell'} onUmschalten={() => umschalten('aktuell')} />
         )}
 
-        {fortschritt.gruppen.map((gruppe) => (
-          <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`}>
-            <h3 id={`hofseite-gruppe-${gruppe.id}`} className="px-1 text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {liste.gruppen.map((gruppe) => (
+          <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`} className="flex flex-col">
+            <h2 id={`hofseite-gruppe-${gruppe.id}`} className={MEIN_HOF_GRUPPE_TITEL}>
               {gruppe.titel}
-            </h3>
-            <ul className="mt-2 overflow-hidden rounded-2xl border border-border bg-card">
+            </h2>
+            <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
               {gruppe.zeilen.map((zeile) => (
                 <Zeile key={zeile.id} zeile={zeile} offen={offen === zeile.id} onToggle={() => umschalten(zeile.id)}>
-                  <AbschnittInhalt
-                    id={zeile.id}
-                    hof={hof}
-                    einstellungen={einstellungen}
-                    auftritt={auftritt}
-                    darstellung="zeile"
-                    onGespeichert={() => gespeichert(zeile.id)}
-                    onAbbrechen={() => setOffen(null)}
-                    onHochladen={setHochladen}
-                  />
+                  {zeile.teile.map((teil) => (
+                    <div key={teil} className="flex flex-col gap-3">
+                      {/* Mehrere Teile in einer Zeile: je Teil sein Name als Zwischentitel (Titelbild, Logo, …). */}
+                      {zeile.teile.length > 1 && <h3 className="text-[15px] font-semibold text-foreground">{ZEILE_TITEL[teil]}</h3>}
+                      <AbschnittInhalt
+                        id={teil}
+                        hof={hof}
+                        einstellungen={einstellungen}
+                        auftritt={auftritt}
+                        darstellung="zeile"
+                        onGespeichert={() => gespeichert(zeile, teil)}
+                        onAbbrechen={() => setOffen(null)}
+                        onHochladen={setHochladen}
+                      />
+                    </div>
+                  ))}
                 </Zeile>
               ))}
             </ul>

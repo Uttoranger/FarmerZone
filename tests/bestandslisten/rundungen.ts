@@ -74,8 +74,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/einrichten/einrichten-seite.tsx': 4,
   'src/components/farm/product-grid.tsx': 3,
   'src/components/farmer/archived-farm-banner.tsx': 1,
-  'src/components/farmer/hofseite-editor.tsx': 3,
-  'src/components/farmer/hofseite-vorschau-rahmen.tsx': 1,
   'src/components/farmer/pending-approval-banner.tsx': 1,
   'src/components/fuer-hoefe/fuer-hoefe-abschnitte.tsx': 5,
   'src/components/fuer-hoefe/heute-bild.tsx': 5,

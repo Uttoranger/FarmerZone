@@ -112,7 +112,8 @@ export function MeinHofSeitenkopf({
     <header className="print:hidden lg:mb-6">
       {/* ===== Unter lg: der Kopf am Handy, mit den Reitern ===== */}
       <div className="lg:hidden">
-        <MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} titelAlsH1 />
+        {/* Die Zustandskarte steht unter lg im Inhalt (farm-page/page.tsx): Titel und Reiter kleben, die Karte scrollt. */}
+        <MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} titelAlsH1 ohneKarte />
       </div>
 
       {/* ===== Ab lg: Überschrift „Mein Hof“ wie im Board w1-mein-hof ===== */}
