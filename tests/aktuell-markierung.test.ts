@@ -94,16 +94,19 @@ function editor(aktuell: AktuellZeile): unknown {
 /** Was der Editor gerade an die Vorschau gibt. */
 const markiert = (baum: unknown) => findeElement(baum, HofseiteVorschauRahmen)?.props.markiert
 
-/**
- * Setzt den Fokus auf die Zeile „Aktuell vom Hof“. Seit Nr. 274 ist sie nach Board w1-mein-hof EIN Link zu
- * Mein Hof › Beiträge (AktuellBlock); den Abschnitt in der Vorschau markiert sie, sobald sie den Fokus bekommt.
- */
-function fokusAufAktuell(baum: unknown): void {
+/** Die Zeile „Aktuell vom Hof“ im Editor: AktuellBlock mit seinen Angaben ausgerollt (der Editor wird flach gerufen). */
+function aktuellZeileIm(baum: unknown): unknown {
   const block = findeElement(baum, AktuellBlock)
   if (!block) throw new Error('Die Zeile „Aktuell vom Hof“ fehlt im Editor')
-  const onFokus = block.props.onFokus
-  if (typeof onFokus !== 'function') throw new Error('Die Zeile „Aktuell vom Hof“ markiert die Vorschau nicht')
-  onFokus()
+  return AktuellBlock(block.props as Parameters<typeof AktuellBlock>[0])
+}
+
+/** Tippt auf die Zeile „Aktuell vom Hof“. */
+function tippeAufAktuell(baum: unknown): void {
+  const zeile = suche(aktuellZeileIm(baum), (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
+  const knopf = suche(zeile?.props?.children, (k) => k.type === 'button')
+  if (!knopf) throw new Error('Die Zeile „Aktuell vom Hof“ hat keinen Knopf, der die Vorschau markiert')
+  ;(knopf.props?.onClick as () => void)()
 }
 
 beforeEach(() => {
@@ -130,23 +133,24 @@ describe('Kennung `aktuell` in der Aufzählung der Markierung', () => {
 })
 
 describe('Editor ab lg: die Zeile schickt `aktuell` — derselbe Weg wie jede Zeile', () => {
-  it('der Fokus auf der Zeile markiert den Abschnitt in der Vorschau (seit Nr. 274; vorher ein Tipp)', () => {
+  it('ein Tipp auf die Zeile markiert den Abschnitt in der Vorschau, ein zweiter nimmt die Markierung weg', () => {
     const vorher = editor(MIT_BEITRAG)
     expect(markiert(vorher)).toBeNull()
-    fokusAufAktuell(vorher)
-    expect(markiert(editor(MIT_BEITRAG))).toBe('aktuell')
+    tippeAufAktuell(vorher)
+    const danach = editor(MIT_BEITRAG)
+    expect(markiert(danach)).toBe('aktuell')
+    tippeAufAktuell(danach)
+    expect(markiert(editor(MIT_BEITRAG))).toBeNull()
   })
 
   it('der Link zu Mein Hof › Beiträge bleibt — die Markierung nimmt ihm nichts', () => {
-    const onFokus = vi.fn()
-    const zeile = suche(AktuellBlock({ aktuell: MIT_BEITRAG, onFokus }), (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
-    expect(zeile?.props?.href).toBe(MIT_BEITRAG.link.href)
-    expect(zeile?.props?.onFocus).toBe(onFokus)
+    const zeile = suche(aktuellZeileIm(editor(MIT_BEITRAG)), (k) => k.props?.['data-bearbeiten-zeile'] === 'aktuell')
+    expect(suche(zeile?.props?.children, (k) => k.props?.href === MIT_BEITRAG.link.href)).not.toBeNull()
   })
 
   it('ohne laufenden Beitrag schickt die Zeile dieselbe Kennung — die Hofseite hat dann kein Ziel (unten)', () => {
     const vorher = editor(OHNE_BEITRAG)
-    fokusAufAktuell(vorher)
+    tippeAufAktuell(vorher)
     expect(markiert(editor(OHNE_BEITRAG))).toBe('aktuell')
   })
 })

@@ -43,14 +43,18 @@ import { RUNDUNG } from '@/components/ui/rundung'
  * (useVorschauMarkierung — derselbe Weg wie „So sieht’s die Kundin" unter lg).
  */
 
-/** Schirmbreite des Handys im Panel — 290 px wie im Board w1-mein-hof (in der 320-px-Spalte mit 12 px Polster). */
-const HANDY_SCHIRM_BREITE = 290
+/**
+ * Schirmbreite des Handys im Panel — 304 px (Register N16/N7: die Vorschau gehört zu Mein Hof, Handy 304 px,
+ * Web 1 408 px). Die Karte darum hat 12 px Polster; der Schirm rückt dafür seitlich ins Polster (-mx-1.5), und sein
+ * Rand ist ein Ring, der keinen Platz nimmt — so passt er in die 320-px-Spalte.
+ */
+const HANDY_SCHIRM_BREITE = 304
 /** Sichtbare Höhe des Browser-Rähmchens im Panel; die Seite darin scrollt. */
 const WEB_RAHMEN_HOEHE = 680
 /** Höhe der Kopfleiste des Browser-Rähmchens (Klasse h-9) — im Overlay geht sie von der Fläche für die Seite ab. */
 const BROWSER_LEISTE_HOEHE = 36
-/** Ohne Gerät bleibt um den Schirm nur der Rand (1 px rundum) — im Overlay geht das vom Platz für den Schirm ab. */
-const HANDY_RAHMEN_DICKE = 2
+/** Ohne Gerät bleibt um den Schirm nur ein Ring, der keinen Platz nimmt — im Overlay geht nichts vom Schirm ab. */
+const HANDY_RAHMEN_DICKE = 0
 
 const GERAETE: { id: VorschauGeraet; label: string }[] = [
   { id: 'handy', label: 'Handy' },
@@ -172,8 +176,8 @@ function Geraeterahmen({
       className={cn(
         geraet === 'handy'
           ? // Kein Gerät drumherum (Board w1-mein-hof, Nr. 274): nur der Schirm, abgerundet und umrandet.
-            'mx-auto w-fit overflow-hidden rounded-[22px] border border-border bg-background'
-          : 'w-full overflow-hidden rounded-2xl border border-border bg-card'
+            cn('mx-auto w-fit overflow-hidden bg-background ring-1 ring-border', RUNDUNG.blatt)
+          : cn('w-full overflow-hidden border border-border bg-card', RUNDUNG.blatt)
       )}
     >
       {geraet === 'web' && <BrowserLeiste adresse={adresse} />}
@@ -299,7 +303,7 @@ export function HofseiteVorschauRahmen({
 
   const webInline = geraet === 'web' && webInlineMoeglich
   const angezeigt: VorschauGeraet = webInline ? 'web' : 'handy'
-  // Web: Faktor = Panelbreite ÷ 1440, gemessen. Handy: fester Schirm, Faktor 304 ÷ 390.
+  // Web: Faktor = Panelbreite ÷ 1440, gemessen. Handy: fester Schirm (HANDY_SCHIRM_BREITE, 304 px), Faktor 304 ÷ 390.
   const massstab = angezeigt === 'web' ? vorschauMassstab({ breite: panelBreite }, 'web') : vorschauMassstab({ breite: HANDY_SCHIRM_BREITE }, 'handy')
   const seitenHoehe = angezeigt === 'web' ? Math.round(WEB_RAHMEN_HOEHE / massstab) : VORSCHAU_HANDY_HOEHE
 
@@ -318,8 +322,8 @@ export function HofseiteVorschauRahmen({
         <h2 className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">Vorschau</h2>
         <GeraetUmschalter wert={angezeigt} onWert={waehle} />
       </div>
-      <div ref={panel}>
-        {/* Handy braucht keine Messung (feste 304 px); Web wartet auf die Panelbreite. */}
+      <div ref={panel} className={cn(angezeigt === 'handy' && '-mx-1.5')}>
+        {/* Handy braucht keine Messung (feste 304 px, HANDY_SCHIRM_BREITE, Register N16); Web wartet auf die Panelbreite. */}
         {(angezeigt === 'handy' || panelBreite > 0) && (
           <Geraeterahmen geraet={angezeigt} adresse={adresse}>
             <VorschauSeite

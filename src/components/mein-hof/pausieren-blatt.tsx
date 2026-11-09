@@ -14,6 +14,7 @@ import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { Textarea } from '@/components/ui/textarea'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { PAUSIERT_GERADE } from '@/components/hofseite/kauf-sperre-hinweis'
+import { kundenPausenText } from '@/lib/shop-pause'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 import { RUNDUNG } from '@/components/ui/rundung'
@@ -141,7 +142,8 @@ export function PausierenBlatt({
       <div className={cn('flex flex-col gap-2 border border-border bg-card px-3 py-2.5', RUNDUNG.blatt)}>
         <p className={KICKER_12}>So steht es auf deiner Hofseite</p>
         <p className="text-[15px] font-bold break-words text-foreground">{`${hofName} ${PAUSIERT_GERADE}.`}</p>
-        {nachricht.trim() && <p className="text-[14px] break-words text-muted-foreground">{`„${nachricht.trim()}“`}</p>}
+        {/* Wie die Hofseite (KaufSperreHinweis): die eigene Nachricht in „…“, ohne sie der Ersatzsatz aus derselben Quelle. */}
+        <p className="text-[14px] break-words text-muted-foreground">{nachricht.trim() ? `„${nachricht.trim()}“` : kundenPausenText(null)}</p>
       </div>
 
       <p className="text-[14px] leading-normal text-muted-foreground">{SCHLUSS_SATZ}</p>
@@ -158,7 +160,8 @@ export function PausierenBlatt({
         aria-busy={laeuft || undefined}
         className={cn(
           // Am Handy über die volle Breite, ab 768 px (Dialog) rechtsbündig wie im Board w1-mein-hof Bild 3.
-          'inline-flex min-h-12 w-full items-center justify-center rounded-[14px] bg-primary px-5 text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90 disabled:opacity-60 md:w-auto md:self-end',
+          'inline-flex min-h-12 w-full items-center justify-center bg-primary px-5 text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90 disabled:opacity-60 md:w-auto md:self-end',
+          RUNDUNG.feld,
           FOKUS_RAHMEN
         )}
       >

@@ -50,7 +50,7 @@ import { RUNDUNG } from '@/components/ui/rundung'
  *
  * Seit Nr. 274 nach Board w1-mein-hof: dieselben Zeilen und Gruppen nach dem Ort
  * wie unter lg (meinHofListe), ohne Symbole, Häkchen rechts; der Fortschritt als
- * Zeile mit flachem Balken; „Aktuell vom Hof“ als letzter Abschnitt.
+ * Zeile mit flachem Balken; „Aktuell vom Hof“ als erste Zeile vor den Gruppen (Register E12).
  *
  * Die Breiten der beiden Spalten kommen aus EINER Regel (editorSpalten in
  * src/lib/hofseite-vorschau.ts, Register N7): Der Editor ist auf 2 000 px
@@ -185,6 +185,13 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
           </div>
         </div>
 
+        {/* Register E12 (Ergänzungen 20.10. und 22.10.2026): den laufenden Beitrag nennt die erste Zeile von Mein Hof ›
+            Hofseite — vor den Gruppen (Register vor Liste und Board, Runde 1 Nr. 274). Ein Tipp markiert den Abschnitt in
+            der Vorschau, ein zweiter gibt ihn frei (Freigabe 129.4); der Link führt zu Mein Hof › Beiträge. */}
+        {aktuell && (
+          <AktuellBlock aktuell={aktuell} kennung="hofseite-editor-aktuell" markiert={offen === 'aktuell'} onUmschalten={() => umschalten('aktuell')} />
+        )}
+
         {liste.gruppen.map((gruppe) => (
           <section key={gruppe.id} aria-labelledby={`hofseite-gruppe-${gruppe.id}`} className="flex flex-col">
             <h2 id={`hofseite-gruppe-${gruppe.id}`} className={MEIN_HOF_GRUPPE_TITEL}>
@@ -214,9 +221,6 @@ export function HofseiteEditor({ fortschritt, hof, einstellungen, auftritt, aktu
             </ul>
           </section>
         ))}
-
-        {/* Der letzte Abschnitt, unter „Über uns“ (Board w1-mein-hof, Liste Lauf 32). Fokus markiert ihn in der Vorschau. */}
-        {aktuell && <AktuellBlock aktuell={aktuell} onFokus={() => !hochladen && setOffen('aktuell')} />}
 
         {/* Wo Produkte liegen — leise, am Ende der Liste (Register N7). */}
         <p className="px-1">

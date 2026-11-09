@@ -268,7 +268,8 @@ describe('„Hof pausieren“ (Dialog bzw. Blatt)', () => {
     // Seit Nr. 274 neutral wie im Board (Abnahme Lauf 32 mein-hof 11): der Satz der Hofseite aus derselben Quelle, die Nachricht in „…“.
     expect(blatt).not.toContain('<KaufSperreHinweis')
     expect(blatt).toContain('{`${hofName} ${PAUSIERT_GERADE}.`}')
-    expect(blatt).toContain('{`„${nachricht.trim()}“`}')
+    // Ohne Nachricht der Ersatzsatz der Hofseite aus derselben Quelle (kundenPausenText, wie KaufSperreHinweis).
+    expect(blatt).toContain('{nachricht.trim() ? `„${nachricht.trim()}“` : kundenPausenText(null)}')
     expect(blatt).not.toMatch(/bg-zustand-tun|<Pause|<Hinweiskarte/)
   })
 

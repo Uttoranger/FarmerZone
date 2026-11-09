@@ -16,7 +16,8 @@ export const MEIN_HOF_ZEILE_TITEL = 'text-[15px] leading-snug font-semibold text
 export const MEIN_HOF_ZEILE_WERT = 'text-[13px] text-muted-foreground'
 
 /** Die Spur des Fortschrittsbalkens. */
-export const FORTSCHRITT_SPUR = 'h-2 overflow-hidden rounded-[4px] bg-muted'
+// Ganz rund: bei 8 px Höhe dasselbe wie die 4 px des Boards, ohne feste Pixelrundung (G8).
+export const FORTSCHRITT_SPUR = 'h-2 overflow-hidden rounded-full bg-muted'
 
 /** Der gefüllte Teil: `zustand-laeuft` — am Tag dunkelgrün, im Dunkeln hellgrün (Liste Lauf 32 mein-hof, Abnahme 13). */
 export const FORTSCHRITT_FUELLUNG = 'h-full bg-zustand-laeuft'

@@ -93,6 +93,11 @@ describe('Darstellung (Nr. 274)', () => {
       expect(q).toContain('meinHofListe(fortschritt)')
       expect(q).toContain('<AktuellBlock aktuell={aktuell}')
     }
+    // Zwei verschiedene Kennungen: Liste (lg:hidden) und Editor stehen beide im Dokument.
+    expect(liste).toContain('kennung="bearbeiten-aktuell"')
+    expect(editor).toContain('kennung="hofseite-editor-aktuell"')
+    // Register E12: ab lg die erste Zeile vor den Gruppen.
+    expect(editor.indexOf('<AktuellBlock')).toBeLessThan(editor.indexOf('{liste.gruppen.map'))
     expect(editor).not.toMatch(/ImageIcon|Stamp|PenLine|SYMBOL\[/)
     expect(editor).not.toContain('fortschritt.gruppen.map')
   })
@@ -112,6 +117,8 @@ describe('Darstellung (Nr. 274)', () => {
     const rahmen = quelle('src/components/farmer/hofseite-vorschau-rahmen.tsx')
     expect(rahmen).not.toMatch(/bg-primary-foreground p-2|Smartphone|Monitor|Maximize2/)
     expect(rahmen).toContain("wert === id ? 'bg-foreground text-background'")
+    // Register N16/N7: Handy-Schirm 304 px.
+    expect(rahmen).toContain('const HANDY_SCHIRM_BREITE = 304')
   })
 })
 

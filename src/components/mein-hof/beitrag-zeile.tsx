@@ -76,49 +76,48 @@ export function BeitragZeile({ eintrag }: { eintrag: BeitragEintrag }): React.JS
       </button>
 
       <div id={handlungenId} hidden={!auf} className="px-3 pb-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {eintrag.aktionen.teilen && (
-          <BeitragTeilenKnopf beitragId={eintrag.id} titel={eintrag.titel} onFehler={setFehler} className={cn(KNOPF_RAHMEN, KLEIN)} />
-        )}
-        {eintrag.aktionen.whatsapp && (
-          <Link href={eintrag.aktionen.whatsapp.href} className={cn(KNOPF_RAHMEN, KLEIN)}>
-            <MessageSquare className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            {eintrag.aktionen.whatsapp.text}
-            <span className="sr-only">: {eintrag.titel}</span>
-          </Link>
-        )}
-        {eintrag.aktionen.deaktivieren && (
+        <div className="flex flex-wrap items-center gap-2">
+          {eintrag.aktionen.teilen && (
+            <BeitragTeilenKnopf beitragId={eintrag.id} titel={eintrag.titel} onFehler={setFehler} className={cn(KNOPF_RAHMEN, KLEIN)} />
+          )}
+          {eintrag.aktionen.whatsapp && (
+            <Link href={eintrag.aktionen.whatsapp.href} className={cn(KNOPF_RAHMEN, KLEIN)}>
+              <MessageSquare className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              {eintrag.aktionen.whatsapp.text}
+              <span className="sr-only">: {eintrag.titel}</span>
+            </Link>
+          )}
+          {eintrag.aktionen.deaktivieren && (
+            <button
+              type="button"
+              onClick={deaktivieren}
+              disabled={laeuft}
+              aria-label={`${eintrag.titel} deaktivieren`}
+              className={cn(KNOPF_RAHMEN, KLEIN)}
+            >
+              Deaktivieren
+            </button>
+          )}
+          {eintrag.aktionen.vorlage && (
+            <Link href={eintrag.aktionen.vorlage} className={cn(KNOPF_RAHMEN, KLEIN)}>
+              <CopyPlus className="size-4" strokeWidth={1.7} aria-hidden="true" />
+              Als Vorlage verwenden
+              <span className="sr-only">: {eintrag.titel}</span>
+            </Link>
+          )}
           <button
             type="button"
-            onClick={deaktivieren}
+            onClick={() => {
+              setFehler(null)
+              setLoeschenOffen(true)
+            }}
             disabled={laeuft}
-            aria-label={`${eintrag.titel} deaktivieren`}
-            className={cn(KNOPF_RAHMEN, KLEIN)}
+            aria-label={`${eintrag.titel} löschen`}
+            className={cn(TEXT_ORANGE, 'ml-auto', KLEIN)}
           >
-            Deaktivieren
+            Löschen
           </button>
-        )}
-        {eintrag.aktionen.vorlage && (
-          <Link href={eintrag.aktionen.vorlage} className={cn(KNOPF_RAHMEN, KLEIN)}>
-            <CopyPlus className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            Als Vorlage verwenden
-            <span className="sr-only">: {eintrag.titel}</span>
-          </Link>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setFehler(null)
-            setLoeschenOffen(true)
-          }}
-          disabled={laeuft}
-          aria-label={`${eintrag.titel} löschen`}
-          className={cn(TEXT_ORANGE, 'ml-auto', KLEIN)}
-        >
-          Löschen
-        </button>
-      </div>
-
+        </div>
       </div>
 
       {fehler && (

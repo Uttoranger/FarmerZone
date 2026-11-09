@@ -211,7 +211,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
       ))}
 
       {/* Der letzte Abschnitt, unter „Über uns“ (Board s1-mein-hof, Liste Lauf 32). */}
-      {aktuell && <AktuellBlock aktuell={aktuell} />}
+      {aktuell && <AktuellBlock aktuell={aktuell} kennung="bearbeiten-aktuell" />}
 
       <Sheet
         open={offen !== null}

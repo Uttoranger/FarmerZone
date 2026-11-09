@@ -33,7 +33,8 @@ const HAUPTKNOPF = cn(
 
 /** „Neuer Beitrag“ in der Karte: über die volle Breite, 52 px, 16 px fett (Board s1-/w1-mein-hof Bild 5). */
 const NEU_KNOPF = cn(
-  'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] bg-primary px-3 text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
+  'inline-flex min-h-[52px] w-full items-center justify-center bg-primary px-3 text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
+  RUNDUNG.feld,
   FOKUS_RAHMEN
 )
 
