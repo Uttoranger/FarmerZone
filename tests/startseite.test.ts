@@ -60,15 +60,12 @@ import {
   abholzeileDerKarte,
   gruppiereKurzkarten,
   KARTE_ADRESSE,
-  KARTE_KNOPF,
   KARTE_UEBERSCHRIFT,
-  STARTSEITE_CHIPS,
   BEISPIEL_WARENPREIS_CENTS,
   STARTSEITE_FRAGEN,
   beispielRechnung,
   hoefeAdresse,
   benenneKartenLink,
-  formatiereRegionsZaehler,
   waehleKartenHoefe,
   waehleStartseitenHoefe,
   type StartseitenHofEingabe,
@@ -80,7 +77,7 @@ import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
 import { leseHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { HeroVideo } from '@/components/startseite/hero-video'
-import { KARTE_LINK, RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
+import { KARTE_LINK, KARTE_QUELLE, RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett, STARTSEITE_SUCH_CHIPS, suchAdresse } from '@/components/startseite/hoefe-in-der-naehe'
 import type { VorschauProdukt } from '@/lib/hofuebersicht'
 import {
@@ -150,35 +147,13 @@ describe('Metadaten', () => {
 })
 
 describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
-  it('die Chips „Oder direkt suchen" in der Reihenfolge des Mockups', () => {
-    expect(STARTSEITE_CHIPS.map((c) => c.label)).toEqual([
-      'Eier',
-      'Gemüse & Obst',
-      'Fleisch',
-      'Milch & Käse',
-      'Brot',
-      'Honig',
-      'Futtermittel',
-      'Brennmaterial',
-    ])
-  })
-
-  it('jeder Chip landet in Bereich und Kategorien, die /hoefe daraus liest', () => {
-    for (const chip of STARTSEITE_CHIPS) {
-      const filter = gelesen(hoefeAdresse(chip.filter))
-      expect(filter.bereich, chip.label).toBe(chip.filter.bereich ?? 'LEBENSMITTEL')
-      expect(filter.kategorien, chip.label).toEqual(chip.filter.kategorien ?? [])
-    }
-  })
-
-  it('Futtermittel ist ein Chip in derselben Reihe und öffnet den Bereich (E2)', () => {
+  it('Futtermittel öffnet den Bereich (E2)', () => {
     expect(hoefeAdresse({ bereich: 'FUTTERMITTEL' })).toBe('/hoefe?bereich=futter')
   })
 
-  it('Brennmaterial ist die Kategorie Brennholz im Hofladen (E11) — Chip und Band führen gleich', () => {
+  it('Brennmaterial ist die Kategorie Brennholz im Hofladen (E11)', () => {
     expect(BRENNMATERIAL_ADRESSE).toBe('/hoefe?kat=BRENNHOLZ')
     expect(gelesen(BRENNMATERIAL_ADRESSE).kategorien).toEqual(['BRENNHOLZ'])
-    expect(hoefeAdresse(STARTSEITE_CHIPS.find((c) => c.label === 'Brennmaterial')?.filter)).toBe(BRENNMATERIAL_ADRESSE)
   })
 
   it('die kurzen Karten führen in den Bereich Futtermittel bzw. auf Brennholz (Board w1-startseite)', () => {
@@ -193,7 +168,6 @@ describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
 
   it('keine Adresse trägt einen Standort (ARCHITECTURE §4)', () => {
     const adressen = [
-      ...STARTSEITE_CHIPS.map((c) => hoefeAdresse(c.filter)),
       FUTTER_KARTE.adresse,
       BRENNMATERIAL_ADRESSE,
       KARTE_ADRESSE,
@@ -273,12 +247,10 @@ describe('Karte der Region — Zähler, Pins und hervorgehobener Hof (Nr. 59)', 
       hof({ slug: 'ohne' }),
     ])
     expect(karte.pins.map((p) => p.slug)).toEqual(['a', 'pause'])
-    expect(formatiereRegionsZaehler(karte.pins.length)).toBe('2 Höfe in der Region')
     expect(benenneKartenLink(karte.pins.length)).toBe('Alle 2 Höfe auf der Karte ansehen')
   })
 
   it('ein Hof in der Einzahl; ohne Zahl nennt der Link keine', () => {
-    expect(formatiereRegionsZaehler(1)).toBe('1 Hof in der Region')
     expect(benenneKartenLink(1)).toBe('Alle Höfe auf der Karte ansehen')
     expect(benenneKartenLink(0)).toBe('Alle Höfe auf der Karte ansehen')
   })
@@ -447,12 +419,18 @@ describe('Karte der Region — gezeichnet (Nr. 59)', () => {
   const web = html(createElement(RegionsKarte, { form: 'web', karte: daten }))
   const leer = html(createElement(RegionsKarte, { form: 'handy', karte: null }))
 
-  it('die ganze Fläche ist EIN Link auf die Kartenansicht, die Zahl der Höfe im Namen', () => {
+  it('die ganze Fläche ist EIN Link auf die Kartenansicht, die Zahl der Höfe im Namen; Zoom und Quelle daneben (Nr. 271)', () => {
     for (const text of [web, html(createElement(RegionsKarte, { form: 'handy', karte: daten }))]) {
       expect(text.match(/<a\b/g)).toHaveLength(1)
-      expect(text).toMatch(new RegExp(`^<a href="${KARTE_ADRESSE.replace(/[?]/g, '\\?')}"`))
-      expect(text).toContain('aria-label="Alle 3 Höfe auf der Karte ansehen"')
-      expect(text.endsWith('</a>')).toBe(true)
+      const link = text.slice(text.indexOf('<a '), text.indexOf('</a>') + 4)
+      expect(link).toMatch(new RegExp(`^<a href="${KARTE_ADRESSE.replace(/[?]/g, '\\?')}"`))
+      expect(link).toContain('aria-label="Alle 3 Höfe auf der Karte ansehen"')
+      // Zoom „+/−“ (Board Bild 1) steht neben dem Link, nie darin — kein Knopf im Link.
+      expect(link).not.toContain('<button')
+      expect(text).toContain('aria-label="Karte vergrößern"')
+      expect(text).toContain('aria-label="Karte verkleinern"')
+      // Die Quelle dieser Karte (Natural Earth), sichtbar unten rechts, außerhalb des Links.
+      expect(text.slice(text.indexOf('</a>'))).toContain(KARTE_QUELLE)
     }
   })
 
@@ -756,12 +734,14 @@ describe('Abschnitte', () => {
       expect(alt.filter(amComputerSichtbar).reduce((n, f) => n + f.wortmarken, 0)).toBe(1)
     })
 
-    it('alle vier Seiten setzen den Fuß der Startseite genau einmal in die Shell, und die Shell setzt den Seitenfuß', () => {
-      const seiten = ['src/app/(public)/fuer-hoefe/page.tsx', 'src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx']
-      for (const datei of seiten) {
-        const text = code(datei)
-        expect(text.match(/<StartseiteFuss\b/g), datei).toHaveLength(1)
-        expect(text, datei).toMatch(/<KundeShellMitSitzung\b/)
+    it('Startseite und /fuer-hoefe setzen den Fuß der Startseite genau einmal in die Shell, und die Shell setzt den Seitenfuß', () => {
+      const text = code('src/app/(public)/fuer-hoefe/page.tsx')
+      expect(text.match(/<StartseiteFuss\b/g)).toHaveLength(1)
+      expect(text).toMatch(/<KundeShellMitSitzung\b/)
+      // Hof- und Produktseite haben am Handy den kurzen Seitenfuß wie /hoefe (Abnahme Lauf 32, hofseite 10, produkt 12; Nr. 271).
+      for (const datei of ['src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx']) {
+        expect(code(datei), datei).not.toMatch(/<StartseiteFuss\b/)
+        expect(code(datei), datei).toMatch(/<KundeShellMitSitzung\b/)
       }
       // Die Startseite baut ihn als Abschnitt FUSS (STARTSEITE_ABSCHNITTE) in derselben Shell.
       expect(code('src/app/page.tsx')).toContain('<StartseitenInhalt ')

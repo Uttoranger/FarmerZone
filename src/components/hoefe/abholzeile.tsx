@@ -23,6 +23,7 @@ export function Abholzeile({
   bestellbar = true,
   jetzt,
   className,
+  leise = false,
 }: {
   /** Die aktiven Abholzeiten; fehlt das Feld (alter Cache-Eintrag), gilt „keine". */
   fenster: readonly AbholFenster[] | undefined
@@ -32,9 +33,22 @@ export function Abholzeile({
   /** Der Zeitpunkt des Servers beim Bauen der Seite (ISO-Text). */
   jetzt: string
   className?: string
+  /**
+   * Als Teil einer grauen Meta-Zeile („Hof · 3 km · Abholung heute …“, Produkttreffer auf /hoefe; Liste Lauf 32,
+   * hoefe Bild 2, Abnahme hoefe 10): ein <span> in der Schrift der Zeile, ohne eigenes Grün und Fett.
+   */
+  leise?: boolean
 }): React.JSX.Element {
   const uhr = useUhr(jetzt)
   const lage = abholLage(fenster, isPaused, uhr)
+  if (leise) {
+    const satz = lage.art === 'pause' ? ABHOLZEILE_TEXT.pause : ((bestellbar ? abholzeileText(lage) : null) ?? ABHOLZEILE_TEXT.nichtBestellbar)
+    return (
+      <span data-abholung={lage.art} className={className}>
+        {satz}
+      </span>
+    )
+  }
   if (lage.art === 'pause') {
     return <p data-abholung="pause" className={cn('text-[13px] font-semibold text-muted-foreground', className)}>{ABHOLZEILE_TEXT.pause}</p>
   }

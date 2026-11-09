@@ -55,11 +55,12 @@ export function HoefeInDerNaehe({ children }: { children: ReactNode }): React.JS
         {children}
 
         {/* Unter den Karten: links der Textlink zur Karte, daneben „Oder direkt suchen:“ mit den Such-Chips (Board Bild 2).
-            Am Handy die Chips in EINER Zeile zum Wischen. Ohne Höfe entfällt die Zeile (Board Bild 5). */}
+            Am Handy die Chips in EINER Zeile zum Wischen und ohne den Textlink — er steht dort schon unter der Karte
+            (Board s1-startseite Bild 2; Abnahme Lauf 32, startseite 6). Ohne Höfe entfällt die Zeile (Board Bild 5). */}
         <div className="flex flex-col gap-2 group-has-[[data-hoefe-leer]]/hoefe:hidden md:flex-row md:items-center md:gap-4">
           <Link
             href={KARTE_ADRESSE}
-            className={cn('inline-flex min-h-11 w-fit shrink-0 items-center rounded-md text-[15px] font-semibold text-brand-text underline underline-offset-4', FOKUS_RAHMEN)}
+            className={cn('hidden min-h-11 w-fit shrink-0 items-center rounded-md text-[15px] font-semibold text-brand-text underline underline-offset-4 md:inline-flex', FOKUS_RAHMEN)}
           >
             {KARTE_KNOPF} →
           </Link>

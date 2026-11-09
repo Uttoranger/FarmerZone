@@ -600,11 +600,11 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
 describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
   const FOTOS = [1, 2, 3].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i, ausschnitt: null }))
 
-  it('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)", rechte Spalte, Über uns', () => {
-    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS } })
+  it('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)" (bei Pause), rechte Spalte, Über uns', () => {
+    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS, isPaused: true } })
     const stellen = [
       html.indexOf('id="fotos"'),
-      html.indexOf('aria-label="Karotten in den Korb legen"'),
+      html.indexOf('id="produkte"'),
       html.indexOf('>Alle Produkte (5)<'),
       html.indexOf('<aside'),
       html.indexOf('id="ueber-uns"'),
@@ -635,10 +635,13 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(seite({ suche: 'reiter=produkte' })).toContain('Blütenhonig')
   })
 
-  it('„Alle Produkte (n)" wechselt in den Reiter Produkte — n ist die Zahl des Reiters', () => {
-    const html = seite()
+  it('„Alle Produkte (n)" wechselt in den Reiter Produkte — n ist die Zahl des Reiters; nur bei Pause (Nr. 271)', () => {
+    const html = seite({ farm: { ...HOF, isPaused: true } })
     expect(html).toMatch(/<a[^>]*href="\/hof-test\?reiter=produkte"[^>]*>Alle Produkte \(5\)</)
     expect(html).toContain('>Produkte · 5<')
+    // Offen kein zweiter Knopf mit demselben Ziel: „Alle ansehen“ über der Liste reicht (Abnahme Lauf 32, hofseite 5).
+    expect(seite()).not.toContain('Alle Produkte (')
+    expect(seite()).toContain('Alle ansehen')
     // Nur in der Übersicht: Im Reiter Produkte steht schon alles.
     expect(seite({ suche: 'reiter=produkte' })).not.toContain('Alle Produkte (')
   })
@@ -812,7 +815,7 @@ describe('Nr. 235, UI-Runde 2 — Abweichungen aus der Bewertung r1', () => {
     expect(ohneKommaNachTag('Nach Vereinbarung, bitte anrufen')).toBe('Nach Vereinbarung, bitte anrufen')
   })
 
-  it('Illustrationen gehen im Dunkeln in der Fläche auf (kein heller Fleck), Fotos bleiben leicht gedämpft', () => {
+  it('Illustrationen im Dunkeln gedämpft wie ein Foto', () => {
     const farm = publicFarm({
       products: [
         publicProduct({ id: 'i1', name: 'Milch', category: 'MILCH', stock: 9, categoryImageUrl: '/categories/milch.webp' }),
@@ -820,9 +823,10 @@ describe('Nr. 235, UI-Runde 2 — Abweichungen aus der Bewertung r1', () => {
       ],
     })
     const html = seite({ farm })
-    // Die Hülle entscheidet (next/image ist hier ein schlichtes <img>; die Mischung am Bild steht in ILLUSTRATION_BILD).
-    expect(html).toMatch(/<span class="[^"]*dark:brightness-\[1\.6\][^"]*"><img src="\/categories\/milch\.webp"/)
+    // Die Hülle entscheidet (next/image ist hier ein schlichtes <img>): F041 — dieselbe Dämpfung wie ein Foto, gerahmt.
+    expect(html).toMatch(/<span class="[^"]*border-border[^"]*dark:brightness-\[0\.85\][^"]*"><img src="\/categories\/milch\.webp"/)
     expect(html).toMatch(/<span class="[^"]*dark:brightness-\[0\.85\][^"]*"><img src="\/foto\/kaese\.jpg"/)
-    expect(html).not.toMatch(/dark:brightness-\[1\.6\][^"]*"><img src="\/foto/)
+    expect(html).not.toContain('dark:brightness-[1.6]')
+    expect(html).not.toContain('mix-blend')
   })
 })

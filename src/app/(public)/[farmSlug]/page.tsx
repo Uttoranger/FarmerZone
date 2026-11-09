@@ -22,7 +22,6 @@ import type { PublicFarm } from '@/server/queries/farm'
 import { nachbestellToken } from '@/schemas/nachbestellung'
 import { FarmPageView } from '@/components/farm/farm-page-view'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
-import { StartseiteFuss } from '@/components/startseite/startseite-abschnitte'
 import { TeilenBesuchMelden } from '@/components/hofseite/teilen-besuch'
 import { HofseiteSkelett } from './hofseite-skelett'
 
@@ -206,8 +205,7 @@ async function Hofseite({ farmSlug, suche, geo }: { farmSlug: string; suche: Suc
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(hofJsonLd(farm, geo, metadatenBasis(UMGEBUNG.appUrl))) }} />
       {/* Teilen-Zählung (Gate 7): nur auf der Seite für Kundinnen, nie in der Vorschau des Hofs. */}
       {ansicht.art === 'kundin' && <TeilenBesuchMelden farmSlug={farm.slug} />}
-      {/* Der Fuß der Startseite — ein Server-Teil, deshalb hier statt in der Client-Komponente. */}
-      <StartseiteFuss jahr={jetzt.getFullYear()} />
+      {/* Kein Fuß der Startseite mehr: Am Handy steht der Seitenfuß der Shell wie auf /hoefe (Abnahme Lauf 32, hofseite 10). */}
     </KundeShellMitSitzung>
   )
 }

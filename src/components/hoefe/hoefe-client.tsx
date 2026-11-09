@@ -12,7 +12,6 @@ import { leseHoefeFilter, schreibeHoefeFilter, type HoefeFilter } from '@/schema
 import {
   berechneHofAuswahl,
   holtAbAnTagen,
-  suchForm,
   tageDerAbholwahl,
   waehleVorschauImBereich,
   type Bezugspunkt,
@@ -311,14 +310,13 @@ export function HoefeClient({
     )
   }
 
-  /** Vorschlag übernommen → Such-Marke, das Feld wird frei für den nächsten Begriff. */
+  /**
+   * Vorschlag übernommen → der Name steht im Feld, keine eigene Zeile „Suche: …“ darunter (Liste Lauf 32, hoefe
+   * Bild 2: „Suche steht im Feld“; Abnahme Lauf 32, hoefe 9). Such-Marken aus einer älteren Adresse bleiben als
+   * Einträge stehen und lassen sich entfernen; neue entstehen hier nicht mehr (Nr. 271).
+   */
   function suchMarkeHinzufuegen(name: string) {
-    setzeFilter({
-      suchMarken: filter.suchMarken.some((m) => suchForm(m) === suchForm(name))
-        ? filter.suchMarken
-        : [...filter.suchMarken, name],
-      suchtext: '',
-    })
+    setzeFilter({ suchtext: name })
   }
 
   /** Pin angetippt → Eintrag hervorheben und in den Blick rollen. */
@@ -561,7 +559,8 @@ export function HoefeClient({
   )
 
   const kopfbereich = (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 md:px-6 md:pt-7">
+    // Inhalt 1098 px wie im Board (1440 − 2 × 171 px Rand; Abnahme Lauf 32, hoefe 8) — alle Spalten dieser Seite.
+    <div className="mx-auto flex max-w-[1146px] flex-col gap-4 px-4 md:px-6 md:pt-7">
       {/* Am Handy ein Kopfstreifen mit Linie und h1 20 px (Liste Lauf 32, hoefe 390), ab 768 px wie bisher. */}
       <div className="-mx-4 flex items-start gap-3 border-b border-border bg-card px-4 py-3 md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0">
         <div className="min-w-0 flex-1">
@@ -602,7 +601,7 @@ export function HoefeClient({
       return (
         <div>
           {kopfbereich}
-          <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-6 pb-12">
+          <div className="mx-auto mt-4 flex max-w-[1146px] flex-col gap-3 px-6 pb-12">
             {reihenfolgeHinweis}
             {anzahl === 0 && ergebnisse(true)}
             <div className="h-[calc(100dvh-6rem)] min-h-[420px]">{karte}</div>
@@ -615,7 +614,7 @@ export function HoefeClient({
     return (
       <div data-ansicht="split">
         {kopfbereich}
-        <div className="mx-auto mt-4 grid max-w-[1200px] grid-cols-[minmax(0,480px)_minmax(0,1fr)] items-start gap-4 px-6 pb-12">
+        <div className="mx-auto mt-4 grid max-w-[1146px] grid-cols-[minmax(0,480px)_minmax(0,1fr)] items-start gap-4 px-6 pb-12">
           <div className="flex min-w-0 flex-col gap-3">
             {reihenfolgeHinweis}
             {ergebnisse(true)}
@@ -650,7 +649,7 @@ export function HoefeClient({
           {/* Titel und Unterzeile weichen der Werkzeugzeile — der Titel bleibt für Vorleser. */}
           <h1 className="sr-only">{titel}</h1>
           {/* 44 px Bedienteile plus je 4 px Luft: Im Querformat (844 × 390) bleiben der Karte 70 %. */}
-          <div className="mx-auto flex w-full max-w-[1200px] shrink-0 items-start gap-2 px-4 py-1 md:px-6">
+          <div className="mx-auto flex w-full max-w-[1146px] shrink-0 items-start gap-2 px-4 py-1 md:px-6">
             <div className="min-w-0 flex-1">{suchfeld(true)}</div>
             {filterblatt(true)}
             <Link
@@ -677,7 +676,7 @@ export function HoefeClient({
               soll beim Tippen nicht schrumpfen. Die zweite Zeile kostet die
               Karte Höhe (im Querformat 844 × 390 unter 70 %). */}
           {hatAktiveFilter && (
-            <div className="mx-auto w-full max-w-[1200px] shrink-0 px-4 pb-2 md:px-6">
+            <div className="mx-auto w-full max-w-[1146px] shrink-0 px-4 pb-2 md:px-6">
               <AktiveFilterZeile
                 filter={filter}
                 onWahl={schreibeUrl}
@@ -742,7 +741,7 @@ export function HoefeClient({
   return (
     <div>
       {kopfbereich}
-      <div className="mx-auto mt-4 flex max-w-[1200px] flex-col gap-3 px-4 pb-10 md:px-6">
+      <div className="mx-auto mt-4 flex max-w-[1146px] flex-col gap-3 px-4 pb-10 md:px-6">
         {reihenfolgeHinweis}
         {ergebnisse(false)}
       </div>

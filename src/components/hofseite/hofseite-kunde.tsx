@@ -619,8 +619,10 @@ export function HofseiteKunde({
             />
           </div>
 
-          {/* Derselbe Reiterwechsel wie die Reiterleiste (reiterAdresse, zeigeReiter) — am Handy unter dem Schaufenster (Register N5). */}
-          {schaufenster && (
+          {/* Derselbe Reiterwechsel wie die Reiterleiste (reiterAdresse, zeigeReiter) — am Handy unter dem Schaufenster (Register N5).
+              Seit Nr. 271 nur noch bei Pause: Sonst führt „Alle ansehen“ über der Liste dorthin, ein zweiter Knopf mit demselben
+              Ziel entfällt (Board s1-hofseite Bild 1; Abnahme Lauf 32, hofseite 5). Bei Pause fehlt „Alle ansehen“ (Board Bild 4). */}
+          {schaufenster && pause && (
             <Link
               href={reiterAdresse(pfad, suche.toString(), 'produkte')}
               onNavigate={zeigeReiter('produkte', { fokusAufReiter: true })}

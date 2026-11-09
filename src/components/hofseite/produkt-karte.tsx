@@ -185,9 +185,8 @@ function KartenAufbau({
 }): React.JSX.Element {
   const bildUndName = (
     <>
-      {/* Im Dunkeln gedämpft (Freigabe Lauf 31, Maßstab Punkt 4): kein heller Fleck auf der dunklen Karte —
-          die Illustration über ILLUSTRATION_HUELLE/-BILD, das Foto leicht (FOTO_HUELLE). Gerahmt statt Schatten
-          (CODING_STANDARDS §7). */}
+      {/* Im Dunkeln gedämpft: das Foto über FOTO_HUELLE, die Illustration wie ein Foto auf ihrem eigenen Grund
+          (ILLUSTRATION_HUELLE, F041). Gerahmt statt Schatten (CODING_STANDARDS §7). */}
       <span
         className={cn(
           'relative flex size-14 shrink-0 items-center justify-center overflow-hidden border border-border md:h-24 md:w-full',

@@ -13,9 +13,9 @@ import { ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dun
  * Reiner Schmuck (`alt=""`): Der Hofname steht direkt darunter. Jede
  * Illustration steht quadratisch auf ihrem Creme-Grund; die Fläche dahinter
  * ist `bg-muted`, im hellen Theme fast derselbe Ton. Im Dunkeln gerahmt statt
- * beschattet und mit der Fläche multipliziert (ILLUSTRATION_HUELLE/-BILD aus
- * ui/bild-dunkel.ts, dieselbe Quelle wie Hofseite und Produktseite): Mit
- * `brightness` allein leuchtete der Crème-Grund noch als hellgraues Quadrat (Abnahme Lauf 31).
+ * beschattet und wie ein Foto gedämpft (ILLUSTRATION_HUELLE aus ui/bild-dunkel.ts,
+ * dieselbe Quelle wie Hofseite und Produktseite; F041, 9.11.2026): Die Illustration
+ * steht auf ihrem eigenen hellen Grund, sie wird nicht mehr mit der Fläche verrechnet.
  *
  * `fuellen`: Die Bilder teilen sich die Breite, statt quadratisch zu bleiben —
  * für kleine Vorschaubilder (Splitscreen, Karussell, Produktzeile), in denen
