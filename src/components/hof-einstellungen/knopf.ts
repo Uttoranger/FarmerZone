@@ -1,5 +1,6 @@
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /**
  * Der helle Knopf der Einstellungen über die volle Spalte (Boards s1-einstellungen „Problem melden“,
@@ -10,3 +11,12 @@ export const HELLER_KNOPF = cn(
   'flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-4 text-center text-[16px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted aria-busy:opacity-60',
   FOKUS_RAHMEN
 )
+
+/** Serif-Überschrift einer Einstellungs-Karte: 18 px halbfett (Boards s2-/w2-konto-hof, „Anmelde-Adresse“, „Passwort ändern“). */
+export const KARTEN_TITEL = 'text-[18px] leading-snug font-semibold'
+
+/**
+ * Karte der Konto-Seite wie auf den übrigen Einstellungs-Unterseiten: 12 px rund (G8), Rand, ohne Schatten und
+ * Ring — der Grundbaustein `Card` rundet mit `rounded-2xl` (≈ 24 px) und trägt einen Schatten (Runde 1, Nr. 278).
+ */
+export const EINSTELLUNG_KARTE = cn(RUNDUNG.karte, 'border border-border shadow-none ring-0')

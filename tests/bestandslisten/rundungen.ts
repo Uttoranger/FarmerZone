@@ -11,9 +11,8 @@
 export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/app/(auth)/verify/loading.tsx': 1,
   'src/app/(auth)/verify/page.tsx': 1,
-  'src/app/(hof)/settings/account/passkey-karte.tsx': 5,
+  'src/app/(hof)/settings/account/passkey-karte.tsx': 3,
   'src/app/(hof)/settings/konditionen/abzeichen-schalter.tsx': 1,
-  'src/app/(hof)/status/new/status-new-client.tsx': 1,
   'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx': 1,
   'src/app/(public)/[farmSlug]/confirm/[orderId]/loading.tsx': 3,
   'src/app/(public)/[farmSlug]/hofseite-skelett.tsx': 9,
@@ -92,7 +91,6 @@ export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/components/hofseite/kauf-sperre-hinweis.tsx': 2,
   'src/components/hofseite/produkt-karte.tsx': 3,
   'src/components/karte/karten-masse.ts': 2,
-  'src/components/konto/angemeldete-geraete.tsx': 2,
   'src/components/mein-hof/abschnitt-formulare.tsx': 2,
   'src/components/mein-hof/bild-bausteine.tsx': 3,
   'src/components/mein-hof/gespeichert-ansehen.tsx': 1,

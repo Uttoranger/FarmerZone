@@ -25,7 +25,7 @@ import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
-import { BETRIEBSNUMMER_ANKER } from '@/lib/taxonomie'
+import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, type BetriebsstatusValue } from '@/lib/taxonomie'
 import { MARKE } from '@/lib/marke'
 import {
   BAR_GEBUEHR_SEPA_SATZ,
@@ -113,7 +113,22 @@ export const HOFDATEN_TEXT = {
   satz: 'Informationen, die auf deiner öffentlichen Hofseite sichtbar sind.',
   speichern: 'Hofdaten speichern',
   gespeichert: 'Hofdaten gespeichert',
+  /** Satz unter „Was für ein Betrieb bist du?“ ohne Wahl — mit Halbgeviertstrich (Abnahme 269 „—“). */
+  betriebsnummerOhneWahl: 'LFBIS-Nummer, BAES- bzw. BVL-Registrierung oder α-Nummer – je nachdem, was du mit Futter machst.',
+  /** Vorsatz bei „Eigene Ernte“ (Board s2-/w2-hofdaten-zahlung Bild 1: unter dem Feld Betriebsnummer). */
+  lfbisVorsatz: 'Das ist deine Futtermittel-Nummer (LFBIS).',
 } as const
+
+/**
+ * Der Hilfesatz unter dem Feld Betriebsnummer (Board s2-/w2-hofdaten-zahlung Bild 1, Nr. 278): bei „Eigene
+ * Ernte“ mit dem Vorsatz zur LFBIS-Nummer, sonst der Satz des Status; der Gedankenstrich als Halbgeviertstrich
+ * mit Leerzeichen wie im Board (der Wortlaut in src/lib/taxonomie.ts bleibt unverändert).
+ */
+export function betriebsnummerHilfe(status: BetriebsstatusValue | null): string {
+  if (!status) return HOFDATEN_TEXT.betriebsnummerOhneWahl
+  const satz = BETRIEBSSTATUS[status].hilfe.replaceAll(' — ', ' – ')
+  return status === 'PRIMAERPRODUKTION' ? `${HOFDATEN_TEXT.lfbisVorsatz} ${satz}` : satz
+}
 
 /**
  * Konto und Sicherheit (Board s2-/w2-konto-hof; N42 c „Anmelde-Adresse“,

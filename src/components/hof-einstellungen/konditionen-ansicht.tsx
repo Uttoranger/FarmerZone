@@ -6,7 +6,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { KARTE } from '@/components/hof-bestellungen/stil'
 import { KICKER_12 } from '@/components/mein-hof/kicker-12'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import {
   DEIN_STAND_TITEL,
   KONDITIONEN_UEBERGANG,
@@ -72,7 +73,10 @@ export function KonditionenAnsicht({
 
   return (
     <div>
-      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel && modell && !beispiel.mitProvision ? vollerWarenpreis(modell) : undefined} />
+      {/* Werkzeug-Kopf (G1) statt des alten Unterseiten-Kopfs (Nr. 278, nur der Kopf); der Satz zum vollen Warenpreis
+          steht unverändert darunter wie auf den übrigen Einstellungs-Unterseiten. */}
+      <WerkzeugKopf titel="Deine Konditionen" />
+      {beispiel && modell && !beispiel.mitProvision && <p className={UNTERSEITE_SATZ}>{vollerWarenpreis(modell)}</p>}
 
       <div className="flex flex-col gap-5 md:gap-6">
         {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}

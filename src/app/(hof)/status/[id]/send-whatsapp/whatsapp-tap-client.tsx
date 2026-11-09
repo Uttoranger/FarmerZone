@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { EmptyState } from '@/components/ui/empty-state'
-import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
 import { beitragLinkMitKanal } from '@/lib/teilen-fenster'
 import {
@@ -122,7 +122,8 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
           titel={TEXT.leer.titel}
           satz={TEXT.leer.satz}
           ausweg={
-            <Link href={BEITRAEGE_HREF} className={KNOPF_RAHMEN}>
+            // Heller Knopf mit 14 px Rundung über die Breite statt der Pille (Board s2-/w2-whatsapp-plakat Bild 2).
+            <Link href={BEITRAEGE_HREF} className={HELLER_KNOPF}>
               {TEXT.leer.aktion}
             </Link>
           }
@@ -142,10 +143,10 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
             {TEXT.abschluss(stand.gesamt)}
           </p>
         ) : (
-          <p className="text-[14px] text-muted-foreground">
-            <strong className="font-bold text-foreground">{TEXT.stand(stand.geoeffnet, stand.gesamt)}</strong>
-            {' · '}
-            <strong className="font-bold text-status-fertig">{TEXT.offen(stand.gesamt - stand.geoeffnet)}</strong>
+          // „1 von 3 geöffnet“ links, „2 ausstehend“ rechtsbündig im Warnton, beide 15 px fett (Board Bild 1; Liste Z. 743).
+          <p className="flex items-baseline justify-between gap-3 text-[15px] font-bold">
+            <span className="text-foreground">{TEXT.stand(stand.geoeffnet, stand.gesamt)}</span>
+            <span className="text-status-offen">{TEXT.offen(stand.gesamt - stand.geoeffnet)}</span>
           </p>
         )}
       </div>
@@ -163,11 +164,11 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
           // Board s2/w2-whatsapp-plakat (V51): nur die nächste offene Person trägt den orangen Hauptknopf, die übrigen sind Umrisse.
           const naechste = stand.personen.find((p) => !p.geoeffnet)?.id === person.id
           return (
-            <li key={person.id} className={cn('flex items-center gap-3 px-3.5 py-3', index > 0 && 'border-t border-border')}>
+            <li key={person.id} className={cn('flex min-h-16 items-center gap-2.5 px-3 py-2', index > 0 && 'border-t border-border')}>
               {/* Initialen in jedem Zustand (Board); „Geöffnet“ steht als Wort rechts. */}
               <div
                 aria-hidden="true"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[13px] font-bold text-muted-foreground"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund text-[14px] font-bold text-zustand-laeuft"
               >
                 {initialen(person.name)}
               </div>
@@ -176,25 +177,25 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
                 <p className="truncate text-[15px] font-semibold text-foreground" title={person.name}>
                   {person.name}
                 </p>
-                {person.geoeffnet && (
-                  // Ein Link „Doch nicht gesendet?“ statt Frage und Knopf (Board).
+              </div>
+
+              {person.geoeffnet ? (
+                // „✓ Geöffnet“ oben rechts, darunter klein „Doch nicht gesendet?“ (Board s2-/w2-whatsapp-plakat Bild 1).
+                <div className="flex shrink-0 flex-col items-end">
+                  <span className="flex items-center gap-1 text-[14px] font-bold text-status-fertig">
+                    {/* Haken als Symbol statt Zeichen (tests/keine-emojis.test.ts). */}
+                    <Check className="size-4" strokeWidth={2.5} aria-hidden="true" />
+                    <span>{TEXT.geoeffnet}</span>
+                  </span>
                   <button
                     type="button"
                     onClick={() => speichere(person.id, false)}
-                    className={cn('-my-2 min-h-11 text-[14px] font-semibold text-foreground underline underline-offset-2', RUNDUNG.feld, FOKUS_RAHMEN)}
+                    className={cn('-mb-2 min-h-11 text-[13px] text-muted-foreground underline underline-offset-2', RUNDUNG.feld, FOKUS_RAHMEN)}
                   >
                     {TEXT.zuruecksetzenFrage}
                     <span className="sr-only"> {TEXT.zuruecksetzen}: {person.name}</span>
                   </button>
-                )}
-              </div>
-
-              {person.geoeffnet ? (
-                <span className="flex shrink-0 items-center gap-1 self-start text-[14px] font-bold text-status-fertig">
-                  {/* Haken als Symbol statt Zeichen (tests/keine-emojis.test.ts). */}
-                  <Check className="size-4" strokeWidth={2.5} aria-hidden="true" />
-                  <span>{TEXT.geoeffnet}</span>
-                </span>
+                </div>
               ) : (
                 link && (
                   <a
@@ -205,7 +206,7 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
                       rueckkehr.current = { id: person.id, verlassen: false }
                     }}
                     className={cn(
-                      'flex min-h-11 shrink-0 items-center rounded-[14px] px-4 text-[15px] font-bold transition-colors',
+                      'flex min-h-11 shrink-0 items-center rounded-[14px] px-4 text-[16px] font-bold transition-colors',
                       naechste
                         ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                         : 'border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted',

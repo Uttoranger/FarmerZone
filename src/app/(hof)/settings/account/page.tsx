@@ -11,7 +11,9 @@ import { supportMailto } from '@/lib/support'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
-import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
+import { HELLER_KNOPF, EINSTELLUNG_KARTE, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
+import { Hinweiskasten } from '@/components/ui/hinweiskasten'
+import { cn } from '@/lib/utils'
 import { EINSTELLUNG_KONTO } from '@/lib/bauern-navigation'
 import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { KONTO_TEXT } from '@/lib/hof-einstellungen'
@@ -95,16 +97,15 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
         <PasskeyKarte passkeys={passkeys} fuerAdmin={fuerAdmin} />
 
         {/* Ohne Symbole vor den Überschriften und ohne Unterzeile (Liste Lauf 32, konto-hof). */}
-        <Card>
+        <Card className={EINSTELLUNG_KARTE}>
           <CardHeader>
-            <CardTitle>{KONTO_TEXT.anmeldeAdresseTitel}</CardTitle>
+            <CardTitle className={KARTEN_TITEL}>{KONTO_TEXT.anmeldeAdresseTitel}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {/* Die Adresse in eigener Zeile, fett (Board s2-konto-hof Bild 1). */}
-            <div className="text-sm">
-              <p className="text-muted-foreground">{KONTO_TEXT.anmeldeAdresse}</p>
-              <p className="font-bold break-all text-foreground">{session.user.email}</p>
-            </div>
+            {/* Am Handy die Adresse in eigener Zeile, im Web in derselben Zeile, fett (Board s2-/w2-konto-hof Bild 1). */}
+            <p className="text-[15px] text-foreground">
+              {KONTO_TEXT.anmeldeAdresse} <strong className="block font-bold break-all md:inline">{session.user.email}</strong>
+            </p>
             <p className="text-sm text-muted-foreground">
               {KONTO_TEXT.anmeldeAdresseAendern}{' '}
               <a href={emailChangeMailto} className={TEXTLINK}>
@@ -115,9 +116,9 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={EINSTELLUNG_KARTE}>
           <CardHeader>
-            <CardTitle>{KONTO_TEXT.passwortTitel}</CardTitle>
+            <CardTitle className={KARTEN_TITEL}>{KONTO_TEXT.passwortTitel}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <PasswordForm />
@@ -135,18 +136,11 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
 
         {farm && <ArchiveFarmCard farmSlug={farm.slug} isArchived={farm.archivedAt !== null} offeneBestellungen={offeneBestellungen} />}
 
-        {/* Konto löschen wörtlich nach Board, Knopf „Support schreiben“ statt Textlink (Liste Lauf 32, konto-hof). */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{KONTO_TEXT.loeschenTitel}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{KONTO_TEXT.loeschenSatz}</p>
-            <a href={accountDeleteMailto} className={HELLER_KNOPF}>
-              {KONTO_TEXT.loeschenKnopf}
-            </a>
-          </CardContent>
-        </Card>
+        {/* Konto löschen wörtlich nach Board im Warnton (Hinweiskasten G3), Knopf „Support schreiben“ hell über die
+            volle Breite (Board s2-/w2-konto-hof Bild 2; Abnahme Lauf 32 „neutral statt Warnfarbe“). */}
+        <Hinweiskasten titel={KONTO_TEXT.loeschenTitel} aktion={<a href={accountDeleteMailto} className={cn(HELLER_KNOPF, 'mt-1.5')}>{KONTO_TEXT.loeschenKnopf}</a>}>
+          {KONTO_TEXT.loeschenSatz}
+        </Hinweiskasten>
       </div>
     </div>
   )

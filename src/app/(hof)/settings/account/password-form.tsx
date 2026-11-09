@@ -13,6 +13,7 @@ import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
 import { FeldFehlerSatz, feldFehlerAttribute } from '@/components/shared/formular-meldungen'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { FELD } from '@/components/hof-bestellungen/stil'
 
 /** Der Satz am Feld „Aktuelles Passwort“, wörtlich nach Board s2-konto-hof Bild 3. */
 export const AKTUELLES_PASSWORT_FALSCH = 'Das aktuelle Passwort ist nicht korrekt.'
@@ -106,7 +107,7 @@ export function PasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="currentPassword" className="text-sm font-medium text-foreground">
+        <Label htmlFor="currentPassword" className="text-[15px] font-semibold text-foreground">
           Aktuelles Passwort
         </Label>
         <PasswordInput
@@ -119,7 +120,8 @@ export function PasswordForm() {
           autoComplete="current-password"
           required
           {...feldFehlerAttribute('currentPassword', Boolean(aktuellFehler))}
-          className={cn('h-11 text-base', aktuellFehler && 'border-status-offen aria-invalid:border-status-offen')}
+          feld={FELD}
+          className={cn(aktuellFehler && 'border-status-offen')}
         />
         <FeldFehlerSatz feldId="currentPassword" text={aktuellFehler} />
         {aktuellFehler === AKTUELLES_PASSWORT_FALSCH && (
@@ -133,7 +135,7 @@ export function PasswordForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="newPassword" className="text-sm font-medium text-foreground">
+        <Label htmlFor="newPassword" className="text-[15px] font-semibold text-foreground">
           Neues Passwort
         </Label>
         <PasswordInput
@@ -144,7 +146,7 @@ export function PasswordForm() {
           required
           aria-invalid={pwHasError || undefined}
           aria-describedby="account-password-checklist"
-          className="h-11 text-base"
+          feld={FELD}
           onBlur={() => setPasswordTouched(true)}
         />
 
@@ -182,7 +184,7 @@ export function PasswordForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="newPasswordConfirm" className="text-sm font-medium text-foreground">
+        <Label htmlFor="newPasswordConfirm" className="text-[15px] font-semibold text-foreground">
           Neues Passwort wiederholen
         </Label>
         <PasswordInput
@@ -193,7 +195,7 @@ export function PasswordForm() {
           required
           aria-invalid={confirmHasError || undefined}
           aria-describedby={confirmHasError ? 'account-confirm-error' : undefined}
-          className="h-11 text-base"
+          feld={FELD}
         />
         {confirmHasError && (
           <p

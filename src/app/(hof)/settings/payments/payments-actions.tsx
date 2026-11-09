@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExternalLink, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
+
 import { NEU_EINRICHTEN_TITEL } from '@/lib/stripe-konto'
 import {
   createConnectAccount,
@@ -13,6 +15,13 @@ import {
   schalteOnlineZahlungEin,
 } from '@/server/actions/stripe-connect'
 import { cn } from '@/lib/utils'
+
+/**
+ * Die Knöpfe der Karte „Online-Zahlung“ über die volle Kartenbreite, 52 px, 14 px rund — der Hauptknopf orange,
+ * „Status prüfen“ hell mit Rand (Board s2-/w2-hofdaten-zahlung Bild 4/5; Abnahme Lauf 32 „Knöpfe … blasser Rand“).
+ */
+const HAUPT = cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60')
+const NEBEN = cn(HELLER_KNOPF, 'disabled:opacity-60')
 
 interface PaymentsActionsProps {
   hasAccount: boolean
@@ -126,11 +135,11 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
 
   if (isReady && !onlineAn) {
     return (
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={handleEinschalten} disabled={loading} className={KNOPF_ORANGE}>
+      <div className="flex flex-col gap-2">
+        <button type="button" onClick={handleEinschalten} disabled={loading} className={HAUPT}>
           {loading ? <Warten /> : 'Online-Zahlung einschalten'}
         </button>
-        <button type="button" onClick={handleRefresh} disabled={loading} className={KNOPF_RAHMEN}>
+        <button type="button" onClick={handleRefresh} disabled={loading} className={NEBEN}>
           Status prüfen
         </button>
       </div>
@@ -139,7 +148,7 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
 
   if (isReady) {
     return (
-      <button type="button" onClick={handleRefresh} disabled={loading} className={KNOPF_RAHMEN}>
+      <button type="button" onClick={handleRefresh} disabled={loading} className={NEBEN}>
         {loading ? <Warten /> : 'Status prüfen'}
       </button>
     )
@@ -149,7 +158,7 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
     // Der Hauptknopf über die volle Kartenbreite (Liste Lauf 32, hofdaten-zahlung „Knöpfe schmal“, Nr. 250);
     // „Status prüfen“ (C-Zeile) darunter.
     <div className="flex flex-col gap-2">
-      <button type="button" onClick={handleSetup} disabled={loading} className={cn(KNOPF_ORANGE, 'w-full justify-center')}>
+      <button type="button" onClick={handleSetup} disabled={loading} className={cn(HAUPT, 'gap-2')}>
         {loading ? (
           <Warten />
         ) : (
@@ -161,7 +170,7 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
       </button>
       {/* Beim Neu-Einrichten gibt es nichts zu prüfen: Stripe kennt das alte Konto nicht. */}
       {hasAccount && !neuEinrichten && (
-        <button type="button" onClick={handleRefresh} disabled={loading} className={KNOPF_RAHMEN}>
+        <button type="button" onClick={handleRefresh} disabled={loading} className={NEBEN}>
           Status prüfen
         </button>
       )}

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -47,8 +47,8 @@ import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/ein
 import { FeldZaehler } from '@/components/shared/zeichen-zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
-import { HOFDATEN_TEXT } from '@/lib/hof-einstellungen'
-import { HOFSEITE_HREF, HOFSEITE_WEG } from '@/lib/bauern-navigation'
+import { HOFDATEN_TEXT, betriebsnummerHilfe } from '@/lib/hof-einstellungen'
+import { HAUPT, HOFSEITE_HREF, MEIN_HOF_REITER_HOFBEREICH } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
 
 // Nur clientseitig: Leaflet greift beim Import auf window zu. Bis die Karte
@@ -68,14 +68,40 @@ const GRENZE: Partial<Record<keyof ProfileFormData, number>> = {
 
 /** Abschnittsüberschrift als Kicker in Großbuchstaben (Liste Lauf 32, hofdaten-zahlung „Abschnittsüberschriften“). */
 const KICKER = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
-/** Beschriftungen fett in Textfarbe (dieselbe Zeile). */
-const BESCHRIFTUNG = 'mb-1 block text-sm font-semibold text-foreground'
-/** Felder 10 px rund (G8) statt Pille; der Fokus als Rahmen außen, auch um den Fehlerrand (Liste Lauf 32, hofdaten-zahlung). */
-const FELD = cn('min-h-11', RUNDUNG.feld, FOKUS_RAHMEN)
+/** Beschriftungen 15 px halbfett in Textfarbe, 6 px über dem Feld (Board s2-/w2-hofdaten-zahlung; Abnahme 269). */
+const BESCHRIFTUNG = 'mb-1.5 block text-[15px] font-semibold text-foreground'
+/**
+ * Felder 48 px, Rand im Feldrand-Token (≥ 3:1), 10 px rund (G8) statt Pille; der Fokus als Rahmen außen, auch um
+ * den Fehlerrand (Liste Lauf 32, hofdaten-zahlung; Abnahme 269 „Felder 44 statt 48 px, blasser“).
+ */
+const FELD = cn('h-12 border-input bg-card px-3.5 text-base md:text-base', RUNDUNG.feld, FOKUS_RAHMEN)
+/** Auswahlfeld wie FELD, ohne den Pfeil des Browsers — den Chevron (G8) zeichnet `Auswahl`. */
+const AUSWAHL = cn('min-h-12 w-full appearance-none border border-input bg-card pr-11 pl-3.5 text-base text-foreground', RUNDUNG.feld, FOKUS_RAHMEN)
 /** Fehlerrand orange in beiden Themes (`status-offen`, V17) — vorher im Dunkeln dunkelrot (`destructive` aus ui/input). */
 const FELD_FEHLER = 'border-status-offen aria-invalid:border-status-offen aria-invalid:ring-status-offen/25 dark:aria-invalid:ring-status-offen/40'
-/** Je Abschnitt eine Karte, 12 px rund (G8). */
-const KARTE_ABSCHNITT = cn('space-y-4 border border-border bg-card p-4', RUNDUNG.karte)
+/**
+ * Die Spalten-Karte: am Handy stehen die Abschnitte auf dem Seitengrund, ab 1024 px je Spalte EINE Karte
+ * (links Hof und Adresse, rechts Kontakt, Betriebsnummer und der Logo-Satz; Board s2-/w2-hofdaten-zahlung Bild 1,
+ * Abnahme Lauf 32 „Abschnitte als eigene Karten“, „vier statt zwei Karten“).
+ */
+const SPALTEN_KARTE = cn('flex flex-col gap-4 lg:border lg:border-border lg:bg-card lg:p-4', RUNDUNG.karte)
+/** Ein Abschnitt in der Spalte: Kicker und Felder. */
+const ABSCHNITT = 'flex flex-col gap-4'
+
+/** Auswahlfeld mit Chevron statt des Browser-Pfeils (G8). Der Chevron ist Zierde, das Feld bleibt das Ziel. */
+function Auswahl({ children, ...props }: React.ComponentProps<'select'>): React.JSX.Element {
+  return (
+    <div className="relative">
+      <select {...props} className={AUSWAHL}>
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 size-5 -translate-y-1/2 text-foreground" strokeWidth={1.8} aria-hidden="true" />
+    </div>
+  )
+}
+
+/** „Mein Hof › Hofseite“ — derselbe Trenner wie in den Brotkrumen (Abnahme Lauf 32 „→ statt ›“). */
+const HOFSEITE_PFAD = `${HAUPT.find((p) => p.id === 'mein-hof')?.label ?? ''} › ${MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'hofseite')?.label ?? ''}`
 
 export function ProfileForm({ farm }: { farm: FarmSettings }) {
   const [isPending, startTransition] = useTransition()
@@ -290,7 +316,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         />
         {max !== undefined && <FeldZaehler control={control} name={id} max={max} />}
         {hilfe && (
-          <p id={hilfeKennung(id)} className="mt-1 text-xs text-muted-foreground">
+          <p id={hilfeKennung(id)} className="mt-1.5 text-[13px] leading-normal text-muted-foreground">
             {hilfe}
           </p>
         )}
@@ -299,15 +325,23 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
     )
   }
 
+  // Der eine Speichern-Knopf — am Handy in der festen Leiste, im Web unter der rechten Spalte (je nur einer sichtbar).
+  // Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit).
+  const speichernKnopf = (
+    <button type="submit" disabled={isPending || sucheLaeuft} className={cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60')}>
+      {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Wird gespeichert" /> : sucheLaeuft ? 'Suche läuft noch …' : HOFDATEN_TEXT.speichern}
+    </button>
+  )
+
   // noValidate: Mit type="email" prüfte sonst der Browser zuerst – mit englischer Blase und ohne unsere Sätze am Feld.
   return (
     <form noValidate onSubmit={handleSubmit(onSubmit)} onKeyDown={weiterMitEnter} className="flex flex-col gap-4">
       {/* „Bitte prüfe das markierte Feld.“ über dem Formular, solange das Schema Felder markiert (G6). */}
       <FormularPruefen anzahl={Object.keys(errors).length} />
       {/* Ab 1024 px zwei Spalten wie im Board w2-hofdaten-zahlung: links Hof und Adresse, rechts Kontakt und Betriebsnummer. */}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start">
-      <div className="flex min-w-0 flex-col gap-4">
-      <div className={KARTE_ABSCHNITT}>
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
+      <div className={cn('min-w-0', SPALTEN_KARTE)}>
+      <div className={ABSCHNITT}>
         <h2 className={KICKER}>Hof-Informationen</h2>
         {field('name', 'Hof-Name', { placeholder: 'Hof Müller' })}
         {field('ownerName', 'Name des Inhabers', { placeholder: 'Klaus Müller' })}
@@ -319,13 +353,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             rows={4}
             placeholder="Beschreibe deinen Hof für Kunden..."
             {...feldFehlerAttribute('description', Boolean(errors.description))}
-            className={cn(RUNDUNG.feld, FOKUS_RAHMEN, errors.description && FELD_FEHLER)}
+            className={cn('border-input bg-card px-3.5 py-2.5 text-base md:text-base', RUNDUNG.feld, FOKUS_RAHMEN, errors.description && FELD_FEHLER)}
           />
           <FeldFehlerSatz feldId="description" text={errors.description?.message} />
         </div>
       </div>
 
-      <div className={KARTE_ABSCHNITT}>
+      <div className={ABSCHNITT}>
         <h2 className={KICKER}>Adresse</h2>
 
         {/* Das Land ÜBER den Adressfeldern: Es entscheidet, wie PLZ und Ort
@@ -339,7 +373,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               dann nur noch über onBlur nach. Wer mit den Pfeiltasten wählt
               und sofort absendet, sähe den DE-Hinweis und speicherte AT.
               Deshalb erst den Handler von register, dann unseren. */}
-          <select
+          <Auswahl
             id="country"
             {...landFeld}
             aria-describedby={land === 'DE' ? 'land-hinweis' : undefined}
@@ -347,14 +381,13 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
               landFeld.onChange(e)
               setLand(alsLand(e.target.value))
             }}
-            className={cn('min-h-11 w-full border border-border bg-card px-3 text-base text-foreground', RUNDUNG.feld)}
           >
             {LAENDER.map((wert) => (
               <option key={wert} value={wert}>
                 {LAND_LABEL[wert]}
               </option>
             ))}
-          </select>
+          </Auswahl>
         </div>
 
         {/* Ruhig, kein Warnbalken, kein Orange: Der Hof hat nichts falsch
@@ -364,7 +397,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
         {land === 'DE' && (
           <p
             id="land-hinweis"
-            className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+            className={cn('border border-border bg-muted/30 px-3 py-2 text-[13px] leading-relaxed text-muted-foreground', RUNDUNG.feld)}
           >
             {DE_VORBEREITUNG_HINWEIS}
           </p>
@@ -414,7 +447,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           onClick={aufKarteSuchen}
           disabled={sucheLaeuft || isPending}
           // Volle Breite, fett (Liste Lauf 32, hofdaten-zahlung „Auf der Karte suchen“).
-          className={cn('inline-flex min-h-11 w-full items-center justify-center gap-2 border-[1.5px] border-foreground bg-card px-4 text-[15px] font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-60', RUNDUNG.feld, FOKUS_RAHMEN)}
+          // Heller Knopf wie im Board: 52 px, 14 px rund, 16 px fett (Abnahme Lauf 32 „Umriss-Knöpfe niedrig, dünn“).
+          className={cn('inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-foreground bg-card px-4 text-[16px] font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-60', FOKUS_RAHMEN)}
         >
           {sucheLaeuft && <Loader2 className="size-4 animate-spin" />}
           Auf der Karte suchen
@@ -427,7 +461,7 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
             während die Karte nachlädt, und schiebt danach nichts mehr.
             Ziel von „Standort auf der Karte setzen" in Region (STANDORT_ANKER, Nr. 122). */}
         <div id="standort" className="scroll-mt-6">
-          {hinweis && <p className="mb-2 text-xs text-muted-foreground">{hinweis}</p>}
+          {hinweis && <p className="mb-2 text-[13px] text-muted-foreground">{hinweis}</p>}
           <StandortKarte
             start={start}
             ziel={ziel}
@@ -440,7 +474,8 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
 
       </div>
       <div className="flex min-w-0 flex-col gap-4">
-      <div className={KARTE_ABSCHNITT}>
+      <div className={SPALTEN_KARTE}>
+      <div className={ABSCHNITT}>
         <h2 className={KICKER}>Kontakt</h2>
         {field('phone', 'Telefon', { placeholder: '+43 660 000 0000' })}
         {/* Ziel der Karte in Heute (HOF_EMAIL_TEXT.einstellungenPfad, Nr. 212): Das Feld trägt die id des Ankers. */}
@@ -451,24 +486,23 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           Produkt. Die Futter-Kennzeichnung zeigt sie an, der Checkout belegt
           sie vor, wenn du selbst Futter „nur an Betriebe" kaufst. */}
       {/* Ziel der Zeile „Futtermittel-Registrierung" der Übersicht (/settings, Nr. 22d). */}
-      <div id={BETRIEBSNUMMER_ANKER} className={cn('scroll-mt-6', KARTE_ABSCHNITT)}>
-        <div>
+      <div id={BETRIEBSNUMMER_ANKER} className={cn('scroll-mt-6', ABSCHNITT)}>
+        <div className="flex flex-col gap-1.5">
           <h2 className={KICKER}>Betriebsnummer</h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[15px] leading-normal text-muted-foreground">
             Freiwillig. Brauchst du, wenn du Futter verkaufst oder bei einem anderen Hof als Betrieb einkaufst.
           </p>
         </div>
         <div>
           <Label htmlFor="betriebsstatus" className={BESCHRIFTUNG}>Was für ein Betrieb bist du?</Label>
           {/* Wie beim Land: erst der Handler von register, dann unserer. */}
-          <select
+          <Auswahl
             id="betriebsstatus"
             {...statusFeld}
             onChange={(e) => {
               statusFeld.onChange(e)
               setStatus(e.target.value === '' ? null : (e.target.value as BetriebsstatusValue))
             }}
-            className={cn('min-h-11 w-full border border-border bg-card px-3 text-base text-foreground', RUNDUNG.feld)}
           >
             <option value="">Keine Angabe</option>
             {BETRIEBSSTATUS_VALUES.map((s) => (
@@ -476,17 +510,14 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
                 {BETRIEBSSTATUS[s].name}
               </option>
             ))}
-          </select>
-          <p className="text-xs text-muted-foreground mt-1">
-            {status
-              ? BETRIEBSSTATUS[status].hilfe
-              : 'LFBIS-Nummer, BAES- bzw. BVL-Registrierung oder α-Nummer — je nachdem, was du mit Futter machst.'}
-          </p>
+          </Auswahl>
         </div>
-        {field('betriebsnummer', 'Betriebsnummer', { placeholder: 'z. B. AT 1234567', letztes: true })}
+        {/* Der Hilfesatz steht unter dem Feld, zu dem er gehört (Board Bild 1; Abnahme Lauf 32 „LFBIS-Hinweis Stelle“). */}
+        {field('betriebsnummer', 'Betriebsnummer', { placeholder: 'z. B. AT 1234567', hilfe: betriebsnummerHilfe(status), letztes: true })}
       </div>
 
-      <p className="text-sm text-muted-foreground">
+      {/* Der Logo-Satz in der rechten Karte, unter der Betriebsnummer (Board w2-hofdaten-zahlung Bild 1). */}
+      <p className="text-[14px] text-muted-foreground">
         Logo und Titelbild verwaltest du unter{' '}
         {/* Ein Link im Satz (Nr. 44), grün wie jeder Link im Fließtext. Das
             Polster macht ihn 44 px hoch, die Gegen-Ränder halten die Zeile ruhig.
@@ -495,23 +526,20 @@ export function ProfileForm({ farm }: { farm: FarmSettings }) {
           href={HOFSEITE_HREF}
           className={cn('-my-3 inline-block rounded-md py-3 font-medium text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}
         >
-          {HOFSEITE_WEG}
+          {HOFSEITE_PFAD}
         </Link>{' '}
-        — dort lädst du Bilder direkt vom Gerät hoch.
+        – dort lädst du Bilder direkt vom Gerät hoch.
       </p>
-
+      </div>
+      {/* Im Web unter der rechten Spalte über deren volle Breite (Board w2-hofdaten-zahlung Bild 1). */}
+      <div className="hidden lg:block">{speichernKnopf}</div>
       </div>
       </div>
 
       <SpeicherFehler text={speicherFehler} nochmal={speicherFehler === NETZ_SATZ} onNochmal={nochmalSpeichern} laeuft={isPending} />
 
-      {/* Am Handy fest über der Unterleiste (G2), im Web am Formularende rechts (Board w2-hofdaten-zahlung).
-          Wartet, solange „Auf der Karte suchen" läuft — sonst ginge der neue Standort verloren (siehe onSubmit). */}
-      <FesteAktionsleiste className="md:items-end">
-        <button type="submit" disabled={isPending || sucheLaeuft} className={cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60 md:w-auto md:px-6')}>
-          {isPending ? <Loader2 className="size-4 animate-spin" aria-label="Wird gespeichert" /> : sucheLaeuft ? 'Suche läuft noch …' : HOFDATEN_TEXT.speichern}
-        </button>
-      </FesteAktionsleiste>
+      {/* Am Handy und bis 1024 px die feste Leiste bzw. das Formularende; ab 1024 px steht der Knopf unter der rechten Spalte. */}
+      <FesteAktionsleiste className="lg:hidden">{speichernKnopf}</FesteAktionsleiste>
     </form>
   )
 }

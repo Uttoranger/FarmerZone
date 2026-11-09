@@ -268,8 +268,10 @@ describe('Speichern auf den Einstellungs-Unterseiten (Quelltext)', () => {
     // Ein neuer Versuch räumt den alten Satz weg.
     expect(profil).toMatch(/if \(sucheLaeuft\) return\s*setSpeicherFehler\(null\)/)
     // Seit Nr. 174 die Hinweiskarte mit „Nochmal" am Netz (SpeicherFehler) statt DialogFehler.
-    // Seit Nr. 250 steht der Knopf in der festen Aktionsleiste (G2), weiter direkt nach dem Fehlerkasten.
-    expect(text).toMatch(/<SpeicherFehler text=\{speicherFehler\}[^>]*\/>\s*\{\/\*[^*]*\*\/\}\s*<FesteAktionsleiste[^>]*>\s*<button type="submit"/)
+    // Seit Nr. 250 steht der Knopf in der festen Aktionsleiste (G2), weiter direkt nach dem Fehlerkasten; seit Nr. 278
+    // ist er eine Konstante (`speichernKnopf`), die im Web unter der rechten Spalte und am Handy in der Leiste steht.
+    expect(text).toMatch(/<SpeicherFehler text=\{speicherFehler\}[^>]*\/>\s*\{\/\*[^*]*\*\/\}\s*<FesteAktionsleiste[^>]*>\{speichernKnopf\}/)
+    expect(text).toMatch(/const speichernKnopf = \(\s*<button type="submit"/)
     // Ohne Fehler steht nichts da.
     expect(renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))).not.toContain('role="alert"')
   })
@@ -413,11 +415,11 @@ const HOF: FarmSettings = {
   pickupSlots: [],
 }
 
-describe('Hof-Profil: „Mein Hof → Hofseite" ist ein Link (seit Nr. 50, vorher „Einstellungen → Mein Auftritt")', () => {
+describe('Hof-Profil: „Mein Hof › Hofseite" ist ein Link (seit Nr. 50, vorher „Einstellungen → Mein Auftritt"; „›“ seit Nr. 278)', () => {
   it('führt nach Mein Hof, grün und 44 px hoch, mit sichtbarem Fokus', () => {
     const html = renderToStaticMarkup(createElement(ProfileForm, { farm: HOF }))
     const link = html.match(/<a href="\/farm-page" class="([^"]*)"[^>]*>([^<]*)<\/a>/)
-    expect(link?.[2]).toBe('Mein Hof → Hofseite')
+    expect(link?.[2]).toBe('Mein Hof › Hofseite')
     const klassen = link?.[1].split(' ') ?? []
     for (const k of ['text-brand-text', 'py-3', ...FOKUS_RAHMEN.split(' ')]) expect(klassen, k).toContain(k)
     expect(html).not.toContain('/settings/appearance')

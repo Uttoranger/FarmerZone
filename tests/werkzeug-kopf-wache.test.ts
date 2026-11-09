@@ -11,7 +11,7 @@
  * ohne Treffer fällt als veraltet auf (die Liste schrumpft nur).
  *
  * Gegenprobe: Text-Attrappen — Aufruf, Ladeansicht und Import schlagen an, der neue Kopf, die Stil-Datei
- * des alten und ein Kommentar nicht; im echten Baum findet die Suche die Liste.
+ * des alten und ein Kommentar nicht; im echten Baum findet die Suche die Liste (seit Nr. 278 leer).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
@@ -71,6 +71,7 @@ describe('UnterseitenKopf nur noch im Bestand (G1)', () => {
     expect(nutztAltenKopf('<WerkzeugKopf titel="Hofdaten" />')).toBe(false)
     expect(nutztAltenKopf("import { LEISTE_HANDY } from '@/components/hofbereich/unterseiten-kopf-stil'")).toBe(false)
     expect(nutztAltenKopf('// früher <UnterseitenKopf /> hier')).toBe(false)
-    expect(aufrufer.size).toBeGreaterThan(0)
+    // Seit Nr. 278 ist der Bestand leer: Die Suche findet genau so viele Aufrufer, wie die Liste nennt.
+    expect(aufrufer.size).toBe(UNTERSEITEN_KOPF_BESTAND.length)
   })
 })

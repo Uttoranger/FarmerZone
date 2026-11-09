@@ -2,12 +2,14 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import * as Sentry from '@sentry/nextjs'
-import { CircleAlert, CircleCheck, Clock } from 'lucide-react'
+import { CircleAlert, CircleCheck } from 'lucide-react'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { prisma } from '@/lib/prisma'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { KARTE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { KARTE } from '@/components/hof-bestellungen/stil'
+import { Hinweiskasten } from '@/components/ui/hinweiskasten'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { UNTERSEITE_RAHMEN, UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
@@ -102,31 +104,17 @@ export default async function PaymentsPage({
             Dein Stripe-Konto ist eingerichtet. Online-Zahlung ist jetzt aktiv.
           </Hinweiskarte>
         )}
+        {/* Offenes als Hinweiskasten (G3): Titel und Satz im Warnton, ohne Symbol (Board s2-/w2-hofdaten-zahlung
+            Bild 5; Abnahme 269 „Hinweis Online-Zahlung mit ⓘ neutral und runder“). Die Sätze bleiben wörtlich. */}
         {hinweis === 'fortsetzen' && (
-          <Hinweiskarte ton="orange" symbol={Clock}>
-            Die Einrichtung bei Stripe ist noch nicht ganz fertig. Bitte setz sie fort.
-          </Hinweiskarte>
+          <Hinweiskasten titel="Die Einrichtung bei Stripe ist noch nicht ganz fertig.">Bitte setz sie fort.</Hinweiskasten>
         )}
         {hinweis === 'fehler' && (
-          <Hinweiskarte ton="orange" symbol={CircleAlert}>
-            Wir konnten den Stand bei Stripe gerade nicht prüfen. Versuch es bitte noch einmal.
-          </Hinweiskarte>
+          <Hinweiskasten titel="Wir konnten den Stand bei Stripe gerade nicht prüfen.">Versuch es bitte noch einmal.</Hinweiskasten>
         )}
-        {hinweis === 'einrichten' && (
-          <Hinweiskarte ton="orange" symbol={CircleAlert} titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}>
-            {ONLINE_ZAHLUNG_EINRICHTEN_SATZ}
-          </Hinweiskarte>
-        )}
-        {hinweis === 'einschalten' && (
-          <Hinweiskarte ton="orange" symbol={CircleAlert} titel={ONLINE_AUS_TITEL}>
-            {ONLINE_AUS_SATZ}
-          </Hinweiskarte>
-        )}
-        {neuEinrichten && (
-          <Hinweiskarte ton="orange" symbol={CircleAlert} titel={NEU_EINRICHTEN_TITEL}>
-            {neuEinrichtenSatz(farm.acceptsOnsite)}
-          </Hinweiskarte>
-        )}
+        {hinweis === 'einrichten' && <Hinweiskasten titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}>{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</Hinweiskasten>}
+        {hinweis === 'einschalten' && <Hinweiskasten titel={ONLINE_AUS_TITEL}>{ONLINE_AUS_SATZ}</Hinweiskasten>}
+        {neuEinrichten && <Hinweiskasten titel={NEU_EINRICHTEN_TITEL}>{neuEinrichtenSatz(farm.acceptsOnsite)}</Hinweiskasten>}
 
         <section aria-labelledby="online-titel" className={cn(KARTE, 'p-5')}>
           {/* Titel in der Serifenschrift, die Marke rechts daneben statt darunter (Liste Lauf 32, hofdaten-zahlung). */}
@@ -135,7 +123,7 @@ export default async function PaymentsPage({
               <h2 id="online-titel" className="font-heading text-[18px] font-semibold text-foreground">
                 Online-Zahlung (Stripe)
               </h2>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
+              <p className="mt-0.5 text-[14px] text-muted-foreground">
                 Kundinnen zahlen online mit Karte, Apple Pay, Google Pay oder EPS.
               </p>
             </div>
@@ -179,14 +167,15 @@ export default async function PaymentsPage({
               <h2 id="bar-titel" className="font-heading text-[18px] font-semibold text-foreground">
                 {BAR_KARTE_TEXT.titel}
               </h2>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">{BAR_KARTE_TEXT.beschreibung}</p>
+              <p className="mt-0.5 text-[14px] text-muted-foreground">{BAR_KARTE_TEXT.beschreibung}</p>
             </div>
             {bar && <StatusBadge status={bar.ton} className="shrink-0">{bar.marke}</StatusBadge>}
           </div>
-          {bar?.satz && <p className="mt-3 text-[13.5px] leading-snug text-foreground">{bar.satz}</p>}
+          {bar?.satz && <p className="mt-3 text-[14px] leading-snug text-foreground">{bar.satz}</p>}
           {(bar?.lastschrift || bar?.zuKonditionen) && (
             <div className="mt-4">
-              <Link href={BAR_KARTE_TEXT.einrichtenHref} className={cn(KNOPF_RAHMEN, 'w-full justify-center')}>
+              {/* Heller Knopf mit kräftigem Rand, fett (Abnahme Lauf 32 „Lastschrift einrichten nicht fett/blasser Rand“). */}
+              <Link href={BAR_KARTE_TEXT.einrichtenHref} className={HELLER_KNOPF}>
                 {bar.lastschrift ? BAR_KARTE_TEXT.einrichten : BAR_KARTE_TEXT.zuKonditionen}
               </Link>
             </div>
