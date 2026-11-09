@@ -7,12 +7,6 @@ import { toast } from 'sonner'
 import { AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
 import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
 
-/**
- * Die Knöpfe der Karte „Online-Zahlung“ über die volle Kartenbreite, 52 px, 14 px rund — der Hauptknopf orange,
- * „Status prüfen“ hell mit Rand (Board s2-/w2-hofdaten-zahlung Bild 4/5; Abnahme Lauf 32 „Knöpfe … blasser Rand“).
- */
-const HAUPT = cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60')
-const NEBEN = cn(HELLER_KNOPF, 'disabled:opacity-60')
 import { NEU_EINRICHTEN_TITEL } from '@/lib/stripe-konto'
 import {
   createConnectAccount,
@@ -21,6 +15,13 @@ import {
   schalteOnlineZahlungEin,
 } from '@/server/actions/stripe-connect'
 import { cn } from '@/lib/utils'
+
+/**
+ * Die Knöpfe der Karte „Online-Zahlung“ über die volle Kartenbreite, 52 px, 14 px rund — der Hauptknopf orange,
+ * „Status prüfen“ hell mit Rand (Board s2-/w2-hofdaten-zahlung Bild 4/5; Abnahme Lauf 32 „Knöpfe … blasser Rand“).
+ */
+const HAUPT = cn(AKTIONSLEISTE_KNOPF, 'disabled:opacity-60')
+const NEBEN = cn(HELLER_KNOPF, 'disabled:opacity-60')
 
 interface PaymentsActionsProps {
   hasAccount: boolean

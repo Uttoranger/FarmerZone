@@ -11,7 +11,7 @@
 export const RUNDUNGEN_BESTAND: Readonly<Record<string, number>> = {
   'src/app/(auth)/verify/loading.tsx': 1,
   'src/app/(auth)/verify/page.tsx': 1,
-  'src/app/(hof)/settings/account/passkey-karte.tsx': 5,
+  'src/app/(hof)/settings/account/passkey-karte.tsx': 3,
   'src/app/(hof)/settings/konditionen/abzeichen-schalter.tsx': 1,
   'src/app/(public)/[farmSlug]/bestaetigen/[token]/loading.tsx': 1,
   'src/app/(public)/[farmSlug]/confirm/[orderId]/loading.tsx': 3,

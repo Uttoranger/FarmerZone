@@ -32,7 +32,8 @@ export function TeilenKopf({ titel, zurueckHref, zurueckName }: { titel: string;
       </p>
       <Link
         href={zurueckHref}
-        className={cn('ml-auto hidden min-h-11 items-center text-[15px] font-semibold text-foreground hover:underline md:inline-flex', FOKUS_RAHMEN)}
+        // Grüner, unterstrichener Textlink wie der Rückweg des Werkzeug-Kopfs (Board w2-teilen; Liste Z. 682, Runde 1).
+        className={cn('ml-auto hidden min-h-11 items-center text-[15px] font-semibold text-status-fertig underline decoration-1 underline-offset-4 md:inline-flex', FOKUS_RAHMEN)}
       >
         <span aria-hidden="true">←&nbsp;</span>
         {`Zu ${zurueckName}`}

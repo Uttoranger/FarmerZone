@@ -109,7 +109,7 @@ const UNEHRLICH = /Gesendet|versendet|automatisch gespeichert/
  * rot, damit die Liste nicht still wächst.
  */
 const ERLAUBTE_SAETZE: readonly { datei: string; satz: string; grund: string }[] = [
-  { datei: 'status/new/status-new-client.tsx', satz: 'E-Mails werden automatisch versendet', grund: 'Die App verschickt die Mails beim Veröffentlichen selbst.' },
+  // „E-Mails werden automatisch versendet“ steht seit Nr. 278 (Runde 1) in src/lib/beitrag-anlass.ts (`mailZusammenfassung`), nicht mehr im Client.
   { datei: 'status/new/status-new-client.tsx', satz: 'Wird versendet…', grund: 'Knopf, solange die App veröffentlicht und die Mails verschickt.' },
 ]
 

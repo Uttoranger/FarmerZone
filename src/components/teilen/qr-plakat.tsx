@@ -47,7 +47,7 @@ export function QrPlakat({ daten }: { daten: PlakatDaten }): React.JSX.Element {
           <br />
           Online vorbestellen.
         </h2>
-        <p className="line-clamp-2 text-[3cqw] font-bold break-words">{daten.ort ? `${daten.hofName} · ${daten.ort}` : daten.hofName}</p>
+        <p className="line-clamp-2 text-[3.6cqw] font-bold break-words">{daten.ort ? `${daten.hofName} · ${daten.ort}` : daten.hofName}</p>
         {/* Heller Rand rund um den Code: Die Norm will vier Module Ruhezone, sonst lesen manche Kameras ihn nicht. */}
         <svg
           role="img"
@@ -57,12 +57,13 @@ export function QrPlakat({ daten }: { daten: PlakatDaten }): React.JSX.Element {
         >
           <path d={qr.pfad} className="fill-primary-foreground" />
         </svg>
-        <p className="text-[2.8cqw] font-semibold break-all">{daten.adresse}</p>
-        {/* Die drei Schritte fett in einer Zeile, je mit der Zahl davor (Board s2-/w2-whatsapp-plakat Bild 3;
-            Abnahme Lauf 32 „Nummernkreise statt fett in einer Zeile“). Reicht die Breite nicht, bricht die Zeile um. */}
-        <ol className="mt-[1cqw] flex w-full flex-wrap justify-center gap-x-[2.4cqw] gap-y-[1cqw] text-[2.7cqw] leading-snug font-bold">
+        <p className="text-[3.3cqw] font-semibold break-all">{daten.adresse}</p>
+        {/* Die drei Schritte fett nebeneinander, je mit der Zahl davor (Board s2-/w2-whatsapp-plakat Bild 3, 13 px
+            auf 420 px = 3,1 cqw; Liste Lauf 32 Z. 732). */}
+        <ol className="mt-[1cqw] grid w-full grid-cols-3 gap-[2.4cqw] text-[3.1cqw] leading-snug font-bold">
           {SCHRITTE.map((schritt, i) => (
-            <li key={schritt} className="whitespace-nowrap">
+            // Drei Spalten nebeneinander; ein langer Schritt bricht in seiner Spalte um, nie in eine eigene Zeile (Runde 1).
+            <li key={schritt} className="text-center text-balance">
               {`${i + 1} ${schritt}`}
             </li>
           ))}

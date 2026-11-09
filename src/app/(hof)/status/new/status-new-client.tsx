@@ -18,13 +18,12 @@ import { enterTaste } from '@/lib/feld-attribute'
 import { FREIWILLIG } from '@/lib/profil-meldungen'
 import { NETZ_SATZ } from '@/lib/netz'
 import { cn } from '@/lib/utils'
-import { BEITRAG_ABLAUF_TEXT, BEITRAG_ANLAESSE, BEITRAG_ANLASS, type BeitragAnlass } from '@/lib/beitrag-anlass'
+import { BEITRAG_ABLAUF_TEXT, BEITRAG_ANLAESSE, BEITRAG_ANLASS, beitragVorschauText, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { FELD_LABEL } from '@/components/hof-bestellungen/stil'
 import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF, AKTIONSLEISTE_ZURUECK } from '@/components/ui/feste-aktionsleiste'
 import { formatEuro } from '@/lib/format'
-import { renderStatusBodyWithChip } from '@/lib/status-body'
 import { MAILABSTAND_TAGE, mailVersandMeldung } from '@/lib/beitrag-mailabstand'
 import { tageSeit } from '@/lib/hof-kunden'
 import { BEITRAEGE_HREF } from '@/lib/bauern-navigation'
@@ -492,7 +491,11 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               {/* Owner-Vorschau zeigt den Platzhalter als Chip (Status-Paket E) —
                   kundenseitig wird weiterhin gestrippt */}
               {/* Text in Textfarbe, 15 px, so wie er ankommt (Board Bild 4; Abnahme Lauf 32 „Vorschau-Text grau/klein“). */}
-              <p className="text-[15px] leading-normal whitespace-pre-wrap text-foreground">{renderStatusBodyWithChip(body)}</p>
+              <p className="text-[15px] leading-normal whitespace-pre-wrap text-foreground">{beitragVorschauText(body)}</p>
+              {/* Beispielname statt Marke „{Vorname}“, der Hinweis klein darunter (Liste Lauf 32 Z. 430; Runde 1). */}
+              {body.includes('{Vorname}') && (
+                <p className="mt-1.5 text-[13px] text-muted-foreground">{BEITRAG_ABLAUF_TEXT.vorschauNameHinweis}</p>
+              )}
               {linkedProductIds.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {products
@@ -520,7 +523,7 @@ export function StatusNewClient({ products, emailCount, recentEmailSentAt, jetzt
               {sendEmail && !emailBlocked && emailCount > 0 && (
                 <p className="flex items-center gap-2 text-[15px] text-foreground">
                   <Check className="size-4 shrink-0 text-status-fertig" strokeWidth={2.5} aria-hidden="true" />
-                  {emailCount} E-Mails werden automatisch versendet
+                  {BEITRAG_ABLAUF_TEXT.mailZusammenfassung(emailCount)}
                 </p>
               )}
             </div>

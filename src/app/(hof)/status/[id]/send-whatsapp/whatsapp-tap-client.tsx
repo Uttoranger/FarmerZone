@@ -143,11 +143,10 @@ export function WhatsAppTapClient({ postId, title, body, farmSlug, showOnFarmPag
             {TEXT.abschluss(stand.gesamt)}
           </p>
         ) : (
-          <p className="text-[14px] text-muted-foreground">
-            <strong className="font-bold text-foreground">{TEXT.stand(stand.geoeffnet, stand.gesamt)}</strong>
-            {' · '}
-            {/* „ausstehend“ im Warnton wie im Board (Bild 1), nicht grün: Da ist noch etwas zu tun. */}
-            <strong className="font-bold text-status-offen">{TEXT.offen(stand.gesamt - stand.geoeffnet)}</strong>
+          // „1 von 3 geöffnet“ links, „2 ausstehend“ rechtsbündig im Warnton, beide 15 px fett (Board Bild 1; Liste Z. 743).
+          <p className="flex items-baseline justify-between gap-3 text-[15px] font-bold">
+            <span className="text-foreground">{TEXT.stand(stand.geoeffnet, stand.gesamt)}</span>
+            <span className="text-status-offen">{TEXT.offen(stand.gesamt - stand.geoeffnet)}</span>
           </p>
         )}
       </div>

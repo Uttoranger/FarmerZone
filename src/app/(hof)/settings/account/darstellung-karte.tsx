@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
-import { KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
+import { EINSTELLUNG_KARTE, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChipGruppe, type ChipGruppeOption } from '@/components/ui/segment'
 
@@ -39,7 +39,7 @@ export function DarstellungKarte() {
   const montiert = useSyncExternalStore(nichtsAbonnieren, imBrowser, aufDemServer)
 
   return (
-    <Card>
+    <Card className={EINSTELLUNG_KARTE}>
       <CardHeader>
         <CardTitle className={KARTEN_TITEL}>Darstellung</CardTitle>
       </CardHeader>

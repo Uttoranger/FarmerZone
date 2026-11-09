@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Fingerprint, KeyRound, Loader2, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { ADMIN_PFAD, FRISCH_FEHLER, FRISCH_TEXT } from '@/lib/admin-anmeldung'
 import { HOF_PASSKEY_TEXT, PASSKEY_NAME_MAX, hofPasskeyFehlerText } from '@/lib/hof-passkey'
 import { hofAnmeldeAdresse } from '@/lib/anmeldecode'
@@ -144,7 +145,7 @@ export function PasskeyKarte({ passkeys, fuerAdmin = false }: { passkeys: readon
 
   if (fuerAdmin) {
     return (
-      <section aria-labelledby={titelId} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+      <section aria-labelledby={titelId} className={cn('flex flex-col gap-3 border border-border bg-card p-4', RUNDUNG.karte)}>
         {kopf}
         <Link href={ADMIN_PFAD.anmeldung} className={cn(TEXT_GRUEN, 'self-start')}>
           {T.adminLink}
@@ -154,7 +155,7 @@ export function PasskeyKarte({ passkeys, fuerAdmin = false }: { passkeys: readon
   }
 
   return (
-    <section aria-labelledby={titelId} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+    <section aria-labelledby={titelId} className={cn('flex flex-col gap-3 border border-border bg-card p-4', RUNDUNG.karte)}>
       {kopf}
 
       {passkeys.length === 0 ? (

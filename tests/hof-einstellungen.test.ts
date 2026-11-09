@@ -731,3 +731,28 @@ describe('Quelltext', () => {
     }
   })
 })
+
+describe('betriebsnummerHilfe (Nr. 278, Board s2-/w2-hofdaten-zahlung Bild 1)', () => {
+  it('ohne Wahl der allgemeine Satz mit Halbgeviertstrich', async () => {
+    const { betriebsnummerHilfe, HOFDATEN_TEXT } = await import('@/lib/hof-einstellungen')
+    expect(betriebsnummerHilfe(null)).toBe(HOFDATEN_TEXT.betriebsnummerOhneWahl)
+    expect(betriebsnummerHilfe(null)).not.toContain('—')
+  })
+
+  it('bei Eigener Ernte mit dem Vorsatz zur LFBIS-Nummer', async () => {
+    const { betriebsnummerHilfe } = await import('@/lib/hof-einstellungen')
+    expect(betriebsnummerHilfe('PRIMAERPRODUKTION')).toBe(
+      'Das ist deine Futtermittel-Nummer (LFBIS). Du verkaufst nur selbst erzeugtes Futter – trag deine LFBIS-Nummer ein.'
+    )
+  })
+
+  it('tauscht „—“ gegen „–“ und lässt den Wortlaut sonst gleich', async () => {
+    const { betriebsnummerHilfe } = await import('@/lib/hof-einstellungen')
+    const { BETRIEBSSTATUS } = await import('@/lib/taxonomie')
+    for (const status of ['REGISTRIERT', 'ZUGELASSEN'] as const) {
+      expect(BETRIEBSSTATUS[status].hilfe).toContain(' — ')
+      expect(betriebsnummerHilfe(status)).toBe(BETRIEBSSTATUS[status].hilfe.replaceAll(' — ', ' – '))
+      expect(betriebsnummerHilfe(status)).not.toContain('—')
+    }
+  })
+})

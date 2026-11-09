@@ -11,7 +11,7 @@ import { supportMailto } from '@/lib/support'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
-import { HELLER_KNOPF, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
+import { HELLER_KNOPF, EINSTELLUNG_KARTE, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
 import { Hinweiskasten } from '@/components/ui/hinweiskasten'
 import { cn } from '@/lib/utils'
 import { EINSTELLUNG_KONTO } from '@/lib/bauern-navigation'
@@ -97,7 +97,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
         <PasskeyKarte passkeys={passkeys} fuerAdmin={fuerAdmin} />
 
         {/* Ohne Symbole vor den Überschriften und ohne Unterzeile (Liste Lauf 32, konto-hof). */}
-        <Card>
+        <Card className={EINSTELLUNG_KARTE}>
           <CardHeader>
             <CardTitle className={KARTEN_TITEL}>{KONTO_TEXT.anmeldeAdresseTitel}</CardTitle>
           </CardHeader>
@@ -116,7 +116,7 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={EINSTELLUNG_KARTE}>
           <CardHeader>
             <CardTitle className={KARTEN_TITEL}>{KONTO_TEXT.passwortTitel}</CardTitle>
           </CardHeader>

@@ -13,3 +13,9 @@ export const HELLER_KNOPF = cn(
 
 /** Serif-Überschrift einer Einstellungs-Karte: 18 px halbfett (Boards s2-/w2-konto-hof, „Anmelde-Adresse“, „Passwort ändern“). */
 export const KARTEN_TITEL = 'text-[18px] leading-snug font-semibold'
+
+/**
+ * Karte der Konto-Seite wie auf den übrigen Einstellungs-Unterseiten: 12 px rund (G8), Rand, ohne Schatten und
+ * Ring — der Grundbaustein `Card` rundet mit `rounded-2xl` (≈ 24 px) und trägt einen Schatten (Runde 1, Nr. 278).
+ */
+export const EINSTELLUNG_KARTE = 'rounded-[12px] border border-border shadow-none ring-0'

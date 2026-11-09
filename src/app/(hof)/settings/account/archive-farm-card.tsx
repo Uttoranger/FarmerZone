@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
-import { HELLER_KNOPF, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
+import { HELLER_KNOPF, EINSTELLUNG_KARTE, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
 import {
   Dialog,
   DialogContent,
@@ -84,7 +84,7 @@ export function ArchiveFarmCard({ farmSlug, isArchived, offeneBestellungen }: Pr
 
   if (isArchived) {
     return (
-      <Card>
+      <Card className={EINSTELLUNG_KARTE}>
         <CardHeader>
           <CardTitle className={KARTEN_TITEL}>Hof reaktivieren</CardTitle>
           <CardDescription>Dein Hof ist derzeit stillgelegt.</CardDescription>
@@ -101,7 +101,7 @@ export function ArchiveFarmCard({ farmSlug, isArchived, offeneBestellungen }: Pr
 
   return (
     <>
-      <Card>
+      <Card className={EINSTELLUNG_KARTE}>
         <CardHeader>
           <CardTitle className={KARTEN_TITEL}>{FARM_ARCHIVE_TITLE}</CardTitle>
         </CardHeader>
