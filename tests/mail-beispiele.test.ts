@@ -73,7 +73,7 @@ const CODE = /(?<![\d.,])\d{3}[\s ]?\d{3}(?![\d.,])/g
 function befunde(text: string): string[] {
   const funde: string[] = []
   for (const a of text.match(ADRESSE) ?? []) if (!a.toLowerCase().endsWith('@example.com')) funde.push(`Adresse ${a}`)
-  for (const c of text.match(CODE) ?? []) if (c.replace(/\D/g, '') !== '000000') funde.push(`Code ${c}`)
+  for (const c of text.match(CODE) ?? []) if (c.replace(/\D/g, '') !== beispiele.BEISPIEL_CODE) funde.push(`Code ${c}`)
   // Ein Link zum Anklicken; `<link rel="preload">` des Fotos ist keiner und zeigt nur auf das Bild.
   if (/<a\b[^>]*\bhref\s*=/i.test(text)) funde.push('Link (href)')
   if (text.includes(beispiele.BEISPIEL_TOKEN)) funde.push('Token')
@@ -112,7 +112,7 @@ describe('Beispiele: jede Art der Boards', () => {
   })
 
   it('Gegenprobe: ein roher Link mit Token, eine echte Adresse und ein echter Code werden gefunden', () => {
-    const roh = `<a href="https://agrilo.at/verify?token=${beispiele.BEISPIEL_TOKEN}">Bestätigen</a> franz@hof.at 482 917`
+    const roh = `<a href="https://hof.example.com/verify?token=${beispiele.BEISPIEL_TOKEN}">Bestätigen</a> franz@hof.at 482 917`
     expect(befunde(roh)).toEqual(['Adresse franz@hof.at', 'Code 482 917', 'Link (href)', 'Token', 'Link mit Token'])
     expect(befunde('Am 12.03.2027 um 482917 Uhr')).toEqual(['Code 482917'])
   })
