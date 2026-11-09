@@ -176,7 +176,7 @@ function ListeTabelle({ zeilen, gewaehlt, href }: { zeilen: readonly AlleMailZei
             <tr key={z.id} className={cn('border-b border-border last:border-0', gewaehlt === z.id && 'bg-muted')}>
               <td className={cn(zelle, 'whitespace-nowrap tabular-nums', LEISE)}>{z.zeit}</td>
               <th scope="row" className={cn(zelle, 'text-left font-semibold')}>
-                <a href={href(z.id)} aria-current={gewaehlt === z.id ? 'true' : undefined} className={cn('rounded-sm text-foreground underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
+                <a href={href(z.id)} aria-current={gewaehlt === z.id ? 'true' : undefined} className={cn('inline-flex min-h-11 items-center rounded-sm text-foreground underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
                   {z.name}
                 </a>
                 {z.hinweis && <span className={cn('block text-[12px] font-normal', LEISE)}>{z.hinweis}</span>}
