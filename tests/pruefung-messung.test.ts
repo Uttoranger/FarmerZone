@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * scripts/pruefung/messung.js (Nr. 262, Regelvorschlag 5): h1 hinter einem
- * offenen aria-modal-Element zählt als „Dialog offen“ (Register N48), Inhalte
+ * offenen aria-modal-Element zählt als „Dialog offen“ (Register N48), seit
+ * Nr. 262b auch hinter einem sichtbaren role="dialog" ohne aria-modal
+ * (Zwischen-Morgenbericht 33 A, freigegeben 9.11.2026), Inhalte
  * geschlossener <details> zählen nicht — mit checkVisibility und ohne
  * (Rückfall über das nächste <details> ohne open).
  *
@@ -74,7 +76,8 @@ function miss(body: Knoten): { h1: number | string } {
     body: alsElement(body),
     documentElement: { classList: { contains: () => false } },
     createTreeWalker: () => ({ nextNode: () => false, currentNode: null }),
-    querySelectorAll: (s: string) => (s === 'h1' || s === '[aria-modal="true"]' ? elemente.filter((k) => passt(k, s)).map(alsElement) : []),
+    // Nur die Abfragen für h1 und offene Dialoge bzw. Blätter beantwortet die Attrappe; Text-, Ziel- und Feldprüfung bleiben leer.
+    querySelectorAll: (s: string) => (s === 'h1' || /aria-modal|role="dialog"/.test(s) ? elemente.filter((k) => passt(k, s)).map(alsElement) : []),
     querySelector: () => null,
     getElementById: () => null,
   }
@@ -105,6 +108,18 @@ describe('messung.js – h1', () => {
     const dialog = knoten('div', { role: 'dialog', 'aria-modal': 'true' }, [], 200)
     dialog.stil = { display: 'none' }
     expect(miss(knoten('body', {}, [knoten('h1'), dialog])).h1).toBe(1)
+  })
+
+  it('ein sichtbares role="dialog" ohne aria-modal (Mehr-Blatt im Hofbereich) meldet „Dialog offen“', () => {
+    const body = knoten('body', {}, [knoten('main', {}, [knoten('h1')]), knoten('div', { role: 'dialog' }, [knoten('h2')])])
+    expect(miss(body).h1).toBe('Dialog offen')
+  })
+
+  it('ein unsichtbares role="dialog" ohne aria-modal ändert nichts (ausgeblendet oder ohne Größe)', () => {
+    const ausgeblendet = knoten('div', { role: 'dialog' }, [knoten('h2')])
+    ausgeblendet.stil = { display: 'none' }
+    const ohneGroesse = knoten('div', { role: 'dialog' }, [], 0)
+    expect(miss(knoten('body', {}, [knoten('h1'), ausgeblendet, ohneGroesse])).h1).toBe(1)
   })
 
   it('zwei h1, eine davon im geschlossenen <details> (Rückfall ohne checkVisibility): 1', () => {

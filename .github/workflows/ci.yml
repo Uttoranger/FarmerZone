@@ -77,6 +77,12 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Leistungstests
+        # Eigener Lauf mit einem Worker und fester Zeitgrenze (vitest.leistung.config.ts,
+        # TESTING_GUIDELINES §4): Im parallelen `pnpm test` davor laufen dieselben Fälle
+        # ohne Grenze, die übrigen Tests der Dateien nur dort.
+        run: pnpm pruefen:leistung
+
       - name: Build
         run: pnpm build
 

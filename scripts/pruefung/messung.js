@@ -5,8 +5,10 @@
 //   ziele    Bedienelemente < 44 px ohne ::before/::after-Vergrößerung
 //            (Inline-Links im Fließtext getrennt als zieleImText)
 //   h1       Zahl der sichtbaren h1 — oder „Dialog offen“, solange ein
-//            sichtbares aria-modal-Element offen ist (Register N48: eine h1
-//            hinter einem offenen Dialog oder Blatt fehlt nicht)
+//            sichtbares aria-modal- oder role="dialog"-Element offen ist
+//            (Register N48: eine h1 hinter einem offenen Dialog oder Blatt
+//            fehlt nicht; role="dialog" auch ohne aria-modal wie das
+//            Mehr-Blatt im Hofbereich, Nr. 262b)
 //   Inhalte geschlossener <details> zählen nirgends mit (checkVisibility,
 //   Rückfall über das nächste <details> ohne open, Nr. 262).
 //   felder   Eingabefelder ohne sichtbare Beschriftung (Platzhalter oder
@@ -75,10 +77,12 @@
     ;(imText ? zieleImText : ziele).push(eintrag)
   }
 
-  // Ein offener Dialog oder ein offenes Blatt (aria-modal, sichtbar): Die h1
-  // der Seite dahinter ist für Vorleseprogramme ausgeblendet — gemeldet wird
-  // „Dialog offen“ statt einer Zahl.
-  const dialogOffen = [...document.querySelectorAll('[aria-modal="true"]')].some((d) => sichtbar(d))
+  // Ein offener Dialog oder ein offenes Blatt (aria-modal oder role="dialog",
+  // sichtbar): Die h1 der Seite dahinter ist für Vorleseprogramme ausgeblendet
+  // bzw. verdeckt — gemeldet wird „Dialog offen“ statt einer Zahl. role="dialog"
+  // zählt auch ohne aria-modal: Das Mehr-Blatt im Hofbereich trägt nur die
+  // Rolle, und die Messung meldete dort h1 0 (Nr. 262b).
+  const dialogOffen = [...document.querySelectorAll('[aria-modal="true"], [role="dialog"]')].some((d) => sichtbar(d))
   const h1Zahl = [...document.querySelectorAll('h1')].filter((h) => {
     const r = h.getBoundingClientRect()
     // sr-only zählt als vorhanden (für Vorleseprogramme), aria-hidden nicht.
