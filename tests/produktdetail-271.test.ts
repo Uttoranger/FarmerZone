@@ -60,4 +60,12 @@ describe('Mengen-Stepper und Warenkorb-Symbol', () => {
     // Die Marke steht direkt vor der klebenden Zeile.
     expect(quelle.indexOf('ref={setKopfMarke}')).toBeLessThan(quelle.indexOf('ref={setKlebeZeile}'))
   })
+
+  it('die Illustration steht als eigenes gerahmtes Quadrat im Band, gedämpft über die Hülle (F041, 15.5.3)', () => {
+    const quadrat = quelle.slice(quelle.indexOf('data-slot="illustration"'), quelle.indexOf('</span>', quelle.indexOf('data-slot="illustration"')))
+    expect(quadrat).toMatch(/className="[^"]*aspect-square[^"]*dark:ring-1 dark:ring-border/)
+    expect(quadrat).toContain('<Image')
+    // Die Hülle trägt die Dämpfung aus der einen Quelle.
+    expect(quelle).toContain('bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE')
+  })
 })

@@ -306,21 +306,33 @@ export function ProduktdetailKunde({
                 bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE
               )}
             >
-              {bild ? (
+              {bild && produkt.imageUrl ? (
                 <Image
                   src={bild}
-                  alt={produkt.imageUrl ? produkt.name : ''}
+                  alt={produkt.name}
                   fill
                   priority
                   sizes="(min-width: 1024px) 680px, 100vw"
-                  // Die Kategorie-Illustration steht nachts wie ein Foto auf ihrem Grund, gedämpft über die Hülle (F041).
-                  className={cn(
-                    produkt.imageUrl ? 'object-cover' : cn('object-contain p-6 md:p-4', ILLUSTRATION_BILD),
-                    ausverkauft && 'grayscale'
-                  )}
+                  className={cn('object-cover', ausverkauft && 'grayscale')}
                   // Ausschnitt nur am echten Foto (Register N17); ausverkauft ohne Filter des Hofs, sonst überschriebe er grayscale.
-                  style={produkt.imageUrl ? bildStil(produkt.bildAusschnitt, { filter: !ausverkauft }) : undefined}
+                  style={bildStil(produkt.bildAusschnitt, { filter: !ausverkauft })}
                 />
+              ) : bild ? (
+                // Die Kategorie-Illustration als eigenes Quadrat mittig im Band, nachts wie ein Foto auf ihrem Grund
+                // (gedämpft über die Hülle) und selbst gerahmt — kein schwebendes helles Quadrat (F041, §37.1 15.5.3).
+                <span
+                  data-slot="illustration"
+                  className="absolute inset-y-6 left-1/2 aspect-square -translate-x-1/2 overflow-hidden rounded-[10px] dark:ring-1 dark:ring-border md:inset-y-4"
+                >
+                  <Image
+                    src={bild}
+                    alt=""
+                    fill
+                    priority
+                    sizes="200px"
+                    className={cn('object-cover', ILLUSTRATION_BILD, ausverkauft && 'grayscale')}
+                  />
+                </span>
               ) : (
                 <span aria-hidden="true" className="flex h-full items-center justify-center font-heading text-5xl font-semibold text-muted-foreground">
                   {produktInitiale(produkt.name)}
