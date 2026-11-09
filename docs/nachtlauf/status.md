@@ -330,4 +330,5 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 279 | System: neuigkeiten, abmelden, systemseiten, widerruf, fehlerseiten, rechtstexte | offen | `nacht/2026-11-08/279-system` | – | vom Integrationszweig von B nach 275 | – | 8.11.2026 |
 | 280 | Mails | offen | `nacht/2026-11-08/280-mails` | – | vom Integrationszweig von C nach 274, 275, 278 und 279 | – | 8.11.2026 |
 | 281 | Admin: messbare Mängel und Schrift-Wache | offen | `nacht/2026-11-08/281-admin-maengel` | – | vom Integrationszweig von C nach 263, 265 und 270 | – | 8.11.2026 |
+| 262b | Werkzeug-Nacharbeit: Leistungstests ohne Parallelität, Messung bei role="dialog" | offen | `nacht/2026-11-08/262b-werkzeug` | – | vom Zwischenstand `integration/lauf33` | – | 9.11.2026 |
 | Sammel 33 | Sammel-PR Lauf 33 (261–281) | Entwurf (Haltepunkt A) | `integration/lauf33` | #508 | main | A: 261–264, 266 per --no-ff; B und C offen | 9.11.2026 |
