@@ -5,13 +5,13 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
-import { unitSuffix } from '@/lib/order-line'
+import { positionszeile } from '@/lib/positionszeile'
 import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { HEUTE_KEINE_ABHOLUNG_PAPIER, abholtage, abholWhere, datumLang, naechsteAbholungPapier } from '@/lib/heute'
 import { wienKalendertag } from '@/lib/kalender'
-import { druckPreisHinweis, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
+import { druckGesamtHinweis, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
 import { naechstesFensterMitZahl } from '@/server/queries/orders'
 import { MARKE } from '@/lib/marke'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
@@ -23,20 +23,53 @@ export const dynamic = 'force-dynamic'
  * Betrag, den die Kundin gezahlt hat — derselbe wie in der Liste am Bildschirm (V57). Seit Nr. 249
  * ohne die Zeile „inkl. € … <Gebühr>“ darunter (Liste Lauf 32, druck Bild 2: das Papier zeigt nur
  * den Betrag; die Aufteilung steht auf dem Abholzettel).
+ * Seit Nr. 277 (Antwort 4 der Projektleitung) steht darunter „Gesamt inkl. Plattformgebühr.“ — je
+ * Bestellung und nur, wenn DIESES Gesamt die Gebühr enthält (druckGesamtHinweis, wie der Abholzettel).
+ * Vorher stand „Preise inkl. Plattformgebühr.“ einmal unter der ganzen Liste, sobald eine Bestellung im
+ * Hofpreis-Modell dabei war — auch über Bestellungen ohne Gebühr. NUR ANZEIGE: Betrag und Rechnung bleiben.
  */
 function PacklistenBetrag({
   order,
 }: {
-  order: { paymentMethod: string; totalAmount: { toString(): string }; serviceFeeCents: number; gebuehrModell: string | null }
+  order: {
+    paymentMethod: string
+    totalAmount: { toString(): string }
+    serviceFeeCents: number
+    serviceFeeRefundedAt: Date | string | null
+    gebuehrModell: string | null
+  }
 }) {
   const summen = bestellSummen(order)
   const kassieren = barZuKassierenCents(order)
+  const gesamtHinweis = druckGesamtHinweis(order)
   return (
     <span className="shrink-0 text-right">
       <span className="block text-sm font-bold text-primary-foreground">
         {kassieren !== null ? `Bar zu kassieren ${formatEuro(centsAlsEuro(kassieren))}` : formatEuro(centsAlsEuro(summen.gesamtCents))}
       </span>
+      {gesamtHinweis && <span className="block text-[13px] text-primary-foreground/70">{gesamtHinweis}</span>}
     </span>
+  )
+}
+
+type PacklistenPosition = {
+  productName: string
+  quantity: number
+  product: { unit: string; unitSize: { toString(): string } | null } | null
+}
+
+function zeileVon(item: PacklistenPosition): ReturnType<typeof positionszeile> {
+  return positionszeile({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null })
+}
+
+/** „**4** × Heumilch frisch (1 L)“ — Positionszeile G14, die Anzahl fett vorn wie auf der Bestellseite. */
+function PositionsText({ item }: { item: PacklistenPosition }) {
+  const zeile = zeileVon(item)
+  return (
+    <>
+      <span className="font-bold text-primary-foreground">{zeile.anzahl}</span> × {zeile.name}
+      {zeile.gebinde && <> ({zeile.gebinde})</>}
+    </>
   )
 }
 
@@ -73,17 +106,15 @@ export default async function PrintPacklistPage() {
   const today = datumLang(jetzt)
   // Leer: die nächste Abholung laut Abholzeiten (Board s2-druck, Bild 3).
   const naechstes = orders.length === 0 ? await naechstesFensterMitZahl(farm.id, jetzt) : null
-  // „Preise inkl. Plattformgebühr.“ sobald eine Bestellung im Hofpreis-Modell dabei ist (V62).
-  const preisHinweis = orders.map((o) => druckPreisHinweis(o)).find((h) => h !== null) ?? null
-
   // Aggregate pack list (Schlüssel: Produktname; Einheit fürs Suffix gemerkt)
-  const packList = new Map<string, { qty: number; product: (typeof orders)[number]['items'][number]['product'] }>()
+  // Das Gebinde schreibt die Positionszeile (G14) — dieselben Einheiten wie die Bestellseite („1 L“, „6 Pakete“).
+  const packList = new Map<string, { qty: number; gebinde: string | null }>()
   for (const order of orders) {
     for (const item of order.items) {
       const entry = packList.get(item.productName)
       packList.set(item.productName, {
         qty: (entry?.qty ?? 0) + item.quantity,
-        product: entry?.product ?? item.product,
+        gebinde: entry ? entry.gebinde : zeileVon(item).gebinde,
       })
     }
   }
@@ -133,7 +164,7 @@ export default async function PrintPacklistPage() {
                 >
                   <span className="min-w-0 text-primary-foreground">
                     {name}
-                    {unitSuffix(entry.product) ? <span className="text-primary-foreground/70"> ({unitSuffix(entry.product)})</span> : null}
+                    {entry.gebinde ? <span className="text-primary-foreground/70"> ({entry.gebinde})</span> : null}
                   </span>
                   <span className="shrink-0 font-bold text-primary-foreground">{entry.qty}×</span>
                 </div>
@@ -163,8 +194,7 @@ export default async function PrintPacklistPage() {
                         <div key={k} className="text-sm text-primary-foreground/90">
                           {/* Ein Kästchen zum Abhaken mit dem Stift — Schmuck für den Bildschirm, Zweck auf dem Papier. */}
                           <span aria-hidden="true">☐ </span>
-                          {item.quantity}× {item.productName}
-                          {unitSuffix(item.product) ? <> ({unitSuffix(item.product)})</> : null}
+                          <PositionsText item={item} />
                         </div>
                       ))}
                     </div>
@@ -181,7 +211,6 @@ export default async function PrintPacklistPage() {
                 )
               })}
             </section>
-            {preisHinweis && <p className="text-sm text-primary-foreground/70">{preisHinweis}</p>}
           </div>
         )}
 

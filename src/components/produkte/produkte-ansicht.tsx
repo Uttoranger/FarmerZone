@@ -36,6 +36,7 @@ import {
   produktLoeschenHinweis,
   filterAdresse,
   filtereProdukte,
+  produktEinheit,
   produktStatus,
   produkteAbschnitte,
   PRODUKTE_LEER,
@@ -60,7 +61,7 @@ import { gespeichertOeffnen, leseGespeichertGezeigt, merkeGespeichertGezeigt } f
 import { GESPEICHERT_HINWEIS } from '@/lib/teilen-momente'
 import { produkteAnsichtAus } from '@/schemas/produkte-filter'
 import type { NeuBereich } from '@/schemas/url-auftrag'
-import { formatEuro, formatGebinde, formatKategorie, formatZahl, hofVorratText } from '@/lib/format'
+import { formatEuro, formatKategorie, formatZahl, hofVorratText } from '@/lib/format'
 import { wienWochenMontag } from '@/lib/kalender'
 import { PRODUKTNAME_MAX } from '@/lib/eingabegrenzen'
 import type { KategorieVorschlag } from '@/lib/taxonomie'
@@ -69,7 +70,7 @@ import type { HofRegistrierung } from '@/lib/futter-registrierung'
 import { useUrlAuftrag } from '@/lib/use-url-auftrag'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import { cn } from '@/lib/utils'
-import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
+import { FOTO_HUELLE, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
 import { RUNDUNG } from '@/components/ui/rundung'
 
 type Props = {
@@ -126,8 +127,9 @@ function PreisZelle({ product, preisAnzeige }: { product: ProductData; preisAnze
   if (teile) {
     return (
       <>
-        <p className="text-[13px] text-foreground">{teile.bekommst}</p>
-        <p className="text-[12px] text-muted-foreground">{teile.zahlt}</p>
+        {/* Board w1-produkte: beide Zeilen in derselben Größe wie die Einheit, die zweite leise (Abnahme Lauf 32). */}
+        <p className="text-[15px] text-foreground">{teile.bekommst}</p>
+        <p className="text-[15px] text-muted-foreground">{teile.zahlt}</p>
       </>
     )
   }
@@ -248,7 +250,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
   }
 
   function lupe() {
-    if (sucheOffen) {
+    if (sucheOffen || suche !== '') {
       // Zu heißt ohne Suche — sonst filterte ein Wort, das niemand mehr sieht.
       setSucheOffen(false)
       setSuche('')
@@ -348,7 +350,7 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                 type="button"
                 onClick={lupe}
                 aria-label="Produkt suchen"
-                aria-expanded={sucheOffen}
+                aria-expanded={sucheOffen || suche !== ''}
                 aria-controls={sucheId}
                 className={cn(
                   'flex size-11 shrink-0 items-center justify-center rounded-full border border-border text-foreground hover:bg-muted md:hidden',
@@ -359,7 +361,9 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
               </button>
             </div>
             {/* Hinter den Filtern, wie im Board; unter md erst nach einem Tipp auf die Lupe — der Fokus folgt hinein. */}
-            <label className={cn('flex-col gap-1.5 md:flex md:w-[320px]', sucheOffen ? 'flex' : 'hidden')}>
+            {/* Steht ein Suchwort da, bleibt das Feld auch am Handy sichtbar (Abnahme Lauf 32, produkte 390 Bild 4: bei
+                aktiver Suche fehlte das beschriftete Feld mit dem Suchwort). */}
+            <label className={cn('flex-col gap-1.5 md:flex md:w-[320px]', sucheOffen || suche !== '' ? 'flex' : 'hidden')}>
               <span className="text-[15px] font-semibold text-foreground">Produkt suchen</span>
               <input
                 ref={sucheFeld}
@@ -404,8 +408,9 @@ export function ProdukteAnsicht({ products: serverProdukte, hofBetriebsnummer, r
                     setSuche('')
                     schreibeAdresse(adresse)
                   }}
+                  // Board s1-produkte Bild 4: dieselbe Form wie „So geht’s“ auf Heute — 52 px, Rand 1,5 px, fett.
                   className={cn(
-                    'inline-flex min-h-12 w-full items-center justify-center rounded-[14px] border border-foreground/80 px-5 text-[15px] font-semibold text-foreground hover:bg-muted',
+                    'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground/70 bg-card px-5 text-base font-bold text-foreground hover:bg-muted',
                     FOKUS_RAHMEN
                   )}
                 >
@@ -531,17 +536,17 @@ function Tabelle({
       <table className="w-full text-sm">
         <thead>
           {/* Board w1-produkte: Köpfe in normaler Schreibung, 13 px (nie unter 12 px). */}
-          {/* Liste Lauf 32 (produkte): der Kopf getönt. */}
-          <tr className="bg-muted text-left text-[13px] font-semibold text-muted-foreground">
+          {/* Liste Lauf 32 (produkte): der Kopf getönt; seit Nr. 277 fett in Textfarbe wie im Board (Abnahme Lauf 32). */}
+          <tr className="bg-muted text-left text-[13px] font-bold text-foreground">
             <th scope="col" className="w-[70px] py-2.5 pl-3.5">
               <span className="sr-only">Bild</span>
             </th>
-            <th scope="col" className="px-3 py-2.5 font-semibold">Produkt</th>
-            <th scope="col" className="hidden px-3 py-2.5 font-semibold xl:table-cell">Einheit</th>
-            <th scope="col" className="px-3 py-2.5 font-semibold">Preis</th>
-            <th scope="col" className="px-3 py-2.5 font-semibold">Vorrat</th>
-            <th scope="col" className="px-3 py-2.5 font-semibold">Status</th>
-            <th scope="col" className="py-2.5 pr-3.5 pl-1 font-semibold">{IM_SHOP}</th>
+            <th scope="col" className="px-3 py-2.5">Produkt</th>
+            <th scope="col" className="hidden px-3 py-2.5 xl:table-cell">Einheit</th>
+            <th scope="col" className="px-3 py-2.5">Preis</th>
+            <th scope="col" className="px-3 py-2.5">Vorrat</th>
+            <th scope="col" className="px-3 py-2.5">Status</th>
+            <th scope="col" className="py-2.5 pr-3.5 pl-1">{IM_SHOP}</th>
           </tr>
         </thead>
         <tbody>
@@ -554,13 +559,13 @@ function Tabelle({
                 </td>
                 <td className="px-3 py-2.5">
                   <NamenKnopf product={product} onOeffnen={oeffnen(product)} />
-                  <p className="text-[12.5px] text-muted-foreground xl:hidden">{formatGebinde(product.unit, product.unitSize)}</p>
+                  <p className="text-[12.5px] text-muted-foreground xl:hidden">{produktEinheit(product.unit, product.unitSize)}</p>
                   {/* Nr. 214: die zwei Angaben zum Rücktritt, wie die Kundin sie sieht. */}
                   <RuecktrittHinweis angabe={product} className="mt-0.5" />
                   <Hinweise product={product} onOeffnen={oeffnen(product)} />
                 </td>
                 {/* Einheit 15 px in Textfarbe (Liste Lauf 32, produkte 1440) — sie ist eine Angabe, kein Nebensatz. */}
-                <td className="hidden px-3 py-2.5 text-[15px] whitespace-nowrap text-foreground xl:table-cell">{formatGebinde(product.unit, product.unitSize)}</td>
+                <td className="hidden px-3 py-2.5 text-[15px] whitespace-nowrap text-foreground xl:table-cell">{produktEinheit(product.unit, product.unitSize)}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   <PreisZelle product={product} preisAnzeige={preisAnzeige} />
                 </td>
@@ -697,7 +702,7 @@ function ProduktZeile({
       <div className="flex min-w-0 flex-1 flex-col items-start gap-[3px]">
         <NamenKnopf product={product} onOeffnen={onOeffnen} />
         <p className="line-clamp-3 max-w-full text-[12.5px] text-muted-foreground">
-          {formatGebinde(product.unit, product.unitSize)} · {preis}
+          {produktEinheit(product.unit, product.unitSize, 'lang')} · {preis}
         </p>
         <RuecktrittHinweis angabe={product} />
         {ausnahme && <ProduktSchild status={status} />}
@@ -831,12 +836,14 @@ const PRODUKT_BILD_SIZES = '44px'
 /** Foto des Hofs, sonst die Kategorie-Illustration (im Dunkeln gedämpft), sonst ein Symbol. */
 function ProduktBild({ product, className }: { product: ProductData; className?: string }): React.JSX.Element {
   return (
-    // G12 (Liste Lauf 32, produkte dunkel): jede Bildfläche über bild-dunkel.ts — Foto gedämpft, Illustration
-    // multipliziert statt auf hellem Kreis, Platzhalter als gedämpfte Fläche.
+    // G12 (Liste Lauf 32, produkte dunkel): jede Bildfläche über bild-dunkel.ts — Foto gedämpft, Platzhalter als
+    // gedämpfte Fläche. Die Illustration steht im Dunkeln wie ein Foto auf ihrem eigenen hellen Grund, gedämpft und
+    // gerahmt (F041, freigabe.md §37.1 15.5.3, Nr. 277): der Ring wie bei `Illustration` der Startseite — der Rand
+    // allein verschwand auf dem dunklen Grund, das helle Quadrat schwebte.
     <div
       className={cn(
         'relative flex shrink-0 items-center justify-center overflow-hidden border border-border',
-        product.imageUrl ? FOTO_HUELLE : product.categoryImageUrl ? cn(PLATZHALTER_FLAECHE, ILLUSTRATION_HUELLE) : PLATZHALTER_FLAECHE,
+        product.imageUrl ? FOTO_HUELLE : product.categoryImageUrl ? cn(PLATZHALTER_FLAECHE, ILLUSTRATION_HUELLE, 'dark:ring-1 dark:ring-border') : PLATZHALTER_FLAECHE,
         className
       )}
     >
@@ -844,7 +851,7 @@ function ProduktBild({ product, className }: { product: ProductData; className?:
         // Die Rahmen sind 44 bis 48 px breit — `sizes` sagt das dem Browser.
         <Image src={product.imageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-cover" style={bildStil(product.bildAusschnitt)} />
       ) : product.categoryImageUrl ? (
-        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className={cn('object-contain', ILLUSTRATION_BILD)} />
+        <Image src={product.categoryImageUrl} alt="" fill sizes={PRODUKT_BILD_SIZES} className="object-contain" />
       ) : (
         <Package className="size-5 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
       )}

@@ -247,7 +247,7 @@ describe('brauchtDich', () => {
       ueberfaellig: { anzahl: 1, juengste: [{ id: 'o1', customerName: 'Anna Beispiel', pickupDate: abholtag('2026-09-23') }] },
     })
     expect(eintrag.art).toBe('ueberfaellig')
-    expect(eintrag.text).toBe('1 Abholung vorbei, noch offen — als abgeholt oder nicht abgeholt markieren')
+    expect(eintrag.text).toBe('1 Abholung vorbei, noch offen – als abgeholt oder nicht abgeholt markieren')
     expect(eintrag.href).toBe('/orders/o1')
     expect(eintrag.unterpunkte).toEqual([{ text: 'Anna B. · Mi., 23.9.', href: '/orders/o1' }])
   })
@@ -304,7 +304,7 @@ describe('brauchtDich', () => {
       { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', erklaerung: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.', href: '/status/new' },
     ])
     expect(brauchtDich({ ...LEER, statusErinnerung: 'never' })[0].text).toBe(
-      'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
+      'Noch kein Beitrag – erzähl deinen Kundinnen, was es gibt'
     )
   })
 

@@ -843,6 +843,11 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(zeile).not.toContain('<h2')
     const mitWirkung = html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz, wirkung: '14 Besuche über deine Links' }))
     expect(mitWirkung).toContain('letzte Woche 14 Besuche über deine Links')
+    // Nr. 277 (Abnahme Lauf 32, heute Bild 1/2): dieselbe Form wie „So geht’s“ — 52 px, Rand 1,5 px in Textfarbe, fett.
+    expect(zeile).toContain('min-h-[52px]')
+    expect(zeile).toContain('border-[1.5px]')
+    expect(zeile).toContain('font-bold')
+    expect(zeile).not.toMatch(/\bh-11\b/)
   })
 
   it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich', () => {
@@ -864,6 +869,12 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(woche).toContain('href="/analytics"')
     // Die Balken sind Bild; die Werte hört der Screenreader als Liste.
     expect(woche).toContain('sr-only')
+    // Nr. 277 (Abnahme Lauf 32, Umsatz-Karte): Balkenfläche 48 px statt 78 px, Balken leicht gerundet, „Auswertung →“ 15 px.
+    expect(woche).toContain('flex h-12 items-end')
+    expect(woche).not.toContain('h-[78px]')
+    expect(woche).toContain('rounded-[4px]')
+    expect(woche).not.toContain('rounded-t-md')
+    expect(woche).toMatch(/class="[^"]*text-\[15px\][^"]*"[^>]*>Auswertung →/)
 
   })
 
@@ -995,11 +1006,30 @@ describe('„Zu tun" — EINE Karte statt Erste Schritte und „Deine Hofseite" 
     expect(ab).not.toContain('festlegen')
   })
 
+  it('Teile der Hofseite heißen nach der Handlung (Abnahme Lauf 32, heute 1440 Bild 1/4; Nr. 277)', () => {
+    const h = html(
+      createElement(ZuTunKarte, {
+        aufgaben: [
+          { id: 'titelbild', titel: 'Titelbild', satz: 'x', href: '/settings/appearance' },
+          { id: 'logo', titel: 'Logo', satz: 'x', href: '/settings/appearance' },
+          { id: 'fotos', titel: 'Fotos', satz: 'x', href: '/farm-page' },
+          { id: 'produkt', titel: 'Erstes Produkt anlegen', satz: 'x', href: '/products' },
+        ],
+        ausblenden: null,
+      })
+    )
+    for (const text of ['Titelbild hochladen', 'Logo hochladen', 'Fotos hochladen', 'Erstes Produkt anlegen']) expect(h).toContain(`>${text}</a>`)
+    // Gegenprobe: der bloße Teil steht nicht mehr allein als Link.
+    expect(h).not.toContain('>Titelbild</a>')
+    expect(h).not.toContain('>Logo</a>')
+  })
+
   it('lange Werte (Hofname bis 80 Zeichen, Adresse) brechen um — gekürzt wird nichts', () => {
     const lang = 'H'.repeat(80)
     const h = html(
       createElement(ZuTunKarte, {
-        aufgaben: [{ id: 'name', titel: `${lang} Name und Kurzbeschreibung`, satz: 'x', href: '/settings/profile' }],
+        // Eine Zeile ohne eigene Handlung (ZU_TUN_HANDLUNG) behält ihren Titel — daran prüft der Test das Umbrechen.
+        aufgaben: [{ id: 'aktuell', titel: `${lang} Name und Kurzbeschreibung`, satz: 'x', href: '/settings/profile' }],
         ausblenden: null,
       })
     )

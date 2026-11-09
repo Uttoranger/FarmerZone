@@ -76,6 +76,7 @@ import {
   Feld,
   FeldFehler,
   FormularMeldung,
+  KlappKarte,
   RuecktrittAbschnitt,
   SperrZeile,
   Wahl,
@@ -143,6 +144,12 @@ function zeileAus(vorlage: FutterVorlage, schluessel: string): Zeile {
 }
 
 /** Bei genau einer erlaubten Futtermittelart steht sie fest (Tabelle 2.4). */
+/** „Pflicht · noch offen“ bzw. „Pflicht · eingetragen“; nach einem Speicherversuch mit Fehler „Bitte prüfen“. */
+function kennzeichnungStand(fehler: boolean, offen: boolean): string {
+  if (fehler) return 'Pflicht · Bitte prüfen'
+  return offen ? 'Pflicht · noch offen' : 'Pflicht · eingetragen'
+}
+
 function artFuer(kategorie: (typeof FUTTER_KATEGORIEN)[number]): FuttermittelartValue | null {
   const erlaubt = futtermittelartenFuer(kategorie)
   return erlaubt.length === 1 ? erlaubt[0] : null
@@ -206,6 +213,10 @@ export function FutterFormular({
   const pruefung = futterFamilieSchema.safeParse(eingabe)
   const fehler = versucht && !pruefung.success ? fehlerJeFeld(pruefung.error.issues) : {}
 
+  // Kurzstand der Karte „Kennzeichnung“: offen, solange das Schema dort noch etwas vermisst (dieselbe Prüfung wie beim
+  // Speichern); orange und aufgeklappt erst nach einem Speicherversuch.
+  const kennzeichnungOffen = !pruefung.success && pruefung.error.issues.some((i) => i.path[0] === 'kennzeichnung')
+  const kennzeichnungFehler = Object.keys(fehler).some((f) => f.startsWith('kennzeichnung.'))
   const sperren = zeilen.map((z) => gebindeSperre({ category, verpackung: z.verpackung }, registrierung))
   const wartend = sperren.filter(Boolean).length
   const erlaubteArten = futtermittelartenFuer(category)
@@ -301,7 +312,10 @@ export function FutterFormular({
       titel="Neues Futtermittel"
       art={PRODUKTE_FILTER_LABEL.futter}
       satz="Vom Sackerl für den Hasen bis zum Rundballen – jede Größe mit eigenem Preis und Vorrat."
-      hinweis={speichernHinweis(zeilen.length - wartend, wartend)}
+      // Über „Speichern“ nur noch der Satz, wenn KEINE Größe online gehen kann (Abnahme Lauf 32, produkt-neu Bild 2/3,
+      // Nr. 277): „n Größen sind sofort sichtbar …“ steht nicht im Board, keine Zeile deckt ihn, und bei leerem Formular
+      // verwirrte er. Welche Größe wartet, sagt ihre Zeile.
+      hinweis={zeilen.length === wartend ? speichernHinweis(0, wartend) : null}
       speichernText="Speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
@@ -491,10 +505,16 @@ export function FutterFormular({
         fehler={fehler.ruecksendekostenCents}
       />
 
-      <Abschnitt
-        id="futter-kennzeichnung"
+      {/* Board s1-/w1-produkt-neu Bild 3 (Abnahme Lauf 32, Nr. 277): eine aufklappbare Karte „Kennzeichnung · Pflicht ·
+          noch offen“ mit Satz und „Angaben eintragen“ statt einer offenen Strecke von Feldern. Ein Fehler darin öffnet
+          sie (der Sprung zum ersten Feld braucht es sichtbar). Der Satz bleibt unser geprüfter Erklärtext (E10a). */}
+      <KlappKarte
         titel={KENNZEICHNUNG_TITEL}
+        stand={kennzeichnungStand(kennzeichnungFehler, kennzeichnungOffen)}
         satz={`${KENNZEICHNUNG_ERKLAERUNG} ${KENNZEICHNUNG_FUNDORT} Sie gelten für alle Größen; das Gewicht steht je Größe oben.`}
+        oeffnenText="Angaben eintragen"
+        immerOffen={kennzeichnungFehler}
+        fehler={kennzeichnungFehler}
       >
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.futtermittelart">
           <p id="futter-art" className="text-[15px] font-semibold text-foreground">
@@ -616,7 +636,7 @@ export function FutterFormular({
           </label>
           {fehler['kennzeichnung.bestaetigt'] && <FeldFehler>{fehler['kennzeichnung.bestaetigt']}</FeldFehler>}
         </div>
-      </Abschnitt>
+      </KlappKarte>
 
       <Abschnitt
         id="futter-registrierungen"

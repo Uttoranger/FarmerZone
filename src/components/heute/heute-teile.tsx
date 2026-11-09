@@ -57,12 +57,6 @@ const KNOPF_ORANGE = cn(
   FOKUS_RAHMEN
 )
 const TEXTLINK = cn('inline-flex min-h-11 items-center rounded-md text-[13.5px] font-semibold text-status-fertig hover:underline underline-offset-2', FOKUS_RAHMEN)
-// Umriss für die Einladung zum Teilen (Board s1-heute, Bild 2): 44 px, Feldrand, volle Textfarbe.
-const KNOPF_UMRISS = cn(
-  RUNDUNG.feld,
-  'inline-flex h-11 items-center justify-center gap-2 border border-input px-4 text-[14.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
-  FOKUS_RAHMEN
-)
 // Die Köpfe der Abschnitte (Board s1-heute): klein, fett, in Großbuchstaben, leise.
 const KOPF = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
 
@@ -355,7 +349,9 @@ export function TeilenKarte({
 }): React.JSX.Element {
   // „Teilen“ ohne Symbol (Liste Lauf 32, heute Bild 2) — die Knöpfe gehören anderen Nummern, das Symbol blendet die
   // Karte aus (Nachfahre statt Kind-Selektor, die Kind-Selektoren-Wache lässt `[&>` nur an Bausteinen zu).
-  const knopf = cn(KNOPF_UMRISS, 'w-full [&_svg]:hidden')
+  // Seit Nr. 277 (Abnahme Lauf 32, heute Bild 1/2) dieselbe Form wie „So geht’s“ und „Jetzt einrichten“ auf dieser
+  // Seite (Board s1-heute: 52 px, Rand 1,5 px in Textfarbe, 15 px fett) — vorher 44 px mit dünnem grauem Rand.
+  const knopf = cn(PFLICHT_KNOPF_RAHMEN, '[&_svg]:hidden')
   return (
     <div className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
       <p className="text-[15px] leading-snug font-semibold break-words">Diese Woche bei dir: {satz}</p>
@@ -450,12 +446,14 @@ export function Packliste({
           <Link
             href="/orders/today/print"
             aria-label="Packliste drucken"
+            // Board w1-heute: Umriss-Pille mit kräftigem Feldrand, 14 px halbfett in Textfarbe, Symbol 20 px
+            // (Abnahme Lauf 32: „Drucken“ war im Web blass und klein).
             className={cn(
-              'inline-flex size-11 shrink-0 items-center justify-center gap-2 rounded-full transition-colors hover:bg-muted md:w-auto md:border md:border-border md:px-4 md:text-[13.5px] md:font-semibold print:hidden',
+              'inline-flex size-11 shrink-0 items-center justify-center gap-2 rounded-full text-foreground transition-colors hover:bg-muted md:w-auto md:border md:border-input md:px-3.5 md:text-sm md:font-semibold print:hidden',
               FOKUS_RAHMEN
             )}
           >
-            <Printer className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            <Printer className="size-5" strokeWidth={2} aria-hidden="true" />
             <span className="hidden md:inline" aria-hidden="true">
               Drucken
             </span>
@@ -619,19 +617,20 @@ export function WocheKarte({
         <p className="font-heading text-[26px] leading-tight font-semibold tabular-nums">{formatEuro(centsAlsEuro(summeCent))}</p>
       </div>
       <div aria-hidden="true">
-        <div className="flex h-[78px] items-end gap-2">
+        {/* Board s1-/w1-heute: Balkenfläche 48 px, Balken leicht gerundet (4 px), 6 px Abstand (Abnahme Lauf 32). */}
+        <div className="flex h-12 items-end gap-1.5">
           {balken.map((b) => (
             <div
               key={b.label}
               // Board s1-heute: alle Tage mit Umsatz grün (heute ohne eigene Farbe, der Tag steht fett darunter);
               // im Dunkeln helles Mint statt Dunkelgrün (G13, DIAGRAMM_BALKEN), leere Tage als Strich (DIAGRAMM_LEER).
-              className={cn('flex-1 rounded-t-md rounded-b-sm', b.cent > 0 ? DIAGRAMM_BALKEN : DIAGRAMM_LEER)}
+              className={cn('flex-1 rounded-[4px]', b.cent > 0 ? DIAGRAMM_BALKEN : DIAGRAMM_LEER)}
               // Höhe ist Messwert, keine Farbe: mindestens ein Strich, damit leere Tage sichtbar bleiben.
               style={{ height: b.hoeheProzent > 0 ? `${b.hoeheProzent}%` : '3px' }}
             />
           ))}
         </div>
-        <div className="mt-1.5 flex gap-2 text-center text-xs">
+        <div className="mt-0.5 flex gap-1.5 text-center text-xs">
           {balken.map((b) => (
             <span key={b.label} className={cn('flex-1', b.heute ? 'font-semibold text-foreground' : LEISE)}>
               {b.label}
@@ -649,7 +648,7 @@ export function WocheKarte({
       </ul>
       {selbstEingetragen && <p className={cn('text-[13px]', LEISE)}>{selbstEingetragen}</p>}
       <p className={cn('text-[13px]', LEISE)}>{vergleich}</p>
-      <Link href="/analytics" className={cn(TEXTLINK, 'self-start underline underline-offset-2')}>
+      <Link href="/analytics" className={cn(TEXTLINK, 'self-start text-[15px] underline underline-offset-2')}>
         Auswertung →
       </Link>
     </section>

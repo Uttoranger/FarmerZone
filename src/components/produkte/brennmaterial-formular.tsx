@@ -57,6 +57,7 @@ import {
   Feld,
   FeldFehler,
   FormularMeldung,
+  KlappKarte,
   RuecktrittAbschnitt,
   Wahl,
   feldId,
@@ -141,6 +142,8 @@ export function BrennmaterialFormular({
   }
   const pruefung = brennmaterialFamilieSchema.safeParse(eingabe)
   const fehler = versucht && !pruefung.success ? fehlerJeFeld(pruefung.error.issues) : {}
+  // Ein Fehler in den Holz-Angaben hält die Karte offen — der Sprung zum ersten Feld braucht es sichtbar.
+  const holzFehler = ['art', 'holzart', 'scheitlaengeCm', 'wassergehalt', 'koernung', 'trocknung', 'gelagertJahre'].some((f) => f in fehler)
   const hackschnitzel = art === 'HACKSCHNITZEL'
 
   function artWaehlen(neu: BrennArt) {
@@ -230,7 +233,9 @@ export function BrennmaterialFormular({
         />
       </Feld>
 
-      <Abschnitt id="brenn-angaben" titel="Holz-Angaben" satz="Die drei Fragen, die jede Kundin stellt.">
+      {/* Board s1-/w1-produkt-neu Bild 4 (Liste Lauf 32 „Holz-Angaben: Aufbau ohne Karte“, Nr. 277): eine aufklappbare
+          Karte, offen; Holzart und Scheitlänge als zwei Felder nebeneinander statt langer Chip-Reihen. */}
+      <KlappKarte titel="Holz-Angaben" stand="Die drei Fragen, die jede Kundin stellt." anfangsOffen immerOffen={holzFehler} fehler={holzFehler}>
         <div className="flex flex-col gap-2" data-feld="art">
           <p id="brenn-art" className="text-[15px] font-semibold text-foreground">
             Art
@@ -250,49 +255,47 @@ export function BrennmaterialFormular({
           )}
         </div>
 
-        {/* Holzart und Scheitlänge nebeneinander (Liste Lauf 32, produkt-neu Bild 4), am Handy untereinander. */}
-        <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 sm:gap-4">
-          <div className="flex flex-col gap-2" data-feld="holzart">
-            <p id="brenn-holzart" className="text-[15px] font-semibold text-foreground">
-              Holzart
-            </p>
-            <div role="radiogroup" aria-labelledby="brenn-holzart" className="flex flex-wrap gap-2">
-              {HOLZARTEN.map((h) => (
-                <Wahl key={h} rolle="radio" aktiv={holzart === h} onClick={() => setHolzart(h)}>
-                  {h}
-                </Wahl>
-              ))}
-            </div>
-            {/* Alle Feldbeschriftungen gleich (Liste Lauf 32, produkt-neu 1440): 15 px fett wie Feld. */}
-            <label htmlFor={feldId('holzart')} className="text-[15px] font-semibold text-foreground">
-              Andere Holzart
-            </label>
+        {/* Holzart und Scheitlänge als zwei Felder nebeneinander, auch am Handy (Board s1-produkt-neu Bild 4). Die
+            üblichen Holzarten schlägt das Feld vor (datalist) — eine andere tippt man einfach ein. */}
+        <div className={cn('grid items-start gap-3', hackschnitzel ? 'grid-cols-1' : 'grid-cols-2')}>
+          <Feld feld="holzart" label="Holzart" fehler={fehler.holzart}>
             <input
               id={feldId('holzart')}
               value={holzart}
               onChange={(e) => setHolzart(e.target.value)}
-              placeholder="z. B. Esche"
+              list="brenn-holzarten"
+              placeholder="z. B. Buche"
               autoComplete="off"
               className={EINGABE}
             />
-            {fehler.holzart && <FeldFehler>{fehler.holzart}</FeldFehler>}
-          </div>
+          </Feld>
+          <datalist id="brenn-holzarten">
+            {HOLZARTEN.map((h) => (
+              <option key={h} value={h} />
+            ))}
+          </datalist>
 
-          {!hackschnitzel ? (
-            <div className="flex flex-col gap-2" data-feld="scheitlaengeCm">
-              <p id="brenn-scheit" className="text-[15px] font-semibold text-foreground">
-                Scheitlänge{art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}
-              </p>
-              <div role="radiogroup" aria-labelledby="brenn-scheit" className="flex flex-wrap gap-2">
+          {!hackschnitzel && (
+            <Feld feld="scheitlaengeCm" label={`Scheitlänge${art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}`} fehler={fehler.scheitlaengeCm}>
+              <select
+                id={feldId('scheitlaengeCm')}
+                value={scheitlaengeCm ?? ''}
+                onChange={(e) => setScheitlaengeCm(e.target.value === '' ? null : Number(e.target.value))}
+                className={EINGABE}
+              >
+                <option value="">Bitte wählen</option>
                 {SCHEITLAENGEN_CM.map((cm) => (
-                  <Wahl key={cm} rolle="radio" aktiv={scheitlaengeCm === cm} onClick={() => setScheitlaengeCm(scheitlaengeCm === cm ? null : cm)}>
+                  <option key={cm} value={cm}>
                     {cm === 100 ? '1 m' : `${cm} cm`}
-                  </Wahl>
+                  </option>
                 ))}
-              </div>
-              {fehler.scheitlaengeCm && <FeldFehler>{fehler.scheitlaengeCm}</FeldFehler>}
-            </div>
-          ) : (
+              </select>
+            </Feld>
+          )}
+        </div>
+
+        {hackschnitzel && (
+          <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 sm:gap-4">
             <>
               <div className="flex flex-col gap-2" data-feld="wassergehalt">
                 <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
@@ -321,8 +324,8 @@ export function BrennmaterialFormular({
                 {fehler.koernung && <FeldFehler>{fehler.koernung}</FeldFehler>}
               </div>
             </>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2" data-feld="trocknung">
           <p id="brenn-trocknung" className="text-[15px] font-semibold text-foreground">
@@ -364,7 +367,7 @@ export function BrennmaterialFormular({
             </label>
           </div>
         </div>
-      </Abschnitt>
+      </KlappKarte>
 
       <Feld feld="description" label="Beschreibung (freiwillig)" fehler={fehler.description}>
         <Textarea

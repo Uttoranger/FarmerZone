@@ -9,7 +9,7 @@
  * Positionen (die stehen ohne Gebühr), und steht nur, wenn das Gesamt die Gebühr wirklich enthält.
  */
 import { describe, it, expect } from 'vitest'
-import { druckGesamtHinweis, druckKasse } from '@/components/orders/druck-kasse'
+import { druckGesamtHinweis, druckKasse } from '@/lib/hof-bestellungen'
 import { barZuKassierenCents } from '@/lib/servicegebuehr'
 import { GEBUEHR_MODELL_HOFPREIS } from '@/lib/plattformgebuehr'
 

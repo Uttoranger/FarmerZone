@@ -1,7 +1,7 @@
 'use client'
 
-import { cloneElement, isValidElement } from 'react'
-import { Check, Lock, Plus, X } from 'lucide-react'
+import { cloneElement, isValidElement, useId, useState } from 'react'
+import { Check, ChevronDown, Lock, Plus, X } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
 import { Button } from '@/components/ui/button'
@@ -120,6 +120,80 @@ export function Abschnitt({
         {satz && <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">{satz}</p>}
       </div>
       {children}
+    </section>
+  )
+}
+
+/**
+ * Eine aufklappbare Karte wie die Abschnitte des Produktdialogs (Board s1-/w1-produkt-neu, Bild 3 und 4; Abnahme
+ * Lauf 32, Nr. 277): Kopf als Knopf mit Titel und Kurzstand („Pflicht · noch offen“), darunter der Inhalt. Zu
+ * steht unter dem Kopf ein Satz und der Knopf, der sie öffnet („Angaben eintragen“). `immerOffen` öffnet sie
+ * von außen — nach einem Fehler darin muss das Feld sichtbar sein, sonst findet der Sprung zum Feld nichts.
+ * Der Inhalt bleibt eingehängt (nur `hidden`), damit Eingaben beim Zuklappen nie verloren gehen.
+ */
+export function KlappKarte({
+  titel,
+  stand,
+  satz,
+  oeffnenText,
+  anfangsOffen = false,
+  immerOffen = false,
+  fehler = false,
+  children,
+}: {
+  titel: string
+  /** Die Zeile unter dem Titel — offen wie zu (Liste Lauf 32, produkt-neu: Kartenköpfe mit Zusammenfassung). */
+  stand: string
+  /** Steht zugeklappt unter dem Kopf. */
+  satz?: string
+  /** Der Knopf der zugeklappten Karte; ohne ihn öffnet nur der Kopf. */
+  oeffnenText?: string
+  anfangsOffen?: boolean
+  immerOffen?: boolean
+  /** Ein Feld darin hat einen Fehler: der Kurzstand wird orange (wie „Bitte prüfen“ im Produktdialog). */
+  fehler?: boolean
+  children: React.ReactNode
+}): React.JSX.Element {
+  const [offenGewaehlt, setOffenGewaehlt] = useState(anfangsOffen)
+  const offen = offenGewaehlt || immerOffen
+  const id = useId()
+  return (
+    <section aria-labelledby={`${id}-titel`} className="rounded-[14px] border border-border bg-card px-4">
+      <h3 id={`${id}-titel`} className="m-0">
+        <button
+          type="button"
+          aria-expanded={offen}
+          aria-controls={`${id}-inhalt`}
+          onClick={() => setOffenGewaehlt(!offen)}
+          className={cn('flex min-h-14 w-full items-center gap-3 rounded-md py-3 text-left', FOKUS_RAHMEN)}
+        >
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[16px] font-bold text-foreground">{titel}</span>
+            <span className={cn('text-[13px]', fehler ? 'font-semibold text-status-offen' : 'text-muted-foreground')}>{stand}</span>
+          </span>
+          <ChevronDown className={cn('size-5 shrink-0 text-muted-foreground transition-transform', offen && 'rotate-180')} strokeWidth={1.7} aria-hidden="true" />
+        </button>
+      </h3>
+      {!offen && (satz || oeffnenText) && (
+        <div className="flex flex-col gap-3 pb-4">
+          {satz && <p className="text-[14px] leading-snug text-muted-foreground">{satz}</p>}
+          {oeffnenText && (
+            <button
+              type="button"
+              onClick={() => setOffenGewaehlt(true)}
+              className={cn(
+                'inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground/70 bg-card px-4 text-[15px] font-bold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+                FOKUS_RAHMEN
+              )}
+            >
+              {oeffnenText}
+            </button>
+          )}
+        </div>
+      )}
+      <div id={`${id}-inhalt`} hidden={!offen} className="flex flex-col gap-4 pb-4">
+        {children}
+      </div>
     </section>
   )
 }

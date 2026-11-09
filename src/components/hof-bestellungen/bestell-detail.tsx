@@ -36,7 +36,7 @@ import type { HofWiderruf } from '@/server/widerruf'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { AbspracheKnoepfe, AbspracheMarke } from '@/components/heute/absprache'
 import { RUNDUNG } from '@/components/ui/rundung'
-import type { Positionszeile } from '@/lib/positionszeile'
+import { PositionsText } from './positions-text'
 import { KARTE, KICKER, KNOPF_ORANGE, KNOPF_RAHMEN, LEISE, TEXT_ORANGE } from './stil'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
@@ -233,7 +233,17 @@ export function BestellDetail({
         <Betrag bestellung={bestellung} geldsatz={geldsatz} kompakt />
         {barFrist && <p className="text-[13.5px]">{barFrist}</p>}
         {bestellung.positionen.length > 0 && (
-          <p className="text-[14px] break-words">{bestellung.positionen.filter((p) => !p.fehlt).map((p) => p.zeile).join(' · ')}</p>
+          // Dieselbe Positionszeile wie die Bestellung selbst (G14; Abnahme Lauf 32, bestellungen 1440 Bild 1).
+          <p className="text-[14px] break-words">
+            {bestellung.positionen
+              .filter((p) => !p.fehlt)
+              .map((p, i) => (
+                <span key={p.id}>
+                  {i > 0 && ' · '}
+                  <PositionsText zeile={p.zeile} teile={p.teile} />
+                </span>
+              ))}
+          </p>
         )}
         {hauptaktion && (
           <button type="button" onClick={hauptaktion.onClick} disabled={laeuft} aria-busy={laeuft || undefined} className={cn(LEISTE_HAUPT, 'md:w-full')}>
@@ -441,17 +451,6 @@ export function BestellDetail({
           <DialogFehler text={offen === 'abholungZurueck' ? fehler : null} />
         </BestellDialog>
       </article>
-    </>
-  )
-}
-
-/** Eine Position nach G14: die Anzahl fett vorn („**4** × Heumilch frisch (1 L)“); ohne Teile die alte Zeile. */
-function PositionsText({ zeile, teile }: { zeile: string; teile?: Positionszeile }): React.JSX.Element {
-  if (!teile) return <>{zeile}</>
-  return (
-    <>
-      <span className="font-bold">{teile.anzahl}</span> × {teile.name}
-      {teile.gebinde && <> ({teile.gebinde})</>}
     </>
   )
 }

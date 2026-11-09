@@ -12,6 +12,7 @@ import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { BestellDialog, DialogFehler } from './bestell-dialog'
+import { PositionsText } from './positions-text'
 import { LEISE, TEXT_ORANGE } from './stil'
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
@@ -128,7 +129,10 @@ export function ArtikelFehltDialog({
                   >
                     {fehlt && <Check className="size-5" strokeWidth={2.4} />}
                   </span>
-                  <span className={cn('min-w-0 flex-1 text-[15px] break-words', fehlt && 'text-muted-foreground line-through')}>{p.zeile}</span>
+                  {/* Positionszeile G14 wie auf der Seite („**2** × Hafer im Big Bag (1 Big Bag)“; Abnahme Lauf 32, bestellung Bild 3). */}
+                  <span className={cn('min-w-0 flex-1 text-[15px] break-words', fehlt && 'text-muted-foreground line-through')}>
+                    <PositionsText zeile={p.zeile} teile={p.teile} />
+                  </span>
                   {fehlt && <span className="shrink-0 text-[13px] font-bold text-status-offen">{p.fehlt ? 'fehlt schon' : 'fehlt'}</span>}
                   <span className={cn('shrink-0 text-[14px] tabular-nums', LEISE)}>{euro(p.betragCents)}</span>
                 </label>
