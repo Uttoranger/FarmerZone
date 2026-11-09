@@ -16,3 +16,8 @@ Gilt mit docs/nachtlauf/berichte/lauf32-board-oder-code.md. Jede Zeile ist kein 
 | rechtstexte und alle Boards mit „12“ Gründungsplätzen | alle | Zahl aus Admin › Einstellungen (100) | R | K2 Nr. 116, E-026 (N48) |
 | kasse | Bild 1, 3 | Unterzeile der Bar-Option „Du bestätigst per E-Mail.“ | R | Register N10 (Ergänzung Freigabe Lauf 13) |
 | alle Boards mit Kategorie-Illustration | dunkel | Illustration hell auf eigenem Grund, gedämpft wie ein Foto, gerahmt | C | Projektleitung, 9.11.2026 (F041; freigabe.md §37.1, N48) |
+| kasse | Leiste | Leistensatz „Wähl noch, wann du abholst · bar am Hof · Bestätigung per E-Mail“ | C | Antwort 5 zum Zwischen-Morgenbericht 33 B, 9.11.2026: Code bleibt, Board wird korrigiert |
+| kasse | alle | Reservierungskasten | C | Antwort 5 zum Zwischen-Morgenbericht 33 B, 9.11.2026: Code bleibt, Board wird korrigiert |
+| bestellung-link | Bild 1 | Marke nach dem Status: „Bezahlt“ erst bei bezahlter Online-Bestellung, sonst „Bestätigt“ | C | Antwort 6 zum Zwischen-Morgenbericht 33 B, 9.11.2026: Code bleibt, Board wird korrigiert |
+| meldungen, problem-melden | Rückweg | /meldungen und /fehler-melden verweisen aufeinander | C | Antwort 7 zum Zwischen-Morgenbericht 33 B, 9.11.2026: gewollt |
+| fehlerseiten | global-error | kein „[TEST]“-Vorsatz auf global-error | C | Antwort 2 zum Zwischen-Morgenbericht 33 B, 9.11.2026: so lassen, keine neue Variable |
