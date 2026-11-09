@@ -55,7 +55,6 @@ import { BestellstoppHinweis, useBestellstopp } from '@/components/notbremse-ban
 import { sperreMitBestellstopp } from '@/lib/notbremse'
 import { GleichMitAbholen, Kennzeichnung } from '@/components/produktdetail/produktdetail-teile'
 import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE, PLATZHALTER_FLAECHE } from '@/components/ui/bild-dunkel'
-import { mengeLabelTipp } from '@/components/produktdetail/menge-label'
 import { ausverkauftSatz, groessenAufsteigend, groessenVorrat, preisJeRaummass, raummassZeile } from '@/components/produktdetail/groessen-anzeige'
 import { futterVerantwortung, futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
@@ -527,11 +526,11 @@ export function ProduktdetailKunde({
                     {/* Die Menge als gerahmte Pille „− n +“ (G13, form="pille", Nr. 252) mit sichtbarer Beschriftung „Menge“
                         und je Knopf und Feld 44 px Ziel (Abnahme Lauf 32, produkt 4: Knöpfe 42 px, Feld 36 px, Feld ohne
                         Beschriftung). Die Pille ist ein geteilter Baustein (ui/stepper.tsx) — die Höhe kommt hier über ihre
-                        data-slot-Hülle, damit Hof-Seiten mit derselben Pille unverändert bleiben. Die Pille nimmt keine id an
-                        (htmlFor ginge nicht), darum umschließt das Label sie; sein erstes beschriftbares Kind wäre aber der
-                        Minus-Knopf — ein Tipp auf „Menge“ senkte die Menge (Runde 1). mengeLabelTipp setzt den Fokus statt
-                        dessen ins Feld; Tipps auf −, Zahl und + wirken wie immer. */}
-                    <label className="flex shrink-0 flex-col gap-0.5" onClick={mengeLabelTipp}>
+                        data-slot-Hülle, damit Hof-Seiten mit derselben Pille unverändert bleiben. „Menge“ steht als Text darüber,
+                        kein <label>: Ohne htmlFor (die Pille nimmt keine id an) gäbe ein Label einen Tipp an sein erstes
+                        beschriftbares Kind weiter — den Minus-Knopf (Runde 1). Den zugänglichen Namen trägt das Feld selbst
+                        (aria-label „Menge <Produkt>“). */}
+                    <div className="flex shrink-0 flex-col gap-0.5">
                       <span className="text-[12px] leading-none font-semibold text-muted-foreground">Menge</span>
                       <Stepper
                         beschriftung={`Menge ${produkt.name}`}
@@ -544,7 +543,7 @@ export function ProduktdetailKunde({
                         className="[&_[data-slot=stepper-pille]]:h-12"
                         form="pille"
                       />
-                    </label>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void inDenKorb(produkt, mengeJetzt)}

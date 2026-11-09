@@ -48,10 +48,22 @@ describe('Gleich mit abholen (Board s1-/w1-produkt Bild 2)', () => {
 })
 
 describe('Mengen-Stepper und Warenkorb-Symbol', () => {
-  it('der Stepper steht in einem Label mit sichtbarem „Menge“, Pille 48 px und Feld 44 px hoch', () => {
-    expect(quelle).toMatch(/<label className="[^"]*" onClick=\{mengeLabelTipp\}>\s*<span className="[^"]*">Menge<\/span>\s*<Stepper/)
+  it('über dem Stepper steht sichtbar „Menge“, Pille 48 px und Feld 44 px hoch', () => {
+    expect(quelle).toMatch(/<div className="[^"]*">\s*<span className="[^"]*">Menge<\/span>\s*<Stepper/)
+    // Den Namen trägt das Feld selbst.
+    expect(quelle).toContain('beschriftung={`Menge ${produkt.name}`}')
     expect(quelle).toContain('eingabeClassName="h-11 w-11"')
     expect(quelle).toContain('className="[&_[data-slot=stepper-pille]]:h-12"')
+  })
+
+  it('kein <label> umschließt den Stepper — ein Tipp auf „Menge“ ginge sonst an den Minus-Knopf (Runde 1)', () => {
+    // Ohne Kommentare (der Kommentar über der Pille nennt das Label beim Namen).
+    const vorStepper = quelle.slice(0, quelle.indexOf('<Stepper')).replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    const offeneLabels = (vorStepper.match(/<label\b/g) ?? []).length - (vorStepper.match(/<\/label>/g) ?? []).length
+    expect(offeneLabels).toBe(0)
+    // Gegenprobe: ein umschließendes Label fiele auf.
+    const schnipsel = '<label className="x"><span>Menge</span><Stepper'
+    expect((schnipsel.match(/<label\b/g) ?? []).length - (schnipsel.match(/<\/label>/g) ?? []).length).toBe(1)
   })
 
   it('am Handy EIN Warenkorb-Symbol: die klebende Zeile zeigt es erst, wenn der Kopf der Shell weggescrollt ist', () => {
