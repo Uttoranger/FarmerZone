@@ -838,7 +838,7 @@ export async function baueAboBestaetigung(email: string, daten: { hofName: strin
  * Versand bisher, wenn die Vorlage scheitert (kein `{ error }`).
  */
 export async function registrierungsHinweisInhalt(ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }): Promise<MailInhalt> {
-  // Vorlage erst beim Versand laden: Seitenmodule, die email.ts einbinden,
+  // Vorlage erst beim Bauen laden: Seitenmodule, die email.ts einbinden,
   // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
   const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
   const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))

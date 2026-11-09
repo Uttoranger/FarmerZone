@@ -17,6 +17,10 @@
  *  3. Jede Inhalts-Funktion aus Nr. 270 in src/lib/email.ts nimmt genau einen
  *     Parameter ohne Empfänger (`email`, `an`, `to`), loggt nie und
  *     verschickt nie; ihre `send…`-Funktion ruft sie.
+ *  4. Jede Funktion, die beispiele.ts aus src/lib/email.ts holt (Inhalts- und
+ *     `baue…`-Funktionen), loggt und verschickt nie — auch nicht über eine
+ *     Hilfe derselben Datei, die sie ruft. Zu 1 zählen auch `export … from`
+ *     und `require()` (Runde 1, Gegenlesen „Sicherheit“).
  * Gegenprobe je Regel: Schnipsel mit dem Verstoß werden gefunden, die echten
  * Dateien nicht.
  */
@@ -53,6 +57,17 @@ function pruefeBeispiele(quelle: string): string[] {
     if (b && ts.isNamespaceImport(b)) funde.push(`ganzes Modul ${modul}`)
     if (b && ts.isNamedImports(b)) for (const e of b.elements) if (istVerboten((e.propertyName ?? e.name).text)) funde.push(`Name ${(e.propertyName ?? e.name).text}`)
   }
+  // Weiterreichen zählt wie Einbinden: `export { x } from …`, `export * from …`.
+  for (const s of datei.statements) {
+    if (!ts.isExportDeclaration(s) || !s.moduleSpecifier || !ts.isStringLiteral(s.moduleSpecifier)) continue
+    const modul = s.moduleSpecifier.text
+    if (VERBOTENE_MODULE.includes(modul)) funde.push(`Modul ${modul}`)
+    if (s.exportClause && ts.isNamedExports(s.exportClause)) {
+      for (const e of s.exportClause.elements) if (istVerboten((e.propertyName ?? e.name).text)) funde.push(`Name ${(e.propertyName ?? e.name).text}`)
+    } else {
+      funde.push(`ganzes Modul ${modul}`)
+    }
+  }
   besuche(datei, (k) => {
     if (ts.isCallExpression(k) && k.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const ziel = k.arguments[0]
@@ -67,6 +82,7 @@ function pruefeBeispiele(quelle: string): string[] {
         if (istVerboten(name)) funde.push(`dynamisch Name ${name}`)
       }
     }
+    if (ts.isCallExpression(k) && ts.isIdentifier(k.expression) && k.expression.text === 'require') funde.push('require')
     if (ts.isIdentifier(k) && istVerboten(k.text)) funde.push(`Bezeichner ${k.text}`)
   })
   return [...new Set(funde)].sort()
@@ -150,6 +166,51 @@ function pruefeInhalte(quelle: string): string[] {
   return [...new Set(funde)]
 }
 
+/** Die Namen, die beispiele.ts per `const { … } = await import('@/lib/email')` holt. */
+function namenAusEmail(quelle: string): string[] {
+  const namen = new Set<string>()
+  besuche(baum(quelle), (k) => {
+    if (!ts.isCallExpression(k) || k.expression.kind !== ts.SyntaxKind.ImportKeyword) return
+    const ziel = k.arguments[0]
+    if (!ziel || !ts.isStringLiteral(ziel) || ziel.text !== '@/lib/email') return
+    const deklaration = ts.isAwaitExpression(k.parent) && ts.isVariableDeclaration(k.parent.parent) ? k.parent.parent : null
+    if (deklaration && ts.isObjectBindingPattern(deklaration.name))
+      for (const e of deklaration.name.elements) {
+        const name = e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName.text : ts.isIdentifier(e.name) ? e.name.text : null
+        if (name) namen.add(name)
+      }
+  })
+  return [...namen].sort()
+}
+
+/** Regel 4: jede dieser Funktionen in email.ts — samt jeder Hilfe derselben Datei, die sie ruft — loggt und verschickt nie. */
+function pruefeBaufunktionen(beispiele: string, emailQuelle: string): string[] {
+  const datei = baum(emailQuelle)
+  const funktionen = new Map<string, ts.FunctionDeclaration>()
+  for (const s of datei.statements) if (ts.isFunctionDeclaration(s) && s.name) funktionen.set(s.name.text, s)
+  const funde: string[] = []
+  for (const name of namenAusEmail(beispiele)) {
+    const fn = funktionen.get(name)
+    if (!fn?.body) {
+      funde.push(`${name} fehlt`)
+      continue
+    }
+    const gesehen = new Set<string>()
+    const pruefe = (f: ts.FunctionDeclaration): void => {
+      if (!f.name || gesehen.has(f.name.text) || !f.body) return
+      gesehen.add(f.name.text)
+      besuche(f.body, (k) => {
+        if (!ts.isIdentifier(k)) return
+        if (LOG_ODER_VERSAND.has(k.text)) funde.push(`${name}: ${k.text}`)
+        const lokal = funktionen.get(k.text)
+        if (lokal) pruefe(lokal)
+      })
+    }
+    pruefe(fn)
+  }
+  return [...new Set(funde)].sort()
+}
+
 describe('Beispiele verschicken, speichern und protokollieren nie', () => {
   it('beispiele.ts: keine verbotenen Module, Namen oder ungeteilten Importe', () => {
     expect(pruefeBeispiele(lies('src/server/mail-arten/beispiele.ts'))).toEqual([])
@@ -168,6 +229,31 @@ describe('Beispiele verschicken, speichern und protokollieren nie', () => {
     ])
     expect(pruefeBeispiele(`function f(html: string) { console.log(html) }`)).toEqual(['Bezeichner console'])
     expect(pruefeBeispiele(`import { protokolliere } from '@/server/admin-protokoll'`)).toEqual(['Bezeichner protokolliere', 'Modul @/server/admin-protokoll', 'Name protokolliere'])
+  })
+
+  it('Gegenprobe beispiele.ts: Weiterreichen und require werden gefunden', () => {
+    expect(pruefeBeispiele(`export { sendRaw } from '@/lib/email'`)).toEqual(['Bezeichner sendRaw', 'Name sendRaw'])
+    expect(pruefeBeispiele(`export * from '@/lib/prisma'`)).toEqual(['Modul @/lib/prisma', 'ganzes Modul @/lib/prisma'])
+    expect(pruefeBeispiele(`const m = require('@/lib/email')`)).toEqual(['require'])
+  })
+
+  it('Baufunktionen, die beispiele.ts aus email.ts holt: loggen und verschicken nie, auch nicht über eine Hilfe', () => {
+    const beispiele = lies('src/server/mail-arten/beispiele.ts')
+    expect(namenAusEmail(beispiele).length).toBeGreaterThan(20)
+    expect(pruefeBaufunktionen(beispiele, lies('src/lib/email.ts'))).toEqual([])
+  })
+
+  it('Gegenprobe Baufunktionen: ein Log in der Funktion und ein Versand in einer Hilfe werden gefunden', () => {
+    const beispiele = lies('src/server/mail-arten/beispiele.ts')
+    const echt = lies('src/lib/email.ts')
+    const mitLog = echt.replace('export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {', 'export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {\n  console.log(an)')
+    expect(pruefeBaufunktionen(beispiele, mitLog)).toEqual(['baueBetreiberTestmail: console'])
+    const hilfeSchickt = echt.replace('async function toHtml(element: React.ReactElement): Promise<string> {', 'async function toHtml(element: React.ReactElement): Promise<string> {\n  await sendRaw(\'x@example.com\', \'x\', \'x\', { art: \'testmail\' })')
+    // Über die Hilfe toHtml erreicht jede Funktion den Versand — und mit ihm sendRaw selbst (Log, Protokoll).
+    const funde = pruefeBaufunktionen(beispiele, hilfeSchickt)
+    for (const name of namenAusEmail(beispiele)) expect(funde, name).toContain(`${name}: sendRaw`)
+    expect(mitLog).not.toBe(echt)
+    expect(hilfeSchickt).not.toBe(echt)
   })
 
   it('zeigeMailBeispielAction: Wache zuerst, kein Versand, kein Protokoll, keine Datenbank, kein Log', () => {
