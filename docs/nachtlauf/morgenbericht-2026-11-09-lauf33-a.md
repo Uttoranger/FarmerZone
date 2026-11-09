@@ -1,6 +1,6 @@
 # Zwischen-Morgenbericht Lauf 33, Abschnitt A (8./9.11.2026) · Ursachen und echte Fehler
 
-**Ergebnis Abschnitt A:** Fertig, geprüft und gepusht sind 261 (Doku), 262 (Prüfwerkzeug 2), 263 (Kurznummer), 264 (Ende der Gründungszeit) und 266 (kleine echte Fehler). Alle fünf liegen im Zwischenstand `integration/lauf33`. Der volle Lauf darauf ist grün (726 Dateien, 13456 Tests), die Integrationstests ganz auch (99 Dateien, 804 Tests). Keine Migration, kein Paket, keine neue Variable. **Nicht fertig:** 267 und 269 brachen gegen 21:05 UTC mitten in der Arbeit ab, weil das Wochenlimit der API erreicht war; 267 ist als WIP gesichert und gepusht (Arbeitsstand voll grün, ohne PR); 269 war rot (6 von 13471 Tests) und ist nach §5 nur lokal als WIP-Commit gesichert, nicht gepusht – in einer neuen Sitzung ist dieser Stand nicht mehr da. 265, 270 und 268 haben nicht begonnen → verschoben nach B. Der Sammel-PR ist als **Entwurf** offen: SAMMEL_PR.
+**Ergebnis Abschnitt A:** Fertig, geprüft und gepusht sind 261 (Doku), 262 (Prüfwerkzeug 2), 263 (Kurznummer), 264 (Ende der Gründungszeit) und 266 (kleine echte Fehler). Alle fünf liegen im Zwischenstand `integration/lauf33`. Der volle Lauf darauf ist grün (726 Dateien, 13456 Tests), die Integrationstests ganz auch (99 Dateien, 804 Tests). Keine Migration, kein Paket, keine neue Variable. **Nicht fertig:** 267 und 269 brachen gegen 21:05 UTC mitten in der Arbeit ab, weil das Wochenlimit der API erreicht war; 267 ist als WIP gesichert und gepusht (Arbeitsstand voll grün, ohne PR); 269 war rot (6 von 13471 Tests) und ist nach §5 nur lokal als WIP-Commit gesichert, nicht gepusht – in einer neuen Sitzung ist dieser Stand nicht mehr da. 265, 270 und 268 haben nicht begonnen → verschoben nach B. Der Sammel-PR ist als **Entwurf** offen: [#508](https://github.com/Uttoranger/FarmerZone/pull/508).
 
 **Ordnungsgemäß beendet:** ja, mit der Einschränkung oben: Haltepunkt A, gekürzter Zwischen-Durchgang, Aufräumen bestätigt, Sammel-PR als Entwurf. **Ziel erreicht (5 Sterne):** in Abschnitt A nicht wertbar; die Gegenprobe mehr-neu bleibt bei 5 Sternen in allen vier Fassungen.
 
@@ -93,7 +93,7 @@ Im Container unter `/home/user/FarmerZone/.nachtlauf/screens/`: `0a/` (Probe age
 
 ## Wiederaufnahme (für B)
 
-- Zwischenstand: `integration/lauf33` (gepusht), Stand im Zeitbuch. Sammel-PR als Entwurf: SAMMEL_PR.
+- Zwischenstand: `integration/lauf33` (gepusht), Stand im Zeitbuch. Sammel-PR als Entwurf: [#508](https://github.com/Uttoranger/FarmerZone/pull/508).
 - WIP-Branch `nacht/2026-11-08/267-kunden-bausteine` (gepusht, 25bebf94a5c6, Basis 233564092734, voll grün, ohne PR) läuft in B zuerst weiter (3.6), Restbudget etwa 1,5 h; Bericht fehlt noch.
 - 269: lokaler WIP-Commit 248823aa7543 (rot, nicht gepusht) im Worktree /home/user/wt/269 dieses Containers. In einer neuen Sitzung ist er nicht vorhanden → 269 startet in B neu vom Zwischenstand (volles Budget 2,5 h); Startbestand der Kästchen-Liste dann neu per `git grep` zählen.
 - Danach in B (verschoben aus A, in dieser Reihenfolge und mit ihren Startbedingungen, vor 271): 265 (nach 263, 264 – erfüllt), 270 (nach 263, 264 – erfüllt), 268 (nach 263 und 269).
