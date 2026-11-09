@@ -1,18 +1,19 @@
 'use client'
 
-import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, LogOut, Monitor, MonitorSmartphone, Smartphone } from 'lucide-react'
+import { useId, useState, useTransition } from 'react'
+import { Loader2, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GERAETE_TEXT, alleAnderenSatz, geraeteHinweise, type GeraeteZeile } from '@/lib/geraete'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { KUNDIN_GERAETE_TEXT } from '@/lib/sitzung-dauer'
 import { meldeAlleAnderenAb, meldeGeraetAb, meldeUeberallAb, type AbmeldenAntwort } from '@/server/actions/geraete'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Marke } from '@/components/ui/marke'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
-import { KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { KNOPF_ORANGE, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { KNOPF_UMRISS } from '@/components/anmelden/stil'
 
 /*
@@ -32,8 +33,10 @@ import { KNOPF_UMRISS } from '@/components/anmelden/stil'
  * SterneSicherheit, rechtes Handy): „Überall abmelden" statt „Alle anderen
  * abmelden" — meldet auch dieses Gerät ab und führt zur Anmeldung —, dazu
  * der Satz zum Abmelden; seit Nr. 239 (Boards s2-/w2-kundenkonto) als
- * Kennzeile, Gerätekarte und eigener neutraler Knopf, ohne „Was wir speichern". `satz` (Konto und
- * Sicherheit der Höfe) steht als letzte Zeile der Karte: die Höchstdauer.
+ * Kennzeile, Gerätekarte und eigener neutraler Knopf, ohne „Was wir speichern". Seit Nr. 278 (Boards
+ * s2-/w2-konto-hof Bild 2) gilt dieser Aufbau auch für Hof und Admin: Kennzeile statt Kartentitel, Liste
+ * ohne Symbole, „dieses Gerät" als Pille ohne Rand, „Alle anderen abmelden" als heller Knopf unter der
+ * Liste. `satz` (Konto und Sicherheit der Höfe) hängt am Hinweis: die Höchstdauer.
  */
 
 const KNOPF_KLEIN = cn(KNOPF_RAHMEN, 'min-h-11 shrink-0 px-4 text-[13px] font-semibold')
@@ -53,6 +56,8 @@ export function AngemeldeteGeraete({
   satz?: string
 }): React.JSX.Element {
   const router = useRouter()
+  // Eigene Kennung je Einbau: Die Seite darf den Baustein nicht zweimal mit derselben id tragen.
+  const titelId = useId()
   // Im Admin-Bereich kommt der Blick auf die Passkeys dazu (N20); für Höfe bleibt der Text, wie er war.
   const hinweise = geraeteHinweise(fuerAdmin)
   const breit = useMindestbreite(768)
@@ -118,40 +123,37 @@ export function AngemeldeteGeraete({
 
   const liste = (
     <ul className="divide-y divide-border">
-      {zeilen.map((zeile) => {
-        const Symbol = zeile.art === 'handy' ? Smartphone : Monitor
-        return (
-          <li key={zeile.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            {/* Die Kundin sieht die Zeilen ohne Symbol (Board s2-kundenkonto). */}
-            {!fuerKundin && <Symbol className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />}
-            <div className="min-w-0 flex-1">
-              <p className={cn('font-semibold break-words text-foreground', fuerKundin ? 'text-[15px]' : 'text-sm')}>{zeile.name}</p>
-              <p className={cn('leading-snug text-muted-foreground', fuerKundin ? 'text-[13px]' : 'text-xs')}>{zeile.unterzeile}</p>
-            </div>
-            {zeile.dieses ? (
-              <Marke art="laeuft" className="shrink-0">
-                {GERAETE_TEXT.diesesGeraet}
-              </Marke>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fuehreAus(() => meldeGeraetAb({ sitzungId: zeile.id }), zeile.id)}
-                disabled={laeuft}
-                aria-label={`${zeile.name} abmelden`}
-                className={cn(KNOPF_KLEIN, 'disabled:opacity-60')}
-              >
-                {abmeldend === zeile.id ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : GERAETE_TEXT.abmelden}
-              </button>
-            )}
-          </li>
-        )
-      })}
+      {zeilen.map((zeile) => (
+        // Zeilen ohne Symbol, Name 15 px fett, Unterzeile 13 px (Boards s2-/w2-konto-hof Bild 2, s2-kundenkonto).
+        <li key={zeile.id} className="flex min-h-[60px] items-center gap-2.5 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold break-words text-foreground">{zeile.name}</p>
+            <p className="text-[13px] leading-snug text-muted-foreground">{zeile.unterzeile}</p>
+          </div>
+          {zeile.dieses ? (
+            // Pille ohne Rand: 22 px, fett (Board konto-hof Bild 2).
+            <Marke art="laeuft" form="schild" className="shrink-0">
+              {GERAETE_TEXT.diesesGeraet}
+            </Marke>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fuehreAus(() => meldeGeraetAb({ sitzungId: zeile.id }), zeile.id)}
+              disabled={laeuft}
+              aria-label={`${zeile.name} abmelden`}
+              className={cn(KNOPF_KLEIN, 'disabled:opacity-60')}
+            >
+              {abmeldend === zeile.id ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : GERAETE_TEXT.abmelden}
+            </button>
+          )}
+        </li>
+      ))}
     </ul>
   )
   const fehlerZeile = (
     <>
       {fehler && (
-        <p role="alert" className="rounded-xl border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground">
+        <p role="alert" className={cn(RUNDUNG.hinweis, 'border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground')}>
           {fehler}
         </p>
       )}
@@ -189,49 +191,31 @@ export function AngemeldeteGeraete({
     </>
   )
 
-  // Kundin (/account): Kennzeile über der Karte, die Karte nur mit den Geräten, darunter „Überall abmelden“
-  // als eigener neutraler Knopf und der Satz (Board s2-/w2-kundenkonto, Bild 3/5) — ohne Titel, Symbol und Zähler.
-  if (fuerKundin) {
-    return (
-      <section aria-labelledby="geraete-titel" className="flex flex-col gap-3">
-        <h2 id="geraete-titel" className={KONTO_ETIKETT}>
-          {GERAETE_TEXT.titel}
-        </h2>
-        <div className="rounded-2xl border border-border bg-card px-4 py-3.5 dark:ring-0">{liste}</div>
-        {fehlerZeile}
-        <button type="button" onClick={() => setFrageOffen(true)} disabled={laeuft} className={KNOPF_UMRISS}>
+  // Kennzeile über der Liste, die Karte nur mit den Geräten, darunter der helle Knopf und der Satz — ohne
+  // Titelkarte, Symbol und Zähler (Boards s2-/w2-konto-hof Bild 2, s2-/w2-kundenkonto Bild 3/5). Gilt für
+  // Hof, Kundin und Admin › Anmeldung gleich; die Kundin hat „Überall abmelden“ und ihren eigenen Satz.
+  const zeigeKnopf = fuerKundin || andere > 0
+  return (
+    <section aria-labelledby={titelId} className="flex flex-col gap-3">
+      <h2 id={titelId} className={KONTO_ETIKETT}>
+        {GERAETE_TEXT.titel}
+      </h2>
+      <div className={cn(RUNDUNG.karte, 'border border-border bg-card px-3 py-1 dark:ring-0')}>{liste}</div>
+      {fehlerZeile}
+      {zeigeKnopf && (
+        <button
+          type="button"
+          onClick={() => setFrageOffen(true)}
+          disabled={laeuft}
+          className={cn(fuerKundin ? KNOPF_UMRISS : HELLER_KNOPF, 'disabled:opacity-60')}
+        >
           {knopfText}
         </button>
-        <p className="text-[13px] leading-normal text-muted-foreground">{KUNDIN_GERAETE_TEXT.hinweis}</p>
-        {frageDialog}
-      </section>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <MonitorSmartphone className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          <CardTitle className="min-w-0 flex-1">{GERAETE_TEXT.titel}</CardTitle>
-          <span className="text-xs text-muted-foreground tabular-nums">{zeilen.length}</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {liste}
-        {fehlerZeile}
-
-        {andere > 0 && (
-          <button type="button" onClick={() => setFrageOffen(true)} disabled={laeuft} className={cn(KNOPF_ORANGE_RAHMEN, 'w-full disabled:opacity-60')}>
-            <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            {knopfText}
-          </button>
-        )}
-
-        <p className="text-xs leading-relaxed text-muted-foreground">{hinweise.hinweis}</p>
-        {satz && <p className="text-xs leading-relaxed text-muted-foreground">{satz}</p>}
-      </CardContent>
+      )}
+      <p className="text-[13px] leading-normal text-muted-foreground">
+        {fuerKundin ? KUNDIN_GERAETE_TEXT.hinweis : satz ? `${hinweise.hinweis} ${satz}` : hinweise.hinweis}
+      </p>
       {frageDialog}
-    </Card>
+    </section>
   )
 }

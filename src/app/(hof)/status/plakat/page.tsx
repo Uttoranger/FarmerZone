@@ -13,14 +13,16 @@ import { DruckenKnopf } from '@/components/teilen/drucken-knopf'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `QR-Plakat — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 
-const KNOPF_ORANGE = cn(
-  'inline-flex h-11 items-center justify-center gap-2 rounded-full border border-primary-foreground/25 bg-primary px-5 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
+/** „Drucken“ im Web neben der h1: orange, 48 px, 14 px rund, fett, ohne Symbol (Board w2-whatsapp-plakat Bild 3). */
+const KNOPF_DRUCKEN = cn(
+  'inline-flex min-h-12 items-center justify-center rounded-[14px] bg-primary px-[22px] text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
   FOKUS_RAHMEN
 )
 
@@ -44,7 +46,8 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
   const daten = await getPlakatDaten(farm.id)
 
   return (
-    <div className="w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10 print:m-0 print:max-w-none print:p-0">
+    // Spalte wie die Einstellungs-Unterseiten: 672 px Inhalt im Web (Abnahme Lauf 32 Bild 4 „815 statt 670 px“).
+    <div className={cn(UNTERSEITE_RAHMEN, 'print:m-0 print:max-w-none print:p-0')}>
       {/* A4 ohne Druckrand: Das Blatt bringt seinen eigenen Rand mit. */}
       <style>{'@page { size: A4; margin: 0; }'}</style>
       {/* Werkzeug-Kopf (G1, Nr. 250): Elternseite „Beiträge“ (N1), Unterzeile „Mein Hof › Beiträge“; im Web
@@ -53,8 +56,8 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
           wird nichts davon (print:hidden im Baustein). */}
       <WerkzeugKopf
         titel="QR-Plakat"
-        unterzeile={<BeitraegeBrotkrumen />}
-        aktion={daten ? <div className="hidden md:block"><DruckenKnopf className={KNOPF_ORANGE} /></div> : undefined}
+        unterzeile={<BeitraegeBrotkrumen hofName={farm.name} />}
+        aktion={daten ? <div className="hidden md:block"><DruckenKnopf className={KNOPF_DRUCKEN} /></div> : undefined}
       />
       {/* Ohne Plakat keine Einleitung, nur der Leerzustand (Board Bild 4, Liste Lauf 32 „Einleitung weg“). */}
       {daten && (
@@ -69,7 +72,7 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
             <QrPlakat daten={daten} />
           </PlakatVorschau>
           <FesteAktionsleiste className="md:hidden">
-            <DruckenKnopf className={cn(AKTIONSLEISTE_KNOPF, 'gap-2')} />
+            <DruckenKnopf className={AKTIONSLEISTE_KNOPF} />
           </FesteAktionsleiste>
         </>
       ) : (
@@ -78,7 +81,7 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
           satz="Solange Kundinnen deine Hofseite nicht sehen können, würde der Code ins Leere führen."
           ausweg={
             // Board s2/w2-whatsapp-plakat Bild 4: der Ausweg sagt, was zu tun ist — in Mein Hof wird die Hofseite eingerichtet.
-            <Link href="/farm-page" className={KNOPF_ORANGE}>
+            <Link href="/farm-page" className={AKTIONSLEISTE_KNOPF}>
               Hofseite einrichten
             </Link>
           }

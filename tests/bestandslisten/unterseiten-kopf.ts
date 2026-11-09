@@ -7,7 +7,4 @@
  * (ui/werkzeug-kopf.tsx) um und nimmt die Datei heraus. Ist die Liste leer, löscht der Dirigent im
  * Sammel-PR unterseiten-kopf.tsx und unterseiten-kopf-stil.ts (Auftrag Lauf 32, G1).
  */
-export const UNTERSEITEN_KOPF_BESTAND: readonly string[] = [
-  'src/components/hof-einstellungen/einstellungen-laden.tsx',
-  'src/components/hof-einstellungen/konditionen-ansicht.tsx',
-]
+export const UNTERSEITEN_KOPF_BESTAND: readonly string[] = []

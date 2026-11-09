@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect, notFound } from 'next/navigation'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { BeitraegeBrotkrumen } from '../../beitraege-brotkrumen'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getStatusPostForWhatsApp } from '@/server/queries/status-posts'
@@ -42,9 +43,10 @@ export default async function SendWhatsAppPage({ params }: Props) {
   if (!data) notFound()
 
   return (
-    <div className="w-full max-w-[750px] px-4 pt-5 pb-12 md:px-8 md:pt-7 xl:px-10">
-      {/* Werkzeug-Kopf (G1, Nr. 250): h1 „WhatsApp versenden“ in jedem Zustand, Unterzeile „Mein Hof › Beiträge“. */}
-      <WerkzeugKopf titel={WHATSAPP_SEITE_TITEL} unterzeile={<BeitraegeBrotkrumen />} />
+    // Spalte wie die Einstellungs-Unterseiten: 672 px Inhalt im Web (Board w2-whatsapp-plakat).
+    <div className={UNTERSEITE_RAHMEN}>
+      {/* Werkzeug-Kopf (G1, Nr. 250): h1 „WhatsApp versenden“ in jedem Zustand, Unterzeile „<Hof> · Mein Hof › Beiträge“ (Nr. 278). */}
+      <WerkzeugKopf titel={WHATSAPP_SEITE_TITEL} unterzeile={<BeitraegeBrotkrumen hofName={farm.name} />} />
       <WhatsAppTapClient
         postId={data.id}
         title={data.title}

@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
+import { KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChipGruppe, type ChipGruppeOption } from '@/components/ui/segment'
 
@@ -40,7 +41,7 @@ export function DarstellungKarte() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Darstellung</CardTitle>
+        <CardTitle className={KARTEN_TITEL}>Darstellung</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">{DARSTELLUNG_SATZ}</p>

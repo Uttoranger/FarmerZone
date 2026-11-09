@@ -9,6 +9,14 @@ export const BEITRAEGE_BROTKRUMEN = `${HAUPT.find((p) => p.id === 'mein-hof')?.l
   MEIN_HOF_REITER_HOFBEREICH.find((r) => r.id === 'beitraege')?.label ?? ''
 }`
 
-export function BeitraegeBrotkrumen(): React.JSX.Element {
-  return <p className="text-[13px] leading-snug text-muted-foreground md:text-sm">{BEITRAEGE_BROTKRUMEN}</p>
+/**
+ * Mit `hofName` steht der Hof davor („Hof Müller · Mein Hof › Beiträge“) — so auf WhatsApp versenden und
+ * QR-Plakat (Board s2-/w2-whatsapp-plakat Bild 2; Auftrag Lauf 33 Nr. 278 „Unterzeile mit Hofname“).
+ */
+export function BeitraegeBrotkrumen({ hofName }: { hofName?: string } = {}): React.JSX.Element {
+  return (
+    <p className="truncate text-[13px] leading-snug text-muted-foreground md:text-sm">
+      {hofName ? `${hofName} · ${BEITRAEGE_BROTKRUMEN}` : BEITRAEGE_BROTKRUMEN}
+    </p>
+  )
 }

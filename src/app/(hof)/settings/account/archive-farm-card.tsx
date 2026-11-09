@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
-import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
+import { HELLER_KNOPF, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
 import {
   Dialog,
   DialogContent,
@@ -86,7 +86,7 @@ export function ArchiveFarmCard({ farmSlug, isArchived, offeneBestellungen }: Pr
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Hof reaktivieren</CardTitle>
+          <CardTitle className={KARTEN_TITEL}>Hof reaktivieren</CardTitle>
           <CardDescription>Dein Hof ist derzeit stillgelegt.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -103,7 +103,7 @@ export function ArchiveFarmCard({ farmSlug, isArchived, offeneBestellungen }: Pr
     <>
       <Card>
         <CardHeader>
-          <CardTitle>{FARM_ARCHIVE_TITLE}</CardTitle>
+          <CardTitle className={KARTEN_TITEL}>{FARM_ARCHIVE_TITLE}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Ein Absatz wörtlich nach Board s2-/w2-konto-hof (vorher drei); der Erklärtext kommt aus farm-archive.ts. */}

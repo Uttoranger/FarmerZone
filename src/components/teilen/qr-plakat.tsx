@@ -58,16 +58,12 @@ export function QrPlakat({ daten }: { daten: PlakatDaten }): React.JSX.Element {
           <path d={qr.pfad} className="fill-primary-foreground" />
         </svg>
         <p className="text-[2.8cqw] font-semibold break-all">{daten.adresse}</p>
-        <ol className="mt-[1cqw] grid w-full grid-cols-3 gap-[3cqw]">
+        {/* Die drei Schritte fett in einer Zeile, je mit der Zahl davor (Board s2-/w2-whatsapp-plakat Bild 3;
+            Abnahme Lauf 32 „Nummernkreise statt fett in einer Zeile“). Reicht die Breite nicht, bricht die Zeile um. */}
+        <ol className="mt-[1cqw] flex w-full flex-wrap justify-center gap-x-[2.4cqw] gap-y-[1cqw] text-[2.7cqw] leading-snug font-bold">
           {SCHRITTE.map((schritt, i) => (
-            <li key={schritt} className="flex flex-col items-center gap-[1.4cqw] text-[2.5cqw] leading-snug">
-              <span
-                aria-hidden="true"
-                className="flex size-[5cqw] shrink-0 items-center justify-center rounded-full bg-accent text-[2.4cqw] font-bold text-accent-foreground"
-              >
-                {i + 1}
-              </span>
-              {schritt}
+            <li key={schritt} className="whitespace-nowrap">
+              {`${i + 1} ${schritt}`}
             </li>
           ))}
         </ol>

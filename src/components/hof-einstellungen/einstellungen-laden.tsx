@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils'
-import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
 import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
 import { RUNDUNG } from '@/components/ui/rundung'
 
@@ -73,11 +72,9 @@ export function EinstellungenUnterseiteLaden(): React.JSX.Element {
 export function KonditionenLaden(): React.JSX.Element {
   return (
     <div className={cn(EINSTELLUNGEN_RAHMEN, 'animate-pulse')} aria-busy="true">
-      <UnterseitenKopfLaden />
-      <div className="mb-5 md:mb-6">
-        <div className="h-8 w-56 rounded-lg bg-border" />
-        <div className="mt-2 h-4 w-80 max-w-full rounded bg-muted" />
-      </div>
+      {/* Derselbe Werkzeug-Kopf wie die fertige Seite (G1, Nr. 278), darunter der Satz. */}
+      <WerkzeugKopfLaden />
+      <div className="mb-5 h-4 w-80 max-w-full rounded bg-muted md:mb-6" />
       <div className="h-16 rounded-2xl border border-border bg-card" />
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="h-52 rounded-2xl border border-border bg-card" />
