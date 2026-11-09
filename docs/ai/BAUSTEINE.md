@@ -313,6 +313,7 @@ Erfasst sind src/components, src/lib und src/server, eine Zeile je Datei: Pfad �
 ## src/components/produktdetail
 
 - src/components/produktdetail/groessen-anzeige.ts · ausverkauftSatz, groessenAufsteigend, groessenVorrat, preisJeRaummass, raummassZeile · Anzeige-Hilfen der Produktseite nach der Abnahme Lauf 32 (Nr. 252, Liste lauf32-board-oder-code.md, Abschnitt produkt). · genutzt
+- src/components/produktdetail/menge-label.ts · mengeLabelTipp · Ein Tipp auf die Beschriftung „Menge“ der Produktseite (Runde 1 Nr. 271): Das Label umschließt den Mengen-Stepper (ui/stepper.tsx nimmt keine id an, ein htmlFor ginge nicht). · genutzt
 - src/components/produktdetail/produktdetail-kunde.tsx · ProduktdetailKunde · Die Produktseite /[farmSlug]/produkt/[id] (Nachtlauf Nr. 11, Gate 4; Aufbau seit Nr. 235 nach den Boards w1-/s1-produkt). · genutzt
 - src/components/produktdetail/produktdetail-teile.tsx · GleichMitAbholen, Kennzeichnung, ohneDoppelteGehalte · Teile der Produktseite (Nachtlauf Nr. 11, Aufbau seit Nr. 235): „Kennzeichnung" und „Gleich mit abholen". · genutzt
 

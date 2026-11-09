@@ -600,8 +600,11 @@ describe('Produktkarten verlinken auf die Produktseite (Nr. 11)', () => {
 describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
   const FOTOS = [1, 2, 3].map((i) => ({ id: `foto_${i}`, url: `/landing/row-${i}.jpg`, caption: null, sortOrder: i, ausschnitt: null }))
 
-  it('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)" (bei Pause), rechte Spalte, Über uns', () => {
-    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS, isPaused: true } })
+  it.each([
+    ['geöffnet', false],
+    ['pausiert', true],
+  ])('der Quelltext hat die Reihenfolge, die man unter lg sieht: Fotos, Produkte, „Alle Produkte (n)", rechte Spalte, Über uns (%s)', (_, isPaused) => {
+    const html = seite({ farm: { ...HOF, farmPhotos: FOTOS, isPaused } })
     const stellen = [
       html.indexOf('id="fotos"'),
       html.indexOf('id="produkte"'),
@@ -635,13 +638,13 @@ describe('Schaufenster zuerst (Register N5, Nr. 51)', () => {
     expect(seite({ suche: 'reiter=produkte' })).toContain('Blütenhonig')
   })
 
-  it('„Alle Produkte (n)" wechselt in den Reiter Produkte — n ist die Zahl des Reiters; nur bei Pause (Nr. 271)', () => {
-    const html = seite({ farm: { ...HOF, isPaused: true } })
+  it('„Alle Produkte (n)" wechselt in den Reiter Produkte — n ist die Zahl des Reiters; genau EIN solcher Knopf (N5, Nr. 271)', () => {
+    const html = seite()
     expect(html).toMatch(/<a[^>]*href="\/hof-test\?reiter=produkte"[^>]*>Alle Produkte \(5\)</)
     expect(html).toContain('>Produkte · 5<')
-    // Offen kein zweiter Knopf mit demselben Ziel: „Alle ansehen“ über der Liste reicht (Abnahme Lauf 32, hofseite 5).
-    expect(seite()).not.toContain('Alle Produkte (')
-    expect(seite()).toContain('Alle ansehen')
+    // Kein zweiter „Alle Produkte“-Knopf: einmal im Schaufenster, offen wie pausiert.
+    expect(html.match(/>Alle Produkte \(5\)</g)).toHaveLength(1)
+    expect(seite({ farm: { ...HOF, isPaused: true } }).match(/>Alle Produkte \(5\)</g)).toHaveLength(1)
     // Nur in der Übersicht: Im Reiter Produkte steht schon alles.
     expect(seite({ suche: 'reiter=produkte' })).not.toContain('Alle Produkte (')
   })

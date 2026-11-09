@@ -49,7 +49,7 @@ describe('Gleich mit abholen (Board s1-/w1-produkt Bild 2)', () => {
 
 describe('Mengen-Stepper und Warenkorb-Symbol', () => {
   it('der Stepper steht in einem Label mit sichtbarem „Menge“, Pille 48 px und Feld 44 px hoch', () => {
-    expect(quelle).toMatch(/<label className="[^"]*">\s*<span className="[^"]*">Menge<\/span>\s*<Stepper/)
+    expect(quelle).toMatch(/<label className="[^"]*" onClick=\{mengeLabelTipp\}>\s*<span className="[^"]*">Menge<\/span>\s*<Stepper/)
     expect(quelle).toContain('eingabeClassName="h-11 w-11"')
     expect(quelle).toContain('className="[&_[data-slot=stepper-pille]]:h-12"')
   })
