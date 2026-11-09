@@ -6,6 +6,8 @@ import * as Sentry from '@sentry/nextjs'
 import { FehlerAnsicht } from '@/components/shared/fehler-ansicht'
 import { HOF_FEHLER_TEXT, ZU_HEUTE } from '@/lib/fehlerseite'
 import { hofAktiverPunkt, hofNavigation } from '@/lib/bauern-navigation'
+import { WERKZEUG_KOPF_LEISTE, WERKZEUG_KOPF_SPALTE, WERKZEUG_KOPF_TITEL } from '@/components/ui/werkzeug-kopf-stil'
+import { cn } from '@/lib/utils'
 
 /**
  * Der Name des Bereichs, in dem der Fehler kam („Heute“, „Mein Hof“ …) — aus derselben Ordnung wie die Seitenleiste.
@@ -56,10 +58,17 @@ export default function HofFehler({
     <>
       {/* Am Handy der Kopf des Bereichs über der Fehlerkarte (Board s3-fehlerseiten Bild 5; Liste Lauf 32, fehlerseiten
           „Kopf ‚Heute‘ fehlt auf der Hof-Fehlerseite“, Nr. 279): Der Hof soll sehen, wo er ist. Keine Überschrift (die h1
-          ist „Da ist etwas schiefgelaufen“), kein Hofname: Die Grenze lädt nichts — die Zeile „<Hof> · Stand …“ fehlt. */}
+          ist „Da ist etwas schiefgelaufen“), kein Hofname: Die Grenze lädt nichts — die Zeile „<Hof> · Stand …“ fehlt.
+          Leiste und Titel in den Maßen des Werkzeug-Kopfs (werkzeug-kopf-stil.ts): fest oben, 56 px, der Platz davor
+          hält ihre Höhe. Ohne `data-werkzeug-kopf`: Das Layout blendete sonst den Hof-Balken aus, ohne ihn darunter zu zeigen. */}
       {bereich && (
-        <div className="flex min-h-14 items-center border-b border-border bg-card px-4 md:hidden print:hidden">
-          <p className="font-heading text-[20px] leading-tight font-semibold text-foreground">{bereich}</p>
+        <div className="md:hidden print:hidden">
+          <div className="h-14" aria-hidden="true" />
+          <div className={WERKZEUG_KOPF_LEISTE} data-unterseiten-leiste="">
+            <div className={cn(WERKZEUG_KOPF_SPALTE, 'pl-3')}>
+              <p className={WERKZEUG_KOPF_TITEL}>{bereich}</p>
+            </div>
+          </div>
         </div>
       )}
       <FehlerAnsicht

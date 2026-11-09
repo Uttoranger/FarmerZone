@@ -182,7 +182,7 @@ export function FehlerAnsicht({
         <a
           href={meldungLinkMitKennung(fehlernummer, meldenPfad)}
           // 16 px wie die Knöpfe darüber, unterstrichen (Board s3-/w3-fehlerseiten; Abnahme Lauf 32: „Problem melden“ kleiner als im Board).
-          className={cn('inline-flex min-h-11 w-full items-center justify-center rounded-[3px] px-4 text-[16px] font-semibold text-foreground underline underline-offset-4 hover:opacity-80', FOKUS_RAHMEN)}
+          className={cn('inline-flex min-h-11 w-full items-center justify-center rounded-sm px-4 text-[16px] font-semibold text-foreground underline underline-offset-4 hover:opacity-80', FOKUS_RAHMEN)}
         >
           {PROBLEM_MELDEN}
         </a>

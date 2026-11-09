@@ -44,6 +44,7 @@ import HofFehler from '@/app/(hof)/error'
 import { SeiteDrucken } from '@/components/rechtstexte/seite-drucken'
 import { RechtstextVorlage } from '@/components/shared/rechtstext-vorlage'
 import { INFOSEITE_TEXT } from '@/components/shared/infoseite-stil'
+import { WERKZEUG_KOPF_TITEL } from '@/components/ui/werkzeug-kopf-stil'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -143,13 +144,16 @@ describe('fehlerseiten: Kopf des Bereichs auf der Hof-Fehlerseite (Bild 5)', () 
     pfad.jetzt = '/dashboard'
     const html = renderToStaticMarkup(createElement(HofFehler, { error: fehler, reset: () => {} }))
     expect(html).toMatch(/<p class="[^"]*font-heading[^"]*">Heute<\/p>/)
+    // In den Maßen des Werkzeug-Kopfs, ohne data-werkzeug-kopf (der Hof-Balken bleibt).
+    expect(html).toContain(WERKZEUG_KOPF_TITEL)
+    expect(html).not.toContain('data-werkzeug-kopf')
     expect(html.match(/<h1/g)).toHaveLength(1)
     expect(html.indexOf('>Heute</p>')).toBeLessThan(html.indexOf('<h1'))
   })
   it('Gegenprobe: auf einem Pfad außerhalb der Ordnung kein Kopf', () => {
     pfad.jetzt = '/gibt-es-nicht'
     const html = renderToStaticMarkup(createElement(HofFehler, { error: fehler, reset: () => {} }))
-    expect(html).not.toContain('font-heading text-[20px]')
+    expect(html).not.toContain(WERKZEUG_KOPF_TITEL)
   })
 })
 
