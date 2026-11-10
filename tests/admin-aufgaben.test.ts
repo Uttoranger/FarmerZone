@@ -47,6 +47,7 @@ const HOF_WARTET: HofAufgabeRoh = {
   createdAt: vor(27 * STUNDE),
   hofseite: { erledigt: 5, gesamt: 7 },
   stripeBereit: true,
+  stripeAnzeige: 'bereit',
   sepaErteilt: false,
   futter: false,
   lfbis: false,
@@ -91,8 +92,10 @@ const VOLL: AufgabenStand = {
   laeufe: new Map([['von-aussen', { gestartetAm: vor(3 * STUNDE), beendetAm: vor(3 * STUNDE), ok: true, fehlerKlasse: null, dauerMs: 10 }]]),
   bestellstopp: { ab: vor(STUNDE).toISOString(), bis: new Date(JETZT.getTime() + 2 * STUNDE).toISOString(), grund: 'wartung', satz: 'Bestellen geht gleich wieder.' },
   hoefeAktiv: [
-    { id: 'hof-ohne-zeit', name: 'Hof Ohne Zeit', approvedAt: vor(60 * TAG), abholzeitAktiv: false, letzteBestellungAm: vor(TAG) },
-    { id: 'hof-still', name: 'Hof Still', approvedAt: vor(90 * TAG), abholzeitAktiv: true, letzteBestellungAm: vor(16 * TAG) },
+    { id: 'hof-ohne-zeit', name: 'Hof Ohne Zeit', approvedAt: vor(60 * TAG), abholzeitAktiv: false, letzteBestellungAm: vor(TAG), stripeAnzeige: 'bereit', onlineAn: true },
+    { id: 'hof-still', name: 'Hof Still', approvedAt: vor(90 * TAG), abholzeitAktiv: true, letzteBestellungAm: vor(16 * TAG), stripeAnzeige: 'bereit', onlineAn: true },
+    // Register N49: verkauft, will online kassieren, Stripe gibt EPS nicht frei.
+    { id: 'hof-eps', name: 'Hof Eps', approvedAt: vor(30 * TAG), abholzeitAktiv: true, letzteBestellungAm: vor(TAG), stripeAnzeige: 'eps_fehlt', onlineAn: true },
   ],
   // Zwei Felder derselben Bestellung sind EINE Aufgabe (Nr. 191).
   geldAbweichungen: [
@@ -139,6 +142,8 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   // Stichtag vorgezogen (erreicht) — das Signal verschwindet von selbst.
   stripe_live_ohne_hofpreis: { liveSignal: { umgebung: { art: 'produktion', stripe: 'live' }, einstellung: { hofpreisModellAb: vor(STUNDE) }, liveSeit: vor(2 * STUNDE) } },
   widerruf_offen: { widerrufe: [] },
+  // Register N49: Stripe hat freigegeben — die Aufgabe verschwindet von selbst.
+  hof_online_haengt: { hoefeAktiv: VOLL.hoefeAktiv.map((h) => ({ ...h, stripeAnzeige: 'bereit' as const })) },
 }
 
 describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {
@@ -179,6 +184,15 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
     expect(a.frist.ziel).toEqual(new Date(HOF_WARTET.createdAt.getTime() + 48 * STUNDE))
     expect(fristText(a, JETZT)).toBe('Ziel 48 h · noch 21 h')
     expect(a.satz).toBe('Hofseite 5 von 7 · Stripe eingerichtet.')
+    // Register N49: der genaue Grund, wenn Stripe nicht fertig ist.
+    const grund = (stripeAnzeige: HofAufgabeRoh['stripeAnzeige']) =>
+      ADMIN_AUFGABEN.hof_wartet({ ...VOLL, hoefeWartend: [{ ...HOF_WARTET, stripeBereit: false, stripeAnzeige }] }, JETZT)[0].satz
+    expect(grund('kein_konto')).toBe('Hofseite 5 von 7 · Stripe fehlt.')
+    expect(grund('angaben_fehlen')).toBe('Hofseite 5 von 7 · Stripe: Angaben fehlen.')
+    expect(grund('pruefung')).toBe('Hofseite 5 von 7 · Stripe prüft.')
+    expect(grund('eps_fehlt')).toBe('Hofseite 5 von 7 · Stripe: EPS nicht aktiv.')
+    expect(grund('unklar')).toBe('Hofseite 5 von 7 · Stripe: nicht freigegeben, Grund unklar.')
+    expect(grund('gesperrt')).toBe('Hofseite 5 von 7 · Stripe: gesperrt.')
     // Seit Nr. 193 (N32): Freischalten steht in der Akte, nicht mehr im Postfach.
     expect(a.ziel).toBe('/admin/hoefe/hof-wartet')
   })
@@ -233,6 +247,41 @@ describe('Braucht dich: je Quelle da und wieder weg', () => {
     expect(a.seit).toEqual(new Date(vor(16 * TAG).getTime() + 14 * TAG))
     const nie = ADMIN_AUFGABEN.hof_ohne_bestellung({ ...VOLL, hoefeAktiv: [{ ...VOLL.hoefeAktiv[1], approvedAt: vor(13 * TAG), letzteBestellungAm: null }] }, JETZT)
     expect(nie).toHaveLength(0)
+  })
+
+  describe('hof_online_haengt (Register N49): Online-Zahlung eines verkaufenden Hofs hängt bei Stripe', () => {
+    const HOF = VOLL.hoefeAktiv[2]
+    const mit = (teil: Partial<(typeof VOLL.hoefeAktiv)[number]>) => ADMIN_AUFGABEN.hof_online_haengt({ ...VOLL, hoefeAktiv: [{ ...HOF, ...teil }] }, JETZT)
+
+    it.each([
+      ['eps_fehlt', 'Bei Stripe ist EPS nicht aktiv. Im Stripe-Dashboard beim Konto des Hofs nachsehen und EPS anfordern.'],
+      ['unklar', 'Stripe gibt die Online-Zahlung nicht frei, nennt aber keine offene Angabe. Im Stripe-Dashboard nachsehen.'],
+      ['gesperrt', 'Stripe hat das Konto abgelehnt oder gesperrt. Im Stripe-Dashboard nachsehen und den Hof anschreiben.'],
+    ] as const)('%s: genau eine Aufgabe mit Titel, Satz, Bereich „Höfe“, Ziel 24 h, Akte', (stripeAnzeige, satz) => {
+      const aufgaben = mit({ stripeAnzeige })
+      expect(aufgaben).toHaveLength(1)
+      const [a] = aufgaben
+      expect(a.titel).toBe('Online-Zahlung eines Hofs hängt bei Stripe')
+      expect(a.satz).toBe(satz)
+      expect(a.bereich).toBe('Höfe')
+      expect(a.frist.dauerMs).toBe(24 * STUNDE)
+      expect(AUFGABE_ZIEL_MS.hof_online_haengt).toBe(24 * STUNDE)
+      expect(a.wasTun).toBe('hofAnsehen')
+      expect(a.ziel).toBe('/admin/hoefe/hof-eps')
+      expect(a.bezug).toEqual({ kennung: 'hof-eps', text: 'Hof Eps' })
+      // Wie hof_ohne_abholzeit: das Spätere aus Freischaltung und Wochenbeginn.
+      expect(a.seit.toISOString()).toBe('2026-10-25T23:00:00.000Z')
+      // Keine Adresse, keine Stripe-Kennung in Titel, Bezug und Satz.
+      expect(JSON.stringify([a.titel, a.bezug, a.satz])).not.toMatch(/@|acct_/)
+    })
+
+    it.each(['bereit', 'kein_konto', 'pruefung', 'angaben_fehlen'] as const)('%s: keine Aufgabe (der Hof sieht es selbst bzw. alles gut)', (stripeAnzeige) => {
+      expect(mit({ stripeAnzeige })).toEqual([])
+    })
+
+    it('Online aus (Bestandshof vor Z1): keine Aufgabe', () => {
+      expect(mit({ stripeAnzeige: 'gesperrt', onlineAn: false })).toEqual([])
+    })
   })
 
   it('Aufgaben zu einem Hof führen in seine Akte (seit Nr. 187), nicht in einen Listenfilter', () => {

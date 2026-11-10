@@ -5,7 +5,15 @@ import type Stripe from 'stripe'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NEU_EINRICHTEN_KURZ, istUnzugaenglichesStripeKonto, neuEinrichtenSchluessel, stripeKontoBereit } from '@/lib/stripe-konto'
+import {
+  NEU_EINRICHTEN_KURZ,
+  hofStufe,
+  istUnzugaenglichesStripeKonto,
+  neuEinrichtenSchluessel,
+  stripeAnzeige,
+  type HofStripeStufe,
+} from '@/lib/stripe-konto'
+import { schreibeStripeKontoStand } from '@/server/stripe-konto-stand'
 import { meldeAbweichendesKontoLand, vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { STRIPE_LAND, alsLand } from '@/lib/laender'
 import { APP_URL } from '@/lib/umgebung-server'
@@ -118,7 +126,8 @@ export async function createConnectAccount(): Promise<{ error?: string }> {
   if (altesKonto) {
     const { count } = await prisma.farm.updateMany({
       where: { id: farm.id, stripeAccountId: altesKonto },
-      data: { stripeAccountId: account.id, stripeAccountReady: false, acceptsOnline: true },
+      // Der Stand des alten Kontos gilt für das neue nicht (Register N49).
+      data: { stripeAccountId: account.id, stripeAccountReady: false, stripeKontoStand: null, stripeKontoGelesenAm: null, acceptsOnline: true },
     })
     // Ins Server-Protokoll, beide Kennungen mit Hof-ID (weder Geheimnis noch
     // Personendatum): Nur so lässt sich ein ersetztes Konto später noch einem
@@ -177,7 +186,7 @@ export async function createOnboardingLink(): Promise<{ url?: string; error?: st
   return { url: link.url }
 }
 
-export async function checkConnectStatus(): Promise<{ ready: boolean; error?: string; kontoUnbekannt?: true }> {
+export async function checkConnectStatus(): Promise<{ ready: boolean; stufe?: HofStripeStufe; error?: string; kontoUnbekannt?: true }> {
   const farm = await getAuthenticatedFarm()
 
   if (!farm.stripeAccountId) {
@@ -186,6 +195,8 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
 
   const { stripe } = await import('@/lib/stripe')
   let account: Stripe.Account
+  // Der Zeitpunkt VOR dem Lesen (Register N49, src/server/stripe-konto-stand.ts).
+  const gelesenAm = new Date()
   try {
     account = await stripe.accounts.retrieve(farm.stripeAccountId)
   } catch (err) {
@@ -197,17 +208,19 @@ export async function checkConnectStatus(): Promise<{ ready: boolean; error?: st
     zeigeZahlungsstandNeu(farm.slug)
     return { ready: false, kontoUnbekannt: true }
   }
-  // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
-  const ready = stripeKontoBereit(account)
   await meldeAbweichendesKontoLand(farm.id, account.country, alsLand(farm.country))
 
-  await prisma.farm.update({
-    where: { id: farm.id },
-    data: { stripeAccountReady: ready },
+  // Dieselbe Regel und derselbe Schreiber wie account.updated (src/server/stripe-konto-stand.ts).
+  const { bereit, stand } = await schreibeStripeKontoStand({
+    farmId: farm.id,
+    stripeAccountId: farm.stripeAccountId,
+    konto: account,
+    gelesenAm,
   })
 
   revalidatePath('/settings/payments')
-  return { ready }
+  // Die Stufe aus DIESEM Lesen — der Knopf zeigt danach den passenden Toast (oder keinen).
+  return { ready: bereit, stufe: hofStufe(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: bereit, stripeKontoStand: stand })) }
 }
 
 /**

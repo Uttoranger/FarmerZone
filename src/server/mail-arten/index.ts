@@ -21,7 +21,14 @@ import {
   rendereNeuerHof,
   rendereWochenbericht,
 } from '@/server/mail-arten/betreiber'
-import { rendereFreischaltung, rendereLastschriftGescheitert, renderePlattformgebuehrAnkuendigung, renderePostfachAntwort, rendereRundschreiben } from '@/server/mail-arten/hof'
+import {
+  rendereFreischaltung,
+  rendereLastschriftGescheitert,
+  rendereOnlineZahlung,
+  renderePlattformgebuehrAnkuendigung,
+  renderePostfachAntwort,
+  rendereRundschreiben,
+} from '@/server/mail-arten/hof'
 import { rendereAboBestaetigung, rendereBescheid } from '@/server/mail-arten/kundin'
 import { rendereWiderrufAbgelehnt, rendereWiderrufErstattet, rendereWiderrufHof } from '@/server/mail-arten/widerruf'
 
@@ -68,6 +75,7 @@ export const RENDERER: RendererTabelle = {
   'abo-bestaetigung': rendereAboBestaetigung,
   'plattformgebuehr-ankuendigung': renderePlattformgebuehrAnkuendigung,
   'lastschrift-gescheitert': rendereLastschriftGescheitert,
+  'online-zahlung': rendereOnlineZahlung,
   beitrag: rendereBeitrag,
   rundschreiben: rendereRundschreiben,
   bescheid: rendereBescheid,

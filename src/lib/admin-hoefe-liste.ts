@@ -15,6 +15,7 @@
 import { zuletztText } from '@/lib/betrieb'
 import { mitAnzahl } from '@/lib/format'
 import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
+import { stripeGrundAdmin, type StripeAnzeige } from '@/lib/stripe-konto'
 import { freischaltSperre, FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT, FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT, FREISCHALTUNG_PRODUKT_OFFEN_TEXT, FREISCHALTUNG_STRIPE_OFFEN_TEXT } from '@/lib/admin-hoefe'
 import { FREISCHALTUNG_EMAIL_OFFEN_TEXT } from '@/lib/email-bestaetigung'
 import { ADMIN_HOEFE_HREF } from '@/lib/admin-hof-akte'
@@ -73,6 +74,8 @@ export type HofSignal = { id: HofSignalId; text: string }
 export type SignalHof = ZustandHof & {
   emailBestaetigungOffen: boolean
   stripeBereit: boolean
+  /** Der Stand des Stripe-Kontos (Register N49) — der Grund in Signal und freischaltKurz. */
+  stripeAnzeige: StripeAnzeige
   produktImShop: boolean
   abholzeitAktiv: boolean
   /** Hof-E-Mail für die Kundschaft fehlt (Nr. 212) — Teil der Freischalt-Sperre. */
@@ -85,7 +88,8 @@ export type SignalHof = ZustandHof & {
 function freischaltKurz(hof: SignalHof): string {
   const sperre = freischaltSperre(hof)
   if (sperre === FREISCHALTUNG_EMAIL_OFFEN_TEXT) return 'E-Mail nicht bestätigt'
-  if (sperre === FREISCHALTUNG_STRIPE_OFFEN_TEXT) return 'Stripe fehlt'
+  // Der genaue Grund (Register N49): fehlt, Angaben fehlen, prüft, EPS, gesperrt …
+  if (sperre === FREISCHALTUNG_STRIPE_OFFEN_TEXT) return stripeGrundAdmin(hof.stripeAnzeige)
   if (sperre === FREISCHALTUNG_PRODUKT_OFFEN_TEXT) return 'kein Produkt im Shop'
   if (sperre === FREISCHALTUNG_ABHOLZEIT_OFFEN_TEXT) return 'Abholzeit fehlt'
   if (sperre === FREISCHALTUNG_HOF_EMAIL_OFFEN_TEXT) return HOF_EMAIL_TEXT.akteFehlt
@@ -102,7 +106,8 @@ export function hofSignale(hof: SignalHof, jetzt: Date): HofSignal[] {
   if (zustand.id === 'wartet') return [{ id: 'wartet', text: freischaltKurz(hof) }]
   if (zustand.id !== 'verkauft') return []
   const signale: HofSignal[] = []
-  if (!hof.stripeBereit) signale.push({ id: 'stripe-fehlt', text: 'Stripe fehlt' })
+  // Kennung bleibt 'stripe-fehlt' (Filter); der Text nennt den Grund (Register N49).
+  if (!hof.stripeBereit) signale.push({ id: 'stripe-fehlt', text: stripeGrundAdmin(hof.stripeAnzeige) })
   if (!hof.abholzeitAktiv) signale.push({ id: 'ohne-abholzeit', text: 'ohne Abholzeit' })
   const grenze = jetzt.getTime() - OHNE_BESTELLUNG_TAGE * TAG_MS
   // Erst wer länger als die Frist freigeschaltet ist, kann „lange ohne Bestellung“ sein.

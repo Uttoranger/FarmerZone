@@ -21,6 +21,7 @@ import {
 import { PLATTFORM_EINSTELLUNG_ID, PLATTFORM_EINSTELLUNG_SELECT, gruendungEinstellungAus, plattformEinstellungAus } from '@/lib/plattform-einstellung'
 import { IM_SHOP_WHERE } from '@/server/queries/einstellungen'
 import { AKTIVITAET_TAGE } from '@/lib/admin-hoefe-liste'
+import { stripeAnzeige, type StripeAnzeige } from '@/lib/stripe-konto'
 
 /**
  * Die Monatsspalten je Hof (Sprint servicegebuehr, E-3) — das Fundament der
@@ -79,6 +80,8 @@ export type AdminFarmRow = {
   monatBezeichnung: string
   /** Stripe-Konto fertig (Farm.stripeAccountReady) — Bedingung fürs Freischalten für jeden Hof (Register Z1). */
   stripeBereit: boolean
+  /** Der Stand des Stripe-Kontos für den Grund (stripeGrundAdmin, Register N49) — nie die Kennung. */
+  stripeAnzeige: StripeAnzeige
   /** Farm.acceptsOnline — nur für das Kennzeichen „Online-Zahlung aus" (Bestandshöfe vor Z1); das Freischalten fragt es nicht. */
   onlineAn: boolean
   /** Bestellungen pausiert (Urlaubsmodus) — nur für Status und Filter der Liste. */
@@ -253,8 +256,10 @@ export async function getAdminFarms(
         serviceFeeMinCents: true,
         serviceFeeActiveFrom: true,
         // Nr. 22f: Status, Freischalt-Sperre und Anzeige der Liste. Die
-        // Stripe-Kennung selbst verlässt diese Funktion nicht.
+        // Stripe-Kennung selbst verlässt diese Funktion nicht (nur als Wahrheitswert, Register N49).
         stripeAccountReady: true,
+        stripeAccountId: true,
+        stripeKontoStand: true,
         acceptsOnline: true,
         isPaused: true,
         betriebsnummer: true,
@@ -330,6 +335,7 @@ export async function getAdminFarms(
     monat: spalten.get(f.id) ?? MONAT_LEER,
     monatBezeichnung: monat.bezeichnung,
     stripeBereit: f.stripeAccountReady === true,
+    stripeAnzeige: stripeAnzeige({ stripeKontoDa: f.stripeAccountId !== null, stripeAccountReady: f.stripeAccountReady === true, stripeKontoStand: f.stripeKontoStand }),
     onlineAn: f.acceptsOnline !== false,
     isPaused: f.isPaused === true,
     betriebsnummer: nummerAnzeige(f.betriebsnummer ?? null),

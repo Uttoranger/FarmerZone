@@ -256,6 +256,29 @@ describe('zahlungHinweis — eine Karte oben auf /settings/payments', () => {
     expect(zahlungHinweis({ rueckmeldung: undefined, stripeBereit: false, onlineAn: true, stripeKontoDa: true })).toBe('einrichten')
   })
 
+  it('Register N49: wartet der Hof auf Stripe, sagt die Karte das — der Stand geht vor ?stripe=pending', () => {
+    const offen = { stripeBereit: false, onlineAn: true, stripeKontoDa: true }
+    expect(zahlungHinweis({ rueckmeldung: undefined, ...offen, stufe: 'pruefung' })).toBe('pruefung')
+    expect(zahlungHinweis({ rueckmeldung: undefined, ...offen, stufe: 'noch_nicht' })).toBe('noch-nicht')
+    expect(zahlungHinweis({ rueckmeldung: undefined, ...offen, stufe: 'gesperrt' })).toBe('gesperrt')
+    expect(zahlungHinweis({ rueckmeldung: 'pending', ...offen, stufe: 'pruefung' })).toBe('pruefung')
+    expect(zahlungHinweis({ rueckmeldung: 'success', ...offen, stufe: 'pruefung' })).toBe('pruefung')
+    // Angaben fehlen: wie bisher.
+    expect(zahlungHinweis({ rueckmeldung: undefined, ...offen, stufe: 'angaben_fehlen' })).toBe('einrichten')
+    expect(zahlungHinweis({ rueckmeldung: 'pending', ...offen, stufe: 'angaben_fehlen' })).toBe('fortsetzen')
+  })
+
+  it('Register N49: ?stripe=error und ?stripe=neu mit Konto gehen jedem Stand vor; „geschafft“ nur bei bereit', () => {
+    const offen = { stripeBereit: false, onlineAn: true, stripeKontoDa: true }
+    for (const stufe of ['pruefung', 'noch_nicht', 'gesperrt'] as const) {
+      expect(zahlungHinweis({ rueckmeldung: 'error', ...offen, stufe })).toBe('fehler')
+      expect(zahlungHinweis({ rueckmeldung: 'neu', ...offen, stufe })).toBe('neu-einrichten')
+    }
+    expect(zahlungHinweis({ rueckmeldung: 'success', stripeBereit: true, onlineAn: true, stripeKontoDa: true, stufe: 'bereit' })).toBe('geschafft')
+    // Ohne Konto zählt eine Stufe nicht.
+    expect(zahlungHinweis({ rueckmeldung: undefined, stripeBereit: false, onlineAn: true, stripeKontoDa: false, stufe: 'pruefung' })).toBe('einrichten')
+  })
+
   it('die Seite fragt die Regel und zeigt „Verbunden und aktiv" nur mit Online an', () => {
     const seite = quelle('src/app/(hof)/settings/payments/page.tsx')
     expect(seite).toContain('zahlungHinweis(')
@@ -329,6 +352,22 @@ describe('einstellungenBereiche', () => {
     expect(halb.zeile).toContain('noch nicht fertig')
     const ohne = bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeKontoDa: false }), VOR_STICHTAG), 'zahlung')
     expect(ohne).toMatchObject({ ton: 'offen', zeile: 'Online-Zahlung noch nicht eingerichtet · bitte einrichten' })
+  })
+
+  it('Zahlung, Register N49: die Zeile je Stufe — wartet der Hof, sagt sie das; Angaben fehlen bleibt wie bisher', () => {
+    const zeile = (stripeStufe: 'pruefung' | 'noch_nicht' | 'gesperrt' | 'angaben_fehlen') =>
+      bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeStufe }), VOR_STICHTAG), 'zahlung')
+    expect(zeile('pruefung')).toMatchObject({ ton: 'offen', zeile: 'Stripe prüft deine Angaben · du musst nichts tun' })
+    expect(zeile('noch_nicht')).toMatchObject({ ton: 'offen', zeile: 'Stripe hat noch nicht ganz freigegeben · wir kümmern uns darum' })
+    expect(zeile('gesperrt')).toMatchObject({ ton: 'offen', zeile: 'Online-Zahlung bei Stripe gesperrt · schreib uns' })
+    expect(zeile('angaben_fehlen').zeile).toBe('Stripe-Einrichtung noch nicht fertig · bitte abschließen')
+    // Ohne Konto zählt eine Stufe nicht; mit fertigem Stripe auch nicht.
+    expect(bereich(einstellungenBereiche(daten({ stripeBereit: false, stripeKontoDa: false, stripeStufe: 'kein_konto' }), VOR_STICHTAG), 'zahlung').zeile).toBe(
+      'Online-Zahlung noch nicht eingerichtet · bitte einrichten'
+    )
+    expect(bereich(einstellungenBereiche(daten({ stripeBereit: true, stripeStufe: 'bereit' }), VOR_STICHTAG), 'zahlung').zeile).toContain(
+      'Online-Zahlung über Stripe aktiv'
+    )
   })
 
   it('Zahlung: Bestandshof mit Online aus (früher „nur bar") ist orange und soll Stripe einrichten — kein „ist aus" (Z1)', () => {

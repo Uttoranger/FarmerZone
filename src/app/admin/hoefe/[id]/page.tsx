@@ -89,6 +89,7 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
               anmeldungGekuerzt: maskiereAdresse(geladen.akte.hof.owner.email),
               emailBestaetigt: geladen.hof.emailBestaetigtText,
               stripeBereit: geladen.hof.stripeBereit,
+              stripeAnzeige: geladen.hof.stripeAnzeige,
               onlineAn: geladen.hof.onlineAn,
               ich,
               ...gebuehr,

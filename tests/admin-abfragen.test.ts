@@ -49,6 +49,8 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
     serviceFeeMinCents: 50,
     serviceFeeActiveFrom: null,
     stripeAccountReady: false,
+    stripeAccountId: null,
+    stripeKontoStand: null,
     acceptsOnline: true,
     isPaused: false,
     betriebsnummer: '  ',
@@ -64,12 +66,21 @@ function dbZeile(ueber: Record<string, unknown> = {}) {
 }
 
 describe('getAdminFarms — Nr. 22f', () => {
-  it('wählt Stripe, Pause, Betriebsnummer und SEPA aus — nie die Stripe-Kennung', async () => {
-    farmFindMany.mockResolvedValue([dbZeile()] as never)
-    await getAdminFarms()
+  it('wählt Stripe, Pause, Betriebsnummer und SEPA aus — die Stripe-Kennung verlässt die Funktion nie', async () => {
+    // Register N49 (A012): Die Kennung wird gelesen, aber nur als Wahrheitswert weitergegeben (stripeAnzeige).
+    farmFindMany.mockResolvedValue([dbZeile({ stripeAccountId: 'acct_platzhalter_123', stripeKontoStand: 'eps_fehlt' })] as never)
+    const [hof] = await getAdminFarms()
     const select = (farmFindMany.mock.calls[0][0] as { select: Record<string, unknown> }).select
-    expect(select).toMatchObject({ stripeAccountReady: true, acceptsOnline: true, isPaused: true, betriebsnummer: true, sepaMandatAm: true })
-    expect(select.stripeAccountId).toBeUndefined()
+    expect(select).toMatchObject({ stripeAccountReady: true, stripeKontoStand: true, acceptsOnline: true, isPaused: true, betriebsnummer: true, sepaMandatAm: true })
+    expect(hof.stripeAnzeige).toBe('eps_fehlt')
+    expect(Object.keys(hof)).not.toContain('stripeAccountId')
+    expect(JSON.stringify(hof)).not.toContain('acct_')
+  })
+
+  it('ohne Kennung: Anzeige kein_konto', async () => {
+    farmFindMany.mockResolvedValue([dbZeile({ stripeAccountId: null, stripeKontoStand: null })] as never)
+    const [hof] = await getAdminFarms()
+    expect(hof.stripeAnzeige).toBe('kein_konto')
   })
 
   it('macht daraus Wahrheitswerte und eine angezeigte Nummer', async () => {

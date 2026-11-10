@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { STRIPE_LIVE_AB } from '@/lib/umgebung-server'
 import { wienKalendertag } from '@/lib/kalender'
@@ -30,6 +31,8 @@ import {
   wochenBalken,
   wochenvergleich,
 } from '@/lib/heute'
+import { onlineZahlungPausiert, type HofPausiertStufe } from '@/lib/stripe-konto'
+import { HOF_FUER_GEBUEHR_LAGE, ladeBarMoeglich, type HofFuerGebuehrLage } from '@/server/queries/plattform-einstellung'
 import { auswerten, umsatzfenster } from '@/lib/umsatz'
 import { umsatzBuchungen } from '@/server/queries/umsatz'
 import { statusReminder } from '@/lib/dashboard-hints'
@@ -81,7 +84,7 @@ export type Heute = {
    * Der Hof will online kassieren, Stripe lässt es gerade nicht zu — dann der
    * Hinweis mit dem Weg zu Stripe; `barMoeglich` wählt den Satz.
    */
-  onlinePausiert: { barMoeglich: boolean } | null
+  onlinePausiert: { barMoeglich: boolean; stufe: HofPausiertStufe } | null
   /** Freigeschaltet ohne fertiges Stripe (Register Z1, stripeEinrichtenHinweis): Hinweis „Online-Zahlung einrichten". */
   stripeEinrichten: boolean
   /**
@@ -98,6 +101,32 @@ export type Heute = {
   hof: { sichtbar: boolean; approvedAt: Date | null; teilenMomenteAus: boolean }
   /** Bis zu drei Produkte im Shop mit Bestand, in der Reihenfolge des Hofs. */
   angebot: string[]
+}
+
+/**
+ * Geht bar bei diesem Hof JETZT (Register N49, [BAR] im Stripe-Hinweis)?
+ * Gefragt wird nur, wenn der Hinweis steht und der Hof sichtbar ist und bar
+ * annimmt — sonst ist die Antwort ohnehin nein. Scheitert das Lesen: nein
+ * (die vorsichtige Fassung des Satzes), gemeldet an Sentry ohne Daten.
+ */
+async function barJetztFuerHinweis(
+  hof: HofFuerGebuehrLage & Parameters<typeof onlineZahlungPausiert>[0] & Parameters<typeof heuteHofSichtbar>[0] & { acceptsOnsite: boolean },
+  jetzt: Date
+): Promise<boolean> {
+  if (!onlineZahlungPausiert(hof) || !heuteHofSichtbar(hof) || !hof.acceptsOnsite) return false
+  try {
+    return await ladeBarMoeglich(hof, jetzt)
+  } catch (err) {
+    // Nur die Art des Fehlers: Ein Datenbanktext kann Kennungen tragen.
+    try {
+      const meldung = new Error('Heute: ob bar geht, nicht geladen')
+      meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+      Sentry.captureException(meldung, { level: 'warning', tags: { bereich: 'heute', teil: 'stripe-hinweis-bar' } })
+    } catch {
+      // Telemetrie scheitert leise.
+    }
+    return false
+  }
 }
 
 export async function getHeute(
@@ -199,8 +228,12 @@ export async function getHeute(
             sectionsConfig: true,
             stripeAccountReady: true,
             stripeAccountId: true,
+            // Der grobe Stand für den Stripe-Hinweis (Register N49).
+            stripeKontoStand: true,
             acceptsOnline: true,
             acceptsOnsite: true,
+            // Ob bar jetzt wirklich geht (ladeBarMoeglich) — dieselben Spalten wie Kasse und /api/checkout.
+            ...HOF_FUER_GEBUEHR_LAGE,
             approvedAt: true,
             archivedAt: true,
             isActive: true,
@@ -256,7 +289,7 @@ export async function getHeute(
   // „pausiert" (Notbremse) oder „einrichten" (Register Z1) — nie beide; der eine
   // Kasten oben auf der Seite (heuteAufbau) und der Grund, die Online-Zahlung
   // nicht noch einmal in „Zu tun" zu nennen.
-  const onlinePausiert = hof ? onlinePausiertDaten(hof) : null
+  const onlinePausiert = hof ? onlinePausiertDaten(hof, await barJetztFuerHinweis(hof, jetzt)) : null
   const stripeEinrichten = hof ? stripeEinrichtenHinweis(hof) : false
   const stripeImKasten = onlinePausiert !== null || stripeEinrichten
 

@@ -81,6 +81,11 @@ export const DB_BREMSEN = {
   // Tag nach Sentry — über alle Instanzen, Merkmal ist die Hof-ID. Ein Tag ist
   // hier ein festes 24-Stunden-Fenster (UTC), für eine Drossel genügt das.
   stripeKontoUnbekannt: { zweck: 'stripe-konto-unbekannt', max: 1, fensterMs: TAG_MS },
+  // Drossel ohne erste Stufe (Register N49, A012): Nachricht und Mail an den
+  // Hof zum Stripe-Konto („Online-Zahlung ist aktiv“, „Stripe braucht noch
+  // Angaben“) höchstens einmal je Hof und Anlass im festen 24-Stunden-Fenster.
+  // Merkmal `<anlass>:<farmId>`; scheitert die Zählung, wird geschickt.
+  stripeKontoNachricht: { zweck: 'stripe-konto-nachricht', max: 1, fensterMs: TAG_MS },
   // Neuigkeiten auf der Bestätigungsseite (Nr. 46, Runde 1): je Bestellung und
   // Tag. Ohne erste Stufe — die Grenze schützt das Postfach hinter der
   // Bestellung, nicht den Server (src/lib/abo-bestaetigung.ts).

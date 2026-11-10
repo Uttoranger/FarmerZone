@@ -85,8 +85,9 @@ describe('Beispiele: jede Art der Boards', () => {
   it('die Liste deckt alle sechs Boards, jede Kennung genau einmal', () => {
     expect(new Set(MAIL_BEISPIEL_IDS).size).toBe(MAIL_BEISPIELE.length)
     expect(new Set(MAIL_BEISPIELE.map((b) => b.gruppe))).toEqual(new Set(BEISPIEL_GRUPPEN.map((g) => g.id)))
-    // 30 Bilder auf den Boards mail-zugang (4), -sicherheit (6), -team (5), -betrieb (6), -hof-konto (5), -neuigkeiten (4)
-    expect(MAIL_BEISPIELE.length).toBe(30)
+    // 30 Bilder auf den Boards mail-zugang (4), -sicherheit (6), -team (5), -betrieb (6), -hof-konto (5), -neuigkeiten (4),
+    // dazu „Online-Zahlung (Stripe)“ in hof-konto (A012, Register N49 — kein Board-Bild, Beispiel wie die übrigen Hof-Mails)
+    expect(MAIL_BEISPIELE.length).toBe(31)
   })
 
   it.each(MAIL_BEISPIEL_IDS)('%s: Betreff und HTML, keine echte Adresse, kein Code außer Nullen, kein Link', async (id) => {

@@ -25,6 +25,7 @@ export function hofRohdaten(teil: Partial<HofRohdaten> = {}): HofRohdaten {
     monat: { bestellungen: 0, gebuehrOnlineCents: 0, gebuehrBarCents: 0, gebuehrEntfallenCents: 0 },
     monatBezeichnung: 'Oktober 2026',
     stripeBereit: false,
+    stripeAnzeige: 'kein_konto',
     onlineAn: true,
     isPaused: false,
     betriebsnummer: null,

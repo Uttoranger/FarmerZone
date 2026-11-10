@@ -16,6 +16,7 @@ import type { GebuehrModell, GebuehrWort } from '@/lib/plattformgebuehr'
 import type { AdminAktionArt } from '@/schemas/admin-aktion'
 import { agbAkteText } from '@/lib/agb-zustimmung'
 import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
+import { stripeGrundAdmin, type StripeAnzeige } from '@/lib/stripe-konto'
 
 export const ADMIN_HOEFE_HREF = '/admin/hoefe'
 
@@ -172,6 +173,8 @@ export function zustandZeilen(stand: {
   isPaused: boolean
   gesperrt: boolean
   stripeBereit: boolean
+  /** Der Stand des Stripe-Kontos (Register N49); fehlt er, wie bisher. */
+  stripeAnzeige?: StripeAnzeige
   onlineAn: boolean
   erstattungenOffen: number
 }): ZustandZeile[] {
@@ -184,10 +187,11 @@ export function zustandZeilen(stand: {
   const pause = stand.gesperrt
     ? zeile('Pause', `${stand.isPaused ? 'ja' : 'nein'} · vom Team gesperrt`, 'achtung')
     : zeile('Pause', stand.isPaused ? 'ja' : 'nein', stand.isPaused ? 'neutral' : 'ok')
+  // Der genaue Grund nur für das Team (Register N49): fehlt, Angaben fehlen, prüft, EPS, gesperrt …
   const online = !stand.stripeBereit
-    ? zeile('Online-Zahlung', 'Stripe fehlt', 'achtung')
+    ? zeile('Online-Zahlung', stripeGrundAdmin(stand.stripeAnzeige ?? 'kein_konto'), 'achtung')
     : stand.onlineAn
-      ? zeile('Online-Zahlung', 'Stripe eingerichtet', 'ok')
+      ? zeile('Online-Zahlung', stripeGrundAdmin('bereit'), 'ok')
       : zeile('Online-Zahlung', 'vom Hof ausgeschaltet', 'neutral')
   const fragen =
     stand.erstattungenOffen > 0
@@ -232,6 +236,8 @@ export const PROTOKOLL_ART_TEXT: Partial<Record<AdminAktionArt, string>> = {
   lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
   lastschrift_gescheitert: 'Lastschrift gescheitert',
   lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
+  online_zahlung_aktiv: 'Online-Zahlung aktiv (Stripe)',
+  online_zahlung_pausiert: 'Online-Zahlung pausiert (Stripe)',
 }
 
 export function protokollArtText(art: string): string {
@@ -317,6 +323,8 @@ export function hofAkteAnsicht(
     anmeldungGekuerzt: string
     emailBestaetigt: string
     stripeBereit: boolean
+    /** Der Stand des Stripe-Kontos (Register N49). */
+    stripeAnzeige: StripeAnzeige
     onlineAn: boolean
     ich: string
     /** Das Wort der Gebühr über die 30 Tage der Aktivität: `gebuehrWortFuerZeitraum(aktivitaetSeit(jetzt), jetzt, Stichtag)`. */
@@ -354,6 +362,7 @@ export function hofAkteAnsicht(
       isPaused: roh.hof.isPaused,
       gesperrt: roh.hof.adminGesperrtAm !== null,
       stripeBereit: zusatz.stripeBereit,
+      stripeAnzeige: zusatz.stripeAnzeige,
       onlineAn: zusatz.onlineAn,
       erstattungenOffen: roh.erstattungenOffen,
     }),

@@ -14,7 +14,7 @@ import { formatSlotTime } from '@/lib/pickup-days'
 import { formatEuro, formatTagKurz, mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
-import { onlineZahlungPausiert } from '@/lib/stripe-konto'
+import { hofStufe, onlineZahlungPausiert, stripeAnzeige, type HofPausiertStufe } from '@/lib/stripe-konto'
 import type { MarkeArt } from '@/lib/marke-art'
 import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
@@ -589,18 +589,24 @@ export function naechsteAbholungPapier(fenster: NaechstesFenster, heuteKalendert
 export const HEUTE_KEINE_BESTELLUNGEN = 'Noch keine Bestellungen'
 
 /**
- * Was der Hinweis „Online-Zahlung ist pausiert" braucht (Register F4) — oder
- * null, wenn er nicht steht (onlineZahlungPausiert). „Nur bar bei Abholung"
+ * Was der Stripe-Hinweis auf Heute braucht (Register F4, N49) — oder null,
+ * wenn er nicht steht (onlineZahlungPausiert). „Nur bar bei Abholung"
  * verspricht, dass Kunden bestellen können: Das gilt nur, solange sie den Hof
- * sehen und bei ihm bestellen können (heuteHofSichtbar) und er bar annimmt.
- * Ein wartender, stillgelegter oder pausierter Hof bekommt die zweite
- * Fassung des Satzes, der Wortlaut bleibt (Nachbesserung Runde 2).
+ * sehen und bei ihm bestellen können (heuteHofSichtbar), er bar annimmt UND
+ * bar jetzt wirklich geht (`barJetzt` von außen: ladeBarMoeglich, dieselbe
+ * Quelle wie Kasse und Zahlungsseite — Mandat, Einzugsbeginn, Sperre; N38).
+ * Sonst die zweite Fassung des Satzes. `stufe` wählt Titel, Satz und Knopf.
  */
 export function onlinePausiertDaten(
-  hof: Parameters<typeof heuteHofSichtbar>[0] & Parameters<typeof onlineZahlungPausiert>[0] & { acceptsOnsite: boolean }
-): { barMoeglich: boolean } | null {
+  hof: Parameters<typeof heuteHofSichtbar>[0] &
+    Parameters<typeof onlineZahlungPausiert>[0] & { acceptsOnsite: boolean; stripeKontoStand: string | null },
+  barJetzt: boolean
+): { barMoeglich: boolean; stufe: HofPausiertStufe } | null {
   if (!onlineZahlungPausiert(hof)) return null
-  return { barMoeglich: heuteHofSichtbar(hof) && hof.acceptsOnsite }
+  const stufe = hofStufe(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: hof.stripeAccountReady, stripeKontoStand: hof.stripeKontoStand }))
+  // Mit Konto und nicht bereit gibt es weder „kein Konto“ noch „bereit“ — sicherheitshalber wie bisher.
+  const pausiert: HofPausiertStufe = stufe === 'kein_konto' || stufe === 'bereit' ? 'angaben_fehlen' : stufe
+  return { barMoeglich: heuteHofSichtbar(hof) && hof.acceptsOnsite && barJetzt, stufe: pausiert }
 }
 
 /**

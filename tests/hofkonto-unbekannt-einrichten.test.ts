@@ -39,6 +39,8 @@ vi.mock('@/lib/stripe', () => ({
     accountLinks: { create: vi.fn() },
   },
 }))
+// Der eine Schreiber des Kontostands (Register N49) — eigene Tests (tests/integration/stripe-konto.int.test.ts).
+vi.mock('@/server/stripe-konto-stand', () => ({ schreibeStripeKontoStand: vi.fn() }))
 vi.mock('@/server/hofkonto-unbekannt', () => ({
   vermerkeUnbekanntesHofKonto: vi.fn(async () => undefined),
   meldeAbweichendesKontoLand: vi.fn(async () => undefined),
@@ -49,6 +51,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import { vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
+import { schreibeStripeKontoStand } from '@/server/stripe-konto-stand'
 import { NEU_EINRICHTEN_FENSTER_MS, NEU_EINRICHTEN_KURZ } from '@/lib/stripe-konto'
 import {
   checkConnectStatus,
@@ -138,12 +141,28 @@ describe('„Status prüfen" (checkConnectStatus)', () => {
     expect(vermerk).not.toHaveBeenCalled()
   })
 
-  it('Gegenprobe: ein bekanntes Konto schreibt den Stand wie bisher', async () => {
-    vi.mocked(stripe.accounts.retrieve).mockResolvedValue({ id: ALT, charges_enabled: true, payouts_enabled: true } as never)
+  it('Gegenprobe: ein bekanntes Konto schreibt den Stand über den einen Schreiber', async () => {
+    const konto = {
+      id: ALT,
+      charges_enabled: true,
+      payouts_enabled: true,
+      details_submitted: true,
+      capabilities: { card_payments: 'active', transfers: 'active', eps_payments: 'active' },
+    }
+    vi.mocked(stripe.accounts.retrieve).mockResolvedValue(konto as never)
+    vi.mocked(schreibeStripeKontoStand).mockResolvedValue({ bereit: true, stand: 'bereit' })
 
-    expect(await checkConnectStatus()).toEqual({ ready: true })
-    expect(farmUpdate).toHaveBeenCalledWith({ where: { id: 'farm_1' }, data: { stripeAccountReady: true } })
+    expect(await checkConnectStatus()).toEqual({ ready: true, stufe: 'bereit' })
+    expect(schreibeStripeKontoStand).toHaveBeenCalledWith({ farmId: 'farm_1', stripeAccountId: ALT, konto, gelesenAm: expect.any(Date) })
+    expect(farmUpdate).not.toHaveBeenCalled()
     expect(vermerk).not.toHaveBeenCalled()
+  })
+
+  it('nicht bereit: die Stufe für den Hof kommt mit (eps_fehlt heißt für ihn „noch nicht“)', async () => {
+    vi.mocked(stripe.accounts.retrieve).mockResolvedValue({ id: ALT } as never)
+    vi.mocked(schreibeStripeKontoStand).mockResolvedValue({ bereit: false, stand: 'eps_fehlt' })
+
+    expect(await checkConnectStatus()).toEqual({ ready: false, stufe: 'noch_nicht' })
   })
 })
 
@@ -184,7 +203,8 @@ describe('„Online-Zahlung neu einrichten" (createConnectAccount mit gespeicher
     expect(stripe.accounts.create).toHaveBeenCalledTimes(1)
     expect(farmUpdateMany).toHaveBeenCalledWith({
       where: { id: 'farm_1', stripeAccountId: ALT },
-      data: { stripeAccountId: NEU, stripeAccountReady: false, acceptsOnline: true },
+      // Der Stand des alten Kontos gilt für das neue nicht (Register N49).
+      data: { stripeAccountId: NEU, stripeAccountReady: false, stripeKontoStand: null, stripeKontoGelesenAm: null, acceptsOnline: true },
     })
     expect(farmUpdate).not.toHaveBeenCalled()
   })

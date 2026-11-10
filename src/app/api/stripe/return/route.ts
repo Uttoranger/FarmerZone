@@ -3,7 +3,8 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { istUnzugaenglichesStripeKonto, stripeKontoBereit } from '@/lib/stripe-konto'
+import { istUnzugaenglichesStripeKonto } from '@/lib/stripe-konto'
+import { schreibeStripeKontoStand } from '@/server/stripe-konto-stand'
 import { meldeAbweichendesKontoLand, vermerkeUnbekanntesHofKonto } from '@/server/hofkonto-unbekannt'
 import { alsLand } from '@/lib/laender'
 
@@ -32,17 +33,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Der Zeitpunkt VOR dem Lesen (Register N49): Ein Schreiber, der früher
+    // gelesen hat, überschreibt nie einen, der später gelesen hat.
+    const gelesenAm = new Date()
     const account = await stripe.accounts.retrieve(accountId)
-    // Dieselbe Regel wie account.updated (src/lib/stripe-konto.ts).
-    const ready = stripeKontoBereit(account)
     await meldeAbweichendesKontoLand(farm.id, account.country, alsLand(farm.country))
 
-    await prisma.farm.update({
-      where: { id: farm.id },
-      data: { stripeAccountReady: ready },
-    })
+    // Dieselbe Regel und derselbe Schreiber wie account.updated (src/server/stripe-konto-stand.ts).
+    const { bereit } = await schreibeStripeKontoStand({ farmId: farm.id, stripeAccountId: accountId, konto: account, gelesenAm })
 
-    const status = ready ? 'success' : 'pending'
+    const status = bereit ? 'success' : 'pending'
     return NextResponse.redirect(new URL(`/settings/payments?stripe=${status}`, request.url))
   } catch (err) {
     // Stripe kennt das Konto nicht oder verweigert den Zugriff (Register Z2):

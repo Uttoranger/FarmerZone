@@ -16,13 +16,16 @@ import { datumKurz } from '@/lib/verkauf-eintragen'
 import { einstellungKurz, kalendertagInWien } from '@/lib/servicegebuehr'
 import { MINDESTGEBUEHR_KEINE_ZAHL } from '@/schemas/servicegebuehr'
 import type { FreischaltHinweis } from '@/lib/gruendungshof'
+import type { StripeAnzeige } from '@/lib/stripe-konto'
 
 /**
  * Jeder Hof braucht vor dem Freischalten ein fertiges Stripe-Konto (Register
- * Z1, Mockup: „Stripe fehlt – Freischalten erst nach Stripe möglich"). Die
- * Sperre sitzt in approveFarmAction; hier steht nur, warum der Knopf ruht.
+ * Z1). Die Sperre sitzt in approveFarmAction; hier steht nur, warum der Knopf
+ * ruht. Wortlaut seit A012 (Fund 19, Koordinator 09.11.2026; Abweichung vom
+ * Mockup „Stripe fehlt – …“): Ein Konto kann da sein und trotzdem nicht fertig
+ * — den genauen Grund nennt stripeGrundAdmin (Register N49).
  */
-export const FREISCHALTUNG_STRIPE_OFFEN_TEXT = 'Stripe fehlt – Freischalten erst nach Stripe möglich.'
+export const FREISCHALTUNG_STRIPE_OFFEN_TEXT = 'Stripe ist noch nicht fertig – Freischalten erst danach möglich.'
 
 /** Register K2, Änderung Nr. 116: Freischalten erst mit mindestens einem Produkt im Shop (Wortlaut der Freigabe). */
 export const FREISCHALTUNG_PRODUKT_OFFEN_TEXT = 'Noch kein Produkt im Shop – Freischalten erst mit mindestens einem Produkt.'
@@ -77,8 +80,12 @@ export function freischaltSperre(hof: {
   return null
 }
 
-/** Das Kennzeichen für freigeschaltete Höfe ohne Stripe (Z1) — Marke und Filter. */
-export const STRIPE_FEHLT_TEXT = 'Stripe fehlt'
+/**
+ * Das Kennzeichen für freigeschaltete Höfe ohne fertiges Stripe (Z1) — Marke
+ * und Filter. Seit A012 (Fund 19) „nicht fertig“ statt „fehlt“: Das Konto kann
+ * da sein und bei Stripe hängen. Die Kennung 'stripe-fehlt' bleibt.
+ */
+export const STRIPE_FEHLT_TEXT = 'Stripe nicht fertig'
 
 /**
  * Ein freigeschalteter Hof ohne fertiges Stripe-Konto (Register Z1): Er bleibt
@@ -297,6 +304,8 @@ export type HofRohdaten = {
   monat: { bestellungen: number; gebuehrOnlineCents: number; gebuehrBarCents: number; gebuehrEntfallenCents: number }
   monatBezeichnung: string
   stripeBereit: boolean
+  /** Der Stand des Stripe-Kontos für den Grund (stripeGrundAdmin, Register N49) — nie die Kennung. */
+  stripeAnzeige: StripeAnzeige
   /** Farm.acceptsOnline — false nur bei Bestandshöfen aus der Zeit vor Register Z1. */
   onlineAn: boolean
   isPaused: boolean
@@ -350,6 +359,8 @@ export type AdminHofZeile = {
   /** Der Satz zur Gründung im Freischalt-Dialog (Platz und Ende bzw. warum keiner) — null ohne Satz. */
   freischaltHinweis: FreischaltHinweis | null
   stripeBereit: boolean
+  /** Der Stand des Stripe-Kontos (Register N49): Marke und Zeile „Online-Zahlung“ der Akte. */
+  stripeAnzeige: StripeAnzeige
   /** Freigeschaltet, aber ohne fertiges Stripe-Konto (stripeFehlt, Z1). */
   stripeFehlt: boolean
   onlineAn: boolean
@@ -398,6 +409,7 @@ export function adminHofZeile(
     gruendungFest: hof.gruendungFest === true,
     freischaltHinweis: hof.approvedAt === null ? (hof.freischaltHinweis ?? null) : null,
     stripeBereit: hof.stripeBereit,
+    stripeAnzeige: hof.stripeAnzeige,
     stripeFehlt: stripeFehlt(hof),
     onlineAn: hof.onlineAn,
     onlineAus: onlineAus(hof),

@@ -25,6 +25,7 @@ import { aufzaehlung } from '@/lib/hofseite-fortschritt'
 import { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT, ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import type { WarteStand } from '@/lib/farm-approval'
+import { ZAHLUNG_ANSEHEN, ZAHLUNG_HREF, ZAHLUNG_STUFE_TEXT, istHofWarteStufe, type HofStripeStufe } from '@/lib/stripe-konto'
 
 export type EinrichtenDaten = {
   /** Name aus dem Konto (User.name). */
@@ -43,8 +44,10 @@ export type EinrichtenDaten = {
     hofseite: { erledigt: number; gesamt: number; fehlend: readonly string[] }
     /** Alle Produkte, auch ausgeblendete: angelegt ist angelegt. */
     produkte: number
-    /** stripeKontoBereit — Zahlungen UND Auszahlungen frei. */
+    /** stripeKontoBereit — Zahlungen und Auszahlungen frei, Karte, Überweisung und EPS aktiv (Register N49). */
     stripeBereit: boolean
+    /** Was der Hof über sein Stripe-Konto sieht (hofStufe, Register N49); fehlt sie, gilt das bisherige Verhalten. */
+    stripeStufe?: HofStripeStufe
     /** Mindestens eine aktive Abholzeit — ohne sie kein Freischalten (Register Z1, Ergänzung 21.10.2026). */
     abholzeitAktiv: boolean
     /** approvedAt gesetzt (nur der Betreiber setzt es). */
@@ -174,6 +177,18 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           zustand: 'erledigt',
           aktion: null,
         }
+      : hof.stripeStufe !== undefined && istHofWarteStufe(hof.stripeStufe)
+        ? {
+            // Der Hof wartet auf Stripe (Register N49): dieselben Wörter wie die
+            // Zahlungsseite, kein Weg zurück ins Stripe-Formular.
+            id: 'zahlung',
+            titel: 'Online-Zahlung einrichten',
+            titelKurz: 'Online-Zahlung (Stripe)',
+            text: `${ZAHLUNG_STUFE_TEXT[hof.stripeStufe].titel} ${ZAHLUNG_STUFE_TEXT[hof.stripeStufe].text}`,
+            textKurz: ZAHLUNG_STUFE_TEXT[hof.stripeStufe].marke,
+            zustand: 'offen',
+            aktion: { art: 'link', href: ZAHLUNG_HREF, label: ZAHLUNG_ANSEHEN, primaer: false },
+          }
       : {
           id: 'zahlung',
           titel: 'Online-Zahlung einrichten',

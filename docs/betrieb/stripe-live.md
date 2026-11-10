@@ -76,7 +76,7 @@ Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route
   | `mandate.updated` | Mandat geändert oder widerrufen: Stand beim Hof nachziehen |
   | `account.updated` | Kontostand eines Hofs aktuell halten (kommt auch über diesen Endpunkt) |
 
-- [ ] **Endpunkt B – Connect** („Ereignisse in verbundenen Konten“): `account.updated`. Ohne diesen Endpunkt bleibt es unbemerkt, wenn Stripe ein Hof-Konto sperrt oder freigibt.
+- [ ] **Endpunkt B – Connect** („Ereignisse in verbundenen Konten“): `account.updated` und `capability.updated`. Ohne diesen Endpunkt bleibt es unbemerkt, wenn Stripe ein Hof-Konto sperrt oder freigibt; `capability.updated` meldet, wenn Stripe eine einzelne Fähigkeit (Karte, Überweisung, EPS) aktiviert oder entzieht — ein Hof gilt erst mit aktivem EPS als bereit (Register N49).
 - [ ] Das Signing Secret jedes Endpunkts (beginnt mit `whsec_`) für Schritt 4 bereitlegen:
   - A → `STRIPE_WEBHOOK_SECRET`,
   - B → `STRIPE_CONNECT_WEBHOOK_SECRET`.

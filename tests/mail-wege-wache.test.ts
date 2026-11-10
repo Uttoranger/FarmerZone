@@ -85,6 +85,7 @@ const WICHTIG: Record<string, MailArt> = {
   baueAboBestaetigung: 'abo-bestaetigung',
   bauePlattformgebuehrAnkuendigung: 'plattformgebuehr-ankuendigung',
   baueLastschriftGescheitert: 'lastschrift-gescheitert',
+  baueOnlineZahlungEmail: 'online-zahlung',
   baueWiderrufHof: 'widerruf-hof',
   baueWiderrufErgebnis: 'widerruf-erstattet',
 }

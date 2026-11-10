@@ -181,6 +181,10 @@ const BAUE: Record<MailBeispielId, () => Promise<Gebaut>> = {
     const text = ankuendigungText({ datum, satz: satzText(satzHundertstel({ plattformgebuehrProzent: null })), mandatNoetig: true })
     return bauePlattformgebuehrAnkuendigung({ an: BEISPIEL_AN, text, datum })
   },
+  'online-zahlung': async () => {
+    const { baueOnlineZahlungEmail } = await import('@/lib/email')
+    return baueOnlineZahlungEmail({ an: BEISPIEL_AN, anlass: 'aktiv', hofSichtbar: true })
+  },
   'lastschrift-gescheitert': async () => {
     const { baueLastschriftGescheitert } = await import('@/lib/email')
     const monat = monatText('2028-04')

@@ -47,6 +47,7 @@ function roh(ueber: Partial<HoefeListenRoh> = {}): HoefeListenRoh {
     isPaused: false,
     emailBestaetigungOffen: false,
     stripeBereit: true,
+    stripeAnzeige: 'bereit',
     produktImShop: true,
     abholzeitAktiv: true,
     hofEmailFehlt: false,
@@ -78,7 +79,10 @@ describe('hofSignale — EINE Regel für Liste und Aufgaben', () => {
 
   it('wartend: genau ein Signal mit dem, was zum Freischalten fehlt', () => {
     expect(hofSignale(roh({ approvedAt: null, abholzeitAktiv: false }), JETZT)).toEqual([{ id: 'wartet', text: 'Abholzeit fehlt' }])
-    expect(hofSignale(roh({ approvedAt: null, stripeBereit: false }), JETZT)).toEqual([{ id: 'wartet', text: 'Stripe fehlt' }])
+    expect(hofSignale(roh({ approvedAt: null, stripeBereit: false, stripeAnzeige: 'kein_konto' }), JETZT)).toEqual([{ id: 'wartet', text: 'Stripe fehlt' }])
+    // Register N49: freischaltKurz nennt den genauen Grund.
+    expect(hofSignale(roh({ approvedAt: null, stripeBereit: false, stripeAnzeige: 'pruefung' }), JETZT)).toEqual([{ id: 'wartet', text: 'Stripe prüft' }])
+    expect(hofSignale(roh({ approvedAt: null, stripeBereit: false, stripeAnzeige: 'eps_fehlt' }), JETZT)).toEqual([{ id: 'wartet', text: 'Stripe: EPS nicht aktiv' }])
     expect(hofSignale(roh({ approvedAt: null }), JETZT)).toEqual([{ id: 'wartet', text: 'bereit zum Prüfen' }])
     // Nr. 212: ohne Hof-E-Mail wartet der Hof mit „Hof-E-Mail fehlt“ — nie „bereit zum Prüfen“; ein Freigeschalteter bekommt kein Signal.
     expect(hofSignale(roh({ approvedAt: null, hofEmailFehlt: true }), JETZT)).toEqual([{ id: 'wartet', text: 'Hof-E-Mail fehlt' }])
@@ -92,6 +96,16 @@ describe('hofSignale — EINE Regel für Liste und Aufgaben', () => {
       'ohne-bestellung',
     ])
     expect(hofSignale(roh({ letzteBestellungAm: null }), JETZT)[0]?.text).toBe(`seit ${OHNE_BESTELLUNG_TAGE} Tagen ohne Bestellung`)
+  })
+
+  it('Register N49: das Signal „Stripe“ nennt den Grund je Stand — die Kennung bleibt stripe-fehlt', () => {
+    const signal = (stripeAnzeige: HoefeListenRoh['stripeAnzeige']) => hofSignale(roh({ stripeBereit: false, stripeAnzeige }), JETZT)[0]
+    expect(signal('kein_konto')).toEqual({ id: 'stripe-fehlt', text: 'Stripe fehlt' })
+    expect(signal('angaben_fehlen')).toEqual({ id: 'stripe-fehlt', text: 'Stripe: Angaben fehlen' })
+    expect(signal('pruefung')).toEqual({ id: 'stripe-fehlt', text: 'Stripe prüft' })
+    expect(signal('eps_fehlt')).toEqual({ id: 'stripe-fehlt', text: 'Stripe: EPS nicht aktiv' })
+    expect(signal('unklar')).toEqual({ id: 'stripe-fehlt', text: 'Stripe: nicht freigegeben, Grund unklar' })
+    expect(signal('gesperrt')).toEqual({ id: 'stripe-fehlt', text: 'Stripe: gesperrt' })
   })
 
   it('Gegenproben: Bestellung vor 13 Tagen, frisch freigeschaltet ohne Bestellung — kein Signal', () => {

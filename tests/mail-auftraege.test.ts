@@ -51,7 +51,14 @@ import {
   zahlungZuSpaetMailAuftrag,
 } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, empfaengerKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
-import { ankuendigungAuftrag, freischaltungAuftrag, lastschriftGescheitertAuftrag, postfachAntwortAuftrag, rundschreibenAuftraege } from '@/server/mail-arten/hof'
+import {
+  ankuendigungAuftrag,
+  freischaltungAuftrag,
+  lastschriftGescheitertAuftrag,
+  onlineZahlungAuftrag,
+  postfachAntwortAuftrag,
+  rundschreibenAuftraege,
+} from '@/server/mail-arten/hof'
 import { aboBestaetigungAuftrag, bescheidAuftraege } from '@/server/mail-arten/kundin'
 import { beitragAuftraege, gesendeteBeitragsMails } from '@/server/mail-arten/beitrag'
 import { widerrufErgebnisAuftrag, widerrufHofAuftrag } from '@/server/mail-arten/widerruf'
@@ -91,6 +98,8 @@ const AUFTRAEGE: EinstellAuftrag[] = [
   freischaltungAuftrag(BESTELLUNG.farmId, JETZT),
   ankuendigungAuftrag(BESTELLUNG.farmId),
   lastschriftGescheitertAuftrag('cabrechnung0000000000001', BESTELLUNG.farmId, 1),
+  // Register N49 (A012): Online-Zahlung aktiv bzw. Stripe braucht noch Angaben.
+  onlineZahlungAuftrag(BESTELLUNG.farmId, 'aktiv', JETZT),
   postfachAntwortAuftrag('cnachricht00000000000001', BESTELLUNG.farmId),
   ...rundschreibenAuftraege([{ id: 'cfaden000000000000000001', farmId: BESTELLUNG.farmId }]),
   aboBestaetigungAuftrag({ id: 'cabo00000000000000000001', farmId: BESTELLUNG.farmId }, JETZT),

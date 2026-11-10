@@ -504,6 +504,8 @@ describe('Freigabe-Actions', () => {
     const result = await approveFarmAction('farm_1')
 
     expect(result.error).toBe(FREISCHALTUNG_STRIPE_OFFEN_TEXT)
+    // Fund 19 (A012): der Satz wörtlich — ein Konto kann da sein und trotzdem nicht fertig.
+    expect(result.error).toBe('Stripe ist noch nicht fertig – Freischalten erst danach möglich.')
     expect(farmUpdateMany).not.toHaveBeenCalled()
     expect(freischaltAuftraege()).toEqual([])
   })

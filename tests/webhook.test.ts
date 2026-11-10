@@ -42,6 +42,8 @@ vi.mock('@/lib/prisma', () => {
 vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
 vi.mock('@/schemas/mail-auftrag', async (o) => (await import('./mail-attrappe')).schemaEcht(await o()))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
+// Der eine Schreiber des Kontostands (Register N49) hat eigene Tests; hier zählt, was die Route ihm übergibt.
+vi.mock('@/server/stripe-konto-stand', () => ({ schreibeStripeKontoStand: vi.fn(async () => ({ bereit: false, stand: 'unklar' })) }))
 
 vi.mock('@/server/unbezahlte-bestellung', () => ({
   storniereUnbezahlteBestellung: vi.fn(),
@@ -57,6 +59,7 @@ import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-w
 import { bezugSchemaFuer } from '@/schemas/mail-auftrag'
 import { bezugWirft, ergebnis, geschriebeneArten } from './mail-attrappe'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
+import { schreibeStripeKontoStand } from '@/server/stripe-konto-stand'
 
 const constructEvent = vi.mocked(stripe.webhooks.constructEvent)
 const erstatten = vi.mocked(stripe.refunds.create)
@@ -469,13 +472,54 @@ describe('Connect-Endpunkt: account.updated mit eigenem Secret', () => {
     expect(constructEvent).toHaveBeenNthCalledWith(2, '{}', 'sig_test', 'whsec_connect_dummy')
     // Der Stand kommt frisch von Stripe, nicht aus dem (womöglich verspäteten) Ereignis.
     expect(stripe.accounts.retrieve).toHaveBeenCalledWith('acct_hof_1', {}, { timeout: 10_000, maxNetworkRetries: 1 })
-    expect(vi.mocked(prisma.farm.update)).toHaveBeenCalledWith({
-      where: { id: 'farm_1' },
-      data: { stripeAccountReady: false },
+    // Geschrieben wird nur über den einen Schreiber, mit dem Zeitpunkt VOR dem Lesen.
+    expect(vi.mocked(prisma.farm.update)).not.toHaveBeenCalled()
+    expect(vi.mocked(schreibeStripeKontoStand)).toHaveBeenCalledWith({
+      farmId: 'farm_1',
+      stripeAccountId: 'acct_hof_1',
+      konto: { id: 'acct_hof_1', charges_enabled: false, payouts_enabled: true },
+      gelesenAm: expect.any(Date),
     })
   })
 
-  it('Ereignisse verbundener Konten laufen nur durch account.updated — nie durch die Zahlungs-Handler', async () => {
+  it('capability.updated eines verbundenen Kontos: derselbe Weg, das Konto aus event.account', async () => {
+    vi.stubEnv('STRIPE_CONNECT_WEBHOOK_SECRET', 'whsec_connect_dummy')
+    vi.mocked(prisma.farm.findFirst).mockResolvedValue({ id: 'farm_1' } as never)
+    vi.mocked(stripe.accounts.retrieve).mockResolvedValue({ id: 'acct_hof_1', charges_enabled: true, payouts_enabled: true } as never)
+    constructEvent.mockReturnValue({
+      id: 'evt_faehigkeit_1',
+      type: 'capability.updated',
+      account: 'acct_hof_1',
+      data: { object: { id: 'eps_payments', object: 'capability', account: 'acct_hof_1', status: 'active' } },
+    } as unknown as ReturnType<typeof constructEvent>)
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ received: true })
+    expect(vi.mocked(prisma.farm.findFirst)).toHaveBeenCalledWith({ where: { stripeAccountId: 'acct_hof_1' }, select: { id: true } })
+    expect(stripe.accounts.retrieve).toHaveBeenCalledWith('acct_hof_1', {}, { timeout: 10_000, maxNetworkRetries: 1 })
+    expect(vi.mocked(schreibeStripeKontoStand)).toHaveBeenCalledWith(expect.objectContaining({ farmId: 'farm_1', stripeAccountId: 'acct_hof_1' }))
+    expect(webhookEventCreate).toHaveBeenCalledWith({ data: { stripeEventId: 'evt_faehigkeit_1', type: 'capability.updated' } })
+  })
+
+  it('capability.updated ohne verbundenes Konto: 200, vermerkt, nichts gelesen oder geschrieben', async () => {
+    constructEvent.mockReturnValue({
+      id: 'evt_faehigkeit_2',
+      type: 'capability.updated',
+      data: { object: { id: 'eps_payments', object: 'capability', account: 'acct_hof_1', status: 'active' } },
+    } as unknown as ReturnType<typeof constructEvent>)
+
+    const res = await POST(makeRequest())
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ received: true })
+    expect(vi.mocked(prisma.farm.findFirst)).not.toHaveBeenCalled()
+    expect(stripe.accounts.retrieve).not.toHaveBeenCalled()
+    expect(vi.mocked(schreibeStripeKontoStand)).not.toHaveBeenCalled()
+  })
+
+  it('Ereignisse verbundener Konten laufen nur durch account.updated und capability.updated — nie durch die Zahlungs-Handler', async () => {
     constructEvent.mockReturnValue({
       id: 'evt_fremd_pi',
       type: 'payment_intent.succeeded',

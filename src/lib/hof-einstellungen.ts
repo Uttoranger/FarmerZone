@@ -60,6 +60,7 @@ import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/for
 import { Decimal } from '@prisma/client/runtime/index-browser'
 import { TEILEN_MOMENTE_PFAD, TEILEN_MOMENTE_TITEL, teilenMomenteZeile } from '@/lib/teilen-momente'
 import { EINSTELLUNG_KONDITIONEN, EINSTELLUNG_KONTO, EINSTELLUNG_MEIN_AUFTRITT } from '@/lib/bauern-navigation'
+import { ZAHLUNG_ZEILE_TEXT, istHofWarteStufe, type HofStripeStufe, type HofWarteStufe } from '@/lib/stripe-konto'
 
 /** Weitergereicht: Das Sprungziel steht in taxonomie.ts, weil das Hofprofil (Client) es auch braucht. */
 export { BETRIEBSNUMMER_ANKER }
@@ -162,6 +163,8 @@ export type EinstellungenDaten = {
   abholzeitenGesamt: number
   stripeKontoDa: boolean
   stripeBereit: boolean
+  /** Was der Hof über sein Stripe-Konto sieht (hofStufe, Register N49); fehlt sie, gilt das bisherige Verhalten. */
+  stripeStufe?: HofStripeStufe
   /**
    * Farm.acceptsOnline. Eine Wahl „nur bar" gibt es nicht mehr (Register Z1);
    * ein Bestandshof mit false wird nur aufgefordert, Stripe einzurichten — die
@@ -252,8 +255,12 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
       // der Punkt orange — auch bei einem Bestandshof mit Online aus, der nur
       // aufgefordert wird. Barzahlung durch Kundinnen bleibt (B1), sie ist
       // aber keine Wahl des Hofs statt Stripe.
+      // Wartet der Hof auf Stripe (prüft, noch nicht freigegeben, gesperrt;
+      // Register N49), sagt die Zeile das — nicht „bitte abschließen“.
       zeile: !d.stripeBereit
-        ? d.stripeKontoDa
+        ? d.stripeKontoDa && d.stripeStufe !== undefined && istHofWarteStufe(d.stripeStufe)
+          ? ZAHLUNG_ZEILE_TEXT[d.stripeStufe]
+          : d.stripeKontoDa
           ? 'Stripe-Einrichtung noch nicht fertig · bitte abschließen'
           : 'Online-Zahlung noch nicht eingerichtet · bitte einrichten'
         : d.onlineAn
@@ -324,8 +331,20 @@ export function einstellungenGruppen(bereiche: readonly EinstellungBereich[]): E
 
 // ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
 
+/** Die Karte, wenn der Hof auf Stripe wartet (Register N49). */
+const WARTE_HINWEIS: Record<HofWarteStufe, ZahlungHinweisArt> = { pruefung: 'pruefung', noch_nicht: 'noch-nicht', gesperrt: 'gesperrt' }
+
 /** Welche EINE Hinweiskarte oben auf /settings/payments steht. */
-export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrichten' | 'einschalten' | 'neu-einrichten'
+export type ZahlungHinweisArt =
+  | 'geschafft'
+  | 'fortsetzen'
+  | 'fehler'
+  | 'einrichten'
+  | 'einschalten'
+  | 'neu-einrichten'
+  | 'pruefung'
+  | 'noch-nicht'
+  | 'gesperrt'
 
 /**
  * Genau eine Karte, nie zwei orange übereinander (Nachbesserung Nr. 24):
@@ -340,6 +359,11 @@ export type ZahlungHinweisArt = 'geschafft' | 'fortsetzen' | 'fehler' | 'einrich
  * Die Karte heißt dann „Online-Zahlung neu einrichten" — nur mit Konto und
  * nur, solange es nicht bereit ist. Der Parameter öffnet nichts: Ob wirklich
  * neu angelegt wird, fragt `createConnectAccount` selbst bei Stripe nach.
+ *
+ * Register N49: Wartet der Hof auf Stripe (Stufe pruefung, noch_nicht,
+ * gesperrt), sagt die Karte das — der gespeicherte Stand geht vor
+ * `?stripe=pending`; `?stripe=error` und `?stripe=neu` mit Konto gehen jedem
+ * Stand vor. „geschafft“ nur bei bereit.
  */
 export function zahlungHinweis(d: {
   rueckmeldung: string | undefined
@@ -347,10 +371,13 @@ export function zahlungHinweis(d: {
   onlineAn: boolean
   /** Ein Stripe-Konto ist gespeichert (Farm.stripeAccountId gesetzt). */
   stripeKontoDa?: boolean
+  /** Was der Hof über sein Stripe-Konto sieht (hofStufe); fehlt sie, gilt das bisherige Verhalten. */
+  stufe?: HofStripeStufe
 }): ZahlungHinweisArt | null {
   if (d.rueckmeldung === 'error') return 'fehler'
   if (!d.stripeBereit) {
     if (d.rueckmeldung === 'neu' && d.stripeKontoDa) return 'neu-einrichten'
+    if (d.stripeKontoDa && d.stufe !== undefined && istHofWarteStufe(d.stufe)) return WARTE_HINWEIS[d.stufe]
     return d.rueckmeldung === 'pending' ? 'fortsetzen' : 'einrichten'
   }
   if (!d.onlineAn) return 'einschalten'

@@ -4,6 +4,7 @@ import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import type { EinrichtenDaten } from '@/lib/einrichten'
 import type { Tarif } from '@prisma/client'
 import { getFarmSettings, getOwnerFarm } from './farm'
+import { hofStufe, stripeAnzeige } from '@/lib/stripe-konto'
 
 export type EinrichtenHof = NonNullable<EinrichtenDaten['hof']> & {
   id: string
@@ -25,8 +26,10 @@ export type EinrichtenHof = NonNullable<EinrichtenDaten['hof']> & {
 export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof | null> {
   const hof = await prisma.farm.findUnique({
     where: { ownerId },
-    // agbFassung (Nr. 207): ob die Karte „AGB bestätigen“ steht.
-    select: { id: true, slug: true, approvedAt: true, tarif: true, sepaMandatAm: true, agbFassung: true },
+    // agbFassung (Nr. 207): ob die Karte „AGB bestätigen“ steht. Stripe-Kennung und
+    // grober Stand nur für die Stufe des Schritts „zahlung“ (Register N49) — die
+    // Kennung verlässt die Funktion nicht, nur als Wahrheitswert.
+    select: { id: true, slug: true, approvedAt: true, tarif: true, sepaMandatAm: true, agbFassung: true, stripeAccountId: true, stripeKontoStand: true },
   })
   if (!hof) return null
 
@@ -52,6 +55,9 @@ export async function ladeEinrichtenHof(ownerId: string): Promise<EinrichtenHof 
     hofseite: { erledigt: fortschritt.erledigt, gesamt: fortschritt.gesamt, fehlend: fortschritt.fehlend },
     produkte,
     stripeBereit: farm.stripeAccountReady,
+    stripeStufe: hofStufe(
+      stripeAnzeige({ stripeKontoDa: hof.stripeAccountId !== null, stripeAccountReady: farm.stripeAccountReady, stripeKontoStand: hof.stripeKontoStand })
+    ),
     // getOwnerFarm liefert nur aktive Abholzeiten — dieselbe Bedingung wie approveFarmAction (Z1-Ergänzung).
     abholzeitAktiv: farm.pickupSlots.length > 0,
     freigeschaltet: hof.approvedAt !== null,

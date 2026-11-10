@@ -28,7 +28,7 @@ import {
   type PacklistenZeile,
   type WochenBalken,
 } from '@/lib/heute'
-import { onlinePausiertHinweis } from '@/lib/stripe-konto'
+import { ZAHLUNG_HREF, onlinePausiertHinweis, type HofPausiertStufe } from '@/lib/stripe-konto'
 import { SPERRE_KARTE_TITEL, sperreKarteSatz } from '@/lib/admin-hof-akte'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
@@ -260,16 +260,18 @@ export function Kennzahlen({
 /**
  * Online-Zahlung pausiert (onlineZahlungPausiert): Der Weg führt in die
  * bestehenden Zahlungs-Einstellungen — dort sitzt der Knopf zu Stripe. Die
- * Seite selbst ruft Stripe nicht auf.
+ * Seite selbst ruft Stripe nicht auf. Titel, Satz und Knopf je Stufe
+ * (Register N49): „Bei Stripe ergänzen“ nur, wenn Angaben fehlen; sonst
+ * „Zahlung ansehen“.
  */
-export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.JSX.Element {
-  const { titel, satz } = onlinePausiertHinweis(barMoeglich)
+export function StripeHinweis({ barMoeglich, stufe }: { barMoeglich: boolean; stufe: HofPausiertStufe }): React.JSX.Element {
+  const { titel, satz, knopf } = onlinePausiertHinweis(stufe, barMoeglich)
   return (
     <PflichtKarte
       titel={titel}
       knoepfe={
-        <Link href="/settings/payments" className={PFLICHT_KNOPF}>
-          Bei Stripe ergänzen
+        <Link href={ZAHLUNG_HREF} className={PFLICHT_KNOPF}>
+          {knopf}
         </Link>
       }
     >

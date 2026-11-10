@@ -157,11 +157,16 @@ describe('hofStatus', () => {
   it('ohne Freischaltung: wartet (orange)', () => {
     expect(hofStatus({ ...basis, approvedAt: null })).toEqual({ id: 'wartet', text: 'Wartet', ton: 'offen' })
   })
+  it('Fund 19 (A012): Freischalt-Satz und Filterwort wörtlich; der Filter behält seine Kennung', () => {
+    expect(FREISCHALTUNG_STRIPE_OFFEN_TEXT).toBe('Stripe ist noch nicht fertig – Freischalten erst danach möglich.')
+    expect(HOF_FILTER_LABEL['stripe-fehlt']).toBe('Stripe nicht fertig')
+  })
   it('pausiert vor „Stripe fehlt"', () => {
     expect(hofStatus({ ...basis, isPaused: true, stripeBereit: false }).id).toBe('pausiert')
   })
   it('freigeschaltet ohne Stripe: „Stripe fehlt" (orange, kein Rot), sonst online (grün)', () => {
-    expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'stripe-fehlt', text: 'Stripe fehlt', ton: 'offen' })
+    // Fund 19 (A012, Koordinator 09.11.2026): Marke und Filter heißen „Stripe nicht fertig“; die Kennung bleibt.
+    expect(hofStatus({ ...basis, stripeBereit: false })).toEqual({ id: 'stripe-fehlt', text: 'Stripe nicht fertig', ton: 'offen' })
     expect(hofStatus(basis)).toEqual({ id: 'online', text: 'Online', ton: 'fertig' })
   })
   it('freigeschaltet ohne aktive Abholzeit: „Abholzeit fehlt" (orange) — nach Pause und „Stripe fehlt", vor „Online-Zahlung aus"', () => {
@@ -298,7 +303,7 @@ describe('adminHofZeile', () => {
   it('ein freigeschalteter Hof ohne Stripe: Kennzeichen „Stripe fehlt", keine Sperre (bleibt online)', () => {
     const zeile = adminHofZeile(roh({ stripeBereit: false }), { gruendungsplatz: null, maxPlaetze: 12 }, JETZT)
     expect(zeile.stripeFehlt).toBe(true)
-    expect(zeile.status.text).toBe('Stripe fehlt')
+    expect(zeile.status.text).toBe('Stripe nicht fertig')
     expect(zeile.sperre).toBeNull()
   })
 

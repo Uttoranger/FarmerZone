@@ -34,6 +34,7 @@ import { kurznummerAus } from '@/lib/kurznummer'
 import { hatRegistrierung } from '@/lib/futter-registrierung'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
+import { stripeAnzeige } from '@/lib/stripe-konto'
 import { platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'
 import { stornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
@@ -401,6 +402,9 @@ export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
         longitude: true,
         acceptsOnline: true,
         stripeAccountReady: true,
+        // Nur für den Grund „Stripe …“ (Register N49); die Kennung verlässt die Funktion nur als Wahrheitswert.
+        stripeAccountId: true,
+        stripeKontoStand: true,
         phone: true,
         email: true,
         isPaused: true,
@@ -432,6 +436,7 @@ export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
       createdAt: h.createdAt,
       hofseite: { erledigt: fortschritt.erledigt, gesamt: fortschritt.gesamt },
       stripeBereit: h.stripeAccountReady,
+      stripeAnzeige: stripeAnzeige({ stripeKontoDa: h.stripeAccountId !== null, stripeAccountReady: h.stripeAccountReady, stripeKontoStand: h.stripeKontoStand }),
       sepaErteilt: h.sepaMandatAm !== null,
       futter: h.products.length > 0,
       lfbis: hatRegistrierung('LFBIS', h),

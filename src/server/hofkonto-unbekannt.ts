@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
+import { protokolliere } from '@/server/admin-protokoll'
 
 /**
  * Stripe kennt das gespeicherte Konto eines Hofs nicht (Register Z2,
@@ -14,7 +15,9 @@ import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
  *
  * 1. Der Hof gilt als NICHT BEREIT: `stripeAccountReady` auf false — bedingt
  *    auf genau diese Kennung, damit ein inzwischen neu eingerichtetes Konto
- *    nie zurückgesetzt wird. Danach bietet der Checkout Online nicht mehr an
+ *    nie zurückgesetzt wird. Dreht sich der Wert, steht es im Protokoll
+ *    („Online-Zahlung pausiert“, Grund konto_unbekannt; N33, N49), und der
+ *    gespeicherte grobe Stand wird gelöscht (Anzeige „Angaben fehlen“). Danach bietet der Checkout Online nicht mehr an
  *    (wie ohne Konto, Z1), und der Hof sieht in den Einstellungen den Weg
  *    „Online-Zahlung neu einrichten".
  * 2. Die Kennung bleibt stehen — NIE automatisch löschen: Ein falsch
@@ -35,19 +38,26 @@ export async function vermerkeUnbekanntesHofKonto(
   jetzt: Date = new Date()
 ): Promise<void> {
   try {
-    await prisma.farm.updateMany({
+    const { count } = await prisma.farm.updateMany({
       where: { id: farmId, stripeAccountId, stripeAccountReady: true },
       data: { stripeAccountReady: false },
     })
-  } catch (err) {
-    // Nur die Art des Fehlers: Ein Prisma-Text kann die Kennung tragen.
-    const meldung = new Error('Hof-Konto nicht als „nicht bereit" vermerkt')
-    meldung.name = err instanceof Error ? err.name : 'Unbekannt'
-    try {
-      Sentry.captureException(meldung, { tags: { aufgabe: 'stripe-konto', grund: 'vermerk_gescheitert' }, extra: { farmId } })
-    } catch {
-      // Telemetrie scheitert leise.
+    // Der Bereit-Wert hat sich gedreht: ins Protokoll (Register N33, N49).
+    // protokolliere wirft nie.
+    if (count === 1) {
+      await protokolliere({ wer: null, art: 'online_zahlung_pausiert', bezugArt: 'hof', bezugId: farmId, mitPasskey: false, grund: 'konto_unbekannt' })
     }
+  } catch (err) {
+    meldeVermerkGescheitert(err, farmId)
+  }
+  // Unabhängig davon den gespeicherten Stand löschen (Register N49): Die
+  // Anzeige gilt dann als „Angaben fehlen“, und der Weg „Bei Stripe ergänzen“
+  // → „Einrichtung fortsetzen“ → „neu einrichten“ greift. Bedingt auf genau
+  // diese Kennung, wie oben.
+  try {
+    await prisma.farm.updateMany({ where: { id: farmId, stripeAccountId }, data: { stripeKontoStand: null } })
+  } catch (err) {
+    meldeVermerkGescheitert(err, farmId)
   }
 
   let melden = true
@@ -63,6 +73,17 @@ export async function vermerkeUnbekanntesHofKonto(
       tags: { aufgabe: 'stripe-konto', grund: 'konto_unbekannt' },
       extra: { farmId },
     })
+  } catch {
+    // Telemetrie scheitert leise.
+  }
+}
+
+/** Nur die Art des Fehlers: Ein Prisma-Text kann die Kennung tragen. */
+function meldeVermerkGescheitert(err: unknown, farmId: string): void {
+  const meldung = new Error('Hof-Konto nicht als „nicht bereit" vermerkt')
+  meldung.name = err instanceof Error ? err.name : 'Unbekannt'
+  try {
+    Sentry.captureException(meldung, { tags: { aufgabe: 'stripe-konto', grund: 'vermerk_gescheitert' }, extra: { farmId } })
   } catch {
     // Telemetrie scheitert leise.
   }
