@@ -1029,11 +1029,9 @@ export async function sendEmailGeaendertHinweis(email: string, daten: { hof: str
 export async function teamRechtGeaendertInhalt(daten: { anlass: import('@/lib/admin-team').TeamAnlass; name: string | null; rechte: string[] }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
   const { TEAM_MAIL } = await import('@/lib/admin-team')
-  const { ADMIN_PFAD } = await import('@/lib/admin-anmeldung')
   const html = await vorlageHtml(async () => {
     const { TeamRechtGeaendertEmail } = await import('@/emails/team-recht-geaendert')
-    // Die Einladung führt auf „Admin-Zugang absichern“ (Board s3/w3-mail-team Bild 3, Nr. 280) — ohne Token, die Seite verlangt die Anmeldung.
-    return React.createElement(TeamRechtGeaendertEmail, { ...daten, einrichten: daten.anlass === 'eingeladen' ? `${APP_URL}${ADMIN_PFAD.einrichten}` : undefined })
+    return React.createElement(TeamRechtGeaendertEmail, daten)
   })
   return { betreff: `${TEAM_MAIL.betreff[daten.anlass]} · ${MARKE}`, html }
 }

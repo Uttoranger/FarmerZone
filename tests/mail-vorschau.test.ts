@@ -857,7 +857,11 @@ describe('Rechtsblöcke: byteweise wie vor Nr. 280 (Render-Vergleich, Auftrag 23
       jetzt[`vorschau:${fall.name}`] = rechtsbloecke((await fall.rendere()).html)
     }
     for (const id of MAIL_BEISPIEL_IDS) jetzt[`beispiel:${id}`] = rechtsbloecke((await baueMailBeispiel(id)).html)
-    if (process.env.MAIL_RECHT_SCHNAPPSCHUSS === '1') writeFileSync(RECHT_SCHNAPPSCHUSS, `${JSON.stringify(jetzt, null, 2)}\n`)
+    // Der Schalter schreibt die Vorher-Fassung neu und schlägt dann bewusst fehl: Ein Lauf mit gesetzter Variable ist nie grün.
+    if (process.env.MAIL_RECHT_SCHNAPPSCHUSS === '1') {
+      writeFileSync(RECHT_SCHNAPPSCHUSS, `${JSON.stringify(jetzt, null, 2)}\n`)
+      throw new Error('Schnappschuss neu geschrieben – ohne MAIL_RECHT_SCHNAPPSCHUSS erneut laufen lassen und den Diff der Fixture begründen')
+    }
     const vorher = JSON.parse(readFileSync(RECHT_SCHNAPPSCHUSS, 'utf8')) as typeof jetzt
     expect(jetzt).toEqual(vorher)
     // Gegenprobe: Der Vergleich greift wirklich — Belehrung, Anbieterzeile und Gebühren-Satz sind erkannt.

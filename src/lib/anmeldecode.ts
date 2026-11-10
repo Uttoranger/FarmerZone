@@ -302,7 +302,7 @@ export const ZU_VIELE_VERSUCHE_MAIL: Record<
     text: (bis) =>
       `Für deine Adresse wurde mehrmals ein falscher Code eingegeben. Zum Schutz nehmen wir für diese Adresse bis ${bis} keinen Code mehr an.`,
     ausweg:
-      'Warst du das nicht? Dann musst du nichts tun – ohne Code kommt niemand in dein Konto. Gib Codes nie an andere weiter – wir fragen dich nie danach.',
+      'Warst du das nicht? Dann musst du nichts tun: Ohne den Code aus deiner E-Mail kommt niemand weiter. Gib Codes nie an andere weiter – wir fragen dich nie danach.',
   },
   passwort: {
     betreff: 'Zu viele falsche Passwörter',

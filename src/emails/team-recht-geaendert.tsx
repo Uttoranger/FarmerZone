@@ -1,8 +1,7 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, Knopf, KnopfReihe, bodyText, h1, leiseZeile, zwischenTitel } from './_layout'
+import { EmailLayout, bodyText, h1, leiseZeile, zwischenTitel } from './_layout'
 import { TEAM_MAIL, type TeamAnlass } from '@/lib/admin-team'
-import { EINRICHTEN_TEXT } from '@/lib/admin-anmeldung'
 
 /**
  * Sicherheitsmail an eine Person im Admin-Team (Register N35, Nr. 190):
@@ -11,18 +10,7 @@ import { EINRICHTEN_TEXT } from '@/lib/admin-anmeldung'
  * „Admin-Sicherheit“): Eine Mail, die zum Anmelden führt, wäre das Muster
  * jeder gefälschten Mail.
  */
-export function TeamRechtGeaendertEmail({
-  anlass,
-  name,
-  rechte,
-  einrichten,
-}: {
-  anlass: TeamAnlass
-  name: string | null
-  rechte: string[]
-  /** Nur bei der Einladung: die Seite „Admin-Zugang absichern“ (ohne Token; davor steht die Anmeldung). */
-  einrichten?: string
-}): React.JSX.Element {
+export function TeamRechtGeaendertEmail({ anlass, name, rechte }: { anlass: TeamAnlass; name: string | null; rechte: string[] }): React.JSX.Element {
   const t = TEAM_MAIL
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={t.betreff[anlass]}>
@@ -41,12 +29,6 @@ export function TeamRechtGeaendertEmail({
             ))}
           </ul>
         </>
-      )}
-      {/* Board s3/w3-mail-team Bild 3 (Nr. 280): die Hauptaktion der Einladung als Knopf. */}
-      {anlass === 'eingeladen' && einrichten && (
-        <KnopfReihe>
-          <Knopf href={einrichten}>{EINRICHTEN_TEXT.titel}</Knopf>
-        </KnopfReihe>
       )}
       <Text style={{ ...leiseZeile, marginTop: '14px' }}>{t.nichtDu}</Text>
     </EmailLayout>

@@ -7,7 +7,7 @@ export interface AdminSicherheitProps {
   anlass: AdminSicherheitAnlass
   /** Gerät und Browser in festen Wörtern („Windows · Chrome", geraetName). */
   geraet: string
-  /** „19.10. um 14:32" — Wiener Zeit (anmeldeZeitpunkt). */
+  /** „Di, 2. März 2027, 21:14 Uhr“ — Wiener Zeit nach V9 (zeitpunktMitUhr in src/lib/email.ts). */
   wann: string
   /** Nur beim Anlass „einrichtungscode": die 6 Ziffern. */
   code?: string

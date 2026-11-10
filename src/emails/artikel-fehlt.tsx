@@ -32,7 +32,7 @@ export interface ArtikelFehltProps {
   orderNumber: string
   farmName: string
   farmPhone: string
-  /** Die fehlende Position in der gemeinsamen Schreibweise („Bauernbrot · 1 × 1 kg"). */
+  /** Die fehlende Position als Positionszeile nach G14 („1 × Bauernbrot (1 kg)“, positionsZeile in src/lib/email.ts). */
   artikel: string
   /** Die Positionen, die bleiben, mit fertigem Zeilenbetrag in Euro (src/lib/email.ts); leer = keine Zeilen. */
   uebrig?: Array<{ name: string; teile?: Positionszeile; betrag: number }>

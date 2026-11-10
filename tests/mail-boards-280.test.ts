@@ -147,6 +147,8 @@ describe('Sicherheit und Team: Sätze der Boards, Zeiten nach V9', () => {
   it('Zu viele Codes: Satz des Boards ohne Anrede, Pause nach V9, Schutzsatz bleibt', async () => {
     const t = klartext((await email.zuVieleVersucheInhalt({ art: 'code', bis: ZEIT })).html)
     expect(t).toContain('Für deine Adresse wurde mehrmals ein falscher Code eingegeben. Zum Schutz nehmen wir für diese Adresse bis Di, 2. März 2027, 21:14 Uhr keinen Code mehr an.')
+    // Der Ausweg bleibt beim Satz der Basis: Hof- und Admin-Konten melden sich nicht mit Code an (Gegenlesen Sicherheit).
+    expect(t).toContain('Warst du das nicht? Dann musst du nichts tun: Ohne den Code aus deiner E-Mail kommt niemand weiter.')
     expect(t).toContain('Gib Codes nie an andere weiter – wir fragen dich nie danach.')
     expect(t).not.toContain('Hallo,')
   })
@@ -159,12 +161,13 @@ describe('Sicherheit und Team: Sätze der Boards, Zeiten nach V9', () => {
     expect(html).not.toMatch(/border-radius:999px/)
   })
 
-  it('Neue Anmelde-Adresse bestätigen: Überschrift, Satz und „Bis dahin … alte Adresse“', async () => {
+  it('Neue Anmelde-Adresse bestätigen: Überschrift und Satz; der Fuß bleibt wie vorher', async () => {
     const { betreff, html } = await email.emailAendernLinkInhalt({ hof: 'Hof Müller', link: 'https://example.org/konto/email' })
     const t = klartext(html)
     expect(betreff).toContain('Bestätige deine neue Anmelde-Adresse')
     expect(t).toContain(`Neue Anmelde-Adresse bestätigen Hallo Hof Müller, das Team von ${MARKE} hat auf deinen Wunsch eine neue Anmelde-Adresse eingetragen. Bitte bestätige sie:`)
-    expect(t).toContain('Der Link gilt 24 Stunden und einmal. Bis dahin meldest du dich mit der alten Adresse an.')
+    // „Bis dahin … alte Adresse“ ist die Board-Korrektur der C-Zeile 1021, nicht gebaut.
+    expect(t).toContain('Der Link gilt 24 Stunden und einmal. Warst du das nicht?')
   })
 
   it('Anmelde-Adresse geändert: Zeitpunkt nach V9', async () => {
@@ -190,11 +193,11 @@ describe('Sicherheit und Team: Sätze der Boards, Zeiten nach V9', () => {
   })
 })
 
-describe('Team: Einladung mit Knopf (Board s3/w3-mail-team Bild 3)', () => {
-  it('eingeladen: Knopf „Admin-Zugang absichern“ auf /admin/einrichten, ohne Token', async () => {
+describe('Team: Einladung ohne Link zum Anmelden (Knopf aus Board s3/w3-mail-team Bild 3 zurückgestellt)', () => {
+  it('eingeladen: kein Link auf einen Admin-Pfad, kein Knopf', async () => {
     const { html } = await email.teamRechtGeaendertInhalt({ anlass: 'eingeladen', name: 'Jonas Pichler', rechte: ['Startseite'] })
-    expect(html).toMatch(/<a href="[^"]*\/admin\/einrichten"[^>]*>Admin-Zugang absichern<\/a>/)
-    expect(html).not.toMatch(/einrichten\?/)
+    expect(html).not.toMatch(/href="[^"]*\/admin/)
+    expect(html).not.toContain('Admin-Zugang absichern')
   })
 
   it('Gegenprobe: andere Anlässe ohne Knopf', async () => {

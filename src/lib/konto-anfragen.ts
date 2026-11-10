@@ -172,7 +172,7 @@ export const EMAIL_AENDERN_MAIL = {
   anrede: (hof: string | null): string => (hof ? `Hallo ${hof},` : 'Hallo,'),
   satz: `das Team von ${MARKE} hat auf deinen Wunsch eine neue Anmelde-Adresse eingetragen. Bitte bestätige sie:`,
   knopf: 'Neue Adresse bestätigen',
-  fuss: `Der Link gilt 24 Stunden und einmal. Bis dahin meldest du dich mit der alten Adresse an. Warst du das nicht? Dann musst du nichts tun – die alte Adresse bleibt. Wir fragen dich nie per Mail nach deinem Passwort.`,
+  fuss: `Der Link gilt 24 Stunden und einmal. Warst du das nicht? Dann musst du nichts tun – die alte Adresse bleibt. Wir fragen dich nie per Mail nach deinem Passwort.`,
 } as const
 
 /** Sicherheitsmail an die ALTE Adresse nach der Änderung (Sofort, nie nochmal). */
