@@ -1,741 +1,521 @@
-# Probelauf-Checkliste (Nachholung von Nr. 34)
+# Probelauf-Checkliste: Hofpreis-Modell, Umschalten, Monatsabrechnung, Rücktritt
 
-**Status Nr. 48: erledigt (Checkliste).** Stand 08.10.2026, Nachtlauf 8. Auftrag: `freigabe.md` §12 „48", Abläufe aus §11 „34".
+**Stand:** 10.11.2026, geschrieben gegen `main` 260f8cf9 (nach Nachtlauf 33 und dem Impressum). Auftrag A011. Ersetzt die Fassung vom 08./12.10.2026 vollständig.
 
-**Angepasst im Sammel-PR Lauf 9** (Stand 12.10.2026, `freigabe.md` §13 „Sammel-PR"): Ort ist nur noch test.farmerzone.at, die Branch-Adresse von `integration/lauf8` und ihr Aufräumteil sind entfallen. Die Abläufe folgen den Texten aus Nr. 49–55 (Bestellseite, Hof-Profil, Testzahlungen, Produktdialog), dazu Abschnitt 9a für das Neue am Handy.
+**Wozu.** Bevor echtes Geld fließt, muss jemand die Kaufstrecke einmal von Hand durchspielen: als Kundin, als Hof und als Admin, am Handy und am Laptop. Diese Liste ist dafür gebaut. Sie ist ein **Blocker vor echten Zahlungen** (`docs/betrieb/stripe-live.md` §0) und enthält drei Abnahmen der Projektleitung:
 
-Nr. 48 sollte die zwölf Abläufe aus Nr. 34 selbst durchspielen. Aus der Nacht-Sitzung waren aber weder die Vorschau noch die Stripe-Schnittstelle erreichbar. Deshalb gehst du die Abläufe hier selbst durch, am Handy und im Browser. Fehler, die du findest, werden danach als 48a, 48b … behoben, jeder mit einem Test, der den Fehler zeigt.
+- **Abnahme 197** – Plattformgebühr im Preis (Teil B, B3),
+- **Abnahme 198** – Monatsabrechnung mit SEPA-Lastschrift (Teil C, C1 bis C3),
+- **Generalprobe 259** – das Umschalten über Mitternacht mit AGB 1.0 (Teil A, A5 und A6, und Teil B, B1).
 
-**Grundregeln**
+Fehler, die du findest, behebt danach je ein eigener Auftrag, jeder mit einem Test, der den Fehler zeigt.
 
-- Bestellt wird nur in der Testumgebung und nur mit Testkarten. In der Produktion (`farmerzone.at`) schaust du nur, du bestellst dort nichts (Abschnitt 8).
-- In Stripes Formulare kommen nur Testdaten: keine echten Namen, Adressen oder Kontonummern.
-- Zu jedem Fehler notierst du Bestellnummer, Uhrzeit und ein Bildschirmfoto. In Berichte kommen keine Namen und keine Adressen.
-- Die Beträge stammen aus dem Code: `src/lib/servicegebuehr.ts`, `src/app/api/checkout/route.ts`, `src/lib/artikel-fehlt.ts`, `src/lib/storno.ts` und `markAsNotPickedUp` in `src/server/actions/orders.ts`. Sie sind gegen diese Funktionen nachgerechnet.
+## Was du brauchst
 
-Inhalt:
+- **Zwei Geräte:** einen Laptop und ein Handy.
+- **Drei getrennte Browserprofile** (oder drei Browser): **Hof**, **Admin** und **Kundin**. Fenster desselben Profils teilen sich die Anmeldung: Meldest du dich dort als Admin an, ist der Hof abgemeldet. Der Browser am Handy ist ein viertes Profil.
+- **In jedem Profil bei Vercel angemeldet.** Die Testumgebung ist nicht öffentlich; ohne Vercel-Anmeldung zeigt sie nur die Anmeldeseite von Vercel.
+- **Admin-Zugang der Testumgebung mit Passkey** für `test.agrilo.at`. Geld-Einstellungen (Stichtag, Plattformgebühr eines Hofs, Servicegebühr) fragen jedes Mal frisch nach dem Passkey und brauchen das Recht „Geld“ bzw. „Höfe freischalten“.
+- **Zwei eigene Mail-Adressen aus `TEST_EMPFAENGER`** (Variable bei Vercel, nur für den Branch `staging`): eine für die Kundin, eine für den neuen Testhof. In der Testumgebung geht Post nur an diese Adressen und an `@example.com`; alles andere wird nur gezählt (`docs/betrieb/testumgebung.md`, Schritt 3).
+- **Stripe-Dashboard im Testmodus** (oben steht „Testmodus“).
+- **Testkarten und Test-IBANs** aus der Tabelle unten.
+- Von Variablen brauchst du nur die **Namen**. Werte liest du nie aus und schreibst sie nie auf.
 
-- 0 Ort und Vorbedingung
-- 1 Ein Test-Schlüssel für Vorschau und Produktion
-- 2 Testhof vorbereiten
-- 3 Beträge auf einen Blick
-- 4 Die zwölf Abläufe
-- 5 Hof-Anmeldung am Handy (Nr. 41)
-- 6 Rückweg (Nr. 44)
-- 7 Unbekanntes Hof-Konto (Nr. 42)
-- 8 Testbetrieb-Hinweise (Nr. 42)
-- 9 Kasse, Neuigkeiten und Kundensicht (Nr. 46)
-- 9a Hofbereich, Hofseite und Karte am Handy (Nr. 49–55)
-- 10 Abschluss und Aufräumen
-- 11 Ergebnis
+## Testkarten und Test-IBANs
 
----
+Quelle: Stripe-Testseite (docs.stripe.com/testing). Nur im Testmodus gültig. Ablaufdatum irgendwann in der Zukunft (z. B. 12/34), Prüfziffer beliebig (z. B. 123).
 
-## 0. Ort und Vorbedingung
+| Wofür | Nummer | Was passiert |
+|---|---|---|
+| Karte, Erfolg | `4242 4242 4242 4242` | Zahlung gelingt sofort |
+| Karte, abgelehnt | `4000 0000 0000 0002` | Stripe lehnt ab, es wird nichts abgebucht |
+| Karte, 3-D Secure | `4000 0027 6000 3184` | Stripe öffnet ein Testfenster; dort „Complete“ (abschließen) tippen |
+| IBAN, Einzug gelingt | `AT321904300235473204` | Lastschrift gelingt nach etwa drei Minuten |
+| IBAN, Einzug scheitert | `AT861904300235473202` | Lastschrift scheitert |
+| IBAN, Stripes Standard-Testwert | `AT611904300234573201` | gelingt; für das Stripe-Onboarding des Hofs (Auszahlungskonto) |
+| IBAN, Rückbuchung | von der Stripe-Testseite nehmen | Stripe nennt dafür eine eigene IBAN; sie ist hier bewusst nicht abgeschrieben |
 
-| | |
-|---|---|
-| Ort | `https://test.farmerzone.at`, die Testumgebung nach `docs/betrieb/testumgebung.md` (Nr. 43). Sie steht, bevor der Probelauf beginnt. Unten heißt diese Adresse kurz **Ort**. |
-| Zugang | Nur mit Vercel-Anmeldung. Du arbeitest mit **drei getrennten Browserprofilen** oder drei Browsern: **Hof**, **Admin** und **Kundin**. Fenster desselben Profils teilen sich die Anmeldung: Meldest du dich dort als Admin an, ist der Testhof abgemeldet. Jedes Profil braucht seine eigene Vercel-Anmeldung, sonst zeigt Vercel nur seine Anmeldeseite. Der Browser am Handy ist ein weiteres Profil und braucht sie ebenfalls. |
-| Daten | Die Entwicklungsdatenbank, nie die Produktion. |
-| Stripe | Testmodus. Auch das Stripe-Dashboard öffnest du im Testmodus. |
+Weitere Testwerte für Stripes Formular beim Hof-Konto: SMS-Code `000000`, Geburtsdatum 01.01.1901, Adresszeile `address_full_match`. Stripe bietet im Testmodus auch Abkürzungen für Testdaten an.
 
-- [ ] Drei Profile sind eingerichtet: Hof, Admin und Kundin. In jedem bist du bei Vercel angemeldet, und der Ort lässt sich öffnen.
-- [ ] **Vorbedingung A:** Oben auf jeder Seite steht das Banner „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · \<Branch\>", am Handy kurz „TEST · Dev-DB · Stripe Test". Steht dort „Stripe LIVE", „Stripe fehlt" oder „Fremde Datenbank": **Stopp.** Bestell nichts und melde es. Den Schlüssel liest du nie aus und entschlüsselst ihn nie; das Banner genügt (Register Z2). Denselben Blick wiederholst du vor jedem Schritt, der bezahlt oder Geld zurückbucht. Dort steht jeweils der Haken „Banner zeigt ‚TEST · Dev-DB · Stripe Test‘".
-- [ ] Das Stripe-Dashboard steht im Testmodus. Der Schalter bzw. Hinweis „Testmodus" ist oben zu sehen.
+## Grundregeln
 
-## 1. Ein Test-Schlüssel für Vorschau und Produktion – was das für den Probelauf heißt
+- **Nur Testumgebung.** Bestellt wird nur auf `https://test.agrilo.at` (Branch `staging`, Entwicklungsdatenbank, Stripe-Testmodus). Auf `agrilo.at` schaust du höchstens, du bestellst dort nichts: Ein Korb reserviert dort Ware eines echten Hofs.
+- **Banner-Blick vor jedem Schritt mit Geld.** Oben auf jeder Seite steht „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · staging“, am Handy kurz „TEST · Dev-DB · Stripe Test“. Steht dort „Stripe LIVE“, „Stripe fehlt“ oder „Fremde Datenbank“ (am Handy „fremde DB“): **Stopp.** Nichts bestellen, nichts erstatten, melden. Vor jedem Schritt, der bezahlt oder Geld zurückbucht, steht deshalb ein eigener Haken „Banner zeigt ‚TEST · Dev-DB · Stripe Test‘“.
+- **Keine echten Daten in Stripes Formulare:** keine echten Namen, Adressen, Kontonummern. Für Kundinnen-Namen und Telefon erfundene Werte.
+- **Zu jedem Fehler** notierst du Bestellnummer, Uhrzeit und ein Bildschirmfoto. In Berichte kommen keine Namen und keine Adressen.
+- **Beträge** stammen aus dem Code (`src/lib/plattformgebuehr.ts`, `src/lib/servicegebuehr.ts`, `src/lib/artikel-fehlt.ts`, `src/lib/storno.ts`, `markAsNotPickedUp` in `src/server/actions/orders.ts`) und sind gegen diese Funktionen nachgerechnet.
+- **SQL nur in der Entwicklungsdatenbank** und nur dort, wo diese Liste es ausdrücklich sagt.
 
-Bei Vercel gibt es heute EINE Gruppe `STRIPE_*`-Variablen. Vorschau und Produktion nutzen beide denselben Test-Schlüssel (Register Z2). Daraus folgt:
+## Drei Sitzungen in fester Reihenfolge
 
-1. **Ein gemeinsames Stripe-Testkonto.** Zahlungen, Erstattungen und verbundene Hof-Konten aus dem Probelauf stehen im Dashboard neben den Testzahlungen der Produktion. Deine Zahlungen findest du über die Bestellnummer: Jede Zahlung trägt in den Metadaten `orderNumber`, dazu `orderId` und `farmId`. Außerdem hängen sie am verbundenen Konto deines Testhofs.
-2. **Webhooks gehen an alle Test-Endpunkte.** Stripe schickt jedes Ereignis im Testmodus an jeden Endpunkt, der dort eingetragen ist.
-   - Heute ist das der Endpunkt der Produktion, `https://farmerzone.at/api/stripe/webhook`. Nach Nr. 43 kommt der Endpunkt der Testumgebung dazu.
-   - Jede Zahlung aus dem Probelauf erreicht also auch die Produktion. Die Produktion kennt die Bestellung nicht und quittiert mit 200. Sie ändert nichts und meldet nichts an Sentry (im Code geprüft, Bericht 48, „Webhook-Prüfung").
-   - Im Protokoll der Produktion steht je bezahlter Testbestellung eine Zeile „[Webhook] Order not found for PaymentIntent …". Das ist erwartet.
-   - Einzige Ausnahme: Eine Erstattung, die bei Stripe scheitert, meldet die Produktion einmal an Sentry und per Mail an den Betreiber („keiner Buchung der App zuzuordnen"). Mit den Testkarten hier scheitert keine Erstattung.
-   - Umgekehrt erreicht jede Testzahlung der Produktion auch die Testumgebung. Dort wird sie genauso still quittiert.
-3. **Die Testumgebung bekommt nur Ereignisse, wenn sie einen eigenen Endpunkt hat.** Bezahlt setzt erst der Webhook. Ohne eigenen Endpunkt bleibt jede Online-Bestellung dort auf „Zahlung wird geprüft", beim Hof auf „Online, noch offen". Dann lassen sich die Abläufe 1, 2, 3, 7, 8 und der Online-Teil von 9 nicht prüfen.
-   - Der Endpunkt braucht ein eigenes Signing Secret als `STRIPE_WEBHOOK_SECRET`, nur für den Branch. Sonst lehnt die Testumgebung jede Zustellung mit 400 ab.
-   - Er braucht außerdem einen Weg an der Vercel-Sperre vorbei. Sonst bekommt Stripe 401.
-   - Beides beschreibt `docs/betrieb/testumgebung.md`, Schritte 3 und 5 (Nr. 43).
-4. **Live ist ausgeschlossen.** Ein Live-Schlüssel startet in der Vorschau gar nicht (Nr. 42). Das Banner muss „Stripe Test" zeigen.
+Die Entwicklungsdatenbank bleibt nach dem Stichtag im neuen Modell. Ein zweiter Anlauf der Generalprobe ist dort nicht möglich. Deshalb gilt diese Reihenfolge:
 
-### Webhook der Testumgebung einrichten (einmal, vor Ablauf 1)
+| Sitzung | Wann | Was | Dauer |
+|---|---|---|---|
+| 1 | Abend vor dem Stichtag, bis kurz nach Mitternacht | Teil A (A0–A6), mit dem Schritt kurz vor und nach Mitternacht | etwa 3 Stunden |
+| 2 | Tag nach dem Stichtag | Teil B (B1–B6) | etwa 3 Stunden |
+| 3 | danach; die Monatsabrechnung im Folgemonat | Teil C (C1–C5) | etwa 2½ Stunden, verteilt |
+| Nachblick | Folgetag nach C3 | Sperre nach einem Tag (C3) | 10 Minuten |
 
-- [ ] **test.farmerzone.at:** Endpunkt, Weg an der Vercel-Sperre vorbei und Signing Secret nach `docs/betrieb/testumgebung.md`, Schritt 5. Dazu `STRIPE_WEBHOOK_SECRET` nur für den Branch `staging` (Schritt 3), dann `staging` neu deployen.
-  - Lies dort auch, was das Geheimnis für die Vercel-Sperre kann: Es öffnet alle geschützten Deployments des Projekts.
-  - Die Ereignisse sind dieselben wie bei Endpunkt A in `docs/betrieb/stripe-live.md`, Schritt 3.
-  - Neu deployen heißt: Deployments → neuestes Deployment des Branch → Redeploy. Variablen wirken erst im nächsten Deployment.
-- [ ] Den bestehenden Eintrag `STRIPE_WEBHOOK_SECRET` für Production fasst du nicht an.
-- [ ] Prüfung nach der ersten Zahlung (Ablauf 1a): Stripe zeigt beim Endpunkt der Testumgebung die Zustellung mit Antwort 200. Eine 401 heißt: Vercel-Sperre. Eine 400 heißt: falsches Secret.
+Die Bestellungen bekommen kurze Namen, damit du sie wiederfindest: **V1–V5** (vor dem Stichtag, altes Modell), **H1–H8** (nach dem Stichtag, Hofpreis-Modell). Notier zu jedem Namen die Bestellnummer.
 
-## 2. Testhof vorbereiten (einmal)
+## Beträge auf einen Blick
 
-Testhof heißt hier ein Hof der Entwicklungsdatenbank, der nur zum Testen da ist. Am schnellsten geht es mit einem Seed-Konto (`…@example.com`, Passwort in `prisma/seed-daten.ts`). Mails an diese Adressen kommen nicht an; für den Hof brauchst du sie nicht.
+**Hofpreis-Modell (ab dem Stichtag).** Plattformgebühr 6 % je Stück, **immer auf den ganzen Cent aufgerundet**, ohne Mindestgebühr (`gebuehrJeStueckCents`). Endpreis je Stück = Warenpreis + Gebühr. Die Gebühr einer Bestellung ist die **Summe aus Menge × Gebühr je Stück** (`bestellGebuehr`), nie 6 % auf die Summe. Online und bar gleich. Mindestbestellwert 10 € **Warenwert** je Bestellung. Online: Stripe überweist dem Hof den vollen Betrag und behält als Anwendungsgebühr genau die Gebühr ein; der Hof bekommt 100 % des Warenpreises.
 
-- [ ] Im Profil **Hof** als Testhof anmelden: Ort → „Anmelden" → „Ich habe einen Hof".
-- [ ] Einstellungen → Zahlung → „Mit Stripe einrichten". Stripe öffnet sein Formular im Testmodus.
-  - Trag nur Testdaten ein. Stripe bietet im Testmodus Abkürzungen für Testdaten an. Sonst gelten Stripes Testwerte: SMS-Code `000000`, Geburtsdatum 01.01.1901, Adresszeile `address_full_match`, IBAN `AT611904300234573201`.
-  - Erwartet nach der Rückkehr: grüne Karte „Dein Stripe-Konto ist eingerichtet. Online-Zahlung ist jetzt aktiv." und die Marke „Verbunden und aktiv".
-  - Steht dort „Einrichtung nicht fertig": kurz warten, dann „Status prüfen".
-- [ ] Stripe → Connect → Verbundene Konten: Das Konto des Testhofs ist neu und gehört nur ihm. Nie die Kennung eines echten Hofs in die Entwicklungsdatenbank übernehmen.
-- [ ] In der Karte „Bar bei Abholung" steht „Immer aktiv".
-- [ ] Im Profil **Admin** anmelden, z. B. mit `admin@example.com`. Dann Höfe → Testhof:
-  - Der Hof ist freigeschaltet.
-  - Servicegebühr „ändern": Prozentsatz 5, Mindestgebühr 0,50, „Gebühr gilt ab" heute oder früher. **Ohne Datum ist der Hof gebührenfrei, dann stimmen alle Beträge unten nicht.**
-  - Die Provision bleibt 0. Dann zeigt Finanzen keine Zeile „Provision".
-- [ ] Hof-Profil: eine erfundene Betriebsnummer eintragen, z. B. 9999999. Ohne Nummer lässt sich Futter nicht verkaufen (Ablauf 6).
-- [ ] Abholzeiten: mindestens ein Fenster an einem der nächsten Tage. Für Ablauf 5 zusätzlich eines heute, das in etwa 20 Minuten beginnt.
-- [ ] Produkte anlegen, genau mit diesen Preisen, damit die Beträge unten stimmen. Alle im Shop, Vorrat je 20:
-  - „Test-Eier" € 4,90,
-  - „Test-Honig" € 7,50,
-  - Futter „Test-Heu": Neu → „Futtermittel", zwei Größen, beide lose bzw. in Ballen: „5 kg-Sack" € 4,90 und „Rundballen" € 45,00. Den Pflicht-Haken „Ich bestätige, dass meine Angaben … richtig und vollständig sind …" setzen.
-- [ ] Einstellungen → Teilen: „Teilen-Hinweise zeigen" ist an (für Ablauf 11).
-- [ ] Mail-Empfang. Gebraucht wird er in den Abläufen 4, 5, 7, 8 und 10 und in Abschnitt 9.
-  - Außerhalb der Produktion verschickt die App Post nur an Adressen aus `TEST_EMPFAENGER` und an `@example.com` (Nr. 43). Alle anderen Mails gelten als „Nicht verschickt" und stehen nur gezählt im Log, ohne Adresse.
-  - **Die Adresse der Kundin des Probelaufs muss deshalb in `TEST_EMPFAENGER` stehen.** Die Variable gilt nur für den Branch (`docs/betrieb/testumgebung.md`, Schritt 3). Nimm dafür eine eigene Adresse, die Mails empfängt.
-  - Betreiber-Mails, etwa „Erstattung offen", kommen in der Testumgebung nur an, wenn auch die Support-Adresse (`SUPPORT_EMAIL`) in `TEST_EMPFAENGER` steht.
-  - Ohne `RESEND_API_KEY` verschickt die Testumgebung gar nichts. Dann kommt auch der Code für Ablauf 10 nicht an.
-- [ ] **Testzahlungen (Nr. 55):** Bei Vercel gilt `STRIPE_LIVE_AB` höchstens für Production, nie für den Branch `staging`. Du siehst nur Namen und Geltungsbereich an, den Wert nie.
-  - Sonst zählen Online-Bestellungen vor dem Stichtag als Testzahlung: Heute, Auswertung und Finanzen lassen sie aus, und die Finanzen-Haken unten stimmen nicht.
-  - Erkennbar ist das an der Zeile „Testzahlungen vor dem … sind nicht mitgezählt." unter den Zahlen. In der Testumgebung darf sie nicht erscheinen.
-- [ ] Admin → Finanzen, aktueller Monat: notier „Servicegebühr, online" als **S** und „Servicegebühr, vor Ort bezahlt" als **V**. In der Entwicklungsdatenbank liegen schon andere Bestellungen. Geprüft wird deshalb nur der Unterschied.
+Rechnung in Cent: Warenpreis × 600 ergibt Zehntausendstel-Cent; durch 10.000, bleibt ein Rest, kommt ein Cent dazu.
 
-## 3. Beträge auf einen Blick
+| Produkt | Warenpreis | Rechnung | Gebühr je Stück | Endpreis |
+|---|---|---|---|---|
+| Test-Eier | 490 Cent | 490 × 6 % = 29,4 → 30 | € 0,30 | € 5,20 |
+| Test-Honig | 750 Cent | 750 × 6 % = 45,0 → 45 (glatt) | € 0,45 | € 7,95 |
+| Test-Heu „5 kg-Sack“ | 490 Cent | 490 × 6 % = 29,4 → 30 | € 0,30 | € 5,20 |
+| Test-Heu „Rundballen“ | 4.500 Cent | 4.500 × 6 % = 270,0 → 270 (glatt) | € 2,70 | € 47,70 |
 
-**Regel.**
+| Korb | Ware (Cent) | Gebühr (Cent) | Kundin zahlt, online wie bar | Anwendungsgebühr | Hof bekommt |
+|---|---|---|---|---|---|
+| 2 × Eier + 1 × Honig | 980 + 750 = 1.730 | 2 × 30 + 45 = 105 | € 18,35 | € 1,05 | € 17,30 |
+| 1 × Eier + 1 × Honig | 490 + 750 = 1.240 | 30 + 45 = 75 | € 13,15 | € 0,75 | € 12,40 |
+| 3 × Eier | 1.470 | 3 × 30 = 90 | € 15,60 | € 0,90 | € 14,70 |
+| 1 × Rundballen | 4.500 | 270 | € 47,70 | € 2,70 | € 45,00 |
+| 2 × Eier | 980 | – | **nicht bestellbar**: unter 1.000 Cent Warenwert | – | – |
 
-- Servicegebühr (E4, `berechneServicegebuehr`): 5 % auf den Warenpreis, **immer auf den nächsten ganzen Cent aufgerundet**, mindestens € 0,50.
-- Bar (B1): Bis 31. Jänner 2027 kostet Barzahlung keine Servicegebühr.
-- Online (`/api/checkout`): Die Zahlung läuft über das Plattformkonto. Stripe überweist dem Hof den vollen Betrag und zieht als Anwendungsgebühr genau die Servicegebühr ab (Provision 0).
-- **Hofanteil = Überweisung − Anwendungsgebühr = Warenpreis.**
-- Stripes eigene Gebühr trägt die Plattform. In der App kommt sie nicht vor; Finanzen sagt dazu „Stripe-Gebühren sind hier noch nicht abgezogen."
+- **„Je Stück aufgerundet“:** 6 % auf die Summe 1.730 wären 103,8 → 104 Cent. Die App nimmt 105 Cent, weil jede Position für sich aufgerundet wird. Genau das prüft B3.
+- **Mindestbestellwert-Satz** (`mindestbestellwertHinweis`): Das „ab“ ist der Endpreis von 1.000 Cent als ein Stück: 1.000 + 60 = 1.060 → „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60).“ Bei 2 × Eier fehlen 1.000 − 980 = 20 Cent → „Dir fehlen noch Waren für € 0,20.“
 
-**Rechnung in ganzen Cent.** Warenpreis in Cent × 5 / 100; bleibt ein Rest, kommt ein Cent dazu.
+**Altes Modell (nur noch für Bestellungen von vor dem Stichtag).** Servicegebühr nach `berechneServicegebuehr` mit dem Satz des Hofs, hier 5 %, aufgerundet, mindestens € 0,50. Bar bis 31. Jänner 2027 ohne Gebühr. Die Gebühr kommt einmal je Bestellung auf die Summe.
 
-| Bestellung | Ablauf | Zahlart | Ware (Cent) | Gebühr gerechnet | Gebühr | Kundin zahlt | Anwendungs­gebühr | Überweisung an den Hof | Hofanteil |
-|---|---|---|---|---|---|---|---|---|---|
-| A | 1a, 7, 9a | Karte 4242 | 2 × Eier + 1 × Honig = 980 + 750 = 1.730 | 86,5 → 87 | € 0,87 | € 18,17 | € 0,87 | € 18,17 | € 17,30 |
-| B | 1b, 9c | 3-D Secure | 1 × Eier = 490 | 24,5 → 25, unter 50 → Mindestgebühr | € 0,50 | € 5,40 | € 0,50 | € 5,40 | € 4,90 |
-| C | 2 | Wallet | 3 × Eier = 1.470 | 73,5 → 74 | € 0,74 | € 15,44 | € 0,74 | € 15,44 | € 14,70 |
-| D | 3, 8 | EPS | 1 × Eier + 1 × Honig = 1.240 | 62,0 → 62 (glatt) | € 0,62 | € 13,02 | € 0,62 | € 13,02 | € 12,40 |
-| E | 4, 9b | bar | 2 × Eier = 980 | B1 → 0 | € 0,00 | € 9,80 bar | – | – | € 9,80 bar |
-| F | 5 | bar | 1 × Honig = 750 | B1 → 0 | € 0,00 | verfällt | – | – | – |
-| G | 6 | bar | 1 × Heu Rundballen = 4.500 | B1 → 0 (online wären es 225 → € 2,25) | € 0,00 | € 45,00 bar | – | – | € 45,00 bar |
+| Korb | Ware (Cent) | Rechnung | Online zahlt die Kundin | Bar zahlt die Kundin |
+|---|---|---|---|---|
+| 2 × Eier + 1 × Honig | 1.730 | 1.730 × 5 % = 86,5 → 87 | € 18,17 (Gebühr € 0,87) | € 17,30 |
+| 1 × Eier + 1 × Honig | 1.240 | 1.240 × 5 % = 62,0 → 62 (glatt) | € 13,02 (Gebühr € 0,62) | € 12,40 |
+| 2 × Eier | 980 | 980 × 5 % = 49,0 → 49, unter 50 → 50 | € 10,30 | € 9,80 |
 
 **Was sich danach bewegt**
 
-| Nach Ablauf | Kundin bekommt zurück | Rückbuchung vom Hof | Anwendungsgebühr | Plattform behält | Hofanteil danach |
-|---|---|---|---|---|---|
-| 7 (A, Honig fehlt) | € 7,87 = 7,50 + (0,87 − 0,50) | € 7,50 (fester Betrag) | bleibt € 0,87 | € 0,50 | € 9,80 |
-| 8 (D, Storno) | € 13,02 (alles) | € 13,02 (ganze Überweisung) | € 0,62 zurück an den Hof | € 0,00 | € 0,00 |
-| 9c (B, nicht abgeholt) | € 0,50 (nur die Gebühr) | keine | bleibt € 0,50 | € 0,00 | € 4,90 |
+| Fall | Kundin bekommt zurück | Rückbuchung vom Hof | Anwendungsgebühr | Rechnung in Cent |
+|---|---|---|---|---|
+| Alt, Honig fehlt (Korb € 18,17) | € 7,87 | € 7,50 | bleibt € 0,87 | neue Gebühr auf 980: 49 → 50; Differenz 87 − 50 = 37; Erstattung 750 + 37 = 787 |
+| Alt, Storno (€ 13,02) | € 13,02 | € 12,40 (die ganze Überweisung von € 13,02 geht zurück, die Anwendungsgebühr € 0,62 an den Hof zurück) | zurück | Kundin = Ware + Gebühr = 1.240 + 62; Hof = Ware − Provision 0 |
+| Neu, Honig fehlt (Korb € 18,35) | € 7,95 | € 7,50 | bleibt € 1,05 | Gebühr der Position fällt weg: 105 − 45 = 60 neu; Erstattung 750 + 45 = 795; neu zu zahlen 980 + 60 = 1.040 |
+| Neu, Storno (€ 18,35) | € 18,35 | € 17,30 (die ganze Überweisung geht zurück, die Anwendungsgebühr € 1,05 an den Hof zurück) | zurück | Kundin = 1.730 + 105; Hof = Ware − Provision 0 |
+| Neu, nicht abgeholt (€ 13,15) | € 0,75 (nur die Gebühr) | keine | bleibt € 0,75 | erstattet wird `serviceFeeCents` = 75; die Plattform zahlt aus ihrem Saldo |
+| Neu, Rücktritt vom Honig nach Abholung (€ 18,35) | € 7,95 | € 7,50 | bleibt € 1,05 | dieselbe Rechnung wie „Honig fehlt“ (`artikelFehltRechnung`) |
 
-**Rechnung zu Ablauf 7 in Cent:**
+---
 
-- Neue Gebühr auf 980: 49,0 → 49, das liegt unter 50, also 50.
-- Differenz: 87 − 50 = 37.
-- Erstattung an die Kundin: 750 + 37 = 787.
-- Vom Hof zurück: genau der Artikelpreis, 750.
-- Plattform: 87 − 37 = 50.
+# Teil A – Vor dem Umschalten (Sitzung 1)
 
-**Admin → Finanzen, „Servicegebühr, online"** (Unterschied zu S):
+Am Abend vor dem Stichtag. Am Ende von A5 setzt du den Stichtag auf **morgen**; A6 läuft rund um Mitternacht.
 
-- nach A +0,87, nach B +0,50, nach C +0,74, nach D +0,62,
-- nach Ablauf 7 −0,37, nach 8 −0,62, nach 9c −0,50.
-- Am Ende: S + € 1,24 mit Ablauf 2, S + € 0,50 ohne.
-- „vor Ort bezahlt" bleibt V: Barbestellungen vor dem Stichtag bringen nichts ein (B1).
-- Solange eine Online-Zahlung noch „wird geprüft", steht ihre Gebühr unter „erwartet: … aus N offenen Bestellungen". Das zeigt auch, ob der Webhook fehlt.
+## A0 · Ort und Vorbedingungen (etwa 10 Minuten)
 
-## 4. Die zwölf Abläufe
+- [ ] In allen drei Profilen öffnet `https://test.agrilo.at`, und oben steht „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · staging“ (am Handy „TEST · Dev-DB · Stripe Test“). Fehler: die Anmeldeseite von Vercel (dann im Profil bei Vercel anmelden) oder ein rotes Band (Stopp, melden).
+- [ ] Stripe-Dashboard im **Testmodus** › Entwickler › Webhooks › Endpunkt `https://test.agrilo.at/api/stripe/webhook…`: Er empfängt alle zehn Ereignisse aus `docs/betrieb/testumgebung.md`, Schritt 5 – `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`, `refund.failed`, `charge.refund.updated`, `invoice.paid`, `invoice.payment_failed`, `charge.dispute.created`, `setup_intent.succeeded`, `mandate.updated`. Nur **ansehen**, nichts ändern. Fehlt eines: melden, Teil C geht dann nicht vollständig.
+- [ ] Profil **Admin** › Einstellungen › Karte „Hofpreis-Modell ab“: Das Feld „Stichtag“ ist änderbar, das Datum liegt in der Zukunft, der Satz lautet „Ab diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis (6 %, Mindestbestellwert 10 €). Vorher bleibt alles wie heute.“
+- [ ] **Steht dort „Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.“:** Stopp für Teil A. Die Generalprobe ist in dieser Datenbank nicht mehr möglich. Weiter mit Teil B ab B3 und Teil C; im Ergebnis „Generalprobe 259: nicht möglich, Stichtag schon erreicht“ eintragen.
 
-Als Kundin bestellst du im Profil **Kundin**, als Hof arbeitest du im Profil **Hof**, und Finanzen siehst du im Profil **Admin** (Abschnitt 0). Abholtermin: immer ein Fenster an einem der nächsten Tage, außer bei Ablauf 5.
+## A1 · Neuer Testhof von der Registrierung bis zur Freischaltung (etwa 75 Minuten)
 
-Vor jedem Schritt, der bezahlt oder Geld zurückbucht, steht der Haken „Banner zeigt ‚TEST · Dev-DB · Stripe Test‘". Im Browser steht die lange Form „TESTUMGEBUNG · Dev-Datenbank · Stripe Test · …". Zeigt das Banner etwas anderes: Stopp.
+Dieser Hof ist der **Testhof** für alles Weitere. Ein neuer Hof ist nötig, weil einem älteren Test-Konto (angelegt vor dem 30.10.2026) die Stripe-Fähigkeit für EPS fehlen kann; erst seither fordert die App sie beim Anlegen an (`scripts/eps-faehigkeit-nachfordern.ts` fordert sie für alte Konten nach – das startet nur die Projektleitung).
 
-### Ablauf 1 – Online mit Testkarte, auch 3-D Secure
+**Registrieren und bestätigen** (Profil **Hof**, abgemeldet)
 
-**1a – Karte, Bestellung A**
+1. `/register`: „Name deines Hofs“ (erfunden, z. B. „Testhof Probelauf“), „Dein Name“ (erfunden), „E-Mail“ = deine Testhof-Adresse aus `TEST_EMPFAENGER`, „Passwort“. Über dem Knopf steht „Mit der Registrierung stimmst du den AGB und den Konditionen für Höfe zu.“ › „Konto erstellen“.
+   - [ ] Es erscheint „Schau in dein Postfach“, und die Mail „Bestätige deine E-Mail-Adresse · Agrilo“ kommt an (Link gilt 24 Stunden).
+2. In der Mail „Zur Bestätigung“ › auf der Seite „E-Mail bestätigen“.
+   - [ ] „Danke, deine E-Mail ist bestätigt“ mit „Weiter zum Einrichten“. Fehler: „Das hat nicht geklappt“.
 
-1. Hofseite des Testhofs: 2 × Test-Eier und 1 × Test-Honig in den Korb, dann zur Kasse.
-2. Eine Abhol-Kachel wählen, etwa „Sa, 10. Okt" mit „09:00–12:00 Uhr". Dann E-Mail, Name und Telefon eintragen. Die E-Mail ist deine und steht in `TEST_EMPFAENGER`; Name und Telefon sind erfunden.
-3. „Online bezahlen" wählen, dann „Weiter zur Zahlung · € 18,17".
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-4. Im Zahlungsfeld: Karte `4242 4242 4242 4242`, Ablaufdatum in der Zukunft (z. B. 12/34), Prüfziffer beliebig (z. B. 123). Dann „Jetzt bezahlen · € 18,17".
+**Hof einrichten**
 
-Erwartet:
+3. `/onboarding` („So wird dein Hof startklar“): „Hof anlegen“ mit erfundener Adresse und Telefon; als „E-Mail des Hofs“ wieder die Testhof-Adresse.
+4. Einstellungen › „Abholzeiten“ › „Abholzeit hinzufügen“: je ein Fenster an den nächsten Tagen, z. B. Mo–Sa 09:00–12:00 › „+ Abholzeit hinzufügen“ (Toast „Abholzeit hinzugefügt“).
+5. Produkte anlegen, genau mit diesen Preisen, alle „Im Shop“, Vorrat je 30. Weg: Unterleiste bzw. Seitenleiste „Neu“ › „Was legst du an?“.
+   - „Lebensmittel“: „Test-Eier“, Kategorie Eier, Preis € 4,90 je Stück. Der Haken „Verdirbt schnell – kein Rücktritt möglich …“ ist bei Eiern **schon gesetzt**; so lassen (das ist das Produkt mit Rücktrittsausnahme).
+   - „Lebensmittel“: „Test-Honig“, Kategorie Honig, € 7,50 je Glas. Haken nicht gesetzt.
+   - „Futtermittel“: „Test-Heu“ mit zwei Größen, „5 kg-Sack“ € 4,90 und „Rundballen“ € 45,00. Unter den Hinweisen für Kunden bei „Abholung“ den Chip **„Abholung nach Absprache“** wählen. Im Abschnitt „Rücktritt“ das Feld „Geschätzte Kosten, wenn die Kundin die Ware zurückschickt …“ auf **30** setzen. Den Pflicht-Haken zu den Angaben setzen.
+   - Für Futter braucht der Hof eine Betriebsnummer im Hof-Profil: eine erfundene, z. B. 9999999.
+6. Einstellungen › „Zahlung“ › „Mit Stripe einrichten“. In Stripes Formular nur Testwerte (Tabelle oben; Auszahlungs-IBAN `AT611904300234573201`).
+   - [ ] Nach der Rückkehr: „Dein Stripe-Konto ist eingerichtet. Online-Zahlung ist jetzt aktiv.“ und die Marke „Verbunden und aktiv“. Steht „Einrichtung nicht fertig“: kurz warten, „Status prüfen“.
+   - [ ] Stripe-Dashboard (Testmodus) › Connect › Verbundene Konten › das neue Konto › Fähigkeiten: **Kartenzahlungen, Überweisungen und EPS-Zahlungen sind aktiv.** Fehlt EPS oder ist es nicht aktiv: Stopp und melden – im Hofpreis-Modell scheitert dann jede Online-Zahlung dieses Hofs, auch mit Karte.
 
-- [ ] Übersicht vor dem Bezahlen: „Warenpreis" € 17,30, „Servicegebühr · 5 %, mind. € 0,50" € 0,87, „Gesamt" € 18,17. Im Zahlungsschritt nennt die Kasse die Uhrzeit, bis zu der die Ware reserviert ist.
-- [ ] Unter dem Knopf steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Bezahlung sicher über Stripe", mit dem gewählten Termin. Die Kasse hat keinen Haken und keinen Abschnitt „Neuigkeiten vom Hof" (Abschnitt 9).
-- [ ] Bestätigungsseite: erst kurz „Zahlung wird geprüft", noch ohne die Karte „Neuigkeiten vom Hof per E-Mail". Nach dem Neuladen „Danke, deine Bestellung ist da!", jetzt mit der Karte. Der Schritt „Bezahlt" ist erreicht. Die Kundin bekommt eine Mail.
-- [ ] Unter den Positionen stehen „Servicegebühr" € 0,87 und als letzte Zeile „Online · Bezahlt" mit € 18,17. Seit Nr. 54 gibt es dort keine Zeile „Zwischensumme"; Zahlart und Stand stehen statt „Gesamt".
-- [ ] Hof → Bestellungen → A. A steht unter dem Filter „Noch offen", der gewählt ist, wenn die Seite aufgeht:
-  - Der Betragskasten zeigt „Online bezahlt" und € 18,17.
-  - Darunter steht „Warenpreis € 17,30 + Servicegebühr € 0,87 – die Gebühr ist online einbehalten."
-  - Vorrat: Eier −2, Honig −1.
-- [ ] Stripe → Zahlungen: € 18,17, erfolgreich. Die Metadaten `orderNumber` zeigen die Bestellnummer aus der App. In der Zahlung: Anwendungsgebühr € 0,87, Überweisung an das verbundene Konto des Testhofs € 18,17.
-- [ ] Stripe → Connect → Verbundene Konten → Testhof: Eingang € 18,17, Anwendungsgebühr − € 0,87, netto € 17,30 (Hofanteil).
-- [ ] Stripe → Webhooks: Beim Endpunkt der Testumgebung **und** beim Endpunkt der Produktion steht `payment_intent.succeeded` mit Antwort 200, ohne Wiederholungen.
-- [ ] Admin → Finanzen: „Servicegebühr, online" = S + € 0,87.
+**AGB zustimmen** (vor dem Stichtag)
 
-**1b – 3-D Secure, Bestellung B**
+- [ ] Hof › Heute: Karte „AGB bestätigen“ mit dem Satz „Ab <Tag> gilt Fassung 1.0. Bitte lies sie und stimm ihr zu – bis dahin gilt für dich Fassung 0.9. Mit deiner Zustimmung gilt Fassung 1.0 für dich ab <Tag>, ohne weitere Ankündigungsfrist (Punkt 32.4).“ <Tag> ist der Stichtag aus A0. Links „Fassung 1.0 lesen“ und „Fassung 0.9“.
+- [ ] „Ich stimme den AGB zu“: Die Seite lädt neu, die Karte ist weg (ein Toast kommt nicht). Profil **Admin** › Höfe › Testhof › Abschnitt „Kontakt“, Zeile „AGB“: „Fassung 1.0 · <Datum>, <Uhrzeit> Uhr“.
 
-1. 1 × Test-Eier in den Korb, Kasse, „Online bezahlen", „Weiter zur Zahlung · € 5,40".
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-2. Freiwillige Gegenprobe vorweg: Karte `4000 0000 0000 0002` (wird abgelehnt) → „Jetzt bezahlen".
-   - Erwartet: „Deine Karte wurde abgelehnt" und „Es wurde nichts abgebucht …". Die Ware bleibt bis zur genannten Uhrzeit reserviert.
-3. Karte `4000 0027 6000 3184` → „Jetzt bezahlen" bzw. „Erneut bezahlen · € 5,40". Im Stripe-Testfenster für 3-D Secure „Complete" (abschließen) tippen.
+**Freischalten, Testhof, Servicegebühr** (Profil **Admin**)
 
-Erwartet:
+7. Admin › Höfe › Testhof „Prüfen“ › „Freischalten“ › Dialog „Hof freischalten?“ › „Freischalten“ › Passkey.
+   - [ ] Toast „<Hof> freigeschaltet“, die Mail „Dein Hof ist freigeschaltet“ kommt an die Testhof-Adresse. Ist der Knopf grau, steht der Grund darunter (E-Mail nicht bestätigt, Stripe fehlt, kein Produkt im Shop, keine Abholzeit, keine Kunden-E-Mail).
+8. In der Akte „Eingreifen“ › „Als Testhof markieren …“ › „Als Testhof markieren“ › Passkey.
+   - [ ] Toast „Der Hof ist jetzt ein Testhof.“ und die Marke „Testhof“ in der Akte. Ein Testhof bekommt keinen Gründungsplatz und verschwindet aus `/hoefe`, Startseite und Karte; per Link bleibt er erreichbar.
+   - [ ] Profil **Kundin**, Hofseite des Testhofs (per Link), eine Produktseite und die Kasse zeigen oben „Testhof von Agrilo – Bestellungen hier sind Testbestellungen, es gibt keine Ware.“
+9. In der Akte „Servicegebühr …“ › „Prozentsatz (%)“ **5**, „Mindestgebühr (€)“ **0,50**, „Gebühr gilt ab“ **heute** › Passkey. Ohne Datum ist der Hof im alten Modell gebührenfrei; dann stimmen die Beträge in A3 nicht. (Der Knopf „Servicegebühr …“ verschwindet nach dem Stichtag.)
 
-- [ ] Die Gebührenzeile zeigt € 0,50, die Mindestgebühr: 5 % von € 4,90 wären nur € 0,25.
-- [ ] Sonst wie bei 1a: Zahlung € 5,40, Anwendungsgebühr € 0,50, Überweisung € 5,40, Hofanteil € 4,90. Finanzen + € 0,50.
+## A2 · Blick vor dem Stichtag (etwa 10 Minuten)
 
-**Ergebnis Ablauf 1**
+Profil **Kundin**.
 
-- [ ] bestanden
-- [ ] Fehler: ______ (Bestellnummer, Uhrzeit, Bild)
-- [ ] ausgelassen, weil: ______
+- [ ] `/agb` zeigt Fassung 0.9 („Fassung 0.9 – Entwurf, Stand 13. Oktober 2026“) und oben fett „Ab <Tag> gilt Fassung 1.0.“ mit dem Link „Fassung 1.0 lesen“.
+- [ ] `/agb/1.0` lässt sich lesen: „Fassung 1.0 – gilt ab <Tag>“, mit den Anhängen 1 bis 3.
+- [ ] `/konditionen` nennt den Stichtag: „Ab <Tag> ist die Plattformgebühr im Preis enthalten (Stichtag).“ Der Abschnitt heißt noch „Servicegebühr und Abrechnung“.
+- [ ] Hofseite des Testhofs: Test-Eier € 4,90, Test-Honig € 7,50 (Warenpreis ohne Aufschlag) und „Preise zzgl. 5 % Servicegebühr (mind. € 0,50) …“.
 
-### Ablauf 2 – Wallet, Bestellung C
+## A3 · Bestellungen im alten Modell als Vorrat für Teil B (etwa 25 Minuten)
 
-Vorbereitung:
+Profil **Kundin**, Testhof. Abholtermin immer an einem der nächsten Tage. Bestellnummern notieren.
 
-- Ein Gerät mit Google Pay (Chrome, Karte im Google-Konto) oder Apple Pay (Safari, Karte in Wallet).
-- Die Domain des Orts ist in Stripe (Testmodus) unter Einstellungen → Zahlungsmethoden → Domains eingetragen; für test.farmerzone.at siehe `docs/betrieb/testumgebung.md`, Schritt 5.
-- Verlangt Stripe dafür eine Datei unter `/.well-known/`, ist das ein eigener kleiner Auftrag (`docs/betrieb/stripe-live.md`, Schritt 7). Heute liegt keine solche Datei im Projekt.
-- Bleibt die Domain unbestätigt, kann auch die Vercel-Sperre der Grund sein. Karte und EPS lassen sich trotzdem testen.
+**V1 – online, 2 × Eier + 1 × Honig**
 
-Schritte:
+- [ ] Kasse, Übersicht: „Warenpreis“ € 17,30, „Servicegebühr (5 %)“ € 0,87, „Gesamt“ € 18,17. Unter dem Kaufknopf: „Es gelten die AGB von Agrilo. Dein Vertragspartner ist der Hof. Mit dem Bestellen stimmst du zu, dass Agrilo die Vermittlung sofort ausführt.“ (diesen letzten Satz gibt es nur im alten Modell).
+- [ ] Banner zeigt „TEST · Dev-DB · Stripe Test“. „Weiter zur Zahlung · € 18,17“, Karte `4242 4242 4242 4242`, „Jetzt bezahlen · € 18,17“. Nach dem Neuladen bezahlt; Stripe: € 18,17, Anwendungsgebühr € 0,87, **kein** „im Namen von“ (on behalf of).
+- [ ] Die Bestätigungsmail „Deine Bestellung bei <Testhof> – Abholung <Datum>“ hat die Datei `agb-agrilo-0.9.html` im Anhang.
 
-1. 3 × Test-Eier in den Korb, „Online bezahlen", „Weiter zur Zahlung · € 15,44".
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-2. Im Zahlungsfeld Google Pay bzw. Apple Pay wählen und bestätigen. Im Testmodus belastet Stripe keine echte Karte.
+**V2 – online, 1 × Eier + 1 × Honig** (für den Storno in B2)
 
-Erwartet:
+- [ ] Banner prüfen. Gesamt € 13,02 (Servicegebühr € 0,62), mit Karte 4242 bezahlen.
 
-- [ ] Wie Ablauf 1a: Zahlung € 15,44, Anwendungsgebühr € 0,74, Überweisung € 15,44, Hofanteil € 14,70. Finanzen + € 0,74.
-- [ ] Erscheint keine Wallet: Ablauf als ausgelassen vermerken und den Grund notieren, etwa „Domain nicht eingetragen" oder „Gerät ohne Wallet". Das ist kein Fehler der App: Welche Wege das Zahlungsfeld anbietet, entscheiden die Stripe-Einstellungen und das Gerät.
+**V3 – bar, 2 × Eier** (für das Abholen in B2)
 
-**Ergebnis Ablauf 2**
+- [ ] Banner prüfen. „Bar bei Abholung“ zeigt „Ohne Servicegebühr bis 31. Jänner 2027. Du bestätigst per E-Mail.“; die Gebührenzeile zeigt „entfällt“, Gesamt € 9,80. „Zahlungspflichtig bestellen · € 9,80“, dann in der Mail „Bitte bestätige deine Bestellung bei <Testhof>“ den Link und „Ja, ich hole verbindlich ab“.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+## A4 · Notbremse (etwa 15 Minuten)
 
-### Ablauf 3 – EPS im Testmodus, Bestellung D
+Wozu: Am Abend vor dem **echten** Stichtag hält die Projektleitung neue Bestellungen über Mitternacht an (Bericht 259). Hier wird der Griff einmal geübt – und **vor A6 wieder gelöst**, sonst lässt sich A6 nicht prüfen.
 
-Vorbereitung: EPS ist in Stripe (Testmodus) unter Einstellungen → Zahlungsmethoden aktiv.
+1. Profil **Admin** › Heute › „Bestellungen anhalten …“. Grund „Wartung“, „Satz für die Kundschaft“ so lassen („Bestellen ist gerade kurz nicht möglich. Bitte versuch es in einer Stunde wieder.“), „Bis spätestens“ in einer Stunde › „Mit Passkey anhalten“.
+   - [ ] Toast „Neue Bestellungen sind angehalten.“, in Heute ganz oben die Aufgabe „Notbremse aktiv“ mit „Freigeben“.
+2. Profil **Kundin**:
+   - [ ] Hofseite und Kasse zeigen unter dem Kopf das Band mit dem Satz und „bis … Uhr“. „In den Korb“ heißt „Nicht bestellbar“; im Korb-Blatt steht statt „Zur Kasse“ „Bestellen geht gerade nicht.“ Eine offene Kasse nimmt beim Absenden nichts an und zeigt den Satz.
+3. Profil **Hof**:
+   - [ ] V1 öffnen: Die Knöpfe („Als gepackt markieren“, „Artikel fehlt“, „Stornieren …“) sind da und nicht gesperrt. Laufende Bestellungen bleiben bearbeitbar; nichts davon jetzt antippen.
+4. Profil **Admin** › „Freigeben“ › Passkey.
+   - [ ] Toast „Bestellungen gehen wieder.“, das Band ist (spätestens nach einer Minute) weg, „In den Korb“ geht wieder. Admin › Betrieb › Protokoll zeigt „Bestellungen angehalten“ und „Bestellungen wieder frei“.
 
-Schritte:
+## A5 · Stichtag auf morgen setzen (etwa 10 Minuten)
 
-1. 1 × Test-Eier und 1 × Test-Honig in den Korb, „Online bezahlen", „Weiter zur Zahlung · € 13,02".
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-2. Im Zahlungsfeld „EPS" und eine Bank wählen, weiter.
-3. Auf Stripes Testseite „Authorize test payment" (Testzahlung bestätigen) tippen.
+> **Achtung: nicht umkehrbar.** Nach Mitternacht ist der Stichtag erreicht und lässt sich nicht mehr ändern. Ein Zurücksetzen in der Datenbank ist kein verlässlicher Rückweg (die Einstellung liegt ohne Ablauf im Zwischenspeicher). Die Entwicklungsdatenbank bleibt danach im Hofpreis-Modell, auch für alle späteren Tests.
 
-Erwartet:
+1. Profil **Admin** › Einstellungen › „Hofpreis-Modell ab“ › „Stichtag“ = **morgen** › „Stichtag speichern“ › Passkey.
+   - [ ] Toast „Stichtag gespeichert.“ Gegenprobe vorher: „heute“ ergibt „Der Stichtag muss in der Zukunft liegen.“
+   - [ ] Admin › Betrieb › Protokoll: „Stichtag Hofpreis-Modell geändert“ mit dem alten und dem neuen Tag.
+   - [ ] `/agb` und `/konditionen` (neu laden) nennen jetzt den **morgigen** Tag. Die AGB-Karte eines Hofs ohne Zustimmung (Seed-Hof) sagt „Ab <morgen> gilt Fassung 1.0. …“.
 
-- [ ] Zurück auf der Bestätigungsseite, nach dem Webhook „Bezahlt".
-- [ ] Ware € 12,40, Gebühr € 0,62. 5 % von 1.240 Cent sind glatt 62 Cent, es gibt nichts aufzurunden. Gesamt € 13,02.
-- [ ] Stripe: Zahlung € 13,02 mit Zahlungsmethode EPS, Anwendungsgebühr € 0,62, Überweisung € 13,02. Hofanteil € 12,40.
-- [ ] Finanzen + € 0,62.
-- [ ] Gibt es EPS nicht: Bestellung D mit Karte `4242 4242 4242 4242` bezahlen, denn Ablauf 8 braucht sie. Ablauf 3 als ausgelassen vermerken.
+## A6 · Rund um Mitternacht (freiwillig, aber der einzige Weg für diesen Fall; etwa 45 Minuten)
 
-**Ergebnis Ablauf 3**
+Geprüft wird: Eine Bestellung von vor Mitternacht bleibt im alten Modell, auch wenn sie erst danach bezahlt oder bestätigt wird. Die Online-Frist ist 30 Minuten ab Bestellung; deshalb geht das nur knapp um Mitternacht.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+**V4 – online vor Mitternacht, bezahlt nach Mitternacht**
 
-### Ablauf 4 – Bar ohne Servicegebühr (B1) mit Bestätigungsknopf, Bestellung E
+1. Zwischen **23:35 und 23:55**: 2 × Eier + 1 × Honig, online (€ 18,17). Banner prüfen. Im Zahlungsschritt **EPS** wählen und auf Stripes Testseite die Zahlung **scheitern lassen**.
+   - [ ] Zurück in der App: „Zahlung fehlgeschlagen“ mit dem Knopf „Erneut versuchen“. Notier die Uhrzeit, bis zu der die Ware reserviert ist (30 Minuten ab Bestellung).
+2. **Nach 00:00 und vor dieser Uhrzeit:** auf der Bestätigungsseite „Erneut versuchen“.
+   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test“.
+   - [ ] Die Seite „Bezahlen“ zeigt den **alten** Betrag € 18,17 mit einer Zeile „Servicegebühr …“ über € 0,87 (nicht „Plattformgebühr“), und der AGB-Link unter dem Knopf führt auf `/agb/0.9`.
+   - [ ] Mit Karte 4242 bezahlen. Stripe: € 18,17, Anwendungsgebühr € 0,87 und **kein** „im Namen von“. Die Bestätigungsmail hat `agb-agrilo-0.9.html` im Anhang.
 
-Schritte:
+**V5 – bar vor Mitternacht, bestätigt nach Mitternacht**
 
-1. 2 × Test-Eier in den Korb, zur Kasse, eine Abhol-Kachel und „Bar bei Abholung" wählen.
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-2. Knopf „Zahlungspflichtig bestellen · € 9,80" tippen. Einen Haken gibt es dafür nicht mehr.
-3. Die Bestätigungsmail öffnen und den Link tippen. Auf der Seite „Ja, ich hole verbindlich ab" tippen.
+1. Gegen **23:40**: 2 × Eier, „Bar bei Abholung“, Abholtermin an einem späteren Tag. Banner prüfen. „Zahlungspflichtig bestellen · € 9,80“. Die Mail noch nicht bestätigen (die Frist ist 2 Stunden).
+2. **Nach 00:00:** In der Mail „Bitte bestätige …“ den Link öffnen, „Ja, ich hole verbindlich ab“.
+   - [ ] V5 bleibt ohne Gebühr: € 9,80, keine Zeile „Plattformgebühr“, beim Hof „Bar zu kassieren“ € 9,80. Die Bestätigungsmail hat `agb-agrilo-0.9.html` im Anhang.
 
-Erwartet:
+---
 
-- [ ] Unter den Zahlarten steht „Bei Barzahlung bis 31. Jänner 2027 ohne Servicegebühr.", bei „Bar bei Abholung" der Zusatz „du bestätigst per E-Mail".
-- [ ] Die Übersicht hat keine Zeile Servicegebühr: „Warenpreis" € 9,80, „Gesamt" € 9,80.
-- [ ] Die Kasse hat keinen Haken bei Bar und keinen Abschnitt „Neuigkeiten vom Hof" (Nr. 46). Unter dem Knopf steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Du zahlst bar beim Abholen", mit dem gewählten Termin.
-- [ ] Bestätigungsseite: „Fast geschafft – bitte bestätige per E-Mail". Darunter steht die Karte „Neuigkeiten vom Hof per E-Mail", weil eine offene Barbestellung bis zu ihrer Frist zählt. Getestet wird sie in Abschnitt 9.
-  - Die letzte Zeile der Bestellung heißt „Bar bei Abholung · Noch offen", mit € 9,80. Eine Zeile Servicegebühr gibt es nicht (Nr. 54).
-- [ ] Seite hinter dem Link: „Bestellung bei … bestätigen" mit „Bitte bestätige bis … – erst dann packt der Hof für dich." Die Positionen stehen da, **eine Zeile Servicegebühr nicht**, Summe € 9,80.
-- [ ] Hof → Bestellungen → E: „Bar zu kassieren € 9,80", darunter „Warenpreis € 9,80", ohne Satz zur Monatsabrechnung.
-- [ ] Stripe: nichts. Admin → Finanzen: S und V unverändert.
-- [ ] Kommt keine Mail an, gibt es einen Notweg: In der Entwicklungsdatenbank (nur dort, nur lesen) `select "confirmationToken" from "Order" where "orderNumber" = '<Bestellnummer>';` abfragen und `<Ort>/<hof-slug>/bestaetigen/<token>` öffnen. Den fehlenden Mailweg notierst du trotzdem als Befund.
+# Teil B – Der Tag danach (Sitzung 2)
 
-**Ergebnis Ablauf 4**
+Ab Mitternacht gilt in der Testumgebung das Hofpreis-Modell. Jede **neue** Bestellung kommt jetzt mit der Plattformgebühr (6 %, je Stück aufgerundet), online und bar mit demselben Endpreis. Bestellungen von gestern bleiben im alten Modell, für immer: Das Modell steht in jeder Bestellung fest gespeichert.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+Vor jedem Schritt, der bezahlt oder Geld zurückbucht, steht wieder der Haken für das Banner. Er zählt mit, auch wenn er gleich aussieht.
 
-### Ablauf 5 – Bar unbestätigt, nach Frist freigegeben, Bestellung F
+## B1 · Generalprobe 259: Was nach Mitternacht umgeschaltet hat (etwa 15 Minuten)
 
-**Regel** (`src/lib/fristen.ts`):
+Profil **Kundin**, dann **Hof** und **Admin**. Seiten, die sich nicht umstellen, einmal neu laden.
 
-- Eine Barbestellung muss bestätigt sein, bevor die frühere von zwei Grenzen erreicht ist: 2 Stunden nach dem Bestellen oder der Beginn des gewählten Abholfensters.
-- Die Frist gilt beim Lesen. Wer danach die Hofseite, die Kasse oder die Bestellungen des Hofs öffnet, gibt die Ware frei. Der tägliche Cron ist nur das Netz darunter.
+- [ ] `/agb` (bei jedem Aufruf frisch) zeigt jetzt „Fassung 1.0 – gilt ab <Stichtag>“ und unten den Link „Frühere Fassung 0.9 (für Bestellungen bis <Vortag>)“. Fehler: Es steht noch 0.9 oben, oder die Seite zeigt einen Ladefehler.
+- [ ] `/agb/0.9` lässt sich weiter öffnen und zeigt die alte Fassung. `/agb/2.0` zeigt „nicht gefunden“.
+- [ ] `/konditionen` (frisch je Aufruf): „Seit <Stichtag> ist die Plattformgebühr im Preis enthalten (Stichtag).“, der Abschnitt heißt jetzt „Plattformgebühr und Abrechnung“, und nirgends steht eine Marke „Entwurf“.
+- [ ] `/fuer-hoefe` sagt „Die Plattformgebühr von 6 % steckt im Preis, den die Kundin zahlt – online wie bar. Du bekommst den vollen Warenpreis.“; Startseite und `/hoefe` zeigen Endpreise „inkl. Plattformgebühr“. Diese drei Seiten erneuern sich nur alle fünf Minuten: Steht kurz nach Mitternacht noch der alte Stand da, nach fünf Minuten einmal neu laden. Erst wenn es danach noch alt ist, ist es ein Fehler. (Der Testhof selbst steht als Testhof nicht auf `/hoefe`; dort schaust du auf einen Seed-Hof.)
+- [ ] Hofseite des Testhofs: Test-Eier zeigen € 5,20, Test-Honig € 7,95 (Endpreise, Tabelle oben). Unter den Produkten steht „Preise inkl. Plattformgebühr (6 %) – online und bar gleich.“
+- [ ] Profil **Admin** › Einstellungen › Karte „Hofpreis-Modell ab“: Das Feld ist gesperrt, dort steht „Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.“ und der Satz beginnt mit „Seit diesem Tag gilt …“.
+- [ ] AGB-Karte eines Hofs, der der Fassung 1.0 noch nicht zugestimmt hat (ein Seed-Hof; seine Admin-Akte zeigt bei den AGB „noch nicht zugestimmt“ oder „Fassung 0.9 · …“). Im Profil **Hof** als dieser Hof › Heute: Karte „AGB bestätigen“ ohne „Ab <Tag> gilt …“, sondern „Die AGB haben sich geändert (jetzt Fassung 1.0). Bitte lies sie und stimm ihnen zu. Dein Hof bleibt in der Zwischenzeit wie gewohnt nutzbar.“ (Hof mit 0.9) bzw. „Bitte lies die AGB (Fassung 1.0) und stimm ihnen zu. …“ (Hof ohne Zustimmung).
 
-Schritte:
+## B2 · Bestellungen von vor dem Stichtag (etwa 20 Minuten)
 
-1. Den Vorrat von Test-Honig notieren.
-2. 1 × Test-Honig in den Korb, zur Kasse, „Bar bei Abholung". Dann die Kachel mit „Heute" wählen, deren Fenster in etwa 20 Minuten beginnt.
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-3. „Zahlungspflichtig bestellen · € 7,50" tippen. Die Mail **nicht** bestätigen.
-4. Warten, bis das Fenster begonnen hat. Dann die Hofseite oder Hof → Bestellungen öffnen.
-5. Statt zu warten, kannst du die Zeit in der Entwicklungsdatenbank vorstellen, nie in der Produktion: `update "Order" set "createdAt" = now() - interval '3 hours' where "orderNumber" = '<Bestellnummer>';` Danach die Hofseite öffnen.
+Die drei Bestellungen aus A3 (**V1**, **V2**, **V3**) bleiben im alten Modell. Profil **Hof** › Bestellungen.
 
-Erwartet:
+- [ ] V1 und V2 zeigen weiter „Servicegebühr“ (nicht „Plattformgebühr“), V1 mit „Warenpreis € 17,30 + Servicegebühr € 0,87 – die Gebühr ist online einbehalten.“
+- [ ] **Artikel fehlt bei V1** (online, alte Regel). Banner zeigt „TEST · Dev-DB · Stripe Test“. V1 › „Artikel fehlt“ › Test-Honig antippen. Der Dialog nennt: „<Vorname> bekommt zurück“ € 7,87 und „Von deiner nächsten Auszahlung abgezogen“ € 7,50, dazu „Artikel € 7,50 + Servicegebühr € 0,37 – die Gebühr gilt nur noch für € 9,80 Ware.“ Speichern. Toast „Gespeichert. <Vorname> bekommt € 7,87 zurück und eine E-Mail.“ (Rechnung: Tabelle „Was sich danach bewegt“.)
+- [ ] **Storno von V2** (online). Banner zeigt „TEST · Dev-DB · Stripe Test“. V2 › „Stornieren …“: „<Vorname> bekommt zurück“ € 13,02, darunter „Warenpreis € 12,40 + Servicegebühr € 0,62“, „Von deiner nächsten Auszahlung abgezogen“ € 12,40 und „… Die Servicegebühr erstattet Agrilo.“ „Stornieren und erstatten“ → Toast „Storniert. <Vorname> bekommt € 13,02 zurück.“
+- [ ] Stripe, Zahlung V2: ganz erstattet (€ 13,02), Überweisung an den Testhof ganz zurückgebucht, Anwendungsgebühr € 0,62 zurück. Zahlung V1: teilweise erstattet € 7,87, Rückbuchung vom Hof € 7,50, Anwendungsgebühr bleibt € 0,87.
+- [ ] **V3 bar abholen**: V3 › „Als gepackt markieren“ › „Abgeholt und € 9,80 kassiert“. Toast „Als abgeholt und bezahlt gespeichert“. Keine Gebühr, auch heute nicht (bar vor dem 1. Februar 2027 im alten Modell). V1 danach „Als gepackt markieren“ › „Abgeholt“ → „Als abgeholt gespeichert“.
+- [ ] **Mail noch einmal schicken**: Profil **Admin** › Betrieb › Reiter „E-Mails“ › „Alle Mails · 90 Tage“ › die Bestätigungsmail zu V3 öffnen › „Nochmal schicken“ › „Mit Passkey bestätigen und schicken“. Es steht „Ist unterwegs – …“. Die Mail kommt an und hat die Datei `agb-agrilo-0.9.html` im Anhang, nicht 1.0.
 
-- [ ] Vor der Frist steht F in Hof → Bestellungen unter „Heute abholen" und unter „Noch offen".
-- [ ] Nach der Frist steht F auf „Storniert" mit dem Grund „Nicht rechtzeitig bestätigt", jetzt unter „Erledigt".
-- [ ] Der Vorrat von Test-Honig ist wieder wie vorher.
-- [ ] Die Kundin bekommt eine Mail, dass die Bestellung verfallen ist.
-- [ ] Der Link aus der ersten Mail zeigt „Bestellung verfallen" und „Die Bestellung wurde nicht rechtzeitig bestätigt. Wir haben die Ware wieder freigegeben – dir entstehen keine Kosten."
-- [ ] Stripe: nichts. Finanzen: unverändert.
+## B3 · Abnahme 197: Plattformgebühr im Preis (etwa 45 Minuten)
 
-**Ergebnis Ablauf 5**
+Profil **Kundin**, Testhof. Bestellungen hier heißen **H1** bis **H5**.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+**Anzeige**
 
-### Ablauf 6 – Futter mit Größe und Hinweis „Angaben stammen vom Hof", Bestellung G
+- [ ] Hofseite, Produktkarte und Produktseite zeigen den Endpreis: Test-Eier € 5,20, Test-Honig € 7,95, Test-Heu „Rundballen“ € 47,70, „5 kg-Sack“ € 5,20. Steht ein Grundpreis je kg darunter, ist er aus dem Endpreis gerechnet (5 kg-Sack: 520 Cent ÷ 5 = € 1,04 je kg). Fehler: irgendwo steht noch € 4,90 für die Eier.
+- [ ] Warenkorb-Blatt mit 2 × Eier und 1 × Honig: Zeilen mit Endpreisen, „Gesamt“ € 18,35 und darunter „Inkl. Plattformgebühr · Reservierung gilt 15 Minuten.“ Nirgends „zzgl. Servicegebühr“.
+- [ ] **Mindestbestellwert:** Nur 2 × Eier in den Korb (Warenwert € 9,80). Die Kasse zeigt keinen Bestellknopf, sondern die Karte „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60).“ und „Dir fehlen noch Waren für € 0,20. Leg noch etwas dazu.“ mit „Zurück zum Angebot“. Fehler: Man kann trotzdem bestellen.
 
-Vorbereitung: Test-Heu mit zwei Größen und die Betriebsnummer im Hof-Profil (Abschnitt 2).
+**H1 – online mit Karte**
 
-Schritte:
+1. Korb: 2 × Eier, 1 × Honig. Kasse öffnen.
+   - [ ] Übersicht: „Ware“ € 17,30, „Plattformgebühr (6 %)“ € 1,05, „Gesamt“ € 18,35, dazu „Preise inkl. USt“ und „Die Plattformgebühr ist Teil des Preises. Der Hof zahlt damit die Bestellplattform Agrilo.“ Die Warenkorb-Karte zeigt „2 × Eier · € 10,40“ und „1 × Honig · € 7,95“ (oder mit dem vollen Produktnamen).
+2. „Online bezahlen“, Abholtermin, Daten, „Weiter zur Zahlung · € 18,35“.
+   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test“.
+3. Karte `4242 4242 4242 4242`, „Jetzt bezahlen · € 18,35“.
+   - [ ] Bestätigungsseite nach dem Neuladen bezahlt. Die Positionen stehen dort mit dem **Warenpreis** (2 × Eier € 9,80, 1 × Honig € 7,50), darunter „Plattformgebühr · € 1,05“, „Gesamt € 18,35“ und „Online bezahlt · inkl. Plattformgebühr (6 %)“. Das ist so gebaut, kein Fehler.
+   - [ ] Stripe › Zahlungen › diese Zahlung: Betrag € 18,35, Anwendungsgebühr € 1,05, Überweisung € 18,35 an das Konto des Testhofs, und in den Details „im Namen von“ (englisch „on behalf of“) **das Hofkonto**. Fehler: kein „im Namen von“.
+   - [ ] Profil **Hof** › Bestellungen › H1: „Online bezahlt“ € 18,35 und „Du bekommst € 17,30 · die Kundin zahlt € 18,35 – die Gebühr ist online einbehalten.“ **Haken „Hof bekommt 100 % des Warenpreises“:** 18,35 − 1,05 = 17,30 = Warenpreis.
 
-1. Hofseite → Abschnitt Futtermittel → Test-Heu → „Größe wählen ›".
-2. Auf der Produktseite „Rundballen" wählen und in den Korb legen.
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-3. Kasse, bar, „Zahlungspflichtig bestellen · € 45,00", dann per Mail bestätigen.
+**H2 – 3-D Secure**
 
-Erwartet:
+- [ ] Korb 1 × Honig + 1 × Eier (Ware € 12,40, Gebühr 45 + 30 = 75 Cent, Gesamt € 13,15). Banner prüfen. Karte `4000 0027 6000 3184`, im Stripe-Fenster „Complete“. Erwartet: bezahlt, Stripe: € 13,15, Anwendungsgebühr € 0,75, „im Namen von“ das Hofkonto.
 
-- [ ] Die Produktseite zeigt beide Größen mit ihren Preisen: 5 kg-Sack € 4,90, Rundballen € 45,00.
-- [ ] Auf der Produktseite und im Warenkorb steht: „Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; FarmerZone vermittelt nur und prüft die Angaben nicht."
-- [ ] Bestellung G: € 45,00 bar, ohne Servicegebühr. Online kämen 5 % dazu, also € 2,25, zusammen € 47,25.
-- [ ] Hof: „Bar zu kassieren € 45,00". Stripe: nichts.
+**H3 – EPS**
 
-**Ergebnis Ablauf 6**
+- [ ] Korb 3 × Eier (Ware € 14,70, Gebühr 3 × 30 = 90 Cent, Gesamt € 15,60). Banner prüfen. „EPS“ und eine Bank wählen, auf Stripes Testseite die Zahlung bestätigen. Erwartet: bezahlt, Stripe: Zahlungsmethode EPS, € 15,60, Anwendungsgebühr € 0,90. **Fehler, der genau hier auffällt:** Stripe lehnt den Zahlungsvorgang ab oder die Kasse meldet, Online-Zahlung sei nicht möglich – dann fehlt dem Hofkonto die EPS-Fähigkeit (A1).
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+**H4 – bar, derselbe Korb wie H1**
 
-### Ablauf 7 – Artikel fehlt bei Online-Bestellung, Teilerstattung (Bestellung A)
+Ob bar geht, hängt am Einzugsbeginn des Hofs („Einzug ab“) und an der Lastschrift. Damit das Ergebnis eindeutig ist, stellst du den Einzugsbeginn selbst ein: Profil **Admin** › Höfe › Testhof › Abschnitt „Plattformgebühr“ (unten in der Akte) › „Einzug ab (Vorgabe JJJJ-MM-TT)“ auf einen Tag **in einem Monat**, „Lastschrift Pflicht für bar“ angehakt lassen › „Mit Passkey speichern“. Toast „Plattformgebühr gespeichert. Satz und Einzug gelten für neue Bestellungen.“
 
-Vorbereitung: A ist bezahlt (Ablauf 1a).
+- [ ] Profil **Kundin**: Korb 2 × Eier + 1 × Honig, „Bar bei Abholung“, „Zahlungspflichtig bestellen · € 18,35“. Banner prüfen. Mail bestätigen („Ja, ich hole verbindlich ab“). **Haken „online = bar“:** Übersicht und Knopf zeigen dieselben € 18,35 wie bei H1.
+- [ ] Profil **Hof** › H4: „Bar zu kassieren“ € 18,35 und „Du bekommst die vollen € 18,35 – bis <Tag vor dem Einzug> zahlst du auf Barverkäufe keine Plattformgebühr.“ Die Gebühr bleibt bis zum Einzugsbeginn beim Hof.
 
-Schritte als Hof:
+**H5 – bar ohne Lastschrift bei fälligem Einzug**
 
-1. Bestellungen → A → „Artikel fehlt".
-2. „Test-Honig" antippen und den Dialog lesen.
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-3. „Änderung speichern und \<Vorname\> informieren".
+In derselben Akte „Einzug ab“ auf **heute** setzen, „Lastschrift Pflicht für bar“ angehakt lassen, „Mit Passkey speichern“.
 
-Erwartet:
+- [ ] Profil **Kundin**, neuer Korb (mindestens € 10 Ware), Kasse neu laden: Es gibt nur noch „Online bezahlen“, „Bar bei Abholung“ fehlt. Fehler: Bar wird angeboten.
+- [ ] Profil **Hof** › Einstellungen › „Zahlung“, Karte „Bar bei Abholung“: Marke „Braucht Lastschrift“ und „Barzahlung gibt es, sobald du die Lastschrift für die Monatsabrechnung eingerichtet hast. …“ Bekannt und kein Fehler dieser Liste: Die Hofseite sagt bei „Zahlung & Kontakt“ weiter „Online bezahlen oder bar bei Abholung.“ (Bericht A011).
 
-- [ ] Der Dialog zeigt vor dem Speichern:
-  - „\<Vorname\> bekommt zurück € 7,87",
-  - „Von deiner nächsten Auszahlung abgezogen € 7,50",
-  - „Artikel € 7,50 + Servicegebühr € 0,37 – die Gebühr gilt nur noch für € 9,80 Ware.",
-  - „Das ist genau der Preis des fehlenden Artikels. Den Unterschied bei der Servicegebühr erstattet FarmerZone."
-- [ ] Toast: „Gespeichert. \<Vorname\> bekommt € 7,87 zurück und eine E-Mail."
-- [ ] A zeigt jetzt € 10,30 mit „Warenpreis € 9,80 + Servicegebühr € 0,50" und „Für fehlende Artikel schon erstattet: € 7,87". Der Honig ist als fehlend markiert. Der Vorrat ändert sich nicht, denn der Artikel war nie da.
-- [ ] Die Kundin bekommt eine Mail mit dem neuen Betrag.
-- [ ] Stripe, Zahlung A: teilweise erstattet € 7,87. Die Erstattung trägt die Metadaten `anlass=teilstorno`, `art=kunde`, dazu `orderId` und `positionId`.
-- [ ] Stripe, Überweisung an den Testhof: Rückbuchung € 7,50 mit `art=hof`. Die Anwendungsgebühr bleibt € 0,87 und wird nicht erstattet.
-- [ ] Stripe, verbundenes Konto: Hofanteil jetzt € 9,80 (18,17 − 0,87 − 7,50).
-- [ ] Admin → Finanzen: „Servicegebühr, online" sinkt um € 0,37.
+## B4 · Kasse und Recht (etwa 35 Minuten)
 
-**Ergebnis Ablauf 7**
+Profil **Kundin**, Testhof, Käuferart Verbraucherin (Normalfall).
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+- [ ] **Testhof-Hinweis (207):** Hofseite, Produktseite und jeder Schritt der Kasse zeigen oben „Testhof von Agrilo – Bestellungen hier sind Testbestellungen, es gibt keine Ware.“ In Mails steht er nicht.
+- [ ] **Sätze unter dem Kaufknopf (215):** Unter „Weiter zur Zahlung“, „Zahlungspflichtig bestellen“ und „Jetzt bezahlen“ steht jeweils „Es gelten die AGB von Agrilo. Dein Vertragspartner ist der Hof.“ – **ohne** den Satz „Mit dem Bestellen stimmst du zu, dass Agrilo die Vermittlung sofort ausführt.“ (den gibt es nur im alten Modell, A3). Darunter „Du kannst vom Kauf innerhalb von 14 Tagen nach der Abholung zurücktreten – außer bei schnell verderblicher Ware. So geht’s: Rücktritt“. Beide Links öffnen in einem neuen Tab; „AGB“ führt auf `/agb` (Fassung 1.0).
+- [ ] **Gewährleistung (211):** Über dem Kaufknopf und im Zahlungsschritt steht die Karte „Gesetzliche Gewährleistung“ mit der amtlichen Grafik.
+- [ ] **Rücktritts-Hinweise am Produkt:** Produktseite und Warenkorb-Karte der Kasse zeigen bei Test-Eier „Kein Rücktritt: verdirbt schnell“ und beim Rundballen „Rücksendung geschätzt ca. € 30,00“ (der Betrag aus A1).
+- [ ] **Abholung nach Absprache (257):** Rundballen in den Korb, Kasse: grüne Karte „Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.“, das Notizfeld heißt „Notiz zur Abholung (freiwillig)“. Bestellen (online, Karte 4242, Banner prüfen; Ware € 45,00 + Gebühr € 2,70 = € 47,70). Die Bestätigungsmail sagt unter „Wo“ „Der Hof stimmt die Abholung mit dir ab …“. Beim Hof (Heute und Bestellung) steht die Marke „Abholung absprechen“ mit „Mail schreiben“.
+- [ ] **Bar-Mail an den Hof (256):** Nach einer Barbestellung (H4) bekommt die Adresse des Testhofs die Mail „Neue Bestellung für <Abholtag> – <Nr> (Bar bei Abholung)“ mit dem orangen Kasten „<Name> bestätigt bis … Erst dann packst du.“ Nach der Bestätigung durch die Kundin folgt „Bar-Bestellung <Nr> bestätigt“.
+- [ ] **Bestätigungsmail an die Kundin (207):** Die Mail zu H1 „Deine Bestellung bei <Testhof> – Abholung <Datum>“ enthält die Rücktrittsbelehrung, das Muster-Widerrufsformular, den Link „Vertrag widerrufen“, die Gewährleistungs-Grafik und im Anhang `agb-agrilo-1.0.html`. Der AGB-Satz darin verlinkt `/agb/1.0`.
+- [ ] **EPS abbrechen (202):** Banner prüfen. Neuer Korb (über € 10 Ware), online, EPS, auf Stripes Testseite die Zahlung **scheitern lassen**. Zurück in der App: „Zahlung fehlgeschlagen“, „Bitte versuche es erneut oder wähle eine andere Zahlungsart.“ und der Knopf „Erneut versuchen“. Der Korb ist noch da. „Erneut versuchen“ öffnet „Bezahlen“ mit „Jetzt bezahlen · € …“ für **dieselbe** Bestellung (gleiche Nummer); mit Karte 4242 bezahlen → bezahlt.
+- [ ] **Käuferart Betrieb:** Dafür braucht der Korb ein Futter, das der Hof „Nur an landwirtschaftliche Betriebe“ abgibt (Schalter im Produktdialog von Test-Heu einschalten). In der Kasse erscheint „Betrieb“ mit „Ich bestelle als landwirtschaftlicher Betrieb“ und „Betriebsnummer“ (erfundene Nummer, z. B. 9999999). Mit Haken: kein Rücktrittssatz, keine Gewährleistungs-Karte, in der Mail keine Belehrung und kein Formular – die AGB-Datei hängt trotzdem an. Danach den Schalter wieder ausschalten.
 
-### Ablauf 8 – Storno online, Vollerstattung mit Transfer-Rückbuchung (Bestellung D)
+## B5 · Rücktritt (200, 214) (etwa 40 Minuten)
 
-Schritte als Hof:
+Rücktritt heißt in der App auch „Widerruf“. Vor der Abholung storniert die App von selbst; nach der Abholung entscheidet der Hof.
 
-1. Bestellungen → D → „Stornieren".
-2. Einen Grund eintragen oder frei lassen.
-   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test".
-3. „Stornieren und erstatten".
+**Einstiege**
 
-Erwartet:
+- [ ] Der Link „Vertrag widerrufen“ steht in der Bestätigungsmail (H1), auf der Bestätigungsseite, auf der Bestellseite (Link aus der Mail) und im Seitenfuß jeder Kundenseite. Aus Mail und Bestellseite öffnet er `/widerruf` mit der Bestellung schon ausgefüllt, aus dem Fuß ein leeres Formular.
 
-- [ ] Der Dialog sagt: „\<Vorname\> bekommt zurück: € 13,02 (Warenpreis + Servicegebühr)" und „Von deiner nächsten Auszahlung abgezogen: € 12,40 – genau der Warenpreis. Die Servicegebühr erstattet FarmerZone."
-- [ ] Toast: „Storniert. \<Vorname\> bekommt € 13,02 zurück."
-- [ ] D zeigt „Storniert" und „Warenpreis € 12,40 · Servicegebühr € 0,62 entfällt". In der Liste steht auf breiteren Bildschirmen die Zahlart „Online, erstattet". Der Vorrat ist zurück: Eier +1, Honig +1.
-- [ ] Die Kundin bekommt eine Storno-Mail mit dem erstatteten Betrag.
-- [ ] Stripe, Zahlung D: erstattet € 13,02, die ganze Zahlung. Metadaten der Erstattung: `anlass=vollstorno`, `art=kunde`.
-- [ ] Stripe, Überweisung: Rückbuchung € 13,02, die ganze Überweisung. Die Anwendungsgebühr € 0,62 geht an den Hof zurück.
-- [ ] Stripe, verbundenes Konto: unterm Strich € 0,00 für diese Bestellung.
-- [ ] Admin → Finanzen: „Servicegebühr, online" sinkt um € 0,62. Stornierte Bestellungen bringen nichts ein.
+**Ganz zurücktreten vor der Abholung (H2, online bezahlt)**
 
-**Ergebnis Ablauf 8**
+1. Aus der Mail zu H2 „Vertrag widerrufen“. Die Seite „Rücktrittsrecht“ zeigt „Schritt 1 von 2“ mit „Bestellung“ und „Hof“.
+2. „Die ganze Bestellung“, „Vertrag widerrufen“, dann „Schritt 2 von 2 · Bitte prüfe deinen Rücktritt“ und „Widerruf bestätigen“.
+   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test“ (der Rücktritt erstattet sofort).
+   - [ ] Grüne Karte „Dein Rücktritt ist bei uns eingegangen“ mit drei Sätzen, Knopf „Drucken oder speichern“.
+   - [ ] Mail „Dein Widerruf ist eingegangen · Agrilo“ (Eingangsbestätigung), dazu die Storno-Mail „Deine Bestellung <Nr> wurde storniert“. Stripe: Zahlung H2 ganz erstattet (€ 13,15).
+   - [ ] Bei Test-Eier stand in der Positionsliste „Für diese Ware besteht nach Angabe des Hofs kein Rücktrittsrecht (§ 18 Abs. 1 Z 4 FAGG). Der Hof prüft das im Einzelfall.“, beim Honig „Diese Ware ist meist haltbar – der Rücktritt ist hier wahrscheinlich möglich. …“.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+**Einzelne Artikel nach der Abholung (H1)**
 
-### Ablauf 9 – Abgeholt und „Nicht abgeholt"
+Vorher Profil **Hof** › H1 › „Als gepackt markieren“ › „Abgeholt“.
 
-- [ ] Vor 9a bis 9c: Banner zeigt „TEST · Dev-DB · Stripe Test". 9b vermerkt eine Barzahlung, 9c bucht Geld zurück.
-- [ ] Vorher auf Heute (Profil Hof) die Kennzahl „Heute eingenommen" notieren.
+1. Aus der Mail zu H1 „Vertrag widerrufen“ › „Einzelne Artikel“ › nur Test-Honig ankreuzen › „Vertrag widerrufen“ › „Widerruf bestätigen“.
+   - [ ] Eingangsbestätigung wie oben, Umfang nennt den Honig. Stripe: noch **nichts** erstattet (nach der Abholung entscheidet der Hof).
+2. Profil **Hof**:
+   - [ ] Heute zeigt die Karte „Rücktritt eingegangen“ („Eine Kundin ist von einem Kauf zurückgetreten.“), das Postfach die Nachricht „Rücktritt zu Bestellung <Nr>: Bitte prüf die Rückgabe und erstatte oder lehne mit Grund ab.“, die Mail „Rücktritt zu Bestellung <Nr>“ kommt an die Hof-Adresse.
+3. H1 öffnen › „Rückgabe erhalten – erstatten …“ › „Erstatten“.
+   - [ ] Banner zeigt „TEST · Dev-DB · Stripe Test“.
+   - [ ] Toast „Erstattung gespeichert“. Die Kundin bekommt „Dein Rücktritt ist erledigt · <Nr>“. Stripe, Zahlung H1: teilweise erstattet **€ 7,95** (Honig € 7,50 + seine Gebühr € 0,45), Rückbuchung vom Hof **€ 7,50**. Rechnung: Tabelle „Was sich danach bewegt“.
 
-**9a – online abgeholt (A, nach Ablauf 7)**
+**Ablehnen und ohne Bestellung**
 
-Schritte: A → „Als gepackt markieren" → „Abgeholt".
+- [ ] Ablehnen: H3 (nur Eier, „kein Rücktritt“) abholen lassen, Rücktritt über „Die ganze Bestellung“ einreichen, beim Hof „Ablehnen …“ mit leerem Grund → „Bitte schreib einen Grund.“; mit Grund → Toast „Ablehnung gespeichert“, die Kundin bekommt „Dein Rücktritt wurde abgelehnt · <Nr>“ mit dem Grund.
+- [ ] Ohne passende Bestellung: Im Seitenfuß „Vertrag widerrufen“, eine erfundene Bestellnummer und die Adresse der Kundin eintragen, absenden. Die Kundin bekommt die Eingangsbestätigung. Profil **Admin** › Heute zeigt „Rücktritt ohne Bestellung“; Admin › Bestellungen, Abschnitt „Rücktritte ohne Bestellung“ zeigt „eingegeben: <Nr>“ und „Zuordnen …“. Nicht zuordnen – stehen lassen ist hier in Ordnung.
 
-- [ ] Nach dem Packen: Toast „Gepackt – \<Vorname\> bekommt Bescheid", die Kundin bekommt eine Mail.
-- [ ] Nach „Abgeholt": Toast „Als abgeholt gespeichert", die Marke zeigt „Abgeholt", A steht unter „Erledigt".
-- [ ] Stripe: nichts Neues. Finanzen: unverändert, A zählt weiter mit € 0,50.
+## B6 · Hof-Alltag im neuen Modell (etwa 30 Minuten)
 
-**9b – bar abgeholt (E)**
+Profil **Hof**. Eine frische Online-Bestellung **H6** (2 × Eier + 1 × Honig, Karte 4242, € 18,35) und eine frische Online-Bestellung **H7** (gleicher Korb) anlegen, dazu **H8** (1 × Honig + 1 × Eier, € 13,15). Banner jedes Mal prüfen.
 
-Schritte: E → „Als gepackt markieren" → „Abgeholt und € 9,80 kassiert".
+- [ ] **Artikel fehlt (H6):** „Artikel fehlt“ › Test-Honig. Dialog: „<Vorname> bekommt zurück“ € 7,95, „Von deiner nächsten Auszahlung abgezogen“ € 7,50, „Artikel € 7,50 + Plattformgebühr € 0,45 – die Gebühr gilt nur noch für € 9,80 Ware.“ und „… Den Unterschied bei der Plattformgebühr erstattet Agrilo.“ Banner prüfen, speichern: Toast „Gespeichert. <Vorname> bekommt € 7,95 zurück und eine E-Mail.“
+- [ ] Stripe zu H6: Erstattung € 7,95 mit `anlass=teilstorno` und `art=kunde`, Rückbuchung der Überweisung € 7,50 mit `art=hof`, Anwendungsgebühr bleibt € 1,05. Beim Hof steht H6 jetzt mit „Für fehlende Artikel schon erstattet: € 7,95“.
+- [ ] **Abgeholt (H6):** „Als gepackt markieren“ (Toast „Als gepackt markiert“) › „Abgeholt“ (Toast „Als abgeholt gespeichert“). Stripe: nichts Neues.
+- [ ] **Storno (H7):** „Stornieren …“: „<Vorname> bekommt zurück“ € 18,35, „Warenpreis € 17,30 + Plattformgebühr € 1,05“, „Von deiner nächsten Auszahlung abgezogen“ € 17,30 und „Das ist genau der Warenpreis, den du für diese Bestellung bekommen hast. Die Plattformgebühr wird mit erstattet – sie gibt Agrilo zurück, nicht du.“ Banner prüfen, „Stornieren und erstatten“ → „Storniert. <Vorname> bekommt € 18,35 zurück.“ Der Vorrat ist zurück.
+- [ ] Stripe zu H7: ganz erstattet € 18,35 (`anlass=vollstorno`), Überweisung ganz zurückgebucht, Anwendungsgebühr € 1,05 zurück. Beim Hof unterm Strich € 0,00.
+- [ ] **Nicht abgeholt (H8):** „Nicht abgeholt“. Dialog „Nicht abgeholt?“: „… Sie bekommt keine E-Mail.“ und „Die Plattformgebühr von € 0,75 bekommt <Vorname> zurück. Der Warenpreis bleibt bei dir.“ sowie „Das lässt sich nicht rückgängig machen.“ Banner prüfen, bestätigen: Toast „Als nicht abgeholt gespeichert“, dazu „Warenpreis € 12,40 · Plattformgebühr € 0,75 entfällt“.
+- [ ] Stripe zu H8: teilweise erstattet € 0,75 mit `grund=servicegebuehr_nicht_abgeholt`, **keine** Rückbuchung vom Hof, Anwendungsgebühr bleibt € 0,75. Der Hof behält € 12,40.
+- [ ] **Bar abgeholt (H4):** „Als gepackt markieren“ › „Abgeholt und € 18,35 kassiert“ → „Als abgeholt und bezahlt gespeichert“. H4 kommt nicht in die Monatsabrechnung, solange ihre Gebühr erlassen war; die Abrechnung prüft Teil C mit eigenen Bestellungen.
 
-- [ ] Toast „Als abgeholt und bezahlt gespeichert", danach „Bar kassiert € 9,80".
-- [ ] Finanzen: V unverändert (B1).
+---
 
-**9c – online nicht abgeholt (B)**
+# Teil C – Monatsabrechnung und was weiter gilt (Sitzung 3)
 
-Schritte: B → „Nicht abgeholt", im Dialog „Nicht abgeholt" bestätigen.
+Die Plattformgebühr aus Barbestellungen holt die Plattform einmal im Monat per Lastschrift (SEPA) oder Rechnung zur Überweisung. Online behält Stripe sie gleich beim Bezahlen ein. Gebraucht werden zwei Höfe:
 
-- [ ] Der Dialog „Nicht abgeholt?" sagt: „\<Vorname\> hat die Bestellung nicht abgeholt. Sie bekommt keine E-Mail." und „Die Servicegebühr von € 0,50 bekommt \<Vorname\> zurück. Der Warenpreis bleibt bei dir."
-- [ ] Toast „Als nicht abgeholt gespeichert". Die Marke zeigt „Nicht abgeholt", dazu „Warenpreis € 4,90 · Servicegebühr € 0,50 entfällt".
-- [ ] Stripe, Zahlung B: teilweise erstattet € 0,50, Metadaten `grund=servicegebuehr_nicht_abgeholt`. Es gibt **keine** Rückbuchung vom Hof. Die Anwendungsgebühr bleibt € 0,50, denn die Erstattung zahlt die Plattform aus ihrem Saldo. Hofanteil € 4,90.
-- [ ] Admin → Finanzen: sinkt um € 0,50. Die Kundin bekommt keine Mail.
+- der **neue Testhof** aus A1 mit der IBAN, deren Einzug **scheitert** (seine Mails kommen bei dir an),
+- ein **Seed-Hof** (Konto `…@example.com`, Passwort aus `prisma/seed-daten.ts`) mit der IBAN, deren Einzug **gelingt**. Seine Mails kommen nicht an; geprüft wird bei ihm nur der Stand.
 
-**Danach auf Heute**
+## C1 · Lastschrift einrichten (etwa 20 Minuten)
 
-- [ ] „Heute eingenommen" ist um € 19,60 gestiegen. Das ist der Warenpreis von A nach Ablauf 7 (€ 9,80) plus der von E (€ 9,80).
-  - Es zählt, was heute abgeholt wurde, ohne Servicegebühr.
-  - B zählt nicht, denn B wurde nicht abgeholt.
-  - Die Kennzahl heißt „Heute eingenommen · mit Hofladen": Verkäufe, die du im Hofladen einträgst, zählen mit. Im Probelauf trägst du keine ein.
+Profil **Hof**, zuerst der neue Testhof.
 
-**Ergebnis Ablauf 9**
+1. Einstellungen › „Konditionen und Tarif“ (Seite „Deine Konditionen“), ganz unten die Karte „Barzahlung“.
+   - [ ] Die Karte zeigt „Plattformgebühr 6 % vom Warenpreis“, „Einzug ab <Datum>“, die Marke „fehlt“ mit „Lastschrift nicht eingerichtet.“ und „Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.“
+2. „Lastschrift einrichten“ tippen. In der Karte erscheint Stripes Formular. Erfundener Name, die Adresse des Testhofs aus `TEST_EMPFAENGER`, IBAN `AT861904300235473202` (Einzug scheitert). Unten wieder „Lastschrift einrichten“.
+   - [ ] Gleich danach steht „Die Bank bestätigt die Lastschrift – das dauert meist nur einen Moment. Lade die Seite gleich neu.“ Gültig ist das Mandat erst, wenn Stripe es der App meldet.
+   - [ ] Nach dem Neuladen: Marke „eingerichtet“, „Lastschrift eingerichtet · … · IBAN endet auf 3202“ und der Knopf „Lastschrift ändern“. Fehler: Auch nach einer Minute und erneutem Laden steht „fehlt“ (dann fehlt meist `setup_intent.succeeded` am Webhook, A0).
+3. Profil **Kundin**, neuer Korb beim Testhof (über € 10 Ware), Kasse neu öffnen.
+   - [ ] „Bar bei Abholung“ ist wieder da (Einzug fällig seit B3, jetzt mit Lastschrift).
+4. Profil **Admin** › Höfe › Testhof › „Plattformgebühr“.
+   - [ ] „Lastschrift“ zeigt „eingerichtet“. Im Protokoll steht „Lastschrift eingerichtet“.
+5. Dasselbe für den **Seed-Hof** mit IBAN `AT321904300235473204` (Einzug gelingt nach etwa drei Minuten). Ein Seed-Hof ist meist Gründungshof, seine Bargebühr wäre damit noch erlassen: In seiner Akte deshalb „Einzug ab“ auf **heute** setzen, wie beim Testhof in B3.
+   - [ ] Nach dem Neuladen „eingerichtet“, IBAN endet auf 3204, „Einzug ab“ zeigt heute.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+## C2 · Abnahme 198: die Monatsabrechnung (etwa 30 Minuten, verteilt über zwei Monate)
 
-### Ablauf 10 – Bestellungen finden per Code
+**Was es braucht:** je Hof eine Barbestellung im neuen Modell, deren Gebühr per Lastschrift kommt (in der Bestellung steht „… – die Gebühr holt die Monatsabrechnung.“), und die im **Vormonat** abgeholt wurde.
 
-Schritte:
+1. Profil **Kundin**: Beim Testhof und beim Seed-Hof je eine Barbestellung nach C1 (also mit Lastschrift), z. B. 2 × Eier + 1 × Honig bzw. ein Korb über € 10. Banner prüfen. Per Mail bestätigen (beim Seed-Hof geht die Mail an die Kundin; die kommt an).
+2. Profil **Hof** je Hof: „Als gepackt markieren“ › „Abgeholt und € … kassiert“.
+   - [ ] Der Satz in der Bestellung endet auf „– die Gebühr holt die Monatsabrechnung.“
+3. Profil **Admin** › Höfe › je Hof › „Plattformgebühr“: „Abrechnungstag (1–28)“ und „Einzug ab“ ansehen und notieren.
 
-1. Im Profil **Kundin** „Meine Bestellungen" tippen, am Handy unten „Bestellungen". Das öffnet `/bestellungen`.
-2. Die E-Mail der Kundin eingeben, „Code schicken".
-3. Den 6-stelligen Code aus der Mail eingeben. Er gilt 10 Minuten, es gibt 5 Versuche.
+**Wie die Abrechnung ausgelöst wird (Stand des Codes beim Schreiben dieser Liste):** Es gibt **keinen Knopf** im Admin. Die Abrechnung läuft als täglicher Ablauf um 05:30 Uhr UTC und rechnet nur Höfe ab, deren Abrechnungstag heute ist, und nur den **Vormonat** (abgeholt im Vormonat, nach Wiener Zeit). Vercel startet solche Abläufe nur in der Produktion. **In der Testumgebung läuft die Monatsabrechnung also nie von selbst.**
 
-Erwartet:
+> **Notweg, nur Testumgebung**
+>
+> 1. Bei Vercel eine eigene Variable `CRON_SECRET` **nur für den Branch `staging`** anlegen (Umgebung Preview, Git-Branch `staging`) mit einem neuen, zufälligen Wert. **Nie den Wert der Produktion nehmen, nie den Wert irgendwo aufschreiben.** Dann `staging` neu deployen.
+> 2. Warten, bis der Monat gewechselt hat: Die Barbestellungen aus Schritt 2 müssen im Vormonat abgeholt sein.
+> 3. Profil **Admin**: Bei beiden Höfen den „Abrechnungstag (1–28)“ auf den **heutigen** Tag des Monats setzen, „Mit Passkey speichern“.
+> 4. Die Abrechnung von einem Laptop aus aufrufen. Die Adresse ist `https://test.agrilo.at/api/cron/monatsabrechnung`. Der Aufruf braucht zwei Kopfzeilen: `Authorization: Bearer <dein staging-CRON_SECRET>` und `x-vercel-protection-bypass: <Geheimnis aus testumgebung.md, Schritt 5>`. Mit einem Terminal geht das so (Werte nur in deinem Terminal einsetzen, nie in eine Datei oder einen Chat):
+>
+> ```bash
+> curl -sS -H "Authorization: Bearer $STAGING_CRON_SECRET" -H "x-vercel-protection-bypass: $VERCEL_BYPASS" https://test.agrilo.at/api/cron/monatsabrechnung
+> ```
+>
+> Erwartet: eine kurze Antwort mit Zahlen und `"at"`. `401` heißt: falsches Secret oder Vercel-Sperre.
+> 5. Der Aufruf rechnet alle Höfe der Entwicklungsdatenbank ab, deren Abrechnungstag heute ist, und verschickt auch die Ankündigungen („Plattformgebühr ab …“). Das ist in der Testumgebung in Ordnung.
 
-- [ ] Die Liste zeigt A bis G (C nur, wenn Ablauf 2 lief), getrennt in laufende und frühere Bestellungen.
-- [ ] Jede Zeile zeigt Hof, Bestellnummer, Stand und Betrag.
-- [ ] Die Marken stimmen: A „Abgeholt" (€ 10,30), B „Nicht abgeholt", C „Bezahlt", D „Storniert", E „Abgeholt", F „Storniert" (verfallen), G „Bestätigt".
-- [ ] Gegenprobe: Ein falscher Code ergibt „Der Code stimmt nicht. Schau noch einmal in die E-Mail oder lass dir einen neuen schicken.", keine Liste. Nach 30 Minuten verlangt die Seite wieder einen Code („Deine Ansicht ist abgelaufen").
+- [ ] Stripe (Testmodus) › Rechnungen: je Hof eine Rechnung „Plattformgebühr <Monat Jahr> · bar“ mit je Bestellung der Zeile „Plattformgebühr bar · Bestellung <Bestellnummer>“ (Betrag = die Gebühr der Bestellung, z. B. € 1,05). Hatte der Hof im Vormonat auch Online-Bestellungen: zusätzlich „Plattformgebühr <Monat Jahr> · online, bereits einbehalten“, als bezahlt markiert.
+- [ ] Profil **Admin** › Geld, Monat = Vormonat (Pfeil „Vorheriger Monat“): Abschnitt „Plattformgebühr · Monatsabrechnung <Monat Jahr>“ mit „bar (Lastschrift oder Überweisung)“ und „online (von Stripe einbehalten)“.
+- [ ] Profil **Hof** › Deine Konditionen › „Monatsabrechnungen“: eine Zeile „<Monat Jahr> · bar € … · online € …“ mit Stand und „Rechnung (PDF) bar“; der Knopf öffnet die Rechnung.
+- [ ] Ein zweiter Aufruf am selben Tag erzeugt keine zweite Rechnung.
 
-**Ergebnis Ablauf 10**
+## C3 · Einzug: gelingt, scheitert, Sperre (etwa 20 Minuten, dazu ein Nachblick am Folgetag)
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+**Gelingt (Seed-Hof):**
 
-### Ablauf 11 – Produkt am Handy anlegen und Teilen-Fenster öffnen
+- [ ] Etwa drei Minuten nach der Abrechnung: Stand „bezahlt“ in Admin › Akte des Seed-Hofs („Letzte Abrechnungen“) und beim Hof unter „Monatsabrechnungen“. Stripe zeigt die Rechnung als bezahlt.
 
-Vorbereitung: Handy oder Browser auf 390 px Breite. Der Testhof ist freigeschaltet, die Teilen-Hinweise sind an.
+**Scheitert (neuer Testhof):**
 
-Schritte:
+- [ ] Stand „Lastschrift gescheitert“ in der Akte und beim Hof. Admin › Heute zeigt die Aufgabe „Lastschrift gescheitert“.
+- [ ] Postfach des Testhofs: Nachricht „Die Lastschrift für <Monat Jahr> hat nicht geklappt. Stripe versucht es erneut. … Bleibt der Betrag <N> Tage offen, nehmen wir bei dir keine Barbestellungen mehr an – laufende Bestellungen bleiben.“ Dazu die Mail „Lastschrift für <Monat Jahr> hat nicht geklappt“.
+- [ ] **Sperre nach Frist:** Vorher (gleich nach C1) in Admin › Akte des Testhofs „Tage bis zur Sperre“ auf **1** setzen. Am **Folgetag**, mehr als 24 Stunden nach der ersten gescheiterten Lastschrift: Die Kasse des Testhofs bietet nur „Online bezahlen“ an. Hof › Heute zeigt „Barzahlung ist gesperrt“ mit „Die Plattformgebühr für <Monat Jahr> ist noch offen. …“ und „Jetzt bezahlen“; Einstellungen › Zahlung zeigt „Bar gesperrt“. Eine schon bestätigte Barbestellung bleibt und lässt sich abholen.
+- [ ] **Wieder frei nach der Zahlung:** Auf Heute „Jetzt bezahlen“ öffnet Stripes Rechnungsseite. Die Rechnung nimmt nur Lastschrift an: dort die IBAN `AT321904300235473204` (gelingt) eingeben und bezahlen. Nach einigen Minuten und dem Neuladen steht die Abrechnung auf „bezahlt“, und die Kasse bietet bar wieder an. Kein Knopf im Admin nötig.
+- [ ] **Rückbuchung (nur, wenn die IBAN dafür an der Stripe-Testseite zu finden ist):** Ein Hof mit der Rückbuchungs-IBAN von docs.stripe.com/testing als Mandat; nach der Abrechnung Stand „zurückgebucht“, Bar **sofort** gesperrt, Hof › Heute „Die Lastschrift für <Monat Jahr> wurde zurückgebucht. Barzahlung ist gesperrt – das Team meldet sich bei dir.“, Admin › Heute „Lastschrift zurückgebucht“. **Achtung:** „zurückgebucht“ hebt sich in der App nicht von selbst auf, auch nicht durch eine spätere Zahlung, und einen Knopf dafür gibt es nicht. Diesen Hof danach nicht mehr für Bar-Tests nehmen.
 
-1. In der Unterleiste „Neu" tippen, das Plus mit dem Wort darunter. Das Blatt „Was legst du an?" geht auf.
-2. „Lebensmittel" wählen und ausfüllen: Name „Test-Marmelade", Kategorie, Preis € 3,90, Vorrat 5, im Shop.
-3. „Produkt veröffentlichen" tippen.
-4. Im Hinweis „Teilen" tippen.
-5. Im Teilen-Fenster bei „Link" auf „Kopieren" tippen und dann WhatsApp antippen.
-6. Das Produkt einmal bearbeiten und speichern.
+## C4 · Was weiter gilt (etwa 45 Minuten)
 
-Erwartet:
+Gekürzte Fassung der Abläufe aus der alten Liste, an die heutige Oberfläche angepasst.
 
-- [ ] Beim Ausfüllen zeigt „So sehen Käufer dein Produkt" die Karte, wie sie auf der Hofseite steht: Bild, Name, Preis und Einheit. Solange der Preis fehlt, steht dort „Preis fehlt noch" statt „€ 0,00" (Nr. 51).
-- [ ] Nach dem Veröffentlichen erscheint „Test-Marmelade ist online" mit „Kunden sehen es ab jetzt auf deiner Hofseite. Sag ihnen Bescheid?". Darunter stehen „Teilen", „Nicht jetzt" und „Fragt nur einmal pro Produkt. Abschalten unter Einstellungen."
-- [ ] Das Teilen-Fenster zeigt ein Bild mit der Wahl „Beitrag 1:1" oder „Status 9:16", die Kanäle WhatsApp, WhatsApp-Status, Facebook, Instagram und E-Mail sowie „Plakat drucken".
-- [ ] „Kopieren" meldet „Link kopiert". Der Link endet auf `<hof-slug>?k=link`, der WhatsApp-Link auf `?k=wa`.
-- [ ] „WhatsApp-Status" und „Instagram" öffnen am Handy das Teilen-Menü des Geräts mit Bild und Text.
-- [ ] Nach dem Bearbeiten kommt kein zweiter Hinweis.
-- [ ] Alles ist gut zu treffen (mindestens 44 px), nichts ist abgeschnitten, hell und dunkel.
+**Bar unbestätigt verfällt** (Profil **Kundin**, Testhof)
 
-**Ergebnis Ablauf 11**
+Eine Barbestellung muss per Mail bestätigt sein, bevor die frühere von zwei Grenzen erreicht ist: 2 Stunden nach dem Bestellen oder der Beginn des gewählten Abholfensters. Die Frist gilt beim Lesen: Wer danach Hofseite, Kasse oder die Bestellungen des Hofs öffnet, gibt die Ware frei.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+1. Vorrat von Test-Honig notieren. 2 × Honig (Ware € 15,00, Gebühr 2 × 45 = 90 Cent, € 15,90), bar, Banner prüfen, „Zahlungspflichtig bestellen · € 15,90“. Die Mail **nicht** bestätigen.
+2. Warten (2 Stunden) – oder in der **Entwicklungsdatenbank, nie in der Produktion** die Zeit vorstellen: `update "Order" set "createdAt" = now() - interval '3 hours' where "orderNumber" = '<Bestellnummer>';` Dann die Hofseite öffnen.
 
-### Ablauf 12 – QR-Plakat mit gültiger Hofseiten-Adresse und `?k=qr`
+- [ ] Beim Hof steht die Bestellung auf „Storniert“ mit dem Grund „Nicht rechtzeitig bestätigt“, der Vorrat von Test-Honig ist wieder wie vorher.
+- [ ] Die Kundin bekommt „Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde“. Der Link aus der ersten Mail zeigt „Bestellung verfallen“ mit „Du hast nicht bis … bestätigt. Der Hof packt nichts, dir entstehen keine Kosten.“
 
-Schritte:
+**Futter mit Größe und Hinweis**
 
-1. Im Teilen-Fenster „Plakat drucken" tippen, oder `<Ort>/status/plakat` öffnen.
-2. Den QR-Code mit dem Handy scannen. Das Handy muss im Browser bei Vercel angemeldet sein, sonst zeigt Vercel zuerst seine Anmeldung. Das ist der Schutz der Testumgebung, kein Fehler.
+- [ ] Produktseite von Test-Heu: beide Größen mit Endpreis (5 kg-Sack € 5,20, Rundballen € 47,70). Auf der Produktseite und im Korb-Blatt steht „Die Angaben zu Registrierung und Kennzeichnung stammen vom Hof. Der Hof ist für ihre Richtigkeit verantwortlich; Agrilo vermittelt nur und prüft die Angaben nicht.“
 
-Erwartet:
+**Bestellungen finden per Code** (Profil **Kundin**)
 
-- [ ] Die Seite „QR-Plakat" zeigt das Blatt:
-  - Hofname · Ort,
-  - „Frisch vom Hof. Online vorbestellen.",
-  - den QR-Code,
-  - unten die Abholzeiten und die Adresse `<host>/<hof-slug>`, mit dem Host des Orts und nicht farmerzone.at.
-- [ ] Der Knopf „Plakat drucken" öffnet den Druckdialog. Die Druckvorschau zeigt nur das A4-Blatt.
-- [ ] Der Scan öffnet `https://<host>/<hof-slug>?k=qr`, die Hofseite des Testhofs. Nach dem Laden verschwindet `?k=qr` aus der Adresszeile. Das ist gewollt (T1): Im Browser wird nichts gespeichert.
-- [ ] Hof → Auswertung, Karte „Über deine geteilten Links": Der Besuch über „QR" ist um 1 gestiegen.
+- [ ] „Meine Bestellungen“ (`/bestellungen`) › E-Mail der Kundin › „Code schicken“. Die Mail „Dein Code für deine Bestellungen · Agrilo“ kommt an. Code eingeben › „Bestellungen anzeigen“: Die Liste zeigt die Bestellungen aus Teil A bis C, getrennt in „Aktuell“ und „Früher“, je mit Hof, Nummer, Stand und Betrag.
+- [ ] Gegenprobe: Ein falscher Code ergibt „Der Code stimmt nicht. …“ und keine Liste. Nach 30 Minuten verlangt die Seite einen neuen Code („Deine Ansicht ist abgelaufen“).
 
-**Ergebnis Ablauf 12**
+**Neuigkeiten mit Bestätigung per Mail** (Double-Opt-in)
 
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
+- [ ] Bestätigungsseite einer abgeholten Bestellung (z. B. H6): Karte „Neuigkeiten vom Hof per E-Mail“ mit „Ja, Neuigkeiten per E-Mail“. **Einmal** tippen: „Danke! Falls du noch nicht angemeldet bist, kommt gleich eine E-Mail zum Bestätigen.“ Die Mail „Bitte bestätige deine Anmeldung · Agrilo“ kommt an; ihr Link führt zu „Bestätige deine Anmeldung“, erst nach „Anmeldung bestätigen“ steht „Danke, du bist angemeldet“. War die Adresse schon angemeldet, kommt keine Mail – auch das ist richtig.
+- [ ] Gegenprobe: Eine stornierte Bestellung (H7) zeigt die Karte **nicht**.
 
-## 5. Hof-Anmeldung am Handy (Nr. 41)
+**Hof-Anmeldung und Hofbereich am Handy** (Handy oder 390 px Breite)
 
-Am Handy oder bei 390 px Breite. Zuerst im Profil **Kundin** (abgemeldet), dann im Profil **Hof** und zuletzt im Profil **Admin**.
+- [ ] Profil **Kundin**, abgemeldet: oben rechts „Anmelden“ › `/login` mit „Ich kaufe ein“ | „Ich habe einen Hof“. Als Testhof mit E-Mail und Passwort anmelden: Es öffnet „Heute“.
+- [ ] Die Unterleiste zeigt „Heute“ · „Bestellungen“ · „Neu“ · „Mein Hof“ · „Mehr“. Alles ist gut zu treffen, nichts abgeschnitten, hell und dunkel.
 
-- [ ] Profil Kundin: Startseite, `/hoefe`, Hofseite des Testhofs und `/fuer-hoefe` zeigen oben rechts „Anmelden".
-- [ ] Ein Tipp darauf öffnet `/login`. „Ich habe einen Hof" ist vorgewählt, „Ich kaufe ein" ist einen Tipp entfernt.
-- [ ] „Schon dabei? Anmelden" führt auf `/login`. Der Link steht im Band „Für Höfe" der Startseite, auf `/fuer-hoefe` oben und unten und auf `/register`.
-- [ ] Hell und Dunkel schaltest du am Handy im Menü bzw. im Seitenfuß um („Dunkelmodus" / „Heller Modus"). Im Browser bleibt der Schalter im Kopf.
-- [ ] Profil Hof, als Testhof angemeldet, dieselben Seiten: Oben rechts steht „Mein Hof". Ein Tipp führt nach Heute (`/dashboard`).
-- [ ] **Startbildschirm:** Ganz unten auf Heute steht im Browser die Karte „Mit einem Tipp in deinem Hof: Leg FarmerZone auf den Startbildschirm", mit je zwei Sätzen für iPhone und Android.
-- [ ] Nach der Anleitung auf einem echten Handy installieren:
-  - iPhone: Safari → „Teilen" → „Zum Home-Bildschirm" → „Hinzufügen".
-  - Android: Chrome → drei Punkte → „Zum Startbildschirm hinzufügen" bzw. „App installieren".
-- [ ] Vom Startbildschirm geöffnet, startet die App auf Heute, und die Karte fehlt.
-  - Am iPhone hat die installierte App einen eigenen Speicher. Dort meldest du dich einmal neu an, in der Testumgebung zuerst bei Vercel.
-- [ ] Profil Admin (`admin@example.com`, ohne Hof) unter `/admin`: kein „← Mein Hof", rechts die Initialen-Plakette, auch am Handy.
-- [ ] Ein Betreiber-Konto mit Hof sieht „← Mein Hof". Seine Plakette führt auf „Konto und Sicherheit".
+**Produkt anlegen und teilen** (Handy, Profil **Hof**)
 
-**Ergebnis Abschnitt 5**
+- [ ] „Neu“ › „Lebensmittel“ › „Test-Marmelade“, € 3,90, Vorrat 5, „Im Shop“ › speichern. Es erscheint „Test-Marmelade ist online“ mit „Kunden sehen es ab jetzt auf deiner Hofseite. Sag ihnen Bescheid?“ und „Fragt nur einmal pro Produkt. Abschalten unter Einstellungen.“ „Jetzt teilen“ öffnet das Teilen-Fenster; „Kopieren“ meldet „Link kopiert“, der Link endet auf `?k=link`.
 
-- [ ] bestanden
-- [ ] Fehler: ______
+**QR-Plakat**
 
-## 6. Rückweg (Nr. 44)
+- [ ] `/status/plakat` zeigt „QR-Plakat“ mit dem Code und unten die Adresse der Hofseite auf `test.agrilo.at`, nicht `agrilo.at`. Scannen mit dem Handy (dort bei Vercel angemeldet) öffnet die Hofseite des Testhofs; `?k=qr` verschwindet nach dem Laden aus der Adresszeile (gewollt).
 
-Am Handy oder bei 390 px Breite, im Profil **Hof**.
+**Unbekanntes Hof-Konto** (`docs/betrieb/stripe-live.md` §0, Probe „neu einrichten“)
 
-- [ ] Einstellungen → Hof-Profil: Oben steht eine feste Leiste „← Einstellungen". Beim Scrollen bleibt sie stehen, die Karte läuft darunter durch.
-- [ ] Unter den Feldern steht „Logo und Titelbild verwaltest du unter Mein Hof → Hofseite". Der Link führt nach Mein Hof (`/farm-page`, seit Nr. 50); `/settings/appearance` leitet dorthin um.
-- [ ] Zurück im Hof-Profil etwas Harmloses ändern, etwa einen Satz in der Beschreibung, und „Profil speichern" tippen. Es erscheint der Toast „Gespeichert", danach die Übersicht `/settings`.
-- [ ] Ausnahme Abholzeiten: Nach dem Speichern bleibt die Seite offen.
-- [ ] Bestellungen → eine Bestellung: Leiste „← Bestellungen". Kunden → eine Kundin: Leiste „← Kunden".
-- [ ] „Mehr" → Zeile „Angemeldet …" öffnet „Konto und Sicherheit".
-- [ ] Im Browser ab 768 px steht wie bisher die Zeile „‹ …".
+Erst ganz am Ende von Teil C: Der Schritt schaltet die Online-Zahlung des Testhofs ab. **Nur in der Entwicklungsdatenbank** (SQL-Editor des Dev-Projekts), **nie in der Produktion.**
 
-**Ergebnis Abschnitt 6**
+1. Bisherige Kennung notieren: `select "stripeAccountId" from "Farm" where slug = '<hof-slug>';`
+2. Erfundene Kennung setzen: `update "Farm" set "stripeAccountId" = 'acct_erfunden0000000000', "stripeAccountReady" = true where slug = '<hof-slug>';`
+3. Profil **Hof** › Einstellungen › „Zahlung“ › „Status prüfen“.
 
-- [ ] bestanden
-- [ ] Fehler: ______
+- [ ] Die Karte „Online-Zahlung neu einrichten“ mit „Stripe kennt dein bisheriges Konto nicht mehr. Richte die Online-Zahlung bitte neu ein – das dauert etwa 10 Minuten. Bis dahin bieten wir deinen Kundinnen nur Barzahlung an.“, die Marke „Nicht mehr verbunden“ und der Knopf „Online-Zahlung neu einrichten“.
+- [ ] Profil **Kundin**: Die Kasse des Testhofs bietet nur noch „Bar bei Abholung“ an. (Kam die Kundin schon vorher in den Zahlungsschritt: „Online-Zahlung ist bei diesem Hof gerade nicht möglich. Bitte wähle Bar bei Abholung.“)
+- [ ] Zurück: alte Kennung wieder eintragen (`update "Farm" set "stripeAccountId" = '<alte Kennung>' where slug = '<hof-slug>';`), dann „Status prüfen“ → „Verbunden und aktiv“. Oder „Online-Zahlung neu einrichten“ tippen; das legt ein neues Test-Konto an (danach wieder die EPS-Fähigkeit wie in A1 prüfen).
 
-## 7. Unbekanntes Hof-Konto (Nr. 42, `docs/betrieb/stripe-live.md` §0)
+**Testbetrieb-Hinweise der Produktion** (nur ansehen, nichts bestellen)
 
-Erst **nach** den zwölf Abläufen: Der Schritt schaltet die Online-Zahlung des Testhofs ab. Nur in der Entwicklungsdatenbank, z. B. im SQL-Editor des Dev-Projekts, nie in der Produktion.
+- [ ] In der Testumgebung erscheint keiner der drei Sätze; dort sagt es das Banner. `agrilo.at/admin` zeigt oben „Stripe läuft im Testmodus – Online-Zahlungen sind Testzahlungen, es fließt kein echtes Geld.“, solange die Produktion mit dem Test-Schlüssel läuft. Die Sätze an „Online bezahlen“ in der Kasse („Testbetrieb: Echte Karten werden noch abgelehnt. …“) und in Einstellungen › Zahlung prüfst du nur an den Bildern in Bericht 42 (`docs/nachtlauf/berichte/bilder/42/`): In der Produktion reserviert ein Korb Ware eines echten Hofs.
 
-1. Die bisherige Kennung notieren: `select "stripeAccountId" from "Farm" where slug = '<hof-slug>';`
-2. Eine erfundene Kennung setzen: `update "Farm" set "stripeAccountId" = 'acct_erfunden0000000000', "stripeAccountReady" = true where slug = '<hof-slug>';`
-3. Freiwillig, im Profil **Kundin**: beim Testhof online bezahlen wollen.
-   - [ ] Vorher: Banner zeigt „TEST · Dev-DB · Stripe Test".
-   - Erwartet: „Online-Zahlung ist bei diesem Hof gerade nicht möglich. Bitte wähle Bar bei Abholung."
-   - Die Kasse stellt auf Bar um, die Ware bleibt reserviert (stripe-live.md §9, Schritt 2).
-4. Im Profil **Hof**: Einstellungen → Zahlung → „Status prüfen".
+## C5 · Abschluss (etwa 10 Minuten)
 
-Erwartet:
+- [ ] Stripe › Entwickler › Webhooks › Endpunkt `https://test.agrilo.at/api/stripe/webhook`: Alle Zustellungen der drei Sitzungen haben 200, keine offenen Wiederholungen. Eine 401 heißt Vercel-Sperre, eine 400 falsches Secret.
+- [ ] Sentry, Umgebung preview: keine neue Meldung außer den erwarteten (unbekanntes Hof-Konto aus C4, höchstens einmal je Hof und Tag). Umgebung production: durch den Probelauf nichts Neues.
+- [ ] Die Kennung aus C4 „Unbekanntes Hof-Konto“ ist zurückgesetzt oder neu eingerichtet; der Testhof zeigt „Verbunden und aktiv“.
+- [ ] Was stehen bleibt und nicht stört: Testhof, Seed-Hof mit Mandat, Testbestellungen und Abrechnungen in der Entwicklungsdatenbank, Zahlungen und Rechnungen im Stripe-Testmodus, der gesetzte Stichtag, das `CRON_SECRET` für `staging`. Die Entwicklungsdatenbank bleibt im Hofpreis-Modell.
 
-- [ ] Oben steht die Karte „Online-Zahlung neu einrichten" mit „Stripe kennt dein bisheriges Konto nicht mehr. Richte die Online-Zahlung bitte neu ein – das dauert etwa 10 Minuten. Bis dahin bieten wir deinen Kundinnen nur Barzahlung an."
-- [ ] Dazu die Marke „Nicht mehr verbunden" und der orange Knopf „Online-Zahlung neu einrichten".
-- [ ] Die Kasse des Testhofs bietet nur noch „Bar bei Abholung" an.
-- [ ] Sentry (Umgebung preview): höchstens eine Meldung „Stripe kennt das gespeicherte Konto eines Hofs nicht" je Hof und Tag, nur mit der Hof-ID.
-- [ ] Die erfundene Kennung bleibt in der Datenbank stehen. Die App löscht sie nie von selbst.
 
-Zurück:
+---
 
-- [ ] Die alte Kennung wieder eintragen: `update "Farm" set "stripeAccountId" = '<alte Kennung>' where slug = '<hof-slug>';`
-- [ ] Dann „Status prüfen". Erwartet: „Verbunden und aktiv".
-- [ ] Oder stattdessen „Online-Zahlung neu einrichten" tippen. Das legt ein neues Test-Konto an und führt durch dasselbe Stripe-Formular wie in Abschnitt 2.
+# Ergebnis
 
-**Ergebnis Abschnitt 7**
+Diese Tabelle kommt in den Bericht an die Projektleitung. Ergebnis je Zeile: **bestanden**, **Fehler** oder **ausgelassen**; in die Notiz Bestellnummer, Uhrzeit und Grund, nie Namen oder Adressen.
 
-- [ ] bestanden
-- [ ] Fehler: ______
-
-## 8. Testbetrieb-Hinweise (Nr. 42)
-
-Die drei Sätze erscheinen **nur in der Produktion**, solange sie mit Test-Schlüssel läuft. In der Testumgebung sagt es stattdessen das Banner.
-
-- [ ] Testumgebung: Keiner der drei Sätze erscheint. Weder an „Online bezahlen" noch im Admin noch in Einstellungen → Zahlung.
-- [ ] Produktion, nur ansehen: `farmerzone.at/admin` zeigt oben die orange Karte „Stripe läuft im Testmodus – Online-Zahlungen sind Testzahlungen, es fließt kein echtes Geld."
-- [ ] Kasse an „Online bezahlen": „Testbetrieb: Echte Karten werden noch abgelehnt. Bitte wähle Bar bei Abholung." Das prüfst du **nur** an den Bildern in Bericht 42 (`docs/nachtlauf/berichte/bilder/42/kasse-390-hell.jpg` und folgende). In der Produktion nicht ausprobieren: Ein Korb reserviert dort Ware eines echten Hofs.
-- [ ] Produktion, nur ansehen, Einstellungen → Zahlung: „Online-Zahlung läuft noch im Testbetrieb."
-  - Nur mit einem eigenen Hof-Konto in der Produktion. Sonst die Bilder in Bericht 42 (`docs/nachtlauf/berichte/bilder/42/zahlung-390-hell.jpg` und folgende).
-
-**Ergebnis Abschnitt 8**
-
-- [ ] bestanden
-- [ ] Fehler: ______
-
-## 9. Kasse, Neuigkeiten und Kundensicht (Nr. 46)
-
-Stand: Nr. 46 nach seiner Runde 1 (`nacht/2026-10-08/46-kundensicht`, ff52d03). Die Wörter stammen aus dem Code. Die Beträge ändert Nr. 46 nicht.
-
-**Kasse** (Profil Kundin, am Handy oder bei 390 px):
-
-- [ ] Abholung: Kacheln mit Datum und Zeit, etwa „Sa, 10. Okt" und „09:00–12:00 Uhr". Heute und morgen steht zusätzlich „Heute" bzw. „Morgen" darüber.
-- [ ] Bar: Es gibt keinen Haken. Bestellt wird allein mit „Zahlungspflichtig bestellen · € …".
-  - Darunter steht „Abholung Sa, 10. Okt, 09:00–12:00 Uhr · Du zahlst bar beim Abholen".
-  - Heute und morgen steht das Wort in Klammern dabei, etwa „Fr, 9. Okt (heute), …".
-- [ ] Online: „Weiter zur Zahlung · € …", darunter „Abholung … · Bezahlung sicher über Stripe".
-- [ ] In der Kasse gibt es keinen Abschnitt „Neuigkeiten vom Hof", weder für E-Mail noch für WhatsApp.
-- [ ] Die Beträge sind wie in Abschnitt 3.
-- [ ] Cookie-Hinweis:
-  - Am Handy ist er eine flache Zeile mit „Verstanden", über der Unterleiste bzw. über dem Kaufknopf. Nichts davon ist verdeckt.
-  - Nach „Verstanden" ist er weg.
-  - Er erscheint nur, bis du „Verstanden" tippst. Prüf ihn also vorher, oder in einem privaten Fenster, in dem du dich zuerst wieder bei Vercel anmeldest.
-
-**Neuigkeiten auf der Bestätigungsseite** (statt des Hakens in der Kasse)
-
-Die Bestätigungsseite einer Bestellung erreichst du über die Liste aus Ablauf 10, denn jede Zeile führt dorthin, oder über den Link in der Mail zur Bestellung. Direkt nach dem Bestellen bist du ohnehin dort.
-
-1. Die Bestätigungsseite einer laufenden oder abgeholten Bestellung öffnen, etwa von A (online bezahlt) oder E (bar bestätigt).
-   - [ ] Die Seite zeigt die Karte „Neuigkeiten vom Hof per E-Mail" mit „Möchtest du erfahren, wenn es bei \<Testhof\> frische Produkte oder Aktionen gibt? Freiwillig – abmelden kannst du dich jederzeit."
-   - [ ] Dazu der Knopf „Ja, Neuigkeiten per E-Mail" und darunter „Wir schicken dir zuerst eine E-Mail an \<Adresse der Bestellung\> zum Bestätigen. Ohne Bestätigung bekommst du nichts."
-2. Den Knopf **einmal** tippen.
-   - [ ] Statt des Knopfs steht „Danke! Falls du noch nicht angemeldet bist, kommt gleich eine E-Mail zum Bestätigen."
-3. Die Mail kommt an die Adresse aus der Bestellung, die deshalb in `TEST_EMPFAENGER` stehen muss (Abschnitt 2). Ihren Link öffnen.
-   - [ ] Die Seite „Bestätige deine Anmeldung" zeigt den Knopf „Anmeldung bestätigen".
-   - [ ] Erst danach steht „Danke, du bist angemeldet". Ohne diesen Klick gibt es keine Neuigkeiten (Double-Opt-in, S11).
-   - Ist die Adresse beim Testhof schon bestätigt angemeldet, kommt keine Mail. Auch das ist richtig, der Dank verrät es nicht.
-4. Die Bestellung ansehen.
-   - [ ] Sie ist unverändert, mit demselben Status und demselben Betrag.
-5. Gegenprobe ohne Karte:
-   - [ ] D (storniert, Ablauf 8) zeigt **keine** Karte „Neuigkeiten vom Hof per E-Mail".
-   - [ ] Ebenso keine Karte zeigen F (verfallen, Ablauf 5), B (nicht abgeholt, Ablauf 9c) und eine Online-Bestellung, solange „Zahlung wird geprüft" dasteht.
-
-Die Bremse nicht absichtlich auslösen: Tipp den Knopf je Bestellung nur einmal.
-- Ein zweites Tippen innerhalb von 10 Minuten bringt denselben Dank, aber keine zweite Mail.
-- Mehr als drei Anfragen je Bestellung und Tag nimmt die App nicht an; die Antwort bleibt trotzdem dieselbe.
-- Ein „Danke" ohne Mail nach mehreren Versuchen ist deshalb kein Fehler.
-
-**Hofseite** (Profil Kundin):
-
-- [ ] „Nächste Abholung" besteht aus Textzeilen mit Datum: „Heute · Fr, 9. Okt", „Morgen · Sa, 10. Okt" oder „So, 11. Okt", die Zeit rechts, etwa „9–12 Uhr".
-- [ ] Nichts davon ist antippbar oder sieht wie ein Knopf aus. Den Termin wählst du erst in der Kasse, dort mit demselben Datum.
-
-**`/hoefe`** (Profil Kundin, 390 × 844):
-
-- [ ] Es gibt ein Feld „Ort oder Produkt", darunter „Standort nutzen" und „Nichts wird gespeichert.".
-- [ ] Der erste Hof ist ohne Scrollen ganz zu sehen, auch bei offenem Cookie-Hinweis.
-- [ ] Tippst du ein Produkt, etwa „Ei", erscheinen Vorschläge. Am Ende steht der Eintrag „Höfe rund um „Ei" zeigen".
-- [ ] Eine Postleitzahl mit **genau vier Ziffern** und Enter sucht den Ort.
-  - Die Liste steht dann nach Entfernung.
-  - Oben steht „Wir zeigen Höfe rund um … – nichts wird gespeichert." mit „Ort ändern".
-- [ ] Ein Ortsname oder eine fünfstellige Postleitzahl sucht erst über den Eintrag „Höfe rund um „…" zeigen".
-- [ ] „Standort nutzen" und erlauben: Die Karte sagt „… rund um deinen Standort".
-
-**Ergebnis Abschnitt 9**
-
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
-
-## 9a. Hofbereich, Hofseite und Karte am Handy (Nr. 49–55)
-
-Am Handy oder bei 390 px Breite. Die Wörter stammen aus dem Code des Sammel-PR Lauf 9. Die Beträge ändern Nr. 49–55 nicht.
-
-**Mein Hof** (Profil Hof, Nr. 49 und 50):
-
-- [ ] Die Unterleiste zeigt Heute · Bestellungen · Neu · Mein Hof · Mehr. „Mein Hof" öffnet die Produkte, oben stehen die Reiter Produkte · Hofseite · Beiträge.
-- [ ] Reiter „Hofseite": Unter dem Kopf steht der Umschalter „Bearbeiten | So sieht’s die Kundin". Er bleibt beim Scrollen oben stehen.
-- [ ] „Bearbeiten": eine Karte „Zu n von 11 fertig", darunter alle Abschnitte als Karten, je mit Stand und „Bearbeiten ›".
-  - Die Reihenfolge ist die der Hofseite am Handy.
-  - Leitspruch und Gründungsjahr sowie Werte tragen „Fehlt" in Grau und zählen nicht mit.
-- [ ] „Bearbeiten ›" öffnet ein Blatt von unten. Etwas Harmloses ändern, etwa den Leitspruch, dann „Speichern".
-  - Es erscheint „Gespeichert" mit „Ansehen".
-  - „Ansehen" schaltet auf „So sieht’s die Kundin" und zeigt den Abschnitt.
-- [ ] Zwei Tabs mit Mein Hof bzw. dem Hof-Profil: Was du im einen speicherst, setzt der andere beim Speichern nicht zurück, solange ihr nicht im selben Augenblick speichert (Restrisiko, Bericht 50).
-
-**Hofseite** (Profil Kundin, Nr. 51):
-
-- [ ] In der Übersicht steht unter dem Kopf zuerst das Schaufenster: der Fotostreifen (nur mit Fotos), bis zu vier Produkte und „Alle Produkte (n)".
-- [ ] Danach folgen Nächste Abholung, Zahlung & Kontakt, Anfahrt und Über uns. Ohne Produkte gibt es kein Schaufenster.
-- [ ] „Alle Produkte (n)" wechselt in den Reiter Produkte.
-
-**Karte** (Profil Kundin, `/hoefe?ansicht=karte`, Nr. 52):
-
-- [ ] Oben eine Zeile mit „Ort oder Produkt", Filter und „Liste", darunter die Karte bis zur Unterleiste. Vor der Karte steht kurz „Karte lädt …", nichts springt.
-- [ ] Liegen Höfe übereinander, steht ein Punkt „n Höfe"; ein Tipp zoomt hinein. Ohne Auswahl steht „Tippe einen Hof an".
-- [ ] Ein Tipp auf einen Hof zeigt unten seine Karte mit „Zum Hof".
-- [ ] Handy quer: Die Karte füllt den Platz zwischen Kopf und Unterleiste, nichts liegt hinter der Unterleiste.
-- [ ] Profil Hof, Hof-Profil: Die Standortkarte zeigt erst „Karte lädt …". Handy drehen, dann „Profil speichern": Adresse und Kartenpunkt bleiben, wie sie waren.
-
-**Heute und Auswertung** (Profil Hof, Nr. 53):
-
-- [ ] Heute zeigt EINE Liste „Zu tun". Erledigtes verschwindet; ist alles erledigt, verschwindet die Liste.
-- [ ] Was der Kasten oben zeigt („Online-Zahlung einrichten"), steht nicht noch einmal in der Liste. Leitspruch und Werte stehen nie darin.
-- [ ] Auswertung: Die Kennzahl heißt „Über FarmerZone", die Umsatzkarte „Mit Hofladen".
-
-**Admin und Seiten im neuen Kopf** (Profil Admin bzw. Kundin, Nr. 54):
-
-- [ ] Admin → Finanzen und Admin → Briefkasten: kein seitliches Wischen.
-- [ ] `/impressum`, `/konditionen` und `/problem-melden` stehen im Kopf der übrigen öffentlichen Seiten.
-- [ ] Eine unbekannte Adresse unter dem Ort zeigt die Seite „nicht gefunden" mit „Höfe entdecken".
-
-**Ergebnis Abschnitt 9a**
-
-- [ ] bestanden
-- [ ] Fehler: ______
-- [ ] ausgelassen, weil: ______
-
-## 10. Abschluss und Aufräumen
-
-- [ ] Stripe → Webhooks → Endpunkt der Produktion: Alle Zustellungen aus dem Probelauf haben 200, ohne Wiederholungen.
-  - Eine bekannte Ausnahme: Gibt es im Testmodus einen Connect-Endpunkt („Ereignisse in verbundenen Konten") zur Produktion, antwortet sie dort mit 400, solange ihr `STRIPE_CONNECT_WEBHOOK_SECRET` fehlt.
-  - Das betrifft jedes Ereignis eines verbundenen Kontos, also auch das neue Testkonto. Es liegt an der Einstellung, nicht am Probelauf (`docs/betrieb/stripe-live.md`, Schritte 3 und 4).
-- [ ] Sentry, Umgebung production: Durch den Probelauf ist keine neue Meldung entstanden. Die Produktion quittiert fremde Ereignisse still.
-  - Die bekannte Warnung „Umgebung widersprüchlich: Stripe TEST in Produktion … Kein STRIPE_CONNECT_WEBHOOK_SECRET …" kommt einmal je Kaltstart und gehört nicht dazu.
-- [ ] Sentry, Umgebung preview: höchstens die Warnung aus Abschnitt 7.
-- [ ] Die Kennung aus Abschnitt 7 ist zurückgesetzt bzw. neu eingerichtet.
-- [ ] Endpunkt, Branch-Variablen und das Geheimnis für den Vercel-Schutz von test.farmerzone.at bleiben stehen; sie gehören zur Testumgebung.
-- [ ] Testbestellungen und Testhof bleiben in der Entwicklungsdatenbank, die Zahlungen im Stripe-Testmodus. Beides stört nicht.
-
-## 11. Ergebnis
-
-Diese Tabelle kommt in den Morgenbericht bzw. als Kommentar in den Sammel-PR.
-
-| # | Ablauf | Ergebnis (bestanden / Fehler / ausgelassen) | Notiz (Bestellnummer, Grund) |
+| Abschnitt | Was | Ergebnis | Notiz |
 |---|---|---|---|
-| 1 | Online mit Testkarte, auch 3-D Secure | | |
-| 2 | Wallet | | |
-| 3 | EPS im Testmodus | | |
-| 4 | Bar ohne Servicegebühr (B1) mit Bestätigungsknopf | | |
-| 5 | Bar unbestätigt, nach Frist freigegeben | | |
-| 6 | Futter mit Größe und „Angaben stammen vom Hof" | | |
-| 7 | Artikel fehlt bei Online-Bestellung, Teilerstattung | | |
-| 8 | Storno online, Vollerstattung mit Transfer-Rückbuchung | | |
-| 9 | Abgeholt und „nicht abgeholt" | | |
-| 10 | Bestellungen finden per Code | | |
-| 11 | Produkt am Handy anlegen, Teilen-Fenster öffnen | | |
-| 12 | QR-Plakat mit `?k=qr` | | |
-| Abschnitt 5 | Hof-Anmeldung am Handy (Nr. 41) | | |
-| Abschnitt 6 | Rückweg (Nr. 44) | | |
-| Abschnitt 7 | Unbekanntes Hof-Konto (Nr. 42) | | |
-| Abschnitt 8 | Testbetrieb-Hinweise (Nr. 42) | | |
-| Abschnitt 9 | Kasse, Neuigkeiten und Kundensicht (Nr. 46) | | |
-| Abschnitt 9a | Hofbereich, Hofseite und Karte am Handy (Nr. 49–55) | | |
+| A0 | Ort und Vorbedingungen | | |
+| A1 | Neuer Testhof bis zur Freischaltung (EPS-Fähigkeit, AGB, Testhof) | | |
+| A2 | Blick vor dem Stichtag | | |
+| A3 | Bestellungen im alten Modell (V1–V3) | | |
+| A4 | Notbremse | | |
+| A5 | Stichtag auf morgen gesetzt | | |
+| A6 | Rund um Mitternacht (V4, V5) | | |
+| B1 | Was nach Mitternacht umgeschaltet hat | | |
+| B2 | Bestellungen von vor dem Stichtag | | |
+| B3 | Plattformgebühr im Preis (H1–H5) | | |
+| B4 | Kasse und Recht | | |
+| B5 | Rücktritt | | |
+| B6 | Hof-Alltag im neuen Modell (H6–H8) | | |
+| C1 | Lastschrift einrichten | | |
+| C2 | Monatsabrechnung (Notweg ja/nein) | | |
+| C3 | Einzug gelingt, scheitert, Sperre | | |
+| C4 | Was weiter gilt | | |
+| C5 | Abschluss | | |
+| **Abnahme 197** | Plattformgebühr im Preis: B3 mit „online = bar“ und „Hof bekommt 100 % des Warenpreises“, dazu B4 und B6 | | |
+| **Abnahme 198** | Monatsabrechnung mit SEPA: C1 bis C3 | | |
+| **Generalprobe 259** | Umschalten über Mitternacht mit AGB 1.0: A5, A6 und B1 | | |
