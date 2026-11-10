@@ -1,6 +1,6 @@
 # Bericht A011 · Probelauf-Checkliste neu gefasst
 
-Auftrag der Projektleitung vom 10.11.2026 (/fix, nur Dokumente). Geschrieben gegen `main` 260f8cf9 (nach #508 Lauf 33 und #448 Impressum). Branch `claude/peaceful-shannon-oqu0hx`, ein PR gegen `main`, nicht gemergt.
+Auftrag der Projektleitung vom 10.11.2026 (/fix, nur Dokumente). Geschrieben gegen `main` 260f8cf9 (nach #508 Lauf 33 und #448 Impressum). Branch `claude/peaceful-shannon-oqu0hx`, PR #528 gegen `main`, nicht gemergt.
 
 ## 1. Was geändert wurde
 
