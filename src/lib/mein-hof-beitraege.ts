@@ -66,9 +66,10 @@ export type BeitraegeUebersicht = {
 }
 
 const GRUPPEN: readonly { id: BeitragGruppeId; titel: string }[] = [
-  { id: 'aktiv', titel: 'Aktiv' },
+  // Wörter der Boards s1-/w1-mein-hof Bild 5 („Läuft · 1“, „Früher · 2“; Nr. 274) — die Zahl setzt der Reiter dazu.
+  { id: 'aktiv', titel: 'Läuft' },
   { id: 'entwuerfe', titel: 'Entwürfe' },
-  { id: 'vergangen', titel: 'Vergangen' },
+  { id: 'vergangen', titel: 'Früher' },
 ]
 
 function gruppeVon(b: BeitragQuelle): BeitragGruppeId {
@@ -78,7 +79,7 @@ function gruppeVon(b: BeitragQuelle): BeitragGruppeId {
 }
 
 const MARKE: Record<BeitragGruppeId, BeitragEintrag['marke']> = {
-  aktiv: { text: 'Aktiv', ton: 'fertig' },
+  aktiv: { text: 'Läuft', ton: 'fertig' },
   entwuerfe: { text: 'Entwurf', ton: 'neutral' },
   vergangen: { text: 'Abgelaufen', ton: 'neutral' },
 }

@@ -48,7 +48,7 @@ describe('/farm-page', () => {
     // Seit Lauf 31 (Nr. 238) trägt der Kopf die sichtbare h1 „Mein Hof“ — keine zweite, unsichtbare h1 im Inhalt.
     expect(seite).not.toContain('<h1')
     expect(quelltext('src/components/mein-hof/seitenkopf.tsx')).toMatch(/<h1 className="[^"]*\bfont-heading\b[^"]*">\{MEIN_HOF_KOPF_TEXT\.titel\}<\/h1>/)
-    expect(quelltext('src/components/mein-hof/seitenkopf.tsx')).toContain('<MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} titelAlsH1 />')
+    expect(quelltext('src/components/mein-hof/seitenkopf.tsx')).toContain('<MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} titelAlsH1 ohneKarte />')
   })
 
   it('der Kopf steht genau einmal je Reiter', () => {

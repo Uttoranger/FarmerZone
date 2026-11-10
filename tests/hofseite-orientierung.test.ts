@@ -381,7 +381,8 @@ describe('6. scroll-padding: der Fokus rutscht nie unter klebende Köpfe und die
   it('die Shells und der Unterseiten-Kopf tragen die Merkmale, auf die die Regeln zielen', () => {
     expect(quelle('src/components/shells/kunde-shell.tsx')).toContain(`data-scroll-rand={unterleiste ? 'kunde' : 'kunde-ohne-leiste'}`)
     expect(quelle('src/components/shells/hof-shell.tsx')).toContain('data-scroll-rand="hof"')
-    expect(quelle('src/components/hofbereich/unterseiten-kopf.tsx')).toContain('data-unterseiten-leiste=""')
+    // Seit 26.1 (Lauf 33) trägt nur der Werkzeug-Kopf das Merkmal (der alte Unterseiten-Kopf ist gelöscht).
+    expect(quelle('src/components/ui/werkzeug-kopf.tsx')).toContain('data-unterseiten-leiste=""')
     expect(seite()).toContain('data-scroll-rand="kunde"')
   })
 
@@ -410,12 +411,12 @@ describe('7. Rückweg im Hofbereich: dieselbe Regel wie auf den Kundenseiten', (
     expect(tippAufRueckweg(hofseite, '/', 'zeile')).toEqual(tippAufZiel('/hoefe', '/'))
   })
 
-  it('UnterseitenKopf und WerkzeugKopf fragen die Regel mit dem Vorgänger aus dem RueckwegMerker — je beide Links', () => {
-    // Seit Nr. 245 steht der Tipp in EINER Quelle (ui/rueckweg-tipp.ts), beide Köpfe nehmen sie.
+  it('der WerkzeugKopf fragt die Regel mit dem Vorgänger aus dem RueckwegMerker — beide Links', () => {
+    // Der Tipp steht in EINER Quelle (ui/rueckweg-tipp.ts, seit Nr. 245); der Werkzeug-Kopf nimmt sie.
     const tipp = quelle('src/components/ui/rueckweg-tipp.ts')
     expect(tipp).toContain('tippAufZiel(ziel, eigenerVorgaengerJetzt())')
     expect(tipp).toContain('window.history.back()')
-    for (const datei of ['src/components/hofbereich/unterseiten-kopf.tsx', 'src/components/ui/werkzeug-kopf.tsx']) {
+    for (const datei of ['src/components/ui/werkzeug-kopf.tsx']) {
       const kopf = quelle(datei)
       expect(kopf, datei).toContain("from '@/components/ui/rueckweg-tipp'")
       expect(kopf.match(/onClick=\{beimTipp\(ziel\)\}/g), datei).toHaveLength(2)

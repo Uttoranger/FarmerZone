@@ -106,9 +106,12 @@ export function VorratBlatt({
         {/* G13 (Liste Lauf 32, produkte Bild 2): die gerahmte Pille „− n +“ statt zweier runder Knöpfe. Die Zahl
             22 px in einem 56-px-Feld und ohne Einheit daneben wie im Board s1-produkte — die Frage darüber nennt sie
             schon (Nr. 249b: die Pille war mit 32 px, 80 px und „Pakete“ zu breit). */}
+        {/* Rand der Pille grün wie im Board s1-produkte (Abnahme Lauf 32, produkte Bild 2; G13) — nur hier, der Baustein
+            bleibt beim Feldrand. */}
         <Stepper
           gross
           form="pille"
+          className="[&_[data-slot=stepper-pille]]:border-status-fertig"
           eingabeClassName="w-14 text-[22px] leading-none"
           beschriftung={bestandLabel(produkt.unit, produkt.unitSize)}
           wert={anzeige}
@@ -175,7 +178,8 @@ export function VorratBlatt({
 
   return (
     <Sheet open={offen} onOpenChange={wechsel} onOpenChangeComplete={fertig}>
-      <SheetBlatt initialFocus={frage} finalFocus={() => fokusZiel() ?? true} className="gap-4">
+      {/* Schleier abgedunkelt statt verwischt (DESIGN_SYSTEM „Dialoge und Blätter“; Abnahme Lauf 32, produkte 390 Bild 2). */}
+      <SheetBlatt initialFocus={frage} finalFocus={() => fokusZiel() ?? true} schleier="abgedunkelt" className="gap-4">
         <SheetKopf titel={vorratTitel(produkt.name)} schliessen="Abbrechen" className="break-words" />
         {inhalt}
         <div className="flex flex-col gap-2">

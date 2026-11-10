@@ -6,8 +6,9 @@ import { aboTokenSchema } from '@/schemas/abo'
 import { ladeAboBestaetigung } from '@/server/abo-anmeldung'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { AboBestaetigenKarte } from '@/components/abo-bestaetigung/bestaetigen-karte'
+import { ZU_HOF_LINK } from '@/components/abo-bestaetigung/stil'
 import { MARKE } from '@/lib/marke'
-import { KNOPF_GRUEN, KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
+import { KNOPF_UMRISS, TEXTLINK } from '@/components/anmelden/stil'
 
 export const metadata: Metadata = {
   title: `${ABO_TEXT.seitenTitel} — ${MARKE}`,
@@ -58,8 +59,8 @@ export default async function NeuigkeitenBestaetigenPage({
         <p className={SATZ}>
           {ABO_TEXT.schonSatz[0]} <strong className="font-semibold text-foreground">{stand.hofName}</strong> {ABO_TEXT.schonSatz[1]}
         </p>
-        {/* Knopf „Zu <Hof>“ (Wortliste N42 c, Board s2-neuigkeiten Bild 3). */}
-        <Link href={`/${stand.hofSlug}`} className={KNOPF_GRUEN}>
+        {/* „Zu <Hof>“ als Textlink, nicht als Knopf (Wortliste N42 c, Board s2-neuigkeiten Bild 3; Abnahme Lauf 32, Nr. 279). */}
+        <Link href={`/${stand.hofSlug}`} className={ZU_HOF_LINK}>
           Zu {stand.hofName}
         </Link>
       </section>

@@ -15,7 +15,9 @@ import {
   kleinText,
   leiseZeile,
   textLink,
+  PositionsName,
 } from './_layout'
+import type { Positionszeile } from '@/lib/positionszeile'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
@@ -30,10 +32,10 @@ export interface ArtikelFehltProps {
   orderNumber: string
   farmName: string
   farmPhone: string
-  /** Die fehlende Position in der gemeinsamen Schreibweise („Bauernbrot · 1 × 1 kg"). */
+  /** Die fehlende Position als Positionszeile nach G14 („1 × Bauernbrot (1 kg)“, positionsZeile in src/lib/email.ts). */
   artikel: string
   /** Die Positionen, die bleiben, mit fertigem Zeilenbetrag in Euro (src/lib/email.ts); leer = keine Zeilen. */
-  uebrig?: Array<{ name: string; betrag: number }>
+  uebrig?: Array<{ name: string; teile?: Positionszeile; betrag: number }>
   pickupDate: string
   pickupTime: string
   zahlung: 'online' | 'vor_ort'
@@ -65,7 +67,7 @@ export function ArtikelFehltEmail(p: ArtikelFehltProps) {
       <BestellnummerKasten nummer={p.orderNumber} />
       {/* Board s3/w3-mail-kauf Bild 6: die Kundin sieht, was bleibt — vor „Neuer Betrag“. */}
       {(p.uebrig ?? []).map((zeile, i) => (
-        <BetragsZeile key={i} links={zeile.name} rechts={formatEuro(zeile.betrag)} />
+        <BetragsZeile key={i} links={<PositionsName name={zeile.name} teile={zeile.teile} />} rechts={formatEuro(zeile.betrag)} />
       ))}
       <Trenner />
       <BetragsZeile links="Neuer Betrag" rechts={formatEuro(p.neu)} stark />

@@ -19,21 +19,26 @@ export function UmfeldKopf({
   bereich,
   km,
   ansicht,
+  nurUmkreis = false,
 }: {
   bereich: AnzeigeBereich
   km: UmfeldKm
   /** Bleibt beim Wechsel von Bereich und Umkreis erhalten. */
   ansicht: UmfeldAnsichtWahl
+  /** Kartenansicht am Handy: nur der Umkreis (Board s1-region Bild 6, Liste Lauf 32 region). */
+  nurUmkreis?: boolean
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <FilterChipReihe beschriftung="Bereich wählen">
-        {ANZEIGE_BEREICH_VALUES.map((b) => (
-          <FilterChip key={b} href={umfeldLink({ km, bereich: b, ansicht })} aktiv={b === bereich} ladePunkt>
-            {ANZEIGE_BEREICHE[b].titel}
-          </FilterChip>
-        ))}
-      </FilterChipReihe>
+      {!nurUmkreis && (
+        <FilterChipReihe beschriftung="Bereich wählen">
+          {ANZEIGE_BEREICH_VALUES.map((b) => (
+            <FilterChip key={b} href={umfeldLink({ km, bereich: b, ansicht })} aktiv={b === bereich} ladePunkt>
+              {ANZEIGE_BEREICHE[b].titel}
+            </FilterChip>
+          ))}
+        </FilterChipReihe>
+      )}
       <KmWahl stufen={UMFELD_KM.map((stufe) => ({ km: stufe, href: umfeldLink({ km: stufe, bereich, ansicht }), aktiv: stufe === km }))} />
     </div>
   )

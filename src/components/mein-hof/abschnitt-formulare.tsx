@@ -207,7 +207,7 @@ export function NameForm({ einstellungen, ...rueckmeldung }: ProfilFormularProps
         <Input id="hofseite-name" className="h-11" {...register('name')} />
         <FeldZaehler control={control} name="name" max={HOFNAME_MAX} leise="text-muted-foreground" />
       </Feld>
-      <Feld id="hofseite-beschreibung" label="Kurzbeschreibung — ein Satz über deinen Hof" fehler={formState.errors.description}>
+      <Feld id="hofseite-beschreibung" label="Kurzbeschreibung – ein Satz über deinen Hof" fehler={formState.errors.description}>
         <Textarea id="hofseite-beschreibung" rows={2} {...register('description')} />
       </Feld>
       <Aktionen pending={pending} fehler={fehler} onAbbrechen={rueckmeldung.onAbbrechen} />
@@ -316,11 +316,11 @@ export function LeitspruchForm({ auftritt, ...rueckmeldung }: AuftrittFormularPr
     )
   return (
     <form onSubmit={handleSubmit(speichern)} className="space-y-3">
-      <Feld id="hofseite-leitspruch" label="Leitspruch — ein kurzer Satz unter deinem Hofnamen" fehler={formState.errors.tagline}>
+      <Feld id="hofseite-leitspruch" label="Leitspruch – ein kurzer Satz unter deinem Hofnamen" fehler={formState.errors.tagline}>
         <Input id="hofseite-leitspruch" className="h-11" placeholder="Zum Beispiel: Frische Produkte direkt vom Feld" {...register('tagline')} />
         <FeldZaehler control={control} name="tagline" max={LEITSPRUCH_MAX} leise="text-muted-foreground" />
       </Feld>
-      <Feld id="hofseite-gruendungsjahr" label="Gründungsjahr (freiwillig) — steht als „Seit …“ bei „Über uns“" fehler={formState.errors.gruendungsjahr}>
+      <Feld id="hofseite-gruendungsjahr" label="Gründungsjahr (freiwillig) – steht als „Seit …“ bei „Über uns“" fehler={formState.errors.gruendungsjahr}>
         <Input
           id="hofseite-gruendungsjahr"
           className="h-11 w-32"
@@ -352,7 +352,7 @@ export function UeberUnsForm({ auftritt, ...rueckmeldung }: AuftrittFormularProp
         <Textarea
           id="hofseite-ueber-uns"
           rows={5}
-          placeholder="Zum Beispiel: Seit drei Generationen bauen wir Gemüse an — alles aus eigener Hand."
+          placeholder="Zum Beispiel: Seit drei Generationen bauen wir Gemüse an – alles aus eigener Hand."
           {...register('aboutText')}
         />
       </Feld>
@@ -432,8 +432,8 @@ export function WerteForm({ auftritt, ...rueckmeldung }: AuftrittFormularProps):
       <fieldset>
         <legend className="mb-2 text-sm text-muted-foreground">
           {voll
-            ? `${WERTE_MAX} von ${WERTE_MAX} gewählt — nimm erst einen heraus, um einen anderen zu wählen.`
-            : `Wähle bis zu ${WERTE_MAX} — sie stehen bei „Über uns“ auf deiner Hofseite.`}
+            ? `${WERTE_MAX} von ${WERTE_MAX} gewählt – nimm erst einen heraus, um einen anderen zu wählen.`
+            : `Wähle bis zu ${WERTE_MAX} – sie stehen bei „Über uns“ auf deiner Hofseite.`}
         </legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {WERTE_KATALOG.map((eintrag) => {

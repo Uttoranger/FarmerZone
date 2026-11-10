@@ -19,7 +19,9 @@ import {
   leiseZeile,
   textLink,
   woZeile,
+  PositionsName,
 } from './_layout'
+import type { Positionszeile } from '@/lib/positionszeile'
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
@@ -46,7 +48,7 @@ export interface OrderConfirmationProps {
   /** Online bezahlt (Webhook) oder vor Ort bestätigt (Bar-Knopf, alte Karte-Bestellungen). */
   zahlart: MailZahlart
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
-  items: Array<{ name: string; betrag: number }>
+  items: Array<{ name: string; teile?: Positionszeile; betrag: number }>
   /**
    * Die Gebührenzeile im Modell „bisher“ (N38): Wort und Erklärsatz der
    * Bestellung (gebuehrWort, gebuehrHinweisFuer in src/lib/email.ts) und der
@@ -110,7 +112,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
       {p.abspracheSatz && <Text style={bodyText}>{p.abspracheSatz}</Text>}
       <Trenner />
       {p.items.map((item, i) => (
-        <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
+        <BetragsZeile key={i} links={<PositionsName name={item.name} teile={item.teile} />} rechts={formatEuro(item.betrag)} />
       ))}
       {gebuehr && <GebuehrBetragsZeile zeile={gebuehr} betrag={formatEuro(gebuehr.betrag)} />}
       <Trenner />

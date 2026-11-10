@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useId, useState, useEffect, useRef, type ReactNode } from 'react'
 import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
@@ -420,6 +420,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   // Welche Abschnitte aufgeklappt sind. Anlegen: nur Grunddaten; Bearbeiten:
   // alle zu, die Titel tragen dann eine Zusammenfassung.
   const [offen, setOffen] = useState<Abschnitt[]>([])
+  // Kennungen der Meldungen unter der Zeile „Kategorie“ — der Knopf verweist mit aria-describedby darauf (WCAG 3.3.1).
+  const kategorieFehlerId = useId()
   // Kategoriewechsel weg von den Futtermitteln wartet auf Bestätigung — die
   // Kennzeichnung würde beim Speichern gelöscht.
   const [kategorieWechsel, setKategorieWechsel] = useState<{
@@ -545,7 +547,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       setAusschnitt(isEdit ? product.bildAusschnitt : null)
       setAusschnittOffen(false)
       setAusschnittSpeichern(false)
-      setOffen(isEdit ? [] : ['grunddaten'])
+      // Anlegen: Grunddaten und „Preis & Verfügbarkeit“ offen wie im Board s1-/w1-produkt-neu Bild 1 (Abnahme Lauf 32,
+      // Nr. 277) — Einheit und Preis stehen gleich nebeneinander da.
+      setOffen(isEdit ? [] : ['grunddaten', 'preis'])
       setKategorieWechsel(null)
       setKategorieSheetOffen(false)
       setDualUseHinweis(null)
@@ -1166,7 +1170,21 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                               type="button"
                               data-feld="subcategory"
                               onClick={() => setKategorieSheetOffen(true)}
-                              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm"
+                              aria-describedby={
+                                [
+                                  form.formState.errors.category ? `${kategorieFehlerId}-kategorie` : null,
+                                  form.formState.errors.subcategory?.message ? `${kategorieFehlerId}-sorte` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ') || undefined
+                              }
+                              // Fehlerrand wie an jedem Feld (G6, FELD_FEHLER_IM_FORMULAR: 2 px orange; Abnahme Lauf 32,
+                              // produkt-neu Bild 5): die Zeile hatte die Meldung, aber keinen Rand. Als Klasse, nicht über
+                              // aria-invalid — die Zeile ist ein Knopf, der das Auswahl-Blatt öffnet.
+                              className={cn(
+                                'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm',
+                                (form.formState.errors.category || form.formState.errors.subcategory) && 'border-2 border-status-offen'
+                              )}
                             >
                               <span className={cn(!category && 'text-muted-foreground')}>
                                 {category
@@ -1177,9 +1195,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                               </span>
                               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                             </button>
-                            <FormMessage />
+                            <FormMessage id={`${kategorieFehlerId}-kategorie`} />
                             {form.formState.errors.subcategory?.message && (
-                              <p role="alert" className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+                              <p id={`${kategorieFehlerId}-sorte`} role="alert" className="text-sm text-destructive">
+                                {form.formState.errors.subcategory.message}
+                              </p>
                             )}
                             {category && hatUnterkategorien(category) && !werte.subcategory && !futterBereich && (
                               <FormDescription className="text-xs">

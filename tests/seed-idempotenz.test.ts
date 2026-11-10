@@ -349,23 +349,22 @@ describe('Testdaten — nichts Echtes', () => {
     for (const mail of mails) expect(mail).toMatch(/@example\.com$/)
   })
 
-  it('benutzt für alle NEUEN Höfe ein erfundenes Nummernschema, je Land eines', () => {
+  it('benutzt für alle Höfe ein erfundenes Nummernschema, je Land eines – auch für den Pilothof', () => {
+    // Der Pilothof trug bis Lauf 33 eine echt aussehende Mobilnummer (Nr. 262);
+    // jetzt folgt er dem genullten Muster wie alle anderen.
     for (const h of SEED_HOEFE) {
-      if (h.bestandsHof === true) continue
       const muster = h.land === 'DE' ? /^\+49 8571 0000\d{2}$/ : /^\+43 660 000\d{4}$/
       expect(h.inhaber.telefon, h.slug).toMatch(muster)
     }
     for (const k of SEED_KONTEN) expect(k.telefon).toMatch(/^\+43 660 000\d{4}$/)
   })
 
-  it('kennt genau eine Ausnahme vom Nummernschema — den Pilothof aus der Zeit davor', () => {
-    // `+43 664 123 4567` und `LFBIS 1234567` stehen seit dem ersten Seed im
-    // Repository und sehen echter aus, als sie sind. Sie bleiben, weil „der
-    // Pilothof bleibt, wie er ist" — dieser Test hält sie fest, damit die
-    // Ausnahme eine benannte Ausnahme ist und nicht eine lasche Regex.
+  it('kennt genau eine Ausnahme vom Schema der Betriebsnummern — den Pilothof aus der Zeit davor', () => {
+    // `LFBIS 1234567` steht seit dem ersten Seed im Repository; sie bleibt,
+    // weil „der Pilothof bleibt, wie er ist". Dieser Test hält sie fest, damit
+    // die Ausnahme eine benannte Ausnahme ist und nicht eine lasche Regex.
     const bestand = SEED_HOEFE.filter((h) => h.bestandsHof === true)
     expect(bestand).toHaveLength(1)
-    expect(bestand[0]!.inhaber.telefon).toBe('+43 664 123 4567')
     expect(bestand[0]!.betriebsnummer).toBe('LFBIS 1234567')
   })
 

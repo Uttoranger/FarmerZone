@@ -1,11 +1,13 @@
 'use server'
 
+import { randomInt } from 'node:crypto'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { checkFormToken, FORM_EXPIRED_MESSAGE } from '@/lib/form-token'
 import { meldungEingabeSchema } from '@/schemas/meldung'
-import { MELDUNGEN_PRO_STUNDE, ZU_VIELE_MELDUNGEN, kurznummer } from '@/lib/meldung'
+import { MELDUNGEN_PRO_STUNDE, ZU_VIELE_MELDUNGEN } from '@/lib/meldung'
+import { CUID_ENDE_ZEICHEN, KURZNUMMER_LAENGE, kurznummerAus } from '@/lib/kurznummer'
 import { istEigenesBild } from '@/server/bild-url'
 import { createRateLimiter, getClientIp } from '@/lib/rate-limit'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
@@ -69,9 +71,14 @@ const STUNDE_MS = 60 * 60 * 1000
 // Nur für anonyme Kundinnen ohne E-Mail (siehe Kopf). Ein Limiter je Instanz.
 const anonymDrossel = createRateLimiter({ max: MELDUNGEN_PRO_STUNDE, windowMs: STUNDE_MS })
 
-/** Eine glaubwürdige, aber bedeutungslose Kurznummer für die stille Ablehnung. */
+/**
+ * Eine glaubwürdige, aber bedeutungslose Kurznummer für die stille Ablehnung — in derselben Form wie eine echte
+ * (`kurznummerAus`: sechs Zeichen aus dem Ende einer cuid, groß), sonst verriete die Form die Bot-Bremse. Aus
+ * `crypto`, nicht aus Math.random: Dessen Folge ließe sich aus wenigen Nummern vorhersagen (Nr. 263).
+ */
 function scheinKurznummer(): string {
-  return Math.random().toString(36).slice(2, 10).padEnd(8, '0')
+  const zeichen = Array.from({ length: KURZNUMMER_LAENGE }, () => CUID_ENDE_ZEICHEN[randomInt(CUID_ENDE_ZEICHEN.length)])
+  return kurznummerAus(zeichen.join(''))
 }
 
 async function hofDerSitzung(): Promise<{ id: string; name: string } | null> {
@@ -185,5 +192,5 @@ export async function meldungAbsenden(data: MeldungFormularDaten): Promise<Meldu
     }
   }
 
-  return { ok: true, kurznummer: kurznummer(meldung.id) }
+  return { ok: true, kurznummer: kurznummerAus(meldung.id) }
 }

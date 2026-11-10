@@ -43,6 +43,7 @@ import { prisma } from '@/lib/prisma'
 import { stelleMailEin } from '@/server/mail-warteschlange'
 import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
+import { kurznummerAus } from '@/lib/kurznummer'
 
 const getSession = vi.mocked(auth.api.getSession)
 const meldungCount = vi.mocked(prisma.meldung.count)
@@ -119,7 +120,7 @@ describe('meldungAbsenden — Eingabe', () => {
 
   it('nimmt genau 2000 Zeichen an', async () => {
     const result = await meldungAbsenden(meldung({ text: 'x'.repeat(MELDUNG_TEXT_MAX) }))
-    expect(result).toEqual({ ok: true, kurznummer: NEUE_ID.slice(0, 8) })
+    expect(result).toEqual({ ok: true, kurznummer: kurznummerAus(NEUE_ID) })
     expect(meldungCreate).toHaveBeenCalledTimes(1)
   })
 
@@ -136,9 +137,9 @@ describe('meldungAbsenden — Eingabe', () => {
     expect(meldungCreate).not.toHaveBeenCalled()
   })
 
-  it('liefert die Kurznummer: die ersten acht Zeichen der neuen ID', async () => {
+  it('liefert die Kurznummer: die letzten sechs Zeichen der neuen ID, groß (Nr. 263)', async () => {
     const result = await meldungAbsenden(meldung())
-    expect(result).toEqual({ ok: true, kurznummer: NEUE_ID.slice(0, 8) })
+    expect(result).toEqual({ ok: true, kurznummer: kurznummerAus(NEUE_ID) })
   })
 })
 
@@ -148,7 +149,8 @@ describe('meldungAbsenden — Honigtopf', () => {
   it('legt bei gefülltem Feld NICHTS an, meldet aber Erfolg mit Kurznummer', async () => {
     const result = await meldungAbsenden(meldung({ website: 'https://spam.example' }))
     expect(result).toMatchObject({ ok: true })
-    expect((result as { kurznummer: string }).kurznummer).toHaveLength(8)
+    // Dieselbe Form wie eine echte (Nr. 263) — die Form verrät die Bot-Bremse nicht.
+    expect((result as { kurznummer: string }).kurznummer).toMatch(/^[A-Z0-9]{6}$/)
     expect(meldungCreate).not.toHaveBeenCalled()
     expect(mail).not.toHaveBeenCalled()
   })
@@ -179,7 +181,7 @@ describe('meldungAbsenden — Zeitschranke', () => {
 
   it('lässt ein gültiges, altes Formular durch', async () => {
     const result = await meldungAbsenden(meldung({ formToken: tokenMitAlter(MIN_FORM_AGE_MS) }))
-    expect(result).toEqual({ ok: true, kurznummer: NEUE_ID.slice(0, 8) })
+    expect(result).toEqual({ ok: true, kurznummer: kurznummerAus(NEUE_ID) })
     expect(meldungCreate).toHaveBeenCalledTimes(1)
   })
 
@@ -343,7 +345,7 @@ describe('meldungAbsenden — Betreiber-Mail', () => {
   it('lässt die Meldung nicht scheitern, wenn die Mail scheitert — sie ist gespeichert', async () => {
     mail.mockRejectedValue(new Error('Resend down'))
     const result = await meldungAbsenden(meldung({ art: 'FEHLER' }))
-    expect(result).toEqual({ ok: true, kurznummer: NEUE_ID.slice(0, 8) })
+    expect(result).toEqual({ ok: true, kurznummer: kurznummerAus(NEUE_ID) })
     expect(meldungCreate).toHaveBeenCalledTimes(1)
   })
 })

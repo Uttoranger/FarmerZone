@@ -222,7 +222,7 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/components/products/product-dialog.tsx', text: 'Noch keine Kategorie', art: 'C', grund: 'Zusammenfassung unter dem zugeklappten Abschnittstitel im Produktdialog, kein Leerzustand' },
   { datei: 'src/components/products/product-dialog.tsx', text: 'Noch keine hinterlegt.', art: 'C', grund: 'Feldwert der „Betriebsnummer“, kein Leerzustand; der Link „In den Hof-Einstellungen ändern“ steht direkt darunter' },
   { datei: 'src/lib/umsatz.ts', text: /^Noch keine? (Vorwoche|Vormonat|Vorjahr) zum Vergleich$/, art: 'C', grund: 'Vergleichssatz unter der Umsatzsumme: ein Wert, keine leere Liste' },
-  { datei: 'src/lib/heute.ts', text: 'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt', art: 'C', grund: 'Eintrag in „Braucht dich“: eine Aufgabe, die selbst zum neuen Beitrag führt' },
+  { datei: 'src/lib/heute.ts', text: 'Noch kein Beitrag – erzähl deinen Kundinnen, was es gibt', art: 'C', grund: 'Eintrag in „Braucht dich“: eine Aufgabe, die selbst zum neuen Beitrag führt' },
   { datei: 'src/lib/heute.ts', text: /noch kein Umsatz$/, art: 'C', grund: 'Vergleichssatz unter der Wochensumme: ein Wert, keine leere Liste' },
   { datei: 'src/lib/einrichten.ts', text: 'noch keins', art: 'C', grund: 'Kurztext des Schritts „Erste Produkte“ in der Einrichtung (ein Zählwert); der Schritt trägt selbst den Link „Produkt anlegen“' },
   { datei: 'src/lib/futter-registrierung.ts', text: /^Noch keine Größe kann online gehen\./, art: 'C', grund: 'Infosatz zur Futter-Registrierung (was online gehen kann), kein Leerzustand' },

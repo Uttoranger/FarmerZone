@@ -64,6 +64,7 @@ import { AbschnitteListe } from '@/components/mein-hof/abschnitte-liste'
 import { AbschnittInhalt, SOFORT_GESPEICHERT, type AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
 import { TitelbildBaustein } from '@/components/mein-hof/bild-bausteine'
 import { HOFSEITE_REIHENFOLGE, hofseiteFortschritt, type HofseiteStand } from '@/lib/hofseite-fortschritt'
+import { MEIN_HOF_AUFBAU } from '@/lib/mein-hof-liste'
 import { hofseiteZeileIdSchema, type HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { FarmSettings } from '@/server/queries/farm'
 import type { AppearanceData } from '@/server/queries/appearance'
@@ -226,15 +227,17 @@ describe('Liste „Bearbeiten"', () => {
 
   it('jede Zeile genau einmal: offene zuerst, dann die Gruppen nach dem Ort — „Bestellungen" lebt im Kopf', () => {
     const ids = [...liste().matchAll(/data-bearbeiten-zeile="([a-z-]+)"/g)].map((m) => m[1])
-    // Offen: Titelbild, Logo, Fotos (Reihenfolge der Seite; Abholzeiten sind da).
-    expect(ids.slice(0, 3)).toEqual(['titelbild', 'logo', 'fotos'])
-    expect(ids.slice(3)).toEqual(['name', 'tagline', 'adresse', 'abschnitte', 'abholzeiten', 'zahlung', 'kontakt', 'ueber-uns', 'werte'])
-    // Ohne `aktuell` (Nr. 129) und ohne `bestellungen` (Nr. 143) — sie zählt aber weiter mit („8 von 11").
-    expect([...ids, 'bestellungen'].toSorted()).toEqual([...HOFSEITE_REIHENFOLGE].toSorted())
-    expect(ids.toSorted()).toEqual(hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell' && id !== 'bestellungen').toSorted())
+    // Seit Nr. 274 nach Board: „Titelbild und Logo“, „Name und Leitspruch“, „Über uns“ (mit Werten) sind je EINE Zeile;
+    // die Kennung ist die des ersten Teils. Offen: Titelbild und Logo, Fotos (Abholzeiten sind da).
+    expect(ids.slice(0, 2)).toEqual(['titelbild', 'fotos'])
+    expect(ids.slice(2)).toEqual(['name', 'adresse', 'abschnitte', 'abholzeiten', 'zahlung', 'kontakt', 'ueber-uns'])
+    // Jeder Abschnitt außer `aktuell` und `bestellungen` steckt in genau einer Zeile (MEIN_HOF_AUFBAU).
+    const teile = MEIN_HOF_AUFBAU.flatMap((g) => g.zeilen.flatMap((z) => z.teile))
+    expect([...teile, 'bestellungen'].toSorted()).toEqual([...HOFSEITE_REIHENFOLGE].toSorted())
+    expect(teile.toSorted()).toEqual(hofseiteZeileIdSchema.options.filter((id) => id !== 'aktuell' && id !== 'bestellungen').toSorted())
     // Ohne Abholzeiten stehen sie in der Karte ganz oben.
     const ohneAbholzeit = [...liste({ ...STAND, abholzeiten: [] }).matchAll(/data-bearbeiten-zeile="([a-z-]+)"/g)].map((m) => m[1])
-    expect(ohneAbholzeit.slice(0, 4)).toEqual(['abholzeiten', 'titelbild', 'logo', 'fotos'])
+    expect(ohneAbholzeit.slice(0, 3)).toEqual(['abholzeiten', 'titelbild', 'fotos'])
   })
 
   it('die Gruppen tragen ihre Überschrift (h2) und je EINE Karte', () => {
@@ -248,17 +251,21 @@ describe('Liste „Bearbeiten"', () => {
   it('jede Zeile ist EIN Knopf: „Titel: Wert. Bearbeiten" — kein Häkchen, Schild nur bei gezählten Zeilen', () => {
     const html = liste()
     const zeilen = html.split('data-bearbeiten-zeile=').slice(1)
-    expect(zeilen).toHaveLength(12)
+    expect(zeilen).toHaveLength(9)
     for (const zeile of zeilen) {
       expect(zeile).toMatch(/<button type="button"[^>]*>[\s\S]*?<span class="sr-only">: <\/span>[\s\S]*?<span class="sr-only">\. Bearbeiten<\/span>[\s\S]*?<\/button>/)
       expect(zeile).not.toContain('>Bearbeiten<')
       expect(zeile).not.toContain('<span class="sr-only">fertig</span>')
     }
     const zeileVon = (id: string) => zeilen.find((z) => z.startsWith(`"${id}"`)) ?? ''
-    // Logo fehlt (gezählt): Schild „Fehlt"; Werte fehlen (freiwillig): kein Schild, der Wert sagt es.
-    expect(zeileVon('logo')).toMatch(/data-status="offen"[^>]*><span class="min-w-0 truncate">Fehlt/)
-    expect(zeileVon('werte')).not.toContain('data-slot="status-badge"')
-    expect(zeileVon('werte')).toContain('Freiwillig —')
+    // Logo fehlt (gezählt): Schild „Fehlt" an „Titelbild und Logo“; Werte fehlen (freiwillig): kein Schild an „Über uns“,
+    // und der Satz zum Freiwilligen steht nicht neben einem gesetzten Text (Nr. 274).
+    expect(zeileVon('titelbild')).toContain('Titelbild und Logo')
+    expect(zeileVon('titelbild')).toMatch(/data-status="offen"[^>]*><span class="min-w-0 truncate">Fehlt/)
+    expect(zeileVon('ueber-uns')).not.toContain('data-slot="status-badge"')
+    expect(zeileVon('ueber-uns')).not.toContain('Freiwillig')
+    // Hausstil: nirgends der lange Gedankenstrich in den Werten.
+    expect(zeilen.join('')).not.toContain('—')
     // Online-Zahlung fehlt: das Schild „Online fehlt" an einer fertigen, gezählten Zeile.
     expect(zeileVon('zahlung')).toContain('Online fehlt')
     // Gegenprobe: Fertige Zeilen ohne Marke tragen kein Schild.
@@ -273,16 +280,17 @@ describe('Liste „Bearbeiten"', () => {
     const lang = 'Ein sehr langer Text über den Hof, der in einer Zeile nie Platz hat '.repeat(4)
     const html = liste({ ...STAND, description: lang, aboutText: lang, address: lang })
     expect(srOhneHalt(html)).toEqual([])
-    expect(html.match(/class="sr-only"/g)?.length).toBeGreaterThanOrEqual(24)
+    expect(html.match(/class="sr-only"/g)?.length).toBeGreaterThanOrEqual(18)
     // Gegenprobe: Ohne `relative` am abschneidenden Span fiele jedes „. Bearbeiten" auf.
-    const ohne = html.replaceAll('relative text-[12.5px]', 'text-[12.5px]')
-    expect(srOhneHalt(ohne)).toHaveLength(12)
+    const ohne = html.replaceAll('relative text-[13px]', 'text-[13px]')
+    expect(srOhneHalt(ohne)).toHaveLength(9)
   })
 
-  it('in Worten ohne Fachbegriff: „Leitspruch und Gründungsjahr", nicht „Tagline"', () => {
+  it('in Worten ohne Fachbegriff: „Name und Leitspruch", nicht „Tagline"', () => {
     // Nur der sichtbare Text — die Kennung der Zeile (data-bearbeiten-zeile="tagline") ist kein Text.
     const text = liste().replace(/<[^>]+>/g, ' ')
-    expect(text).toContain('Leitspruch und Gründungsjahr')
+    // Titel nach Board s1-mein-hof (Nr. 274).
+    expect(text).toContain('Name und Leitspruch')
     expect(text).not.toMatch(/Tagline/i)
     expect(inhalt('tagline', 'blatt').replace(/<[^>]+>/g, ' ')).not.toMatch(/Tagline/i)
   })
@@ -372,7 +380,7 @@ describe('Bausteine im Blatt und im Editor', () => {
     const html = inhalt('werte', 'blatt', vier)
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(4)
     expect(html.match(/aria-pressed="false" disabled=""/g)).toHaveLength(2)
-    expect(html).toContain('4 von 4 gewählt — nimm erst einen heraus')
+    expect(html).toContain('4 von 4 gewählt – nimm erst einen heraus')
     // Gegenprobe: mit einem Wert ist keine Kachel gesperrt.
     expect(inhalt('werte', 'blatt')).not.toMatch(/aria-pressed="(?:true|false)" disabled=""/)
   })
@@ -448,13 +456,16 @@ describe('Titelbild — das kleine Logo der Browser-Vorschau (Nr. 108, Runde 1)'
 describe('„Aktuell vom Hof“ unter lg (Register E12, Nr. 129, Runde 1)', () => {
   it('seit Nr. 251 letzter Abschnitt der Liste (unter „Über uns“) mit Titel, „läuft noch …“ und „Beiträge ›“; ohne Angabe keine Zeile', () => {
     const html = renderToStaticMarkup(
-      createElement(AbschnitteListe, { fortschritt: hofseiteFortschritt(STAND), hof: HOF, einstellungen: EINSTELLUNGEN, auftritt: AUFTRITT, aktuell: { titel: 'Aktuell vom Hof', wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage', link: { text: 'Beiträge', href: '/farm-page?reiter=beitraege' } } })
+      createElement(AbschnitteListe, { fortschritt: hofseiteFortschritt(STAND), hof: HOF, einstellungen: EINSTELLUNGEN, auftritt: AUFTRITT, aktuell: { titel: 'Aktuell vom Hof', wert: 'Die ersten Kürbisse sind da · läuft noch 6 Tage', link: { text: 'Beiträge', href: '/farm-page?reiter=beitraege' }, beitrag: { titel: 'Die ersten Kürbisse sind da', stand: 'läuft noch 6 Tage' } } })
     )
     // Nach der Karte „offen" (Titelbild, Logo, Fotos).
     expect(html.indexOf('data-bearbeiten-zeile="fotos"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="aktuell"'))
     // Board s1-mein-hof (Liste Lauf 32): „Aktuell vom Hof“ steht nach allen Gruppen.
     expect(html.indexOf('data-bearbeiten-zeile="name"')).toBeLessThan(html.indexOf('data-bearbeiten-zeile="aktuell"'))
-    expect(html).toContain('Die ersten Kürbisse sind da · läuft noch 6 Tage')
+    // Seit Nr. 274 nach Board: Überschrift „Aktuell vom Hof“, darunter Titel, Stand und „Läuft“, ohne Symbol.
+    expect(html).toContain('Die ersten Kürbisse sind da')
+    expect(html).toContain('läuft noch 6 Tage')
+    expect(html).toContain('>Läuft<')
     expect(html).toMatch(/<a [^>]*href="\/farm-page\?reiter=beitraege"/)
     expect(liste()).not.toContain('data-bearbeiten-zeile="aktuell"')
   })

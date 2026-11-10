@@ -320,7 +320,7 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
     const rest = anzahl - einzeln.length
     eintraege.push({
       art: 'ueberfaellig',
-      text: `${anzahl} ${mehrzahl(anzahl, 'Abholung', 'Abholungen')} vorbei, noch offen — als abgeholt oder nicht abgeholt markieren`,
+      text: `${anzahl} ${mehrzahl(anzahl, 'Abholung', 'Abholungen')} vorbei, noch offen – als abgeholt oder nicht abgeholt markieren`,
       erklaerung: BRAUCHT_DICH_ERKLAERUNG.ueberfaellig[anzahl === 1 ? 'eins' : 'viele'],
       href: anzahl === 1 && einzeln.length === 1 ? `/orders/${einzeln[0].id}` : '/orders',
       unterpunkte: [
@@ -369,7 +369,7 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
       art: 'status',
       text:
         statusErinnerung === 'never'
-          ? 'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
+          ? 'Noch kein Beitrag – erzähl deinen Kundinnen, was es gibt'
           : `Seit ${statusErinnerung} Tagen kein neuer Beitrag`,
       erklaerung: BRAUCHT_DICH_ERKLAERUNG.status.eins,
       href: '/status/new',
@@ -898,11 +898,28 @@ export function heuteAufbau({
 // ─── Packliste ohne Abholzeit und „Zu tun“ (Liste Lauf 32, heute Bild 4) ──────
 
 /**
- * Der Link einer Aufgabe in „Zu tun“ auf Heute: wie der Titel, nur Abholzeiten heißt dort wie der Knopf
- * („Abholzeiten eintragen“, Wortliste „eintragen“ statt „festlegen“; Board s1-/w1-heute Bild 4).
+ * Die Handlung zu einer Zeile der Hofseite in „Zu tun“ (Abnahme Lauf 32, heute 1440 Bild 1/4, Nr. 277): Das
+ * Board nennt, was zu tun ist („Abholzeiten eintragen“), nicht nur den Teil („Titelbild“, „Logo“, „Fotos“).
+ * Wortliste: „eintragen“ statt „festlegen“. Eine Zeile ohne Eintrag behält ihren Titel.
+ */
+const ZU_TUN_HANDLUNG: Readonly<Record<string, string>> = {
+  titelbild: 'Titelbild hochladen',
+  logo: 'Logo hochladen',
+  fotos: 'Fotos hochladen',
+  name: 'Hofnamen eintragen',
+  adresse: 'Adresse eintragen',
+  kontakt: 'Kontakt eintragen',
+  'ueber-uns': '„Über uns“ schreiben',
+}
+
+/**
+ * Der Link einer Aufgabe in „Zu tun“ auf Heute: die Handlung statt des bloßen Teils — Abholzeiten heißt wie der
+ * Knopf („Abholzeiten eintragen“; Board s1-/w1-heute Bild 4), die Teile der Hofseite nach ZU_TUN_HANDLUNG; die
+ * Ersten Schritte („Erstes Produkt anlegen“) sind schon Handlungen.
  */
 export function zuTunLinkText(aufgabe: { id: string; titel: string }): string {
-  return aufgabe.id === 'abholzeiten' ? ABHOLZEITEN_FEHLEN.aktion.text : aufgabe.titel
+  if (aufgabe.id === 'abholzeiten') return ABHOLZEITEN_FEHLEN.aktion.text
+  return ZU_TUN_HANDLUNG[aufgabe.id] ?? aufgabe.titel
 }
 
 // ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────

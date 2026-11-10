@@ -87,6 +87,30 @@ export function pruefeDatenbankAdressen(werte: PruefWerte): string | null {
   return null
 }
 
+/** Dienst-Schlüssel, die der Prüf-Seed nie in seiner Umgebung duldet (pruef-env.sh lässt sie weg). */
+export const VERBOTENE_DIENSTE = ['RESEND_API_KEY', 'RESEND_WEBHOOK_SECRET', 'NEXT_PUBLIC_SENTRY_DSN', 'SENTRY_AUTH_TOKEN'] as const
+
+/** Ein Stripe-Schlüssel ist nur als Platzhalter erlaubt: Der Wert trägt „_pruefung“ (sk_test_pruefung, whsec_pruefung). */
+export const STRIPE_PLATZHALTER_TEIL = '_pruefung'
+
+/**
+ * Harter Abbruch, wenn ein echter Dienst erreichbar wäre (Auftrag Lauf 33,
+ * „Prüf-Umgebung“): RESEND_* (Mails an echte Adressen), Sentry (Ereignisse aus
+ * der Prüf-DB), jede VERCEL*-Variable und jeder Stripe-Schlüssel ohne
+ * „_pruefung“. Gesetzt heißt: vorhanden, auch leer. Die Meldung nennt nur
+ * Namen, nie Werte.
+ */
+export function pruefeDienstSchluessel(env: Record<string, string | undefined>): string | null {
+  const namen = Object.keys(env).filter((name) => env[name] !== undefined)
+  const funde = [
+    ...namen.filter((name) => (VERBOTENE_DIENSTE as readonly string[]).includes(name)),
+    ...namen.filter((name) => name.startsWith('VERCEL')),
+    ...namen.filter((name) => name.includes('STRIPE') && !(env[name] ?? '').includes(STRIPE_PLATZHALTER_TEIL)),
+  ]
+  if (funde.length === 0) return null
+  return `Dienst-Schlüssel gesetzt (${[...new Set(funde)].sort().join(', ')}). Der Prüf-Seed läuft nur ohne echte Dienste (pruef-env.sh).`
+}
+
 /**
  * Antwort von `SELECT inet_server_addr()`: null heißt Unix-Socket, sonst muss
  * es eine Loopback-Adresse sein. So fällt auch ein Tunnel auf, der auf

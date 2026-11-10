@@ -72,6 +72,9 @@ vi.mock('@/server/queries/auswertung', () => ({
   })),
   // Seit Nr. 251 zeigt die Karte die Gebühr des gewählten Zeitraums.
   getServicegebuehrenZeitraum: vi.fn(async () => ({ onlineCents: 0, onlineAnzahl: 0, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 0 })),
+  // Seit Nr. 273: Vergleichsbetrag und Fußsatz der Umsatzkarte, Hofdaten für den Erklärsatz der Gebühren-Karte.
+  getUmsatzZusatz: vi.fn(async () => ({ vergleichCent: 0, selbstEingetrageneTage: [], heuteAbholen: null })),
+  getAuswertungHof: vi.fn(async () => null),
 }))
 vi.mock('@/server/queries/teilen-wirkung', () => ({ getTeilenWirkung: vi.fn(async () => ({ besuche: 0, kanaele: [] })) }))
 vi.mock('@/server/queries/testzahlungen', () => ({ testzahlungenHinweisFuerHof: vi.fn(async () => zustand.hinweis) }))

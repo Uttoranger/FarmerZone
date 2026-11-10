@@ -62,11 +62,13 @@ const HANDY_TITEL = 'Deine Bestellung'
 
 function LinkUngueltig() {
   return (
-    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL} fussSpalte="md:max-w-[600px]">
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL}>
       {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
           Ausweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
-      {/* Board s1-/w1-bestellung-link Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zur Hofübersicht. */}
-      <div className="mx-auto w-full max-w-[552px] px-4 pt-6 pb-12 md:pt-10">
+      {/* Board s1-/w1-bestellung-link Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zur Hofübersicht — im
+          Browser und am Handy 16 px unter dem Kopf wie im Board (pruefer-ui Lauf 33: im Browser vorher 40 px, 24 px zu
+          tief; Nr. 276). */}
+      <div className="mx-auto w-full max-w-[552px] px-4 pt-4 pb-12">
         <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
           <h1 className="font-heading text-[24px] leading-tight font-semibold text-foreground">
             {BESTELLSEITE_LINK_UNGUELTIG.titel}
@@ -162,7 +164,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
   }))
 
   return (
-    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL} fussSpalte="md:max-w-[944px]">
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL}>
       {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer
           Mail. Die Wege hinaus sind echte Links: zum Hof und über die Shell. */}
       <div className={SPALTE}>

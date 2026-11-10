@@ -20,7 +20,7 @@ import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
-import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { TeilenKopf } from '@/components/teilen/teilen-kopf'
 import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
 import { cn } from '@/lib/utils'
 
@@ -168,13 +168,13 @@ export function TeilenClient({
   }, [fertigOhneFehler])
 
   return (
-    <main data-design="neu" className="min-h-screen bg-background px-4 pt-5 pb-8 md:px-8 md:pt-8">
-      {/* 520 px wie im Board w2-teilen (vorher 448), linksbündig. */}
-      <div className="max-w-[520px]">
-        {/* Werkzeug-Kopf (G1, Nr. 250): am Handy die feste Leiste mit „‹“ nach Heute (Elternseite in
-            bauern-navigation.ts), im Web der Textlink „‹ Heute“ über der h1; die Seite steht ohne Shell. */}
-        <WerkzeugKopf titel={TEILEN_TITEL} />
-        <p className="mb-6 text-[15px] leading-[1.45] text-muted-foreground">
+    <main data-design="neu" className="min-h-screen bg-background">
+      {/* Eigene Kopfleiste (Seite ohne Shell, Boards s2-/w2-teilen): am Handy „‹“ und Name, im Web Marke, Name
+          und „← Zu Heute“ rechts. Darunter die Spalte von 520 px, im Web mittig (Board w2-teilen). */}
+      <TeilenKopf titel={TEILEN_TITEL} zurueckHref={HEUTE_HREF} zurueckName="Heute" />
+      <div className="mx-auto w-full max-w-[552px] px-4 pt-3 pb-8 md:max-w-[600px] md:px-10 md:pt-4">
+        <h1 className="mb-2.5 font-heading text-[24px] leading-tight font-semibold text-foreground md:mb-3">{TEILEN_TITEL}</h1>
+        <p className="mb-4 text-[15px] leading-[1.45] text-muted-foreground">
           Fotos, die du aus der Galerie an {MARKE} teilst, landen hier.
         </p>
 
@@ -183,8 +183,9 @@ export function TeilenClient({
 
         {/* Aufgerufen ohne geteilte Datei: der dezente Hinweis */}
         {fotos !== null && fotos.length === 0 && !ergebnisse && (
-          // Board s2/w2-teilen Bild 2: gestrichelter Kasten ohne Symbol, Titel fett in eigener Zeile, „Zu Heute“ als Umriss über die Breite.
-          <div className={cn('flex flex-col gap-2 border border-border bg-card p-5', RUNDUNG.karte)}>
+          // Board s2/w2-teilen Bild 2: Kasten ohne Symbol, Titel fett in eigener Zeile, „Zu Heute“ als Umriss über die
+          // Breite. Rand durchgezogen nach G4 (Auftrag Lauf 33, Z. 99: 3.2 geht dem gestrichelten Board vor).
+          <div className={cn('flex flex-col gap-2 border border-border bg-card px-4 py-5', RUNDUNG.karte)}>
             <p className="text-[16px] font-bold text-foreground">Gerade wurde nichts geteilt</p>
             <p className="text-sm leading-[1.45] text-muted-foreground">
               So geht’s: {MARKE} über das Browser-Menü als App installieren, dann in der Galerie ein Foto wählen und über
@@ -242,20 +243,21 @@ export function TeilenClient({
                     aria-checked={ziel === wert}
                     onClick={() => setZiel(wert)}
                     className={cn(
-                      'flex min-h-[52px] w-full items-center gap-3 border-[1.5px] bg-card px-3.5 text-left text-[16px] font-semibold text-foreground transition-colors hover:bg-muted',
+                      'flex min-h-[52px] w-full items-center gap-3 px-3 text-left text-[15px] font-semibold text-foreground transition-colors',
                       RUNDUNG.karte,
-                      ziel === wert ? 'border-foreground' : 'border-border',
+                      // Gewählt: getönte Fläche mit Akzent-Rand, sonst Kartenfläche mit Feldrand (Board s2-/w2-teilen Bild 1).
+                      ziel === wert ? 'border-2 border-status-offen bg-zustand-tun-grund' : 'border border-input bg-card hover:bg-muted',
                       FOKUS_RAHMEN
                     )}
                   >
                     <span
                       aria-hidden="true"
                       className={cn(
-                        'grid size-5 shrink-0 place-items-center rounded-full border-2',
-                        ziel === wert ? 'border-foreground' : 'border-muted-foreground'
+                        'grid size-[22px] shrink-0 place-items-center rounded-full border-2',
+                        ziel === wert ? 'border-status-offen' : 'border-muted-foreground'
                       )}
                     >
-                      {ziel === wert && <span className="size-2.5 rounded-full bg-foreground" />}
+                      {ziel === wert && <span className="size-2.5 rounded-full bg-status-offen" />}
                     </span>
                     {label}
                   </button>

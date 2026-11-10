@@ -370,7 +370,8 @@ describe('mitgeschicktSatz — was unter „Problem melden" automatisch mitgeht'
       expect(lies(datei), datei).not.toMatch(/Keine IP-Adresse|automatisch mit\./)
     }
     // Seit Nr. 225 zeichnet der gemeinsame Baustein beide Formulare — der Satz kommt dort aus der Quelle, ein Hof mit „dein Hof".
-    expect(lies('src/components/ui/meldung-formular-ansicht.tsx')).toMatch(/mitgeschicktSatz\(f\.kennung, alsHof\)/)
+    // Seit Nr. 268 mit der Nummer, die wirklich mitgeht (nur bei „Etwas funktioniert nicht“, kennungZumSenden).
+    expect(lies('src/components/ui/meldung-formular-ansicht.tsx')).toMatch(/mitgeschicktSatz\(kennung, alsHof\)/)
     expect(mitgeschicktSatz('', true)).toBe(`Mitgeschickt: Seite, Gerät und dein Hof. ${OHNE_IP_UND_COOKIES}`)
     expect(OHNE_IP_UND_COOKIES).toBe('Keine IP-Adresse, keine Cookies.')
   })

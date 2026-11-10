@@ -79,7 +79,10 @@ export function raummassZeile(units: readonly string[]): string | null {
   return eintrag ? `${eintrag.kurz} – ${eintrag.text}` : null
 }
 
-/** Der Satz der Karte „Gerade ausverkauft“, wörtlich nach der Liste: „<Hof> hat gerade kein <Produkt>. Schau, was es sonst gibt.“ */
-export function ausverkauftSatz(hofName: string, produktName: string): string {
-  return `${hofName} hat gerade kein ${produktName}. Schau, was es sonst gibt.`
+/**
+ * Der Satz der Karte „Gerade ausverkauft“ (Antwort 2 der Projektleitung, Register N48): „<Produkt> gibt es gerade
+ * nicht. Schau, was es sonst gibt.“ — ohne Hofnamen, damit kein Artikel nötig ist („kein Milch“ passte nicht).
+ */
+export function ausverkauftSatz(produktName: string): string {
+  return `${produktName} gibt es gerade nicht. Schau, was es sonst gibt.`
 }

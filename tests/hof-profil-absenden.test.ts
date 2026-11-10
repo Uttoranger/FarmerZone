@@ -4,7 +4,7 @@
  * und dann abgeschickt wie mit „Profil speichern" — react-hook-form mit dem
  * echten Schema (zodResolver), der echte onSubmit, der echte Maßstab
  * (profilWieImSchema, geaendertSeitLaden). Ersetzt die Textvergleiche, die
- * bis dahin in tests/unterseiten-kopf.test.ts standen.
+ * bis dahin in tests/unterseiten.test.ts (damals unterseiten-kopf.test.ts) standen.
  *
  * Ohne DOM (TESTING_GUIDELINES §1) geht das so: useForm ist nur umhüllt, um
  * an das Formular und an den Absende-Griff zu kommen, den die Komponente

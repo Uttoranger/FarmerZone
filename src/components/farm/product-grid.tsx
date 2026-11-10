@@ -13,6 +13,7 @@ import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, C
 import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
+import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { MONTH_SHORT, centsAlsEuro, formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl, seasonLabel } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
@@ -39,6 +40,7 @@ import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
@@ -192,21 +194,16 @@ function ProductImageArea({
       {fileInput}
 
       {/* Gedimmter Bildrahmen — Foto ?? Illustration (Unterkategorie, sonst Kategorie, sonst „Sonstiges", categoryImageUrl) ?? Sand-Platzhalter */}
-      <div className="absolute inset-0" style={{ opacity: dim }}>
+      <div className={cn('absolute inset-0', !product.imageUrl && product.categoryImageUrl && 'dark:ring-1 dark:ring-border dark:ring-inset')} style={{ opacity: dim }}>
         {(product.imageUrl ?? product.categoryImageUrl) ? (
           <Image
             src={(product.imageUrl ?? product.categoryImageUrl)!}
             alt={product.name}
             fill
             sizes="(min-width: 768px) 33vw, 50vw"
-            // Nur die Kategorie-Illustration wird im Dunkeln gedämpft, sonst
-            // leuchtet ihr Crème-Grund als Fläche; Fotos bleiben, wie sie sind
-            // (CODING_STANDARDS §7, Altlast aus ARCHITECTURE §6 beim Anfassen
-            // nachgezogen — Werte wie in components/produkte/produkte-ansicht.tsx).
-            className={cn(
-              'object-contain',
-              !product.imageUrl && 'dark:brightness-[0.85] dark:saturate-[0.9]'
-            )}
+            // Die Kategorie-Illustration steht im Dunkeln wie ein Foto: gedämpft aus der einen Quelle
+            // (ILLUSTRATION_HUELLE, F041) und gerahmt; Fotos bleiben, wie sie sind (CODING_STANDARDS §7).
+            className={cn('object-contain', !product.imageUrl && ILLUSTRATION_HUELLE)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -632,7 +629,9 @@ export function ProductGrid({
     let satz = null as string | null
     ersetzeKorb((vorher) => {
       const abgleich = gleicheKorbMitHofseite(vorher, products, sperre)
-      satz = abgleich?.satz ?? null
+      // Board s1-/w1-korb Bild 2 (Nr. 276): der Satz zu entfernten Positionen mit dem Produktnamen — die Quelle kennt
+      // keine Namen, der Korb vorher schon. Alles andere im Satz bleibt wörtlich (korbHinweisMitNamen).
+      satz = abgleich?.satz ? korbHinweisMitNamen(abgleich.satz, entfernteNamen(vorher, abgleich.positionen)) : null
       return abgleich?.positionen ?? vorher
     })
     if (satz) zeigeKorbHinweis(farmId, satz)

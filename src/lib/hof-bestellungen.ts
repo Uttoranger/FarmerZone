@@ -16,8 +16,13 @@ import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import type { PaymentMethod, PaymentStatus } from '@prisma/client'
 import type { MarkeArt } from '@/lib/marke-art'
 import { GEBUEHR_MODELL_HOFPREIS, gebuehrBezeichnungFuer, istHofpreisBestellung } from '@/lib/plattformgebuehr'
-import { INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
-import { centsAlsEuro } from '@/lib/servicegebuehr'
+import {
+  barZuKassierenCents,
+  centsAlsEuro,
+  gebuehrEntfallen,
+  type BestellungFuerGebuehrStatus,
+  type BestellungMitGebuehr,
+} from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 // Prisma-frei: Diese Datei erreicht auch Client-Bauteile (admin/bestellungen/bestellung-aktionen.tsx
 // über admin-bestellung.ts); die Abfrage-Datei reicht dieselbe Liste nur weiter.
@@ -219,16 +224,60 @@ export const DRUCK_ABGLEICH = 'Bestellnummer nur zum Abgleich – bitte zusätzl
 /**
  * Die eigene Zeile mit der Gebühr auf dem Papier — nur im Modell „bisher“ und nur mit
  * Gebühr (Wort über gebuehrBezeichnungFuer). Im Hofpreis-Modell steckt die
- * Plattformgebühr im Preis (N38): keine Zeile, dafür druckPreisHinweis.
+ * Plattformgebühr im Preis (N38): keine Zeile, dafür druckGesamtHinweis am Gesamt.
  */
 export function druckGebuehrZeile(bestellung: { gebuehrModell: string | null }, gebuehrCents: number): string | null {
   if (istHofpreisBestellung(bestellung) || gebuehrCents <= 0) return null
   return gebuehrBezeichnungFuer(bestellung)
 }
 
-/** „Preise inkl. Plattformgebühr.“ — nur bei Bestellungen im Hofpreis-Modell (Board w2-druck). */
-export function druckPreisHinweis(bestellung: { gebuehrModell: string | null }): string | null {
-  return istHofpreisBestellung(bestellung) ? `Preise ${INKL_PLATTFORMGEBUEHR}.` : null
+/*
+ * Abholzettel und Packliste (Nr. 249b, seit Nr. 277 hier statt in components/orders/druck-kasse.ts):
+ * Titel des Kastens unter „Gesamt“ und der Satz zur Gebühr.
+ * NUR ANZEIGE — der Betrag kommt unverändert aus `barZuKassierenCents` (Snapshot); hier wird nichts
+ * gerechnet, nur gewählt, welches Wort darüber steht.
+ */
+
+export type DruckKasse = {
+  /** „Bar zu kassieren“, „Zu kassieren“ (Karte bei Abholung, Altbestand) oder „Nichts zu kassieren“. */
+  titel: 'Bar zu kassieren' | 'Zu kassieren' | 'Nichts zu kassieren'
+  /** Der Betrag aus barZuKassierenCents; null bei „Nichts zu kassieren“ — dann steht kein Betrag da. */
+  cents: number | null
+}
+
+/**
+ * Was der Kasten unter „Gesamt“ sagt (Antwort 8 der Projektleitung, 7.11.2026). Online: kein Kasten (null).
+ * Nicht abgeholt, storniert oder mit entfallener Gebühr gibt es nichts mehr zu kassieren — der Snapshot-
+ * Betrag bliebe dort stehen und läse sich wie eine offene Forderung. Storniert zählt auch ohne
+ * Erstattungszeitpunkt (Altbestand ohne Gebühr), weil eine stornierte Bestellung nie kassiert wird.
+ */
+export function druckKasse(
+  bestellung: BestellungMitGebuehr & Pick<BestellungFuerGebuehrStatus, 'status' | 'paymentMethod' | 'serviceFeeRefundedAt'>
+): DruckKasse | null {
+  const cents = barZuKassierenCents(bestellung)
+  if (cents === null) return null
+  if (bestellung.status === 'NOT_PICKED_UP' || bestellung.status === 'CANCELLED' || gebuehrEntfallen(bestellung)) {
+    return { titel: 'Nichts zu kassieren', cents: null }
+  }
+  // Mit Karte zahlt niemand bar — „Bar zu kassieren“ wäre bei diesem Altbestand falsch.
+  if (bestellung.paymentMethod === 'ONSITE_CARD') return { titel: 'Zu kassieren', cents }
+  return { titel: 'Bar zu kassieren', cents }
+}
+
+/**
+ * Der Satz zur Gebühr am Gesamt — nur im Hofpreis-Modell, und nur, wenn das gezeigte Gesamt die
+ * Gebühr wirklich enthält (Gebühr > 0, nicht entfallen). Er spricht vom Gesamt, nicht von „Preisen“: Die
+ * Positionen stehen mit dem Warenpreis aus dem Snapshot, also OHNE Gebühr (Mangel Zwischen-Durchgang A,
+ * druck Bild 1: Positionen € 12,20, Gesamt € 12,95). Positionen inkl. Gebühr umzurechnen wäre eine neue
+ * Geldrechnung. Das Wort kommt aus gebuehrBezeichnungFuer, nie fest. Abholzettel und Packliste (Antwort 4
+ * der Projektleitung, Nr. 277) fragen je Bestellung — auf der Packliste steht er an jedem Betrag, dessen
+ * Gesamt die Gebühr enthält, nie einmal für die ganze Seite.
+ */
+export function druckGesamtHinweis(
+  bestellung: { gebuehrModell: string | null } & Pick<BestellungFuerGebuehrStatus, 'serviceFeeCents' | 'serviceFeeRefundedAt'>
+): string | null {
+  if (!istHofpreisBestellung(bestellung) || bestellung.serviceFeeCents <= 0 || gebuehrEntfallen(bestellung)) return null
+  return `Gesamt inkl. ${gebuehrBezeichnungFuer(bestellung)}.`
 }
 
 const ZAHLART: Record<string, string> = {

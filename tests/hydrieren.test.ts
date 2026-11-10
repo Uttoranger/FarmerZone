@@ -32,6 +32,8 @@ import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { NotbremseBand } from '@/components/notbremse-band'
 import { NETZ_ZEILE } from '@/lib/netz'
 import { HeuteRoutine } from '@/components/admin/heute-routine'
+import { FEHLER_SEITENTITEL, FehlerAnsicht } from '@/components/shared/fehler-ansicht'
+import { TEST_VORSATZ, TITEL_VORSATZ_ATTRIBUT } from '@/lib/titel-vorsatz'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
 const adresse = { suche: '' }
@@ -248,6 +250,22 @@ describe('Hydrieren – das Band der Notbremse (Register N34, Nr. 189)', () => {
     expect(holen).toHaveBeenCalledWith('/api/notbremse', { cache: 'no-store' })
     expect(ergebnis.container.textContent).toContain(satz)
     expect(ergebnis.container.querySelector('[role="status"]')).not.toBeNull()
+  })
+})
+
+describe('Hydrieren – Titel der 500 mit „[TEST]“ (Nr. 279)', () => {
+  afterEach(() => document.documentElement.removeAttribute(TITEL_VORSATZ_ATTRIBUT))
+
+  it('FehlerAnsicht: Server ohne Vorsatz, nach dem Hydrieren mit dem Vorsatz aus <html>; ohne Attribut keiner', async () => {
+    const ansicht = createElement(FehlerAnsicht, { nochmal: () => {}, imLayout: true })
+    const mit = await pruefeHydrieren(ansicht, { imBrowser: () => document.documentElement.setAttribute(TITEL_VORSATZ_ATTRIBUT, TEST_VORSATZ) })
+    expect(mit.serverHtml).toContain(`<title>${FEHLER_SEITENTITEL}</title>`)
+    expect(document.title).toBe(`${TEST_VORSATZ}${FEHLER_SEITENTITEL}`)
+    await raeumeHydrierenAuf()
+    document.documentElement.removeAttribute(TITEL_VORSATZ_ATTRIBUT)
+    // Gegenprobe: Produktion (kein Attribut) — kein Vorsatz.
+    await pruefeHydrieren(ansicht)
+    expect(document.title).toBe(FEHLER_SEITENTITEL)
   })
 })
 
@@ -554,6 +572,7 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/hoefe/hoefe-client.tsx': ['HoefeClient'],
   'src/components/hoefe/use-hoefe-adresse.ts': ['useHoefeAdresse'],
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
+  'src/components/shared/fehler-ansicht.tsx': ['FehlerAnsicht'],
   'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterPille', 'ThemeWahl'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],

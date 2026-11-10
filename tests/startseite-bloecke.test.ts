@@ -111,7 +111,7 @@ describe('Höfe-Auswahl', () => {
 })
 
 describe('Kategorie-Hinweis', () => {
-  it('zeigt Kategorie, Illustration (nachts gedämpft) und den Weg auf Entdecken', () => {
+  it('zeigt Kategorie, Illustration (nachts wie ein Foto gedämpft und gerahmt) und den Weg auf Entdecken', () => {
     const aus = html(
       createElement(StartseitenBlock, { block: block({ vorlage: 'KATEGORIE_HINWEIS', kategorie: 'HONIG' }), kategorieBild: '/categories/honig.webp' })
     )
@@ -119,8 +119,11 @@ describe('Kategorie-Hinweis', () => {
     expect(aus).toContain('src="/categories/honig.webp"')
     expect(aus).toContain(`href="${hoefeAdresse({ kategorien: ['HONIG'] })}"`)
     expect(aus).toContain('Honig &amp; Bienenprodukte entdecken')
+    // F041: Die Hülle ist gerahmt (next/image ist hier eine Attrappe ohne Klassen) …
+    expect(aus).toMatch(/<span class="[^"]*dark:ring-1 dark:ring-border[^"]*"><img src="\/categories\/honig\.webp"/)
+    // … und das Bild nimmt die Dämpfung eines Fotos aus der einen Quelle, keine eigene Kopie.
     const abschnitt = readFileSync(join(process.cwd(), 'src/components/startseite/bloecke/kategorie-hinweis.tsx'), 'utf8')
-    expect(abschnitt).toMatch(/dark:brightness-\[0\.78\] dark:saturate-\[0\.9\]/)
+    expect(abschnitt).toContain("className={cn('object-cover', ILLUSTRATION_HUELLE)}")
   })
 
   it('nimmt ein eigenes Link-Ziel statt Entdecken', () => {

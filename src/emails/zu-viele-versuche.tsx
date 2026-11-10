@@ -5,7 +5,7 @@ import { ZU_VIELE_VERSUCHE_MAIL, type FehlversuchArt } from '@/lib/anmeldecode'
 
 export interface ZuVieleVersucheProps {
   art: FehlversuchArt
-  /** Ende der Pause, fertig für die Mail („Montag, 19. Oktober, 15:00 Uhr", zeitpunktFuerMail). */
+  /** Ende der Pause, fertig für die Mail („Mi, 3. März 2027, 09:15 Uhr“, V9 über formatZeitpunktMitWochentag, Nr. 280). */
   bis: string
 }
 
@@ -24,8 +24,8 @@ export function ZuVieleVersucheEmail({ art, bis }: ZuVieleVersucheProps): React.
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={text.titel}>
       <Text style={h1}>{text.titel}</Text>
-      {/* Anrede im selben Satz wie in den Boards (s3/w3-mail-sicherheit Bild 2 und 3). */}
-      <Text style={bodyText}>{`Hallo, ${text.text(bis)}`}</Text>
+      {/* Board s3/w3-mail-sicherheit Bild 2 und 3: ohne Anrede, gleich der Satz (Nr. 280). */}
+      <Text style={bodyText}>{text.text(bis)}</Text>
       <Text style={leiseZeile}>{text.ausweg}</Text>
     </EmailLayout>
   )

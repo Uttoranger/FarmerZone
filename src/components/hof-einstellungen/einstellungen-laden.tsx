@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils'
-import { UnterseitenKopfLaden } from '@/components/hofbereich/hof-laden'
 import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
 import { RUNDUNG } from '@/components/ui/rundung'
 
@@ -20,8 +19,13 @@ export const EINSTELLUNGEN_RAHMEN = 'w-full max-w-[1000px] px-4 pt-5 pb-12 md:px
  */
 export const UEBERSICHT_RAHMEN = 'w-full max-w-[1064px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:max-w-[1080px] xl:px-10'
 
-/** Unterseiten: eine Spalte mit Formularen, so breit wie bisher. */
-export const UNTERSEITE_RAHMEN = 'w-full max-w-2xl px-4 pt-5 pb-12 md:px-8 md:pt-8'
+/**
+ * Unterseiten: eine Spalte mit Formularen, der Inhalt selbst 672 px breit, das Polster kommt dazu (Boards
+ * w2-konto-hof, -hofdaten-zahlung: `main` 672 px plus 40 px je Seite; Abnahme Lauf 32 „Spalte 605 px statt 671“,
+ * Nr. 269) — vorher zählte das Polster in die 672 px (`max-w-2xl`). Die EINE Stelle der Spaltenbreite aller
+ * Einstellungs-Unterseiten; 736 = 672 + 2 × 32 (md:px-8), 752 = 672 + 2 × 40 (xl:px-10).
+ */
+export const UNTERSEITE_RAHMEN = 'w-full max-w-[736px] px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:max-w-[752px] xl:px-10'
 
 /** Der Satz unter dem Werkzeug-Kopf einer Unterseite (Boards s2-/w2-konto-hof, -hofdaten-zahlung; Nr. 250). */
 export const UNTERSEITE_SATZ = 'mb-5 text-[15px] leading-relaxed text-muted-foreground md:mb-6 md:text-base'
@@ -68,11 +72,9 @@ export function EinstellungenUnterseiteLaden(): React.JSX.Element {
 export function KonditionenLaden(): React.JSX.Element {
   return (
     <div className={cn(EINSTELLUNGEN_RAHMEN, 'animate-pulse')} aria-busy="true">
-      <UnterseitenKopfLaden />
-      <div className="mb-5 md:mb-6">
-        <div className="h-8 w-56 rounded-lg bg-border" />
-        <div className="mt-2 h-4 w-80 max-w-full rounded bg-muted" />
-      </div>
+      {/* Derselbe Werkzeug-Kopf wie die fertige Seite (G1, Nr. 278), darunter der Satz. */}
+      <WerkzeugKopfLaden />
+      <div className="mb-5 h-4 w-80 max-w-full rounded bg-muted md:mb-6" />
       <div className="h-16 rounded-2xl border border-border bg-card" />
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="h-52 rounded-2xl border border-border bg-card" />

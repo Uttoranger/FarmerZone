@@ -100,6 +100,16 @@ export function meldeGescheitertesAbsenden(fehler: unknown): void {
   }
 }
 
+/**
+ * Die Fehlernummer geht nur bei „Etwas funktioniert nicht“ mit (Board s3-/w3-problem-melden Bild 3, Liste Lauf 32
+ * problem-melden „Fehlernummer auch bei ‚Ich hätte gern …‘“; Nr. 268): Bei Wunsch und Frage steht das Feld nicht da,
+ * also schickt das Formular auch nichts, was der Mensch nicht sieht. Der Zustand bleibt — wer zurück auf „Fehler“
+ * wechselt, findet die Nummer (etwa die von der Fehlerseite vorbelegte) wieder.
+ */
+export function kennungZumSenden(art: MeldungArt, kennung: string): string {
+  return art === 'FEHLER' ? kennung : ''
+}
+
 export type MeldungFormular = {
   art: MeldungArt
   setArt: (art: MeldungArt) => void
@@ -171,7 +181,7 @@ export function useMeldungFormular({
           seiteUrl: kontext.seiteUrl,
           userAgent: kontext.userAgent,
           viewport: kontext.viewport,
-          diagKennung: kennung,
+          diagKennung: kennungZumSenden(art, kennung),
           customerEmail: alsHof ? '' : email,
           screenshotUrl: screenshotUrl ?? '',
           website,

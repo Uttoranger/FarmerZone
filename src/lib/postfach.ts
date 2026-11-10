@@ -223,7 +223,7 @@ export const POSTFACH_MAIL_TEXT = {
   zu: 'Zu',
   link: 'Ansehen',
   oeffnen: 'Im Postfach öffnen',
-  antwortenInDerApp: 'Antworten geht in der App: Öffne die Nachricht in deinem Postfach und schreib dort zurück.',
+  antwortenInDerApp: 'Antworten geht in der App, im Postfach.',
   gruss: `Dein ${MARKE_TEAM}`,
   /** Der Satz unter der Karte (EmailLayout `fusszeile`): Absender ist das Team, nicht ein Hof. */
   fuss: `Versandt vom ${MARKE_TEAM}.`,
@@ -239,7 +239,12 @@ export const POSTFACH_LEER = {
 } as const
 
 /** Filter „Ungelesen" ohne Treffer — der Ausweg zeigt wieder alle. */
-export const POSTFACH_ALLES_GELESEN = { titel: 'Alles gelesen', satz: 'Neue Nachrichten vom Team erscheinen hier.', ausweg: 'Alle zeigen' } as const
+export const POSTFACH_ALLES_GELESEN = {
+  titel: 'Alles gelesen',
+  // Wörtlich nach Board s2-/w2-postfach Bild 5 (Liste Lauf 32 postfach, B-Zeile „Leer-Zustand …“; Nr. 274).
+  satz: 'Neue Nachrichten vom Team erscheinen hier und als Karte auf Heute.',
+  ausweg: 'Alle Nachrichten zeigen',
+} as const
 
 /** Fehler an der Oberfläche (deutsch, geduzt, mit Ausweg). */
 export const POSTFACH_FEHLER = {

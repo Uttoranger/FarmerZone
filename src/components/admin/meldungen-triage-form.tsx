@@ -164,7 +164,7 @@ export function TriageForm({
             value={form.duplikatVonId}
             onChange={(e) => setze('duplikatVonId', e.target.value)}
             maxLength={40}
-            placeholder="8 Zeichen"
+            placeholder="6 Zeichen"
             className={cn(FELD, 'font-mono')}
           />
         </div>

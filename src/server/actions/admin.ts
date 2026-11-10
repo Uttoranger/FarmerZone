@@ -17,6 +17,8 @@ import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { ablegenSchema, buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema, type TriageEingabe } from '@/schemas/meldung'
 import { BUENDEL_STAND_STATUS, MELDUNG_GEAENDERT, MELDUNG_VERWEIS_GEAENDERT, WUENSCHE_TEXT, triageAufruf, type TriageStand } from '@/lib/meldung'
 import { MEINE_MELDUNGEN_HREF } from '@/lib/hof-hilfe'
+import { KURZNUMMER_MEHRDEUTIG } from '@/lib/kurznummer'
+import { findeMeldungZurKurznummer } from '@/server/queries/meldung'
 import { verschickeRundschreiben } from '@/server/rundschreiben'
 import { bestaetigungOffen } from '@/lib/email-bestaetigung'
 import { FREISCHALTUNG_GEAENDERT_TEXT, freischaltSperre } from '@/lib/admin-hoefe'
@@ -556,16 +558,15 @@ export async function triageMeldungAction(
   const meldung = await prisma.meldung.findUnique({ where: { id: meldungId }, select: { id: true } })
   if (!meldung) return { error: 'Meldung nicht gefunden.' }
 
-  // Duplikat-Verweis: Kurznummer (Präfix) oder volle ID — gespeichert wird immer
-  // die volle ID, und nur, wenn es die Meldung wirklich gibt.
+  // Duplikat-Verweis: Kurznummer, alte Kurznummer oder volle ID nach DER Regel
+  // (Nr. 263) — gespeichert wird immer die volle ID, und nur, wenn es genau eine
+  // passende Meldung gibt: Bei mehreren wäre jede Wahl ein möglicher falscher Verweis.
   let duplikatVonId: string | null = null
   if (triage.duplikatVonId !== null) {
-    const eingabe = triage.duplikatVonId
-    const original = await prisma.meldung.findFirst({
-      where: eingabe.length >= 20 ? { id: eingabe } : { id: { startsWith: eingabe } },
-      select: { id: true, status: true },
-    })
-    if (!original) return { error: 'Duplikat-Verweis: diese Meldung gibt es nicht.' }
+    const wahl = await findeMeldungZurKurznummer(triage.duplikatVonId)
+    if (wahl.art === 'mehrdeutig') return { error: KURZNUMMER_MEHRDEUTIG }
+    if (wahl.art === 'keine') return { error: 'Duplikat-Verweis: diese Meldung gibt es nicht.' }
+    const original = wahl.meldung
     if (original.id === meldungId) return { error: 'Eine Meldung kann nicht ihr eigenes Duplikat sein.' }
     if (original.status === 'DUPLIKAT') return { error: KEINE_KETTE }
     duplikatVonId = original.id

@@ -1,6 +1,6 @@
 import { gebuehrWortFuerZeitraum, hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { zeitraumImSatz, type Periodenfenster } from '@/lib/umsatz'
-import { gebuehrenKarteText, type GebuehrenKarteText } from '@/lib/auswertung'
+import { gebuehrenKarteText, type GebuehrHofStand, type GebuehrenKarteText } from '@/lib/auswertung'
 import { monatsschluesselInWien } from '@/lib/servicegebuehr'
 
 /*
@@ -43,7 +43,12 @@ export function gebuehrTitel(pf: Periodenfenster, einstellung: HofpreisEinstellu
  * „Hofpreis-Modell ab“) und `vorBarStichtag` (B1) — keine zweite Datumsregel, nur Anzeige. Über den
  * Stichtag hinweg („Gebühren …“) stehen die Sätze des Modells am Ende des Fensters.
  */
-export function gebuehrenKarteFuerZeitraum(pf: Periodenfenster, einstellung: HofpreisEinstellung | null): GebuehrenKarteText {
+export function gebuehrenKarteFuerZeitraum(
+  pf: Periodenfenster,
+  einstellung: HofpreisEinstellung | null,
+  /** Der eigene Hof für den Erklärsatz je Stand (Nr. 273); null = die allgemeinen Sätze. */
+  stand: GebuehrHofStand | null = null
+): GebuehrenKarteText {
   const bezug = pf.aktuell.bis
-  return { ...gebuehrenKarteText(monatsschluesselInWien(bezug), einstellung, bezug), titel: gebuehrTitel(pf, einstellung) }
+  return { ...gebuehrenKarteText(monatsschluesselInWien(bezug), einstellung, bezug, stand), titel: gebuehrTitel(pf, einstellung) }
 }

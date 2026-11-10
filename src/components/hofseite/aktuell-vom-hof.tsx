@@ -18,6 +18,7 @@ import { stripStatusVariables } from '@/lib/status-body'
 import { bildStil } from '@/lib/bild-ausschnitt'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
 import { cn } from '@/lib/utils'
+import { ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { textlinkKlassen } from '@/components/ui/textlink'
 
@@ -326,7 +327,7 @@ function BeitragProdukt({
   return (
     <div className="flex items-center gap-2.5">
       <Link href={href} title={produkt.name} className={cn('flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg', FOKUS_RAHMEN)}>
-        <span className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted">
+        <span className={cn('relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-muted', bild && !istFoto && 'dark:ring-1 dark:ring-border')}>
           {bild ? (
             <Image
               src={bild}
@@ -334,7 +335,7 @@ function BeitragProdukt({
               alt={istFoto ? produkt.name : ''}
               fill
               sizes="44px"
-              className={cn(istFoto ? 'object-cover' : 'object-contain p-1 dark:brightness-[0.85] dark:saturate-[0.9]', ausverkauft && 'grayscale')}
+              className={cn(istFoto ? 'object-cover' : cn('object-contain p-1', ILLUSTRATION_HUELLE), ausverkauft && 'grayscale')}
               style={istFoto ? bildStil(produkt.bildAusschnitt, { filter: !ausverkauft }) : undefined}
             />
           ) : (

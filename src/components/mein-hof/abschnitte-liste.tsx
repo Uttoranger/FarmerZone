@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, Check, ChevronRight } from 'lucide-react'
-import { zeilenNachOrt, zeilenWieAufDerHofseite, type HofseiteFortschritt, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
+import { Check, ChevronRight } from 'lucide-react'
+import { ZEILE_TITEL, type HofseiteFortschritt } from '@/lib/hofseite-fortschritt'
 import { HOFSEITE_VOLLSTAENDIG, punkteOffenTitel, schildTon } from '@/lib/mein-hof'
+import { meinHofListe, type MeinHofZeile } from '@/lib/mein-hof-liste'
 import type { AktuellZeile } from '@/lib/mein-hof-ansicht'
 import type { HofseiteZeileId } from '@/schemas/hofseite-vorschau'
 import type { FarmSettings } from '@/server/queries/farm'
@@ -18,6 +18,14 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 import { RUNDUNG } from '@/components/ui/rundung'
+import { AktuellBlock } from '@/components/mein-hof/aktuell-block'
+import {
+  FORTSCHRITT_FUELLUNG,
+  FORTSCHRITT_SPUR,
+  MEIN_HOF_GRUPPE_TITEL,
+  MEIN_HOF_ZEILE_TITEL,
+  MEIN_HOF_ZEILE_WERT,
+} from '@/components/mein-hof/zeilen-stil'
 
 /*
  * „Bearbeiten" in Mein Hof unter lg (Nachtlauf Nr. 50, Register N4; seit
@@ -28,6 +36,10 @@ import { RUNDUNG } from '@/components/ui/rundung'
  * (zeilenNachOrt), je EINE Karte mit Trennlinien, und seit Nr. 251 zuletzt
  * „Aktuell vom Hof" (Board s1-mein-hof: letzter Abschnitt). Die Zeile
  * „Bestellungen" (Pause) lebt im Kopf und steht hier nicht.
+ *
+ * Seit Nr. 274 Titel, Zusammenlegung und Reihenfolge nach den Boards
+ * (meinHofListe, src/lib/mein-hof-liste.ts): „Titelbild und Logo“, „Name und
+ * Leitspruch“, „Über uns“ öffnen die Bausteine aller ihrer Teile im selben Blatt.
  *
  * Jede Zeile ist EIN Knopf: Titel, Wert, Schild (nur bei der Marke einer
  * gezählten Zeile), Pfeil. „Bearbeiten" hört nur der Screenreader. Bearbeitet
@@ -57,36 +69,35 @@ type Props = {
 
 /**
  * Eine Zeile als Knopf. Der Wert steht in einer Zeile (gekürzt, ganz im title),
- * in der Karte „offen" bis zwei Zeilen. Ein Schild nur bei der Marke einer
- * gezählten Zeile — Freiwilliges sagt es im Wert („Freiwillig — …").
+ * in der Karte „offen" bis zwei Zeilen. Ein Schild nur bei der Marke eines
+ * gezählten Teils.
  */
-function Zeile({ zeile, umbrechen, onOeffne }: { zeile: HofseiteZeile; umbrechen: boolean; onOeffne: (id: HofseiteZeileId) => void }) {
-  const schild = zeile.freiwillig ? null : zeile.marke
+function Zeile({ zeile, umbrechen, onOeffne }: { zeile: MeinHofZeile; umbrechen: boolean; onOeffne: (id: HofseiteZeileId) => void }) {
   return (
     <li data-bearbeiten-zeile={zeile.id} className="border-t border-border first:border-t-0">
       <button
         type="button"
         onClick={() => onOeffne(zeile.id)}
         title={`${zeile.titel}: ${zeile.wert}`}
-        className={cn('flex min-h-14 w-full items-center gap-2.5 py-2 pr-2.5 pl-3.5 text-left hover:bg-muted/60', FOKUS_RAHMEN, 'focus-visible:-outline-offset-2')}
+        className={cn('flex min-h-14 w-full items-center gap-2.5 px-3 py-1.5 text-left hover:bg-muted/60', FOKUS_RAHMEN, 'focus-visible:-outline-offset-2')}
       >
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           {/* `relative` hält das absolute sr-only im Span — sonst steht es am Ende eines langen Werts außerhalb des Schnitts, und die Seite scrollt waagerecht (Nr. 143, Runde 1). */}
-          <span className="relative text-[14px] leading-snug font-semibold text-foreground">
+          <span className={cn('relative', MEIN_HOF_ZEILE_TITEL)}>
             {zeile.titel}
             <span className="sr-only">: </span>
           </span>
-          <span className={cn('relative text-[12.5px] text-muted-foreground', umbrechen ? 'line-clamp-2 leading-snug' : 'truncate')}>
+          <span className={cn('relative', MEIN_HOF_ZEILE_WERT, umbrechen ? 'line-clamp-2 leading-snug' : 'truncate')}>
             {zeile.wert}
             <span className="sr-only">. Bearbeiten</span>
           </span>
         </span>
-        {schild && (
-          <StatusBadge status={schildTon(schild.farbe)} className="self-start">
-            {schild.text}
+        {zeile.marke && (
+          <StatusBadge status={schildTon(zeile.marke.farbe)} className="self-start">
+            {zeile.marke.text}
           </StatusBadge>
         )}
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+        <ChevronRight className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={2} aria-hidden="true" />
       </button>
     </li>
   )
@@ -95,7 +106,8 @@ function Zeile({ zeile, umbrechen, onOeffne }: { zeile: HofseiteZeile; umbrechen
 export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, aktuell }: Props): React.JSX.Element {
   const router = useRouter()
   const ansicht = useMeinHofAnsicht()
-  const zeilen = zeilenWieAufDerHofseite(fortschritt)
+  const liste = meinHofListe(fortschritt)
+  const zeilen = liste.gruppen.flatMap((g) => g.zeilen)
   // Offen ist das Blatt; `imBlatt` bleibt nach dem Schließen stehen, damit der
   // Inhalt beim Hinausgleiten nicht leer wird.
   const [offen, setOffen] = useState<HofseiteZeileId | null>(null)
@@ -136,14 +148,18 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
     setzeOffen(null)
   }
 
-  function gespeichert(id: HofseiteZeileId) {
+  // Eine Zeile mit mehreren Teilen (Titelbild und Logo, …) bleibt nach dem Speichern offen: Man ändert oft beide.
+  function gespeichert(zeile: MeinHofZeile, teil: HofseiteZeileId) {
     router.refresh()
-    if (!SOFORT_GESPEICHERT.has(id)) setzeOffen(null)
+    if (zeile.teile.length === 1 && !SOFORT_GESPEICHERT.has(teil)) setzeOffen(null)
   }
 
   const zeile = zeilen.find((z) => z.id === imBlatt) ?? null
-  const { offen: offeneZeilen, gruppen } = zeilenNachOrt(fortschritt)
-  const vollstaendig = offeneZeilen.length === 0
+  const offeneZeilen = liste.offen
+  // Eine offene Zeile steht nicht noch einmal in ihrer Gruppe; leere Gruppen entfallen.
+  const gruppen = liste.gruppen.map((g) => ({ ...g, zeilen: g.zeilen.filter((z) => !z.offen) })).filter((g) => g.zeilen.length > 0)
+  const vollstaendig = liste.anzahlOffen === 0
+  const schliessenKnopf = zeile !== null && (zeile.teile.length > 1 || zeile.teile.some((t) => SOFORT_GESPEICHERT.has(t)))
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -162,15 +178,15 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
           <div className="flex flex-col gap-2.5 px-3.5 pt-3.5 pb-3">
             <div className="flex items-baseline gap-2.5">
               <h2 id="bearbeiten-stand" className="flex-1 font-heading text-[17px] font-semibold text-foreground">
-                {punkteOffenTitel(offeneZeilen.length)}
+                {punkteOffenTitel(liste.anzahlOffen)}
               </h2>
               <p className="shrink-0 text-[13px] font-semibold text-muted-foreground tabular-nums">
                 {fortschritt.erledigt} von {fortschritt.gesamt}
               </p>
             </div>
             {/* Der Wert steht daneben als Text; der Balken ist Veranschaulichung. */}
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-              <div className="h-full rounded-full bg-accent" style={{ width: `${fortschritt.prozent}%` }} />
+            <div className={FORTSCHRITT_SPUR} aria-hidden="true">
+              <div className={FORTSCHRITT_FUELLUNG} style={{ width: `${fortschritt.prozent}%` }} />
             </div>
           </div>
           <ul className="border-t border-border">
@@ -183,7 +199,7 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
 
       {gruppen.map((g) => (
         <section key={g.id} aria-labelledby={`bearbeiten-ort-${g.id}`} className="flex flex-col">
-          <h2 id={`bearbeiten-ort-${g.id}`} className="px-1 pt-3.5 pb-2 text-xs font-bold tracking-[1px] text-muted-foreground uppercase">
+          <h2 id={`bearbeiten-ort-${g.id}`} className={MEIN_HOF_GRUPPE_TITEL}>
             {g.titel}
           </h2>
           <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
@@ -194,27 +210,8 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
         </section>
       ))}
 
-      {aktuell && (
-        // Der letzte Abschnitt, unter „Über uns“ (Board s1-mein-hof, Liste Lauf 32). Der laufende Beitrag. Verwaltet wird unter Mein Hof › Beiträge — darum ein Link, kein Blatt.
-        <Link
-          href={aktuell.link.href}
-          data-bearbeiten-zeile="aktuell"
-          title={`${aktuell.titel}: ${aktuell.wert}`}
-          className={cn('flex min-h-14 items-center gap-2.5 border border-border bg-card py-2 pr-2.5 pl-3.5 hover:bg-muted/60', RUNDUNG.karte, FOKUS_RAHMEN)}
-        >
-          <CalendarDays className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-[14px] leading-snug font-semibold text-foreground">
-              {aktuell.titel}
-              <span className="sr-only">: </span>
-            </span>
-            <span className="truncate text-[12.5px] text-muted-foreground">{aktuell.wert}</span>
-          </span>
-          <span className="shrink-0 text-[13.5px] font-semibold text-brand-text">{aktuell.link.text}</span>
-          <ChevronRight className="size-4 shrink-0 text-brand-text" strokeWidth={1.7} aria-hidden="true" />
-        </Link>
-      )}
-
+      {/* Der letzte Abschnitt, unter „Über uns“ (Board s1-mein-hof, Liste Lauf 32). */}
+      {aktuell && <AktuellBlock aktuell={aktuell} kennung="bearbeiten-aktuell" />}
 
       <Sheet
         open={offen !== null}
@@ -235,18 +232,24 @@ export function AbschnitteListe({ fortschritt, hof, einstellungen, auftritt, akt
               <SheetTitle ref={titel} tabIndex={-1} className="font-heading text-xl leading-tight font-semibold break-words outline-none">
                 {zeile.titel}
               </SheetTitle>
-              <AbschnittInhalt
-                id={zeile.id}
-                hof={hof}
-                einstellungen={einstellungen}
-                auftritt={auftritt}
-                darstellung="blatt"
-                onGespeichert={() => gespeichert(zeile.id)}
-                onAbbrechen={() => setzeOffen(null)}
-                meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: zeile.id, onAnsehen: () => ansehen(zeile.id) }) : undefined}
-                onHochladen={meldeHochladen}
-              />
-              {SOFORT_GESPEICHERT.has(zeile.id) && (
+              {zeile.teile.map((teil) => (
+                <div key={teil} className="flex flex-col gap-3">
+                  {/* Mehrere Teile in einer Zeile: je Teil sein Name als Zwischentitel (Titelbild, Logo, …). */}
+                  {zeile.teile.length > 1 && <h3 className="text-[15px] font-semibold text-foreground">{ZEILE_TITEL[teil]}</h3>}
+                  <AbschnittInhalt
+                    id={teil}
+                    hof={hof}
+                    einstellungen={einstellungen}
+                    auftritt={auftritt}
+                    darstellung="blatt"
+                    onGespeichert={() => gespeichert(zeile, teil)}
+                    onAbbrechen={() => setzeOffen(null)}
+                    meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: teil, onAnsehen: () => ansehen(teil) }) : undefined}
+                    onHochladen={meldeHochladen}
+                  />
+                </div>
+              ))}
+              {schliessenKnopf && (
                 <SheetClose
                   disabled={hochladen}
                   className={cn('mx-auto min-h-11 rounded-full px-5 text-sm font-semibold text-brand-text hover:bg-muted disabled:opacity-60', FOKUS_RAHMEN)}

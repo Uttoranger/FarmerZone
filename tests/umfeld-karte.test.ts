@@ -84,7 +84,9 @@ describe('Umfeld-Karte — erst beim Umschalten geladen', () => {
     expect(text).toMatch(/dynamic\(\s*\(\)\s*=>\s*import\('@\/components\/analytics\/umfeld-karte'\)/)
     expect(text).toMatch(/ssr:\s*false/)
     // Gerendert — und damit geladen — nur in der Ansicht „Karte".
-    expect(text).toMatch(/wahl === 'karte' \? \(\s*<UmfeldKarteAnsicht/)
+    // Seit Nr. 272: gerendert nur, wenn die Karte zu sehen ist — ab 1024 px immer, darunter in der Ansicht „Karte“.
+    expect(text).toMatch(/\{zeigeKarte && \(\s*<div[^>]*>\s*<UmfeldKarteAnsicht/)
+    expect(text).toContain('useRegionAnsicht(wahl)')
     expect(text.match(/<UmfeldKarteAnsicht/g)).toHaveLength(1)
   })
 

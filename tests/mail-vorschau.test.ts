@@ -694,7 +694,7 @@ describe('Gebühren-Wort in den Kunden-Mails (V63)', () => {
 /** Die Fuß-Art je Vorlage in der Reihenfolge ihrer EmailLayout-Aufrufe — die Liste aus dem Auftrag (Nr. 232, Punkt 1). */
 const FUSS_JE_VORLAGE: Record<string, MailFussArt[]> = {
   'abo-bestaetigung.tsx': ['plattform'],
-  'admin-sicherheit.tsx': ['plattform', 'plattform'],
+  'admin-sicherheit.tsx': ['plattform', 'plattform', 'plattform'],
   'anmeldecode.tsx': ['plattform'],
   'artikel-fehlt.tsx': ['hof'],
   'bescheid.tsx': ['postfach'],
@@ -813,4 +813,59 @@ describe('Bescheid: die Antwort des Teams steht nur als Text da (Nr. 241, Runde 
     expect(mail.html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
     expect(mail.html).toContain('&amp; &lt;b&gt;gut&lt;/b&gt;')
   })
+})
+
+// ─── Rechtsblöcke byteweise gleich (Nr. 280, Auftrag 23.3) ──────────────────
+
+/**
+ * Weitere Fassungen derselben Beispielwelt, damit jeder Rechtsblock einmal
+ * vorkommt: Modell „bisher“ (Servicegebühr), Käuferart BETRIEB (ohne Belehrung)
+ * und Karte bei Abholung.
+ */
+const RECHT_FAELLE: Fall[] = [
+  ...FAELLE,
+  { name: 'bestellung-bestaetigung-online-bisher', art: 'bestellung-bestaetigung', fuss: 'hof', rendere: () => (bestellung({ ...BESTELLUNG, gebuehrModell: null }), ausRenderer('bestellung-bestaetigung', { orderId: BESTELLUNG.id })) },
+  { name: 'bestellung-bestaetigung-bar-bisher', art: 'bestellung-bestaetigung', fuss: 'hof', rendere: () => (bestellung({ ...BAR, gebuehrModell: null }), ausRenderer('bestellung-bestaetigung', { orderId: BAR.id })) },
+  { name: 'bestellung-bestaetigung-betrieb', art: 'bestellung-bestaetigung', fuss: 'hof', rendere: () => (bestellung({ ...BESTELLUNG, kaeuferArt: 'BETRIEB' }), ausRenderer('bestellung-bestaetigung', { orderId: BESTELLUNG.id })) },
+  { name: 'bestellung-bestaetigung-karte', art: 'bestellung-bestaetigung', fuss: 'hof', rendere: () => (bestellung({ ...BAR, paymentMethod: 'ONSITE_CARD' }), ausRenderer('bestellung-bestaetigung', { orderId: BAR.id })) },
+  {
+    name: 'bar-bestaetigungslink-bisher',
+    art: 'bar-bestaetigungslink',
+    fuss: 'hof',
+    rendere: async () => {
+      await email.sendOnsiteConfirmation(alsMailBestellung({ ...BAR, gebuehrModell: null }), 'platzhalter-ohne-token')
+      return ausResend()
+    },
+  },
+  { name: 'abholbereit-betrieb', art: 'abholbereit', fuss: 'hof', rendere: () => (bestellung({ ...BESTELLUNG, kaeuferArt: 'BETRIEB' }), ausRenderer('abholbereit', { orderId: BESTELLUNG.id })) },
+  { name: 'bestellung-bezahlt-hof-bisher', art: 'bestellung-bezahlt-hof', fuss: 'plattform', rendere: () => (bestellung({ ...BESTELLUNG, gebuehrModell: null }), ausRenderer('bestellung-bezahlt-hof', { orderId: BESTELLUNG.id })) },
+  { name: 'bar-bestaetigt-hof-bisher', art: 'bar-bestaetigt-hof', fuss: 'plattform', rendere: () => (bestellung({ ...BAR, gebuehrModell: null }), ausRenderer('bar-bestaetigt-hof', { orderId: BAR.id })) },
+]
+
+/** Die „vorher“-Fassung: erzeugt aus dem Stand der Basis (acdd1ab6828f), bevor Nr. 280 eine Mail änderte. */
+const RECHT_SCHNAPPSCHUSS = join(process.cwd(), 'tests', 'fixtures', 'mail-rechtsbloecke-280.json')
+
+describe('Rechtsblöcke: byteweise wie vor Nr. 280 (Render-Vergleich, Auftrag 23.3)', () => {
+  it('jede Mail der Vorschau und jedes Beispiel aus Admin › Betrieb › Mails', async () => {
+    const { rechtsbloecke } = await import('./mail-rechtsbloecke')
+    const { baueMailBeispiel } = await import('@/server/mail-arten/beispiele')
+    const { MAIL_BEISPIEL_IDS } = await import('@/lib/betrieb-mails')
+    const jetzt: Record<string, ReturnType<typeof rechtsbloecke>> = {}
+    for (const fall of RECHT_FAELLE) {
+      vi.clearAllMocks()
+      sendMock.mockResolvedValue({ data: { id: 'email_1' }, error: null })
+      jetzt[`vorschau:${fall.name}`] = rechtsbloecke((await fall.rendere()).html)
+    }
+    for (const id of MAIL_BEISPIEL_IDS) jetzt[`beispiel:${id}`] = rechtsbloecke((await baueMailBeispiel(id)).html)
+    // Der Schalter schreibt die Vorher-Fassung neu und schlägt dann bewusst fehl: Ein Lauf mit gesetzter Variable ist nie grün.
+    if (process.env.MAIL_RECHT_SCHNAPPSCHUSS === '1') {
+      writeFileSync(RECHT_SCHNAPPSCHUSS, `${JSON.stringify(jetzt, null, 2)}\n`)
+      throw new Error('Schnappschuss neu geschrieben – ohne MAIL_RECHT_SCHNAPPSCHUSS erneut laufen lassen und den Diff der Fixture begründen')
+    }
+    const vorher = JSON.parse(readFileSync(RECHT_SCHNAPPSCHUSS, 'utf8')) as typeof jetzt
+    expect(jetzt).toEqual(vorher)
+    // Gegenprobe: Der Vergleich greift wirklich — Belehrung, Anbieterzeile und Gebühren-Satz sind erkannt.
+    expect(jetzt['vorschau:bestellung-bestaetigung-online'].length).toBeGreaterThanOrEqual(3)
+    expect(Object.values(jetzt).filter((b) => b.length > 0).length).toBeGreaterThan(40)
+  }, 60_000)
 })

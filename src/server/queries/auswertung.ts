@@ -8,8 +8,12 @@ import {
   type ServicegebuehrenMonat,
 } from '@/lib/auswertung'
 import { monatsgrenzenWien, monatsschluesselInWien } from '@/lib/servicegebuehr'
-import { umsatzBestellungWhere, type Periodenfenster, type Umsatzfenster } from '@/lib/umsatz'
-import { centAusDecimal } from './umsatz'
+import { eimerDerPeriode, summeCent, umsatzBestellungWhere, zaehlt, type Periodenfenster, type Umsatzfenster } from '@/lib/umsatz'
+import { abholWhere, abholtage, hofWartetAufFreigabe } from '@/lib/heute'
+import { wienKalendertag } from '@/lib/kalender'
+import type { GebuehrHofStand } from '@/lib/auswertung'
+import { ladeGruendungBis } from './admin'
+import { centAusDecimal, umsatzBuchungen } from './umsatz'
 
 /**
  * Die Abfragen der Auswertung im neuen Design (Nachtlauf Nr. 22c). Jede fragt
@@ -143,4 +147,70 @@ export async function getServicegebuehrenZeitraum(
     summe.summeCents += teil.summeCents
   }
   return summe
+}
+
+/** Was die Auswertung vom eigenen Hof braucht (Nr. 273). */
+export type AuswertungHof = {
+  /** Für den Erklärsatz der Gebühren-Karte je Stand. */
+  gebuehrStand: GebuehrHofStand
+  /** Noch nicht freigegeben (`hofWartetAufFreigabe`, wie Heute): die Links-Karte sagt, ab wann Teilen geht. */
+  wartetAufFreigabe: boolean
+}
+
+/**
+ * Der Hof für die Auswertung (Nr. 273): Satz (`plattformgebuehrProzent`, null = Vorgabe), eigener
+ * Einzugsbeginn und — nur ohne ihn — das wirksame Gründungsende, wie getProdukteSeite und die Bestellung
+ * (`ladeGruendungBis`); dazu, ob der Hof noch auf die Freigabe wartet. Nur gelesen, nur der Hof der Sitzung;
+ * null, wenn es ihn nicht gibt.
+ */
+export async function getAuswertungHof(farmId: string): Promise<AuswertungHof | null> {
+  const hof = await prisma.farm.findUnique({
+    where: { id: farmId },
+    select: { plattformgebuehrProzent: true, einzugAb: true, approvedAt: true, archivedAt: true },
+  })
+  if (!hof) return null
+  const gruendungBis = hof.einzugAb ? null : await ladeGruendungBis({ id: farmId })
+  return {
+    gebuehrStand: { hof: { plattformgebuehrProzent: hof.plattformgebuehrProzent, einzugAb: hof.einzugAb }, gruendungBis },
+    wartetAufFreigabe: hofWartetAufFreigabe(hof),
+  }
+}
+
+/** Was die Umsatzkarte zusätzlich zur Auswertung zeigt (Nr. 273): Vergleichsbetrag und Stoff für den Fußsatz. */
+export type UmsatzZusatz = {
+  /** Die Vorperiode bis zum selben Zeitpunkt, in Cent — der Betrag in Klammern hinter dem Prozentsatz. */
+  vergleichCent: number
+  /** Woche: die Tage (Kürzel der Balken), an denen ein selbst eingetragener Verkauf im Balken steckt; sonst leer. */
+  selbstEingetrageneTage: string[]
+  /** Laufende Woche: wie viele Bestellungen heute abgeholt werden (dieselbe Bedingung wie Heute); sonst null. */
+  heuteAbholen: number | null
+}
+
+/**
+ * Der Zusatz der Umsatzkarte (Liste Lauf 32 auswertung „Vergleichszeile ohne Betrag; Fußsatz fehlt“, Nr. 273).
+ * Der Vergleichsbetrag nimmt dieselben Buchungen und dieselbe Summe wie `auswerten` für den Prozentsatz
+ * (`umsatzBuchungen`, `summeCent` über `pf.vergleich`); die selbst eingetragenen Tage dieselben Balken
+ * (`eimerDerPeriode`) wie das Diagramm; „heute abholen“ dieselbe Bedingung wie Heute (`abholWhere`).
+ * Nur Anzeige, nur gelesen, nur der Hof der Sitzung.
+ */
+export async function getUmsatzZusatz(
+  farmId: string,
+  pf: Periodenfenster,
+  jetzt: Date,
+  stripeLiveAb: Date | null = STRIPE_LIVE_AB
+): Promise<UmsatzZusatz> {
+  const woche = pf.periode === 'woche'
+  const [vorher, diese, heuteAbholen] = await Promise.all([
+    umsatzBuchungen(farmId, pf.vergleich, stripeLiveAb),
+    woche ? umsatzBuchungen(farmId, pf.aktuell, stripeLiveAb) : Promise.resolve([]),
+    woche && pf.laufend ? prisma.order.count({ where: abholWhere(farmId, abholtage(jetzt).heute) }) : Promise.resolve(null),
+  ])
+  const verkaufsTage = new Set(diese.filter((b) => b.quelle === 'verkauf' && zaehlt(b, pf.aktuell)).map((b) => wienKalendertag(b.zeitpunkt)))
+  return {
+    vergleichCent: summeCent(vorher, pf.vergleich),
+    selbstEingetrageneTage: eimerDerPeriode(pf.periode, pf.startTag)
+      .filter((e) => [...verkaufsTage].some((tag) => tag >= e.vonTag && tag <= e.bisTag))
+      .map((e) => e.label),
+    heuteAbholen,
+  }
 }

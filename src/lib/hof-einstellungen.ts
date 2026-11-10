@@ -25,7 +25,7 @@ import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
-import { BETRIEBSNUMMER_ANKER } from '@/lib/taxonomie'
+import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, type BetriebsstatusValue } from '@/lib/taxonomie'
 import { MARKE } from '@/lib/marke'
 import {
   BAR_GEBUEHR_SEPA_SATZ,
@@ -54,7 +54,7 @@ import {
   type TarifZustand,
 } from '@/lib/konditionen'
 import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
-import { barMoeglich, bestellGebuehr, einzugFuer, satzText, type GebuehrEinzug, type GebuehrLage } from '@/lib/plattformgebuehr'
+import { barMoeglich, bestellGebuehr, einzugFuer, letzterFreierTag, satzText, type GebuehrEinzug, type GebuehrLage } from '@/lib/plattformgebuehr'
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
@@ -113,7 +113,22 @@ export const HOFDATEN_TEXT = {
   satz: 'Informationen, die auf deiner öffentlichen Hofseite sichtbar sind.',
   speichern: 'Hofdaten speichern',
   gespeichert: 'Hofdaten gespeichert',
+  /** Satz unter „Was für ein Betrieb bist du?“ ohne Wahl — mit Halbgeviertstrich (Abnahme 269 „—“). */
+  betriebsnummerOhneWahl: 'LFBIS-Nummer, BAES- bzw. BVL-Registrierung oder α-Nummer – je nachdem, was du mit Futter machst.',
+  /** Vorsatz bei „Eigene Ernte“ (Board s2-/w2-hofdaten-zahlung Bild 1: unter dem Feld Betriebsnummer). */
+  lfbisVorsatz: 'Das ist deine Futtermittel-Nummer (LFBIS).',
 } as const
+
+/**
+ * Der Hilfesatz unter dem Feld Betriebsnummer (Board s2-/w2-hofdaten-zahlung Bild 1, Nr. 278): bei „Eigene
+ * Ernte“ mit dem Vorsatz zur LFBIS-Nummer, sonst der Satz des Status; der Gedankenstrich als Halbgeviertstrich
+ * mit Leerzeichen wie im Board (der Wortlaut in src/lib/taxonomie.ts bleibt unverändert).
+ */
+export function betriebsnummerHilfe(status: BetriebsstatusValue | null): string {
+  if (!status) return HOFDATEN_TEXT.betriebsnummerOhneWahl
+  const satz = BETRIEBSSTATUS[status].hilfe.replaceAll(' — ', ' – ')
+  return status === 'PRIMAERPRODUKTION' ? `${HOFDATEN_TEXT.lfbisVorsatz} ${satz}` : satz
+}
 
 /**
  * Konto und Sicherheit (Board s2-/w2-konto-hof; N42 c „Anmelde-Adresse“,
@@ -386,8 +401,9 @@ export const BAR_KARTE_TEXT = {
  * Marke „Bar gesperrt“ — eine Lastschrift höbe die Sperre nicht auf. Sonst
  * (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und keine da) heißt sie
  * „Braucht Lastschrift“ mit dem Weg dorthin (N42 g). Ist die Bargebühr noch
- * erlassen (`einzugFuer` → `erlassen`), nennt der Satz den Einzugstag aus der
- * Lage (`einzugAb`, wie die Karte „Barzahlung“) — als Gründungshof nur, wenn
+ * erlassen (`einzugFuer` → `erlassen`), nennt der Satz „Bis <Tag>“ den letzten
+ * Tag ohne Gebühr — den Wiener Tag vor `einzugAb` aus der Lage (`letzterFreierTag`,
+ * Register N48; wie die Karte „Barzahlung“) — als Gründungshof nur, wenn
  * `Farm.einzugAb` leer ist (dann kommt der Tag aus der Gründung), sonst neutral.
  * Im Modell „bisher“ kein Satz.
  */
@@ -399,8 +415,8 @@ export function barKarte(lage: GebuehrLage, jetzt: Date, hof: { einzugAb: Date |
   }
   let satz: string | null = null
   if (lage.modell === 'hofpreis' && einzugFuer(lage, 'ONSITE_CASH', jetzt) === 'erlassen') {
-    // Derselbe Tag wie die Karte „Barzahlung“ (ladeBarzahlung: formatDatumLang(einzugAb)) — eine Quelle.
-    const bis = formatDatumLang(lage.einzugAb)
+    // Derselbe Tag wie die Karte „Barzahlung“ (ladeBarzahlung: letzterFreierTagText) — eine Quelle.
+    const bis = letzterFreierTag(lage.einzugAb)
     satz = hof.einzugAb === null ? T.gruendungSatz(bis) : LASTSCHRIFT_TEXT.erlassen(bis)
   }
   return { marke: T.aktiv, ton: 'fertig', satz, lastschrift: false, zuKonditionen: false }
@@ -600,8 +616,8 @@ function rechenbeispielHofpreis(
 
 /** Der Satz unter der Bar-Spalte im Hofpreis-Modell — nur bestehende Texte, gewählt nach `einzugFuer`. */
 function barSatzHofpreis(lage: Extract<GebuehrLage, { modell: 'hofpreis' }>, einzug: GebuehrEinzug | null): string {
-  // Tag wie die Karte „Barzahlung“ darunter (formatDatumLang(einzugAb)), nie ein anderer.
-  if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(formatDatumLang(lage.einzugAb))
+  // „Bis <Tag>“ ist der letzte freie Tag wie in der Karte „Barzahlung“ darunter (letzterFreierTag), nie ein anderer.
+  if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(letzterFreierTag(lage.einzugAb))
   if (einzug === 'ueberweisung') return LASTSCHRIFT_TEXT.mandatFrei
   if (einzug === null) return lage.barGesperrt ? BAR_KARTE_TEXT.gesperrtSatz : LASTSCHRIFT_TEXT.mandatPflicht
   return BAR_GEBUEHR_SEPA_SATZ

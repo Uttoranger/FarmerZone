@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, Search } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 import {
   KARTE_ADRESSE,
@@ -24,7 +24,9 @@ import {
 } from '@/lib/regionskarte'
 import type { StrassenArt } from '@/lib/regionskarte-daten'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { KartenZoom } from '@/components/startseite/karten-zoom'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { HeroVideo } from '@/components/startseite/hero-video'
 import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 
@@ -47,6 +49,9 @@ const FOKUS_AUF_FOTO = cn(FOKUS_RAHMEN, 'focus-visible:outline-white')
 
 /** Der Satz unter der h1, wörtlich nach der Liste Lauf 32 (startseite). */
 export const STARTSEITE_UNTERTITEL = 'Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen.'
+
+/** Die Quellenangabe der Regionskarte: die Daten dieser Karte (Natural Earth, gemeinfrei; regionskarte-daten.ts). */
+export const KARTE_QUELLE = 'Kartendaten: Natural Earth'
 
 /** Der Link unter der Regionskarte (Board w1-/s1-startseite). */
 export const KARTE_LINK = `${KARTE_KNOPF} →`
@@ -106,10 +111,9 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
               <label htmlFor="startseite-suche" className="w-fit text-[14px] font-semibold text-white">
                 {SUCHE_BESCHRIFTUNG}
               </label>
-              {/* Feld und „Höfe finden“ nebeneinander, auch am Handy (Liste Lauf 32, startseite 390 Bild 1). */}
-              <div className="flex flex-row items-center gap-2 rounded-full border border-border bg-card py-1.5 pr-1.5 pl-4 md:gap-2.5 md:py-2 md:pr-2 md:pl-[18px]">
-              <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <Search className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+              {/* Ein eigenes gerahmtes Feld ohne Symbol und daneben ein eigener Knopf „Höfe finden“, auch am Handy
+                  (Board w1-/s1-startseite Bild 1; Abnahme Lauf 32, startseite 2). */}
+              <div className="flex flex-row items-center gap-2 md:gap-2.5">
                 <input
                   id="startseite-suche"
                   type="search"
@@ -117,20 +121,21 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
                   maxLength={SUCHTEXT_MAX}
                   placeholder={SUCHE_PLATZHALTER}
                   className={cn(
-                    'h-11 min-w-0 flex-1 rounded-md bg-transparent text-base text-foreground placeholder:text-muted-foreground',
-                    FOKUS_RAHMEN
+                    'h-12 min-w-0 flex-1 border border-border bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground',
+                    RUNDUNG.feld,
+                    FOKUS_AUF_FOTO
                   )}
                 />
-              </div>
-              <button
-                type="submit"
-                className={cn(
-                  'h-11 shrink-0 rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:px-[18px]',
-                  FOKUS_AUF_FOTO
-                )}
-              >
-                Höfe finden
-              </button>
+                <button
+                  type="submit"
+                  className={cn(
+                    'h-12 shrink-0 bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:px-[18px]',
+                    RUNDUNG.feld,
+                    FOKUS_AUF_FOTO
+                  )}
+                >
+                  Höfe finden
+                </button>
               </div>
             </form>
 
@@ -268,96 +273,110 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
   const land = zeichneLand(mass, marken)
 
   return (
-    <Link
-      href={KARTE_ADRESSE}
-      aria-label={benenneKartenLink(anzahl)}
+    // Die Hülle trägt Fläche, Rundung und Maß; darin der Link (ganze Fläche), daneben Zoom und Quelle — Knöpfe
+    // stehen nie im Link (Board w1-/s1-startseite Bild 1, Abnahme Lauf 32 startseite 3).
+    <div
+      data-slot="regionskarte"
       className={cn(
-        'group relative block overflow-hidden bg-accent-foreground shadow-2xl dark:bg-card dark:ring-1 dark:ring-border',
-        form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]',
-        form === 'web' ? FOKUS_AUF_FOTO : FOKUS_RAHMEN
+        'relative isolate overflow-hidden bg-accent-foreground shadow-2xl dark:bg-card dark:ring-1 dark:ring-border',
+        form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]'
       )}
       style={{ aspectRatio: `${mass.breite} / ${mass.hoehe}` }}
     >
-      <svg viewBox={`0 0 ${mass.breite} ${mass.hoehe}`} aria-hidden="true" className="absolute inset-0 block size-full">
-        {/* Papier: Crème mit einem Hauch Dunkel, damit die Straßen heller sind als das Land. */}
-        <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6 dark:fill-foreground/4" />
-        {land.fluesse.map((fluss) =>
-          fluss.pfade.map((d, i) => (
-            <path
-              key={`${fluss.name}-${i}`}
-              d={d}
-              fill="none"
-              strokeWidth={FLUSS_STRICH[fluss.name] ?? 4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="stroke-accent/45 dark:stroke-accent/70"
-            />
-          ))
-        )}
-        {land.strassen.map((strasse, s) =>
-          strasse.pfade.map((d, i) => (
-            <g key={`${s}-${i}`} fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20 dark:stroke-background" />
-              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground dark:stroke-foreground/14" />
-            </g>
-          ))
-        )}
-        {land.fluesse.map(
-          ({ beschriftung: b }) =>
-            b && (
+      <KartenZoom>
+        <Link
+          href={KARTE_ADRESSE}
+          aria-label={benenneKartenLink(anzahl)}
+          // Der Fokus innen: Die Hülle schneidet alles ab, was über ihren Rand ragt.
+          className={cn('group absolute inset-0 block', FOKUS_RAHMEN_INNEN)}
+        >
+          <svg viewBox={`0 0 ${mass.breite} ${mass.hoehe}`} aria-hidden="true" className="absolute inset-0 block size-full">
+            {/* Papier: Crème mit einem Hauch Dunkel, damit die Straßen heller sind als das Land. */}
+            <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6 dark:fill-foreground/4" />
+            {land.fluesse.map((fluss) =>
+              fluss.pfade.map((d, i) => (
+                <path
+                  key={`${fluss.name}-${i}`}
+                  d={d}
+                  fill="none"
+                  strokeWidth={FLUSS_STRICH[fluss.name] ?? 4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="stroke-accent/45 dark:stroke-accent/70"
+                />
+              ))
+            )}
+            {land.strassen.map((strasse, s) =>
+              strasse.pfade.map((d, i) => (
+                <g key={`${s}-${i}`} fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20 dark:stroke-background" />
+                  <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground dark:stroke-foreground/14" />
+                </g>
+              ))
+            )}
+            {land.fluesse.map(
+              ({ beschriftung: b }) =>
+                b && (
+                  <text
+                    key={b.text}
+                    x={rundeAufZehntel(b.x)}
+                    y={rundeAufZehntel(b.y)}
+                    transform={`rotate(${rundeAufZehntel(b.winkel)} ${rundeAufZehntel(b.x)} ${rundeAufZehntel(b.y)})`}
+                    textAnchor="middle"
+                    fontSize={12}
+                    strokeWidth={3}
+                    className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke] dark:fill-status-fertig dark:stroke-card"
+                  >
+                    {b.text}
+                  </text>
+                )
+            )}
+            {land.schilder.map((schild) => {
+              const breite = 8 + 5.5 * schild.text.length
+              return (
+                <g key={schild.text}>
+                  <rect
+                    x={rundeAufZehntel(schild.x - breite / 2)}
+                    y={rundeAufZehntel(schild.y - 8)}
+                    width={rundeAufZehntel(breite)}
+                    height={16}
+                    rx={4}
+                    className="fill-accent-foreground stroke-primary-foreground/25 dark:fill-card dark:stroke-foreground/25"
+                  />
+                  <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans dark:fill-foreground/70">
+                    {schild.text}
+                  </text>
+                </g>
+              )
+            })}
+            {REGIONS_NAMEN.map((name) => (
               <text
-                key={b.text}
-                x={rundeAufZehntel(b.x)}
-                y={rundeAufZehntel(b.y)}
-                transform={`rotate(${rundeAufZehntel(b.winkel)} ${rundeAufZehntel(b.x)} ${rundeAufZehntel(b.y)})`}
-                textAnchor="middle"
-                fontSize={12}
-                strokeWidth={3}
-                className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke] dark:fill-status-fertig dark:stroke-card"
+                key={name.text}
+                x={rundeAufZehntel(name.x * mass.breite)}
+                y={rundeAufZehntel(name.y * mass.hoehe)}
+                textAnchor={name.anker}
+                fontSize={10}
+                fontWeight={600}
+                letterSpacing={2}
+                className="fill-primary-foreground/65 font-sans dark:fill-foreground/65"
               >
-                {b.text}
+                {name.text}
               </text>
-            )
-        )}
-        {land.schilder.map((schild) => {
-          const breite = 8 + 5.5 * schild.text.length
-          return (
-            <g key={schild.text}>
-              <rect
-                x={rundeAufZehntel(schild.x - breite / 2)}
-                y={rundeAufZehntel(schild.y - 8)}
-                width={rundeAufZehntel(breite)}
-                height={16}
-                rx={4}
-                className="fill-accent-foreground stroke-primary-foreground/25 dark:fill-card dark:stroke-foreground/25"
-              />
-              <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans dark:fill-foreground/70">
-                {schild.text}
-              </text>
-            </g>
-          )
-        })}
-        {REGIONS_NAMEN.map((name) => (
-          <text
-            key={name.text}
-            x={rundeAufZehntel(name.x * mass.breite)}
-            y={rundeAufZehntel(name.y * mass.hoehe)}
-            textAnchor={name.anker}
-            fontSize={10}
-            fontWeight={600}
-            letterSpacing={2}
-            className="fill-primary-foreground/65 font-sans dark:fill-foreground/65"
-          >
-            {name.text}
-          </text>
-        ))}
-        {/* Der hervorgehobene Hof zuletzt: Er liegt über seinen Nachbarn. */}
-        {[...marken.filter((m) => !m.hervorgehoben), ...marken.filter((m) => m.hervorgehoben)].map((marke) => (
-          <Marke key={marke.schluessel} marke={marke} />
-        ))}
-      </svg>
+            ))}
+            {/* Der hervorgehobene Hof zuletzt: Er liegt über seinen Nachbarn. */}
+            {[...marken.filter((m) => !m.hervorgehoben), ...marken.filter((m) => m.hervorgehoben)].map((marke) => (
+              <Marke key={marke.schluessel} marke={marke} />
+            ))}
+          </svg>
 
-      {/* Keine Pille „n Höfe“ und kein „Karte öffnen“ mehr (Liste Lauf 32, startseite): Der Link darunter führt zur Karte. */}
-    </Link>
+          {/* Keine Pille „n Höfe“ und kein „Karte öffnen“ mehr (Liste Lauf 32, startseite): Der Link darunter führt zur Karte. */}
+        </Link>
+      </KartenZoom>
+      {/* Die Quelle unten rechts wie im Board (V92) — mit der Quelle DIESER Karte: Sie ist aus Natural Earth gezeichnet
+          (regionskarte-daten.ts), nicht aus OpenStreetMap; eine neue Kartenquelle baut Nr. 271 nicht. */}
+      <span className="pointer-events-none absolute right-0 bottom-0 rounded-tl-md bg-accent-foreground/85 px-1.5 py-0.5 text-[12px] leading-tight text-primary-foreground/80 dark:bg-card/85 dark:text-muted-foreground">
+        {KARTE_QUELLE}
+      </span>
+    </div>
   )
 }

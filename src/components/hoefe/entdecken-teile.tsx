@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MapPinOff, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { kurzPreis, nameMitGebinde } from '@/components/hofseite/preis-zeilen'
 import type { HoefeFilter } from '@/schemas/hoefe-filter'
 import {
@@ -243,14 +243,12 @@ export function AktiveFilterZeile({
   )
 }
 
-/** „Nicht auf der Karte" — ein Hof ohne Kartenpunkt steht nur in der Liste (Register N22). */
+/**
+ * „Nicht auf der Karte" — ein Hof ohne Kartenpunkt steht nur in der Liste (Register N22). Seit Nr. 271 ohne Symbol,
+ * leise wie die übrigen Zeilen der Karte (Abnahme Lauf 32, hoefe 6; der Hinweis auf der Karte selbst bleibt, C-Zeile).
+ */
 export function OhneKartenpunkt(): React.JSX.Element {
-  return (
-    <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-      <MapPinOff className="size-3.5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-      {ABHOLZEILE_TEXT.nichtAufDerKarte}
-    </p>
-  )
+  return <p className="text-[13px] text-muted-foreground">{ABHOLZEILE_TEXT.nichtAufDerKarte}</p>
 }
 
 /** Was eine Hofkarte braucht — ein Ausschnitt aus HofUebersichtEintrag samt Entfernung. */
@@ -498,10 +496,11 @@ export function ProduktZeile({
               </StatusBadge>
             ))}
           </div>
+          {/* EINE graue Meta-Zeile „Hof · km · Abholung …“ (Board w1-/s1-hoefe Bild 2; Abnahme Lauf 32, hoefe 10). */}
           <p className="text-[13px] break-words text-muted-foreground" title={hof.name}>
-            {hof.name} · {wo}
+            {hof.name} · {wo} ·{' '}
+            <Abholzeile fenster={hof.abholfenster} isPaused={hof.isPaused} bestellbar={istBestellbar(hof)} jetzt={jetzt} leise />
           </p>
-          <Abholzeile fenster={hof.abholfenster} isPaused={hof.isPaused} bestellbar={istBestellbar(hof)} jetzt={jetzt} />
           <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 tabular-nums">
             <span className="text-[15px] font-bold whitespace-nowrap text-foreground">{preis}</span>
             {grundpreis && <span className="text-[13px] whitespace-nowrap text-muted-foreground">{grundpreis}</span>}

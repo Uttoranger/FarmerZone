@@ -7,13 +7,12 @@ import { endpreisEuro } from '@/lib/plattformgebuehr'
 import { PREISE_INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { Plus } from 'lucide-react'
 import type { PublicProduct } from '@/server/queries/farm'
-import { formatGrundpreis } from '@/lib/format'
+import { nameMitGebinde, preisZeilen } from '@/components/hofseite/preis-zeilen'
 import { zeigeKaufknopf } from '@/lib/bereiche-anzeige'
 import { bestaetigtAmText, type Angabe } from '@/lib/produktdetail'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { AusverkauftMarke } from '@/components/ui/marke'
-import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
 import { FOTO_HUELLE, ILLUSTRATION_BILD, ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 /*
@@ -107,7 +106,7 @@ export function GleichMitAbholen({
           // Ohne Sperre: Mit Kaufsperre ist die Liste leer (gleichMitAbholen, N24), hier zählt nur der Vorrat.
           const kaufbar = zeigeKaufknopf(p, null)
           const alles = imKorb(p.id) >= p.stock
-          const preis = endpreisEuro(p.price, anzeige)
+          const zeilen = preisZeilen({ ...p, price: endpreisEuro(p.price, anzeige) })
           const bild = p.imageUrl ?? p.categoryImageUrl
           return (
             <li key={p.id} className="flex items-center gap-3 px-2.5 py-2">
@@ -123,10 +122,12 @@ export function GleichMitAbholen({
                     />
                   )}
                 </span>
+                {/* Name mit Menge, darunter der Preis fett und der Grundpreis grau — dieselbe Hilfe wie die Hofseite
+                    (preisZeilen, nameMitGebinde; Board s1-/w1-produkt Bild 2, Abnahme Lauf 32 produkt 5). */}
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="line-clamp-2 text-[15px] font-bold break-words text-foreground">{p.name}</span>
-                  <span className="text-[15px] text-foreground tabular-nums">{formatGrundpreis(preis, p.unit, p.unitSize)}</span>
-                  <GrundpreisZeile price={preis} unit={p.unit} unitSize={p.unitSize} className="text-[13px] text-muted-foreground tabular-nums" />
+                  <span className="line-clamp-2 text-[15px] font-semibold break-words text-foreground">{nameMitGebinde(p.name, p)}</span>
+                  <span className="text-[15px] font-bold text-foreground tabular-nums">{zeilen.preis}</span>
+                  {zeilen.grundpreis && <span className="text-[13px] text-muted-foreground tabular-nums">{zeilen.grundpreis}</span>}
                 </span>
               </Link>
               {mitFamilie(p) ? (

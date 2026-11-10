@@ -43,8 +43,9 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
   }
 })
 
-import { CartSheet, KORB_GEAENDERT_TITEL, korbStartfokus, mengeFehlerNach, neueMengenFolge } from '@/components/farm/cart-sheet'
+import { CartSheet, KORB_GEAENDERT_TITEL, korbStartfokus, korbZeileGrundpreis, korbZeileTitel, mengeFehlerNach, neueMengenFolge } from '@/components/farm/cart-sheet'
 import { NETZ_SATZ } from '@/lib/netz'
+import { nameMitGebinde, preisZeilen } from '@/components/hofseite/preis-zeilen'
 import { KORB_LEER } from '@/lib/use-cart'
 import type { CartItem } from '@/lib/use-cart'
 
@@ -83,7 +84,7 @@ describe('Korb-Blatt (Boards s1-/w1-korb)', () => {
   })
 
   it('nach dem Abgleich: eine Karte im Paar „tun“ mit Titel und Satz, vorgelesen als Status (Lauf 31)', () => {
-    const satz = 'Bergkäse ist gerade ausverkauft – wir haben ihn herausgenommen.'
+    const satz = 'Bergkäse ist gerade ausverkauft – wir haben es herausgenommen.'
     const html = blatt({ hinweis: satz })
     const karte = html.indexOf(KORB_GEAENDERT_TITEL)
     expect(karte).toBeGreaterThan(-1)
@@ -242,5 +243,41 @@ describe('Korb-Blatt: Startfokus auf „Schließen“ (Board w1-korb, UI-Runde 3
     const sheet = readFileSync(join(__dirname, '..', 'src/components/ui/sheet.tsx'), 'utf8')
     const kopf = sheet.slice(sheet.indexOf('function SheetKopf('))
     expect(kopf).toMatch(/<SheetPrimitive\.Close\s+data-slot="sheet-close"/)
+  })
+})
+
+describe('Korb-Blatt: Zeile mit Menge und Grundpreis je Einheit (Abnahme Lauf 32 korb 2, Nr. 276)', () => {
+  const EIER: CartItem = { productId: 'p2', name: 'Bio-Freilandeier', price: 3.82, unit: 'PAKET', unitSize: 6, imageUrl: null, quantity: 1 }
+  const KAESE: CartItem = { productId: 'p3', name: 'Bergkäse', price: 6.58, unit: 'KG', unitSize: 0.25, imageUrl: null, quantity: 1 }
+  const GEWUERZ: CartItem = { productId: 'p6', name: 'Safran', price: 1, unit: 'G', unitSize: 12.5, imageUrl: null, quantity: 1 }
+  const BROT: CartItem = { productId: 'p4', name: 'Bauernbrot', price: 4.5, unit: 'STUECK', unitSize: 1, imageUrl: null, quantity: 2 }
+
+  it('Titel „Name, Menge“ wie Hof- und Produktseite (nameMitGebinde)', () => {
+    expect(korbZeileTitel(MILCH)).toBe('Heumilch frisch, 1 L')
+    expect(korbZeileTitel(EIER)).toBe('Bio-Freilandeier, 6 Pakete')
+    expect(korbZeileTitel(BROT)).toBe('Bauernbrot')
+    for (const p of [MILCH, EIER, KAESE, GEWUERZ, BROT]) expect(korbZeileTitel(p)).toBe(nameMitGebinde(p.name, p))
+  })
+
+  it('Grundpreis je EINER Einheit statt „für 6 Pakete“', () => {
+    expect(korbZeileGrundpreis(EIER)).toBe('€ 0,64 / Paket')
+    expect(korbZeileGrundpreis(MILCH)).toBe('€ 1,40 / L')
+    expect(korbZeileGrundpreis(BROT)).toBe('€ 4,50 / Stück')
+  })
+
+  it('Korbzeile und Produktseite zeigen für dasselbe Produkt denselben Grundpreis (Paket, kg, g mit Nachkommastelle)', () => {
+    for (const p of [EIER, KAESE, GEWUERZ, MILCH, BROT]) {
+      expect(korbZeileGrundpreis(p)).toBe(preisZeilen({ price: p.price, unit: p.unit, unitSize: p.unitSize, futter: null } as Parameters<typeof preisZeilen>[0]).grundpreis)
+    }
+    // 12,5 g zu € 1,00: € 80,00 / kg wie auf der Produktseite — über die gemeinsame Hilfe, keine eigene Umrechnung (Nr. 282; bis dahin € 0,08 / g).
+    expect(korbZeileGrundpreis(GEWUERZ)).toBe('€ 80,00 / kg')
+    expect(korbZeileGrundpreis(KAESE)).toBe('€ 26,32 / kg')
+  })
+
+  it('gerendert: eine Zeile Grundpreis, kein „für … Pakete“ mehr', () => {
+    const html = blatt({ items: [EIER] })
+    expect(html).toContain('Bio-Freilandeier, 6 Pakete')
+    expect(html).toContain('€ 0,64 / Paket')
+    expect(html).not.toContain('für 6 Pakete')
   })
 })

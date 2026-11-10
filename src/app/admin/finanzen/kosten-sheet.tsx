@@ -230,7 +230,7 @@ function SheetInhalt({
         </div>
 
         <div>
-          <span className={beschriftung}>
+          <span id="kosten-ab-titel" className={beschriftung}>
             {entwurf.rhythmus === 'EINMALIG' ? 'Monat' : 'Ab Monat'}
           </span>
           <MonatWahl
@@ -238,6 +238,7 @@ function SheetInhalt({
             onChange={(m) => setze('ab', m)}
             bezug={monat}
             idPraefix="kosten-ab"
+            beschriftungId="kosten-ab-titel"
           />
         </div>
 
@@ -279,12 +280,13 @@ function SheetInhalt({
       {vorhanden && (
         <div className="space-y-4 border-t border-border p-4">
           <div>
-            <span className={beschriftung}>Posten beenden — letzter Monat</span>
+            <span id="kosten-bis-titel" className={beschriftung}>Posten beenden — letzter Monat</span>
             <MonatWahl
               wert={endeMonat}
               onChange={setEndeMonat}
               bezug={monat}
               idPraefix="kosten-bis"
+              beschriftungId="kosten-bis-titel"
             />
             <p className="mt-1.5 text-xs text-muted-foreground">
               Der Posten zählt in diesem Monat noch, danach nicht mehr. Die Monate davor bleiben,
@@ -372,7 +374,8 @@ function Chip({
       aria-pressed={aktiv}
       onClick={onClick}
       className={cn(
-        'min-h-11 rounded-full border px-3 text-sm transition-colors',
+        // min-w-11: Die Pille „KI" maß mit px-3 nur 39 px (Messung Lauf 32, Nr. 281).
+        'min-h-11 min-w-11 rounded-full border px-3 text-sm transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         aktiv
           ? 'border-primary bg-primary text-primary-foreground'

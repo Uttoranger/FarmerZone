@@ -93,7 +93,10 @@ describe('Dunkel-Klassen für Bilder: eine Quelle', () => {
   }
 
   it('liefert die Werte aus einem Modul ohne „use client“ — Server-Komponenten bekommen die Klassen selbst', () => {
-    expect([ILLUSTRATION_HUELLE, ILLUSTRATION_BILD, FOTO_HUELLE]).toEqual(['dark:brightness-[1.6]', 'dark:mix-blend-multiply', 'dark:brightness-[0.85]'])
+    // F041 (freigabe.md §37.1): Die Illustration steht im Dunkeln wie ein Foto — dieselbe Dämpfung, keine Mischung.
+    expect(ILLUSTRATION_HUELLE).toBe(FOTO_HUELLE)
+    expect(ILLUSTRATION_BILD).toBe('')
+    expect(FOTO_HUELLE).toBe('dark:brightness-[0.85]')
     expect(quelle('src/components/ui/bild-dunkel.ts')).not.toMatch(/^['"]use client['"]/m)
   })
 

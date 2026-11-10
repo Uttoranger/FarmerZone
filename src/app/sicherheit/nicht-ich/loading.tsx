@@ -1,3 +1,6 @@
+import { cn } from '@/lib/utils'
+import { RUNDUNG } from '@/components/ui/rundung'
+
 /**
  * Ladeansicht von „Das war ich nicht" (Nr. 114): Die Seite liest den Link aus
  * der Datenbank. Form der Seite in der KundeShell (Kopfleiste 56 px, ab md
@@ -8,7 +11,7 @@ export default function NichtIchLaden(): React.JSX.Element {
     <div data-design="neu" className="min-h-dvh bg-background">
       <div className="h-14 border-b border-border bg-card md:h-16" />
       <div className="mx-auto w-full max-w-[1032px] animate-pulse px-4 pt-4 pb-10 *:max-w-[520px]" aria-busy="true">
-        <div className="mb-4 size-10 rounded-[12px] bg-muted" />
+        <div className={cn(RUNDUNG.karte, 'mb-4 size-10 bg-muted')} />
         <div className="mb-3 h-7 w-56 rounded-lg bg-border" />
         <div className="mb-2 h-4 w-full rounded bg-app-trough" />
         <div className="mb-6 h-4 w-2/3 rounded bg-app-trough" />

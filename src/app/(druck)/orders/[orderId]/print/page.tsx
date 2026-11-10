@@ -10,11 +10,14 @@ import { formatEuro } from '@/lib/format'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { datumLang } from '@/lib/heute'
 import { formatiereTelefon } from '@/lib/telefon-anzeige'
-import { unitSuffix } from '@/lib/order-line'
-import { DRUCK_ABGLEICH, druckGebuehrZeile, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
-import { druckGesamtHinweis, druckKasse } from '@/components/orders/druck-kasse'
+import { positionszeile } from '@/lib/positionszeile'
+import { DRUCK_ABGLEICH, druckGebuehrZeile, druckGesamtHinweis, druckKasse, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
 
 export const dynamic = 'force-dynamic'
+
+function gebindeVon(item: { productName: string; quantity: number; product?: { unit: string; unitSize: { toString(): string } | null } | null }): string | null {
+  return positionszeile({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null }).gebinde
+}
 
 /*
  * Der Abholzettel einer Bestellung (Boards s2-druck, w2-druck; nur hell, V44).
@@ -146,7 +149,8 @@ export default async function OrderPrintPage({
               <tr key={item.id} className="border-b border-primary-foreground/10">
                 <td className={`py-1.5 ${item.fehltSeit ? 'line-through' : ''}`}>
                   {item.productName}
-                  {unitSuffix(item.product ?? undefined) ? <> ({unitSuffix(item.product ?? undefined)})</> : null}
+                  {/* Gebinde wie auf der Bestellseite („1 L“, „6 Pakete“; Positionszeile G14). */}
+                  {gebindeVon(item) ? <> ({gebindeVon(item)})</> : null}
                   {item.fehltSeit && <span className="no-underline"> (fehlt)</span>}
                 </td>
                 <td className="py-1.5 text-right">{item.quantity}×</td>

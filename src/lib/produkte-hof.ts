@@ -12,7 +12,7 @@
  * Filterwert in der Adresse bleibt `entwuerfe`, damit alte Links gelten.
  */
 import { IM_SHOP, NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
-import { formatEuro, formatGebinde, formatMenge, formatZahl, hofVorratText } from '@/lib/format'
+import { einheitLabel, formatEuro, formatGebinde, formatMenge, formatZahl, gebindeGroesse, hofVorratText } from '@/lib/format'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { endpreisEuro, gebuehrWortFuerModell, satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
@@ -56,6 +56,24 @@ export function produktStatus(p: { isAvailable: boolean; stock: number; unit: st
 }
 
 // ─── Preis je Modell (N38; Boards s1/w1-produkte, s1/w1-produkt-neu) ────────
+
+/** Kürzel der Einheit in der Produktliste des Hofs, wo das Board vom allgemeinen Label abweicht (s1-/w1-produkte). */
+const EINHEIT_LISTE: Readonly<Record<string, { kurz: string; lang: string }>> = {
+  STUECK: { kurz: 'Stk.', lang: 'Stk.' },
+  RAUMMETER: { kurz: 'RM', lang: 'Raummeter' },
+  SCHUETTRAUMMETER: { kurz: 'SRM', lang: 'Schüttraummeter' },
+}
+
+/**
+ * Die Einheit eines Produkts in der Liste des Hofs, immer mit Zahl (Abnahme Lauf 32, produkte Bild 1; Nr. 277):
+ * „1 L“, „10 Stk.“, „500 g“, „1 RM“ (Tabelle, `kurz`) bzw. „1 Raummeter“ (Zeile am Handy, `lang`) — statt
+ * „je L“, „je m³“ aus `formatGebinde`. Ohne Gebindegröße zählt eine Einheit. Nur Anzeige.
+ */
+export function produktEinheit(unit: string, unitSize: number | { toString(): string } | null | undefined, form: 'kurz' | 'lang' = 'kurz'): string {
+  const groesse = gebindeGroesse(unitSize) ?? 1
+  const label = EINHEIT_LISTE[unit]?.[form] ?? einheitLabel(unit, groesse)
+  return `${formatZahl(groesse)} ${label}`
+}
 
 /**
  * „Du bekommst € 7,50" und „die Kundin zahlt € 7,95" — nur im Hofpreis-Modell

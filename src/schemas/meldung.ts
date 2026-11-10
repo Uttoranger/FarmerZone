@@ -30,7 +30,8 @@ export const meldungEingabeSchema = z.object({
   text: z
     .string()
     .trim()
-    .min(MELDUNG_TEXT_MIN, `Bitte beschreibe es mit mindestens ${MELDUNG_TEXT_MIN} Zeichen.`)
+    // Wörtlich nach Board s2-/w2-meldungen Bild 2 (Abnahme Lauf 32 meldungen Punkt 6; Nr. 268).
+    .min(MELDUNG_TEXT_MIN, `Schreib bitte etwas mehr – mindestens ${MELDUNG_TEXT_MIN} Zeichen, damit wir die Stelle finden.`)
     .max(MELDUNG_TEXT_MAX, `Höchstens ${MELDUNG_TEXT_MAX} Zeichen.`),
   seiteUrl: z.string().trim().max(500).default(''),
   userAgent: z.string().trim().max(500).default(''),

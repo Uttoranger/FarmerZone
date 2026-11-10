@@ -15,9 +15,6 @@ export const metadata: Metadata = {
   referrer: 'no-referrer',
 }
 
-/** Der Seitenfuß im Browser in der Spalte der Seite (Board w1-meine-bestellungen: 520 px, Lauf 31). */
-const FUSS_SPALTE = 'md:max-w-[568px]'
-
 // Jede Anfrage liest den Cookie neu — nie zwischengespeichert (S1).
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +31,7 @@ export default async function BestellungenSeite(): Promise<React.JSX.Element> {
 
   if (zugang.art !== 'gueltig') {
     return (
-      <KundeShellMitSitzung fussSpalte={FUSS_SPALTE}>
+      <KundeShellMitSitzung>
         <BestellungenFinden abgelaufen={zugang.art === 'abgelaufen'} />
       </KundeShellMitSitzung>
     )
@@ -49,7 +46,7 @@ export default async function BestellungenSeite(): Promise<React.JSX.Element> {
     meldung.name = err instanceof Error ? err.name : 'Unbekannt'
     Sentry.captureException(meldung, { tags: { aufgabe: 'bestellungen-finden' } })
     return (
-      <KundeShellMitSitzung fussSpalte={FUSS_SPALTE}>
+      <KundeShellMitSitzung>
         <BestellungenFehler email={zugang.email} />
       </KundeShellMitSitzung>
     )
@@ -57,7 +54,7 @@ export default async function BestellungenSeite(): Promise<React.JSX.Element> {
 
   const { laufend, frueher } = teileBestellungen(liste, jetzt)
   return (
-    <KundeShellMitSitzung fussSpalte={FUSS_SPALTE}>
+    <KundeShellMitSitzung>
       <BestellungenListe
         email={zugang.email}
         laufend={laufend.map((b) => bestellEintrag(b, jetzt, true))}

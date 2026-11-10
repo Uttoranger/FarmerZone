@@ -154,6 +154,17 @@ export function ProduktdetailKunde({
     }
   }, [klebeZeile])
 
+  // EIN Warenkorb-Symbol am Handy (Abnahme Lauf 32, produkt 9): Solange der Kopf der Shell zu sehen ist, trägt er
+  // den Korb; erst wenn er weggescrollt ist (die Marke über der Zeile ist aus dem Bild), zeigt ihn die klebende Zeile.
+  const [kopfMarke, setKopfMarke] = useState<HTMLSpanElement | null>(null)
+  const [kopfWeg, setKopfWeg] = useState(false)
+  useEffect(() => {
+    if (!kopfMarke || typeof IntersectionObserver === 'undefined') return
+    const beobachter = new IntersectionObserver(([eintrag]) => setKopfWeg(eintrag ? !eintrag.isIntersecting : false))
+    beobachter.observe(kopfMarke)
+    return () => beobachter.disconnect()
+  }, [kopfMarke])
+
   // Die Seite prüft vorher (notFound); hier nur die Absicherung für den Typ.
   if (!einstieg) return null
 
@@ -245,6 +256,8 @@ export function ProduktdetailKunde({
         <div className="flex min-w-0 flex-col gap-3 lg:col-start-1 lg:row-start-1">
           {/* Rückweg (Board w1-/s1-produkt): am Handy „‹ Alle Produkte von <Hof>“, im Browser „‹ Zurück zu allen Produkten“.
               Am Handy klebt die Zeile oben (G9, Nr. 252: der Kopf der Shell scrollt weg) und trägt den Warenkorb. */}
+          {/* Die Marke für „Kopf der Shell weggescrollt“ — ohne Höhe, direkt über der klebenden Zeile. */}
+          <span ref={setKopfMarke} aria-hidden="true" className="-mb-3 block h-0 md:hidden" />
           <div
             ref={setKlebeZeile}
             data-klebe-zeile=""
@@ -268,7 +281,11 @@ export function ProduktdetailKunde({
             <Link
               href={korbKopf.href}
               aria-label={`Warenkorb, ${korbKopf.anzahl} Artikel`}
-              className={cn('relative ml-auto flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted md:hidden', FOKUS_RAHMEN)}
+              className={cn(
+                'relative ml-auto flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted md:hidden',
+                !kopfWeg && 'hidden',
+                FOKUS_RAHMEN
+              )}
             >
               <Handbag className="size-5" strokeWidth={1.7} aria-hidden="true" />
               <Zaehler anzahl={korbKopf.anzahl} wofuer="Artikel im Warenkorb" ton="gruen" className="absolute -top-0.5 -right-0.5 h-5 min-w-5 px-1 text-[12px]" />
@@ -280,7 +297,7 @@ export function ProduktdetailKunde({
           <section aria-labelledby="produkt-titel" className="flex flex-col gap-3">
             {/* Das Bild als Band über der ganzen Spalte, Titel und Texte darunter (Board w1-/s1-produkt): am Handy
                 390 : 200 wie die Vorschau „Auf der Produktseite“ (Bild-Baustein, Register N17), ab 768 px 160 px hoch.
-                Im Dunkeln gedämpft (Freigabe Lauf 31), damit kein heller Fleck bleibt. */}
+                Im Dunkeln gedämpft wie ein Foto, auch die Illustration (F041), gerahmt. */}
             <div
               className={cn(
                 'relative aspect-[390/200] w-full shrink-0 overflow-hidden border border-border md:aspect-auto md:h-[160px]',
@@ -289,21 +306,33 @@ export function ProduktdetailKunde({
                 bild && !produkt.imageUrl ? ILLUSTRATION_HUELLE : FOTO_HUELLE
               )}
             >
-              {bild ? (
+              {bild && produkt.imageUrl ? (
                 <Image
                   src={bild}
-                  alt={produkt.imageUrl ? produkt.name : ''}
+                  alt={produkt.name}
                   fill
                   priority
                   sizes="(min-width: 1024px) 680px, 100vw"
-                  // Die Kategorie-Illustration geht nachts in der Fläche auf — ihr Crème-Grund leuchtete sonst (ILLUSTRATION_BILD).
-                  className={cn(
-                    produkt.imageUrl ? 'object-cover' : cn('object-contain p-6 md:p-4', ILLUSTRATION_BILD),
-                    ausverkauft && 'grayscale'
-                  )}
+                  className={cn('object-cover', ausverkauft && 'grayscale')}
                   // Ausschnitt nur am echten Foto (Register N17); ausverkauft ohne Filter des Hofs, sonst überschriebe er grayscale.
-                  style={produkt.imageUrl ? bildStil(produkt.bildAusschnitt, { filter: !ausverkauft }) : undefined}
+                  style={bildStil(produkt.bildAusschnitt, { filter: !ausverkauft })}
                 />
+              ) : bild ? (
+                // Die Kategorie-Illustration als eigenes Quadrat mittig im Band, nachts wie ein Foto auf ihrem Grund
+                // (gedämpft über die Hülle) und selbst gerahmt — kein schwebendes helles Quadrat (F041, §37.1 15.5.3).
+                <span
+                  data-slot="illustration"
+                  className="absolute inset-y-6 left-1/2 aspect-square -translate-x-1/2 overflow-hidden rounded-[10px] dark:ring-1 dark:ring-border md:inset-y-4"
+                >
+                  <Image
+                    src={bild}
+                    alt=""
+                    fill
+                    priority
+                    sizes="200px"
+                    className={cn('object-cover', ILLUSTRATION_BILD, ausverkauft && 'grayscale')}
+                  />
+                </span>
               ) : (
                 <span aria-hidden="true" className="flex h-full items-center justify-center font-heading text-5xl font-semibold text-muted-foreground">
                   {produktInitiale(produkt.name)}
@@ -446,7 +475,7 @@ export function ProduktdetailKunde({
               <div className={cn(SPALTEN_KARTE, 'gap-1.5')}>
                 <p className="text-[15px] font-bold text-foreground">Gerade ausverkauft</p>
                 <p className="text-[14px] break-words text-muted-foreground">
-                  {ausverkauftSatz(farm.name, produkt.name)}
+                  {ausverkauftSatz(produkt.name)}
                 </p>
                 <Link
                   href={zurueck}
@@ -494,18 +523,27 @@ export function ProduktdetailKunde({
               <div className="mx-auto flex max-w-[1152px] items-center gap-3 md:flex-row-reverse">
                 {kaufbar ? (
                   <>
-                    {/* Die Menge als gerahmte Pille „− n +“ (G13, form="pille", Nr. 252). */}
-                    <Stepper
-                      beschriftung={`Menge ${produkt.name}`}
-                      wert={mengeJetzt}
-                      min={1}
-                      max={Math.max(1, nochMoeglich)}
-                      disabled={nochMoeglich === 0}
-                      onWertChange={setMenge}
-                      eingabeClassName="w-11"
-                      className="shrink-0"
-                      form="pille"
-                    />
+                    {/* Die Menge als gerahmte Pille „− n +“ (G13, form="pille", Nr. 252) mit sichtbarer Beschriftung „Menge“
+                        und je Knopf und Feld 44 px Ziel (Abnahme Lauf 32, produkt 4: Knöpfe 42 px, Feld 36 px, Feld ohne
+                        Beschriftung). Die Pille ist ein geteilter Baustein (ui/stepper.tsx) — die Höhe kommt hier über ihre
+                        data-slot-Hülle, damit Hof-Seiten mit derselben Pille unverändert bleiben. „Menge“ steht als Text darüber,
+                        kein <label>: Ohne htmlFor (die Pille nimmt keine id an) gäbe ein Label einen Tipp an sein erstes
+                        beschriftbares Kind weiter — den Minus-Knopf (Runde 1). Den zugänglichen Namen trägt das Feld selbst
+                        (aria-label „Menge <Produkt>“). */}
+                    <div className="flex shrink-0 flex-col gap-0.5">
+                      <span className="text-[12px] leading-none font-semibold text-muted-foreground">Menge</span>
+                      <Stepper
+                        beschriftung={`Menge ${produkt.name}`}
+                        wert={mengeJetzt}
+                        min={1}
+                        max={Math.max(1, nochMoeglich)}
+                        disabled={nochMoeglich === 0}
+                        onWertChange={setMenge}
+                        eingabeClassName="h-11 w-11"
+                        className="[&_[data-slot=stepper-pille]]:h-12"
+                        form="pille"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => void inDenKorb(produkt, mengeJetzt)}

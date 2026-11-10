@@ -183,7 +183,7 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           // Auch am Handy der volle Satz — er ist der Grund für die Pflicht.
           textKurz: ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
           zustand: 'offen',
-          aktion: { art: 'link', href: '/settings/payments', label: 'Mit Stripe einrichten', primaer: true },
+          aktion: { art: 'link', href: '/settings/payments', label: 'Mit Stripe einrichten', primaer: false },
         }
 
   // Nr. 198: der Mandat-Schritt — ein Hinweis mit dem Weg zu „Lastschrift einrichten“, zählt nicht mit.
@@ -276,6 +276,12 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
       : freischaltung
 
   const schritte = [...vorher, sepa, freischaltungFertig].map((s, i) => ({ ...s, nummer: i + 1 }))
+  // Eine Hauptaktion (Register N1): orange ist nur der Knopf am ersten offenen Schritt in der Reihenfolge
+  // (Liste Lauf 32, registrieren „Orange auf ‚Mit Stripe einrichten‘ statt auf ‚Weiter‘“); alle anderen Wege bleiben Umriss.
+  const erster = schritte.find((s) => s.zustand === 'offen' && s.aktion !== null)
+  for (const s of schritte) {
+    if (s.aktion?.art === 'link') s.aktion = { ...s.aktion, primaer: s === erster }
+  }
   const zaehlend = schritte.filter((s) => s.zustand !== 'hinweis')
   const erledigt = zaehlend.filter((s) => s.zustand === 'erledigt').length
   const gesamt = zaehlend.length

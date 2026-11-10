@@ -170,7 +170,7 @@ export const EMAIL_BESTAETIGEN_TEXT = {
 export const EMAIL_AENDERN_MAIL = {
   betreff: 'Bestätige deine neue Anmelde-Adresse',
   anrede: (hof: string | null): string => (hof ? `Hallo ${hof},` : 'Hallo,'),
-  satz: `das Team von ${MARKE} hat auf deinen Wunsch die Anmelde-Adresse deines Kontos auf diese Adresse umgestellt. Erst wenn du bestätigst, gilt sie.`,
+  satz: `das Team von ${MARKE} hat auf deinen Wunsch eine neue Anmelde-Adresse eingetragen. Bitte bestätige sie:`,
   knopf: 'Neue Adresse bestätigen',
   fuss: `Der Link gilt 24 Stunden und einmal. Warst du das nicht? Dann musst du nichts tun – die alte Adresse bleibt. Wir fragen dich nie per Mail nach deinem Passwort.`,
 } as const

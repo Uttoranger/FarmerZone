@@ -4,14 +4,15 @@ import * as Sentry from '@sentry/nextjs'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getUmsatzAuswertung, getYtdRevenue } from '@/server/queries/analytics'
-import { getKennzahlen, getServicegebuehrenZeitraum } from '@/server/queries/auswertung'
+import { getAuswertungHof, getKennzahlen, getServicegebuehrenZeitraum, getUmsatzZusatz } from '@/server/queries/auswertung'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
 import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { testzahlungenHinweisFuerHof } from '@/server/queries/testzahlungen'
-import { auswertungSummen, grenzeStand, teilenKarte, teilenZeitraumAus } from '@/lib/auswertung'
+import { auswertungSummen, grenzeStand, teilenKarte, teilenZeitraumAus, umsatzFussSatz } from '@/lib/auswertung'
 import { umsatzfenster, zeitraumImSatz, type Periode, type Periodenfenster } from '@/lib/umsatz'
 import { PROCESSING_REVENUE_LIMIT, limitProgress } from '@/lib/revenue-limit'
 import { formatEuro } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { REGION_HREF } from '@/lib/bauern-navigation'
 import { auswertungHref, leseAuswertungZeitraum } from '@/schemas/auswertung'
 import { Textlink } from '@/components/ui/textlink'
@@ -29,6 +30,7 @@ import {
   TopProdukteKarte,
   UmsatzKarte,
   ZeitraumWahl,
+  umsatzLeer,
 } from '@/components/auswertung/auswertung-teile'
 import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { MARKE } from '@/lib/marke'
@@ -95,6 +97,26 @@ export default async function AnalyticsPage({
   // Woche mit ausgeschriebenem Monat („2.–8. November“, Liste Lauf 32 auswertung); Monat und Jahr wie bisher.
   const zeitraum = daten ? (periode === 'woche' ? wocheAusgeschrieben(pf) : daten.umsatz.zeitraum) : ''
   const satzZeitraum = periode === 'woche' ? zeitraum : zeitraumImSatz(pf)
+  /*
+   * Reihenfolge und Spalten (Board s2-/w2-auswertung, Liste Lauf 32 auswertung, Nr. 273) über `order` in EINEM
+   * Fluss — jede Karte steht genau einmal im Baum:
+   *  - Handy: Woche Diagramm → Links-Karte, sonst Links-Karte → Diagramm; dann Hinweis → Wo kam | Was lief →
+   *    Gebühr → Grenze.
+   *  - Web (ab 1280 px): Links-Karte über die ganze Breite, darunter Diagramm | Gebühr (360 px), Hinweis,
+   *    Wo kam | Was lief, Grenze über die ganze Breite (C). Ohne Umsatz (neuer Hof, Board Bild 4) zwei gleiche
+   *    Spalten: Links-Karte | leeres Diagramm, Gebühr | Grenze.
+   */
+  const leer = daten ? umsatzLeer(daten.umsatz.balken) : false
+  const woche = periode === 'woche'
+  const ORT = {
+    teilen: cn(woche ? 'max-xl:order-2' : 'max-xl:order-1', 'xl:order-1', !leer && 'xl:col-span-2'),
+    umsatz: cn(woche ? 'max-xl:order-1' : 'max-xl:order-2', 'xl:order-2'),
+    einsicht: 'order-4 xl:col-span-2',
+    kanaele: 'order-5 xl:col-span-2',
+    gebuehr: cn('max-xl:order-6', 'xl:order-3'),
+    grenze: cn('order-7', !leer && 'xl:col-span-2'),
+  }
+
   const umsatzKarte = daten && (
     <UmsatzKarte
       zeitraum={zeitraum}
@@ -103,10 +125,16 @@ export default async function AnalyticsPage({
       laufend={daten.umsatz.laufend}
       balken={daten.umsatz.balken}
       vergleichLabel={daten.umsatz.vergleichLabel}
+      vergleichCent={daten.zusatz.vergleichCent}
+      fussSatz={umsatzFussSatz(daten.zusatz.selbstEingetrageneTage, daten.zusatz.heuteAbholen)}
+      className={ORT.umsatz}
     />
   )
-  const gebuehrenKarte = gebuehrenKarteFuerZeitraum(pf, daten?.hofpreis ?? null)
-  const teilenKarteEl = daten && <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={zeitraum} />
+  // Erklärsatz je Stand (Nr. 273): mit dem eigenen Hof Satz und Bar-Stand; ohne Hofdaten die allgemeinen Sätze.
+  const gebuehrenKarte = gebuehrenKarteFuerZeitraum(pf, daten?.hofpreis ?? null, daten?.hof?.gebuehrStand ?? null)
+  const teilenKarteEl = daten && (
+    <TeilenWirkungKarte karte={teilenKarte(daten.wirkung)} zeitraum={zeitraum} ohneFreigabe={daten.hof?.wartetAufFreigabe ?? false} className={ORT.teilen} />
+  )
 
   const inhalt = !daten ? (
     <AuswertungFehler nochmal={auswertungHref(periode, zurueck)} />
@@ -114,36 +142,38 @@ export default async function AnalyticsPage({
     <>
       <ZeitraumWahl periode={periode} zurueck={zurueck} zeitraum={zeitraum} />
       <KennzahlenReihe k={daten.kennzahlen} zeitraum={zeitraum} satzZeitraum={satzZeitraum} />
-      {/* Woche: das Diagramm direkt unter den Kennzahlen (Board s2-auswertung Bild 3); sonst erst die Links-Karte. */}
-      {periode === 'woche' ? (
-        <>
-          {umsatzKarte}
-          {teilenKarteEl}
-        </>
-      ) : (
-        <>
-          {teilenKarteEl}
-          {umsatzKarte}
-        </>
-      )}
-      {daten.umsatz.einsicht && <EinsichtZeile text={daten.umsatz.einsicht} />}
-      {(daten.umsatz.kanaele.length > 0 || daten.umsatz.topProdukte.length > 0) && (
-        <div className="grid items-start gap-4 md:grid-cols-2">
-          {daten.umsatz.kanaele.length > 0 && <KanaeleKarte kanaele={daten.umsatz.kanaele} />}
-          {daten.umsatz.topProdukte.length > 0 && <TopProdukteKarte produkte={daten.umsatz.topProdukte} />}
-        </div>
-      )}
-      {/* Reihenfolge nach Board: Diagramm → Hinweis → Wo kam das Geld her → Was lief am besten → Gebühr + Grenze. */}
-      {/* Titel, Betrag und Sätze aus demselben Zeitraum (Nr. 251 Runde 1) — nie das Modell von heute. */}
-      <GebuehrenKarte titel={gebuehrenKarte.titel} gebuehr={daten.gebuehren} text={gebuehrenKarte} />
-      <GrenzeKarte
-        jahr={jahr}
-        jahresUmsatz={daten.ytdRevenue}
-        grenze={PROCESSING_REVENUE_LIMIT}
-        prozent={daten.grenze.pct}
-        spielraum={daten.grenze.remaining}
-        stand={grenzeStand(daten.grenze.pct, grenzeText)}
-      />
+      <div className={cn('flex flex-col gap-4 md:gap-[18px] xl:grid xl:items-start', leer ? 'xl:grid-cols-2' : 'xl:grid-cols-[minmax(0,1fr)_360px]')}>
+        {/* Im Baum in der Reihenfolge des Handys (Lese- und Tab-Reihenfolge); `order` ordnet nur das Web um. */}
+        {woche ? (
+          <>
+            {umsatzKarte}
+            {teilenKarteEl}
+          </>
+        ) : (
+          <>
+            {teilenKarteEl}
+            {umsatzKarte}
+          </>
+        )}
+        {daten.umsatz.einsicht && <EinsichtZeile text={daten.umsatz.einsicht} className={ORT.einsicht} />}
+        {(daten.umsatz.kanaele.length > 0 || daten.umsatz.topProdukte.length > 0) && (
+          <div className={cn('grid items-start gap-4 md:grid-cols-2', ORT.kanaele)}>
+            {daten.umsatz.kanaele.length > 0 && <KanaeleKarte kanaele={daten.umsatz.kanaele} />}
+            {daten.umsatz.topProdukte.length > 0 && <TopProdukteKarte produkte={daten.umsatz.topProdukte} />}
+          </div>
+        )}
+        {/* Titel, Betrag und Sätze aus demselben Zeitraum (Nr. 251 Runde 1) — nie das Modell von heute. */}
+        <GebuehrenKarte titel={gebuehrenKarte.titel} gebuehr={daten.gebuehren} text={gebuehrenKarte} className={ORT.gebuehr} />
+        <GrenzeKarte
+          jahr={jahr}
+          jahresUmsatz={daten.ytdRevenue}
+          grenze={PROCESSING_REVENUE_LIMIT}
+          prozent={daten.grenze.pct}
+          spielraum={daten.grenze.remaining}
+          stand={grenzeStand(daten.grenze.pct, grenzeText)}
+          className={ORT.grenze}
+        />
+      </div>
     </>
   )
 
@@ -166,7 +196,7 @@ export default async function AnalyticsPage({
  * Abfragen selbst mit (src/lib/umgebung-server.ts).
  */
 async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number, pf: Periodenfenster, jetzt: Date) {
-  const [umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, testzahlungenHinweis, hofpreis] = await Promise.all([
+  const [umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, testzahlungenHinweis, hofpreis, zusatz, hof] = await Promise.all([
     getUmsatzAuswertung(farmId, periode, zurueck, jetzt),
     getYtdRevenue(farmId, jetzt),
     getKennzahlen(farmId, pf),
@@ -176,7 +206,11 @@ async function ladeAuswertung(farmId: string, periode: Periode, zurueck: number,
     testzahlungenHinweisFuerHof(farmId, auswertungSummen(pf, jetzt)),
     // Der Stichtag für das Wort der Gebühr; scheitert das Lesen, gilt die Vorgabe (ladeHofpreisEinstellung meldet selbst).
     ladeHofpreisEinstellung(),
+    // Vergleichsbetrag und Fußsatz der Umsatzkarte (Nr. 273) — dieselben Buchungen wie der Prozentsatz.
+    getUmsatzZusatz(farmId, pf, jetzt),
+    // Satz, Einzugsbeginn und Gründungsende für den Erklärsatz der Gebühren-Karte, dazu der Freigabe-Stand (Nr. 273).
+    getAuswertungHof(farmId),
   ])
-  return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis, hofpreis }
+  return { umsatz, ytdRevenue, kennzahlen, wirkung, gebuehren, grenze: limitProgress(ytdRevenue), testzahlungenHinweis, hofpreis, zusatz, hof }
 }
 

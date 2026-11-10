@@ -110,7 +110,8 @@ describe('G11 – Seitenfuß', () => {
     const fuss = renderToStaticMarkup(createElement(KundeFuss))
     expect(fuss).not.toContain(`aria-label="${MARKE} – zur Startseite"`)
     expect(fuss).toMatch(/<nav aria-label="Mehr entdecken" class="hidden md:block">/)
-    expect(fuss).toMatch(/<nav aria-label="Rechtliches" class="md:ml-auto">/)
+    // Seit Nr. 267 ohne `md:ml-auto`: Die Zeile verteilt Wege und Rechtslinks über `justify-between` (tests/bausteine-267.test.ts).
+    expect(fuss).toMatch(/<nav aria-label="Rechtliches">/)
   })
 })
 

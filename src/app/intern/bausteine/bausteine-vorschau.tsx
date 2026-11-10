@@ -39,12 +39,15 @@ import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { Vorschau246 } from '@/app/intern/bausteine/vorschau-246'
 import { Vorschau247 } from '@/app/intern/bausteine/vorschau-247'
 import { Vorschau248 } from '@/app/intern/bausteine/vorschau-248'
+import { Vorschau267 } from '@/app/intern/bausteine/vorschau-267'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { KaufZusammenfassung, type ZusammenfassungPosition } from '@/components/checkout/kauf-zusammenfassung'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { Vorschau269 } from '@/app/intern/bausteine/vorschau-269'
+import { Vorschau268 } from '@/app/intern/bausteine/vorschau-268'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -255,29 +258,34 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             titel="WerkzeugKopf (G1) mit Hof-Balken (G3)"
             satz="Am Handy die feste Leiste mit „‹“, Titel und Unterzeile – hier im Kasten scrollen –, im Web der grüne Textlink „‹ Elternseite“, h1 und Unterzeile. Der Hof-Balken steht unter dem Kopf in der Inhaltsspalte."
           >
-            {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5), damit die Leiste hier sichtbar klebt. */}
-            <div className={cn('relative h-80 overflow-y-auto border border-border bg-background px-4 pt-5 md:px-8 md:pt-8', RUNDUNG.karte)}>
-              <UnterDemWerkzeugKopf
-                inhalt={<HofBalken lage="unter-kopf" balken={{ art: 'wartet', farmId: 'farm_vorschau', farmName: 'Hof Beispielberg', country: 'AT', stand: 'einrichten' }} />}
-              >
-                <WerkzeugKopf pfad="/settings/profile" titel="Hofdaten" unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />} />
-              </UnterDemWerkzeugKopf>
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={cn('mb-3 h-24 border border-border bg-card', RUNDUNG.karte)} />
-              ))}
+            {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5). Die Leiste steht am Handy fest (Nr. 269);
+                `transform-gpu` am äußeren Kasten macht ihn zu ihrem Bezug, sie steht also oben im Kasten statt am Fenster. */}
+            <div className={cn('relative h-80 transform-gpu overflow-hidden border border-border', RUNDUNG.karte)}>
+              <div className="h-full overflow-y-auto bg-background px-4 pt-5 md:px-8 md:pt-8">
+                <UnterDemWerkzeugKopf
+                  inhalt={<HofBalken lage="unter-kopf" balken={{ art: 'wartet', farmId: 'farm_vorschau', farmName: 'Hof Beispielberg', country: 'AT', stand: 'einrichten' }} />}
+                >
+                  <WerkzeugKopf pfad="/settings/profile" titel="Hofdaten" unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />} />
+                </UnterDemWerkzeugKopf>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className={cn('mb-3 h-24 border border-border bg-card', RUNDUNG.karte)} />
+                ))}
+              </div>
             </div>
-            <div className={cn('relative h-48 overflow-y-auto border border-border bg-background px-4 pt-5 md:px-8 md:pt-8', RUNDUNG.karte)}>
-              <WerkzeugKopf
-                pfad="/settings"
-                titel="Einstellungen"
-                unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />}
-                aktion={
-                  <Link href="/intern/bausteine#werkzeugkopf" className={KNOPF.rand}>
-                    Postfach
-                  </Link>
-                }
-              />
-              <p className="text-[13px] text-muted-foreground">Ohne Elternseite (Seite der Leiste): kein Rückweg, eine Aktion rechts.</p>
+            <div className={cn('relative h-48 transform-gpu overflow-hidden border border-border', RUNDUNG.karte)}>
+              <div className="h-full overflow-y-auto bg-background px-4 pt-5 md:px-8 md:pt-8">
+                <WerkzeugKopf
+                  pfad="/settings"
+                  titel="Einstellungen"
+                  unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />}
+                  aktion={
+                    <Link href="/intern/bausteine#werkzeugkopf" className={KNOPF.rand}>
+                      Postfach
+                    </Link>
+                  }
+                />
+                <p className="text-[13px] text-muted-foreground">Ohne Elternseite (Seite der Leiste): kein Rückweg, eine Aktion rechts.</p>
+              </div>
             </div>
           </Abschnitt>
 
@@ -604,6 +612,9 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           <Vorschau246 />
           <Vorschau247 />
           <Vorschau248 />
+          <Vorschau267 />
+          <Vorschau269 />
+          <Vorschau268 />
         </div>
       </main>
     </div>

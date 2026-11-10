@@ -207,11 +207,11 @@ describe('Band des Vollbilds', () => {
     expect(html).toMatch(new RegExp(`<button type="button"[^>]*>${MEIN_HOF_ANSICHT_TEXT.fertig}</button>`))
   })
 
-  it('das Auge ist aria-hidden; kein Hexwert', () => {
+  it('neutral nach Board s1-mein-hof Bild 6 (Nr. 274): ohne Symbol, ohne orange Tönung, Titel in der Serife; kein Hexwert', () => {
     const html = band()
-    const symbole = html.match(/<svg[^>]*>/g) ?? []
-    expect(symbole.length).toBeGreaterThan(0)
-    for (const svg of symbole) expect(svg).toContain('aria-hidden="true"')
+    expect(html).not.toMatch(/<svg/)
+    expect(html).not.toMatch(/bg-primary\/|text-status-offen/)
+    expect(html).toMatch(/<h2 [^>]*class="[^"]*font-heading/)
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
   })
 })

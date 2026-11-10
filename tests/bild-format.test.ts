@@ -9,7 +9,7 @@
  * Kasten `av1C` — ohne ihn dekodiert libheif kein AV1.
  * Die Bytes hier sind erfundene Köpfe, keine echten Bilder.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, inject, it } from 'vitest'
 import { BILD_PIXEL_GRENZE, PIXEL_GRENZE_FEHLER, formatFuerSharp, istPixelGrenzeFehler } from '@/lib/bild-format'
 
 function bytes(...teile: (number[] | string)[]): Uint8Array {
@@ -75,6 +75,13 @@ describe('formatFuerSharp — alles andere fällt durch', () => {
   })
 })
 
+/**
+ * Die feste Grenze gilt nur im eigenen Leistungslauf (`pnpm pruefen:leistung`, ein Worker, eine Datei zur Zeit;
+ * TESTING_GUIDELINES §4). Im parallelen `pnpm test` läuft die Suche ohne Grenze mit: Dort teilen sich die Dateien
+ * die Kerne, und eine Grenze, die das aushält, fängt die frühere Schleife nicht mehr sicher.
+ */
+const GRENZE_MS = inject('leistungslauf') ? 500 : Number.POSITIVE_INFINITY
+
 describe('formatFuerSharp — Laufzeit', () => {
   it('ein 25-MB-Original voller „a" hinter einem HEIC-Kopf ist schnell geprüft (die Suche nach av1C ist linear)', () => {
     const gross = new Uint8Array(25 * 1024 * 1024).fill(0x61)
@@ -89,7 +96,7 @@ describe('formatFuerSharp — Laufzeit', () => {
       schnellste = Math.min(schnellste, performance.now() - beginn)
     }
     // Großzügig: nativ sind es Millisekunden; die frühere Schleife brauchte gut eine Sekunde.
-    expect(schnellste).toBeLessThan(500)
+    expect(schnellste).toBeLessThan(GRENZE_MS)
   }, 30_000)
 })
 

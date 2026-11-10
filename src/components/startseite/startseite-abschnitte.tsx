@@ -5,10 +5,9 @@ import { unstable_rethrow } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
 import { ArrowRight, ChevronDown } from 'lucide-react'
 import {
-  BEISPIEL_WARENPREIS_CENTS,
   BRENNMATERIAL_KARTE,
   FUTTER_KARTE,
-  beispielRechnung,
+  startseitenBeispiel,
   startseitenFragen,
   hoefeAdresse,
   type Beispielrechnung,
@@ -19,10 +18,10 @@ import type { AbschnittArt } from '@/lib/startseite-gestalten'
 import { SERVICEGEBUEHR_BEZEICHNUNG, centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { textlinkKlassen } from '@/components/ui/textlink'
-import { SchonDabei } from '@/components/shared/schon-dabei'
 import { Wortmarke } from '@/components/shared/wortmarke'
 import { Kicker } from '@/components/startseite/kicker'
 import { MARKE } from '@/lib/marke'
@@ -52,13 +51,13 @@ const CONTAINER = 'mx-auto max-w-[1146px] px-4 md:px-6'
 
 /**
  * Eine Kategorie-Illustration (public/categories/): Sie hat einen hellen
- * Crème-Grund und ist kein Foto — nachts gedämpft und gerahmt statt
- * leuchtend (CODING_STANDARDS §7).
+ * Crème-Grund und ist kein Foto — nachts steht sie wie ein Foto auf ihrem Grund,
+ * gedämpft aus der einen Quelle (ILLUSTRATION_HUELLE, F041) und gerahmt (CODING_STANDARDS §7).
  */
 export function Illustration({ src, sizes, className }: { src: string | null; sizes: string; className?: string }) {
   return (
     <span className={cn('relative block overflow-hidden bg-muted dark:ring-1 dark:ring-border', className)}>
-      {src && <Image src={src} alt="" fill sizes={sizes} className="object-cover dark:brightness-[0.78] dark:saturate-[0.9]" />}
+      {src && <Image src={src} alt="" fill sizes={sizes} className={cn('object-cover', ILLUSTRATION_HUELLE)} />}
     </span>
   )
 }
@@ -223,8 +222,7 @@ export function warumPunkte(modell: GebuehrModell | undefined): readonly string[
  * der Hofwelt steht erst auf /fuer-hoefe. Es trägt die Sprungmarke #fuer-hoefe für die Navigation.
  * „Mehr für Höfe" führt seit Nr. 15 auf die eigene Seite /fuer-hoefe. Preise
  * nennt das Band keine — die stehen nur dort und auf /konditionen
- * (src/lib/konditionen.ts). Darunter „Schon dabei? Anmelden" für Höfe, die
- * schon registriert sind (Register N1, Nr. 41).
+ * (src/lib/konditionen.ts). „Schon dabei? Anmelden" steht nicht mehr darin (Nr. 271).
  */
 /**
  * Das Für-Höfe-Band mit dem Satz der Gründungshöfe (Register K2-Ergänzung,
@@ -239,7 +237,8 @@ export async function FuerHoefeBand(): Promise<React.JSX.Element> {
 /**
  * Das Band selbst — ohne Zahlen (`gruendung` null) ohne den Satz. Seit Nr. 252 (Liste Lauf 32, startseite
  * Bild 3/4) eine schlichte Karte mit einem breiten Knopf „Für Höfe“ (→ /fuer-hoefe, dort Registrieren und
- * Konditionen). Der Satz der Gründungshöfe (K2-Ergänzung) und „Schon dabei? Anmelden“ (N1) bleiben darunter.
+ * Konditionen). Der Satz der Gründungshöfe (K2-Ergänzung) bleibt; „Schon dabei? Anmelden“ steht seit Nr. 271 nicht
+ * mehr in der Karte (Abnahme Lauf 32, startseite 8) — „Anmelden“ steht im Kopf (N1), der Weg der Höfe auf /fuer-hoefe.
  */
 export function FuerHoefeBandInhalt({ gruendung = null }: { gruendung?: GruendungSeiten | null }): React.JSX.Element {
   return (
@@ -259,7 +258,6 @@ export function FuerHoefeBandInhalt({ gruendung = null }: { gruendung?: Gruendun
           >
             Für Höfe
           </Link>
-          <SchonDabei />
         </div>
       </div>
     </section>
@@ -297,7 +295,7 @@ export function gutZuWissen(jetzt: Date, modell: GebuehrModell, rechnung: Beispi
 export function Fragen({
   jetzt,
   modell,
-  rechnung = beispielRechnung(jetzt, BEISPIEL_WARENPREIS_CENTS, modell),
+  rechnung = startseitenBeispiel(jetzt, modell),
 }: {
   jetzt: Date
   modell: GebuehrModell
@@ -343,8 +341,9 @@ export function Fragen({
 // genau einen Fuß: den Seitenfuß, der dort auch „Höfe entdecken", „Für Höfe"
 // (→ /fuer-hoefe mit Registrierung und Konditionen) und „So funktioniert's"
 // führt; „Anmelden" steht im Kopf. Dieser Fuß gilt darum nur am Handy: Der
-// Seitenfuß führt die Wege dort nicht, und die Produktseite hat keine
-// Unterleiste. Die AGB bleiben in jedem Fuß erreichbar (O4).
+// Seitenfuß führt die Wege dort nicht. Seit Nr. 271 nur noch auf der Startseite
+// und /fuer-hoefe — Hof- und Produktseite haben den kurzen Seitenfuß wie /hoefe
+// (Abnahme Lauf 32). Die AGB bleiben in jedem Fuß erreichbar (O4).
 const FUSS_SPALTEN: readonly {
   titel: string
   links: readonly { href: string; text: string }[]
@@ -439,7 +438,7 @@ async function modellZu(jetzt: Date): Promise<GebuehrModell> {
 
 /** „So funktioniert’s“ mit dem Beispiel je Modell — im Hofpreis-Modell über bestellGebuehr (beispielRechnung, Nr. 221). */
 async function SoFunktioniertsGeladen({ jetzt }: AbschnittProps) {
-  return <SoFunktionierts rechnung={beispielRechnung(jetzt, BEISPIEL_WARENPREIS_CENTS, await modellZu(jetzt))} />
+  return <SoFunktionierts rechnung={startseitenBeispiel(jetzt, await modellZu(jetzt))} />
 }
 
 /** „Gut zu wissen“ mit „Wie bezahle ich?" je Modell. */

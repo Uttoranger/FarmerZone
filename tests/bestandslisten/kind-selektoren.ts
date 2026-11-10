@@ -21,7 +21,6 @@ export const KIND_SELEKTOR_BESTAND: Readonly<Record<string, number>> = {
   'src/components/admin/meldungen-teile.tsx': 4,
   'src/components/admin/meldungen-werkzeug.tsx': 2,
   'src/components/auswertung/auswertung-teile.tsx': 2,
-  'src/components/bestellungen/bestellungen-ansicht.tsx': 1,
   'src/components/farm/cart-sheet.tsx': 24,
   'src/components/hof-einstellungen/barzahlung.tsx': 2,
   'src/components/hof-einstellungen/einstellungen-uebersicht.tsx': 2,

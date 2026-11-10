@@ -6,9 +6,12 @@ import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { ErfolgKasten } from '@/components/ui/erfolg-kasten'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { bestaetigeNeuigkeiten } from '@/server/actions/subscriptions'
 import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 import { TEXTLINK } from '@/components/anmelden/stil'
+import { ZU_HOF_LINK } from './stil'
 
 /*
  * Der Link aus der Bestätigungsmail landet hier (/account/neuigkeiten-bestaetigen,
@@ -16,6 +19,9 @@ import { TEXTLINK } from '@/components/anmelden/stil'
  * aus einer Mail ändert nie einen Zustand, Link-Scanner rufen ihn ungefragt
  * auf (ARCHITECTURE §5). In Grün: Kundensache. Seit Nr. 239 nach Board
  * s2-/w2-neuigkeiten ohne Symbol und ohne Karte, Fehler als Fehlerkasten.
+ * Seit Nr. 279 (Abnahme Lauf 32, neuigkeiten Bild 2): „Danke, du bist
+ * angemeldet“ als grün getönter Erfolgskasten mit Häkchen-Kreis, „Zu <Hof>“
+ * darin als unterstrichener Textlink statt Knopf.
  */
 
 const TITEL = 'font-heading text-[24px] leading-tight font-semibold outline-none'
@@ -38,29 +44,29 @@ export function AboBestaetigenKarte({
   const [laedt, starte] = useTransition()
   const [stand, setStand] = useState<'offen' | 'bestaetigt' | { fehler: string }>('offen')
   const ueberschrift = useRef<HTMLHeadingElement>(null)
+  const erfolg = useRef<HTMLElement>(null)
 
   function bestaetigen(): void {
     starte(async () => {
       const antwort = await bestaetigeNeuigkeiten({ token })
       setStand('ok' in antwort ? 'bestaetigt' : { fehler: antwort.error })
-      // Der Inhalt wechselt — der Fokus folgt der neuen Überschrift.
-      requestAnimationFrame(() => ueberschrift.current?.focus())
+      // Der Inhalt wechselt — der Fokus folgt der neuen Überschrift bzw. dem Erfolgskasten, der sie trägt.
+      requestAnimationFrame(() => (erfolg.current ?? ueberschrift.current)?.focus())
     })
   }
 
   if (stand === 'bestaetigt') {
     return (
-      <section aria-labelledby="abo-titel" className="flex flex-col gap-3">
-        <h2 id="abo-titel" ref={ueberschrift} tabIndex={-1} className={TITEL}>
-          {ABO_TEXT.danke}
-        </h2>
-        <p className={SATZ}>
-          {ABO_TEXT.dankeSatz[0]} <strong className="font-semibold text-foreground">{hofName}</strong> {ABO_TEXT.dankeSatz[1]}
-        </p>
-        {/* „Zu <Hof>“ (Wortliste N42 c). */}
-        <Link href={`/${hofSlug}`} className={KNOPF_BREIT_GRUEN}>
-          Zu {hofName}
-        </Link>
+      // Der Kasten trägt den Fokus (tabIndex -1) und heißt wie seine Überschrift — so liest der Vorleser „Danke, …“.
+      <section ref={erfolg} tabIndex={-1} aria-labelledby="abo-titel" className="outline-none">
+        <ErfolgKasten titel={<span id="abo-titel">{ABO_TEXT.danke}</span>} className={RUNDUNG.hinweis}>
+          <p className="break-words [overflow-wrap:anywhere]">
+            {ABO_TEXT.dankeSatz[0]} <strong className="font-semibold">{hofName}</strong> {ABO_TEXT.dankeSatz[1]}
+          </p>
+          <Link href={`/${hofSlug}`} className={ZU_HOF_LINK}>
+            Zu {hofName}
+          </Link>
+        </ErfolgKasten>
       </section>
     )
   }

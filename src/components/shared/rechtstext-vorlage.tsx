@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { RUNDUNG } from '@/components/ui/rundung'
@@ -78,7 +77,7 @@ export function RechtstextVorlage({
       className={cn(
         // Seit Nr. 254 (Liste Lauf 32, rechtstexte Z. 850): die Spalte der Shell (1000 px wie der Seitenfuß), der
         // Text links darin statt mittig — auch ohne Verzeichnis (Impressum-Form, Konditionen) beginnt er an der Kante des Fußes.
-        'mx-auto w-full max-w-[1032px] px-4 pt-8 pb-12 md:pt-10',
+        'mx-auto w-full max-w-[1032px] px-4 pt-8 pb-12 md:pt-4',
         // Ab 1024 px: links die Spalte des Verzeichnisses (260 px), rechts der Text (Board w3-rechtstexte Bild 1).
         verzeichnis && 'lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-x-6'
       )}
@@ -111,7 +110,10 @@ export function RechtstextVorlage({
                 </span>
                 <span className="text-[12.5px] text-muted-foreground">{verzeichnis.zusammenfassung}</span>
               </span>
-              <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" strokeWidth={1.7} aria-hidden="true" />
+              {/* Ein Dreieck wie das Board s3-rechtstexte („▾“), kein Chevron (Abnahme Lauf 32, Nr. 279); offen zeigt es nach oben. */}
+              <span aria-hidden="true" className="shrink-0 text-[14px] leading-none text-foreground transition-transform group-open:rotate-180">
+                ▾
+              </span>
             </summary>
             <nav aria-labelledby={verzeichnis.kennung} className="border-t border-border px-3 py-2 print:hidden">
               <RechtstextVerzeichnis gruppen={verzeichnis.gruppen} />
@@ -127,13 +129,15 @@ export function RechtstextVorlage({
 
       {verzeichnis && (
         <aside className="hidden lg:col-start-1 lg:row-start-1 lg:block print:hidden">
-          {/* Eine geschlossene Karte ohne sichtbaren Rollbalken (Z. 854); ist sie höher als das Fenster, rollt sie
-              innen, und das Verzeichnis holt den gelesenen Eintrag selbst ins Bild (Z. 847). */}
+          {/* Eine geschlossene Karte, die nie innen rollt (Liste Lauf 32, rechtstexte „Spalte scrollt intern | B |
+              geschlossene Karte“; pruefer-ui Lauf 33: AGB-Karte bei „13.“ abgeschnitten, Nr. 279): Sie klebt nicht mehr
+              und rollt mit der Seite — mit 35 Punkten der AGB ist sie höher als jedes Fenster, und ein klebender Kasten
+              schnitte die unteren Einträge ab. Alle Einträge bleiben so in einer Karte erreichbar. */}
           <nav
             aria-labelledby={`${verzeichnis.kennung}-spalte`}
             className={cn(
               RUNDUNG.karte,
-              'sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto border border-border bg-card p-3.5 [scrollbar-width:none] print:hidden'
+              'border border-border bg-card p-3.5 print:hidden'
             )}
           >
             <p id={`${verzeichnis.kennung}-spalte`} className={cn(INFOSEITE_KICKER, 'mb-1 px-1')}>

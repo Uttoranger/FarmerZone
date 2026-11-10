@@ -460,7 +460,7 @@ export function hofHandyAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 
 // ─── Rückweg auf Unterseiten (Nachtlauf Nr. 44, Register N1) ────────────────
 //
 // Am Handy hat jede Unterseite des Hofbereichs einen festen Kopf mit dem Weg
-// zur Elternseite (components/hofbereich/unterseiten-kopf.tsx). Wohin er führt
+// zur Elternseite (components/ui/werkzeug-kopf.tsx). Wohin er führt
 // und wie er heißt, steht nur hier — aus denselben Punkten wie Leiste und
 // Mehr-Blatt, damit es keine zweite Schreibweise gibt („‹ Alle Kunden",
 // „Zu den Beiträgen" und „Meine Meldungen" hießen vorher je Seite anders).
@@ -503,18 +503,40 @@ function mehrBlatt(): Elternseite {
   return { href: navPunkt('heute').href, name: HOF_MEHR_TITEL, nurHandy: true }
 }
 
+/** Das Formular „Problem melden“ im Hofbereich (Board s2-meldungen Bild 1–3). */
+const PROBLEM_MELDEN_FORMULAR_HREF = '/fehler-melden'
+
+/**
+ * „Problem melden“ als Elternseite von „Meine Meldungen“ am Handy (Register
+ * N1, Ergänzung aus N48; Board s2-meldungen Bild 4–6 „Zurück zu Problem
+ * melden“): Im Board ist „Problem melden“ das Formular, die Liste der eigenen
+ * Meldungen liegt darunter. Nur am Handy wie die übrigen Seiten des
+ * Mehr-Blatts — im Web steht „Problem melden“ in der Seitenleiste.
+ */
+function problemMeldenFormular(): Elternseite {
+  return { href: PROBLEM_MELDEN_FORMULAR_HREF, name: navPunkt('hilfe').label, nurHandy: true }
+}
+
 /**
  * Die Unterseiten mit Rückweg (freigabe.md §12 Nr. 44). Ein Muster je Route,
  * genau so tief wie die Route — /orders/today/print (Druckansicht ohne
  * HofShell) trifft deshalb nichts. /analytics/umfeld leitet seit Nr. 22c auf
  * /region um und zeigt den Kopf nie; die Zuordnung bleibt trotzdem, wie sie
- * beauftragt ist. Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg
- * — einzige Ausnahme ist /settings am Handy (`mehrBlatt`, N1-Ergänzung
- * 7.11.2026). Das Plakat gehört seit Nr. 250 zu den Beiträgen (Liste Lauf 32,
- * whatsapp-plakat „Zurück-Ziel“; vorher Heute).
+ * beauftragt ist. Seiten der Leiste haben keinen Rückweg. Seiten des
+ * Mehr-Blatts haben ihn nur am Handy (`nurHandy`, Register N1, Ergänzungen
+ * 7.11.2026): /settings, Auswertung, Kunden, Verkäufe und Postfach nach
+ * „Mehr“ (Boards s2-auswertung, -kunden, -verkaeufe, -postfach Bild 1: „‹“
+ * ohne eigenen Namen wie s1-einstellungen; Nr. 269), Meine Meldungen nach
+ * „Problem melden“. Das Plakat gehört seit Nr. 250 zu den Beiträgen (Liste
+ * Lauf 32, whatsapp-plakat „Zurück-Ziel“; vorher Heute).
  */
 const UNTERSEITEN: readonly { muster: RegExp; eltern: () => Elternseite }[] = [
   { muster: /^\/settings$/, eltern: mehrBlatt },
+  { muster: /^\/analytics$/, eltern: mehrBlatt },
+  { muster: /^\/customers$/, eltern: mehrBlatt },
+  { muster: /^\/sales$/, eltern: mehrBlatt },
+  { muster: /^\/postfach$/, eltern: mehrBlatt },
+  { muster: /^\/meldungen$/, eltern: problemMeldenFormular },
   { muster: /^\/settings\/.+$/, eltern: () => alsElternseite(navPunkt('einstellungen')) },
   { muster: /^\/customers\/[^/]+$/, eltern: () => alsElternseite(navPunkt('kunden')) },
   { muster: /^\/orders\/[^/]+$/, eltern: () => alsElternseite(navPunkt('bestellungen')) },
@@ -537,9 +559,9 @@ function nurPfad(pfad: string): string {
 
 /**
  * Die Elternseite zu einem Pfad — null für alles, was keine Unterseite ist:
- * Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg (dorthin führt
- * die Navigation selbst), ebenso unbekannte Pfade. Ausnahme: /settings hat am
- * Handy „Mehr“ (`nurHandy`, Register N1, Ergänzung 7.11.2026).
+ * Seiten der Leiste haben keinen Rückweg (dorthin führt die Navigation
+ * selbst), ebenso unbekannte Pfade. Seiten des Mehr-Blatts haben ihn nur am
+ * Handy (`nurHandy`, Register N1, Ergänzungen 7.11.2026).
  */
 export function elternseite(pfad: string | null | undefined): Elternseite | null {
   if (!pfad) return null

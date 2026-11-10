@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { Kicker } from '@/components/startseite/kicker'
 import { KundeCodeFormular } from '@/components/anmelden/kunde-code-formular'
 import { HofAnmeldung } from '@/components/anmelden/hof-anmeldung'
@@ -13,9 +14,11 @@ const WEGE: ReadonlyArray<{ art: Anmeldeart; label: string; href: string }> = [
   { art: 'hof', label: 'Ich habe einen Hof', href: '/login' },
 ]
 
-/** Am Handy ohne Karte, im Browser zwei Karten nebeneinander (Boards s2-/w2-anmelden). */
-const KARTE =
-  'min-w-0 flex-1 flex-col gap-3 lg:rounded-2xl lg:border lg:border-border lg:bg-card lg:p-5 dark:lg:ring-0'
+/**
+ * Am Handy ohne Karte, im Browser zwei Karten nebeneinander (Boards s2-/w2-anmelden). Rundung 12 px aus RUNDUNG
+ * (G8; pruefer-ui Lauf 33: 22 statt 12 px, weil die Tailwind-Rundung mit --radius wächst; Nr. 275).
+ */
+const KARTE = cn('min-w-0 flex-1 flex-col gap-3 lg:border lg:border-border lg:bg-card lg:p-5 dark:lg:ring-0', RUNDUNG.karte)
 
 /**
  * Die Anmeldeseite für Kundinnen (/account/login) und Höfe (/login) — EINE
@@ -32,7 +35,8 @@ const KARTE =
  */
 export function AnmeldenSeite({ aktiv, ziel }: { aktiv: Anmeldeart; ziel: string }): React.JSX.Element {
   return (
-    <div className="mx-auto w-full max-w-[944px] px-[18px] pt-[22px] pb-10 lg:px-6 lg:pt-8">
+    // Unten 20 px bis zum Seitenfuß im Browser (pruefer-ui Lauf 33: 57 statt 37 px von der Karte bis zur Fußlinie).
+    <div className="mx-auto w-full max-w-[944px] px-[18px] pt-[22px] pb-10 lg:px-6 lg:pt-8 lg:pb-5">
       {/* Kopf links bündig über den Karten, am Handy wie im Browser (Board s2-anmelden, Bild 1). */}
       <h1 className="font-heading text-[26px] leading-tight font-semibold lg:text-[28px]">Willkommen zurück</h1>
       <p className="mt-1.5 text-[15px] leading-normal text-muted-foreground">

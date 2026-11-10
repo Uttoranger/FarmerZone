@@ -53,7 +53,8 @@ describe('„Ablehnen" — Kontrast in beiden Themes', () => {
     expect(klassenDesKnopfs(ansicht, 'Ablehnen')).toBe('KNOPF_RAHMEN')
     const klassen = KNOPF_RAHMEN.split(/\s+/)
     expect(klassen).toContain('text-foreground')
-    expect(klassen).toContain('border-border')
+    // Rand in Textfarbe nach Board (Nr. 269, „So geht’s“ auf Heute; vorher der blasse Kartenrand border-border).
+    expect(klassen).toContain('border-foreground')
     expect(klassen.filter((k) => /^bg-/.test(k))).toEqual([])
     expect(klassen.join(' ')).not.toMatch(/destructive|#[0-9a-f]{3,6}/i)
   })

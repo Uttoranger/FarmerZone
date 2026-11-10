@@ -17,8 +17,8 @@ export const metadata: Metadata = { title: `${TITEL} — ${MARKE}` }
 /*
  * Hofdaten (bis Nr. 224 „Hof-Profil“, Register N42 c) in der HofShell (Nachtlauf Nr. 22d): gleiches Formular, gleiche
  * Action (updateProfile mit Zod und Besitzprüfung), nur Kopf und Rahmen neu.
- * Seit Nr. 44 am Handy mit festem Kopf (UnterseitenKopf); nach dem Speichern
- * geht es zurück zur Übersicht (Register N1).
+ * Am Handy mit festem Kopf (WerkzeugKopf), damit der Rückweg beim Scrollen
+ * bleibt; nach dem Speichern geht es zurück zur Übersicht (Register N1).
  * data-app-palette: Das Formular zeichnet teils noch mit --app-* (DESIGN_SYSTEM
  * „Bestandsteile im Geltungsbereich").
  */

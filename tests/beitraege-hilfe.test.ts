@@ -188,7 +188,7 @@ describe('/status leitet in den Reiter um, Unterseiten unter (hof)', () => {
     const client = quelle('src/app/(hof)/status/new/status-new-client.tsx')
     expect(client).toContain('router.push(BEITRAEGE_HREF)')
     expect(client).not.toContain("router.push('/status')")
-    // Seit Nr. 250 kommt der Rückweg aus dem Werkzeug-Kopf (G1; vorher UnterseitenKopf) — Ziel weiter der Reiter.
+    // Der Rückweg kommt aus dem Werkzeug-Kopf (G1, seit Nr. 250) — Ziel ist der Reiter.
     const whatsapp = quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')
     expect(whatsapp).toContain('<WerkzeugKopf')
     expect(quelle('src/app/(hof)/status/new/page.tsx')).toContain('<WerkzeugKopf')
@@ -242,7 +242,11 @@ describe('Hilfe und Meine Meldungen unter (hof)', () => {
   it('die Datei-Felder stehen außerhalb der Fallunterscheidung (PR 135)', () => {
     const text = quelle('src/components/ui/meldung-formular-ansicht.tsx')
     expect(text.match(/f\.upload\.fileInput\}/g)).toHaveLength(1)
-    expect(text.indexOf('f.upload.fileInput}')).toBeLessThan(text.indexOf('(f.screenshotUrl ?'))
+    // Seit Nr. 268 steht die Fallunterscheidung (Foto da oder Knopf) in `bildschirmfoto`, je Welt vor oder nach der
+    // Fehlernummer gesetzt; die Datei-Felder bleiben außerhalb davon.
+    const fall = text.slice(text.indexOf('const bildschirmfoto'), text.indexOf('return (', text.indexOf('const bildschirmfoto')))
+    expect(fall).toContain('f.screenshotUrl ? (')
+    expect(fall).not.toContain('fileInput')
   })
 })
 
@@ -297,7 +301,7 @@ describe('Meldungen: Ton, Zähler, Zeilen', () => {
       status: 'In Arbeit',
       statusTon: 'fertig',
       antwort: 'Liegt am Bildformat — eine Umwandlung kommt.',
-      kurznummer: 'cmabcdef',
+      kurznummer: '456789',
     })
     // 23:30 Uhr in Wien am Folgetag = schon „Gestern" (Wiener Tag, nie UTC).
     expect(meldungZeilen([fuerHof(VOLL)], new Date('2026-10-07T21:30:00.000Z'))[0].datum).toBe('Gestern')
@@ -424,7 +428,6 @@ describe('Tokens statt Farbwerte (neue und umgezogene Dateien)', () => {
     'src/components/shared/meldung-form.tsx',
     'src/components/hof-hilfe/hilfe-seitenspalte.tsx',
     'src/components/hof-hilfe/hilfe-laden.tsx',
-    'src/components/hofbereich/unterseiten-kopf.tsx',
     'src/app/(hof)/fehler-melden/page.tsx',
     'src/app/(hof)/meldungen/page.tsx',
     'src/app/(hof)/status/new/status-new-client.tsx',

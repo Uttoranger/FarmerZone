@@ -22,7 +22,7 @@ import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { Textlink } from '@/components/ui/textlink'
 import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import { RUNDUNG } from '@/components/ui/rundung'
-import { LadeFehlerKasten } from '@/components/hof-hilfe/lade-fehler-kasten'
+import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 import { NEUE_MELDUNG_HREF } from '@/lib/hof-hilfe'
 import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
@@ -43,7 +43,9 @@ export const dynamic = 'force-dynamic'
  * Alle/Ungelesen. Nur die Fäden dieses Hofs (farmId der Sitzung in der
  * Abfrage). Abweichend vom Mockup ohne Pfeil zurück: Postfach ist ein
  * Hauptpunkt, und Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg
- * (Register N1, elternseite). Ein Ladefehler steht inline statt als 500.
+ * (Register N1, elternseite). Ein Ladefehler steht inline statt als 500
+ * (LadeFehlerKasten aus ui/, Nr. 274). Der Fußtext mit „Problem melden“ steht seit
+ * Nr. 274 auch im leeren Postfach.
  */
 export default async function PostfachPage({
   searchParams,
@@ -86,11 +88,14 @@ export default async function PostfachPage({
           nochmal={postfachFilterHref(filter)}
         />
       ) : faeden.length === 0 ? (
-        <EmptyState
-          titel={POSTFACH_LEER.titel}
-          satz={POSTFACH_LEER.satz}
-          ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
-        />
+        <>
+          <EmptyState
+            titel={POSTFACH_LEER.titel}
+            satz={POSTFACH_LEER.satz}
+            ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
+          />
+          <Fusstext />
+        </>
       ) : (
         <LadeRahmen>
           {/* Polster, damit der Fokusring um „Alle“ nicht abgeschnitten wird (Liste Lauf 32 postfach). */}
@@ -126,14 +131,24 @@ export default async function PostfachPage({
                 ))}
               </ul>
             )}
-            {/* Nur mit Fäden: Leer sagt der EmptyState dasselbe (DESIGN_SYSTEM „Leerzustände"). */}
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
-              <ErklaerungMitLink />
-            </p>
+            <Fusstext />
           </LadeInhalt>
         </LadeRahmen>
       )}
     </div>
+  )
+}
+
+/**
+ * Der Fußtext unter Liste und Leerzustand (Boards s2-/w2-postfach Bild 1 und 5; Abnahme Lauf 32 postfach 2,
+ * Nr. 274): Er steht in jedem Zustand außer dem Ladefehler — auch im leeren Postfach, wo der Weg zu
+ * „Problem melden“ der einzige ist, dem Team zu schreiben.
+ */
+function Fusstext(): React.JSX.Element {
+  return (
+    <p className="text-[13px] leading-relaxed text-muted-foreground" data-postfach-fuss="">
+      <ErklaerungMitLink />
+    </p>
   )
 }
 
