@@ -7,11 +7,14 @@ export interface AdminSicherheitProps {
   anlass: AdminSicherheitAnlass
   /** Gerät und Browser in festen Wörtern („Windows · Chrome", geraetName). */
   geraet: string
-  /** „19.10. um 14:32" — Wiener Zeit (anmeldeZeitpunkt). */
+  /** „Di, 2. März 2027, 21:14 Uhr“ — Wiener Zeit nach V9 (zeitpunktMitUhr in src/lib/email.ts). */
   wann: string
   /** Nur beim Anlass „einrichtungscode": die 6 Ziffern. */
   code?: string
 }
+
+/** Die Überschrift der Passkey-Mail nach Board s3/w3-mail-team Bild 2; der Betreff bleibt „Neuer Passkey bei deinem Admin-Konto“. */
+const PASSKEY_UEBERSCHRIFT = 'Neuer Passkey'
 
 /**
  * „Admin-Sicherheit" (Register N20; Nr. 115) — eine Vorlage für die Mails an
@@ -33,6 +36,16 @@ export function AdminSicherheitEmail({ anlass, geraet, wann, code }: AdminSicher
         {/* Ungegliedert: Das Feld der Einrichtung nimmt nur sechs Ziffern ohne Leerzeichen (einrichtungscodeSchema). */}
         {code && <CodeKasten code={code} gruppiert={false} />}
         <Text style={leiseZeile}>{text.codeGilt}</Text>
+      </EmailLayout>
+    )
+  }
+  // Board s3/w3-mail-team Bild 2 (Nr. 280): „Neuer Passkey“, der Passkey in Anführungszeichen, der Zeitpunkt in Klammern.
+  if (anlass === 'passkey-hinzugefuegt') {
+    return (
+      <EmailLayout fuss={{ art: 'plattform' }} previewText={`${betreff} · ${geraet}`}>
+        <Text style={h1}>{PASSKEY_UEBERSCHRIFT}</Text>
+        <Text style={bodyText}>{`Bei deinem Admin-Konto wurde der Passkey „${geraet}“ hinzugefügt (${wann}).`}</Text>
+        <Text style={bodyText}>{text.warstDu}</Text>
       </EmailLayout>
     )
   }

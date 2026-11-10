@@ -223,7 +223,7 @@ export const POSTFACH_MAIL_TEXT = {
   zu: 'Zu',
   link: 'Ansehen',
   oeffnen: 'Im Postfach öffnen',
-  antwortenInDerApp: 'Antworten geht in der App: Öffne die Nachricht in deinem Postfach und schreib dort zurück.',
+  antwortenInDerApp: 'Antworten geht in der App, im Postfach.',
   gruss: `Dein ${MARKE_TEAM}`,
   /** Der Satz unter der Karte (EmailLayout `fusszeile`): Absender ist das Team, nicht ein Hof. */
   fuss: `Versandt vom ${MARKE_TEAM}.`,

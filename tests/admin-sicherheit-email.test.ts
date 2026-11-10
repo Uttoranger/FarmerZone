@@ -53,7 +53,7 @@ describe('sendAdminSicherheitEmail', () => {
       expect(aufruf.to).toBe('admin@example.com')
       expect(aufruf.subject).toBe(`${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`)
       expect(aufruf.html).toContain('Windows · Chrome')
-      expect(aufruf.html).toContain('20.10. um 12:05')
+      expect(aufruf.html).toContain('Di, 20. Oktober 2026, 12:05 Uhr')
       expect(fremdeLinks(aufruf.html)).toEqual([])
     })
   }

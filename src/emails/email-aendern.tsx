@@ -9,11 +9,14 @@ import { EMAIL_AENDERN_MAIL, EMAIL_GEAENDERT_MAIL } from '@/lib/konto-anfragen'
  * (POST) — Programme, die Links vorab öffnen, lösen nichts aus. Der Link steht
  * nur hier, nie im Betreff oder Vorschautext.
  */
+/** Die Überschrift nach Board s3/w3-mail-sicherheit Bild 4; der Betreff bleibt „Bestätige deine neue Anmelde-Adresse“ (Nr. 280). */
+const AENDERN_UEBERSCHRIFT = 'Neue Anmelde-Adresse bestätigen'
+
 export function EmailAendernEmail({ hof, link }: { hof: string | null; link: string }): React.JSX.Element {
   const t = EMAIL_AENDERN_MAIL
   return (
     <EmailLayout fuss={{ art: 'plattform' }} previewText={t.betreff}>
-      <Text style={h1}>{t.betreff}</Text>
+      <Text style={h1}>{AENDERN_UEBERSCHRIFT}</Text>
       <Text style={bodyText}>{`${t.anrede(hof)} ${t.satz}`}</Text>
       <KnopfReihe>
         <Knopf href={link}>{t.knopf}</Knopf>

@@ -64,7 +64,7 @@ describe('sendZuVieleVersucheEmail', () => {
     expect(ergebnis.id).toBe('email_1')
     expect(aufruf.to).toBe('kundin@example.com')
     expect(aufruf.subject).toBe(`Zu viele falsche Codes · ${MARKE}`)
-    expect(aufruf.html).toContain('Montag, 19. Oktober, 15:00 Uhr')
+    expect(aufruf.html).toContain('Mo, 19. Oktober 2026, 15:00 Uhr')
     expect(aufruf.html).toContain('keinen Code mehr an')
     expect(fremdeLinks(aufruf.html)).toEqual([])
     expect(aufruf.html.replace(/<[^>]+>/g, ' ')).not.toMatch(/\d{6}/)

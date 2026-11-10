@@ -1,0 +1,516 @@
+{
+  "vorschau:bestellung-bestaetigung-online": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Alle Preise inkl. Plattformgebühr (darin € 1,12). Die Plattf",
+      "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-bestaetigung-bar": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Alle Preise inkl. Plattformgebühr (darin € 1,12). Die Plattf",
+      "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bar-bestaetigungslink": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Alle Preise inkl. Plattformgebühr (darin € 1,12). Die Plattf",
+      "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:abholbereit": [
+    {
+      "anfang": "Vertrag widerrufen",
+      "sha256": "4a8b5108fa590aaf90d2e6dcf56b39a902804b25443a8c080cae772acf231480"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:nicht-abholbereit": [
+    {
+      "anfang": "Vertrag widerrufen",
+      "sha256": "4a8b5108fa590aaf90d2e6dcf56b39a902804b25443a8c080cae772acf231480"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:artikel-fehlt": [
+    {
+      "anfang": "Die Plattformgebühr gilt nur für das, was du bekommst.",
+      "sha256": "681b82f90649a7266c02e0779a59c0a2c090d558235aef9bfc0058e17d3d9715"
+    },
+    {
+      "anfang": "Vertrag widerrufen",
+      "sha256": "4a8b5108fa590aaf90d2e6dcf56b39a902804b25443a8c080cae772acf231480"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:storniert-online": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:storniert-bar": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:verfallen": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:zahlung-zu-spaet": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:widerruf-eingang": [
+    {
+      "anfang": "Dein Rücktritt ist eingegangen",
+      "sha256": "08b405778552e388bf6c1c2266aec7b6d38725711d3c06ad979bd4686e49f41f"
+    },
+    {
+      "anfang": "Hof Müller prüft deinen Rücktritt und meldet sich.",
+      "sha256": "e16c31d59bc9d4af1310dbbc3fca61156cbbf0e46e6651cb3a0bb2c13759c147"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:widerruf-erstattet": [
+    {
+      "anfang": "Dein Rücktritt ist erledigt",
+      "sha256": "ede863635f9c2699563535a6695c82fc19f4bfc74e64e9e9501e52eaa2904f18"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:widerruf-abgelehnt": [
+    {
+      "anfang": "Dein Rücktritt wurde abgelehnt",
+      "sha256": "a15521f37cc158ab0a6998d3497de05de6a6837f1deaca048f0052178cdbbbb0"
+    },
+    {
+      "anfang": "Hof Müller hat deinen Rücktritt zur Bestellung HM-0303-2C91 ",
+      "sha256": "bcc7acc63dd368e426fd9612e03a6ca3007317d72a22343efda20d55834ddfce"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:anmeldecode": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellcode": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:passwort-link": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:email-bestaetigung": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:neue-anmeldung": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:zu-viele-versuche-code": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:zu-viele-versuche-passwort": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:email-aendern-link": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:email-geaendert-hinweis": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:registrierungs-hinweis": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:admin-sicherheit-einrichtungscode": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:admin-sicherheit-passkey": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:team-recht-geaendert": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:betreiber-bestaetigung": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:betreiber-testmail": [],
+  "vorschau:abo-bestaetigung": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:beitrag": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:beitrag-ohne-foto": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bescheid": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-bezahlt-hof": [
+    {
+      "anfang": "Die Plattformgebühr behält Stripe gleich ein. Die Kundin hat",
+      "sha256": "eb4b15163d8174c1f3d7743b5026f89a2381991eef3ab7c219f54867c445053d"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-neu-bar-hof": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bar-bestaetigt-hof": [
+    {
+      "anfang": "davon Plattformgebühr € 1,12; Warenpreis € 18,00 bleibt dir.",
+      "sha256": "667a594a28966b151d79216d055527c7c10b9e1c694cdfa691e73716de1cac7b"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:widerruf-hof": [
+    {
+      "anfang": "Eine Kundin ist zurückgetreten",
+      "sha256": "49354c7ca32ba21d2f4534a9e467baf09aa54be75f1c9d907b87b3d0216ff237"
+    },
+    {
+      "anfang": "Zur Bestellung HM-0303-2C91 ist am 3. März 2027, 07:40 Uhr e",
+      "sha256": "ce2b1992dabc4fef1c80cb3111d6182cb5606498c8877435b61276ef518bfc32"
+    },
+    {
+      "anfang": "Ausnahmen nach § 18 FAGG (etwa schnell verderbliche Ware) pr",
+      "sha256": "d5d1656a83ff1f978fcace6ddc46616f8959e07edb9569feba05f1c6593301b4"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:freischaltung": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:plattformgebuehr-ankuendigung": [
+    {
+      "anfang": "Ab 1. Februar 2028 ziehen wir die Plattformgebühr (6 % vom W",
+      "sha256": "0a96b140cf7466ae645888d453f92037a10d032a565d9b6abdd43999b3a5e654"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:lastschrift-gescheitert": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:rundschreiben": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:postfach-antwort": [
+    {
+      "anfang": "Hallo, das ist schon erledigt: Online behält Stripe die Gebü",
+      "sha256": "ce5d1122a95d19a13dae78b7f658b3b7aa74c5c9950d1e3b401eebeb0bed1ead"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:neuer-hof": [],
+  "vorschau:meldung": [],
+  "vorschau:erstattung-offen": [
+    {
+      "anfang": "Der Hof hat die Bestellung storniert, die Erstattung über St",
+      "sha256": "fc494d93fb97fe68a9a8ae40aaadb18f30187ede9fa35107a9dfe858da5304f6"
+    }
+  ],
+  "vorschau:wochenbericht": [],
+  "vorschau:antwort-an-team": [
+    {
+      "anfang": "Hof am Bach · zu „Plattformgebühr ab 1. Februar“",
+      "sha256": "6ecbf33d5fe2818b88ea6439abdac37436a62d78d4d0adb9810a0184e8124b17"
+    }
+  ],
+  "vorschau:betrieb-warnung": [],
+  "vorschau:bestellung-bestaetigung-online-bisher": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Servicegebühr: Für Bereitstellung, Abwicklung und Zahlungsse",
+      "sha256": "b33d49d9cfd1e17bf58a816c084cbd03771bc1716f2b3d3effe48c8954cb0ae8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "403f9edf2eeb001c22f46d2f043a427688bd8f20d5d8a0b35152013d37196d84"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-bestaetigung-bar-bisher": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Servicegebühr: Für Bereitstellung, Abwicklung und Zahlungsse",
+      "sha256": "b33d49d9cfd1e17bf58a816c084cbd03771bc1716f2b3d3effe48c8954cb0ae8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "403f9edf2eeb001c22f46d2f043a427688bd8f20d5d8a0b35152013d37196d84"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-bestaetigung-betrieb": [
+    {
+      "anfang": "Alle Preise inkl. Plattformgebühr (darin € 1,12). Die Plattf",
+      "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-bestaetigung-karte": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Alle Preise inkl. Plattformgebühr (darin € 1,12). Die Plattf",
+      "sha256": "0813b80458f6e55a92eee12f97ec24281297ad5a51d12ee1599c1614cd287bc8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "ef4e5476f00acde74f7cf8e861391104f67cb0041affaa37cec270b7ddaf9b83"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bar-bestaetigungslink-bisher": [
+    {
+      "anfang": "Teil A – Widerrufsbelehrung Widerrufsrecht Sie haben das Rec",
+      "sha256": "d7a264d6812f7e05dd2c528c13be1d745516edd1f1fc2b2399cba919df364a4e"
+    },
+    {
+      "anfang": "Servicegebühr: Für Bereitstellung, Abwicklung und Zahlungsse",
+      "sha256": "b33d49d9cfd1e17bf58a816c084cbd03771bc1716f2b3d3effe48c8954cb0ae8"
+    },
+    {
+      "anfang": "Es gelten die AGB von {{MARKE}}. Du findest sie auch als Datei ",
+      "sha256": "403f9edf2eeb001c22f46d2f043a427688bd8f20d5d8a0b35152013d37196d84"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:abholbereit-betrieb": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bestellung-bezahlt-hof-bisher": [
+    {
+      "anfang": "Die Servicegebühr behält Stripe gleich ein. Die Kundin hat €",
+      "sha256": "9185d8a0fabdc6c9a324fe07ca3db8ffdf2975e4a435d0684436da13931768f1"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:bar-bestaetigt-hof-bisher": [
+    {
+      "anfang": "davon Servicegebühr € 1,12 — die schuldest du der Monatsabre",
+      "sha256": "bffd022d8e99a259e88feaee111df0ad6f66eb6f80ea484afc8503f5a2e68ce9"
+    },
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "beispiel:anmeldecode": [],
+  "beispiel:bestellcode": [],
+  "beispiel:passwort-link": [],
+  "beispiel:email-bestaetigung": [],
+  "beispiel:neue-anmeldung": [],
+  "beispiel:zu-viele-codes": [],
+  "beispiel:zu-viele-passwoerter": [],
+  "beispiel:email-aendern-link": [],
+  "beispiel:email-geaendert-hinweis": [],
+  "beispiel:registrierungs-hinweis": [],
+  "beispiel:einrichtungscode": [],
+  "beispiel:passkey-hinzugefuegt": [],
+  "beispiel:team-recht-geaendert": [],
+  "beispiel:betreiber-bestaetigung": [],
+  "beispiel:betreiber-testmail": [],
+  "beispiel:neuer-hof": [],
+  "beispiel:meldung": [],
+  "beispiel:erstattung-offen": [],
+  "beispiel:wochenbericht": [],
+  "beispiel:antwort-an-team": [
+    {
+      "anfang": "Hof am Bach · zu „Plattformgebühr ab 1. Februar“",
+      "sha256": "6ecbf33d5fe2818b88ea6439abdac37436a62d78d4d0adb9810a0184e8124b17"
+    }
+  ],
+  "beispiel:betrieb-warnung": [],
+  "beispiel:freischaltung": [],
+  "beispiel:plattformgebuehr-ankuendigung": [
+    {
+      "anfang": "Ab 1. Februar 2028 ziehen wir die Plattformgebühr (6 % vom W",
+      "sha256": "0a96b140cf7466ae645888d453f92037a10d032a565d9b6abdd43999b3a5e654"
+    }
+  ],
+  "beispiel:lastschrift-gescheitert": [],
+  "beispiel:rundschreiben": [],
+  "beispiel:postfach-antwort": [
+    {
+      "anfang": "Zu: Plattformgebühr ab 1. Februar: so steht sie in deiner Ab",
+      "sha256": "198fcc6b184b486fad15fbea917cd062e853688523bdf986d4b8f1a27e89cee5"
+    }
+  ],
+  "beispiel:abo-bestaetigung": [],
+  "beispiel:beitrag-mit-foto": [],
+  "beispiel:beitrag-ohne-foto": [],
+  "beispiel:bescheid": []
+}

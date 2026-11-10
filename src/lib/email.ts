@@ -3,7 +3,8 @@ import * as React from 'react'
 import * as Sentry from '@sentry/nextjs'
 import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { formatEuro, formatPosition } from '@/lib/format'
+import { formatEuro, formatZeitpunktMitWochentag } from '@/lib/format'
+import { positionszeile, type Positionszeile } from '@/lib/positionszeile'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
 import { abspracheMailSatz, brauchtAbsprache } from '@/lib/abholhinweise'
@@ -537,19 +538,17 @@ export type OrderForEmail = {
 export type OrderForHofMail = OrderForEmail & { farm: OrderForEmail['farm'] & HofKontakt }
 
 /**
- * „Heumilch frisch · 2 × 1 L" — die Positionszeile in DERSELBEN Schreibweise
- * wie Warenkorb, Checkout, Bestätigungsseite und Bauern-Backend
- * (src/lib/format.ts, Bug-Report Befund 13). Vorher stand die Menge in den
- * Vorlagen selbst („2× Name (1 l)"), also in einer fünften Variante.
- * Die Menge steckt jetzt IN der Zeile — die Vorlagen stellen ihr deshalb
- * keine Anzahl mehr voran.
+ * „**4** × Heumilch frisch (1 L)" — die Positionszeile nach G14 (Nr. 280), wie
+ * Packliste, Abholzettel und Verkäufe (src/lib/positionszeile.ts). `text` ist
+ * die ganze Zeile; die Vorlagen setzen mit `PositionsName` die Anzahl fett.
+ * Nur Anzeige: Menge, Gebinde und Betrag kommen unverändert aus der Position.
  */
 function positionsZeile(i: {
   productName: string
   quantity: number
   product?: OrderLineProduct
-}): string {
-  return formatPosition({
+}): Positionszeile {
+  return positionszeile({
     name: i.productName,
     quantity: i.quantity,
     unit: i.product?.unit ?? null,
@@ -583,13 +582,34 @@ function mailGebuehrEntfallen(order: OrderForEmail): boolean {
 }
 
 /**
+ * Zeitpunkte in Sicherheits- und Team-Mails nach V9 (Nr. 280): „Di, 2. März 2027, 21:14 Uhr“ — der
+ * Datumshelfer aus Nr. 279 (formatZeitpunktMitWochentag, Wiener Zeit) mit „Uhr“ wie in den Boards.
+ * Nur Anzeige; Fristen und Pausen selbst rechnet weiter ihr Aufrufer.
+ */
+function zeitpunktMitUhr(am: Date): string {
+  return `${formatZeitpunktMitWochentag(am)} Uhr`
+}
+
+/** Nur der Tag daraus, „Di, 2. März 2027“ — für den Satz über den Zeilen (Board s3/w3-mail-sicherheit Bild 1). */
+function tagMitWochentag(am: Date): string {
+  const voll = formatZeitpunktMitWochentag(am)
+  return voll.slice(0, voll.lastIndexOf(', '))
+}
+
+/** Eine Zeile der Positionsliste in Mails: Text, Teile für die fette Anzahl (G14) und der Zeilenbetrag. */
+export type MailPosition = { name: string; teile?: Positionszeile; betrag: number }
+
+/**
  * Positionen für die Mails: Zeile in der gemeinsamen Schreibweise, Betrag
  * fertig gerechnet — im Hofpreis-Modell der Endpreis inkl. Plattformgebühr
  * (N38), sonst der Warenpreis. `mitGebuehr` überschreibt das für die
  * Kunden-Mails (`kundenPositionen`); die Hof-Mails rufen ohne.
  */
-function mailPositionen(order: OrderForEmail, mitGebuehr: boolean = imHofpreis(order)): Array<{ name: string; betrag: number }> {
-  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, mitGebuehr) }))
+function mailPositionen(order: OrderForEmail, mitGebuehr: boolean = imHofpreis(order)): MailPosition[] {
+  return order.items.map((i) => {
+    const zeile = positionsZeile(i)
+    return { name: zeile.text, teile: zeile, betrag: zeilenBetrag(i, mitGebuehr) }
+  })
 }
 
 /**
@@ -599,7 +619,7 @@ function mailPositionen(order: OrderForEmail, mitGebuehr: boolean = imHofpreis(o
  * sonst wäre die Zeilensumme größer als „Gesamt“ (Nr. 255 Runde 1, wie die
  * Bestätigungsseite). NUR Anzeige; gespeicherte Beträge bleiben.
  */
-function kundenPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
+function kundenPositionen(order: OrderForEmail): MailPosition[] {
   return mailPositionen(order, imHofpreis(order) && !mailGebuehrEntfallen(order))
 }
 
@@ -732,10 +752,12 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
 }
 
 /**
- * Der Betrag in „Bring bitte … in bar mit“ / „Bitte zahle … mit Karte“: was der
- * Hof kassiert, aus dem Snapshot (barZuKassierenCents) — dieselbe Zahl wie
- * „Bar zu kassieren“ in der Hof-Mail, nie das Anzeige-Gesamt (Nr. 255 Runde 1).
- * Online gibt es nichts zu kassieren: dann das Gesamt aus dem Snapshot.
+ * Der Betrag in „Bring bitte … in bar mit“ (bar) / „Bitte zahle … mit Karte“
+ * (Karte bei Abholung, E5): was der Hof kassiert, aus dem Snapshot
+ * (barZuKassierenCents) — dieselbe Zahl wie „Bar zu kassieren“ in der Hof-Mail,
+ * nie das Anzeige-Gesamt (Nr. 255 Runde 1). Beide Zahlarten gehen denselben Weg.
+ * Online kassiert der Hof nichts und die Mail zeigt keinen Kasten; der Rückfall
+ * auf das Gesamt aus dem Snapshot wird dort nie gelesen.
  * null = kein Kasten: Ist die Gebühr entfallen (Storno, „nicht abgeholt“,
  * verfallen — nur die Admin-Vorschau), ist bei der Abholung nichts mehr zu
  * zahlen; der Snapshot-Betrag stünde sonst neben „Servicegebühr (entfällt)“.
@@ -878,7 +900,7 @@ export async function zuVieleVersucheInhalt(daten: { art: import('@/lib/anmeldec
   const { ZU_VIELE_VERSUCHE_MAIL } = await import('@/lib/anmeldecode')
   const html = await vorlageHtml(async () => {
     const { ZuVieleVersucheEmail } = await import('@/emails/zu-viele-versuche')
-    return React.createElement(ZuVieleVersucheEmail, { art: daten.art, bis: zeitpunktFuerMail(daten.bis) })
+    return React.createElement(ZuVieleVersucheEmail, { art: daten.art, bis: zeitpunktMitUhr(daten.bis) })
   })
   return { betreff: `${ZU_VIELE_VERSUCHE_MAIL[daten.art].betreff} · ${MARKE}`, html }
 }
@@ -902,11 +924,11 @@ export async function sendZuVieleVersucheEmail(
 /** „Neue Anmeldung bei deinem Hof-Konto": nur Betreff und HTML (Nr. 270). `link` trägt einen Einmal-Token. */
 export async function neueAnmeldungInhalt(daten: { hof: boolean; name: string | null; geraet: string; zeitpunkt: Date; link: string }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { NEUE_ANMELDUNG_MAIL, anmeldeZeitpunkt } = await import('@/lib/geraete')
+  const { NEUE_ANMELDUNG_MAIL } = await import('@/lib/geraete')
   const html = await vorlageHtml(async () => {
     const { NeueAnmeldungEmail } = await import('@/emails/neue-anmeldung')
     const { zeitpunkt, ...rest } = daten
-    return React.createElement(NeueAnmeldungEmail, { ...rest, wann: anmeldeZeitpunkt(zeitpunkt) })
+    return React.createElement(NeueAnmeldungEmail, { ...rest, wann: zeitpunktMitUhr(zeitpunkt), tag: tagMitWochentag(zeitpunkt) })
   })
   return { betreff: `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, html }
 }
@@ -936,10 +958,9 @@ export async function adminSicherheitInhalt(daten: {
 }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
   const { ADMIN_SICHERHEIT_MAIL } = await import('@/lib/admin-anmeldung')
-  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
   const html = await vorlageHtml(async () => {
     const { AdminSicherheitEmail } = await import('@/emails/admin-sicherheit')
-    return React.createElement(AdminSicherheitEmail, { anlass: daten.anlass, geraet: daten.geraet, wann: anmeldeZeitpunkt(daten.zeitpunkt), code: daten.code })
+    return React.createElement(AdminSicherheitEmail, { anlass: daten.anlass, geraet: daten.geraet, wann: zeitpunktMitUhr(daten.zeitpunkt), code: daten.code })
   })
   return { betreff: `${ADMIN_SICHERHEIT_MAIL.betreff[daten.anlass]} · ${MARKE}`, html }
 }
@@ -987,10 +1008,9 @@ export async function sendEmailAendernLink(email: string, daten: { hof: string |
 export async function emailGeaendertHinweisInhalt(daten: { hof: string | null; zeitpunkt: Date; link: string }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
   const { EMAIL_GEAENDERT_MAIL } = await import('@/lib/konto-anfragen')
-  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
   const html = await vorlageHtml(async () => {
     const { EmailGeaendertEmail } = await import('@/emails/email-aendern')
-    return React.createElement(EmailGeaendertEmail, { hof: daten.hof, wann: anmeldeZeitpunkt(daten.zeitpunkt), link: daten.link })
+    return React.createElement(EmailGeaendertEmail, { hof: daten.hof, wann: zeitpunktMitUhr(daten.zeitpunkt), link: daten.link })
   })
   return { betreff: `${EMAIL_GEAENDERT_MAIL.betreff} · ${MARKE}`, html }
 }
@@ -1435,7 +1455,7 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: hofAbholzeit(order),
-    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
+    items: order.items.map(i => ({ name: positionsZeile(i).text, quantity: i.quantity })),
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
@@ -1594,9 +1614,12 @@ export async function baueArtikelFehlt(
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
-    artikel: positionsZeile(fehlt.position),
+    artikel: positionsZeile(fehlt.position).text,
     // Dieselbe Zeilenrechnung wie die Bestätigung (mailPositionen): Decimal/Cent, im Hofpreis-Modell der Endpreis.
-    uebrig: (fehlt.uebrig ?? []).map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) })),
+    uebrig: (fehlt.uebrig ?? []).map((i) => {
+      const zeile = positionsZeile(i)
+      return { name: zeile.text, teile: zeile, betrag: zeilenBetrag(i, hofpreis) }
+    }),
     gebuehrWort: gebuehrWort(order),
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,

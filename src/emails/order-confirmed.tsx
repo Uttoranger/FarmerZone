@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Link, Text } from '@react-email/components'
-import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, textLink } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, TelefonFett } from './_layout'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { BAR_OHNE_GEBUEHR_SATZ } from '@/lib/konditionen'
@@ -67,13 +67,8 @@ export function OrderConfirmedEmail(p: OrderConfirmedProps) {
         rechts={
           <>
             {`${p.customerName} · `}
-            {anrufen ? (
-              <Link href={anrufen} style={textLink}>
-                {formatiereTelefon(p.customerPhone)}
-              </Link>
-            ) : (
-              p.customerPhone
-            )}
+            {/* Telefonnummer fett wie in den Mails an die Kundin (Nr. 280): ein Tippen wählt. */}
+            <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.customerPhone) : p.customerPhone} />
           </>
         }
       />
