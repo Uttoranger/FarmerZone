@@ -183,7 +183,7 @@ const AUSNAHME_DATEIEN: AusnahmeDatei[] = [
   { datei: 'src/lib/rechtstexte/agb-0-9.ts', grund: 'Fassung 0.9 eingefroren (N45/A005)' },
   {
     datei: 'src/app/(public)/datenschutz/page.tsx',
-    grund: 'Recht prüft: Die Datenschutzerklärung bleibt als ganze Datei wörtlich bis zur Entscheidung der Anwältin (N43 (4)); „Widerruf“ meint dort auch den Widerruf einer Einwilligung (N43 (5))',
+    grund: 'Rechtstext, Wortlaut nur durch die Projektleitung (A006b); der Absatz zum Rücktritt bleibt nach N43 (4); „Widerruf“ steht dort und für die Einwilligung (N43 (5))',
   },
 ]
 

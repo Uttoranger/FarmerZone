@@ -188,7 +188,7 @@ describe('Datenschutzerklärung — Fakten wie gebaut', () => {
 
   it('Satzzeichen: zwischen Wort und Markenname steht ein Leerzeichen („Betreiber von X“, nicht „vonX“)', () => {
     expect(text()).toMatch(/Betreiber von \S+ \(Kontaktdaten/)
-    expect(text()).toMatch(/gespeichert\. \S+ speichert keine/)
+    expect(text()).toMatch(/speichert sie\. \S+ speichert keine/)
   })
 
   it('Links sind grün (INFOSEITE_LINK), nie text-primary (orange) — in der KundeShell wie im Impressum', () => {
@@ -199,7 +199,7 @@ describe('Datenschutzerklärung — Fakten wie gebaut', () => {
   it('Gegenprobe: die alten Zusagen bleiben (Sentry, Stripe, Stand)', () => {
     expect(text()).toContain('Sentry')
     expect(text()).toContain('Stripe')
-    expect(text()).toContain('Stand: Oktober 2026')
+    expect(text()).toContain('Stand: November 2026')
   })
 })
 

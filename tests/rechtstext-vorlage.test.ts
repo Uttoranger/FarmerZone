@@ -170,11 +170,11 @@ describe('Vorlage der Rechtsseiten — /agb und /datenschutz', () => {
     for (const ziel of spruenge) expect(kennungen.has(ziel), ziel).toBe(true)
   })
 
-  it('/datenschutz: „Inhalt“ fasst die 14 Abschnitte zusammen, jede Überschrift ist ein Sprungziel', () => {
+  it('/datenschutz: „Inhalt“ fasst die 18 Abschnitte zusammen, jede Überschrift ist ein Sprungziel', () => {
     const html = seiten[1][1]
-    expect(html).toContain(RECHTSTEXT_TEXT.abschnitte(14))
+    expect(html).toContain(RECHTSTEXT_TEXT.abschnitte(18))
     const ueberschriften = [...html.matchAll(/<h2 id="([^"]+)"/g)].map((m) => m[1])
-    expect(ueberschriften).toHaveLength(14)
+    expect(ueberschriften).toHaveLength(18)
     // Je Abschnitt zwei Sprünge: einer im Verzeichnis am Handy, einer in der Spalte.
     for (const anker of ueberschriften) expect(html.split(`href="#${anker}"`).length - 1, anker).toBe(2)
   })
