@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import * as Sentry from '@sentry/nextjs'
-import { CheckCheck, Inbox } from 'lucide-react'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFaedenHof } from '@/server/queries/postfach'
@@ -20,10 +19,16 @@ import {
 } from '@/lib/postfach'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { Textlink } from '@/components/ui/textlink'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { NEUE_MELDUNG_HREF } from '@/lib/hof-hilfe'
 import { LadeInhalt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { Marke } from '@/components/ui/marke'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
 import { POSTFACH_RAHMEN, PostfachZeile } from './teile'
@@ -38,7 +43,9 @@ export const dynamic = 'force-dynamic'
  * Alle/Ungelesen. Nur die Fäden dieses Hofs (farmId der Sitzung in der
  * Abfrage). Abweichend vom Mockup ohne Pfeil zurück: Postfach ist ein
  * Hauptpunkt, und Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg
- * (Register N1, elternseite). Ein Ladefehler steht inline statt als 500.
+ * (Register N1, elternseite). Ein Ladefehler steht inline statt als 500
+ * (LadeFehlerKasten aus ui/, Nr. 274). Der Fußtext mit „Problem melden“ steht seit
+ * Nr. 274 auch im leeren Postfach.
  */
 export default async function PostfachPage({
   searchParams,
@@ -60,51 +67,63 @@ export default async function PostfachPage({
 
   const ungelesen = faeden ? zaehleUngelesen(faeden) : 0
   // Ein Zeitpunkt für die ganze Seite, auf dem Server („vor 3 Std.").
-  const zeilen = faeden ? postfachZeilen(faeden, filter, new Date()) : []
+  const jetzt = new Date()
+  const zeilen = faeden ? postfachZeilen(faeden, filter, jetzt) : []
 
   return (
     <div className={cn(POSTFACH_RAHMEN, 'flex flex-col gap-4')}>
-      <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <h1 className="font-heading text-[27px] font-semibold md:text-[30px]">{POSTFACH_TEXT.titel}</h1>
-        {ungelesen > 0 && <Marke art="tun">{neuText(ungelesen)}</Marke>}
-      </header>
+      {/* Werkzeug-Kopf (G1) wie im Board s2-/w2-postfach: Titel und Hofzeile, „n neu“ rechts. */}
+      <WerkzeugKopf
+        titel={POSTFACH_TEXT.titel}
+        unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />}
+        aktion={ungelesen > 0 ? <Marke art="tun">{neuText(ungelesen)}</Marke> : undefined}
+      />
 
       {faeden === null ? (
-        <Hinweiskarte ton="orange">{POSTFACH_FEHLER.laden}</Hinweiskarte>
-      ) : faeden.length === 0 ? (
-        <EmptyState
-          symbol={Inbox}
-          titel={POSTFACH_LEER.titel}
-          satz={POSTFACH_LEER.satz}
-          ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
+        // G6 mit Überschrift, Satz und „Neu laden“ (Board s2-/w2-postfach Bild 6) — der Link fragt dieselbe Seite neu.
+        <LadeFehlerKasten
+          titel={POSTFACH_FEHLER.laden.replace(/ Lade die Seite bitte neu\.$/, '')}
+          satz="Lade die Seite bitte neu. Deine Nachrichten sind nicht verloren."
+          knopf="Neu laden"
+          nochmal={postfachFilterHref(filter)}
         />
+      ) : faeden.length === 0 ? (
+        <>
+          <EmptyState
+            titel={POSTFACH_LEER.titel}
+            satz={POSTFACH_LEER.satz}
+            ausweg={{ ohne: 'Höfe beginnen keine Unterhaltung (Register N12): Nachrichten schreibt nur das Team, Probleme und Wünsche gehen über die Meldungsseite' }}
+          />
+          <Fusstext />
+        </>
       ) : (
         <LadeRahmen>
-          <FilterChipReihe beschriftung={POSTFACH_TEXT.filterBeschriftung}>
+          {/* Polster, damit der Fokusring um „Alle“ nicht abgeschnitten wird (Liste Lauf 32 postfach). */}
+          <FilterChipReihe beschriftung={POSTFACH_TEXT.filterBeschriftung} className="md:-mx-1 md:px-1">
             <FilterChip href={postfachFilterHref('alle')} aktiv={filter === 'alle'} ladePunkt>
               {POSTFACH_TEXT.alle}
             </FilterChip>
             <FilterChip href={postfachFilterHref('ungelesen')} aktiv={filter === 'ungelesen'} ladePunkt>
-              {POSTFACH_TEXT.ungelesen}
+              {/* Mit Zahl wie im Board s2-/w2-postfach („Ungelesen · 1“). */}
+              {ungelesen > 0 ? `${POSTFACH_TEXT.ungelesen} · ${ungelesen}` : POSTFACH_TEXT.ungelesen}
             </FilterChip>
           </FilterChipReihe>
           <LadeInhalt className="flex flex-col gap-4">
             {zeilen.length === 0 ? (
               <EmptyState
-                symbol={CheckCheck}
                 titel={POSTFACH_ALLES_GELESEN.titel}
                 satz={POSTFACH_ALLES_GELESEN.satz}
                 ausweg={
                   <Link
                     href={postfachFilterHref('alle')}
-                    className={cn('inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold hover:bg-muted', FOKUS_RAHMEN)}
+                    className={KNOPF_RAHMEN}
                   >
                     {POSTFACH_ALLES_GELESEN.ausweg}
                   </Link>
                 }
               />
             ) : (
-              <ul className="overflow-hidden rounded-2xl border border-border bg-card dark:ring-1 dark:ring-border">
+              <ul className={cn('overflow-hidden border border-border bg-card', RUNDUNG.karte)}>
                 {zeilen.map((zeile) => (
                   <li key={zeile.id} className="border-b border-border last:border-0">
                     <PostfachZeile zeile={zeile} />
@@ -112,11 +131,40 @@ export default async function PostfachPage({
                 ))}
               </ul>
             )}
-            {/* Nur mit Fäden: Leer sagt der EmptyState dasselbe (DESIGN_SYSTEM „Leerzustände"). */}
-            <p className="text-[12.5px] leading-relaxed text-muted-foreground">{POSTFACH_TEXT.erklaerung}</p>
+            <Fusstext />
           </LadeInhalt>
         </LadeRahmen>
       )}
     </div>
+  )
+}
+
+/**
+ * Der Fußtext unter Liste und Leerzustand (Boards s2-/w2-postfach Bild 1 und 5; Abnahme Lauf 32 postfach 2,
+ * Nr. 274): Er steht in jedem Zustand außer dem Ladefehler — auch im leeren Postfach, wo der Weg zu
+ * „Problem melden“ der einzige ist, dem Team zu schreiben.
+ */
+function Fusstext(): React.JSX.Element {
+  return (
+    <p className="text-[13px] leading-relaxed text-muted-foreground" data-postfach-fuss="">
+      <ErklaerungMitLink />
+    </p>
+  )
+}
+
+/** Der Erklärsatz mit „Problem melden“ als grünem Textlink (Board s2-/w2-postfach); der Satz bleibt EINE Quelle. */
+function ErklaerungMitLink(): React.JSX.Element {
+  // Die Anführungszeichen bleiben außerhalb des Links stehen wie im Board.
+  const wort = PROBLEM_MELDEN
+  const stelle = POSTFACH_TEXT.erklaerung.lastIndexOf(wort)
+  if (stelle < 0) return <>{POSTFACH_TEXT.erklaerung}</>
+  return (
+    <>
+      {POSTFACH_TEXT.erklaerung.slice(0, stelle)}
+      <Textlink href={NEUE_MELDUNG_HREF} form="im-satz">
+        {PROBLEM_MELDEN}
+      </Textlink>
+      {POSTFACH_TEXT.erklaerung.slice(stelle + wort.length)}
+    </>
   )
 }

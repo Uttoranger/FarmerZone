@@ -10,8 +10,8 @@ import { starteLastschrift, oeffneRechnung } from '@/server/actions/lastschrift'
 import { cn } from '@/lib/utils'
 import { StatusBadge, type StatusTon } from '@/components/ui/status-badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ReceiptText } from 'lucide-react'
-import { KARTE, KICKER, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE, TEXT_GRUEN } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
 
 const T = LASTSCHRIFT_TEXT
 
@@ -19,6 +19,8 @@ const T = LASTSCHRIFT_TEXT
 export type BarzahlungAnzeige = {
   satzText: string
   einzugAbText: string
+  /** Der letzte Tag ohne Bargebühr (Wiener Tag vor dem Einzug) — für „Bis <Tag> behältst du …“, Register N48. */
+  letzterFreierTagText: string
   einzugBegonnen: boolean
   mandat: boolean
   mandatPflicht: boolean
@@ -67,7 +69,7 @@ export function Barzahlung({ daten }: { daten: BarzahlungAnzeige }): React.JSX.E
         </h2>
         <ul className="flex flex-col gap-1.5 text-[14px] leading-snug text-foreground md:text-[13.5px]">
           <li>{T.satz(daten.satzText)}</li>
-          <li>{daten.einzugBegonnen ? T.einzugAb(daten.einzugAbText) : `${T.einzugAb(daten.einzugAbText)} · ${T.erlassen(daten.einzugAbText)}`}</li>
+          <li>{daten.einzugBegonnen ? T.einzugAb(daten.einzugAbText) : `${T.einzugAb(daten.einzugAbText)} · ${T.erlassen(daten.letzterFreierTagText)}`}</li>
           <li className="flex flex-wrap items-center gap-2">
             <StatusBadge status={daten.mandat ? 'fertig' : 'neutral'}>{daten.mandat ? 'eingerichtet' : 'fehlt'}</StatusBadge>
             <span>{daten.mandat ? T.mandatDa(daten.bank, daten.letzte4) : T.mandatFehlt}</span>
@@ -175,11 +177,11 @@ function RechnungKnopf({ abrechnungId, art }: { abrechnungId: string; art: 'bar'
 function Monatsabrechnungen({ zeilen }: { zeilen: BarzahlungAnzeige['abrechnungen'] }): React.JSX.Element {
   return (
     <section aria-labelledby="abrechnungen-titel" className="flex flex-col gap-2.5">
-      <h2 id="abrechnungen-titel" className={KICKER}>
+      <h2 id="abrechnungen-titel" className={KICKER_12}>
         {T.abrechnungen}
       </h2>
       {zeilen.length === 0 ? (
-        <EmptyState symbol={ReceiptText} titel={T.abrechnungenLeer} satz={T.abrechnungenLeerSatz} ausweg={{ ohne: 'Sie entsteht von selbst am Abrechnungstag – du musst nichts tun.' }} />
+        <EmptyState titel={T.abrechnungenLeer} satz={T.abrechnungenLeerSatz} ausweg={{ ohne: 'Sie entsteht von selbst am Abrechnungstag – du musst nichts tun.' }} />
       ) : (
         <ul className={cn(KARTE, '[&>li+li]:border-t [&>li+li]:border-border')}>
           {zeilen.map((z) => (

@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { Lightbulb } from 'lucide-react'
-import { MELDUNG_ART_LABEL, WUENSCHE_TEXT, kiBegruendung, kurznummer, prLink, type TriageStand } from '@/lib/meldung'
+import { MELDUNG_ART_LABEL, WUENSCHE_TEXT, kiBegruendung, prLink, type TriageStand } from '@/lib/meldung'
+import { kurznummerAus } from '@/lib/kurznummer'
 import { ADMIN_STATUS_TON, WUNSCHLISTE_LEER, WUNSCHLISTE_SATZ, adminStatusText, bildschirmText } from '@/lib/admin-briefkasten'
 import { MELDUNG_ART_TON, OHNE_IP_UND_COOKIES, geraetKurz } from '@/lib/hof-hilfe'
 import { eingangMeldungAdresse } from '@/lib/postfach'
@@ -44,7 +44,6 @@ export function Wunschliste({ buendel }: { buendel: WunschBuendel[] }): React.JS
       </h2>
       {buendel.length === 0 ? (
         <EmptyState
-          symbol={Lightbulb}
           titel={WUNSCHLISTE_LEER.titel}
           ausweg={{ ohne: 'Die Wunschliste bündelt jeden Wunsch außer Dubletten; Wünsche kommen nur von Höfen und Kundinnen, der Admin legt keinen an' }}
           className="rounded-xl py-6"
@@ -126,7 +125,7 @@ export function MeldungEntscheidenSpalte({
     status: m.status,
     clusterKey: m.clusterKey ?? '',
     triageNotiz: m.triageNotiz ?? '',
-    duplikatVonId: m.duplikatVonId ? kurznummer(m.duplikatVonId) : '',
+    duplikatVonId: m.duplikatVonId ? kurznummerAus(m.duplikatVonId) : '',
     sprintName: m.sprintName ?? '',
     antwortAnMelder: m.antwortAnMelder ?? '',
   }

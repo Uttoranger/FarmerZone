@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Sheet, SheetBlatt, SheetClose, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -58,13 +57,13 @@ export function EntdeckenFilterblatt({
       {kompakt ? (
         <SheetTrigger
           className={cn(
-            'relative inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted sm:px-4',
+            'relative inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border bg-card px-4 text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
             FOKUS_RAHMEN
           )}
         >
-          <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
-          <span className="max-sm:sr-only">Filter</span>
-          <Zaehler anzahl={anzahlFilter} wofuer="gesetzt" ton="gruen" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9.5px]" />
+          {/* Ohne Regler-Symbol, das Wort trägt (Liste Lauf 32, hoefe; Nr. 252). */}
+          <span>Filter</span>
+          <Zaehler anzahl={anzahlFilter} wofuer="gesetzt" ton="gruen" klein className="absolute -top-1.5 -right-1.5" />
         </SheetTrigger>
       ) : (
         <SheetTrigger
@@ -73,7 +72,6 @@ export function EntdeckenFilterblatt({
             FOKUS_RAHMEN
           )}
         >
-          <SlidersHorizontal className="size-4" strokeWidth={1.7} aria-hidden="true" />
           Filter
           {anzahlFilter > 0 && (
             <>
@@ -83,7 +81,8 @@ export function EntdeckenFilterblatt({
           )}
         </SheetTrigger>
       )}
-      <SheetBlatt>
+      {/* Am Handy von unten, ab 768 px von rechts wie der Warenkorb (Board w1-hoefe: „Filter" auch im Browser). */}
+      <SheetBlatt seite="rechts">
         <div className="flex items-center justify-between gap-2">
           <SheetTitle className="font-heading text-xl font-semibold">Filter</SheetTitle>
           {zuruecksetzen}
@@ -116,7 +115,7 @@ export function EntdeckenFilterblatt({
 export function BlattGruppe({ titel, children }: { titel: string; children: ReactNode }): React.JSX.Element {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-[11.5px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">{titel}</h3>
+      <h3 className="text-[12px] font-semibold tracking-[0.12em] text-muted-foreground uppercase">{titel}</h3>
       {children}
     </section>
   )

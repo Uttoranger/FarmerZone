@@ -1,4 +1,4 @@
-import { Send } from 'lucide-react'
+
 import { ladeEmpfaengerHoefe, ladeRundschreibenListe, type GesendetesRundschreiben } from '@/server/queries/postfach'
 import {
   ADMIN_POSTFACH_TEXT,
@@ -54,7 +54,6 @@ export function RundschreibenReiter({ daten, jetzt }: { daten: RundschreibenDate
             </h2>
             {daten.gesendet.length === 0 ? (
               <EmptyState
-                symbol={Send}
                 titel={RUNDSCHREIBEN_LEER.titel}
                 satz={RUNDSCHREIBEN_LEER.satz}
                 className="rounded-none border-0 py-8"

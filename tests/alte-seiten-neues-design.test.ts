@@ -52,9 +52,16 @@ describe('Shell je Seite (Nr. 54)', () => {
   const KUNDE_SHELL = /<KundeShellMitSitzung>/
   const FOKUS_SHELL = /<KundeFokusShell\b/
 
-  it.each([
+  it('die Bestellseite steht in der KundeShell ohne Unterleiste, am Handy mit der Titelzeile (Board s1-bestellung-link, Lauf 31)', () => {
+    const text = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
     // Gültiger Link und ruhige Seite bei falscher Signatur — beide in derselben Shell.
-    ['src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx', 2],
+    expect(anzahl(text, /<KundeShellMitSitzung unterleiste=\{false\} handyTitel=\{HANDY_TITEL\}/)).toBe(2)
+    // Gegenprobe: keine Shell mit Unterleiste und kein alter Kopf.
+    expect(anzahl(text, KUNDE_SHELL)).toBe(0)
+    expect(text).not.toMatch(/<KundenKopf\b/)
+  })
+
+  it.each([
     ['src/app/(public)/impressum/page.tsx', 1],
     ['src/app/(public)/konditionen/page.tsx', 1],
     ['src/app/(public)/agb/page.tsx', 1],
@@ -186,7 +193,7 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
   const TOKEN_ZEILEN = [
     "const token = searchParams.get('token')",
     'const linkUngueltig = !token || !!errorParam',
-    'if (!canSubmit || !token) return',
+    'if (laedt || !token) return',
     'const { error } = await authClient.resetPassword({ newPassword: password, token })',
   ]
   /**
@@ -280,14 +287,16 @@ describe('/reset-password — der Token steht nur an den erwarteten Stellen', ()
 })
 
 describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
-  it('die grüne Marke der Bestellseite steht auf der Kopf-Karte, nicht auf dem hellen Seitengrund', () => {
+  it('die Marke der Bestellseite steht im Kopf als Schild auf ihrer eigenen Fläche, vor der Abholung', () => {
+    // Seit Nr. 227 (Board s1-/w1-bestellung-link) steht der Kopf ohne Karte auf dem Grund. Der Axe-Befund galt der
+    // Marke mit Rand und durchsichtiger Fläche; das Schild trägt seine eigene Fläche (zustand-…-grund), deren Paar
+    // tests/design-tokens.test.ts in beiden Themes auf ≥ 4,5:1 nachrechnet — gleich, worauf es liegt.
     const text = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
-    const karte = text.indexOf("<div className={cn(KARTE, 'flex flex-col gap-2')}>")
-    const marke = text.indexOf('<Marke art={status.art}')
-    const abholung = text.indexOf('abholung-titel')
-    expect(karte).toBeGreaterThan(-1)
-    // Die Marke steht im Kopf — nach dem Öffnen der Karte, vor der Karte „Abholung".
-    expect(marke).toBeGreaterThan(karte)
+    const kopf = text.indexOf('<h1')
+    const marke = text.indexOf('<Marke art={status.art} form="schild">')
+    const abholung = text.indexOf('<AbholKarte')
+    expect(kopf).toBeGreaterThan(-1)
+    expect(marke).toBeGreaterThan(kopf)
     expect(marke).toBeLessThan(abholung)
   })
 
@@ -305,16 +314,17 @@ describe('Kontrast und Touch-Ziele (Befunde der Axe-Prüfung)', () => {
 describe('Ladeansicht der Bestellseite — dieselben Karten wie die Seite', () => {
   const SEITE = 'src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx'
   const LADEN = 'src/app/(public)/[farmSlug]/bestellung/[orderId]/loading.tsx'
-  /** Der Kopf der Seite ist seit dem Axe-Befund eine Karte (b98c13a). */
-  const KOPF_KARTE = "className={cn(KARTE, 'flex flex-col gap-2')}"
+  /** Seit Nr. 227 (Board s1-/w1-bestellung-link) steht der Kopf ohne Karte; Abholung und „Hof erreichen“ ab 768 px nebeneinander. */
+  const PAAR = 'grid items-start gap-4 md:grid-cols-2'
 
-  it('der Kopf steht im Skeleton als dieselbe Karte wie auf der Seite — beim Umschalten springt nichts', () => {
+  it('der Kopf und das Paar Abholung · Hof erreichen stehen im Skeleton wie auf der Seite — beim Umschalten springt nichts', () => {
     const seite = lies(SEITE)
     const laden = lies(LADEN)
-    expect(seite).toContain(KOPF_KARTE)
-    // Die erste Karte der Ladeansicht ist der Kopf, vor „Abholung".
-    expect(laden.indexOf(KOPF_KARTE)).toBeGreaterThan(-1)
-    expect(laden.indexOf(KOPF_KARTE)).toBeLessThan(laden.indexOf('{/* Abholung */}'))
+    expect(seite).toContain(PAAR)
+    expect(laden).toContain(PAAR)
+    // Der Kopf ist im Skeleton keine Karte und steht vor „Abholung".
+    expect(laden.indexOf('{/* Kopf wie auf der Seite, ohne Karte')).toBeGreaterThan(-1)
+    expect(laden.indexOf('{/* Kopf wie auf der Seite, ohne Karte')).toBeLessThan(laden.indexOf('{/* Abholung */}'))
   })
 
   it('alle drei Karten nehmen die Klasse der Seite, nicht eine Abschrift', () => {
@@ -334,7 +344,8 @@ describe('Problem melden — das Beispiel im Textfeld kommt aus dem Mockup', () 
   })
 
   it('das Textfeld nimmt das Beispiel der gewählten Art', () => {
-    expect(lies('src/components/shared/meldung-form.tsx')).toMatch(/placeholder=\{MELDUNG_TEXT_BEISPIEL\[art\]\}/)
+    // Seit Nr. 225 zeichnet der gemeinsame Baustein das Feld für beide Welten.
+    expect(lies('src/components/ui/meldung-formular-ansicht.tsx')).toMatch(/placeholder=\{MELDUNG_TEXT_BEISPIEL\[f\.art\]\}/)
   })
 })
 
@@ -353,14 +364,14 @@ describe('mitgeschicktSatz — was unter „Problem melden" automatisch mitgeht'
   it('eine Quelle: beide Meldeformulare und der Briefkasten schreiben den Satz nicht selbst', () => {
     for (const datei of [
       'src/components/shared/meldung-form.tsx',
-      'src/components/hof-hilfe/meldung-abgeben.tsx',
+      'src/components/ui/meldung-formular-ansicht.tsx',
       'src/components/admin/briefkasten-teile.tsx',
     ]) {
       expect(lies(datei), datei).not.toMatch(/Keine IP-Adresse|automatisch mit\./)
     }
-    expect(lies('src/components/shared/meldung-form.tsx')).toMatch(/mitgeschicktSatz\(kennung, alsHof\)/)
-    // „Meldung abgeben" ist immer ein Hof — am Handy derselbe Satz, mit Fehlernummer, sobald eine dasteht.
-    expect(lies('src/components/hof-hilfe/meldung-abgeben.tsx')).toMatch(/\{mitgeschicktSatz\(kennung, true\)\}/)
+    // Seit Nr. 225 zeichnet der gemeinsame Baustein beide Formulare — der Satz kommt dort aus der Quelle, ein Hof mit „dein Hof".
+    // Seit Nr. 268 mit der Nummer, die wirklich mitgeht (nur bei „Etwas funktioniert nicht“, kennungZumSenden).
+    expect(lies('src/components/ui/meldung-formular-ansicht.tsx')).toMatch(/mitgeschicktSatz\(kennung, alsHof\)/)
     expect(mitgeschicktSatz('', true)).toBe(`Mitgeschickt: Seite, Gerät und dein Hof. ${OHNE_IP_UND_COOKIES}`)
     expect(OHNE_IP_UND_COOKIES).toBe('Keine IP-Adresse, keine Cookies.')
   })
@@ -442,7 +453,7 @@ describe('Die Marke der Bestellseite ist die Marke der Liste (Art aus bestellSta
           pickupTimeStart: '15:00',
           pickupTimeEnd: '18:00',
           createdAt: new Date('2026-10-09T08:00:00Z'),
-          gesamtCents: 1000,
+          summen: { totalAmount: '10.00', serviceFeeCents: 0, serviceFeeRefundedAt: null },
           artikel: 1,
         },
         jetzt,
@@ -455,6 +466,6 @@ describe('Die Marke der Bestellseite ist die Marke der Liste (Art aus bestellSta
   it('die Bestellseite zeichnet die Art aus bestellStatusAnzeige mit dem Baustein Marke', () => {
     const seite = lies('src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx')
     expect(seite).toMatch(/const status = bestellStatusAnzeige\(order\.status, /)
-    expect(seite).toMatch(/<Marke art=\{status\.art\}>\{status\.marke\}<\/Marke>/)
+    expect(seite).toMatch(/<Marke art=\{status\.art\} form="schild">\s*\{status\.marke\}\s*<\/Marke>/)
   })
 })

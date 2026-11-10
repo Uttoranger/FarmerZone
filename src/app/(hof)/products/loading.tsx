@@ -46,11 +46,11 @@ export default function ProdukteLaden(): React.JSX.Element {
             <div className="hidden h-9 w-[260px] rounded-full bg-muted md:block" />
           </div>
 
-          <div className="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block">
+          <div className="hidden overflow-hidden rounded-[12px] border border-border bg-card lg:block">
             <div className="h-9 border-b border-border" />
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="flex h-[68px] items-center gap-4 border-t border-border px-3.5 first:border-t-0">
-                <div className="size-11 rounded-xl bg-muted" />
+                <div className="size-11 rounded-[10px] bg-muted" />
                 <div className="h-4 w-48 rounded bg-border" />
                 <div className="ml-auto h-4 w-16 rounded bg-muted" />
                 <div className="h-8 w-32 rounded-full bg-muted" />
@@ -60,10 +60,10 @@ export default function ProdukteLaden(): React.JSX.Element {
             ))}
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card lg:hidden">
+          <div className="overflow-hidden rounded-[12px] border border-border bg-card lg:hidden">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="flex h-[78px] items-center gap-2.5 border-t border-border p-2.5 first:border-t-0">
-                <div className="size-[46px] rounded-xl bg-muted" />
+                <div className="size-[46px] rounded-[10px] bg-muted" />
                 <div className="flex-1">
                   <div className="h-4 w-32 rounded bg-border" />
                   <div className="mt-1.5 h-3 w-24 rounded bg-muted" />

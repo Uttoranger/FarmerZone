@@ -4,18 +4,20 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { PowerOff, Power } from 'lucide-react'
 import { archiveFarm, reactivateFarm } from '@/server/actions/farm-archive'
 import {
   FARM_ARCHIVE_TITLE,
   FARM_ARCHIVE_EXPLANATION,
   FARM_ARCHIVED_EXPLANATION,
-  farmArchiveBlockedMessage,
+  FARM_ARCHIVE_BLOCKED_SATZ,
+  farmArchiveBlockedTitel,
 } from '@/lib/farm-archive'
+import { KONTO_TEXT, URLAUB_UND_PAUSE } from '@/lib/hof-einstellungen'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
 import { KNOPF_ORANGE_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { HELLER_KNOPF, EINSTELLUNG_KARTE, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
 import {
   Dialog,
   DialogContent,
@@ -27,13 +29,22 @@ import {
 interface Props {
   farmSlug: string
   isArchived: boolean
+  /** Offene Bestellungen beim Laden der Seite — dieselbe Zählung wie der Server (getOpenOrdersCount). */
+  offeneBestellungen: number
 }
 
-export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
+/**
+ * Hof stilllegen bzw. reaktivieren. Seit Nr. 250 (Liste Lauf 32, konto-hof): Solange offene Bestellungen da
+ * sind, steht statt des Knopfs der Hinweis mit „Zu den Bestellungen“ — der Server lehnt ohnehin ab
+ * (archiveFarm), der Knopf führte ins Leere. Kommt die Sperre erst beim Absenden (eine Bestellung kam
+ * zwischen Laden und Tipp dazu), zeigt die Karte denselben Hinweis mit der Zahl des Servers.
+ */
+export function ArchiveFarmCard({ farmSlug, isArchived, offeneBestellungen }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isBusy, setIsBusy] = useState(false)
   // Zahl offener Bestellungen, wenn der Guard die Stilllegung verhindert hat.
   const [blockedBy, setBlockedBy] = useState<number | null>(null)
+  const gesperrt = blockedBy ?? (offeneBestellungen > 0 ? offeneBestellungen : null)
   const router = useRouter()
 
   async function handleArchive() {
@@ -73,12 +84,9 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
 
   if (isArchived) {
     return (
-      <Card>
+      <Card className={EINSTELLUNG_KARTE}>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Power className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-            <CardTitle>Hof reaktivieren</CardTitle>
-          </div>
+          <CardTitle className={KARTEN_TITEL}>Hof reaktivieren</CardTitle>
           <CardDescription>Dein Hof ist derzeit stillgelegt.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -93,47 +101,39 @@ export function ArchiveFarmCard({ farmSlug, isArchived }: Props) {
 
   return (
     <>
-      <Card>
+      <Card className={EINSTELLUNG_KARTE}>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <PowerOff className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-            <CardTitle>{FARM_ARCHIVE_TITLE}</CardTitle>
-          </div>
-          <CardDescription>Deinen Hofladen dauerhaft schließen.</CardDescription>
+          <CardTitle className={KARTEN_TITEL}>{FARM_ARCHIVE_TITLE}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">{FARM_ARCHIVE_EXPLANATION}</p>
-
+          {/* Ein Absatz wörtlich nach Board s2-/w2-konto-hof (vorher drei); der Erklärtext kommt aus farm-archive.ts. */}
           <p className="text-sm text-muted-foreground">
-            Nur vorübergehend zusperren? Dann nutze lieber{' '}
+            {KONTO_TEXT.stilllegenSatz} {FARM_ARCHIVE_EXPLANATION} {KONTO_TEXT.nurVoruebergehend}{' '}
             <Link href="/settings/pause" className="font-medium text-brand-text underline underline-offset-2">
-              Urlaubsmodus
+              {URLAUB_UND_PAUSE}
             </Link>{' '}
-            — dabei bleibt deine Hofseite mit einem Hinweis sichtbar.
+            {KONTO_TEXT.nurVoruebergehendNach}
           </p>
 
-          {blockedBy !== null && (
-            <Hinweiskarte
-              ton="orange"
-              aktion={
-                <Link href="/orders" className="inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-2">
-                  Zu den Bestellungen
-                </Link>
-              }
+          {gesperrt !== null ? (
+            // Titel fett in der Warnfarbe, Knopf über die volle Breite (Board Bild 4); kein „Hof stilllegen“.
+            <HinweiskarteFehler titel={farmArchiveBlockedTitel(gesperrt)}>
+              <p>{FARM_ARCHIVE_BLOCKED_SATZ}</p>
+              <Link href="/orders" className={`${HELLER_KNOPF} mt-3`}>
+                Zu den Bestellungen
+              </Link>
+            </HinweiskarteFehler>
+          ) : (
+            // Zerstörend: Orange-Umriss statt Rot (DESIGN_SYSTEM „Dialoge und Blätter").
+            <button
+              type="button"
+              onClick={() => setDialogOpen(true)}
+              disabled={isBusy}
+              className={`${KNOPF_ORANGE_RAHMEN} w-full sm:w-auto`}
             >
-              {farmArchiveBlockedMessage(blockedBy)}
-            </Hinweiskarte>
+              Hof stilllegen
+            </button>
           )}
-
-          {/* Zerstörend: Orange-Umriss statt Rot (DESIGN_SYSTEM „Dialoge und Blätter"). */}
-          <button
-            type="button"
-            onClick={() => setDialogOpen(true)}
-            disabled={isBusy}
-            className={`${KNOPF_ORANGE_RAHMEN} w-full sm:w-auto`}
-          >
-            Hof stilllegen
-          </button>
         </CardContent>
       </Card>
 

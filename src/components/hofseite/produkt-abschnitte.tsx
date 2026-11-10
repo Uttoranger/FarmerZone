@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { Info } from 'lucide-react'
 import type { KategorieAbschnitt } from '@/lib/bereiche-anzeige'
 import { mitAnzahl } from '@/lib/format'
 import { naechsterAktiverReiter } from '@/lib/hofseite-sektionen'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { PRODUKT_LISTE } from '@/components/hofseite/produkt-karte'
+import { UEBERZEILE } from '@/components/hofseite/hofseite-seitenspalte'
 
 /** Das Sprungziel „Alle" — der Anfang der Produkte. */
 const ALLE_ANKER = 'produkte-alle'
@@ -28,15 +27,23 @@ const SPY_STREIFEN = '-30% 0px -60% 0px'
 /** Wie lange nach einem angetippten Chip sein Ziel gilt — das Ende eines weichen Scrollens lässt sich nicht überall abfragen. */
 const SPRUNG_SPERRE_MS = 1000
 
+/** Wie viele der drei Spalten ein Abschnitt ab 768 px nimmt — als ganze Klassen, Tailwind liest keine zusammengesetzten. */
+/** Produkte je Abschnitt → Spaltenzahl (0 Produkte zählt wie 1, mehr als 3 wie 3). */
+const SPALTEN_ZAHL: Readonly<Record<number, 1 | 2 | 3>> = { 0: 1, 1: 1, 2: 2, 3: 3 }
+const ABSCHNITT_SPALTEN = { 1: 'md:col-span-1', 2: 'md:col-span-2', 3: 'md:col-span-3' } as const
+/** Die Kacheln darin: so viele Spalten wie der Abschnitt breit ist, jede Kachel so breit wie in jedem anderen Abschnitt. */
+const LISTE_SPALTEN = { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3' } as const
+
 const CHIP = cn(
-  "relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[13.5px] whitespace-nowrap transition-colors duration-[250ms] before:absolute before:inset-x-0 before:-inset-y-[5px] before:content-['']",
+  "relative inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-[15px] whitespace-nowrap transition-colors duration-[250ms]",
   FOKUS_RAHMEN
 )
 
 /**
- * Der Reiter „Produkte": Kategorie-Chips als Sprungmarken, der Hinweis auf die
- * Servicegebühr und die Abschnitte je Kategorie (E1, kategorieAbschnitte).
- * Mockups web-k2-alle-produkte-nach-kategorie, mobil-k2-produkte.
+ * Der Reiter „Produkte" (Boards s1-/w1-hofseite Bild 3): Kategorie-Chips als Sprungmarken,
+ * die Abschnitte je Kategorie (E1, kategorieAbschnitte) mit leiser Überzeile
+ * „MILCH & EIER · 3 PRODUKTE" und darunter der Satz zur Gebühr — als leise Zeile am Ende,
+ * nicht als Kasten über der Liste.
  *
  * Die Chips sind echte Links auf ihren Abschnitt (#kategorie-…): Mittelklick
  * und Teilen funktionieren. Ein gewöhnlicher Klick scrollt weich und schreibt
@@ -44,13 +51,9 @@ const CHIP = cn(
  * markiert ist, entscheidet naechsterAktiverReiter (dieselbe Regel wie die
  * frühere Sektionsleiste): Ein angetippter Sprung gewinnt, bis er steht,
  * sonst der unterste sichtbare Abschnitt — der Beobachter überschreibt nie
- * unterwegs den Chip, den jemand gedrückt hat (Meldung cmua8bof).
- *
- * `chipBlock` (Nr. 177): Die Hofseite hält im klebenden Block unter dem Kopf
- * einen Platz bereit — am Handy kommen die Chips per Portal dorthin und
- * kleben mit Hofzeile und Reitern in EINEM Element; ab md bleiben sie im
- * Fluss. Bis der Platz steht (`platz` null, Server-HTML), hält die Hofseite
- * seine Höhe frei. Ohne `chipBlock` stehen die Chips überall im Fluss.
+ * unterwegs den Chip, den jemand gedrückt hat (Meldung cmua8bof). Die Reihe steht
+ * im Fluss (seit Nr. 235: am Handy klebt nur die Hofzeile, Board s1-hofseite) und
+ * scrollt am Handy seitlich; der markierte Chip rückt dort in Sicht.
  *
  * `springeZu`: ein Abschnitt, zu dem die Seite beim Öffnen springt — der
  * Futter-Abschnitt für `?bereich=futter`. Einmal; danach meldet
@@ -61,14 +64,12 @@ export function ProduktAbschnitte<P extends { id: string }>({
   gebuehrHinweis,
   springeZu,
   onGesprungen,
-  chipBlock,
   renderKarte,
 }: {
   abschnitte: readonly KategorieAbschnitt<P>[]
   gebuehrHinweis: string | null
   springeZu?: string | null
   onGesprungen?: () => void
-  chipBlock?: { platz: HTMLElement | null }
   renderKarte: (p: P) => ReactNode
 }): React.JSX.Element {
   const gesamt = abschnitte.reduce((n, a) => n + a.produkte.length, 0)
@@ -78,7 +79,7 @@ export function ProduktAbschnitte<P extends { id: string }>({
   const sprungZiel = useRef<string | null>(null)
   const sprungTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chipReihe = useRef<HTMLUListElement>(null)
-  const chipPlatz = chipBlock?.platz ?? null
+  const chipLeiste = useRef<HTMLElement>(null)
 
   function sperreAuf(anker: string) {
     sprungZiel.current = anker
@@ -108,19 +109,26 @@ export function ProduktAbschnitte<P extends { id: string }>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Den markierten Chip beim Scrollen nachführen.
+  // Den markierten Chip beim Scrollen nachführen. Solange die Chip-Reihe selbst zu sehen ist, steht man am
+  // Anfang der Liste und sieht alle Abschnitte: dann „Alle" (Board s1-/w1-hofseite Bild 3) — sonst markierte
+  // der Streifen schon beim Öffnen den ersten Abschnitt, der zufällig darin liegt.
   useEffect(() => {
     const ids = reihenfolgeText.split(' ')
     const sichtbare = new Set<string>()
+    let reiheZuSehen = chipLeiste.current !== null
+    const neu = () =>
+      setAktiv((bisher) =>
+        sprungZiel.current === null && reiheZuSehen
+          ? ALLE_ANKER
+          : naechsterAktiverReiter({ sichtbare: [...sichtbare], reihenfolge: ids, bisher, gesperrtAuf: sprungZiel.current })
+      )
     const beobachter = new IntersectionObserver(
       (eintraege) => {
         for (const e of eintraege) {
           if (e.isIntersecting) sichtbare.add(e.target.id)
           else sichtbare.delete(e.target.id)
         }
-        setAktiv((bisher) =>
-          naechsterAktiverReiter({ sichtbare: [...sichtbare], reihenfolge: ids, bisher, gesperrtAuf: sprungZiel.current })
-        )
+        neu()
       },
       { rootMargin: SPY_STREIFEN }
     )
@@ -128,12 +136,23 @@ export function ProduktAbschnitte<P extends { id: string }>({
       const el = document.getElementById(id)
       if (el) beobachter.observe(el)
     }
-    return () => beobachter.disconnect()
+    // Die Reihe zählt erst ganz verschwunden als „weg" (ganzes Fenster, ohne Streifen).
+    const reihe = chipLeiste.current
+    const reihenBeobachter = reihe
+      ? new IntersectionObserver(([e]) => {
+          reiheZuSehen = e?.isIntersecting ?? false
+          neu()
+        })
+      : null
+    if (reihe) reihenBeobachter?.observe(reihe)
+    return () => {
+      beobachter.disconnect()
+      reihenBeobachter?.disconnect()
+    }
   }, [reihenfolgeText])
 
-  // Die Chip-Reihe im Block klebt am Handy und scrollt seitlich: Der markierte Chip
-  // rückt in den sichtbaren Teil, sonst stünde „Honig" gewählt, aber außer
-  // Sicht. Nur die Reihe scrollt (scrollTo), nie das Fenster.
+  // Am Handy scrollt die Reihe seitlich: Der markierte Chip rückt in den sichtbaren Teil,
+  // sonst stünde „Honig" gewählt, aber außer Sicht. Nur die Reihe scrollt (scrollTo), nie das Fenster.
   useEffect(() => {
     const reihe = chipReihe.current
     const chip = reihe?.querySelector<HTMLElement>(`[data-chip="${aktiv}"]`)
@@ -142,8 +161,7 @@ export function ProduktAbschnitte<P extends { id: string }>({
     if (links < reihe.scrollLeft || links + chip.offsetWidth > reihe.scrollLeft + reihe.clientWidth) {
       reihe.scrollTo({ left: Math.max(0, links - 16) })
     }
-  // chipPlatz: Erst mit dem Platz im Block gibt es die Reihe, die scrollt.
-  }, [aktiv, chipPlatz])
+  }, [aktiv])
 
   function beimChip(e: MouseEvent<HTMLAnchorElement>, anker: string) {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
@@ -154,83 +172,73 @@ export function ProduktAbschnitte<P extends { id: string }>({
     document.getElementById(anker)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  // Die Zahl nur an „Alle" (Board w1-hofseite Bild 3) — die Abschnitte nennen ihre Zahl in der Überzeile.
   const chips = [
-    { anker: ALLE_ANKER, titel: 'Alle', anzahl: gesamt },
-    ...abschnitte.map((a) => ({ anker: a.anker, titel: a.titel, anzahl: a.produkte.length })),
+    { anker: ALLE_ANKER, titel: 'Alle', anzahl: gesamt as number | null },
+    ...abschnitte.map((a) => ({ anker: a.anker, titel: a.titel, anzahl: null as number | null })),
   ]
 
-  // Dieselbe Reihe im Fluss und im Block — eine Quelle für Chips und Markierung.
-  function chipReiheInhalt(ref: typeof chipReihe | null, klassen: string) {
-    return (
-      <ul ref={ref ?? undefined} className={klassen}>
-        {chips.map((chip) => {
-          const gewaehlt = aktiv === chip.anker
-          return (
-            <li key={chip.anker}>
-              <a
-                href={`#${chip.anker}`}
-                data-chip={chip.anker}
-                onClick={(e) => beimChip(e, chip.anker)}
-                aria-current={gewaehlt ? 'true' : undefined}
-                className={cn(
-                  CHIP,
-                  gewaehlt
-                    ? 'border-foreground bg-foreground font-semibold text-background'
-                    : 'border-border bg-card font-medium text-foreground hover:bg-muted'
-                )}
-              >
-                {chip.titel}
-                <span className={cn('tabular-nums', gewaehlt ? 'text-background' : 'text-muted-foreground')}>· {chip.anzahl}</span>
-              </a>
-            </li>
-          )
-        })}
-      </ul>
-    )
-  }
-
   return (
-    <div id={ALLE_ANKER} className={cn('flex flex-col gap-5', SPRUNGZIEL_UNTER_LEISTE)}>
+    <div id={ALLE_ANKER} className={cn('flex flex-col gap-3', SPRUNGZIEL_UNTER_LEISTE)}>
       {abschnitte.length > 1 && (
-        // Im klebenden Block nur ab md sichtbar; am Handy steht die Reihe im Block (Portal unten).
-        <nav
-          aria-label="Zu einer Kategorie springen"
-          className={cn('-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0', chipBlock && 'hidden md:block')}
-        >
-          {chipReiheInhalt(null, 'flex gap-2 md:flex-wrap')}
+        <nav ref={chipLeiste} aria-label="Zu einer Kategorie springen" className="-mx-4 overflow-x-auto px-4 py-1 md:mx-0 md:px-0">
+          <ul ref={chipReihe} className="flex gap-2 md:flex-wrap">
+            {chips.map((chip) => {
+              const gewaehlt = aktiv === chip.anker
+              return (
+                <li key={chip.anker}>
+                  <a
+                    href={`#${chip.anker}`}
+                    data-chip={chip.anker}
+                    onClick={(e) => beimChip(e, chip.anker)}
+                    aria-current={gewaehlt ? 'true' : undefined}
+                    className={cn(
+                      CHIP,
+                      gewaehlt
+                        ? 'border-foreground bg-foreground font-bold text-background'
+                        : 'border-input bg-card font-semibold text-foreground hover:bg-muted'
+                    )}
+                  >
+                    {chip.titel}
+                    {chip.anzahl !== null && <span className="tabular-nums">· {chip.anzahl}</span>}
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
         </nav>
       )}
-      {abschnitte.length > 1 &&
-        chipPlatz &&
-        createPortal(
-          // Am Handy im klebenden Block der Hofseite unter den Reitern (Meldung „Sprungmarken am Handy"); eigene Fläche mit Linie.
-          <nav aria-label="Zu einer Kategorie springen" className="border-b border-border bg-background">
-            {chipReiheInhalt(chipReihe, 'flex gap-2 overflow-x-auto px-4 py-1')}
-          </nav>,
-          chipPlatz
-        )}
 
-      {gebuehrHinweis && (
-        <Hinweiskarte symbol={Info} className="py-3">
-          {gebuehrHinweis}
-        </Hinweiskarte>
-      )}
+      {/* Ab 768 px ein Raster aus drei Spalten: Jeder Abschnitt nimmt so viele Spalten, wie er Produkte hat
+          (höchstens drei) — kleine Abschnitte stehen so nebeneinander („Futter · 1 Produkt" neben
+          „Brennmaterial · 1 Produkt", Board w1-hofseite Bild 3) statt je eine Zeile mit leerer Fläche daneben. */}
+      <div className="flex flex-col gap-3 md:grid md:grid-cols-3 md:gap-x-3">
+        {abschnitte.map((a) => {
+          const spalten = SPALTEN_ZAHL[Math.min(a.produkte.length, 3)] ?? 1
+          return (
+            <section
+              key={a.anker}
+              id={a.anker}
+              aria-labelledby={`${a.anker}-titel`}
+              className={cn('flex min-w-0 flex-col gap-2.5', ABSCHNITT_SPALTEN[spalten], SPRUNGZIEL_UNTER_LEISTE)}
+            >
+              <h2 id={`${a.anker}-titel`} className={cn(UEBERZEILE, 'mt-1')}>
+                {a.titel} · {mitAnzahl(a.produkte.length, 'Produkt', 'Produkte')}
+              </h2>
+              <ul className={cn(PRODUKT_LISTE, LISTE_SPALTEN[spalten])}>
+                {a.produkte.map((p) => (
+                  // Spalte statt Block (Liste Lauf 32, hofseite Bild 3): Die Karte füllt die Zeilenhöhe, ihr Knopf steht mit mt-auto unten.
+                  <li key={p.id} className="md:flex md:flex-col">
+                    {renderKarte(p)}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        })}
+      </div>
 
-      {abschnitte.map((a) => (
-        <section key={a.anker} id={a.anker} aria-labelledby={`${a.anker}-titel`} className={cn('flex flex-col gap-3', SPRUNGZIEL_UNTER_LEISTE)}>
-          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-            <h2 id={`${a.anker}-titel`} className="font-heading text-xl font-semibold text-foreground">
-              {a.titel}
-            </h2>
-            <p className="text-[13px] text-muted-foreground">{mitAnzahl(a.produkte.length, 'Produkt', 'Produkte')}</p>
-          </div>
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {a.produkte.map((p) => (
-              <li key={p.id}>{renderKarte(p)}</li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      {gebuehrHinweis && <p className="text-[13px] text-muted-foreground">{gebuehrHinweis}</p>}
     </div>
   )
 }

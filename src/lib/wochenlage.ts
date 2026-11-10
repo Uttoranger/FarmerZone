@@ -1,5 +1,6 @@
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { GEZAEHLTE_TOEPFE, topfVonBestellung, type BestellungFuerFinanzen } from '@/lib/finanzen'
+import { gebuehrWortFuerZeitraum } from '@/lib/plattformgebuehr'
 
 /*
  * Die Regeln der Wochenlage (Register N32, Nr. 192) — rein, ohne Datenbank.
@@ -43,17 +44,30 @@ export function servicegebuehrDerWoche(
   return { gezaehltCents, erwartetCents }
 }
 
+/** Die Woche der Wochenlage: die letzten 7 Tage bis jetzt — derselbe Zeitraum wie ladeWochenlage (src/server/queries/wochenlage.ts). */
+const WOCHE_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * Das Wort für die Gebühren der Woche (V63): ganz vor dem Stichtag
+ * „Servicegebühr“, ganz danach „Plattformgebühr“, über den Stichtag
+ * „Gebühren“ — `gebuehrWortFuerZeitraum` mit dem Zeitraum der Wochenlage.
+ */
+export function wochenlageGebuehrWort(jetzt: Date, stichtag: Date): string {
+  return gebuehrWortFuerZeitraum(new Date(jetzt.getTime() - WOCHE_MS), jetzt, stichtag)
+}
+
 /**
  * Die Zeilen der Wochenlage in der Reihenfolge der Mail. Stripe-Gebühren
  * stehen hier noch nicht: Admin › Geld kennt sie erst mit Nr. 191; dann kommt
- * die Zeile dazu, vorher nennt die Mail keine Zahl, die dort fehlt.
+ * die Zeile dazu, vorher nennt die Mail keine Zahl, die dort fehlt. Das Wort
+ * der Gebühr kommt immer als Argument (`wochenlageGebuehrWort`), nie als Vorgabe.
  */
-export function wochenlageZeilen(z: WochenlageZahlen): LageZeile[] {
+export function wochenlageZeilen(z: WochenlageZahlen, gebuehrWort: string): LageZeile[] {
   const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
   return [
     { label: 'Bestellungen', wert: String(z.bestellungen) },
     { label: 'Umsatz der Höfe', wert: euro(z.umsatzCents) },
-    { label: 'Servicegebühr', wert: z.servicegebuehrErwartetCents > 0 ? `${euro(z.servicegebuehrCents)} (dazu erwartet: ${euro(z.servicegebuehrErwartetCents)})` : euro(z.servicegebuehrCents) },
+    { label: gebuehrWort, wert: z.servicegebuehrErwartetCents > 0 ? `${euro(z.servicegebuehrCents)} (dazu erwartet: ${euro(z.servicegebuehrErwartetCents)})` : euro(z.servicegebuehrCents) },
     { label: 'Neue Höfe', wert: String(z.neueHoefe) },
     { label: 'Offene Aufgaben', wert: z.ueberfaellig > 0 ? `${z.offen} (überfällig: ${z.ueberfaellig})` : String(z.offen) },
     { label: 'Fehlermeldungen der Woche', wert: String(z.fehler) },

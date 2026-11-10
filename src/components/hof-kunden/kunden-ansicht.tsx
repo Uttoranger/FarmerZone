@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bell, Phone, Search, Users } from 'lucide-react'
+import { Phone } from 'lucide-react'
 import type { CustomerSummary } from '@/server/queries/customers'
 import {
   KUNDEN_FILTER_LABEL,
@@ -26,11 +26,13 @@ import { telefonLink } from '@/lib/telefon-anzeige'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KARTE, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
 import { cn } from '@/lib/utils'
 import { KundenSortieren } from './kunden-sortieren'
+import { KundenMarke } from './kunden-marke'
 
 /*
  * Kunden des Hofs in der HofShell (Gate 8 „Code ohne Mockup", Nachtlauf
@@ -51,7 +53,14 @@ function schreibeAdresse(adresse: string) {
   window.history.replaceState(null, '', adresse)
 }
 
-export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
+export function KundenAnsicht({
+  kunden,
+  unterzeile,
+}: {
+  kunden: CustomerSummary[]
+  /** „<Hof> · Stand …“ unter der Überschrift (HofUnterzeile, von der Seite auf dem Server gebaut). */
+  unterzeile?: React.ReactNode
+}): React.JSX.Element {
   const ansicht = kundenAnsichtAus(useSearchParams())
   // Die Suche tippt lokal (Leerzeichen am Ende bleiben stehen); die Adresse bekommt sie bereinigt mit.
   const [suche, setSuche] = useState(ansicht.suche)
@@ -62,7 +71,8 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
   return (
     <div className="flex flex-col gap-4 md:gap-[18px]">
       <header className="min-w-0">
-        <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Kunden</h1>
+        {/* Werkzeug-Kopf (G1) mit dem Hof-Balken darunter (G3, Liste Lauf 32 kunden). */}
+        <WerkzeugKopf titel="Kunden" unterzeile={unterzeile} />
         <p className="text-[13px] leading-normal text-muted-foreground">
           {kunden.length > 0 ? kundenKopfzeile(kunden) : 'Alle, die bisher bei dir bestellt haben'}
         </p>
@@ -70,19 +80,21 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
 
       {kunden.length === 0 ? (
         <EmptyState
-          symbol={Users}
           titel="Noch keine Kunden"
           satz="Sobald jemand bei dir bestellt, taucht er hier auf. Eine vollständige Hofseite hilft dabei."
           ausweg={
-            <Link href="/farm-page" className={KNOPF_RAHMEN}>
-              Zu Mein Hof
+            // Board s2/w2-kunden Bild 5: der Ausweg sagt, was hilft — die Hofseite liegt in Mein Hof.
+            <Link href="/farm-page" className={cn(KNOPF_RAHMEN, 'w-full justify-center border-primary text-status-offen', RUNDUNG.feld)}>
+              Hofseite vervollständigen
             </Link>
           }
         />
       ) : (
         <>
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-            <FilterChipReihe beschriftung="Kunden filtern" className="min-w-0 xl:flex-1">
+          {/* Werkzeugzeile wie im Board s2-/w2-kunden: Chips und „Sortieren“ in einer Zeile, am Handy die Suche
+              darunter, im Web direkt nach den Chips und „Sortieren“ rechts außen (Liste Lauf 32 kunden, Nr. 273). */}
+          <div className="flex flex-wrap items-end gap-x-2 gap-y-3 xl:gap-x-3">
+            <FilterChipReihe beschriftung="Kunden filtern" className="order-1 min-w-0 flex-1 xl:flex-none">
               {sichtbareKundenFilter(ansicht.filter).map((f) => {
                 const adresse = kundenAdresse({ ...aktuell, filter: f })
                 return (
@@ -90,6 +102,8 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                     key={f}
                     href={adresse}
                     aktiv={ansicht.filter === f}
+                    // 44 px hoch, 14 px halbfett wie die Chips im Board s2-/w2-kunden (Befund pruefer-ui Lauf 33: 36 px).
+                    className="h-11 px-3.5 text-sm font-semibold"
                     onNavigate={(e) => {
                       e.preventDefault()
                       schreibeAdresse(adresse)
@@ -101,9 +115,8 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                 )
               })}
             </FilterChipReihe>
-            <label className="relative block md:max-w-[340px] xl:w-[280px] xl:shrink-0">
-              <span className="sr-only">Kundin suchen</span>
-              <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
+            <label className="relative order-3 block w-full xl:order-2 xl:w-auto xl:max-w-[360px] xl:flex-1">
+              <span className="mb-1 block text-sm font-semibold text-foreground">Kundin suchen</span>
               <input
                 type="search"
                 value={suche}
@@ -115,25 +128,26 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
                 }}
                 placeholder="Name, Telefon oder E-Mail"
                 className={cn(
-                  'h-11 w-full rounded-full border border-border bg-card pr-4 pl-10 text-base text-foreground placeholder:text-muted-foreground md:h-9 md:text-[13px]',
+                  // 48 px, leicht gerundet im Feldrand (Board); nie unter 44 px (WCAG 2.5.8).
+                  'h-12 w-full border border-input bg-card px-4 text-base text-foreground placeholder:text-muted-foreground md:text-[15px]', RUNDUNG.feld,
                   FOKUS_RAHMEN
                 )}
               />
             </label>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={cn('text-[13px]', LEISE)} aria-live="polite">
-              {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
-            </p>
             {/* Ein Knopf, kein Link: Sortierung und Filter im Blatt sind Seitenzustand;
                 die Adresse bekommt sie trotzdem mit (Neuladen, Teilen). */}
-            <KundenSortieren ansicht={aktuell} zahlen={zahlen} onAdresse={schreibeAdresse} />
+            <div className="order-2 shrink-0 xl:order-3 xl:ml-auto">
+              <KundenSortieren ansicht={aktuell} zahlen={zahlen} onAdresse={schreibeAdresse} />
+            </div>
           </div>
+
+          {/* Die Zahl der Treffer hört nur der Screenreader — das Board zeigt sie nicht, die Chips zählen schon. */}
+          <p className="sr-only" aria-live="polite">
+            {mitAnzahl(liste.length, 'Kunde', 'Kunden')}
+          </p>
 
           {liste.length === 0 ? (
             <EmptyState
-              symbol={Search}
               titel="Niemand passt"
               satz={suche.trim() ? `Nichts gefunden für „${suche.trim()}“.` : 'In diesem Filter ist gerade niemand.'}
               ausweg={
@@ -186,29 +200,18 @@ export function KundenAnsicht({ kunden }: { kunden: CustomerSummary[] }): React.
   )
 }
 
-/** Kreis mit den Initialen — Schmuck, der Name steht daneben. */
+/** Kreis mit den Initialen — Schmuck, der Name steht daneben; grün getönt mit grüner Schrift (Liste Lauf 32 kunden). */
 function Initialen({ name, klein = false }: { name: string; klein?: boolean }): React.JSX.Element {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-foreground',
+        'flex shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund font-semibold text-status-fertig',
         klein ? 'size-8 text-xs' : 'size-10 text-sm'
       )}
     >
       {initialen(name)}
     </span>
-  )
-}
-
-/** Die Glocke für „bekommt Neuigkeiten" — Bedeutung im Screenreader-Text. */
-function Neuigkeiten({ an }: { an: boolean }): React.JSX.Element | null {
-  if (!an) return null
-  return (
-    <>
-      <Bell className="size-3.5 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-      <span className="sr-only">bekommt Neuigkeiten</span>
-    </>
   )
 }
 
@@ -221,7 +224,7 @@ function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string 
     <a
       href={anrufen}
       aria-label={`${kunde.customerName} anrufen`}
-      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
+      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-full border-[1.5px] border-foreground bg-card text-foreground hover:bg-muted', FOKUS_RAHMEN, klassen)}
     >
       <Phone className="size-[18px]" strokeWidth={1.7} aria-hidden="true" />
     </a>
@@ -234,7 +237,7 @@ function Anrufen({ kunde, klassen }: { kunde: CustomerSummary; klassen?: string 
  * und kürzt — lange Namen sprengen die Tabelle nie.
  */
 function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
-  const kopf = 'px-2.5 py-2.5 text-left xl:px-3.5 text-[11px] font-semibold tracking-[0.08em] whitespace-nowrap text-muted-foreground uppercase'
+  const kopf = 'px-2.5 py-2.5 text-left xl:px-3.5 text-[13px] font-semibold whitespace-nowrap text-muted-foreground'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
       <table className="w-full text-[13.5px]">
@@ -260,16 +263,16 @@ function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
                   <Link
                     href={`/customers/${k.kundeId}`}
                     title={k.customerName}
-                    className={cn('flex min-h-11 min-w-0 items-center gap-2.5 rounded-xl px-1.5 font-semibold text-foreground hover:underline', FOKUS_RAHMEN_INNEN)}
+                    className={cn('flex min-h-11 min-w-0 items-center gap-2.5 px-1.5', RUNDUNG.feld, 'font-semibold text-foreground hover:underline', FOKUS_RAHMEN_INNEN)}
                   >
                     <Initialen name={k.customerName} klein />
                     <span className="min-w-0 truncate">{k.customerName}</span>
-                    <Neuigkeiten an={k.isSubscribed} />
                   </Link>
                 </td>
-                <td className="px-2.5 py-1 xl:px-3.5 whitespace-nowrap">{marke && <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>}</td>
+                <td className="px-2.5 py-1 xl:px-3.5 whitespace-nowrap">{marke && <KundenMarke ton={marke.ton}>{marke.text}</KundenMarke>}</td>
                 <td className="px-2.5 py-1 xl:px-3.5 text-right tabular-nums">{k.orderCount}</td>
-                <td className="px-2.5 py-1 xl:px-3.5 text-right font-semibold whitespace-nowrap tabular-nums">{euro(k.umsatzCents)}</td>
+                {/* Umsatz in normaler Schrift wie im Board w2-kunden (Abnahme Lauf 32 kunden Punkt 13). */}
+                <td className="px-2.5 py-1 xl:px-3.5 text-right whitespace-nowrap tabular-nums">{euro(k.umsatzCents)}</td>
                 <td className={cn('px-2.5 py-1 xl:px-3.5 whitespace-nowrap', LEISE)}>{vorTagenText(k.daysSinceLastOrder)}</td>
                 <td className={cn('hidden px-3.5 py-1 xl:table-cell', LEISE)}>
                   <span className="block max-w-[180px] truncate" title={k.topProducts[0]?.name}>
@@ -295,11 +298,11 @@ function Tabelle({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
  */
 function Zeilen({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
   return (
-    <ul aria-label="Kunden" className={cn(KARTE, 'overflow-hidden lg:hidden [&>li+li]:border-t [&>li+li]:border-border')}>
+    <ul aria-label="Kunden" className={cn(KARTE, 'overflow-hidden lg:hidden')}>
       {kunden.map((k) => {
         const marke = kundenMarke(k.status)
         return (
-          <li key={k.kundeId} className="flex items-center gap-1 pr-1.5">
+          <li key={k.kundeId} className="flex items-center gap-1 border-t border-border pr-1.5 first:border-t-0">
             <Link
               href={`/customers/${k.kundeId}`}
               title={k.customerName}
@@ -307,23 +310,21 @@ function Zeilen({ kunden }: { kunden: CustomerSummary[] }): React.JSX.Element {
             >
               <Initialen name={k.customerName} />
               <span className="min-w-0 flex-1">
+                {/* Wie im Board s2-kunden: Name und Marke in einer Zeile, darunter Bestellungen und „Häufig“,
+                    ohne Betrag (den zeigt die Tabelle ab 1024 px und die Kundin-Seite). */}
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="min-w-0 truncate text-[14.5px] font-semibold">{k.customerName}</span>
-                  <Neuigkeiten an={k.isSubscribed} />
-                  <span className="ml-auto shrink-0 pl-2 text-[14px] font-semibold tabular-nums">{euro(k.umsatzCents)}</span>
+                  <span className="min-w-0 truncate text-[15px] font-semibold">{k.customerName}</span>
+                  {marke && (
+                    <span className="shrink-0">
+                      <KundenMarke ton={marke.ton}>{marke.text}</KundenMarke>
+                    </span>
+                  )}
                 </span>
-                <span className={cn('mt-0.5 block truncate text-[12.5px]', LEISE)}>
+                <span className={cn('mt-0.5 block truncate text-[13px]', LEISE)}>
                   {mitAnzahl(k.orderCount, 'Bestellung', 'Bestellungen')} · {zuletztText(k.daysSinceLastOrder)}
                 </span>
-                {(marke || k.topProducts.length > 0) && (
-                  <span className="mt-1 flex min-w-0 items-center gap-2">
-                    {marke && <StatusBadge status={marke.ton}>{marke.text}</StatusBadge>}
-                    {k.topProducts.length > 0 && (
-                      <span className={cn('min-w-0 truncate text-[12.5px]', LEISE)}>
-                        Häufig: {k.topProducts.slice(0, 2).map((p) => p.name).join(', ')}
-                      </span>
-                    )}
-                  </span>
+                {k.topProducts.length > 0 && (
+                  <span className={cn('block truncate text-[13px]', LEISE)}>Häufig: {k.topProducts.slice(0, 2).map((p) => p.name).join(', ')}</span>
                 )}
               </span>
             </Link>

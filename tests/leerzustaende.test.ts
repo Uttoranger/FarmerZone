@@ -16,6 +16,8 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -50,6 +52,7 @@ beforeAll(async () => {
 }, 30_000)
 
 const html = (el: React.ReactElement) => renderToStaticMarkup(el)
+const quelle = (datei: string) => readFileSync(join(process.cwd(), datei), 'utf8')
 const maskiere = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const anzahlEmptyStates = (h: string) => (h.match(/data-slot="empty-state"/g) ?? []).length
 /** Wie oft der Text im Markup steht. */
@@ -61,17 +64,16 @@ const alsLink = (href: string, text: string) => new RegExp(`<a href="${maskiere(
 const alsKnopf = (text: string) => new RegExp(`<button type="button"[^>]*>${maskiere(text)}</button>`)
 
 describe('Heute — keine Abholzeiten', () => {
-  it('Satz und Knopf stehen auf der Seite genau einmal — in der Packliste; die Karte sagt es in einer Zeile', () => {
-    const packliste = html(createElement(heute.Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: null } }))
-    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))
+  it('Satz und Knopf stehen auf der Seite genau einmal — in der Packliste; die Karte „Nächste Abholung“ entfällt (Liste Lauf 32, heute Bild 4)', () => {
+    const packliste = html(createElement(heute.Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: null } }))
+    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: null, tag: null, anzahl: 0 }))
     // So stehen die beiden Blöcke auf /dashboard untereinander (app/(hof)/dashboard/page.tsx).
     const seite = packliste + karte
     expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.satz)).toBe(1)
     expect(vorkommen(seite, ABHOLZEITEN_FEHLEN.aktion.text)).toBe(1)
     expect(packliste).toMatch(alsLink(ABHOLZEITEN_FEHLEN.aktion.href, ABHOLZEITEN_FEHLEN.aktion.text))
-    // Die Karte: nur der Titel als Zeile, kein EmptyState, kein Knopf, kein Link.
+    expect(karte).toBe('')
     expect(anzahlEmptyStates(karte)).toBe(0)
-    expect(karte).toContain(ABHOLZEITEN_FEHLEN.titel)
     expect(karte).not.toContain('<a ')
     expect(karte).not.toContain('<button')
     // Die zweiten Fassungen von früher sind weg.
@@ -80,14 +82,14 @@ describe('Heute — keine Abholzeiten', () => {
   })
 
   it('Gegenprobe: mit Abholfenster steht in der Karte kein EmptyState, in der leeren Packliste der Weg ins Fenster', () => {
-    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 0 }))
+    const karte = html(createElement(heute.NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, tag: 'Heute, Di 6. Okt', anzahl: 0 }))
     expect(anzahlEmptyStates(karte)).toBe(0)
     // Die eine Zeile ohne Aktion bleibt eine Zeile (N9, Art B).
     expect(karte).toContain('Noch keine Bestellungen')
     const packliste = html(
-      createElement(heute.Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' } } })
+      createElement(heute.Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr' } })
     )
-    expect(packliste).toContain('Nächste Abholung: Heute, 15–18 Uhr.')
+    expect(packliste).toContain('Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr')
     expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.satz)
     expect(packliste).not.toContain(ABHOLZEITEN_FEHLEN.aktion.text)
   })
@@ -162,15 +164,16 @@ describe('WhatsApp — keine Abonnentin', () => {
   const basis = { postId: 'p1', title: 'Frische Eier', body: 'Heute neu im Shop.', farmSlug: 'hof-test', showOnFarmPage: true, getippt: [] }
   const anzahlH1 = (h: string) => (h.match(/<h1\b/g) ?? []).length
 
-  it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen; sein Titel ist die eine h1', () => {
+  it('ohne Abonnentin: EmptyState mit Titel, Satz und dem Weg zurück zu den Beiträgen; die h1 „WhatsApp versenden“ trägt der Werkzeug-Kopf der Seite (Nr. 250)', () => {
     const h = html(createElement(whatsapp.WhatsAppTapClient, { ...basis, abonnentinnen: [] }))
     expect(anzahlEmptyStates(h)).toBe(1)
     expect(h).toContain(WHATSAPP_VERSAND_TEXT.leer.satz)
     expect(h).toMatch(alsLink(BEITRAEGE_HREF.replaceAll('&', '&amp;'), WHATSAPP_VERSAND_TEXT.leer.aktion))
-    expect(anzahlH1(h)).toBe(1)
-    expect(h).toMatch(new RegExp(`<h1[^>]*>${maskiere(WHATSAPP_VERSAND_TEXT.leer.titel)}</h1>`))
-    // Keine zweite Fassung der Überschrift (unsichtbar oder nicht) und kein Fachwort.
-    expect(h).not.toContain('WhatsApp versenden')
+    // Board s2-whatsapp-plakat Bild 2: h1 „WhatsApp versenden“ im Kopf, der Leerzustand darunter ohne eigene h1.
+    expect(anzahlH1(h)).toBe(0)
+    expect(h).toContain(WHATSAPP_VERSAND_TEXT.leer.titel)
+    expect(quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')).toContain("WHATSAPP_SEITE_TITEL = 'WhatsApp versenden'")
+    // Kein Fachwort.
     expect(h).not.toContain('Opt-in')
   })
 
@@ -182,7 +185,7 @@ describe('WhatsApp — keine Abonnentin', () => {
     const abonnentinnen = [{ id: 'a1', name: 'Erika Mustermann', phone: '+43 660 0000000' }]
     const h = html(createElement(whatsapp.WhatsAppTapClient, { ...basis, abonnentinnen }))
     expect(anzahlEmptyStates(h)).toBe(0)
-    expect(anzahlH1(h)).toBe(1)
+    expect(anzahlH1(h)).toBe(0)
     expect(h).toContain('Erika')
   })
 })

@@ -8,16 +8,19 @@
  */
 import type { Prisma } from '@prisma/client'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
-import { wienerMitternacht } from '@/lib/servicegebuehr'
-import { wienerZeitpunkt } from '@/lib/fristen'
+import { centsAlsEuro, wienerMitternacht } from '@/lib/servicegebuehr'
+import { uhrzeitInWien, wienerZeitpunkt } from '@/lib/fristen'
 import { formatSlotTime } from '@/lib/pickup-days'
-import { mitAnzahl } from '@/lib/format'
+import { formatEuro, formatTagKurz, mitAnzahl } from '@/lib/format'
 import { hofZustand } from '@/lib/mein-hof'
 import { summeCent, UMSATZ_TEXT, type UmsatzBuchung } from '@/lib/umsatz'
 import { onlineZahlungPausiert } from '@/lib/stripe-konto'
 import type { MarkeArt } from '@/lib/marke-art'
 import { BEITRAG_ANLAESSE, type BeitragAnlass } from '@/lib/beitrag-anlass'
 import type { BildAusschnitt } from '@/schemas/bild-ausschnitt'
+import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import { abspracheOffen, brauchtAbsprache } from '@/lib/abholhinweise'
+import { telefonLink } from '@/lib/telefon-anzeige'
 
 // ─── Tage ───────────────────────────────────────────────────────────────────
 
@@ -125,12 +128,38 @@ export type NaechsteAbholung = {
   anzahl: number
 }
 
-/** Die schmale Zeile unter „Heute abholen": „Morgen: 3 Bestellungen". */
-export function naechsteAbholungText(a: NaechsteAbholung): string {
-  return `${a.name}: ${a.anzahl} ${a.anzahl === 1 ? 'Bestellung' : 'Bestellungen'}`
+// ─── Heute abholen ──────────────────────────────────────────────────────────
+
+/**
+ * Ein Abholtag mit Wochentag und Datum (V9, Boards s1-heute, s1-bestellungen):
+ * „Heute, Mi 3. März", „Morgen, Do 4. März", sonst „Sa, 6. März" — „Heute“ und
+ * „Morgen“ stehen nur zusätzlich, nie statt des Datums (DESIGN_SYSTEM
+ * „Komponenten“). Nach „Heute, “ ohne zweites Komma, sonst stünden drei
+ * hintereinander. Das Datum kommt aus formatTagKurz, kein eigenes Format.
+ */
+export function abholTagMitDatum(heuteKalendertag: string, kalendertag: string): string {
+  const kurz = formatTagKurz(kalendertag)
+  const vorsatz =
+    kalendertag === heuteKalendertag ? 'Heute' : kalendertag === tagVersetzt(heuteKalendertag, 1) ? 'Morgen' : kalendertag === tagVersetzt(heuteKalendertag, -1) ? 'Gestern' : null
+  return vorsatz ? `${vorsatz}, ${kurz.replace(', ', ' ')}` : kurz
 }
 
-// ─── Heute abholen ──────────────────────────────────────────────────────────
+/**
+ * Ein Zeitpunkt kurz, wie das Board w1-bestellung ihn bei der Kundin zeigt: „heute, 07:12“, „gestern, 18:40“,
+ * sonst „Mi, 3. März, 07:12“ (Nr. 249b; vorher die lange Mail-Fassung „Samstag, 7. November, 02:50 Uhr“).
+ * Tag und Uhrzeit in Wiener Zeit; `jetzt` ist Parameter.
+ */
+export function zeitpunktKurz(zeitpunkt: Date, jetzt: Date): string {
+  const tag = wienKalendertag(zeitpunkt)
+  const heute = wienKalendertag(jetzt)
+  const vorsatz = tag === heute ? 'heute' : tag === tagVersetzt(heute, -1) ? 'gestern' : formatTagKurz(tag)
+  return `${vorsatz}, ${uhrzeitInWien(zeitpunkt)}`
+}
+
+/** Die grüne Marke unter dem Kopf von Heute: „Abholung heute, Mi 3. März, 15–18 Uhr" (Board s1-heute). */
+export function abholungHeuteText(heuteKalendertag: string, zeit: string): string {
+  return `Abholung ${abholTagMitDatum(heuteKalendertag, heuteKalendertag).replace('Heute', 'heute')}, ${zeit}`
+}
 
 /** „Anna Beispiel" → „Anna B." — genug zum Erkennen, mehr steht auf dem Handy nicht offen herum. */
 export function kurzname(name: string): string {
@@ -140,11 +169,15 @@ export function kurzname(name: string): string {
   return `${teile[0]} ${teile[teile.length - 1][0].toUpperCase()}.`
 }
 
-/** „2× Eier, 1× Bauernbrot +2" — die ersten Positionen, der Rest als Zahl. */
+/**
+ * „2× Eier · 1× Heumilch" bzw. ab drei Positionen „3 Positionen" (Board s1-heute):
+ * In der schmalen Zeile der Packliste wäre eine gekürzte Aufzählung mit „+2"
+ * schwerer zu lesen als die Zahl. Der Punkt trennt, weil Produktnamen selbst
+ * Kommas tragen („Futterhafer, Big Bag").
+ */
 export function positionenKurz(items: readonly { productName: string; quantity: number }[], hoechstens = 2): string {
-  const gezeigt = items.slice(0, hoechstens).map((i) => `${i.quantity}× ${i.productName}`)
-  const rest = items.length - gezeigt.length
-  return rest > 0 ? `${gezeigt.join(', ')} +${rest}` : gezeigt.join(', ')
+  if (items.length > hoechstens) return `${items.length} Positionen`
+  return items.map((i) => `${i.quantity}× ${i.productName}`).join(' · ')
 }
 
 export type AbholChip = 'bereit' | 'vorbereiten' | 'wartet'
@@ -160,10 +193,11 @@ export function abholChip(status: string): AbholChip {
   return 'vorbereiten'
 }
 
+// Klein, weil es hinter den Positionen im Satz steht („3 Positionen · bar", Board s1-heute).
 const ZAHLART_KURZ: Record<string, string> = {
-  ONLINE: 'Online',
-  ONSITE_CASH: 'Bar vor Ort',
-  ONSITE_CARD: 'Karte vor Ort',
+  ONLINE: 'online',
+  ONSITE_CASH: 'bar',
+  ONSITE_CARD: 'Karte',
 }
 
 export type HeutigeAbholung = {
@@ -230,9 +264,23 @@ export function brauchtDichAnzeige(eintraege: number, packlisteLeer: boolean): '
 export type BrauchtDichEintrag = {
   art: 'ueberfaellig' | 'ausverkauft' | 'ohne-kategorie' | 'status'
   text: string
+  /** Die leise Erklärzeile unter dem Titel — warum es dich braucht (Liste Lauf 32, heute; Board s1-heute). */
+  erklaerung: string
   href: string
   /** Überfällige Abholungen: jede Bestellung mit eigenem Link. */
   unterpunkte?: { text: string; href: string }[]
+}
+
+/**
+ * Die Erklärzeile je Grund (Board s1-heute Bild 1–3: „Ohne Kategorie bleibt er nicht im Shop.“). Das Board
+ * zeigt nur den Grund „ohne Kategorie“ an einem männlichen Produktnamen; weil der Name hier beliebig ist, steht
+ * „das Produkt“ statt „er“. Die übrigen Sätze folgen derselben Form: ein kurzer Satz, was sonst geschieht.
+ */
+export const BRAUCHT_DICH_ERKLAERUNG: Record<BrauchtDichEintrag['art'], { eins: string; viele: string }> = {
+  ueberfaellig: { eins: 'Erst dann stimmen Bestellungen und Umsatz.', viele: 'Erst dann stimmen Bestellungen und Umsatz.' },
+  ausverkauft: { eins: 'So kann es gerade niemand bestellen.', viele: 'So kann sie gerade niemand bestellen.' },
+  'ohne-kategorie': { eins: 'Ohne Kategorie bleibt das Produkt nicht im Shop.', viele: 'Ohne Kategorie bleiben sie nicht im Shop.' },
+  status: { eins: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.', viele: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.' },
 }
 
 export type BrauchtDichDaten = {
@@ -272,7 +320,8 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
     const rest = anzahl - einzeln.length
     eintraege.push({
       art: 'ueberfaellig',
-      text: `${anzahl} ${mehrzahl(anzahl, 'Abholung', 'Abholungen')} vorbei, noch offen — als abgeholt oder nicht abgeholt markieren`,
+      text: `${anzahl} ${mehrzahl(anzahl, 'Abholung', 'Abholungen')} vorbei, noch offen – als abgeholt oder nicht abgeholt markieren`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG.ueberfaellig[anzahl === 1 ? 'eins' : 'viele'],
       href: anzahl === 1 && einzeln.length === 1 ? `/orders/${einzeln[0].id}` : '/orders',
       unterpunkte: [
         ...einzeln.map((b) => ({
@@ -286,12 +335,13 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
 
   const { ausverkauft } = daten
   for (const p of ausverkauft.slice(0, BRAUCHT_DICH_EINZELN)) {
-    eintraege.push({ art: 'ausverkauft', text: `${p.name} ist ausverkauft`, href: `/products?edit=${p.id}` })
+    eintraege.push({ art: 'ausverkauft', text: `${p.name} ist ausverkauft`, erklaerung: BRAUCHT_DICH_ERKLAERUNG.ausverkauft.eins, href: `/products?edit=${p.id}` })
   }
   if (ausverkauft.length > BRAUCHT_DICH_EINZELN) {
     eintraege.push({
       art: 'ausverkauft',
       text: `und ${ausverkauft.length - BRAUCHT_DICH_EINZELN} weitere ausverkauft`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG.ausverkauft.viele,
       href: '/products',
     })
   }
@@ -301,10 +351,16 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
     eintraege.push({
       art: 'ohne-kategorie',
       text: `${ohneKategorie[0].name} hat keine Kategorie`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG['ohne-kategorie'].eins,
       href: `/products?edit=${ohneKategorie[0].id}`,
     })
   } else if (ohneKategorie.length > 1) {
-    eintraege.push({ art: 'ohne-kategorie', text: `${ohneKategorie.length} Produkte ohne Kategorie`, href: '/products' })
+    eintraege.push({
+      art: 'ohne-kategorie',
+      text: `${ohneKategorie.length} Produkte ohne Kategorie`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG['ohne-kategorie'].viele,
+      href: '/products',
+    })
   }
 
   const { statusErinnerung } = daten
@@ -313,8 +369,9 @@ export function brauchtDich(daten: BrauchtDichDaten): BrauchtDichEintrag[] {
       art: 'status',
       text:
         statusErinnerung === 'never'
-          ? 'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
+          ? 'Noch kein Beitrag – erzähl deinen Kundinnen, was es gibt'
           : `Seit ${statusErinnerung} Tagen kein neuer Beitrag`,
+      erklaerung: BRAUCHT_DICH_ERKLAERUNG.status.eins,
       href: '/status/new',
     })
   }
@@ -369,12 +426,33 @@ export function vorwocheBis(jetzt: Date): string {
   return `bis ${wert('weekday')}, ${wert('hour')}:${wert('minute')}`
 }
 
-/** „+20 % gegenüber der Vorwoche bis Dienstag, 14:30" — ohne Vorwochenumsatz kein Prozent. */
-export function vergleichText(prozent: number | null, jetzt: Date): string {
-  const bis = vorwocheBis(jetzt)
-  if (prozent === null) return `Vorwoche ${bis}: noch kein Umsatz`
-  const zahl = prozent > 0 ? `+${prozent}` : prozent < 0 ? `−${Math.abs(prozent)}` : '±0'
-  return `${zahl} % gegenüber der Vorwoche ${bis}`
+/** „Mittwoch“ — der Wiener Wochentag, bis zu dem die Vorwoche zählt (Board s1-heute: ohne Uhrzeit). */
+function wochentagLang(jetzt: Date): string {
+  return new Intl.DateTimeFormat('de-AT', { timeZone: 'Europe/Vienna', weekday: 'long' }).format(jetzt)
+}
+
+/**
+ * „Mehr als letzte Woche bis Mittwoch (€ 431,20).“ (Board s1-heute Bild 2, Liste Lauf 32): statt eines
+ * Prozents der Vergleich in Worten und der Betrag der Vorwoche bis zum selben Zeitpunkt (dieselbe Zahl wie
+ * bisher, wochenvergleich). Ohne Umsatz in der Vorwoche gibt es nichts zu vergleichen.
+ */
+export function vergleichText(woche: Pick<Wochenvergleich, 'dieseWocheCent' | 'vorwocheCent'>, jetzt: Date): string {
+  const tag = wochentagLang(jetzt)
+  if (woche.vorwocheCent <= 0) return `Letzte Woche bis ${tag}: noch kein Umsatz`
+  const vorher = formatEuro(centsAlsEuro(woche.vorwocheCent))
+  const wort = woche.dieseWocheCent > woche.vorwocheCent ? 'Mehr als' : woche.dieseWocheCent < woche.vorwocheCent ? 'Weniger als' : 'So viel wie'
+  return `${wort} letzte Woche bis ${tag} (${vorher}).`
+}
+
+/**
+ * „Mo und Di: Verkäufe, die du selbst eingetragen hast.“ (Board s1-heute Bild 2) — die Tage der Woche, an
+ * denen ein selbst eingetragener Verkauf im Balken steckt, damit niemand sie für Bestellungen hält. Die Tage
+ * kommen als Kürzel der Balken (Mo … So), ohne Tag kein Satz.
+ */
+export function selbstEingetragenSatz(tage: readonly string[]): string | null {
+  if (tage.length === 0) return null
+  const liste = tage.length === 1 ? tage[0] : `${tage.slice(0, -1).join(', ')} und ${tage[tage.length - 1]}`
+  return `${liste}: Verkäufe, die du selbst eingetragen hast.`
 }
 
 // ─── Packliste (Gate 5, Nachtlauf Nr. 17) ──────────────────────────────────
@@ -394,9 +472,31 @@ export const PACK_MARKE: Record<AbholChip, { text: string; art: MarkeArt }> = {
 // Was Arbeit macht, steht oben: erst packen, dann warten, zuletzt Erledigtes.
 const PACK_RANG: Record<AbholChip, number> = { vorbereiten: 0, wartet: 1, bereit: 2 }
 
-/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen). */
-export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number }
-export type PacklistenZeile = AbholZeile & { gesamtCents: number }
+/**
+ * Abholung nach Absprache (Register N47, Nr. 257): die Ziele von „Anrufen“
+ * (tel:-Link, ohne lesbare Nummer null) und „Mail schreiben“. Nur Ziele, nie
+ * Text zum Anzeigen — auf Heute steht der Kontakt nicht sichtbar in der Zeile.
+ */
+export type AbspracheKontakt = { anrufen: string | null; email: string }
+
+/**
+ * Datensparsam: Kontakt nur für eine offene Bestellung mit Absprache, für jede
+ * andere null — dann verlässt die Nummer den Server gar nicht erst (auch nicht
+ * in den Seitendaten). Bedingung aus src/lib/abholhinweise.ts.
+ */
+export function abspracheKontakt(b: {
+  status: string
+  customerPhone: string
+  customerEmail: string
+  hinweiseJePosition: readonly (readonly string[] | null | undefined)[]
+}): AbspracheKontakt | null {
+  if (!abspracheOffen(b.status, brauchtAbsprache(b.hinweiseJePosition))) return null
+  return { anrufen: telefonLink(b.customerPhone), email: b.customerEmail }
+}
+
+/** Eine heutige Abholung samt Betrag — den rechnet die Servergrenze in Cent (bestellSummen); Kontakt nur mit Absprache. */
+export type PacklistenBestellung = HeutigeAbholung & { gesamtCents: number; absprache?: AbspracheKontakt | null }
+export type PacklistenZeile = AbholZeile & { gesamtCents: number; absprache?: AbspracheKontakt }
 
 /**
  * Die Packliste auf Heute: dieselben Bestellungen wie „Heute abholen" und das
@@ -405,16 +505,33 @@ export type PacklistenZeile = AbholZeile & { gesamtCents: number }
  */
 export function packliste(bestellungen: readonly PacklistenBestellung[]): PacklistenZeile[] {
   const cents = new Map(bestellungen.map((b) => [b.id, b.gesamtCents]))
+  const kontakt = new Map(bestellungen.flatMap((b) => (b.absprache ? [[b.id, b.absprache] as const] : [])))
   return abholZeilen(bestellungen)
-    .map((z) => ({ ...z, gesamtCents: cents.get(z.id) ?? 0 }))
+    .map((z) => {
+      const absprache = kontakt.get(z.id)
+      // Ohne Absprache fehlt das Feld ganz — keine leeren Kontaktfelder in den Seitendaten.
+      return absprache ? { ...z, gesamtCents: cents.get(z.id) ?? 0, absprache } : { ...z, gesamtCents: cents.get(z.id) ?? 0 }
+    })
     .toSorted((a, b) => PACK_RANG[a.chip] - PACK_RANG[b.chip])
 }
 
 export type PacklistenZahlen = { bestellungen: number; zuPacken: number }
 
-/** „Heute abholen" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt. */
+/**
+ * „Heute abholen" und „Noch zu packen" — gezählt an derselben Liste, die die Seite zeigt.
+ * „Noch zu packen" zählt nur bestätigte bzw. bezahlte, noch nicht gepackte Bestellungen
+ * (V40, N41 e): „Wartet auf Kunde" (Bestätigung offen) und „Gepackt" zählen nicht.
+ */
 export function packlistenZahlen(zeilen: readonly PacklistenZeile[]): PacklistenZahlen {
   return { bestellungen: zeilen.length, zuPacken: zeilen.filter((z) => z.chip === 'vorbereiten').length }
+}
+
+/** „2 zu packen · 1 wartet" hinter „Packliste" (Board s1-heute) — nur, was es gibt; gepackt steht in den Zeilen. */
+export function packlistenStand(zeilen: readonly PacklistenZeile[]): string {
+  const zuPacken = zeilen.filter((z) => z.chip === 'vorbereiten').length
+  const wartet = zeilen.filter((z) => z.chip === 'wartet').length
+  const teile = [zuPacken > 0 ? `${zuPacken} zu packen` : null, wartet > 0 ? `${wartet} wartet` : null].filter((t) => t !== null)
+  return teile.length > 0 ? teile.join(' · ') : 'alles gepackt'
 }
 
 // ─── Kennzahlen (freigabe.md §12 Nr. 45) ────────────────────────────────────
@@ -445,6 +562,28 @@ export const KENNZAHL_TEXT = {
 
 /** Der Leerzustand der Packliste — auch der des Filters „Heute abholen" in Bestellungen. */
 export const HEUTE_NIEMAND = 'Heute holt niemand etwas ab.'
+
+/**
+ * Der Satz unter HEUTE_NIEMAND: das nächste Abholfenster mit Datum und seiner
+ * Zahl in derselben Zeile (V40, Boards s1-heute, s1-bestellungen):
+ * „Nächste Abholung: Sa, 6. März, 9–12 Uhr · 2 Bestellungen". Ohne Bestellung
+ * nur das Fenster.
+ */
+export function naechsteAbholungSatz(fenster: NaechstesFenster, anzahl: number, heuteKalendertag: string): string {
+  const wann = `${abholTagMitDatum(heuteKalendertag, fenster.tag)}, ${fenster.zeit}`
+  return anzahl > 0 ? `Nächste Abholung: ${wann} · ${mitAnzahl(anzahl, 'Bestellung', 'Bestellungen')}` : `Nächste Abholung: ${wann}`
+}
+
+/** Die leere Packliste auf Papier (Board s2-druck, Bild 3). */
+export const HEUTE_KEINE_ABHOLUNG_PAPIER = 'Heute keine Bestellungen zur Abholung.'
+
+/** Auf der leeren Packliste (Papier, Board s2-druck): „Die nächste Abholung ist Sa, 6. März, 9–12 Uhr.“ */
+export function naechsteAbholungPapier(fenster: NaechstesFenster, heuteKalendertag: string): string {
+  const tag = abholTagMitDatum(heuteKalendertag, fenster.tag)
+  // Mitten im Satz klein: „ist heute, Mi 3. März, …“; Wochentage bleiben groß.
+  const imSatz = /^(Heute|Morgen),/.test(tag) ? tag[0].toLowerCase() + tag.slice(1) : tag
+  return `Die nächste Abholung ist ${imSatz}, ${fenster.zeit}.`
+}
 
 /** Die eine Zeile unter dem Abholfenster in „Nächste Abholung“, solange nichts bestellt ist (Register N9, eine Zeile ohne Aktion). */
 export const HEUTE_KEINE_BESTELLUNGEN = 'Noch keine Bestellungen'
@@ -578,6 +717,67 @@ export function naechstesAbholfenster(slots: readonly HeuteFenster[], jetzt: Dat
   return null
 }
 
+/** Das Abholfenster an einem bestimmten Kalendertag laut Abholzeiten (ganzer Tag), sonst null. */
+export function abholfensterAm(slots: readonly HeuteFenster[], kalendertag: string, heuteKalendertag: string): NaechstesFenster | null {
+  const fenster = aktiveAm(slots, kalendertag)
+  if (fenster.length === 0) return null
+  return { tag: kalendertag, name: kalendertag === heuteKalendertag ? 'Heute' : abholtagName(heuteKalendertag, kalendertag), zeit: fensterText(fenster) }
+}
+
+/**
+ * Welches Fenster „Nächste Abholung“ nennt, wenn es leer ist (Liste Lauf 32, bestellungen Bild 2 und druck
+ * Bild 3): Unter „Heute holt niemand etwas ab.“ las sich „Nächste Abholung: Heute …“ wie ein Widerspruch. Darum:
+ * Hat das nächste Fenster Bestellungen, dieses mit seiner Zahl (V40). Sonst das Fenster des nächsten Abholtags
+ * mit Bestellungen (naechsteAbholung, nach abholWhere gezählt), sofern dort laut Abholzeiten eines liegt. Gibt
+ * es keine, und läge das nächste Fenster heute, das nächste Fenster ab morgen. Ohne aktive Abholzeit null.
+ */
+export function fensterMitBestellungen(
+  slots: readonly HeuteFenster[],
+  jetzt: Date,
+  anzahlHeute: number,
+  naechsteAbholung: NaechsteAbholung | null
+): { fenster: NaechstesFenster; anzahl: number } | null {
+  const fenster = naechstesAbholfenster(slots, jetzt)
+  if (!fenster) return null
+  const heute = wienKalendertag(jetzt)
+  const anzahl = fenster.tag === heute ? anzahlHeute : naechsteAbholung?.tag === fenster.tag ? naechsteAbholung.anzahl : 0
+  if (anzahl > 0) return { fenster, anzahl }
+  if (naechsteAbholung && naechsteAbholung.anzahl > 0) {
+    const mitBestellungen = abholfensterAm(slots, naechsteAbholung.tag, heute)
+    if (mitBestellungen) return { fenster: mitBestellungen, anzahl: naechsteAbholung.anzahl }
+  }
+  if (fenster.tag === heute) {
+    const ab = naechstesAbholfenster(slots, wienerTag(tagVersetzt(heute, 1)).von)
+    if (ab) return { fenster: { ...ab, name: abholtagName(heute, ab.tag) }, anzahl: 0 }
+  }
+  return { fenster, anzahl: 0 }
+}
+
+/**
+ * Welches Fenster die Karte „Nächste Abholung“ in der Seitenspalte von Heute nennt (Nr. 249b, Board s1/w1-heute
+ * Bild 1: Packliste „Heute“, Karte „Sa, 6. März, 9–12 Uhr · 2 Bestellungen“). Steht das heutige Fenster schon in
+ * der Packliste (heute Bestellungen), nennt die Karte das Fenster DANACH: den nächsten Abholtag mit Bestellungen
+ * samt Zahl, sonst das nächste Fenster ab morgen (Zahl, wenn an dem Tag bestellt ist). Ist heute nichts bestellt,
+ * dasselbe wie die Zeile unter der leeren Packliste (fensterMitBestellungen). Ohne aktive Abholzeit null.
+ */
+export function karteNaechsteAbholung(
+  slots: readonly HeuteFenster[],
+  jetzt: Date,
+  anzahlHeute: number,
+  naechsteAbholung: NaechsteAbholung | null
+): { fenster: NaechstesFenster; anzahl: number } | null {
+  const mitZahl = fensterMitBestellungen(slots, jetzt, anzahlHeute, naechsteAbholung)
+  const heute = wienKalendertag(jetzt)
+  if (!mitZahl || mitZahl.fenster.tag !== heute) return mitZahl
+  if (naechsteAbholung && naechsteAbholung.anzahl > 0) {
+    const mitBestellungen = abholfensterAm(slots, naechsteAbholung.tag, heute)
+    if (mitBestellungen) return { fenster: mitBestellungen, anzahl: naechsteAbholung.anzahl }
+  }
+  const ab = naechstesAbholfenster(slots, wienerTag(tagVersetzt(heute, 1)).von)
+  if (!ab) return mitZahl
+  return { fenster: { ...ab, name: abholtagName(heute, ab.tag) }, anzahl: naechsteAbholung?.tag === ab.tag ? naechsteAbholung.anzahl : 0 }
+}
+
 /**
  * Wie viele Bestellungen auf das nächste Fenster warten: liegt es heute, die
  * Packliste (ohne Abgeholte, Stornierte, Nicht-Abgeholte — packliste); liegt
@@ -634,6 +834,9 @@ export function abholungText(fenster: NaechstesFenster | null): string {
   return `Abholung ${tag}, ${fenster.zeit}`
 }
 
+/** Der Satz unter „Diese Woche bei dir: …" in der Teilen-Karte (Board s1-heute, Bild 2). */
+export const TEILEN_KARTE_SATZ = 'Erzähl es deiner Kundschaft – mit einem Tipp per WhatsApp oder E-Mail.'
+
 /** „Eier, Erdäpfel, Heu – Abholung Samstag, 9–12 Uhr" — was es gibt und wann man es holt. */
 export function teilenSatz(angebot: readonly string[], fenster: NaechstesFenster | null): string {
   const was = angebot.join(', ')
@@ -684,11 +887,39 @@ export function heuteAufbau({
 }): { oben: HeuteBlock[]; haupt: HeuteBlock[]; seite: HeuteBlock[] } {
   const oben: HeuteBlock[] = stripeHinweis ? ['stripe'] : []
   const haupt: HeuteBlock[] = ['packliste', 'braucht-dich']
-  if (beitrag) haupt.push('beitrag')
+  // Liste Lauf 32 (heute, Reihenfolge am Handy): Braucht dich → Teilen → „Was gibt’s Neues am Hof?“ (N11-Ergänzung E12).
   if (teilen) haupt.push('teilen')
+  if (beitrag) haupt.push('beitrag')
   if (postfach) haupt.unshift('postfach')
   const seite: HeuteBlock[] = zuTun ? ['zu-tun', 'naechste-abholung', 'woche'] : ['naechste-abholung', 'woche']
   return { oben, haupt, seite }
+}
+
+// ─── Packliste ohne Abholzeit und „Zu tun“ (Liste Lauf 32, heute Bild 4) ──────
+
+/**
+ * Die Handlung zu einer Zeile der Hofseite in „Zu tun“ (Abnahme Lauf 32, heute 1440 Bild 1/4, Nr. 277): Das
+ * Board nennt, was zu tun ist („Abholzeiten eintragen“), nicht nur den Teil („Titelbild“, „Logo“, „Fotos“).
+ * Wortliste: „eintragen“ statt „festlegen“. Eine Zeile ohne Eintrag behält ihren Titel.
+ */
+const ZU_TUN_HANDLUNG: Readonly<Record<string, string>> = {
+  titelbild: 'Titelbild hochladen',
+  logo: 'Logo hochladen',
+  fotos: 'Fotos hochladen',
+  name: 'Hofnamen eintragen',
+  adresse: 'Adresse eintragen',
+  kontakt: 'Kontakt eintragen',
+  'ueber-uns': '„Über uns“ schreiben',
+}
+
+/**
+ * Der Link einer Aufgabe in „Zu tun“ auf Heute: die Handlung statt des bloßen Teils — Abholzeiten heißt wie der
+ * Knopf („Abholzeiten eintragen“; Board s1-/w1-heute Bild 4), die Teile der Hofseite nach ZU_TUN_HANDLUNG; die
+ * Ersten Schritte („Erstes Produkt anlegen“) sind schon Handlungen.
+ */
+export function zuTunLinkText(aufgabe: { id: string; titel: string }): string {
+  if (aufgabe.id === 'abholzeiten') return ABHOLZEITEN_FEHLEN.aktion.text
+  return ZU_TUN_HANDLUNG[aufgabe.id] ?? aufgabe.titel
 }
 
 // ─── Online-Zahlung einrichten (Register Z1) ────────────────────────────────
@@ -702,7 +933,12 @@ export function heuteAufbau({
  *
  * Greift die Notbremse (onlineZahlungPausiert: Konto da, Stripe lässt es
  * gerade nicht zu), steht stattdessen „Online-Zahlung ist pausiert" — nie
- * beide. Wartende Höfe führt Einrichten, stillgelegte sind vom Netz.
+ * beide. Stillgelegte sind vom Netz.
+ *
+ * Seit Nr. 249 (Liste Lauf 32, heute Bild 4) auch für einen Hof, der noch auf
+ * die Freischaltung wartet: Z1 verlangt Stripe VOR der Freischaltung, die
+ * Karte steht dann in der Hauptspalte und „Zu tun“ nennt die Online-Zahlung
+ * nicht noch einmal (stripeImKasten).
  */
 export function stripeEinrichtenHinweis(hof: {
   approvedAt: Date | null
@@ -711,7 +947,7 @@ export function stripeEinrichtenHinweis(hof: {
   acceptsOnline: boolean
   stripeAccountId: string | null
 }): boolean {
-  return hof.approvedAt !== null && hof.archivedAt === null && !hof.stripeAccountReady && !onlineZahlungPausiert(hof)
+  return hof.archivedAt === null && !hof.stripeAccountReady && !onlineZahlungPausiert(hof)
 }
 
 // ─── Wochenbalken ───────────────────────────────────────────────────────────
@@ -837,4 +1073,12 @@ export function entferneBeitragErinnerung(eintraege: readonly BrauchtDichEintrag
 /** Die vier Anlässe des Anstoßes als Links auf „Neuer Beitrag“, in der Reihenfolge des Assistenten. */
 export function anstossLinks(): { anlass: BeitragAnlass; href: string }[] {
   return BEITRAG_ANLAESSE.map((anlass) => ({ anlass, href: neuerBeitragHref(anlass) }))
+}
+
+/**
+ * Wartet der Hof noch auf die Freischaltung? Für den Leerzustand von Bestellungen (Board s1-bestellungen Bild 3).
+ * Ein stillgelegter Hof wartet nicht: ihm gilt der Stilllegungs-Balken, nicht „Sobald dein Hof freigeschaltet ist …“.
+ */
+export function hofWartetAufFreigabe(hof: { approvedAt: Date | null; archivedAt: Date | null } | null): boolean {
+  return hof != null && hof.archivedAt == null && hof.approvedAt == null
 }

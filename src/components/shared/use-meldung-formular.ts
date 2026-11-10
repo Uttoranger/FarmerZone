@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useSyncExternalStore, useTransition } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { meldungAbsenden } from '@/server/actions/meldung'
-import type { MeldungArt } from '@/lib/meldung'
+import { MELDUNG_NICHT_GESPEICHERT, type MeldungArt } from '@/lib/meldung'
+import { NETZ_SATZ_UNSICHER, istNetzFehler } from '@/lib/netz'
+import { BEZEICHNER, befundVon } from '@/lib/upload-diagnose'
 import { useImageUpload } from '@/components/shared/image-upload'
 
 /**
@@ -76,6 +79,37 @@ function kontextAbonnieren(melden: () => void): () => void {
   return () => window.removeEventListener('resize', melden)
 }
 
+/**
+ * Meldet ein gescheitertes Absenden an Sentry — seit der Wurf nicht mehr an die Fehlergrenze geht, sähe Sentry ihn
+ * sonst nicht (CODING_STANDARDS §4 „Fremde Fehler nach Sentry“): fester Text, die Klasse als Name, die Nachricht
+ * bereinigt (befundVon), nie der Text der Meldung. Ein Netzabbruch ist nur eine Brotkrume. Wirft nie.
+ */
+export function meldeGescheitertesAbsenden(fehler: unknown): void {
+  try {
+    const { klasse, meldung } = befundVon(fehler)
+    const name = BEZEICHNER.test(klasse) ? klasse : 'Unbekannt'
+    if (istNetzFehler(fehler)) {
+      Sentry.addBreadcrumb({ category: 'meldung', level: 'warning', message: 'Meldung: Verbindung abgebrochen', data: { klasse: name } })
+      return
+    }
+    const ereignis = new Error('Meldung: Absenden gescheitert')
+    ereignis.name = name
+    Sentry.captureException(ereignis, { level: 'error', tags: { bereich: 'meldung-absenden', klasse: name }, extra: { fehlertext: meldung } })
+  } catch {
+    // Absichtlich leer: Telemetrie scheitert leise, der Satz an der Karte kommt trotzdem.
+  }
+}
+
+/**
+ * Die Fehlernummer geht nur bei „Etwas funktioniert nicht“ mit (Board s3-/w3-problem-melden Bild 3, Liste Lauf 32
+ * problem-melden „Fehlernummer auch bei ‚Ich hätte gern …‘“; Nr. 268): Bei Wunsch und Frage steht das Feld nicht da,
+ * also schickt das Formular auch nichts, was der Mensch nicht sieht. Der Zustand bleibt — wer zurück auf „Fehler“
+ * wechselt, findet die Nummer (etwa die von der Fehlerseite vorbelegte) wieder.
+ */
+export function kennungZumSenden(art: MeldungArt, kennung: string): string {
+  return art === 'FEHLER' ? kennung : ''
+}
+
 export type MeldungFormular = {
   art: MeldungArt
   setArt: (art: MeldungArt) => void
@@ -91,6 +125,12 @@ export type MeldungFormular = {
   setWebsite: (wert: string) => void
   /** Die Ablehnung des Servers als Satz; leer = kein Fehler. */
   fehler: string
+  /**
+   * Nur nach einem Wurf der Aktion (Server, nicht Netz): schickt dieselben Eingaben noch einmal — die Fehlerkarte
+   * zeigt dann „Nochmal“. Nach einem Netzabbruch fehlt er (die Meldung kann schon angelegt sein, Register N29,
+   * Ergänzung 26.10.2026), ebenso bei einer Ablehnung (zu viele Meldungen, Text zu kurz).
+   */
+  nochmal?: () => void
   /** Nach dem Absenden die Kurznummer, sonst null. */
   kurznummer: string | null
   isPending: boolean
@@ -127,25 +167,45 @@ export function useMeldungFormular({
     onUploaded: (url) => setScreenshotUrl(url),
   })
 
-  function absenden(e: React.FormEvent) {
-    e.preventDefault()
+  const [gescheitert, setGescheitert] = useState(false)
+
+  function senden() {
     setFehler('')
+    setGescheitert(false)
     startTransition(async () => {
-      const result = await meldungAbsenden({
-        art,
-        text,
-        seiteUrl: kontext.seiteUrl,
-        userAgent: kontext.userAgent,
-        viewport: kontext.viewport,
-        diagKennung: kennung,
-        customerEmail: alsHof ? '' : email,
-        screenshotUrl: screenshotUrl ?? '',
-        website,
-        formToken,
-      })
+      let result: Awaited<ReturnType<typeof meldungAbsenden>>
+      try {
+        result = await meldungAbsenden({
+          art,
+          text,
+          seiteUrl: kontext.seiteUrl,
+          userAgent: kontext.userAgent,
+          viewport: kontext.viewport,
+          diagKennung: kennungZumSenden(art, kennung),
+          customerEmail: alsHof ? '' : email,
+          screenshotUrl: screenshotUrl ?? '',
+          website,
+          formToken,
+        })
+      } catch (wurf) {
+        // Geworfen ginge es an die Fehlergrenze (500), und der Text wäre weg (Board Bild 6, Nr. 242). Darum der
+        // Satz an der Karte, die Eingaben bleiben. Am Netz gescheitert kann der Server die Meldung schon angelegt
+        // haben (Abbruch auf dem Rückweg): dann NETZ_SATZ_UNSICHER ohne „Nochmal“ (Register N29, Ergänzung
+        // 26.10.2026) — sonst entstünde eine zweite Meldung. „Nochmal“ nur nach einem Wurf des Servers.
+        meldeGescheitertesAbsenden(wurf)
+        const amNetz = istNetzFehler(wurf)
+        setFehler(amNetz ? NETZ_SATZ_UNSICHER : MELDUNG_NICHT_GESPEICHERT)
+        setGescheitert(!amNetz)
+        return
+      }
       if ('error' in result) setFehler(result.error)
       else setKurznummer(result.kurznummer)
     })
+  }
+
+  function absenden(e: React.FormEvent) {
+    e.preventDefault()
+    senden()
   }
 
   /** „Noch etwas melden": zurück zum leeren Formular, die Art bleibt. */
@@ -170,6 +230,7 @@ export function useMeldungFormular({
     website,
     setWebsite,
     fehler,
+    nochmal: gescheitert ? senden : undefined,
     kurznummer,
     isPending,
     kontext,

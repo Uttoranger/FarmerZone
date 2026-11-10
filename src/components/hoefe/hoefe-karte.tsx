@@ -29,6 +29,7 @@ import {
 } from '@/lib/hoefe-anzeige'
 import { cn } from '@/lib/utils'
 import { useKartenGroesse } from '@/components/karte/use-karten-groesse'
+import { LEAFLET_BEDIENTEILE } from '@/components/karte/karten-masse'
 import { KURZKARTE_BREITE } from '@/components/hoefe/hof-kurzkarte'
 
 /**
@@ -116,11 +117,21 @@ function trefferRahmen(breite: number, hoehe: number, bild: string): Pick<L.DivI
   }
 }
 
-/** Die Pille mit dem Namen: in jeder Stufe weiß mit dunkelgrüner Schrift — nur die Scheibe zeigt den Zustand (Board). */
+/**
+ * Das Namensschild: Fläche, Rand und Schrift aus den Tokens (Board w1-hoefe, Liste Lauf 32, Nr. 252) — in jeder
+ * Stufe gleich, nur die Scheibe zeigt den Zustand. Als CSS-Variablen, damit es beiden Themes folgt.
+ */
 const PILLE = {
-  hintergrund: pinDarstellung('normal').hintergrund,
-  schrift: pinDarstellung('hervorgehoben').schrift,
-  rand: pinDarstellung('normal').rand,
+  hintergrund: 'var(--fz-surface)',
+  schrift: 'var(--fz-text)',
+  rand: 'var(--fz-border)',
+}
+
+/** Der Einzel-Pin in Ruhe: dunkler Nummernkreis mit hellem Rand (Board w1-hoefe); gewählt und überfahren bleiben grün. */
+function scheibenStil(zustand: PinZustand): { groesse: number; hintergrund: string; schrift: string; rand: string } {
+  const stil = pinDarstellung(zustand)
+  if (zustand !== 'normal') return stil
+  return { groesse: 30, hintergrund: 'var(--fz-text)', schrift: 'var(--fz-surface)', rand: 'var(--fz-surface)' }
 }
 
 /** Text für das HTML einer Marke — ein Hofname ist Fremdtext. */
@@ -129,18 +140,18 @@ function ohneMarkup(text: string): string {
 }
 
 function scheibe(nummer: number, zustand: PinZustand): string {
-  const stil = pinDarstellung(zustand)
+  const stil = scheibenStil(zustand)
   return (
     `<div style="width:${stil.groesse}px;height:${stil.groesse}px;border-radius:9999px;flex:none;position:relative;z-index:1;` +
     `background:${stil.hintergrund};color:${stil.schrift};` +
     `display:flex;align-items:center;justify-content:center;` +
-    `font-size:13px;font-weight:600;border:2px solid ${stil.rand};` +
+    `font-size:13px;font-weight:700;border:2px solid ${stil.rand};` +
     `box-shadow:0 1px 4px rgba(0,0,0,0.35);">${nummer}</div>`
   )
 }
 
 function pinIcon(nummer: number, zustand: PinZustand, name?: string): L.DivIcon {
-  const stil = pinDarstellung(zustand)
+  const stil = scheibenStil(zustand)
   if (!name) {
     return L.divIcon({ ...trefferRahmen(stil.groesse, stil.groesse, scheibe(nummer, zustand)), className: cn(TREFFER_RUNDUNG, PIN_FOKUS) })
   }
@@ -149,9 +160,9 @@ function pinIcon(nummer: number, zustand: PinZustand, name?: string): L.DivIcon 
   const masse = pinNamenMasse(name)
   const links = masse.ankerX - stil.groesse / 2
   const pille =
-    `<div style="height:${PILLE_HOEHE}px;margin-left:-6px;padding:0 8px 0 12px;border-radius:9999px;white-space:nowrap;` +
+    `<div style="height:${PILLE_HOEHE}px;margin-left:4px;padding:0 6px;border-radius:6px;white-space:nowrap;` +
     `display:flex;align-items:center;background:${PILLE.hintergrund};` +
-    `color:${PILLE.schrift};font-size:12px;font-weight:700;border:1px solid ${PILLE.rand};` +
+    `color:${PILLE.schrift};font-size:12px;font-weight:600;border:1px solid ${PILLE.rand};` +
     `box-shadow:0 1px 4px rgba(0,0,0,0.25);">${ohneMarkup(pinName(name))}</div>`
   return L.divIcon({
     className: cn(TREFFER_RUNDUNG, PIN_FOKUS),
@@ -383,7 +394,8 @@ export default function HoefeKarte({
     const map = L.map(kartenDiv.current, {
       center: OESTERREICH_MITTE,
       zoom: OESTERREICH_ZOOM,
-      zoomControl: true,
+      // Der Zoom kommt unten selbst dazu — oben rechts wie in den Boards (w1-/s1-hoefe, Nr. 234).
+      zoomControl: false,
       attributionControl: false,
       // Den Größenwechsel misst useKartenGroesse (ResizeObserver) — nicht
       // zusätzlich Leaflet beim window-resize.
@@ -395,6 +407,8 @@ export default function HoefeKarte({
       .attribution({ position: attributionOben ? 'topright' : 'bottomright' })
       .setPrefix(false)
       .addTo(map)
+    // Nach der Attribution angelegt: Steht sie oben rechts (Kartenmodus am Handy), liegt der Zoom darunter.
+    L.control.zoom({ position: 'topright', zoomInTitle: 'Hineinzoomen', zoomOutTitle: 'Herauszoomen' }).addTo(map)
     L.tileLayer(KARTEN_KACHELN.url, {
       maxZoom: KARTEN_KACHELN.maxZoom,
       attribution: KARTEN_KACHELN.attribution,
@@ -705,14 +719,14 @@ export default function HoefeKarte({
   return (
     // `isolate`: Leaflets Ebenen (400) und Bedienteile (1000) bleiben in der
     // Karte — sonst lägen sie beim Scrollen über der klebenden Kopfzeile (40).
-    <div className={cn('relative isolate overflow-hidden', !randlos && 'rounded-2xl border border-border', hoeheKlasse)}>
+    <div className={cn('relative isolate overflow-hidden', !randlos && 'rounded-2xl border border-border', LEAFLET_BEDIENTEILE, hoeheKlasse)}>
       <div ref={kartenDiv} className="h-full w-full" />
       {hinweis && (
-        // Über den Pins (Ebene 600), neben dem Zoom links oben und unter der Attribution, wenn sie oben steht.
+        // Über den Pins (Ebene 600), links oben neben dem Zoom (oben rechts, 44 px) — unter der Attribution, wenn sie oben steht.
         <p
           ref={hinweisRef}
           className={cn(
-            'pointer-events-none absolute right-3 left-14 z-[700] w-fit max-w-[calc(100%-4.25rem)] rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground shadow-md',
+            'pointer-events-none absolute left-3 z-[700] w-fit max-w-[calc(100%-5.5rem)] rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground shadow-md',
             attributionOben ? 'top-8' : 'top-3'
           )}
         >

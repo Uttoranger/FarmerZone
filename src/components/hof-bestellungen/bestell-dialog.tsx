@@ -1,18 +1,22 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { useRef, type ReactNode } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogMitte, DialogTitle } from '@/components/ui/dialog'
+import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle } from '@/components/ui/sheet'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { useMindestbreite } from '@/lib/use-mindestbreite'
 import { cn } from '@/lib/utils'
-import { KNOPF_GRUEN, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from './stil'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { KNOPF_GRUEN, KNOPF_ORANGE, KNOPF_ORANGE_RAHMEN, KNOPF_RAHMEN } from './stil'
 
 export type Hauptaktion = {
   text: string
   onClick: () => void
-  /** grün = Hauptaktion, orange = zerstörend (Orange-Umriss). */
-  ton: 'gruen' | 'orange'
+  /**
+   * haupt = Hauptaktion im Hofbereich (orange gefüllt, N42 a; Bestellungen seit Lauf 30),
+   * gruen = Hauptaktion im Bestand (Admin), orange = zerstörend (Orange-Umriss).
+   */
+  ton: 'haupt' | 'gruen' | 'orange'
   laeuft?: boolean
   gesperrt?: boolean
 }
@@ -23,6 +27,13 @@ export type Hauptaktion = {
  * Handy ein Blatt von unten mit der Hauptaktion über die volle Breite und
  * „Abbrechen" als Textknopf darunter (DESIGN_SYSTEM „Dialoge und Blätter").
  * Solange die Aktion läuft, schließt nichts — ein zweiter Tipp landet nicht.
+ *
+ * Mit `mitte` (Boards s1-/w1-bestellung, Lauf 31) steht „Abbrechen“ in beiden
+ * Breiten oben rechts neben dem Titel — im Dialog wie im Blatt (abgedunkelter
+ * Schleier, die Seite bleibt lesbar) —, und der Fokus startet dort: Eine
+ * Rückfrage vor Storno, „Nicht abgeholt“ oder „Artikel fehlt“ beginnt nie auf
+ * der Aktion selbst. `nebenaktion` steht unter der Hauptaktion (Blatt) bzw.
+ * links daneben (Dialog), etwa „Ganze Bestellung stornieren …“.
  */
 export function BestellDialog({
   offen,
@@ -30,19 +41,31 @@ export function BestellDialog({
   titel,
   unterzeile,
   breite = 'schmal',
+  mitte = false,
   hauptaktion,
+  nebenaktion,
   children,
 }: {
+  /**
+   * Ab 768 px der zentrierte Dialog nach N41 d (DialogMitte, höchstens 560 px, oben rechts
+   * genau ein „Abbrechen“; Boards w1-bestellung). Ohne `mitte` bleibt der Bestand
+   * (DialogContent) — die übrigen Aufrufer (Admin) stellen ihre Nummern um.
+   */
+  mitte?: boolean
   offen: boolean
   onOffenChange: (offen: boolean) => void
   titel: string
   unterzeile?: string
   breite?: 'schmal' | 'breit'
   hauptaktion: Hauptaktion
+  /** Ein zweiter Weg als Textknopf (nur mit `mitte`). */
+  nebenaktion?: ReactNode
   children: ReactNode
 }): React.JSX.Element {
   const breit = useMindestbreite(768)
   const laeuft = hauptaktion.laeuft === true
+  const popup = useRef<HTMLDivElement>(null)
+  const startfokus = () => abbrechenIn(popup.current)
   const wechsel = (o: boolean) => {
     if (!laeuft) onOffenChange(o)
   }
@@ -52,11 +75,30 @@ export function BestellDialog({
       onClick={hauptaktion.onClick}
       disabled={laeuft || hauptaktion.gesperrt}
       aria-busy={laeuft || undefined}
-      className={cn(hauptaktion.ton === 'gruen' ? KNOPF_GRUEN : KNOPF_ORANGE_RAHMEN, !breit && 'w-full rounded-[14px]')}
+      className={cn(
+        hauptaktion.ton === 'haupt' ? KNOPF_ORANGE : hauptaktion.ton === 'gruen' ? KNOPF_GRUEN : KNOPF_ORANGE_RAHMEN,
+        !breit && 'w-full rounded-[14px]'
+      )}
     >
       {laeuft ? 'Einen Moment …' : hauptaktion.text}
     </button>
   )
+
+  if (breit && mitte) {
+    return (
+      <Dialog open={offen} onOpenChange={wechsel}>
+        <DialogMitte ref={popup} titel={titel} schliessen="Abbrechen" className="gap-4" initialFocus={startfokus}>
+          {unterzeile && <DialogDescription className="-mt-2 text-[13px] break-words text-muted-foreground">{unterzeile}</DialogDescription>}
+          {children}
+          {/* Hauptknopf rechts, der zweite Weg darunter (Liste Lauf 32, bestellung Bild 3: „Ganze Bestellung stornieren …“). */}
+          <div className="flex flex-col items-end gap-1.5">
+            {hauptKnopf}
+            {nebenaktion}
+          </div>
+        </DialogMitte>
+      </Dialog>
+    )
+  }
 
   if (breit) {
     return (
@@ -83,6 +125,22 @@ export function BestellDialog({
     )
   }
 
+  if (mitte) {
+    return (
+      <Sheet open={offen} onOpenChange={wechsel}>
+        <SheetBlatt ref={popup} schleier="abgedunkelt" initialFocus={startfokus}>
+          <div className="min-w-0">
+            <SheetKopf titel={titel} schliessen="Abbrechen" />
+            {unterzeile && <SheetDescription className="mt-1 text-[13px] break-words">{unterzeile}</SheetDescription>}
+          </div>
+          {children}
+          {hauptKnopf}
+          {nebenaktion && <div className="flex justify-center">{nebenaktion}</div>}
+        </SheetBlatt>
+      </Sheet>
+    )
+  }
+
   return (
     <Sheet open={offen} onOpenChange={wechsel}>
       <SheetBlatt>
@@ -103,11 +161,21 @@ export function BestellDialog({
   )
 }
 
+/**
+ * Der Startfokus der Rückfragen mit `mitte`: das eine „Abbrechen“ oben rechts (Dialog bzw. Blatt).
+ * Gesucht wird nur im eigenen Popup — beim Wechsel von einem Dialog zum nächsten steht der schließende
+ * noch kurz im DOM, und ein Treffer dort hieße: Fokus auf ein Element, das gleich verschwindet.
+ */
+export function abbrechenIn(popup: HTMLElement | null): HTMLElement | true {
+  const knopf = popup?.querySelector<HTMLElement>('[data-slot="dialog-close"], [data-slot="sheet-kopf"] [data-slot="sheet-close"]')
+  return knopf ?? true
+}
+
 /** Fehler einer Aktion — inline im Dialog, orange (Register O1: kein Fehler-Token). */
 export function DialogFehler({ text }: { text: string | null }): React.JSX.Element | null {
   if (!text) return null
   return (
-    <p role="alert" className="rounded-xl border border-primary/45 bg-primary/12 px-3.5 py-2.5 text-[13px] font-medium text-foreground">
+    <p role="alert" className={cn(RUNDUNG.hinweis, 'border border-primary/45 bg-primary/12 px-3.5 py-2.5 text-[13px] font-medium text-foreground')}>
       {text}
     </p>
   )

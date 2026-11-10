@@ -25,9 +25,11 @@
  * eine Falle. Wiener Tage kommen aus wiener-tag.ts, Cent → Euro aus format.ts.
  */
 import type { Tarif } from '@prisma/client'
-import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl, plural } from '@/lib/format'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
 import { MARKE } from '@/lib/marke'
+// Nur der Typ — zur Laufzeit bindet diese Datei plattformgebuehr.ts nicht ein (sonst ein Ring über servicegebuehr.ts).
+import type { GebuehrModell } from '@/lib/plattformgebuehr'
 
 /**
  * Die Tarif-Kennung ist das Prisma-Enum `Tarif` — nur als Typ eingebunden,
@@ -209,7 +211,10 @@ export const PLATTFORMGEBUEHR_BEZEICHNUNG = 'Plattformgebühr'
 /** Der Zusatz am Endpreis — Hofseite, Produktseite, Karten, Korb und Mails (N38). */
 export const INKL_PLATTFORMGEBUEHR = 'inkl. Plattformgebühr'
 
-/** Der Satz unter Korb und Positionen der Kasse im Hofpreis-Modell. */
+/**
+ * Der Satz unter einer Preisliste im Hofpreis-Modell: unter den Produktzeilen auf /hoefe und unter „Gleich mit
+ * abholen“ der Produktseite. Die Kasse zeigt ihn seit Nr. 236 nicht mehr (N38 verlangt ihn dort nicht).
+ */
 export const PREISE_INKL_PLATTFORMGEBUEHR = `Preise ${INKL_PLATTFORMGEBUEHR}`
 
 /** Der Satz in der Kasse unter der Aufschlüsselung (Freigabe Lauf 26, Nr. 197, wörtlich). */
@@ -225,6 +230,21 @@ export function inklPlattformgebuehrSatz(betrag: string): string {
 
 /** Der Grund am ausgeschalteten Bestellknopf und die Meldung von /api/checkout (400). */
 export const MINDESTBESTELLWERT_SATZ = `Mindestbestellwert ${formatZahl(centsAlsEuro(MINDESTBESTELLWERT_CENTS))} € bei diesem Hof`
+
+/** „10 €“ — der Mindestbestellwert als Wort im Satz, wie in `MINDESTBESTELLWERT_SATZ`. */
+export const MINDESTBESTELLWERT_TEXT = `${formatZahl(centsAlsEuro(MINDESTBESTELLWERT_CENTS))} €`
+
+/**
+ * Der Wortlaut des Mindestbestellwert-Hinweises in der Kasse (Register N41 a,
+ * Antwort A3): „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab
+ * € 10,60). Dir fehlen noch Waren für € X.“ Die Beträge rechnet
+ * `mindestbestellwertHinweis` (plattformgebuehr.ts) mit dem Satz des Hofs —
+ * nie ein Literal. Ohne Fehlbetrag entfällt der zweite Satz.
+ */
+export function mindestbestellwertHinweisText(abCents: number, fehlendCents: number): string {
+  const satz = `Mindestbestellwert: Waren für ${MINDESTBESTELLWERT_TEXT} (mit ${PLATTFORMGEBUEHR_BEZEICHNUNG} ab ${formatEuro(centsAlsEuro(abCents))}).`
+  return fehlendCents > 0 ? `${satz} Dir fehlen noch Waren für ${formatEuro(centsAlsEuro(fehlendCents))}.` : satz
+}
 
 /**
  * Neutral, wenn bar bei diesem Hof gerade nicht geht (kein Mandat, N38) —
@@ -260,11 +280,12 @@ export const LASTSCHRIFT_TEXT = {
   rechnung: 'Rechnung (PDF)',
   bezahlen: 'Jetzt bezahlen',
   rechnungFehlt: 'Die Rechnung lässt sich gerade nicht öffnen. Versuch es bitte gleich noch einmal.',
-  heuteTitel: 'Barzahlung ist pausiert',
+  /** Dasselbe Wort wie die Marke „Bar gesperrt“ (Register N38, Ergänzung 5.11.2026) — nie „pausiert“, das ist der Hofzustand. */
+  heuteTitel: 'Barzahlung ist gesperrt',
   heuteSatz: (monat: string): string =>
     `Die Plattformgebühr für ${monat} ist noch offen. Bis sie bezahlt ist, nehmen wir bei dir keine Barbestellungen an – laufende Bestellungen bleiben.`,
   /** Nach einer Rückbuchung ist die Rechnung bezahlt — es gibt nichts zu bezahlen, das Team klärt es. */
-  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist pausiert – das Team meldet sich bei dir.`,
+  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist gesperrt – das Team meldet sich bei dir.`,
   zumPostfach: 'Zum Postfach',
 } as const
 
@@ -315,8 +336,12 @@ export const ONLINE_ZAHLUNG_START_SCHRITT = {
   text: 'Über Stripe, dauert etwa 10 Minuten. Gehört zum Start – ohne sie schalten wir keinen Hof frei.',
 } as const
 
-/** Dasselbe kurz — neben dem Registrieren-Formular. */
-export const ONLINE_ZAHLUNG_START_KURZ = 'über Stripe, etwa 10 Minuten – gehört zum Start'
+/**
+ * Dasselbe kurz — neben dem Registrieren-Formular (nur dort, REGISTRIEREN_SCHRITTE). Wortlaut nach Board
+ * w2-registrieren, Seitenspalte Schritt 3 (Liste Lauf 32, registrieren; Nr. 275): „mit Stripe, etwa 10 Minuten“;
+ * den Nachsatz „für SEPA ist jetzt nichts zu tun“ hängt fuer-hoefe.ts an.
+ */
+export const ONLINE_ZAHLUNG_START_KURZ = 'mit Stripe, etwa 10 Minuten'
 
 // ─── Servicegebühr ──────────────────────────────────────────────────────────
 
@@ -406,17 +431,125 @@ export type TextTeil = { text: string; betont?: boolean }
  * Grundgebühr nur nach aktiver Wahl von Hofladen (E6-Ergänzung, Nr. 61) —
  * „Deine Konditionen" hebt das hervor, darum in Teilen.
  */
-export const MONATSABRECHNUNG_TEILE: readonly TextTeil[] = [
+const MONATSABRECHNUNG_GRUNDGEBUEHR: readonly TextTeil[] = [
   { text: `Ab dem ${TARIFE_AB_TEXT} rechnen wir einmal im Monat per SEPA-Lastschrift ab: die Grundgebühr – ` },
   { text: `nur wenn du ${tarifText('HOFLADEN').name} gewählt hast`, betont: true },
+]
+
+export const MONATSABRECHNUNG_TEILE: readonly TextTeil[] = [
+  ...MONATSABRECHNUNG_GRUNDGEBUEHR,
   { text: ' – und die Servicegebühren aus Barbestellungen. Bei Online-Zahlungen ist die Servicegebühr schon beim Bezahlen erledigt.' },
 ]
 
 /** Derselbe Satz am Stück — für /konditionen. */
 export const MONATSABRECHNUNG_TEXT = MONATSABRECHNUNG_TEILE.map((teil) => teil.text).join('')
 
-/** Wann der Text dieser Seite zuletzt geändert wurde. */
+/** Wann der Text dieser Seite zuletzt geändert wurde — die Fassung vor dem Stichtag (`konditionenStand`). */
 export const KONDITIONEN_STAND = 'Oktober 2026'
+
+// ─── Gebühren-Texte je Modell (V62, V63; Lauf 30, Nr. 221) ───────────────────
+//
+// Ab dem Stichtag „Hofpreis-Modell ab“ heißt es überall „Plattformgebühr“
+// (N38). Jede Funktion hier nimmt das MODELL (`gebuehrModellFuer` in
+// plattformgebuehr.ts) statt eines Datums — so gibt es keine zweite
+// Datumsregel. Die festen Sätze darüber (SERVICEGEBUEHR_ZAHLT_KUNDE,
+// VOLLER_WARENPREIS, MONATSABRECHNUNG_TEILE, KONDITIONEN_DERZEIT,
+// KONDITIONEN_STAND) sind die Fassung „bisher“; Seiten mit Stichtag nehmen
+// die Funktionen. Nur der Typ wird eingebunden — ein Ring zur Laufzeit
+// entsteht so nicht.
+
+/**
+ * Die frühere Kennzeichnung über „Plattformgebühr und Abrechnung“. Seit N45
+ * fällt sie ab dem Stichtag weg (`entwurf` ist dann null) — der Abschnitt
+ * steht erst ab dem Stichtag da, die Seite zeigt sie also nicht mehr.
+ */
+export const KONDITIONEN_ENTWURF = 'Entwurf – die Anwältin prüft den Wortlaut'
+
+/**
+ * Die Zeile über den Tarifen auf /konditionen mit dem Stichtag (N45, ergänzt
+ * K1): vor dem Stichtag K1 wörtlich und danach der Satz zum Stichtag; ab dem
+ * Stichtag der Satz zum Stichtag und, solange der Tarifstart in der Zukunft
+ * liegt, TARIFE_AB_SATZ. `tag` ist der Stichtag als Text (formatDatumLang).
+ */
+export function konditionenStichtagZeile(modell: GebuehrModell, tag: string, jetzt: Date): string {
+  if (modell === 'bisher') return `${KONDITIONEN_UEBERGANG} Ab ${tag} ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG} im Preis enthalten (Stichtag).`
+  const seit = `Seit ${tag} ist die ${PLATTFORMGEBUEHR_BEZEICHNUNG} im Preis enthalten (Stichtag).`
+  return jetzt.getTime() < TARIFE_AB.getTime() ? `${seit} ${TARIFE_AB_SATZ}` : seit
+}
+
+/** Ein Abschnitt der Konditionen-Seite: Überschrift, Kennzeichnung (null = keine) und Absätze. */
+export type KonditionenAbschnitt = { titel: string; entwurf: string | null; absaetze: readonly string[] }
+
+/**
+ * Der Abschnitt zur Gebühr auf /konditionen (V62; Wortlaut nach Board
+ * w3-rechtstexte Bild 6 und dem Auftrag Lauf 30). Vor dem Stichtag der
+ * bisherige (Servicegebühr, Bar-Ausnahme B1, Monatsabrechnung), ab dem
+ * Stichtag „Plattformgebühr und Abrechnung“ — seit N45 ohne Entwurf-Kennzeichnung.
+ * `satz` ist der Satz eines bestimmten Hofs („6,5“); ohne ihn steht der
+ * Standard mit dem Hinweis, dass ein eingetragener Satz vorgeht.
+ */
+export function konditionenGebuehrAbschnitt(modell: GebuehrModell, jetzt: Date, satz?: string): KonditionenAbschnitt {
+  if (modell === 'bisher') {
+    return { titel: 'Servicegebühr und Abrechnung', entwurf: null, absaetze: [servicegebuehrZahltKunde(jetzt), MONATSABRECHNUNG_TEXT] }
+  }
+  const prozent = satz ?? formatZahl(PLATTFORMGEBUEHR_PROZENT)
+  const standard = satz === undefined ? ' (Standard; ist für deinen Hof ein anderer Satz eingetragen, gilt dieser)' : ''
+  return {
+    titel: `${PLATTFORMGEBUEHR_BEZEICHNUNG} und Abrechnung`,
+    // N45: Ab dem Stichtag fällt „Entwurf – die Anwältin prüft den Wortlaut“ weg; das Feld bleibt im Typ.
+    entwurf: null,
+    absaetze: [
+      `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} beträgt ${prozent} % vom Warenpreis, je Stück auf den Cent aufgerundet${standard}. ` +
+        `Sie steckt im Preis, den Kundinnen sehen – online und bar gleich. Mindestbestellwert ${MINDESTBESTELLWERT_TEXT} Warenwert je Bestellung.`,
+      'Online behält Stripe die Gebühr gleich bei der Zahlung ein – der Hof ist dabei Händler. ' +
+        'Bar ziehen wir sie einmal im Monat per SEPA-Lastschrift ein, fällig erst mit „Abgeholt“; dafür richtest du eine Lastschrift ein. ' +
+        'Gründungshöfe zahlen sie bar erst nach ihrer Gründungszeit und brauchen bis dahin keine Lastschrift.',
+    ],
+  }
+}
+
+/** Die Stand-Zeile der Konditionen: vor dem Stichtag `KONDITIONEN_STAND`, ab dann der Stichtag selbst (Board w3-rechtstexte). */
+export function konditionenStand(modell: GebuehrModell, stichtag: Date): string {
+  return modell === 'hofpreis' ? formatDatumLang(stichtag) : KONDITIONEN_STAND
+}
+
+/**
+ * „Derzeit gilt: …“ im Freischalt-Dialog des Admins — ab dem Stichtag nach
+ * N38 (Wortlaut Board w3-admin-freischalten), davor `KONDITIONEN_DERZEIT`.
+ */
+export function konditionenDerzeit(modell: GebuehrModell): string {
+  if (modell === 'bisher') return KONDITIONEN_DERZEIT
+  const hofladen = tarifText('HOFLADEN')
+  return (
+    `Derzeit gilt: ${PLATTFORMGEBUEHR_BEZEICHNUNG} ${formatZahl(PLATTFORMGEBUEHR_PROZENT)} % im Hofpreis, online und bar gleich; ` +
+    `${tarifText('HOFTOR').name} ${KOSTENLOS}, ${hofladen.name} ${hofladen.preis} ${IM_MONAT}. ${BESTANDSHOEFE_SATZ}`
+  )
+}
+
+/**
+ * Der Grundsatz im Preise-Abschnitt (/fuer-hoefe) und auf der Tarif-Karte —
+ * vor dem Stichtag `servicegebuehrZahltKunde`, ab dann die Plattformgebühr im
+ * Preis (N38: der Hof reicht nur weiter, was die Kundin zahlt).
+ */
+export function gebuehrGrundsatz(modell: GebuehrModell, jetzt: Date): string {
+  if (modell === 'bisher') return servicegebuehrZahltKunde(jetzt)
+  return `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} von ${formatZahl(PLATTFORMGEBUEHR_PROZENT)} % steckt im Preis, den die Kundin zahlt – online wie bar. Du bekommst den vollen Warenpreis.`
+}
+
+/** Die Kurzfassung für Karten (Einrichten, „Deine Konditionen“) — Wortlaut Board w2-registrieren; davor `VOLLER_WARENPREIS`. */
+export function vollerWarenpreis(modell: GebuehrModell): string {
+  if (modell === 'bisher') return VOLLER_WARENPREIS
+  return `Die ${PLATTFORMGEBUEHR_BEZEICHNUNG} (${formatZahl(PLATTFORMGEBUEHR_PROZENT)} %) steckt im Preis, den die Kundin zahlt – online wie bar.`
+}
+
+/** Die Monatsabrechnung in Teilen — ab dem Stichtag mit der Plattformgebühr; davor `MONATSABRECHNUNG_TEILE`. */
+export function monatsabrechnungTeile(modell: GebuehrModell): readonly TextTeil[] {
+  if (modell === 'bisher') return MONATSABRECHNUNG_TEILE
+  return [
+    ...MONATSABRECHNUNG_GRUNDGEBUEHR,
+    { text: ` – und die ${PLATTFORMGEBUEHR_BEZEICHNUNG} aus Barbestellungen. Bei Online-Zahlungen behält Stripe sie schon beim Bezahlen ein.` },
+  ]
+}
 
 /**
  * Was die Karte „Tarif" auf Einrichten zeigt: ohne gewählten Tarif
@@ -509,10 +642,15 @@ export const TARIF_ZEILE = {
 export type TarifZeileDaten = {
   zustand: Exclude<TarifZustand, 'hofladen'>
   titel: string
-  /** Unterzeile in der Seitenleiste. */
+  /** Unterzeile in der Seitenleiste (beim Gründungshof liest sie nur noch die Übersicht der Einstellungen, `konditionenZeile`). */
   zeile: string
   /** Unterzeile im Mehr-Blatt (am Handy). */
   zeileHandy: string
+  /**
+   * Nur Gründungshof: „noch 11 Monate (bis 31. Jänner 2028)“ — die Unterzeile in Seitenleiste und Mehr-Blatt statt
+   * `zeile`/`zeileHandy` (Boards w1-/s1-mehr-neu, Nr. 233). Reine Anzeige aus dem Datum und heute.
+   */
+  restzeit?: string
   /** Nur Hoftor: „n von 3" und der Anteil für den Balken (0 bis 1) — Anzeige, keine Sperre (O8 baut Gate 8). */
   grenze?: { wert: string; anteil: number }
   /** Nur Hoftor: „Tarife vergleichen". */
@@ -530,8 +668,20 @@ export function baueTarifZeile(hof: TarifHof & { produkteImShop: number }, jetzt
       return { zustand: stand.zustand, titel: t.titel, zeile: t.zeile, zeileHandy: `${t.zeile} · ${t.handy}` }
     }
     case 'gruendungshof': {
-      const zeile = `${TARIF_ZEILE.gruendungshof.zeile} ${formatDatumLang(stand.bis)}`
-      return { zustand: stand.zustand, titel: TARIF_ZEILE.gruendungshof.titel, zeile, zeileHandy: zeile }
+      const datum = formatDatumLang(stand.bis)
+      const zeile = `${TARIF_ZEILE.gruendungshof.zeile} ${datum}`
+      // Nur Anzeige (Boards w1-/s1-mehr-neu): angefangene Monate bis einschließlich des Wiener Tags `bis` — keine Frist
+      // und keine Geldregel; ob die Zusage gilt, entscheidet allein ermittleStand. Weil `bis` nie vor heute liegt,
+      // steht hier mindestens „noch 1 Monat“ (am 3. März bis 31. Jänner: 10 volle Monate und ein angefangener = 11).
+      // monatsAbstand/monatsschluesselInWien aus servicegebuehr.ts darf diese Datei nicht holen (Ring, wiener-tag.ts),
+      // deshalb hier nur der Monatsschritt über den Wiener Kalendertag; die Mehrzahl über plural() aus format.ts.
+      // Ein Wiener Kalendertag (JJJJ-MM-TT) als Zahl der Monate seit Jahr 0.
+      const monatsZahl = (kalendertag: string) => parseInt(kalendertag.slice(0, 4), 10) * 12 + parseInt(kalendertag.slice(5, 7), 10)
+      const heute = kalendertagInWien(jetzt)
+      const bisTag = kalendertagInWien(stand.bis)
+      const monate = monatsZahl(bisTag) - monatsZahl(heute) + (bisTag.slice(8) >= heute.slice(8) ? 1 : 0)
+      const restzeit = `noch ${monate} ${plural(monate, 'Monat', 'Monate')} (bis ${datum})`
+      return { zustand: stand.zustand, titel: TARIF_ZEILE.gruendungshof.titel, zeile, zeileHandy: zeile, restzeit }
     }
     case 'hoftor': {
       const t = TARIF_ZEILE.hoftor

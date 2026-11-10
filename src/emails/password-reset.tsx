@@ -1,7 +1,6 @@
 import * as React from 'react'
-import { Text, Link } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, ctaButton } from './_layout'
-import { MARKE } from '@/lib/marke'
+import { Text } from '@react-email/components'
+import { EmailLayout, Knopf, KnopfReihe, h1, bodyText, kleinText, leiseZeile } from './_layout'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 
 export interface PasswordResetProps {
@@ -10,27 +9,15 @@ export interface PasswordResetProps {
 
 export function PasswordResetEmail({ resetUrl }: PasswordResetProps) {
   return (
-    <EmailLayout previewText={`Passwort zurücksetzen — Link gültig ${PASSWORT_LINK_DAUER_TEXT}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig.`}>
       <Text style={h1}>Passwort zurücksetzen</Text>
-      <Text style={bodyText}>
-        Hallo,
-        <br />
-        {`du möchtest das Passwort für dein ${MARKE}-Konto zurücksetzen. Klicke auf den Button unten und wähle ein neues Passwort.`}
-      </Text>
-
-      <div style={{ textAlign: 'center' as const, margin: '28px 0' }}>
-        <Link href={resetUrl} style={ctaButton}>
-          Neues Passwort wählen
-        </Link>
-      </div>
-
-      <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        Dieser Link ist <strong>{PASSWORT_LINK_DAUER_TEXT}</strong> gültig und kann nur einmal verwendet werden.
-      </Text>
-      <Text style={mutedText}>
-        Falls du das nicht angefordert hast, ignoriere diese E-Mail. Dein Passwort bleibt
-        unverändert.
-      </Text>
+      {/* Board s3/w3-mail-zugang Bild 3; ohne Namen — die Mail kennt nur die Adresse. */}
+      <Text style={bodyText}>Hallo, du möchtest ein neues Passwort für dein Konto. Tipp auf den Knopf unten:</Text>
+      <KnopfReihe>
+        <Knopf href={resetUrl}>Neues Passwort wählen</Knopf>
+      </KnopfReihe>
+      <Text style={leiseZeile}>{`Dieser Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig und funktioniert nur einmal.`}</Text>
+      <Text style={kleinText}>Du warst das nicht? Dann ignorier diese Mail – dein Passwort bleibt, wie es ist.</Text>
     </EmailLayout>
   )
 }

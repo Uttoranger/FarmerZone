@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement, type ComponentType, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Package, Sprout, Truck } from 'lucide-react'
+import { Package, Truck } from 'lucide-react'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
@@ -120,12 +120,12 @@ const FAELLE: Fall[] = [
     name: 'EmptyState',
     datei: 'empty-state',
     element: createElement(EmptyState, {
-      symbol: Sprout,
       titel: 'Noch keine Produkte',
       satz: 'Lege dein erstes an.',
       ausweg: createElement('a', { href: '/products?neu=1' }, 'Produkt anlegen'),
     }),
-    merkmale: ['Noch keine Produkte', 'Lege dein erstes an.', 'href="/products?neu=1"', 'lucide-sprout'],
+    // Ohne Symbol seit Nr. 246 (G4, N9 mit Ergänzung N46): Merkmal ist die Karte mit festem Rand.
+    merkmale: ['Noch keine Produkte', 'Lege dein erstes an.', 'href="/products?neu=1"', 'data-slot="empty-state"'],
   },
   {
     name: 'Marke',

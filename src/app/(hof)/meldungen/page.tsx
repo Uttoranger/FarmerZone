@@ -7,6 +7,7 @@ import { getMeldungenFuerHof } from '@/server/queries/meldung'
 import { meldungZeilen, type MeldungZeile } from '@/lib/hof-hilfe'
 import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
 import { MELDUNGEN_RAHMEN } from '@/components/hof-hilfe/hilfe-laden'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `Meine Meldungen — ${MARKE}` }
@@ -26,9 +27,10 @@ export default async function MeineMeldungenPage(): Promise<React.JSX.Element> {
   if (!farm) redirect('/onboarding')
 
   let zeilen: MeldungZeile[] | null = null
+  const jetzt = new Date()
   try {
     // Der Tag „Heute/Gestern" einmal hier auf dem Server, nach Wiener Zeit.
-    zeilen = meldungZeilen(await getMeldungenFuerHof(farm.id), new Date())
+    zeilen = meldungZeilen(await getMeldungenFuerHof(farm.id), jetzt)
   } catch (err) {
     // Nur Bereich und Hof — kein Meldungstext (Fremdtext) nach Sentry.
     Sentry.captureException(err, { tags: { bereich: 'hilfe', seite: 'meldungen' }, extra: { farmId: farm.id } })
@@ -36,7 +38,7 @@ export default async function MeineMeldungenPage(): Promise<React.JSX.Element> {
 
   return (
     <div className={MELDUNGEN_RAHMEN}>
-      <MeineMeldungen zeilen={zeilen} />
+      <MeineMeldungen zeilen={zeilen} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
     </div>
   )
 }

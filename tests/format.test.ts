@@ -270,9 +270,9 @@ describe('Grundpreis — EINE Rundungsstelle für jede Ausgabe (Nr. 11, Nachbess
     expect(formatKilopreis(grundpreisAusKennzeichnung(0.01, { nettoMenge: 0.016, nettoEinheit: 'KG' })!)).toBe('€ 0,63 / kg')
   })
 
-  it('Einheiten g, ml und m³ — je ihre eigene Einheit hinter dem Schrägstrich', () => {
-    expect(formatGrundpreisZeile(3, 'G', 500)).toBe('€ 0,01 / g')
-    expect(formatGrundpreisZeile(2.5, 'ML', 250)).toBe('€ 0,01 / ml')
+  it('Einheiten g und ml je kg bzw. L, m³ und L je ihre eigene Einheit', () => {
+    expect(formatGrundpreisZeile(3, 'G', 500)).toBe('€ 6,00 / kg')
+    expect(formatGrundpreisZeile(2.5, 'ML', 250)).toBe('€ 10,00 / L')
     expect(formatGrundpreisZeile(120, 'M3', 2)).toBe('€ 60,00 / m³')
     expect(formatGrundpreisZeile(100.01, 'M3', 2)).toBe('€ 50,01 / m³')
     expect(formatGrundpreisZeile(4.5, 'LITER', 5)).toBe('€ 0,90 / L')
@@ -401,6 +401,44 @@ describe('formatGrundpreisZeile — die zweite Zeile unter dem Preis', () => {
   it('unbrauchbare Zahlen: nichts statt „€ NaN"', () => {
     expect(formatGrundpreisZeile(Number.NaN, 'KG', 2)).toBeNull()
     expect(formatGrundpreisZeile(50, 'KG', 0)).toBeNull()
+  })
+})
+
+describe('formatGrundpreisZeile — Gramm und Milliliter je kg bzw. L (Antwort 3, Zwischen-Morgenbericht 33 B)', () => {
+  it('g zeigt den Grundpreis je kg, ml je L', () => {
+    expect(formatGrundpreisZeile(4.5, 'G', 250)).toBe('€ 18,00 / kg')
+    expect(formatGrundpreisZeile(2.9, 'ML', 500)).toBe('€ 5,80 / L')
+    expect(formatGrundpreisZeile(3, 'G', 500)).toBe('€ 6,00 / kg')
+    expect(formatGrundpreisZeile(2.5, 'ML', 250)).toBe('€ 10,00 / L')
+  })
+
+  it('Halbcent-Grenze: kaufmännisch in ganzen Zahlen, nicht über Fließkomma', () => {
+    // € 2,01 für 2000 g = € 1,005 / kg → € 1,01 (2.01 * 1000 / 2000 * 100 läge knapp unter 100,5).
+    expect(formatGrundpreisZeile(2.01, 'G', 2000)).toBe('€ 1,01 / kg')
+    expect(formatGrundpreisZeile(2.01, 'G', 2000)).toBe(formatGrundpreisZeile(2.01, 'KG', 2))
+    // € 0,01 für 16 ml = € 0,625 / L → € 0,63.
+    expect(formatGrundpreisZeile(0.01, 'ML', 16)).toBe('€ 0,63 / L')
+  })
+
+  it('krumme Mengen: 330 ml, 12,5 g und 0,5 g', () => {
+    // € 1,99 / 0,33 L = € 6,0303… → € 6,03.
+    expect(formatGrundpreisZeile(1.99, 'ML', 330)).toBe('€ 6,03 / L')
+    expect(formatGrundpreisZeile(1, 'G', 12.5)).toBe('€ 80,00 / kg')
+    // 0,5 g bleibt in Tausendstel-Gramm ganzzahlig — kein Umweg über 0,0005 kg.
+    expect(formatGrundpreisZeile(3, 'G', 0.5)).toBe(`${formatEuro(6000)} / kg`)
+  })
+
+  it('kg und L wie bisher', () => {
+    expect(formatGrundpreisZeile(4.5, 'KG', 0.25)).toBe('€ 18,00 / kg')
+    expect(formatGrundpreisZeile(2.9, 'LITER', 0.5)).toBe('€ 5,80 / L')
+  })
+
+  it('wie heute ohne Zeile: Gebinde 1 g bzw. 1 ml, ohne Gebinde, Preis 0 (Fall „1 g“ offen, Bericht 282)', () => {
+    expect(formatGrundpreisZeile(0.5, 'G', 1)).toBeNull()
+    expect(formatGrundpreisZeile(0.5, 'ML', 1)).toBeNull()
+    expect(formatGrundpreisZeile(0.5, 'G')).toBeNull()
+    expect(formatGrundpreisZeile(0.5, 'ML', null)).toBeNull()
+    expect(formatGrundpreisZeile(0, 'G', 250)).toBeNull()
   })
 })
 

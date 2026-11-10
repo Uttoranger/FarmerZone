@@ -53,7 +53,7 @@ describe('baueZahlungZuSpaet', () => {
         customerName: 'Erika Mustermann',
         customerEmail: 'kundin@example.com',
         orderNumber: 'TST-0101-AAAA',
-        farm: { name: 'Hof Test' },
+        farm: { name: 'Hof Test', email: '' },
       },
       2137
     )
@@ -67,6 +67,8 @@ describe('baueZahlungZuSpaet', () => {
     expect(call.html).toContain('Hof Test')
     // Cent → Euro an der Grenze, deutsch formatiert.
     expect(call.html).toContain('21,37')
-    expect(call.html).toContain('bleibt storniert')
+    expect(call.html).toContain('schon abgelaufen war')
+    // Ohne Aufruf zur nächsten Bestellung (S11, Board s3/w3-mail-storno Bild 4).
+    expect(call.html).not.toContain('bestell einfach neu')
   })
 })

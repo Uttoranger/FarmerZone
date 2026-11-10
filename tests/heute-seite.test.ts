@@ -42,11 +42,15 @@ import { join } from 'node:path'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+// HeuteKopf ist seit Nr. 249 der Werkzeug-Kopf (G1): Heute hat keine Elternseite, also kein Rückweg.
+vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard', useParams: () => ({}) }))
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
 
 import {
+  abholungHeuteText,
   brauchtDichAnzeige,
   HEUTE_ABHOLEN,
   KENNZAHL_TEXT,
@@ -59,6 +63,10 @@ import {
   kennzahlBreiteEm,
   mitTrennstellen,
   naechstesAbholfenster,
+  fensterMitBestellungen,
+  karteNaechsteAbholung,
+  zeitpunktKurz,
+  naechsteAbholungSatz,
   onlinePausiertDaten,
   stripeEinrichtenHinweis,
   packliste,
@@ -70,6 +78,7 @@ import {
   type PacklistenZeile,
 } from '@/lib/heute'
 import { onlinePausiertHinweis, onlineZahlungPausiert } from '@/lib/stripe-konto'
+import { formatTagKurz } from '@/lib/format'
 import { umsatzBestellungWhere } from '@/lib/umsatz'
 import {
   FREISCHALT_MOMENT_TAGE,
@@ -80,6 +89,7 @@ import {
   merkeFreischaltGesehen,
 } from '@/lib/freischalt-moment'
 import {
+  AbholungHeuteMarke,
   BrauchtDichKarte,
   HeuteKopf,
   Kennzahlen,
@@ -93,7 +103,6 @@ import {
 } from '@/components/heute/heute-teile'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
-import { LEISE } from '@/components/hof-bestellungen/stil'
 import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, ersteSchritte, ersteSchritteDaten, zuTun, type ZuTunAufgabe } from '@/lib/erste-schritte'
 import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 
@@ -175,6 +184,47 @@ describe('Abholfenster — Wiener Wochentag', () => {
     expect(naechstesAbholfenster([dienstag], danach)).toEqual({ tag: '2026-10-13', name: 'Dienstag, 13. Oktober', zeit: '15–18 Uhr' })
     expect(naechstesAbholfenster([{ dayOfWeek: 3, startTime: '15:00', endTime: '18:00' }], danach)?.name).toBe('Morgen')
     expect(naechstesAbholfenster([], vorher)).toBeNull()
+  })
+
+  it('leer: das nächste Fenster MIT Bestellungen, nie „Heute …“ unter „Heute holt niemand etwas ab.“ (Liste Lauf 32, bestellungen/druck)', () => {
+    const vorher = new Date('2026-10-06T12:00:00Z') // Di 14:00 Wien, Fenster heute 15–18 Uhr
+    // Heute Bestellungen: das heutige Fenster mit seiner Zahl.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 3, null)).toEqual({ fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 3 })
+    // Heute keine, Samstag zwei: Samstag mit zwei.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, { tag: '2026-10-10', name: 'Samstag', anzahl: 2 })).toEqual({
+      fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' },
+      anzahl: 2,
+    })
+    // Gar keine Bestellung: das nächste Fenster ab morgen, nicht heute.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, null)).toEqual({ fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' }, anzahl: 0 })
+    // Bestellungen an einem Tag ohne Abholzeit (Abholzeit inzwischen gelöscht): Gegenprobe, das nächste Fenster ab morgen.
+    expect(fensterMitBestellungen([dienstag, samstag], vorher, 0, { tag: '2026-10-08', name: 'Donnerstag', anzahl: 1 })?.fenster.tag).toBe('2026-10-10')
+    expect(fensterMitBestellungen([], vorher, 0, null)).toBeNull()
+  })
+
+  it('zeitpunktKurz: „heute, 07:12“, „gestern, 18:40“, sonst Tag mit Datum — Wiener Zeit (Nr. 249b, Board w1-bestellung)', () => {
+    const jetzt = new Date('2026-11-07T10:00:00Z') // Sa 11:00 Wien
+    expect(zeitpunktKurz(new Date('2026-11-07T06:12:00Z'), jetzt)).toBe('heute, 07:12')
+    expect(zeitpunktKurz(new Date('2026-11-06T17:40:00Z'), jetzt)).toBe('gestern, 18:40')
+    // 23:30 UTC am Vortag ist in Wien schon heute (00:30).
+    expect(zeitpunktKurz(new Date('2026-11-06T23:30:00Z'), jetzt)).toBe('heute, 00:30')
+    expect(zeitpunktKurz(new Date('2026-11-04T08:05:00Z'), jetzt)).toBe(`${formatTagKurz('2026-11-04')}, 09:05`)
+    expect(zeitpunktKurz(new Date('2026-11-04T08:05:00Z'), jetzt)).toMatch(/^Mi, 4\./)
+  })
+
+  it('Karte „Nächste Abholung“: steht heute in der Packliste, nennt sie das Fenster danach mit seiner Zahl (Nr. 249b, Board s1/w1-heute Bild 1)', () => {
+    const vorher = new Date('2026-10-06T12:00:00Z') // Di 14:00 Wien, Fenster heute 15–18 Uhr
+    const samstagZwei = { tag: '2026-10-10', name: 'Samstag', anzahl: 2 }
+    // Heute drei in der Packliste, Samstag zwei: die Karte nennt Samstag mit zwei — nicht das heutige Fenster.
+    expect(karteNaechsteAbholung([dienstag, samstag], vorher, 3, samstagZwei)).toEqual({
+      fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' },
+      anzahl: 2,
+    })
+    // Heute drei, danach noch nichts bestellt: das nächste Fenster ab morgen mit 0 (Karte: „Noch keine Bestellungen“).
+    expect(karteNaechsteAbholung([dienstag, samstag], vorher, 3, null)).toEqual({ fenster: { tag: '2026-10-10', name: 'Samstag', zeit: '9–12 Uhr' }, anzahl: 0 })
+    // Heute leer: wie die Zeile unter der Packliste (fensterMitBestellungen).
+    expect(karteNaechsteAbholung([dienstag, samstag], vorher, 0, samstagZwei)).toEqual(fensterMitBestellungen([dienstag, samstag], vorher, 0, samstagZwei))
+    expect(karteNaechsteAbholung([], vorher, 3, null)).toBeNull()
   })
 })
 
@@ -388,9 +438,10 @@ describe('Hinweis „Online-Zahlung einrichten" für freigeschaltete Höfe ohne 
     expect(stripeEinrichtenHinweis({ ...basis, acceptsOnline: false, stripeAccountId: 'acct_test_platzhalter' })).toBe(true)
   })
 
-  it('kein Hinweis mit Stripe, vor der Freischaltung oder stillgelegt', () => {
+  it('kein Hinweis mit Stripe oder stillgelegt; vor der Freischaltung seit Nr. 249 schon (Liste Lauf 32, heute Bild 4)', () => {
     expect(stripeEinrichtenHinweis({ ...basis, stripeAccountReady: true })).toBe(false)
-    expect(stripeEinrichtenHinweis({ ...basis, approvedAt: null })).toBe(false)
+    // Board s1-/w1-heute Bild 4: der neue Hof (wartet) sieht die Karte in der Hauptspalte — Z1 verlangt Stripe vor der Freischaltung.
+    expect(stripeEinrichtenHinweis({ ...basis, approvedAt: null })).toBe(true)
     expect(stripeEinrichtenHinweis({ ...basis, archivedAt: FREI })).toBe(false)
   })
 
@@ -611,7 +662,7 @@ const zeile = (z: Partial<PacklistenZeile> & Pick<PacklistenZeile, 'id' | 'chip'
   uhrzeit: '15:00–18:00',
   kunde: 'Anna T.',
   positionen: '10× Eier, 1× Bauernbrot',
-  zahlart: 'Bar vor Ort',
+  zahlart: 'bar',
   gesamtCents: 1030,
   ...z,
 })
@@ -621,13 +672,19 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const h = html(
       createElement(Packliste, {
         zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' }), zeile({ id: 'o2', chip: 'bereit', gesamtCents: 2190 })],
-        zuPacken: 1,
-        naechsteAbholung: null,
-        leer: { abholfenster: null },
+        stand: '1 zu packen',
+        leer: { naechsteAbholung: 'Nächste Abholung: Heute, Di 6. Okt, 15–18 Uhr · 2 Bestellungen' },
       })
     )
-    expect(h).toContain('Packliste für heute')
-    expect(h).toContain('1 offen')
+    // Board s1-heute: der Kopf über der Karte mit dem Stand — „Packliste“, auch im Web (Liste Lauf 32, heute).
+    expect(h).toContain('Packliste')
+    expect(h).not.toContain('Packliste für heute')
+    // Antwort 2 (Lauf 32): Kurzname ohne Uhrzeit, Positionen zweizeilig statt abgeschnitten.
+    expect(h).not.toContain('15:00–18:00')
+    expect(h).toContain('Anna T.')
+    expect(h).toContain('line-clamp-2')
+    expect(h).toContain('10× Eier, 1× Bauernbrot · bar')
+    expect(h).toContain(' · 1 zu packen')
     expect(h).toContain('href="/orders/o1"')
     expect(h).toContain('Zum Packen')
     expect(h).toContain('Gepackt')
@@ -637,36 +694,41 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(h).toContain('Alle Bestellungen ansehen')
   })
 
-  it('Packliste leer: Satz mit Ausweg, ohne Druckknopf', () => {
-    const ohneFenster = html(createElement(Packliste, { zeilen: [], zuPacken: 0, naechsteAbholung: null, leer: { abholfenster: null } }))
-    expect(ohneFenster).toContain('Heute holt niemand etwas ab.')
+  it('Packliste leer: ohne Abholzeit „Noch keine Abholzeiten" mit Knopf, mit Abholzeit die nächste Abholung samt Zahl — beide ohne Druckknopf (Board s1-heute, Bild 3 und 4)', () => {
+    const ohneFenster = html(createElement(Packliste, { zeilen: [], stand: '', leer: { naechsteAbholung: null } }))
+    expect(ohneFenster).toContain(ABHOLZEITEN_FEHLEN.titel)
     expect(ohneFenster).toContain('href="/settings/pickup-slots"')
     expect(ohneFenster).not.toContain('/orders/today/print')
+    const satz = naechsteAbholungSatz({ tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' }, 3, '2026-10-06')
+    expect(satz).toBe('Nächste Abholung: Do, 8.\u00a0Okt, 15–18 Uhr · 3 Bestellungen')
     const mitFenster = html(
       createElement(Packliste, {
         zeilen: [],
-        zuPacken: 0,
-        naechsteAbholung: { tag: '2026-10-08', name: 'Donnerstag', anzahl: 3 },
-        leer: { abholfenster: { tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' } },
+        stand: '',
+        leer: { naechsteAbholung: satz },
       })
     )
-    expect(mitFenster).toContain('Nächste Abholung: Donnerstag, 15–18 Uhr')
-    expect(mitFenster).toContain('Donnerstag: 3 Bestellungen')
-    expect(mitFenster).toContain('href="/orders"')
+    expect(mitFenster).toContain('Heute holt niemand etwas ab.')
+    expect(mitFenster).toContain('Nächste Abholung: Do, 8.\u00a0Okt, 15–18 Uhr · 3 Bestellungen')
+    // Nichts zu tun: kein Knopf, kein Druck.
+    expect(mitFenster).not.toContain('href="/settings/pickup-slots"')
+    expect(mitFenster).not.toContain('/orders/today/print')
   })
 
   it('lange Namen: eine Zeile mit Auslassung, voller Text im title', () => {
     const lang = 'K'.repeat(80)
-    const h = html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten', kunde: lang })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } }))
+    const h = html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten', kunde: lang })], stand: '1 zu packen', leer: { naechsteAbholung: null } }))
     expect(h).toContain(`title="${lang}"`)
     expect(h).toContain('truncate')
   })
 
   it('Kopf und Kennzahlen: Abholung heute als Marke, Betrag über formatEuro, offen orange', () => {
-    const kopf = html(createElement(HeuteKopf, { datum: 'Dienstag, 6. Oktober 2026', abholungHeute: '15–18 Uhr' }))
+    const kopf = html(createElement(HeuteKopf, { datum: 'Dienstag, 6. Oktober 2026' }))
     expect(kopf).toContain('<h1')
-    expect(kopf).toContain('Abholung heute, 15–18 Uhr')
-    expect(html(createElement(HeuteKopf, { datum: 'Dienstag', abholungHeute: null }))).not.toContain('Abholung heute')
+    expect(kopf).not.toContain('Abholung heute')
+    // Die Marke mit Wochentag und Datum (V9), getrennt vom Kopf (Board s1-heute).
+    expect(abholungHeuteText('2026-10-06', '15–18 Uhr')).toBe('Abholung heute, Di 6.\u00a0Okt, 15–18 Uhr')
+    expect(html(createElement(AbholungHeuteMarke, { text: abholungHeuteText('2026-10-06', '15–18 Uhr') }))).toContain('Abholung heute, Di 6.\u00a0Okt, 15–18 Uhr')
     const zahlen = html(createElement(Kennzahlen, { bestellungen: 8, zuPacken: 5, umsatzHeuteCent: 18640 }))
     expect(zahlen).toContain('Noch zu packen')
     expect(zahlen).toContain('€ 186,40')
@@ -686,7 +748,8 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(zahlen).toContain('Heute abholen')
     // Mit weicher Trennstelle für schmale Karten (siehe unten) — gelesen wird dasselbe Wort.
     expect(zahlen).toContain(mitTrennstellen(KENNZAHL_TEXT.eingenommen))
-    expect(zahlen).toContain('mit Hofladen')
+    // Liste Lauf 32 (heute): der Zusatz „mit Hofladen“ unter der Kennzahl entfällt (Board „Heute eingenommen“).
+    expect(zahlen).not.toContain('mit Hofladen')
     expect(zahlen).toContain('€ 178,00')
     expect(zahlen).not.toContain('Bestellungen heute')
     expect(zahlen).not.toContain('Umsatz heute')
@@ -780,16 +843,23 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(zeile).not.toContain('<h2')
     const mitWirkung = html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz, wirkung: '14 Besuche über deine Links' }))
     expect(mitWirkung).toContain('letzte Woche 14 Besuche über deine Links')
+    // Nr. 277 (Abnahme Lauf 32, heute Bild 1/2): dieselbe Form wie „So geht’s“ — 52 px, Rand 1,5 px in Textfarbe, fett.
+    expect(zeile).toContain('min-h-[52px]')
+    expect(zeile).toContain('border-[1.5px]')
+    expect(zeile).toContain('font-bold')
+    expect(zeile).not.toMatch(/\bh-11\b/)
   })
 
   it('Seitenspalte: nächste Abholung, Woche mit Balken und Vergleich', () => {
-    const abholung = html(createElement(NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, anzahl: 8 }))
-    expect(abholung).toMatch(/Heute, <span[^>]*>15–18 Uhr<\/span>/)
+    const abholung = html(
+      createElement(NaechsteAbholungKarte, { fenster: { tag: '2026-10-06', name: 'Heute', zeit: '15–18 Uhr' }, tag: 'Heute, Di 6. Okt', anzahl: 8 })
+    )
+    // Mit Wochentag und Datum (V9, Board s1-heute).
+    expect(abholung).toMatch(/Heute, Di 6\. Okt, <span[^>]*>15–18 Uhr<\/span>/)
     expect(abholung).toContain('8 Bestellungen')
-    // Ohne Abholzeit nur der Titel als Zeile; Satz und Knopf stehen allein in der Packliste (tests/leerzustaende.test.ts).
-    const ohneFenster = html(createElement(NaechsteAbholungKarte, { fenster: null, anzahl: 0 }))
-    expect(ohneFenster).toContain('Noch keine Abholzeiten')
-    expect(ohneFenster).not.toContain('href=')
+    // Ohne Abholzeit entfällt die Karte (Liste Lauf 32, heute Bild 4); Satz und Knopf stehen allein in der Packliste.
+    const ohneFenster = html(createElement(NaechsteAbholungKarte, { fenster: null, tag: null, anzahl: 0 }))
+    expect(ohneFenster).toBe('')
 
     const balken = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((label, i) => ({ label, cent: 1000 * i, heute: i === 1, hoeheProzent: Math.round((100 * i) / 6) }))
     const woche = html(createElement(WocheKarte, { summeCent: 61290, vergleich: '+20 % gegenüber der Vorwoche bis Dienstag, 14:30', balken }))
@@ -799,26 +869,31 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     expect(woche).toContain('href="/analytics"')
     // Die Balken sind Bild; die Werte hört der Screenreader als Liste.
     expect(woche).toContain('sr-only')
+    // Nr. 277 (Abnahme Lauf 32, Umsatz-Karte): Balkenfläche 48 px statt 78 px, Balken leicht gerundet, „Auswertung →“ 15 px.
+    expect(woche).toContain('flex h-12 items-end')
+    expect(woche).not.toContain('h-[78px]')
+    expect(woche).toContain('rounded-[4px]')
+    expect(woche).not.toContain('rounded-t-md')
+    expect(woche).toMatch(/class="[^"]*text-\[15px\][^"]*"[^>]*>Auswertung →/)
 
   })
 
-  it('Braucht dich ohne Eintrag bei leerer Packliste: eine leise Zeile „Nichts braucht dich heute." — gedämpft, keine Karte, keine Überschrift, kein Link (N11)', () => {
+  it('Braucht dich ohne Eintrag bei leerer Packliste: Kopf „Braucht dich" und die eine Zeile „Nichts braucht dich heute." in einer Karte — ohne Liste und ohne Link (N11, Board s1-heute Bild 3)', () => {
     const leer = html(createElement(BrauchtDichKarte, { eintraege: [], packlisteLeer: true }))
     expect(leer).toContain('Nichts braucht dich heute.')
     expect(leer).not.toContain('Alles erledigt.')
-    // Gedämpft wie „Zu tun einblenden": die leise Schrift der Hofbereich-Bausteine (LEISE), halbfett-leicht (font-medium).
-    expect(leer).toMatch(new RegExp(`<p class="[^"]*\\b${LEISE}\\b[^"]*">Nichts braucht dich heute\\.</p>`))
-    expect(leer).toMatch(/<p class="[^"]*\bfont-medium\b/)
-    // Die Karte erkennt man am Abschnitt mit Überschrift, an der Liste und am Rahmen
-    // auf der Kartenfläche (Gegenprobe unten: dort kommt jedes dieser Merkmale vor).
-    expect(leer).not.toMatch(/<section|<h2|<ul|<a /)
-    expect(leer).not.toMatch(/bg-card|border/)
+    expect(leer).toMatch(/<h2[^>]*>Braucht dich<\/h2>/)
+    expect(leer).toMatch(/<p class="[^"]*\bbg-card\b[^"]*">Nichts braucht dich heute\.<\/p>/)
+    // Nichts zu tun: keine Liste, kein Link (Gegenprobe unten: dort kommen beide vor).
+    expect(leer).not.toMatch(/<ul|<a /)
   })
 
   it('Braucht dich mit Einträgen: die Karte mit Überschrift und Zeilen mit Ziel — die leise Zeile fehlt dann (N11)', () => {
-    const gefuellt = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', href: '/products?edit=p1' }], packlisteLeer: false }))
+    const gefuellt = html(createElement(BrauchtDichKarte, { eintraege: [{ art: 'ausverkauft', text: 'Eier ist ausverkauft', erklaerung: 'So kann es gerade niemand bestellen.', href: '/products?edit=p1' }], packlisteLeer: false }))
     expect(gefuellt).toMatch(/<section[^>]*aria-labelledby="heute-braucht-dich"/)
-    expect(gefuellt).toMatch(/<h2[^>]*>Braucht dich<\/h2>/)
+    // Liste Lauf 32 (heute Bild 3): die Erklärzeile je Grund unter dem Titel.
+    expect(gefuellt).toContain('So kann es gerade niemand bestellen.')
+    expect(gefuellt).toMatch(/<h2[^>]*>Braucht dich · 1<\/h2>/)
     expect(gefuellt).toContain('Eier ist ausverkauft')
     expect(gefuellt).toContain('href="/products?edit=p1"')
     expect(gefuellt).toMatch(/<ul/)
@@ -834,7 +909,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   it('Packliste mit Bestellungen, aber ohne aktive Abholzeit: Satz und Knopf unter der Liste — mit Abholzeit nicht', () => {
     const ohneAbholzeit = html(
-      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })
+      createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })
     )
     expect(ohneAbholzeit).toContain('href="/orders/o1"')
     expect(ohneAbholzeit).toContain(ABHOLZEITEN_FEHLEN.satz)
@@ -843,9 +918,8 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const mitAbholzeit = html(
       createElement(Packliste, {
         zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })],
-        zuPacken: 1,
-        naechsteAbholung: null,
-        leer: { abholfenster: { tag: '2026-10-08', name: 'Donnerstag', zeit: '15–18 Uhr' } },
+        stand: '1 zu packen',
+        leer: { naechsteAbholung: 'Nächste Abholung: Do, 8. Okt, 15–18 Uhr' },
       })
     )
     expect(mitAbholzeit).not.toContain(ABHOLZEITEN_FEHLEN.satz)
@@ -856,9 +930,9 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
     const alle = [
       html(createElement(StripeHinweis, { barMoeglich: true })),
       html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x' })),
-      html(createElement(HeuteKopf, { datum: 'x', abholungHeute: '15–18 Uhr' })),
-      html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], zuPacken: 1, naechsteAbholung: null, leer: { abholfenster: null } })),
-      html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: false, ausblenden: null })),
+      html(createElement(HeuteKopf, { datum: 'x' })),
+      html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })),
+      html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, ausblenden: null })),
     ].join('')
     const symbole = alle.match(/<svg[^>]*>/g) ?? []
     expect(symbole.length).toBeGreaterThan(0)
@@ -902,55 +976,76 @@ function zuTunFuer(stripeImKasten: boolean) {
 }
 
 describe('„Zu tun" — EINE Karte statt Erste Schritte und „Deine Hofseite" (Nr. 53)', () => {
-  it('Titel, Anzahl offener Aufgaben, jede Aufgabe ein Link mit ihrem Satz; der Schalter zum Ausblenden steht im Kopf', () => {
+  it('Titel, Anzahl offener Aufgaben, jede Aufgabe ein Link; der Schalter zum Ausblenden steht im Kopf', () => {
     const h = html(
       createElement(ZuTunKarte, {
         aufgaben: ZU_TUN_BEISPIEL,
-        wartetAufFreigabe: false,
         ausblenden: createElement('button', { type: 'button' }, 'Ausblenden'),
       })
     )
-    expect(h).toMatch(/<h2[^>]*>Zu tun<\/h2>/)
-    expect(h).toContain('2 offen')
+    // Board s1-heute: „Zu tun · 2" als Kopf.
+    expect(h).toMatch(/<h2[^>]*>Zu tun · 2<\/h2>/)
     expect([...h.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1])).toEqual(['/settings/appearance', '/settings/appearance'])
-    expect(h).toContain('Farbverlauf — ein eigenes Foto wirkt persönlicher')
-    expect(h).toContain('Noch keine Fotos')
+    // Liste Lauf 32 (heute Bild 4): nur Überschrift und Links — keine Beschreibung darunter.
+    expect(h).not.toContain('Farbverlauf — ein eigenes Foto wirkt persönlicher')
+    expect(h).not.toContain('Noch keine Fotos')
     expect(h).toContain('Ausblenden')
     expect(h).not.toContain(ERSTE_SCHRITTE_WARTET)
   })
 
   it('erledigt ist nichts in der Karte: kein Haken, kein „erledigt", kein Fortschrittsbalken', () => {
-    const h = html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: false, ausblenden: null }))
+    const h = html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, ausblenden: null }))
     expect(h).not.toMatch(/erledigt|lucide-check|role="progressbar"|%/)
   })
 
-  it('wartet auf Freischaltung: dazu der Satz, warum es sich lohnt, die Liste jetzt abzuarbeiten', () => {
-    const h = html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, wartetAufFreigabe: true, ausblenden: null }))
-    expect(h).toContain(ERSTE_SCHRITTE_WARTET)
+  it('ohne Einleitungssatz, auch wenn der Hof wartet (Liste Lauf 32, heute Bild 4); Abholzeiten heißt „eintragen“', () => {
+    const h = html(createElement(ZuTunKarte, { aufgaben: ZU_TUN_BEISPIEL, ausblenden: null }))
+    expect(h).not.toContain(ERSTE_SCHRITTE_WARTET)
+    const ab = html(createElement(ZuTunKarte, { aufgaben: [{ id: 'abholzeiten', titel: 'Abholzeiten festlegen', satz: 'x', href: '/settings/pickup-slots' }], ausblenden: null }))
+    expect(ab).toContain('Abholzeiten eintragen')
+    expect(ab).not.toContain('festlegen')
+  })
+
+  it('Teile der Hofseite heißen nach der Handlung (Abnahme Lauf 32, heute 1440 Bild 1/4; Nr. 277)', () => {
+    const h = html(
+      createElement(ZuTunKarte, {
+        aufgaben: [
+          { id: 'titelbild', titel: 'Titelbild', satz: 'x', href: '/settings/appearance' },
+          { id: 'logo', titel: 'Logo', satz: 'x', href: '/settings/appearance' },
+          { id: 'fotos', titel: 'Fotos', satz: 'x', href: '/farm-page' },
+          { id: 'produkt', titel: 'Erstes Produkt anlegen', satz: 'x', href: '/products' },
+        ],
+        ausblenden: null,
+      })
+    )
+    for (const text of ['Titelbild hochladen', 'Logo hochladen', 'Fotos hochladen', 'Erstes Produkt anlegen']) expect(h).toContain(`>${text}</a>`)
+    // Gegenprobe: der bloße Teil steht nicht mehr allein als Link.
+    expect(h).not.toContain('>Titelbild</a>')
+    expect(h).not.toContain('>Logo</a>')
   })
 
   it('lange Werte (Hofname bis 80 Zeichen, Adresse) brechen um — gekürzt wird nichts', () => {
     const lang = 'H'.repeat(80)
     const h = html(
       createElement(ZuTunKarte, {
-        aufgaben: [{ id: 'name', titel: 'Name und Kurzbeschreibung', satz: `${lang} — Kurzbeschreibung fehlt`, href: '/settings/profile' }],
-        wartetAufFreigabe: false,
+        // Eine Zeile ohne eigene Handlung (ZU_TUN_HANDLUNG) behält ihren Titel — daran prüft der Test das Umbrechen.
+        aufgaben: [{ id: 'aktuell', titel: `${lang} Name und Kurzbeschreibung`, satz: 'x', href: '/settings/profile' }],
         ausblenden: null,
       })
     )
-    expect(h).toContain(`${lang} — Kurzbeschreibung fehlt`)
+    expect(h).toContain(`${lang} Name und Kurzbeschreibung`)
     expect(h).toContain('break-words')
     expect(h).not.toMatch(/truncate|line-clamp/)
   })
 
   it('„Online-Zahlung einrichten" höchstens einmal: freigeschaltet ohne Stripe steht es im Kasten und nicht in der Liste', () => {
     const kasten = html(createElement(StripeEinrichtenHinweis))
-    const karte = html(createElement(ZuTunKarte, { aufgaben: zuTunFuer(true).aufgaben, wartetAufFreigabe: false, ausblenden: null }))
+    const karte = html(createElement(ZuTunKarte, { aufgaben: zuTunFuer(true).aufgaben, ausblenden: null }))
     const anzahl = (text: string) => text.split(ONLINE_ZAHLUNG_EINRICHTEN_TITEL).length - 1
     expect(anzahl(kasten) + anzahl(karte)).toBe(1)
     expect(anzahl(karte)).toBe(0)
     // Ohne Kasten (wartet auf Freischaltung) einmal — in der Liste.
-    const ohneKasten = html(createElement(ZuTunKarte, { aufgaben: zuTunFuer(false).aufgaben, wartetAufFreigabe: true, ausblenden: null }))
+    const ohneKasten = html(createElement(ZuTunKarte, { aufgaben: zuTunFuer(false).aufgaben, ausblenden: null }))
     expect(anzahl(ohneKasten)).toBe(1)
   })
 

@@ -34,7 +34,6 @@ const ENDPREIS = /mitEndpreis|endpreisEuro|anzeigePreisCents|usePreisAnzeige|kas
 /** Dateien mit Preisen, die die Endpreis-Funktion nicht brauchen — je mit Grund. */
 const BESTAND: Record<string, string> = {
   'src/components/checkout/stripe-payment.tsx': 'zeigt den Betrag, den /api/checkout an Stripe gab (ZahlungsBetrag) — schon mit Gebühr',
-  'src/components/startseite/startseite-abschnitte.tsx': 'Beispielrechnung der Konditionen für Höfe, kein Produktpreis',
   'src/emails/order-cancelled.tsx': 'Storno: erstattete Summe aus dem Snapshot',
   'src/emails/zahlung-zu-spaet.tsx': 'Erstattete Summe aus dem Snapshot',
   'src/emails/widerruf.tsx': 'Widerruf: der Betrag, den Stripe eben erstattet hat — kein Produktpreis',

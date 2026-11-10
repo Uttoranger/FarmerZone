@@ -11,7 +11,8 @@
  */
 import { DAY_NAMES } from '@/lib/pickup-slot-rules'
 import { zuletztText } from '@/lib/betrieb'
-import { mitAnzahl } from '@/lib/format'
+import { centsAlsEuro, formatEuro, mitAnzahl } from '@/lib/format'
+import type { GebuehrModell, GebuehrWort } from '@/lib/plattformgebuehr'
 import type { AdminAktionArt } from '@/schemas/admin-aktion'
 import { agbAkteText } from '@/lib/agb-zustimmung'
 import { HOF_EMAIL_TEXT } from '@/lib/hof-kontakt'
@@ -268,6 +269,22 @@ export type HofAkteEingabe = {
   protokoll: ReadonlyArray<{ id: string; wann: Date; wer: string | null; art: string; grund: string | null; mitPasskey: boolean }>
 }
 
+/**
+ * Der Knopf „Servicegebühr …“ unter „Eingreifen“ (Register N38, Ergänzung
+ * 3.11.2026, A1): nur im Modell „bisher“. Er schreibt den Satz des alten
+ * Modells (Farm.serviceFee*, servicegebuehr-dialog.tsx) — ab dem Stichtag
+ * „Hofpreis-Modell ab“ ist der eine Weg zum Satz die Karte „Plattformgebühr“.
+ * Umbenennen würde in die Irre führen: Es wäre ein anderes Feld.
+ */
+export function servicegebuehrKnopfSichtbar(modell: GebuehrModell): boolean {
+  return modell === 'bisher'
+}
+
+/** „Plattformgebühr € 61,50“ — die Gebühr der letzten 30 Tage mit dem Wort dieses Zeitraums (V63, gebuehrWortFuerZeitraum). */
+export function aktivitaetGebuehrZeile(wort: GebuehrWort, cents: number): string {
+  return `${wort} ${formatEuro(centsAlsEuro(cents))}`
+}
+
 export type HofAkteAnsicht = {
   /** `agb`: „Fassung 0.9 · 31.10.2026, 14:05 Uhr“ (Wien) oder „noch nicht zugestimmt“ (Nr. 207). */
   kontakt: { telefon: string; anmeldung: string; emailBestaetigt: string; hofEmail: string; ort: string; agb: string }
@@ -276,6 +293,8 @@ export type HofAkteAnsicht = {
     bestellungenZeile: string
     umsatzCents: number
     servicegebuehrCents: number
+    /** Die Gebühr der 30 Tage mit ihrem Wort (V63) — die Zeile unter „Umsatz 30 Tage“. */
+    gebuehrZeile: string
     zuletztAngemeldet: string
     anmeldung: string | null
     antwortzeit: string
@@ -283,6 +302,8 @@ export type HofAkteAnsicht = {
   zustand: ZustandZeile[]
   sperre: { gesperrt: boolean; grund: string | null; seit: string | null }
   protokoll: Array<{ id: string; wann: string; wer: string; text: string; grund: string | null; mitPasskey: boolean }>
+  /** Das Gebührenmodell jetzt (gebuehrModellFuer) — für A1 und „Derzeit gilt …“ im Freischalt-Dialog. */
+  gebuehrModell: GebuehrModell
 }
 
 /**
@@ -292,7 +313,17 @@ export type HofAkteAnsicht = {
  */
 export function hofAkteAnsicht(
   roh: HofAkteEingabe,
-  zusatz: { anmeldungGekuerzt: string; emailBestaetigt: string; stripeBereit: boolean; onlineAn: boolean; ich: string },
+  zusatz: {
+    anmeldungGekuerzt: string
+    emailBestaetigt: string
+    stripeBereit: boolean
+    onlineAn: boolean
+    ich: string
+    /** Das Wort der Gebühr über die 30 Tage der Aktivität: `gebuehrWortFuerZeitraum(aktivitaetSeit(jetzt), jetzt, Stichtag)`. */
+    gebuehrWort: GebuehrWort
+    /** Das Modell jetzt: `gebuehrModellFuer(einstellung, jetzt)`. */
+    gebuehrModell: GebuehrModell
+  },
   jetzt: Date
 ): HofAkteAnsicht {
   const sitzung = roh.hof.owner.sessions[0] ?? null
@@ -311,6 +342,7 @@ export function hofAkteAnsicht(
       bestellungenZeile: `${zahlen.storniert} storniert · ${zahlen.nichtAbgeholt} nicht abgeholt`,
       umsatzCents: zahlen.umsatzCents,
       servicegebuehrCents: zahlen.servicegebuehrCents,
+      gebuehrZeile: aktivitaetGebuehrZeile(zusatz.gebuehrWort, zahlen.servicegebuehrCents),
       zuletztAngemeldet: zuletztAngemeldetText(sitzung?.createdAt ?? null, jetzt),
       anmeldung: sitzung ? anmeldungText(sitzung) : null,
       antwortzeit: antwortzeitText(antwortzeitStunden(roh.nachrichten)),
@@ -338,5 +370,6 @@ export function hofAkteAnsicht(
       grund: e.grund,
       mitPasskey: e.mitPasskey,
     })),
+    gebuehrModell: zusatz.gebuehrModell,
   }
 }

@@ -8,6 +8,7 @@ import { bestellCodeAnfordernSchema } from '@/schemas/bestellungen-finden'
 import { codeEingabeSchema } from '@/schemas/anmeldecode'
 import { fordereBestellCodeAn, zeigeBestellungen } from '@/server/actions/bestellungen-finden'
 import { CodeEingabeSchritt, CodeEmailSchritt } from '@/components/anmelden/kunde-code-formular'
+import { KARTE } from '@/components/bestaetigung/bestaetigung-stil'
 
 /*
  * „Bestellungen finden" (Nr. 14): E-Mail → Code aus der Mail → Liste. Dieselbe
@@ -20,9 +21,39 @@ import { CodeEingabeSchritt, CodeEmailSchritt } from '@/components/anmelden/kund
 
 type Schritt = 'email' | 'code'
 
-export function BestellungenFindenFormular(): React.JSX.Element {
-  const router = useRouter()
+/**
+ * Formular samt Einleitung davor und Hinweis danach: Beide stehen nur im ersten Schritt (Board s1-/w1-meine-bestellungen
+ * Bild 1 und 2, Lauf 31) — im Code-Schritt steht nur die Karte. `ohneSaetze`, wenn die Ansicht abgelaufen ist (dann
+ * sagt die Karte darüber, was zu tun ist).
+ */
+export function BestellungenFindenBlock({ ohneSaetze = false }: { ohneSaetze?: boolean }): React.JSX.Element {
   const [schritt, setSchritt] = useState<Schritt>('email')
+  const saetze = !ohneSaetze && schritt === 'email'
+  return (
+    <>
+      {saetze && (
+        <p className="-mt-2.5 text-[15px] leading-normal text-foreground">
+          Hier findest du alle Bestellungen zu deiner E-Mail-Adresse – ohne Konto, nur für diesen Besuch.
+        </p>
+      )}
+      <section aria-label="Bestellungen finden" className={KARTE}>
+        <BestellungenFindenFormular schritt={schritt} setSchritt={setSchritt} />
+      </section>
+      {saetze && (
+        <p className="text-[14px] leading-normal text-muted-foreground">Jede Bestellung erreichst du auch über den Link in deiner Bestätigungsmail.</p>
+      )}
+    </>
+  )
+}
+
+export function BestellungenFindenFormular({
+  schritt,
+  setSchritt,
+}: {
+  schritt: Schritt
+  setSchritt: (schritt: Schritt) => void
+}): React.JSX.Element {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [laedt, setLaedt] = useState(false)
@@ -74,7 +105,8 @@ export function BestellungenFindenFormular(): React.JSX.Element {
     setFehler(null)
     setHinweis(null)
     if (!codeEingabeSchema.safeParse(codeJetzt).success) {
-      setFehler(`Bitte gib alle ${ANMELDECODE_LAENGE} Ziffern aus der E-Mail ein.`)
+      // Wortlaut des Boards s1-/w1-meine-bestellungen Bild 2 (Lauf 31).
+      setFehler(`Bitte gib alle ${ANMELDECODE_LAENGE} Ziffern ein.`)
       return
     }
     setLaedt(true)

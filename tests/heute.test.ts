@@ -27,11 +27,11 @@ import {
   brauchtDich,
   datumLang,
   kurzname,
-  naechsteAbholungText,
   naechsteAbholungWhere,
   positionenKurz,
   ueberfaelligWhere,
   vergleichText,
+  selbstEingetragenSatz,
   vorwocheBis,
   wochenvergleich,
   type BrauchtDichDaten,
@@ -121,11 +121,6 @@ describe('nächste Abholung', () => {
     const heute = tagVersetzt('2026-09-28', 1)
     expect(abholtagName(heute, '2026-09-30')).toBe('Morgen')
   })
-
-  it('Zeile: Einzahl und Mehrzahl', () => {
-    expect(naechsteAbholungText({ tag: '2026-09-30', name: 'Morgen', anzahl: 1 })).toBe('Morgen: 1 Bestellung')
-    expect(naechsteAbholungText({ tag: '2026-10-01', name: 'Donnerstag', anzahl: 4 })).toBe('Donnerstag: 4 Bestellungen')
-  })
 })
 
 describe('Wiener Woche (kalender.ts)', () => {
@@ -176,15 +171,17 @@ describe('Heute abholen — Zeilen', () => {
     expect(kurzname('   ')).toBe('Kunde')
   })
 
-  it('positionenKurz: zwei Positionen, der Rest als Zahl', () => {
+  it('positionenKurz: bis zwei Positionen mit Punkt getrennt, ab drei nur die Zahl (Board s1-heute)', () => {
     const items = [
       { productName: 'Eier', quantity: 2 },
-      { productName: 'Bauernbrot', quantity: 1 },
+      { productName: 'Futterhafer, Big Bag', quantity: 1 },
       { productName: 'Butter', quantity: 1 },
       { productName: 'Honig', quantity: 3 },
     ]
-    expect(positionenKurz(items)).toBe('2× Eier, 1× Bauernbrot +2')
-    expect(positionenKurz(items.slice(0, 2))).toBe('2× Eier, 1× Bauernbrot')
+    expect(positionenKurz(items)).toBe('4 Positionen')
+    expect(positionenKurz(items.slice(0, 3))).toBe('3 Positionen')
+    // Der Punkt trennt, weil Produktnamen selbst Kommas tragen.
+    expect(positionenKurz(items.slice(0, 2))).toBe('2× Eier · 1× Futterhafer, Big Bag')
     expect(positionenKurz([])).toBe('')
   })
 
@@ -223,10 +220,10 @@ describe('Heute abholen — Zeilen', () => {
       uhrzeit: '09:00–18:00',
       kunde: 'Frida T.',
       positionen: '10× Eier',
-      zahlart: 'Bar vor Ort',
+      zahlart: 'bar',
       chip: 'vorbereiten',
     })
-    expect(zeilen[1].zahlart).toBe('Online')
+    expect(zeilen[1].zahlart).toBe('online')
     expect(zeilen[1].chip).toBe('wartet')
     expect(zeilen[2].chip).toBe('bereit')
   })
@@ -250,7 +247,7 @@ describe('brauchtDich', () => {
       ueberfaellig: { anzahl: 1, juengste: [{ id: 'o1', customerName: 'Anna Beispiel', pickupDate: abholtag('2026-09-23') }] },
     })
     expect(eintrag.art).toBe('ueberfaellig')
-    expect(eintrag.text).toBe('1 Abholung vorbei, noch offen — als abgeholt oder nicht abgeholt markieren')
+    expect(eintrag.text).toBe('1 Abholung vorbei, noch offen – als abgeholt oder nicht abgeholt markieren')
     expect(eintrag.href).toBe('/orders/o1')
     expect(eintrag.unterpunkte).toEqual([{ text: 'Anna B. · Mi., 23.9.', href: '/orders/o1' }])
   })
@@ -288,7 +285,7 @@ describe('brauchtDich', () => {
 
   it('ohne Kategorie: eines direkt, mehrere zur Liste', () => {
     expect(brauchtDich({ ...LEER, ohneKategorie: [{ id: 'p9', name: 'Kürbis' }] })).toEqual([
-      { art: 'ohne-kategorie', text: 'Kürbis hat keine Kategorie', href: '/products?edit=p9' },
+      { art: 'ohne-kategorie', text: 'Kürbis hat keine Kategorie', erklaerung: 'Ohne Kategorie bleibt das Produkt nicht im Shop.', href: '/products?edit=p9' },
     ])
     expect(
       brauchtDich({
@@ -298,16 +295,16 @@ describe('brauchtDich', () => {
           { id: 'p2', name: 'B' },
         ],
       })
-    ).toEqual([{ art: 'ohne-kategorie', text: '2 Produkte ohne Kategorie', href: '/products' }])
+    ).toEqual([{ art: 'ohne-kategorie', text: '2 Produkte ohne Kategorie', erklaerung: 'Ohne Kategorie bleiben sie nicht im Shop.', href: '/products' }])
   })
 
   it('Status-Erinnerung nur, wenn fällig', () => {
     expect(brauchtDich({ ...LEER, statusErinnerung: null })).toEqual([])
     expect(brauchtDich({ ...LEER, statusErinnerung: 9 })).toEqual([
-      { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', href: '/status/new' },
+      { art: 'status', text: 'Seit 9 Tagen kein neuer Beitrag', erklaerung: 'Ein Beitrag zeigt deiner Kundschaft, was es gibt.', href: '/status/new' },
     ])
     expect(brauchtDich({ ...LEER, statusErinnerung: 'never' })[0].text).toBe(
-      'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt'
+      'Noch kein Beitrag – erzähl deinen Kundinnen, was es gibt'
     )
   })
 
@@ -331,12 +328,19 @@ describe('Kopf in Wiener Zeit', () => {
     expect(vorwocheBis(new Date('2026-09-29T12:30:00Z'))).toBe('bis Dienstag, 14:30')
   })
 
-  it('vergleichText: Vorzeichen, gleich, ohne Vorwoche', () => {
+  it('vergleichText: mehr, weniger, gleich, ohne Vorwoche — in Worten mit dem Betrag der Vorwoche (Board s1-heute, Lauf 32)', () => {
     const jetzt = new Date('2026-09-29T12:30:00Z')
-    expect(vergleichText(20, jetzt)).toBe('+20 % gegenüber der Vorwoche bis Dienstag, 14:30')
-    expect(vergleichText(-7, jetzt)).toBe('−7 % gegenüber der Vorwoche bis Dienstag, 14:30')
-    expect(vergleichText(0, jetzt)).toBe('±0 % gegenüber der Vorwoche bis Dienstag, 14:30')
-    expect(vergleichText(null, jetzt)).toBe('Vorwoche bis Dienstag, 14:30: noch kein Umsatz')
+    expect(vergleichText({ dieseWocheCent: 45000, vorwocheCent: 43120 }, jetzt)).toBe('Mehr als letzte Woche bis Dienstag (€ 431,20).')
+    expect(vergleichText({ dieseWocheCent: 100, vorwocheCent: 43120 }, jetzt)).toBe('Weniger als letzte Woche bis Dienstag (€ 431,20).')
+    expect(vergleichText({ dieseWocheCent: 43120, vorwocheCent: 43120 }, jetzt)).toBe('So viel wie letzte Woche bis Dienstag (€ 431,20).')
+    expect(vergleichText({ dieseWocheCent: 5000, vorwocheCent: 0 }, jetzt)).toBe('Letzte Woche bis Dienstag: noch kein Umsatz')
+  })
+
+  it('selbstEingetragenSatz: die Tage mit selbst eingetragenen Verkäufen (Board s1-heute Bild 2)', () => {
+    expect(selbstEingetragenSatz([])).toBeNull()
+    expect(selbstEingetragenSatz(['Mo'])).toBe('Mo: Verkäufe, die du selbst eingetragen hast.')
+    expect(selbstEingetragenSatz(['Mo', 'Di'])).toBe('Mo und Di: Verkäufe, die du selbst eingetragen hast.')
+    expect(selbstEingetragenSatz(['Mo', 'Di', 'Fr'])).toBe('Mo, Di und Fr: Verkäufe, die du selbst eingetragen hast.')
   })
 })
 
@@ -374,8 +378,9 @@ describe('an den Seiten — Heute und Packliste teilen die Abfrage', () => {
     expect(teile).toContain('BRAUCHT_DICH_LEER')
     expect(teile).not.toContain('Nichts braucht dich heute.')
     expect(teile).not.toContain('Alles erledigt.')
-    // Die Zeile zum nächsten Abholtag entfällt ohne ihn und führt nach /orders.
-    expect(teile).toMatch(/\{naechsteAbholung && \(\s*<Link\s+href="\/orders"/)
+    // Die nächste Abholung steht nur in der Seitenspalte, nicht noch einmal als Zeile unter der Packliste (Board w1-heute, Lauf 31).
+    expect(teile).not.toContain('naechsteAbholungText(')
+    expect(seite).toContain('<NaechsteAbholungKarte')
     expect(beide).not.toContain('Morgen:')
     expect(teile).toContain('href="/orders/today/print"')
     expect(beide).not.toContain('getHours()')

@@ -23,11 +23,10 @@ export const FARM_ARCHIVED_OWNER_BANNER =
 /** Überschrift des Selbstbedienungs-Kastens auf /settings/account. */
 export const FARM_ARCHIVE_TITLE = 'Hof stilllegen'
 
-/** Erklärtext im Kasten, solange der Hof aktiv ist. */
+/** Erklärtext im Kasten, solange der Hof aktiv ist — wörtlich nach Board s2-/w2-konto-hof Bild 2 (Nr. 250). */
 export const FARM_ARCHIVE_EXPLANATION =
   'Deine Hofseite verschwindet aus dem Netz und es sind keine Bestellungen mehr möglich. ' +
-  'Deine Daten bleiben vollständig erhalten — Bestellungen, Produkte, Kundinnen und Auswertungen. ' +
-  'Du kannst dich weiterhin anmelden und alles einsehen, und den Hof jederzeit selbst wieder aktivieren.'
+  'Deine Daten bleiben vollständig erhalten, und du kannst den Hof jederzeit selbst wieder aktivieren.'
 
 /** Erklärtext im Kasten, wenn der Hof bereits stillgelegt ist. */
 export const FARM_ARCHIVED_EXPLANATION =
@@ -40,7 +39,16 @@ export const FARM_ARCHIVED_EXPLANATION =
  * Offen = weder abgeholt noch storniert (OPEN_STATUSES in src/server/queries/orders.ts).
  */
 export function farmArchiveBlockedMessage(openOrders: number): string {
-  return openOrders === 1
-    ? 'Du hast noch 1 offene Bestellung. Schließe sie ab oder storniere sie, dann kannst du den Hof stilllegen.'
-    : `Du hast noch ${openOrders} offene Bestellungen. Schließe sie ab oder storniere sie, dann kannst du den Hof stilllegen.`
+  return `${farmArchiveBlockedTitel(openOrders)} ${FARM_ARCHIVE_BLOCKED_SATZ}`
 }
+
+/**
+ * Die beiden Teile desselben Hinweises einzeln — für den Kasten auf /settings/account mit fettem Titel und
+ * Satz darunter (Board s2-/w2-konto-hof Bild 4, Nr. 250). `farmArchiveBlockedMessage` setzt sie zusammen.
+ */
+export function farmArchiveBlockedTitel(openOrders: number): string {
+  return openOrders === 1 ? 'Du hast noch 1 offene Bestellung.' : `Du hast noch ${openOrders} offene Bestellungen.`
+}
+
+/** Der Satz unter dem Titel: was der Hof tun kann. */
+export const FARM_ARCHIVE_BLOCKED_SATZ = 'Schließe sie ab oder storniere sie, dann kannst du den Hof stilllegen.'

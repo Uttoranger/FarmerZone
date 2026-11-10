@@ -3,13 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Search, Store } from 'lucide-react'
+import { Search } from 'lucide-react'
 import {
   HOEFE_LISTE_FILTER,
   HOEFE_LISTE_FILTER_LABEL,
   HOEFE_LISTE_TEXT,
   filtereHoefeListe,
   hoefeListeAdresse,
+  hoefeListeZeile,
   zaehleHoefeListe,
   type HoefeListenZeile,
 } from '@/lib/admin-hoefe-liste'
@@ -20,7 +21,6 @@ import { hoefeListeAus } from '@/schemas/admin-hoefe'
 import type { FarmAktivitaet } from '@/lib/farm-aktivitaet'
 import type { GruendungAnzeige } from '@/lib/gruendungshof'
 import { HOFNAME_MAX } from '@/lib/eingabegrenzen'
-import { mitAnzahl } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -111,34 +111,44 @@ export function HoefeAnsicht({ zeilen }: { zeilen: HoefeListenZeile[] }): React.
       </FilterChipReihe>
 
       <p className={cn('text-[13px]', LEISE)} aria-live="polite">
-        {filter === 'braucht-blick'
-          ? `${liste.length} von ${mitAnzahl(zahlen.alle, 'Hof', 'Höfen')} brauchen Blick · Testhöfe nur unter „Testhöfe“`
-          : mitAnzahl(liste.length, 'Hof', 'Höfe')}
+        {hoefeListeZeile(filter, liste.length, zahlen.alle)}
       </p>
 
       {zahlen.alle === 0 ? (
         <EmptyState
-          symbol={Store}
           titel={HOEFE_LISTE_TEXT.leerTitel}
           satz={HOEFE_LISTE_TEXT.leerSatz}
           ausweg={{ ohne: 'Höfe melden sich selbst an; vorher gibt es hier nichts zu tun' }}
         />
       ) : liste.length === 0 ? (
         <EmptyState
-          symbol={filter === 'braucht-blick' && suche.trim() === '' ? Store : Search}
           titel={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlick : HOEFE_LISTE_TEXT.keinTreffer}
           satz={filter === 'braucht-blick' && suche.trim() === '' ? HOEFE_LISTE_TEXT.keinerBrauchtBlickSatz : HOEFE_LISTE_TEXT.keinTrefferSatz}
           ausweg={
-            <Link
-              href={hoefeListeAdresse({ filter: 'alle', suche: '' })}
-              className={KNOPF_RAHMEN}
-              onNavigate={(e) => {
-                e.preventDefault()
-                waehle({ filter: 'alle', suche: '' })
-              }}
-            >
-              Alle Höfe zeigen
-            </Link>
+            // Mit Suche führt „Suche löschen“ zurück (Board, Bild 5) und behält den Filter; ohne Suche „Alle Höfe zeigen“.
+            suche.trim() !== '' ? (
+              <Link
+                href={hoefeListeAdresse({ filter, suche: '' })}
+                className={KNOPF_RAHMEN}
+                onNavigate={(e) => {
+                  e.preventDefault()
+                  waehle({ suche: '' })
+                }}
+              >
+                {HOEFE_LISTE_TEXT.sucheLoeschen}
+              </Link>
+            ) : (
+              <Link
+                href={hoefeListeAdresse({ filter: 'alle', suche: '' })}
+                className={KNOPF_RAHMEN}
+                onNavigate={(e) => {
+                  e.preventDefault()
+                  waehle({ filter: 'alle', suche: '' })
+                }}
+              >
+                {HOEFE_LISTE_TEXT.alleZeigen}
+              </Link>
+            )
           }
         />
       ) : (
@@ -189,7 +199,7 @@ function Signale({ zeile }: { zeile: HoefeListenZeile }): React.JSX.Element {
 
 /** Ab 1024 px: die Tabelle aus dem Mockup. */
 function Tabelle({ zeilen }: { zeilen: HoefeListenZeile[] }): React.JSX.Element {
-  const kopf = 'px-3.5 py-2.5 text-left text-[11px] font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
+  const kopf = 'px-3.5 py-2.5 text-left text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase'
   return (
     <div className={cn(KARTE, 'hidden overflow-hidden lg:block')}>
       <table className="w-full text-[14px]">

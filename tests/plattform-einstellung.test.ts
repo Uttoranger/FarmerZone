@@ -5,8 +5,9 @@
  * ohne Mock; die Action mit gemockter Datenbank und Sitzung, die Berechtigung
  * echt (verlangeAdminAktion).
  *
- * Beweist: Plätze nur erhöhen und nie unter die vergebenen; Monate nur
- * erhöhen, mehr nur, solange die Aktion nicht vorbei ist; „Aktion bis“ einmal
+ * Beweist: Plätze nur erhöhen und nie unter die vergebenen; Monate vor dem
+ * Festschreiben frei von 1 bis zum Höchstwert, danach nur erhöhen (Register
+ * N44), mehr nur, solange die Aktion nicht vorbei ist; „Aktion bis“ einmal
  * gesetzt nur früher (nie leer, nie später, nie vor dem heutigen WIENER Tag);
  * das Schema gibt nur eigene deutsche Sätze heraus; ohne Admin-Recht wird
  * nichts geschrieben und nichts gelesen; mit Recht nur die Felder der Gruppe,
@@ -40,6 +41,7 @@ import { bildeGruendungBis, type GruendungEinstellung } from '@/lib/gruendungsho
 import {
   EINSTELLUNGEN_TEXT,
   GRUENDUNG_EINSTELLUNG_FEHLER,
+  GRUENDUNG_MONATE_MAX,
   PLATTFORM_EINSTELLUNG_STANDARD,
   festgeschriebenZeile,
   gruendungZeileKurz,
@@ -77,10 +79,20 @@ describe('pruefeGruendungEingabe — Plätze', () => {
 })
 
 describe('pruefeGruendungEingabe — Monate', () => {
-  it('nur erhöhen: 24 → 30 geht, 24 → 18 nicht', () => {
+  it('vor dem Festschreiben frei (N44): 24 → 12 und 24 → 1 gehen, 24 → 30 auch; 0 und über dem Höchstwert nicht', () => {
+    expect(pruefeGruendungEingabe({ ...GUT, monate: 12 }, STAND, 0, JETZT)).toBeNull()
+    expect(pruefeGruendungEingabe({ ...GUT, monate: 1 }, STAND, 0, JETZT)).toBeNull()
     expect(pruefeGruendungEingabe({ ...GUT, monate: 30 }, STAND, 0, JETZT)).toBeNull()
-    expect(pruefeGruendungEingabe({ ...GUT, monate: 18 }, STAND, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24))
     expect(pruefeGruendungEingabe({ ...GUT, monate: 0 }, STAND, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monate)
+    expect(pruefeGruendungEingabe({ ...GUT, monate: GRUENDUNG_MONATE_MAX + 1 }, STAND, 0, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monate)
+  })
+
+  it('nach dem Festschreiben nur erhöhen: 24 → 30 geht, 24 → 12 nicht, gleich bleibt', () => {
+    const eingabe = { plaetze: 100, monate: 24, aktionBisTag: '2027-03-31', anzeige: true }
+    expect(pruefeGruendungEingabe({ ...eingabe, monate: 30 }, FEST, 5, JETZT)).toBeNull()
+    expect(pruefeGruendungEingabe(eingabe, FEST, 5, JETZT)).toBeNull()
+    expect(pruefeGruendungEingabe({ ...eingabe, monate: 12 }, FEST, 5, JETZT)).toBe(GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24))
+    expect(GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24)).toBe('Nach dem Festschreiben lassen sich die Monate nur erhöhen – gerade sind es 24.')
   })
 
   it('mehr Monate nur, solange die Aktion läuft — nach dem Stichtag nicht mehr, gleich viele schon', () => {
@@ -268,12 +280,44 @@ describe('speichereGruendungEinstellung — die Wache, die Sperre und was geschr
     expect(vi.mocked(updateTag)).toHaveBeenCalledWith('plattform-einstellung')
     for (const pfad of ['/', '/fuer-hoefe', '/register', '/konditionen', '/admin/einstellungen']) expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith(pfad)
   })
+
+  it('Monate senken (N44): vor dem Festschreiben geschrieben, danach abgelehnt — entschieden an der Zeile nach der Sperre', async () => {
+    angemeldet(true)
+    const gespeichert = {
+      gruendungPlaetze: 100,
+      gruendungBisStandard: new Date('2027-12-31T00:00:00.000Z'),
+      gruendungAnzeige: true,
+      gruendungMonate: 24,
+      gruendungAktionBis: new Date('2027-03-31T00:00:00.000Z'),
+      gruendungFestAm: null as Date | null,
+      hofpreisModellAb: null,
+      geaendertVonUserId: null,
+      updatedAt: new Date('2026-10-01T00:00:00.000Z'),
+    }
+    const zwoelf = { plaetze: 100, monate: 12, aktionBisTag: '2027-03-31', anzeige: true }
+
+    p.plattformEinstellung.findUnique.mockResolvedValue(gespeichert as never)
+    expect(await speichereGruendungEinstellung(zwoelf)).toEqual({ ok: true })
+    expect(p.plattformEinstellung.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: expect.objectContaining({ gruendungMonate: 12 }) }))
+
+    vi.clearAllMocks()
+    p.$transaction.mockImplementation((async (rueckruf: (tx: typeof prisma) => unknown) => rueckruf(prisma)) as never)
+    p.farm.findMany.mockResolvedValue(sieben as never)
+    angemeldet(true)
+    p.plattformEinstellung.findUnique.mockResolvedValue({ ...gespeichert, gruendungFestAm: new Date('2026-10-14T08:00:00.000Z') } as never)
+    expect(await speichereGruendungEinstellung(zwoelf)).toEqual({ error: GRUENDUNG_EINSTELLUNG_FEHLER.monateNurMehr(24) })
+    // Die Sperre kam vor dem Lesen der Zeile; geschrieben und geleert wird nichts.
+    expect(p.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(p.plattformEinstellung.findUnique.mock.invocationCallOrder[0])
+    expect(p.plattformEinstellung.upsert).not.toHaveBeenCalled()
+    expect(vi.mocked(updateTag)).not.toHaveBeenCalled()
+  })
 })
 
 describe('EinstellungenGruendung — Felder der Aktion und „Zusagen festschreiben“', () => {
   const daten: GruendungFormularDaten = {
     gespeichert: { plaetze: 12, monate: 24, aktionBisTag: null, anzeige: true, bisTag: '2027-12-31', festAm: null },
     vergeben: 7,
+    inDerVergabe: 7,
     ausgenommen: 0,
     jetzt: JETZT.toISOString(),
     protokoll: 'Noch nie geändert – es gelten die Standardwerte.',

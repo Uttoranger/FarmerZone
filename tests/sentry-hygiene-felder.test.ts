@@ -22,7 +22,7 @@
  *
  * Der Filter ist eine reine Funktion — kein Mock.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, inject } from 'vitest'
 import type { ErrorEvent } from '@sentry/nextjs'
 import { bereinigeEreignis, ohneAnfrage } from '@/lib/sentry-hygiene'
 
@@ -339,8 +339,11 @@ describe('Nachrichten — event.message und message der Brotkrumen (Nachbesserun
 describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung 2)', () => {
   // Alles läuft synchron in beforeSend, und das SDK kürzt vorher nichts. Die
   // alten Muster brauchten für jeden dieser Texte Sekunden (quadratisch);
-  // jetzt sind es Millisekunden. Die Grenze lässt Luft für eine volle Maschine.
-  const GRENZE_MS = 500
+  // jetzt sind es Millisekunden. Die feste Grenze von 500 ms gilt nur im eigenen
+  // Leistungslauf (`pnpm pruefen:leistung`, ein Worker, eine Datei zur Zeit;
+  // TESTING_GUIDELINES §4); im parallelen `pnpm test` laufen die Fälle ohne Grenze mit.
+  const leistungslauf = inject('leistungslauf') === true
+  const GRENZE_MS = leistungslauf ? 500 : Number.POSITIVE_INFINITY
   const N = 50_000
   const lang: [string, object][] = [
     ['Query-Text unter suchQuery', { extra: { suchQuery: 'a='.repeat(N) + ' x' } }],
@@ -430,7 +433,7 @@ describe('Laufzeit — linear auch bei langen Texten ohne Treffer (Nachbesserung
   ]
 
   for (const [name, teil] of lang) {
-    it(`${name}: unter ${GRENZE_MS} ms`, () => {
+    it(leistungslauf ? `${name}: unter ${GRENZE_MS} ms` : `${name}: läuft durch (Grenze nur im Leistungslauf)`, () => {
       const start = performance.now()
       bereinigeEreignis(ereignis(teil))
       expect(performance.now() - start).toBeLessThan(GRENZE_MS)

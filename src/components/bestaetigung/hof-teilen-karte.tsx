@@ -2,7 +2,7 @@
 
 import { Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { ETIKETT, KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { teileHof } from '@/components/shared/hof-teilen'
 
 /**
@@ -15,29 +15,17 @@ import { teileHof } from '@/components/shared/hof-teilen'
  * Zählung, kein Kanal, keine Personendaten — die Teilen-Wirkung ist Gate 7.
  */
 export function HofTeilenKarte({ hofName, hofSlug }: { hofName: string; hofSlug: string }): React.JSX.Element {
+  // Board s1-/w1-bestaetigung: „ERZÄHL’S WEITER“ als kleine Überschrift, ein Satz, darunter der Knopf mit Rand über die volle Breite.
   return (
-    <section
-      aria-labelledby="erzaehl-weiter"
-      className="flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:gap-3.5 md:px-[18px]"
-    >
-      <div className="min-w-0 flex-1">
-        <h2 id="erzaehl-weiter" className="text-[15px] font-semibold">
-          Erzähl&apos;s weiter
-        </h2>
-        <p className="mt-0.5 text-[12.5px] leading-normal break-words text-muted-foreground">
-          {hofName} freut sich über neue Stammkundschaft aus der Nachbarschaft.
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={() => void teileHof({ name: hofName, slug: hofSlug })}
-        className={cn(
-          'inline-flex h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-border bg-card px-3.5 text-[13.5px] font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted sm:self-auto',
-          FOKUS_RAHMEN
-        )}
-      >
-        <Share2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
-        Hof teilen
+    // Rundung und Innenabstand wie die Neuigkeiten-Karte daneben (KARTE, 16 px wie im Board; Liste Lauf 32, G8).
+    <section aria-labelledby="erzaehl-weiter" className={cn(KARTE, 'flex min-w-0 flex-col gap-2')}>
+      <h2 id="erzaehl-weiter" className={ETIKETT}>
+        Erzähl&apos;s weiter
+      </h2>
+      <p className="text-[14px] leading-normal text-muted-foreground">Kennst du jemanden, der gern frisch vom Hof kauft?</p>
+      <button type="button" onClick={() => void teileHof({ name: hofName, slug: hofSlug })} className={cn(KNOPF_BREIT_RAHMEN, 'mt-1')}>
+        <Share2 className="size-[18px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
+        <span className="min-w-0 truncate">{hofName} teilen</span>
       </button>
     </section>
   )

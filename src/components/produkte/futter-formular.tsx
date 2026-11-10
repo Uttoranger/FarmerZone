@@ -1,12 +1,26 @@
 'use client'
 
+import { Switch } from '@/components/ui/switch'
+import { TREFFER_44 } from '@/components/ui/button'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { cn } from '@/lib/utils'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { istNetzFehler } from '@/lib/netz'
 import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeFutterFamilieAn } from '@/server/actions/produktfamilie'
-import type { ProduktAngelegt } from '@/lib/produkte-hof'
+import {
+  PRODUKTE_FILTER_LABEL,
+  hofpreisZeile,
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  vorschauGebuehrSatz,
+  type ProduktAngelegt,
+  type SpeicherFehlerAnzeige,
+} from '@/lib/produkte-hof'
+import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { FUTTER_KATEGORIEN, futterFamilieSchema, type FutterFamilieEingabe } from '@/schemas/produktfamilie'
 import {
   FUTTERMITTELART_ERKLAERUNG,
@@ -52,7 +66,6 @@ import { futterSchild } from '@/lib/produktdetail'
 import type { AbholhinweisValue } from '@/lib/abholhinweise'
 import { FutterSchild } from '@/components/produkte/futter-schild'
 import { zusammensetzungVorbelegung } from '@/components/products/produkt-abschnitte'
-import { cn } from '@/lib/utils'
 import {
   AbholhinweisWahl,
   Abschnitt,
@@ -62,6 +75,8 @@ import {
   FamilienDialog,
   Feld,
   FeldFehler,
+  FormularMeldung,
+  KlappKarte,
   RuecktrittAbschnitt,
   SperrZeile,
   Wahl,
@@ -128,6 +143,12 @@ function zeileAus(vorlage: FutterVorlage, schluessel: string): Zeile {
   }
 }
 
+/** „Pflicht · noch offen“ bzw. „Pflicht · eingetragen“; nach einem Speicherversuch mit Fehler „Bitte prüfen“. */
+function kennzeichnungStand(fehler: boolean, offen: boolean): string {
+  if (fehler) return 'Pflicht · Bitte prüfen'
+  return offen ? 'Pflicht · noch offen' : 'Pflicht · eingetragen'
+}
+
 /** Bei genau einer erlaubten Futtermittelart steht sie fest (Tabelle 2.4). */
 function artFuer(kategorie: (typeof FUTTER_KATEGORIEN)[number]): FuttermittelartValue | null {
   const erlaubt = futtermittelartenFuer(kategorie)
@@ -138,11 +159,14 @@ export function FutterFormular({
   onClose,
   registrierung,
   onAngelegt,
+  preisAnzeige = null,
 }: {
   onClose: () => void
   registrierung: HofRegistrierung
   /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet die Ansicht. */
   onAngelegt?: (angelegt: ProduktAngelegt) => void
+  /** N38: im Hofpreis-Modell der Satz des Hofs — dann „Du bekommst … · die Kundin zahlt …" und Endpreise in der Vorschau. */
+  preisAnzeige?: PreisAnzeige
 }): React.JSX.Element {
   const naechster = useRef(0)
   const neuerSchluessel = () => `z${naechster.current++}`
@@ -164,6 +188,7 @@ export function FutterFormular({
   )
   const [versucht, setVersucht] = useState(false)
   const [speichert, setSpeichert] = useState(false)
+  const [speicherFehler, setSpeicherFehler] = useState<SpeicherFehlerAnzeige | null>(null)
 
   const eingabe: FutterFamilieEingabe = {
     name,
@@ -188,6 +213,10 @@ export function FutterFormular({
   const pruefung = futterFamilieSchema.safeParse(eingabe)
   const fehler = versucht && !pruefung.success ? fehlerJeFeld(pruefung.error.issues) : {}
 
+  // Kurzstand der Karte „Kennzeichnung“: offen, solange das Schema dort noch etwas vermisst (dieselbe Prüfung wie beim
+  // Speichern); orange und aufgeklappt erst nach einem Speicherversuch.
+  const kennzeichnungOffen = !pruefung.success && pruefung.error.issues.some((i) => i.path[0] === 'kennzeichnung')
+  const kennzeichnungFehler = Object.keys(fehler).some((f) => f.startsWith('kennzeichnung.'))
   const sperren = zeilen.map((z) => gebindeSperre({ category, verpackung: z.verpackung }, registrierung))
   const wartend = sperren.filter(Boolean).length
   const erlaubteArten = futtermittelartenFuer(category)
@@ -252,8 +281,9 @@ export function FutterFormular({
 
   async function speichern() {
     setVersucht(true)
+    setSpeicherFehler(null)
     if (!pruefung.success) {
-      toast.error('Bitte prüfe die markierten Felder.')
+      // Die Karte „Bitte prüfe die markierten Felder." steht über den Feldern (V17), der Fokus springt.
       springeZuFeld(Object.keys(fehlerJeFeld(pruefung.error.issues))[0])
       return
     }
@@ -261,14 +291,15 @@ export function FutterFormular({
     try {
       const ergebnis = await legeFutterFamilieAn(eingabe)
       if ('error' in ergebnis) {
-        toast.error(ergebnis.error)
+        setSpeicherFehler(speicherFehlerAusAntwort(ergebnis.error))
         return
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
       onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), kaufbar: ergebnis.kaufbar })
-    } catch {
-      toast.error('Wir konnten das Futter nicht speichern. Bitte versuch es noch einmal.')
+    } catch (e) {
+      // Anlegen: ein zweiter Versuch legte womöglich doppelt an — darum ohne „Nochmal" (speicherFehlerNachWurf).
+      setSpeicherFehler(speicherFehlerNachWurf(istNetzFehler(e), false, 'Wir konnten das Futter nicht speichern. Bitte versuch es noch einmal.'))
     } finally {
       setSpeichert(false)
     }
@@ -279,13 +310,18 @@ export function FutterFormular({
       open
       onClose={onClose}
       titel="Neues Futtermittel"
+      art={PRODUKTE_FILTER_LABEL.futter}
       satz="Vom Sackerl für den Hasen bis zum Rundballen – jede Größe mit eigenem Preis und Vorrat."
-      hinweis={speichernHinweis(zeilen.length - wartend, wartend)}
-      speichernText="Futter speichern"
+      // Über „Speichern“ nur noch der Satz, wenn KEINE Größe online gehen kann (Abnahme Lauf 32, produkt-neu Bild 2/3,
+      // Nr. 277): „n Größen sind sofort sichtbar …“ steht nicht im Board, keine Zeile deckt ihn, und bei leerem Formular
+      // verwirrte er. Welche Größe wartet, sagt ihre Zeile.
+      hinweis={zeilen.length === wartend ? speichernHinweis(0, wartend) : null}
+      speichernText="Speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
+      meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
-      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Bergwiesen-Heu 5 kg-Sack“.">
+      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Name und Größe, z. B. „Heu, 1. Schnitt, Kleinballen“">
         <input
           id={feldId('name')}
           value={name}
@@ -298,7 +334,7 @@ export function FutterFormular({
       </Feld>
 
       <div className="flex flex-col gap-2" data-feld="category">
-        <p id="futter-kategorie" className="text-[13px] font-medium text-foreground">
+        <p id="futter-kategorie" className="text-[15px] font-semibold text-foreground">
           Kategorie
         </p>
         <div role="radiogroup" aria-labelledby="futter-kategorie" className="flex flex-wrap gap-2">
@@ -312,7 +348,7 @@ export function FutterFormular({
 
       {sorten.length > 0 && (
         <div className="flex flex-col gap-2" data-feld="subcategory">
-          <p id="futter-sorte" className="text-[13px] font-medium text-foreground">
+          <p id="futter-sorte" className="text-[15px] font-semibold text-foreground">
             Sorte
           </p>
           <div role="radiogroup" aria-labelledby="futter-sorte" className="flex flex-wrap gap-2">
@@ -337,25 +373,13 @@ export function FutterFormular({
       </Feld>
 
       <Abschnitt id="futter-groessen" titel="Verkaufsgrößen" satz="Tipp an, was du abgibst – vom Sackerl für den Hasen bis zum Rundballen.">
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-groessen" data-feld="groessen">
-          {FUTTER_VORLAGEN.map((v) => {
-            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
-            return (
-              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
-                {v.bezeichnung}
-              </Wahl>
-            )
-          })}
-          <EigeneGroesseKnopf onClick={eigeneGroesse} disabled={zeilen.length >= GROESSEN_MAX} />
-        </div>
-        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
-
+        {/* Erst die gewählten Größen, dann die Schnellwahl (Liste Lauf 32, produkt-neu: Reihenfolge Board). */}
         <ul className="flex flex-col gap-2.5">
           {zeilen.map((z, i) => {
             const pfad = `groessen.${i}`
             const kilo = grundpreisVorschau(z.price, z.nettoMenge)
             return (
-              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
+              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-[12px] border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
@@ -421,11 +445,30 @@ export function FutterFormular({
                   </div>
                 </div>
 
+                {/* N38 (Board s1/w1-produkt-neu, Bild 2): was der Hof bekommt und was die Kundin zahlt. */}
+                {z.price !== null && hofpreisZeile(z.price, preisAnzeige) && (
+                  <p className="text-[12.5px] text-muted-foreground" aria-live="polite">
+                    {hofpreisZeile(z.price, preisAnzeige)}
+                  </p>
+                )}
                 {sperren[i] && <SperrZeile grund={sperren[i].grund} />}
               </li>
             )
           })}
         </ul>
+
+        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="futter-groessen" data-feld="groessen">
+          {FUTTER_VORLAGEN.map((v) => {
+            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
+            return (
+              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
+                {v.bezeichnung}
+              </Wahl>
+            )
+          })}
+          <EigeneGroesseKnopf onClick={eigeneGroesse} disabled={zeilen.length >= GROESSEN_MAX} />
+        </div>
+        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
         <p className="text-[12.5px] leading-snug text-muted-foreground">
           € / kg rechnet sich automatisch und wird deinen Kundinnen zum Vergleichen gezeigt. Sackerl und Säcke gelten als abgepacktes Heimtierfutter,
           Ballen als lose Ernte – siehe Registrierungen unten. Jede Größe hat ihren eigenen Vorrat.
@@ -437,11 +480,20 @@ export function FutterFormular({
           <Wahl aktiv={bio} onClick={() => setBio((b) => !b)}>
             Bio
           </Wahl>
-          <Wahl aktiv={nurBetriebe} onClick={() => setNurBetriebe((n) => !n)}>
-            Nur an landwirtschaftliche Betriebe
-          </Wahl>
         </div>
-        {nurBetriebe && <p className="text-xs text-muted-foreground">Wer bestellt, muss in der Kasse eine Betriebsnummer angeben.</p>}
+        {/* Liste Lauf 32 (produkt-neu Bild 3): eine Einstellung mit Folge in der Kasse — ein Schalter mit Satz, kein Chip. */}
+        <label htmlFor="futter-nur-betriebe" className={cn('flex min-h-14 items-center gap-3 border border-border p-3', RUNDUNG.feld)}>
+          <Switch
+            id="futter-nur-betriebe"
+            checked={nurBetriebe}
+            onCheckedChange={setNurBetriebe}
+            className={cn(TREFFER_44, 'data-checked:bg-accent')}
+          />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-semibold text-foreground">Nur an landwirtschaftliche Betriebe</span>
+            <span className="text-[13px] text-muted-foreground">Dann fragt die Kasse nach der Betriebsnummer.</span>
+          </span>
+        </label>
       </Abschnitt>
 
       <AbholhinweisWahl wert={abholhinweise} onWert={setAbholhinweise} />
@@ -453,13 +505,19 @@ export function FutterFormular({
         fehler={fehler.ruecksendekostenCents}
       />
 
-      <Abschnitt
-        id="futter-kennzeichnung"
+      {/* Board s1-/w1-produkt-neu Bild 3 (Abnahme Lauf 32, Nr. 277): eine aufklappbare Karte „Kennzeichnung · Pflicht ·
+          noch offen“ mit Satz und „Angaben eintragen“ statt einer offenen Strecke von Feldern. Ein Fehler darin öffnet
+          sie (der Sprung zum ersten Feld braucht es sichtbar). Der Satz bleibt unser geprüfter Erklärtext (E10a). */}
+      <KlappKarte
         titel={KENNZEICHNUNG_TITEL}
+        stand={kennzeichnungStand(kennzeichnungFehler, kennzeichnungOffen)}
         satz={`${KENNZEICHNUNG_ERKLAERUNG} ${KENNZEICHNUNG_FUNDORT} Sie gelten für alle Größen; das Gewicht steht je Größe oben.`}
+        oeffnenText="Angaben eintragen"
+        immerOffen={kennzeichnungFehler}
+        fehler={kennzeichnungFehler}
       >
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.futtermittelart">
-          <p id="futter-art" className="text-[13px] font-medium text-foreground">
+          <p id="futter-art" className="text-[15px] font-semibold text-foreground">
             Futtermittelart
           </p>
           {erlaubteArten.length === 1 ? (
@@ -487,7 +545,7 @@ export function FutterFormular({
         </div>
 
         <div className="flex flex-col gap-2" data-feld="kennzeichnung.zielTierarten">
-          <p id="futter-tiere" className="text-[13px] font-medium text-foreground">
+          <p id="futter-tiere" className="text-[15px] font-semibold text-foreground">
             Für welche Tiere?
           </p>
           <div role="group" aria-labelledby="futter-tiere" className="flex flex-wrap gap-2">
@@ -578,7 +636,7 @@ export function FutterFormular({
           </label>
           {fehler['kennzeichnung.bestaetigt'] && <FeldFehler>{fehler['kennzeichnung.bestaetigt']}</FeldFehler>}
         </div>
-      </Abschnitt>
+      </KlappKarte>
 
       <Abschnitt
         id="futter-registrierungen"
@@ -588,53 +646,86 @@ export function FutterFormular({
         <FutterRegistrierungen registrierung={registrierung} />
       </Abschnitt>
 
-      <KaeuferVorschau name={name} zeilen={zeilen} sperren={sperren.map(Boolean)} category={category} registrierung={registrierung} />
+      <KaeuferVorschau
+        name={name}
+        zeilen={zeilen}
+        sperren={sperren.map(Boolean)}
+        category={category}
+        registrierung={registrierung}
+        preisAnzeige={preisAnzeige}
+      />
     </FamilienDialog>
   )
 }
 
 /**
- * „So sehen Käufer dein Futter" (Mockup web-h2-neues-futter): Name, ab-Kilopreis,
- * Zahl der Größen, Schild nach E9 und die Größen, die online gehen.
+ * „So sehen Kunden dein Futter" (Mockup web-h2-neues-futter; Board s1/w1-produkt-neu, Bild 2/3):
+ * Name, ab-Kilopreis, Zahl der Größen, Schild nach E9 und die Größen, die online gehen. Exportiert
+ * für den Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag" (tests/produkte-gebuehr-wort.test.ts).
+ *
+ * Je Stichtag (V62): Im Hofpreis-Modell sind die Preise der Kundin Endpreise (`endpreisEuro`,
+ * dieselbe Rechnung wie /api/checkout) — die Größen, der ab-Kilopreis und darunter „Preise inkl.
+ * Plattformgebühr (6 %)". Im Modell „bisher" der Preis des Hofs und der Satz von heute.
  */
-function KaeuferVorschau({
+export function KaeuferVorschau({
   name,
-  zeilen,
+  zeilen: eingetragen,
   sperren,
   category,
   registrierung,
+  preisAnzeige = null,
 }: {
   name: string
-  zeilen: Zeile[]
+  zeilen: readonly Pick<Zeile, 'schluessel' | 'unit' | 'nettoMenge' | 'price'>[]
   sperren: boolean[]
   category: (typeof FUTTER_KATEGORIEN)[number]
   registrierung: HofRegistrierung
+  preisAnzeige?: PreisAnzeige
 }): React.JSX.Element {
+  // Was die Kundin sieht: im Hofpreis-Modell der Endpreis je Größe, sonst der Preis des Hofs.
+  const zeilen = useMemo(
+    () => eingetragen.map((z) => (z.price === null || !preisAnzeige ? z : { ...z, price: endpreisEuro(z.price, preisAnzeige) })),
+    [eingetragen, preisAnzeige]
+  )
   const sichtbar = useMemo(() => zeilen.filter((z, i) => !sperren[i] && z.price !== null && z.nettoMenge !== null), [zeilen, sperren])
   // Nur Anzeige: der günstigste Kilopreis als Vergleich (CODING_STANDARDS, Ausnahme Grundpreis).
-  const guenstigste = sichtbar.reduce<Zeile | null>((best, z) => {
+  const guenstigste = sichtbar.reduce<(typeof sichtbar)[number] | null>((best, z) => {
     if (z.price === null || z.nettoMenge === null) return best
     if (!best || best.price === null || best.nettoMenge === null) return z
     return z.price / z.nettoMenge < best.price / best.nettoMenge ? z : best
   }, null)
   const ab = guenstigste?.price != null && guenstigste.nettoMenge != null ? formatGrundpreisNetto(guenstigste.price, guenstigste.nettoMenge, 'KG') : null
   const schild = futterSchild({ category, futter: { betriebsnummer: registrierung.betriebsnummer } }, registrierung.betriebsstatus)
+  // Nur Anzeige: der kleinste Preis einer sichtbaren Größe („ab € 2,65“) — verglichen, nicht gerechnet.
+  const abPreis = sichtbar.reduce<number | null>((best, z) => (z.price !== null && (best === null || z.price < best) ? z.price : best), null)
+  const anzeigeName = name.trim() || 'Dein Futter'
 
   return (
-    <section aria-labelledby="futter-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
-      <h3 id="futter-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+    <section aria-labelledby="futter-vorschau" className={cn('flex flex-col gap-2 border border-border bg-muted/40 p-4', RUNDUNG.karte)}>
+      <h3 id="futter-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
         So sehen Kunden dein Futter
       </h3>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Futter'}</p>
+      {/* Am Handy eine Zeile (Liste Lauf 32, produkt-neu 390 Bild 3): „<Name> · ab € … · ab € … / kg“, darunter der
+          Gebührensatz des Modells; ab 640 px die ausführliche Vorschau. */}
+      <p className="text-sm text-foreground sm:hidden">
+        <span className="font-semibold">{anzeigeName}</span>
+        {abPreis !== null && <span className="tabular-nums"> · ab {formatEuro(abPreis)}</span>}
+        {ab && <span className="tabular-nums"> · ab {ab}</span>}
+      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 max-sm:hidden">
+        <p className="min-w-0 font-heading text-lg font-semibold break-words text-foreground">{anzeigeName}</p>
         {ab && <p className="text-sm font-semibold text-foreground tabular-nums">ab {ab}</p>}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground max-sm:hidden">
         {sichtbar.length === 1 ? '1 Größe sichtbar' : `${formatZahl(sichtbar.length)} Größen sichtbar`}
       </p>
-      {schild && <FutterSchild text={schild} />}
+      {schild && (
+        <div className="max-sm:hidden">
+          <FutterSchild text={schild} />
+        </div>
+      )}
       {sichtbar.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul className="flex flex-wrap gap-1.5 max-sm:hidden">
           {sichtbar.map((z) => (
             <li key={z.schluessel} className="rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground tabular-nums">
               {gewichtUngefaehr(z.unit) ? '~' : ''}
@@ -644,8 +735,8 @@ function KaeuferVorschau({
           ))}
         </ul>
       )}
-      <p className={cn('text-xs text-muted-foreground')}>Die Servicegebühr zahlt die Kundin zusätzlich. Du bekommst genau deinen Preis.</p>
-      <p className="text-xs text-muted-foreground">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
+      <p className="text-xs text-muted-foreground">{vorschauGebuehrSatz(preisAnzeige)}</p>
+      <p className="text-xs text-muted-foreground max-sm:hidden">Erscheint auf deiner Hofseite und in Entdecken unter Futtermittel.</p>
     </section>
   )
 }

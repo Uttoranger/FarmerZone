@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
 import { BESTAETIGEN_TEXT, ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
-import { EmailLayout, h1, bodyText, mutedText, Knopf, KnopfReihe } from './_layout'
+import { EmailLayout, h1, bodyText, leiseZeile, Knopf, KnopfReihe } from './_layout'
 
 export interface BetreiberBestaetigungProps {
   /** Volle Adresse der Seite mit dem Knopf (bestaetigenPfad). */
@@ -18,14 +18,13 @@ export interface BetreiberBestaetigungProps {
  */
 export function BetreiberBestaetigungEmail({ url }: BetreiberBestaetigungProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={ZUSTELLUNG_MAIL_TEXT.bestaetigungTitel} fusszeile={ZUSTELLUNG_MAIL_TEXT.fuss}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={ZUSTELLUNG_MAIL_TEXT.bestaetigungTitel}>
       <Text style={h1}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungTitel}</Text>
       <Text style={bodyText}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungSatz}</Text>
       <KnopfReihe>
         <Knopf href={url}>{BESTAETIGEN_TEXT.knopf}</Knopf>
       </KnopfReihe>
-      <Text style={{ ...mutedText, margin: '0 0 6px' }}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungGueltig}</Text>
-      <Text style={mutedText}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungIgnorieren}</Text>
+      <Text style={leiseZeile}>{ZUSTELLUNG_MAIL_TEXT.bestaetigungGueltig}</Text>
     </EmailLayout>
   )
 }

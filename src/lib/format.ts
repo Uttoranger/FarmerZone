@@ -141,6 +141,19 @@ export function formatDatumLang(zeitpunkt: Date): string {
   return datumLangFormat.format(zeitpunkt).replace(/^(\d+\.) /, '$1\u00a0')
 }
 
+/**
+ * „Mi, 3. März 2027, 19:40" — ein Zeitpunkt mit Wochentag, ohne „Uhr" (V9; Boards s3-/w3-widerruf Bild 4), in
+ * Wiener Zeit. Seit Nr. 279 hier statt in src/app/(public)/widerruf/eingang-zeit.ts (Nacharbeit 254): Die
+ * Eingangsbestätigung auf /widerruf schreibt ihn so, die Mails (Nr. 280) nehmen denselben Helfer. Der Wortlaut der
+ * Mails und des Admins nach N39 (`eingangZeitpunkt` in src/lib/widerruf.ts) bleibt davon unberührt.
+ */
+export function formatZeitpunktMitWochentag(am: Date): string {
+  const wochentag = am.toLocaleDateString('de-AT', { weekday: 'short', timeZone: 'Europe/Vienna' }).replace(/\.$/, '')
+  const datum = am.toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna' })
+  const zeit = am.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })
+  return `${wochentag}, ${datum}, ${zeit}`
+}
+
 // Fester Wortlaut statt Intl „short": Je nach ICU-Stand schreibt Intl „Sa" oder
 // „Sa." und „Okt" oder „Okt." — ein Abholtermin soll überall gleich aussehen.
 const WOCHENTAG_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const
@@ -278,6 +291,28 @@ export function formatPosition(p: {
 }
 
 /**
+ * Eine Position mit der Menge vorn, wie in den Boards der Kaufstrecke (s1-/w1-kasse, s1-/w1-bestaetigung,
+ * s1-/w1-bestellung-link, Lauf 31) — nur Anzeige, ohne Betrag, in EINER Form „Anzahl × Name, Gebinde“:
+ *   Stück ohne Gebinde (oder ohne Einheit): „3 × Bergkäse“
+ *   sonst mit dem Gebinde dahinter:         „1 × Bio-Freilandeier, 6 Pakete“, „4 × Heumilch frisch, 1 L“
+ * Ohne Gebindegröße zählt eine Einheit (Preis-Semantik unten: Anzahl × Gebinde).
+ * Mails, Hofbereich und Admin behalten `formatPosition` (Name vorn); dort ist nichts geändert.
+ */
+export function positionMengeVorn(p: {
+  name: string
+  quantity: number
+  unit?: string | null
+  unitSize?: number | { toString(): string } | null
+}): string {
+  const anzahl = `${formatZahl(p.quantity)} × ${p.name}`
+  if (!p.unit) return anzahl
+  const gebinde = gebindeGroesse(p.unitSize) ?? 1
+  // „3 × Bergkäse, 1 Stück“ sagte nichts Neues — beim Stück steht das Gebinde nur, wenn es mehr als eins ist.
+  if (p.unit === 'STUECK' && gebinde === 1) return anzahl
+  return `${anzahl}, ${formatZahl(gebinde)} ${einheitLabel(p.unit, gebinde)}`
+}
+
+/**
  * Singular oder Plural — für Sätze wie „1 Produkt" statt „1 Produkte"
  * (Bug-Report Befund 11). Die Zahl steht mit davor.
  */
@@ -353,14 +388,20 @@ export function grundpreisJeEinheit(
  * Kilopreis auf Hof- und Produktseite, Produkttreffer und „ab €" auf /hoefe).
  * Preis 0 ergibt null: Zod lässt ihn nicht zu (positive), und „€ 0,00 / kg"
  * sagte nichts — dann steht keine Zeile da. NUR Anzeige — nie Abrechnung.
+ * `jeBasis` rechnet auf eine größere Einheit hoch (g → kg, ml → L: 1000),
+ * ohne die Menge erst in Fließkomma umzurechnen — 0,5 g bleiben 500
+ * Tausendstel-Gramm, der Faktor geht ganzzahlig in den Zähler (Nr. 282).
  */
-function grundpreisCents(price: number, menge: number): number | null {
+function grundpreisCents(price: number, menge: number, jeBasis = 1): number | null {
   if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(menge)) return null
+  if (!Number.isSafeInteger(jeBasis) || jeBasis <= 0) return null
   const preisCents = Math.round(price * 100)
   const mengeTausendstel = Math.round(menge * 1000)
   if (mengeTausendstel <= 0) return null
   // round-half-up(a / b) = floor((2a + b) / 2b), exakt in ganzen Zahlen.
-  const zaehler = 2 * preisCents * 1000 + mengeTausendstel
+  const zaehler = 2 * preisCents * 1000 * jeBasis + mengeTausendstel
+  // Jenseits von 2^53 wäre die Ganzzahl-Rechnung nicht mehr exakt — lieber keine Zeile.
+  if (!Number.isSafeInteger(zaehler)) return null
   const nenner = 2 * mengeTausendstel
   let q = Math.trunc(zaehler / nenner)
   // Die Division oben ist Fließkomma — hier auf die exakte Ganzzahl gerückt.
@@ -425,6 +466,10 @@ export function formatBestand(
 /**
  * Die zweite Zeile unter dem Preis: „€ 25,00 / kg". Nur bei einer Maßeinheit
  * UND einer Gebindegröße ungleich 1 — sonst null, dann steht dort nichts.
+ * Gramm und Milliliter zeigen den Grundpreis je kg bzw. L (Preisangabenrecht,
+ * Antwort 3 im Zwischen-Morgenbericht 33 B, Nr. 282): € 4,50 für 250 g →
+ * „€ 18,00 / kg" statt „€ 0,02 / g". Die Basis kommt aus GRUNDPREIS_BASIS,
+ * gerundet wird in grundpreisCents. Gebinde 1 g bzw. 1 ml bleibt ohne Zeile.
  */
 export function formatGrundpreisZeile(
   price: number,
@@ -434,9 +479,10 @@ export function formatGrundpreisZeile(
   const size = gebindeGroesse(unitSize)
   if (!size || size === 1) return null
   if (!istMassEinheit(unit)) return null
-  const je = grundpreisJeEinheit(price, size)
-  if (je == null) return null
-  return `${formatEuro(je)} / ${einheitLabel(unit)}`
+  const basis = GRUNDPREIS_BASIS[unit]
+  const cents = grundpreisCents(price, size, basis?.jeBasis ?? 1)
+  if (cents == null) return null
+  return `${formatEuro(cents / 100)} / ${einheitLabel(basis?.einheit ?? unit)}`
 }
 
 /**

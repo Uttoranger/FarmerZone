@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import {
   ABO_BESTAETIGUNG_GUELTIG_MS,
   ABO_BESTAETIGUNG_PAUSE_MS,
+  ABO_TEXT,
   emailAnmeldungSchritt,
   wartetAufBestaetigung,
   werbemailErlaubt,
@@ -165,6 +166,24 @@ describe('Bestätigungs-Token', () => {
 
   it('der Pfad führt auf die Seite mit dem Knopf, Token kodiert', () => {
     expect(aboBestaetigungsPfad('a.b')).toBe('/account/neuigkeiten-bestaetigen?token=a.b')
+  })
+})
+
+describe('der Satz zur Gültigkeit', () => {
+  // Nr. 242: Die Fehlerkarte der Bestätigungsseite schnitt „Er gilt N Tage.“ per indexOf aus dem langen Satz —
+  // ein umformulierter Satz hätte dort still einen falschen Rest gezeigt. Jetzt ein eigener Eintrag, der lange
+  // Satz baut auf ihm auf.
+  it('steht als eigener Eintrag und schließt den Satz zum abgelaufenen Link ab', () => {
+    expect(ABO_TEXT.gueltigkeit).toBe('Er gilt 7 Tage.')
+    expect(ABO_TEXT.abgelaufen).toBe(`Dieser Link ist abgelaufen. ${ABO_TEXT.gueltigkeit}`)
+  })
+
+  it('die Seite nimmt den Eintrag, nicht einen Schnitt aus dem langen Satz', () => {
+    const seite = readFileSync(join(process.cwd(), 'src/app/account/neuigkeiten-bestaetigen/page.tsx'), 'utf8')
+    expect(seite).toContain('ABO_TEXT.gueltigkeit')
+    // Gegenprobe: die Suche erkennt den alten Schnitt.
+    expect(seite).not.toMatch(/ABO_TEXT\.abgelaufen\.slice\(/)
+    expect(/ABO_TEXT\.abgelaufen\.slice\(/.test("ABO_TEXT.abgelaufen.slice(ABO_TEXT.abgelaufen.indexOf('Er gilt'))")).toBe(true)
   })
 })
 

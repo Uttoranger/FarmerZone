@@ -312,8 +312,10 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Dateien:** `src/lib/konditionen.ts`, `/fuer-hoefe`, `/konditionen`, Registrieren-Link, `src/app/admin/admin-farm-list.tsx`, `src/lib/gruendungshof.ts`.
 - **Datum:** **1. Februar 2027** (festgelegt am 06.10.2026, uttoranger im Chat). Damit ist 17d freigegeben (freigabe.md §8).
 - **Stand:** umgesetzt in 17d.
+- **Verweis:** ergänzt durch N45, 05.11.2026 (auf /konditionen hinter K1 die Zeile mit dem Stichtag „Ab <Tag> ist die Plattformgebühr im Preis enthalten (Stichtag).“; ab dem Stichtag „Seit <Tag> …“ und, solange er in der Zukunft liegt, der Tarifstart).
 
 ### K2 · Gründungs-Enddatum je Hof (12.10.2026)
+- **Verweis:** geändert durch N44, 3.11.2026 (Gründungszeit 12 Monate, Einzugsbeginn der Bargebühr).
 - **Verweis:** ergänzt durch N38, 26.10.2026 (siehe Ergänzung am Ende dieses Eintrags).
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 10):** Gründungshöfe gelten als Hofladen ohne Grundgebühr bis zu einem Enddatum; Standard 31.12.2027, je Hof im Admin änderbar, auch für die bestehenden Testhöfe. Danach gilt die normale Regel (E6-Ergänzung). Vor einer Änderung des Standards werden bestehende Zusagen je Hof festgeschrieben (eigene Migration mit Freigabe). Der Satz „danach dauerhaft 3 %" verschwindet aus jeder Anzeige.
 - **Verhältnis zu anderen Einträgen:** entscheidet O7 (Variante b); ergänzt E6 und K1.
@@ -329,6 +331,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Verhältnis zu N21 (19.10.2026):** Ein Testhof ist immer auch ausgenommen; ‚ausgenommen‘ heißt ab N21 nur noch: zählt nicht für die Gründungsplätze (ein ausgenommener echter Hof ist normal sichtbar und wird indexiert).
 - **Ergänzung (uttoranger, im Chat, 26.10.2026):** „Gründungshöfe zahlen die Bargebühr aus N38 erst nach ihrer Laufzeit; bis dahin brauchen sie für Barbestellungen kein Mandat. Die Zusage ‚Hofladen ohne Grundgebühr‘ bleibt unverändert.“
 - **Umsetzung (Ergänzung 26.10.2026):** Nr. 197 und Nr. 198 (freigabe.md §30); `einzugAb` je Hof aus Nr. 188.
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; E-026, N48):** Es bleibt bei 100 Gründungsplätzen (Nr. 116). Die Zahl kommt aus Admin › Einstellungen › Gründungshöfe; den Wert in Produktion stellt die Projektleitung vor dem ersten Festschreiben auf 100. Der Spalten-Default 12 und der Standardwert im Code bleiben (keine Migration; sie gelten nur ohne Zeile). Boards mit 12 werden korrigiert.
 
 ### K3 · Unterhaltungen zwischen Höfen (13.10.2026)
 - **Stand:** beschlossen 13.10.2026, **Bau nach Signal**, nicht in Lauf 13.
@@ -355,6 +358,7 @@ Alle E-Einträge hat uttoranger am **02.10.2026** in `docs/nachtlauf/freigabe.md
 - **Stand:** umgesetzt in 19a (06.10.2026); maßgeblich ist der Bestellzeitpunkt, Annahmen im Bericht 19a.
 - **Ergänzung (uttoranger, im Chat, 26.10.2026):** „B1 gilt nur bis zum Stichtag aus N38. Danach gibt es keine Barzahlung ohne Gebühr mehr; bis zum Einzugsbeginn des Hofs ist die Bargebühr ‚erlassen‘ (sie bleibt beim Hof).“
 - **Umsetzung (Ergänzung 26.10.2026):** Nr. 197 und Nr. 198 (freigabe.md §30); `barOhneServicegebuehr` und `BAR_SERVICEGEBUEHR_AB` bleiben für Bestellungen im bisherigen Modell.
+- **Ergänzung (N45, 05.11.2026):** AGB 0.9 gilt für alle Bestellungen im Modell bisher, auch nach dem Stichtag (N45).
 
 Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert (Freigabe Lauf 6, „ältere offene Punkte").
 
@@ -549,6 +553,8 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Einstellungs-Unterseiten führen nach dem Speichern zur Übersicht zurück.
 - **Begründung:** Befund vom 08.10.2026 (Handy, 390 px): Bestehende Höfe finden die Anmeldung nur ganz unten im Fuß der Startseite („Anmelden für Höfe"); im Kopf der KundeShell ist „Anmelden" unter 768 px ausgeblendet; ein angemeldeter Hof sieht auf öffentlichen Seiten keinen Weg in seinen Bereich. Im Hofbereich ist der Rückweg auf Unterseiten klein und nach dem Scrollen weg.
 - **Dateien:** KundeShell und KundenKopf, AdminShell, `src/lib/kunden-navigation.ts`, `src/lib/kunden-menue.ts`, `src/lib/admin-navigation.ts`, `src/lib/bauern-navigation.ts`, Hofbereich-Unterseiten; Umsetzung Nr. 41 und 44 (freigabe.md §12).
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** /settings bekommt am Handy „Mehr“ als Elternseite („‹ Mehr“ im Kopf).
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; N48, B-Zeilen der Liste Lauf 32):** Wie /settings bekommen am Handy auch Auswertung, Kunden, Verkäufe, Postfach und Meine Meldungen einen Rückweg; Ziel und Name nach dem Board, eine Quelle in src/lib/bauern-navigation.ts.
 
 ### N2 · Kasse ohne Zusatz-Haken (08.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 8):**
@@ -558,6 +564,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Begründung:** Weniger Schritte in der Kasse; der verbindliche Abschluss liegt im Kaufknopf.
 - **Verhältnis zu anderen Einträgen:** ändert die Kasse aus Gate 4 (Nr. 12: Zusage-Haken bei Bar); S11 und H3 bleiben unverändert.
 - **Dateien:** Kasse (Formular, Schema, `/api/checkout`), Bestätigungsseite; Umsetzung Nr. 46 (freigabe.md §12).
+- **Verweis:** ergänzt durch N45, 05.11.2026 (Kassensatz im Hofpreis-Modell ohne Zustimmung zur sofortigen Vermittlung; bei einer bestehenden Bestellung folgt er ihrem Snapshot).
 - **Ergänzung (uttoranger, im Chat, 31.10.2026; Nr. 202):** „Ergänzung zu N2/E5 (31.10.2026, Nr. 202): Pausiert ein Hof, nachdem eine Bestellung angenommen und reserviert wurde, darf die Kundin die Zahlung dieser Bestellung noch abschließen; nur neue Bestellungen sind gesperrt. Die Admin-Sperre hält auch bestehende Zahlungen an.“ (gilt auch für E5; Entscheidung 3 aus Morgenbericht 27).
 - **Ergänzung (uttoranger, im Chat, 1.11.2026; Nr. 215):** „Ergänzung zu N2/O4 (1.11.2026, Nr. 215): Der Satz zu den AGB und der Rücktrittssatz stehen unter jedem Knopf, mit dem eine Bestellung verbindlich wird – bar unter ‚Zahlungspflichtig bestellen‘, online unter ‚Jetzt bezahlen‘ bzw. ‚Erneut bezahlen‘. Unter ‚Weiter zur Zahlung‘ bleiben sie zusätzlich stehen.“ Umsetzung: Nr. 215 (freigabe.md §33).
 - **Ergänzung (uttoranger, im Chat, 1.11.2026; Nr. 210):** „Ergänzung zu N2 (1.11.2026, Nr. 210): Am Handy steht die Übersicht im Zahlungsschritt am Ende, unmittelbar über dem Kaufknopf; die Reservierungsfrist rückt mit. Das Gesetz (§ 8 Abs. 1 FAGG) geht dem Mockup vor; das Mockup wird nicht nachgezeichnet, der Index vermerkt die Abweichung.“ Umsetzung: Nr. 210 (freigabe.md §32), Vermerk im Mockup-Index: Doku-PR Lauf 29 (freigabe.md §33).
@@ -572,6 +579,10 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ergänzt N1 und E12.
 - **Dateien:** `src/lib/bauern-navigation.ts`, `src/components/ui/bottom-nav.tsx`, Mein Hof (`src/app/(hof)/farm-page/`, `src/components/mein-hof/`), `/products`; Umsetzung Nr. 49 (freigabe.md §13).
 - **Ergänzung (uttoranger, im Chat, 22.10.2026; Nr. 143):** „Am Handy tragen die drei Reiter von Mein Hof denselben Kopf (auf /farm-page unter lg, auf /products unter md): das Titelbild als schmaler Streifen mit Logo und Name, Teilen (nur wenn öffentlich) und Kundenansicht, darunter eine Zustandszeile mit dem nächsten Schritt – Pausiert (Fortsetzen, sofort) · Noch nicht bestellbar ohne Abholzeit (Eintragen) · Gerade ausgebucht (Abholzeiten) · Noch nicht bestellbar ohne kaufbares Produkt (Produkte) · Nimmt Bestellungen an mit der nächsten Abholung (Pausieren, im Blatt mit Bestätigung und Nachricht). Stillgelegt und ‚wartet auf Freigabe‘ zeigt weiter nur der Balken über jeder Seite (eine Fassung je Zustand). Bestellbar, ausgebucht und die nächste Abholung kommen aus derselben Rechnung wie bei der Kundin und auf /hoefe (`kaufSperre`, `naechsteAbholung`, `istKaufbar`). Die Reiter stehen immer an derselben Stelle. ‚Mein Hof‘ öffnet weiter Produkte; ‚damit der Vorrat ein Tipp bleibt‘ heißt jetzt: Ein Tipp öffnet das Vorrat-Blatt (N25). Adresse und Kopieren stehen unter lg nicht mehr im Kopf (den Link gibt ‚Teilen‘ über das Teilen-Menü des Geräts weiter, sonst wird er kopiert). Ab lg bleibt der Kopf von Mein Hof, wie er ist. Grundlage: Board system-h1-mein-hof-v3 (bewertet: Menüführung 66 → 94, Übersicht 48 → 92).“
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 6):** Kopf von Mein Hof am Handy:
+  - Titel „Mein Hof“ und Schild wie im Board s1-mein-hof statt des Titelbild-Streifens aus der Ergänzung vom 22.10.2026.
+  - Nicht berührt: das Titelbild selbst und seine Bearbeitung sowie die Karte „Noch n Punkte offen“ (N4).
+  - Umsetzung: Nacharbeit zu Lauf 30; keine Migration.
 
 ### N4 · Hofseite an EINEM Ort bearbeiten (10.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
@@ -585,6 +596,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Ergänzung (12.10.2026, Freigabe Lauf 10):** `saveAppearanceAction` schreibt nur die mitgeschickten Felder; `farmValues` nur, wenn sie mitkommen. Das Adress-Formular in Mein Hof schickt die Adresse als Ganzes (Land, Breite, Länge mit). Umsetzung Nr. 65 (freigabe.md §14).
 - **Ergänzung Kundenansicht am Handy (uttoranger, im Chat, 16.10.2026; Nr. 107):** „Die Kundenansicht in Mein Hof (Knopf „Kundenansicht“ im Kopf, Adresse `?ansicht=kundin`) öffnet am Handy als Vollbild mit dem Band ‚Kundenansicht · So sieht dich die Kundschaft‘ und ‚Fertig‘. Sie deckt die Leiste des Hofs ab; die Leiste der Kundschaft ist zu sehen, reagiert in der Vorschau aber nicht.“
 - **Ergänzung (uttoranger, im Chat, 22.10.2026; Nr. 143):** „Die Liste ‚Bearbeiten‘ unter lg zeigt bei 100 % nur die Zeile ‚Hofseite vollständig · n von n‘, sonst die Karte ‚Noch n Punkte offen‘ mit genau diesen Zeilen, Abholzeiten zuerst. Danach stehen die übrigen Zeilen in der Reihenfolge der Hofseite in vier Gruppen nach dem Ort auf der Seite: Oben auf der Seite, Aufbau und Fotos, Abholen und Bezahlen, Über uns. Keine Häkchen und kein ‚Bearbeiten‘ je Zeile; die ganze Zeile ist der Knopf. Schilder nur für Fehlt und Online fehlt. Die Zeile ‚Bestellungen‘ (Pause) steht unter lg nicht mehr in der Liste, sondern im Kopf (N3-Ergänzung); sie zählt weiter im Fortschritt mit.“
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 6):** Der Kopf am Handy steht bei N3. Die Liste „Bearbeiten“ mit der Karte „Noch n Punkte offen“ (Ergänzung vom 22.10.2026) ist davon nicht berührt.
 
 ### N5 · Hofseite unter lg, Reiter Übersicht (10.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 9):**
@@ -612,6 +624,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** Web-Vorschau bleibt 1 408 px, DESIGN_SYSTEM nennt 1 408. Quelle: Morgenbericht 12 §10, zu Nr. 75; Umsetzung Nr. 85.
 
 ### N8 · Wortliste (13.10.2026)
+- **Verweis:** ergänzt durch N42 (Wortliste vor Code) und N43 (Rücktritt statt Widerruf in Nutzertexten), 3.11.2026.
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** Für jede Sache gibt es in Nutzertexten genau ein Wort; die Liste steht in docs/ai/DESIGN_SYSTEM.md und ein Test schützt sie. Erste Einträge: **Abholzeiten** = die Zeiten, die der Hof anbietet; **Abholtermin** = der Termin, den die Kundin gewählt hat; nicht: Zeitfenster, Abholslot. **Vorrat**; nicht: Bestand, Lagerstand, Lager (Code-Bezeichner wie `stock` bleiben). **Beitrag**; nicht: Status, Post, Neuigkeit als Objekt (Route /status bleibt, Register 22e). **Problem melden** als Türname auf beiden Seiten; „Meine Meldungen" bleibt die Übersicht des Hofs; nicht: Hilfe und Rückmeldung, Fehler melden. **Kundin/Kunden**: Beschriftungen, Reiter, Kennzahlen „Kunden" (z. B. „Kunden", „12 Kunden"); ganze Sätze „die Kundin"/„deine Kundinnen" (gewachsener Hausstil); „Käufer" nur für die Futter-Käuferarten (Betrieb/privat). **Telefonnummern** werden einheitlich angezeigt: „+43 660 000 0000" (Ländercode, Leerzeichen nach Vorwahl und in Dreier-/Vierergruppen), gespeichert bleibt die Eingabe. Jeder weitere Eintrag kommt nur über eine Freigabe.
 - **Verhältnis zu anderen Einträgen:** ergänzt CLAUDE.md §5 (Sprache) und E11 (Brennmaterial).
 - **Umsetzung:** Nr. 77 (Liste und Test), Nr. 78 (Begriffe), Nr. 81 (Telefonnummern); freigabe.md §16.
@@ -626,6 +639,11 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Verhältnis zu anderen Einträgen:** ergänzt DESIGN_SYSTEM, Abschnitt „Zustände".
 - **Umsetzung:** Nr. 80 (freigabe.md §16).
 - **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 80 – ein Sollte zum Blocker hochgestuft; neue Variante `titelStufe` am EmptyState (die Freigabe erlaubt eine Variante, wo nötig). Runde 1 von Nr. 80 ist in den Branch von Nr. 83 zusammengeführt (e813eb7; Konflikt nur in DESIGN_SYSTEM „Leerzustände").
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 2):** Zustand READY einer Bestellung:
+  - Der Hof sieht „Gepackt“, die Kundin „Abholbereit“. So ist es gebaut.
+  - Das ist eine Ausnahme von „kein Zustand hat zwei Fassungen“; DESIGN_SYSTEM „Zustände“ nennt sie.
+  - Nachtrag (uttoranger, „Ja, Abholbereit“, 5.11.2026; über die Schaltzentrale, zur Beobachtung in PR #465): Auch die Schritt-Leiste der Kundin auf der Bestätigungsseite (`bestellSchritte`) heißt beim dritten Schritt „Abholbereit“ statt „Gepackt“. Das weicht bewusst von den Boards s1-bestaetigung und w1-bestaetigung ab, die dort noch „Gepackt“ zeigen; die Mockups bleiben unverändert.
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Leerzustände ohne Symbol; ‚Symbol‘ ist aus der Entscheidung gestrichen.
 
 ### N10 · Kasse glätten (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 12):** vier flache Karten in Lesereihenfolge Korb → Abholung (eine Zeile Chips, Adresse rechts im Kopf) → Deine Daten (ab md zwei Spalten: E-Mail · Name / Telefon · Notiz, Notiz einzeilig und wächst) → Bezahlen (Optionen ab md nebeneinander, jede mit eigener Erklärung). **Online bleibt vorbelegt**, auch im Testbetrieb (Entscheidung uttoranger 13.10.: Die Plattform verdient nur an Online-Zahlungen); der Testbetrieb-Satz steht an der Online-Option. Bar trägt seinen Vorteil selbst („Ohne Servicegebühr bis 31. Jänner 2027. Du bestätigst per E-Mail – ein Tipp genügt."); der Stripe-Satz nur bei Online (wie heute). „Ein Korb pro Hof" entfällt in der Kasse. Übersicht: „Servicegebühr (5 %)" mit (i)-Knopf, der den Erklärsatz und „mind. € 0,50" aufklappt; bei Bar ohne Gebühr steht „entfällt" statt € 0,00. Angaben zum Hof, Kaufknopf und Knopftexte bleiben (Nr. 60, N2). Abweichung von k3-kasse-angaben-zum-hof genehmigt.
@@ -640,6 +658,10 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Bestätigt (uttoranger, Freigabe Lauf 13, 13.10.2026):** Entscheidungen des Dirigenten aus Lauf 12 (Morgenbericht 12 §7): Nr. 83 – Runde 1 von Nr. 80 hereingeholt (e813eb7); eine Kommentarzeile an `brauchtDich` außerhalb von `heuteAufbau`.
 - **Ergänzung (uttoranger, Freigabe Lauf 13, 13.10.2026):** „Nichts braucht dich heute." nur, wenn Packliste UND Braucht dich leer sind. Quelle: Morgenbericht 12 §10, zu Nr. 83; Umsetzung Nr. 85.
 - **Ergänzung (uttoranger, im Chat, 21.10.2026; Nr. 134):** „Steht in Heute der Anstoß für einen Beitrag (E12), entfällt in ‚Braucht dich‘ die Erinnerung an einen Beitrag. Es gibt nie zwei Erinnerungen an dieselbe Sache.“
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 1):** Pflichtkarten auf „Heute“:
+  - Team-Sperre (N34), Rücktritte (N39), AGB (Nr. 207), Hof-E-Mail (Nr. 212) und Lastschrift-Sperre fallen nicht unter „höchstens ein Hinweis-Kasten oben“ aus Nr. 45.
+  - Sie bleiben untereinander stehen; der eine Kasten aus Nr. 45 ist der Stripe-Hinweis.
+  - DESIGN_SYSTEM „Heute“ hält das fest.
 
 ### N12 · Postfach, Stufe 1 (13.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 13):** ein Wort für alles, was ankommt – bei Hof und Admin. Das Team schreibt Höfen Nachrichten (Rundschreiben an alle, ausgewählte oder nach Filter: ohne Online-Zahlung, Futter ohne Nummer; auch an einen einzelnen Hof); jede Nachricht ist ein eigener Faden, auf den der Hof antwortet; das Team antwortet im selben Faden. Höfe beginnen keine Fäden – ein Problem, Wunsch oder eine Frage geht wie bisher über „Problem melden" (Meldung); so gibt es für jede Sache einen Weg. Art Info/Wichtig; Link nur relativ oder auf die Produktionsdomain (aus PRODUKTION_HOST, ab 91 agrilo.at); E-Mail an den Hof nur mit Haken „Betriebsmitteilung" (betrifft den Betrieb des Hofs; Werbung für Dritte nie) und bei einer Antwort des Teams höchstens eine je Faden und Stunde. Hof: Hauptpunkt „Postfach" nach „Bestellungen" (Seitenleiste; am Handy ganz oben im Mehr-Blatt) mit Zähler ungelesen; auf Heute steht eine ungelesene Nachricht **ganz oben in der Hauptspalte lesbar** (Titel, Text, Link, „Antworten", „Gelesen"; bei mehreren die neueste, darunter „n weitere im Postfach"). Admin: /admin/postfach mit Reitern Unterhaltungen (Antworten der Höfe) · Meldungen (der bisherige „Briefkasten", Logik unverändert, /admin/meldungen leitet um) · Rundschreiben (Gesendet mit Lesequote, Neues Rundschreiben). Kein Echtzeit-Kanal: Laden beim Öffnen, offener Faden alle 60 s nachladen (router.refresh). Rate-Limit je Hof und Tag: 30 Nachrichten. Wortliste: Postfach, Nachricht, Rundschreiben, Unterhaltung, Meldung; „Briefkasten" entfällt. Aufbewahrung: Nachrichten vom Team bleiben, solange das Hofkonto besteht (Betriebsmitteilungen, Abrechnung); mit dem Hof werden sie gelöscht (Cascade). Mockups: mobil-h6-postfach, mobil-h6-unterhaltung, mobil-h3-heute-post-karte, admin-postfach, admin-rundschreiben, system-h0-navigation-postfach.
@@ -716,6 +738,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Umsetzung (Lauf 18):** Nr. 115 lief in Lauf 17 nicht (Installation des Pakets gesperrt) und läuft neu in Lauf 18 (freigabe.md §22; Migration `20261020110000_admin_passkey`, Expand; das Paket kam vorher mit dem Paket-PR, G6).
 - **Ergänzung (uttoranger, im Chat, 19.10.2026; Nr. 115 in Lauf 18):** „Die frische Bestätigung ist eine erneute Anmeldung mit Passkey; sie zählt nur, wenn der Passkey zum angemeldeten Konto gehört, und ersetzt dessen Sitzung. Ein Admin-Passkey verlangt Fingerabdruck, Gesicht oder PIN (Nutzerprüfung) beim Einrichten und bei jeder Anmeldung. Die Pflicht ‚erst Passkey, dann Admin-Bereich‘ prüft jede Admin-Seite selbst, nicht nur das Layout. Nach einem Ersatzcode ist genau ein neuer Passkey erlaubt. Migration `20261020110000_admin_passkey` (statt des nie angelegten Namens aus Lauf 17).“
 - **Ergänzung (uttoranger, im Chat, 23.10.2026):** „Auch Freischalten, Servicegebühr ändern, ‚Gründungshof bis‘ ändern, Rundschreiben senden, Startseite veröffentlichen und einen Empfänger der Zustellung hinzufügen verlangen eine frische Bestätigung mit Passkey (höchstens 5 Minuten alt). Der Bescheid an die Höfe beim Stand eines Bündels in Postfach › Meldungen läuft über denselben Versand wie ein Rundschreiben, aber mit der Wache seiner eigenen Aktion; er verlangt keine eigene frische Bestätigung.“
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Für die lokale Abnahme darf ein Prüf-Passkey nur in einer Wegwerf-Datenbank auf localhost angelegt werden (scripts/pruefung); nie in Code, Entwicklungs- oder Produktionsdatenbank.
 
 ### N21 · Testhof (19.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 18):** „Ein Hof kann im Admin als Testhof markiert werden. Ein Testhof erscheint in keiner Liste, Karte, Zählung oder Auswahl der Plattform – nicht auf /hoefe, nicht auf der Startseite, nicht in Region (Preise vergleichen, Futter kaufen), nicht in der Produktsuche und nicht in der Sitemap – und trägt noindex. Seine Hofseite bleibt per direktem Link erreichbar und zeigt oben ‚Testhof – nur zum Ausprobieren‘; Bestellen bleibt möglich. Ein Testhof ist immer auch aus der Gründung ausgenommen und bekommt nie einen Gründungsplatz und nie das Abzeichen; wird ein Hof mit Platz markiert, wird der Platz frei (Haken wie beim Ausnehmen). ‚Ausgenommen‘ heißt ab jetzt nur noch: zählt nicht für die Gründungsplätze – ein ausgenommener echter Hof ist normal sichtbar und wird indexiert. Ändert die Festlegung von Nr. 117 (noindex und Sitemap lesen das Testhof-Merkmal statt `gruendungAusgenommen`) und ergänzt K2.“
@@ -748,6 +771,9 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ### N25 · Produkte am Handy (22.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 21):** „In den Karten-Zeilen unter 1024 px stehen zuerst ‚Braucht dich‘ (Produkte im Shop mit Vorrat 0, mit Vorrat bis `LOW_STOCK_THRESHOLD` oder mit einem Hinweis zum Handeln), dann ‚Im Shop‘ in der Reihenfolge des Hofs, am Ende im Filter ‚Alle‘ die Zeile ‚Nicht im Shop · n‘, unter einem Bereichsfilter die Produkte dieses Bereichs, die nicht im Shop sind. Größen bleiben je eine Zeile. Schilder nur bei Ausnahmen; ‚Sichtbar‘ entfällt in diesen Zeilen. Der Vorrat steht als Knopf mit Zahl und Einheit des Vorrats (kg, Stück, Pakete, Ballen); geändert wird er in einem Blatt mit Feld, − und +, ‚Dazu +5 +10 +25 +50‘, ‚Ausverkauft‘ und ‚Speichern‘, über `setzeVorrat` wie bisher und mit derselben Logik wie die Tabelle. ‚Nur noch n‘ trägt die Einheit des Vorrats, auch in der Tabelle. Unter md hört die Überschrift ‚Produkte‘ nur der Screenreader, und die Suche steht als Lupe in der Reihe der Filter. Ab 1024 px bleibt die Tabelle mit − und +. Grundlage: Board system-h1-mein-hof-v3; Vorrat im Blatt gewählt am 22.10.2026 statt − und + in der Zeile.“
 - **Umsetzung:** geplant in Nr. 144 (freigabe.md §25); keine Migration.
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 3):** Vorrat-Blatt:
+  - „Dazu +5 +10 +25 +50“ und „Ausverkauft“ bleiben, wie gebaut (Nr. 223).
+  - Gewollte Abweichung vom Board s1-produkte, das beides nicht zeigt.
 
 ### N26 · Mails über die Warteschlange (24.10.2026)
 - **Entscheidung (uttoranger, im Chat, Freigabe Lauf 24):** „Jede Mail außer den Mails mit Code, Einmal-Link oder Bestätigungslink (Anmeldecode, Bestellcode, Passwort-Link, E-Mail bestätigen, Bar-Bestätigungslink, Admin-Sicherheit, Neue Anmeldung) geht über eine Warteschlange in der Datenbank. Kein Massenversand mehr innerhalb einer Anfrage. ‚Wichtig‘ sind Mails zu Bestellungen und an Höfe und Betreiber, ‚Kann warten‘ Beiträge, Rundschreiben und Bescheide; ‚Sofort‘ heißen die Mails mit Code oder Link, die direkt gehen. ‚Kann warten‘ pausiert, wenn das Tageskontingent zu 70 % oder das Kontingent des Abrechnungszeitraums zu 90 % verbraucht ist. Die Warteschlange speichert keine Adressen und keine Inhalte, nur Art, Bezug (Kennungen, darunter die Bestellung), Stand, Fehlercode und für die Support-Suche einen Fingerabdruck der Adresse (HMAC mit eigenem Zweck, nicht umkehrbar). Die Adresse lädt der Versand; ein abgemeldetes Abo bekommt nichts mehr. Jeder Versand, auch der direkte, steht als Zeile im Protokoll; Zeilen älter als 90 Tage löscht das Aufräumen. Resend meldet Zustellung, Bounce und Beschwerde an einen signierten Endpunkt; ein Bounce oder eine Beschwerde zu einem Abo meldet es ab. Admin › Betrieb › E-Mails zeigt Kontingent, Warteschlange, Fehler, Zustellquoten und auf Eingabe der Bestellnummer alle Mails zu dieser Bestellung (Mockup admin-betrieb-mails).“
@@ -812,6 +838,8 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
   - Jeder Hof hat eine Akte; jede Bestellung ist im Admin auffindbar (Nummer oder genaue Adresse).
   - Mockups ‚ADMIN · Regelbetrieb‘.“
 - **Umsetzung:** Nr. 185 (Heute), Nr. 186 (Bestellungen), Nr. 187 (Höfe und Akte), Nr. 192 (Handbuch), Nr. 193 (Navigation, Postfach nur Gespräche) und Nr. 184 (Betrieb: Alarm-Matrix) (freigabe.md §30); keine Migration außer der in Nr. 188.
+- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen; ersetzt die Zählweise nach Nr. 240.
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** Das Kachel-Wort der Geld-Kachel in Admin › Heute heißt „Bestellwert“; /admin/geld behält sein Wort.
 
 ### N33 · Admin-Protokoll (26.10.2026)
 - **Entscheidung (uttoranger, im Chat, 26.10.2026):** „Jede Admin-Aktion, jedes Ansehen einer vollen Kundenadresse und jedes Ereignis, das Geld oder den Zustand eines Hofs ändert, steht im Protokoll.
@@ -858,6 +886,7 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Umsetzung:** Nr. 191 (freigabe.md §30); keine Migration, kein Paket.
 
 ### N38 · Plattformgebühr im Hofpreis, bar per SEPA-Monatsabrechnung (26.10.2026)
+- **Verweis:** Punkt „Rechtstexte“ und „Umsetzung“ geändert durch N45 (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024)) (siehe Vermerke an beiden Stellen).
 - **Entscheidung (uttoranger, im Chat, 26.10.2026; Option 1 aus claude/plattformgebuehr-optionen-2026-10-26.md):**
   - „**Grundsatz:** Die Plattformgebühr ist Teil des Preises, den der Hof der Kundin verrechnet, online und bar gleich hoch. Agrilo verrechnet sie dem Hof als Entgelt für die Nutzung der Software. Unterm Strich zahlt der Hof nichts, er reicht nur weiter, was die Kundin gezahlt hat.
   - **Satz:** 6 % vom Warenpreis, ohne Mindestgebühr, je Stück auf den Cent aufgerundet. Je Hof im Admin änderbar, gilt nur für neue Bestellungen. Mindestbestellwert 10 € Warenwert je Bestellung.
@@ -876,10 +905,28 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
     - Bis zum Einzug zeigt auch ein Gründungshof den Endpreis inklusive Gebühr: Online behält Stripe sie ein; bar behält der Hof sie, Agrilo verzichtet (‚erlassen‘), ein Mandat ist nicht nötig. So zahlt die Kundin online und bar immer dasselbe.
     - Jeder Hof bekommt 4 Wochen vor seinem Einzugsbeginn eine Nachricht im Postfach und eine Mail.
   - **Rechtstexte** (Hof-AGB, Ankündigung, Datenschutz) kommen nach Rückmeldung der Anwältin. Vor dem Stichtag müssen sie stehen.
+    - *Vermerk (kein Teil des Zitats):* geändert durch N45 (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024)) — die Hof-AGB (Fassung 1.0) stehen vor der Rückmeldung der Anwältin; ihre Prüfung folgt als 1.1.
   - Keine Rechtsberatung.“
-- **Umsetzung:** Nr. 188 (Felder, Expand-Migration), Nr. 197 (Preis, Anzeige, Zahlung), Nr. 198 (Mandat, Monatsabrechnung, Sperre) (freigabe.md §30). Rechtstexte (Hof-AGB, Ankündigung, Datenschutz) folgen als eigener Auftrag nach Rückmeldung der Anwältin und müssen vor dem Stichtag stehen.
+- **Umsetzung:** Nr. 188 (Felder, Expand-Migration), Nr. 197 (Preis, Anzeige, Zahlung), Nr. 198 (Mandat, Monatsabrechnung, Sperre) (freigabe.md §30). Rechtstexte (Hof-AGB, Ankündigung, Datenschutz) folgen als eigener Auftrag nach Rückmeldung der Anwältin und müssen vor dem Stichtag stehen. **Vermerk:** geändert durch N45 (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024)) — die Hof-AGB 1.0 baut Nr. 259 (A005) vor der Rückmeldung der Anwältin.
+- **Ergänzung (uttoranger, im Chat, 3.11.2026; Lauf 30, A1):** Knopf „Servicegebühr …“ in der Akte:
+  - Ab dem Stichtag „Hofpreis-Modell ab“ nicht mehr zeigen. Der eine Weg zum Satz ist die Karte „Plattformgebühr“.
+  - Grund: Der Knopf schreibt den Satz des alten Modells (servicegebuehr-dialog.tsx), also ein anderes Feld. Ein Umbenennen würde in die Irre führen.
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 5):** Gesperrte Barzahlung heißt „Bar gesperrt“:
+  - Gemeint ist die Sperre durch eine offene Monatsabrechnung (oben „Einzug scheitert“).
+  - „Bar gesperrt“ statt „Pausiert“, weil „Pausiert“ der Hofzustand ist (Urlaub und Pause). Der Hofzustand „Pausiert“ bleibt unberührt.
+  - Das Wort steht in der Wortliste (N8, DESIGN_SYSTEM „Wortliste“).
+  - Umsetzung: Nacharbeit zu Lauf 30 (Marke auf /settings/payments und alle anderen Stellen dieses Zustands); keine Migration.
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 8):** ~~Die Geld-Kachel in Admin › Heute bleibt, wie sie ist (sie zählt nach Abholung).~~ **Ersetzt durch** die folgende Ergänzung (zweite Fassung, 5.11.2026).
+- **Ergänzung (uttoranger, 5.11.2026, zweite Fassung; über die Schaltzentrale; Rückfragen Lauf 30, Punkt 8):** Geld-Kachel in Admin › Heute:
+  - Zählt nach `createdAt` der Bestellung, wie es die Freigabe von Lauf 30 nennt (freigabe.md §34, „Gebühr“: maßgeblich ist createdAt, wie `gebuehrModell`).
+  - Ändert nur die Anzeige, keine Geldberechnung.
+  - Umsetzung: geplant in Lauf 31, Nr. 240; nicht in der Nacharbeit zu Lauf 30.
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 9):** `setServiceFeeAction`:
+  - Bleibt aufrufbar; nach A1 zeigt die Akte den Knopf ab dem Stichtag nur nicht mehr.
+  - Im Hofpreis-Modell rechnet die Kasse nicht mit `Farm.serviceFee*`.
 
 ### N39 · Widerruf online (§ 13a FAGG) (30.10.2026)
+- **Verweis:** ergänzt durch N43 (Wort „Rücktritt“ in Nutzertexten; die Beschriftung der Online-Funktion bleibt), 3.11.2026.
 - **Entscheidung (uttoranger, im Chat, 30.10.2026):**
   - „**Zugang:** Jede Bestellung einer Verbraucherin (`kaeuferArt` PRIVAT) kann online ohne Anmeldung widerrufen werden. Einstieg: Link ‚Vertrag widerrufen‘ in jeder Bestellmail an die Kundin, auf der Bestätigungsseite, auf der Bestellseite und im Fuß jeder Kundenseite (/widerruf).
   - **Zwei Schritte:** Erst der Knopf ‚Vertrag widerrufen‘, dann eine Zusammenfassung mit dem Knopf ‚Widerruf bestätigen‘. Gewählt werden die ganze Bestellung oder einzelne Positionen.
@@ -897,6 +944,65 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 ### N40 · Stripe live nur mit Hofpreis-Modell (30.10.2026)
 - **Entscheidung (uttoranger, im Chat, 30.10.2026):** „Ist Stripe live (Live-Schlüssel in der Produktion) und liegt der Stichtag ‚Hofpreis-Modell ab‘ noch in der Zukunft, steht in Admin › Heute ganz oben eine Aufgabe, und die Betriebsleiste warnt. Die Bestellungen laufen weiter; es ist ein Signal, keine Sperre. stripe-live.md nennt den Stichtag als Vorbedingung.“
 - **Umsetzung:** Nr. 201 (freigabe.md §31).
+
+### N41 · Redesign Welle 1 (3.11.2026; Projekt E-014)
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „Mindestbestellwert als ‚Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir fehlen noch Waren für € X.‘; Pause ohne Enddatum; ‚Warenkorb · n‘ nur bei gefülltem Warenkorb; Web-Dialoge: Neu = Dropdown, Warenkorb = Blatt rechts (≤ 448 px), sonst zentrierter Dialog ≤ 560 px; Zähler ‚Bestellungen‘ = alles nicht Abgeholte, Stornierte oder Verfallene; Kaufknopf grün.“
+- **Ergänzung (uttoranger, im Chat, 3.11.2026; Lauf 30, A3):** Mindestbestellwert-Satz:
+  - „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir fehlen noch Waren für € X.“
+  - Ohne Gebührenbetrag beim Fehlbetrag, weil die Gebühr je Stück aufgerundet wird und jede Zahl dort nur ungefähr stimmt.
+  - Im PR unter „Offen für Recht“ (Preisangabe).
+- **Umsetzung:** Nr. 219–232 (freigabe.md §34).
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 4):** ~~Produkt-Formular im Web: wird eine eigene Seite mit Vorschau rechts wie im Board w1-produkt-neu, statt eines Dialogs; Ausnahme von N41 d; eigene Nummer.~~ **Ersetzt durch** die folgende Ergänzung (zweite Fassung, 5.11.2026).
+- **Ergänzung (uttoranger, 5.11.2026, zweite Fassung; über die Schaltzentrale; Rückfragen Lauf 30, Punkt 4):** Produkt-Formular im Web:
+  - Bleibt ein Dialog nach N41 d (zentriert, höchstens 560 px).
+  - Keine eigene Seite mit Vorschau rechts, keine Ausnahme von N41 d, keine eigene Nummer dafür. Das Board w1-produkt-neu gilt hier nicht.
+
+### N42 · Redesign Welle 2 (3.11.2026; Projekt E-015)
+- **Verweis:** ergänzt N8 (Wortliste).
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „Hauptknopf im Hofbereich orange; Kundschaft grün, Hof-Eingänge orange; Wortliste vor Code (‚Hinweis‘ statt ‚Mitteilung‘, ‚Hofseite‘, ‚Anmelde-Adresse‘, Papier = Bildschirm); ‚Hof‘ statt ‚Hofladen‘ beim Stilllegen; Balken ‚Richte deinen Hof fertig ein …‘ bzw. ‚Dein Hof wird noch geprüft …‘; ‚Lastschrift einrichten‘.“
+- **Umsetzung:** Nr. 219–232 (freigabe.md §34).
+- **Ergänzung (uttoranger, im Chat, 5.11.2026; Rückfragen Lauf 30, Punkt 7):** N42 e, Balken je Stand:
+  - Auf allen Hof-Seiten, nicht nur auf /onboarding; dafür sind `(hof)/layout.tsx` und `src/server/hofbereich.ts` nötig.
+  - Als eigene Nummer freigegeben, nicht in der Nacharbeit zu Lauf 30 gebaut. Bis dahin ist N42 e nicht ganz erledigt.
+
+### N43 · Rücktritt in Nutzertexten (3.11.2026; Projekt E-017; ergänzt N8 und N39)
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „In Nutzertexten heißt es ‚Rücktritt‘ bzw. ‚Rücktrittsrecht‘, nie ‚Widerruf‘. Die Route /widerruf bleibt, der Titel lautet ‚Rücktrittsrecht‘. Wörtlich bleiben bis zur Entscheidung der Anwältin: die Beschriftung der Online-Funktion nach § 13a FAGG (Einstiege und Knöpfe, N39), die Belehrung und das Muster-Formular nach Anhang I FAGG, die AGB und die Datenschutzerklärung. Der Widerruf einer Einwilligung bleibt ‚Widerruf‘.“
+- **Umsetzung:** Nr. 219 und 231 (freigabe.md §34).
+
+### N44 · Gründungszeit 12 Monate (3.11.2026; Projekt E-018; ändert K2)
+- **Entscheidung (uttoranger, im Chat, 3.11.2026):** „Gründungshöfe bekommen den Hofladen 12 statt 24 Monate ohne Grundgebühr, einstellbar im Feld ‚Monate ohne Grundgebühr‘ (Admin › Einstellungen). Beginn am späteren Tag von Tarifstart und Freischaltung. Die Laufzeit bestimmt auch den Einzugsbeginn der Bargebühr aus N38 (K2-Ergänzung 26.10.2026): Gründungshöfe zahlen sie ab dem Tag nach dem Gründungs-Ende, bei Freischaltung vor dem Tarifstart also ab 1.2.2028. Das feste Datum (Art ‚bisher‘) entfällt mit dem Festschreiben. ‚Monate nur erhöhen‘ gilt erst nach dem Festschreiben; vorher ist jeder Wert von 1 bis zum Höchstwert erlaubt.“
+- **Ergänzung (uttoranger, im Chat, 3.11.2026; Lauf 30, A2):** Gründungszeit 12 Monate (N44):
+  - Bestätigt, mit der Folge für den Einzug der Bargebühr (siehe Entschieden).
+  - Wert setzen und Festschreiben macht die Projektleitung nach dem Merge, vor dem Tarifstart am 1.2.2027.
+  - Der Lauf ändert keine Daten.
+- **Umsetzung:** Nr. 221 (freigabe.md §34).
+
+### N45 · AGB 1.0 mit dem Stichtag (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024))
+- **Entscheidung:**
+  - Variante A (Chat 31.10.2026): Fassung 1.0 wird vor der anwaltlichen Prüfung veröffentlicht; die Prüfung folgt als 1.1.
+  - AGB 1.0 gilt ab dem Stichtag „Hofpreis-Modell ab“ und schaltet mit ihm um; vorher gilt 0.9. Die Seite /agb wird bei jedem Aufruf frisch gebaut und zeigt die geltende Fassung; /agb/0.9 und /agb/1.0 zeigen je eine.
+  - Für jede Bestellung gilt die Fassung ihres Gebührenmodells (Order.gebuehrModell: bisher = 0.9, hofpreis = 1.0). Danach richten sich Mail-Anhang und Links; in der Kasse einer bestehenden Bestellung gilt ihr Snapshot.
+  - Höfe stimmen ab dem Merge der neuesten Fassung zu. Eine Zustimmung nach der Ankündigung verzichtet auf den Rest der Frist (AGB 32.4).
+  - Vor dem Stichtag schaltet die Projektleitung keinen echten Hof ohne Zustimmung zur neuesten Fassung frei und bittet keinen um Zustimmung vor der Ankündigung per E-Mail.
+  - Kasse im Hofpreis-Modell ohne Zustimmung zur sofortigen Vermittlung. Ab dem Stichtag ohne „Entwurf“-Marke auf /konditionen.
+  - Keine Rechtsberatung.
+- **Verhältnis zu anderen Einträgen:** ändert O4 (Fassung 1.0 wird vor der anwaltlichen Prüfung veröffentlicht, Variante A vom 31.10.2026; die Prüfung folgt als 1.1; Stand-Vermerk und Kassensatz neu). Ändert N38 beim Punkt „Rechtstexte“ (die Hof-AGB stehen vor der Rückmeldung der Anwältin; ihre Prüfung folgt). Ergänzt B1, N2 (Kassensatz) und K1 (Zeile mit dem Stichtag auf /konditionen). N43 bleibt. Umsetzung: A005.
+- **Umsetzung:** Nr. 259 (A005, freigabe.md §36; docs/nachtlauf/berichte/a005-agb-1-0-stichtag.md); keine Migration.
+
+### N46 · Antworten auf Morgenbericht 31 und Abnahme-Grundlage (6.11.2026)
+- **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Die Entscheidungsliste docs/nachtlauf/berichte/lauf32-board-oder-code.md gilt für die Abnahme: B wird gebaut, C, R und U sind kein Mangel. Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen. Packliste auf Heute mit Kurzname, ohne Uhrzeit. Passwort-Auge, ‚Willkommen, <Vorname>‘, Kürzel ‚HM‘, Sicherheits-Link 24 Stunden und die Bot-Bremse mit stillem Scheinerfolg bleiben. Der Hof bekommt die Mail ‚Neue Bestellung bar‘. Der Link ‚Dieselbe Bestellung nochmal aufgeben‘ entfällt. Leerzustände ohne Symbol. ‚Höchstens zweimal im Monat‘ entfällt. Ein Prüf-Passkey entsteht nur in einer lokalen Wegwerf-Datenbank (scripts/pruefung); App-Code und Passkey-Logik bleiben unverändert (N20).“
+- **Umsetzung:** Nr. 243–258b (freigabe.md §36); keine Migration.
+- **Ergänzung (uttoranger, im Chat, 7.11.2026; Antworten Zwischen-Morgenbericht Lauf 32):** Abholzettel: Der Kasten heißt bei nicht abgeholter Bestellung bzw. entfallener Gebühr „Nichts zu kassieren“, bei Karte bei Abholung „Zu kassieren“ statt „Bar zu kassieren“; nur Anzeige, gespeicherte Beträge und jede Berechnung bleiben.
+
+### N47 · Abholung nach Absprache (6.11.2026)
+- **Entscheidung (uttoranger, im Chat, 6.11.2026):** „Enthält eine Bestellung ein Produkt mit dem Abholhinweis ‚Abholung nach Absprache‘, sagt die Kasse über der Terminwahl ‚Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.‘ und das Notizfeld heißt ‚Notiz zur Abholung‘. Die Bestätigungsmail sagt ‚Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.‘ (mit Reply-To auf die Profil-E-Mail des Hofs) bzw. ‚Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.‘ Der Hof sieht in Bestellung und Heute die Marke ‚Abholung absprechen‘ mit ‚Anrufen‘ und ‚Mail schreiben‘, nur bei offenen Bestellungen. Kein neues Feld, Preis und Zahlung unverändert.“
+- **Umsetzung:** Nr. 257 (freigabe.md §36); keine Migration.
+
+### N48 · Antworten auf Morgenbericht 32 und Gründungsplätze (7.11.2026)
+- **Entscheidung (uttoranger, im Chat, 7.11.2026):** „Das Feld ‚Hof-E-Mail‘ auf den Hofdaten bleibt; es ist die Kontaktangabe für den Rücktritt. Ist ein Produkt gerade ausverkauft, sagt die Produktseite ‚<Produkt> gibt es gerade nicht.‘ Der Abholzettel sagt ‚Nichts zu kassieren‘ auch bei stornierten Bestellungen ohne Erstattungszeitpunkt. Die Packliste nennt die Plattformgebühr nur, wo ein gezeigter Betrag sie enthält, wie der Abholzettel. /onboarding hat die Inhaltsbreite des Boards. Die Mail im Hofpreis-Modell zeigt bei entfallener Gebühr keinen Kasten ‚Bring bitte … mit‘. Eine h1 hinter einem offenen Dialog oder Blatt fehlt nicht. Es gibt 100 Gründungsplätze; die Zahl kommt aus Admin › Einstellungen, den Wert in Produktion setzt die Projektleitung. Steht ‚bis <Tag>‘ beim Ende der Gründungszeit oder der erlassenen Bargebühr, ist es der letzte Tag ohne diese Gebühr; der Einzug der Bargebühr beginnt am Tag danach, außer der Hof hat im Admin einen eigenen Einzugstag. Kurznummern von Meldungen haben sechs Zeichen in Großbuchstaben; alte achtstellige werden weiter gefunden. Admin › Betrieb › Mails zeigt zusätzlich ‚Beispiele‘: jede Mail-Art mit erfundenen Daten, Codes als Nullen, Links unkenntlich; kein Versand, kein Mail-Auftrag, nichts gespeichert. Die Vorschau echter Mails (N27) bleibt, wie sie ist.“
+- **Verhältnis zu anderen Einträgen:** bestätigt K2 (Änderung Nr. 116, 100 Plätze) und schließt die offene Frage „Zahl der Gründungsplätze“; ergänzt N38 und N44 (nur die Anzeige des Endes, nicht, wann eine Gebühr anfällt), N46 (Abholzettel) und N1 (siehe Ergänzung dort).
+- **Umsetzung:** Nr. 261–281 (freigabe.md §37); keine Migration.
+- Ergänzung (uttoranger, im Chat, 9.11.2026; F041): Im dunklen Design steht die Kategorie-Illustration wie ein Foto: auf ihrem eigenen Grund, gedämpft wie ein Foto (FOTO_HUELLE), gerahmt. Kartenkacheln bleiben mit der Fläche verrechnet, Platzhalter ohne Bild gedämpft. Die Regel ‚keine hellen Flecken‘ (freigabe.md §35, Maßstab Punkt 4) gilt für Illustrationen nicht mehr. I1 und N22 bleiben. Umsetzung: Nr. 271 (freigabe.md §37.1).
 
 ---
 
@@ -916,11 +1022,12 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 | O1 | Fehler-Token | **Entschieden 07.10.2026 (uttoranger):** Die Fehler-Farbe bekommt einen Kontrast von mindestens 4,5:1 in beiden Themes (Nr. 28). Bisher: Fehlertext 4,22:1 im hellen Theme, deshalb orange Hinweiskarte bzw. `text-status-offen`. |
 | O2 | Bearbeiten am Handy (#180) | **Entschieden durch N4 (10.10.2026, Freigabe Lauf 9).** Bisher: Unter der Checkliste in Mein Hof steht weiter der Editor mit Stiften; das Mockup zeigt nur „Vorschau ansehen". Entfällt er, braucht es einen eigenen Auftrag. |
 | O3 | S11 Double-Opt-in | **Entschieden, siehe S11** (Freigabe Lauf 7, Umsetzung Nr. 38). Offen bleibt die Frage, ob „Nochmal bestellen" in der Abholbereit-Mail Werbung ist. |
-| O4 | AGB / Nutzungsbedingungen | **Geändert 13.10.2026 (uttoranger, Freigabe Lauf 13):** AGB liegen als Entwurf in docs/recht/agb.md (Fassung 0.9, 13.10.2026); Seite /agb baut Nr. 90; Freigabe der Fassung 1.0 nach anwaltlicher Prüfung durch die Projektleitung; bis dahin trägt die Seite den Stand-Vermerk. Beim Registrieren und in der Kasse ein Satz mit Link, kein Haken. Der Entwurf docs/recht/agb.md ist die Quelle der AGB-Seite; Änderungen am Wortlaut nur durch die Projektleitung (nach anwaltlicher Prüfung), nie durch einen Lauf. Die Seite trägt bis zur Freigabe „Fassung 0.9 – Entwurf, Stand 13.10.2026". Einbeziehung: Registrierung mit dem Satz „Mit der Registrierung stimmst du den AGB und den Konditionen zu" (Links), Kasse unter dem Kaufknopf „Es gelten die AGB von Agrilo. Vertragspartner ist der Hof." (Link; Name aus MARKE) und die Zustimmung zur sofortigen Ausführung der Vermittlung („… und stimme zu, dass Agrilo die Vermittlung sofort ausführt") – ohne Haken. AGB-Link in jeder Fußzeile und in der Bestellbestätigungs-Mail. **Ergänzung 1.11.2026 (uttoranger, Nr. 215):** Der Satz zu den AGB und der Rücktrittssatz stehen unter jedem Knopf, mit dem eine Bestellung verbindlich wird; Wortlaut bei N2. |
+| O4 | AGB / Nutzungsbedingungen | **Geändert 13.10.2026 (uttoranger, Freigabe Lauf 13):** AGB liegen als Entwurf in docs/recht/agb.md (Fassung 0.9, 13.10.2026); Seite /agb baut Nr. 90; Freigabe der Fassung 1.0 nach anwaltlicher Prüfung durch die Projektleitung; bis dahin trägt die Seite den Stand-Vermerk. *Vermerk (kein Teil des Wortlauts):* geändert durch N45 (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024)) — Fassung 1.0 wird vor der anwaltlichen Prüfung veröffentlicht (Variante A, 31.10.2026), die Prüfung folgt als 1.1; der Stand-Vermerk lautet „Fassung 1.0 – gilt ab <Stichtag>“. Beim Registrieren und in der Kasse ein Satz mit Link, kein Haken. Der Entwurf docs/recht/agb.md ist die Quelle der AGB-Seite; Änderungen am Wortlaut nur durch die Projektleitung (nach anwaltlicher Prüfung), nie durch einen Lauf. *Vermerk (kein Teil des Wortlauts):* geändert durch N45 (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024)) — den Wortlaut von 1.0 hat die Projektleitung vor der anwaltlichen Prüfung freigegeben (A005); ihre Prüfung folgt als 1.1. Die Seite trägt bis zur Freigabe „Fassung 0.9 – Entwurf, Stand 13.10.2026". Einbeziehung: Registrierung mit dem Satz „Mit der Registrierung stimmst du den AGB und den Konditionen zu" (Links), Kasse unter dem Kaufknopf „Es gelten die AGB von Agrilo. Vertragspartner ist der Hof." (Link; Name aus MARKE) und die Zustimmung zur sofortigen Ausführung der Vermittlung („… und stimme zu, dass Agrilo die Vermittlung sofort ausführt") – ohne Haken. *Vermerk (kein Teil des Wortlauts):* geändert durch N45 (Projektleitung im Chat, 05.11.2026, E-019 = F021 Fragen 1–8 wie empfohlen (F024)) — im Hofpreis-Modell steht der Kassensatz ohne die Zustimmung zur sofortigen Vermittlung (Wortlaut bei N45/N2). AGB-Link in jeder Fußzeile und in der Bestellbestätigungs-Mail. **Ergänzung 1.11.2026 (uttoranger, Nr. 215):** Der Satz zu den AGB und der Rücktrittssatz stehen unter jedem Knopf, mit dem eine Bestellung verbindlich wird; Wortlaut bei N2. |
 | O5 | Rückruf anfordern | **Entfällt (07.10.2026, uttoranger).** Schema `RueckrufAnfrage` wird nicht gebaut. Ersatz bleibt „E-Mail schreiben". |
 | O6 | Kachelquelle der Karten (10.10.2026) | OSM direkt, basemap.at oder ein Anbieter mit Schlüssel. Ein Wechsel ändert die Datenschutzerklärung. **Nicht bauen**; Nr. 52 legt nur einen Vorschlag in den Bericht. Stand 12.10.2026: weiter offen; der Vorschlag aus Bericht 52 steht. |
 | O7 | Gründungszusage (10.10.2026) | **Entschieden durch K2 (12.10.2026, Freigabe Lauf 10).** Bisher: Der Freischalt-Dialog im Admin (`GRUENDUNGS_KONDITIONEN`, `src/lib/gruendungshof.ts`) verspricht „keine Plattformgebühr bis 31.12.2029, danach dauerhaft 3 %". Das passt nicht zu E6 und K1. Der Mensch entscheidet; der Text bleibt. |
 | O8 | Produkte über der Grenze ab 1.2.2027 (12.10.2026) | **Entschieden 12.10.2026 (uttoranger, Freigabe Lauf 10), Bau in Gate 8 / Lauf 11:** Der Hof wählt die 3 sichtbaren Produkte, die übrigen ruhen, nichts wird gelöscht; ohne Wahl bleiben die 3 zuletzt verkauften sichtbar; Vorwarnung per Mail im Jänner 2027. |
+| O9 | Rücktritts-Hinweise an Kundinnen (6.11.2026) | Zeile ‚14 Tage Rücktrittsrecht …‘ je Produkt auf der Produktseite und zwei Sätze in der Storno-Mail (Rückzahlung, verderbliche Ware); Wortlaut liegt bei der Anwältin. Lauf 32 baut nicht. |
 
 ---
 
@@ -975,3 +1082,9 @@ Vormerkung (uttoranger, im Chat, 31.10.2026; Nr. 209): „Nacharbeit nach dem Go
 Stand Lauf 28 (uttoranger, 31.10.2026): Die Ergänzungen zu N17, G8, N2/E5 und N39 sowie die Vormerkung Nr. 209 sind entschieden und in Nr. 208, 210–214 eingeplant (freigabe.md §32). Dazu die Befunde aus Bericht 207 (§ 8 Abs. 1 FAGG, Gewährleistungs-Mitteilung, Hof-E-Mail) und die Nacharbeit aus Morgenbericht 27. Lauf 28 hat eine Migration (214), kein neues Paket und keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, Monatsabrechnungs-Gutschrift, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.
 
 Stand Lauf 29 (uttoranger, 1.11.2026): Die Ergänzungen zu N2/O4, N2 (Handy-Reihenfolge) und zur Fließkomma-Wache sind entschieden; 211 (Gewährleistungs-Mitteilung, Grafik liegt vor) und 215–218 sind eingeplant (freigabe.md §33). Lauf 29 hat keine Migration, kein neues Paket, keine neue Variable. Nicht in diesem Lauf: AGB 1.0 (eigener /fix), 209, 212-Profil, Monatsabrechnung, die 13 Entscheidungen aus Morgenbericht 26, DPMG, CSP mit Nonces, Stripe live.
+
+Stand Lauf 30 (uttoranger, 3.11.2026): N41–N44 entschieden; Redesign nach den Mockups November 2026 in Nr. 219–232 (freigabe.md §34). Keine Migration, kein Paket, keine Variable. Nicht: Ab Hof, Willkommenszeit, Zahl der Gründungsplätze, Kartenquelle, Tarife als Abrechnung, Preise vergleichen v2 (PR #329), AGB 1.0, Impressum (A001).
+
+Stand Lauf 32 (uttoranger, 6.11.2026): N46 und N47 entschieden; Abnahme nach der Board-oder-Code-Liste, gemeinsame Bausteine G1–G14 und die B-Zeilen je Board in Nr. 243–258b, dazu AGB 1.0 mit dem Stichtag in Nr. 259 (N45, A005), in zwei Abschnitten (freigabe.md §36). Keine Migration, kein Paket, keine neue Variable. Nicht: P1 (O9, Anwältin), Zahl der Gründungsplätze (offen), Recht-Texte außer AGB 1.0 nach A005 (Datenschutz A006, Impressum A004), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F030), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien.
+
+Stand Lauf 33 (uttoranger, 7.11.2026): N48 entschieden (Antworten auf Morgenbericht 32, 100 Gründungsplätze, Ende der Gründungszeit als letzter Tag, Kurznummer); Ergänzungen bei K2 und N1. Gemeinsame Ursachen, echte Fehler und die Boards unter 5 Sternen in Nr. 261–281, in drei Abschnitten (freigabe.md §37). Keine Migration, kein Paket, keine neue Variable. Nicht: Recht-Wortlaut (P1/O9, Anwältin), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F035), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien, Toast-Token.

@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Wallet } from 'lucide-react'
 import { FINANZEN_JAHR_TEXT, ergebnisText, monatOhneJahr, type JahrMonatAnzeige } from '@/lib/finanzen'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -10,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Switch } from '@/components/ui/switch'
 import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
+import type { JahrGebuehrTexte } from '@/app/admin/geld/texte'
 
 /**
  * Die Jahresansicht der Finanzen: das Diagramm „<Jahr> nach Monaten" und die
@@ -72,11 +72,14 @@ export function JahrMonate({
   jahr,
   monate,
   vorjahr,
+  gebuehr,
   vergleichAb,
   hinweisImVergleich = null,
 }: {
   jahr: number
   monate: JahrMonatAnzeige[]
+  /** Das Wort der Gebühr (V63) für Kopf, Legende, Diagramm und Zeilen — fertig von der Seite (`jahrGebuehrTexte`). */
+  gebuehr: JahrGebuehrTexte
   /** Das Vorjahr, wenn es Daten hat; sonst null (der Schalter ist dann aus, mit Hinweis). */
   vorjahr: number | null
   vergleichAb: number
@@ -93,7 +96,7 @@ export function JahrMonate({
   const mitVergleich = vergleich && vorjahr !== null
   const leer = monate.every((m) => m.zahlen === null || (m.zahlen.servicegebuehrCents === 0 && m.zahlen.kostenCents === 0))
   if (leer) {
-    return <EmptyState symbol={Wallet} titel={text.leerTitel} satz={text.leer} ausweg={{ ohne: 'Die Monate füllen sich von selbst, sobald Bestellungen eingehen; es gibt nichts, wohin der Weg führen könnte' }} />
+    return <EmptyState titel={text.leerTitel} satz={text.leer} ausweg={{ ohne: 'Die Monate füllen sich von selbst, sobald Bestellungen eingehen; es gibt nichts, wohin der Weg führen könnte' }} />
   }
 
   const gezaehlt = monate.filter((m) => m.zahlen !== null).reverse()
@@ -103,14 +106,14 @@ export function JahrMonate({
       <section aria-labelledby={titelId} className={cn(KARTE, 'flex flex-col gap-4 p-4 md:p-[18px]')}>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h2 id={titelId} className="font-heading text-[17px] font-semibold text-foreground">
-            {text.diagrammTitel(jahr)}
+            {text.diagrammBeschriftung(jahr, gebuehr.wort)}
           </h2>
           <VergleichSchalter jahr={jahr} vorjahr={vorjahr} vergleichAb={vergleichAb} an={mitVergleich} onChange={setVergleich} />
-          <Legende vorjahr={mitVergleich ? vorjahr : null} />
+          <Legende vorjahr={mitVergleich ? vorjahr : null} gebuehr={gebuehr} />
         </div>
         {mitVergleich && hinweisImVergleich && <p className={cn('-mt-2 text-[12.5px] leading-snug', LEISE)}>{hinweisImVergleich}</p>}
         <div ref={messRahmen}>
-          <Diagramm jahr={jahr} monate={monate} breite={breite} vergleich={mitVergleich} beschreibtId={tabelleId} />
+          <Diagramm jahr={jahr} monate={monate} gebuehr={gebuehr} breite={breite} vergleich={mitVergleich} beschreibtId={tabelleId} />
         </div>
       </section>
 
@@ -126,7 +129,7 @@ export function JahrMonate({
                   {text.monat}
                 </th>
                 <th scope="col" className="px-3 py-3 text-right font-semibold">
-                  {text.legendeServicegebuehren}
+                  {text.legendeGebuehren(gebuehr.wort)}
                 </th>
                 {mitVergleich && (
                   <th scope="col" className="px-3 py-3 text-right font-semibold">
@@ -146,7 +149,7 @@ export function JahrMonate({
             </thead>
             <tbody>
               {gezaehlt.map((m) => (
-                <MonatsZeile key={m.monat} monat={m} mitVergleich={mitVergleich} />
+                <MonatsZeile key={m.monat} monat={m} wort={gebuehr.jeMonat[m.monat] ?? null} mitVergleich={mitVergleich} />
               ))}
             </tbody>
           </table>
@@ -156,7 +159,7 @@ export function JahrMonate({
   )
 }
 
-function MonatsZeile({ monat, mitVergleich }: { monat: JahrMonatAnzeige; mitVergleich: boolean }): React.JSX.Element | null {
+function MonatsZeile({ monat, wort, mitVergleich }: { monat: JahrMonatAnzeige; wort: string | null; mitVergleich: boolean }): React.JSX.Element | null {
   const zahlen = monat.zahlen
   if (!zahlen) return null
   const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
@@ -168,7 +171,11 @@ function MonatsZeile({ monat, mitVergleich }: { monat: JahrMonatAnzeige; mitVerg
           {monat.bezeichnung}
         </Link>
       </th>
-      <td className="px-3 py-3 text-right text-foreground tabular-nums">{euro(zahlen.servicegebuehrCents)}</td>
+      <td className="px-3 py-3 text-right text-foreground tabular-nums">
+        {euro(zahlen.servicegebuehrCents)}
+        {/* Über den Stichtag nennt jede Zeile ihr Wort (Board w3-admin-geld Bild 4) — sonst steht es im Kopf. */}
+        {wort !== null && <span className={cn('block text-[12px] font-normal', LEISE)}>{wort}</span>}
+      </td>
       {mitVergleich && (
         <td className={cn('px-3 py-3 text-right tabular-nums', LEISE)}>{monat.vorjahrCents === null ? '–' : euro(monat.vorjahrCents)}</td>
       )}
@@ -220,20 +227,20 @@ function VergleichSchalter({
   )
 }
 
-/** Die Legende über dem Diagramm: Servicegebühren · Kosten · noch offen (und das Vorjahr, wenn es verglichen wird). */
-function Legende({ vorjahr }: { vorjahr: number | null }): React.JSX.Element {
+/** Die Legende über dem Diagramm: Gebühren · Kosten · noch offen (und das Vorjahr, wenn es verglichen wird). */
+function Legende({ vorjahr, gebuehr }: { vorjahr: number | null; gebuehr: JahrGebuehrTexte }): React.JSX.Element {
   const text = FINANZEN_JAHR_TEXT
   return (
     <p aria-hidden="true" className={cn('flex flex-wrap gap-x-3 gap-y-1 text-[12px]', LEISE)}>
       {vorjahr !== null && (
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2.5 rounded-[2px] bg-status-fertig/50" />
-          {text.legendeVorjahr(vorjahr)}
+          {text.legendeVorjahr(vorjahr, gebuehr.vorjahrWort ?? gebuehr.wort)}
         </span>
       )}
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-[2px] bg-status-fertig" />
-        {text.legendeServicegebuehren}
+        {gebuehr.legende}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <span className="size-2.5 rounded-[2px] bg-status-offen" />
@@ -248,7 +255,7 @@ function Legende({ vorjahr }: { vorjahr: number | null }): React.JSX.Element {
 }
 
 /**
- * Das Diagramm: je Monat zwei Balken (Servicegebühren, Kosten), auf Wunsch
+ * Das Diagramm: je Monat zwei Balken (Gebühren, Kosten), auf Wunsch
  * davor ein blasser für das Vorjahr; die Achse in €; ein offener Monat als
  * gestrichelter Kasten; ein Ausreißer mit dem Namen des einmaligen Postens am
  * Balken. Farben nur aus Tokens (`status-fertig` grün, `status-offen` orange),
@@ -258,12 +265,14 @@ function Legende({ vorjahr }: { vorjahr: number | null }): React.JSX.Element {
 function Diagramm({
   jahr,
   monate,
+  gebuehr,
   breite,
   vergleich,
   beschreibtId,
 }: {
   jahr: number
   monate: JahrMonatAnzeige[]
+  gebuehr: JahrGebuehrTexte
   breite: number
   vergleich: boolean
   beschreibtId: string
@@ -290,7 +299,7 @@ function Diagramm({
     <div className="relative">
       <svg
         role="img"
-        aria-label={FINANZEN_JAHR_TEXT.diagrammBeschriftung(jahr)}
+        aria-label={FINANZEN_JAHR_TEXT.diagrammBeschriftung(jahr, gebuehr.wort)}
         aria-describedby={beschreibtId}
         viewBox={`0 0 ${breite} ${HOEHE}`}
         width="100%"
@@ -302,7 +311,7 @@ function Diagramm({
           return (
             <g key={c}>
               <line x1={LINKS} x2={breite - RECHTS} y1={y} y2={y} className="stroke-border" strokeWidth={1} />
-              <text x={LINKS - 8} y={y + 4} textAnchor="end" fontSize={11} className="fill-muted-foreground">
+              <text x={LINKS - 8} y={y + 4} textAnchor="end" fontSize={12} className="fill-muted-foreground">
                 {formatEuro(centsAlsEuro(c), 0)}
               </text>
             </g>
@@ -331,7 +340,7 @@ function Diagramm({
                     className="stroke-muted-foreground/60"
                   />
                   {!schmal && (
-                    <text x={mitte} y={BASIS - 66} textAnchor="middle" fontSize={10.5} className="fill-muted-foreground">
+                    <text x={mitte} y={BASIS - 66} textAnchor="middle" fontSize={12} className="fill-muted-foreground">
                       offen
                     </text>
                   )}
@@ -369,7 +378,7 @@ function Diagramm({
                       x={rechts ? kostenX + balkenBreite : kostenX}
                       y={BASIS - kostenHoehe - 6}
                       textAnchor={rechts ? 'end' : 'start'}
-                      fontSize={10.5}
+                      fontSize={12}
                       className="fill-status-offen"
                     >
                       {`${kuerze(m.ausreisser, 24)} (${FINANZEN_JAHR_TEXT.einmaligZusatz})`}
@@ -397,7 +406,7 @@ function Diagramm({
             prefetch={false}
             title={
               m.zahlen
-                ? `${m.bezeichnung}: ${FINANZEN_JAHR_TEXT.legendeServicegebuehren} ${formatEuro(centsAlsEuro(m.zahlen.servicegebuehrCents))}, ${FINANZEN_JAHR_TEXT.legendeKosten} ${formatEuro(centsAlsEuro(m.zahlen.kostenCents))}`
+                ? `${m.bezeichnung}: ${gebuehr.titelJeMonat[m.monat] ?? FINANZEN_JAHR_TEXT.legendeGebuehren(gebuehr.wort)} ${formatEuro(centsAlsEuro(m.zahlen.servicegebuehrCents))}, ${FINANZEN_JAHR_TEXT.legendeKosten} ${formatEuro(centsAlsEuro(m.zahlen.kostenCents))}`
                 : `${m.bezeichnung}: ${FINANZEN_JAHR_TEXT.nochOffen}`
             }
             className="absolute inset-y-0 rounded-md hover:bg-foreground/5"

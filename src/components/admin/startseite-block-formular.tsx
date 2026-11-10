@@ -245,23 +245,29 @@ export function BlockFormular({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <fieldset className="flex min-w-0 flex-col">
-          <legend className={FELD_LABEL}>Live ab</legend>
+          {/* Die Felder tragen ihren Namen über die sichtbare Legende (aria-labelledby) und ihr eigenes Wort —
+              ein aria-label allein zählt die Messung als „ohne Beschriftung" (Nr. 281). */}
+          <legend id={`${id}-live-ab`} className={FELD_LABEL}>
+            Live ab
+          </legend>
           <div className="flex gap-2">
-            <input type="date" aria-label="Live ab, Tag" className={FELD} value={werte.liveAbTag} onChange={(e) => setze({ liveAbTag: e.target.value })} />
-            <input type="time" aria-label="Live ab, Uhrzeit" className={cn(FELD, 'w-[9rem] shrink-0')} value={werte.liveAbUhrzeit} onChange={(e) => setze({ liveAbUhrzeit: e.target.value })} />
+            <input id={`${id}-live-ab-tag`} type="date" aria-label="Tag" aria-labelledby={`${id}-live-ab ${id}-live-ab-tag`} className={FELD} value={werte.liveAbTag} onChange={(e) => setze({ liveAbTag: e.target.value })} />
+            <input id={`${id}-live-ab-uhrzeit`} type="time" aria-label="Uhrzeit" aria-labelledby={`${id}-live-ab ${id}-live-ab-uhrzeit`} className={cn(FELD, 'w-[9rem] shrink-0')} value={werte.liveAbUhrzeit} onChange={(e) => setze({ liveAbUhrzeit: e.target.value })} />
           </div>
         </fieldset>
         <fieldset className="flex min-w-0 flex-col">
-          <legend className={FELD_LABEL}>Live bis (freiwillig)</legend>
+          <legend id={`${id}-live-bis`} className={FELD_LABEL}>
+            Live bis (freiwillig)
+          </legend>
           <div className="flex gap-2">
-            <input type="date" aria-label="Live bis, Tag" className={FELD} value={werte.liveBisTag} onChange={(e) => setze({ liveBisTag: e.target.value })} />
-            <input type="time" aria-label="Live bis, Uhrzeit" className={cn(FELD, 'w-[9rem] shrink-0')} value={werte.liveBisUhrzeit} placeholder="23:59" onChange={(e) => setze({ liveBisUhrzeit: e.target.value })} />
+            <input id={`${id}-live-bis-tag`} type="date" aria-label="Tag" aria-labelledby={`${id}-live-bis ${id}-live-bis-tag`} className={FELD} value={werte.liveBisTag} onChange={(e) => setze({ liveBisTag: e.target.value })} />
+            <input id={`${id}-live-bis-uhrzeit`} type="time" aria-label="Uhrzeit" aria-labelledby={`${id}-live-bis ${id}-live-bis-uhrzeit`} className={cn(FELD, 'w-[9rem] shrink-0')} value={werte.liveBisUhrzeit} placeholder="23:59" onChange={(e) => setze({ liveBisUhrzeit: e.target.value })} />
           </div>
         </fieldset>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-semibold tracking-[0.1em] text-muted-foreground uppercase">{T.vorschauKachel}</span>
+        <span className="text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase">{T.vorschauKachel}</span>
         <div className="pointer-events-none max-h-[360px] overflow-hidden rounded-2xl border border-border bg-background" inert>
           <StartseitenBlock block={block} hoefe={gewaehlteHoefe} kategorieBild={block.kategorie ? illustrationPfad(block.kategorie) : null} />
         </div>

@@ -1,23 +1,17 @@
 import Link from 'next/link'
-import { CalendarPlus, LinkIcon, MapPin } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { bestellLinkGilt, bestellSignatur, widerrufPfad } from '@/lib/bestell-link'
 import { widerrufMoeglich } from '@/lib/widerruf'
 import { WiderrufLink } from '@/components/bestaetigung/widerruf-link'
-import { bestellStatusAnzeige, formatiereAbholtermin, zahlungsAnzeige } from '@/lib/bestellstatus'
-import { formatPosition } from '@/lib/format'
+import { bestellStatusAnzeige, formatiereAbholtermin } from '@/lib/bestellstatus'
+import { positionMengeVorn } from '@/lib/format'
 import { alsCents } from '@/lib/order-totals'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Marke } from '@/components/ui/marke'
-import {
-  Aktionen,
-  AktionsLink,
-  BestellPositionen,
-  KARTE,
-  KNOPF_GRUEN,
-  KNOPF_RAHMEN,
-} from '@/components/bestaetigung/bestaetigung-teile'
+import { Textlink } from '@/components/ui/textlink'
+import { AbholKarte, BestellPositionen, KARTE, KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
+import { abholTerminZeile, BESTELLSEITE_LINK_UNGUELTIG, BESTELLSEITE_OHNE_STORNO, kalenderTerminGilt } from '@/lib/bestaetigung'
+import { buildMapsUrl } from '@/lib/customer-links'
 import { HofErreichen } from '@/components/bestaetigung/hof-erreichen'
 import { KundeShellMitSitzung } from '@/components/shells/kunde-shell-mit-sitzung'
 import { hofSichtbar } from '@/lib/hof-sichtbar'
@@ -33,13 +27,10 @@ import { hofSichtbar } from '@/lib/hof-sichtbar'
  * oder einen stillgelegten Hof. Wer Links durchprobiert, erfährt so nicht
  * einmal, OB eine Bestellung existiert.
  *
- * Neues Design seit Nr. 54: KundeShell MIT Unterleiste — die Bestellseite ist
- * keine Fokus-Seite (DESIGN_SYSTEM „Fokus-Seiten ohne Unterleiste" nennt sie
- * nicht), sie hat keine feste Aktionsleiste, und von hier geht es zu den
- * Höfen oder zu „Meine Bestellungen" weiter. Die Bausteine (Karte,
- * Positionen, Knöpfe) sind die der Bestätigungsseite: dieselbe Bestellung
- * sieht an beiden Stellen gleich aus. Zugang, Abfrage und ICS-Link sind
- * unverändert.
+ * Neues Design seit Nr. 54, seit Lauf 31 nach dem Board s1-/w1-bestellung-link: KundeShell OHNE Unterleiste, am
+ * Handy mit der Titelzeile „Deine Bestellung“ — keine feste Aktionsleiste; von hier geht es über die Links im Inhalt
+ * zum Hof. Die Bausteine (Karte, Positionen, Knöpfe) sind die der Bestätigungsseite: dieselbe Bestellung sieht an
+ * beiden Stellen gleich aus. Zugang, Abfrage und ICS-Link sind unverändert.
  */
 
 interface Props {
@@ -53,29 +44,40 @@ export const metadata = {
   robots: { index: false, follow: false },
 }
 
-/** Die Spalte der Seite: 640 px wie die Bestätigungsseite, am Handy mit 16 px Rand. */
-const SPALTE = 'mx-auto flex w-full max-w-[640px] flex-col gap-4 px-4 pt-8 pb-12 md:pt-10'
+/**
+ * Die Spalte der Seite: wie die Bestätigungsseite (Board w1-bestellung-link), am Handy mit 16 px Rand. Im Browser kein
+ * Polster unten: Bis zur Linie des Seitenfußes bleiben so rund 20 px wie im Board (UI-Runde 3), der Fuß bringt sein
+ * eigenes Polster mit. Die Abstände zwischen den Karten bleiben 16 px wie im Skeleton (loading.tsx, Nr. 227).
+ */
+const SPALTE = 'mx-auto flex w-full max-w-[928px] flex-col gap-4 px-4 pt-6 pb-12 md:pt-8 md:pb-0'
 
-/** Kleine Überschrift einer Karte in Großbuchstaben (wie „Abholung" auf der Bestätigungsseite). */
-const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
+/** Zwei Karten nebeneinander ab 768 px (Abholung · Hof erreichen). */
+const PAAR = 'grid items-start gap-4 md:grid-cols-2'
+
+/**
+ * Lauf 31 (Board s1-bestellung-link): am Handy die Titelzeile „Deine Bestellung“ und keine Unterleiste — die Seite
+ * kommt aus einer Mail, ihre Wege hinaus sind die Links im Inhalt. Im Browser der Seitenfuß in der Spalte der Seite.
+ */
+const HANDY_TITEL = 'Deine Bestellung'
 
 function LinkUngueltig() {
   return (
-    <KundeShellMitSitzung>
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL}>
       {/* Ohne gültige Signatur ist nicht einmal der Hof bestätigt — der
           Ausweg führt deshalb zur Hofübersicht, nicht zu /{farmSlug}. */}
-      <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-2.5 px-4 pt-10 pb-12 text-center md:pt-[60px]">
-        <LinkIcon className="size-12 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
-        <h1 className="font-heading text-[22px] font-semibold text-foreground md:text-[28px]">
-          Dieser Link ist nicht gültig
-        </h1>
-        <p className="text-[15px] leading-normal text-muted-foreground">
-          Bitte öffne den Link genau so, wie er in deiner E-Mail steht — am
-          einfachsten, indem du ihn direkt in der E-Mail antippst.
-        </p>
-        <Link href="/hoefe" className={cn(KNOPF_RAHMEN, 'mt-2')}>
-          Zur Hofübersicht
-        </Link>
+      {/* Board s1-/w1-bestellung-link Bild 4: eine Karte mit Überschrift, Satz und dem einen Weg zur Hofübersicht — im
+          Browser und am Handy 16 px unter dem Kopf wie im Board (pruefer-ui Lauf 33: im Browser vorher 40 px, 24 px zu
+          tief; Nr. 276). */}
+      <div className="mx-auto w-full max-w-[552px] px-4 pt-4 pb-12">
+        <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
+          <h1 className="font-heading text-[24px] leading-tight font-semibold text-foreground">
+            {BESTELLSEITE_LINK_UNGUELTIG.titel}
+          </h1>
+          <p className="text-[15px] leading-normal text-muted-foreground">{BESTELLSEITE_LINK_UNGUELTIG.satz}</p>
+          <Link href="/hoefe" className={cn(KNOPF_BREIT_RAHMEN, 'mt-1')}>
+            Zur Hofübersicht
+          </Link>
+        </div>
       </div>
     </KundeShellMitSitzung>
   )
@@ -102,6 +104,8 @@ export default async function BestellungPage({ params, searchParams }: Props) {
       serviceFeeRefundedAt: true,
       // N38 (Nr. 197): im Hofpreis-Modell heißt die Zeile „Plattformgebühr“.
       gebuehrModell: true,
+      // Der angewendete Satz für die Zahlzeile („inkl. Plattformgebühr (6 %)“, Nr. 253) — Snapshot, nie die Hofeinstellung.
+      serviceFeePercentApplied: true,
       pickupDate: true,
       pickupTimeStart: true,
       pickupTimeEnd: true,
@@ -122,7 +126,7 @@ export default async function BestellungPage({ params, searchParams }: Props) {
           // „Artikel fehlt" (E14): die Position steht da, ist aber nicht mehr im Betrag.
           fehltSeit: true,
           // Einheit nur zur Anzeige gejoint — dieselbe Schreibweise wie auf
-          // der Bestätigungsseite (formatPosition, src/lib/format.ts).
+          // der Bestätigungsseite (positionMengeVorn, src/lib/format.ts).
           product: { select: { unit: true, unitSize: true } },
         },
       },
@@ -139,20 +143,15 @@ export default async function BestellungPage({ params, searchParams }: Props) {
     order.pickupTimeEnd
   )
   const status = bestellStatusAnzeige(order.status, abholtermin, order.paymentMethod)
-  const zahlung = zahlungsAnzeige(order.paymentMethod, order.paymentStatus)
-
-  const pickupDatum = order.pickupDate.toLocaleDateString('de-AT', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'Europe/Vienna',
-  })
+  // Einmal je Anfrage bestimmt — Server-Komponente, kein Hydration-Abgleich.
+  const jetzt = new Date()
 
   const storniert = order.status === 'CANCELLED'
+  const adresse = `${order.farm.address}, ${order.farm.postalCode} ${order.farm.city}`
 
   const positionen = order.items.map((item) => ({
-    text: formatPosition({
+    // Menge vorn wie im Board („2 × Bergkäse, 250 g · € 13,16“, s1-/w1-bestellung-link Bild 1).
+    text: positionMengeVorn({
       name: item.productName,
       quantity: item.quantity,
       unit: item.product?.unit ?? null,
@@ -165,75 +164,67 @@ export default async function BestellungPage({ params, searchParams }: Props) {
   }))
 
   return (
-    <KundeShellMitSitzung>
+    <KundeShellMitSitzung unterleiste={false} handyTitel={HANDY_TITEL}>
       {/* Zurück führt hier NIE durch den Verlauf — die Seite kommt aus einer
           Mail. Die Wege hinaus sind echte Links: zum Hof und über die Shell. */}
       <div className={SPALTE}>
-        {/* Kopf als Karte wie in „Meine Bestellungen" und im Bestelldetail des
-            Hofs. Die Marke trägt die Art aus bestellStatusAnzeige (Register G5)
-            — dieselbe wie die Liste, storniert rot. */}
-        <div className={cn(KARTE, 'flex flex-col gap-2')}>
-          <p className="text-[13.5px] text-muted-foreground">
-            Deine Bestellung bei{' '}
-            <Link
-              href={`/${order.farm.slug}`}
-              className={cn('rounded-sm font-semibold break-words text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}
-            >
-              {order.farm.name}
-            </Link>
-          </p>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="min-w-0 font-heading text-[26px] leading-tight font-semibold break-words text-foreground md:text-[28px]">
+        {/* Board s1-/w1-bestellung-link (Nr. 227): „Deine Bestellung bei <Hof>“ als grüner Link darüber, die
+            Bestellnummer als h1 mit dem Schild des Status (Art aus bestellStatusAnzeige, Register G5 — dieselbe wie
+            die Liste, storniert rot). Den Satz an die Kundin zeigt das Board hier nicht (Lauf 31): Termin und Stand stehen
+            in Schild und Abholkarte. */}
+        {/* Liste Lauf 32 (bestellung-link): Link 15 px wie der Textlink-Baustein, h1 24 px, 12 px Abstand darunter. */}
+        <div className="flex flex-col gap-3">
+          <Textlink href={`/${order.farm.slug}`} className="self-start break-words underline">
+            Deine Bestellung bei {order.farm.name}
+          </Textlink>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="min-w-0 font-heading text-[24px] leading-tight font-semibold break-words text-foreground">
               {order.orderNumber}
             </h1>
-            <Marke art={status.art}>{status.marke}</Marke>
+            <Marke art={status.art} form="schild">
+              {status.marke}
+            </Marke>
           </div>
-          <p className="text-[14px] leading-normal text-foreground">{status.satz}</p>
         </div>
 
-        {/* Abholung — bei stornierten Bestellungen entfällt der Block: ein
-            Termin samt Kalender-Knopf wäre eine falsche Einladung. */}
+        {/* Abholung und „Hof erreichen“ — bei stornierten Bestellungen entfallen beide: ein Termin samt
+            Kalender-Knopf wäre eine falsche Einladung. „In den Kalender“ ist hier die eine grüne Hauptaktion und
+            steht nur, solange es den Termin gibt (kalenderTerminGilt — dieselbe Antwort wie die ICS-Route). */}
         {!storniert && (
-          <section aria-labelledby="abholung-titel" className={cn(KARTE, 'flex flex-col gap-1.5')}>
-            <h2 id="abholung-titel" className={ETIKETT}>
-              Abholung
-            </h2>
-            <p className="text-[17px] font-semibold text-foreground">{pickupDatum}</p>
-            <p className="text-[14px] text-muted-foreground">
-              {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
-            </p>
-            <p className="mt-1 flex items-start gap-2 text-[13px] leading-normal break-words text-muted-foreground">
-              <MapPin className="mt-0.5 size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-              <span className="min-w-0">
-                {order.farm.name}
-                <br />
-                {order.farm.address}, {order.farm.postalCode} {order.farm.city}
-              </span>
-            </p>
-            {/* Ein LINK, kein Formular: die ICS-Antwort trägt denselben
-                signierten Zugang wie diese Seite. */}
-            <a
-              href={`/${order.farm.slug}/bestellung/${order.id}/kalender?s=${bestellSignatur(order.id)}`}
-              className={cn(KNOPF_GRUEN, 'mt-2 gap-2 self-start')}
-            >
-              <CalendarPlus className="size-4" strokeWidth={1.7} aria-hidden="true" />
-              Termin in den Kalender
-            </a>
-          </section>
+          <div className={PAAR}>
+            <AbholKarte
+              bestellnummer={order.orderNumber}
+              abholZeit={abholTerminZeile(order, jetzt)}
+              hofName={order.farm.name}
+              adresse={adresse}
+              routeHref={buildMapsUrl(order.farm.address, order.farm.postalCode, order.farm.city)}
+              // Ein LINK, kein Formular: die ICS-Antwort trägt denselben signierten Zugang wie diese Seite.
+              kalenderHref={kalenderTerminGilt(order.status) ? `/${order.farm.slug}/bestellung/${order.id}/kalender?s=${bestellSignatur(order.id)}` : null}
+              kalenderHaupt
+            />
+            {/* Nach dem Kauf: der Weg zum Hof, wenn etwas dazwischenkommt. */}
+            <HofErreichen telefon={order.farm.phone} email={order.farm.email} />
+          </div>
         )}
 
-        {/* Nach dem Kauf: der Weg zum Hof, wenn etwas dazwischenkommt — wie die Abholung nicht bei storniert. */}
-        {!storniert && <HofErreichen telefon={order.farm.phone} email={order.farm.email} />}
+        {/* Dieselben Zeilen wie auf der Bestätigungsseite — aus dem Snapshot der Bestellung. Board s1-/w1-bestellung-link
+            Bild 1: kein eigenes „Gesamt“, derselbe Betrag steht in der Zahlzeile („… · € 19,12 inkl. Plattformgebühr“). */}
+        <BestellPositionen
+          titel="Positionen"
+          positionen={positionen}
+          summen={order}
+          summeInZahlzeile
+        />
 
-        {/* Dieselben Zeilen wie auf der Bestätigungsseite — aus dem Snapshot der Bestellung. */}
-        <BestellPositionen positionen={positionen} summen={order} zahlung={`${zahlung.art} · ${zahlung.zustand}`} />
-
-        <Aktionen>
-          <AktionsLink href={`/${order.farm.slug}`}>Zum Hof</AktionsLink>
-        </Aktionen>
+        <Link href={`/${order.farm.slug}`} className={KNOPF_BREIT_RAHMEN}>
+          Zum Hof
+        </Link>
 
         {/* Nr. 200 (N39, § 13a FAGG): der Weg zum Widerruf — nur solange er möglich ist. */}
-        {widerrufMoeglich(order, new Date()) && <WiderrufLink href={widerrufPfad(order.id)} />}
+        {widerrufMoeglich(order, jetzt) && <WiderrufLink href={widerrufPfad(order.id)} />}
+
+        {/* Die Seite liest nur (Kopfkommentar): Stornieren gibt es hier nicht, für Änderungen ist der Hof da. */}
+        <p className="text-[13px] leading-normal text-muted-foreground">{BESTELLSEITE_OHNE_STORNO}</p>
       </div>
     </KundeShellMitSitzung>
   )

@@ -20,6 +20,9 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
     ...echt,
     Sheet: (props: Kinder) => createElement(Fragment, null, props.open ? props.children : null),
     SheetContent: (props: Kinder) => createElement('section', null, props.children),
+    // Nr. 227: Der Warenkorb steht im Blatt rechts (SheetBlatt seite="rechts", SheetKopf) — ebenso an Ort und Stelle.
+    SheetBlatt: (props: Kinder) => createElement('section', null, props.children),
+    SheetKopf: (props: { titel?: ReactNode }) => createElement('h2', null, props.titel),
     SheetTitle: (props: Kinder) => createElement('h2', null, props.children),
   }
 })
@@ -51,7 +54,7 @@ describe('Korb-Blatt: Zeilensumme in ganzen Cent (Nr. 139)', () => {
         // Eine Summe, die von der Zeile abweicht: So prüft `toContain(3.3)` die Zeile, nicht die Summe.
         total: 9.99,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { sperre: null, hofName: 'Hof Test', pauseMessage: null },
       })

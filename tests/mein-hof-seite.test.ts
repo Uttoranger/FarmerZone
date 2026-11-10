@@ -93,7 +93,7 @@ describe('Beiträge-Übersicht', () => {
     whatsappGetippt: [],
   }
 
-  it('ordnet Aktiv · Entwürfe · Vergangen, leere Gruppen fallen weg', () => {
+  it('ordnet Läuft · Entwürfe · Früher (Board, Nr. 274), leere Gruppen fallen weg', () => {
     const u = beitraegeUebersicht(
       [
         { ...basis, id: 'alt', publishedAt: '2026-10-01T10:00:00.000Z' },
@@ -104,9 +104,9 @@ describe('Beiträge-Übersicht', () => {
       0
     )
     expect(u.gruppen.map((g) => [g.titel, g.eintraege.map((e) => e.id)])).toEqual([
-      ['Aktiv', ['aktiv']],
+      ['Läuft', ['aktiv']],
       ['Entwürfe', ['entwurf']],
-      ['Vergangen', ['alt']],
+      ['Früher', ['alt']],
     ])
     expect(u.anzahl).toBe(3)
     expect(beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt, 0).gruppen.map((g) => g.titel)).toEqual(['Entwürfe'])
@@ -115,7 +115,7 @@ describe('Beiträge-Übersicht', () => {
 
   it('Marke je Zustand: aktiv grün, Entwurf und abgelaufen neutral', () => {
     const [aktiv] = beitraegeUebersicht([{ ...basis, isActive: true, publishedAt: jetzt }], jetzt, 0).gruppen[0].eintraege
-    expect(aktiv.marke).toEqual({ text: 'Aktiv', ton: 'fertig' })
+    expect(aktiv.marke).toEqual({ text: 'Läuft', ton: 'fertig' })
     const [entwurf] = beitraegeUebersicht([{ ...basis, isDraft: true }], jetzt, 0).gruppen[0].eintraege
     expect(entwurf.marke).toEqual({ text: 'Entwurf', ton: 'neutral' })
     const [alt] = beitraegeUebersicht([{ ...basis, publishedAt: '2026-09-01T10:00:00.000Z' }], jetzt, 0).gruppen[0].eintraege
@@ -212,14 +212,11 @@ describe('Kopf und Reiter (neues Design)', () => {
     adresse: { anzeige: 'agrilo.at/hof-test', url: 'https://agrilo.at/hof-test' },
     logoUrl: null,
     logoAusschnitt: null,
-    titelbildUrl: null,
-    bannerValue: null,
-    bannerFocusY: 50,
     zustand: { art: 'sichtbar', schild: { text: 'Öffentlich', farbe: 'gruen' }, oeffentlich: true },
   }
 
   const rendere = (aktiv: 'hofseite' | 'beitraege', k: MeinHofKopfDaten = kopf) =>
-    renderToStaticMarkup(createElement(MeinHofSeitenkopf, { hof: k, aktiv, zustand: null }))
+    renderToStaticMarkup(createElement(MeinHofSeitenkopf, { hof: k, aktiv, zustand: null, jetzt: new Date('2026-10-06T10:00:00Z') }))
 
   it('Reiter als Links mit aria-current, ohne Zahl hinter „Beiträge" (E12, Nr. 143)', () => {
     const html = rendere('beitraege')
@@ -283,7 +280,11 @@ describe('Reiter „Beiträge"', () => {
     expect(html).toContain('Erdbeeren sind da')
     expect(html).toContain('href="/status/new"')
     expect(html).not.toContain('href="/status"')
-    expect(html).toContain('Aktiv')
+    // Seit Nr. 274 nach Board s1-/w1-mein-hof Bild 5: „Läuft · 1“, eine Zeile mit „›“, die Handlungen klappen darin auf.
+    expect(html).toContain('Läuft · 1')
+    expect(html).toMatch(/<button type="button" aria-expanded="false" aria-controls="beitrag-handlungen-b1"/)
+    expect(html).toMatch(/<div id="beitrag-handlungen-b1" hidden=""/)
+    expect(html).toMatch(/<a href="\/status\/new" class="[^"]*w-full[^"]*">Neuer Beitrag<\/a>/)
     // F6 (22e): die Zahl der E-Mail-Empfänger steht in der Zeile.
     expect(html).toContain('Hofseite und 7 per E-Mail')
   })
@@ -332,17 +333,32 @@ describe('Tokens statt Farbwerte', () => {
 })
 
 describe('Balken der HofShell', () => {
-  it('stillgelegt: Satz und „Hof reaktivieren"; wartet: Hof-ID und Frage per Mail; sonst nichts', async () => {
+  it('stillgelegt: Satz und „Hof reaktivieren"; wartet: Hof-ID im Link und Frage per Mail; sonst nichts', async () => {
     const { HofBalken } = await import('@/components/hofbereich/hof-balken')
     const still = renderToStaticMarkup(createElement(HofBalken, { balken: { art: 'stillgelegt' } }))
     expect(still).toContain('href="/settings/account"')
-    expect(still).toContain('data-ton="orange"')
+    // Seit Nr. 245 (G3) der Hinweiskasten statt der orangen Hinweiskarte.
+    expect(still).toContain('data-hinweiskasten=""')
     const wartet = renderToStaticMarkup(
-      createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT' } })
+      createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT', stand: 'einrichten' } })
     )
     expect(wartet).toContain('farm_test')
     expect(wartet).toContain('href="mailto:')
     expect(renderToStaticMarkup(createElement(HofBalken, { balken: null }))).toBe('')
+  })
+
+  it('wartet: der Titel folgt dem Stand aus dem Lader (N42 e, Nr. 233) — einrichten und Prüfung, nie fest', async () => {
+    const { HofBalken } = await import('@/components/hofbereich/hof-balken')
+    const { FARM_PENDING_OWNER_BANNER, FARM_SETUP_OWNER_BANNER } = await import('@/lib/farm-approval')
+    const balken = (stand: 'einrichten' | 'pruefung') =>
+      renderToStaticMarkup(createElement(HofBalken, { balken: { art: 'wartet', farmId: 'farm_test', farmName: 'Hof Test', country: 'AT', stand } }))
+    const einrichten = balken('einrichten')
+    expect(einrichten).toContain(FARM_SETUP_OWNER_BANNER)
+    expect(einrichten).not.toContain(FARM_PENDING_OWNER_BANNER)
+    // Gegenprobe: alles erledigt, das Team prüft.
+    const pruefung = balken('pruefung')
+    expect(pruefung).toContain(FARM_PENDING_OWNER_BANNER)
+    expect(pruefung).not.toContain(FARM_SETUP_OWNER_BANNER)
   })
 
   it('der Mail-Link trägt Betreff und Hof-ID, Leerzeichen als %20', async () => {

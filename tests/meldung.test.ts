@@ -63,7 +63,7 @@ describe('Sichtbarkeitsregel fuerHof', () => {
     }
     expect(sicht.status).toBe('Kein Fehler — Antwort lesen')
     expect(sicht.antwortAnMelder).toBe('Das ist so gewollt — die Datei war zu groß.')
-    expect(sicht.kurznummer).toBe('cmabcdef')
+    expect(sicht.kurznummer).toBe('456789')
   })
 
   it('übersetzt alle sieben internen Status in Worte ohne Fachsprache', () => {
@@ -170,7 +170,7 @@ describe('Meldeformular: die Art als Satz', () => {
 })
 
 describe('Kurznummer und erste Zeile', () => {
-  it('Kurznummer = die ersten acht Zeichen der ID', () => {
+  it('alte Kurznummer (nur CLI-Export und /api/triage) = die ersten acht Zeichen der ID', () => {
     expect(kurznummer('cmabcdef123456789')).toBe('cmabcdef')
     expect(kurznummer('kurz')).toBe('kurz')
   })

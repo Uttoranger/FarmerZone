@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ExternalLink, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, ExternalLink } from 'lucide-react'
 import type { HofAkteAnsicht as AkteDaten } from '@/lib/admin-hof-akte'
-import { ADMIN_HOEFE_HREF, AKTE_PROTOKOLL_LEER, SPERRE_TEXT } from '@/lib/admin-hof-akte'
+import { ADMIN_HOEFE_HREF, AKTE_PROTOKOLL_LEER, SPERRE_TEXT, servicegebuehrKnopfSichtbar } from '@/lib/admin-hof-akte'
 import type { HofZustand } from '@/lib/admin-hoefe-liste'
 import { GRUENDUNG_AUSNEHMEN_TEXT } from '@/lib/admin-hoefe-seite'
 import { NUMMER_HINWEIS, SERVICEGEBUEHR_NUR_NEUE } from '@/lib/admin-hoefe'
@@ -57,6 +57,8 @@ export function HofAkteAnsicht({
   const [sperre, setSperre] = useState<HofSperreWahl | null>(null)
   const wartet = zustand.id === 'wartet'
   const geschlossen = zustand.id === 'geschlossen' || zustand.id === 'stillgelegt'
+  // A1: Den Satz des alten Modells gibt es nur bis zum Stichtag; danach ist die Karte „Plattformgebühr“ der eine Weg.
+  const alterSatz = servicegebuehrKnopfSichtbar(akte.gebuehrModell)
 
   return (
     <div className="flex flex-col gap-5">
@@ -137,14 +139,15 @@ export function HofAkteAnsicht({
             <Kennzahl
               titel="Umsatz 30 Tage"
               wert={formatEuro(centsAlsEuro(akte.aktivitaet.umsatzCents))}
-              satz={`Servicegebühr ${formatEuro(centsAlsEuro(akte.aktivitaet.servicegebuehrCents))}`}
+              satz={akte.aktivitaet.gebuehrZeile}
             />
             <Kennzahl titel="Zuletzt angemeldet" wert={akte.aktivitaet.zuletztAngemeldet} satz={akte.aktivitaet.anmeldung} />
             <Kennzahl titel="Antwortzeit Postfach" wert={akte.aktivitaet.antwortzeit} satz={null} />
           </dl>
         </Abschnitt>
 
-        <Abschnitt titel="Zustand" satz="was Kundinnen erleben">
+        {/* Ein wartender Hof ist noch nicht sichtbar — der Satz sagt, was Kundinnen erleben würden (Board w3-admin-akte Bild 3). */}
+        <Abschnitt titel="Zustand" satz={wartet ? 'was Kundinnen erleben würden' : 'was Kundinnen erleben'}>
           <dl className="flex flex-col text-[14px] [&>div+div]:border-t [&>div+div]:border-border">
             {akte.zustand.map((z) => (
               <div key={z.titel} className="flex items-center gap-3 py-2">
@@ -191,9 +194,11 @@ export function HofAkteAnsicht({
                 {hof.testhofAenderung.menue}
               </button>
             )}
-            <button type="button" onClick={() => setGebuehr(true)} className={KNOPF_RAHMEN}>
-              Servicegebühr …<span className="sr-only"> ({hof.satz})</span>
-            </button>
+            {alterSatz && (
+              <button type="button" onClick={() => setGebuehr(true)} className={KNOPF_RAHMEN}>
+                Servicegebühr …<span className="sr-only"> ({hof.satz})</span>
+              </button>
+            )}
             {hof.gruendung && (
               <button type="button" onClick={() => hof.gruendung && setGruendungHof({ id: hof.id, name: hof.name, gruendung: hof.gruendung })} className={KNOPF_RAHMEN}>
                 {GRUENDUNG_AUSNEHMEN_TEXT.menueBis}
@@ -218,7 +223,8 @@ export function HofAkteAnsicht({
           </div>
           {hof.gruendungAenderung?.gesperrt && <p className={cn('text-[12.5px]', LEISE)}>{hof.gruendungAenderung.gesperrt}</p>}
           <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>
-            {SPERRE_TEXT.erklaerung} {SERVICEGEBUEHR_NUR_NEUE}
+            {SPERRE_TEXT.erklaerung}
+            {alterSatz && <> {SERVICEGEBUEHR_NUR_NEUE}</>}
           </p>
           {hof.sperre && wartet && <p className="text-[13px] font-medium text-status-offen">{hof.sperre}</p>}
           {hof.gruendungZuletzt && <p className={cn('text-[12px]', LEISE)}>{hof.gruendungZuletzt}</p>}
@@ -234,7 +240,6 @@ export function HofAkteAnsicht({
       <Abschnitt titel="Akte" satz="Einträge aus dem Protokoll – Team und System">
         {akte.protokoll.length === 0 ? (
           <EmptyState
-            symbol={ShieldCheck}
             titel={AKTE_PROTOKOLL_LEER.titel}
             satz={AKTE_PROTOKOLL_LEER.satz}
             ausweg={{ ohne: 'Einträge entstehen erst mit einer Aktion; hier gibt es nichts zu tun' }}
@@ -256,8 +261,8 @@ export function HofAkteAnsicht({
         )}
       </Abschnitt>
 
-      <HofAktionDialog aktion={aktion} onClose={() => setAktion(null)} />
-      <ServicegebuehrDialog hof={gebuehr ? hof : null} onClose={() => setGebuehr(false)} />
+      <HofAktionDialog aktion={aktion} gebuehrModell={akte.gebuehrModell} onClose={() => setAktion(null)} />
+      {alterSatz && <ServicegebuehrDialog hof={gebuehr ? hof : null} onClose={() => setGebuehr(false)} />}
       <GruendungBisDialog hof={gruendungHof} onClose={() => setGruendungHof(null)} />
       <GruendungAusnehmenDialog hof={ausnehmenHof} onClose={() => setAusnehmenHof(null)} />
       <TesthofDialog hof={testhofHof} onClose={() => setTesthofHof(null)} />

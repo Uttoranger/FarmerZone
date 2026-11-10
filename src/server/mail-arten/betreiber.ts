@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { kurznummer } from '@/lib/meldung'
+import { kurznummerAus } from '@/lib/kurznummer'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import { POSTFACH_TEXT } from '@/lib/postfach'
-import { wochenlageZeilen } from '@/lib/wochenlage'
+import { wochenlageGebuehrWort, wochenlageZeilen } from '@/lib/wochenlage'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
 import type { StapelMail } from '@/lib/email'
 import type { ZustellArt } from '@/lib/zustellung'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
@@ -143,10 +144,25 @@ export async function rendereNeuerHof(bezug: Record<string, string>): Promise<St
   const { farmId, empfaengerId } = hofBetreiberBezugSchema.parse(bezug)
   const an = await betreiberAdresse(empfaengerId)
   if (!an) return OHNE_EMPFAENGER
-  const hof = await prisma.farm.findUnique({ where: { id: farmId }, select: { id: true, name: true, slug: true, createdAt: true, owner: { select: { email: true } } } })
+  // Board s3/w3-mail-betrieb Bild 1 (Nr. 255): PLZ und Ort zum Hof und die Zeile „Fehlt noch“ — beim Versand gelesen, nur Anzeige.
+  const hof = await prisma.farm.findUnique({
+    where: { id: farmId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      createdAt: true,
+      postalCode: true,
+      city: true,
+      stripeAccountReady: true,
+      owner: { select: { email: true } },
+      _count: { select: { products: true, pickupSlots: { where: { isActive: true } } } },
+    },
+  })
   if (!hof) return { verworfen: 'hof_fehlt' }
   const { baueNewFarmNotification } = await import('@/lib/email')
-  return baueNewFarmNotification({ id: hof.id, name: hof.name, slug: hof.slug, ownerEmail: hof.owner.email, createdAt: hof.createdAt }, an)
+  const fehlt = [!hof.stripeAccountReady && 'Stripe', hof._count.products === 0 && 'Produkte', hof._count.pickupSlots === 0 && 'Abholzeit'].filter((x): x is string => typeof x === 'string')
+  return baueNewFarmNotification({ id: hof.id, name: hof.name, slug: hof.slug, ownerEmail: hof.owner.email, createdAt: hof.createdAt, postalCode: hof.postalCode, city: hof.city, fehlt }, an)
 }
 
 export async function rendereMeldung(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
@@ -162,7 +178,8 @@ export async function rendereMeldung(bezug: Record<string, string>): Promise<Sta
   return baueMeldungNotification(
     {
       id: m.id,
-      kurznummer: kurznummer(m.id),
+      // G14 (Nr. 255): die Kurznummer aus dem Ende der ID, wie Bestätigung und Postfach — nie „cmeldung“ aus dem Anfang.
+      kurznummer: kurznummerAus(m.id),
       text: m.text,
       seiteUrl: m.seiteUrl,
       userAgent: m.userAgent,
@@ -191,8 +208,10 @@ export async function rendereWochenbericht(bezug: Record<string, string>): Promi
   const [{ zaehleFuerWochenlauf }, { zaehleOffenImEingang }] = await Promise.all([import('@/server/queries/meldung'), import('@/server/queries/postfach')])
   const jetzt = new Date()
   const [zaehler, eingang] = await Promise.all([zaehleFuerWochenlauf(jetzt), zaehleOffenImEingang()])
-  const { ladeWochenlage } = await import('@/server/queries/wochenlage')
-  const lage = wochenlageZeilen(await ladeWochenlage(jetzt, eingang.gesamt, zaehler.liegenGeblieben))
+  const [{ ladeWochenlage }, { ladeHofpreisEinstellung }] = await Promise.all([import('@/server/queries/wochenlage'), import('@/server/queries/plattform-einstellung')])
+  // Das Gebühren-Wort der Woche nach dem Stichtag „Hofpreis-Modell ab“ (V63); scheitert das Lesen, gilt die Vorgabe (ladeHofpreisEinstellung meldet es).
+  const [zahlen, hofpreis] = await Promise.all([ladeWochenlage(jetzt, eingang.gesamt, zaehler.liegenGeblieben), ladeHofpreisEinstellung()])
+  const lage = wochenlageZeilen(zahlen, wochenlageGebuehrWort(jetzt, hofpreisModellAb(hofpreis)))
   const { baueBriefkastenZusammenfassung } = await import('@/lib/email')
   // Die jüngsten Meldungen nennt die Wochenlage nicht: Ihr Text ist Fremdtext, die Mail trägt nur Zahlen.
   return baueBriefkastenZusammenfassung({ ...zaehler, neueste: [], geloescht: Number.parseInt(geloeschtAnzahl, 10), eingang, lage }, an)

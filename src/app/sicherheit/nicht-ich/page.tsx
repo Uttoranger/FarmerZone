@@ -33,7 +33,8 @@ export default async function NichtIchSeite({
 
   return (
     <KundeShellMitSitzung unterleiste={false}>
-      <div className="mx-auto w-full max-w-[480px] px-4 pt-6 pb-12 md:pt-12">
+      {/* Im Web 37 px von der Karte bis zur Linie des Fußes wie das Board w2-systemseiten (pruefer-ui Lauf 33: 57 px, Nr. 279). */}
+      <div className="mx-auto w-full max-w-[1032px] px-4 pt-4 pb-10 md:pb-5">
         {/* Immer dieselbe Komponente: Lädt die Seite nach dem Knopf neu (Link
             dann verbraucht), bleibt „Alle Geräte sind abgemeldet" stehen. */}
         <NichtIchKarte

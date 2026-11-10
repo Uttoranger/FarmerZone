@@ -276,14 +276,16 @@ describe('Seite /{hof}/bestaetigen/{token}', () => {
     const text = await seite()
 
     expect(text).toContain('Bestellung bei Hof Test bestätigen')
-    expect(text).toContain('Bitte bestätige bis heute, 12:00 Uhr – erst dann packt der Hof für dich.')
-    expect(text).toContain('Freilandeier')
-    expect(text).toContain('Bauernbrot')
+    // Seit Nr. 227 mit Wochentag und Datum (V9), Frist aus fristVon.
+    expect(text).toMatch(/Bitte bestätige bis heute, Fr, 2\.\sOkt, 12:00 Uhr – erst dann packt der Hof für dich\./)
+    // Board s1-/w1-bestellung-link Bild 2 (Runde 2): Menge vorn, der Betrag dahinter.
+    expect(text).toContain('1 × Freilandeier · € 4,50')
+    expect(text).toContain('1 × Bauernbrot · € 5,80')
     expect(text).toContain('Servicegebühr')
     expect(text).toContain('€ 0,52')
     expect(text).toContain('Bar bei Abholung')
     expect(text).toContain('€ 10,82')
-    expect(text).toContain('Abholung heute, 15:00–18:00 Uhr')
+    expect(text).toMatch(/Abholung heute, Fr, 2\.\sOkt, 15:00–18:00 Uhr/)
     expect(text).toContain(`KNOEPFE:${TOKEN}`)
   })
 
@@ -397,7 +399,7 @@ describe('Seite /{hof}/bestaetigen/{token} — ohne gültigen Token führt der W
 
   it('Gegenprobe: offen führt der Kopf zum Hof der Bestellung — die Suche findet auch den Zurück-Link der Shell', async () => {
     const links = await seitenLinks()
-    expect(links).toContainEqual({ href: '/hof-test', text: 'Zurück zu Hof Test' })
+    expect(links).toContainEqual({ href: '/hof-test', text: 'Zurück zum Hof' })
     expect(links).not.toContainEqual({ href: '/hoefe', text: 'Zurück zu den Höfen' })
   })
 })

@@ -9422,3 +9422,1993 @@ Wie Lauf 28, dazu:
   - Resend-Schlüssel bzw. `TEST_EMPFAENGER` der Testumgebung prüfen (JAVASCRIPT-NEXTJS-G).
   - Nach dem Merge: Produktion zeigt die Grafik in der Kasse; Datum T für den AGB-Fix festlegen.
   - Merge per Merge-Commit, zuerst Doku-PR, dann Sammel-PR.
+
+## 34. Lauf 30 (uttoranger, im Chat erteilt, 3.11.2026)
+
+Nachtlauf 30
+Ort: lokal (agent-browser, lokales Postgres und die Mockup-Dateien im Arbeitsordner sind nötig; in der Cloud fehlte agent-browser in Lauf 29)
+Basis: main (056a321e oder später); die Nummern stapeln auf docs/lauf30 bzw. dem Zwischenstand integration/lauf30
+Berührt: Kasse (nur Texte und Darstellung, nie /api/**) · Webhook: nein · Schema: nein (keine Migration) · Geldberechnung: nein (nur Anzeige) · Geschäftsregel: ja (221: „Monate nur erhöhen“ erst nach dem Festschreiben; wirkt über das Gründungs-Ende auf Grundgebühr und Einzug der Bargebühr)
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate (mit Regel-Inventur), 4a Tempo, §5 Stoppen, §6 Morgenbericht, §7 Fortsetzen. Dieser Text ist die Freigabe. Der Doku-PR trägt ihn wörtlich als „## 34. Lauf 30 (uttoranger, im Chat erteilt, 3.11.2026)“ in docs/nachtlauf/freigabe.md ein. Zeitbuch: docs/nachtlauf/berichte/zeitbuch-lauf30.md.
+
+Kennungen: Die Entscheidungen dieses Laufs heißen im Register N41–N44 (in den Projekt-Dokumenten E-014, E-015, E-017, E-018). Offene Punkte ohne Register-Eintrag stehen hier im Klartext.
+
+══════════════════════════════════════════════════════════════════════
+ANTWORTEN DER PROJEKTLEITUNG (Vorgabe = Empfehlung des Teams; gilt, wenn hier nichts geändert ist)
+══════════════════════════════════════════════════════════════════════
+A1 Knopf „Servicegebühr …“ in der Akte:
+   - Ab dem Stichtag „Hofpreis-Modell ab“ nicht mehr zeigen. Der eine Weg zum Satz ist die Karte „Plattformgebühr“.
+   - Grund: Der Knopf schreibt den Satz des alten Modells (servicegebuehr-dialog.tsx), also ein anderes Feld. Ein Umbenennen würde in die Irre führen.
+A2 Gründungszeit 12 Monate (N44):
+   - Bestätigt, mit der Folge für den Einzug der Bargebühr (siehe Entschieden).
+   - Wert setzen und Festschreiben macht die Projektleitung nach dem Merge, vor dem Tarifstart am 1.2.2027.
+   - Der Lauf ändert keine Daten.
+A3 Mindestbestellwert-Satz:
+   „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir fehlen noch Waren für € X.“
+   Ohne Gebührenbetrag beim Fehlbetrag, weil die Gebühr je Stück aufgerundet wird und jede Zahl dort nur ungefähr stimmt.
+   Im PR unter „Offen für Recht“ (Preisangabe).
+
+══════════════════════════════════════════════════════════════════════
+AUSGANGSLAGE (geprüft 03.11.2026, main 056a321e, nur gelesen)
+══════════════════════════════════════════════════════════════════════
+
+Stand allgemein
+- Alle Routen tragen schon data-design="neu" (Shells in src/components/shells/kunde-shell.tsx, hof-shell.tsx, admin-shell.tsx; die letzten Altrouten zog Nr. 181 um). Der Lauf zieht die Darstellung der neuen Mockups nach, er baut keinen Umzug.
+- Die neuen Mockups liegen noch nicht im Repo. docs/mockups/README.md kennt nur die älteren web-/mobil-Dateien. Nach CLAUDE.md §2 müssen die neuen zuerst dort liegen und Vorrang haben.
+- tests/telefonnummern-wache.test.ts liest alle .html-Dateien unter docs/, auch unversionierte im Arbeitsordner. Am Export (3.11.2026) hatten 16 Dateien Nummern mit Ziffern 1–9 im Teilnehmerteil:
+  - s1/w1-bestellung (je hell und dunkel)
+  - s1/w1-kasse (je hell und dunkel)
+  - s2/w2-druck
+  - s2/w2-kunden (je hell und dunkel)
+  - w-l-kundenseite (hell und dunkel)
+  Die Projektleitung lässt sie vor der Übergabe nullen; sonst STOPP (siehe Stand).
+- N38-Geld ist in der Logik umgesetzt; das bleibt unberührt:
+  - src/lib/plattformgebuehr.ts: gebuehrJeStueckCents Z. 105 (je Stück aufgerundet), bestellGebuehr Z. 133, mindestbestellwertErreicht Z. 150, einzugAbFuer Z. 163
+  - src/lib/konditionen.ts: MINDESTBESTELLWERT_CENTS Z. 204, PLATTFORMGEBUEHR_PROZENT Z. 201
+  - src/app/api/checkout/route.ts: Z. 687–697, on_behalf_of nur im Hofpreis-Modell Z. 226
+  - Umschaltung: gebuehrModellFuer, preisAnzeigeFuer
+  Falsch sind nur Texte und eine Anzeige-Rechnung.
+
+Gebühren-Texte, die nach dem Stichtag „Hofpreis-Modell ab“ noch das alte Modell nennen
+- src/components/produkte/futter-formular.tsx Z. 647: „Die Servicegebühr zahlt die Kundin zusätzlich. Du bekommst genau deinen Preis.“ (ohne Bedingung)
+- src/components/hof-bestellungen/storno-dialog.tsx Z. 91 und 103 („Warenpreis … + Servicegebühr …“, „Die Servicegebühr erstattet Agrilo.“). Die Hilfslogik liegt in src/lib/storno.ts Z. 49–60, 84; den Geldweg (refund_application_fee im Hofpreis-Modell) zeigt src/server/stornieren.ts Z. 323–333.
+- src/lib/startseite.ts Z. 310–320: beispielRechnung rechnet immer mit berechneServicegebuehr (5 %, online).
+- src/lib/konditionen.ts:
+  - Z. 343–354: SERVICEGEBUEHR_ZAHLT_KUNDE auf /konditionen und /fuer-hoefe
+  - Z. 396: KONDITIONEN_DERZEIT „In der Startphase kostenlos …“ im Freischalt-Dialog src/components/admin/hof-aktion-dialog.tsx Z. 106
+  - Z. 227: MINDESTBESTELLWERT_SATZ, auch Fehlermeldung von /api/checkout (route.ts Z. 26, 688), geprüft wörtlich in tests/plattformgebuehr.test.ts Z. 92, tests/plattformgebuehr-checkout.test.ts Z. 262 und in der Kasse von tests/kaufknopf-saetze.test.ts Z. 296
+- src/lib/kasse.ts Z. 236–239: mindestbestellwertGrund gibt vor dem Stichtag null (kein Mindestbestellwert), danach MINDESTBESTELLWERT_SATZ; Aufruf in src/components/checkout/checkout-form.tsx Z. 352.
+- Admin:
+  - src/lib/admin-bestellung.ts Z. 250–251
+  - src/app/admin/geld/page.tsx Z. 158
+  - src/components/admin/hof-akte-ansicht.tsx Z. 140, 195
+  - src/lib/admin-rechte.ts Z. 40
+  - src/lib/servicegebuehr.ts Z. 58 (SERVICEGEBUEHR_BEZEICHNUNG, Geld-Kachel in src/lib/admin-aufgaben.ts)
+  - src/lib/finanzen.ts Z. 471–472 (EINNAHMEN_ONLINE_LABEL, EINNAHMEN_VOR_ORT_LABEL) und Z. 816–888 (Jahresdiagramm „Servicegebühren“)
+  - src/lib/plattform-einstellung.ts Z. 341 („Vorher bleibt alles wie heute.“)
+- Ein Helfer je Bestellung existiert: gebuehrBezeichnungFuer (src/lib/plattformgebuehr.ts Z. 298); der Admin nutzt ihn nicht.
+- Die vollständige Liste der Fundstellen zählt die Wache aus 221 (git grep), nicht diese Aufzählung.
+
+Gründungszeit (N44)
+- Feld vorhanden:
+  - prisma/schema.prisma Z. 1446 gruendungMonate Int @default(24), Z. 1448 gruendungFestAm
+  - Admin-Feld „Monate ohne Grundgebühr“ (src/lib/plattform-einstellung.ts Z. 251)
+  - GRUENDUNG_MONATE_STANDARD = 24 (src/lib/gruendungshof.ts Z. 321)
+- Beginn „später von Tarifstart und Freischaltung“ ist gebaut (zusageEnde, gruendungshof.ts Z. 488).
+- Hindernis: die Regel „Monate nur erhöhen“, src/lib/plattform-einstellung.ts Z. 184 (monateNurMehr).
+- Vor dem Festschreiben (gruendungFestAm = null) gilt Art „bisher“ mit festem Ende gruendungBisStandard. Ein dann freigeschalteter Hof bekommt schon eine Zusage auf dieses Ende samt Postfach-Nachricht (gruendungshof.ts Z. 440–454). festschreibenListe (Z. 611–620) nimmt beim Festschreiben immer den späteren Tag von bisherigem und neuem Ende; niemand verliert etwas.
+- Das Gründungs-Ende bestimmt auch den Einzug der Bargebühr: einzugAbFuer (plattformgebuehr.ts Z. 157–172) = der spätere Tag von Stichtag und Tag nach gruendungBis (Register K2, Ergänzung 26.10.2026).
+- Register K2 sagt noch 24 Monate und „Monate nur erhöhen“ (docs/entscheidungen.md Z. 316 ff.). Die Aktion zählt die Freischaltung bis „Aktion bis“, nicht die Anmeldung (Z. 327).
+
+Wortliste und Texte (Register N8)
+- „Widerruf“ in Nutzertexten. Die Texte stehen in src/lib/widerruf.ts (WIDERRUF_TEXT Z. 238 ff.).
+  N39 legt wörtlich fest:
+  - den Einstieg „Vertrag widerrufen“ (fussLink Z. 241, Links in Mails, Bestätigung, Bestellseite)
+  - die Knöpfe „Vertrag widerrufen“ (knopfWiderrufen Z. 239) und „Widerruf bestätigen“
+  Die Belehrung Teil A/B (Z. 318–346) ist das Muster aus Anhang I FAGG.
+  Die Datenschutzerklärung verwendet „Widerruf“ auch für Einwilligungen (src/app/(public)/datenschutz/page.tsx Z. 61–64, 205).
+- „Login-E-Mail“: src/app/(hof)/settings/account/page.tsx Z. 90.
+- „Hofladen“ für den Hof beim Stilllegen: archive-farm-card.tsx Z. 102, account/page.tsx Z. 138.
+- „Hof-Profil“ / „Profil speichern“ / „Profil gespeichert“: src/app/(hof)/settings/profile/page.tsx Z. 11; src/components/settings/profile-form.tsx Z. 166, 488.
+- Anlass „Mitteilung“: src/lib/beitrag-anlass.ts Z. 32 (Ausnahme im Test).
+- Balken mit langem Strich, immer derselbe Text:
+  - Text: src/lib/farm-approval.ts Z. 30–31
+  - gerendert in src/components/hofbereich/hof-balken.tsx und src/components/farmer/pending-approval-banner.tsx
+  - Schritte: src/lib/einrichten.ts
+- Postfach-Satz „Du kannst auf jede Nachricht antworten.“: src/lib/postfach.ts Z. 180 (widerspricht N14).
+- „In den Warenkorb“: src/lib/notbremse.ts Z. 165.
+- Jahresansicht „Finanzen“ statt „Geld“ (N32): src/lib/admin-finanzen-seite.ts Z. 14.
+
+Zähler „Bestellungen“ (N41 e)
+- Die Navigation zählt nach src/server/queries/orders.ts Z. 110 (OPEN_STATUSES, nicht exportiert).
+- Die Unterleiste der Kundschaft kommt aus src/lib/kunden-navigation.ts.
+
+E-Mails
+- Standard-Fuß „Versandt von Agrilo im Auftrag eines Hofes.“ (src/emails/_layout.tsx Z. 119), auch bei Code-, Passwort-, Sicherheits-, Freischalt-, Lastschrift- und Team-Mails.
+- Eigene Füße haben schon: Betriebs-Mails, Postfach (src/lib/zustellung.ts Z. 215), Widerruf-Eingang (src/emails/widerruf.tsx Z. 29).
+- Knöpfe 41 px: ctaButton padding '11px 18px', _layout.tsx Z. 221.
+- Kein Reply-To unter src/; Versand über sendRaw (src/lib/email.ts Z. 243) und versendeStapel (Z. 314).
+- Bar-Frist: Die Mail nennt die richtige Frist schon heute über fristVon (src/emails/onsite-confirmation.tsx Z. 42; Regel src/lib/fristen.ts: 2 Stunden ab Bestellung, spätestens Beginn des Abholfensters). Z. 105 wiederholt sie als „… nach spätestens zwei Stunden wieder frei“.
+- „Im Dashboard ansehen →“: new-order-notification.tsx Z. 81, order-confirmed.tsx Z. 92.
+- „Vor-Ort-Bestellung“: order-confirmed.tsx Z. 37–38, src/lib/email.ts Z. 1128.
+- „Klicke auf den Button“: src/emails/password-reset.tsx Z. 18.
+- „E-Mail-Updates“ / „Mehr ansehen beim …“: src/emails/status-update.tsx Z. 100–106. Der Abmelde-Link, manageUrl und List-Unsubscribe/-Post stehen in status-update.tsx Z. 104–107, _layout.tsx Z. 120–123 und src/lib/abmelde-link.ts.
+- Hof-E-Mail: hofKontaktEmail (src/lib/hof-kontakt.ts) ist nur zum Anschreiben des Hofs; sie fällt auf die Anmelde-Adresse zurück. Wo Kundinnen eine Adresse sehen, gilt nur das Profilfeld (Kopfkommentar, tests/hof-kontakt-wache.test.ts; hofEmailFehlt Z. 32).
+- Mail-Vorschau:
+  - Admin › Betrieb › Alle Mails zeigt einzelne Aufträge (N27, hinter Passkey, nicht alle Arten), über RENDERER (src/server/mail-arten, vorschau.ts).
+  - Für Bilder aller Vorlagen gibt es kein Skript.
+
+Rechtstexte
+- /agb: „Fassung 0.9 – Entwurf“ (src/lib/rechtstexte/agb.ts Z. 65), gerendert über src/components/rechtstexte/agb-ansicht.tsx. AGB 1.0 ist ein eigener /fix.
+- /impressum: „Pilotbetrieb … Kein kommerzieller Betrieb.“ (impressum/page.tsx Z. 38). Inhalte laufen über den Projektauftrag A001. Es nutzt src/components/shared/infoseite-stil.ts wie /agb, /datenschutz, /konditionen.
+
+Werkzeug
+- Kein Unteragent „sichter“. Die Bilder macht der Umsetzer selbst (4a Punkt 6 b).
+
+══════════════════════════════════════════════════════════════════════
+STAND – vor dem Start prüfen, sonst STOPP und melden
+══════════════════════════════════════════════════════════════════════
+- main enthält 056a321e oder später. Ist etwas dazugekommen, die Ausgangslage je Nummer am Code neu bestätigen (Morgenbericht ganz oben).
+- Mockups (Übergabe ohne Henne-Ei):
+  - Die Projektleitung hat vor dem Start im lokalen Arbeitsordner auf main die 304 Dateien der Soll-Liste unten nach docs/mockups/redesign-2026-11/ entpackt (unversioniert, kein ZIP im Repo).
+  - Der Dirigent legt docs/lauf30 von main an. Unversionierte Dateien bleiben beim Anlegen erhalten.
+  - Er vergleicht den Ordner mit der Soll-Liste: genau diese 304 Namen, nichts mehr, nichts weniger. Kein canvas.json, kein Main/h*/k*/hof-vorher/kunde-vorher.
+  - Abweichung: STOPP.
+  - Erst der Doku-PR committet sie. Keine Nummer startet vor dem Commit.
+- Prüfung der Mockups vor dem Commit, sonst STOPP:
+  - `pnpm vitest run tests/telefonnummern-wache.test.ts` grün (keine Ausnahmen für Mockups anlegen)
+  - Namen nur aus der Beispielwelt
+  - E-Mail-Adressen nur @beispiel.at bzw. Plattform-Adressen @agrilo.at
+  - Skripte nur `<script src="./support.js">` und `<script type="text/x-dc">`; externe Verweise nur der Google-Fonts-Link (wie in den bestehenden Mockups)
+- agent-browser läuft lokal; `TEST_DATABASE_URL` zeigt auf localhost.
+- `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint` (0 Fehler) und `pnpm test` sind grün. pnpm test sieht die unversionierten Mockups schon (Telefonnummern-Wache).
+- Stripe ist in Vorschau und Produktion im Testmodus (Umgebungsbanner, nie entschlüsseln).
+
+Soll-Liste docs/mockups/redesign-2026-11/ (304 Dateien; der Doku-PR schreibt sie als LISTE.txt dazu, ein Name je Zeile):
+  s1- (36):
+    s1-bestaetigung-dunkel.dc.html s1-bestaetigung.dc.html s1-bestellung-dunkel.dc.html
+    s1-bestellung-link-dunkel.dc.html s1-bestellung-link.dc.html s1-bestellung.dc.html
+    s1-bestellungen-dunkel.dc.html s1-bestellungen.dc.html s1-einstellungen-dunkel.dc.html
+    s1-einstellungen.dc.html s1-heute-dunkel.dc.html s1-heute.dc.html s1-hoefe-dunkel.dc.html s1-hoefe.dc.html
+    s1-hofseite-dunkel.dc.html s1-hofseite.dc.html s1-kasse-dunkel.dc.html s1-kasse.dc.html
+    s1-korb-dunkel.dc.html s1-korb.dc.html s1-mehr-neu-dunkel.dc.html s1-mehr-neu.dc.html
+    s1-mein-hof-dunkel.dc.html s1-mein-hof.dc.html s1-meine-bestellungen-dunkel.dc.html
+    s1-meine-bestellungen.dc.html s1-produkt-dunkel.dc.html s1-produkt-neu-dunkel.dc.html
+    s1-produkt-neu.dc.html s1-produkt.dc.html s1-produkte-dunkel.dc.html s1-produkte.dc.html
+    s1-region-dunkel.dc.html s1-region.dc.html s1-startseite-dunkel.dc.html s1-startseite.dc.html
+  s2- (35):
+    s2-abmelden-dunkel.dc.html s2-abmelden.dc.html s2-anmelden-dunkel.dc.html s2-anmelden.dc.html
+    s2-auswertung-dunkel.dc.html s2-auswertung.dc.html s2-beitraege-dunkel.dc.html s2-beitraege.dc.html
+    s2-druck.dc.html s2-hofdaten-zahlung-dunkel.dc.html s2-hofdaten-zahlung.dc.html
+    s2-konto-hof-dunkel.dc.html s2-konto-hof.dc.html s2-kunden-dunkel.dc.html s2-kunden.dc.html
+    s2-kundenkonto-dunkel.dc.html s2-kundenkonto.dc.html s2-meldungen-dunkel.dc.html s2-meldungen.dc.html
+    s2-neuigkeiten-dunkel.dc.html s2-neuigkeiten.dc.html s2-passwort-dunkel.dc.html s2-passwort.dc.html
+    s2-postfach-dunkel.dc.html s2-postfach.dc.html s2-registrieren-dunkel.dc.html s2-registrieren.dc.html
+    s2-systemseiten-dunkel.dc.html s2-systemseiten.dc.html s2-teilen-dunkel.dc.html s2-teilen.dc.html
+    s2-verkaeufe-dunkel.dc.html s2-verkaeufe.dc.html s2-whatsapp-plakat-dunkel.dc.html
+    s2-whatsapp-plakat.dc.html
+  s3- (41):
+    s3-admin-akte-dunkel.dc.html s3-admin-akte.dc.html s3-admin-bestellungen-dunkel.dc.html
+    s3-admin-bestellungen.dc.html s3-admin-betrieb-dunkel.dc.html s3-admin-betrieb.dc.html
+    s3-admin-einstellungen-dunkel.dc.html s3-admin-einstellungen.dc.html s3-admin-freischalten-dunkel.dc.html
+    s3-admin-freischalten.dc.html s3-admin-geld-dunkel.dc.html s3-admin-geld.dc.html
+    s3-admin-heute-dunkel.dc.html s3-admin-heute.dc.html s3-admin-hoefe-dunkel.dc.html s3-admin-hoefe.dc.html
+    s3-admin-postfach-dunkel.dc.html s3-admin-postfach.dc.html s3-admin-shell-dunkel.dc.html
+    s3-admin-shell.dc.html s3-admin-startseite-dunkel.dc.html s3-admin-startseite.dc.html
+    s3-admin-zugang-dunkel.dc.html s3-admin-zugang.dc.html s3-fehlerseiten-dunkel.dc.html
+    s3-fehlerseiten.dc.html s3-mail-betrieb.dc.html s3-mail-hof-bestellung.dc.html s3-mail-hof-konto.dc.html
+    s3-mail-kauf.dc.html s3-mail-neuigkeiten.dc.html s3-mail-sicherheit.dc.html s3-mail-storno.dc.html
+    s3-mail-team.dc.html s3-mail-zugang.dc.html s3-problem-melden-dunkel.dc.html s3-problem-melden.dc.html
+    s3-rechtstexte-dunkel.dc.html s3-rechtstexte.dc.html s3-widerruf-dunkel.dc.html s3-widerruf.dc.html
+  t- (40):
+    t-a-tarifzeile-dunkel.dc.html t-a-tarifzeile.dc.html t-b-produkte-dunkel.dc.html t-b-produkte.dc.html
+    t-b2-zaehlweise-dunkel.dc.html t-b2-zaehlweise.dc.html t-b3-zustaende-dunkel.dc.html
+    t-b3-zustaende.dc.html t-c-abholzeiten-dunkel.dc.html t-c-abholzeiten.dc.html t-d-packliste-dunkel.dc.html
+    t-d-packliste.dc.html t-e-pause-urlaub-dunkel.dc.html t-e-pause-urlaub.dc.html
+    t-f-konditionen-dunkel.dc.html t-f-konditionen.dc.html t-g-auswahl-dunkel.dc.html t-g-auswahl.dc.html
+    t-h-hofladen-waehlen-dunkel.dc.html t-h-hofladen-waehlen.dc.html t-i-kuendigen-dunkel.dc.html
+    t-i-kuendigen.dc.html t-j-abrechnung-dunkel.dc.html t-j-abrechnung.dc.html t-k-nachrichten-dunkel.dc.html
+    t-k-nachrichten.dc.html t-l-kundenseite-dunkel.dc.html t-l-kundenseite.dc.html t-m-admin-dunkel.dc.html
+    t-m-admin.dc.html t-n-region-dunkel.dc.html t-n-region.dc.html t-o-fuer-hoefe-dunkel.dc.html
+    t-o-fuer-hoefe.dc.html t-p-meine-bestellungen-dunkel.dc.html t-p-meine-bestellungen.dc.html
+    t-q-admin-gratiszeit-dunkel.dc.html t-q-admin-gratiszeit.dc.html t-r-admin-freischalten-dunkel.dc.html
+    t-r-admin-freischalten.dc.html
+  w- (40):
+    w-a-tarifzeile-dunkel.dc.html w-a-tarifzeile.dc.html w-b-produkte-dunkel.dc.html w-b-produkte.dc.html
+    w-b2-zaehlweise-dunkel.dc.html w-b2-zaehlweise.dc.html w-b3-zustaende-dunkel.dc.html
+    w-b3-zustaende.dc.html w-c-abholzeiten-dunkel.dc.html w-c-abholzeiten.dc.html w-d-packliste-dunkel.dc.html
+    w-d-packliste.dc.html w-e-pause-urlaub-dunkel.dc.html w-e-pause-urlaub.dc.html
+    w-f-konditionen-dunkel.dc.html w-f-konditionen.dc.html w-g-auswahl-dunkel.dc.html w-g-auswahl.dc.html
+    w-h-hofladen-waehlen-dunkel.dc.html w-h-hofladen-waehlen.dc.html w-i-kuendigen-dunkel.dc.html
+    w-i-kuendigen.dc.html w-j-abrechnung-dunkel.dc.html w-j-abrechnung.dc.html w-k-nachrichten-dunkel.dc.html
+    w-k-nachrichten.dc.html w-l-kundenseite-dunkel.dc.html w-l-kundenseite.dc.html w-m-admin-dunkel.dc.html
+    w-m-admin.dc.html w-n-region-dunkel.dc.html w-n-region.dc.html w-o-fuer-hoefe-dunkel.dc.html
+    w-o-fuer-hoefe.dc.html w-p-meine-bestellungen-dunkel.dc.html w-p-meine-bestellungen.dc.html
+    w-q-admin-gratiszeit-dunkel.dc.html w-q-admin-gratiszeit.dc.html w-r-admin-freischalten-dunkel.dc.html
+    w-r-admin-freischalten.dc.html
+  w1- (36):
+    w1-bestaetigung-dunkel.dc.html w1-bestaetigung.dc.html w1-bestellung-dunkel.dc.html
+    w1-bestellung-link-dunkel.dc.html w1-bestellung-link.dc.html w1-bestellung.dc.html
+    w1-bestellungen-dunkel.dc.html w1-bestellungen.dc.html w1-einstellungen-dunkel.dc.html
+    w1-einstellungen.dc.html w1-heute-dunkel.dc.html w1-heute.dc.html w1-hoefe-dunkel.dc.html w1-hoefe.dc.html
+    w1-hofseite-dunkel.dc.html w1-hofseite.dc.html w1-kasse-dunkel.dc.html w1-kasse.dc.html
+    w1-korb-dunkel.dc.html w1-korb.dc.html w1-mehr-neu-dunkel.dc.html w1-mehr-neu.dc.html
+    w1-mein-hof-dunkel.dc.html w1-mein-hof.dc.html w1-meine-bestellungen-dunkel.dc.html
+    w1-meine-bestellungen.dc.html w1-produkt-dunkel.dc.html w1-produkt-neu-dunkel.dc.html
+    w1-produkt-neu.dc.html w1-produkt.dc.html w1-produkte-dunkel.dc.html w1-produkte.dc.html
+    w1-region-dunkel.dc.html w1-region.dc.html w1-startseite-dunkel.dc.html w1-startseite.dc.html
+  w2- (35):
+    w2-abmelden-dunkel.dc.html w2-abmelden.dc.html w2-anmelden-dunkel.dc.html w2-anmelden.dc.html
+    w2-auswertung-dunkel.dc.html w2-auswertung.dc.html w2-beitraege-dunkel.dc.html w2-beitraege.dc.html
+    w2-druck.dc.html w2-hofdaten-zahlung-dunkel.dc.html w2-hofdaten-zahlung.dc.html
+    w2-konto-hof-dunkel.dc.html w2-konto-hof.dc.html w2-kunden-dunkel.dc.html w2-kunden.dc.html
+    w2-kundenkonto-dunkel.dc.html w2-kundenkonto.dc.html w2-meldungen-dunkel.dc.html w2-meldungen.dc.html
+    w2-neuigkeiten-dunkel.dc.html w2-neuigkeiten.dc.html w2-passwort-dunkel.dc.html w2-passwort.dc.html
+    w2-postfach-dunkel.dc.html w2-postfach.dc.html w2-registrieren-dunkel.dc.html w2-registrieren.dc.html
+    w2-systemseiten-dunkel.dc.html w2-systemseiten.dc.html w2-teilen-dunkel.dc.html w2-teilen.dc.html
+    w2-verkaeufe-dunkel.dc.html w2-verkaeufe.dc.html w2-whatsapp-plakat-dunkel.dc.html
+    w2-whatsapp-plakat.dc.html
+  w3- (41):
+    w3-admin-akte-dunkel.dc.html w3-admin-akte.dc.html w3-admin-bestellungen-dunkel.dc.html
+    w3-admin-bestellungen.dc.html w3-admin-betrieb-dunkel.dc.html w3-admin-betrieb.dc.html
+    w3-admin-einstellungen-dunkel.dc.html w3-admin-einstellungen.dc.html w3-admin-freischalten-dunkel.dc.html
+    w3-admin-freischalten.dc.html w3-admin-geld-dunkel.dc.html w3-admin-geld.dc.html
+    w3-admin-heute-dunkel.dc.html w3-admin-heute.dc.html w3-admin-hoefe-dunkel.dc.html w3-admin-hoefe.dc.html
+    w3-admin-postfach-dunkel.dc.html w3-admin-postfach.dc.html w3-admin-shell-dunkel.dc.html
+    w3-admin-shell.dc.html w3-admin-startseite-dunkel.dc.html w3-admin-startseite.dc.html
+    w3-admin-zugang-dunkel.dc.html w3-admin-zugang.dc.html w3-fehlerseiten-dunkel.dc.html
+    w3-fehlerseiten.dc.html w3-mail-betrieb.dc.html w3-mail-hof-bestellung.dc.html w3-mail-hof-konto.dc.html
+    w3-mail-kauf.dc.html w3-mail-neuigkeiten.dc.html w3-mail-sicherheit.dc.html w3-mail-storno.dc.html
+    w3-mail-team.dc.html w3-mail-zugang.dc.html w3-problem-melden-dunkel.dc.html w3-problem-melden.dc.html
+    w3-rechtstexte-dunkel.dc.html w3-rechtstexte.dc.html w3-widerruf-dunkel.dc.html w3-widerruf.dc.html
+
+══════════════════════════════════════════════════════════════════════
+ENTSCHIEDEN (Stand 03.11.2026, Vorgaben V1–V92; alles hier ist Auftrag, keine Rückfrage)
+══════════════════════════════════════════════════════════════════════
+
+Maßstab
+- Gültig sind die Mockups in docs/mockups/redesign-2026-11/. Sie gehen älteren Mockups derselben Route vor.
+- Je Board gilt die Notiz über den Bildern (erster <p>). Ihre Sätze mit „Abweichung vom Code“ bzw. „Code: …“ sind die Änderungsliste, außer wo dieser Text etwas anderes festlegt (Frist, Rücktritt-Einstiege, Reply-To).
+- Beispieldaten sind kein Bauauftrag: Namen, Daten, Fristen, Beträge, Bestellnummern, Zähler, Adressen der Beispielwelt (Stand Mi 3. März 2027). Die Mockups werden darin noch nachgezogen.
+- Gebaut werden Aufbau, Wortlaut der Oberfläche, Zustände, Farben, Abstände.
+- t-*/w-* (Tarif-Boards) sind Vorschlag (Tarife als Abrechnung: offen, nicht im Register). Gebaut wird daraus nur, was ein s1–s3-Board zeigt oder was der Code schon hat (Tarif-Zeile, „Deine Konditionen“, Packliste, /fuer-hoefe).
+- Recht und Gesetz gehen dem Mockup vor (Register N2-Ergänzung 1.11.2026). In der Kasse bleiben KaufZusammenfassung unmittelbar über dem Kaufknopf (210), Gewährleistungs-Grafik dazwischen (211) und AGB- und Rücktrittssatz unter jedem Kaufknopf (215).
+- Was ein Mockup nicht zeigt: nach DESIGN_SYSTEM „Zustände“.
+
+N41 (Projekt E-014, Welle 1)
+- a) Mindestbestellwert nach A3. Neu und daneben: mindestbestellwertHinweis(fehlendCents, hundertstel) in src/lib/konditionen.ts. „ab € 10,60“ über gebuehrJeStueckCents mit dem Satz des Hofs, nie als Literal.
+  - MINDESTBESTELLWERT_SATZ bleibt unverändert (Meldung von /api/checkout, Geld-Tests).
+  - Vor dem Stichtag gibt es keinen Mindestbestellwert (mindestbestellwertGrund bleibt dort null).
+- b) Pause ohne Enddatum. Nur die freie Nachricht des Hofs. Kein „Nächste Abholung“ bei pausiertem Hof; im Mini-Warenkorb steht der Grund statt „Zur Kasse“ (V6).
+- c) „Warenkorb · n“ im Kopf der Kundschaft nur bei gefülltem Warenkorb (V12).
+- d) Web-Dialoge:
+  - „Neu“ = Dropdown unter „+ Neu ▾“
+  - Warenkorb = Blatt von rechts, max. 448 px, volle Höhe
+  - alles andere = zentrierter Dialog, max. 560 px, genau ein Schließen-Element
+  - Toasts nur im Inhaltsbereich
+  - DESIGN_SYSTEM „Dialoge und Blätter“ (heute 480–820 px) wird angepasst.
+- e) Zähler „Bestellungen“ = alles, was nicht abgeholt, storniert oder verfallen ist, inkl. „Bestätigung offen“: OPEN_STATUSES, eine Quelle. Überall dieselbe Zahl: Unterleiste, Seitenleiste, Chip „Noch offen · n“. „Noch zu packen“ in Heute zählt nur bestätigte und bezahlte, nicht gepackte Bestellungen mit Abholung heute; die nächste Abholung nennt ihre Zahl in ihrer Zeile (V40).
+- f) Kaufknopf grün.
+
+N42 (Projekt E-015, Welle 2)
+- a) Hauptknopf im Hofbereich orange.
+- b) Kundschaft grün, Hof-Eingänge orange:
+  - Die Hof-Karte in /login bleibt orange.
+  - Seiten in der KundeShell sind grün, auch wenn ein Hof sie öffnet (V52).
+  - Gemeinsamer Baustein „Problem melden“ mit Farbe je Welt (V51).
+- c) Wortliste vor Code:
+  - Beitrags-Anlass „Hinweis“ statt „Mitteilung“. Nur das Etikett, Enum ANNOUNCEMENT bleibt. „Neuigkeit“ im Mail-Board ist ein Fehler im Board: Das Wort steht in der Wortliste unter „nicht“.
+  - „Hofseite“ zusammen.
+  - „Anmelde-Adresse“ statt „Login-E-Mail“.
+  - Seite und Knopf „Hofdaten“ / „Hofdaten speichern“ / „Hofdaten gespeichert“ (V43, V49).
+  - Papier = Bildschirm: „Zum Packen“, „Wartet auf Kunde“, „Bar bei Abholung“; in Mails „Bar-Bestellung bestätigt“ (V57).
+  - „Bei Heute ansehen →“ statt „Im Dashboard ansehen →“.
+  - „Tipp auf den Knopf“.
+  - „Neuigkeiten“ statt „E-Mail-Updates“, Knopf „Zu <Hof>“.
+  - Admin-Jahresansicht „Geld“ (N32).
+  - „Stripe Live“ einheitlich.
+  - Postfach nach N14: „Auf die meisten Nachrichten kannst du antworten.“ (V54)
+- d) Beim Stilllegen „Hof“ statt „Hofladen“: „Deinen Hof dauerhaft schließen.“ (V55)
+- e) Balken je Stand (V59):
+  - Solange Einrichtungsschritte offen sind: „Richte deinen Hof fertig ein – Kundinnen sehen ihn noch nicht“.
+  - Danach: „Dein Hof wird noch geprüft – Kundinnen sehen ihn noch nicht“, mit Halbgeviertstrich.
+  - Schritte aus src/lib/einrichten.ts, keine zweite Zählung.
+- g) Überall „Lastschrift einrichten“, Marke „Braucht Lastschrift“. Beim Einrichten ein Hinweis, kein Schritt; zählt nicht in „x von 5“ (V61, V71).
+
+N43 Rücktritt (Projekt E-017; V73, V88)
+- Nutzertexte sagen „Rücktritt“, „Rücktrittsrecht“, „vom Kauf zurücktreten“, nie „Widerruf“. Die Route /widerruf bleibt. Seitentitel und Überschriften heißen „Rücktrittsrecht“. Die übrigen Texte der Seite stehen im Mockup s3/w3-widerruf: „Wovon möchtest du zurücktreten?“, „Bitte prüfe deinen Rücktritt“, „Dein Rücktritt ist bei uns eingegangen“, „Von dieser Bestellung kannst du hier nicht mehr zurücktreten.“
+- Wörtlich bleiben bis zur Entscheidung der Anwältin (V88; Recht vor Anfrage):
+  - (1) die Beschriftung der Online-Funktion nach § 13a FAGG, wie N39 sie festlegt: die Einstiege „Vertrag widerrufen“ (Mails, Bestätigung, Bestellseite, Fuß jeder Kundenseite; WIDERRUF_TEXT.fussLink) und die Knöpfe „Vertrag widerrufen“ und „Widerruf bestätigen“. Das Mockup zeigt hier andere Wörter; der Code behält N39. Im PR unter „Offen für Recht“.
+  - (2) Belehrung Teil A/B und Muster-Formular nach Anhang I FAGG (src/lib/widerruf.ts ab Z. 318, src/emails/belehrung-teil.tsx)
+  - (3) die AGB (src/lib/rechtstexte/agb.ts)
+  - (4) die Datenschutzerklärung als ganze Datei
+  - (5) jeder Text zum Widerruf einer Einwilligung (Abo, Neuigkeiten, Datenschutz). Das ist kein Rücktritt; dort bleibt „widerrufen“.
+- Bezeichner, Routen, Datenbankfelder bleiben.
+- „Offen für Recht“: gemischte Begriffe auf einer Seite (Rücktritt in der Oberfläche, Widerruf in Belehrung und Knöpfen). Ein erklärender Satz nur mit Freigabe.
+
+N44 Gründungszeit (Projekt E-018; V81)
+- „Monate ohne Grundgebühr“ in Admin › Einstellungen › Gründungshöfe, Zielwert 12. Beginn am späteren Tag von Tarifstart und Freischaltung (gebaut: zusageEnde).
+- Folge für das Geld (A2): Das Gründungs-Ende bestimmt auch den Einzugsbeginn der Bargebühr aus N38. Gründungshöfe zahlen sie ab dem Tag nach ihrem Gründungs-Ende (einzugAbFuer).
+  - Höfe, die vor dem Tarifstart freigegeben sind: ab 1.2.2028 statt ab 1.2.2029 (bei 24 Monaten).
+  - Am festen Datum heute (Art „bisher“, Standard 31.12.2027) wäre es der 1.1.2028.
+  - Der Lauf ändert einzugAbFuer nicht.
+- Code-Änderung:
+  - GRUENDUNG_MONATE_STANDARD = 12
+  - „Monate nur erhöhen“ gilt erst nach dem Festschreiben (gruendungFestAm gesetzt). Vorher ist 1 bis GRUENDUNG_MONATE_MAX frei.
+  - Keine Zusage wird kürzer (K1): festschreibenListe nimmt den späteren Tag. Ein eigenes gruendungBis je Hof bleibt.
+- Kein Senken nach dem Festschreiben (unverändert).
+- Spalten-Default 24 bleibt (keine Migration); Kommentar an der Konstante: „Standard nur, wenn die Zeile fehlt; Produktion trägt den Wert in der Zeile.“
+- Texte: „12 Monate ohne Grundgebühr ab der Freischaltung, frühestens ab Tarifstart“ (Zahl aus der Einstellung).
+- Die Gründungsaktion bleibt: Freischaltung bis zum Stichtag „Aktion bis“, heute 31.3.2027. Kein Text sagt „Anmeldung bis“.
+- Der Zähler der Gründungsplätze bleibt wie im Code (12 oder 100: offen).
+
+Gebühr (V62, V63)
+- Ab dem Stichtag „Hofpreis-Modell ab“ heißt es überall „Plattformgebühr“, auch im Admin. Bestellungen im Modell „bisher“ zeigen weiter „Servicegebühr“, immer über gebuehrBezeichnungFuer bzw. gebuehrHinweisFuer.
+- Summen über einen Zeitraum: gebuehrWortFuerZeitraum(von, bis, stichtag).
+  - ganz vor dem Stichtag → „Servicegebühr“
+  - ganz ab dem Stichtag → „Plattformgebühr“
+  - beides → „Gebühren“
+  - maßgeblich ist createdAt der Bestellung (wie gebuehrModell)
+- Akte: nach A1.
+- Freischalt-Dialog: KONDITIONEN_DERZEIT ab dem Stichtag nach N38 (Wortlaut w3-admin-freischalten).
+- Hofpreis-Stichtag nach Erreichen: „Seit diesem Tag gilt …“ ohne „Vorher bleibt alles wie heute.“
+- Startseite „Beispiel“ ab dem Stichtag über bestellGebuehr (nur Anzeige, Wortlaut w1-startseite).
+- Futter-Vorschau je Stichtag.
+- Storno-Dialog je Modell der Bestellung. Der Hofpreis-Text beschreibt den Weg aus stornieren.ts (die Gebühr wird mit erstattet); beim Umsetzen gegen den Code belegen.
+
+Rechtstexte (V62)
+- Eine neue Vorlage neben infoseite-stil.ts für /agb, /datenschutz, /konditionen (nach s3/w3-rechtstexte):
+  - Kicker, h1, Stand-Zeile direkt unter dem Titel, „Drucken/Speichern“
+  - Inhaltsverzeichnis: ab 1024 px als Spalte, am Handy aufklappbar „Inhalt“
+  - Abschnitte, Fuß „Stand: …“
+- Die bestehenden Exporte von infoseite-stil.ts bleiben unverändert, denn /impressum nutzt sie (A001).
+- Wortlaut von AGB und Datenschutz unverändert. Keine neuen Rechtssätze außer dem Konditionen-Abschnitt unten.
+- /konditionen ab dem Stichtag: Abschnitt „Plattformgebühr und Abrechnung“:
+  „6 % je Stück aufgerundet (Standard; ist für einen Hof ein anderer Satz eingetragen, zeigt die Seite für ihn diesen), Mindestbestellwert 10 € Warenwert, online behält Stripe die Gebühr ein (der Hof ist Händler), bar zieht Agrilo sie monatlich per SEPA-Lastschrift ein, fällig erst mit ‚Abgeholt‘; Gründungshöfe erst nach ihrer Laufzeit, bis dahin ohne Mandat.“
+  - Aufbau nach w3-rechtstexte Bild 6, Zahlen aus konditionen.ts.
+  - Darüber steht die Kennzeichnung „Entwurf – die Anwältin prüft den Wortlaut“, bis die Projektleitung sie entfernt (wie AGB 0.9).
+  - Im PR unter „Offen für Recht“; im Morgenbericht unter „Für dich zu tun“: Freigabe vor dem Stichtag (N38: Rechtstexte nach Rückmeldung der Anwältin).
+
+E-Mails (V68, V72, V78, V79, V86, V87)
+- Fuß je Absender:
+  - „Versandt von Agrilo im Auftrag eines Hofes.“ nur bei Bestellmails an die Kundin (Vertrag Kundin–Hof)
+  - Konto-, Code-, Passwort-, Sicherheits-, Freischalt-, Lastschrift-, Team-Mails und Mails an den Hof: „Versandt von Agrilo.“
+  - Betriebs-Mails und Postfach behalten ihren Fuß.
+  - Beitrags-Mails: „Im Auftrag von <Hofname> · versandt von Agrilo“
+- Anbieterzeile unter dem Fuß (außer Betriebs-Mails): „Agrilo · agrilo.at/impressum“ als Link. Keine Betreiberdaten im Code (A001, öffentliches Repo).
+- „Offen für Recht“: ECG § 6, MedienG § 24/25, ob die Anschrift des Hofs in den Fuß der Beitrags-Mail gehört.
+- Reply-To (V86):
+  - nur die Hof-E-Mail aus dem Profil (farm.email), nur wenn sie gesetzt ist (!hofEmailFehlt(farm)); sonst kein Reply-To
+  - nie die Anmelde-Adresse, nie hofKontaktEmail (src/lib/hof-kontakt.ts, Kopfkommentar)
+  - nur bei Bestellmails an die Kundin
+  - gelesen beim Versand aus Bestellung bzw. Hof des MailAuftrags, keine neue Spalte
+  - die Option des Resend-SDK (resend ^6.12.4) per Typ prüfen
+- Bar-Frist (V87):
+  - „Bitte bestätige“ nennt die Frist aus fristVon (src/lib/fristen.ts), wie heute.
+  - Der Satz „… nach spätestens zwei Stunden wieder frei.“ (Z. 105) entfällt; er nennt die Frist doppelt und unvollständig.
+  - fristen.ts bleibt unverändert.
+  - Fristen in Boards („bis Freitag, 18:00“) sind Beispieldaten.
+- Knöpfe mindestens 44 px: ctaButton padding '13px 18px'.
+- Abmeldung bleibt: Abmelde-Link, manageUrl und List-Unsubscribe/-Post in jeder Beitrags-Mail unverändert.
+- Wörter nach N42 c und N43. Nach N38 keine Zeile „Servicegebühr“, sondern „Alle Preise inkl. Plattformgebühr (darin …)“ (gebaut; die alte Zeile nur bei bisher-Bestellungen). Mails nur hell.
+
+Muster aus den Vorgaben (für alle Nummern; Wortlaute aus den Boards)
+- V9 Tage immer mit Wochentag und Datum.
+- V10 Unterleiste Kundschaft „Entdecken · [Warenkorb] · Bestellungen“ mit erhobenem grünem Mittelknopf 54 px; V28 nichts liegt unter dem Überstand.
+- V12 Kopf Kundschaft im Web:
+  - Reihenfolge: Höfe entdecken · So funktioniert’s · Für Höfe · Meine Bestellungen
+  - Startseite ohne aktiven Punkt
+  - „Anmelden“ als Umriss-Pille 44 px
+- V13 Seitenleiste Hof:
+  - „Abmelden“ unter Konto
+  - Tarif-Datum mit geschütztem Leerzeichen
+  - Theme-Symbol Sonne/Mond aus lucide
+- V15 Bild-Platzhalter ohne Dateinamen, dunkel mit eigenem Verlauf, im Formular „Foto hinzufügen“.
+- V16 Textlinks mit Trefferfläche ≥ 44 px.
+- V17 Feldfehler orange mit aria-invalid; Karten-Ablehnung als orange Hinweiskarte; Speicherfehler mit „Nochmal“.
+- V18 Pausierter Hof in Listen ausgegraut, gestrichelt, neutraler Text.
+- V19 „Ausverkauft“ neutral.
+- V21 Knopf „In den Korb“, sonst „Warenkorb“.
+- V22 Hof-Marken:
+  - „Zum Packen“ (orange)
+  - „Bestätigung offen“ bzw. in der Packliste „Wartet auf Kunde“
+  - Knopf „Als gepackt markieren“ (V40)
+- V25 Hofseite ab 768 px Kacheln mit „In den Korb“.
+- V26 „Meine Bestellungen“: „Abmelden“ in der Karte heißt „Ansicht beenden“.
+- V29 Keine Mockup-Notizen in der Oberfläche.
+- V36 Region: gebauter Stand; kein „← Zurück“ auf Seiten aus der Seitenleiste.
+- V37 Restzeit unter einem Monat in Wochen bzw. Tagen.
+- V44 Druck nur hell.
+- V47 Web-Formulare: Knöpfe am Formularende, feste Leisten nur, wo der Code sie hat.
+- V64 Admin › Höfe Standard „Braucht Blick“.
+- V65 Freischalt-Dialog zeigt die Platzvergabe (gebaut).
+- V67, V85 sind nur Beispieldaten.
+
+Technik für alle Nummern
+- Nur Tokens aus DESIGN_SYSTEM, keine Hexwerte, keine Palette-Klassen; jede Änderung hell und dunkel; data-design="neu" bleibt an jeder Shell.
+- FOKUS_RAHMEN, Touch-Ziele ≥ 44 px über die Grundbausteine bzw. TREFFER_44, Text ≥ 4,5:1, Feldränder ≥ 3:1.
+- Bausteine aus docs/ai/BAUSTEINE.md benutzen oder additiv erweitern; nach Änderung `pnpm bausteine`.
+- Texte als Konstanten in src/lib/* (eine Quelle).
+
+══════════════════════════════════════════════════════════════════════
+UMSETZUNG
+══════════════════════════════════════════════════════════════════════
+
+§0 Zuordnung
+- Modell:
+  - Doku-PR und Regel-Inventur mit Sonnet; alle Nummern mit Opus
+  - tester mit Sonnet; pruefer mit Opus, höchstens 22 Schritte je Aufruf
+- Prüfdurchgänge:
+  - voller Durchgang für 221 (Geschäftsregel, Geld-Anzeige), 227 (Kasse), 229 (Admin-Aktionen), 231 (Recht), 232 (Mails, Recht, Daten)
+  - gezielt für die übrigen
+- pnpm test:integration:
+  - jede Nummer, die eine Server-Action, eine Abfrage oder eine Mail ändert
+  - 221 ganz
+  - im Sammel-PR ganz
+- Bilder (Pflicht, 4a Punkt 6 b, Umsetzer selbst):
+  - jede geänderte Route bei 390 und 1440 px, hell und dunkel, je Zustand des Boards
+  - unter .nachtlauf/screens/<nr>/<board>-<bild>.png
+  - Admin-Bilder hinter Passkey macht die Projektleitung
+  - späteste Uhrzeit bei zeitabhängigen Bildern in der Lesemappe
+- Lesemappe (alle):
+  - CLAUDE.md §2, CODING_STANDARDS und TESTING_GUIDELINES ganz
+  - DESIGN_SYSTEM nur „Farbtokens“, „Komponenten“, „Wortliste“, „Zustände“, „Dialoge und Blätter“ und die eigenen Routen
+  - ARCHITECTURE §5, BAUSTEINE.md, Register N8, N38, N39, K2 und N41–N44
+  - die Boards der Nummer
+  - die Liste „Abweichung vom Code“ der Nummer (per Skript aus dem ersten <p> je Board: Sätze mit „Abweichung“ oder „Code:“, in den Bericht)
+
+§1 Warteschlange (fest)
+- Doku-PR (docs/lauf30, siehe Stand)
+- Regel-Inventur (G4, nur lesen; Quellen und Form nach nachtlauf.md §4; höchstens 20 Vorschläge; Ergebnis im Morgenbericht unter „Regelvorschläge“)
+- Welle 1, von docs/lauf30: 219
+- Welle 2, vom Zwischenstand integration/lauf30 nach 219: 220 ∥ 221
+- Welle 3, vom Zwischenstand nach 219, 220 und 221 (voller lokaler Lauf grün): 227 ∥ 222 ∥ 226, dann nach freien Plätzen 232, 231, 229, 230, 224, 223, 225, 228
+- Höchstens drei Umsetzer gleichzeitig.
+- Sammel-PR integration/lauf30 (Haltepunkt), Merge per Merge-Commit.
+- Branches nacht/<datum>/<nr>-<kurz>.
+- Priorität: 219 → 221 → 220 → 227 → 222 → 226 → 232 → 231 → 229 → 230 → 224 → 223 → 225 → 228. Nicht begonnene Nummern bleiben „offen“; die nächste Nacht setzt nach §7 fort.
+- 219 nach zwei Runden nicht fertig: STOPP des Laufs. 220 nicht fertig: in Welle 3 nur 221-abhängige Nummern ohne Shell-Teil (227, 232, 231), mit Bericht.
+
+Dateigrenzen (nie zwei Nummern an derselben Datei außerhalb dieser Grenzen)
+- Nacheinander geteilt:
+  - docs/ai/DESIGN_SYSTEM.md (je Nummer eigener Abschnitt)
+  - DEVELOPMENT.md (je ein Eintrag)
+  - docs/ai/BAUSTEINE.md (nur über `pnpm bausteine`)
+- Bestandslisten ohne Konflikt:
+  - 219 legt für jede spätere Nummer eine Datei tests/wortliste-offen/<nr>.ts an, mit den Fundstellen der neuen „nicht“-Wörter in Dateien dieser Nummer.
+  - 221 legt tests/gebuehr-wort-offen/<nr>.ts an (Fundstellen „Servicegebühr“ ohne Bedingung).
+  - Jede Nummer leert und löscht nur ihre eigene Datei; die Wachen lesen den Ordner.
+  - Fundstellen in Dateien ohne Nummer oder mit wörtlichem Rechtstext kommen nicht in eine Offen-Datei, sondern in AUSNAHMEN bzw. AUSNAHME_DATEIEN mit Grund („Recht prüft“, „Einwilligung“): datenschutz/page.tsx, agb.ts, Belehrung und N39-Beschriftung in widerruf.ts, Betreff in src/emails/widerruf.tsx. Liste im Bericht von 219.
+  - Im Sammel-PR sind beide Ordner leer.
+
+Doku-PR (docs/lauf30, Sonnet, ohne Code)
+1. Mockups:
+   - Ordner gegen die Soll-Liste prüfen und die Prüfungen aus „Stand“ ausführen.
+   - docs/mockups/redesign-2026-11/LISTE.txt (Anzahl in Zeile 1, dann ein Name je Zeile) dazulegen.
+   - Die Dateien unverändert committen (Canvas-Exporte, ohne support.js lesbar; nicht umbauen).
+   - Commit mit Präfix docs:.
+2. docs/mockups/README.md:
+   - Abschnitt „Redesign November 2026 (gilt vor älteren Mockups derselben Route)“: Board · Handy · Web · Route im Code · Arbeit · Nummer
+   - t-/w-Boards: „Vorschlag (Tarife als Abrechnung offen) – gebaut nur, was s1–s3 zeigen“
+   - t-n/w-n: „Vorschlag Preise vergleichen v2 (PR #329, offen) – nicht bauen“
+   - Kasse: „Recht vor Mockup: Zusammenfassung unmittelbar über dem Kaufknopf, Gewährleistungs-Grafik, Sätze unter jedem Kaufknopf (210, 211, 215)“
+   - widerruf/Mails: „Online-Rücktrittsfunktion: Wortlaut nach N39, bis die Anwältin entscheidet“
+   - Fristen in Boards sind Beispieldaten (Regel src/lib/fristen.ts)
+3. docs/entscheidungen.md, wörtlich (nächste freie Kennungen nach N40):
+   - „### N41 · Redesign Welle 1 (3.11.2026; Projekt E-014): Mindestbestellwert als ‚Waren für 10 € (mit Plattformgebühr ab € 10,60). Dir fehlen noch Waren für € X.‘; Pause ohne Enddatum; ‚Warenkorb · n‘ nur bei gefülltem Warenkorb; Web-Dialoge: Neu = Dropdown, Warenkorb = Blatt rechts (≤ 448 px), sonst zentrierter Dialog ≤ 560 px; Zähler ‚Bestellungen‘ = alles nicht Abgeholte, Stornierte oder Verfallene; Kaufknopf grün.“
+   - „### N42 · Redesign Welle 2 (3.11.2026; Projekt E-015): Hauptknopf im Hofbereich orange; Kundschaft grün, Hof-Eingänge orange; Wortliste vor Code (‚Hinweis‘ statt ‚Mitteilung‘, ‚Hofseite‘, ‚Anmelde-Adresse‘, Papier = Bildschirm); ‚Hof‘ statt ‚Hofladen‘ beim Stilllegen; Balken ‚Richte deinen Hof fertig ein …‘ bzw. ‚Dein Hof wird noch geprüft …‘; ‚Lastschrift einrichten‘.“
+   - „### N43 · Rücktritt in Nutzertexten (3.11.2026; Projekt E-017; ergänzt N8 und N39): In Nutzertexten heißt es ‚Rücktritt‘ bzw. ‚Rücktrittsrecht‘, nie ‚Widerruf‘. Die Route /widerruf bleibt, der Titel lautet ‚Rücktrittsrecht‘. Wörtlich bleiben bis zur Entscheidung der Anwältin: die Beschriftung der Online-Funktion nach § 13a FAGG (Einstiege und Knöpfe, N39), die Belehrung und das Muster-Formular nach Anhang I FAGG, die AGB und die Datenschutzerklärung. Der Widerruf einer Einwilligung bleibt ‚Widerruf‘.“
+   - „### N44 · Gründungszeit 12 Monate (3.11.2026; Projekt E-018; ändert K2): Gründungshöfe bekommen den Hofladen 12 statt 24 Monate ohne Grundgebühr, einstellbar im Feld ‚Monate ohne Grundgebühr‘ (Admin › Einstellungen). Beginn am späteren Tag von Tarifstart und Freischaltung. Die Laufzeit bestimmt auch den Einzugsbeginn der Bargebühr aus N38 (K2-Ergänzung 26.10.2026): Gründungshöfe zahlen sie ab dem Tag nach dem Gründungs-Ende, bei Freischaltung vor dem Tarifstart also ab 1.2.2028. Das feste Datum (Art ‚bisher‘) entfällt mit dem Festschreiben. ‚Monate nur erhöhen‘ gilt erst nach dem Festschreiben; vorher ist jeder Wert von 1 bis zum Höchstwert erlaubt.“
+   - Bei N8 und N39 der Verweis auf N42/N43; bei K2 auf N44.
+   - Antworten A1–A3 als Ergänzungen bei N41 (A3) bzw. N38 (A1).
+   - Stand-Zeile: „Stand Lauf 30 (uttoranger, 3.11.2026): N41–N44 entschieden; Redesign nach den Mockups November 2026 in Nr. 219–232 (freigabe.md §34). Keine Migration, kein Paket, keine Variable. Nicht: Ab Hof, Willkommenszeit, Zahl der Gründungsplätze, Kartenquelle, Tarife als Abrechnung, Preise vergleichen v2 (PR #329), AGB 1.0, Impressum (A001).“
+4. docs/nachtlauf.md §3: Zeilen 219–232 und „Sammel 30“.
+5. docs/nachtlauf/status.md:
+   - 211, 215–218 und „Sammel 29“ tragen „gemergt (#447)“
+   - neu 219–232 und „Sammel 30“ mit „offen“
+6. Commit- und PR-Texte über eine Datei, Präfix docs:.
+
+Die Nummern
+
+219 Bausteine und Wortliste – Opus, gezielt, von docs/lauf30
+Grenze: src/components/ui/**, src/app/intern/bausteine/**, DESIGN_SYSTEM (Wortliste, Komponenten, Dialoge), tests/wortliste.test.ts, tests/wortliste-offen/**, Tests der Bausteine.
+1. Wortliste (Tabelle bleibt vierspaltig):
+   - Rücktritt (nicht: Widerruf, widerrufen, Widerrufsrecht), mit Ausnahmen nach N43 (1)–(5)
+   - Anmelde-Adresse (nicht: Login-E-Mail)
+   - Anlass „Hinweis“ (die Ausnahme „Mitteilung“ fällt weg)
+   - Bar bei Abholung (nicht: Vor-Ort-Bestellung, Barzahlung vor Ort)
+   - Hofseite (nicht: Hof-Seite)
+   - Hofdaten (nicht: Hof-Profil)
+   - Lastschrift einrichten / Braucht Lastschrift (nicht: Mandat erteilen)
+   - Knopf (nicht: Button)
+   - Neuigkeiten (nicht: E-Mail-Updates)
+   - Geld im Admin (nicht: Finanzen)
+   - Heute in Mails (nicht: Dashboard; Ausnahme „Nur im Dashboard“ für fremde Dienste in Admin › Betrieb)
+   - Zeile „Servicegebühr“: „bis zum Stichtag Servicegebühr, ab ‚Hofpreis-Modell ab‘ Plattformgebühr (N38)“
+   - Zeile „Aktion“: „12 Monate (einstellbar)“
+   Fundstellen nach den Dateigrenzen in die Offen-Dateien (ohne 220/221, deren Wörter tragen sie selbst) bzw. in die Ausnahmen.
+2. Bausteine, je additiv als Variante, mit Vorschau in /intern/bausteine und Render-Test:
+   - Dialog zentriert ≤ 560 px mit einem Schließen-Element
+   - SheetBlatt rechts für den Warenkorb
+   - Marke „Ausverkauft“ neutral
+   - Feldfehler orange mit aria-invalid
+   - Textlink mit 44-px-Fläche
+   - Bild-Platzhalter ohne Dateinamen
+   - Hinweiskarte mit „Nochmal“
+   - Hofkarte „pausiert“
+   - Darstellung des „Problem melden“-Formulars mit Ton je Welt (Logik bleibt useMeldungFormular)
+3. DESIGN_SYSTEM „Dialoge und Blätter“ nach N41 d.
+Tests:
+- wortliste.test.ts mit Ordner-Logik
+- Gegenprobe je neuem Wort (schlägt im String an, nicht im Kommentar; nicht bei Einwilligung)
+- Bausteine-Render-Test
+- fokus-sichtbar, grundbausteine-groesse, design-tokens, palette-klassen grün
+
+220 Shells und Navigation – Opus, gezielt, vom Zwischenstand nach 219
+Grenze: src/components/shells/**, src/lib/bauern-navigation.ts, src/lib/admin-navigation.ts, src/lib/kunden-navigation.ts, src/server/queries/orders.ts (nur Export von OPEN_STATUSES, keine Abfrage ändern), src/components/shared/theme-umschalter.tsx, src/components/hofbereich/unterseiten-kopf.tsx, Tests dazu. Eigene Fundstellen der Wortliste stellt 220 selbst um.
+Boards: s1/w1-mehr-neu, s3/w3-admin-shell, Köpfe und Unterleisten aller s1–s3-Boards.
+1. KundeShell: Unterleiste V10/V28, Kopf V12, „Warenkorb · n“ nur gefüllt.
+2. HofShell:
+   - Unterleiste Heute · Bestellungen (Zähler nach N41 e) · Neu · Mein Hof · Mehr
+   - Blätter „Mehr“ und „Neu“ nach s1-mehr-neu
+   - Web-Seitenleiste mit „+ Neu ▾“ als Dropdown, „Abmelden“ unter Konto, Tarif-Zeile mit geschütztem Leerzeichen, Sonne/Mond
+   - Der Balken gehört zu 228.
+3. AdminShell:
+   - Reiter als Pillen mit 44-px-Fläche, Zahlen an Heute, Höfe, Postfach, Punkt an Betrieb
+   - Betriebsleiste „Stripe Live/Test“
+   - Handy-Leiste mit Blatt „Mehr“
+Tests: Zähler aus OPEN_STATUSES (exportiert) gleich in Unterleiste und Seitenleiste; nichts unter dem Überstand; Fokus und 44 px.
+
+221 Gebühren-Texte und Gründungszeit – Opus, voller Durchgang, vom Zwischenstand nach 219 (parallel zu 220)
+Grenze:
+- src/lib/konditionen.ts, src/lib/gruendungshof.ts, src/lib/plattform-einstellung.ts, src/schemas/plattform-einstellung.ts, src/server/actions/plattform-einstellung.ts
+- src/lib/servicegebuehr.ts (nur Bezeichnung und Texte), src/lib/plattformgebuehr.ts (nur Text-Helfer, keine Rechenfunktion, einzugAbFuer unverändert), src/lib/startseite.ts (beispielRechnung)
+- src/lib/kasse.ts (mindestbestellwertGrund: neuer Parameter hundertstel und der neue Satz; den Aufruf in checkout-form.tsx stellt 227 um, bis dahin optionaler Parameter mit heutigem Verhalten)
+- src/lib/admin-bestellung.ts, src/lib/admin-aufgaben.ts (Geld-Kachel), src/lib/finanzen.ts (Wörter inkl. Z. 471–472), src/lib/admin-rechte.ts (Wort), src/lib/admin-finanzen-seite.ts (Titel)
+- tests/gebuehr-wort-wache.test.ts (neu), tests/gebuehr-wort-offen/**, Tests dazu
+Seitendateien (storno-dialog, futter-formular, hof-akte-ansicht, geld/page) fasst 221 nicht an.
+1. Gründungszeit nach N44:
+   - Konstante 12
+   - pruefeGruendungEingabe: monateNurMehr nur bei festAm ≠ null
+   - Feldhilfe „Vor dem Festschreiben frei wählbar, danach nur mehr“
+   - GRUENDUNG_TEXT „aktion“ nach V81 (Wortlaut s3/w3-admin-einstellungen, s2/w2-registrieren)
+   - kein „Anmeldung bis“
+2. Gebühren-Wort:
+   - gebuehrWortFuerZeitraum nach „Gebühr“
+   - SERVICEGEBUEHR_BEZEICHNUNG nur für bisher-Bestellungen
+   - Admin-Texte über gebuehrBezeichnungFuer bzw. gebuehrWortFuerZeitraum
+   - admin-rechte.ts Z. 40 nur, wenn das Recht auch die Karte „Plattformgebühr“ schützt (per git grep belegen); sonst lassen, im Bericht nennen
+3. Konditionen:
+   - Abschnitt „Plattformgebühr und Abrechnung“ nach „Rechtstexte“, als Funktion von jetzt, mit Entwurf-Kennzeichnung
+   - KONDITIONEN_DERZEIT ab dem Stichtag
+   - mindestbestellwertHinweis nach A3
+   - Hofpreis-Stichtag-Satz nach Erreichen
+4. Startseite: beispielRechnung ab dem Stichtag über bestellGebuehr.
+5. Wache tests/gebuehr-wort-wache.test.ts:
+   - Jede Zeichenkette mit „Servicegebühr“ unter src/ steht in einer festen Liste mit Grund („nur Modell bisher“, „AGB 0.9“) oder in tests/gebuehr-wort-offen/<nr>.ts.
+   - Gegenprobe.
+   - 221 testet nur seine Helfer und die Konditionen-Texte. Den Rendertest „kein Servicegebühr nach dem Stichtag“ schreibt jede Seiten-Nummer für ihre Seiten; der Sammel-PR prüft alle zusammen.
+Tests (Pflicht):
+- Rechenfunktionen unverändert: tests zu plattformgebuehr, plattformgebuehr-checkout, kasse, checkout-preis, checkout-totals ohne geänderte Erwartung; MINDESTBESTELLWERT_SATZ unverändert
+- zusageEnde mit 12: 2027-02-01 → 2028-01-31 und 2027-03-12 → 2028-03-11
+- einzugAbFuer mit gruendungBis 2028-01-31 → 1.2.2028 (nur Beleg, Funktion unverändert)
+- Monate senken vor dem Festschreiben erlaubt, danach abgelehnt
+- festschreibenListe mit 12 nie kürzer als bisher
+- mindestbestellwertHinweis mit 6 % und mit abweichendem Satz
+- gebuehrWortFuerZeitraum für alle drei Lagen
+
+222 Hof-Alltag – Opus, gezielt, Welle 3
+Boards: s1/w1-heute, -bestellungen, -bestellung, s2/w2-druck, t-d-packliste (nur Gebautes).
+Grenze: src/app/(hof)/dashboard/**, src/app/(hof)/orders/**, src/app/(druck)/**, src/components/heute/**, src/components/hof-bestellungen/**, src/lib/heute.ts, src/lib/hof-bestellungen.ts, src/lib/bestellstatus.ts (nur Hof-Wörter), src/lib/storno.ts (nur Texte), eigene Offen-Dateien.
+1. Heute: Reihenfolge nach s1-heute, „Noch zu packen“ nach V40, Marken V22, Leerzustände wie Board.
+2. Bestellungen: Chips „Heute abholen · n“, „Noch offen · n“ (Standard, über das exportierte OPEN_STATUSES), „Erledigt“; Test: Chip und Navigation liefern dieselbe Zahl; Gruppen je Abholfenster.
+3. Bestellung:
+   - Betrag und Zusammensetzung mit den Helfern aus 221
+   - Storno-Dialog nach „Gebühr“
+   - Hauptaktion „Als gepackt markieren“
+   - Dialoge zentriert ≤ 560 px im Web
+   - Bar-Fristen über fristVon
+4. Druck: Papier = Bildschirm (V57); „Servicegebühr“ nur bei bisher-Bestellungen; nur hell.
+Rendertest: kein „Servicegebühr“ nach dem Stichtag auf Heute, Bestellung, Druck.
+Nicht: Geld-Logik von Storno, Artikel fehlt, Erstattung (src/server/stornieren.ts, artikel-fehlt.ts).
+
+223 Produkte und Produkt-Formulare – Opus, gezielt, Welle 3
+Boards: s1/w1-produkte, -produkt-neu, t-b-produkte, t-b3-zustaende (nur Gebautes).
+Grenze: src/app/(hof)/products/**, src/components/produkte/**, src/components/products/**, src/lib/produkte-hof.ts, eigene Offen-Dateien.
+1. Liste nach Board; Schild nur bei Ausnahme; „Ausverkauft“ neutral.
+2. „Was legst du an?“, Lebensmittel-, Futter-, Brennmaterial- und Familien-Formular nach Board:
+   - Futter-Vorschau Z. 647 je Stichtag („Du bekommst € X · die Kundin zahlt € Y“)
+   - „Foto hinzufügen“
+   - Feldfehler V17
+3. Rücktritts-Felder aus 214/218 bleiben, Wort „Rücktritt“.
+Rendertest: Futter-Vorschau nach dem Stichtag ohne „Servicegebühr“.
+
+224 Mein Hof, Einstellungen, Region – Opus, gezielt, Welle 3
+Boards: s1/w1-mein-hof, -einstellungen, -region, s2/w2-hofdaten-zahlung, -konto-hof, t-a-tarifzeile, t-c-abholzeiten, t-f-konditionen (nur Gebautes).
+Grenze: src/app/(hof)/farm-page/**, src/app/(hof)/settings/**, src/app/(hof)/region/**, src/components/mein-hof/**, src/components/farmer/** (ohne pending-approval-banner.tsx, das hat 228), src/components/hof-einstellungen/**, src/components/settings/**, src/components/konto/**, src/components/region/**, src/lib/hof-einstellungen.ts, src/lib/mein-hof.ts, src/lib/region.ts, eigene Offen-Dateien.
+1. Mein Hof:
+   - Kopf mit Zustandszeile und einer Aktion, „Noch 1 Punkt offen“
+   - Vorschau wie im Code
+   - Kundenansicht im Vollbild ohne Verkleinerung
+2. Einstellungen: Punkte mit Text, „Urlaub und Pause“ (V8), Gründungstext aus 221.
+3. Unterseiten:
+   - Hofdaten (N42 c)
+   - Zahlung „Bar bei Abholung · Braucht Lastschrift“ mit „Lastschrift einrichten“ für Höfe ohne Gründungszeit (Bedingung aus barMoeglich, keine neue Regel)
+   - Konto: Anmelde-Adresse, Stilllegen mit „Hof“
+   - Teilen-Hinweise
+   - Konditionen-Unterseite (nur Gebautes)
+4. Region: gebauter Stand, Karte technisch unverändert; PR #329 und w-n nicht.
+
+225 Hof-Werkzeuge – Opus, gezielt, Welle 3
+Boards: s2/w2-auswertung, -kunden, -verkaeufe, -postfach, -meldungen, -beitraege, -whatsapp-plakat, -teilen, s3/w3-problem-melden.
+Grenze: src/app/(hof)/analytics/**, customers/**, sales/**, postfach/**, fehler-melden/**, meldungen/**, status/**, src/app/teilen/**, src/app/(public)/problem-melden/**, src/components/auswertung/**, hof-kunden/**, hof-verkaeufe/**, hof-hilfe/**, src/components/shared/meldung-form.tsx, src/components/teilen/**, src/lib/auswertung.ts, hof-kunden.ts, verkauf-eintragen.ts, postfach.ts (nur Z. 180 und Wörter), beitrag-anlass.ts, hof-hilfe.ts, eigene Offen-Dateien.
+1. Auswertung: Gebühren-Karte mit gebuehrWortFuerZeitraum.
+2. Kunden, Verkäufe nach Board. Der Kanal heißt weiter „Hofladen“. „Verkauf eintragen“ orange.
+3. Postfach: Satz nach N14, „Senden“ orange.
+4. Problem melden: Darstellung aus 219 für /fehler-melden (orange) und /problem-melden (grün).
+5. Beiträge: Anlass „Hinweis“; WhatsApp, Plakat, /teilen mit „Zu Heute“.
+Rendertest: Auswertung nach dem Stichtag ohne „Servicegebühr“.
+
+226 Kundschaft: Finden – Opus, gezielt, Welle 3
+Boards: s1/w1-startseite, -hoefe, -hofseite, -produkt, t-l-kundenseite, t-o-fuer-hoefe (nur Gebautes).
+Grenze: src/app/page.tsx, src/components/startseite/**, src/app/(public)/hoefe/**, src/components/hoefe/**, src/app/(public)/[farmSlug]/page.tsx, src/app/(public)/[farmSlug]/hofseite-skelett.tsx, src/app/(public)/[farmSlug]/produkt/** (ohne not-found.tsx, das hat 231), src/components/farm/** (ohne cart-sheet.tsx), src/components/hofseite/**, src/components/produktdetail/**, src/app/(public)/fuer-hoefe/**, src/lib/hofseite-kunde.ts, hoefe-entdecken.ts, eigene Offen-Dateien.
+1. Startseite nach Board, „Beispiel“ aus 221, Admin-Blöcke bleiben (N16).
+2. /hoefe: Hofkarte, pausiert V18, Filter-Blatt; Karte technisch unverändert.
+3. Hofseite: Reiter, Kacheln ab 768 px, Seitenspalte, Pause V6; Telefonnummer erst nach dem Kauf (E8).
+4. Produktseite: Größen-Kacheln, „In den Korb · € X“ grün.
+5. /fuer-hoefe: Gründungs- und Gebührentexte aus 221, kein Willkommens-Versprechen.
+Rendertest: Hofseite, Produktseite, /fuer-hoefe nach dem Stichtag ohne „Servicegebühr“.
+
+227 Kauf – Opus, voller Durchgang, Welle 3 (Sperrzone Kasse)
+Boards: s1/w1-korb, -kasse, -bestaetigung, -bestellung-link, -meine-bestellungen, t-p-meine-bestellungen (Ausschnitt).
+Grenze: src/components/farm/cart-sheet.tsx, src/app/(public)/[farmSlug]/checkout/** (nur Seiten-Komponenten), src/components/checkout/**, src/app/(public)/[farmSlug]/confirm/**, bestellung/**, bestaetigen/**, src/components/bestaetigung/**, src/app/(public)/bestellungen/**, src/components/bestellungen/**, src/lib/bestaetigung.ts, tests/kaufknopf-saetze.test.ts (nur die Mindestbestellwert-Erwartung auf den neuen Satz), eigene Offen-Dateien.
+NIE: src/app/api/**, src/lib/kasse.ts (außer 221), src/lib/plattformgebuehr.ts, src/lib/reservierung.ts, src/lib/fristen.ts, Beträge, Idempotenz.
+1. Warenkorb-Blatt rechts nach Board, Kaufsperre-Grund statt „Zur Kasse“.
+2. Kasse:
+   - Reihenfolge nach Board, Übersicht rechts ab 1024 px
+   - Aufruf von mindestbestellwertGrund mit dem Satz des Hofs (A3)
+   - Zahlung abgelehnt als orange Hinweiskarte
+   - Kaufknopf grün
+   - Reihenfolge Zusammenfassung → Grafik → Knopf → Sätze bleibt
+3. Bestätigung:
+   - Köpfe je Zustand nach Board
+   - bar offen ohne Abholkarte, Schritte „Bestellt → Bestätigt → Gepackt → Abgeholt“
+   - Frist über fristVon
+   - Einstieg „Vertrag widerrufen“ bleibt (N43 (1))
+4. Bestellung ansehen und Bar bestätigen nach Board, Frist über fristVon, Einstieg bleibt.
+5. Meine Bestellungen nach Board, „Ansicht beenden“.
+Tests:
+- Rendertests je Kassen-Zustand: bar, online, abgelehnt, Mindestbestellwert, Betrieb ohne Rücktrittssatz
+- Reihenfolge-Test aus 210/215 grün
+- Gegenprobe: checkout-totals, checkout-preis, kasse, plattformgebuehr, plattformgebuehr-checkout ohne geänderte Erwartung
+- kein „Servicegebühr“ nach dem Stichtag
+
+228 Anmelden und Konto – Opus, gezielt, Welle 3
+Boards: s2/w2-anmelden, -passwort, -registrieren, -kundenkonto, -neuigkeiten, -abmelden, -systemseiten.
+Grenze: src/app/(auth)/**, src/components/anmelden/**, src/components/einrichten/**, src/lib/einrichten.ts, src/lib/farm-approval.ts, src/components/hofbereich/hof-balken.tsx, src/components/farmer/pending-approval-banner.tsx, src/app/account/**, src/app/konto/**, src/app/sicherheit/**, eigene Offen-Dateien.
+1. Login: Hof-Karte orange in der KundeShell.
+2. Registrieren:
+   - nur die Fassung ohne Versprechen, Gründungssatz aus 221
+   - eine h1 je Seite („Hof einrichten“; „Willkommen“ als h2)
+   - Lastschrift als Hinweis
+3. Systemseiten grün (V52). „Widerruf“ einer Einwilligung (Abos) bleibt.
+4. Balken je Stand nach N42 e (Text, beide Darstellungen, Halbgeviertstrich).
+
+229 Admin Teil 1 – Opus, voller Durchgang, Welle 3
+Boards: s3/w3-admin-heute, -hoefe, -akte, -freischalten, -bestellungen.
+Grenze: src/app/admin/page.tsx, src/app/admin/hoefe/**, src/app/admin/bestellungen/**, src/components/admin/** (ohne die Komponenten von 230, Liste im Bericht), src/lib/admin-hoefe-liste.ts, src/lib/admin-hof-akte.ts, eigene Offen-Dateien; optional src/app/admin/error.tsx (neu).
+1. Heute: Kacheln, „Braucht dich“, Läuft/Kommt/Protokoll nach Board; Geld-Kachel mit gebuehrWortFuerZeitraum; Notbremse „In den Korb“.
+2. Höfe: Standard „Braucht Blick“, Tarif-Spalte nicht.
+3. Akte: Aktivität mit Wort aus 221; Knopf „Servicegebühr …“ nach A1; Karte „Plattformgebühr“ bleibt.
+4. Freischalten-Dialoge: KONDITIONEN_DERZEIT aus 221.
+5. Bestellungen:
+   - „inkl. € … Plattformgebühr“ über gebuehrBezeichnungFuer
+   - Rücktritts-Wörter (außer N43 (1))
+   - „‹ Zur Liste“ nur am Handy
+6. Optional, nur wenn trivial: src/app/admin/error.tsx über FehlerAnsicht und einen Eintrag in lib/fehlerseite.ts mit „Zu Heute“ (/admin), ohne neue Komponente. Routen-Wachen prüfen (tests nach „admin“ greppen). Sonst weglassen und im Bericht nennen.
+Rendertest: Admin-Heute und Bestell-Detail nach dem Stichtag ohne „Servicegebühr“.
+Nicht: Rechte, Passkey-Pflicht, Protokoll, Notfall-Storno-Logik.
+
+230 Admin Teil 2 – Opus, gezielt, Welle 3
+Boards: s3/w3-admin-postfach, -startseite, -geld, -betrieb, -einstellungen, -zugang.
+Grenze: src/app/admin/postfach/**, startseite/**, geld/**, finanzen/**, betrieb/**, einstellungen/**, bestaetigen/**, einrichten/**, die Komponenten dieser Seiten (Liste im Bericht, getrennt von 229), eigene Offen-Dateien.
+1. Geld: Kennzahl, Abgleich-Satz (page.tsx Z. 158), Jahresdiagramm und Titel mit gebuehrWortFuerZeitraum, Jahresansicht „Geld“.
+2. Einstellungen: Feld „Monate ohne Grundgebühr“ mit Hilfe aus 221; Hofpreis-Stichtag „Seit diesem Tag gilt …“; keine Gruppe „Gratiszeit“.
+3. Postfach, Startseite, Betrieb, Zugang nach Board, Logik unverändert.
+Rendertest: Geld nach dem Stichtag ohne „Servicegebühr“.
+
+231 Rechtstexte, Rücktrittsrecht, Fehlerseiten – Opus, voller Durchgang, Welle 3
+Boards: s3/w3-rechtstexte, -widerruf, -fehlerseiten.
+Grenze:
+- eine neue Vorlage neben src/components/shared/infoseite-stil.ts (bestehende Exporte unverändert)
+- src/components/rechtstexte/agb-ansicht.tsx (nur Rahmen, nie Wortlaut)
+- src/app/(public)/agb/**, datenschutz/** (nur Rahmen), konditionen/**, widerruf/**
+- src/lib/widerruf.ts (nur WIDERRUF_TEXT ohne fussLink, knopfWiderrufen und den Bestätigen-Knopf; nie BELEHRUNG)
+- src/app/not-found.tsx, error.tsx, global-error.tsx, src/app/(hof)/error.tsx, src/app/(public)/[farmSlug]/not-found.tsx, src/app/(public)/[farmSlug]/produkt/[id]/not-found.tsx
+- src/lib/fehlerseite.ts, src/components/shared/fehler-ansicht.tsx, nicht-gefunden-ansicht.tsx
+- eigene Offen-Dateien
+NIE: src/app/(public)/impressum/** (A001), src/lib/rechtstexte/agb.ts, docs/recht/**, der Wortlaut der Datenschutzerklärung.
+1. Vorlage für /agb, /datenschutz, /konditionen (V62); Konditionen-Abschnitt aus 221 mit Entwurf-Kennzeichnung.
+2. /widerruf: Titel „Rücktrittsrecht“, Texte nach Board, Ausnahmen N43 (1) und (2).
+3. Fehlerseiten:
+   - gemeinsamer Aufbau aus lib/fehlerseite.ts
+   - 404 Produkt in denselben Aufbau
+   - 500 im Hofbereich orange
+   - „Nochmal versuchen“-Fassungen bleiben
+
+232 E-Mails – Opus, voller Durchgang, Welle 3
+Boards: s3/w3-mail-kauf, -storno, -zugang, -sicherheit, -neuigkeiten, -hof-bestellung, -hof-konto, -betrieb, -team.
+Grenze: src/emails/**, src/lib/email.ts, src/server/mail-arten/**. Erlaubt sind Texte, Fuß-Art und ein optionales Feld antwortAn im Ergebnis des Renderers, das sendRaw bzw. versendeStapel als Resend-Option weitergibt. Warteschlange, Wege, Idempotenz und Protokoll bleiben unverändert. src/lib/hof-kontakt.ts nur lesen; tests/hof-kontakt-wache.test.ts; Tests der Mails; eigene Offen-Dateien.
+1. EmailLayout:
+   - Fuß-Arten als Typ: hof | agrilo | betrieb | postfach | beitrag(<Hof>)
+   - Anbieterzeile als ein Baustein
+   - ctaButton '13px 18px'
+   - jede Vorlage wählt ihre Art (Liste im Test)
+2. Reply-To nach V86.
+3. Texte nach „E-Mails“:
+   - Frist aus fristVon ohne den Zwei-Stunden-Satz
+   - Wörter
+   - Einstieg „Vertrag widerrufen“ bleibt (N43 (1))
+   - Plattformgebühr
+4. Abmeldung in Beitrags-Mails unverändert (Link, manageUrl, List-Unsubscribe/-Post).
+5. Vorschau ohne Route und ohne Paket:
+   - ein Vitest-Fall rendert jede Vorlage mit Beispieldaten nach .nachtlauf/mails/<art>.html (nicht committen)
+   - Schalter MAIL_VORSCHAU nur im Test, nicht in .env.example, nicht in Vercel
+   - die Vorlagen und die Bausteine aus src/server/mail-arten (RENDERER) wie im Versand, keine zweite Render-Kette
+   - der Umsetzer fotografiert sie mit agent-browser bei 390 und 600 px
+Tests:
+- jede Vorlage mit Knopf-Padding ≥ 44 px
+- Fuß-Art je Vorlage
+- Reply-To nur bei Bestellmails an die Kundin und nur mit Profil-E-Mail; Hof ohne Hof-E-Mail → kein Reply-To; nie die Anmelde-Adresse
+- Beitrags-Mail enthält Abmelde-Link und die Kopfzeilen
+- kein „zwei Stunden“, kein „Dashboard“, kein „Vor-Ort“ in Mail-Texten
+- mail-vorlagen.test.ts grün
+
+§2 Regeln
+- Es gelten die Regeln aus Lauf 29 (freigabe.md §33, §2).
+- Geld: Keine Nummer ändert einen Betrag, eine Rechenfunktion (bestellGebuehr, gebuehrJeStueckCents, einzugAbFuer), einen Erstattungsweg, eine Frist (fristen.ts, Reservierung), einen Idempotenzschlüssel oder Stripe-Parameter. Anzeige-Rechnungen nur über die bestehenden Funktionen. Gegenprobe: Geld-Tests ohne geänderte Erwartung.
+- Recht:
+  - Belehrung, Muster-Formular, AGB, Datenschutz-Wortlaut, Impressum und die N39-Beschriftung bleiben.
+  - Neue Rechtssätze nur der Konditionen-Abschnitt, mit Entwurf-Kennzeichnung.
+  - Was ein Board als „Recht prüft“ markiert, steht im PR unter „Offen für Recht“.
+- Daten:
+  - Keine Migration, keine Datenänderung.
+  - Seed nur mit erfundenen Beispieldaten für Bilder (@beispiel.at, Telefonnummern genullt).
+  - Reply-To nie mit der Anmelde-Adresse.
+- Sicherheit: keine Prüfung lockern (Rechte, Passkey, signierte Links, Abholcode nur Anzeige).
+- Mails: kein Test verschickt echte Mails; keine neue Mail-Art.
+- Design: siehe „Technik für alle Nummern“; Mockup-Abweichung ohne Begründung ist ein Blocker.
+- Kein neues Paket, keine neue Variable (Ausnahme: MAIL_VORSCHAU nur im Test).
+
+§3 Checkliste je PR
+Wie Lauf 29 (§33, §3), mit „Migration: nein · Paket: nein · Variable: nein“, dazu:
+- Liste „Abweichung vom Code erledigt“: je Board die Sätze aus der Notiz, je erledigt / bewusst nicht (Grund) / offen (Entscheidung)
+- Bilder: Pfad und Liste je Route, Breite, Thema
+- eigene Offen-Dateien gelöscht
+- „Offen für Recht“, falls vorhanden
+
+§4 Morgenbericht (morgenbericht-<datum>-lauf30.md)
+Wie Lauf 29, dazu:
+- Ganz oben: je Nummer, ob die Ausgangslage am Code bestätigt war; nicht begonnene Nummern; Ergebnis der Mockup-Prüfung (304 Dateien).
+- Regelvorschläge aus der Regel-Inventur.
+- Je Nummer Vorschau-Link und Bilder-Liste.
+- „Für dich zu tun“:
+  - Abnahme in der Vorschau und auf test.agrilo.at je Bereich; Admin-Bilder hinter Passkey.
+  - Nach dem Merge, vorher lesend prüfen: gruendungMonate, gruendungFestAm, gruendungBisStandard, Höfe mit Gründungsplatz, und ob irgendwo „24 Monate“ oder „456 €“ zugesagt wurde (Postfach, Rundschreiben, Mails).
+  - Danach „Monate ohne Grundgebühr“ = 12 speichern, die Liste „Zusagen festschreiben“ prüfen (jedes Ende nur später), festschreiben. Folge: Einzug der Bargebühr der Gründungshöfe ab dem Tag nach ihrem Ende.
+  - „Offen für Recht“ gesammelt an die Anwältin; Konditionen-Abschnitt vor dem Stichtag freigeben.
+  - A001 (Impressum) vor Stripe live; die Anbieterzeile verlinkt dorthin.
+  - Merge per Merge-Commit: zuerst Doku-PR, dann Sammel-PR.
+
+══════════════════════════════════════════════════════════════════════
+NICHT (ausdrücklich draußen)
+══════════════════════════════════════════════════════════════════════
+- „Ab Hof“ als Verkaufskanal: Der Kanal heißt weiter „Hofladen“.
+- Willkommenszeit (offen): Registrieren zeigt nur die Fassung ohne Versprechen.
+- 12 oder 100 Gründungsplätze: wie im Code.
+- Kartenquelle (offen): Karte technisch unverändert.
+- Tarife Hoftor/Hofladen als Abrechnung (offen): nur, was der Code schon hat; nicht Urlaubsmodus (Hofladen), Kündigen, Abrechnung, Gratiszeit-Gruppe, Vorprüfung, Tarif-Spalte und -Reiter, Mandat mit Endziffern.
+- Preise vergleichen v2 (PR #329, t-n/w-n).
+- Impressum: Betreiberangaben und Seite nicht anfassen, siehe A001; keine Betreiberdaten duplizieren; infoseite-stil.ts nicht ändern.
+- AGB 1.0 (eigener /fix), Wortlaut der Datenschutzerklärung.
+- Belehrung, Muster-Formular und N39-Beschriftung (Einstiege, Knöpfe) – bis die Anwältin entscheidet.
+- Bar-Frist ändern (fristen.ts); „bis Vortag 18:00“ wäre eine eigene Entscheidung (Reservierung, N24).
+- „Dieselbe Bestellung nochmal aufgeben“ in der Abholbereit-Mail (offene Ausnahme laut DESIGN_SYSTEM „E-Mails“): bleibt.
+- Lastschrift-Knopf in der Ankündigungs-Mail nur bei Bedarf (lib/email.ts ab Z. 837, offen).
+- Die Fassungen von „Nochmal versuchen“ vereinheitlichen (Wortliste offen).
+- Ausnahmen für Mockups in der Telefonnummern-Wache.
+- Schema, Migration, Spalten-Default gruendungMonate; Stripe, Webhook, /api/**; Gate 9.
+- 209 (form.watch), 212-Profil, Monatsabrechnung, CSP mit Nonces, Stripe live.
+
+══════════════════════════════════════════════════════════════════════
+FERTIG, WENN
+══════════════════════════════════════════════════════════════════════
+Doku-PR
+- 304 Dateien gleich der Soll-Liste, LISTE.txt dabei.
+- telefonnummern-wache grün ohne neue Ausnahme.
+- Register N41–N44, status.md und nachtlauf.md §3 nachgezogen.
+
+Je Nummer
+- `pnpm typecheck && pnpm lint && pnpm test` grün (voller Lauf vor jedem Push, G10); test:integration nach §0.
+- wortliste.test.ts grün mit den neuen Zeilen; eigene Datei in tests/wortliste-offen/ gelöscht.
+- gebuehr-wort-wache.test.ts grün; eigene Datei in tests/gebuehr-wort-offen/ gelöscht; Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag“ für die eigenen Seiten.
+- Bilder je Route bei 390 und 1440 px, hell und dunkel, je Zustand des Boards; jede sichtbare Abweichung mit Grund im Bericht.
+- fokus-sichtbar, grundbausteine-groesse, design-tokens, palette-klassen, keine-emojis, telefonnummern-wache grün; keine neue Hexfarbe.
+- Geld-Tests ohne geänderte Erwartung; MINDESTBESTELLWERT_SATZ unverändert.
+- 231 und 232:
+  - `git diff <Basis> -- src/lib/rechtstexte/agb.ts 'src/app/(public)/impressum' docs/recht src/components/shared/infoseite-stil.ts` ist leer
+  - BELEHRUNG und die N39-Texte (fussLink, knopfWiderrufen, Bestätigen-Knopf) sind per Test gleich dem Stand auf main
+- 232: Mail-Bilder 390/600 aus .nachtlauf/mails; jede Vorlage hat ihre Fuß-Art; Knöpfe 44 px; Reply-To-Tests grün.
+- PR-Text: Bericht nach CLAUDE.md §4, Liste „Abweichung vom Code erledigt“ je Board, weggelassene Teile mit Grund, „Offen für Recht“, „Gestapelt auf #…“.
+
+Sammel-PR
+- Alle fertigen Nummern per --no-ff; nach jedem Merge der volle Lauf.
+- Integration ganz grün; Regel 3 auf frischer DB ohne Unterschied (keine neue Migration).
+- Beide Offen-Ordner leer; kein „Servicegebühr“ in Seiten mit Stichtag in der Vergangenheit.
+
+Woran die Projektleitung den Erfolg nach dem Merge erkennt
+- Vorschau-URL je PR (Morgenbericht): jede Route wie ihr Board, hell und dunkel, 390 und 1440.
+- test.agrilo.at nach dem Nachziehen von staging:
+  - Kasse bar und online (Privat und Betrieb) mit Mindestbestellwert-Satz, Grafik und Sätzen unter dem Kaufknopf
+  - Bestellmail mit neuem Fuß; Reply-To nur bei einem Hof mit Profil-E-Mail
+  - /widerruf mit Titel „Rücktrittsrecht“ und N39-Knöpfen
+- Datenbank, nur lesend: kein neues Feld.
+  - Nach deinem Speichern: PlattformEinstellung.gruendungMonate = 12.
+  - Nach dem Festschreiben: gruendungFestAm gesetzt; Gründungshöfe mit Farm.gruendungBis = 2028-01-31 (vor dem Tarifstart freigeschaltet) bzw. Freischaltung + 12 Monate − 1 Tag.
+- Sentry nach dem Deploy ohne neue Issues auf den umgebauten Routen.
+
+### Ergänzung Ort und Mockups (Hinweis der Schaltzentrale, 3.11.2026)
+
+Hinweis der Schaltzentrale (Entscheidungen der Projektleitung im Chat vom 3.11.2026 nach dem Stand-Check; sie gehen dem Text oben vor und gehören als „Ergänzung Ort und Mockups“ direkt hinter §34 in freigabe.md, und in den Morgenbericht):
+
+1. Ort: Der Lauf läuft als Cloud-Sitzung auf Linux, nicht lokal. „Ort: lokal“ im Text ist damit überholt.
+2. Mockups: Sie liegen schon auf `origin/docs/lauf30`, Commit `6ce5aa98` (von main `056a321e`), zusammen mit `LISTE.txt`. Hol diesen Branch und arbeite darauf weiter; lege ihn nicht neu an und erzwinge keinen Push. Der Punkt 1 des Doku-PR ist damit erledigt, die Punkte 2 bis 6 fehlen noch. Nimm im Doku-PR als Hinweis mit auf, dass der Commit ausnahmsweise von Windows aus ohne vollen grünen Lauf entstand (nur Mockups, CI prüft ihn; Ausnahme der Projektleitung).
+3. Geprüft vor dem Commit: alle 304 Namen gleich der Soll-Liste, Telefonnummern-Wache grün, nur erlaubte Skripte, keine externen Verweise außer Google Fonts. Lass die Telefonnummern-Wache und den Abgleich mit LISTE.txt hier noch einmal laufen.
+4. Abweichung von „unverändert committen“: Die Projektleitung hat freigegeben, zwei Orte der Beispielwelt vor dem Commit gegen Orte aus dem Seed zu tauschen (22 Dateien, sonst keine Änderung). In der Auswahl „Welches Neukirchen?“ steht deshalb ein anderes Neukirchen. Nenne die alten Orte nirgends, weder in Commits noch in PRs, Berichten oder Doku; such sie auch nicht in der Git-Historie.
+5. E-Mail-Adressen in den Mockups: Subdomains von beispiel.at (z. B. `kontakt@hof-am-moos.beispiel.at`) sind von der Schaltzentrale als erfunden und harmlos eingestuft und bleiben stehen. Das ist kein STOPP-Grund; nenn es im Morgenbericht als zu bestätigenden Punkt.
+6. agent-browser: Die Projektleitung erlaubt, ihn nur in diesem Container als Werkzeug zu installieren, nicht als Projektabhängigkeit: keine Änderung an package.json, pnpm-lock.yaml oder pnpm-workspace.yaml. Sieh dir dazu `.claude/skills/agent-browser` an (zum Beispiel `pnpm add -g agent-browser` und danach `agent-browser install`; `npm install` blockt der Hook). Prüfe nachher mit einem Bild einer lokalen Seite, dass es läuft. Klappt das nicht, gilt die Freigabe: STOPP, Grund in den Morgenbericht, mit dem, was fertig ist (Doku-PR). Es gibt dann keinen Lauf ohne Bilder.
+7. Postgres: Starte das lokale Postgres im Container und nutze je Worktree eine Wegwerf-DB auf localhost für `TEST_DATABASE_URL`, wie in Lauf 29. Nie eine Adresse aus der Umgebung.
+8. Stand-Check: Prüfe alle übrigen Punkte aus „Stand“ hier auf Linux. Ist er rot, gilt die Freigabe: STOPP, nichts reparieren.
+9. Impressum: PR #448 (Impressum) ist offen und kann während des Laufs auf main landen. Lauf 30 fasst das Impressum nicht an; er bringt nur `src/lib/pilotbetrieb.ts` mit, falls du origin/main hineinholst.
+10. Kein `git stash`. Diese Sitzung meldet sich nicht automatisch bei der Schaltzentrale. Deshalb gehört der Morgenbericht in den Sammel-PR, oder in den Doku-PR, falls kein Sammel-PR entsteht. Setz Morgenbericht-Pfad, PR-Nummern und offene Punkte in den PR-Text und in deine letzte Nachricht.
+
+Vermerk des Dirigenten (4.11.2026): Über 6ce5aa98 liegt ein zweiter Commit f179cabc, der nur docs/nachtlauf/auftrag-lauf30.md hinzufügt; auch er entstand ausnahmsweise von Windows aus ohne vollen grünen Lauf, mit Freigabe der Projektleitung (nur diese eine Datei). Die Datei ist Auftrag, kein Vorbild für Regeln, und steht nicht in docs/ai/.
+
+## 35. Lauf 31 (uttoranger, im Chat erteilt, 5.11.2026)
+
+Nachtlauf 31
+Ort: lokal (agent-browser, lokales Postgres mit Seed, die Boards unter docs/mockups/redesign-2026-11/; in der Cloud fehlte agent-browser in Lauf 29)
+Basis: main (1216b8cf oder später)
+Berührt: Kasse (nur Darstellung, nie /api/**) · Webhook: nein · Schema: nein (keine Migration) · Geldberechnung: nein
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate (ohne Regel-Inventur, die lief in Lauf 30), 4a Tempo (höchstens drei Umsetzer gleichzeitig), §5 Stoppen, §6 Morgenbericht, §7 Fortsetzen. Dieser Text ist die Freigabe. Der Doku-PR trägt ihn wörtlich als „## 35. Lauf 31 (uttoranger, im Chat erteilt, 5.11.2026)“ in docs/nachtlauf/freigabe.md ein. Zeitbuch: docs/nachtlauf/berichte/zeitbuch-lauf31.md. Nummern ab 233.
+
+══════════════════════════════════════════════════════════════════════
+ANTWORTEN DER PROJEKTLEITUNG (Vorgabe = Empfehlung des Teams; gilt, wenn hier nichts geändert ist)
+══════════════════════════════════════════════════════════════════════
+A1 Startseite, Kopf: Das Video (Nr. 176, hero-video.tsx) bleibt. Die Boards w1-/s1-startseite zeigen es nicht; das gilt als Fehler des Boards. Nachgezogen werden nur: sichtbare Beschriftung „Hof oder Produkt“ über dem Suchfeld, Karte im Dunkeln gedämpft, Überschrift wie im Board höchstens zwei Zeilen ab 1024 px.
+A2 Rückfragen aus Morgenbericht 30:
+   1 (Nr. 45): Pflichtkarten (N34, N39, Nr. 207, Nr. 212, Lastschrift-Sperre) zählen nicht zur Regel „höchstens ein Hinweis-Kasten“. Sie stehen untereinander wie gebaut.
+   2 READY heißt „Gepackt“ (wie gebaut, wie s1-/w1-heute).
+   3 N25 gilt vor dem Board: Vorrat-Blatt mit „Dazu“ und „Ausverkauft“ bleibt.
+   4 Produkt-Formulare im Web bleiben Dialoge (N41 d), keine Seite mit Vorschau.
+   5 Die Marke für gesperrte Barzahlung heißt „Bar gesperrt“, nicht „Pausiert“.
+   6 Kopf von Mein Hof am Handy wie im Board (Titel und Schild), kein Titelbild-Streifen.
+   7 N42 e: Der Balken je Stand kommt auf alle Hof-Seiten. Die Grenze wird für (hof)/layout.tsx und src/server/hofbereich.ts erweitert (Nr. 233).
+   8 Geld-Kachel in Admin › Heute zählt nach createdAt (wie die Freigabe von Lauf 30).
+   9 setServiceFeeAction: nur prüfen und im Bericht nennen, ob Farm.serviceFee* im Hofpreis-Modell noch wirkt. Nichts ändern (Geld).
+
+══════════════════════════════════════════════════════════════════════
+AUSGANGSLAGE (geprüft 05.11.2026 auf test.agrilo.at = main 1216b8cf, Entwicklungsdatenbank; Web 1440 und Handy 390, hell und dunkel; nur gelesen)
+══════════════════════════════════════════════════════════════════════
+Stand: Lauf 30 ist gemergt (#464), Produktion READY, keine Laufzeitfehler. Gebührenwörter, Rücktritt nach N43, Mail-Fuß und die Zustände entsprechen den Boards. Abweichungen sind vor allem Aufbau, Maße und Schrift:
+
+Kundschaft
+- Startseite (src/components/startseite/startseite-kopf.tsx): keine sichtbare Beschriftung über dem Suchfeld; Karte im Dunkeln hell; Überschrift dreizeilig. Futter- und Brennmaterial-Karten groß mit Illustration statt kompakt (Board w1-startseite Bild 3). Leerzustand „Die ersten Höfe …“ mit Knopf „Hof registrieren“, Board: „Für Höfe“.
+- Höfe entdecken (src/components/hoefe/hoefe-client.tsx, hoefe-suche.tsx): 12 Kategorie-Chips und Siegel-Filter statt 5 Chips plus „Filter“; es fehlen „Filter“, der Umschalter Liste | Karte (Web) und „Reihenfolge: nach Entfernung. Keine bezahlte Platzierung.“; Feld „Ort oder Produkt“ nur als Platzhalter. Hofkarte: „Zum Hof“ als Link unter den Produkten statt Knopf unter dem Bild (Board w1-hoefe Bild 1).
+- Hofseite (src/components/hofseite/hofseite-kunde.tsx, titelbild.tsx, hofseite-seitenspalte.tsx): Titelbild über die volle Breite, Seitenspalte beginnt erst darunter. Board w1-hofseite: Titelbild links in der Inhaltsspalte, Seitenspalte (Warenkorb, Nächste Abholung, Abholzeiten, Zahlung, Anfahrt) oben rechts daneben. Im hellen Modus steht der Hofname halb über dem Titelbild (Kontrast prüfen). „Anfahrt“ statt „Route“; „Jetzt bestellen“ gefüllt statt Umriss; „In den Korb“ klein neben dem Preis statt breit darunter. Am Handy lädt die Seite über 2 s nur die Skelett-Ansicht (Messen, Ursache im Bericht).
+- Produktseite: Zähler am Warenkorb 9,5 px; Pfad „Heu & Stroh · …“ 11 px.
+- Kasse: am Handy nimmt die feste Leiste mit Knopf und vier Sätzen etwa 40 % der Höhe ein (Board s1-kasse: Knopf und Satz kompakt). Web zweispaltig wie im Board.
+- Überall in der KundeShell: Zähler „Artikel im Warenkorb“ 11 px.
+
+Hofbereich
+- Schrift unter 12 px (Boards: nie unter 12 px): Überschrift der Seitenleistengruppe „Verkauf und Kunden“ 10,5 px (src/components/ui/sidebar-gruppe.tsx); Tabellenköpfe Produkte 11 px; Abschnittsköpfe Mein Hof, Neuer Beitrag, Verkäufe 11 px; Marken („Noch nicht freigegeben“, „Fehlt“, „Online fehlt“, „Aktiv“) 11,5 px; Achsen der Wochengrafik 11 px; Kennzahl-Bezeichnungen in Auswertung 11 px. Im Code stehen text-[8–11.5px] an 119 Stellen in 55 Dateien (rg "text-\[(1[01](\.5)?|9(\.5)?|8)px\]" src). Ausnahme bleibt die Unterleiste unter 360 px (DESIGN_SYSTEM) und reine Illustrationen mit aria-hidden.
+- Mein Hof: sichtbare Überschrift fehlt; Board: „Mein Hof“ mit Schild und Teilen | Kundenansicht im Kopf (h1 heute nur sr-only „Hofseite bearbeiten“).
+- Aktiver Eintrag der Seitenleiste: helle Pille; Board: getönte Fläche in Primärfarbe (s. Nacharbeit 220).
+- Hofdaten: Zoom-Knöpfe der Karte 30 px ohne 44-px-Trefferfläche.
+- Problem melden, Registrieren: Datei-Feld 24 px hoch.
+- Region: Testhof ohne Standort zeigt „Wo liegt dein Hof?“ – richtig; Karte mit Standort nicht prüfbar gewesen.
+
+Nicht geprüft (bitte in Gate A)
+- Admin vollständig (Passkey), Druckseiten, alle E-Mails, alle Zustände der Boards (leer, Fehler, gesperrt), Hof am Moos-Fall (nicht freigegeben), Stand nach dem Stichtag (Admin › Einstellungen „Hofpreis-Modell ab“ lokal in die Vergangenheit).
+
+Falsch-Positive, nicht „beheben“: Chips (36 px sichtbar), Segmente, Fußlinks und Textlinks haben über ::before 44 px Trefferfläche (DESIGN_SYSTEM: chip.tsx, textlink.tsx, kunde-fuss.tsx).
+
+Offene Nacharbeit aus Morgenbericht 30 gehört in diesen Lauf (je Bereich der Nummer zugeteilt): ui/-Bausteine (aktive Pille, flaches „Neu“, Seitenleiste ohne Symbole, getönte Admin-Zähler, Satz im Melde-Baustein); Abfragen (gebuehrModell in server/geld-abgleich.ts, Gebühren-Karte in queries/auswertung.ts, „Bar bis …“ in queries/products.ts, Uhrzeit der Packliste in queries/heute.ts); Texte ohne Nummer (kasse.ts, postfach.ts, meldung.ts, admin-anmeldung.ts, betrieb-mails.ts, startbildschirm.ts, farm-archive.ts, hof-verkaeufe.ts, Storno-Grund in server/widerruf.ts – ohne N39-Wortlaut); Doku-Punkte; tote Teile (HoefeLaden, RegistrierenSatz, pending-approval-banner.tsx, FINANZEN_JAHR_TEXT.diagrammTitel, Felder …Kurz in einrichten.ts); Robustheit (lesePlattformEinstellung im Promise.all von Admin-Heute und Akte, Formatprüfung antwortAnHof, /teilen lädt beim „Nochmal“ alles neu); Zeitgrenzen der Tests mail-wege-wache und bild-format; Hofkarten der Startseite (Pause gestrichelt, drei Preise; StartseitenHof in src/lib/startseite.ts).
+
+══════════════════════════════════════════════════════════════════════
+ENTSCHIEDEN (alles hier ist Auftrag, keine Rückfrage)
+══════════════════════════════════════════════════════════════════════
+- Maßstab ist das Board in docs/mockups/redesign-2026-11/ (Index docs/mockups/README.md). Gilt ein Register-Eintrag anders, gilt das Register; der Bericht nennt es als „Register vor Board“.
+- Der 5-Sterne-Maßstab je Board (Handy und Web, hell und dunkel; Mails und Druck nur hell):
+  1. Aufbau und Reihenfolge wie das Board (Spalten, Kopf, Seitenspalte, feste Leisten nur wo das Board sie zeigt, V47).
+  2. Texte wörtlich wie das Board, außer N39-Wortlaut und Rechtstexte (bleiben).
+  3. Schrift nie unter 12 px (Ausnahmen oben), Ziele mindestens 44 px (sichtbar oder per ::before), eine sichtbare h1 je Seite, Felder mit sichtbarer Beschriftung.
+  4. Kontrast WCAG AA in beiden Themes; im Dunkeln Bilder und Karten gedämpft; keine hellen Flecken.
+  5. Fokus sichtbar; in Dialogen im Dialog; Startfokus bei Löschen auf „Abbrechen“.
+  6. Alle Zustände des Boards erreichbar und gleich (leer, Fehler mit „Nochmal“, gesperrt, nicht freigegeben, vor/nach Stichtag).
+  7. Keine Hexfarbe, keine Palette-Klasse, nur Tokens.
+  Unter 5 Sterne ist jede sichtbare Abweichung, die nicht als „Register vor Board“ oder „Board-Fehler“ (A1) begründet ist.
+- Bewertet wird von einem eigenen Subagenten „pruefer-ui“ (Agent-Aufruf mit eigenem Auftrag, keine neue Datei unter .claude/agents) mit frischem Kontext, der nur Bild der App, Bild des Boards und diesen Maßstab bekommt – nicht den Code und nicht den Bericht des Umsetzers.
+- Beispieldaten im Seed bleiben erfunden; neue Seed-Daten nur, wenn ein Board-Zustand sonst nicht erreichbar ist (mit ＠example.com, Telefonnummern genullt).
+
+══════════════════════════════════════════════════════════════════════
+UMSETZUNG
+══════════════════════════════════════════════════════════════════════
+Gate A – Abnahme-Lauf (Nr. 233a, nur lesen, kein Code)
+1. Lokal starten: pnpm dev gegen lokales Postgres mit pnpm db:seed. Anmelden mit den Seed-Konten (Hof, Kundin, Admin). Für den Admin die vorhandene Test-Anmeldung verwenden; gibt es keine ohne Passkey, STOPP und melden – keinen Passkey-Umweg bauen.
+2. Für jede Route aus docs/mockups/README.md (Abschnitt Redesign November 2026) und jeden Zustand des Boards: agent-browser-Bilder bei 390 und 1440 px, hell und dunkel, nach .nachtlauf/screens/abnahme/<board>/<bild>-<breite>-<thema>.png; dazu dasselbe Bild des Boards (Board-HTML im Browser rendern).
+3. pruefer-ui bewertet je Board mit Sternen und Liste der Abweichungen. Ergebnis: docs/nachtlauf/berichte/abnahme-lauf31.md (Tabelle Board × Fassung × Sterne, darunter die Mängel je Board mit Bild-Pfad). Zusätzlich automatische Messung je Seite: Schrift < 12 px, Ziele < 44 px ohne ::before, h1-Zahl, Felder ohne Beschriftung, Kontrast (axe-core über agent-browser, wenn vorhanden; sonst die Messung im Bericht beschreiben).
+4. Doku-PR mit Freigabe, Abnahme-Bericht, Status-Zeilen; danach Nummern je Bereich anlegen.
+
+Nummern (je ein Branch und PR, gestapelt auf docs/lauf31; Grenzen je Nummer im Bericht)
+233 Hof-Shell und Balken N42 e (alle Hof-Seiten), aktive Pille, Seitenleiste, Schriftgrößen in ui/ (sidebar-gruppe, marke, status-badge, table)
+234 Kundschaft Finden: Startseite (A1), Höfe entdecken, Hofkarten der Startseite
+235 Hofseite und Produktseite (Aufbau nach w1-/s1-hofseite, w1-/s1-produkt)
+236 Kauf: Warenkorb, Kasse (feste Leiste am Handy), Bestätigung, Bestellung ansehen, Meine Bestellungen
+237 Hof-Alltag und Produkte (Heute, Bestellungen, Bestellung, Druck, Produkte, Formulare)
+238 Mein Hof, Einstellungen, Region, Hof-Werkzeuge (Auswertung, Kunden, Verkäufe, Postfach, Beiträge, Problem melden)
+239 Anmelden, Konto, Systemseiten, Rechtstexte, Fehlerseiten
+240 Admin (alle Boards s3-/w3-admin-*)
+241 E-Mails (Bilder 390/600, nur hell) und Druck
+242 Nacharbeit-Abfragen, Texte ohne Nummer, tote Teile, Robustheit, Test-Zeitgrenzen (ohne Geld-Logik)
+Je Nummer:
+- Umsetzer baut nach den Mängeln aus abnahme-lauf31.md für seine Boards; wiederverwendbare Bausteine zuerst in src/components/ui/ (eine Quelle, keine Einzellösung je Seite).
+- Danach pruefer-ui auf die eigenen Boards (alle vier Fassungen). Unter 5 Sterne: nächste Runde, höchstens 4 Runden; danach STOPP für diese Nummer mit Begründung im Bericht.
+- Voller Lauf vor jedem Push (G10).
+Sammel-PR integration/lauf31 per --no-ff, nach jedem Merge der volle Lauf; am Ende Gate A noch einmal komplett (alle Boards, alle Fassungen) auf dem Sammelstand.
+
+══════════════════════════════════════════════════════════════════════
+NICHT
+══════════════════════════════════════════════════════════════════════
+- Keine Migration, kein neues Paket, keine neue Variable; nichts in /api/**, Webhook, Stripe, Geldberechnung, Fristen (src/lib/fristen.ts), Reservierung.
+- Keine Daten in Entwicklungs- oder Produktionsdatenbank ändern (nur lokal mit Seed).
+- N39-Wortlaut („Vertrag widerrufen“, „Widerruf bestätigen“, Belehrung, Muster-Formular), AGB, Datenschutzerklärung, Impressum (A001): Wortlaut bleibt.
+- Offen und nicht bauen: „Ab Hof“, Willkommenszeit G1, Zahl der Gründungsplätze, Kartenquelle E-003, Tarife als Abrechnung E-012, Preise vergleichen v2 E-004.
+- Kein Video entfernen (A1). Kein Claude in Chrome.
+
+══════════════════════════════════════════════════════════════════════
+FERTIG, WENN
+══════════════════════════════════════════════════════════════════════
+- abnahme-lauf31.md (Schluss-Durchgang auf dem Sammelstand): jedes Board in jeder Fassung 5 Sterne von pruefer-ui, oder die Abweichung ist als „Register vor Board“/„Board-Fehler“ mit Quelle begründet.
+- Messung: 0 sichtbare Texte unter 12 px außer den Ausnahmen; 0 Ziele unter 44 px ohne ::before; je Seite genau eine sichtbare h1; 0 Felder ohne Beschriftung; axe ohne Verstöße der Stufe „serious/critical“.
+- pnpm typecheck && pnpm lint && pnpm test grün; test:integration grün; Wachen (palette-klassen, design-tokens, fokus-sichtbar, grundbausteine-groesse, wortliste, gebuehr-wort, telefonnummern) grün; Geld-Tests ohne geänderte Erwartung.
+- Hofseite am Handy: erste Inhalte nach höchstens 1 s im lokalen Lauf (gemessen, Zahl im Bericht).
+- PR-Text je Nummer: Bericht nach CLAUDE.md §4, Tabelle Board × Fassung × Sterne vorher/nachher, Bild-Pfade, „Register vor Board“, „Offen für Recht“, „Gestapelt auf #…“.
+- Morgenbericht mit: Ergebnis-Tabelle, Merge-Reihenfolge (Merge-Commit, nicht Squash), Antwort zu A2 Punkt 9, offene Rückfragen.
+Woran die Projektleitung den Erfolg erkennt: Vorschau-URL je PR und test.agrilo.at nach dem Merge zeigen jede Route wie ihr Board (390/1440, hell/dunkel); die Abnahme-Tabelle im Morgenbericht steht überall auf 5.
+
+### Präzisierungen der Projektleitung (uttoranger, im Chat, 5.11.2026)
+
+Sie gelten vor dem Text oben.
+
+1. Ort: Der Lauf läuft in der Cloud auf Linux, nicht lokal. agent-browser, Postgres und Seed sind dort vorhanden. Die Bilder bleiben im Container und werden nicht committet.
+2. Admin: Ist der Admin ohne Passkey nicht erreichbar, stoppt der Lauf NICHT. Die Admin-Boards stehen dann in abnahme-lauf31.md als „nicht abgenommen“ und fallen aus dem Fertig-Kriterium. Kein Passkey-Umweg, weder in Code noch in Daten. Nr. 240 baut dann nur die Geld-Kachel nach `createdAt` (A2 Punkt 8) mit Tests; alle anderen Admin-Mängel bleiben offen und stehen im Morgenbericht.
+   Vermerk Lauf 32 (6.11.2026): Ab Lauf 32 ist ein Prüf-Passkey in einer lokalen Wegwerf-DB nach freigabe.md §36 erlaubt; in Code und jeder anderen DB bleibt er verboten.
+3. A2 Punkt 2 gilt für den Hof. Die Kundin liest bei READY „Abholbereit“: Marke, Meine Bestellungen, Mails und die Schritt-Leiste der Bestätigung (Register N9). Das Board s1-/w1-bestaetigung zeigt dort „Gepackt“; im Bericht steht das als „Register vor Board“.
+4. Mit #465 erledigt, nicht wiederholen: die Register-Einträge zu A2 Punkt 1 bis 9, „Bar gesperrt“ (Punkt 5) und der Kopf von Mein Hof am Handy (Punkt 6). Die Ausgangslage unten ist älter als #465; prüfe deshalb den Kopf von Mein Hof gegen den aktuellen Stand. Offen aus A2 bleiben: Punkt 7 (Nr. 233), Punkt 8 (Nr. 240), Punkt 9 (nur prüfen, im Morgenbericht beantworten).
+5. Ändert ein Punkt aus Nr. 242 eine Geldberechnung, statt nur Anzeige oder Text: nicht bauen, im Morgenbericht nennen.
+6. PR #448 (Impressum) ist offen und bleibt unberührt.
+
+## 36. Lauf 32 (uttoranger, im Chat erteilt, 6.11.2026)
+
+Nachtlauf 32
+Ort: Cloud-Sitzung auf Linux wie Lauf 31 (agent-browser 0.39.x, Postgres 16 und Seed im Container; Bilder und Prüf-Geheimnisse bleiben im Container unter .nachtlauf/ und werden nicht committet)
+Basis: main (c8aadaed7 oder später); die Nummern stapeln auf docs/lauf32 bzw. auf dem Zwischenstand integration/lauf32
+Berührt: AGB und /konditionen (nur 259, Wortlaut nur aus der A005-Datei) · Kasse (nur Anzeige und Text: 253, 257, 259 Kassensatz) · /api/checkout: genau ein zusätzlicher Mail-Auftrag nach der Antwort (256, nur mit „256 freigegeben“), sonst nichts · Admin › Heute: Zählregel nur mit „Geld-Kachel-Regel bestätigt“ · Webhook: nein · Schema: nein (keine Migration) · Geldberechnung: nein (244, 248, 251, 253, 256, 258 nur Anzeige und Zählung) · Auth: nein · Pakete: nein · neue Variablen: nein
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate (ohne Regel-Inventur, die lief in Lauf 30), 4a Tempo mit den Grenzen aus „Umsetzung · Stabilität“ (gehen 4a vor), §5 Stoppen, §6 Morgenbericht, §7 Fortsetzen. Dieser Text ist die Freigabe. Der Doku-PR trägt ihn wörtlich als „## 36. Lauf 32 (uttoranger, im Chat erteilt, 6.11.2026)“ in docs/nachtlauf/freigabe.md ein. Zeitbuch: docs/nachtlauf/berichte/zeitbuch-lauf32.md. Abnahme-Bericht: docs/nachtlauf/berichte/abnahme-lauf32.md. Zwischen-Morgenbericht nach Abschnitt A: docs/nachtlauf/morgenbericht-<datum>-lauf32-a.md; Morgenbericht am Ende: docs/nachtlauf/morgenbericht-<datum>-lauf32.md, beide committet auf dem Integrationszweig des Abschnitts (siehe Haltepunkt A). Nummern ab 243. Branches nacht/2026-11-06/<nr>-<kurz> (Datum des Laufstarts, auch in Abschnitt B).
+
+══════════════════════════════════════════════════════════════════════
+AUSGANGSLAGE (geprüft 06.11.2026, main c8aadaed7 = Merge #477 Lauf 31, nur gelesen)
+══════════════════════════════════════════════════════════════════════
+
+Stand allgemein
+- Lauf 31 ist ganz auf main (#477). Offen auf GitHub, Inhalt schon auf main: #466, #467, #468, #469, #476; Hilfs-Zweig nacht/2026-11-05/242-basis.
+- Schluss-Durchgang Lauf 31 (docs/nachtlauf/berichte/abnahme-lauf31.md ab Z. 1986): kein Board in allen Fassungen 5 Sterne; 12 Admin-Boards „nicht abgenommen“.
+- Die Entscheidungsliste der Design-Gruppe (769 Zeilen: 502 B, 115 C, 73 R, 75 U, 4 P) liegt noch NICHT im Repo.
+- Laufrechner Lauf 31: 4 Kerne, 15 GB. Zwei Container-Neustarts, vermutlich Speicher (bis zu vier Typechecks gleichzeitig, je bis 6 GB; zeitbuch-lauf31.md Z. 45–46). Voller Lauf damals 13:33 min mit 1 Worker bei laufenden Fotografen.
+- Alle Abnahme-Server in Lauf 31 teilten den Next-Cache eines Baus; /konditionen und das Startseiten-Beispiel waren vor dem Stichtag vorgerendert („Servicegebühr“ im Bild).
+- Im Haupt-Klon liegt eine .env.local (ungelesen). Next lädt .env, .env.local und .env.<modus> beim Bau und Start selbst. git-Worktrees enthalten sie nicht.
+
+Gemeinsame Bausteine (heute)
+- Kopf der Hof-Unterseiten: UnterseitenKopf in src/components/hofbereich/unterseiten-kopf.tsx (+ unterseiten-kopf-stil.ts). Der Name stimmt; er liegt NICHT in ui/. 21 Aufrufer: 7 unter src/components (hof-kunden/kunden-detail.tsx, kunden-laden.tsx, hof-hilfe/hilfe-laden.tsx, hofbereich/hof-laden.tsx, hof-bestellungen/bestell-detail.tsx, hof-einstellungen/konditionen-ansicht.tsx, einstellungen-laden.tsx) und 14 unter src/app/(hof) (settings/pause, profile, account, teilen, payments, pickup-slots; postfach/[id]; status/plakat, status/new, status/[id]/send-whatsapp; fehler-melden; dazu loading.tsx), plus die Vorschau src/app/intern/bausteine/bausteine-vorschau.tsx. Auswertung, Verkäufe, Region, Kunden-Liste und Beiträge bauen ihren Kopf teils selbst.
+- Hof-Balken: src/components/hofbereich/hof-balken.tsx (Quelle ladeHofbereich, src/server/hofbereich.ts; gerendert über src/app/(hof)/layout.tsx).
+- Leerzustand: EmptyState in src/components/ui/empty-state.tsx. Grundform zentriert, gestrichelt, Serif-Titel, `symbol` freiwillig; Form `karte` seit Nr. 242. 40 Dateien importieren ihn. Register N9 (docs/entscheidungen.md Z. 631) verlangt noch „Symbol, ein Satz, nächste Aktion“.
+- Hinweise: src/components/ui/hinweiskarte.tsx (52 Nutzer), netz-hinweis.tsx, feld-fehler.tsx; Netz-Sätze src/lib/netz.ts (NETZ_SATZ, NETZ_SATZ_UNSICHER); Produkt speichern zeigt bei Netzfehler NETZ_SATZ_UNSICHER ohne Knopf (src/lib/produkte-hof.ts Z. 404).
+- Größen und Menge: src/components/ui/groessenkachel.tsx (GroessenWahl, 2 Nutzer), src/components/ui/stepper.tsx (5 Nutzer).
+- Bilder im Dunkeln: src/components/ui/bild-dunkel.ts (7 Nutzer). CODING_STANDARDS §7 nennt Kacheln und Regionskarte noch „hell“.
+- Rundungen: src/app/globals.css `--radius` 0.75rem bzw. 1rem (Z. 169 und 469), `--radius-xl` ×1,4, `--radius-2xl` ×1,8 → 22/29 px statt 12/16 px. rounded-xl/2xl/3xl 433-mal in 187 Dateien.
+- Dialoge: DialogMitte (src/components/ui/dialog.tsx Z. 113), SheetBlatt (src/components/ui/sheet.tsx Z. 127); `initialFocus` an 12 Stellen, nicht überall auf „Abbrechen“.
+- `[&>…]`-Selektoren an ui/-Bausteinen: 22 Dateien.
+- Kunden-Shell: src/components/shells/kunde-shell.tsx, kunde-fuss.tsx, kunde-shell-mit-sitzung.tsx; src/components/ui/bottom-nav.tsx, chip.tsx, segment.tsx.
+
+Geldanzeige-Fehler (Morgenbericht 31, „Bestätigung bei Bar“)
+- BestellPositionen in src/components/bestaetigung/bestaetigung-teile.tsx (ab Z. 200): „Gesamt“ = bestellSummen(summen).gesamtCents (src/lib/servicegebuehr.ts Z. 233: Warenpreis + serviceFeeCents, auch wenn die Gebühr entfallen ist). Die Gebührenzeile streicht den Betrag aber durch, sobald gebuehrEntfallen() (Z. 251) wahr ist („(entfällt)“ bzw. „(erstattet)“).
+- serviceFeeRefundedAt setzen: Storno (src/server/stornieren.ts Z. 155), „Nicht abgeholt“ (src/server/actions/orders.ts Z. 472 ff.), verfallene Bar-Bestellung (src/server/unbezahlte-bestellung.ts Z. 36).
+- bestellSummen trägt auch barZuKassierenCents (src/lib/servicegebuehr.ts) und steht in tests/bestellsummen-cent.test.ts fest. Seiten: src/app/(public)/[farmSlug]/confirm/[orderId]/page.tsx (Z. 125), src/app/(public)/[farmSlug]/bestellung/[orderId]/page.tsx (Z. 102).
+- Satz der Plattformgebühr je Hof: Farm.plattformgebuehrProzent Decimal? (null = Vorgabe 6 %; prisma/schema.prisma Z. 693–695); Bestellungen vor dem Stichtag haben gebuehrModell null bzw. „bisher“; Wort über gebuehrBezeichnungFuer (src/lib/plattformgebuehr.ts).
+
+Fragen aus Morgenbericht 31 – was der Code heute tut (der Morgenbericht stellt nur Fragen, ohne Empfehlung)
+1 Geld-Kachel Admin › Heute: src/server/queries/admin-heute.ts geldKachelWhere (Z. 170): nur abgeholte Bestellungen (umsatzBestellungWhere, src/lib/umsatz.ts Z. 188), Fenster nach createdAt (Nr. 240). „Woche: n“ in „Bestellungen heute“ zählt abgeholt in der Woche (ladeWoche, Z. 186). PENDING_CONFIRMATION gilt für unbestätigte Bar-Bestellungen UND für Online-Bestellungen vor der Zahlung (src/app/api/checkout/route.ts Z. 283).
+2 Packliste: src/lib/heute.ts abholZeilen (Z. 207) liefert `uhrzeit` „15:00–18:00“ und `kunde: kurzname(…)` (Z. 150).
+3 Passwort-Auge: src/components/ui/password-input.tsx.
+4 „Willkommen, <Vorname>“ im Onboarding.
+5 Kürzel „HM“ in der Seitenleiste.
+6 Sicherheits-Mail „Adresse bestätigen“: Code 24 Stunden, Board 7 Tage.
+7 „Neue Bestellung bar“ an den Hof: Vorlage src/emails/new-order-notification.tsx kennt den Bar-Fall, nimmt aber `kassieren = p.customerTotal ?? p.total` (Z. 38, Rückfall auf den Warenpreis) und zeigt die Telefonnummer immer mit tel:-Link (Z. 39, 69–84). Nur baueOrderPaidToFarmer (online, src/lib/email.ts Z. 1129) nutzt sie. Für bar gibt es nur „Bar bestätigt“ (baueOrderConfirmedToFarmer Z. 1154, Art 'bar-bestaetigt-hof'). Der Bar-Zweig der Kasse verschickt in src/app/api/checkout/route.ts (Schritt 11b, nachDerAntwort ab ca. Z. 950) nur sendOnsiteConfirmation an die Kundin; der Wiederholungsweg (bestehende Bestellung, ab ca. Z. 370) verschickt nichts. Mail-Arten: src/schemas/mail-auftrag.ts (MAIL_ARTEN Z. 17, MAIL_WEG Z. 88, Bezugs-Schemas ab Z. 250), Renderer src/server/mail-arten/index.ts und bestellung.ts (Muster rendereAbholbereit Z. 266: verwirft bei falschem Status), Namen und passtNochmal in src/lib/betrieb-mails.ts (Z. 1261). Einstellen ohne Risiko: stelleEinOhneRisiko(art, bestellungId, auftraege) in src/server/mail-warteschlange.ts Z. 233 (wirft nie, meldet an Sentry). MailAuftrag.art ist String – eine neue Art braucht keine Migration.
+8 Abholbereit-Mail: src/emails/pickup-reminder.tsx Z. 78–84, Link „Dieselbe Bestellung nochmal aufgeben“ (reorderUrl), gebaut in baueOrderReady (src/lib/email.ts Z. 1192).
+9 Leerzustand: Startseite (src/components/startseite/hoefe-in-der-naehe.tsx, neu-bei-den-hoefen.tsx, bloecke/hinweisband.tsx) übergibt `symbol`; das Kundenkonto nicht.
+10 Bot-Bremse /problem-melden (Zeitschranke src/lib/form-token.ts MIN_FORM_AGE_MS = 3000, Honigtopf in src/components/shared/meldung-form.tsx): stiller Scheinerfolg.
+11 „Höchstens zweimal im Monat“ steht NUR im Board s1-/w1-bestaetigung, nicht im Code.
+
+Abholung nach Absprache
+- src/lib/abholhinweise.ts: NACH_ABSPRACHE = „Abholung nach Absprache“; Product.abholhinweise Abholhinweis[] (prisma/schema.prisma Z. 777, nur Futtermittel). Genutzt nur in Formularen, Produktseite und Futterkarte.
+- Kasse: Korb liegt im Browser (src/lib/use-cart.ts, ohne Abholhinweise). Notizfeld src/components/checkout/checkout-form.tsx Z. 837 „Notiz an den Hof (freiwillig)“. Seite src/app/(public)/[farmSlug]/checkout/page.tsx.
+- Reply-To (Vorgabe V86, freigabe.md §34; kein Register-Eintrag): antwortAnHof/mitAntwortAn in src/lib/email.ts (Z. 557, 562): nur Profil-E-Mail, nur wenn !hofEmailFehlt(farm) (src/lib/hof-kontakt.ts Z. 32); gesetzt u. a. in baueOrderConfirmation (Z. 1011/1043), Vorlage src/emails/order-confirmation.tsx.
+- Hof: Kontaktkarte in src/components/hof-bestellungen/bestell-detail.tsx (ca. Z. 520–550) mit „Anrufen“ (telefonLink, src/lib/telefon-anzeige.ts Z. 130) und mailto; Heute: Packliste aus src/lib/heute.ts / src/server/queries/heute.ts ohne Kontakt.
+
+Admin, Mail-Codes, Prüfwerkzeug
+- Admin nur mit Passkey (Register N20). Pflichtseite /admin/einrichten (src/app/admin/einrichten/page.tsx): erster Passkey nur mit E-Mail-Code (src/server/actions/admin-anmeldung.ts schickeEinrichtungscode; Code nur als HMAC, nie im Log) im 24-Stunden-Fenster nach adminSeit (src/lib/admin-anmeldung.ts Z. 26; adminPasskeyWo Z. 170 zählt nur Passkeys ab adminSeit). Seed-Konto admin@example.com (prisma/seed-daten.ts Z. 93) ohne Passkey; dasselbe Konto mit öffentlichem Seed-Passwort gibt es auch in der Entwicklungsdatenbank der Vorschau.
+- Passkey-Herkunft: passkeyAdresse(UMGEBUNG.appUrl, LOKALE_HERKUNFT) (src/lib/admin-anmeldung.ts Z. 265, src/lib/auth.ts Z. 246 f.), genau mit Port. Mit `next dev` (NODE_ENV development → Art „lokal“, src/lib/umgebung.ts Z. 441) ist appUrl fest http://localhost:3000 (Z. 106), dazu lokaleHerkunft(NEXT_PUBLIC_APP_URL) nur für http://localhost:<port>. Mit `next start` ist die Art „produktion“ und die Herkunft kommt allein aus NEXT_PUBLIC_APP_URL (beim Bau fest eingesetzt). Ein gemeinsamer Bau für mehrere Ports nimmt den Passkey also höchstens auf einem Port an.
+- Passkey-Zeile: model Passkey (id, name, publicKey, userId, credentialID, counter, deviceType, backedUp, transports, createdAt, aaguid). @better-auth/passkey 1.6.23 speichert publicKey als base64 der COSE-Daten.
+- Mail-Codes: Einen Mail-Abfang gibt es nicht. Ohne RESEND_API_KEY und mit NODE_ENV ≠ production schreibt die App Bestellcode und Anmeldecode als „[DEV] …“ ins Terminal (src/server/actions/bestellungen-finden.ts Z. 99, src/lib/auth.ts Z. 924). Mit `next start` nicht.
+- Datenbank-Sperren: istTestDatenbank (src/lib/umgebung.ts Z. 416) ist streng (exakte Hosts, kein gehostetes Projekt); istDevDatenbank (Z. 394) lässt auch die Entwicklungs-Supabase durch. prisma/seed.ts erlaubt beide (Z. 35).
+- Pflichtvariablen der App (src/lib/env.ts): DATABASE_URL, BETTER_AUTH_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET; LINK_SECRET optional (sonst BETTER_AUTH_SECRET, Z. 76–80); NEXT_PUBLIC_APP_URL optional.
+- Signierte Links: src/lib/bestell-link.ts, src/lib/link-signatur.ts (signiereLink), src/lib/abmelde-link.ts, src/lib/abo-bestaetigung-token.ts (erzeugeAboBestaetigungsToken(aboId, angefragtAm)).
+- agent-browser steuert Chromium über CDP (ohne Playwright). Playwright ist nicht im Projekt.
+- Seed lokal (Lauf 31): Migrationsfolge mit DATABASE_URL und DIRECT_URL ausdrücklich auf localhost, Seed mit `tsx prisma/seed.ts` gegen dieselbe Adresse (nicht `pnpm db:seed`).
+- next.config.ts importiert ./src/lib/csp (Z. 3); `next start <ordner>` braucht deshalb auch src/ im Ordner.
+- docs/nachtlauf.md §4a Punkt 6 sagt: „Bilder hinter der Admin-Anmeldung macht die Projektleitung in der Vorschau“. freigabe.md §35, Präzisierung 2 (Z. 10397): „Kein Passkey-Umweg, weder in Code noch in Daten.“
+
+Gründungsplätze (P2, offen)
+- Register-Stand Lauf 30 (docs/entscheidungen.md Z. 1046) und freigabe.md §35 führen „Zahl der Gründungsplätze“ als offen. Register Nr. 116 (Z. 328) nennt 100, die Boards 12, die Spalte PlattformEinstellung.gruendungPlaetze hat @default(12) (prisma/schema.prisma Z. 1439).
+- /konditionen: AktionAbschnitt (src/app/(public)/konditionen/page.tsx Z. 41) mit GRUENDUNG_TEXT.aktion; nur, wenn die Aktion läuft (vor dem Festschreiben immer false, src/lib/gruendungshof.ts Z. 361).
+
+AGB 1.0 mit dem Stichtag (A005, Nr. 259; Ausgangslage der A005-Datei ist von main 1216b8c, hier am heutigen Stand neu bestätigt)
+- /agb: src/app/(public)/agb/page.tsx, statisch, ohne error.tsx; Fassung fest über AGB_STAND_VERMERK = „Fassung 0.9 – Entwurf, Stand 13. Oktober 2026“ (src/lib/rechtstexte/agb.ts Z. 65), gerendert über RechtstextVorlage (src/components/shared/rechtstext-vorlage.tsx, Layout aus Lauf 31 Nr. 239) und src/components/rechtstexte/agb-ansicht.tsx. Eine Route /agb/[fassung] gibt es nicht.
+- Mail-Anhang: agbAnhang() in src/lib/email.ts Z. 601 (agbDateiname/agbAlsHtml aus src/lib/rechtstexte/agb-datei.ts, AGB_DATEI_MAX_BYTES 300 kB Z. 24), genutzt Z. 1042 (baueOrderConfirmation) und Z. 1096 (Bar-Bestätigungslink). MAIL_AGB_ZEILE (src/lib/rechtstexte/agb-einbindung.ts Z. 59) in src/emails/order-confirmation.tsx Z. 137 und onsite-confirmation.tsx Z. 107.
+- Kasse: KASSE_AGB_SATZ (agb-einbindung.ts Z. 48) in KaufknopfSaetze (src/components/checkout/checkout-form.tsx Z. 1140, Satz Z. 1150).
+- Zustimmung der Höfe: src/lib/agb-zustimmung.ts, src/server/actions/agb-zustimmung.ts, Karte src/components/heute/agb-karte.tsx, gelesen in src/app/(hof)/dashboard/page.tsx und src/app/(auth)/onboarding/page.tsx (agbFassung aus agb-datei.ts).
+- Stichtag: ladePlattformEinstellung (src/server/queries/plattform-einstellung.ts Z. 59), ladeHofpreisEinstellung (Z. 191); speichereHofpreisStichtag (src/server/actions/plattform-einstellung.ts Z. 114) revalidiert /agb heute nicht.
+- /konditionen: revalidate 3600 (src/app/(public)/konditionen/page.tsx Z. 31), ohne error.tsx; KONDITIONEN_ENTWURF (src/lib/konditionen.ts Z. 458), KONDITIONEN_UEBERGANG (K1).
+- docs/recht/agb.md enthält 0.9. BELEHRUNG in src/lib/widerruf.ts Z. 350. Register: O4 (docs/entscheidungen.md Z. 986), N38 (Z. 878), letzter N-Eintrag N44 – kein N45 auf main.
+- Dateien, die A005 und Lauf-32-Nummern beide berühren: agb-ansicht.tsx/rechtstext-vorlage.tsx und /konditionen (254), checkout-form.tsx (253, 257), src/lib/email.ts, order-confirmation.tsx, onsite-confirmation.tsx, src/server/mail-arten/** (255, 256, 257), dashboard/page.tsx und src/components/heute/** (249, 257), onboarding/page.tsx (253).
+
+Wachen, die es gibt (tests/): telefonnummern-wache, doku-doppelte-absaetze, wortliste, palette-klassen-wache, design-tokens, fokus-sichtbar, grundbausteine-groesse, gebuehr-wort-wache, mail-wege-wache, bild-format, hof-kontakt-wache, geld-fliesskomma-wache, geld-number-wache, claude-einstellungen-wache, bausteine-*. Es gibt KEINE Wache für Rundungen, Startfokus, `[&>`, UnterseitenKopf-Aufrufer und für das Prüfwerkzeug.
+
+══════════════════════════════════════════════════════════════════════
+ENTSCHIEDEN (alles hier ist Auftrag, keine Rückfrage)
+══════════════════════════════════════════════════════════════════════
+
+Abnahme-Grundlage
+- Die Entscheidungsliste docs/nachtlauf/berichte/lauf32-board-oder-code.md ist Teil dieser Freigabe. Je Zeile gilt:
+  - B: Board gilt – wird gebaut (Spalte „Umsetzung“).
+  - C: Code gilt – kein Mangel, nicht abwerten, nicht „angleichen“.
+  - R: Register, Freigabe oder Recht gilt – kein Mangel.
+  - U: Umgebung, Aufnahme, Beispieldaten – kein Mangel; die Aufnahme wird verbessert, wo die Liste es sagt.
+  - P1: wird nicht gebaut; die P1-Zeilen von produkt und mail-storno fallen aus der Wertung.
+  - P2: bleibt offen; die P2-Zeile von rechtstexte (Bild 5, Aktion-Karte und Zahl) fällt aus der Wertung.
+  - Querschnitts-Regeln Q1–Q5 der Liste gelten für alle Boards.
+- Zusätzlich gilt in der Wertung als C (Liste nachträglich): produkt-neu „Fehler … ohne ‚Nochmal‘“ (Bild 6). Produkt anlegen behält in Lauf 32 NETZ_SATZ_UNSICHER ohne Knopf.
+- Die Board-Korrekturen (Abschnitt 3.1 der Liste) macht die Design-Gruppe. Der Lauf ändert keine Datei unter docs/mockups/.
+- Maßstab für 5 Sterne: wie Lauf 31 (freigabe.md §35, „Der 5-Sterne-Maßstab je Board“, Punkte 1–7), Handy 390 und Web 1440, hell und dunkel; Mails und Druck nur hell. Unter 5 Sterne ist nur eine sichtbare Abweichung, die keine C-, R-, U-, P1- oder P2-Zeile und keine Q-Regel deckt.
+- pruefer-ui: eigener Agent-Aufruf mit frischem Kontext (keine neue Datei unter .claude/agents). Er bekommt NUR: App-Bild, Board-Bild, den Maßstab, den Abschnitt seines Boards aus der Liste, Q1–Q5 sowie die Abschnitte „Antworten der Projektleitung“, „P-Punkte“ und „Nicht herstellbare Bilder“ dieses Auftrags. Nicht den Code, nicht den Bericht des Umsetzers. Er nennt je Abweichung die Listenzeile bzw. den Auftragspunkt, der sie deckt, oder „Mangel“.
+- Nicht herstellbare Bilder:
+  - Signierte Links (Bestellseite, Bestätigung, Bar-Bestätigen, Abmelden, Neuigkeiten, Systemseiten, Rücktritt): Der Prüf-Seed (Nr. 243) erzeugt sie mit den Signier-Funktionen der App, nur in der lokalen Wegwerf-DB, mit dem Prüf-Geheimnis. „Abgelaufen“ nur über einen vorhandenen Parameter (z. B. angefragtAm des Abo-Tokens) oder eine im Skriptprozess gestellte Uhr; keine Änderung an src/lib/*-link.ts oder *-token.ts. Geht es so nicht: „nicht herstellbar“ mit Grund.
+  - Mail-Code (Meine Bestellungen Bild 3–6, Anmelde-Code der Kundschaft): über den Dev-Fotografen (`next dev`, siehe Prüf-Umgebung) ohne RESEND_API_KEY; der Fotograf liest den Code aus der Laufzeit-Ausgabe des dev-Servers und tippt ihn ein. Liegt diese Ausgabe technisch in einer Datei (Hintergrund-Prozess), dann nur unter .nachtlauf/ (gitignored); sie wird beim Aufräumen gelöscht. Der Code steht in keinem Commit, nicht im Zeitbuch, in keinem Bericht und in keiner Bildunterschrift. Kein Abfang wird gebaut, kein Code in die DB geschrieben. Gelingt es nicht: „nicht prüfbar“ mit Grund.
+  - Der Hinweis von Next im Dev-Modus (Entwicklungsanzeige) in Bildern des dev-Fotografen und ein Umgebungs- bzw. Testmodus-Banner (Platzhalter sk_test_…, src/lib/stripe-modus.ts) in allen Prüf-Bildern sind U, kein Mangel.
+  - Stripe-Zustände (Online-Zahlung pausiert, abgelehnte Zahlung), Nominatim, global-error: „nicht prüfbar“ wie in Lauf 31.
+
+Prüf-Umgebung und Admin-Abnahme (gilt für Prüf-Seed, Prüf-Bau und jeden Fotografen)
+- „Keine Variable“ heißt: keine NEUE Variable im Code, in .env.example oder bei Vercel. Bestehende Variablen dürfen in der Prüf-Umgebung gesetzt werden.
+- Abgeschottet: Jeder Prüf-Befehl läuft als `env -i` mit fester Liste, die scripts/pruefung/pruef-env.sh erzeugt: PATH, HOME, NODE_OPTIONS, DATABASE_URL und DIRECT_URL (lokale Prüf-DB bzw. Kopie), BETTER_AUTH_URL und NEXT_PUBLIC_APP_URL (Adresse des jeweiligen Servers), BETTER_AUTH_SECRET und LINK_SECRET je Lauf neu aus `openssl rand -hex 32`, STRIPE_SECRET_KEY als Platzhalter `sk_test_pruefung`, STRIPE_WEBHOOK_SECRET als Platzhalter `whsec_pruefung`. Weggelassen: RESEND_API_KEY, RESEND_WEBHOOK_SECRET, NEXT_PUBLIC_SENTRY_DSN, SENTRY_AUTH_TOKEN, jede VERCEL*-Variable, jeder echte Stripe-Schlüssel. Die Werte stehen nur in .nachtlauf/pruef-env (chmod 600), nie im Zeitbuch, nie in einem Bericht.
+- Bricht ab, wenn im Worktree oder in einem Fotograf-Ordner eine .env-Datei außer *.example liegt oder ein Verweis auf eine zeigt. Geprüft wird nur im Worktree, nie im Haupt-Klon mit .env.local. Die Sperre hat keine Ausnahme, auch nicht für .env.test: Integrationstests im Worktree laufen mit TEST_DATABASE_URL (localhost) im Aufruf, `TEST_DATABASE_URL=… pnpm exec vitest run --config vitest.integration.config.ts`, ohne .env.test-Datei.
+- Strikte Loopback-Sperre (pruef-seed.ts, fotograf.sh, passkey-browser.mjs): als ERSTES, vor jedem Import von Prisma, auth oder env (dynamische Importe wie prisma/seed.ts): DATABASE_URL UND DIRECT_URL bestehen beide istTestDatenbank (nicht istDevDatenbank), der Host ist exakt localhost oder 127.0.0.1 (nicht „postgres“, nicht ::1 – istTestDatenbank kennt ::1 nicht, src/lib/umgebung.ts Z. 104; das Prüfwerkzeug lässt die Funktion unverändert), und nach dem Verbinden liefert `SELECT inet_server_addr()` eine Loopback-Adresse oder null (Unix-Socket). Sonst Abbruch mit Exit 1; in Meldungen nur Host und Port, nie die volle Adresse. Befehle mit Verbindungsadresse stehen im Zeitbuch nur mit Host und Port. Abbruch auch, wenn VERCEL gesetzt ist, wenn es in der DB schon eine Passkey-Zeile gibt oder wenn die DB mehr Konten hat, als der Seed anlegt (keine Wegwerf-DB).
+- Admin-Fotograf (dev-Fotograf): genau einer, in einem eigenen git-Worktree des Prüfstands (`git worktree add "$HOME/nachtlauf32-dev" <commit>` – fester Pfad, damit das Aufräumen ihn findet –, node_modules mit `pnpm install --frozen-lockfile --offline`; scheitert das offline (z. B. am Einrichtungs-Skript von @sentry/cli), einmal `pnpm install --frozen-lockfile` mit Netz, pnpm-lock.yaml bleibt unverändert (vorher/nachher prüfen), keine .env-Dateien), nie im Worktree eines Baus – so hat er sein eigenes .next und überschreibt keinen Bau. Start: `pnpm exec next dev -H 127.0.0.1 -p 3000` im eigenen Worktree gegen eine eigene DB-Kopie (Art „lokal“, Herkunft http://localhost:3000, rpId „localhost“). Der Prüf-Browser startet mit `--host-resolver-rules="MAP localhost 127.0.0.1"` und öffnet http://localhost:3000. Dieselbe Instanz macht die Mail-Code-Bilder. Ein Bau mit `next start` wird für den Admin nicht verwendet; kein distDir.
+- Passkey: Der Prüf-Seed erzeugt für admin@example.com (nur dieses Konto) ein P-256-Schlüsselpaar (node:crypto), setzt adminSeit und schreibt die Passkey-Zeile: id, userId des Seed-Admins, name „Prüf-Passkey“, publicKey (base64 der COSE-Daten), credentialID, counter 0, deviceType „singleDevice“, backedUp false, createdAt nach adminSeit. Der private Schlüssel liegt nur in .nachtlauf/admin-passkey.json (chmod 600).
+- Virtueller Authenticator: scripts/pruefung/passkey-browser.mjs (Node, eingebautes WebSocket, kein Paket) verbindet sich mit dem DevTools-Port der Prüf-Instanz (Chromium mit --remote-debugging-address=127.0.0.1) und ruft `WebAuthn.enable`, `WebAuthn.addVirtualAuthenticator` (ctap2, internal, hasResidentKey, hasUserVerification, isUserVerified: true) und `WebAuthn.addCredential` (isResidentCredential: true, rpId „localhost“, userHandle = base64 der userId, privateKey als PKCS#8 base64, signCount 0) auf. rpId nur „localhost“ oder „127.0.0.1“. Ob agent-browser an diese Instanz andocken kann, wird zuerst mit `agent-browser --help` geprüft. Playwright wird nicht installiert.
+- Danach normale Anmeldung auf /login/admin „Mit Passkey anmelden“. Kein Umweg im App-Code, keine Änderung an src/lib/auth.ts, admin-wache, admin-anmeldung oder Passkey-Logik, kein Test-Schalter.
+- Abweichend von docs/nachtlauf.md §4a Punkt 6 und freigabe.md §35 Präzisierung 2 gilt ab Lauf 32: Admin-Bilder entstehen lokal; der Prüf-Passkey in der lokalen Wegwerf-DB ist freigegeben (Projektleitung, 6.11.2026). In Code und in jeder anderen DB bleibt er verboten. Der Doku-PR trägt das an beiden Stellen ein.
+- Aufräumen am Ende jedes Abschnitts (A und B) und nach einem Abbruch: .nachtlauf/pruef-env, .nachtlauf/admin-passkey.json, Ausgabedateien der Prüf-Server und alle Prüf-DBs löschen, Prüf-Server und Prüf-Browser beenden, den Worktree des dev-Fotografen entfernen (`git worktree remove --force "$HOME/nachtlauf32-dev"`). Der (Zwischen-)Morgenbericht bestätigt es. Abschnitt B legt sie neu an.
+- Klappt die Admin-Anmeldung nicht binnen 60 Minuten Arbeit: Admin-Boards „nicht abgenommen“ wie in Lauf 31, Grund im Morgenbericht, der Lauf stoppt nicht.
+- Ist der Admin erreichbar: Bilder und pruefer-ui-Wertung für alle 12 Admin-Boards. Für den Admin gibt es keine Board-oder-Code-Liste; deshalb baut der Lauf im Admin nur (a) die Geld-Kachel (258) und (b) messbare Mängel (258b): Schrift unter 12 px, Ziele unter 44 px ohne ::before, h1 ≠ 1, Felder ohne Beschriftung, axe serious/critical, Fokus unsichtbar. Abweichungen in Aufbau und Wortlaut gehen als Liste in den Morgenbericht (Vorlage für eine Admin-Board-oder-Code-Runde). Admin-Boards zählen nicht zum 5-Sterne-Kriterium, wohl aber zur Messung.
+
+AGB 1.0 mit dem Stichtag (Nr. 259 = A005; Projektleitung 6.11.2026: „schreibe A005 auch in diesen Prompt“)
+- Vorbedingung: docs/nachtlauf/berichte/a005-agb-1-0-stichtag.md liegt vor (unverändert, wie von der Projektleitung abgelegt). Fehlt sie oder ist eine der drei Doku-Wachen mit ihr rot: Die Datei wird nicht geändert und nicht committet, Nr. 259 entfällt, der Lauf läuft ohne sie weiter, der Morgenbericht meldet es.
+- Inhalt: Der Umsetzungstext von 259 ist Schritt 1–8 der A005-Datei, wörtlich; ebenso ihre Abschnitte „Nicht“, „Bilder“ und „Fertig, wenn“. Dieser Auftrag ergänzt nur Einbindung, Reihenfolge, Grenzen, Prüfumgebung und Konfliktregeln. Widerspricht etwas: in Inhalt und Wortlaut gilt die Datei, in Einbindung, Reihenfolge, Grenzen und Bildern dieser Auftrag. Der Schritt „Vorher“ der Datei ist erfüllt (Lauf 31 gemergt, #477); origin/main holt §2 Regel 8. Register-Kennungen (N45 in der Datei und jeder Verweis darauf in Code, Tests und Doku) gehören zur Einbindung; es gilt die Zuordnung aus §0a.
+- AGB-Wortlaut nur aus der Datei (zwischen den Marken), kein Wort geändert. Nichts in src/lib/widerruf.ts. Keine Migration, kein Paket, keine Variable, nichts an /api/checkout, Webhook, Stripe, Geldberechnung, keine DB-Werte (Stichtag, Monate, Notbremse, Testhöfe setzt die Projektleitung). A005 ändert kein Layout; agb-ansicht.tsx bekommt nur die Fassung als Prop.
+- Halte- und Rückfragestellen der A005-Datei – im Nachtlauf gilt (vollständige Liste nach Lesung des vollen Texts durch den Koordinator):
+  (a) „Vorher: … Ist Lauf 31 (Sammel-PR integration/lauf31) noch nicht gemergt: STOPP und melden.“ → erfüllt (#477), entfällt.
+  (b) „Steht N45 (siehe 7c) noch nicht als Entscheidung fest oder widerspricht O4/N38 dem Auftrag ohne den Verweis auf N45: STOPP und melden.“ → kein STOPP: Die Entscheidung ist E-019 (Projektleitung, 05.11.2026); N45 legt Schritt 7c selbst an (Kennung nach §0a); O4 und N38 bekommen die Vermerke aus 7c.
+  (c) Schritt 4e „Widerspricht das dem Board w3-rechtstexte oder K1: STOPP und fragen.“ → nicht stoppen, nicht fragen: die Stelle nach K1 bzw. Register bauen (Register vor Board) und im Bericht und Morgenbericht als „Register vor Board“ melden. Geben K1 und Register keine Antwort, wird der Teil weggelassen (docs/nachtlauf.md §2 Regel 5); geht das nicht sauber, bleibt 259 als Entwurf stehen, der Lauf läuft weiter.
+  (d) „Nicht“: „Sollte sich wider Erwarten eine [Migration] als nötig zeigen: nur Expand, mit prisma migrate diff erzeugen, zeigen und auf Freigabe warten“ → im Nachtlauf keine Migration: Braucht 259 eine, bleibt 259 Entwurf, der Lauf läuft weiter, Morgenbericht.
+  (e) „Kein Wort im Text unten ändern (Fehler im Text: melden, nicht verbessern).“ → Fehler im Morgenbericht melden (Fundstelle), nicht verbessern, nicht stoppen.
+  (f) Schritt 4b „Prüfe, dass /agb/0.9 und /agb/1.0 auf Vercel als Seite ankommen … Wenn nicht: Kennungen im Pfad als ‚0-9‘ und ‚1-0‘“ → bedingt, kein Halt; die Vercel-Prüfung nur lesend über die Vorschau (siehe Bilder), sonst „Für dich zu tun“; ohne Ergebnis bleibt der Punkt im Pfad, und der Morgenbericht nennt die Prüfung.
+  Jede weitere Stelle dieser Art behandelt der Umsetzer wie (c) bzw. (e). Er listet zu Beginn alle solchen Stellen der Datei mit Zeile im Zeitbuch.
+- Register: A005 Schritt 7c schreibt N45 „AGB 1.0 mit dem Stichtag“ wörtlich aus der Datei, mit den Vermerken bei O4 und N38 ohne Löschen. Die Einträge dieses Laufs heißen deshalb N46 und N47 (Kollisionsregel in §0a).
+- Wirkung des Merge (E-019: Höfe stimmen ab dem Merge der neuesten Fassung zu; Betriebsregel: die Projektleitung bittet keinen echten Hof vor der Ankündigung; alle Höfe in Produktion sind heute Testhöfe): Erste Zeile im PR-Text von 259 und im Sammel-PR sowie ganz oben in „Für dich zu tun“: „Mit dem Merge sehen alle Höfe mit Fassung 0.9 die Karte ‚AGB 1.0 zustimmen‘ (E-019). Vor dem Merge sicherstellen, dass kein echter Hof freigeschaltet ist, der die Ankündigung noch nicht hat. Wer 259 allein mergt, mergt vorher den Doku-PR; der bringt auch Freigabe §36 und die Register-Einträge von Lauf 32 auf main.“
+- Eine Quelle für die Fassung: agbFassungFuerBestellung ordnet gebuehrModell null oder „bisher“ → 0.9 und „hofpreis“ → 1.0 zu; jeder andere Wert → 0.9, nie werfen (sofern die Datei nichts anderes sagt), Test für alle vier Fälle. Die Funktion bleibt rein (auch im Browser importierbar) und gibt `{ fassung, unbekannt }` zurück; die Meldung an Sentry machen nur die serverseitigen Aufrufer (Mail-Bau, Kassen-Seite auf dem Server), Inhalt nur die Kennung des Werts und die Bestell-ID, keine Personendaten. Kasse (auch „Erneut bezahlen“), Mail, Nochmal schicken und Admin-Vorschau nutzen diese Funktion. /agb/[fassung] nimmt nur Werte aus AGB_FASSUNGEN an, alles andere notFound(); kein Pfad und kein Import aus dem Parameter.
+- Pflicht-Gegenlesen vor dem Push:
+  - „Recht“: Test tests/agb-wortgleich.test.ts (bleibt im Repo): Text zwischen den Marken der A005-Datei, docs/recht/agb.md und agbAlsHtml für 1.0 werden je zu reinem Text gemacht; gleich behandelt werden nur Markdown- bzw. HTML-Auszeichnung, Zeilenumbrüche, mehrfache Leerzeichen und Platzhalter; danach Zeichen für Zeichen gleich (auch Satzzeichen, Anführungszeichen, Gedankenstriche). Die Platzhalter stehen im Test als feste Tabelle: je Platzhalter genau der Text aus der A005-Datei und die Kennung im Code (z. B. Betreiber, E-Mail, ‚inkrafttreten‘); jeder kommt in allen drei Quellen gleich oft vor. Die Bereinigung wird nie erweitert, damit ein Vergleich passt. Dauerhaft prüft der Test außerdem agb-0-9.ts gegen docs/recht/agb-0.9.md; einmalig im PR (Ergebnis im PR-Text) wird agb-0-9.ts gegen `git show <Basis>:src/lib/rechtstexte/agb.ts` verglichen. Meldet eine Wache etwas im AGB-Text: Ausnahme mit Grund, nie Textänderung. Dazu `git diff --name-only <Basis>.. -- src/lib/widerruf.ts` leer; N39-/N43-Wortlaut, Datenschutzerklärung und Impressum unverändert.
+  - „Geld“: Kassensatz je Modell bzw. Snapshot der bestehenden Bestellung, Mail-Anhang und Mail-Zeile je Snapshot der Bestellung (bisher → 0.9, hofpreis → 1.0), keine Geldberechnung geändert, /api/checkout unverändert.
+  - „Daten“: Zustimmung der Höfe nur für den eigenen Hof (farmId der Sitzung), nur gegen AGB_NEUESTE, Integrationstest; Mail-Anhang je Snapshot der Bestellung.
+- Bilder in der Prüfumgebung dieses Laufs (Prüf-Seed-Regeln, Loopback-Sperre, env -i gelten): ab T auf der lokalen Prüf-DB mit Stichtag in der Vergangenheit; vor T auf einer eigenen lokalen Prüf-DB mit Stichtag in der Zukunft (eigener Bau, siehe Stabilität). NIE gegen Entwicklungs- oder Produktionsdatenbank. Die in der Datei verlangten Bilder „vor T auf der Dev-DB“ und die Prüfung „Punkt im Pfad auf Vercel“ entstehen nur lesend über die Vorschau-Adresse des PR, wenn sie aus dem Container erreichbar ist; sonst stehen sie unter „Für dich zu tun“. Die Mail-Datei 1.0 entsteht über den Renderer bzw. Test, nie durch Versand. Die DB-Abfragen je Aufruf von /agb und /konditionen werden am lokalen Prüf-Server gemessen. Auf der Vorschau nur GET auf öffentliche Seiten (/agb, /agb/<Fassung>, /konditionen): keine Anmeldung, kein Formular, keine Bestellung, kein Schutz-Umgehungs-Token, keine Vercel-Variable lesen oder entschlüsseln. Ist die Vorschau geschützt oder nicht erreichbar: „Für dich zu tun“. Der Prüf-Seed hat dafür die Option „Stichtag in der Zukunft“ (zweite lokale DB vor T), nie per Hand-SQL.
+- Konflikte: 259 zweigt von docs/lauf32 ab und ist allein mergebar. Alle Lauf-32-Nummern mit Dateien aus der Liste „Dateien, die A005 und Lauf-32-Nummern beide berühren“ (249, 253, 254, 255, 256, 257) zweigen erst vom Zwischenstand mit 259 ab und schreiben ihre Tests gegen den A005-Stand. Bei den Bausteinen überschneidet sich nur 246 (src/components/checkout/checkout-form.tsx übergibt EmptyState `symbol={ShoppingBasket}`, Z. 962): 246 startet deshalb erst, wenn 259 im Zwischenstand ist (docs/nachtlauf.md §4a Punkt 9: nie zwei Nummern an derselben Code-Datei; keine Ausnahme nötig). 247 ändert nur die Shells, nicht die Seiten /agb, /konditionen, /onboarding, die sie importieren. Findet git grep zu Beginn weitere Überschneidungen, wartet die Baustein-Nummer ebenso auf 259 (Eintrag im Zeitbuch). Die Rechtstexte-B-Zeilen (254) baut die Seiten-Nummer danach auf dem A005-Stand.
+- AGB-Texte gegen spätere Nummern schützen: KASSE_AGB_SATZ, KASSE_AGB_SATZ_HOFPREIS, MAIL_AGB_ZEILE, AGB_SEITE_TEXT und der Anhang bleiben in src/lib/rechtstexte/agb-einbindung.ts bzw. agb-datei.ts (eine Quelle) und werden von 253–257 nicht umformuliert. Der Render-Vergleich in 255 umfasst AGB-Zeile und Anhang für eine Bestellung „bisher“ und eine „hofpreis“. Die Tests aus 259 (kaufknopf-saetze, agb-seite, agb-datei, belehrung-mail, agb-wortgleich) bleiben in 253–257 ohne geänderte Erwartung grün.
+- Ist 259 entfallen oder Entwurf, starten die abhängigen Nummern vom letzten grünen Zwischenstand (§1); sie ändern dann nichts an AGB-Texten.
+
+Antworten der Projektleitung auf Morgenbericht 31 (der Morgenbericht stellte nur Fragen; die Projektleitung hat die Vorschläge des Koordinators übernommen; Fragen im Morgenbericht „Für dich zu tun“ → „Entscheidungen“)
+1 Geld-Kachel Admin › Heute (Auslegung des Koordinators; gilt nur mit „Geld-Kachel-Regel bestätigt“ im Startauftrag, sonst wird sie nicht gebaut und steht im Morgenbericht): zählt alle Bestellungen, die in der Woche eingegangen sind (createdAt, Montag Wien bis jetzt), außer storniert bzw. abgelaufen (status CANCELLED; verfallene Bestellungen sind CANCELLED). Bedingung über die Zahlart: `OR: [{ paymentMethod: 'ONLINE', paymentStatus: 'PAID' }, { paymentMethod: { in: ['ONSITE_CASH', 'ONSITE_CARD'] } }]` – online nur bezahlt (eine Online-Bestellung mit paymentStatus REFUNDED zählt nicht, auch ohne CANCELLED), vor Ort (bar, Altbestand Karte) ab Eingang, auch unbestätigt (PENDING_CONFIRMATION). Ohne Testzahlungen (ohneTestzahlungenWhere wie bisher). Darin: Warenwert und Gebühr ohne entfallene (serviceFeeRefundedAt null, wie bisher).
+  Ebenfalls markiert: „Woche: n“ und die Vorwoche (bis zum selben Zeitpunkt) zählen nach derselben Regel (Regelvorschlag 240: eine Zählregel je Kachel). Die Umsatzregel der Höfe (Auswertung, Verkäufe) bleibt. → Nr. 258
+2 Packliste auf Heute: Kurzname ohne Uhrzeit (die Zeit steht im Kopf des Fensters), Positionen zweizeilig statt abgeschnitten. → Nr. 249
+3 Passwort-Auge bleibt. Nichts zu bauen.
+4 „Willkommen, <Vorname>“ bleibt. Nichts zu bauen.
+5 Kürzel „HM“ bleibt. Nichts zu bauen.
+6 Sicherheits-Mail: 24 Stunden (Code). Nichts zu bauen; Board-Korrektur.
+7 Mail „Neue Bestellung bar“ an den Hof wird gebaut, wenn „256 freigegeben“ im Startauftrag steht; sonst nicht, Morgenbericht. → Nr. 256
+8 Abholbereit-Mail: Link „Dieselbe Bestellung nochmal aufgeben“ entfällt; damit ist die offene Ausnahme zu S11 (Bericht Nr. 13, O3) erledigt. Die Nachbestell-Route bleibt für alte Mails. → Nr. 255
+9 Leerzustände ohne Symbol, überall (G4); Register N9 wird ergänzt. → Nr. 246
+10 Bot-Bremse mit stillem Scheinerfolg bleibt; im DESIGN_SYSTEM „Problem melden“ als gewollt vermerken (Nr. 254).
+11 „Höchstens zweimal im Monat“ entfällt; im Code steht der Satz nicht, nichts zu bauen, Board-Korrektur.
+
+P-Punkte
+- P1 wird nicht gebaut (Anwältin): Rücktritts-Zeile je Produkt, die beiden Sätze in der Storno-Mail, Platzhalter in der Belehrung auf /widerruf. Im Morgenbericht unter „Recht“.
+- P2 bleibt offen für die Projektleitung: Lauf 32 baut und ändert an Aktion-Karte, Aktion-Abschnitt und Zahl der Gründungsplätze nichts; der Prüf-Seed schreibt die Gründung nicht fest und ändert gruendungPlaetze nicht; rechtstexte Bild 5 fällt insoweit aus der Wertung. Frage im Morgenbericht: „Zahl der Gründungsplätze 12 (Boards) oder 100 (Register Nr. 116)? In Produktion steht gruendungPlaetze, sofern nicht geändert, auf dem Vorgabewert 12.“
+
+Geldanzeige-Fehler (Nr. 244)
+- Erst Ursache belegen (Test, der heute rot ist), dann Fix nur der Anzeige.
+- Anzeige-Regel: „Gesamt“ = Warenpreis + Gebühr, solange die Gebühr gilt; ist sie entfallen bzw. erstattet (gebuehrEntfallen), Gesamt = Warenpreis. Gilt auf Bestätigung und Bestellseite (auch summeInZahlzeile). Die Zeile „Plattformgebühr (entfällt) · € …“ bleibt durchgestrichen stehen.
+- Neue reine Funktion `anzeigeGesamtCents` in src/lib/servicegebuehr.ts (neben gebuehrEntfallen), JSDoc „nur Anzeige, nie für Buchung, Erstattung, Abrechnung“. Wache: sie wird nicht aus src/server/**, src/app/api/** oder src/lib/plattformgebuehr*.ts importiert.
+- bestellSummen, barZuKassierenCents, Stripe-Beträge, Webhook, gespeicherte Werte und alle Geld-Tests bleiben unverändert.
+- Tests: (a) bar mit entfallener Gebühr; (b) online „erstattet“; (c) NOT_PICKED_UP online mit offener Erstattung (gebuehrErstattungOffen, serviceFeeRefundedAt null) → Gesamt MIT Gebühr; (d) Modell hofpreis mit entfallener Gebühr; (e) Gebühr 0 → Gesamt = Warenpreis, keine Gebührenzeile; (f) barZuKassierenCents in allen Fällen unverändert.
+- Weitere Stellen mit derselben Summe (Mails, Druck, Hof-Bestellung, Meine Bestellungen) per git grep auf bestellSummen/gesamtCents finden und im Bericht auflisten. Mitgezogen wird nur, was als „Gesamt“ einer Bestellung mit entfallener Gebühr angezeigt wird; „Bar zu kassieren“ bleibt.
+- 244 ändert keine Datei, die 259 berührt (u. a. src/lib/email.ts, src/emails/order-confirmation.tsx, onsite-confirmation.tsx, src/components/checkout/checkout-form.tsx, src/server/mail-arten/**), weil beide parallel von docs/lauf32 abzweigen (docs/nachtlauf.md §4a Punkt 9). Die Mail-„Gesamt“-Stelle (heute betraege() in src/lib/email.ts Z. 615–621, gesamt aus bestellSummen) listet 244 im Bericht, ebenso die Admin-Vorschau der Mails (src/server/actions/betrieb.ts); 255 stellt beide auf dem Stand nach 259 mit anzeigeGesamtCents um, Gegenlesen „Geld“ dort. Solange 255 nicht gebaut ist, steht im (Zwischen-)Morgenbericht unter „Offen“: „Mail-Gesamt und Admin-Vorschau zeigen bei entfallener Gebühr noch den alten Betrag (betrifft nur die Admin-Vorschau; Kundinnen- und Hof-Mails gehen vorher raus). Kommt mit 255.“ checkout-form.tsx Z. 364 ist die Summe vor dem Kauf (keine entfallene Gebühr) und bleibt.
+- Ändert der Fix eine Geldberechnung statt nur Anzeige: nicht bauen, im Morgenbericht melden.
+- Pflicht-Gegenlesen „Geld“ vor dem Push; Ergebnis wörtlich im PR-Text.
+
+Abholung nach Absprache (Nr. 257; Projektleitung 6.11.2026)
+- Eine reine Hilfe in src/lib/abholhinweise.ts entscheidet für alle drei Orte: „braucht der Korb bzw. die Bestellung eine Absprache?“ = mindestens eine Position mit NACH_ABSPRACHE. Keine Migration, kein neues Feld.
+- (a) Kasse: Die Seite lädt serverseitig die Produkt-IDs des Hofs mit NACH_ABSPRACHE (eine Abfrage in src/server/queries/) und gibt sie an CheckoutForm. Enthält der Korb eines davon, steht über der Terminwahl ein Hinweis aus dem Hinweis-Baustein (G3): „Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.“ Das Notizfeld heißt dann „Notiz zur Abholung (freiwillig)“. Markiert: „(freiwillig)“ ist Hausstil an jedem freiwilligen Feld und bleibt. Feldname customerNote, Länge, Prüfung, Preis, Zahlung, Termin-Pflicht und /api/checkout bleiben unverändert.
+- (b) Bestätigungsmail an die Kundschaft (baueOrderConfirmation: online bezahlt und Bar nach Bestätigung): bei Absprache ein Satz im Abholblock. Mit Reply-To (mitAntwortAn liefert eine Adresse): „Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.“ Sonst: „Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.“ Bedingung und Reply-To aus EINER Funktion. Die Bar-Bestätigungslink-Mail bleibt unverändert.
+- (c) Hof: Bestellung (/orders/[orderId]) und Heute (Packliste) zeigen die Marke „Abholung absprechen“ (Abzeichen, Ton „offen“) und zwei Knöpfe „Anrufen“ (tel: über telefonLink; ohne lesbare Nummer kein Knopf) und „Mail schreiben“ (mailto: an die E-Mail der Bestellung). Nur bei offenen Bestellungen (nicht PICKED_UP, CANCELLED, NOT_PICKED_UP). Auf Heute stehen die Knöpfe unter der Zeile, nicht im Zeilen-Link. Telefon und E-Mail stehen auf Heute nur als Ziel der Knöpfe, nicht als sichtbarer Text.
+- Datensparsam: src/server/queries/heute.ts liefert customerPhone und customerEmail nur für offene Bestellungen mit Absprache; die übrigen Zeilen tragen keine Kontaktdaten (auch nicht im RSC-Payload). Der Druck der Packliste zeigt keine Kontaktdaten.
+- Nur für den Hof der Bestellung: dieselbe Berechtigung wie die bestehenden Bestelldetails (farmId der Sitzung). Integrationstests: fremder Hof → weder Marke noch Kontakt; Zeile ohne Absprache → weder tel: noch mailto: in Props/HTML.
+- Pflicht-Gegenlesen „Daten“ vor dem Push (prüft besonders Heute und RSC-Payload); Ergebnis im PR-Text.
+
+Mail „Neue Bestellung bar“ (Nr. 256; nur mit „256 freigegeben“, sonst entfällt die Nummer und Antwort 7 geht als offen in den Morgenbericht)
+- Neue Mail-Art 'bestellung-bar-hof' (Weg „wichtig“, Name „Neue Bestellung bar (an den Hof)“, Bezug bestellungBezugSchema in src/schemas/mail-auftrag.ts), Renderer über die bestehende Vorlage new-order-notification.tsx (Bar-Fall), an hofKontaktEmail wie die übrigen Hof-Mails, kein Reply-To.
+- Renderer nur, solange die Bestellung auf Bestätigung wartet: rendereBestellungBarHof verwirft mit `{ verworfen: 'nicht_mehr_offen' }`, wenn der Status nicht PENDING_CONFIRMATION ist oder die Bestätigungsfrist schon vorbei ist (istVerwaist, src/lib/fristen.ts Z. 108; Muster rendereAbholbereit und der Bar-Bestätigungslink in passtNochmal Z. 1280); dieselbe Regel in passtNochmal (src/lib/betrieb-mails.ts), sodass der Support die Mail nur zu offenen Bar-Bestellungen nochmal schickt.
+- Inhalt nach Board Bild 2: Betreff „Neue Bestellung für <Abholtag> – <Bestellnummer> (Bar bei Abholung)“, h1 „Neue Bestellung eingegangen“, Satz „<Name> hat eine Bestellung aufgegeben. Die Zahlung (Bar bei Abholung) erfolgt bei der Abholung.“, Bestellnummer, Abholung, „<Name> bestätigt bis <Wochentag>, <Datum>, <Uhrzeit> Uhr. Erst dann packst du.“ (Frist aus fristVon, src/lib/fristen.ts, nur gelesen; Format wie die Kundin-Mail nach der C-Zeile mail-kauf), Positionen (G14, sobald vorhanden; sonst die heutige Positionszeile), „Bar zu kassieren € …“ (ohne Doppelpunkt), „Bei Heute ansehen →“, Fuß „Versandt von Agrilo.“
+- „Bar zu kassieren“ kommt allein aus barZuKassierenCents(order); nie aus total oder einem Rückfall. Der Renderer übergibt customerPhone NICHT; die Vorlage macht customerPhone optional und zeigt die Zeile „Kundin“ dann nur mit Namen (Online-Fall unverändert). Kein tel:, keine E-Mail-Adresse und keine Notiz der Kundin in dieser Mail.
+- Auslöser: genau ein Aufruf `stelleEinOhneRisiko('bestellung-bar-hof', order.id, bestellMailAuftrag('bestellung-bar-hof', order))` im bestehenden nachDerAntwort-Block von Schritt 11b in src/app/api/checkout/route.ts, NACH dem try/catch der Kundin-Mail, in eigenem Aufruf (wirft nie). Der Wiederholungsweg (bestehende Bestellung) bekommt keinen Aufruf. Sonst ändert sich in route.ts nichts; geht das nicht ohne weitere Änderung: nicht bauen, Morgenbericht.
+- Tests: Render bar vor dem Stichtag → Bar zu kassieren = Warenpreis; Render bar nach dem Stichtag mit Gebühr > 0 → gleich barZuKassierenCents; HTML ohne tel:, ohne Seed-Telefonnummer, ohne E-Mail-Adresse und Notiz der Kundin; Renderer verwirft bei CONFIRMED, CANCELLED, PICKED_UP und bei abgelaufener Frist (PENDING_CONFIRMATION mit istVerwaist). Integration: Bar-Bestellung über die Route legt genau einen Auftrag an; ein Fehler beim Einstellen ändert weder Bestellung noch Antwort; zweiter Aufruf legt keinen zweiten an. Wachen nachziehen: mail-wege-wache, MAIL_ART_NAME, Admin › Betrieb › Mails.
+- Voller Prüfdurchgang (Kaufstrecke), Pflicht-Gegenlesen „Geld“ UND „Daten“.
+
+Gemeinsame Bausteine (Abschnitt 3.2 der Liste; je Baustein eine Quelle in src/components/ui/ bzw. src/lib/, Vorschau in /intern/bausteine, Render-Test)
+- G1 WerkzeugKopf (src/components/ui/werkzeug-kopf.tsx) ist der feste Handy-Kopf UND der Web-Kopf in einem Baustein: Handy feste Leiste 56 px, bg-card, Linie unten, „‹“, Titel als h1, Unterzeile, rechts höchstens eine Aktion; Web grüner unterstrichener Textlink „‹ <Elternseite>“, h1, Unterzeile, Aktion bündig rechts. Ziel und Name nur aus elternseite (src/lib/bauern-navigation.ts); die Rückweg-Logik aus unterseiten-kopf.tsx wird übernommen, nicht neu geschrieben. Er ersetzt UnterseitenKopf; Wache mit Bestandsliste der UnterseitenKopf-Aufrufer, die nur schrumpft. unterseiten-kopf.tsx und -stil.ts löscht der Dirigent im Sammel-PR, sobald die Liste leer ist. Die Regel „h1 sr-only, wenn Titel = Elternseite“ (Nr. 56) entfällt.
+- G2 Aktionsleiste am Handy, G3 Hinweiskasten/Hof-Balken unter dem Kopf (ohne Uhr, ohne Hof-ID-Zeile, ohne Nachsatz; Hof-ID nur im vorausgefüllten Link), G4 EmptyState ohne Symbol (Prop `symbol` entfällt mit allen Aufrufern, Grundform linksbündig mit durchgezogenem Rand), G5 Größenkachel (bestehende groessenkachel.tsx umbauen), G6 Formularfehler und „Nochmal“, G7 Toast, G8 Rundungen in px, G9 Kunden-Shell-Kopf, G10 Unterleiste der Kundschaft, G11 Seitenfuß und Chip-Gruppe, G12 Bilder im Dunkeln, G13 Stepper und Diagrammfarbe, G14 Positionszeile und Kurznummer – jeweils wie in Abschnitt 3.2 der Liste.
+- G6 Ausnahmen: Verkäufe bekommt kein „Nochmal“ (C-Zeile verkaeufe: doppelte Buchung und doppelter Vorratsabzug, D1). Produkt anlegen bekommt kein „Nochmal“ (siehe Abnahme-Grundlage); ein Weg über eine Formular-ID geht als Regelvorschlag in den Morgenbericht (bräuchte Gegenlesen „Daten/Sicherheit“: Format-Prüfung, ID eines fremden Hofs ergibt einen Fehler ohne Auskunft).
+- G8: Konstanten RUNDUNG (karte 12 px, feld 10 px, hinweis 12 px, blatt 16 px) in src/components/ui/rundung.ts; die Tokens in globals.css bleiben. Wache tests/rundungen-wache.test.ts: rounded-xl/2xl/3xl nur in Dateien der Bestandsliste; sie schrumpft mit jeder Seiten-Nummer.
+- Geldsätze nach V1 („Du bekommst € … · die Kundin zahlt € …“, „Bar bis <Datum> ohne Gebühr für dich.“) als EINE Anzeige-Hilfe in src/lib/plattformgebuehr.ts über die bestehenden Funktionen (gebuehrJeStueckCents, bestellGebuehr, einzugAbFuer), Satz aus der Hof-Einstellung. Keine neue Rechnung, Geld-Tests ohne geänderte Erwartung, Pflicht-Gegenlesen „Geld“. → Nr. 248
+- Vorschau /intern/bausteine: 245 legt in src/app/intern/bausteine/bausteine-vorschau.tsx einmal Einhängepunkte für 246, 247 und 248 an (Import je einer eigenen Datei src/app/intern/bausteine/vorschau-<nr>.tsx, zunächst leer); 246–248 ändern nur ihre eigene vorschau-<nr>.tsx, nie bausteine-vorschau.tsx.
+- Bausteine, die Dateien von 259 nutzen (checkout-form.tsx: EmptyState Z. 962, Hinweiskarte Z. 686, 753, 956; /agb und /konditionen: KundeShellMitSitzung; /onboarding: KundeFokusShell): Ihre Schnittstelle (Props) ändert sich nur in 246, und 246 startet erst nach 259. 245 ändert hinweiskarte.tsx nicht (G3 kommt als neue, additive Variante bzw. Datei); 247 ändert die Shells ohne Änderung ihrer Props.
+- Route für Route: Die Baustein-Nummern bauen die Bausteine und stellen nur die Bausteine selbst und ihre Vorschau um (G4 und G9–G11 wirken als gemeinsame Quelle sofort überall; das ist gewollt). Die Seiten-Nummern ziehen ihre Routen auf G1–G3, G5–G8, G12–G14 um; jede Route bleibt im Geltungsbereich data-design="neu".
+
+Seiten
+- Gebaut werden alle B-Zeilen der Boards der Nummer, nach der Spalte „Umsetzung“ der Liste. Texte wörtlich wie dort.
+- Prozent und Wort der Gebühr nie als fester Text („6 %“ o. ä.): Satz aus der Bestellung (Snapshot, gebuehrModell und angewendeter Satz) bzw. aus der Hof-Einstellung, Wort über gebuehrBezeichnungFuer. Bestellungen im Modell „bisher“ bzw. mit gebuehrModell null zeigen die bisherige Zahlzeile; bei entfallener Gebühr kein „inkl.“ (wie heute). gebuehr-wort-wache bleibt grün.
+- /hoefe: Die fertigen Funktionen bleiben (C-Zeilen: Kasten „Ort ändern“, Taxonomie-Chips, Hinweis „kein Kartenpunkt“, Häufchen, Löschen-×, getönte Listenkarte). Die Vorschlagsliste öffnet nur beim Tippen und schließt nach dem Absenden (B).
+- Offene Seiten aus Nr. 238 (Hofdaten/Zahlung, Konto, WhatsApp/Plakat, Beiträge, Region-Liste) gehören in 250 bzw. 251.
+- Video der Startseite bleibt (A1 Lauf 31), gedämpft über FOTO_HUELLE.
+- Kasse (253): nur Darstellung über die Bausteine, keine Logik; die Kasse hat in der Liste nur C, R und U.
+- Mails (255): Belehrung, Muster-Formular, Rücktritt- bzw. N39-Wortlaut, 5-b-Satz (Nr. 207/214) und Anbieterzeile werden nicht umformuliert. Beim Verschieben der Texte in eine Datei je Mail belegt ein Render-Vergleich je Mail (HTML vorher/nachher mit derselben Seed-Bestellung), dass sich diese Blöcke nicht ändern. Weicht einer ab: zurück, Bericht unter „Recht“.
+
+Regelvorschläge aus Morgenbericht 31 – als entschieden übernommen (Werkzeug und Prüfung)
+- Doku-Wachen vor jedem Push, auch bei reinen Doku-Commits: Skript `pnpm pruefen:doku` (package.json, nur Skript-Zeile) = vitest run telefonnummern-wache, doku-doppelte-absaetze, wortliste. Markiert: Der Vorschlag sagte „als Hook vor git push“; gebaut wird ein Skript plus Regel in docs/nachtlauf.md §4a, weil .claude/settings.json und .claude/hooks unberührt bleiben.
+- flock für schwere Befehle; eigene .next-Kopie je Fotograf (siehe Stabilität).
+- Rundungen in px als Wache (G8).
+- CODING_STANDARDS §7: Kacheln und Regionskarte im Dunkeln gedämpft über ui/bild-dunkel.ts (multiplizieren).
+- Werkzeug-Kopf als Baustein in ui/ (G1).
+- Startfokus-Wache: DialogMitte/SheetBlatt mit orangem Hauptknopf (löschen, stornieren, pausieren, stilllegen) setzen initialFocus auf „Abbrechen“; Wache mit Bestandsliste.
+- Mail-Texte in EINE Textdatei je Mail (src/emails/texte/<mail>.ts oder in die Vorlage); Regel in DESIGN_SYSTEM „E-Mails“.
+- `[&>`-Wache: className mit `[&>` an ui/-Bausteinen nur mit Bestandsliste (heute 22 Dateien), die schrumpft.
+- Abwesenheit am Kennzeichen prüfen, nicht am Wort; Wache über den Importgraphen für Konstanten aus 'use client'-Modulen in Server-Komponenten (beide TESTING_GUIDELINES §2); Knopf mit Ziel je Breite als zwei Links mit lg:hidden/hidden lg:flex (DESIGN_SYSTEM „Komponenten“); Zählregel je Feld am Typ nennen (CODING_STANDARDS §2).
+- Kein Vorschlag aus Morgenbericht 31 ändert eine Produktregel; deshalb steht unter „Nicht“ keiner davon.
+
+Register (Doku-PR, wörtlich; N45 ist für A005 = Nr. 259 bestimmt, diese Einträge sind die nächsten zwei freien Kennungen danach)
+- „### N46 · Antworten auf Morgenbericht 31 und Abnahme-Grundlage (6.11.2026): Die Entscheidungsliste docs/nachtlauf/berichte/lauf32-board-oder-code.md gilt für die Abnahme: B wird gebaut, C, R und U sind kein Mangel. [GELD-KACHEL] Packliste auf Heute mit Kurzname, ohne Uhrzeit. Passwort-Auge, ‚Willkommen, <Vorname>‘, Kürzel ‚HM‘, Sicherheits-Link 24 Stunden und die Bot-Bremse mit stillem Scheinerfolg bleiben. [BAR-MAIL] Der Link ‚Dieselbe Bestellung nochmal aufgeben‘ entfällt. Leerzustände ohne Symbol. ‚Höchstens zweimal im Monat‘ entfällt. Ein Prüf-Passkey entsteht nur in einer lokalen Wegwerf-Datenbank (scripts/pruefung); App-Code und Passkey-Logik bleiben unverändert (N20).“
+- Platzhalter in N46, nur je nach Startauftrag:
+  - [GELD-KACHEL] = mit „Geld-Kachel-Regel bestätigt“: „Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen.“ Ohne den Satz: „Zählregel der Geld-Kachel: offen.“
+  - [BAR-MAIL] = mit „256 freigegeben“: „Der Hof bekommt die Mail ‚Neue Bestellung bar‘.“ Ohne den Satz: „Mail ‚Neue Bestellung bar‘ an den Hof: offen (Sperrzone Kasse).“
+- „### N47 · Abholung nach Absprache (6.11.2026): Enthält eine Bestellung ein Produkt mit dem Abholhinweis ‚Abholung nach Absprache‘, sagt die Kasse über der Terminwahl ‚Der Hof meldet sich bei dir, um die Abholung abzustimmen. Wähl trotzdem einen Wunschtermin.‘ und das Notizfeld heißt ‚Notiz zur Abholung‘. Die Bestätigungsmail sagt ‚Der Hof stimmt die Abholung mit dir ab. Du kannst einfach auf diese Mail antworten.‘ (mit Reply-To auf die Profil-E-Mail des Hofs) bzw. ‚Der Hof stimmt die Abholung mit dir ab und meldet sich bei dir.‘ Der Hof sieht in Bestellung und Heute die Marke ‚Abholung absprechen‘ mit ‚Anrufen‘ und ‚Mail schreiben‘, nur bei offenen Bestellungen. Kein neues Feld, Preis und Zahlung unverändert.“
+- Unter N9 als neue Zeile: „- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Leerzustände ohne Symbol; ‚Symbol‘ ist aus der Entscheidung gestrichen.“
+- Unter N32 als neue Zeile, NUR mit „Geld-Kachel-Regel bestätigt“: „- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Die Geld-Kachel in Admin › Heute und ‚Woche: n‘ zählen alle in der Woche eingegangenen Bestellungen außer stornierten und abgelaufenen, online nur bezahlte, vor Ort ab Eingang, ohne Testzahlungen; ersetzt die Zählweise nach Nr. 240.“
+- Unter N20 als neue Zeile: „- **Ergänzung (uttoranger, im Chat, 6.11.2026; N46):** Für die lokale Abnahme darf ein Prüf-Passkey nur in einer Wegwerf-Datenbank auf localhost angelegt werden (scripts/pruefung); nie in Code, Entwicklungs- oder Produktionsdatenbank.“
+- In der Tabelle „O – Offen“ neue Zeile: „| O9 | Rücktritts-Hinweise an Kundinnen (6.11.2026) | Zeile ‚14 Tage Rücktrittsrecht …‘ je Produkt auf der Produktseite und zwei Sätze in der Storno-Mail (Rückzahlung, verderbliche Ware); Wortlaut liegt bei der Anwältin. Lauf 32 baut nicht. |“ (Spalten wie die bestehenden O-Zeilen.)
+- P2 bekommt KEINEN Register-Eintrag (offen).
+- Stand-Zeile, Fassung mit A005-Datei: „Stand Lauf 32 (uttoranger, 6.11.2026): N46 und N47 entschieden; Abnahme nach der Board-oder-Code-Liste, gemeinsame Bausteine G1–G14 und die B-Zeilen je Board in Nr. 243–258b, dazu AGB 1.0 mit dem Stichtag in Nr. 259 (N45, A005), in zwei Abschnitten (freigabe.md §36). Keine Migration, kein Paket, keine neue Variable. Nicht: P1 (O9, Anwältin), Zahl der Gründungsplätze (offen), Recht-Texte außer AGB 1.0 nach A005 (Datenschutz A006, Impressum A004), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F030), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien.“
+- Stand-Zeile, Fassung ohne A005-Datei (259 entfällt): derselbe Satz ohne „, dazu AGB 1.0 mit dem Stichtag in Nr. 259 (N45, A005)“ und mit den Kennungen nach §0a. Endet 259 nach dem Doku-PR als Entwurf, ersetzt der Dirigent im Sammel-PR (docs:-Commit) die Stand-Zeile durch diese Fassung und vermerkt „N45 frei, A005 offen“; der Morgenbericht nennt die Lücke unter „Für dich zu tun“.
+
+══════════════════════════════════════════════════════════════════════
+UMSETZUNG
+══════════════════════════════════════════════════════════════════════
+
+§0a Vorprüfung (vor 243a; sonst STOPP und melden)
+- docs/nachtlauf/berichte/lauf32-board-oder-code.md liegt vor (auf main oder unversioniert im Arbeitsordner). Fehlt sie: STOPP, nichts anlegen.
+- docs/nachtlauf/berichte/a005-agb-1-0-stichtag.md liegt vor? Ins Zeitbuch „A005-Datei: ja/nein“; ohne sie entfällt 259 (kein STOPP).
+- A005-Datei vor dem Commit: `pnpm vitest run tests/telefonnummern-wache.test.ts` grün und eine Suche nach E-Mail-Adressen außer @example.com, @beispiel.at (auch Subdomains) und @agrilo.at, z. B. `grep -noiE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}' <datei> | grep -viE '@(example\.com|([a-z0-9-]+\.)*beispiel\.at|agrilo\.at)$'`, dazu eine Suche nach Schlüssel-Präfixen `grep -nE 'sk_(live|test)_|rk_(live|test)_|pk_live|whsec_|re_[A-Za-z0-9]{8,}|sntrys_|eyJ[A-Za-z0-9_-]{10,}' <datei>`. Ein Treffer: Datei nicht committen, 259 entfällt, Fundstelle (Zeile, ohne den Wert) im Morgenbericht.
+- `pnpm vitest run tests/telefonnummern-wache.test.ts tests/doku-doppelte-absaetze.test.ts tests/wortliste.test.ts` ist mit der Liste (und der A005-Datei) grün. Ist eine wegen der Liste rot, wird die Liste nicht geändert: STOPP vor 243a, Fundstelle im Morgenbericht. Ist eine nur wegen der A005-Datei rot: Datei liegen lassen, nicht committen, 259 entfällt, weiter.
+- Stehen „256 freigegeben“ und „Geld-Kachel-Regel bestätigt“ im Startauftrag? Ein Satz zählt NUR, wenn er als eigene Zeile in der Nachricht der Projektleitung steht, außerhalb des Auftragstexts und außerhalb jedes Codeblocks; dass er im Auftragstext selbst vorkommt, zählt nie. Ins Zeitbuch: ja/nein und die Fundstelle (z. B. „Zeile 2 der Startnachricht“). Ohne den jeweiligen Satz entfällt 256 bzw. die Zählregel in 258.
+- main enthält c8aadaed7 oder später. Ist etwas dazugekommen, die Ausgangslage je Nummer am Code neu bestätigen (Zeitbuch, ganz oben).
+- Register-Nummern: F = erste freie N-Nummer auf main beim Start (Stand c8aadaed7: N45). Mit A005-Datei: 259 schreibt seinen Eintrag als F (in der Datei „N45“), die beiden Einträge dieses Laufs heißen F+1 und F+2 (in diesem Text N46 und N47). Ohne A005-Datei heißen sie F und F+1. Weicht F von N45 ab (z. B. A006 schon gemergt) oder entfällt 259, gilt die Zuordnung überall in diesem Auftrag und in der Datei-Einbindung (Einträge, Ergänzungen, Platzhalter, Stand-Zeile, Verweise). Ins Zeitbuch: welche Nummern es wurden. Nie einen bestehenden Eintrag überschreiben; Einträge stehen im Register in Nummernfolge (259 setzt seinen Eintrag vor N46).
+- agent-browser läuft (`agent-browser --version`, Bild einer lokalen Seite). Sonst STOPP; kein Lauf ohne Bilder.
+- Postgres läuft im Container; TEST_DATABASE_URL und jede Prüf-DB zeigen auf localhost. Nie eine Adresse aus der Umgebung.
+- `pnpm install --frozen-lockfile`, `pnpm typecheck` (NODE_OPTIONS=--max-old-space-size=6144), `pnpm lint` (0 Fehler), `pnpm test` grün.
+- Im Container ist kein Stripe-Schlüssel mit sk_live_ oder rk_live_ gesetzt (nur das Präfix prüfen, nie den Wert ausgeben, nie entschlüsseln).
+
+§0 Zuordnung
+- Modell: Doku-PR mit Sonnet; alle Nummern mit Opus; tester Sonnet; pruefer Opus, höchstens 22 Schritte je Aufruf; pruefer-ui Opus.
+- Voller Prüfdurchgang: 243 (Sicherheit des Prüfwerkzeugs), 244, 248, 251, 253, 256, 257, 258, 259. Gezielt: die übrigen.
+- Pflicht-Gegenlesen vor dem Push durch einen eigenen pruefer-Aufruf mit nur diesem Auftrag:
+  - „Geld“: 244, 255 (Mail-„Gesamt“), 248, 251 (Gebühr je Zeitraum, wenn gebaut), 253 (Zahlzeile), 256, 258, 259 (Kassensatz, Mail-Anhang je Snapshot)
+  - „Recht“: 259 (Wortgleichheit AGB, widerruf.ts unverändert)
+  - „Daten“: 256, 257, 259 (Zustimmung der Höfe: nur der eigene Hof, nur AGB_NEUESTE, Integrationstest; Mail-Anhang je Snapshot)
+  - „Sicherheit“: 243 (Loopback-Sperre, Abschottung, Grenze)
+  Ergebnis wörtlich im PR-Text.
+- Integrationstests (im Worktree immer in der Form aus „Prüf-Umgebung“: `TEST_DATABASE_URL=… pnpm exec vitest run --config vitest.integration.config.ts`, nie `pnpm test:integration`, weil das .env.test lädt): 243 (Prüf-Seed gegen localhost), 259 (agb-zustimmung), 256, 257, 258, im Sammel-PR ganz.
+- Lesemappe 259 zusätzlich: die A005-Datei ganz und die dort genannten Abschnitte (ARCHITECTURE, CODING_STANDARDS, TESTING_GUIDELINES, DESIGN_SYSTEM, BAUSTEINE zu AGB, Rechtstext, Stichtag, Belehrung), Register O4, N38, B1, N2, K1.
+- Lesemappe (4a Punkt 1): CLAUDE.md §2, CODING_STANDARDS und TESTING_GUIDELINES ganz; DESIGN_SYSTEM nur „Typografie und Form“, „Komponenten“, „Zustände“, „Dialoge und Blätter“, „Wortliste“ und die eigenen Routen; ARCHITECTURE §5; BAUSTEINE.md; Register N1, N8, N9, N20, N29, N32, N38, N41–N47; der Abschnitt der eigenen Boards aus der Liste mit Q1–Q5 und Abschnitt 3.2; die Boards der Nummer unter docs/mockups/redesign-2026-11/.
+- Bilder je Nummer (4a Punkt 6 b, Umsetzer selbst): jede geänderte Route bei 390 und 1440, hell und dunkel, je Zustand des Boards, unter .nachtlauf/screens/<nr>/r<runde>/; danach pruefer-ui auf die eigenen Boards, höchstens drei Runden. Diese UI-Runden zählen nicht zu den zwei Nachbesserungsrunden aus §4 Schritt 4 (tester/pruefer); nach jeder UI-Runde mit Code-Änderung prüft der pruefer nur den Rundendiff (4a Punkt 3). Unter 5 Sternen nach drei Runden: Nummer abschließen, Rest mit Zeilenverweis im Bericht.
+
+§1 Warteschlange und Rangfolge (fest, streng nach Abhängigkeiten)
+
+Abschnitt A
+- 243a Doku-PR (docs/lauf32 von main, Sonnet, ohne Code)
+- Welle 1, von docs/lauf32: 243 ∥ 244; 259 (von docs/lauf32, PR gegen docs/lauf32, allein mergebar) auf dem ersten frei werdenden Platz
+- Welle 2, vom Zwischenstand integration/lauf32 nach 243 und 244: 245 auf dem nächsten freien Platz
+- Platzregel: Jeder frei werdende Platz geht an die nächste startbare Nummer der Rangfolge.
+- Welle 3, vom Zwischenstand nach 245: 247, 248 auf den frei werdenden Plätzen; 246 erst, wenn 259 im Zwischenstand ist (checkout-form.tsx); 256 nach 259 (nur mit Freigabe); 258 (keine Abhängigkeit, nur mit Bestätigung)
+- Welle 4a, vom Zwischenstand nach 245–248 und 259 (voller Lauf grün): 249 – startet nur, wenn es bis Stunde 11 nach dem Start beginnen kann, sonst rückt es nach B
+- HALTEPUNKT A (siehe unten)
+
+Abschnitt B
+- Start nur mit dem Auftrag „Nachtlauf 32 fortsetzen“ der Projektleitung, in einer neuen Sitzung (siehe Haltepunkt A).
+- Welle 4b, vom Integrationszweig von B: 252 ∥ 253, danach 250, 251 (249, falls nicht in A)
+- Welle 5, vom Zwischenstand: 257 nach 249, 253, 256 und 259 (fehlende überspringen nach §1); dann 254 (nach 259 und 251) ∥ 255 (nach 257); 258b nach 243, nur wenn der Admin abgenommen ist
+- Sammel-PR, danach der Schluss-Durchgang (5 h; hat Vorrang vor jeder weiteren Nummer)
+
+Rangfolge (jede Nummer steht hinter allen ihren Vorgängerinnen; bei Zeitnot gilt sie, eine Nummer startet nur, wenn ihre Vorgängerinnen grün im Zwischenstand sind, sonst die nächste startbare):
+243a → 243 → 244 → 259 → 245 → 247 → 246 → 248 → 256 → 258 → 249 ‖ HALTEPUNKT A ‖ 252 → 253 → 250 → 257 → 251 → 255 → 254 → 258b → Sammel-PR → Schluss-Durchgang
+- 259 hat Vorrang vor allen Seiten-Nummern (Go-live-kritisch, Tag T 24.11.2026); es hängt von keiner Nummer ab, 246 hängt von ihm ab (checkout-form.tsx). Ist 259 entfallen oder Entwurf, startet 246 ohne 259. Ein späteres 259 (in B oder in einer Fortsetzung) holt dann den Zwischenstand mit 246 per Merge herein (kein Rebase) und schreibt seine Tests gegen ihn.
+- Höchstens zwei Umsetzer gleichzeitig.
+- Ist eine Vorgängerin Entwurf oder entfallen, startet die Nachfolgerin vom letzten grünen Zwischenstand und lässt Teile, die die Vorgängerin brauchen, mit Bericht weg. 245 nach drei Runden nicht fertig: 246–249 entfallen in Abschnitt A, 252 läuft in B ohne die Bausteine; weiter mit 259, 256, 258, dann Haltepunkt A; Abschnitt B mit 253 (ohne Bausteine), 257, 255.
+
+Haltepunkt A
+- Erreicht, wenn 249 und 259 fertig (oder Entwurf/entfallen/nach B gerückt) sind, spätestens 13 h nach dem Start: Laufende Nummern sichern (WIP-Commit, nicht pushen, wenn rot), keine neue Nummer starten.
+- Zwischenstand integration/lauf32 mit allen fertigen Nummern, voller Lauf und Integration grün, pushen.
+- Zwischen-Durchgang nur für die Boards der fertigen Nummern (Fotografen, pruefer-ui, Messung) → abnahme-lauf32.md, Abschnitt „Zwischen-Durchgang A“.
+- Aufräumen der Prüf-Umgebung.
+- Zwischen-Morgenbericht docs/nachtlauf/morgenbericht-<datum>-lauf32-a.md auf integration/lauf32: Nummern-Tabelle, Sterne der fertigen Boards, offene Fragen (P2, Admin-Mängel, fehlende Startsätze), Stand von 259 mit der Liste „Für die Projektleitung am Tag T“, was in B folgt, Wiederaufnahme-Stand.
+- Sammel-PR integration/lauf32 → main als ENTWURF öffnen (Merge-Commit, nicht Squash; §4 Schritt 8: Nummern im Entwurf-Status kommen nicht hinein). Die Projektleitung kann ihn nach Durchsicht des Zwischen-Morgenberichts auf „bereit“ stellen und mergen; der Lauf mergt nie.
+- Danach endet die Sitzung. Abschnitt B startet nur mit dem Auftrag „Nachtlauf 32 fortsetzen“ der Projektleitung in einer neuen Sitzung. Dann liest der Dirigent Zeitbuch und status.md, prüft §0a erneut (ohne 243a) und wählt den Integrationszweig von B:
+  - Hat die Projektleitung den Sammel-PR von A gemergt: integration/lauf32b von main; die Nummern von B zweigen davon ab (§7); der Sammel-PR von B geht von integration/lauf32b nach main.
+  - Sonst: origin/main in docs/lauf32 und integration/lauf32 holen (§2 Regel 8); B arbeitet auf integration/lauf32 weiter; der Entwurf-PR von A wird zum Sammel-PR von A+B (Text aktualisieren, am Ende auf „bereit“).
+  Danach beginnt er bei der ersten offenen Nummer von Abschnitt B.
+
+Dateigrenzen (nie zwei Nummern an derselben Datei außerhalb dieser Grenzen; je Nummer aus git grep der genannten Funktionen ableiten, 4a Punkt 1)
+- 243: scripts/pruefung/** (neu), package.json (nur Skript-Zeilen pruefen:doku und pruefen:seed), tests/pruefung-*.test.ts, docs/nachtlauf.md (Abschnitt Prüfwerkzeug), docs/ai/TESTING_GUIDELINES.md §6 „Bekannte Umgebungsfallen“.
+- 244: src/lib/servicegebuehr.ts (nur neue Anzeige-Funktion), src/components/bestaetigung/bestaetigung-teile.tsx, die gefundenen Anzeige-Stellen (Liste im Bericht), Tests.
+- src/components/ui/** gehört in Welle 2/3 den Baustein-Nummern:
+  - 245: ui/werkzeug-kopf.tsx (neu), ui/rundung.ts (neu), Aktionsleiste (neu), hofbereich/hof-balken.tsx; src/app/(hof)/layout.tsx und src/server/hofbereich.ts nur für G3; Vorschau; Beispiel-Route /settings.
+  - 246: ui/empty-state.tsx und alle Aufrufer (nur das Prop), hinweiskarte.tsx, netz-hinweis.tsx, feld-fehler.tsx, shared/formular-meldungen.tsx, sonner.tsx, dialog.tsx/sheet.tsx nur für die Startfokus-Wache.
+  - 247: shells/kunde-shell*.tsx, shells/kunde-fuss.tsx, ui/bottom-nav.tsx, ui/chip.tsx, ui/segment.tsx.
+  - 248: ui/groessenkachel.tsx, ui/stepper.tsx, ui/bild-dunkel.ts, Positionszeile und Kurznummer in src/lib, Geldsatz-Hilfe in src/lib/plattformgebuehr.ts.
+  Spätere Nummern ändern ui/ nur mit Grenz-Erweiterung durch den Dirigenten (Eintrag im Zeitbuch).
+- 259 (A005): die Dateien aus Schritt 1–8 der A005-Datei, das sind nach heutigem Stand src/lib/rechtstexte/** (agb.ts, neu agb-0-9.ts und agb-fassung.ts, agb-datei.ts, agb-einbindung.ts, stuecke.ts), src/app/(public)/agb/** (page, neu error.tsx und [fassung]), src/components/rechtstexte/agb-ansicht.tsx (nur Prop), src/app/(public)/konditionen/page.tsx und neu error.tsx, src/lib/konditionen.ts (nur KONDITIONEN_ENTWURF und die Stichtag-Sätze), src/lib/email.ts (agbAnhang, AGB-Zeile), src/emails/order-confirmation.tsx und onsite-confirmation.tsx (AGB-Zeile), die Wege Nochmal schicken und Admin-Vorschau (src/server/mail-arten/**, src/server/actions/betrieb.ts, soweit nötig), src/server/actions/plattform-einstellung.ts (nur revalidatePath), src/lib/agb-zustimmung.ts, src/server/actions/agb-zustimmung.ts, src/components/heute/agb-karte.tsx, src/app/(hof)/dashboard/page.tsx und src/app/(auth)/onboarding/page.tsx (nur Stichtag lesen), src/components/checkout/checkout-form.tsx (nur KaufknopfSaetze), docs/recht/agb.md, neu docs/recht/agb-0.9.md, docs/entscheidungen.md (N45, Vermerke O4/N38), DEVELOPMENT.md, docs/ai/ARCHITECTURE.md, BAUSTEINE.md, die Tests aus Schritt 8 und die Ausnahmelisten der Wachen. Die genaue Liste bestätigt der Umsetzer zuerst mit git grep gegen den heutigen Stand (Zeilen der Datei sind von 1216b8c).
+- 249 Hof-Alltag: src/app/(hof)/dashboard/**, orders/**, products/**, src/components/heute/**, hof-bestellungen/**, produkte/**, products/**, shells/hof-shell.tsx (Blätter Mehr/Neu), src/lib/heute.ts, src/server/queries/heute.ts, orders.ts, products.ts.
+- 250 Einstellungen und Teilen: src/app/(hof)/settings/**, status/**, src/app/teilen/**, src/components/hof-einstellungen/**, settings/** und die Beiträge-/WhatsApp-Komponenten.
+- 251 Hof-Werkzeuge: src/app/(hof)/analytics/**, customers/**, sales/**, postfach/**, meldungen/**, fehler-melden/**, region/**, farm-page/** und ihre Komponenten; src/server/queries/auswertung.ts.
+- 252 Finden: src/app/(public)/page.tsx, hoefe/**, [farmSlug]/page.tsx, [farmSlug]/produkt/**, src/components/startseite/**, hoefe/**, hofseite/**, produktdetail/**.
+- 253 Kauf und Konto: src/components/farm/cart-sheet.tsx, src/components/checkout/** (nur Darstellung), bestaetigung/**, [farmSlug]/confirm/**, bestellung/**, bestaetigen/**, (public)/bestellungen/**, src/app/account/**, (auth)/login/**, register/**, verify/**, onboarding/**, forgot-password/**, reset-password/**.
+- Gemeinsame Meldungs-Bausteine (src/components/shared/meldung-form.tsx, src/components/ui/meldung-formular-ansicht.tsx; genutzt von /fehler-melden (251), /problem-melden (254) und settings/account/darstellung-karte.tsx (250)): gehören 251; 250 und 254 ändern sie nicht, 254 startet erst nach 251.
+- Warenkorb (src/components/farm/cart-sheet.tsx und die Warenkorb-Leiste der Hofseite): gehören 253; 252 ändert sie nicht.
+- 254 System und Rechtsrahmen (auf dem A005-Stand): account/unsubscribe, account/neuigkeiten-bestaetigen, sicherheit/nicht-ich, konto/email-bestaetigen, (public)/widerruf/**, agb, datenschutz, impressum (nur Rahmen; /konditionen nur Rahmen ohne AktionAbschnitt), not-found.tsx, error.tsx, (public)/problem-melden/**.
+- 255 Mails: src/emails/**, src/lib/email.ts, src/server/mail-arten/**, neue Textdateien unter src/emails/texte/, dazu die Mail-„Gesamt“-Stellen aus dem Bericht von 244.
+- 256: src/schemas/mail-auftrag.ts, src/server/mail-arten/**, src/lib/betrieb-mails.ts, src/lib/email.ts, src/emails/new-order-notification.tsx, src/app/api/checkout/route.ts (nur der eine Aufruf in 11b), Wachen dazu.
+- 257: src/lib/abholhinweise.ts, eine Abfrage in src/server/queries/, checkout/page.tsx und checkout-form.tsx (nur Anzeige), src/lib/email.ts (baueOrderConfirmation), src/emails/order-confirmation.tsx, die Lader der Mail-Art, bestell-detail.tsx, src/lib/heute.ts, src/server/queries/heute.ts, src/components/heute/**.
+- 258: src/server/queries/admin-heute.ts, die Admin-Heute-Komponenten, Tests dazu. 258b: die betroffenen Dateien unter src/app/admin/** und src/components/admin/** (Liste aus der Admin-Erstabnahme).
+- Nacheinander geteilt: docs/ai/DESIGN_SYSTEM.md (je Nummer eigener Abschnitt „… nach der Abnahme Lauf 32 (Nr. …)“), DEVELOPMENT.md (je ein Eintrag), docs/ai/BAUSTEINE.md (nur über pnpm bausteine), Bestandslisten der Wachen (je Nummer eine eigene Datei in einem Ordner wie wortliste-offen; im Sammel-PR so klein wie erreicht, Rest im Morgenbericht). Die Ausnahmelisten in tests/wortliste, gebuehr-wort-wache, fachwort-wache, warenkorb-wort-wache und ladeansichten ändert in Abschnitt A nur 259; braucht 245, 246, 247 oder 248 dort einen Eintrag, schreibt die Nummer ihn in ihre eigene Datei (tests/wortliste-offen/<nr>.ts bzw. gleichwertig) oder wartet, bis 259 im Zwischenstand ist. 245 lässt die Exporte von src/server/hofbereich.ts unverändert (dashboard/page.tsx in 259 importiert verlangeHofDerSitzung); 249 behält in src/lib/heute.ts die Exporte ABHOLUNG_ERLEDIGT und abholtage (admin-heute.ts in 258).
+
+Doku-PR 243a (docs/lauf32 von main, Sonnet, ohne Code)
+1. Entscheidungsliste und, wenn vorhanden und grün, die A005-Datei: liegen sie unversioniert da, unverändert committen (Präfix docs:), nach der Vorprüfung §0a.
+2. docs/nachtlauf/freigabe.md: diesen Text wörtlich als „## 36. Lauf 32 (uttoranger, im Chat erteilt, 6.11.2026)“, Gliederung wie §35. Unter §35 Präzisierung 2 ein Vermerk (alter Text bleibt): „Vermerk Lauf 32 (6.11.2026): Ab Lauf 32 ist ein Prüf-Passkey in einer lokalen Wegwerf-DB nach freigabe.md §36 erlaubt; in Code und jeder anderen DB bleibt er verboten.“
+3. docs/entscheidungen.md: N46 (Platzhalter [GELD-KACHEL] und [BAR-MAIL] je nach Startauftrag ersetzt), N47, die Ergänzungen bei N9, N20, O9, bei N32 nur mit „Geld-Kachel-Regel bestätigt“, und die Stand-Zeile, wörtlich wie unter „Entschieden · Register“. Danach `git grep -n '\[GELD-KACHEL\]\|\[BAR-MAIL\]' docs/` – kein Treffer, sonst STOPP vor dem Push.
+4. docs/nachtlauf.md:
+   - §3: Zeilen 243a, 243–258, 258b, 259 („AGB 1.0 mit dem Stichtag (A005)“, freigabe.md §36, Register O4, N38, K1) und „Sammel 32“; Absatz „Reihenfolge in Lauf 32“ nach §1 oben (Abschnitte A/B, Haltepunkt).
+   - §4a Punkt 6, nach „Bilder hinter der Admin-Anmeldung macht die Projektleitung in der Vorschau“: „Ausnahme ab Lauf 32: Admin-Bilder lokal mit Prüf-Passkey in der Wegwerf-DB nach dem Abschnitt Prüfwerkzeug; nie gegen Vorschau, test.agrilo.at oder Produktion (Projektleitung, 6.11.2026).“
+   - §4/§4a die Stabilitätsregeln unten (Obergrenzen, Sperren und ihre Reihenfolge, Fotografen, Doku-Wachen, Zeitbudget, Haltepunkt, Wiederaufnahme) mit Herkunft „Morgenbericht 31, freigegeben 6.11.2026“.
+5. docs/nachtlauf/status.md: 233a–242 und „Sammel 31“ tragen „gemergt (#477)“; neu 243a–258, 258b, 259 und „Sammel 32“ mit „offen“ (259 „entfallen – A005-Datei fehlt“, wenn so).
+6. Zeitbuch anlegen (Kopf: Kerne, Speicher, NODE_OPTIONS, Uhrzeit des Starts, Zeitbudget je Phase, „256 freigegeben: ja/nein“, „Geld-Kachel-Regel bestätigt: ja/nein“, „A005-Datei: ja/nein“, Register-Nummern).
+
+243 Prüfwerkzeug und Admin-Erstabnahme – Opus, voller Durchgang, von docs/lauf32
+1. scripts/pruefung/pruef-env.sh: erzeugt .nachtlauf/pruef-env nach „Prüf-Umgebung“; Test tests/pruefung-umgebung.test.ts: die erzeugte Liste enthält keinen der weggelassenen Namen.
+2. scripts/pruefung/pruef-seed.ts (tsx): Loopback-Sperre zuerst; dann auf der frischen Wegwerf-DB (Migrationsfolge: `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/<db> DIRECT_URL=<dieselbe> pnpm exec prisma migrate deploy`, danach tsx prisma/seed.ts mit derselben Adresse; im Zeitbuch nur „localhost:5432/<db>“):
+   - setzt hofpreisModellAb mit der Option `--stichtag vergangenheit` (Vorgabe; 2026-10-01) oder `--stichtag zukunft` (heute + 30 Tage, für eine zweite Prüf-DB vor T); Gründung und gruendungPlaetze bleiben unberührt (P2); Test für beide Optionen;
+   - erzeugt die signierten Links je Board-Zustand (auch „abgelaufen“ und „ungültig“, nach „Nicht herstellbare Bilder“) und schreibt sie nach .nachtlauf/pruef-links.json;
+   - legt für admin@example.com adminSeit und die Passkey-Zeile an (siehe „Prüf-Umgebung und Admin-Abnahme“);
+   - schreibt keine Codes und keine Passwörter; Seed-Passwort nie in eine Datei, nie ins Zeitbuch; gibt beim Start nur Host und Port aus.
+   Kopien je Fotograf: `createdb -T <prüf-db> <kopie>` (nur localhost).
+3. scripts/pruefung/passkey-browser.mjs nach „Virtueller Authenticator“.
+4. scripts/pruefung/fotograf.sh: startet einen Prüf-Server (siehe Stabilität) mit `-H 127.0.0.1`, eigener DB-Kopie, prüft die DB-Adresse wie der Seed; Modus `start` (eigene .next-Kopie) oder `dev` (Admin-/Mail-Code-Fotograf im eigenen Worktree, Port 3000).
+5. Tests: tests/pruefung-sperre.test.ts – abgelehnt werden db.localhost.example.com, localhost.evil.at, eine Adresse mit „localhost“ nur im Pfad oder Passwort, „postgres“, *.supabase.co, *.pooler.supabase.com, ein Benutzer mit Punkt (postgres.<ref>), eine abweichende DIRECT_URL, gesetztes VERCEL und [::1] (istTestDatenbank kennt es nicht); angenommen werden genau localhost und 127.0.0.1. tests/pruefung-grenze.test.ts – keine Datei unter src/, prisma/ oder in next.config.ts importiert scripts/pruefung/, und pruefen:seed kommt in build, vercel-build, postinstall und db:seed nicht vor. Integrationstest gegen localhost: zweiter Seed-Lauf auf derselben DB bricht wegen vorhandener Passkey-Zeile ab.
+6. package.json: `"pruefen:doku"` und `"pruefen:seed"` (nur Skript-Zeilen; pnpm-lock.yaml unverändert).
+7. Probe: ein Bau gegen die Prüf-DB, ein start-Fotograf, Bild von /konditionen (muss „Plattformgebühr“ zeigen), Bild einer Bestellseite per signiertem Link; der dev-Fotograf: Meine Bestellungen mit Code aus dem Terminal, Admin-Anmeldung mit Passkey.
+8. Admin-Erstabnahme (falls angemeldet): 12 Admin-Boards, alle vier Fassungen, pruefer-ui und Messung → abnahme-lauf32.md, Abschnitt „Admin, Erstabnahme“. Vorlage für 258b.
+9. Pflicht-Gegenlesen „Sicherheit“.
+
+244 Geldanzeige: Gesamt bei entfallener Gebühr – Opus, voller Durchgang, von docs/lauf32
+1. Test, der den Fehler zeigt (heute rot).
+2. anzeigeGesamtCents und Umstellung nach „Entschieden · Geldanzeige“, mit Tests (a)–(f) und der Import-Wache.
+3. Gegenlesen „Geld“, voller Lauf, Push.
+
+245 Bausteine Teil 1: G8, G1, G3, G2 – Opus, gezielt, vom Zwischenstand nach 243 und 244
+- Dazu tests/rundungen-wache.test.ts mit Bestandsliste, Wache für UnterseitenKopf-Aufrufer, DESIGN_SYSTEM „Typografie und Form“ (Rundungen in px) und „Komponenten“ (WerkzeugKopf, Aktionsleiste, Hinweiskasten). Stellt nur die Vorschau und die Beispiel-Route /settings um.
+
+246 Bausteine Teil 2: G4, G6, G7, Startfokus- und `[&>`-Wache – Opus, gezielt, vom Zwischenstand nach 245 und 259 (ohne 259 nach 245)
+- G4: Prop `symbol` entfällt; alle 40 Aufrufer mechanisch nachgezogen (keine Seiten-Gestaltung).
+- G6 mit den Ausnahmen (Verkäufe, Produkt anlegen).
+- DESIGN_SYSTEM „Leerzustände“: Verweis auf N9-Ergänzung.
+
+247 Bausteine Teil 3: G9, G10, G11 – Opus, gezielt, vom Zwischenstand nach 245
+- Kunden-Shell-Kopf nach V12 und N1: Web vier Links, „Warenkorb · n“, Sonne/Mond, Umriss-Pille „Anmelden“ bzw. „Mein Konto“/„Mein Hof“, kein Suchfeld im Kopf; Handy Marke + Pille; auf /login und /register ohne Pille; auf Hof- und Produktseite scrollt der Agrilo-Kopf weg, nur der Hof-Kopf klebt.
+- Unterleiste, Seitenfuß, Chip-Gruppe nach G10/G11.
+
+248 Bausteine Teil 4: G5, G12, G13, G14, Geldsätze V1 – Opus, voller Durchgang, vom Zwischenstand nach 245
+- CODING_STANDARDS §7 nach dem Regelvorschlag (bild-dunkel.ts, multiplizieren).
+- Geldsätze-Hilfe mit Tests für bar/online, Gründungshof/kein Gründungshof, vor/nach Stichtag, abweichender plattformgebuehrProzent; Gegenlesen „Geld“.
+
+259 AGB 1.0 mit dem Stichtag (A005) – Opus, voller Durchgang, von docs/lauf32 (PR gegen docs/lauf32, allein mergebar), nur mit A005-Datei
+- Erste Zeile des PR-Texts: der Merge-Hinweis aus „Entschieden · AGB 1.0 · Wirkung des Merge“.
+- Umsetzung: Schritt 1–8 der Datei docs/nachtlauf/berichte/a005-agb-1-0-stichtag.md, wörtlich, mit den Ergänzungen aus „Entschieden · AGB 1.0 mit dem Stichtag“. Vorab die Ausgangslage der Datei (Stand 1216b8c) am Zwischenstand mit git grep neu bestätigen; Abweichungen ins Zeitbuch und in den Bericht.
+- Tests nach Schritt 8 der Datei (Uhr und Einstellung gemockt, mit Gegenproben); Integrationstest agb-zustimmung in der vitest-Form.
+- Bilder nach „Bilder“ der Datei, in der Prüfumgebung nach „Entschieden · AGB 1.0“: Der Bau entsteht im Worktree von 259; Prüf-Seed (mit `--stichtag vergangenheit` bzw. `zukunft`), pruef-env und Fotografen kommen aus dem Worktree des Zwischenstands mit 243 – die Skripte werden nur ausgeführt, nicht in den Branch von 259 übernommen. Ist 243 noch nicht im Zwischenstand, macht 259 Code, Tests und Gegenlesen fertig, pusht und holt die Bilder nach, sobald 243 dort ist. Ist 243 entfallen, gehen die Bilder von 259 in den Zwischen-Durchgang A bzw. als „nicht prüfbar – Prüfwerkzeug fehlt“ in den Morgenbericht. Die Bilder sind Bedingung für „Ziel erreicht“, nicht für den Push von 259.
+- Bericht zusätzlich: DB-Abfragen je Aufruf /agb und /konditionen (lokal gemessen), Ergebnis „Punkt im Pfad“ (bzw. „Für dich zu tun“), die Liste „Für die Projektleitung am Tag T“ wörtlich aus der Datei.
+- Pflicht-Gegenlesen „Recht“ und „Geld“.
+
+249 Hof-Alltag: heute, bestellungen, bestellung, druck, produkte, produkt-neu, mehr-neu – Opus, gezielt
+- B-Zeilen der sieben Boards; Antwort 2 (Packliste); Produkt anlegen ohne „Nochmal“.
+
+250 Einstellungen und Teilen: einstellungen, hofdaten-zahlung, konto-hof, teilen, whatsapp-plakat, beitraege – Opus, gezielt
+- B-Zeilen; darin die aus Nr. 238 offenen Seiten. „Hof stilllegen“ ausblenden, solange offene Bestellungen da sind (der Server lehnt ohnehin ab: src/server/actions/farm-archive.ts; Regel in src/lib/farm-archive.ts).
+
+251 Hof-Werkzeuge: auswertung, kunden, verkaeufe, postfach, meldungen, region, mein-hof – Opus, voller Durchgang
+- B-Zeilen; Region-Liste aus 238; Auswertung: Gebühr für den gewählten Zeitraum als Anzeige-Abfrage; ändert die Zeile eine Summe der Monatsabrechnung: nicht bauen, Morgenbericht. Gegenlesen „Geld“.
+
+252 Finden: startseite, hoefe, hofseite, produkt – Opus, gezielt
+- B-Zeilen; /hoefe nach „Entschieden · Seiten“; P1-Zeile der Produktseite nicht.
+
+253 Kauf und Konto: korb, kasse, bestaetigung, bestellung-link, meine-bestellungen, kundenkonto, anmelden, passwort, registrieren – Opus, voller Durchgang
+- B-Zeilen; Kasse nur Darstellung; Zahlzeile „Online bezahlt · … inkl. <Gebühr> (<Satz> %)“ bzw. „Bar bei Abholung · inkl. <Gebühr> (<Satz> %)“ aus EINER Hilfe für Bestätigung und Bestellseite (auf 244 aufbauen), Satz und Wort nach „Entschieden · Seiten“. Gegenlesen „Geld“.
+
+254 System und Rechtsrahmen: abmelden, neuigkeiten, systemseiten, widerruf, rechtstexte, fehlerseiten, problem-melden – Opus, gezielt, nach 259
+- Nur Rahmen, Aufbau und Zustände, auf dem A005-Stand (Fassungen, Hinweise vor/ab T, /agb/[fassung] bleiben wie 259 sie gebaut hat); Wortlaut von AGB, Datenschutz, Impressum, Konditionen, Belehrung, N39 bleibt; an AktionAbschnitt und Gründungsplätzen nichts (P2). Bot-Bremse im DESIGN_SYSTEM als gewollt vermerken.
+
+255 E-Mails: alle mail-* Boards – Opus, gezielt, nach 257
+- B-Zeilen; Antwort 8; Mail-Texte je Mail in eine Datei mit Render-Vergleich der Rechtsteile; Mails nur hell, Bilder 390 und 600 px.
+- Die Mail-„Gesamt“-Stellen aus dem Bericht von 244 auf anzeigeGesamtCents umstellen (Tests wie 244 (a)–(f) für die Mail); Pflicht-Gegenlesen „Geld“.
+
+256 Mail „Neue Bestellung bar“ an den Hof – Opus, voller Durchgang, vom Zwischenstand nach 259 (ohne 259 nach 243 und 244), nur mit „256 freigegeben“
+- Nach „Entschieden · Mail Neue Bestellung bar“.
+
+257 Abholung nach Absprache – Opus, voller Durchgang, nach 249, 253, 256 und 259
+- Nach „Entschieden · Abholung nach Absprache“; Tests: Hilfe (rein), Kasse zeigt Hinweis und Feldnamen nur mit Absprache-Produkt, Mail-Satz je Reply-To-Fall, Hof-Marke und Kontakt nur für den eigenen Hof und nur bei offenen Bestellungen mit Absprache (Integration).
+
+258 Admin: Geld-Kachel nach Antwort 1 – Opus, voller Durchgang, vom Zwischenstand integration/lauf32, nur mit „Geld-Kachel-Regel bestätigt“
+- Integrationstest wie Nr. 240 (localhost): bestellt in W, abgeholt in W+1 zählt in W; storniert und verfallen zählen nicht; online unbezahlt (PENDING_CONFIRMATION, paymentStatus PENDING) zählt nicht; online bezahlt zählt; online mit paymentStatus REFUNDED ohne CANCELLED zählt nicht; bar unbestätigt zählt; ONSITE_CARD (Altbestand) zählt; NOT_PICKED_UP online bezahlt zählt; Testzahlung zählt nicht; entfallene Gebühr nicht in der Gebührensumme; „Woche: n“ gleich der Kachel. Gegenlesen „Geld“. DESIGN_SYSTEM „Admin › Heute“ nachziehen.
+
+258b Admin: messbare Mängel – Opus, gezielt, vom Zwischenstand nach 243, nur wenn 243 den Admin abgenommen hat
+- Nur die Mängel aus „Admin, Erstabnahme“ nach den sechs Messpunkten.
+
+Sammel-PR und Schluss-Durchgang (Ende Abschnitt B)
+- Der Sammel-PR (Entwurf aus A, fortgeschrieben, oder neu von integration/lauf32b, siehe Haltepunkt A) wird auf „bereit“ gestellt; alle fertigen Nummern sind per git merge --no-ff in Wellen-Reihenfolge darin; nach JEDEM Merge voller Lauf; BAUSTEINE.md bei Konflikt neu erzeugen; Bestandslisten zusammenführen; UnterseitenKopf-Dateien löschen, wenn die Liste leer ist; Integration ganz.
+- Schluss-Durchgang (Zeitbudget 5 h): Bau des Sammelstands gegen eine frische Prüf-DB nach dem Stichtag, start-Fotografen mit eigener .next-Kopie, dev-Fotograf für Admin und Mail-Codes, alle 49 Boards plus Admin (falls erreichbar), alle Fassungen, pruefer-ui je Board mit Liste, Q1–Q5 und den genannten Auftragsabschnitten, Messung. Ergebnis in abnahme-lauf32.md, Abschnitt „Schluss-Durchgang“, Tabelle wie Lauf 31 mit Spalten „Nummer abgeschlossen ja/nein“ und „gedeckt durch Liste/Auftrag“.
+- Aufräumen der Prüf-Umgebung.
+
+Stabilität (geht 4a vor, wo es abweicht)
+- Obergrenzen bei 4 Kernen und 15 GB: höchstens zwei Umsetzer gleichzeitig (tester und pruefer laufen auf dem Platz ihrer Nummer); höchstens EIN schwerer Befehl gleichzeitig (pnpm typecheck, pnpm build, voller pnpm test, pnpm test:integration); höchstens drei Prüf-Server gleichzeitig (davon höchstens ein dev-Fotograf); höchstens vier pruefer-ui gleichzeitig, verteilt auf eigene Workflows mit je höchstens zwei Agenten (4a Punkt 9).
+- Sperren: jeder schwere Befehl läuft als `flock <Skripte des Dirigenten>/schwer.lock <Befehl>`; NODE_OPTIONS=--max-old-space-size=6144 für typecheck und build. Voller Lauf unter der Sperre mit Kerne−1 Workern (n = 1). Wer zusätzlich integration.lock braucht (Seed der geteilten Test-DB, Integration, Bilder; 4a Punkt 6), nimmt immer zuerst schwer.lock, dann integration.lock, und gibt sie in umgekehrter Folge frei. Leichte Befehle (vitest related, lint einzelner Dateien) ohne Sperre.
+- Fotografen (Modus start): ein Bau je Prüfstand im Worktree (ohne .env-Dateien), danach je Fotograf ein Ordner .nachtlauf/fotograf/<n>/ mit Kopie von .next (`cp -a`) und Verweisen auf node_modules, public, package.json, next.config.ts, tsconfig.json, src/ und prisma/ (und was next.config.ts sonst importiert); Start mit `pnpm exec next start .nachtlauf/fotograf/<n> -H 127.0.0.1 -p <port>` unter env -i nach „Prüf-Umgebung“. Kein distDir in next.config.ts, keine neue App-Variable. Jeder Fotograf hat seine eigene DB-Kopie. Startet `next start <ordner>` in der Probe (243 Punkt 7) nicht, bekommt jeder start-Fotograf stattdessen einen eigenen Worktree wie der dev-Fotograf, mit `cp -a` des gebauten .next. NEXT_PUBLIC_APP_URL ist beim Bau eingesetzt; Bilder, die die Adresse zeigen, gelten nur für den Port des Baus (U).
+- Stichtag beim Bau: Gebaut wird gegen eine Prüf-DB, deren hofpreisModellAb zum geprüften Stand passt (Boards = März 2027 → nach dem Stichtag). Zeigt ein Board den Stand vor dem Stichtag, eigener Bau gegen eine DB mit Stichtag in der Zukunft. Vor jedem Bild-Durchgang: Probebild /konditionen und Startseiten-Beispiel; zeigen sie den falschen Stand, Bau wiederholen.
+- Doku-Wachen vor jedem Push, auch bei reinen Doku-Commits: `pnpm pruefen:doku` grün (ab 243; davor die drei Tests einzeln).
+- Zeitbudget je Phase (Wanduhr ab Start; Abbruchregel: Phase überschritten → Nummer mit dem fertigen Stand abschließen bzw. als Entwurf, Rest im Bericht, nächste Nummer):
+  - Abschnitt A: 243a 45 min · 243 2,5 h (davon Admin 60 min) · 244 75 min · 259 3,75 h (inkl. zweiter Bau vor T) · 245–248 je 2 h · 256 90 min · 258 75 min · 249 2,5 h · Merges in den Zwischenstand (je voller Lauf unter der Sperre) zusammen ca. 1,5–2 h · Haltepunkt A mit Zwischen-Durchgang 2 h. Gerechnet mit zwei Plätzen ohne Merge-Zeit: 243 0,75–3,25 h, 244 0,75–2 h, 259 2–5,75 h, 245 3,25–5,25 h, 247 5,25–7,25 h, 246 5,75–7,75 h, 248 7,25–9,25 h, 256 7,75–9,25 h, 258 9,25–10,5 h, 249 9,25–11,75 h; mit Merge-Zeit rückt 249 voraussichtlich nach B. 252 liegt in B. Keine neue Nummer nach Stunde 11; Haltepunkt spätestens 13 h nach dem Start (laufende Nummern sichern), danach die Haltepunkt-Arbeiten.
+  - Abschnitt B: 250, 251, 252, 253, 254 je 2,5 h · 257 2 h · 255 2 h · 258b 75 min · Sammel-PR 1 h · Schluss-Durchgang 5 h. Wanduhr ab Start von B: Nach Stunde 8 beginnt keine neue Nummer mehr; dann Sammel-PR, Schluss-Durchgang, Morgenbericht (zusammen rund 6 h). Der Schluss-Durchgang hat Vorrang: Laufende Nummern werden dafür mit ihrem fertigen Stand abgeschlossen.
+- Wiederaufnahme nach Container-Absturz oder bei „Nachtlauf 32 fortsetzen“: Das Zeitbuch führt je laufender Nummer eine Zeile „Wiederaufnahme“ (Branch, Worktree, letzter Commit, Runde, offene Dateien, laufende Prüfer, Port, Prüf-DB), nachgeführt bei jedem WIP-Commit. Umsetzer machen spätestens alle 30 Minuten einen WIP-Commit (schneller Lauf vorher, nicht pushen). Danach: Postgres starten, Sperrdateien und laeufe/ leeren, Prüf-Umgebung neu anlegen (neues Geheimnis, neue Prüf-DBs), je Worktree `git status`, dann jede Nummer aus ihrer Zeile mit einem neuen Umsetzer fortsetzen; nie git stash; nie einen roten Stand pushen.
+
+Bericht und PR-Text je Nummer
+- Bericht nach CLAUDE.md §4 (höchstens 60 Zeilen) als docs/nachtlauf/berichte/<nr>.md.
+- PR-Text: Bericht; Tabelle Board × Fassung × Sterne (Schluss Lauf 31 → nachher); Zahl der gebauten B-Zeilen je Board und die nicht gebauten mit Grund und Zeilenverweis; „gedeckt durch Liste/Auftrag“; Bild-Pfade; „Offen für Recht“; Ergebnis des Pflicht-Gegenlesens (wo verlangt); „keine Migration, kein Paket, keine Variable“ mit `git diff --name-only <Basis>.. -- prisma/ pnpm-lock.yaml` (leer); „Gestapelt auf #…“; „voller Lauf grün“ im letzten Commit.
+
+══════════════════════════════════════════════════════════════════════
+NICHT (ausdrücklich draußen)
+══════════════════════════════════════════════════════════════════════
+- Recht-Texte, AUSSER genau A005 in Nr. 259 (AGB 1.0 und die AGB-Sätze in Kasse, Mail, /konditionen, Wortlaut nur aus der A005-Datei): AGB sonst, Datenschutzerklärung (A006), Impressum (A001/A004), Belehrung und Muster-Formular, N39-Wortlaut („Vertrag widerrufen“, „Widerruf bestätigen“), Konditionen-Wortlaut, Gewährleistungs-Grafik (bleibt ungedämpft), Reihenfolge-Satz § 4a FAGG, Gebührensatz-Vorschlag der Boards, Anbieterzeile der Mails.
+- P1 (O9): Rücktritts-Zeile je Produkt, Sätze zur Rückzahlung und zu verderblicher Ware in der Storno-Mail, Platzhalter in der Belehrung.
+- P2: Zahl der Gründungsplätze, Aktion-Karte und AktionAbschnitt auf /konditionen, Festschreiben der Gründung (auch nicht im Prüf-Seed).
+- Produkt anlegen mit „Nochmal“ bzw. Formular-ID.
+- Tarife als Abrechnung (t-/w-Boards nur, was s1–s3 zeigen), Stripe live, Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Willkommenszeit.
+- BAES/Futter-Registrierung neu ordnen (eigener Auftrag nach den Boards, F030); die R-Zeilen zu E9/E10/E10a bleiben.
+- Migrationen, neue Pakete (auch nicht im Container, außer dem vorhandenen agent-browser), neue Umgebungsvariablen, Änderungen an Auth, Webhook, Stripe, Fristen (src/lib/fristen.ts), Reservierung, Geldberechnung, gespeicherten Beträgen.
+- In /api/** nur der eine Aufruf aus 256 (nur mit Freigabe); 259 fasst /api/** nicht an.
+- Werte in Entwicklungs- oder Produktionsdatenbank (Stichtag, Monate, Notbremse, Testhöfe): setzt nur die Projektleitung (A005 „Nicht“). E-025 (AGB 1.0 nur sichtbar oder Stichtag vorziehen) ist keine Code-Frage: Es entscheidet allein der Stichtag-Wert im Admin.
+- Admin-Mängel in Aufbau und Wortlaut (nur Liste im Morgenbericht); Admin-Bilder gegen test.agrilo.at, Vorschau oder Produktion.
+- Alles, was die Liste mit C oder R entscheidet; Board-Dateien unter docs/mockups/.
+- Mail-Abfang, Codes in der DB, Codes in Dateien außerhalb .nachtlauf/ (die Ausgabe des dev-Servers unter .nachtlauf/ ist erlaubt, siehe Nicht herstellbare Bilder); Prüf-Seed oder Prüf-Server gegen eine andere DB als localhost; .env-Dateien im Prüf-Worktree.
+- Änderungen an .claude/settings.json und .claude/hooks.
+- Auf GitHub schließen oder löschen (PRs #466–469, #476, Zweig nacht/2026-11-05/242-basis): docs/nachtlauf.md §2 Regel 1 und §8 erlauben nur gh pr create/view/list. To-do der Projektleitung im Morgenbericht.
+- Kein Claude in Chrome. Kein Video entfernen.
+- Keine echten Namen, Adressen, Telefonnummern; Beispieldaten erfunden (Hof Müller, Franz Müller, hof-mueller@beispiel.at; Seed-Konten @example.com, Telefonnummern genullt).
+
+══════════════════════════════════════════════════════════════════════
+FERTIG, WENN
+══════════════════════════════════════════════════════════════════════
+Ordnungsgemäß beendet (je Sitzung, also auch am Haltepunkt A):
+- abnahme-lauf32.md (Zwischen-Durchgang A bzw. Schluss-Durchgang) nennt für jedes Board jeder abgeschlossenen Nummer die Sterne je Fassung und ordnet jede verbleibende Abweichung einer C-, R-, U-, P1- oder P2-Zeile, einer Q-Regel oder einem Auftragspunkt zu, oder führt sie als „Mangel“ mit Grund und Zeilenverweis. Boards nicht begonnener Nummern stehen mit „offen (Abschnitt B)“. „Nicht prüfbar“ ist je Bild begründet (Stripe, Nominatim, global-error; Mail-Code nur, wenn der Weg über den dev-Fotografen scheitert). Admin: abgenommen mit Sternen und Mängelliste, oder „nicht abgenommen“ mit Grund.
+- Die übrigen Punkte unten sind für alle gebauten Nummern erfüllt; der (Zwischen-)Morgenbericht liegt vor; Aufräumen bestätigt; am Haltepunkt A der Sammel-PR als Entwurf offen.
+Ziel erreicht (5 Sterne): darüber hinaus bleibt nach dem Schluss-Durchgang kein „Mangel“ – jedes Board aller Nummern in jeder Fassung 5 Sterne von pruefer-ui oder vollständig durch Liste bzw. Auftrag gedeckt. Wird das Ziel nicht erreicht, ist der Lauf trotzdem ordnungsgemäß beendet, wenn die Liste der Mängel vollständig ist.
+Prüfbare Einzelpunkte:
+- Messung auf allen geprüften Seiten (inkl. Admin, falls abgenommen): 0 sichtbare Texte unter 12 px außer den Ausnahmen (Unterleiste unter 360 px, Illustrationen mit aria-hidden); 0 Ziele unter 44 px ohne ::before; je Seite genau eine sichtbare h1; 0 Felder ohne Beschriftung; axe ohne serious/critical.
+- 259 (falls nicht entfallen): Tests aus Schritt 8 der A005-Datei grün mit Gegenproben; /agb wechselt mit dem Stichtag ohne Deploy; Bestellung „bisher“ → 0.9, „hofpreis“ → 1.0, unabhängig vom Bauzeitpunkt; Kassensatz je Modell und Snapshot; Zustimmungskarte; /konditionen vor und ab T; docs/recht/agb.md wortgleich (Vergleich im PR-Text); N45 im Register; widerruf.ts unverändert; Gegenlesen „Recht“ und „Geld“ im PR-Text; die übrigen Punkte aus „Fertig, wenn“ der Datei.
+- 244: Test zeigt den Fehler vor dem Fix (rot) und danach grün; Geld-Tests ohne geänderte Erwartung; Gegenlesen „Geld“ im PR-Text.
+- 256/257/258: Integrationstests grün; Gegenlesen im PR-Text; /api/checkout-Diff nur der eine Aufruf (oder 256 entfallen); fehlt ein Startsatz, ist die Nummer im Morgenbericht als „nicht gebaut – Bestätigung fehlt“ geführt.
+- 243: Sperr-, Umgebungs- und Grenz-Tests grün; Prüf-Geheimnisse, Passkey-Datei und Prüf-DBs nach jedem Abschnitt gelöscht (im Morgenbericht bestätigt).
+- Wachen grün: palette-klassen, design-tokens, fokus-sichtbar, grundbausteine-groesse, wortliste, gebuehr-wort, telefonnummern, mail-wege, hof-kontakt, geld-number, geld-fliesskomma, dazu neu rundungen, Startfokus, `[&>`, UnterseitenKopf-Aufrufer, anzeigeGesamtCents-Import, pruefung-*; jede Bestandsliste nur geschrumpft, Endstand je Liste im Morgenbericht. Einzige Ausnahme von „nur geschrumpft“: 259 nimmt agb-0-9.ts (eingefrorene Fassung 0.9) nach Schritt 8 der A005-Datei in die dort genannten Ausnahmelisten auf (heute nennen wortliste, gebuehr-wort-wache, warenkorb-wort-wache, fachwort-wache und ladeansichten src/lib/rechtstexte/agb.ts); jeder neue Eintrag nennt als Grund „Fassung 0.9 eingefroren (N45/A005)“.
+- pnpm typecheck && pnpm lint && pnpm test grün auf jeder Nummer und nach jedem Merge in den Zwischen- und Sammelstand (G10); Integrationstests (Form aus „Prüf-Umgebung“) ganz grün auf dem Sammelstand; `pnpm pruefen:doku` vor jedem Push.
+- Keine Migration im Diff: `git diff --name-only origin/main...integration/lauf32 -- prisma/` leer; pnpm-lock.yaml unverändert; package.json nur die zwei Skript-Zeilen.
+- Zwischen-Morgenbericht (Haltepunkt A) und Morgenbericht (Ende) mit: Ergebnis-Tabelle (Schluss Lauf 31 → jetzt, je Board und Fassung), Nummern-Tabelle (Status, PR, Vorschau, Migration nein, Weggelassenes), Merge-Reihenfolge (Sammel-PR per Merge-Commit, nicht Squash; am Haltepunkt A Entwurf; danach die Einzel-PRs schließen), „Für dich zu tun“ (ganz oben der Merge-Hinweis aus „Wirkung des Merge“; danach die Liste „Für die Projektleitung am Tag T“ aus der A005-Datei wörtlich – Generalprobe auf test.agrilo.at, Stichtag setzen, Monate = 12, keine Hofzustimmung vor der Ankündigung, Notbremse am Vorabend – mit Begründung: sie sichert Bestellungen rund um Mitternacht ab, an denen Kassensatz (0.9) und Snapshot (1.0) auseinanderfallen könnten, also nicht optional –, Prüfung danach, keine abgeholte Testbestellung in Produktion, nichts deployen, so wie die Datei es sagt –; Bilder „vor T auf der Dev-DB“ und „Punkt im Pfad auf Vercel“, falls der Container sie nicht konnte; Hinweis E-025: nur der Stichtag-Wert im Admin entscheidet, kein Code; P2-Frage; fehlende Startsätze „256 freigegeben“ bzw. „Geld-Kachel-Regel bestätigt“; „Nachtlauf 32 fortsetzen“ für B; PRs #466–469 und #476 schließen, Zweig nacht/2026-11-05/242-basis löschen; Prüfungen in der Vorschau, die der Container nicht kann; P1 an die Anwältin; Admin-Mängelliste für eine Board-oder-Code-Runde; Regelvorschlag Produkt-„Nochmal“; Backlog: Beispiel-Domain beispiel.at prüfen), „Recht“, Regelvorschläge, Stabilität (Neustarts, Zeitbudget je Phase eingehalten oder nicht), Aufräumen bestätigt, Bilder-Ablage.
+Woran die Projektleitung den Erfolg erkennt: Die Vorschau des Sammel-PR zeigt jede Route der abgeschlossenen Nummern wie ihr Board, soweit die Liste B sagt; die Abnahme-Tabelle steht dort auf 5 oder nennt die Zeile; eine Testbestellung mit einem Futter „Abholung nach Absprache“ zeigt den Satz in Kasse und Mail und beim Hof die Marke mit „Anrufen“ und „Mail schreiben“; eine stornierte Bar-Bestellung zeigt „Gesamt“ ohne die entfallene Gebühr; Admin › Heute zählt eine in dieser Woche eingegangene, noch nicht abgeholte Bar-Bestellung mit.
+
+## 37. Lauf 33 (uttoranger, im Chat erteilt, 7.11.2026)
+
+Nachtlauf 33
+Ort: Cloud-Sitzung auf Linux wie Lauf 32 (agent-browser 0.39.x, Postgres 16 und Seed im Container; Bilder und Prüf-Geheimnisse bleiben im Container unter .nachtlauf/ und werden nicht committet). Kein Claude in Chrome.
+Basis: main (5fe822b9c853 = Merge #501 oder später); die Nummern stapeln auf docs/lauf33 bzw. auf dem Zwischenstand integration/lauf33 (Abschnitt A), integration/lauf33b (B) und integration/lauf33c (C); siehe §1 zum Fall, dass ein Sammel-PR noch nicht gemergt ist
+Berührt (Sperrzonen): Recht-Wortlaut: nein (AGB, Datenschutz, Impressum, Konditionen-Wortlaut, Belehrung, Muster-Formular, N39/N43-Sätze, Rücktrittssätze, P1/O9; src/lib/rechtstexte/**, src/lib/widerruf.ts und docs/recht/** bleiben ohne Diff) · Kasse: nur Darstellung (276); BAR_BESTAETIGEN bleibt (N10) · Warenkorb-Prüfung: nein (src/lib/reservierung.ts, src/server/warenkorb.ts ohne Diff) · /api/**: nein · Webhook: nein · Stripe-Beträge und Geldberechnung: nein (264, 265, 276, 277 nur Anzeige) · Auth und Passkey-Logik: nein (270 löst in src/lib/email.ts nur Inhalts-Funktionen heraus, 280 ändert in src/lib/admin-anmeldung.ts, anmeldecode.ts, geraete.ts nur Zeichenketten von Mails) · Fristen (src/lib/fristen.ts): nein · Schema: nein (keine Migration) · prisma/: nur die eine Musternummer in prisma/seed-daten.ts Z. 974 (262) · globals.css: nur neue Kästchen-Token (269) · Pakete: nein · neue Variablen: nein · Werte in Entwicklungs- oder Produktionsdatenbank: nein · Board-Dateien unter docs/mockups/: nein
+
+Arbeite als Dirigent nach docs/nachtlauf.md: §2 Regeln, §4 Ablauf je Gate (ohne Regel-Inventur), §4a Tempo samt Punkt 12 Stabilität, Abschnitt „Prüfwerkzeug“, §5 Stoppen, §6 Morgenbericht, §7 Fortsetzen. Dieser Text ist die Freigabe. Die Doku-Nummer 261 trägt ihn wörtlich als „## 37. Lauf 33 (uttoranger, im Chat erteilt, 7.11.2026)“ in docs/nachtlauf/freigabe.md ein. Zeitbuch: docs/nachtlauf/berichte/zeitbuch-lauf33.md. Abnahme-Bericht: docs/nachtlauf/berichte/abnahme-lauf33.md. Zwischen-Morgenberichte nach A und B: docs/nachtlauf/morgenbericht-<datum>-lauf33-a.md und -lauf33-b.md; Morgenbericht am Ende von C: docs/nachtlauf/morgenbericht-<datum>-lauf33.md, je auf dem Integrationszweig des Abschnitts committet. Nummern ab 261. Branches nacht/<Startdatum>/<nr>-<kurz> (Datum des Laufstarts, auch in den Abschnitten B und C).
+
+══════════════════════════════════════════════════════════════════════
+AUSGANGSLAGE (geprüft 07.11.2026, main 5fe822b9c853, nur gelesen)
+══════════════════════════════════════════════════════════════════════
+
+Stand allgemein
+- Lauf 32 liegt ganz auf main: Abschnitt A mit #490 (Merge-Commit), Abschnitt B mit #501 (5fe822b9c853, 7.11.2026, 20:08). Zu schließen bleiben laut Morgenbericht 32 B #466–#469, #476, #479–#489, #491–#500 und der Zweig nacht/2026-11-05/242-basis (aus dem Container nicht geprüft).
+- Laufzeiten Lauf 32 (zeitbuch-lauf32.md): Abschnitt A 19:59–02:15 UTC (11 Nummern, ein Container-Neustart), Abschnitt B 08:19–14:17 UTC (10 Nummern, Sammel-PR, Schluss-Durchgang). Je Nummer 45–70 Minuten Umsetzung, voller Lauf unter schwer.lock 232–471 s, Integration ganz 383–390 s. Kein Phasenbudget überschritten.
+- Register docs/entscheidungen.md: letzter Eintrag N47 (Z. 995); N48 ist frei. Letzte Stand-Zeile „Stand Lauf 32“ (Z. 1080). K2 ab Z. 317, Änderung Nr. 116 „Es gibt 100 Gründungsplätze …“ Z. 329. N1 ab Z. 547 mit Ergänzung vom 7.11.2026 (/settings „‹ Mehr“) Z. 555. N22 Z. 746, I1 Z. 1003.
+- docs/nachtlauf/freigabe.md: 10881 Zeilen, letzter Abschnitt „## 36. Lauf 32“ ab Z. 10404; Maßstab für 5 Sterne in §35 („Der 5-Sterne-Maßstab je Board“, Punkte 1–7, ab Z. 10334).
+- docs/nachtlauf.md: Abschnitt „Prüfwerkzeug“ ab Z. 540; §4a Punkt 12 Stabilität. Die Regelvorschläge 1–12 aus Morgenbericht 32 A sind mit Nr. 260 eingetragen, außer Vorschlag 1 (Laufzeit-Grenzen) und 8 (Checkbox-Baustein). Beide sind laut Zeitbuch 32 B (Auftrag 7.11.2026: „Regelvorschläge 1–12 angenommen“) freigegeben und kommen in diesem Lauf (262, 269).
+- Bestandslisten (tests/bestandslisten/, Endstand Lauf 32): rundungen 120 Dateien, unterseiten-kopf 3 (einstellungen-laden.tsx, konditionen-ansicht.tsx, hof-laden.tsx), kind-selektoren 21, startfokus 1.
+- Wachen, die es gibt (tests/): u. a. telefonnummern-wache, doku-doppelte-absaetze, wortliste, palette-klassen-wache, rundungen-wache, werkzeug-kopf-wache, startfokus-wache, kind-selektoren-wache, gebuehr-wort-wache, geldanzeige-gesamt-wache, plattformgebuehr-anzeige-wache, mail-wege-wache, gruendung-konstanten-wache, pruefung-sperre, pruefung-umgebung, pruefung-grenze, pruefung-werkzeug. Es gibt KEINE Wache für Schriftgrößen unter 12 px im Admin.
+- package.json: Skripte „pruefen:doku“ und „pruefen:seed“ (Z. 24–25).
+
+Ergebnis Schluss-Durchgang Lauf 32 (abnahme-lauf32.md Z. 319 ff.; Fassungen 390 hell · 390 dunkel · 1440 hell · 1440 dunkel)
+- 5 überall: mehr-neu, einstellungen. korb 3·3·5·5, systemseiten 5·5·4·4.
+- 4: kasse, bestaetigung, bestellung-link, anmelden, passwort, heute, bestellungen, bestellung, druck, kundenkonto, abmelden, rechtstexte.
+- 3: startseite, hofseite, registrieren, produkte, produkt-neu, auswertung, kunden, postfach, meldungen, meine-bestellungen, neuigkeiten, widerruf, fehlerseiten, hofdaten-zahlung, konto-hof, whatsapp-plakat, beitraege, mail-kauf, mail-storno, mail-hof-bestellung; teilen 3·3·2·2, mein-hof 3·3·2·2.
+- 2: hoefe 2·2·3·3, produkt 2·2·3·2, region, verkaeufe, problem-melden.
+- Nicht prüfbar: mail-betrieb, mail-hof-konto, mail-neuigkeiten, mail-sicherheit, mail-team, mail-zugang (keine Mail-Vorschau im Admin für diese Arten).
+- Mängel je Board mit Begründung: abnahme-lauf32.md, Gruppen 1–9 (startseite Z. 427, hoefe 453, hofseite 482, produkt 507, korb 531, region 548, kasse 604, bestaetigung 626, bestellung-link 646, anmelden 663, passwort 684, registrieren 700, heute 757, bestellungen 781, bestellung 798, druck 815, produkte 830, produkt-neu 850, einstellungen bis beitraege 883–899, auswertung 912, kunden 944, verkaeufe 978, postfach 1012, meldungen 1035, mein-hof 1064, mehr-neu 1120, meine-bestellungen 1142, kundenkonto 1169, mail-kauf 1196, mail-storno 1222, mail-hof-bestellung 1246, Admin 1297–1656, abmelden 1675, neuigkeiten 1692, systemseiten 1711, widerruf 1729, rechtstexte 1757, fehlerseiten 1779, problem-melden 1805). Gemeinsame Ursachen Z. 400–408, „Aufnahme nachholen“ Z. 410–412.
+
+Gemeinsame Ursachen (am Code bestätigt)
+- G11 Seitenfuß der Kundschaft: KundeFuss in src/components/shells/kunde-fuss.tsx steht im Browser in `max-w-[1200px]`; nur wer `fussSpalte` übergibt, bekommt die Spalte des Inhalts (kunde-shell.tsx Z. 308). Das tun nur (public)/[farmSlug]/bestellung/[orderId]/page.tsx (Z. 65, 165), confirm/[orderId]/page.tsx (Z. 94, 263) und (public)/bestellungen/page.tsx (Z. 37, 52, 60). Betroffen laut Abnahme: anmelden, passwort, registrieren, bestaetigung, bestellung-link, kundenkonto, abmelden, systemseiten, widerruf, rechtstexte, fehlerseiten, problem-melden, neuigkeiten. Liste 3.2, G11: „Web ohne Logo, Breite = Inhaltsspalte, ‚Vertrag widerrufen‘ in derselben Ausrichtung“.
+- G1 Rückweg im Hof-Kopf: elternseite (src/lib/bauern-navigation.ts Z. 544) liest UNTERSEITEN (Z. 516); Seiten des Mehr-Blatts haben keinen Rückweg, einzige Ausnahme /settings am Handy (mehrBlatt Z. 502, N1-Ergänzung). Die Seiten von auswertung, kunden, verkaeufe, postfach und Meine Meldungen nutzen WerkzeugKopf (git grep), zeigen am Handy aber kein „‹“; die Liste hat dazu B-Zeilen („Kopf ohne Zurück-Pfeil, scrollt weg“). zielNachSpeichern (Z. 565) führt nur zur Einstellungs-Übersicht zurück; ein neuer Rückweg ändert dort nichts.
+- G3 Fließtext im Hinweiskasten neutral statt Warnton (auswertung, kunden, verkaeufe, meldungen, hofdaten-zahlung, whatsapp-plakat, registrieren, heute, bestellungen): src/components/ui/hinweiskasten.tsx, Hof-Balken src/components/hofbereich/hof-balken.tsx.
+- Umriss-Knöpfe „niedrig, dünn, blass“ (heute „Teilen“, produkte, whatsapp-plakat, hofdaten-zahlung, beitraege): KNOPF_RAHMEN in src/components/hof-bestellungen/stil.ts Z. 21 (`font-medium`, `border-border`); 203 Fundstellen in 90 Dateien, auch im Admin und auf /widerruf. Vorbild laut Abnahme Z. 774: der Knopf „So geht’s“ auf Heute entspricht dem Board. FELD_LABEL Z. 28 (12,5 px, `text-muted-foreground`) und FELD Z. 29 (`rounded-[11px]`).
+- Spalte der Einstellungs-Unterseiten im Web 605–607 statt 671 px (konto-hof, hofdaten-zahlung, whatsapp-plakat); die Stelle ist nicht als eine Konstante zu finden (git grep `max-w-[6..px]` ohne Treffer).
+- LadeFehlerKasten liegt unter src/components/hof-hilfe/lade-fehler-kasten.tsx (ui/ war in Lauf 32 gesperrt), genutzt von postfach/page.tsx, auswertung-zustaende.tsx, meine-meldungen.tsx, kunden-fehler.tsx, verkaeufe-fehler.tsx, region-zustaende.tsx.
+- Meldungs-Bausteine: src/components/shared/meldung-form.tsx, use-meldung-formular.ts, src/components/ui/meldung-formular-ansicht.tsx; problem-melden hat 10 Mängel aus B-Zeilen in diesen Bausteinen (Kartenhöhe, Zähler, Beschriftungen, Hilfetext, Fehlernummer bei „Ich hätte gern …“, Bildschirmfoto-Feld, Satz bei Hof-Sitzung, Auswahlpunkt im Dunkeln).
+- G12 und „je Raummeter“: Der Seed führt Brennholz mit Einheit M3 (prisma/seed-daten.ts Z. 1031–1044); „€ … / m³“ ist für M3 richtig. Die Anzeige „je Raummeter“ gibt es (src/components/produktdetail/groessen-anzeige.ts Z. 50–57), sie greift nur bei Einheit RAUMMETER. Ursache „je Raummeter“ = Prüfdaten. Kategorie-Illustration ohne Foto: hof-bildflaeche.tsx, hof-vorschaubild.tsx, produkt-karte.tsx Z. 177–202, produktdetail-kunde.tsx Z. 299 – entschieden durch Register I1 (Z. 1003) und N22 (Z. 746). „Bildfläche im Dunkeln mittelgrün“ (produkt Bild 3) ist eine offene B-Zeile von G12.
+- Prüf-Seed (scripts/pruefung/pruef-seed.ts): Optionen `--stichtag`, `--links`, `--passkey`; schreibt signierte Links (Bestellung, Bestätigung, Rücktritt nur TD-0004 und ungültig, Bar-Bestätigen, Abmelden, Neuigkeiten); Better-Auth-Links „nicht erzeugt“. Es fehlen laut Morgenbericht 32 B (Regelvorschlag 4) und Abnahme: Größen-Familie, Brennholz in Raummeter mit Holzangaben, Postfach-Unterhaltung und Rundschreiben, Abonnentin mit WhatsApp, Zustand Mindestbestellwert, offene Bar-Bestellung und bezahlte Online-Bestellung im Hofpreis-Modell, Hof ohne Produkte „wartet auf Freigabe“, Abholtag heute mit Bestellungen, künftiges Fenster mit Bestellungen, Bestellung mit „Artikel fehlt“, Rücktritts-Link „nicht mehr möglich“. Ladefehler- und Speicherfehler-Zustände sind ohne Werkzeug „nicht herstellbar“.
+- Prüfwerkzeug: messung.js zählt jede sichtbare h1, auch bei offenem Dialog (dann 0) und Inhalte geschlossener `<details>`; seiten-bild.sh und board-bilder.sh rufen `agent-browser --cdp <port>` ohne `--session`; der Prüf-Browser wird von Hand gestartet (Flags nur in docs/nachtlauf.md „Prüfwerkzeug“ Punkt 4, ohne `--lang`); fotograf.sh hat den festen Pfad `$HOME/nachtlauf32-dev` (Z. 13, 26).
+- Mail-Vorschau im Admin: zeigeMailVorschauAction (src/server/actions/betrieb.ts Z. 341–361, Wache `verlangeAdminAktion({ recht: 'ansehen' })`) baut über baueMailVorschau (src/server/mail-arten/vorschau.ts) eine Mail aus einem vorhandenen MailAuftrag, nur für Arten aus NOCHMAL_ERLAUBT (src/lib/betrieb-mails.ts Z. 1042), mit entschaerfeLinks. Codes, Passwort-Links und Admin-Mails zeigt sie nie. Mail-Arten: src/schemas/mail-auftrag.ts (MAIL_ARTEN Z. 17).
+
+Vermutete echte Fehler (Ursache am Code, noch ohne Test)
+- Ende der Gründungszeit: einzugAbFuer (src/lib/plattformgebuehr.ts Z. 180) liefert Mitternacht in Wien des Tags NACH dem letzten Gründungstag; die Abrechnung nutzt dieselbe Funktion (src/server/plattformgebuehr-abrechnung.ts Z. 105, 143), einzugFuer (Z. 210) sagt „erlassen“, solange jetzt < einzugAb. Für die Anzeige gibt es schon `letzterFreierTag` (Z. 418, nicht exportiert; „der Wiener Tag vor dem Einzugsbeginn“). Mit dem Einzugstag selbst stehen „bis“-Sätze in: src/lib/hof-einstellungen.ts Z. 403 (Karte „Bar bei Abholung“, gruendungSatz Z. 376 „Bis <Tag> zahlst du als Gründungshof …“) und Z. 604 (LASTSCHRIFT_TEXT.erlassen, src/lib/konditionen.ts Z. 272 „Bis <Tag> behältst du …“), src/server/queries/plattformgebuehr.ts Z. 124 (einzugAbText) mit src/components/hof-einstellungen/barzahlung.tsx Z. 70 („Einzug ab <Tag>“ richtig, „Bis <Tag> behältst du …“ falsch). /settings zeigt gruendungBis (letzter Tag, inklusiv). Register: K2/N44 „Beginn am späteren Tag von Tarifstart und Freischaltung“, Bargebühr „ab dem Tag nach dem Gründungs-Ende, bei Freischaltung vor dem Tarifstart also ab 1.2.2028“; E-018 (Beispiel): „bis 31.1.2028“.
+- Kurznummer: kurznummerAus (src/lib/kurznummer.ts, 6 Zeichen vom ENDE, groß) gibt es seit Nr. 248; passtZurKurznummer erkennt auch die alte Nummer, wird aber nur in tests/bausteine-248.test.ts benutzt. Die alte `kurznummer` (src/lib/meldung.ts Z. 232, erste 8 Zeichen) nutzen noch: src/server/actions/meldung.ts Z. 188 (Danke-Seite) und Z. 73–75 (scheinKurznummer der Bot-Bremse, 8 Zeichen), src/server/queries/meldung.ts Z. 130, 230, 285, 395, 405, 463, src/server/queries/postfach.ts Z. 510, src/lib/admin-aufgaben.ts Z. 362 (Postfach-Aufgabe in Admin › Heute), src/lib/meldung.ts Z. 295, 846, src/components/admin/briefkasten-teile.tsx Z. 127, src/lib/briefkasten-export.ts Z. 118, 131, 186. Die Mail an den Betrieb nutzt schon kurznummerAus (src/server/mail-arten/betreiber.ts Z. 182) – Danke-Seite und Betriebs-Mail nennen heute verschiedene Nummern. Gesucht wird über `startsWith` (getMeldungDetail Z. 224–230, /api/triage/status/route.ts Z. 72–75). Seed-Meldungen heißen „meldung-seed-1“ usw. (prisma/seed-daten.ts Z. 2156 ff.); daher „Nr. meldung-“.
+- Admin-Bestelldetail „Servicegebühr“: Das Wort kommt je Bestellung aus gebuehrBezeichnungFuer (src/lib/admin-bestellung.ts Z. 253–259; src/app/admin/bestellungen/page.tsx Z. 264, 276). Die Seed-Bestellungen sind im Modell „bisher“ → „Servicegebühr“ ist dann richtig. Vermutung: kein Code-Fehler, Prüfdaten.
+- Gründungshöfe „36 sind schon vergeben“ gegen „Vergeben 12“: ladeGruendungStandAdmin (src/server/queries/plattform-einstellung.ts Z. 170) liefert `gruendungsplaetze(hoefe).size` (alle Höfe im Rennen, ohne Obergrenze); die Kachel zeigt `gesamt − frei` = min(vergeben, Plätze) (einstellungen-gruendung.tsx Z. 199–206, seitenZahlen gruendungshof.ts); die Prüfung im Browser nutzt die ungekappte Zahl (einstellungen-gruendung.tsx Z. 135), die Server-Action die gekappte (vergebeneGruendungsplaetze, src/server/actions/plattform-einstellung.ts Z. 74). Satz GRUENDUNG_EINSTELLUNG_FEHLER.weniger src/lib/plattform-einstellung.ts Z. 155, Prüfung Z. 196. Zwei Zählregeln für dieselbe Zahl.
+- 500-Seite ohne `<title>`: src/app/error.tsx ist eine Client-Komponente mit FehlerAnsicht (src/components/shared/fehler-ansicht.tsx, h1 Z. 76); kein Seitentitel (axe document-title).
+- /widerruf nach dem Absenden ohne h1: Die Seiten-h1 (src/app/(public)/widerruf/page.tsx Z. 126) wird nach dem Absenden ausgeblendet; die Überschrift der Bestätigung ist ein h2 (widerruf-formular.tsx Z. 127, Text WIDERRUF_TEXT.eingangTitel aus src/lib/widerruf.ts Z. 290).
+
+Gründungsplätze
+- PlattformEinstellung.gruendungPlaetze `@default(12)` (prisma/schema.prisma Z. 1439); die Zeile legt die Migration an (Kommentar Z. 1425–1431). MAX_GRUENDUNGSHOEFE = 12 (src/lib/gruendungshof.ts Z. 45) ist nur der Standard ohne Zeile; tests/gruendung-konstanten-wache.test.ts erlaubt den Namen nur in gruendungshof.ts und plattform-einstellung.ts. Alle Sätze (GRUENDUNG_TEXT ab Z. 667, Aktion Z. 723, Abzeichen-Blatt) nehmen `g.gesamt` aus der Einstellung. Die Aktion-Karte auf /konditionen (AktionAbschnitt, src/app/(public)/konditionen/page.tsx) erscheint nur, solange die Aktion läuft, also erst nach dem Festschreiben. Die „12“ in Board rechtstexte Bild 5 ist eine Board-Zahl.
+- Zurückfallen auf den Standard kann eine Regel, wenn ein Lader `gruendungPlaetze` nicht an die Zeilen setzt (plaetzeDerVergabe, gruendungshof.ts Z. 150–152). Welche Aufrufer das betrifft, ist nicht geprüft.
+
+Weitere Fakten für die Seiten
+- „hat gerade kein <Produkt>“: ausverkauftSatz in src/components/produktdetail/groessen-anzeige.ts Z. 82–84; Test tests/produktdetail-252.test.ts Z. 78.
+- Packliste: src/app/(druck)/orders/today/print/page.tsx Z. 76–77 setzt druckPreisHinweis (src/lib/hof-bestellungen.ts Z. 229–232: „Preise inkl. Plattformgebühr.“, sobald eine Bestellung im Hofpreis-Modell dabei ist). Der Abholzettel nutzt seit 249b druckGesamtHinweis (src/components/orders/druck-kasse.ts Z. 48: nur, wenn das gezeigte Gesamt die Gebühr enthält).
+- Online-Zahlung-Satz auf Heute, Einrichten und Zahlung: ONLINE_ZAHLUNG_EINRICHTEN_SATZ (src/lib/konditionen.ts Z. 321–323), laut Kommentar wörtlich aus freigabe.md §10 („24“), geprüft von tests/stripe-pflicht.test.ts. Das Board (heute Bild 4, registrieren Bild 5) will einen anderen Satz mit Google Pay.
+- Korb „Eine Position ist nicht mehr verfügbar und wurde entfernt.“: befundMeldung (src/lib/reservierung.ts Z. 138–153), aufgerufen in reservierung.ts Z. 244 (in gleicheKorbMitHofseite Z. 196, rein, im Browser: Abgleich der Hofseite, product-grid.tsx Z. 630–638 → zeigeKorbHinweis in src/lib/use-cart.ts Z. 100, Anzeige im Korb-Blatt) und src/server/warenkorb.ts Z. 250 (Feld `meldung` der Antwort von /api/checkout, /api/reserve und /api/warenkorb/pruefen; die Kasse zeigt es, checkout-form.tsx Z. 294–296, und übernimmt `items` = berichtigter Korb). WarenkorbBefund kennt keine Produktnamen; der Korb im Browser (GespeichertePosition) kennt sie.
+- Kasse „Du bestätigst per E-Mail.“: BAR_BESTAETIGEN in src/lib/kasse.ts Z. 108, Wortlaut festgelegt in Register N10 (Ergänzung Freigabe Lauf 13, docs/entscheidungen.md Z. 651); das Board will „…, dann packt der Hof.“
+- Geteilte Text- und Stilquellen: components/anmelden/stil.ts (Auth-Seiten, profile-client, einrichten-seite, widerruf-formular, unsubscribe, neuigkeiten-bestaetigen, sicherheit/nicht-ich, konto/email-bestaetigen, konto/angemeldete-geraete); src/lib/geraete.ts (angemeldete-geraete.tsx, nicht-ich, emails/neue-anmeldung.tsx, admin-anmeldung.ts, auth.ts u. a.); src/lib/anmeldecode.ts (Anmeldeseiten, Bestellungen finden, Mails); src/lib/postfach.ts (Hof-Postfach, Admin-Postfach, heute-teile.tsx, lastschrift-karte.tsx, Mails); src/components/konto/angemeldete-geraete.tsx (Hof-Konto, Kundenkonto, Admin › Anmeldung); src/lib/shop-pause.ts (auch /api/checkout).
+- Mail-Texte außerhalb src/emails: „Neue Anmeldung bei deinem Hof-Konto“ (emails/neue-anmeldung.tsx, lib/email.ts, lib/geraete.ts), „Admin-Zugang absichern“ (lib/admin-anmeldung.ts), „Wir fragen dich nie …“ (lib/anmeldecode.ts, geraete.ts, konto-anfragen.ts), „Antworten geht in der App …“ und „Du bist Gründungshof Nr …“ (lib/postfach.ts), „Größte Tabelle“ (lib/betrieb.ts), „Neue Fehlermeldung“ (emails/meldung-notification.tsx).
+- Schriftgröße unter 12 px im Admin (`text-[10px]` bis `text-[11.5px]`): 8 Dateien – src/app/admin/betrieb/betrieb-teile.tsx (3), betrieb/mails-ansicht.tsx (3), finanzen/finanzen-diagramm.tsx (1), postfach/faden-spalte.tsx (1), src/components/admin/meldungen-teile.tsx (4), startseite-block-formular.tsx (1), startseite-vorschau.tsx (1), startseite-zeitplan.tsx (1).
+- Checkbox: `type="checkbox"` in 20 Dateien unter src/ (widerruf-formular.tsx Z. 241 Positionen, checkout-form.tsx Z. 893 kaeuferArt Privat/Betrieb, bestell-detail.tsx, product-dialog.tsx, ruecktritt-felder.tsx Z. 75, familien-teile.tsx, futter-formular.tsx und 13 Dateien im Admin, darunter gruendung-ausnehmen-dialog.tsx, testhof-dialog.tsx, hof-akte-plattformgebuehr.tsx Z. 155 Lastschrift-Pflicht, ersatzcodes-anzeige.tsx, mails-alle.tsx und admin/bestellungen/page.tsx), Farbe über `accent-primary`; im Design-System gibt es KEIN eigenes Kästchen-Token und keinen Kästchen-Baustein (globals.css, DESIGN_SYSTEM.md geprüft).
+- Mails: Für Codes, Einmal-Links, Sicherheits-, Konto- und Team-Mails gibt es in src/lib/email.ts nur `send*`-Funktionen, die Vorlage, Betreff und Versand in einem Schritt machen (sendAnmeldeCodeEmail Z. 714 bis sendTeamRechtGeaendert Z. 892, sendBetreiberBestaetigung Z. 1583, sendBetriebWarnung Z. 1628; Versand über sendRaw Z. 248). Reine Inhalts-Funktionen gibt es nur für die Bar-Bestätigung (onsiteConfirmationInhalt Z. 1147) und den Rücktrittseingang (widerrufEingangInhalt Z. 1671). Die Renderer der Wichtig-Mails (src/server/mail-arten/**) laden ihre Daten aus der DB.
+- Musternummer im Seed: prisma/seed-daten.ts Z. 974 trägt für den Inhaber des Pilothofs eine nicht genullte Mobilnummer (Vorwahl 664); alle anderen Seed-Nummern folgen dem genullten Muster mit Vorwahl 660. tests/seed-idempotenz.test.ts Z. 361–370 hält sie als einzige Ausnahme fest; tests/telefonnummern-wache.test.ts führt für tests/seed-idempotenz.test.ts eine Ausnahme mit Kennung MOBIL_A (Grund: „Prüft den Wert, den der Seed … schreibt“). Die Wache liest prisma/ nicht.
+- Zeitgrenzen in Tests: tests/bild-format.test.ts Z. 92 (schnellste von drei Messungen < 500 ms; in Lauf 32 A unter Last 572 ms) und tests/sentry-hygiene-felder.test.ts Z. 436 (GRENZE_MS). Regel zu Zeitgrenzen: TESTING_GUIDELINES §4 und tests/zeitgrenzen-wache.test.ts (nur Lese-Wachen).
+- Unterleiste: src/components/ui/bottom-nav.tsx wird von kunde-shell.tsx, hof-shell.tsx und admin-shell.tsx genutzt (mehr-neu steht bei 5·5·5·5).
+- Suche nach Meldungen über den Anfang der ID außerhalb von /api: src/server/actions/admin.ts Z. 565 (Duplikat-Verweis der Triage, ein Schreibweg) und src/lib/meldung.ts Z. 874 (sucheMeldungen). src/server/actions/admin.ts enthält auch die Gründungs-Zusage bei der Freischaltung.
+- /widerruf: Das Feld „Deine E-Mail-Adresse“ gibt es (widerruf-formular.tsx Z. 195 ff.); ohne Bestellbezug geht die Eingangsbestätigung an diese Adresse (Z. 343).
+- Ankündigung des Einzugs („Ab <Tag> ziehen wir …“, src/lib/konditionen.ts Z. 295, Tag aus src/server/plattformgebuehr-abrechnung.ts Z. 106) nennt den Einzugstag richtig. Vor dem Festschreiben ist das Gründungs-Ende das Standard-Ende 31.12.2027 (GRUENDUNG_BIS_STANDARD); erst das Festschreiben setzt es über zusageEnde (12 Monate ab Tarifstart → 31.1.2028).
+- Nacharbeit aus den PR-Prüfungen (Morgenbericht 32 B „Offen“): 255 Kommentar in src/lib/email.ts und Test „Bitte zahle … mit Karte“; 251 zwei Knopf-Rundungen der Kundschaft auf /problem-melden, LadeFehlerKasten als ui-Variante, unbenutztes src/components/sales/kanal-symbol.tsx; 252 tote Exporte in src/lib/startseite.ts, src/app/intern/bausteine/vorschau-247.tsx Z. 108 „Produktseite folgt mit Nr. 252“; 254 `rounded-[12px]` statt RUNDUNG an fünf Stellen, Datumshelfer src/app/(public)/widerruf/eingang-zeit.ts nach src/lib/format.ts; 249b druckKasse nach src/lib/hof-bestellungen.ts; 258b weitere Admin-Stellen unter 12 px.
+- Dateien, die in Lauf 32 außerhalb der Grenzen lagen: src/lib/einrichten.ts (onboarding/page.tsx, einrichten-seite.tsx, server/hofbereich.ts, queries/einrichten.ts), Einrichten-Sätze in src/lib/konditionen.ts und src/lib/fuer-hoefe.ts, src/server/queries/customers.ts, src/components/konto/angemeldete-geraete.tsx, Texte in src/lib/reservierung.ts.
+
+══════════════════════════════════════════════════════════════════════
+ENTSCHIEDEN (alles hier ist Auftrag, keine Rückfrage)
+══════════════════════════════════════════════════════════════════════
+
+Abnahme-Grundlage (wie Lauf 32, freigabe.md §36 „Abnahme-Grundlage“, mit diesen Ergänzungen)
+- Die Entscheidungsliste docs/nachtlauf/berichte/lauf32-board-oder-code.md gilt weiter (B gebaut; C, R, U kein Mangel; P1 nicht gebaut und aus der Wertung; Q1–Q5 für alle Boards). Die P2-Ausnahme entfällt: Die Zahl der Gründungsplätze ist entschieden (100, siehe unten).
+- Neu: docs/nachtlauf/berichte/lauf33-ergaenzungen.md (legt 261 an, Wortlaut unten unter „Ergänzungsliste“). Ihre Zeilen sind C oder R wie Zeilen der Liste.
+- Abschnitt 3.2 der Liste (G1–G14) gehört zur Abnahme-Grundlage: Zeigt ein Board etwas anderes als eine 3.2-Zeile (z. B. Logo im Fuß gegen G11 „Web ohne Logo“, gestrichelter Leerkasten gegen G4 „durchgezogener Rand“), gilt 3.2 und es ist kein Mangel (Liste Regel 4: die stimmigere, neuere Fassung).
+- Register vor Board (R, kein Mangel), solange der Startsatz „Bildfläche statt Illustration freigegeben“ fehlt: Kategorie-Illustration statt neutraler Bildfläche ohne Foto (hoefe, hofseite, produkt, region; Register I1, N22). Mit dem Startsatz entfällt diese Zeile, und Nr. 271 baut die Bildfläche.
+- Register bzw. Freigabe vor Board (R): ONLINE_ZAHLUNG_EINRICHTEN_SATZ auf Heute, Einrichten und Zahlung (freigabe.md §10 „24“, tests/stripe-pflicht.test.ts). Der Lauf ändert den Satz nicht; Frage im Morgenbericht.
+- Aus §36 gilt weiter: Bestellungen im Modell „bisher“ zeigen die bisherige Zahlzeile (C); P1 nicht; Stripe-Zustände, Nominatim und global-error „nicht prüfbar“; Entwicklungsanzeige des dev-Fotografen und Testmodus-Banner sind U.
+- Maßstab für 5 Sterne: freigabe.md §35 „Der 5-Sterne-Maßstab je Board“, Punkte 1–7, Handy 390 und Web 1440, hell und dunkel; Mails und Druck nur hell. Unter 5 Sterne ist nur eine sichtbare Abweichung, die keine Zeile der Liste oder der Ergänzungsliste, keine 3.2-Zeile, keine Q-Regel und kein Punkt dieses Auftrags deckt.
+- pruefer-ui: eigener Agent-Aufruf mit frischem Kontext (keine neue Datei unter .claude/agents). Er bekommt NUR: App-Bild, Board-Bild, den Maßstab, den Abschnitt seines Boards aus der Liste, Q1–Q5, Abschnitt 3.2, die Ergänzungsliste und aus diesem Auftrag die Abschnitte „Abnahme-Grundlage“, „Antworten der Projektleitung auf Morgenbericht 32“ und „Nicht herstellbare Bilder“. Nicht den Code, nicht den Bericht des Umsetzers. Er nennt je Abweichung die deckende Zeile oder „Mangel“.
+- Messung (messung.js nach Nr. 262): Bei offenem `aria-modal`-Dialog oder -Blatt meldet die Messung „h1: Dialog offen“ statt einer Zahl; das ist kein Mangel. Inhalte geschlossener `<details>` zählen nicht.
+- Admin: Für den Admin gibt es keine Board-oder-Code-Liste. Admin-Boards zählen nicht zum 5-Sterne-Kriterium; Mängel sind nur die sechs Messpunkte (Schrift unter 12 px, Ziele unter 44 px ohne ::before, h1 ≠ 1, Felder ohne Beschriftung, axe serious/critical, Fokus unsichtbar). Abweichungen in Aufbau und Wortlaut bleiben eine Liste für eine Admin-Board-oder-Code-Runde.
+
+Antworten der Projektleitung auf Morgenbericht 32 (7.11.2026, „ich folge deinen Empfehlungen“)
+1 Das Feld „Hof-E-Mail“ auf Hofdaten bleibt (Kontaktangabe für den Rücktritt) – R, Board-Korrektur.
+2 Statt „<Hof> hat gerade kein <Produkt>.“ steht „<Produkt> gibt es gerade nicht.“; der zweite Satz „Schau, was es sonst gibt.“ bleibt. Geändert wird nur ausverkauftSatz (eine Quelle) und sein Test. → Nr. 271
+3 Abholzettel „Nichts zu kassieren“ auch bei storniertem Altbestand ohne Erstattungszeitpunkt bleibt – C.
+4 Packliste: „Preise inkl. Plattformgebühr.“ über Positionen ohne Gebühr wird wie beim Abholzettel nachgearbeitet: Der Satz spricht vom Gesamt und steht nur, wo ein gezeigtes Gesamt die Gebühr wirklich enthält (druckGesamtHinweis). Nur Anzeige, keine neue Rechnung, Pflicht-Gegenlesen „Geld“. → Nr. 277
+5 /onboarding: Die Inhaltsbreite des Boards (896 px) gilt – B. → Nr. 275
+6 Mail im Hofpreis-Modell ohne Kasten „Bring bitte … mit“ bei entfallener Gebühr bleibt – C.
+7 h1 hinter offenem Dialog oder Blatt ist kein Mangel (Messung, Nr. 262) – U.
+
+Regelvorschläge 1–10 aus Morgenbericht 32 B – angenommen
+- 1 Uhrzeit nie schätzen (Zeit aus `date -u` bzw. Commit-Zeit) → 261, docs/nachtlauf.md §4a Punkt 12 (g).
+- 2 Commit-Kurzwerte in der Doku mit 12 Zeichen → 261, §4a Punkt 7.
+- 3 agent-browser immer mit eigener Sitzung → 262 (Skripte brechen ohne Sitzungsnamen ab) und 262 im Abschnitt „Prüfwerkzeug“.
+- 4 Prüf-Seed vervollständigen → 262.
+- 5 Messung: h1 hinter offenen Dialogen nicht zählen, geschlossene `<details>` ausnehmen → 262.
+- 6 Prüf-Browser mit `--lang=de-AT` → 262 (Start-Skript und Abschnitt „Prüfwerkzeug“ Punkt 4).
+- 7 Integrationstests bei geänderten Texten (`git grep` des alten Wortlauts in tests/integration; Treffer → diese Integrationstests laufen) → 261, §4a Punkt 2.
+- 8 Kein leerer Abschluss-Commit; der letzte WIP mit vollem Lauf wird per `git commit --amend` zum normalen Commit, solange nicht gepusht → 261, §4a Punkt 2.
+- 9 Aufräumen von `.nachtlauf/fotograf/` über `git worktree remove --force` → 262 (fotograf.sh stopp) und Abschnitt „Prüfwerkzeug“ Punkt 6.
+- 10 Admin-Schrift-Wache mit Bestandsliste → 281.
+- Jede neue Regel trägt die Herkunft „(Morgenbericht 32 B, freigegeben 7.11.2026)“.
+
+Regelvorschläge 1 und 8 aus Morgenbericht 32 A – angenommen (Auftrag 7.11.2026, „Regelvorschläge 1–12 angenommen“; 2–7 und 9–12 trug Nr. 260 ein)
+- A-1 Laufzeit-Grenzen unter Last → 262: Zeitgrenzen in Leistungstests (bild-format.test.ts Z. 92, sentry-hygiene-felder.test.ts Z. 436 und jede weitere, die `git grep -n "performance.now" tests/` findet) wachsen mit der Zahl der Worker (Grenze × Worker, Zahl aus der vitest-Umgebung) oder laufen als eigener Lauf ohne Parallelität; Regel in TESTING_GUIDELINES §4. Beleg: bild-format mit 3 Workern unter schwer.lock grün.
+- A-8 Kästchen-Baustein mit Token → 269: src/components/ui/kaestchen.tsx mit eigenen Token für Rand, Fläche und Haken in src/app/globals.css (hell und dunkel; Rand-Kontrast mindestens 3:1 nach WCAG 1.4.11, Haken mindestens 4,5:1), Ziel 44 px über ::before, sichtbarer Fokus (FOKUS_RAHMEN), Abschnitt in DESIGN_SYSTEM „Komponenten“ und Eintrag in der Token-Tabelle (design-tokens-Wache), Vorschau, Render-Test. Startbestand der Bestandsliste tests/bestandslisten/kaestchen.ts = Dateien laut `git grep -l 'type="checkbox"' src/` beim Start von 269 (Stand 5fe822b9c853: 20), mit Wache (nur schrumpfen); umgestellt wird nur in Nummern, die die Datei ohnehin ändern, und nur, wenn ui/kaestchen.tsx schon im Zwischenstand liegt (also nicht in 266 und 270). Verhalten bleibt gleich: Der Baustein umschließt ein natives `<input type="checkbox">` (kein `role="checkbox"` auf einem anderen Element), reicht `name`, `value`, `checked`/`defaultChecked`, `onChange`, `required`, `disabled`, `id` und `aria-*` unverändert durch und setzt nie einen eigenen Ausgangswert; eine Umstellung ändert nur das Aussehen. Für kaeuferArt in der Kasse (checkout-form.tsx, Rücktrittsrecht nach FAGG), die Positionen auf /widerruf, ruecktritt-felder.tsx, die Admin-Dialoge Gründungsplatz (gruendung-ausnehmen-dialog.tsx) und Testhof (testhof-dialog.tsx), die Lastschrift-Pflicht in der Hof-Akte (hof-akte-plattformgebuehr.tsx) und ersatzcodes-anzeige.tsx belegt ein Test vorher und nachher denselben Zustand nach Klick und Absenden (übermittelter Wert) in jsdom, dazu einmal die Leertaste im Prüf-Bau mit agent-browser (Bild und Formularwert im Bericht); lässt sich einer dieser Tests nicht schreiben, bleibt das Kästchen in der Bestandsliste; die umstellende Nummer nimmt diese Dateien ins Pflicht-Gegenlesen „Recht“ (Kasse, /widerruf, Rücktritt) bzw. „Geld“ (Gründungsplatz, Testhof, Lastschrift) bzw. „Sicherheit“ (ersatzcodes-anzeige.tsx). Lässt sich ein Kästchen nicht verhaltensgleich umstellen, bleibt es in der Bestandsliste (Bericht). Neue Einwilligungs-Kästchen sind nie vorab angehakt.
+- Jede Regel trägt die Herkunft „(Morgenbericht 32 A, freigegeben 7.11.2026)“.
+- Ein Toast-Token gehört nicht dazu (kein Regelvorschlag); es bleibt draußen.
+
+Gründungsplätze (E-026, Register K2 Nr. 116)
+- Es gibt 100 Gründungsplätze. Die Zahl kommt aus Admin › Einstellungen (PlattformEinstellung.gruendungPlaetze); den Wert in Produktion setzt nur die Projektleitung („Für dich zu tun“: vor dem ersten Festschreiben auf 100 stellen; „Plätze nur erhöhen“ lässt 12 → 100 zu).
+- Im Code: MAX_GRUENDUNGSHOEFE (12) und der Spalten-Default 12 bleiben (keine Migration; sie gelten nur ohne Zeile, die Zeile legt die Migration an). Begründung: Ein Standard 100 im Code neben einer gespeicherten 12 würde zwei Zahlen gleichzeitig gelten lassen, solange die Projektleitung den Wert nicht gesetzt hat.
+- Jede Anzeige und jede Regel, die Plätze braucht, nimmt die Einstellung. Fällt ein Aufrufer auf den Standard zurück, obwohl es eine Zeile gibt, ist das ein Fehler und wird behoben (Nr. 265). Ausnahme mit Stopp: Liegt ein solcher Aufrufer in einem Pfad, der über istGruendungshof, bestimmeGruendungBis oder einzugAbFuer entscheidet, ob eine Gebühr anfällt oder wer eine Zusage bekommt (Kasse, src/app/api/**, src/server/plattformgebuehr-abrechnung.ts, Geldsätze, Festschreiben, Freischalten in src/server/actions/admin.ts), wird er nicht geändert: Nummer als Entwurf, Fund unter „Geld“ im Morgenbericht. Ohne Rückfrage umgestellt werden nur reine Anzeigen; der Bericht trennt beides.
+- Boards mit 12 werden korrigiert (Ergänzungsliste). Der Prüf-Seed stellt in der Wegwerf-DB 100 ein (Nr. 262). Unter „Geld“ im Morgenbericht steht der feste Satz: „Stellt die Projektleitung die Plätze in Produktion von 12 auf 100, werden freigeschaltete Höfe ab Platz 13 Gründungshof (ohne Grundgebühr, Bargebühr erlassen bis zum Gründungs-Ende) – so gewollt (E-026).“
+
+Echte Fehler (je eine Nummer oder ein Teil davon; immer zuerst ein Test, der heute rot ist, dann der Fix)
+- Ende der Gründungszeit (Nr. 264, Pflicht-Gegenlesen „Geld“): Eine Quelle für das Ende ist einzugAbFuer; eine Regel für die Anzeige: Ein Satz „bis <Tag>“ nennt den letzten Tag ohne Gebühr (inklusiv, Register K2/E-018: „bis 31.1.2028“), also den Wiener Tag vor einzugAb; ein Satz „ab <Tag>“ nennt einzugAb selbst. Hat der Hof im Admin einen eigenen Einzugstag (Farm.einzugAb), gilt dasselbe für diesen Tag; /settings nennt dann weiter das Ende der Grundgebühr (gruendungBis) – zwei verschiedene Enden, so gewollt. Dafür wird `letzterFreierTag` (plattformgebuehr.ts Z. 418, heute schon von geldsaetzeFuer Z. 453 und 465 genutzt) als reine Anzeige-Hilfe exportiert: gibt nur Text zurück, nie ein Datum; JSDoc „nur Anzeige, nie für Buchung, Abrechnung, Einzug, Versand“. Import-Wache: kein Gebrauch in src/app/api/**, src/server/actions/**, src/server/plattformgebuehr-abrechnung.ts und src/server/mail-arten/**; erlaubt in src/lib/plattformgebuehr.ts (Definition), in src/lib/** für Anzeige-Sätze (in src/lib/email.ts und src/emails/** nur für den Text eines Satzes, nie für einen Zeitpunkt des Versands) und in src/server/queries/** (reine Lader für die Anzeige). Ein „bis“-Satz in einem Renderer unter src/server/mail-arten/** bleibt stehen und steht im Bericht. src/server/queries/plattformgebuehr.ts liefert dafür zusätzlich `letzterFreierTagText` neben `einzugAbText`. Alle „bis“-Sätze mit einzugAb ziehen um (Liste per git grep im Bericht). einzugAbFuer, einzugFuer, die Abrechnung, die Ankündigung („Ab <Tag>“) und jede Geldberechnung bleiben unverändert. Zeigt sich, dass die Abrechnung ein anderes Ende nutzt als die Anzeige, oder dass Abrechnung und Anzeige mit dem Fix auseinanderfallen: nichts ändern, Nummer als Entwurf, Morgenbericht unter „Geld“. Der Bericht nennt, dass LASTSCHRIFT_TEXT.erlassen und gruendungSatz danach einen Tag früher nennen: Der Text war um einen Tag zu großzügig, die Zusage bleibt gleich.
+- Kurznummer (Nr. 263): Überall, wo Hof, Kundschaft oder Admin eine Kurznummer sehen, steht kurznummerAus (6 Zeichen, groß, aus dem Ende der ID) – Danke-Seite (auch der Scheinerfolg der Bot-Bremse mit 6 Zeichen groß), Meine Meldungen, Admin › Heute, Admin-Postfach und Briefkasten-Ansichten, Mails. Suchen erkennt die neue Nummer, die alte (8 Zeichen vom Anfang, auch klein) und die volle ID über EINE Regel (passtZurKurznummer bzw. eine Abfrage nach derselben Regel: Ende der ID ohne Rücksicht auf Groß/Klein, Anfang für die alte Nummer); passen mehrere, wird keine beliebige genommen (wie heute in /api/triage: „mehrdeutig“). /api/triage/status und der CLI-Export (src/lib/briefkasten-export.ts) bleiben unverändert (Sperrzone /api; beide nutzen dieselbe alte Nummer, das passt zusammen) – Morgenbericht. Dazu: der Duplikat-Verweis der Triage (src/server/actions/admin.ts Z. 560–571) und sucheMeldungen (src/lib/meldung.ts Z. 871–875) nach derselben Regel; mehrdeutig → Fehler „Diese Kurznummer passt zu mehreren Meldungen – gib die volle Nummer ein.“; Für den Nummern-Teil der Suche ergeben Eingaben unter sechs Zeichen (außer der vollen ID) keinen Treffer; die Wortsuche im Kurztitel von sucheMeldungen bleibt, wie sie ist. scheinKurznummer kommt aus `crypto` mit demselben Zeichensatz wie das Ende einer cuid (a–z, 0–9, groß geschrieben), damit der Scheinerfolg der Bot-Bremse nicht an der Form erkennbar ist.
+- Admin › Heute „Nr. meldung-“: Folge der alten Kurznummer an den Seed-IDs; mit Nr. 263 behoben, Test mit einer ID „meldung-seed-1“.
+- Admin-Bestelldetail „Servicegebühr“ (Nr. 266): Erst belegen: Test mit einer Bestellung `gebuehrModell: 'hofpreis'` → „Plattformgebühr“, mit null bzw. „bisher“ → „Servicegebühr“ (Wort je Modell, gebuehrBezeichnungFuer). Ist der Test grün, ist der Code richtig: kein Fix, im Morgenbericht als U (Seed-Bestellungen im Modell „bisher“); die Prüfdaten aus Nr. 262 zeigen beide Fälle. Ist er rot: Fix nur am Wort.
+- Gründungshöfe „36 gegen 12“ (Nr. 265): EINE Zählregel für „vergeben“ in Kachel, Hinweis, Prüfung im Browser und Server-Action: vergebeneGruendungsplaetze(hoefe, plaetze) (vor dem Festschreiben höchstens die Plätze, danach die festgeschriebenen). Test mit mehr Höfen im Rennen als Plätzen; Testhöfe und ausgenommene Höfe zählen nicht (wie heute). Keine Änderung, wer einen Platz bekommt. Berührt die Korrektur einen Pfad aus der Stopp-Regel unter „Gründungsplätze“: nicht ändern, Entwurf, Morgenbericht „Geld“.
+- 500-Seite ohne Seitentitel (Nr. 266): Die Fehlergrenze setzt einen Seitentitel (React 19 `<title>` im Baum der Ansicht, Text „Fehler — <Marke>“ aus einer Konstante neben FehlerAnsicht); global-error ebenso. Test: gerenderte Ansicht enthält genau einen `<title>`.
+- /widerruf nach dem Absenden ohne h1 (Nr. 266): Die Überschrift der Eingangsbestätigung wird das h1 der Seite (Element tauschen in widerruf-formular.tsx Z. 127, Fokus-Ziel bleibt). Wortlaut aus src/lib/widerruf.ts unverändert; `git diff --name-only <Basis>.. -- src/lib/widerruf.ts` leer. Test: nach dem Absenden genau eine h1 mit eingangTitel.
+
+Gemeinsame Ursachen (Bausteine; je eine Quelle, Vorschau in /intern/bausteine, Render-Test)
+- G11 Seitenfuß (Nr. 267): Im Web steht der Fuß in der Breite der Inhaltsspalte der Seite, ohne Logo, „Vertrag widerrufen“ bündig mit den übrigen Rechtslinks; am Handy unverändert. Die Spalte kommt aus EINER Quelle: bevorzugt eine Zuordnung Route → Spalte in src/lib/kunden-navigation.ts, die KundeShell liest; die drei vorhandenen `fussSpalte`-Aufrufer ziehen auf sie um. Weitere Seiten-Dateien ändert 267 nicht. Alle 13 Boards der Ursache bekommen ein Bild 1440 hell und dunkel.
+- G10 Rest (Nr. 267): Warenkorb-Symbol im Handy-Kopf in Board-Größe (anmelden), Unterleiste nach G10.
+- Hof-Kopf G1 Rest (Nr. 269): Seiten des Mehr-Blatts mit B-Zeile „Kopf ohne ‹“ (auswertung, kunden, verkaeufe, postfach, Meine Meldungen) bekommen am Handy einen Rückweg nach dem Muster der N1-Ergänzung vom 7.11.2026 (`nurHandy`), Ziel und Name nach dem Board, eingetragen nur in UNTERSEITEN (bauern-navigation.ts). Der Werkzeug-Kopf steht am Handy fest (56 px, klebt), wie G1 sagt; scrollt er weg, wird die Ursache im Baustein behoben, nicht je Seite.
+- G3 (Nr. 269): Fließtext im Hinweiskasten bzw. Hof-Balken im Warnton wie der Titel, Kontrast WCAG AA in beiden Themes (Test mit den Token-Werten).
+- Umriss-Knopf, Feld und Beschriftung im Hofbereich (Nr. 269): KNOPF_RAHMEN nach Board (Höhe, Schrift fett, Rand in Textfarbe; Vorbild „So geht’s“ auf Heute), FELD mit 10 px Rundung (RUNDUNG.feld), FELD_LABEL nach Board (fett, Textfarbe; Größe nach Board). Wirkt gewollt überall, wo die Konstanten stehen, auch im Admin; Bilder je betroffenem Board-Typ (heute, produkte, hofdaten-zahlung, beitraege, ein Admin-Board).
+- Spalte der Einstellungs-Unterseiten im Web 671 px (Nr. 269): eine Konstante; Ursache per git grep finden und im Bericht nennen.
+- LadeFehlerKasten als ui-Variante (Nr. 269, Nacharbeit 251): neue Datei in src/components/ui/, die alte Datei unter hof-hilfe/ exportiert sie weiter (keine Aufrufer-Änderung in 269; die Seiten-Nummern ziehen um).
+- Meldungs-Bausteine (Nr. 268): die B-Zeilen von problem-melden und meldungen nach der Liste, in den gemeinsamen Bausteinen; die Hof-Seite /fehler-melden bleibt beim Hof-Board, die Kunden-Seite beim Kunden-Board (Bausteine mit Variante, keine zweite Quelle).
+- Prüf-Seed vervollständigen (Nr. 262): siehe dort; damit verschwindet „nicht herstellbar“ bei allen Bildern, die nur an Prüfdaten hingen.
+- Mail-Vorschau mit Beispieldaten (Nr. 270): siehe dort; nur Vorschau, kein Versand, keine echten Codes, kein MailAuftrag.
+
+Seiten (Board-Nummern 271–280)
+- Gebaut werden alle als „Mangel“ markierten Punkte aus abnahme-lauf32.md der Boards der Nummer und die offenen B-Zeilen der Liste, Texte wörtlich wie dort. Was eine Zeile der Liste, die Ergänzungsliste, 3.2 oder dieser Auftrag deckt, wird nicht „angeglichen“.
+- Prozent und Wort der Gebühr nie fest im Text: Satz aus der Bestellung bzw. der Hof-Einstellung, Wort über gebuehrBezeichnungFuer (wie §36 „Seiten“). gebuehr-wort-wache bleibt grün.
+- Recht-Wortlaut bleibt (Belehrung, Muster-Formular, N39/N43, Rücktritts- und Gewährleistungssätze, § 4a-FAGG-Reihenfolge-Satz, AGB- und Kassensätze, Anbieterzeile, Datenschutz, Impressum, Konditionen-Wortlaut). Dateien, die in Lauf 32 außerhalb der Grenzen lagen, bekommen eine Grenze in einer Nummer (siehe Dateigrenzen); Recht-Wortlaut darin bleibt ausgenommen.
+- Kasse (276): nur Darstellung. BAR_BESTAETIGEN („Du bestätigst per E-Mail.“) bleibt: Register N10 vor Board (R, Ergänzungsliste). Die Karte „Deine Bestellung“ mit Vertragspartner und Gewährleistung bleibt, wo sie ist (Recht, § 4a FAGG und Gewährleistung; Frage im Morgenbericht). Spaltenbreite und Rückweg bei 1440 sind C (Ergänzungsliste).
+- Korb-Hinweis mit Produktname (276): Der Satz entsteht im Browser in einer neuen reinen Funktion `korbHinweisMitNamen` (src/lib/korb-hinweis.ts) aus dem Korb vorher und dem berichtigten Korb (Hofseite: Abgleich in product-grid.tsx; Kasse: `items` der Antwort in checkout-form.tsx). befundMeldung, gleicheKorbMitHofseite, src/lib/reservierung.ts, src/server/warenkorb.ts und die Antworten der drei API-Routen bleiben unverändert (Diff-Beleg). Lässt sich ein Name nicht sicher zuordnen (z. B. mehrere Positionen desselben Produkts): Satz der Quelle bleibt, Bericht „nicht gebaut“. Satzbau ohne zweite Quelle: `korbHinweisMitNamen(satzDerQuelle, entfernteNamen)` ersetzt im Satz der Quelle nur den Satz zu entfernten Positionen durch den Board-Satz mit Namen; alle übrigen Teile (gekürzte Mengen, KORB_PREIS_GEAENDERT, RESERVIERUNG_ABGELAUFEN) bleiben wörtlich. Der zu ersetzende Satz wird nicht als zweites Literal geschrieben, sondern über einen Aufruf von befundMeldung mit einem Befund nur aus entfernten Positionen erzeugt (Anzahl 1 bzw. n; Aufruf, kein Diff in reservierung.ts). Findet er sich nicht im Satz der Quelle, bleibt der Satz der Quelle.
+- /widerruf (279): Kein bestehendes Feld wird entfernt oder zur Pflicht gemacht. Ein neues Feld (z. B. Anschrift) nur, wenn eine B- oder C-Zeile es verlangt; sonst Frage „Recht“ im Morgenbericht. Beschriftungen und Hinweise der Felder stammen aus src/lib/widerruf.ts und bleiben (Diff leer).
+- Geteilte Bausteine und fertige Boards: Änderungen an src/components/ui/bottom-nav.tsx nur für die Variante der Kundschaft (Prop oder eigene Klasse); Hof- und Admin-Unterleiste bleiben (Render-Test, Bild mehr-neu 390 hell und dunkel vorher und nachher).
+- Karten (271, 272): Bedienelemente, Lage der Quellenangabe und Aufbau um die Karte herum ja; eine neue Kartenquelle, ein Paket oder eine andere Kachel-Adresse nein (Kartenquelle steht unter „Nicht“).
+- Mails (280): die offenen B-Zeilen der Mail-Boards, die nicht Recht oder P1 sind. Nicht gebaut: „Rücktritts-Hinweis mit ‚§ 18 FAGG‘“ und „Einleitung ohne Kundinnen-Namen“ der Hof-Mail zum Rücktritt (mail-hof-bestellung Bild 4; Rücktritts-Wortlaut, Anwältin), die zwei Sätze der Storno-Mail (P1), Gebühren-Sätze nach N38 (R). Render-Vergleich der Rechtsblöcke je Mail wie in 255 (byteweise gleich); weicht einer ab: zurück, „Recht“ im Bericht.
+- Texte von Mails, die heute in src/lib/admin-anmeldung.ts, anmeldecode.ts, geraete.ts, konto-anfragen.ts, postfach.ts oder betrieb.ts stehen, ändert 280 nur als Zeichenkette: Der Diff dieser Dateien enthält nur geänderte String-Literale (Beleg im PR-Text mit `git diff -U0`), keine Funktion, keine Frist, keine Prüfung, kein Ablauf; Pflicht-Gegenlesen „Sicherheit“.
+
+Nacharbeit aus den Prüfungen (Morgenbericht 32 B „Offen“) – Zuordnung
+- 255 Kommentar in src/lib/email.ts und Test „Bitte zahle … mit Karte“ → 280.
+- 251 zwei Knopf-Rundungen der Kundschaft auf /problem-melden → 268; LadeFehlerKasten als ui-Variante → 269; unbenutztes src/components/sales/kanal-symbol.tsx löschen, wenn git grep keinen Import findet → 269.
+- 252 tote Exporte in src/lib/startseite.ts → 271; vorschau-247.tsx Z. 108 „folgt mit Nr. 252“ → 267.
+- 254 `rounded-[12px]` statt RUNDUNG an fünf Stellen und Datumshelfer eingang-zeit.ts nach src/lib/format.ts → 279.
+- 249b druckKasse nach src/lib/hof-bestellungen.ts → 277.
+- 258b weitere Admin-Stellen unter 12 px und FELD ohne Mindesthöhe in Admin-Dialogen → 281 (außer src/app/admin/betrieb/mails-*.tsx → 270).
+
+Prüf-Umgebung (wie freigabe.md §36 „Prüf-Umgebung und Admin-Abnahme“ und docs/nachtlauf.md „Prüfwerkzeug“; dort steht das Verfahren, hier nur, was neu ist)
+- `env -i` mit der Liste aus pruef-env.sh; Loopback-Sperre zuerst (beide Adressen gleich, istTestDatenbank, Host exakt localhost oder 127.0.0.1, `inet_server_addr()` Loopback, kein VERCEL, keine Passkey-Zeile vor dem Seed, nicht mehr Konten als der Seed, keine .env-Datei außer *.example im Worktree). Integrationstests im Worktree immer als `TEST_DATABASE_URL=… pnpm exec vitest run --config vitest.integration.config.ts`, nie `pnpm test:integration`.
+- Prüf-Passkey nur in der lokalen Wegwerf-DB (N46, N20-Ergänzung); kein Umweg im App-Code.
+- Neu ab 262: Prüf-Browser nur über scripts/pruefung/pruef-browser.sh (feste Flags samt `--lang=de-AT`), agent-browser nur mit `--session <name>` je Fotograf, dev-Worktree unter einem laufneutralen festen Pfad, Fehlerzustände nur an der eigenen DB-Kopie eines Fotografen. Der Prüf-Seed bricht zusätzlich hart ab, wenn RESEND_API_KEY, RESEND_WEBHOOK_SECRET, NEXT_PUBLIC_SENTRY_DSN, SENTRY_AUTH_TOKEN, eine VERCEL*-Variable oder ein Stripe-Schlüssel ohne „_pruefung“ gesetzt ist. Die Sperre „nicht mehr Konten als der Seed“ nimmt die erwartete Zahl aus der Liste des Seeds selbst (neue Konten eingeschlossen), nie als feste Zahl; Test: ein zusätzliches Konto lässt sie anschlagen.
+- Aufräumen am Ende jedes Abschnitts und nach einem Abbruch wie §36, dazu alle Fotograf-Worktrees mit `git worktree remove --force`. Der (Zwischen-)Morgenbericht bestätigt es.
+- Klappt die Admin-Anmeldung nicht binnen 60 Minuten Arbeit: Admin-Boards „nicht abgenommen“, Grund im Morgenbericht, der Lauf stoppt nicht.
+
+Nicht herstellbare Bilder (nach Nr. 262)
+- Herstellbar sind dann auch: Größenwahl Futter, Brennholz in Raummeter, Postfach mit Nachrichten und Rundschreiben, WhatsApp-Abonnentin, Mindestbestellwert, Bar- und Online-Bestellung im Hofpreis-Modell, Abholtag heute, künftiges Fenster mit Bestellungen, „Artikel fehlt“, Rücktritt „nicht mehr möglich“, Hof ohne Produkte „wartet auf Freigabe“, Ladefehler und Speicherfehler über die abgeschaltete DB-Kopie, die Mail-Boards über die Beispiel-Vorschau (Nr. 270), die Aktion-Karte auf /konditionen über die Option „Gründung festschreiben“ in der Wegwerf-DB.
+- Bleiben „nicht prüfbar“ (mit Grund je Bild): Stripe-Zustände (Online-Zahlung pausiert, abgelehnte Zahlung, Zahlung zu spät), Nominatim (Ortssuche, Umkreis), global-error, Better-Auth-Einmal-Links (systemseiten 1–4, registrieren 4), Mail-Code-Bilder nur, wenn der Weg über den dev-Fotografen scheitert. Code-Bilder (Meine Bestellungen, Anmelde-Code) wie §36: Code nur aus der Laufzeit-Ausgabe des dev-Servers unter .nachtlauf/, in keinem Commit, Zeitbuch, Bericht oder Bildtext.
+- Aufnahme nachholen (U, abnahme-lauf32.md Z. 410–412): anmelden Bild 2, auswertung Bild 1–3/5 (Reiter Monat), korb 1440 Bild 1/2 (Blatt offen), region Bild 1/6, mehr-neu 3-1440, fehlerseiten Bild 1 (mehrteilige Adresse), konto-hof Bild 5, verkaeufe Bild 4 dunkel, meine-bestellungen Bild 4 dunkel.
+
+Register (Doku-Nummer 261, wörtlich; Kennungen nach §0a)
+- Neuer Eintrag nach N47:
+  „### N48 · Antworten auf Morgenbericht 32 und Gründungsplätze (7.11.2026)
+  - **Entscheidung (uttoranger, im Chat, 7.11.2026):** „Das Feld ‚Hof-E-Mail‘ auf den Hofdaten bleibt; es ist die Kontaktangabe für den Rücktritt. Ist ein Produkt gerade ausverkauft, sagt die Produktseite ‚<Produkt> gibt es gerade nicht.‘ Der Abholzettel sagt ‚Nichts zu kassieren‘ auch bei stornierten Bestellungen ohne Erstattungszeitpunkt. Die Packliste nennt die Plattformgebühr nur, wo ein gezeigter Betrag sie enthält, wie der Abholzettel. /onboarding hat die Inhaltsbreite des Boards. Die Mail im Hofpreis-Modell zeigt bei entfallener Gebühr keinen Kasten ‚Bring bitte … mit‘. Eine h1 hinter einem offenen Dialog oder Blatt fehlt nicht. Es gibt 100 Gründungsplätze; die Zahl kommt aus Admin › Einstellungen, den Wert in Produktion setzt die Projektleitung. Steht ‚bis <Tag>‘ beim Ende der Gründungszeit oder der erlassenen Bargebühr, ist es der letzte Tag ohne diese Gebühr; der Einzug der Bargebühr beginnt am Tag danach, außer der Hof hat im Admin einen eigenen Einzugstag. Kurznummern von Meldungen haben sechs Zeichen in Großbuchstaben; alte achtstellige werden weiter gefunden. Admin › Betrieb › Mails zeigt zusätzlich ‚Beispiele‘: jede Mail-Art mit erfundenen Daten, Codes als Nullen, Links unkenntlich; kein Versand, kein Mail-Auftrag, nichts gespeichert. Die Vorschau echter Mails (N27) bleibt, wie sie ist.“
+  - **Verhältnis zu anderen Einträgen:** bestätigt K2 (Änderung Nr. 116, 100 Plätze) und schließt die offene Frage „Zahl der Gründungsplätze“; ergänzt N38 und N44 (nur die Anzeige des Endes, nicht, wann eine Gebühr anfällt), N46 (Abholzettel) und N1 (siehe Ergänzung dort).
+  - **Umsetzung:** Nr. 261–281 (freigabe.md §37); keine Migration.“
+- Unter K2 als neue Zeile: „- **Ergänzung (uttoranger, im Chat, 7.11.2026; E-026, N48):** Es bleibt bei 100 Gründungsplätzen (Nr. 116). Die Zahl kommt aus Admin › Einstellungen › Gründungshöfe; den Wert in Produktion stellt die Projektleitung vor dem ersten Festschreiben auf 100. Der Spalten-Default 12 und der Standardwert im Code bleiben (keine Migration; sie gelten nur ohne Zeile). Boards mit 12 werden korrigiert.“
+- Unter N1 als neue Zeile: „- **Ergänzung (uttoranger, im Chat, 7.11.2026; N48, B-Zeilen der Liste Lauf 32):** Wie /settings bekommen am Handy auch Auswertung, Kunden, Verkäufe, Postfach und Meine Meldungen einen Rückweg; Ziel und Name nach dem Board, eine Quelle in src/lib/bauern-navigation.ts.“
+- NUR mit „Bildfläche statt Illustration freigegeben“: neuer Eintrag „### N49 · Bildfläche ohne Foto (7.11.2026)
+  - **Entscheidung (uttoranger, im Chat, 7.11.2026):** „Ohne Foto zeigen Hofkarten, Produktkarten, Hofseite, Produktseite und Region die neutrale Bildfläche der Boards statt der Kategorie-Illustration. Das Teilen-Bild bleibt bei der Illustration.“
+  - **Verhältnis zu anderen Einträgen:** ändert N22 (Satz „Fehlt ein Foto, steht die Illustration der Kategorie“) und I1 (Rückfall je Produkt) für diese Orte.
+  - **Umsetzung:** Nr. 271 (freigabe.md §37); keine Migration.“
+  und unter N22 und I1 je ein Vermerk „- **Verweis:** geändert durch N49, 7.11.2026 (Bildfläche ohne Foto).“
+- Stand-Zeile am Ende: „Stand Lauf 33 (uttoranger, 7.11.2026): N48 entschieden (Antworten auf Morgenbericht 32, 100 Gründungsplätze, Ende der Gründungszeit als letzter Tag, Kurznummer)[, N49 (Bildfläche ohne Foto)]; Ergänzungen bei K2 und N1. Gemeinsame Ursachen, echte Fehler und die Boards unter 5 Sternen in Nr. 261–281, in drei Abschnitten (freigabe.md §37). Keine Migration, kein Paket, keine neue Variable. Nicht: Recht-Wortlaut (P1/O9, Anwältin), Tarife als Abrechnung, Stripe live, BAES/Futter-Registrierung (F035), Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle, Board-Dateien, Toast-Token.“ Der Teil in eckigen Klammern nur mit dem Startsatz; die Klammern selbst stehen nie im Register.
+
+Ergänzungsliste (Doku-Nummer 261 legt docs/nachtlauf/berichte/lauf33-ergaenzungen.md mit genau diesem Inhalt an)
+„# Lauf 33 · Ergänzungen zur Board-oder-Code-Liste (Board-Korrekturen der Projektleitung, 7.11.2026)
+Gilt mit docs/nachtlauf/berichte/lauf32-board-oder-code.md. Jede Zeile ist kein Mangel. Die Board-Dateien korrigiert die Design-Gruppe außerhalb des Laufs.
+
+| Board | Bild/Fassung | Was die App zeigt | Entsch. | Grund |
+|---|---|---|---|---|
+| hofdaten-zahlung | alle | Feld „Hof-E-Mail“ mit Hinweis auf die Rücktrittsbelehrung | R | Antwort 1 der Projektleitung, 7.11.2026 (N48): Kontaktangabe für den Rücktritt |
+| meldungen, problem-melden | Danke, Meine Meldungen | Kurznummer mit sechs Zeichen in Großbuchstaben | C | Antwort 5 zum Zwischen-Morgenbericht 32 A (G14) |
+| kasse | 1440 | Spalten breiter als im Board, Rückweg mit Symbol | C | Antwort 9 zum Zwischen-Morgenbericht 32 A |
+| bestaetigung | Hofpreis-Modell | „Ware · Plattformgebühr · Gesamt“ getrennt | R | Antwort 10 zum Zwischen-Morgenbericht 32 A (AGB 1.0 Punkt 10.2, N38) |
+| hoefe | Bild 2, 390 | Satz zur Reihenfolge der Ergebnisse | R | § 4a FAGG (Morgenbericht 32 B) |
+| einstellungen | alle | Statuspunkt zur Titelzeile ausgerichtet | C | Morgenbericht 32 B |
+| meine-bestellungen | 390 | Seitenfuß sichtbar | C | Board kundenkonto zeigt ihn (Morgenbericht 32 B) |
+| passwort | Bild 5 | Unterzeile „Für dein Agrilo-Konto.“ | C | wie Board Bild 3 und 4 (Morgenbericht 32 B) |
+| bestellung-link | Bild 2, 3 | Frist mit Wochentag | C | V9, wie bestaetigung (Morgenbericht 32 B) |
+| kunden | Bild 2, 390 | „Sortieren nach“ zweispaltig | C | Liste: „Zweispaltig bzw. nebeneinander“ (Morgenbericht 32 B) |
+| rechtstexte und alle Boards mit „12“ Gründungsplätzen | alle | Zahl aus Admin › Einstellungen (100) | R | K2 Nr. 116, E-026 (N48) |
+| kasse | Bild 1, 3 | Unterzeile der Bar-Option „Du bestätigst per E-Mail.“ | R | Register N10 (Ergänzung Freigabe Lauf 13) |
+“
+
+Konflikte und Reihenfolge (Grundsatz)
+- Nie zwei Nummern gleichzeitig an derselben Code-Datei (docs/nachtlauf.md §4a Punkt 9). Teilen sich zwei Nummern eine Datei, startet die spätere erst, wenn die frühere im Zwischenstand ist, und schreibt ihre Tests gegen deren Stand.
+- Gemeinsam und mechanisch zu lösen: Bestandslisten unter tests/bestandslisten/ (jede Nummer streicht nur ihre eigenen Zeilen; beim Merge gilt die Schnittmenge), src/app/intern/bausteine/bausteine-vorschau.tsx (je Baustein-Nummer genau eine Import- und eine Einhäng-Zeile am Ende; beide behalten), DEVELOPMENT.md (beide Einträge), docs/ai/DESIGN_SYSTEM.md (je Nummer ein eigener Abschnitt „… nach der Abnahme Lauf 32 (Nr. …)“), docs/ai/BAUSTEINE.md (nur über `pnpm bausteine`). Dazu tests/bestandslisten/kaestchen.ts (ab 269, wie die übrigen Bestandslisten).
+- Wirkung geteilter Bausteine: Ändert eine Nummer einen geteilten Baustein (ui/** in 267 und 269, components/anmelden/stil.ts in 275, components/konto in 278, Inhalts-Funktionen in src/lib/email.ts in 270), fotografiert pruefer-ui die Boards einer gleichzeitig laufenden Nummer erst nach dem Merge der Baustein-Nummer in den Zwischenstand; fertige Nummern holen die Bilder dort nach.
+- Findet eine Nummer per git grep eine Fundstelle in einer Datei einer anderen Nummer: nicht ändern; Grenz-Erweiterung beim Dirigenten (Eintrag im Zeitbuch) nur, wenn die andere Nummer nicht gleichzeitig läuft, sonst Bericht „Nacharbeit“.
+
+══════════════════════════════════════════════════════════════════════
+UMSETZUNG
+══════════════════════════════════════════════════════════════════════
+
+1. §0a Vorprüfung (vor 261; sonst STOPP und melden)
+   1.1 main enthält 5fe822b9c853 oder später. Ist etwas dazugekommen, die Ausgangslage je Nummer am Code neu bestätigen (Zeitbuch, ganz oben).
+   1.2 Register-Kennungen: F = erste freie N-Nummer auf main beim Start (Stand 5fe822b9c853: N48). N48 heißt dann F, N49 heißt F+1; die Zuordnung gilt überall in diesem Auftrag. Nie einen bestehenden Eintrag überschreiben. Ins Zeitbuch: welche Kennungen es wurden.
+   1.3 Steht „Bildfläche statt Illustration freigegeben“ als eigene Zeile in der Nachricht der Projektleitung, außerhalb dieses Auftragstexts und außerhalb jedes Codeblocks? Dass der Satz im Auftragstext selbst steht, zählt nie. Ins Zeitbuch: ja/nein mit Fundstelle.
+   1.4 Liste docs/nachtlauf/berichte/lauf32-board-oder-code.md und abnahme-lauf32.md liegen auf main.
+   1.5 agent-browser läuft (`agent-browser --version`, Bild einer lokalen Seite). Sonst: Lauf ohne Bilder; alle Boards „nicht prüfbar (kein Prüf-Browser)“, pruefer-ui entfällt, Code und Tests wie geplant, Morgenbericht „Für dich zu tun“.
+   1.6 Postgres läuft im Container; TEST_DATABASE_URL und jede Prüf-DB zeigen auf localhost.
+   1.7 `pnpm install --frozen-lockfile`, `pnpm typecheck` (NODE_OPTIONS=--max-old-space-size=6144), `pnpm lint` (0 Fehler), `pnpm test` grün; `pnpm pruefen:doku` grün.
+   1.8 Kein Stripe-Schlüssel mit sk_live_ oder rk_live_ in der Umgebung (nur das Präfix prüfen, nie den Wert ausgeben).
+   1.9 STOPP gibt es in §0a nur bei 1.1 (main fehlt), 1.4 (Liste oder Abnahme-Bericht fehlt), 1.6 (keine lokale DB), 1.7 (Basis rot) und 1.8 (Live-Schlüssel). Alle übrigen Abweichungen gehen ins Zeitbuch, und der Lauf geht weiter.
+
+2. §0 Zuordnung
+   2.1 Modell: 261 Sonnet; alle übrigen Opus; tester Sonnet; pruefer Opus (höchstens 22 Schritte je Aufruf); pruefer-ui Opus.
+   2.2 Voller Prüfdurchgang: 262 (Sicherheit des Werkzeugs), 263 (Suche, Duplikat-Verweis), 264, 265, 270 (Admin, Sicherheit, Eingriff in src/lib/email.ts), 276, 277, 280. Gezielt: die übrigen.
+   2.3 Pflicht-Gegenlesen vor dem Push (eigener pruefer-Aufruf mit nur diesem Auftrag; Ergebnis wörtlich im PR-Text):
+       - „Geld“: 281, falls es Kästchen in gruendung-ausnehmen-dialog.tsx, testhof-dialog.tsx oder hof-akte-plattformgebuehr.tsx umstellt (Vorher-nachher-Test); 264, 265 (Konditionen K1), 271 (Beispiel-Rechnung der Startseite), 273 (Gebühren-Karte), 276 (Zahlzeile), 277 (Packliste), 280 (Beträge in Mails).
+       - „Daten“: 262 (Prüfdaten erfunden, @example.com, Telefonnummern genullt, auch die Musternummer im Seed), 263 (Suche über Kurznummer und Duplikat-Verweis der Triage: nur Admin, mehrdeutig ohne Auskunft, kein falscher Verweis), 268 (Meldungs-Formulare: keine neuen Felder, keine Personendaten an Sentry).
+       - „Sicherheit“: 281, falls es das Kästchen in ersatzcodes-anzeige.tsx umstellt (Vorher-nachher-Test); 262 (Loopback-Sperre, Abschottung, harter Abbruch bei Dienst-Schlüsseln, Fehlerzustand nur an der eigenen Kopie), 270 (Admin-Wache, keine echten Codes oder Token, kein Versand, keine Schreibvorgänge in irgendeiner Tabelle, Inhalts-Funktionen byteweise gleich), 280 (Zeichenketten in Auth-nahen Dateien, nur String-Literale).
+       - „Recht“: 266 (widerruf.ts unverändert), 279 (Rahmen der Rechtsseiten, Wortlaut unverändert), 280 (Render-Vergleich der Rechtsblöcke); dazu jede Nummer, die ein Kästchen aus A-8 in der Kasse (276), auf /widerruf (279) oder in ruecktritt-felder.tsx (277) umstellt (Vorher-nachher-Test).
+   2.4 Integrationstests (Form aus „Prüf-Umgebung“): 262 (Prüf-Seed gegen localhost), 263 (Suche), 265 (Gründung), jede Nummer, die einen Text ändert, den tests/integration erwartet (Regelvorschlag 7), im Sammel-PR ganz.
+   2.5 Lesemappe (4a Punkt 1): CLAUDE.md §2, CODING_STANDARDS und TESTING_GUIDELINES ganz; DESIGN_SYSTEM nur „Typografie und Form“, „Komponenten“, „Zustände“, „Dialoge und Blätter“, „Wortliste“ und die eigenen Routen; ARCHITECTURE §5; BAUSTEINE.md; Register N1, N8, N9, N20, N22, N29, N38, N41–N48 (und N49, falls angelegt), K1, K2, I1; aus der Liste die eigenen Boards, Q1–Q5 und 3.2; die Ergänzungsliste; aus abnahme-lauf32.md die Abschnitte der eigenen Boards; die Boards unter docs/mockups/redesign-2026-11/ (s1-/s2-/s3-<board>.dc.html und -dunkel).
+   2.6 Bilder je Nummer (Umsetzer selbst): jede geänderte Route bei 390 und 1440, hell und dunkel, je Zustand des Boards, unter .nachtlauf/screens/<nr>/r<runde>/; danach pruefer-ui auf die eigenen Boards, höchstens drei Runden (zählen nicht zu den zwei Nachbesserungsrunden aus §4 Schritt 4). Unter 5 Sternen nach drei Runden: Nummer abschließen, Rest mit Zeilenverweis im Bericht. Bilder entstehen erst, wenn 262 im Zwischenstand ist; Nummern, die vorher fertig sind, holen sie nach (Bedingung für „Ziel erreicht“, nicht für den Push).
+
+3. §1 Warteschlange, Rangfolge, Haltepunkte
+   3.1 Abschnitt A (Ursachen und Fehler)
+       - 261 Doku (docs/lauf33 von main, Sonnet, ohne Code).
+       - Welle 1 von docs/lauf33: 262 ∥ 264.
+       - Danach auf jedem frei werdenden Platz die nächste startbare Nummer der Rangfolge vom Zwischenstand integration/lauf33.
+       - Rangfolge A: 261 → 262 → 264 → 263 → 265 → 266 → 267 → 269 → 270 → 268 ‖ HALTEPUNKT A
+       - Startbedingungen: 265 nach 263 und 264; 268 nach 263 und 269; 269 nach 264; 270 nach 263 und 264. Übrige nach 261.
+   3.2 Haltepunkt A: erreicht, wenn alle Nummern von A fertig, Entwurf oder entfallen sind, spätestens 11 h nach dem Start; nach Stunde 8,5 beginnt keine neue Nummer. Dann: laufende Nummern sichern (WIP-Commit, nicht pushen, wenn rot); Zwischenstand integration/lauf33 mit vollem Lauf und Integration grün pushen; Zwischen-Durchgang (höchstens 1,5 h) für die Boards von 268 und je ein Board je Baustein (267: abmelden, passwort, rechtstexte; 269: kunden, heute, hofdaten-zahlung, dazu mehr-neu als Gegenprobe; 270: mail-sicherheit) → abnahme-lauf33.md „Zwischen-Durchgang A“; Aufräumen; Zwischen-Morgenbericht -lauf33-a.md; Sammel-PR integration/lauf33 → main als ENTWURF (Merge-Commit). Zwischen-Durchgang, Aufräumen und Zwischen-Morgenbericht enden spätestens 13 h nach dem Start (§4a Punkt 12 f); reicht die Zeit nicht, kürzt der Dirigent den Zwischen-Durchgang auf die Boards von 268 und mehr-neu. Danach endet die Sitzung.
+   3.3 Abschnitt B (Boards Teil 1)
+       - Start nur mit „Nachtlauf 33 fortsetzen“ der Projektleitung in einer neuen Sitzung. Der Dirigent liest Zeitbuch und status.md, prüft §0a erneut (ohne 1.2 und 1.3) und wählt den Integrationszweig: Ist der Sammel-PR von A gemergt, integration/lauf33b von main; sonst origin/main in docs/lauf33 und integration/lauf33 holen (§2 Regel 8) und auf integration/lauf33 weiter, der Entwurf-PR von A wird fortgeschrieben. Jede Nummer zweigt vom Integrationszweig des Abschnitts ab, eine Nummer mit Startbedingung von dessen Stand nach dem Merge ihrer Vorgängerinnen.
+       - Rangfolge B (nach Hebel): (am Haltepunkt A gesicherte Nummern, dann aus A verschobene, 3.6) → 271 → 272 → 274 → 273 → 275 → 276 → 279 ‖ HALTEPUNKT B
+       - Startbedingungen in B: 276 nach 271; 279 nach 275. Übrige ab Start von B.
+       - Ist vor Stunde 7 von B ein Platz frei und keine Nummer von B startbar, darf nur 277 beginnen (nach 274 und 275; keine andere Nummer von C), wenn ihr Budget vor Stunde 9,5 endet; sie zählt dann zu B.
+       - Nach Stunde 7 von B beginnt keine neue Nummer. Haltepunkt B wie Haltepunkt A: Zwischenstand pushen, Zwischen-Durchgang (höchstens 1,5 h) für die Boards der fertigen Nummern von B → abnahme-lauf33.md „Zwischen-Durchgang B“, Aufräumen, Zwischen-Morgenbericht -lauf33-b.md, Sammel-PR als ENTWURF (neu von integration/lauf33b oder fortgeschrieben), spätestens 12 h nach dem Start von B.
+   3.4 Abschnitt C (Boards Teil 2, Sammel-PR, Schluss-Durchgang)
+       - Start nur mit „Nachtlauf 33 fortsetzen“ in einer neuen Sitzung; Integrationszweig wie in B (integration/lauf33c von main, wenn der Sammel-PR von B gemergt ist, sonst auf dem Zweig von B weiter).
+       - Rangfolge C: (am Haltepunkt B gesicherte Nummern, dann aus B verschobene, 3.6) → 277 → 278 → 280 → 281 → Sammel-PR → Schluss-Durchgang (Nummern, die schon in B liefen, entfallen hier).
+       - Startbedingungen in C: 277 nach 274 und 275; 280 nach 274, 275, 278 und 279.
+       - Nach Stunde 5 von C beginnt keine neue Nummer; dann Sammel-PR, Schluss-Durchgang, Morgenbericht. Der Schluss-Durchgang hat Vorrang: Laufende Nummern werden dafür mit ihrem fertigen Stand abgeschlossen. Reicht die Zeit nicht, entfällt 281 (Admin, nicht im 5-Sterne-Kriterium) und kommt in Lauf 34; der Morgenbericht nennt es.
+   3.5 Höchstens zwei Umsetzer gleichzeitig. Ist eine Vorgängerin Entwurf, entfallen oder am Ende von C nicht begonnen, startet die Nachfolgerin vom letzten grünen Zwischenstand und lässt Teile, die die Vorgängerin braucht, mit Bericht weg. Die Reihenfolge der Abschnitte 5–25 unten ist die der Beschreibung, nicht die Rangfolge.
+   3.6 Nummern, die am Haltepunkt als WIP gesichert wurden, laufen im nächsten Abschnitt zuerst weiter (aus ihrer Wiederaufnahme-Zeile im Zeitbuch), vor den verschobenen. Nummern, die bis zur Sperrstunde ihres Abschnitts nicht begonnen haben, stehen am Anfang der Rangfolge des nächsten Abschnitts, in ihrer bisherigen Reihenfolge und mit ihren Startbedingungen (aus A vor 271; aus B vor 277). Der Zwischen-Morgenbericht führt sie als „verschoben nach B“ bzw. „verschoben nach C“, die Abnahme ihre Boards als „offen (Abschnitt B)“ bzw. „offen (Abschnitt C)“. Bleibt eine Nummer am Ende von C unbegonnen, steht sie im Morgenbericht als „nicht begonnen – Lauf 34“; ihre Nachfolgerinnen starten nach 3.5 und lassen die abhängigen Teile weg (möglicher Fall: 281 bleibt unbegonnen; es hat keine Nachfolgerin, die Admin-Messmängel stehen im Morgenbericht).
+
+4. Dateigrenzen (je Nummer aus git grep der genannten Funktionen bestätigen, 4a Punkt 1; nie zwei Nummern an derselben Datei außerhalb dieser Grenzen)
+   - 261: docs/nachtlauf/freigabe.md, docs/entscheidungen.md, docs/nachtlauf.md (§3, §4a Punkte 2, 7, 12), docs/nachtlauf/status.md, docs/nachtlauf/berichte/zeitbuch-lauf33.md, docs/nachtlauf/berichte/lauf33-ergaenzungen.md.
+   - 262: scripts/pruefung/** (auch neu pruef-browser.sh), tests/pruefung-*.test.ts, tests/pruefung-worktree.ts, docs/nachtlauf.md (Abschnitt „Prüfwerkzeug“), docs/ai/TESTING_GUIDELINES.md §6. Dazu: prisma/seed-daten.ts (nur Z. 974, die Musternummer), tests/seed-idempotenz.test.ts (nur der Test der Ausnahme Z. 361–370), tests/telefonnummern-wache.test.ts (nur die dann veraltete Ausnahme für tests/seed-idempotenz.test.ts; eine Ausweitung der Wache auf prisma/ entfällt in diesem Lauf, weil das Seed-Muster selbst Endziffern 1–9 trägt), tests/bild-format.test.ts und tests/sentry-hygiene-felder.test.ts (nur die Zeitgrenze), docs/ai/TESTING_GUIDELINES.md §4 (A-1).
+   - 263: src/lib/kurznummer.ts, src/lib/meldung.ts (nur die Kurznummer-Stellen), src/server/actions/meldung.ts (nur Z. 73–75, 98, 188 und die Typen dazu), src/server/queries/meldung.ts, src/server/queries/postfach.ts (nur Z. 510), src/lib/admin-aufgaben.ts (nur Z. 362), src/components/admin/briefkasten-teile.tsx (nur Z. 127), die Admin-Suche nach einer Meldung (Datei per git grep auf `startsWith` an Meldungs-IDs, außer src/app/api/**), Tests. Dazu: src/server/actions/admin.ts (nur der Duplikat-Verweis Z. 560–571), src/lib/meldung.ts sucheMeldungen (Z. 871–875).
+   - 264: src/lib/plattformgebuehr.ts (nur Export der Anzeige-Hilfe), src/lib/hof-einstellungen.ts (nur die „bis“-Sätze, Z. 376–405 und 600–605), src/server/queries/plattformgebuehr.ts (nur Z. 93 und 124 samt Typ), src/components/hof-einstellungen/barzahlung.tsx (nur Z. 70), die weiteren Fundstellen eines „bis“-Satzes mit einzugAb (Liste im Bericht; auch in src/lib/auswertung.ts, src/emails/**, src/lib/email.ts, src/lib/postfach.ts, aber nur die betroffene Zeile), Import-Wache, Tests. Nie src/lib/konditionen.ts-Wortlaut, nie src/lib/gruendungshof.ts. In src/server/queries/** nur der Lader, nie src/server/actions/**, src/server/plattformgebuehr-abrechnung.ts, src/server/mail-arten/**.
+   - 265: src/lib/gruendungshof.ts, src/lib/plattform-einstellung.ts, src/server/queries/plattform-einstellung.ts, src/server/queries/admin.ts (nur Lader der Plätze), src/components/admin/einstellungen-gruendung.tsx, src/app/admin/einstellungen/page.tsx, src/server/actions/plattform-einstellung.ts (nur Z. 74), die Aufrufer, die auf den Standard zurückfallen (Liste im Bericht), Tests. Nie src/server/actions/admin.ts, src/server/queries/postfach.ts, src/server/plattformgebuehr-abrechnung.ts, src/app/api/**; liegt dort ein Rückfall: Bericht und Morgenbericht „Geld“.
+   - 266: src/components/shared/fehler-ansicht.tsx, src/app/error.tsx, src/app/global-error.tsx (nur der Titel), src/app/(public)/widerruf/widerruf-formular.tsx (nur das Element der Überschrift Z. 127), src/app/admin/bestellungen/page.tsx (nur, wenn der Wort-Test rot ist), Tests.
+   - 267: src/components/shells/kunde-fuss.tsx, kunde-shell.tsx, kunde-shell-mit-sitzung.tsx, src/lib/kunden-navigation.ts, src/components/ui/bottom-nav.tsx, die drei `fussSpalte`-Aufrufer (nur die Prop), src/app/intern/bausteine/vorschau-247.tsx (nur Z. 108), neu vorschau-267.tsx, Tests. bottom-nav.tsx nur für die Variante der Kundschaft.
+   - 268: src/components/shared/meldung-form.tsx, use-meldung-formular.ts, src/components/ui/meldung-formular-ansicht.tsx, src/app/(public)/problem-melden/**, src/app/(hof)/fehler-melden/**, src/app/(hof)/meldungen/**, src/components/hof-hilfe/meine-meldungen.tsx, die Texte der Feldfehler in src/schemas/ (nur Meldung), neu vorschau-268.tsx, Tests.
+   - 269: src/lib/bauern-navigation.ts (nur UNTERSEITEN und Hilfen dazu), src/components/ui/werkzeug-kopf.tsx und werkzeug-kopf-stil.ts, src/components/ui/hinweiskasten.tsx, src/components/hofbereich/hof-balken.tsx, hof-laden.tsx, src/components/hof-bestellungen/stil.ts, neu src/components/ui/lade-fehler-kasten.tsx samt Weiter-Export in hof-hilfe/lade-fehler-kasten.tsx, die eine Stelle der Einstellungs-Spalte (Datei per git grep, Eintrag im Zeitbuch), src/components/sales/kanal-symbol.tsx (nur löschen), neu vorschau-269.tsx, Tests. Dazu (A-8): neu src/components/ui/kaestchen.tsx, src/app/globals.css (nur die neuen Kästchen-Token), docs/ai/DESIGN_SYSTEM.md (eigener Abschnitt und Token-Tabelle), neu tests/bestandslisten/kaestchen.ts und tests/kaestchen-wache.test.ts.
+   - 270: src/server/mail-arten/vorschau.ts (nur der Kopfkommentar und der Einstieg), neu src/server/mail-arten/beispiele.ts, src/lib/email.ts (nur: je Art eine reine Inhalts-Funktion `<art>Inhalt(daten) → { betreff, html }` herauslösen, nach dem Muster von onsiteConfirmationInhalt; die `send*`-Funktion ruft sie und dann sendRaw, Text und Ablauf gleich), src/server/actions/betrieb.ts (nur eine neue Action neben zeigeMailVorschauAction), src/app/admin/betrieb/mails-*.tsx, src/lib/betrieb-mails.ts (nur Namen und Texte der Beispiele), neu tests/mail-beispiele-wache.test.ts, Tests.
+   - 271: src/app/(public)/page.tsx, (public)/hoefe/**, (public)/[farmSlug]/page.tsx, (public)/[farmSlug]/produkt/**, src/components/startseite/**, hoefe/**, hofseite/**, produktdetail/**, farm/product-grid.tsx, karte/** (nur Bedienelemente und Quellenangabe), src/lib/startseite.ts, src/lib/hoefe-anzeige.ts, Tests. Nie src/lib/gruendungshof.ts (K2-Wortlaut), nie cart-sheet.tsx.
+   - 272: src/app/(hof)/region/**, src/components/region/**, src/components/analytics/umfeld-*, src/lib/umfeld.ts, src/app/(hof)/sales/**, src/components/hof-verkaeufe/**, src/components/sales/**, Tests. Dazu src/app/(hof)/analytics/umfeld/** (leitet auf /region um).
+   - 273: src/app/(hof)/customers/**, src/components/hof-kunden/**, src/server/queries/customers.ts, src/app/(hof)/analytics/** (ohne umfeld), src/components/analytics/** (ohne umfeld-*), src/components/auswertung/**, src/lib/auswertung.ts, src/server/queries/auswertung.ts, Tests.
+   - 274: src/app/(hof)/farm-page/**, src/components/mein-hof/**, src/components/farmer/hofseite-editor.tsx, hofseite-vorschau-rahmen.tsx, src/lib/mein-hof*.ts, src/app/(hof)/postfach/**, src/lib/postfach.ts (nur Texte der Hof-Postfach-Seiten), Tests. Nie src/lib/shop-pause.ts.
+   - 275: src/app/(auth)/** (register, onboarding, verify, login, forgot-password, reset-password), src/app/account/login/**, src/app/account/profile/**, src/app/(public)/bestellungen/**, src/components/einrichten/**, src/components/anmelden/** (auch stil.ts, die einzige Nummer, die sie ändert), src/components/bestellungen/**, src/lib/einrichten.ts, src/lib/fuer-hoefe.ts und Einrichten-Sätze in src/lib/konditionen.ts (nur Konstanten, die per git grep nur auf Einrichten, Onboarding und Heute stehen; nie ONLINE_ZAHLUNG_EINRICHTEN_SATZ, nie Sätze von /konditionen, /fuer-hoefe-Konditionen oder AGB), src/lib/bestellungen-finden.ts, src/lib/anmeldecode.ts (nur Texte der Anmeldeseiten), Tests.
+   - 276: src/components/farm/cart-sheet.tsx und die Warenkorb-Leiste, src/components/checkout/** (nur Darstellung; KaufknopfSaetze und AGB-Sätze nie), src/app/(public)/[farmSlug]/checkout/page.tsx (nur Darstellung), src/components/bestaetigung/**, (public)/[farmSlug]/confirm/**, bestellung/**, bestaetigen/**, src/lib/zahlzeile.ts, neu src/lib/korb-hinweis.ts, die zwei Stellen, die den Hinweis setzen (src/components/farm/product-grid.tsx Z. 630–638, checkout-form.tsx Z. 294–296), Tests. Nie src/lib/reservierung.ts, src/server/warenkorb.ts, src/lib/use-cart.ts (außer, falls zeigeKorbHinweis den Satz nicht annimmt: nur Bericht), src/lib/kasse.ts, src/app/api/**.
+   - 277: src/app/(hof)/dashboard/**, orders/**, products/**, src/app/(druck)/**, src/components/heute/**, hof-bestellungen/** (außer stil.ts), orders/**, produkte/**, products/**, src/lib/heute.ts, src/lib/hof-bestellungen.ts, src/lib/produkte-hof.ts, src/server/queries/heute.ts, orders.ts, products.ts, Tests. Nie src/lib/postfach.ts, nie ONLINE_ZAHLUNG_EINRICHTEN_SATZ.
+   - 278: src/app/(hof)/settings/** (außer den Rechtstexten auf /settings/konditionen), src/app/(hof)/status/**, src/app/teilen/**, src/components/hof-einstellungen/**, src/components/settings/**, src/components/teilen/**, src/components/konto/** (einzige Nummer), src/lib/hof-einstellungen.ts (außer den Zeilen von 264), src/lib/geraete.ts (nur Texte der Geräte-Liste), src/lib/beitrag-anlass.ts, Tests. Nie src/lib/shop-pause.ts.
+   - 279: src/app/account/unsubscribe/**, account/neuigkeiten-bestaetigen/**, src/app/sicherheit/**, src/app/konto/**, src/components/abo-bestaetigung/**, src/app/(public)/widerruf/** (Rahmen), src/app/not-found.tsx, (public)/[farmSlug]/not-found.tsx, produkt/[id]/not-found.tsx, src/app/(hof)/error.tsx, src/components/shared/fehler-ansicht.tsx, rechtstext-vorlage.tsx, rechtstext-verzeichnis.tsx, infoseite-stil.ts, src/components/rechtstexte/** (nur Darstellung), src/lib/format.ts (nur der neue Datumshelfer), Tests. Nie src/lib/widerruf.ts, src/lib/rechtstexte/**, docs/recht/**, src/lib/konditionen.ts, components/anmelden/stil.ts.
+   - 280: src/emails/**, src/lib/email.ts, src/server/mail-arten/** (außer vorschau.ts und beispiele.ts), die Mail-Zeichenketten in src/lib/admin-anmeldung.ts, anmeldecode.ts, geraete.ts, konto-anfragen.ts, postfach.ts, betrieb.ts, src/lib/format.ts (nur Nutzung), Tests.
+   - 281: src/app/admin/** und src/components/admin/** (außer src/app/admin/betrieb/mails-*.tsx und den Zeilen von 263 und 265), neu tests/admin-schrift-wache.test.ts mit tests/bestandslisten/admin-schrift.ts, Tests.
+
+5. Nr. 261 – Doku (docs/lauf33 von main, Sonnet, ohne Code)
+   5.1 docs/nachtlauf/freigabe.md: diesen Text wörtlich als „## 37. Lauf 33 (uttoranger, im Chat erteilt, 7.11.2026)“, Gliederung wie §36.
+   5.2 docs/entscheidungen.md: N48, Ergänzungen unter K2 und N1, Stand-Zeile; mit dem Startsatz zusätzlich N49 und die Vermerke unter N22 und I1; alles wörtlich wie unter „Entschieden · Register“, Kennungen nach §0a 1.2. Danach `git grep -n '\[, N49' docs/` ohne Treffer; gibt es einen, berichtigt 261 die eigene Zeile und läuft weiter.
+   5.3 docs/nachtlauf/berichte/lauf33-ergaenzungen.md mit genau dem Inhalt unter „Ergänzungsliste“.
+   5.4 docs/nachtlauf.md: §3 Zeilen 261–281 und „Sammel 33“, Absatz „Reihenfolge in Lauf 33“ (Abschnitte A–C, Haltepunkte A und B); §4a Punkt 2 (Regelvorschläge 7 und 8), Punkt 7 (Regelvorschlag 2), Punkt 12 (g) (Regelvorschlag 1), je mit Herkunft „(Morgenbericht 32 B, freigegeben 7.11.2026)“.
+   5.5 docs/nachtlauf/status.md: Lauf 32 B (260, 252, 253, 249b, 250, 257, 255, 251, 258b, 254, Sammel 32b) „gemergt (#501)“; neu 261–281 und „Sammel 33“ mit „offen“.
+   5.6 Zeitbuch anlegen (Kopf: Kerne, Speicher, NODE_OPTIONS, Uhrzeit des Starts aus `date -u`, Zeitbudget je Phase, „Bildfläche statt Illustration freigegeben: ja/nein“, Register-Kennungen).
+   5.7 `pnpm pruefen:doku` grün vor dem Push. Ist eine Doku-Wache wegen dieses Texts rot: In freigabe.md §37 nur die gemeldete Stelle so schreiben, dass die Wache sie nicht liest (z. B. Zählung in Worten), mit dem Vermerk „[Doku-Wache, Wortlaut sonst gleich]“ direkt dahinter; Fundstelle ins Zeitbuch; weiter. STOPP nur, wenn danach eine andere Wache rot ist.
+
+6. Nr. 262 – Prüfwerkzeug 2: Prüf-Seed, Messung, Browser, Fehlerzustand (Opus, voller Durchgang, Pflicht-Gegenlesen „Sicherheit“ und „Daten“, von docs/lauf33)
+   6.1 Prüf-Seed (scripts/pruefung/pruef-seed.ts) ergänzt in der frischen Wegwerf-DB, nach der Loopback-Sperre, nur mit erfundenen Daten (@example.com, Telefonnummern genullt, Hof Müller, Franz Müller), Zeiten relativ zur Uhr des Seed-Laufs:
+       (a) ein Futter mit Größen-Familie (mindestens drei Größen, eine „gerade nicht da“, eine Lose-Größe);
+       (b) Brennholz in Einheit RAUMMETER mit Holzart, Scheitlänge und Lagerung, ein zweites ausverkauft;
+       (c) Postfach von Hof Müller: eine Unterhaltung mit dem Team mit einer ungelesenen Nachricht und einer Antwort, ein Rundschreiben;
+       (d) eine Abonnentin mit WhatsApp-Einwilligung (Telefonnummer genullt);
+       (e) einen Hof im Hofpreis-Modell, an dem der Zustand „Mindestbestellwert“ der Kasse entsteht;
+       (f) im Hofpreis-Modell eine offene Bar-Bestellung (wartet auf Bestätigung, Frist in der Zukunft) und eine online bezahlte; Gebühr, Snapshot und Beträge nur über die Rechenfunktionen der App (die Funktionen, die die Kasse nutzt), nie von Hand; Stripe-IDs als Platzhalter;
+       (g) einen Hof ohne Produkte im Zustand „wartet auf Freigabe“;
+       (h) einen Abholtag heute mit vier Bestellungen und ein künftiges Fenster mit Bestellungen;
+       (i) eine online bezahlte Bestellung mit zwei Positionen und „Artikel fehlt“ an einer;
+       (j) signierte Rücktritts-Links für eine abgeholte Bestellung außerhalb der Frist und eine stornierte (Zustand „nicht mehr möglich“), mit den Signier-Funktionen der App; keine Änderung an src/lib/*-link.ts;
+       (k) gruendungPlaetze = 100; mit Option `--gruendung-fest` schreibt der Seed die Zusagen mit derselben Regel wie die Admin-Aktion fest (Funktion der App, nie Hand-SQL), damit die Aktion-Karte auf /konditionen entsteht;
+       (l) zu jeder neuen Bestellung die Mail-Aufträge über stelleEinOhneRisiko mit bestellMailAuftrag (nie per Hand); scheitert der Import außerhalb von Next: (l) weglassen, Mail-Bilder über die Beispiele aus 270;
+       Für (f): Gebühr und Beträge über bestellGebuehr und ladeGebuehrLage (src/lib/plattformgebuehr.ts bzw. der Lader in src/server/queries/), Snapshot-Felder genau wie /api/checkout sie schreibt (Feldliste im Bericht; Integrationstest: eine Seed-Bestellung und eine über die Kasse im Integrationstest haben dieselben Snapshot-Felder; für den Kassen-Vergleich nur der Bar-Weg bzw. die reine Snapshot-Hilfe, nie der Online-Weg, der Stripe ruft). Lässt sich ladeGebuehrLage im Seed nicht laden (src/server/queries/plattform-einstellung.ts importiert unstable_cache aus next/cache), baut der Seed die Lage aus den reinen Funktionen derselben Kette (hofpreisEinstellungAus, bestimmeGruendungBis, einzugAbFuer, satzHundertstel, bestellGebuehr); sonst entfällt (f) mit Bericht, nie mit eingetippten Beträgen. Für (k): Liste über festschreibenListe (src/lib/gruendungshof.ts), geschrieben im Seed mit Prisma in einer Transaktion; keine Änderung an src/server/actions/**. Der Bericht nennt, dass die Bilder der Aktion-Karte nicht zeigen, was die Admin-Aktion zusätzlich tut (Nachricht, Protokoll).
+       (m) prisma/seed-daten.ts Z. 974: die Musternummer des Pilothof-Inhabers auf das genullte Muster der übrigen Seed-Nummern (Vorwahl 660, Teilnehmerteil aus Nullen und einer Endziffer; die nächste freie per git grep wählen; die Nummer selbst steht in keinem Bericht und keiner Doku, weil die Telefonnummern-Wache docs/ liest); tests/seed-idempotenz.test.ts: der Test der Ausnahme prüft dann das Muster für alle Höfe (LFBIS bleibt); die veraltete Ausnahme in tests/telefonnummern-wache.test.ts fällt weg. Die Entwicklungsdatenbank behält den alten Wert bis zum nächsten Seed (Morgenbericht).
+       (n) A-1: Zeitgrenzen der Leistungstests nach „Entschieden“; Regel in TESTING_GUIDELINES §4.
+       Tests in tests/pruefung-*.test.ts für jede neue Option und eine Gegenprobe (zweiter Lauf bricht ab wie bisher).
+   6.2 messung.js: h1 bei offenem `aria-modal`-Element als „Dialog offen“, Inhalte geschlossener `<details>` ausgenommen (`checkVisibility` mit Rückfall); Test mit einer Attrappe.
+   6.3 Neu scripts/pruefung/pruef-browser.sh: startet Chromium aus /opt/pw-browsers nur mit `--remote-debugging-address=127.0.0.1`, `--host-resolver-rules="MAP localhost 127.0.0.1"`, `--no-proxy-server`, `--hide-scrollbars --enable-features=OverlayScrollbar`, `--lang=de-AT` und eigenem Profil-Ordner unter .nachtlauf/.
+   6.4 seiten-bild.sh und board-bilder.sh verlangen `--session <name>` und reichen ihn an agent-browser durch; ohne Namen Abbruch mit Exit 1 (Test).
+   6.5 fotograf.sh: dev-Worktree unter festem, laufneutralem Pfad (`$HOME/nachtlauf-dev`); `stopp` entfernt Fotograf-Worktrees mit `git worktree remove --force`; neu `db-aus <kopie>` und `db-an <kopie>`: sperrt bzw. öffnet nur eine DB-Kopie eines Fotografen (Name mit Kopie-Präfix, nie die Prüf-Haupt-DB, nur localhost, Sperre zuerst) – damit entstehen Ladefehler und „Speichern fehlgeschlagen“. Tests: abgelehnt werden die Haupt-DB, ein fremder Host und ein Name ohne Präfix. Verfahren: `ALTER DATABASE <kopie> WITH ALLOW_CONNECTIONS false` und `pg_terminate_backend` nur für Verbindungen auf diese Kopie; db-an mit `ALLOW_CONNECTIONS true`.
+   6.6 docs/nachtlauf.md „Prüfwerkzeug“: Punkte 3–6 nachziehen (Browser-Skript, Sitzung, Pfad, Fehlerzustand, Aufräumen über git worktree remove), Herkunft „(Morgenbericht 32 B, freigegeben 7.11.2026)“; TESTING_GUIDELINES §6 um „Cookies je Host, Sitzung je Fotograf“ ergänzen, wenn dort nicht schon.
+   6.7 Probe: Bau gegen die Prüf-DB, Bild der Produktseite mit Größenwahl, des Brennholzes mit „je Raummeter“, einer Bestätigung im Hofpreis-Modell, eines Ladefehlers (auswertung) und der Aktion-Karte auf /konditionen mit `--gruendung-fest`.
+   6.8 Pflicht-Gegenlesen „Sicherheit“ und „Daten“; voller Lauf; Push.
+
+7. Nr. 263 – Kurznummer überall gleich (Opus, voller Durchgang, Pflicht-Gegenlesen „Daten“)
+   7.1 Test, der heute rot ist: Danke-Seite (Server-Action) liefert 6 Zeichen groß; Admin › Heute zeigt für „meldung-seed-1“ eine Nummer aus dem Ende.
+   7.2 Alle Anzeige-Stellen der Ausgangslage auf kurznummerAus; scheinKurznummer liefert dieselbe Form (6 Zeichen, groß), damit die Bot-Bremse nicht erkennbar wird.
+   7.3 Suche (Admin): neue, alte und volle Nummer nach einer Regel; mehrdeutig → keine beliebige; Integrationstest (zwei Meldungen mit gleichem Ende). /api/triage/status und src/lib/briefkasten-export.ts unverändert (Morgenbericht).
+   7.4 tests/bausteine-248.test.ts bleibt ohne geänderte Erwartung grün; Wortlaut „Deine Kurznummer:“ unverändert.
+   7.5 Duplikat-Verweis und sucheMeldungen nach der Regel; Nummern-Eingaben unter sechs Zeichen ohne Treffer, Wortsuche unverändert (Test: „Foto“ findet weiter eine Meldung mit „Foto“ im Kurztitel); scheinKurznummer aus crypto; Gegenlesen „Daten“ für den Duplikat-Verweis.
+
+8. Nr. 264 – Ende der Gründungszeit in der Anzeige (Opus, voller Durchgang, Pflicht-Gegenlesen „Geld“)
+   8.1 Test, der heute rot ist: Hof mit gespeichertem gruendungBis 31.12.2027 → Karte „Bar bei Abholung“ und Karte „Barzahlung“ sagen „bis 31. Dezember 2027“, „Einzug ab 1. Jänner 2028“; Hof mit gespeichertem gruendungBis 31.1.2028 (wie nach dem Festschreiben mit 12 Monaten; nicht aus den Monaten gerechnet, gruendungshof.ts bleibt) → „bis 31. Jänner 2028“ (E-018); Hof mit eigenem Farm.einzugAb → „bis“ = Tag vor diesem Einzugstag, /settings unverändert.
+   8.2 Anzeige-Hilfe exportieren, alle „bis“-Fundstellen umstellen (git grep auf `einzugAb`, `einzugAbText`, `formatDatumLang(` neben „Bis “/„bis “), Import-Wache.
+   8.3 Gegenproben: einzugAbFuer, einzugFuer, Abrechnung und alle Geld-Tests ohne geänderte Erwartung; /settings zeigt gruendungBis wie bisher; Grenzfall Mitternacht in Wien (letzter Tag 23:59 „erlassen“, 00:00 nicht).
+   8.4 Liste der umgestellten und der bewusst gelassenen Stellen im Bericht.
+
+9. Nr. 265 – Gründungsplätze aus der Einstellung, eine Zählregel (Opus, voller Durchgang, Pflicht-Gegenlesen „Geld“)
+   9.1 Test, der heute rot ist: 36 Höfe im Rennen, 12 Plätze → Kachel, Hinweis, Prüfung im Browser und Action nennen dieselbe Zahl (12).
+   9.2 Zählregel nach „Entschieden“; Satz GRUENDUNG_EINSTELLUNG_FEHLER.weniger unverändert, nur die Zahl.
+   9.3 Mit Einstellung 100 (Test): Startseite, /fuer-hoefe, /register, Hofseite, Abzeichen-Blatt, Admin › Höfe, Tarif-Zeile, „Dein Stand“, Gründungs-Nachricht und Aktion-Karte nennen 100 bzw. rechnen mit 100. Jeder Aufrufer, der stattdessen auf MAX_GRUENDUNGSHOEFE fällt, wird umgestellt (Liste im Bericht). gruendung-konstanten-wache bleibt mit leerer Ausnahmeliste grün. Liegt ein solcher Aufrufer in einem Pfad der Stopp-Regel („Gründungsplätze“): nicht ändern, Nummer als Entwurf, Morgenbericht „Geld“.
+   9.4 Keine Änderung, wer einen Platz bekommt; Gegenprobe ohne Zeile (Standard 12 wie bisher).
+
+10. Nr. 266 – Kleine echte Fehler (Opus, gezielt, Pflicht-Gegenlesen „Recht“)
+   10.1 500-Seite mit Seitentitel (Test vorher rot); global-error ebenso.
+   10.2 /widerruf nach dem Absenden mit genau einer h1 (Test vorher rot), auch im Barrierebaum: Die ausgeblendete Seiten-h1 ist dann `hidden` bzw. `display:none`, nicht nur unsichtbar (Test auf Seitenebene); widerruf.ts-Diff leer.
+   10.3 Admin-Bestelldetail: Render-Test der Seite admin/bestellungen mit einer Bestellung `gebuehrModell: 'hofpreis'` und einer „bisher“ (Z. 264 und 276 nehmen beide T.gebuehrZeile); nur bei Rot ein Fix.
+
+11. Nr. 267 – Kunden-Bausteine: G11 Seitenfuß, G10 Rest (Opus, gezielt)
+   11.1 Fußbreite aus einer Quelle je Route; die drei `fussSpalte`-Aufrufer umgestellt; Render-Test je Spaltenart; Test, dass „Vertrag widerrufen“ in derselben Liste wie die übrigen Rechtslinks steht.
+   11.2 G10: Warenkorb-Symbol am Handy, Unterleiste nach Board – nur die Variante der Kundschaft; Render-Test, dass Hof- und Admin-Unterleiste unverändert sind; Bild mehr-neu 390 hell und dunkel vorher und nachher.
+   11.3 Bilder 1440 hell und dunkel aller 13 Boards der Ursache (Fotograf mit Prüf-Seed nach 262); vorschau-267.tsx; vorschau-247.tsx Z. 108 berichtigt.
+
+12. Nr. 269 – Hof-Bausteine: Rückweg, Hinweis, Knopf, Feld, Spalte, Ladefehler (Opus, gezielt)
+   12.1 UNTERSEITEN um die Mehr-Blatt-Seiten (Board-Ziel), Test je Pfad mit `nurHandy`; zielNachSpeichern unverändert (Test).
+   12.2 Werkzeug-Kopf am Handy fest; G3-Fließtext im Warnton (Kontrast-Test in beiden Themes).
+   12.3 KNOPF_RAHMEN, FELD, FELD_LABEL nach Board; feld-kontrast-wache, feld-schriftgroesse-wache und grundbausteine-groesse grün.
+   12.4 Einstellungs-Spalte 671 px; LadeFehlerKasten als ui-Variante mit Weiter-Export; kanal-symbol.tsx löschen (nur ohne Import); hof-laden.tsx aus der Bestandsliste unterseiten-kopf.
+   12.5 Bilder: kunden 390 (Rückweg), heute, produkte, hofdaten-zahlung, beitraege, ein Admin-Board (Knopf).
+   12.6 A-8 Kästchen-Baustein nach „Entschieden“ (Token, Baustein, Bestandsliste, Wache, DESIGN_SYSTEM, Vorschau); 269 stellt selbst nur Dateien seiner Grenze um. Kontrast-Test der Token in beiden Themes.
+
+13. Nr. 268 – Meldungen: problem-melden und meldungen (Opus, gezielt, Pflicht-Gegenlesen „Daten“, nach 263 und 269)
+   13.1 Offene B-Zeilen und Mängel beider Boards in den gemeinsamen Bausteinen; Kunden- und Hof-Variante; Feldfehler wörtlich nach Board; zwei Knopf-Rundungen über RUNDUNG.
+   13.2 Bot-Bremse mit stillem Scheinerfolg bleibt (N46); keine neuen Felder, keine Personendaten in Sentry.
+   13.3 Bilder beider Boards samt Danke-Seite mit neuer Kurznummer und Serverfehler (DB-Kopie aus).
+
+14. Nr. 270 – Mail-Vorschau mit Beispieldaten im Admin (Opus, voller Durchgang, Pflicht-Gegenlesen „Sicherheit“)
+   14.1 In Admin › Betrieb › Mails ein Bereich „Beispiele“: je Art, die die bestehende Vorschau nicht zeigt (Codes, Einmal-Links, Sicherheits- und Team-Mails, Betreiber-Mails, Rundschreiben, Beiträge, Hof-Konto-Mails; genaue Liste aus den Boards mail-betrieb, mail-hof-konto, mail-neuigkeiten, mail-sicherheit, mail-team, mail-zugang je Bild), „Beispiel ansehen“. Startet nach 263 und 264.
+   14.2 Gebaut nur über reine Inhalts-Funktionen: Für jede Art ohne eine solche löst 270 sie aus der `send*`-Funktion in src/lib/email.ts heraus (Dateigrenze); Test je Art: Betreff und HTML vorher (über einen gemockten sendRaw) und nachher byteweise gleich. Für Wichtig-Arten nimmt das Beispiel die reine Baufunktion (baue…) mit Beispieldaten, nie den Renderer mit DB-Lader. Feste Beispieldaten in src/server/mail-arten/beispiele.ts (erfunden, Adressen @example.com, Code als fester Platzhalter aus Nullen, Token wie VORSCHAU_TOKEN, IDs in einer Form, die keine cuid sein kann, z. B. „beispiel-…“), danach entschaerfeLinks. Kein Versand, kein MailAuftrag, kein Protokolleintrag, kein Log des HTML. Wache wie die bestehende Vorschau (`verlangeAdminAktion({ recht: 'ansehen' })`). Gibt es für eine Art keine reine Inhalts-Funktion ohne Änderung des Ablaufs, bekommt sie kein Beispiel (Bericht). Das erweitert die Regel im Kopf von vorschau.ts (Nr. 167): Codes und Admin-Mails erscheinen nur als Beispiel mit festen Platzhaltern, nie aus einem MailAuftrag; der Kopfkommentar wird ergänzt, N27 bleibt. Der Vorher-nachher-Test vergleicht auch den Fehlerweg (Vorlage wirft → gleicher Rückgabewert bzw. gleiche Ausnahme, z. B. htmlOderFehler mit `{ error }`, sendPasswordResetEmail wirft) und dass sendRaw genau einmal mit denselben Argumenten gerufen wird; die Inhalts-Funktion selbst loggt nie und nimmt keinen Empfänger (der lokale Code-Ausdruck in src/lib/auth.ts hängt weiter am Ergebnis des Versands und bleibt unverändert).
+   14.3 Tests: jede Art aus der Liste liefert Betreff und HTML; kein HTML enthält eine echte Adresse, einen Code außer dem Platzhalter oder einen signierten Link; Syntaxbaum-Wache tests/mail-beispiele-wache.test.ts: beispiele.ts und die neue Action importieren nie sendRaw, eine send*-Funktion, versendeStapel, stelleMailEin, stelleEinOhneRisiko, protokolliere oder prisma; Integrationstest: die Action ändert die Zeilenzahl keiner Tabelle des Schemas (alle Tabellen vor und nach gezählt).
+   14.4 Admin › Betrieb › Mails: Links der Tabelle mindestens 44 px, Schrift ab 12 px (mails-ansicht.tsx, Messfund Lauf 32).
+   14.5 Bilder aller sechs Mail-Boards (390 und 600, hell) über die Beispiele.
+
+15. Nr. 271 – Finden: hoefe, startseite, hofseite, produkt (Opus, gezielt, Pflicht-Gegenlesen „Geld“ für die Beispiel-Rechnung)
+   15.1 Mängel und offene B-Zeilen der vier Boards (abnahme-lauf32.md Gruppe 1), u. a. hoefe „Suche steht im Feld“, Produktkarte mit einer Meta-Zeile, Kartenansicht 390; startseite Suchfeld und Knopf getrennt, Zoom und Quellenangabe der Karte (ohne neue Kartenquelle), Beispiel-Text wörtlich mit dem Betrag des Boards, gerechnet mit den Funktionen der App und dem Satz der Einstellung; hofseite Reihenfolge 390, kein zweiter „Alle Produkte“-Knopf, Fuß wie /hoefe; produkt Merkmal-Kacheln Brennholz, „je Raummeter“, „Gleich mit abholen“ nach Board, Mengen-Stepper 44 px mit Beschriftung, ein Warenkorb-Symbol am Handy, Bildfläche im Dunkeln nach G12.
+   15.2 Antwort 2: ausverkauftSatz „<Produkt> gibt es gerade nicht. Schau, was es sonst gibt.“ samt Test.
+   15.3 G12: ohne Startsatz bleibt die Illustration (R); mit Startsatz neutrale Bildfläche aus einer Quelle für Hofkarte, Produktkarte, Hofseite, Produktseite und Region, Teilen-Bild unverändert, Test.
+   15.4 Tote Exporte in src/lib/startseite.ts entfernen.
+
+16. Nr. 272 – Region und Verkäufe (Opus, gezielt)
+   16.1 region: Liste und Karte nebeneinander ab 1024 px, Sortenzeile, Futterkarte nach Board und N23 (Größe als Optionen über die Größenkachel G5), Kartenansicht 390 nur Umkreis und „Liste / Karte“, „Du“-Marke und Quelle nach Board, Hinweise wörtlich.
+   16.2 verkaeufe: Listenzeilen mit Marke, Datum als Chip, Betrag ohne Serif-Kasten, „Anderes“ als Link neben „Wo verkauft?“, Menge vor Vorrat, „Eintragen“ nie deaktiviert (G6; kein „Nochmal“ nach der C-Zeile), Blatt höchstens 86 %, Dialog ohne Weichzeichnen, Knopf ohne „+“ auf Höhe der h1.
+   16.3 Ladefehler und Speicherfehler über die DB-Kopie; LadeFehlerKasten aus ui/.
+
+17. Nr. 273 – Kunden und Auswertung (Opus, gezielt, Pflicht-Gegenlesen „Geld“)
+   17.1 kunden: Profilkopf, Bestellzeilen mit Abholtermin, Kontakt ohne Symbole und als Links mit 44 px, Vorauswahl „Letzte Bestellung“, Suchfeld nach den Chips, Marken ohne Rand, Umsatz normal.
+   17.2 auswertung: Vergleichszeile mit Betrag und Fußsatz, Gebühren-Karte mit Erklärsatz je Stand aus der Geldsatz-Hilfe (Datum nach 264), Marke rechts, Tausenderpunkt („€ 55.000“), Web zweispaltig nach Board, Satz der Links-Karte bei nicht freigegebenem Hof. Keine Summe der Monatsabrechnung ändert sich; sonst nicht bauen, Morgenbericht.
+   17.3 src/server/queries/customers.ts nur lesend erweitern, nur für den Hof der Sitzung.
+
+18. Nr. 274 – Mein Hof und Postfach (Opus, gezielt)
+   18.1 mein-hof: Kopf und Reiter kleben, Zeilentitel nach Board, Halbgeviertstrich „–“, Fortschritt im Web als Zeile mit Balken, Gruppen nach Ort, keine Symbole, Vorschau ohne Handy-Rahmen mit Segment „Handy | Web“, Pause-Kasten neutral, Beiträge-Reiter nach Board, Kundenansicht ohne Zusatzkopf, Gründungshof-Marke und „Nächste Abholung“, Balken im Dunkeln hell.
+   18.2 postfach: Fußtext mit Link „Problem melden“; Zustände mit den neuen Prüfdaten (Nachricht, Antwort, Rundschreiben, Filter „Ungelesen“).
+   18.3 src/lib/shop-pause.ts bleibt (auch /api/checkout).
+
+19. Nr. 279 – System: neuigkeiten, abmelden, systemseiten, widerruf, fehlerseiten, rechtstexte (Opus, gezielt, Pflicht-Gegenlesen „Recht“)
+   19.1 Erfolgskarten mit Häkchen-Kreis und getönter Fläche (abmelden Bild 2, neuigkeiten Bild 2), „Zu Hof Müller“ als Textlink, Pfeil mitunterstrichen; widerruf: Positionsliste mit Häkchen, Auswahlkarten nach Board, Felder nach „Entschieden · /widerruf“ (kein Feld entfernen, keins zur Pflicht machen, neue nur mit Zeile), Anschrift nur, wo eine Zeile sie deckt (sonst Frage „Recht“); fehlerseiten Umbruch der Überschrift, „Zu <Hof>“, Hof-Fehlerseite mit Kopf, Lage nach Board, Haus-404 neu aufnehmen; rechtstexte Fließtext in Textfarbe, Knopf ohne Symbol, Dreieck statt Chevron. Startet nach 275 (components/anmelden/stil.ts wirkt auf diese Seiten).
+   19.2 Nacharbeit 254: RUNDUNG statt `rounded-[12px]`, Datumshelfer nach src/lib/format.ts (eingang-zeit.ts zieht um).
+   19.3 Wortlaut aller Rechtstexte, der Belehrung und der N39-Sätze unverändert; Diff auf src/lib/widerruf.ts, src/lib/rechtstexte/**, src/lib/konditionen.ts, docs/recht/** leer.
+
+20. Nr. 275 – Konto und Einrichten: registrieren/onboarding, meine-bestellungen, kundenkonto, anmelden, passwort (Opus, gezielt)
+   20.1 /onboarding: Inhalt 896 px (Antwort 5), G1-Kopf mit Rückweg, Orange nur auf dem ersten offenen Schritt, G3, Texte aus einrichten.ts nach Board (ohne ONLINE_ZAHLUNG_EINRICHTEN_SATZ, R); /register Seitenspalte Schritt 3 nach Board.
+   20.2 meine-bestellungen: Zeilentexte im Format des Boards (Wochentag, „heute“ klein, „15–18 Uhr“), Hofname fett, Leerkarte; kundenkonto: Personen-Symbol am Handy nach B-Zeile; anmelden: Trennlinie; Aufnahme anmelden Bild 2.
+   20.3 components/anmelden/stil.ts ändert nur diese Nummer; Wirkung auf die Seiten von 279 im Bericht.
+
+21. Nr. 277 – Hof-Alltag: heute, bestellungen, bestellung, druck, produkte, produkt-neu (Opus, voller Durchgang, Pflicht-Gegenlesen „Geld“, nach 274 und 275)
+   21.1 Antwort 4: Packliste mit druckGesamtHinweis-Regel statt druckPreisHinweis; druckKasse nach src/lib/hof-bestellungen.ts (Nacharbeit 249b); Tests (a) Packliste nur „bisher“ → kein Satz, (b) eine hofpreis-Bestellung mit Gebühr → Satz zum Gesamt, (c) hofpreis mit entfallener Gebühr → kein Satz; gespeicherte Beträge und Berechnung unverändert. Der Satz „Gesamt inkl. …“ steht je Bestellung an deren gezeigtem Gesamt, nicht einmal für die ganze Seite (Test mit gemischten Bestellungen).
+   21.2 heute: Umsatz-Karte nach Board (Höhe, Rundung, Link), Abstände, „Zu tun“ mit Handlung, Postfach-Karte mit Prüfdaten; bestellungen: Kopf enger, Positionszeile G14, Leer-Karte volle Breite; bestellung: Positionszeile im Dialog „Was fehlt“ (G14); druck: Einheiten wie die Bestellseite („1 L“, „6 Pakete“); produkte: Hinweis unter Kopf und Reitern, Schleier abgedunkelt, Stepper-Rand, Einheiten nach Board, Tabellenkopf fett, Suchfeld am Handy; produkt-neu: Karte „Preis & Verfügbarkeit“ offen, Schleier, kein Satz „n Größen sind sofort sichtbar …“ über „Speichern“ (nur, wenn keine Zeile ihn deckt), Kennzeichnung als aufklappbare Karte, Holz-Angaben nach Board, Fehlerrand an „Kategorie“. Produkt anlegen ohne „Nochmal“ (C, §36).
+   21.3 Bilder mit Abholtag heute, Bar-Bestellung im Hofpreis-Modell, „Artikel fehlt“, wartendem Hof.
+
+22. Nr. 278 – Einstellungen und Teilen: hofdaten-zahlung, konto-hof, teilen, whatsapp-plakat, beitraege (Opus, gezielt)
+   22.1 Mängel der fünf Boards (abnahme-lauf32.md Gruppe 4) auf den Bausteinen aus 269; Angemeldete Geräte als Kicker mit Liste (components/konto, wirkt auch im Kundenkonto und Admin › Anmeldung; Pille „dieses Gerät“ ohne Rand); „Konto löschen“ im Warnton; teilen mit Kopfleiste und 520-px-Spalte; whatsapp-plakat Unterzeile mit Hofname, Schritte in einer Zeile, „Drucken“ ohne Symbol in der Spalte; beitraege ohne große Karte, Schrittzeiger über volle Breite, Knöpfe im Web rechts, gewählte Karten getönt.
+   22.2 einstellungen-laden.tsx und konditionen-ansicht.tsx aus der Bestandsliste unterseiten-kopf (nur der Kopf; Konditionen-Wortlaut unverändert).
+   22.3 Bilder mit WhatsApp-Abonnentin und Ladefehler.
+
+23. Nr. 280 – Mails (Opus, voller Durchgang, Pflicht-Gegenlesen „Recht“, „Sicherheit“ und „Geld“, nach 270, 274, 275, 278, 279)
+   23.1 Offene B-Zeilen der neun Mail-Boards nach „Entschieden · Seiten“, Positionszeilen G14, Zeiten nach V9 über den Datumshelfer aus 279, Telefonnummer fett, Werte-Spalte ohne Umbruch bei 390.
+   23.2 Nacharbeit 255 (Kommentar in email.ts, Test „Bitte zahle … mit Karte“).
+   23.3 Render-Vergleich der Rechtsblöcke je Mail (vorher/nachher, dieselbe Prüf-Bestellung bzw. dasselbe Beispiel) byteweise gleich.
+   23.4 Bilder aller Mail-Boards (390 und 600, hell), Bestellmails über die bestehende Vorschau, die übrigen über die Beispiele.
+
+24. Nr. 276 – Kauf: korb, kasse, bestaetigung, bestellung-link (Opus, voller Durchgang, Pflicht-Gegenlesen „Geld“)
+   24.1 korb: Positionen mit Menge und Grundpreis je Einheit; Ausverkauft-Hinweis mit Produktname nach Board („<Produkt> ist gerade ausverkauft – wir haben es herausgenommen.“) aus korbHinweisMitNamen im Browser (Hofseite und Kasse), nach „Entschieden · Korb-Hinweis“. Tests: reine Funktion (eine, zwei, mehrere Positionen desselben Produkts → Satz der Quelle; entfernt plus Preis geändert → Board-Satz plus KORB_PREIS_GEAENDERT; entfernt plus gekürzt plus abgelaufen → nur der Teil zu entfernten Positionen ersetzt; der zu ersetzende Satz kommt im Satz der Quelle nicht vor → Satz der Quelle unverändert), Antworten der drei API-Routen vor und nach der Nummer gleich (vorhandene Tests ohne geänderte Erwartung).
+   24.2 kasse: nur Darstellung; BAR_BESTAETIGEN bleibt (N10).
+   24.3 bestaetigung und bestellung-link: Zahlzeile „Online bezahlt · inkl. <Gebühr> (<Satz> %)“ bzw. „Bar bei Abholung · inkl. …“ für Bestellungen im Hofpreis-Modell aus zahlzeile.ts (Prüfdaten aus 262); „bisher“ bleibt (C); h1-Umbruch 390 nach Board.
+
+25. Nr. 281 – Admin: messbare Mängel und Schrift-Wache (Opus, gezielt, nach 263, 265, 270)
+   25.1 tests/admin-schrift-wache.test.ts: keine Schriftgröße unter 12 px (`text-[10px]` bis `text-[11.5px]`, auch in SVG-Klassen) unter src/app/admin und src/components/admin, außer in tests/bestandslisten/admin-schrift.ts (Startbestand 8 Dateien, schrumpft; SVG-Achsen nur mit Grund).
+   25.2 Die Bestandsliste auf 0 bringen, soweit es ohne Aufbau-Änderung geht; dazu die Messfunde aus Lauf 32 (Postfach Bild 3/4, Startseite Bild 2/4, Felder ohne Beschriftung in Startseite Bild 2 und im Geld-Dialog, „KI“-Pille 44 px) und FELD mit Mindesthöhe in Admin-Dialogen.
+   25.3 Aufbau und Wortlaut des Admin nicht (nur Liste im Morgenbericht).
+
+26. Sammel-PR und Schluss-Durchgang (Ende Abschnitt C)
+   26.1 Sammel-PR (Entwurf aus A bzw. B, fortgeschrieben, oder neu von integration/lauf33c) auf „bereit“; alle fertigen Nummern per `git merge --no-ff` in Rangfolge; nach JEDEM Merge voller Lauf; BAUSTEINE.md bei Konflikt neu erzeugen; Bestandslisten als Schnittmenge; ist unterseiten-kopf leer, löscht der Dirigent unterseiten-kopf.tsx und unterseiten-kopf-stil.ts; hat der Weiter-Export in hof-hilfe/lade-fehler-kasten.tsx keinen Importeur mehr (git grep), löscht der Dirigent ihn; Integration ganz.
+   26.2 Schluss-Durchgang (höchstens 3 h): Bau des Sammelstands gegen eine frische Prüf-DB nach dem Stichtag mit allen Optionen aus 262 (und eine zweite mit `--gruendung-fest` für rechtstexte Bild 5), start-Fotografen mit eigener .next-Kopie und eigener Sitzung, dev-Fotograf für Admin und Mail-Codes, alle 49 Boards plus 12 Admin-Boards, alle Fassungen, pruefer-ui je Board mit den Eingaben aus „Abnahme-Grundlage“, Messung. Ergebnis in abnahme-lauf33.md „Schluss-Durchgang“, Tabelle wie Lauf 32 mit Spalten „Schluss Lauf 32“, „Schluss-Durchgang 33“, „Nummer abgeschlossen“, „Mängel (Rest gedeckt)“ und „gedeckt durch Liste/Ergänzung/3.2/Auftrag“.
+   26.3 Aufräumen der Prüf-Umgebung.
+
+27. Stabilität (docs/nachtlauf.md §4a Punkt 12 gilt; hier nur die Budgets, gerechnet mit zwei Plätzen, Rangfolge und Startbedingungen)
+   27.1 Abschnitt A (Wanduhr ab Start): 261 40 min · 262 2,75 h · 264 90 min · 263 75 min · 265 90 min · 266 45 min · 267 2 h · 269 2,5 h · 270 2 h · 268 2 h. Ablauf: 262 0,7–3,45 h; 264 0,7–2,2 h; 263 2,2–3,45 h; 265 3,45–4,95 h; 266 3,45–4,2 h; 267 4,2–6,2 h; 269 4,95–7,45 h; 270 6,2–8,2 h; 268 7,45–9,45 h. Merges zusammen etwa 1,5 h → letzte Nummer im Zwischenstand gegen 11 h; Zwischen-Durchgang 1,5 h, Aufräumen und Zwischen-Morgenbericht 0,5 h → Haltepunkt A gegen 13 h. Keine neue Nummer nach Stunde 8,5.
+   27.2 Abschnitt B: 271 2,5 h · 272 2,5 h · 274, 273, 275, 276, 279 je 2 h. Ablauf: 271 und 272 0–2,5 h; 274 und 273 2,5–4,5 h; 275 und 276 4,5–6,5 h; 279 6,5–8,5 h; auf dem zweiten Platz ab 6,5 h nach 3.3 die erste Nummer von C (277, bis 9 h). Merges 1 h → gegen 10 h; Zwischen-Durchgang, Aufräumen und Zwischen-Morgenbericht 2 h → Haltepunkt B gegen 12 h. Keine neue Nummer nach Stunde 7.
+   27.3 Abschnitt C: 277 2,5 h (falls nicht in B) · 278 2 h · 280 2,5 h · 281 75 min · Sammel-PR 1 h · Schluss-Durchgang 3 h. Ablauf: 277 und 278 0–2,5 h; 280 2,5–5 h; 281 2,5–3,75 h; Merges 0,5 h; Sammel-PR 5,5–6,5 h; Schluss-Durchgang 6,5–9,5 h; Morgenbericht und Aufräumen → gegen 10 h. Keine neue Nummer nach Stunde 5.
+   27.4 Lauf 32 war je Nummer schneller als sein Budget (45–70 Minuten). Endet ein Abschnitt früher, rückt die nächste startbare Nummer des folgenden Abschnitts nach; die Haltepunkte bleiben.
+   27.5 Abbruchregel je Phase: Budget überschritten → Nummer mit dem fertigen Stand abschließen bzw. als Entwurf, Rest im Bericht, nächste Nummer.
+   27.6 Wiederaufnahme nach Absturz oder bei „Nachtlauf 33 fortsetzen“ wie §36 „Wiederaufnahme“ (Zeile je laufender Nummer im Zeitbuch, WIP-Commit spätestens alle 30 Minuten, nie git stash, nie roten Stand pushen).
+
+28. Bericht und PR-Text je Nummer
+   28.1 Bericht nach CLAUDE.md §4 (höchstens 60 Zeilen) als docs/nachtlauf/berichte/<nr>.md; „Nur eigene Dateien“ mit `git diff --name-only` der Runde.
+   28.2 PR-Text: Bericht; bei echten Fehlern der Test, der vorher rot war (Name und Ausgabe); Tabelle Board × Fassung × Sterne (Schluss Lauf 32 → nachher); gebaute und nicht gebaute Mängel bzw. B-Zeilen mit Grund und Zeilenverweis; „gedeckt durch Liste/Ergänzung/3.2/Auftrag“; Bild-Pfade; „Offen für Recht“; Ergebnis des Pflicht-Gegenlesens wörtlich (wo verlangt); „keine Migration, kein Paket, keine Variable“ mit `git diff --name-only <Basis>.. -- prisma/ pnpm-lock.yaml .env.example` (leer; bei 262 nur prisma/seed-daten.ts (Musternummer, Nr. 262), schema.prisma und migrations/ unverändert, belegt mit `git diff -U0 <Basis>.. -- prisma/`); bei 266, 279, 280 zusätzlich `git diff --name-only <Basis>.. -- src/lib/widerruf.ts src/lib/rechtstexte/ docs/recht/` (leer); bei 280 `git diff -U0` der Auth-nahen Dateien (nur String-Literale); „Gestapelt auf #…“; „voller Lauf grün“ im letzten Commit.
+
+══════════════════════════════════════════════════════════════════════
+NICHT (ausdrücklich draußen)
+══════════════════════════════════════════════════════════════════════
+- Recht-Wortlaut: AGB, Datenschutzerklärung, Impressum, Konditionen-Wortlaut, Belehrung und Muster-Formular, N39/N43-Sätze, Rücktrittssätze in Mails und auf /widerruf (auch die Hof-Mail zum Rücktritt: „§ 18 FAGG“-Satz, Einleitung), Gewährleistungs-Sätze und -Grafik, Reihenfolge-Satz § 4a FAGG, AGB- und Kassensätze, Anbieterzeile, Gebührensatz-Vorschläge der Boards. P1/O9 (Anwältin).
+- ONLINE_ZAHLUNG_EINRICHTEN_SATZ (Freigabe §10) und die Karte „Deine Bestellung“ in der Kasse (Frage im Morgenbericht).
+- Tarife als Abrechnung, Stripe live, Ab Hof, Preise vergleichen v2 (PR #329), Kartenquelle (Kachel-Dienst, Karten-Paket), Willkommenszeit.
+- BAES/Futter-Registrierung neu ordnen (F035, erst nach eigenen Boards); die R-Zeilen zu E9, E10, E10a bleiben.
+- Migrationen, neue Pakete (auch nicht im Container, außer dem vorhandenen agent-browser), neue Umgebungsvariablen; auch keine Änderung am Spalten-Default von gruendungPlaetze und an MAX_GRUENDUNGSHOEFE.
+- Geldberechnung, gespeicherte Beträge, Stripe-Beträge, Webhook, einzugAbFuer, einzugFuer, Monatsabrechnung, Fristen (src/lib/fristen.ts), Prüfung und Frist der Reservierung, Auth, Passkey-Logik, admin-wache.
+- Jede Änderung unter src/app/api/** (auch /api/triage und der zugehörige CLI-Export bleiben bei der alten Kurznummer).
+- Werte in Entwicklungs- oder Produktionsdatenbank (Gründungsplätze, Stichtag, Monate, Notbremse, Testhöfe, Festschreiben): setzt nur die Projektleitung.
+- Toast-Token (kein Regelvorschlag; nur mit ausdrücklicher Freigabe, Frage im Morgenbericht).
+- BAR_BESTAETIGEN ändern (Register N10); befundMeldung, gleicheKorbMitHofseite, src/lib/reservierung.ts, src/server/warenkorb.ts.
+- Produkt anlegen mit „Nochmal“ bzw. Formular-ID; „Nochmal“ in Verkäufe.
+- Neutrale Bildfläche statt Kategorie-Illustration ohne den Startsatz „Bildfläche statt Illustration freigegeben“.
+- Seed-Dateien unter prisma/ außer der einen Musternummer in prisma/seed-daten.ts Z. 974 (262); neue Prüfdaten nur über scripts/pruefung.
+- Admin: Aufbau und Wortlaut (nur Liste); Admin-Bilder gegen test.agrilo.at, Vorschau oder Produktion.
+- Alles, was die Liste, die Ergänzungsliste oder 3.2 mit C oder R entscheidet; Board-Dateien unter docs/mockups/.
+- Mail-Abfang, Versand an echte Adressen, Codes in der DB, Codes oder Token in Dateien außerhalb .nachtlauf/; Prüf-Seed oder Prüf-Server gegen eine andere DB als localhost; .env-Dateien im Prüf-Worktree.
+- Änderungen an .claude/settings.json und .claude/hooks.
+- Auf GitHub schließen oder löschen (§2 Regel 1, §8: nur gh pr create/view/list). To-do der Projektleitung im Morgenbericht.
+- Claude in Chrome. Video der Startseite entfernen.
+- Echte Namen, Adressen, Telefonnummern; Beispieldaten erfunden (Hof Müller, Franz Müller; Adressen @example.com; Telefonnummern genullt).
+
+══════════════════════════════════════════════════════════════════════
+FERTIG, WENN
+══════════════════════════════════════════════════════════════════════
+Ordnungsgemäß beendet (je Sitzung, also auch an den Haltepunkten A und B):
+- abnahme-lauf33.md (Zwischen-Durchgang A bzw. Schluss-Durchgang) nennt für jedes geprüfte Board die Sterne je Fassung und ordnet jede verbleibende Abweichung einer Zeile der Liste, der Ergänzungsliste, 3.2, einer Q-Regel oder einem Punkt dieses Auftrags zu, oder führt sie als „Mangel“ mit Grund und Zeilenverweis. Boards nicht begonnener Nummern stehen mit „offen (Abschnitt B)“ bzw. „offen (Abschnitt C)“. „Nicht prüfbar“ ist je Bild begründet und nur noch für die Fälle unter „Nicht herstellbare Bilder · Bleiben nicht prüfbar“ zulässig. Admin: abgenommen mit Sternen und Messmängeln, oder „nicht abgenommen“ mit Grund.
+- Die übrigen Punkte unten sind für alle gebauten Nummern erfüllt; der (Zwischen-)Morgenbericht liegt vor; Aufräumen bestätigt; an den Haltepunkten A und B der Sammel-PR als Entwurf offen.
+Ziel erreicht (5 Sterne): darüber hinaus bleibt nach dem Schluss-Durchgang kein „Mangel“ – jedes Board in jeder Fassung 5 Sterne von pruefer-ui oder vollständig gedeckt. Wird das Ziel nicht erreicht, ist der Lauf trotzdem ordnungsgemäß beendet, wenn die Mängelliste vollständig ist. Der Morgenbericht nennt beides getrennt.
+Prüfbare Einzelpunkte:
+- Echte Fehler: je ein Test, der vor dem Fix rot war und danach grün ist (Name im PR-Text) – 263 (Kurznummer Danke-Seite und Admin › Heute), 264 („bis 31. Dezember 2027“ bzw. „bis 31. Jänner 2028“), 265 (eine Zahl für „vergeben“), 266 (Titel der 500-Seite, h1 auf /widerruf); 266 Wort-Test im Admin mit Ergebnis (Code richtig oder Fix).
+- 264: einzugAbFuer, einzugFuer und alle Geld-Tests ohne geänderte Erwartung; Import-Wache der Anzeige-Hilfe grün; Gegenlesen „Geld“ im PR-Text.
+- 265: Mit Einstellung 100 nennen alle Anzeigen 100; ohne Zeile gilt der Standard; gruendung-konstanten-wache mit leerer Ausnahmeliste grün; Gegenlesen „Geld“.
+- 262: Sperr-, Umgebungs-, Grenz- und Werkzeug-Tests grün, dazu Tests für jede neue Option, `--session`-Pflicht und db-aus/db-an; Integrationstest des Prüf-Seeds gegen localhost grün; Gegenlesen „Sicherheit“ und „Daten“.
+- 270: Integrationstest „schreibt nichts“ grün; keine echte Adresse, kein Code außer dem Platzhalter, kein signierter Link im HTML; Gegenlesen „Sicherheit“.
+- 280: Render-Vergleich der Rechtsblöcke byteweise gleich; Diff der Auth-nahen Dateien nur String-Literale; Gegenlesen „Recht“, „Sicherheit“, „Geld“.
+- 276: `git diff --name-only <Basis>.. -- src/lib/reservierung.ts src/server/warenkorb.ts src/lib/kasse.ts src/app/api/` leer.
+- 262: prisma/-Diff nur prisma/seed-daten.ts mit genau einer geänderten Zeile (Z. 974); seed-idempotenz und telefonnummern-wache grün; A-1-Regel in TESTING_GUIDELINES, bild-format mit 3 Workern grün.
+- 269: Kästchen-Baustein mit Token, Kontrast-Test in beiden Themes, Wache mit Bestandsliste kaestchen (Startbestand laut git grep beim Start von 269, Stand 20 Dateien, nur geschrumpft; Vorher-nachher-Tests der Kästchen aus A-8 grün).
+- 270: Inhalts-Funktionen byteweise gleich zum bisherigen Versand; mail-beispiele-wache grün; Integrationstest „keine Tabelle ändert sich“ grün.
+- Messung auf allen geprüften Seiten (inkl. Admin, falls abgenommen): 0 sichtbare Texte unter 12 px außer den Ausnahmen (Unterleiste unter 360 px, Illustrationen mit aria-hidden); 0 Ziele unter 44 px ohne ::before; je Seite genau eine sichtbare h1 oder „Dialog offen“; 0 Felder ohne Beschriftung; axe ohne serious/critical (auch die 500-Seite).
+- Wachen grün: palette-klassen, design-tokens, fokus-sichtbar, grundbausteine-groesse, feld-kontrast, feld-schriftgroesse, wortliste, gebuehr-wort, geldanzeige-gesamt, plattformgebuehr-anzeige, telefonnummern, mail-wege, hof-kontakt, geld-number, geld-fliesskomma, gruendung-konstanten, rundungen, werkzeug-kopf, startfokus, kind-selektoren, pruefung-*, dazu neu admin-schrift und die Import-Wache aus 264; jede Bestandsliste nur geschrumpft, Endstand je Liste im Morgenbericht.
+- pnpm typecheck && pnpm lint && pnpm test grün auf jeder Nummer und nach jedem Merge in den Zwischen- und Sammelstand (G10); Integrationstests ganz grün auf dem Sammelstand; `pnpm pruefen:doku` vor jedem Push.
+- Keine Migration, kein Paket, keine Variable: `git diff --name-only origin/main...<Sammelzweig> -- prisma/ pnpm-lock.yaml .env.example` zeigt nur prisma/seed-daten.ts (Musternummer, Nr. 262; eine Zeile); prisma/schema.prisma und prisma/migrations/ unverändert; package.json ohne Änderung außer, falls nötig, Skript-Zeilen unter „pruefen:“ (im PR-Text begründet).
+- Recht: `git diff --name-only origin/main...<Sammelzweig> -- src/lib/widerruf.ts src/lib/rechtstexte/ docs/recht/` leer.
+- Register: N48 (bzw. F) mit Ergänzungen bei K2 und N1, Stand-Zeile; N49 nur mit Startsatz; lauf33-ergaenzungen.md wortgleich mit diesem Auftrag; freigabe.md §37.
+- Zwischen-Morgenberichte (A, B) und Morgenbericht (C) mit: Ergebnis-Tabelle (Schluss Lauf 32 → jetzt, je Board und Fassung), „ordnungsgemäß beendet“ und „Ziel erreicht“ getrennt, Nummern-Tabelle (Status, PR, Vorschau, Migration nein, Weggelassenes), Merge-Reihenfolge (Sammel-PR per Merge-Commit, nicht Squash; an den Haltepunkten A und B Entwurf; danach die Einzel-PRs schließen), „Für dich zu tun“ (ganz oben die Liste „Für die Projektleitung am Tag T“ aus Morgenbericht 32 B wörtlich, unverändert gültig und nicht optional – Generalprobe auf test.agrilo.at, Stichtag setzen, „Monate ohne Grundgebühr“ = 12 festschreiben, kein echter Hof ohne Zustimmung zu 1.0, Notbremse am Vorabend, Prüfung nach 00:10 Uhr, keine abgeholte Testbestellung in Produktion, nichts deployen; Gründungsplätze in Produktion auf 100 stellen, bevor eine Seite in Produktion eine Platzzahl nennt und vor jeder Werbung mit einer Zahl (sonst entsteht nachträglich künstliche Knappheit), spätestens vor dem ersten Festschreiben; die Gründungszusagen vor dem 1.1.2028 festschreiben, sonst beginnt der Bar-Einzug der Gründungshöfe am 1.1.2028 statt am 1.2.2028 (K2/N44); die Entwicklungsdatenbank trägt die alte Musternummer bis zum nächsten Seed; „Nachtlauf 33 fortsetzen“ für B, danach für C; Frage, ob die alte Musternummer des Pilothofs auch in Produktion steht (die Projektleitung prüft lesend; der Lauf ändert nichts); PRs aus Lauf 32 und 33 schließen; Board-Korrekturen für die Design-Gruppe aus der Ergänzungsliste und neue aus dem Schluss-Durchgang; Prüfungen in der Vorschau, die der Container nicht kann; P1 an die Anwältin samt Hof-Mail zum Rücktritt), „Entscheidungen und Fragen“ (Toast-Token; ONLINE_ZAHLUNG_EINRICHTEN_SATZ gegen Board mit Google Pay; Karte „Deine Bestellung“ in der Kasse; Startseite Platzhalter gegen Illustration, falls ohne Startsatz uneinheitlich; /api/triage und CLI-Export auf die neue Kurznummer; was 279 bei widerruf an Feld und Anschrift offen ließ), „Geld“, „Recht“, Regelvorschläge, Stabilität (Neustarts, Budgets je Phase eingehalten oder nicht, Uhrzeiten aus `date -u`), Aufräumen bestätigt, Bilder-Ablage.
+Woran die Projektleitung den Erfolg erkennt: Die Vorschau des Sammel-PR zeigt im Web den Seitenfuß in der Breite des Inhalts; am Handy haben Auswertung, Kunden, Verkäufe und Postfach „‹“; die Danke-Seite von „Problem melden“ zeigt eine Kurznummer wie „4F8M2Q“, und Admin › Heute zeigt dieselbe; Einstellungen › Zahlung und /settings nennen beim Gründungshof ohne eigenen Einzugstag denselben letzten Tag (mit eigenem Einzugstag nennt die Barzahlung den Tag davor); Admin › Einstellungen › Gründungshöfe nennt in Kachel und Hinweis dieselbe Zahl; Admin › Betrieb › Mails zeigt unter „Beispiele“ die Anmeldecode-Mail mit Platzhalter-Code; Kästchen sehen in beiden Themes gleich aus, wo sie umgestellt sind; die Abnahme-Tabelle steht auf 5 oder nennt je Board die deckende Zeile.
+
+### 37.1 Nachtrag (uttoranger, im Chat, 9.11.2026, F041)
+
+Nachtrag der Projektleitung zu Lauf 33 (9.11.2026, F041): Illustration im Dunkeln wie ein Foto (Variante A)
+Geltung: Dieser Nachtrag gehört zur Freigabe von Lauf 33. Bevor in Abschnitt B die erste Nummer startet, trägt der Dirigent ihn wörtlich als „### 37.1 Nachtrag (uttoranger, im Chat, 9.11.2026, F041)“ direkt unter §37 in docs/nachtlauf/freigabe.md ein; §37 selbst bleibt unverändert. Im selben Doku-Commit (Präfix docs:, auf dem Integrationszweig von B, `pnpm pruefen:doku` grün vor dem Push): die Register-Ergänzung unter N48 und die Zeile der Ergänzungsliste (Wortlaut unten), dazu im Zeitbuch „Nachtrag F041: eingetragen <Commit, 12 Zeichen>“. Erst danach gilt er. Steht der Nachtrag nicht in freigabe.md, wird er nicht gebaut.
+Entschieden: Im dunklen Design wird die Kategorie-Illustration nicht mehr mit der Fläche verrechnet (heute: nur dunkle Umrisse), sondern wie ein Produktfoto gezeigt: auf ihrem eigenen hellen Grund, nur leicht gedämpft (dieselbe Dämpfung wie ein Foto, FOTO_HUELLE), gerahmt. Am Tag bleibt alles unverändert. Damit gilt die Regel „keine hellen Flecken“ (freigabe.md §35, Maßstab Punkt 4) nicht mehr für Illustrationen; für Kartenkacheln und Platzhalter ohne Bild gilt sie weiter. Register I1 und N22 (Illustration statt Bildfläche ohne Foto) bleiben unberührt.
+Umsetzung: als Teil von Nr. 271 (neuer Punkt 15.5). Die Dateigrenze von 271 wächst um src/components/ui/bild-dunkel.ts, docs/ai/CODING_STANDARDS.md (nur §7 „Was dem Modus NICHT folgt“, Absatz zu Illustrationen) und die unten genannten Tests. Keine andere Nummer von Lauf 33 schreibt bild-dunkel.ts (geprüft auf integration/lauf33 2e33a9920, auch der WIP-Stand von 267). Wird 271 nach 3.6 verschoben, wandert 15.5 mit; bleibt 271 unbegonnen, steht 15.5 im Morgenbericht unter „nicht begonnen – Lauf 34“.
+15.5.1 Nur in src/components/ui/bild-dunkel.ts:
+
+* `ILLUSTRATION_HUELLE = FOTO_HUELLE` (als Verweis auf die Konstante, nie als zweites Literal). FOTO_HUELLE steht in der Datei VOR ILLUSTRATION_HUELLE (sonst greift der Verweis beim Laden des Moduls auf eine noch nicht angelegte Konstante zu und wirft); Reihenfolge der übrigen Exporte unverändert.
+* `ILLUSTRATION_BILD = ''` – der Export bleibt bestehen, damit kein Aufrufer geändert werden muss (src/components/produkte/produkte-ansicht.tsx gehört Nr. 277, src/app/intern/bausteine/vorschau-248.tsx keiner Nummer; beide bleiben ohne Diff).
+* Kopfkommentar der Datei auf die neue Regel umschreiben (Herkunft F041, 9.11.2026).
+* FOTO_HUELLE, PLATZHALTER_FLAECHE, KARTE_HUELLE und KARTE_KACHELN unverändert.
+
+15.5.2 Eine Quelle für Illustrationen im Dunkeln: Diese Stellen dämpfen Illustrationen heute mit eigenen Klassen (`dark:brightness-[…] dark:saturate-[…]`) und liegen alle in der Grenze von 271: src/components/farm/product-grid.tsx Z. 208, src/components/hofseite/aktuell-vom-hof.tsx Z. 337, src/components/startseite/startseite-abschnitte.tsx Z. 61, src/components/startseite/bloecke/kategorie-hinweis.tsx Z. 33. 271 stellt sie auf ILLUSTRATION_HUELLE bzw. FOTO_HUELLE um (Bild vorher und nachher, dunkel 390 und 1440). Lässt sich eine Stelle nicht ohne sichtbaren Rückschritt umstellen: bleibt, Bericht. Danach steht in src/components außerhalb von bild-dunkel.ts kein Literal `dark:brightness-` oder `dark:saturate-` mehr (Test über alle Dateien, wie die Wache in tests/bausteine-242.test.ts; Gegenprobe mit einem Schnipsel). Bleibt eine Stelle nach dem Satz davor stehen, steht sie mit Grund als einzige Ausnahme im Test.
+15.5.3 Rahmen: Jede Illustrationsstelle hat im Dunkeln einen sichtbaren Rand (border oder ring), kein „schwebendes“ helles Quadrat. Heute gerahmt: hof-bildflaeche.tsx (`dark:ring-1 dark:ring-border`), produktdetail-teile.tsx (border), produkt-karte.tsx („gerahmt statt Schatten“). Fehlt der Rand an einer Stelle der Grenze von 271: ergänzen. Fehlt er an produkte-ansicht.tsx (Nr. 277): nicht ändern, Eintrag „Nacharbeit 277“ im Bericht.
+15.5.4 Bleibt: die gedämpfte Darstellung pausierter Höfe (hof-bildflaeche.tsx `opacity-60 grayscale`, entdecken-teile.tsx), das Teilen-Bild, alle Fotos, Karten und Platzhalter.
+15.5.5 Tests (heutige Erwartungen, die sich ändern, alle in der Grenze von 271):
+
+* tests/bausteine-242.test.ts Z. 96: Werte neu (`ILLUSTRATION_HUELLE === FOTO_HUELLE`, `ILLUSTRATION_BILD === ''`); die Wache Z. 85–107 (kein zweites Modul mit `dark:mix-blend-multiply` bzw. `dark:brightness-[1.6]`) bleibt.
+* tests/bausteine-248.test.ts Z. 181: `KARTE_KACHELN` ist nicht mehr `ILLUSTRATION_BILD`; neu `expect(KARTE_KACHELN).toBe('dark:mix-blend-multiply')` und `expect(ILLUSTRATION_BILD).not.toContain('mix-blend')`.
+* tests/hofseite-kunde-ansicht.test.ts Z. 815–826: Testname und Erwartung neu („Illustrationen im Dunkeln gedämpft wie ein Foto“); Hülle der Illustration trägt `dark:brightness-[0.85]`, kein `dark:brightness-[1.6]` und kein `mix-blend` auf der Seite.
+* tests/hoefe-seite.test.ts Z. 258, 279, 292: erwartete Klassen der Hofbildfläche (`dark:brightness-[1.6]` → `dark:brightness-[0.85]`).
+* Neu: Test aus 15.5.2.
+* `git grep -n "brightness-\[1\.6\]\|ILLUSTRATION_BILD" tests/` vor dem Push; jeder Treffer ist umgestellt oder begründet.
+
+15.5.6 Doku: docs/ai/DESIGN_SYSTEM.md Z. 120, 380 und 1032 (Illustration „mit der Fläche multipliziert“) im eigenen Abschnitt von 271 berichtigen; docs/ai/CODING_STANDARDS.md §7, Absatz „Ausnahme: Die Kategorie-Illustrationen …“, auf die neue Regel (gedämpft über ILLUSTRATION_HUELLE, gerahmt, keine Verrechnung); docs/ai/BAUSTEINE.md nur über `pnpm bausteine`.
+15.5.7 Bilder: hofseite, produkt, hoefe, startseite (Abschnitte mit Illustration) je 390 und 1440 dunkel, hell als Gegenprobe unverändert; Hof › produkte (Board von 277) als Wirkungsbild, Bewertung erst mit 277.
+Abnahme: Zeigt ein dunkles Board die Illustration mit der Fläche verrechnet und die App sie gedämpft hell und gerahmt, ist das C (kein Mangel). Zeile der Ergänzungsliste (docs/nachtlauf/berichte/lauf33-ergaenzungen.md, wörtlich): „| alle Boards mit Kategorie-Illustration | dunkel | Illustration hell auf eigenem Grund, gedämpft wie ein Foto, gerahmt | C | Projektleitung, 9.11.2026 (F041; freigabe.md §37.1, N48) |“ pruefer-ui bekommt §37.1 zusätzlich zu den Eingaben aus „Abnahme-Grundlage“. Bis 271 im Zwischenstand liegt, gilt die Zeile nicht (die App zeigt dann noch die alte Darstellung). In „Für dich zu tun“: Board-Korrektur „Illustration im Dunkeln“ für die Design-Gruppe.
+Register (wörtlich, als neue Zeile unter N48): „- Ergänzung (uttoranger, im Chat, 9.11.2026; F041): Im dunklen Design steht die Kategorie-Illustration wie ein Foto: auf ihrem eigenen Grund, gedämpft wie ein Foto (FOTO_HUELLE), gerahmt. Kartenkacheln bleiben mit der Fläche verrechnet, Platzhalter ohne Bild gedämpft. Die Regel ‚keine hellen Flecken‘ (freigabe.md §35, Maßstab Punkt 4) gilt für Illustrationen nicht mehr. I1 und N22 bleiben. Umsetzung: Nr. 271 (freigabe.md §37.1).“
+Fertig, wenn (zusätzlich für 271): Tests aus 15.5.5 grün; `git diff --name-only <Basis>.. -- src/components/produkte/ src/app/intern/bausteine/vorschau-248.tsx` leer; Bilder aus 15.5.7 liegen vor; §37.1, Register-Zeile und Ergänzungszeile auf dem Integrationszweig.
+Nicht: keine neuen Bilddateien, keine Nachtfassungen der Illustrationen (Variante C, später eigener Auftrag), kein Token, kein Paket, keine Änderung an §37 oder an der Datei a010-auftrag-lauf33.md, keine Änderung an Dateien anderer Nummern.

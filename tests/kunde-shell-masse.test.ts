@@ -58,8 +58,10 @@ describe('Maße der KundeShell', () => {
   it('die Shell setzt die Variablen an ihren Rahmen und baut die Kopfzeile aus derselben Konstante', () => {
     const shell = quelle('src/components/shells/kunde-shell.tsx')
     const kundeShell = shell.slice(shell.indexOf('export function KundeShell('), shell.indexOf('export type KundeFokusShellProps'))
-    expect(kundeShell).toMatch(/<div data-design="neu" data-scroll-rand=\{[^}]*\} className=\{cn\('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE\)\}>/)
-    expect(kundeShell).toMatch(/<header className="sticky top-0 z-40 border-b border-border/)
+    // Seit Nr. 247 steht data-kopf-scrollt dazwischen (G9); die Variablen sitzen weiter am Rahmen.
+    expect(kundeShell).toMatch(/<div\s+data-design="neu"\s+data-scroll-rand=\{[^}]*\}\s+data-kopf-scrollt=\{[^}]*\}\s+className=\{cn\('min-h-dvh bg-background text-foreground', KUNDE_SHELL_MASSE\)\}\s*>/)
+    // Seit Nr. 247 über cn(): am Handy auf Hof- und Produktseite zusätzlich max-md:relative (G9).
+    expect(kundeShell).toMatch(/<header className=\{cn\('sticky top-0 z-40 border-b border-border/)
     expect(kundeShell).toContain('KUNDE_KOPF_ZEILE')
     // Keine zweite Höhe daneben: Die Kopfzeile nennt ihre Höhe nur über die Konstante.
     expect(kundeShell).not.toMatch(/\bh-14\b|md:h-16/)
@@ -80,7 +82,8 @@ describe('Maße der KundeShell', () => {
 
   it('unter md keine Mindesthöhe: Sie schöbe die Karte im Querformat hinter die Unterleiste (Runde 1)', () => {
     const client = quelle('src/components/hoefe/hoefe-client.tsx')
-    expect(client).toContain("cn('flex flex-col md:min-h-[280px]', KUNDE_PLATZ_HOEHE)")
+    // Seit Nr. 271 wächst der Bereich in niedrigen Fenstern mit dem Kopf der Liste (die Karte behält dort die volle Höhe).
+    expect(client).toContain("cn('flex flex-col md:min-h-[280px] [@media(max-height:500px)]:h-auto', KUNDE_PLATZ_HOEHE)")
     expect(client).not.toMatch(/(?<!md:)min-h-\[280px\]/)
     // Gegenprobe: die alte Klasse fiele auf.
     expect("cn('flex min-h-[280px] flex-col', KUNDE_PLATZ_HOEHE)").toMatch(/(?<!md:)min-h-\[280px\]/)

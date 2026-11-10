@@ -5,7 +5,7 @@
  * Beweist: Hof › Deine Konditionen zeigt „Barzahlung“ (Satz, Einzug ab bzw.
  * erlassen, Mandat mit Bank und letzten 4 Stellen — nie mehr) und die
  * Monatsabrechnungen mit Stand als Wort; ohne Abrechnung der Leersatz. Die
- * Heute-Karte sagt „Barzahlung ist pausiert“ mit „Jetzt bezahlen“; nach einer
+ * Heute-Karte sagt „Barzahlung ist gesperrt“ mit „Jetzt bezahlen“; nach einer
  * Rückbuchung ohne Knopf, mit dem Weg ins Postfach. Die Akte
  * zeigt Mandat, Quote und die Einstellungen. Der Einrichten-Schritt führt zu
  * „Lastschrift einrichten“ und zählt nicht mit.
@@ -31,6 +31,7 @@ const html = (el: React.ReactElement): string => renderToStaticMarkup(el).replac
 const DATEN: BarzahlungAnzeige = {
   satzText: '6',
   einzugAbText: '1. Februar 2028',
+  letzterFreierTagText: '31. Jänner 2028',
   einzugBegonnen: true,
   mandat: true,
   mandatPflicht: true,
@@ -60,7 +61,8 @@ describe('Hof › Deine Konditionen: Barzahlung und Monatsabrechnungen', () => {
     const h = html(createElement(Barzahlung, { daten: { ...DATEN, mandat: false, bank: null, letzte4: null, einzugBegonnen: false, abrechnungen: [] } }))
     expect(h).toContain(LASTSCHRIFT_TEXT.mandatFehlt)
     expect(h).toContain(LASTSCHRIFT_TEXT.mandatPflicht)
-    expect(h).toContain(LASTSCHRIFT_TEXT.erlassen('1. Februar 2028'))
+    // „Bis“ nennt den letzten freien Tag, „Einzug ab“ den Einzugstag (Nr. 264, Register N48).
+    expect(h).toContain(`${LASTSCHRIFT_TEXT.einzugAb('1. Februar 2028')} · ${LASTSCHRIFT_TEXT.erlassen('31. Jänner 2028')}`)
     expect(h).toContain('>Lastschrift einrichten<')
     expect(h).toContain(LASTSCHRIFT_TEXT.abrechnungenLeer)
     expect(h).toContain('data-slot="empty-state"')
@@ -69,7 +71,7 @@ describe('Hof › Deine Konditionen: Barzahlung und Monatsabrechnungen', () => {
   })
 })
 
-describe('Hof › Heute: Karte „Barzahlung ist pausiert“', () => {
+describe('Hof › Heute: Karte „Barzahlung ist gesperrt“', () => {
   it('Titel, Satz mit dem Monat, Knopf „Jetzt bezahlen“ (≥ 44 px über die Pille)', () => {
     const h = html(createElement(LastschriftSperreKarte, { abrechnungId: 'a2', monatText: 'März 2028', stand: 'offen' }))
     expect(h).toContain(LASTSCHRIFT_TEXT.heuteTitel)
@@ -81,7 +83,7 @@ describe('Hof › Heute: Karte „Barzahlung ist pausiert“', () => {
   it('zurückgebucht: kein „Jetzt bezahlen“ auf die schon bezahlte Rechnung, sondern ein Satz ohne Fachbegriff und der Weg ins Postfach', () => {
     const h = html(createElement(LastschriftSperreKarte, { abrechnungId: 'a2', monatText: 'März 2028', stand: 'zurueckgebucht' }))
     expect(h).toContain(LASTSCHRIFT_TEXT.heuteTitel)
-    expect(h).toContain('Die Lastschrift für März 2028 wurde zurückgebucht. Barzahlung ist pausiert – das Team meldet sich bei dir.')
+    expect(h).toContain('Die Lastschrift für März 2028 wurde zurückgebucht. Barzahlung ist gesperrt – das Team meldet sich bei dir.')
     expect(h).not.toContain('Jetzt bezahlen')
     expect(h).not.toContain(LASTSCHRIFT_TEXT.heuteSatz('März 2028'))
     expect(h).toContain('href="/postfach"')

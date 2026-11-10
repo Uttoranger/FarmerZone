@@ -95,7 +95,7 @@ function Rahmen({
   const fenster = useRef(new Map<string, HTMLIFrameElement>())
 
   const bandZeile = (
-    <p className={cn('flex h-[22px] items-center justify-center px-2 text-center text-[10px] font-bold tracking-[0.08em]', BAND[band].klasse)}>
+    <p className={cn('flex min-h-[22px] items-center justify-center px-2 py-0.5 text-center text-xs leading-tight font-bold tracking-[0.04em]', BAND[band].klasse)}>
       {BAND[band].text}
     </p>
   )
@@ -149,7 +149,7 @@ function Rahmen({
           <span className="size-2.5 rounded-full bg-muted-foreground/50" />
           <span className="size-2.5 rounded-full bg-muted-foreground/50" />
         </span>
-        <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-[11.5px] text-muted-foreground ring-1 ring-border">/</span>
+        <span className="mx-auto max-w-[70%] truncate rounded-full bg-card px-3 py-0.5 text-xs text-muted-foreground ring-1 ring-border">/</span>
         <span className="w-9" />
       </div>
       {bandZeile}

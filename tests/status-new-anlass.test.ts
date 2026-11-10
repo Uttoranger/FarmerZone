@@ -25,7 +25,6 @@ vi.mock('@/lib/prisma', () => ({
     statusPost: { findFirst: vi.fn(async () => null) },
   },
 }))
-vi.mock('@/components/hofbereich/unterseiten-kopf', () => ({ UnterseitenKopf: () => null }))
 vi.mock('@/app/(hof)/status/new/status-new-client', () => ({ StatusNewClient: vi.fn(() => null) }))
 
 import StatusNewPage from '@/app/(hof)/status/new/page'

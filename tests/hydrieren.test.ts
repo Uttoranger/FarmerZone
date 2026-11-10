@@ -25,14 +25,15 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import ts from 'typescript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, createElement, useState, type ComponentProps, type ReactNode } from 'react'
+import { act, createElement, type ComponentProps, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BROWSER_OBJEKTE, hydriere, pruefeHydrieren, raeumeHydrierenAuf } from './hydrieren-hilfe'
 import { NetzHinweis } from '@/components/ui/netz-hinweis'
 import { NotbremseBand } from '@/components/notbremse-band'
-import { useHofzeileKlebt } from '@/components/hofseite/use-hofzeile-klebt'
 import { NETZ_ZEILE } from '@/lib/netz'
 import { HeuteRoutine } from '@/components/admin/heute-routine'
+import { FEHLER_SEITENTITEL, FehlerAnsicht } from '@/components/shared/fehler-ansicht'
+import { TEST_VORSATZ, TITEL_VORSATZ_ATTRIBUT } from '@/lib/titel-vorsatz'
 
 // Attrappen wie in tests/mein-hof-umschalter.test.ts: Die Adresse liest useSearchParams aus `adresse`.
 const adresse = { suche: '' }
@@ -71,7 +72,7 @@ vi.mock('@/server/actions/meldung', () => ({ meldungAbsenden: vi.fn() }))
 
 import { Abholzeile } from '@/components/hoefe/abholzeile'
 import { BeitragMarke } from '@/components/hoefe/beitrag-marke'
-import { ThemeUmschalter, ThemeUmschalterZeile } from '@/components/shared/theme-umschalter'
+import { ThemeUmschalter, ThemeUmschalterPille, ThemeWahl } from '@/components/shared/theme-umschalter'
 import { CookieBanner } from '@/components/cookie-banner'
 import { useWarenkorbKopf } from '@/lib/use-warenkorb-kopf'
 import { MeinHofAnsicht } from '@/components/mein-hof/mein-hof-ansicht'
@@ -87,6 +88,8 @@ import { useImVorschauRahmen, VorschauImRahmen } from '@/components/farm/vorscha
 import { HoefeClient } from '@/components/hoefe/hoefe-client'
 import { useMeldungFormular } from '@/components/shared/use-meldung-formular'
 import { useWarenkorbVomHof } from '@/lib/use-warenkorb-kopf'
+import { Toaster, useImNeuenDesign } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import type { HofUebersichtEintrag } from '@/server/queries/farm'
 
 /** Die Breite des Fensters für matchMedia, und ob die Seite als installierte App läuft. */
@@ -185,18 +188,34 @@ describe('Hydrieren – Teile mit dem Darstellungsmodus des Browsers', () => {
     expect(ergebnis.serverHtml).not.toContain('<button')
     // Im Browser ist es dunkel: Der Knopf bietet den hellen Modus an.
     expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
+    // Das Symbol ist auch im Dunkeln der Mond des Boards (Nr. 233, UI-Runde 3), keine Sonne.
+    expect(ergebnis.container.querySelector('button svg[data-symbol="mond"]')).not.toBeNull()
+    expect(ergebnis.container.querySelector('button .lucide-sun')).toBeNull()
   })
 
-  // Fund aus Nr. 135: Die Beschriftung am Knopf richtete sich schon beim ersten Rendern im Browser nach dem Modus, den der Server nicht kennt.
-  it('ThemeUmschalterZeile: „Darstellung“ im Server-HTML, danach das Wort zum Modus des Browsers', async () => {
-    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalterZeile), { imBrowser: () => localStorage.setItem('theme', 'dark') })
-    expect(ergebnis.serverHtml).toContain('Darstellung')
+  it('ThemeUmschalter hell: derselbe Mond, nur die Beschriftung sagt, was der Tipp tut (Nr. 233)', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalter), { imBrowser: () => localStorage.setItem('theme', 'light') })
+    expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Dunkelmodus einschalten')
+    expect(ergebnis.container.querySelector('button svg[data-symbol="mond"]')).not.toBeNull()
+  })
+
+  // Fund aus Nr. 135 (damals an ThemeUmschalterZeile, die seit Nr. 220 der Pille und der Wahl gewichen ist): Die
+  // Beschriftung richtete sich schon beim ersten Rendern im Browser nach dem Modus, den der Server nicht kennt.
+  // Nr. 220: die Pille im Seitenfuß der Kundschaft und die Wahl Hell/Dunkel im Mehr-Blatt des Hofbereichs.
+  it('ThemeUmschalterPille: „Darstellung“ im Server-HTML, danach „Darstellung: dunkel“ aus dem Speicher', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeUmschalterPille), { imBrowser: () => localStorage.setItem('theme', 'dark') })
+    expect(ergebnis.serverHtml).toContain('>Darstellung</button>')
     expect(ergebnis.meldungen).toEqual([])
-    expect(ergebnis.container.textContent).toBe('Heller Modus')
-    // Im Browser ist es dunkel: Beschriftung und Tooltip bieten den hellen Modus an.
-    const knopf = ergebnis.container.querySelector('button')
-    expect(knopf?.getAttribute('aria-label')).toBe('Hellen Modus einschalten')
-    expect(knopf?.getAttribute('title')).toBe('Hellen Modus einschalten')
+    expect(ergebnis.container.textContent).toBe('Darstellung: dunkel')
+    expect(ergebnis.container.querySelector('button')?.getAttribute('aria-label')).toBe('Darstellung: dunkel – auf hell umschalten')
+  })
+
+  it('ThemeWahl: im Server-HTML keine Pille gewählt, danach „Dunkel“ aus dem Speicher', async () => {
+    const ergebnis = await pruefeHydrieren(createElement(ThemeWahl), { imBrowser: () => localStorage.setItem('theme', 'dark') })
+    expect(ergebnis.serverHtml).not.toContain('aria-pressed="true"')
+    expect(ergebnis.meldungen).toEqual([])
+    const gewaehlt = [...ergebnis.container.querySelectorAll('button[aria-pressed="true"]')].map((k) => k.textContent)
+    expect(gewaehlt).toEqual(['Dunkel'])
   })
 })
 
@@ -234,25 +253,19 @@ describe('Hydrieren – das Band der Notbremse (Register N34, Nr. 189)', () => {
   })
 })
 
-describe('Hydrieren – klebt die Hofzeile (Nr. 195)', () => {
-  function Probe(): React.JSX.Element {
-    const [block, setzeBlock] = useState<HTMLDivElement | null>(null)
-    return createElement('div', { ref: setzeBlock }, `klebt: ${useHofzeileKlebt(block)}`)
-  }
-  afterEach(() => vi.restoreAllMocks())
-  const lageDesBlocks = (oben: number) => () =>
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: oben, height: 0 } as DOMRect)
+describe('Hydrieren – Titel der 500 mit „[TEST]“ (Nr. 279)', () => {
+  afterEach(() => document.documentElement.removeAttribute(TITEL_VORSATZ_ATTRIBUT))
 
-  it('im Server-HTML „klebt nicht“; oben angekommen nach dem Hydrieren „klebt“', async () => {
-    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(0) })
-    expect(ergebnis.serverHtml).toContain('klebt: false')
-    expect(ergebnis.meldungen).toEqual([])
-    expect(ergebnis.container.textContent).toBe('klebt: true')
-  })
-
-  it('Gegenprobe: weit unten im Fluss bleibt es bei „klebt nicht“', async () => {
-    const ergebnis = await pruefeHydrieren(createElement(Probe), { imBrowser: lageDesBlocks(420) })
-    expect(ergebnis.container.textContent).toBe('klebt: false')
+  it('FehlerAnsicht: Server ohne Vorsatz, nach dem Hydrieren mit dem Vorsatz aus <html>; ohne Attribut keiner', async () => {
+    const ansicht = createElement(FehlerAnsicht, { nochmal: () => {}, imLayout: true })
+    const mit = await pruefeHydrieren(ansicht, { imBrowser: () => document.documentElement.setAttribute(TITEL_VORSATZ_ATTRIBUT, TEST_VORSATZ) })
+    expect(mit.serverHtml).toContain(`<title>${FEHLER_SEITENTITEL}</title>`)
+    expect(document.title).toBe(`${TEST_VORSATZ}${FEHLER_SEITENTITEL}`)
+    await raeumeHydrierenAuf()
+    document.documentElement.removeAttribute(TITEL_VORSATZ_ATTRIBUT)
+    // Gegenprobe: Produktion (kein Attribut) — kein Vorsatz.
+    await pruefeHydrieren(ansicht)
+    expect(document.title).toBe(FEHLER_SEITENTITEL)
   })
 })
 
@@ -431,7 +444,7 @@ describe('Hydrieren – Teile mit der Breite und der Adresse des Browsers', () =
   it('StartbildschirmKarte: im Server-HTML nichts, im Browser die Anleitung — in der installierten App nicht', async () => {
     const imBrowser = await pruefeHydrieren(createElement(StartbildschirmKarte))
     expect(imBrowser.serverHtml).toBe('')
-    expect(imBrowser.container.textContent).toContain(STARTBILDSCHIRM_KARTE.titel)
+    expect(imBrowser.container.textContent).toContain(STARTBILDSCHIRM_KARTE.titel.split(': ')[0])
     await raeumeHydrierenAuf()
 
     fenster.standalone = true
@@ -450,6 +463,60 @@ describe('Hydrieren – Teile mit der Breite und der Adresse des Browsers', () =
     expect(ergebnis.serverHtml).toContain('Adresse: leer')
     expect(ergebnis.container.textContent).toBe('Adresse: ?kat=eier')
   })
+})
+
+describe('Hydrieren – die Meldung (Toast) nur im Geltungsbereich data-design="neu" (Nr. 246, Runde 1)', () => {
+  // Die Shell mit der Marke steht neben dem Toaster (der hängt im Root-Layout): Der Server sieht sie nicht.
+  function setzeMarke(): HTMLElement {
+    const shell = document.createElement('div')
+    shell.setAttribute('data-design', 'neu')
+    document.body.appendChild(shell)
+    return shell
+  }
+
+  it('useImNeuenDesign: im Server-HTML und beim Hydrieren „alt“, erst danach „neu“', async () => {
+    function Gestalt(): React.JSX.Element {
+      return createElement('p', null, `Toast: ${useImNeuenDesign() ? 'neu' : 'alt'}`)
+    }
+    let shell: HTMLElement | undefined
+    try {
+      const ergebnis = await pruefeHydrieren(createElement(Gestalt), { imBrowser: () => (shell = setzeMarke()) })
+      expect(ergebnis.serverHtml).toContain('Toast: alt')
+      expect(ergebnis.container.textContent).toBe('Toast: neu')
+    } finally {
+      shell?.remove()
+    }
+  })
+
+  // Mit den Props, die src/app/layout.tsx heute mitgibt: innen G7 (unten, ohne richColors), außen der Bestand (oben).
+  for (const [fall, mitMarke, lage, bunt] of [
+    ['innen: unten mittig, ohne richColors, dunkler Balken', true, 'bottom', 'false'],
+    ['Gegenprobe außen: oben mittig mit richColors wie bisher', false, 'top', 'true'],
+  ] as const) {
+    it(`Toaster ${fall}`, async () => {
+      const shell = mitMarke ? setzeMarke() : undefined
+      try {
+        const ergebnis = await pruefeHydrieren(createElement(Toaster, { position: 'top-center', richColors: true }))
+        // sonner reicht die Meldung über einen Takt (setTimeout) an den Toaster weiter.
+        await act(async () => {
+          toast.success('Gespeichert')
+          await new Promise((fertig) => setTimeout(fertig, 20))
+        })
+        const liste = ergebnis.container.querySelector('[data-sonner-toaster]')
+        expect(liste?.getAttribute('data-y-position')).toBe(lage)
+        expect(liste?.getAttribute('data-x-position')).toBe('center')
+        const meldung = ergebnis.container.querySelector('[data-sonner-toast]')
+        expect(meldung?.getAttribute('data-rich-colors')).toBe(bunt)
+        expect(meldung?.className.includes('bg-[var(--fz-text)]!')).toBe(mitMarke)
+      } finally {
+        await act(async () => {
+          toast.dismiss()
+          await new Promise((fertig) => setTimeout(fertig, 20))
+        })
+        shell?.remove()
+      }
+    })
+  }
 })
 
 describe('Hydrieren – die Hofübersicht /hoefe', () => {
@@ -480,9 +547,9 @@ describe('Hydrieren – die Hofübersicht /hoefe', () => {
   it('HoefeClient (useIstBreit): der Server zeichnet die schmale Gestalt, am breiten Fenster springt der Splitscreen erst nach dem Hydrieren ein', async () => {
     const element = createElement(HoefeClient, { hoefe: [hof('a'), hof('b')], jetzt: JETZT })
     const ergebnis = await pruefeHydrieren(element, { imBrowser: () => (fenster.breite = 1280) })
-    // Die Zahlzeile in der Filterreihe (ein <span role="status">) steht nur im Splitscreen; die <p role="status"> über der Liste immer.
-    expect(ergebnis.serverHtml).not.toContain('<span role="status"')
-    expect(ergebnis.container.querySelector('span[role="status"]')).not.toBeNull()
+    // Den Splitscreen trägt sein Rahmen (data-ansicht="split") — der Server zeichnet ihn nie.
+    expect(ergebnis.serverHtml).not.toContain('data-ansicht="split"')
+    expect(ergebnis.container.querySelector('[data-ansicht="split"]')).not.toBeNull()
   })
 })
 
@@ -502,13 +569,14 @@ const GEPRUEFT: Record<string, string[]> = {
   'src/components/cookie-banner.tsx': ['CookieBanner'],
   'src/components/farm/vorschau-im-rahmen.tsx': ['useImVorschauRahmen'],
   'src/components/heute/startbildschirm-karte.tsx': ['StartbildschirmKarte'],
-  'src/components/hofseite/use-hofzeile-klebt.ts': ['useHofzeileKlebt'],
   'src/components/hoefe/hoefe-client.tsx': ['HoefeClient'],
   'src/components/hoefe/use-hoefe-adresse.ts': ['useHoefeAdresse'],
   'src/components/hoefe/use-uhr.ts': ['Abholzeile', 'BeitragMarke'],
-  'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterZeile'],
+  'src/components/shared/fehler-ansicht.tsx': ['FehlerAnsicht'],
+  'src/components/shared/theme-umschalter.tsx': ['ThemeUmschalter', 'ThemeUmschalterPille', 'ThemeWahl'],
   'src/components/shared/use-meldung-formular.ts': ['useMeldungFormular'],
   'src/components/ui/netz-hinweis.tsx': ['NetzHinweis'],
+  'src/components/ui/sonner.tsx': ['useImNeuenDesign'],
   'src/components/notbremse-band.tsx': ['NotbremseBand'],
   'src/lib/use-cart.ts': ['useCart', 'useKorbHinweis'],
   'src/lib/use-mindestbreite.ts': ['useMindestbreite', 'useSchmalerAls'],

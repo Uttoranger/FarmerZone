@@ -5,7 +5,7 @@ import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { Banknote, CalendarDays, CreditCard, Info, MapPin, Phone, ShoppingBasket } from 'lucide-react'
+import { ArrowRight, Info } from 'lucide-react'
 import type { PublicPickupSlot } from '@/server/queries/farm'
 import { abholtagZeile, abholzeitenJeWochentag, nextPickupDays } from '@/lib/pickup-days'
 import { buildMapsUrl } from '@/lib/customer-links'
@@ -14,9 +14,10 @@ import { warenkorbAnzahl } from '@/lib/warenkorb-speicher'
 import { useWarenkorbVomHof } from '@/lib/use-warenkorb-kopf'
 import { useKorbHinweis } from '@/lib/use-cart'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { KONTAKT_NACH_DEM_KAUF, korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
+import { korbBetraege, type Zahlungsart } from '@/lib/hofseite-kunde'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { cn } from '@/lib/utils'
+import { textlinkKlassen } from '@/components/ui/textlink'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FutterVerantwortung } from '@/components/shared/futter-verantwortung'
 import { futterVerantwortungImKorb, type FutterAbgabe } from '@/lib/futter-registrierung'
@@ -25,17 +26,19 @@ import { KaufGrund } from '@/components/hofseite/kauf-grund'
 import { useBestellstopp } from '@/components/notbremse-band'
 
 /*
- * Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt):
- * Mini-Warenkorb, Nächste Abholung, Abholzeiten, Zahlung & Kontakt mit dem
- * Gebührenhinweis und Anfahrt. Mockups web-k2-hofseite und
- * web-k2-alle-produkte-nach-kategorie (rechts), mobil-k2-hofseite (oben in
- * der Übersicht). Ab 1024 px steht sie rechts neben dem Inhalt, darunter in
- * der Übersicht vor ihm; der Mini-Warenkorb nur ab 1024 px — am Handy trägt
- * die Leiste über der Unterleiste den Korb (product-grid.tsx).
+ * Die rechte Spalte der Hofseite — EINE Komponente (Gate 4, Kernpunkt; Aufbau
+ * seit Nr. 235 nach den Boards w1-/s1-hofseite und w1-/s1-produkt): Mini-Warenkorb,
+ * Nächste Abholung, Abholzeiten, Zahlung & Kontakt und Anfahrt als ruhige Karten
+ * mit leiser Überzeile in Großbuchstaben, ohne Symbole. Ab 1024 px steht die
+ * Spalte rechts neben dem Inhalt, ab dem Titelbild, und bleibt beim Scrollen
+ * stehen (`sticky`). Am Handy steht sie in der Übersicht nach dem Schaufenster
+ * und vor „Über uns“ (Register N5), ohne den Mini-Warenkorb — dort trägt die
+ * Korb-Leiste den Korb.
  *
  * Alles aus den echten Hofdaten; was entschieden wird (Zahlungsarten, Satz
  * der Gebühr, Abholzeiten), steht in src/lib/. `data-abschnitt` sind die
- * Ziele der Markierung aus dem Editor (vorschau-im-rahmen.tsx).
+ * Ziele der Markierung aus dem Editor (vorschau-im-rahmen.tsx sucht das
+ * sichtbare davon).
  */
 
 export type SeitenspalteHof = {
@@ -51,34 +54,57 @@ export type SeitenspalteHof = {
   pickupSlots: PublicPickupSlot[]
 }
 
-const KARTE = 'flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-[18px]'
-const KARTEN_TITEL = 'text-[15px] font-semibold text-foreground'
-const ZEILE = 'flex items-center gap-2.5 text-[13.5px] text-foreground'
-const SYMBOL = 'size-4 shrink-0 text-muted-foreground'
-const TEXTLINK = cn(
-  'inline-flex min-h-11 w-fit items-center rounded-md text-[13.5px] font-semibold text-brand-text underline-offset-4 hover:underline',
-  FOKUS_RAHMEN
-)
+/** Die Karte der Boards: Fläche, Rand, Radius 16, Polster 12/14 px, 6 px zwischen Überzeile und Zeilen. */
+export const SPALTEN_KARTE = 'flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3.5 py-3'
+/** Die leise Überzeile in Großbuchstaben (13 px fett) — Überschrift jeder Karte und der Abschnitte der Hofseite. */
+export const UEBERZEILE = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
+/**
+ * Ein Textlink mit Pfeil wie im Board („Alle ansehen →", „Route planen →"): unterstrichen und der Pfeil als
+ * kräftiges Symbol statt des schmalen Zeichens. Ergänzt `textlinkKlassen()` (ui/textlink.tsx), ändert ihn nicht.
+ */
+export const PFEIL_LINK = 'w-fit gap-1 underline decoration-[1.5px] underline-offset-4'
+
+/** Steht in „Zahlung & Kontakt“ statt der Nummer (Nr. 60): Telefon und E-Mail kommen mit der Bestellung. */
+export const TELEFON_IN_DER_BESTAETIGUNG = 'Die Telefonnummer des Hofs steht in deiner Bestellbestätigung.'
+
+/**
+ * „Mittwoch 15–18 Uhr" wie im Board: nur die Darstellung der Zeile aus `abholzeitenJeWochentag`
+ * (src/lib/pickup-days.ts, „Mittwoch, 15–18 Uhr") — das Komma nach dem Wochentag fällt weg.
+ */
+export function ohneKommaNachTag(zeile: string): string {
+  return zeile.replace(/^([^\d,]+), (?=\d)/, '$1 ')
+}
+
+/** „Online bezahlen oder bar bei Abholung." — die Zahlarten des Hofs als ein Satz (Board w1-hofseite). */
+export function zahlungsSatz(zahlungsarten: readonly Zahlungsart[]): string | null {
+  const online = zahlungsarten.some((z) => z.art === 'online')
+  const bar = zahlungsarten.some((z) => z.art === 'bar')
+  if (online && bar) return 'Online bezahlen oder bar bei Abholung.'
+  if (online) return 'Online bezahlen.'
+  if (bar) return 'Bar bei Abholung.'
+  return null
+}
 
 export function HofseiteSeitenspalte({
   hof,
   sperre,
   zahlungsarten,
-  gebuehrKurz,
+  gebuehrHinweis,
   gebuehrKorb,
   mitKorb,
   jetzt,
   produkte = [],
   kasseHref,
+  kasseUmriss = false,
   className,
 }: {
   hof: SeitenspalteHof
   /** Die Kaufsperre der Seite (kaufSperre, Register N24) — einmal auf dem Server gerechnet. */
   sperre: KaufSperre
   zahlungsarten: readonly Zahlungsart[]
-  /** „Preise zzgl. 5 % Servicegebühr …" — null, wenn der Hof gerade gebührenfrei ist. */
-  gebuehrKurz: string | null
-  /** „zzgl. Servicegebühr" neben der Korbsumme — null ohne Gebühr. */
+  /** „Preise inkl. Plattformgebühr (6 %) – online und bar gleich." — null, wenn der Hof gerade gebührenfrei ist. */
+  gebuehrHinweis: string | null
+  /** „inkl. Plattformgebühr" bzw. „zzgl. Servicegebühr" neben der Korbsumme — null ohne Gebühr. */
   gebuehrKorb: string | null
   /** Ob die Seite einen Korb führt (korbErlaubt) — in der Vorschau des Hofs nie. */
   mitKorb: boolean
@@ -88,122 +114,139 @@ export function HofseiteSeitenspalte({
   produkte?: readonly (FutterAbgabe & { id: string })[]
   /** Adresse von „Zur Kasse" — die Produktseite gibt `?kaeufer=betrieb` mit (Nr. 29); sonst die Kasse des Hofs. */
   kasseHref?: string
+  /**
+   * „Zur Kasse" als Umriss statt grün — auf der Produktseite ist „In den Korb · €"
+   * die eine Hauptaktion (Boards s1/w1-produkt); auf der Hofseite bleibt „Zur Kasse" grün.
+   */
+  kasseUmriss?: boolean
+  /**
+   * Der Verantwortungs-Hinweis zu Futter im Korb (E10a) im Mini-Warenkorb — auf der Hofseite ja. Die Produktseite
+   * schaltet ihn ab: Dort stünde er neben jedem Produkt (auch Brennholz) und läse sich wie ein Satz über dieses
+   * Produkt. Sie zeigt den Hinweis zum eigenen Futter unter der Kennzeichnung; zum Korb sagen ihn Korb-Blatt und Kasse.
+   */
   className?: string
 }): React.JSX.Element {
-  const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 3, new Date(jetzt)), [hof.pickupSlots, jetzt])
+  const tage = useMemo(() => nextPickupDays(hof.pickupSlots, 2, new Date(jetzt)), [hof.pickupSlots, jetzt])
   const zeiten = useMemo(() => abholzeitenJeWochentag(hof.pickupSlots), [hof.pickupSlots])
-  const kartenLink = buildMapsUrl(hof.address, hof.postalCode, hof.city)
 
   return (
-    <aside aria-label="Abholung, Zahlung und Anfahrt" className={cn('flex flex-col gap-[18px]', className)}>
-      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} />}
+    <aside
+      aria-label="Abholung, Zahlung und Anfahrt"
+      // Bleibt beim Scrollen stehen, ab „Dein Warenkorb“ oben (Boards w1-hofseite Bild 2, w1-produkt Bild 2); ist sie höher
+      // als das Fenster, scrollt sie selbst. Sie klebt nur, solange das Raster darunter weitergeht — am Seitenende schiebt
+      // der Fuß sie hoch. Darum ab lg engere Zeilen (wie im Board, 15 px auf etwa 20 px) und 12 px unter dem Kopf: So
+      // passt sie mit Mini-Warenkorb und Futter-Hinweis bei 1440 × 900 ganz zwischen Kopf und Fuß.
+      className={cn('flex flex-col gap-3 lg:sticky lg:top-[4.75rem] lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:leading-snug', className)}
+    >
+      {mitKorb && <MiniWarenkorb hof={hof} sperre={sperre} gebuehrKorb={gebuehrKorb} produkte={produkte} kasseHref={kasseHref} kasseUmriss={kasseUmriss} />}
 
       {/* Mit Kaufsperre (Pause, keine Abholzeit, ausgebucht) keine Termine: Ankündigen, was man nicht
           buchen kann, wäre ein leeres Versprechen — auch ein heute noch laufendes Fenster nicht. */}
       {sperre === null && tage.length > 0 && (
-        <section aria-labelledby="naechste-abholung" className={KARTE}>
-          <h2 id="naechste-abholung" className={KARTEN_TITEL}>
+        <section aria-labelledby="naechste-abholung" className={SPALTEN_KARTE}>
+          <h2 id="naechste-abholung" className={UEBERZEILE}>
             Nächste Abholung
           </h2>
-          {/* Klar als Text (Nr. 46, Register N2): Zeilen wie „Abholzeiten", keine
-              Kacheln, die wie wählbare Knöpfe aussehen, aber nichts tun. Gewählt
-              wird das Zeitfenster in der Kasse — dort mit demselben Datum. */}
-          <ul className="flex flex-col gap-2">
+          {/* Klar als Text (Nr. 46, Register N2): Zeilen, keine Kacheln, die wie wählbare Knöpfe aussehen.
+              Gewählt wird das Zeitfenster in der Kasse — dort mit demselben Datum. */}
+          <ul className="flex flex-col text-[15px] text-foreground">
             {tage.map((tag, i) => (
-              <li key={tag.kalendertag} className={ZEILE}>
-                <CalendarDays className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
-                <span className={cn('min-w-0 flex-1 break-words', i === 0 && 'font-semibold')}>{abholtagZeile(tag)}</span>
-                <span className="shrink-0 text-muted-foreground tabular-nums">{tag.times}</span>
+              <li key={tag.kalendertag} className={cn('break-words', i === 0 && 'font-semibold')}>
+                {abholtagZeile(tag)} <span className="tabular-nums">{tag.times}</span>
               </li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">Deinen Abholtermin wählst du beim Bestellen.</p>
+          <p className="text-[14px] text-muted-foreground">Deinen Abholtermin wählst du beim Bestellen.</p>
         </section>
       )}
 
       {zeiten.length > 0 && (
-        <section data-abschnitt="abholung" aria-labelledby="abholzeiten" className={KARTE}>
-          <h2 id="abholzeiten" className={KARTEN_TITEL}>
+        <section data-abschnitt="abholung" aria-labelledby="abholzeiten" className={SPALTEN_KARTE}>
+          <h2 id="abholzeiten" className={UEBERZEILE}>
             Abholzeiten
           </h2>
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col text-[15px] text-foreground">
             {zeiten.map((zeile) => (
-              <li key={zeile} className={ZEILE}>
-                <CalendarDays className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
-                {zeile}
-              </li>
+              <li key={zeile}>{ohneKommaNachTag(zeile)}</li>
             ))}
           </ul>
         </section>
       )}
 
-      <section data-abschnitt="kontakt" aria-labelledby="zahlung-kontakt" className={KARTE}>
-        <h2 id="zahlung-kontakt" className={KARTEN_TITEL}>
-          Zahlung &amp; Kontakt
-        </h2>
-        <ul className="flex flex-col gap-1">
-          {zahlungsarten.map((z) => (
-            <li key={z.art} className={cn(ZEILE, 'min-h-7')}>
-              {z.art === 'online' ? (
-                <CreditCard className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
-              ) : (
-                <Banknote className={SYMBOL} strokeWidth={1.7} aria-hidden="true" />
-              )}
-              {z.text}
-            </li>
-          ))}
-        </ul>
-        {/* Keine Nummer vor dem Kauf (Nr. 60, Mockups web/mobil-k2-hofseite-ohne-telefon):
-            Telefon und E-Mail des Hofs stehen in Kasse, Bestätigung und Bestellseite. */}
-        <p className="flex items-start gap-2.5 rounded-xl bg-muted px-3 py-2.5 text-[13px] leading-[1.45] text-muted-foreground">
-          <Phone className={cn(SYMBOL, 'mt-px')} strokeWidth={1.7} aria-hidden="true" />
-          {KONTAKT_NACH_DEM_KAUF}
-        </p>
-        {gebuehrKurz && (
-          <p className="border-t border-border pt-2.5 text-xs leading-normal text-muted-foreground">{gebuehrKurz}</p>
-        )}
-      </section>
-
-      <section aria-labelledby="anfahrt" className={KARTE}>
-        <h2 id="anfahrt" className={KARTEN_TITEL}>
-          Anfahrt
-        </h2>
-        {/* Ein Bild der Gegend, kein Kartendienst — wie die Startseite: Leaflet
-            und Kacheln bleiben der Hofübersicht vorbehalten. Wo der Hof liegt,
-            zeigt der Kartendienst hinter dem Link. */}
-        <a
-          href={kartenLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Anfahrt zu ${hof.address}, ${hof.postalCode} ${hof.city} in Google Maps öffnen`}
-          className={cn('relative block h-[150px] overflow-hidden rounded-xl border border-border bg-muted', FOKUS_RAHMEN)}
-        >
-          <span aria-hidden="true" className="absolute top-[52px] -left-6 h-0.5 w-[460px] rotate-[12deg] bg-border" />
-          <span aria-hidden="true" className="absolute -top-10 left-[46%] h-[260px] w-0.5 rotate-[22deg] bg-border" />
-          <span aria-hidden="true" className="absolute top-[104px] -left-6 h-px w-[460px] -rotate-[8deg] bg-border" />
-          <span aria-hidden="true" className="absolute top-1/2 left-1/2 flex size-9 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full bg-accent text-accent-foreground ring-4 ring-card">
-            <MapPin className="size-[18px]" strokeWidth={1.7} />
-          </span>
-        </a>
-        <p className="text-[13px] break-words text-muted-foreground">
-          {hof.address}, {hof.postalCode} {hof.city}
-        </p>
-        <a href={kartenLink} target="_blank" rel="noopener noreferrer" className={TEXTLINK}>
-          Route planen <span aria-hidden="true">&nbsp;→</span>
-        </a>
-      </section>
+      <ZahlungKarte zahlungsarten={zahlungsarten} gebuehrHinweis={gebuehrHinweis} kennung="zahlung-kontakt" />
+      <AnfahrtKarte hof={hof} kennung="anfahrt" />
     </aside>
   )
 }
 
 /**
- * Der Mini-Warenkorb (DESIGN_SYSTEM, „Kaufstrecke"): sobald etwas im Korb
- * dieses Hofs liegt, oben in der rechten Spalte, klebend. Liest den Korb aus
- * dem Speicher (useWarenkorbVomHof) — geschrieben wird nur über useCart im
- * Produktraster, das danach WARENKORB_EREIGNIS meldet. Mit Kaufsperre
- * (Register N24) steht statt „Zur Kasse“ der Hinweis mit dem Grund: Die Kasse
- * nähme die Bestellung ohnehin nicht an. Nur der Titel (`kurz`): Den Satz trägt
- * schon die Karte oben auf derselben Seite — ein Zustand, eine Fassung.
+ * „Zahlung & Kontakt": die Zahlarten als ein Satz, statt der Nummer der Hinweis auf die
+ * Bestellbestätigung (Nr. 60 — kein Anruf vor dem Kauf), darunter leise der Gebührensatz.
+ */
+function ZahlungKarte({
+  zahlungsarten,
+  gebuehrHinweis,
+  kennung,
+  className,
+}: {
+  zahlungsarten: readonly Zahlungsart[]
+  gebuehrHinweis: string | null
+  kennung: string
+  className?: string
+}): React.JSX.Element {
+  const satz = zahlungsSatz(zahlungsarten)
+  return (
+    <section data-abschnitt="kontakt" aria-labelledby={kennung} className={cn(SPALTEN_KARTE, className)}>
+      <h2 id={kennung} className={UEBERZEILE}>
+        Zahlung &amp; Kontakt
+      </h2>
+      <p className="text-[14px] text-foreground">
+        {satz && <>{satz} </>}
+        {TELEFON_IN_DER_BESTAETIGUNG}
+      </p>
+      {gebuehrHinweis && <p className="text-[13px] text-muted-foreground">{gebuehrHinweis}</p>}
+    </section>
+  )
+}
+
+/** „Anfahrt": die Anschrift und „Route planen →" zum Kartendienst — kein Kartenbild (Board w1-hofseite). */
+function AnfahrtKarte({
+  hof,
+  kennung,
+  className,
+}: {
+  hof: Pick<SeitenspalteHof, 'address' | 'postalCode' | 'city'>
+  kennung: string
+  className?: string
+}): React.JSX.Element {
+  return (
+    <section aria-labelledby={kennung} className={cn(SPALTEN_KARTE, className)}>
+      <h2 id={kennung} className={UEBERZEILE}>
+        Anfahrt
+      </h2>
+      <p className="text-[14px] break-words text-foreground">
+        {hof.address}, {hof.postalCode} {hof.city}
+      </p>
+      <a
+        href={buildMapsUrl(hof.address, hof.postalCode, hof.city)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(textlinkKlassen(), PFEIL_LINK)}
+      >
+        Route planen
+        <ArrowRight className="size-4 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+      </a>
+    </section>
+  )
+}
+
+/**
+ * Der Mini-Warenkorb (Board w1-hofseite): sobald etwas im Korb dieses Hofs liegt, oben
+ * in der rechten Spalte — „3 Produkte · € … · inkl. Plattformgebühr" und „Zur Kasse".
+ * Liest den Korb aus dem Speicher (useWarenkorbVomHof) — geschrieben wird nur über
+ * useCart im Produktraster, das danach WARENKORB_EREIGNIS meldet. Mit Kaufsperre
+ * (Register N24) steht statt „Zur Kasse“ der Grund (nur der Titel, `kurz`): Die Kasse
+ * nähme die Bestellung ohnehin nicht an, und den Satz trägt die Karte auf der Seite.
  */
 function MiniWarenkorb({
   hof,
@@ -211,16 +254,18 @@ function MiniWarenkorb({
   gebuehrKorb,
   produkte,
   kasseHref,
+  kasseUmriss,
 }: {
   hof: SeitenspalteHof
   sperre: KaufSperre
   gebuehrKorb: string | null
   produkte: readonly (FutterAbgabe & { id: string })[]
   kasseHref?: string
+  kasseUmriss: boolean
 }): ReactNode {
   const { id: farmId, slug } = hof
   const imKorb = useWarenkorbVomHof(farmId)
-  // Im Hofpreis-Modell (N38) Endpreise je Stück — Zeilen und Summe wie in der Kasse.
+  // Im Hofpreis-Modell (N38) Endpreise je Stück — die Summe wie in der Kasse.
   const anzeige = usePreisAnzeige()
   const positionen = imKorb.map((p) => mitEndpreis(p, anzeige))
   // Der Satz nach dem Abgleich der Hofseite (Register N28) — auch wenn danach nichts mehr im Korb liegt:
@@ -232,18 +277,12 @@ function MiniWarenkorb({
   const anzahl = warenkorbAnzahl(positionen)
   // In ganzen Cent auf dem Weg des Checkouts (korbBetraege), nie price × Menge
   // in Fließkomma — verbindlich rechnet der Checkout mit den Preisen aus der Datenbank.
-  const { zeilenCents, summeCents } = korbBetraege(positionen)
+  const { summeCents } = korbBetraege(positionen)
 
   return (
-    <section
-      aria-labelledby="mini-warenkorb"
-      className="sticky top-32 z-10 hidden flex-col gap-2.5 rounded-2xl border border-accent/45 bg-card p-[18px] shadow-lg lg:flex"
-    >
-      <h2 id="mini-warenkorb" className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
-        <ShoppingBasket className="size-4 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
+    <section aria-labelledby="mini-warenkorb" className={cn(SPALTEN_KARTE, 'hidden lg:flex')}>
+      <h2 id="mini-warenkorb" className={UEBERZEILE}>
         Dein Warenkorb
-        <span className="flex-1" />
-        <span className="text-[13px] font-normal text-muted-foreground">{mitAnzahl(anzahl, 'Artikel', 'Artikel')}</span>
       </h2>
       {hinweis && (
         <div role="status">
@@ -253,37 +292,28 @@ function MiniWarenkorb({
         </div>
       )}
       {positionen.length > 0 && (
-      <>
-      <ul className="flex flex-col gap-1.5">
-        {positionen.map((p) => (
-          <li key={p.productId} className="flex items-baseline gap-2 text-[13.5px]">
-            <span className="min-w-0 flex-1 truncate text-foreground" title={p.name}>
-              {p.quantity > 1 && <span className="tabular-nums">{p.quantity} × </span>}
-              {p.name}
-            </span>
-            <span className="shrink-0 tabular-nums text-foreground">{formatEuro(centsAlsEuro(zeilenCents.get(p.productId) ?? 0))}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="border-t border-border pt-2.5 text-[15px] font-semibold text-foreground">
-        <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
-        {gebuehrKorb && <span className="text-[13px] font-normal text-muted-foreground">&nbsp;{gebuehrKorb}</span>}
-      </p>
-      <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
-      {sperre !== null || stopp !== null ? (
-        <KaufGrund sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} stopp={stopp} kurz />
-      ) : (
-        <Link
-          href={kasseHref ?? `/${slug}/checkout`}
-          className={cn(
-            'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-[14.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-            FOKUS_RAHMEN
+        <>
+          <p className="text-[15px] text-foreground">
+            {mitAnzahl(anzahl, 'Produkt', 'Produkte')} · <span className="tabular-nums">{formatEuro(centsAlsEuro(summeCents))}</span>
+            {gebuehrKorb && <> · {gebuehrKorb}</>}
+          </p>
+          <FutterVerantwortung saetze={futterVerantwortungImKorb(positionen, produkte)} />
+          {sperre !== null || stopp !== null ? (
+            <KaufGrund sperre={sperre} hofName={hof.name} pauseMessage={hof.pauseMessage} stopp={stopp} kurz />
+          ) : (
+            <Link
+              href={kasseHref ?? `/${slug}/checkout`}
+              data-kasse={kasseUmriss ? 'umriss' : 'gruen'}
+              className={cn(
+                'flex min-h-[52px] items-center justify-center rounded-[14px] px-3 text-[16px] font-bold transition-opacity duration-[250ms] hover:opacity-90',
+                kasseUmriss ? 'border border-input bg-card text-foreground' : 'bg-accent text-accent-foreground',
+                FOKUS_RAHMEN
+              )}
+            >
+              Zur Kasse
+            </Link>
           )}
-        >
-          Zur Kasse
-        </Link>
-      )}
-      </>
+        </>
       )}
     </section>
   )

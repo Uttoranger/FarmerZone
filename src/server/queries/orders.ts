@@ -1,11 +1,17 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { gebuehrFuerMonatsabrechnungJeModell, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'
+import * as Sentry from '@sentry/nextjs'
+import { gebuehrFuerMonatsabrechnungJeModell, geldsaetzeFuer, istHofpreisBestellung, type GebuehrEinzug } from '@/lib/plattformgebuehr'
+import { positionszeile, type Positionszeile } from '@/lib/positionszeile'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { ladeGruendungBis } from '@/server/queries/admin'
 import { stornoBetraege, type StornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
 import { artikelFehltRechnung, type ArtikelFehltErgebnis } from '@/lib/artikel-fehlt'
 import {
   abholungKurz,
+  bestaetigungOffenSatz,
   bestellAktionen,
   bestellKopfzeile,
   bestellMarke,
@@ -17,9 +23,12 @@ import {
   type BestellAktionen,
 } from '@/lib/hof-bestellungen'
 import { formatPosition } from '@/lib/format'
-import { zeitpunktFuerMail } from '@/lib/fristen'
+import { fristVon, tagInWorten, uhrzeitInWien } from '@/lib/fristen'
+import { abholtagName, abholtage, abholWhere, fensterMitBestellungen, naechsteAbholungWhere, wienerTag, zeitpunktKurz, type NaechstesFenster } from '@/lib/heute'
+import { wienKalendertag } from '@/lib/kalender'
 import { gebuehrEntfallen, gebuehrErstattungOffen, istVorOrtZahlung } from '@/lib/servicegebuehr'
 import { buildOrderReminderUrl } from '@/lib/whatsapp'
+import { abspracheOffen, brauchtAbsprache } from '@/lib/abholhinweise'
 import type { MarkeArt } from '@/lib/marke-art'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 
@@ -107,7 +116,14 @@ export async function getOrderDetail(farmId: string, orderId: string) {
   return row ? serialize(row) : null
 }
 
-const OPEN_STATUSES = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY'] as const
+/**
+ * Offen = alles, was nicht abgeholt, storniert oder verfallen (nicht abgeholt) ist —
+ * auch „Bestätigung offen“ (Register N41 e). Die Liste liegt Prisma-frei in
+ * src/lib/bestellstatus-offen.ts (dort liest sie auch der Chip „Noch offen · n“);
+ * hier unter demselben Namen weitergereicht, damit Aufrufer und Tests der Abfrage
+ * keine zweite Liste führen.
+ */
+export { OPEN_STATUSES }
 
 export async function getOpenOrdersCount(farmId: string): Promise<number> {
   return prisma.order.count({
@@ -146,6 +162,7 @@ const DETAIL_AUSWAHL = {
   customerNote: true,
   createdAt: true,
   paidAt: true,
+  pickedUpAt: true,
   cancelReason: true,
   platformFeeAmount: true,
   stripePaymentIntentId: true,
@@ -164,7 +181,8 @@ const DETAIL_AUSWAHL = {
       totalPrice: true,
       fehltSeit: true,
       gebuehrCents: true,
-      product: { select: { unit: true, unitSize: true } },
+      // abholhinweise (N47, Nr. 257): „Abholung absprechen“ im Bestelldetail.
+      product: { select: { unit: true, unitSize: true, abholhinweise: true } },
     },
     orderBy: { id: 'asc' },
   },
@@ -183,6 +201,8 @@ export type HofListenEintrag = {
 export type HofBestellPosition = {
   id: string
   zeile: string
+  /** Die Positionszeile nach G14 („**4** × Heumilch frisch (1 L)“, positionszeile) — die Anzahl fett vorn. */
+  teile?: Positionszeile
   betragCents: number
   fehlt: boolean
   /** Was „Artikel fehlt" für diese Position hieße — auf dem Server gerechnet. */
@@ -201,6 +221,10 @@ export type HofBestellDetail = {
   zahlart: string
   vorOrt: boolean
   bezahltAm: string | null
+  /** Abgeholt: „16:05“ (Wiener Uhrzeit aus pickedUpAt) für „· abgeholt um 16:05“ (Board s1-bestellung Bild 4). */
+  abgeholtUm?: string | null
+  /** Vor Ort: „bar, bezahlt wird bei Abholung“ hinter „Bestellt: …“ (Board w1-bestellung); online null. */
+  zahlungBeiAbholung?: string | null
   betrag: {
     warenCents: number
     gebuehrCents: number
@@ -219,6 +243,8 @@ export type HofBestellDetail = {
   aktionen: BestellAktionen
   /** WhatsApp-Erinnerung an die Kundin, nur solange etwas abzuholen ist. */
   erinnernUrl: string | null
+  /** N47 (Nr. 257): offene Bestellung mit „Abholung nach Absprache“ — Marke „Abholung absprechen“ mit Anrufen und Mail schreiben. */
+  absprache?: boolean
 }
 
 export type BestellungenSeite = {
@@ -287,9 +313,12 @@ export async function getHofBestellDetail(
     id: o.id,
     nummer: o.orderNumber,
     status: o.status,
-    marke: bestellMarke(o.status),
+    // Abgeholt grün statt grau (Liste Lauf 32, bestellung Bild 4: Status fertig) — das grüne Paar der Marke ist
+    // „läuft“ (Register G5 kennt keine eigene Art „fertig“); Liste, Admin und Kundendetail bleiben bei bestellMarke.
+    marke: o.status === 'PICKED_UP' ? { ...bestellMarke(o.status), art: 'laeuft' } : bestellMarke(o.status),
     abholung: abholungKurz(o.pickupDate, o.pickupTimeStart, o.pickupTimeEnd, jetzt),
-    bestelltAm: zeitpunktFuerMail(o.createdAt),
+    // Kurz wie im Board w1-bestellung: „heute, 07:12“ (Nr. 249b).
+    bestelltAm: zeitpunktKurz(o.createdAt, jetzt),
     kunde: {
       name: o.customerName,
       vorname: vorname(o.customerName),
@@ -299,7 +328,9 @@ export async function getHofBestellDetail(
     },
     zahlart: zahlartText(o.paymentMethod, o.paymentStatus),
     vorOrt: istVorOrtZahlung(o.paymentMethod),
-    bezahltAm: o.paidAt ? zeitpunktFuerMail(o.paidAt) : null,
+    bezahltAm: o.paidAt ? zeitpunktKurz(o.paidAt, jetzt) : null,
+    abgeholtUm: o.status === 'PICKED_UP' && o.pickedUpAt ? uhrzeitInWien(o.pickedUpAt) : null,
+    zahlungBeiAbholung: ZAHLUNG_BEI_ABHOLUNG[o.paymentMethod] ?? null,
     betrag: {
       warenCents,
       gebuehrCents: o.serviceFeeCents,
@@ -325,6 +356,7 @@ export async function getHofBestellDetail(
         unit: i.product?.unit ?? null,
         unitSize: i.product?.unitSize ?? null,
       }),
+      teile: positionszeile({ name: i.productName, quantity: i.quantity, unit: i.product?.unit ?? null, unitSize: i.product?.unitSize ?? null }),
       betragCents: alsCents(i.totalPrice),
       fehlt: i.fehltSeit !== null,
       fehltVorschau: artikelFehltRechnung(rechenStand, i.id),
@@ -349,5 +381,99 @@ export async function getHofBestellDetail(
             pickupTimeEnd: o.pickupTimeEnd,
           })
         : null,
+    // Nur Positionen, die übergeben werden: Fehlt das Produkt mit Absprache, gibt es nichts abzustimmen.
+    absprache: abspracheOffen(o.status, brauchtAbsprache(o.items.filter((i) => i.fehltSeit === null).map((i) => i.product?.abholhinweise))),
   }
+}
+
+// ─── Kleine Leser der Hof-Bestellseiten (Nr. 222; vorher in src/app/(hof)/orders/) ───
+
+/**
+ * Bis wann die Kundin eine Bar-Bestellung bestätigen muss — der Satz für die
+ * Bestellung im Hofbereich (V87: die Frist kommt immer aus fristVon, nie als
+ * eigene Zahl). Nur bei „Bestätigung offen“; sonst null, ohne Abfrage. Liest
+ * die vier Felder der Frist nach ID UND Hof (eine fremde ID findet nichts) —
+ * die Bestellung selbst bleibt die aus getHofBestellDetail.
+ */
+export async function barFristSatz(farmId: string, detail: HofBestellDetail, jetzt: Date): Promise<string | null> {
+  if (detail.status !== 'PENDING_CONFIRMATION' || !detail.vorOrt) return null
+  const frist = await prisma.order.findFirst({
+    where: { id: detail.id, farmId },
+    select: { paymentMethod: true, createdAt: true, pickupDate: true, pickupTimeStart: true },
+  })
+  if (!frist) return null
+  const bis = fristVon(frist)
+  return bestaetigungOffenSatz(detail.kunde.vorname, `${tagInWorten(bis, jetzt)}, ${uhrzeitInWien(bis)} Uhr`)
+}
+
+// Hinter „Bestellt: …“ bei Zahlung vor Ort (Board w1-bestellung); Karte ist Altbestand.
+const ZAHLUNG_BEI_ABHOLUNG: Record<string, string> = {
+  ONSITE_CASH: 'bar, bezahlt wird bei Abholung',
+  ONSITE_CARD: 'mit Karte, bezahlt wird bei Abholung',
+}
+
+/**
+ * Der Geldsatz nach V1 unter dem Betrag der Bestellung (Liste Lauf 32, bestellung Bild 1/2/4): „Du bekommst die
+ * vollen € … – bis <Gründungsende> zahlst du auf Barverkäufe keine Plattformgebühr.“ bzw. der Satz des Modells —
+ * EINE Anzeige-Hilfe (geldsaetzeFuer, Nr. 248), nur aus dem Snapshot der Bestellung, keine Rechnung. Das Datum
+ * kommt aus den heutigen Hofdaten (einzugAb bzw. wirksames Gründungsende, ladeGruendungBis — dieselben Werte wie
+ * beim Einzug). null im Modell „bisher“ und bei entfallener Gebühr; dann bleibt der Satz der Seite (betragSatz).
+ * Nur der eigene Hof: Bestellung nach ID UND farmId. Ein Ladefehler nimmt nur den Satz weg, nie die Seite.
+ */
+export async function ladeBestellGeldsatz(farmId: string, orderId: string, jetzt: Date): Promise<string | null> {
+  try {
+    const [o, hof, einstellung] = await Promise.all([
+      prisma.order.findFirst({
+        where: { id: orderId, farmId },
+        select: { totalAmount: true, serviceFeeCents: true, serviceFeeRefundedAt: true, paymentMethod: true, gebuehrModell: true, gebuehrEinzug: true },
+      }),
+      prisma.farm.findUnique({ where: { id: farmId }, select: { id: true, einzugAb: true, plattformgebuehrProzent: true } }),
+      ladeHofpreisEinstellung(),
+    ])
+    if (!o || !hof) return null
+    const gruendungBis = hof.einzugAb ? null : await ladeGruendungBis({ id: hof.id })
+    const satz = geldsaetzeFuer(
+      { art: 'bestellung', bestellung: { ...o, gebuehrEinzug: gebuehrEinzugAus(o.gebuehrEinzug) } },
+      hof,
+      einstellung,
+      gruendungBis,
+      jetzt
+    )
+    return satz?.satz ?? null
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'bestellung-geldsatz' }, extra: { farmId, orderId } })
+    return null
+  }
+}
+
+/** `Order.gebuehrEinzug` ist in der DB ein Text — nur die vier Wege gehen an den Geldsatz, alles andere ist null. */
+function gebuehrEinzugAus(wert: string | null): GebuehrEinzug | null {
+  return wert === 'stripe' || wert === 'sepa' || wert === 'ueberweisung' || wert === 'erlassen' ? wert : null
+}
+
+/**
+ * Das nächste Abholfenster laut Abholzeiten samt der Zahl seiner Bestellungen —
+ * für die leeren Zustände von „Heute abholen" (Bestellungen) und der Packliste
+ * auf Papier (Boards s1-bestellungen, s2-druck). Gezählt über abholWhere,
+ * dieselbe Bedingung wie die Packliste; ohne aktive Abholzeit null.
+ */
+export async function naechstesFensterMitZahl(farmId: string, jetzt: Date): Promise<{ fenster: NaechstesFenster; anzahl: number } | null> {
+  const slots = await prisma.pickupSlot.findMany({
+    where: { farmId, isActive: true },
+    select: { dayOfWeek: true, startTime: true, endTime: true },
+  })
+  if (slots.length === 0) return null
+  // Liste Lauf 32 (bestellungen Bild 2, druck Bild 3): ohne Bestellung im nächsten Fenster das nächste Fenster mit
+  // Bestellungen (fensterMitBestellungen) — gezählt über dieselbe Bedingung wie die Packliste (abholWhere).
+  const [anzahlHeute, naechste] = await Promise.all([
+    prisma.order.count({ where: abholWhere(farmId, abholtage(jetzt).heute) }),
+    prisma.order.findFirst({ where: naechsteAbholungWhere(farmId, jetzt), orderBy: { pickupDate: 'asc' }, select: { pickupDate: true } }),
+  ])
+  let naechsteAbholung = null
+  if (naechste) {
+    const tag = wienKalendertag(naechste.pickupDate)
+    const anzahl = await prisma.order.count({ where: abholWhere(farmId, wienerTag(tag)) })
+    naechsteAbholung = { tag, name: abholtagName(wienKalendertag(jetzt), tag), anzahl }
+  }
+  return fensterMitBestellungen(slots, jetzt, anzahlHeute, naechsteAbholung)
 }

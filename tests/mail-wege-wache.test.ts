@@ -67,6 +67,7 @@ const WICHTIG: Record<string, MailArt> = {
   baueOrderConfirmation: 'bestellung-bestaetigung',
   baueOrderPaidToFarmer: 'bestellung-bezahlt-hof',
   baueOrderConfirmedToFarmer: 'bar-bestaetigt-hof',
+  baueBarBestellungAnHof: 'bestellung-bar-hof',
   baueOrderReady: 'abholbereit',
   baueOrderNotReady: 'nicht-abholbereit',
   baueOrderCancelled: 'storniert',
@@ -218,13 +219,20 @@ function* quelldateien(ordner: string): Generator<string> {
   }
 }
 
+/**
+ * Die Zeitgrenze der Fälle, die email.ts (über 1500 Zeilen) bzw. ganz src/server und src/app mit dem Parser von
+ * TypeScript lesen: Allein dauern sie unter einer Sekunde, unter Last (vier Umsetzer, Last über 12 auf 4 Kernen)
+ * rissen sie die 5 s des Standards (Morgenbericht Lauf 30, Nr. 242). Die Erwartungen bleiben, wie sie sind.
+ */
+const PARSER_GRENZE = 30_000
+
 const EMAIL_QUELLE = readFileSync(EMAIL_TS, 'utf8')
 const VERSAND_NAMEN = new Set(['sendRaw', ...[...versandFunktionen(EMAIL_QUELLE).keys()].filter((n) => n.startsWith('send'))])
 
 describe('Mail-Wege: jede Versandfunktion in genau einer Liste (N26, Nr. 159)', () => {
   it('jede send…/baue…-Funktion steht in genau einer Liste, mit dem Weg aus MAIL_WEG; Sofort verschickt selbst, die anderen nie', () => {
     expect(pruefeEmailQuelle(EMAIL_QUELLE)).toEqual([])
-  })
+  }, PARSER_GRENZE)
 
   it('jede Art hat eine Funktion in einer Liste oder einen Grund ohne', () => {
     const mitFunktion = new Set(Object.values(LISTEN).flatMap((l) => Object.values(l)))
@@ -245,7 +253,7 @@ describe('Mail-Wege: jede Versandfunktion in genau einer Liste (N26, Nr. 159)', 
       }
     }
     expect(funde).toEqual([])
-  })
+  }, PARSER_GRENZE)
 })
 
 describe('Gegenprobe (Quelltext im Speicher)', () => {
@@ -263,7 +271,7 @@ describe('Gegenprobe (Quelltext im Speicher)', () => {
     const fremdeArt = EMAIL_QUELLE.replace("{ art: 'passwort-link' }", "{ art: 'beitrag' }")
     expect(fremdeArt).not.toBe(EMAIL_QUELLE)
     expect(pruefeEmailQuelle(fremdeArt)).toContain('sendPasswordResetEmail: Art im Versand beitrag, erwartet passwort-link')
-  })
+  }, PARSER_GRENZE)
 
   it('Schleifen mit Versand werden gefunden, stelleMailEin in der Schleife und Versand außerhalb nicht', () => {
     const namen = new Set(['sendRaw', 'sendOrderReady'])

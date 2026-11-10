@@ -172,7 +172,7 @@ describe('„Kundenansicht" im Kopf', () => {
   it('der Kopf am Handy nimmt den Knopf (unter lg in seitenkopf.tsx); ab lg bleibt der Link in den neuen Tab', () => {
     expect(quelle('src/components/mein-hof/mein-hof-kopf.tsx')).toContain('<KundenansichtKnopf slug={hof.slug}')
     const kopf = quelle('src/components/mein-hof/seitenkopf.tsx')
-    expect(kopf).toMatch(/<div className="lg:hidden">\s*<MeinHofKopf /)
+    expect(kopf).toMatch(/<div className="lg:hidden">\s*\{[^}]*\}\s*<MeinHofKopf /)
     expect(kopf).toMatch(/<a href=\{vorschauLink\(hof\.slug\)\} target="_blank"/)
     // Gegenprobe: Ab lg steht kein Knopf für das Vollbild in der Zeile.
     expect(kopf).not.toContain('<KundenansichtKnopf')
@@ -254,7 +254,7 @@ describe('„Gespeichert · Ansehen"', () => {
   it('Hofseite (seit Nr. 50 die Liste „Bearbeiten"): jedes Blatt meldet „Gespeichert · Ansehen" mit seinem Abschnitt, statt selbst zu toasten', () => {
     const liste = quelle('src/components/mein-hof/abschnitte-liste.tsx')
     // Je Abschnitt EIN Hinweis (Nr. 49 Runde 1): die Liste gibt den Abschnitt mit.
-    expect(liste).toContain('meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: zeile.id, onAnsehen: () => ansehen(zeile.id) }) : undefined}')
+    expect(liste).toContain('meldeErfolg={ansicht ? () => meldeGespeichertAnsehen({ abschnitt: teil, onAnsehen: () => ansehen(teil) }) : undefined}')
     // „Ansehen" schließt erst das Blatt und schaltet danach um — unter dem Blatt sähe niemand die Kundenansicht.
     expect(liste).toMatch(/nachDemSchliessen\.current = \(\) => ansicht\.zeigeKundin\(id\)\s*setzeOffen\(null\)/)
     expect(liste).toMatch(/onOpenChangeComplete=\{\(auf\) => \{[\s\S]*?danach\?\.\(\)/)

@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { PLATZHALTER_ANGABE, type AgbStueck } from '@/lib/rechtstexte/stuecke'
+import { OHNE_STICHTAG, PLATZHALTER_ANGABE, type AgbKontext, type AgbStueck } from '@/lib/rechtstexte/stuecke'
 
 /**
  * Zeichnet Textstücke (src/lib/rechtstexte/stuecke.ts) als Fließtext: Klartext,
- * fett, kursiv, Link, Mail-Adresse — und die zwei Platzhalter des AGB-Entwurfs,
- * die aus den Konstanten des Impressums gefüllt werden. Ohne eigene Farbe
+ * fett, kursiv, Link, Mail-Adresse — und die Platzhalter der AGB, gefüllt
+ * aus den Konstanten des Impressums bzw. dem Stichtag (`kontext`, N45). Ohne eigene Farbe
  * außer dem Fettdruck; den Link gibt der Aufrufer vor, weil die Seite der AGB
  * und die Sätze in Registrierung und Kasse verschieden aussehen.
  */
@@ -14,12 +14,18 @@ export function AgbStuecke({
   stuecke,
   linkKlasse,
   neuerTab = false,
+  kontext,
 }: {
   stuecke: readonly AgbStueck[]
   /** Klassen jedes Links im Text. */
   linkKlasse: string
   /** Links öffnen in einem neuen Tab — wo ein Formular offen bleiben muss. */
   neuerTab?: boolean
+  /**
+   * Der Stichtag für „[Tag des Inkrafttretens]“ (AGB 1.0). Pflicht, ohne Vorgabe: Bei Rechtstexten fällt
+   * nichts still auf einen Ersatz zurück — wer keinen Stichtag braucht, gibt OHNE_STICHTAG ausdrücklich mit.
+   */
+  kontext: AgbKontext
 }): React.JSX.Element {
   return (
     <>
@@ -29,7 +35,7 @@ export function AgbStuecke({
           case 'fett':
             return (
               <strong key={i} className="font-semibold text-foreground">
-                <AgbStuecke stuecke={stueck.stuecke} linkKlasse={linkKlasse} neuerTab={neuerTab} />
+                <AgbStuecke stuecke={stueck.stuecke} linkKlasse={linkKlasse} neuerTab={neuerTab} kontext={kontext} />
               </strong>
             )
           case 'kursiv':
@@ -53,7 +59,7 @@ export function AgbStuecke({
               </a>
             )
           case 'platzhalter':
-            return <AgbStuecke key={i} stuecke={PLATZHALTER_ANGABE[stueck.was]} linkKlasse={linkKlasse} neuerTab={neuerTab} />
+            return <AgbStuecke key={i} stuecke={PLATZHALTER_ANGABE(kontext)[stueck.was]} linkKlasse={linkKlasse} neuerTab={neuerTab} kontext={kontext} />
         }
       })}
     </>
@@ -83,7 +89,8 @@ export function AgbSatz({
 }): React.JSX.Element {
   return (
     <p className={className}>
-      <AgbStuecke stuecke={stuecke} linkKlasse={SATZ_LINK} neuerTab={neuerTab} />
+      {/* Die Sätze der Einbindung tragen keinen Platzhalter für den Stichtag — darum ausdrücklich ohne. */}
+      <AgbStuecke stuecke={stuecke} linkKlasse={SATZ_LINK} neuerTab={neuerTab} kontext={OHNE_STICHTAG} />
     </p>
   )
 }

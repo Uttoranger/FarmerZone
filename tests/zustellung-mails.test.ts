@@ -87,7 +87,8 @@ describe('Betreiber-Mails an eine Adresse der Liste', () => {
       'team@example.com'
     )
     expect(mail.betreff).toBe('Neuer Hof wartet auf Freischaltung: Hof Beispiel')
-    expect(mail.html).toContain('15.10.2026')
+    // Wiener Zeit, Tag wie in den Boards („Do, 15. Oktober 2026, 10:00“).
+    expect(mail.html).toContain('Do, 15. Oktober 2026, 10:00')
   })
 
   it('die Fehlermeldung führt in den Eingang (Filter Meldung), nicht mehr auf /admin/meldungen', async () => {
@@ -109,10 +110,11 @@ describe('Betreiber-Mails an eine Adresse der Liste', () => {
     expect(html).toContain('/admin/postfach"')
   })
 
-  it('die Testmail führt in den Eingang', async () => {
+  it('die Testmail sagt nur, dass die Zustellung stimmt — ohne Link (Board s3/w3-mail-team Bild 5)', async () => {
     const mail = await email.baueBetreiberTestmail('team@example.com')
     expect(mail.betreff).toBe(ZUSTELLUNG_MAIL_TEXT.testBetreff)
-    expect(mail.html).toContain('/admin/postfach')
+    expect(mail.html).toContain(ZUSTELLUNG_MAIL_TEXT.testSatz)
+    expect(mail.html).not.toContain('/admin/postfach')
   })
 })
 

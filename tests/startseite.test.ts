@@ -54,16 +54,18 @@ vi.mock('@/server/queries/farm', () => ({ getOeffentlicheHoefe: async () => [] }
 import { metadata, revalidate } from '@/app/page'
 import {
   BRENNMATERIAL_ADRESSE,
-  FUTTER_ZIELGRUPPEN,
+  FUTTER_KARTE,
+  BRENNMATERIAL_KARTE,
+  HOEFE_LEER,
+  abholzeileDerKarte,
+  gruppiereKurzkarten,
   KARTE_ADRESSE,
-  KARTE_KNOPF,
   KARTE_UEBERSCHRIFT,
-  STARTSEITE_CHIPS,
+  BEISPIEL_WARENPREIS_CENTS,
   STARTSEITE_FRAGEN,
   beispielRechnung,
   hoefeAdresse,
   benenneKartenLink,
-  formatiereRegionsZaehler,
   waehleKartenHoefe,
   waehleStartseitenHoefe,
   type StartseitenHofEingabe,
@@ -75,8 +77,9 @@ import { KATEGORIE_LABEL } from '@/lib/taxonomie'
 import type { ProductCategoryValue } from '@/schemas/product'
 import { leseHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { HeroVideo } from '@/components/startseite/hero-video'
-import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
-import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
+import { KARTE_LINK, KARTE_QUELLE, RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
+import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett, STARTSEITE_SUCH_CHIPS, suchAdresse } from '@/components/startseite/hoefe-in-der-naehe'
+import type { VorschauProdukt } from '@/lib/hofuebersicht'
 import {
   BrennmaterialBand,
   Fragen,
@@ -84,6 +87,8 @@ import {
   FutterAbschnitt,
   SoFunktionierts,
   StartseiteFuss,
+  gutZuWissen,
+  warumPunkte,
 } from '@/components/startseite/startseite-abschnitte'
 import { KundeFuss } from '@/components/shells/kunde-fuss'
 
@@ -142,42 +147,19 @@ describe('Metadaten', () => {
 })
 
 describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
-  it('die Chips „Oder direkt suchen" in der Reihenfolge des Mockups', () => {
-    expect(STARTSEITE_CHIPS.map((c) => c.label)).toEqual([
-      'Eier',
-      'Gemüse & Obst',
-      'Fleisch',
-      'Milch & Käse',
-      'Brot',
-      'Honig',
-      'Futtermittel',
-      'Brennmaterial',
-    ])
-  })
-
-  it('jeder Chip landet in Bereich und Kategorien, die /hoefe daraus liest', () => {
-    for (const chip of STARTSEITE_CHIPS) {
-      const filter = gelesen(hoefeAdresse(chip.filter))
-      expect(filter.bereich, chip.label).toBe(chip.filter.bereich ?? 'LEBENSMITTEL')
-      expect(filter.kategorien, chip.label).toEqual(chip.filter.kategorien ?? [])
-    }
-  })
-
-  it('Futtermittel ist ein Chip in derselben Reihe und öffnet den Bereich (E2)', () => {
+  it('Futtermittel öffnet den Bereich (E2)', () => {
     expect(hoefeAdresse({ bereich: 'FUTTERMITTEL' })).toBe('/hoefe?bereich=futter')
   })
 
-  it('Brennmaterial ist die Kategorie Brennholz im Hofladen (E11) — Chip und Band führen gleich', () => {
+  it('Brennmaterial ist die Kategorie Brennholz im Hofladen (E11)', () => {
     expect(BRENNMATERIAL_ADRESSE).toBe('/hoefe?kat=BRENNHOLZ')
     expect(gelesen(BRENNMATERIAL_ADRESSE).kategorien).toEqual(['BRENNHOLZ'])
-    expect(hoefeAdresse(STARTSEITE_CHIPS.find((c) => c.label === 'Brennmaterial')?.filter)).toBe(BRENNMATERIAL_ADRESSE)
   })
 
-  it('die zwei Futter-Zielgruppen: Kleinmengen und Ballen über die Gebinde-Facette', () => {
-    expect(FUTTER_ZIELGRUPPEN.map((g) => g.knopf)).toEqual(['Kleinmengen finden', 'Ballen finden'])
-    const [klein, gross] = FUTTER_ZIELGRUPPEN.map((g) => gelesen(hoefeAdresse(g.filter)))
-    expect(klein).toMatchObject({ bereich: 'FUTTERMITTEL', gebinde: 'KLEIN' })
-    expect(gross).toMatchObject({ bereich: 'FUTTERMITTEL', gebinde: 'GROSS' })
+  it('die kurzen Karten führen in den Bereich Futtermittel bzw. auf Brennholz (Board w1-startseite)', () => {
+    expect(gelesen(FUTTER_KARTE.adresse)).toMatchObject({ bereich: 'FUTTERMITTEL' })
+    expect(BRENNMATERIAL_KARTE.adresse).toBe(BRENNMATERIAL_ADRESSE)
+    expect([FUTTER_KARTE.link, BRENNMATERIAL_KARTE.link]).toEqual(['Futter in deiner Nähe', 'Brennmaterial in deiner Nähe'])
   })
 
   it('die Karte führt in die Kartenansicht', () => {
@@ -186,32 +168,25 @@ describe('Wege auf /hoefe — /hoefe liest jeden wieder', () => {
 
   it('keine Adresse trägt einen Standort (ARCHITECTURE §4)', () => {
     const adressen = [
-      ...STARTSEITE_CHIPS.map((c) => hoefeAdresse(c.filter)),
-      ...FUTTER_ZIELGRUPPEN.map((g) => hoefeAdresse(g.filter)),
+      FUTTER_KARTE.adresse,
       BRENNMATERIAL_ADRESSE,
       KARTE_ADRESSE,
     ]
     for (const adresse of adressen) expect(adresse).not.toMatch(/[?&](lat|lon|lng|plz|ort|umkreis)=/i)
   })
 
-  it('keine Zusage, die die Plattform nicht hält (Gebinde, Staub, Verladen sind Sache des Hofs)', () => {
-    const texte = FUTTER_ZIELGRUPPEN.flatMap((g) => [g.kicker, g.titel, ...g.punkte]).join(' ')
-    expect(texte).not.toMatch(/staubarm|Frontlader|ab 1 kg/i)
-    expect(texte).toMatch(/je nach Hof/)
-  })
-
-  it('keine Zusage, die es erst mit Gate 6 gibt (Registrierung bei Ballen)', () => {
-    const texte = FUTTER_ZIELGRUPPEN.flatMap((g) => [g.kicker, g.titel, ...g.punkte]).join(' ')
-    expect(texte).not.toMatch(/registriert/i)
+  it('keine Zusage, die die Plattform nicht hält (Staub, Verladen, Registrierung bei Ballen)', () => {
+    const texte = [FUTTER_KARTE, BRENNMATERIAL_KARTE].flatMap((k) => [k.ueberzeile, k.satz, k.link]).join(' ')
+    expect(texte).not.toMatch(/staubarm|Frontlader|ab 1 kg|registriert/i)
     // Gegenprobe: Die Suche findet Wörter in diesen Texten.
     expect(texte).toMatch(/Rundballen/)
   })
 })
 
 describe('waehleStartseitenHoefe', () => {
-  it('zeigt höchstens vier Höfe, in der Reihenfolge der Übersicht', () => {
+  it('zeigt höchstens drei Höfe (eine Reihe im Board w1-startseite), in der Reihenfolge der Übersicht', () => {
     const auswahl = waehleStartseitenHoefe(['a', 'b', 'c', 'd', 'e'].map((slug) => hof({ slug })))
-    expect(auswahl.map((h) => h.slug)).toEqual(['a', 'b', 'c', 'd'])
+    expect(auswahl.map((h) => h.slug)).toEqual(['a', 'b', 'c'])
   })
 
   it('stellt pausierte Höfe ans Ende und sagt es statt einer Abholzeit', () => {
@@ -220,7 +195,8 @@ describe('waehleStartseitenHoefe', () => {
       hof({ slug: 'offen' }),
     ])
     expect(auswahl.map((h) => h.slug)).toEqual(['offen', 'pause'])
-    expect(auswahl[1]).toMatchObject({ abholung: 'Macht gerade Pause', abholungIstTermin: false })
+    expect(auswahl[1]).toMatchObject({ abholung: 'Macht gerade Pause – Bestellen geht bald wieder', abholungIstTermin: false, pausiert: true })
+    expect(auswahl[0].pausiert).toBe(false)
   })
 
   it('PLZ und Ort statt Kilometer, die nächste Abholung, das erste Foto', () => {
@@ -271,12 +247,10 @@ describe('Karte der Region — Zähler, Pins und hervorgehobener Hof (Nr. 59)', 
       hof({ slug: 'ohne' }),
     ])
     expect(karte.pins.map((p) => p.slug)).toEqual(['a', 'pause'])
-    expect(formatiereRegionsZaehler(karte.pins.length)).toBe('2 Höfe in der Region')
     expect(benenneKartenLink(karte.pins.length)).toBe('Alle 2 Höfe auf der Karte ansehen')
   })
 
   it('ein Hof in der Einzahl; ohne Zahl nennt der Link keine', () => {
-    expect(formatiereRegionsZaehler(1)).toBe('1 Hof in der Region')
     expect(benenneKartenLink(1)).toBe('Alle Höfe auf der Karte ansehen')
     expect(benenneKartenLink(0)).toBe('Alle Höfe auf der Karte ansehen')
   })
@@ -345,6 +319,14 @@ describe('Kopf — Video, Standbild und Suche', () => {
   const kopfMitVideo = html(createElement(HeroVideo, { anfang: true }))
   const video = kopfMitVideo.slice(kopfMitVideo.indexOf('<video'), kopfMitVideo.indexOf('</video>'))
 
+  it('Suche: ein eigenes gerahmtes Feld ohne Symbol, daneben ein eigener Knopf „Höfe finden“ (Board Bild 1; Nr. 271)', () => {
+    const form = kopf.slice(kopf.indexOf('<form role="search"'), kopf.indexOf('</form>'))
+    // Feld und Knopf sind Geschwister in einer Reihe — der Knopf liegt nicht im Rahmen des Felds.
+    expect(form).toMatch(/<div class="flex flex-row[^"]*"><input [^>]*class="[^"]*border border-border[^"]*"[^>]*\/><button type="submit"[^>]*>Höfe finden<\/button><\/div>/)
+    expect(form).not.toContain('lucide-search')
+    expect(form).not.toContain('rounded-full')
+  })
+
   it('das Video läuft stumm, in Schleife, im Bild (playsInline), ohne Ton und Bedienung', () => {
     expect(video).toMatch(/<video [^>]*autoPlay=""/)
     expect(video).toMatch(/<video [^>]*muted=""/)
@@ -380,17 +362,22 @@ describe('Kopf — Video, Standbild und Suche', () => {
     expect(formular).toContain('role="search"')
     expect(formular).toContain('action="/hoefe"')
     expect(formular).toContain('method="get"')
-    expect(kopf).toMatch(/<input type="search"[^>]*name="q"/)
+    expect(kopf).toMatch(/<input id="startseite-suche" type="search"[^>]*name="q"/)
+    // A1: sichtbare Beschriftung über dem Feld, der Platzhalter nur noch das Beispiel.
+    expect(kopf).toMatch(/<label for="startseite-suche"[^>]*>Hof oder Produkt<\/label>/)
+    expect(kopf).toContain('placeholder="z. B. Eier oder Heu"')
     expect(gelesen('/hoefe?q=Eier').suchtext).toBe('Eier')
   })
 
-  it('die Karte führt zur Kartenansicht — im Browser und am Handy, dort mit dem Knopf darunter (Nr. 59)', () => {
-    // Zwei Karten (Browser, Handy) und der Knopf „Alle Höfe auf der Karte".
-    expect(kopf.split(`href="${KARTE_ADRESSE}"`).length - 1).toBe(3)
-    expect(kopf).toContain('Alle Höfe auf der Karte')
+  it('die Karte führt zur Kartenansicht — im Browser und am Handy, je mit dem Link „Alle Höfe auf der Karte →“ darunter (Nr. 252)', () => {
+    // Zwei Karten (Browser, Handy) und zweimal der Textlink darunter.
+    expect(kopf.split(`href="${KARTE_ADRESSE}"`).length - 1).toBe(4)
+    expect(kopf.split(`>${KARTE_LINK}</a>`).length - 1).toBe(2)
     const daten = waehleKartenHoefe([hof({ slug: 'erster', ...IM_AUSSCHNITT[0] })])
     const mitDaten = html(createElement(StartseiteKopf, { karte: (form) => createElement(RegionsKarte, { form, karte: daten }) }))
-    expect(mitDaten.split('1 Hof in der Region').length - 1).toBe(2)
+    // Die Zahl steht nur noch im Namen des Links, keine Pille mehr (Liste Lauf 32, startseite).
+    expect(mitDaten).not.toContain('1 Hof in der Region')
+    expect(mitDaten).toContain(`aria-label="${benenneKartenLink(1)}"`)
   })
 
   /** Teilt das HTML am Ende des Kopfs (der Kopf enthält keinen weiteren Abschnitt). */
@@ -399,15 +386,15 @@ describe('Kopf — Video, Standbild und Suche', () => {
     return { kopfTeil: seite.slice(0, ende), danach: seite.slice(ende) }
   }
 
-  it('am Handy endet der Kopf vor der Karte: darunter ein Abschnitt mit Überschrift, Karte, Knopf wie im Mockup (Nr. 59)', () => {
+  it('am Handy endet der Kopf vor der Karte: darunter die Karte ohne eigene Überschrift, der Link darunter (Nr. 252)', () => {
     // Die Karte je Form als Merkmal: So zeigt das HTML, wohin der Kopf welche Karte stellt.
     const { kopfTeil, danach } = teileAmKopfEnde(html(createElement(StartseiteKopf, { karte: (form) => createElement('i', { 'data-karte': form }) })))
 
     expect(kopfTeil).toContain('data-karte="web"')
     expect(kopfTeil).not.toContain('data-karte="handy"')
-    expect(danach).toMatch(/^<section aria-labelledby="region-titel"[^>]*>/)
-    expect(danach).toContain(`<h2 id="region-titel"`)
-    const reihe = [`>${KARTE_UEBERSCHRIFT}</h2>`, 'data-karte="handy"', `${KARTE_KNOPF}</a>`].map((t) => danach.indexOf(t))
+    expect(danach).toMatch(new RegExp(`^<section aria-label="${KARTE_UEBERSCHRIFT}"[^>]*>`))
+    expect(danach).not.toContain('<h2')
+    const reihe = ['data-karte="handy"', `${KARTE_LINK}</a>`].map((t) => danach.indexOf(t))
     expect(reihe.every((stelle) => stelle > 0), String(reihe)).toBe(true)
     expect([...reihe].sort((a, b) => a - b)).toEqual(reihe)
   })
@@ -440,12 +427,18 @@ describe('Karte der Region — gezeichnet (Nr. 59)', () => {
   const web = html(createElement(RegionsKarte, { form: 'web', karte: daten }))
   const leer = html(createElement(RegionsKarte, { form: 'handy', karte: null }))
 
-  it('die ganze Fläche ist EIN Link auf die Kartenansicht, die Zahl der Höfe im Namen', () => {
+  it('die ganze Fläche ist EIN Link auf die Kartenansicht, die Zahl der Höfe im Namen; Zoom und Quelle daneben (Nr. 271)', () => {
     for (const text of [web, html(createElement(RegionsKarte, { form: 'handy', karte: daten }))]) {
       expect(text.match(/<a\b/g)).toHaveLength(1)
-      expect(text).toMatch(new RegExp(`^<a href="${KARTE_ADRESSE.replace(/[?]/g, '\\?')}"`))
-      expect(text).toContain('aria-label="Alle 3 Höfe auf der Karte ansehen"')
-      expect(text.endsWith('</a>')).toBe(true)
+      const link = text.slice(text.indexOf('<a '), text.indexOf('</a>') + 4)
+      expect(link).toMatch(new RegExp(`^<a href="${KARTE_ADRESSE.replace(/[?]/g, '\\?')}"`))
+      expect(link).toContain('aria-label="Alle 3 Höfe auf der Karte ansehen"')
+      // Zoom „+/−“ (Board Bild 1) steht neben dem Link, nie darin — kein Knopf im Link.
+      expect(link).not.toContain('<button')
+      expect(text).toContain('aria-label="Karte vergrößern"')
+      expect(text).toContain('aria-label="Karte verkleinern"')
+      // Die Quelle dieser Karte (Natural Earth), sichtbar unten rechts, außerhalb des Links.
+      expect(text.slice(text.indexOf('</a>'))).toContain(KARTE_QUELLE)
     }
   })
 
@@ -453,9 +446,11 @@ describe('Karte der Region — gezeichnet (Nr. 59)', () => {
     // Das SVG, in dem das Land steht (die Symbole von lucide tragen aria-hidden ohnehin).
     const kartenSvg = web.slice(web.lastIndexOf('<svg', web.indexOf('Salzach')))
     expect(kartenSvg.slice(0, kartenSvg.indexOf('>'))).toContain('aria-hidden="true"')
-    for (const teil of ['3 Höfe in der Region', 'Hof Erster', 'Testort', 'Abholung: Heute 15:00–18:00', 'title="Hof Erster"']) {
-      expect(web).toContain(teil)
+    // Seit Nr. 252 ohne Pille und Infokarte (Liste Lauf 32, startseite): Der Name des Links nennt die Zahl.
+    for (const teil of ['3 Höfe in der Region', 'Hof Erster', 'Abholung: Heute 15:00–18:00']) {
+      expect(web).not.toContain(teil)
     }
+    expect(web).toContain('aria-label="Alle 3 Höfe auf der Karte ansehen"')
   })
 
   it('Gruppen-Pin mit Zahl: die zwei nahen Höfe zeigen eine 2', () => {
@@ -504,15 +499,21 @@ describe('Höfe in deiner Nähe — gefüllt, leer, laden, Fehler', () => {
     expect(text).toContain('line-clamp-2')
   })
 
-  it('die Chips stehen in jedem Zustand darunter', () => {
+  it('die Such-Chips (Produkte, Board) stehen in jedem Zustand darunter, daneben der Textlink zur Karte (Nr. 252)', () => {
     const text = abschnitt(createElement(HofKartenSkelett))
-    for (const chip of STARTSEITE_CHIPS) expect(text).toContain(`href="${hoefeAdresse(chip.filter).replace(/&/g, '&amp;')}"`)
+    for (const wort of STARTSEITE_SUCH_CHIPS) expect(text).toContain(`href="${suchAdresse(wort)}"`)
+    expect(STARTSEITE_SUCH_CHIPS).toEqual(['Eier', 'Heumilch', 'Heu', 'Brennholz', 'Honig'])
+    expect(suchAdresse('Eier')).toBe('/hoefe?q=Eier')
+    expect(text.indexOf(`href="${KARTE_ADRESSE}"`)).toBeLessThan(text.indexOf('Oder direkt suchen:'))
   })
 
   it('leer: kein nacktes „nichts gefunden" — ein Satz und ein Ausweg', () => {
     const text = abschnitt(createElement(HofKarten, { hoefe: [] }))
     expect(text).toContain('Die ersten Höfe kommen gerade dazu')
-    expect(text).toContain('href="/register"')
+    expect(text).toContain(HOEFE_LEER.satz)
+    // Board Bild 5: „Für Höfe" statt „Hof registrieren"; die Marke blendet „Oder direkt suchen" aus.
+    expect(text).toMatch(/<a href="\/fuer-hoefe" data-hoefe-leer=""[^>]*>Für Höfe<\/a>/)
+    expect(text).toContain('group-has-[[data-hoefe-leer]]/hoefe:hidden')
     // Gegenprobe: Mit Höfen gibt es den Leerzustand nicht.
     expect(abschnitt(createElement(HofKarten, { hoefe: waehleStartseitenHoefe([hof({ slug: 'a' })]) }))).not.toContain(
       'Die ersten Höfe kommen gerade dazu'
@@ -553,23 +554,27 @@ describe('Abschnitte', () => {
     const text = html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) }))
     expect(text.match(/<section\b/g)).toHaveLength(1)
     expect(text).toContain('In drei Schritten zum Hofkorb')
-    expect(text).toContain('Du weißt, woher es kommt')
-    for (const betrag of ['€ 20,00', '€ 1,00', '€ 21,00', '€ 0,50']) expect(text).toContain(betrag)
+    // Seit Nr. 252 die drei Punkte des Boards in einer Karte.
+    expect(text).toContain('Warum direkt vom Hof?')
+    for (const punkt of warumPunkte('bisher')) expect(text).toContain(punkt)
+    expect(warumPunkte('hofpreis')[2]).toBe('Der Hof setzt seinen Preis selbst.')
+    // Der Mindestbetrag steht seit Nr. 252 in „Was ist die Servicegebühr?“ (Gut zu wissen), nicht mehr unter „Warum“.
+    for (const betrag of ['€ 20,00', '€ 1,00', '€ 21,00']) expect(text).toContain(betrag)
   })
 
-  it('Futter: zwei Zielgruppen mit ihren Wegen auf /hoefe', () => {
-    const text = html(createElement(FutterAbschnitt))
-    expect(text).toContain('Für Hase &amp; Meerschwein')
-    expect(text).toContain('Für Pferd, Rind &amp; Schaf')
-    for (const gruppe of FUTTER_ZIELGRUPPEN) expect(text).toContain(`href="${hoefeAdresse(gruppe.filter).replace(/&/g, '&amp;')}"`)
-  })
-
-  it('Brennmaterial: Saison-Marke, erklärte Raummeter, Weg auf /hoefe', () => {
-    const text = html(createElement(BrennmaterialBand))
-    expect(text).toContain('Saison Oktober bis März')
-    expect(text).toContain('Raummeter (ein Kubikmeter geschichtetes Holz)')
-    expect(text).toContain('Schüttraummeter (ein Kubikmeter lose geschüttet)')
-    expect(text).toContain(`href="${BRENNMATERIAL_ADRESSE}"`)
+  it('Futter und Brennmaterial: kurze Karten mit Überschrift, Satz und Textlink (Board w1-startseite)', () => {
+    for (const [element, karte, id] of [
+      [createElement(FutterAbschnitt), FUTTER_KARTE, 'futter'],
+      [createElement(BrennmaterialBand), BRENNMATERIAL_KARTE, 'brennmaterial'],
+    ] as const) {
+      const text = html(element)
+      expect(text).toMatch(new RegExp(`<h2 id="${id}-titel"[^>]*>${karte.ueberzeile}</h2>`))
+      expect(text).toContain(karte.satz)
+      expect(text).toContain(`href="${karte.adresse.replace(/&/g, '&amp;')}"`)
+      expect(text).toContain(karte.link)
+      // Kurz wie im Board: kein Bild, kein Knopf.
+      expect(text).not.toContain('<img')
+    }
   })
 
   it('keine erfundenen Preise: Futter, Brennmaterial und „Für Höfe" nennen keinen Betrag (E6)', () => {
@@ -580,40 +585,44 @@ describe('Abschnitte', () => {
     expect(html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) }))).toMatch(/€/)
   })
 
-  it('„So funktioniert’s": Bestellnummer statt eines Abholcodes, den es nicht gibt', () => {
+  it('„So funktioniert’s": nur die Titel der Schritte (Board), kein Abholcode, den es nicht gibt', () => {
     const text = html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) }))
-    expect(text).toContain('Bestellnummer zeigen')
+    for (const titel of ['Hof finden', 'Bestellen und Abholtermin wählen', 'Am Hof abholen']) expect(text).toContain(titel)
+    expect(text).not.toContain('Bestellnummer zeigen')
     expect(text).not.toMatch(/Abholcode/)
   })
 
   it('Für Höfe: keine unbelegte Zeitangabe', () => {
     const text = html(createElement(FuerHoefeBandInhalt))
     expect(text).not.toMatch(/zehn Minuten|Minuten/)
-    expect(text).toContain('Schnell eingerichtet')
+    expect(text).toContain('Du hast einen Hof? Dein Hofladen, online.')
   })
 
-  it('Für Höfe: registrieren in Orange, „Mehr für Höfe" zur Seite für Höfe (seit Nr. 15)', () => {
+  it('Für Höfe: schlichte Karte mit EINEM breiten Knopf „Für Höfe“ zur Seite für Höfe (Nr. 252)', () => {
     const text = html(createElement(FuerHoefeBandInhalt))
-    expect(text).toMatch(/<a href="\/register"[^>]*bg-primary/)
-    expect(text).toContain('href="/fuer-hoefe"')
+    expect(text).toMatch(/<a href="\/fuer-hoefe"[^>]*w-full[^>]*>Für Höfe<\/a>/)
+    expect(text).not.toMatch(/<a href="\/register"[^>]*bg-primary/)
   })
 
-  it('Fragen: alle Antworten im HTML, auch zugeklappt — die erste offen', () => {
-    const text = html(createElement(Fragen, { jetzt: JETZT }))
-    for (const { frage, antwort } of STARTSEITE_FRAGEN) {
+  it('Fragen: die drei Fragen des Boards, alle Antworten im HTML, auch zugeklappt (Nr. 252)', () => {
+    const fragen = gutZuWissen(JETZT, 'bisher', beispielRechnung(JETZT))
+    expect(fragen.map((f) => f.frage)).toEqual(['Wie bezahle ich?', 'Was ist die Servicegebühr?', 'Wo finde ich meine Bestellung?'])
+    expect(gutZuWissen(JETZT, 'hofpreis', beispielRechnung(JETZT, BEISPIEL_WARENPREIS_CENTS, 'hofpreis'))[1]!.frage).toBe('Was ist die Plattformgebühr?')
+    const text = html(createElement(Fragen, { jetzt: JETZT, modell: 'bisher' }))
+    for (const { frage, antwort } of fragen) {
       expect(text).toContain(frage)
       expect(text).toContain(antwort.replace(/&/g, '&amp;'))
     }
   })
 
   it('Fragen ohne Skript: <details name="fragen">, nur die erste offen, Fokus sichtbar', () => {
-    const text = html(createElement(Fragen, { jetzt: JETZT }))
+    const text = html(createElement(Fragen, { jetzt: JETZT, modell: 'bisher' }))
     const details = text.match(/<details\b[^>]*>/g) ?? []
-    expect(details).toHaveLength(STARTSEITE_FRAGEN.length)
+    expect(details).toHaveLength(3)
     for (const tag of details) expect(tag).toContain('name="fragen"')
-    expect(details[0]).toMatch(/\bopen=""/)
-    for (const tag of details.slice(1)) expect(tag).not.toMatch(/\bopen\b/)
-    expect(text.match(/<summary\b[^>]*focus-visible:outline-solid/g)).toHaveLength(STARTSEITE_FRAGEN.length)
+    // Board Bild 4: alle zugeklappt.
+    for (const tag of details) expect(tag).not.toMatch(/\bopen\b/)
+    expect(text.match(/<summary\b[^>]*focus-visible:outline-solid/g)).toHaveLength(3)
     expect(text).not.toMatch(/data-slot="accordion"/)
     expect(quelle('src/components/startseite/startseite-abschnitte.tsx')).not.toMatch(/@\/components\/ui\/accordion/)
   })
@@ -686,7 +695,7 @@ describe('Abschnitte', () => {
       for (const weg of WEGE) {
         const huelle = klassenVor(seitenfuss, weg)
         expect(huelle, weg).toContain('hidden')
-        expect(huelle, weg).toContain('md:flex')
+        expect(huelle, weg).toContain('md:block')
         // … und im Fuß der Startseite genau umgekehrt: am Handy sichtbar, ab md verborgen.
         const spalte = klassenVor(startseite, weg)
         expect(spalte, weg).toContain('md:hidden')
@@ -700,7 +709,8 @@ describe('Abschnitte', () => {
   })
 
   // Nr. 127: „Für Höfe" im Seitenfuß führt zu /fuer-hoefe (dort stehen /register und /konditionen), „Anmelden" steht im Kopf.
-  describe('Am Computer genau ein Fuß mit der Wortmarke: /, Hofseite, Produktseite, /fuer-hoefe', () => {
+  // Seit Nr. 247 (G11): Der Seitenfuß trägt am Computer keine Wortmarke mehr — sie steht im Kopf.
+  describe('Am Computer genau ein Fuß, ohne Wortmarke: /, Hofseite, Produktseite, /fuer-hoefe', () => {
     const WORTMARKE = `text-brand-text">${MARKE}</span>`
     type Fuss = { klassen: string[]; wortmarken: number }
     /** Alle <footer> eines Markups mit ihren Klassen und der Zahl der Wortmarken darin. */
@@ -715,29 +725,31 @@ describe('Abschnitte', () => {
     /** Eine Kundenseite wie die vier Routen sie bauen: der Fuß der Startseite im Inhalt, der Seitenfuß der Shell danach. */
     const seite = (): string => html(createElement('div', null, createElement('main', null, createElement(StartseiteFuss, { jahr: 2026 })), createElement(KundeFuss)))
 
-    it('am Computer ist genau ein Fuß sichtbar, und er trägt genau eine Wortmarke — der Seitenfuß', () => {
+    it('am Computer ist genau ein Fuß sichtbar — der Seitenfuß, ohne Wortmarke (G11)', () => {
       const alle = fuesse(seite())
       expect(alle).toHaveLength(2)
       const sichtbar = alle.filter(amComputerSichtbar)
       expect(sichtbar).toHaveLength(1)
-      expect(sichtbar[0].wortmarken).toBe(1)
+      expect(sichtbar[0].wortmarken).toBe(0)
       expect(sichtbar[0].klassen).toContain('print:hidden')
-      // Am Handy bleibt der Fuß der Startseite sichtbar, wie er war: beide Füße tragen die Wortmarke.
-      expect(alle.reduce((n, f) => n + f.wortmarken, 0)).toBe(2)
+      // Am Handy bleibt der Fuß der Startseite sichtbar, wie er war: nur er trägt die Wortmarke.
+      expect(alle.reduce((n, f) => n + f.wortmarken, 0)).toBe(1)
     })
 
-    it('Gegenprobe: ohne md:hidden am Fuß der Startseite stünden am Computer zwei Füße mit zwei Wortmarken', () => {
+    it('Gegenprobe: ohne md:hidden am Fuß der Startseite stünden am Computer zwei Füße, einer mit Wortmarke', () => {
       const alt = fuesse(seite().replace('border-t border-border py-10 md:hidden', 'border-t border-border py-10'))
       expect(alt.filter(amComputerSichtbar)).toHaveLength(2)
-      expect(alt.filter(amComputerSichtbar).reduce((n, f) => n + f.wortmarken, 0)).toBe(2)
+      expect(alt.filter(amComputerSichtbar).reduce((n, f) => n + f.wortmarken, 0)).toBe(1)
     })
 
-    it('alle vier Seiten setzen den Fuß der Startseite genau einmal in die Shell, und die Shell setzt den Seitenfuß', () => {
-      const seiten = ['src/app/(public)/fuer-hoefe/page.tsx', 'src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx']
-      for (const datei of seiten) {
-        const text = code(datei)
-        expect(text.match(/<StartseiteFuss\b/g), datei).toHaveLength(1)
-        expect(text, datei).toMatch(/<KundeShellMitSitzung\b/)
+    it('Startseite und /fuer-hoefe setzen den Fuß der Startseite genau einmal in die Shell, und die Shell setzt den Seitenfuß', () => {
+      const text = code('src/app/(public)/fuer-hoefe/page.tsx')
+      expect(text.match(/<StartseiteFuss\b/g)).toHaveLength(1)
+      expect(text).toMatch(/<KundeShellMitSitzung\b/)
+      // Hof- und Produktseite haben am Handy den kurzen Seitenfuß wie /hoefe (Abnahme Lauf 32, hofseite 10, produkt 12; Nr. 271).
+      for (const datei of ['src/app/(public)/[farmSlug]/page.tsx', 'src/app/(public)/[farmSlug]/produkt/[id]/page.tsx']) {
+        expect(code(datei), datei).not.toMatch(/<StartseiteFuss\b/)
+        expect(code(datei), datei).toMatch(/<KundeShellMitSitzung\b/)
       }
       // Die Startseite baut ihn als Abschnitt FUSS (STARTSEITE_ABSCHNITTE) in derselben Shell.
       expect(code('src/app/page.tsx')).toContain('<StartseitenInhalt ')
@@ -766,7 +778,7 @@ describe('Themes: Farben nur über Tokens', () => {
     html(createElement(BrennmaterialBand)),
     html(createElement(SoFunktionierts, { rechnung: beispielRechnung(JETZT) })),
     html(createElement(FuerHoefeBandInhalt)),
-    html(createElement(Fragen, { jetzt: JETZT })),
+    html(createElement(Fragen, { jetzt: JETZT, modell: 'bisher' })),
     html(createElement(StartseiteFuss, { jahr: 2026 })),
   ]
 
@@ -781,7 +793,8 @@ describe('Themes: Farben nur über Tokens', () => {
 
   it('Gegenprobe: die Token-Klassen stehen im HTML', () => {
     const zusammen = alles.join('')
-    for (const token of ['to-background', 'bg-card', 'border-border', 'text-muted-foreground', 'bg-accent', 'bg-primary', 'text-status-fertig']) {
+    // bg-primary entfällt seit Nr. 252: Das Band „Für Höfe“ hat keinen orangen Knopf mehr (Liste Lauf 32, startseite).
+    for (const token of ['to-background', 'bg-card', 'border-border', 'text-muted-foreground', 'bg-accent', 'text-status-fertig']) {
       expect(zusammen, token).toContain(token)
     }
   })
@@ -843,5 +856,71 @@ describe('Aufbau der Seite', () => {
     expect(inhalt).toMatch(/case 'KOPF':\s*return \(\s*<StartseiteKopf/)
     expect(inhalt).toMatch(/case 'HOEFE':\s*return \(\s*<HoefeInDerNaehe/)
     expect(inhalt).toMatch(/STARTSEITE_ABSCHNITTE\[eintrag\.art\]/)
+  })
+})
+
+describe('Nr. 234: Hofkarten der Startseite mit drei Preisen, Abholzeile, kurze Karten', () => {
+  const produkt = (id: string, teil: Partial<VorschauProdukt> = {}): VorschauProdukt => ({
+    id,
+    name: `Produkt ${id}`,
+    price: 4.2,
+    unit: 'STUECK',
+    unitSize: null,
+    imageUrl: null,
+    bildAusschnitt: null,
+    category: 'EIER',
+    subcategory: null,
+    verfuegbar: true,
+    ...teil,
+  })
+
+  it('höchstens drei Produkte, nur verfügbare, in der Reihenfolge der Hofseite', () => {
+    const [eintrag] = waehleStartseitenHoefe([
+      hof({ slug: 'x', produkte: [produkt('a'), produkt('aus', { verfuegbar: false }), produkt('b'), produkt('c'), produkt('d')] }),
+    ])
+    expect(eintrag.produkte?.map((p) => p.id)).toEqual(['a', 'b', 'c'])
+    // Gegenprobe: Ist nur ein ausverkauftes da, steht keine Zeile — nie „derzeit aus" auf der Startseite.
+    const [nurAus] = waehleStartseitenHoefe([hof({ slug: 'y', produkte: [produkt('aus', { verfuegbar: false })] })])
+    expect(nurAus.produkte).toEqual([])
+  })
+
+  it('die Karte zeigt die drei Preise und einmal „inkl. Plattformgebühr", wenn die Preise sie enthalten', () => {
+    const mit = waehleStartseitenHoefe([
+      hof({ slug: 'x', produkte: [produkt('a', { inklPlattformgebuehr: true }), produkt('b', { price: 50, unit: 'KG', unitSize: 2 }), produkt('c')] }),
+    ])
+    const text = html(createElement(HofKarten, { hoefe: mit }))
+    expect(text.match(/<li class="flex items-baseline justify-between/g)).toHaveLength(3)
+    expect(text).toContain('€ 4,20 / Stück')
+    // Seit Nr. 252 trägt der Name das Gebinde, daneben der Preis des Gebindes (kurzPreis).
+    expect(text).toMatch(/, 2 kg<\/span><span[^>]*>€ 50,00</)
+    expect(text.match(/inkl\. Plattformgebühr/g)).toHaveLength(1)
+    // Gegenprobe: ohne Endpreise kein Satz.
+    const ohne = waehleStartseitenHoefe([hof({ slug: 'y', produkte: [produkt('a')] })])
+    expect(html(createElement(HofKarten, { hoefe: ohne }))).not.toContain('inkl. Plattformgebühr')
+  })
+
+  it('ein pausierter Hof steht gestrichelt in seinem Rahmen (data-pausiert), ein offener nicht', () => {
+    const text = html(createElement(HofKarten, { hoefe: waehleStartseitenHoefe([hof({ slug: 'offen' }), hof({ slug: 'pause', isPaused: true })]) }))
+    expect(text.match(/data-pausiert="ja"/g)).toHaveLength(1)
+    expect(text).toContain('border-dashed')
+  })
+
+  it('Abholzeile: „Abholung" davor, „heute"/„morgen" klein, Wochentage und Hinweise bleiben', () => {
+    expect(abholzeileDerKarte({ abholung: 'Heute 15:00–18:00', abholungIstTermin: true })).toBe('Abholung heute 15:00–18:00')
+    expect(abholzeileDerKarte({ abholung: 'Morgen 08:00–12:00', abholungIstTermin: true })).toBe('Abholung morgen 08:00–12:00')
+    expect(abholzeileDerKarte({ abholung: 'Samstag 09:00–12:00', abholungIstTermin: true })).toBe('Abholung Samstag 09:00–12:00')
+    expect(abholzeileDerKarte({ abholung: 'Macht gerade Pause – Bestellen geht bald wieder', abholungIstTermin: false })).toBe(
+      'Macht gerade Pause – Bestellen geht bald wieder'
+    )
+    expect(abholzeileDerKarte({ abholung: null, abholungIstTermin: false })).toBeNull()
+  })
+
+  it('Futter und Brennmaterial werden ein Paar nur, wenn sie direkt aufeinander folgen', () => {
+    const arten = (liste: string[]) => gruppiereKurzkarten(liste.map((art) => ({ art }))).map((g) => g.map((e) => e.art))
+    expect(arten(['KOPF', 'HOEFE', 'FUTTER', 'BRENNMATERIAL', 'FUSS'])).toEqual([['KOPF'], ['HOEFE'], ['FUTTER', 'BRENNMATERIAL'], ['FUSS']])
+    expect(arten(['BRENNMATERIAL', 'FUTTER'])).toEqual([['BRENNMATERIAL', 'FUTTER']])
+    // Gegenprobe: dazwischen ein Block — kein Paar; ohne Brennmaterial (außer Saison) steht Futter allein.
+    expect(arten(['FUTTER', 'BLOCK', 'BRENNMATERIAL'])).toEqual([['FUTTER'], ['BLOCK'], ['BRENNMATERIAL']])
+    expect(arten(['FUTTER', 'SO_FUNKTIONIERTS'])).toEqual([['FUTTER'], ['SO_FUNKTIONIERTS']])
   })
 })

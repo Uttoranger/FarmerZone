@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Wallet } from 'lucide-react'
 import { FINANZEN_JAHR_TEXT, KOSTEN_RHYTHMUS_KURZ, monatOhneJahr, type JahrRechnung } from '@/lib/finanzen'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -23,7 +22,6 @@ export function KostenJahr({ rechnung, kostenHref }: { rechnung: JahrRechnung; k
   if (posten.length === 0) {
     return (
       <EmptyState
-        symbol={Wallet}
         titel={text.keineKostenTitel(jahr)}
         satz={text.keineKostenSatz}
         ausweg={

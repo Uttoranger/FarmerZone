@@ -63,26 +63,27 @@ const STUFEN = [
   { km: 50 as const, href: '/region?km=50', aktiv: false },
 ]
 
-describe('KmWahl — Umkreis mit Zahl je Stufe', () => {
-  it('ohne Zahl: Beschriftung „Umkreis", jede Stufe sichtbar 36 px mit 44 px Trefferfläche', () => {
-    const wanne = html(createElement(KmWahl, { stufen: STUFEN }))
-    expect(wanne).toContain('aria-label="Umkreis"')
-    expect(wanne.match(/class="relative inline-flex h-9 [^"]*before:-inset-y-1[^"]*"/g)).toHaveLength(3)
-    expect(wanne).toMatch(/aria-current="page"[^>]*>25 km</)
-    expect(wanne).not.toContain('text-[11.5px]')
+describe('KmWahl — Umkreis als Chip-Gruppe mit Zahl je Stufe (G11, Nr. 251)', () => {
+  it('ohne Zahl: Beschriftung „Umkreis", jede Stufe ein Filter-Chip (36 px, Trefferfläche 44 px über ::before)', () => {
+    const reihe = html(createElement(KmWahl, { stufen: STUFEN }))
+    expect(reihe).toContain('aria-label="Umkreis"')
+    expect(reihe.match(/data-slot="filter-chip"/g)).toHaveLength(3)
+    expect(reihe.match(/class="relative inline-flex h-9 [^"]*before:-inset-y-\[5px\][^"]*"/g)).toHaveLength(3)
+    expect(reihe).toMatch(/aria-current="page"[^>]*>25 km</)
+    expect(reihe).not.toContain('text-[11.5px]')
   })
 
-  it('mit Zahl: „25 km 8" je Stufe, gleich hoch, die Beschriftung nennt die Zahl', () => {
-    const wanne = html(createElement(KmWahl, { stufen: STUFEN, zahlen: { 10: 3, 25: 8, 50: 19 }, zahlLabel: 'Umkreis, Zahl der Höfe je Stufe' }))
-    expect(wanne).toContain('aria-label="Umkreis, Zahl der Höfe je Stufe"')
-    for (const [km, zahl] of [[10, 3], [25, 8], [50, 19]]) expect(wanne).toContain(`>${km} km<span class="text-[11.5px] font-medium">${zahl}</span>`)
-    expect(wanne.match(/class="relative inline-flex h-9 /g)).toHaveLength(3)
+  it('mit Zahl: „25 km · 8" je Stufe, die Beschriftung nennt die Zahl', () => {
+    const reihe = html(createElement(KmWahl, { stufen: STUFEN, zahlen: { 10: 3, 25: 8, 50: 19 }, zahlLabel: 'Umkreis, Zahl der Höfe je Stufe' }))
+    expect(reihe).toContain('aria-label="Umkreis, Zahl der Höfe je Stufe"')
+    for (const [km, zahl] of [[10, 3], [25, 8], [50, 19]]) expect(reihe).toContain(`>${km} km<span class="ml-1">· ${zahl}</span>`)
+    expect(reihe.match(/class="relative inline-flex h-9 /g)).toHaveLength(3)
   })
 
   it('eine fehlende Zahl lässt nur die Zahl weg, nicht die Stufe', () => {
-    const wanne = html(createElement(KmWahl, { stufen: STUFEN, zahlen: { 25: 8 }, zahlLabel: 'Umkreis, Zahl der Angebote je Stufe' }))
-    expect(wanne.match(/<span class="text-\[11.5px\] font-medium">/g)).toHaveLength(1)
-    expect(wanne.match(/<a /g)).toHaveLength(3)
+    const reihe = html(createElement(KmWahl, { stufen: STUFEN, zahlen: { 25: 8 }, zahlLabel: 'Umkreis, Zahl der Angebote je Stufe' }))
+    expect(reihe.match(/<span class="ml-1">/g)).toHaveLength(1)
+    expect(reihe.match(/<a /g)).toHaveLength(3)
   })
 })
 
@@ -229,7 +230,7 @@ describe('HofKopf — ein Kopf für Hofkarte, Pin-Karte und Region', () => {
 
   it('Gegenprobe: eine Kopie des alten Kopfs in HofKarte fällt auf', () => {
     const kopie = teile.replace(
-      '<HofKopf hof={hof} als="h2" gedaempft={hof.isPaused} />',
+      '<HofKopf hof={hof} als="h2" gedaempft={hof.isPaused} aufTonung={ausgewaehlt} />',
       '<span className="shrink-0">{hof.entfernungKm !== null && formatiereEntfernung(hof.entfernungKm)}</span>'
     )
     expect(kopie).not.toBe(teile)
@@ -261,7 +262,8 @@ const KARTEN_HOF: KartenHof = {
 describe('Ohne eigenen Standort — für beide Reiter gleich', () => {
   it('Leerzustand mit Ausweg direkt zur Karte im Hofprofil, darunter die eigene Hofkarte mit „Nicht auf der Karte"', () => {
     const seite = html(createElement(StandortFehlt, { eigeneKarte: { hof: KARTEN_HOF, bereich: 'LEBENSMITTEL', schaufenster: { produkte: [produkt('a', 'Freilandeier')], weitere: 5 } }, jetzt: JETZT }))
-    expect(seite).toContain(`<h2 class="font-heading text-lg font-semibold text-foreground">${OHNE_STANDORT_TEXT.titel}</h2>`)
+    // Titel fett in der Grundschrift (G4, Nr. 246).
+    expect(seite).toContain(`<h2 class="text-[16px] font-bold text-foreground">${OHNE_STANDORT_TEXT.titel}</h2>`)
     expect(seite).toContain(OHNE_STANDORT_TEXT.satz)
     expect(seite).toMatch(new RegExp(`<a href="/settings/profile#${STANDORT_ANKER}" class="[^"]*">${OHNE_STANDORT_TEXT.knopf}</a>`))
     expect(seite).toContain(OHNE_STANDORT_TEXT.ueberschriftListe)

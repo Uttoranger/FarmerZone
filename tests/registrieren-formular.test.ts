@@ -150,11 +150,20 @@ describe('Hofname vom Registrieren bis Einrichten', () => {
 describe('RegisterForm — gerendert', () => {
   const html = renderToStaticMarkup(createElement(RegisterForm, { formToken: 'token' }))
 
-  it('Felder nach Mockup: Hofname mit Adresse, ein Name, E-Mail, Passwort mit Stärke', () => {
-    for (const text of ['Name deines Hofs', 'Wird zu deiner Adresse: agrilo.at/dein-hof', 'Dein Name', 'E-Mail', 'Passwort', 'Konto erstellen']) {
+  it('Felder nach Mockup: Hofname mit Adresse, ein Name, E-Mail, Passwort mit Regeln zum Abhaken (Lauf 30)', () => {
+    for (const text of ['Name deines Hofs', 'Deine Adresse wird: agrilo.at/dein-hof', 'Dein Name', 'E-Mail', 'Passwort', 'Konto erstellen']) {
       expect(html).toContain(text)
     }
-    expect(html).toContain('Mindestens 8 Zeichen, mit Groß- und Kleinbuchstaben und einer Zahl.')
+    expect(html).toContain('Beim Tippen siehst du, was noch fehlt.')
+    // Jede Regel aus validatePassword steht in der Liste, leer noch offen — mit Wort, nicht nur Farbe.
+    for (const regel of ['Mindestens 8 Zeichen', 'Ein Großbuchstabe (A–Z)', 'Ein Kleinbuchstabe (a–z)', 'Eine Zahl (0–9)']) expect(html).toContain(regel)
+    expect(html.match(/ – fehlt noch/g)?.length).toBe(4)
+    expect(html).not.toContain(' – erfüllt')
+  })
+
+  it('eine h1 je Seite: Die Karte trägt „Hof registrieren“ als h2 (die Fokus-Shell die h1)', () => {
+    expect(html).not.toMatch(/<h1[ >]/)
+    expect(html).toMatch(/<h2[^>]*>Hof registrieren<\/h2>/)
   })
 
   it('kein Zustimmungs-Haken: ein Satz mit Links zu AGB und Konditionen, beide in neuem Tab (Register O4)', () => {

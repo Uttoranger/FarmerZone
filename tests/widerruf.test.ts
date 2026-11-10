@@ -167,7 +167,7 @@ describe('Admin › Heute: Widerruf offen', () => {
   })
 })
 
-describe('Mail „Dein Widerruf ist erledigt“', () => {
+describe('Mail „Dein Rücktritt ist erledigt“ (Wort nach N43)', () => {
   const basis = { bestellnummer: 'HM-2611-TEST', hofName: 'Testhof', grund: null }
   const html = (p: { erstattet: number | null; vorAbholung?: boolean; teilweise?: boolean }) => renderToStaticMarkup(createElement(WiderrufErgebnisEmail, { ...basis, ...p }))
 
@@ -190,18 +190,18 @@ describe('Mail „Dein Widerruf ist erledigt“', () => {
 
   it('vor der Abholung nur zum Teil gebucht (Nachbesserung Runde 2): „zum Teil erledigt“, der Rest beim Hof — Gegenprobe ganz gebucht ohne diesen Satz', () => {
     const teil = html({ erstattet: 4.95, vorAbholung: true, teilweise: true })
-    expect(teil).toContain('Dein Widerruf ist zum Teil erledigt')
+    expect(teil).toContain('Dein Rücktritt ist zum Teil erledigt')
     expect(teil).toContain('Die übrigen prüft der Hof')
     expect(teil).toContain('4,95')
     const ganz = html({ erstattet: 4.95, vorAbholung: true })
     expect(ganz).not.toContain('zum Teil')
-    expect(ganz).toContain('Dein Widerruf ist erledigt')
+    expect(ganz).toContain('Dein Rücktritt ist erledigt')
   })
 
   it('Ablehnung nach Teilbuchung (Nachbesserung Runde 3): „für die übrigen Artikel abgelehnt“ — Gegenprobe ohne Teilbuchung ohne Zusatz', () => {
     const abgelehnt = (teilweise?: boolean) => renderToStaticMarkup(createElement(WiderrufErgebnisEmail, { ...basis, erstattet: null, grund: 'Ware angebrochen', teilweise }))
     expect(abgelehnt(true)).toContain('für die übrigen Artikel')
-    expect(abgelehnt(true)).toContain('Dein Widerruf wurde abgelehnt')
+    expect(abgelehnt(true)).toContain('Dein Rücktritt wurde abgelehnt')
     expect(abgelehnt()).not.toContain('übrigen')
   })
 })

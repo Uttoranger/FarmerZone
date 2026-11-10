@@ -1,23 +1,21 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, House, LocateFixed, Map as MapIcon, Search, Sprout } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { SUCHTEXT_MAX, SUCHTEXT_PARAMETER } from '@/schemas/hoefe-filter'
 import {
   KARTE_ADRESSE,
   KARTE_KNOPF,
-  KARTE_OEFFNEN,
   KARTE_UEBERSCHRIFT,
   hoefeAdresse,
+  SUCHE_BESCHRIFTUNG,
+  SUCHE_PLATZHALTER,
   benenneKartenLink,
-  formatiereRegionsZaehler,
   type StartseitenKarte,
 } from '@/lib/startseite'
 import {
-  HOFKARTE_ANTEIL,
   REGIONSKARTE_MASSE,
   REGIONS_NAMEN,
-  platziereHofkarte,
   rundeAufZehntel,
   zeichneLand,
   zeichneMarken,
@@ -26,8 +24,11 @@ import {
 } from '@/lib/regionskarte'
 import type { StrassenArt } from '@/lib/regionskarte-daten'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
+import { KartenZoom } from '@/components/startseite/karten-zoom'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { HeroVideo } from '@/components/startseite/hero-video'
+import { FOTO_HUELLE } from '@/components/ui/bild-dunkel'
 
 /*
  * Der Kopf der Startseite (Mockups web-k0-startseite, mobil-k0-startseite;
@@ -45,6 +46,15 @@ import { HeroVideo } from '@/components/startseite/hero-video'
 
 /** Der Fokus auf dem Foto: weiß, denn das Grün des Fokusrings trägt am Tag auf dem dunklen Bild nicht. */
 const FOKUS_AUF_FOTO = cn(FOKUS_RAHMEN, 'focus-visible:outline-white')
+
+/** Der Satz unter der h1, wörtlich nach der Liste Lauf 32 (startseite). */
+export const STARTSEITE_UNTERTITEL = 'Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen.'
+
+/** Die Quellenangabe der Regionskarte: die Daten dieser Karte (Natural Earth, gemeinfrei; regionskarte-daten.ts). */
+export const KARTE_QUELLE = 'Kartendaten: Natural Earth'
+
+/** Der Link unter der Regionskarte (Board w1-/s1-startseite). */
+export const KARTE_LINK = `${KARTE_KNOPF} →`
 
 const VERSPRECHEN = ['Bar oder online bezahlen', 'Keine Lieferkosten – du holst ab', 'Der Hof bekommt den vollen Preis'] as const
 
@@ -64,7 +74,7 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
         {/* Drei Schichten wie bisher: (1) das Standbild — immer da, es ist die
             Darstellung bei „Bewegung reduzieren" und der LCP-Kandidat (priority);
             (2) darüber das Video, rein per CSS eingeblendet; (3) der Schleier. */}
-        <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className="-z-10 object-cover" />
+        <Image src="/landing/hero-poster.jpg" alt="" fill priority sizes="100vw" className={cn('-z-10 object-cover', FOTO_HUELLE)} />
 
         {/* Das Video samt Pause-Knopf (Nr. 176): hero-video.tsx. */}
         <HeroVideo />
@@ -72,24 +82,20 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
         <div aria-hidden="true" className="absolute inset-0 -z-10 bg-linear-to-tr from-black/65 via-black/30 via-45% to-black/5" />
         <div aria-hidden="true" className="absolute inset-x-0 bottom-0 -z-10 h-12 bg-linear-to-b from-transparent to-background md:h-20" />
 
-        <div className="mx-auto flex max-w-[1200px] items-center gap-[60px] px-4 pt-8 pb-14 md:px-6 md:pt-[84px] md:pb-24">
+        <div className="mx-auto flex max-w-[1146px] items-center gap-[60px] px-4 pt-8 pb-14 md:px-6 md:pt-[84px] md:pb-24">
           <div className="flex min-w-0 flex-1 flex-col gap-[18px] md:gap-5">
             <p className="text-[12.5px] font-bold tracking-[1.6px] text-white/85 uppercase">Direkt vom Hof in deiner Nähe</p>
             <h1
               id="startseite-titel"
-              className="font-heading text-[36px] leading-[1.06] font-semibold text-balance text-white md:text-[58px] md:leading-[1.04]"
+              // Ab 1024 px höchstens zwei Zeilen wie im Board (A1): kleiner und ohne die festen Umbrüche.
+              className="font-heading text-[36px] leading-[1.06] font-semibold text-balance text-white md:text-[58px] md:leading-[1.04] lg:text-[36px] lg:leading-[1.1] xl:text-[42px]"
             >
-              Frisch vom Hof. <br className="hidden md:inline" />
-              Online bestellen, <br className="hidden md:inline" />
+              Frisch vom Hof. <br className="hidden md:inline lg:hidden" />
+              Online bestellen, <br className="hidden md:inline lg:hidden" />
               am Hof abholen.
             </h1>
-            <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">
-              <span className="md:hidden">Eier, Gemüse, Brot – und Heu für die Hasen. Von Höfen aus deiner Gegend.</span>
-              <span className="hidden md:inline">
-                Eier, Gemüse, Fleisch, Brot – und sogar Heu für die Hasen. Von Bäuerinnen und Bauern aus deiner Gegend,
-                ohne Umweg über den Supermarkt.
-              </span>
-            </p>
+            {/* Wörtlich nach dem Board (Liste Lauf 32, startseite), in jeder Breite derselbe Satz. */}
+            <p className="max-w-[600px] text-[15px] leading-normal text-white/85 md:text-[17px]">{STARTSEITE_UNTERTITEL}</p>
 
             {/* Die Suche schickt den Suchtext `q` — derselbe Weg wie die Suche der
                 404 und der KundeShell. /hoefe löst ihn beim Ankommen auf (Nr. 84):
@@ -100,49 +106,54 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
                 (abgesendeterSuchtext) — kein Feld `t` dazusetzen. Der Standort
                 steht nie in der Adresse; der Link darunter führt zu „Standort
                 nutzen" auf /hoefe. */}
-            <form
-              role="search"
-              action="/hoefe"
-              method="get"
-              className="flex flex-col gap-3 md:w-full md:max-w-[560px] md:flex-row md:items-center md:gap-2.5 md:rounded-full md:border md:border-border md:bg-card md:py-2 md:pr-2 md:pl-[18px]"
-            >
-              <label className="flex h-[50px] min-w-0 items-center gap-2.5 rounded-full border border-border bg-card px-4 md:h-auto md:flex-1 md:border-0 md:bg-transparent md:px-0">
-                <Search className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-                <span className="sr-only">Hof oder Produkt suchen</span>
+            <form role="search" action="/hoefe" method="get" className="flex flex-col gap-1.5 md:w-full md:max-w-[560px]">
+              {/* Die sichtbare Beschriftung über dem Feld (A1, Board Bild 1) — weiß wie alles auf dem Foto. */}
+              <label htmlFor="startseite-suche" className="w-fit text-[14px] font-semibold text-white">
+                {SUCHE_BESCHRIFTUNG}
+              </label>
+              {/* Ein eigenes gerahmtes Feld ohne Symbol und daneben ein eigener Knopf „Höfe finden“, auch am Handy
+                  (Board w1-/s1-startseite Bild 1; Abnahme Lauf 32, startseite 2). */}
+              <div className="flex flex-row items-center gap-2 md:gap-2.5">
                 <input
+                  id="startseite-suche"
                   type="search"
                   name={SUCHTEXT_PARAMETER}
                   maxLength={SUCHTEXT_MAX}
-                  placeholder="Hof oder Produkt, z. B. Eier oder Heu"
+                  placeholder={SUCHE_PLATZHALTER}
                   className={cn(
-                    'h-11 min-w-0 flex-1 rounded-md bg-transparent text-base text-foreground placeholder:text-muted-foreground',
-                    FOKUS_RAHMEN
+                    'h-12 min-w-0 flex-1 border border-border bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground',
+                    RUNDUNG.feld,
+                    FOKUS_AUF_FOTO
                   )}
                 />
-              </label>
-              <button
-                type="submit"
-                className={cn(
-                  'h-[50px] shrink-0 rounded-[14px] bg-accent px-[18px] text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:h-[46px] md:rounded-full',
-                  FOKUS_AUF_FOTO
-                )}
-              >
-                Höfe finden
-              </button>
+                <button
+                  type="submit"
+                  className={cn(
+                    'h-12 shrink-0 bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 md:px-[18px]',
+                    RUNDUNG.feld,
+                    FOKUS_AUF_FOTO
+                  )}
+                >
+                  Höfe finden
+                </button>
+              </div>
             </form>
 
+            {/* Unterstrichener Textlink ohne Symbol (Board). Auf dem Video bleibt er weiß: Das Grün der Boards trägt
+                auf dem dunklen Bild nicht (A1, das Video bleibt; DESIGN_SYSTEM „Bild-Overlays“). Ohne Höfe entfallen
+                Link und Häkchenliste (Board Bild 5) — die Höfe laden hinter Suspense, also entscheidet das CSS. */}
             <Link
               href={hoefeAdresse()}
               className={cn(
-                'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-[13.5px] font-semibold text-white underline-offset-4 hover:underline',
+                'inline-flex min-h-11 w-fit items-center rounded-md text-[14px] font-medium text-white underline underline-offset-4 [:root:has([data-hoefe-leer])_&]:hidden',
                 FOKUS_AUF_FOTO
               )}
             >
-              <LocateFixed className="size-4" strokeWidth={1.7} aria-hidden="true" />
               In deiner Nähe suchen – mit Postleitzahl oder Standort
             </Link>
 
-            <ul className="flex flex-col gap-[7px] md:mt-1.5 md:flex-row md:flex-wrap md:gap-[22px]">
+            {/* Einspaltig wie im Board (Liste Lauf 32, startseite 1440). */}
+            <ul className="flex flex-col gap-[7px] md:mt-1.5 [:root:has([data-hoefe-leer])_&]:hidden">
               {VERSPRECHEN.map((text) => (
                 <li key={text} className="flex items-center gap-[7px] text-[13.5px] text-white/85">
                   <Check className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
@@ -152,8 +163,11 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
             </ul>
           </div>
 
-          {/* Die Karte rechts (ab 1024 px), so breit wie bisher. */}
-          <div className="hidden w-[420px] shrink-0 lg:block xl:w-[520px]">{karte('web')}</div>
+          {/* Die Karte rechts (ab 1024 px), darunter „Alle Höfe auf der Karte →“ (Board w1-startseite Bild 1). */}
+          <div className="hidden w-[420px] shrink-0 flex-col gap-2 lg:flex xl:w-[520px]">
+            {karte('web')}
+            <KartenLink aufFoto />
+          </div>
         </div>
       </section>
 
@@ -165,27 +179,31 @@ export function StartseiteKopf({ karte = zeichneKarteOhneDaten }: { karte?: (for
           als 440 px wird die Karte nicht: Am Tablett füllte sie sonst den Schirm.
           Nach unten der Abstand der übrigen Abschnitte; das Mockup zeigt darunter
           nichts mehr. */}
-      <section aria-labelledby="region-titel" className="pt-[18px] pb-[52px] md:pb-[72px] lg:hidden">
-        <div className="mx-auto max-w-[1200px] px-4 md:px-6">
-          <div className="flex max-w-[440px] flex-col gap-2.5">
-            <h2 id="region-titel" className="font-heading text-xl font-semibold text-foreground">
-              {KARTE_UEBERSCHRIFT}
-            </h2>
+      <section aria-label={KARTE_UEBERSCHRIFT} className="pt-[18px] pb-8 md:pb-12 lg:hidden">
+        <div className="mx-auto max-w-[1146px] px-4 md:px-6">
+          <div className="flex max-w-[440px] flex-col gap-2">
+            {/* Die Karte direkt unter der Häkchenliste, ohne eigene Überschrift und Pille, der Link darunter (Board s1-startseite Bild 1). */}
             {karte('handy')}
-            <Link
-              href={KARTE_ADRESSE}
-              className={cn(
-                'mt-[22px] flex h-12 items-center justify-center gap-2 rounded-[14px] bg-accent px-4 text-[15px] font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
-                FOKUS_RAHMEN
-              )}
-            >
-              <MapIcon className="size-[17px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-              {KARTE_KNOPF}
-            </Link>
+            <KartenLink />
           </div>
         </div>
       </section>
     </>
+  )
+}
+
+/** „Alle Höfe auf der Karte →“ unter der Regionskarte (Board w1-/s1-startseite) — der Weg in die Kartenansicht von /hoefe. */
+function KartenLink({ aufFoto = false }: { aufFoto?: boolean }) {
+  return (
+    <Link
+      href={KARTE_ADRESSE}
+      className={cn(
+        'inline-flex min-h-11 w-fit items-center rounded-md text-[15px] font-semibold underline underline-offset-4',
+        aufFoto ? cn('text-white', FOKUS_AUF_FOTO) : cn('text-brand-text', FOKUS_RAHMEN)
+      )}
+    >
+      {KARTE_LINK}
+    </Link>
   )
 }
 
@@ -236,15 +254,16 @@ function Marke({ marke }: { marke: GezeichneteMarke }) {
  * Link, sein Name nennt die Zahl. Ohne Daten (laden, Fehler) steht nur das
  * Land da, ohne Zähler und Hofkarte; den Fehler zeigen die Hofkarten darunter.
  *
- * Die Karte folgt dem Modus bewusst NICHT: Sie ist Papier wie die Kacheln der
- * Hofübersicht (CODING_STANDARDS §7, „Was dem Modus NICHT folgt") und bleibt
- * hell wie im dunklen Mockup — im Browser auf dem Foto, am Handy auf dem
- * Seitengrund. Deshalb nur Tokens, die im neuen Design in beiden Themes gleich
- * sind: accent-foreground (Crème) für Papier und Flächen, primary-foreground
- * (fast schwarz) für Schrift und Linien, accent (Grün) für Höfe und Wasser —
- * ein Blau kennt das Design-System nicht. Auch der Hover der Pille geht über
- * die Deckkraft: accent-hover ist je Theme verschieden. Nur der Fokus folgt
- * dem Grund: weiß auf dem Foto, am Handy der Fokusring.
+ * Am Tag ist die Karte Papier: Tokens, die im neuen Design in beiden Themes
+ * gleich sind — accent-foreground (Crème) für Papier und Flächen,
+ * primary-foreground (fast schwarz) für Schrift und Linien, accent (Grün) für
+ * Höfe und Wasser; ein Blau kennt das Design-System nicht. Im Dunkeln ist sie
+ * gedämpft wie im Board (A1, Lauf 31): Papier und Schilder auf `card`, Straßen
+ * leise in `foreground`, Schrift in den Text-Tokens, grüne Schrift in
+ * `status-fertig` (das Knopf-Grün trägt auf dunklem Grund nur 3:1) — die Pins
+ * bleiben grün. Der Hover der Pille geht über die Deckkraft: accent-hover ist
+ * je Theme verschieden. Nur der Fokus folgt dem Grund: weiß auf dem Foto, am
+ * Handy der Fokusring.
  */
 export function RegionsKarte({ form, karte }: { form: KartenForm; karte: StartseitenKarte | null }): React.JSX.Element {
   const mass = REGIONSKARTE_MASSE[form]
@@ -252,155 +271,112 @@ export function RegionsKarte({ form, karte }: { form: KartenForm; karte: Startse
   const hof = karte?.hervorgehoben ?? null
   const marken = zeichneMarken(karte?.pins ?? [], mass, hof?.slug ?? null)
   const land = zeichneLand(mass, marken)
-  const markeDesHofs = marken.find((m) => m.hervorgehoben)
-  const lage = hof && markeDesHofs ? platziereHofkarte(markeDesHofs, mass, HOFKARTE_ANTEIL[form]) : null
 
   return (
-    <Link
-      href={KARTE_ADRESSE}
-      aria-label={benenneKartenLink(anzahl)}
+    // Die Hülle trägt Fläche, Rundung und Maß; darin der Link (ganze Fläche), daneben Zoom und Quelle — Knöpfe
+    // stehen nie im Link (Board w1-/s1-startseite Bild 1, Abnahme Lauf 32 startseite 3).
+    <div
+      data-slot="regionskarte"
       className={cn(
-        'group relative block overflow-hidden bg-accent-foreground shadow-2xl',
-        form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]',
-        form === 'web' ? FOKUS_AUF_FOTO : FOKUS_RAHMEN
+        'relative isolate overflow-hidden bg-accent-foreground shadow-2xl dark:bg-card dark:ring-1 dark:ring-border',
+        form === 'web' ? 'rounded-[26px]' : 'rounded-[22px]'
       )}
       style={{ aspectRatio: `${mass.breite} / ${mass.hoehe}` }}
     >
-      <svg viewBox={`0 0 ${mass.breite} ${mass.hoehe}`} aria-hidden="true" className="absolute inset-0 block size-full">
-        {/* Papier: Crème mit einem Hauch Dunkel, damit die Straßen heller sind als das Land. */}
-        <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6" />
-        {land.fluesse.map((fluss) =>
-          fluss.pfade.map((d, i) => (
-            <path
-              key={`${fluss.name}-${i}`}
-              d={d}
-              fill="none"
-              strokeWidth={FLUSS_STRICH[fluss.name] ?? 4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="stroke-accent/45"
-            />
-          ))
-        )}
-        {land.strassen.map((strasse, s) =>
-          strasse.pfade.map((d, i) => (
-            <g key={`${s}-${i}`} fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20" />
-              <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground" />
-            </g>
-          ))
-        )}
-        {land.fluesse.map(
-          ({ beschriftung: b }) =>
-            b && (
-              <text
-                key={b.text}
-                x={rundeAufZehntel(b.x)}
-                y={rundeAufZehntel(b.y)}
-                transform={`rotate(${rundeAufZehntel(b.winkel)} ${rundeAufZehntel(b.x)} ${rundeAufZehntel(b.y)})`}
-                textAnchor="middle"
-                fontSize={12}
-                strokeWidth={3}
-                className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke]"
-              >
-                {b.text}
-              </text>
-            )
-        )}
-        {land.schilder.map((schild) => {
-          const breite = 8 + 5.5 * schild.text.length
-          return (
-            <g key={schild.text}>
-              <rect
-                x={rundeAufZehntel(schild.x - breite / 2)}
-                y={rundeAufZehntel(schild.y - 8)}
-                width={rundeAufZehntel(breite)}
-                height={16}
-                rx={4}
-                className="fill-accent-foreground stroke-primary-foreground/25"
-              />
-              <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans">
-                {schild.text}
-              </text>
-            </g>
-          )
-        })}
-        {REGIONS_NAMEN.map((name) => (
-          <text
-            key={name.text}
-            x={rundeAufZehntel(name.x * mass.breite)}
-            y={rundeAufZehntel(name.y * mass.hoehe)}
-            textAnchor={name.anker}
-            fontSize={10}
-            fontWeight={600}
-            letterSpacing={2}
-            className="fill-primary-foreground/65 font-sans"
-          >
-            {name.text}
-          </text>
-        ))}
-        {lage && (
-          <line
-            x1={rundeAufZehntel(lage.linie.x1)}
-            y1={rundeAufZehntel(lage.linie.y1)}
-            x2={rundeAufZehntel(lage.linie.x2)}
-            y2={rundeAufZehntel(lage.linie.y2)}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            className="stroke-accent"
-          />
-        )}
-        {/* Der hervorgehobene Hof zuletzt: Er liegt über seinen Nachbarn. */}
-        {[...marken.filter((m) => !m.hervorgehoben), ...marken.filter((m) => m.hervorgehoben)].map((marke) => (
-          <Marke key={marke.schluessel} marke={marke} />
-        ))}
-      </svg>
-
-      {anzahl > 0 && (
-        <span className="absolute top-3.5 left-3.5 flex h-[34px] items-center gap-[7px] rounded-full bg-accent-foreground px-[13px] text-[13px] font-semibold text-primary-foreground shadow-md">
-          <House className="size-[15px] shrink-0 text-accent" strokeWidth={1.7} aria-hidden="true" />
-          {formatiereRegionsZaehler(anzahl)}
-        </span>
-      )}
-
-      {form === 'web' && (
-        <span className="absolute right-3.5 bottom-3.5 flex h-[38px] items-center gap-1.5 rounded-full bg-accent px-[15px] text-[13.5px] font-semibold text-accent-foreground transition-opacity duration-[250ms] group-hover:opacity-90">
-          <MapIcon className="size-[15px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          {KARTE_OEFFNEN}
-        </span>
-      )}
-
-      {hof && lage && (
-        <span
-          className="absolute flex items-center gap-2.5 rounded-2xl bg-accent-foreground p-2.5 text-primary-foreground shadow-xl"
-          style={{
-            left: `${lage.links}%`,
-            width: `${HOFKARTE_ANTEIL[form] * 100}%`,
-            ...(lage.senkrecht.kante === 'oben' ? { top: `${lage.senkrecht.abstand}%` } : { bottom: `${lage.senkrecht.abstand}%` }),
-          }}
+      <KartenZoom>
+        <Link
+          href={KARTE_ADRESSE}
+          aria-label={benenneKartenLink(anzahl)}
+          // Der Fokus innen: Die Hülle schneidet alles ab, was über ihren Rand ragt.
+          className={cn('group absolute inset-0 block', FOKUS_RAHMEN_INNEN)}
         >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-accent/15 text-accent">
-            <Sprout className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span title={hof.name} className="truncate font-heading text-[15px] font-semibold">
-              {hof.name}
-            </span>
-            {hof.zeile && <span className="truncate text-[11.5px] text-primary-foreground/70">{hof.zeile}</span>}
-            {hof.abholung && (
-              // Die Abholzeit darf umbrechen statt abzubrechen — abgeschnitten fehlte genau die Uhrzeit.
-              <span
-                className={cn(
-                  'line-clamp-2 text-[11.5px] break-words',
-                  hof.abholungIstTermin ? 'font-semibold text-accent' : 'text-primary-foreground/70'
-                )}
-              >
-                {hof.abholungIstTermin ? `Abholung: ${hof.abholung}` : hof.abholung}
-              </span>
+          <svg viewBox={`0 0 ${mass.breite} ${mass.hoehe}`} aria-hidden="true" className="absolute inset-0 block size-full">
+            {/* Papier: Crème mit einem Hauch Dunkel, damit die Straßen heller sind als das Land. */}
+            <rect width={mass.breite} height={mass.hoehe} className="fill-primary-foreground/6 dark:fill-foreground/4" />
+            {land.fluesse.map((fluss) =>
+              fluss.pfade.map((d, i) => (
+                <path
+                  key={`${fluss.name}-${i}`}
+                  d={d}
+                  fill="none"
+                  strokeWidth={FLUSS_STRICH[fluss.name] ?? 4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="stroke-accent/45 dark:stroke-accent/70"
+                />
+              ))
             )}
-          </span>
-        </span>
-      )}
-    </Link>
+            {land.strassen.map((strasse, s) =>
+              strasse.pfade.map((d, i) => (
+                <g key={`${s}-${i}`} fill="none" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].rand} className="stroke-primary-foreground/20 dark:stroke-background" />
+                  <path d={d} strokeWidth={STRASSEN_STRICH[strasse.art].flaeche} className="stroke-accent-foreground dark:stroke-foreground/14" />
+                </g>
+              ))
+            )}
+            {land.fluesse.map(
+              ({ beschriftung: b }) =>
+                b && (
+                  <text
+                    key={b.text}
+                    x={rundeAufZehntel(b.x)}
+                    y={rundeAufZehntel(b.y)}
+                    transform={`rotate(${rundeAufZehntel(b.winkel)} ${rundeAufZehntel(b.x)} ${rundeAufZehntel(b.y)})`}
+                    textAnchor="middle"
+                    fontSize={12}
+                    strokeWidth={3}
+                    className="fill-accent stroke-accent-foreground font-heading italic [paint-order:stroke] dark:fill-status-fertig dark:stroke-card"
+                  >
+                    {b.text}
+                  </text>
+                )
+            )}
+            {land.schilder.map((schild) => {
+              const breite = 8 + 5.5 * schild.text.length
+              return (
+                <g key={schild.text}>
+                  <rect
+                    x={rundeAufZehntel(schild.x - breite / 2)}
+                    y={rundeAufZehntel(schild.y - 8)}
+                    width={rundeAufZehntel(breite)}
+                    height={16}
+                    rx={4}
+                    className="fill-accent-foreground stroke-primary-foreground/25 dark:fill-card dark:stroke-foreground/25"
+                  />
+                  <text x={rundeAufZehntel(schild.x)} y={rundeAufZehntel(schild.y + 3.5)} textAnchor="middle" fontSize={10} fontWeight={600} className="fill-primary-foreground/70 font-sans dark:fill-foreground/70">
+                    {schild.text}
+                  </text>
+                </g>
+              )
+            })}
+            {REGIONS_NAMEN.map((name) => (
+              <text
+                key={name.text}
+                x={rundeAufZehntel(name.x * mass.breite)}
+                y={rundeAufZehntel(name.y * mass.hoehe)}
+                textAnchor={name.anker}
+                fontSize={10}
+                fontWeight={600}
+                letterSpacing={2}
+                className="fill-primary-foreground/65 font-sans dark:fill-foreground/65"
+              >
+                {name.text}
+              </text>
+            ))}
+            {/* Der hervorgehobene Hof zuletzt: Er liegt über seinen Nachbarn. */}
+            {[...marken.filter((m) => !m.hervorgehoben), ...marken.filter((m) => m.hervorgehoben)].map((marke) => (
+              <Marke key={marke.schluessel} marke={marke} />
+            ))}
+          </svg>
+
+          {/* Keine Pille „n Höfe“ und kein „Karte öffnen“ mehr (Liste Lauf 32, startseite): Der Link darunter führt zur Karte. */}
+        </Link>
+      </KartenZoom>
+      {/* Die Quelle unten rechts wie im Board (V92) — mit der Quelle DIESER Karte: Sie ist aus Natural Earth gezeichnet
+          (regionskarte-daten.ts), nicht aus OpenStreetMap; eine neue Kartenquelle baut Nr. 271 nicht. */}
+      <span className="pointer-events-none absolute right-0 bottom-0 rounded-tl-md bg-accent-foreground/85 px-1.5 py-0.5 text-[12px] leading-tight text-primary-foreground/80 dark:bg-card/85 dark:text-muted-foreground">
+        {KARTE_QUELLE}
+      </span>
+    </div>
   )
 }

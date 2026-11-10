@@ -5,9 +5,9 @@
  * Beweist, je mit Gegenprobe:
  *  1. Hof- und Produktseite setzen „Entdecken" aktiv (aria-current="true"),
  *     die Startseite nicht.
- *  2. Am Handy kleben Hofzeile (Zurück, Name, Ort · Zustand, Teilen), Reiter
- *     und Chips als EIN Block unter dem Kopf; ab md bleibt „‹ Alle Höfe".
- *  3. Die Chips kommen am Handy in ihren Platz im Block (Portal).
+ *  2. Am Handy klebt die Hofzeile (Zurück, Name, Ort · Zustand, Teilen) als
+ *     EIN Block unter dem Kopf (seit Nr. 235 allein, Board s1-hofseite).
+ *  3. Die Chips stehen im Fluss (seit Nr. 235).
  *  4. Fehlertexte beim Griff in den Korb sind geglättet; das Korb-Blatt
  *     öffnet nur das erste Mal einer Sitzung (Merker, auch ohne Speicher).
  *  5. Maße: Kopf der Fokus-Shell 56 px, Beschriftung der Unterleiste 12 px.
@@ -58,10 +58,8 @@ import {
   KLEBE_BLOCK_VAR,
   REITER_PX,
   blattBeimErstenMal,
-  TITELBILD_ZURUECK,
   hofZeileUnterzeile,
   hofZeileZustand,
-  hofzeileSteht,
   korbFehlerText,
   vergissBlattMerker,
 } from '@/lib/hofseite-orientierung'
@@ -168,25 +166,30 @@ describe('2. Hofzeile, Reiter und Chips: EIN klebender Block unter dem Kopf', ()
     expect(zeile).toContain('aria-label="Zurück zu allen Höfen"')
     expect(zeile).toContain('href="/hoefe"')
     expect(zeile).toMatch(/class="truncate [^"]*" title="Hof Test">Hof Test</)
-    expect(zeile).toContain('Musterdorf · Nimmt Bestellungen an')
+    // Nach dem Ort klein weiter wie im Board s1-hofseite („Braunau am Inn · nimmt Bestellungen an").
+    expect(zeile).toContain('Musterdorf · nimmt Bestellungen an')
     expect(zeile.match(/size-11/g)).toHaveLength(2)
   })
 
-  it('der Zustand kommt aus der Kaufsperre — pausiert heißt „Pausiert" (Gegenprobe zum offenen Hof)', () => {
-    expect(element(seite({ sperre: 'pause' }), 'data-hofzeile', 'Hofseite teilen')).toContain('Musterdorf · Pausiert')
+  it('der Zustand kommt aus der Kaufsperre — pausiert heißt „pausiert gerade" (Board Bild 4; Gegenprobe zum offenen Hof)', () => {
+    const pausiert = element(seite({ sperre: 'pause' }), 'data-hofzeile', 'Hofseite teilen')
+    expect(pausiert).toContain('Musterdorf · pausiert gerade')
+    expect(pausiert).not.toContain('nimmt Bestellungen an')
     expect(hofZeileZustand('keine-abholzeit')).toBe('Noch nicht bestellbar')
     expect(hofZeileZustand('ausgebucht')).toBe('Gerade ausgebucht')
     expect(hofZeileUnterzeile('  ', null)).toBe('Nimmt Bestellungen an')
   })
 
-  it('ein einziges `sticky` (am Handy top-14, ab md top-16) — Hofzeile, Reiter und Chip-Platz darin im Fluss', () => {
-    expect(KLEBE_BLOCK).toBe('sticky top-14 z-30 bg-background md:top-16')
+  // Seit Nr. 247 (G9) am Handy ganz oben: Der Kopf der Shell scrollt auf der Hofseite dort weg.
+  it('ein einziges `sticky` (am Handy top-0, ab md top-16) — darin nur die Hofzeile (Board s1-hofseite, Nr. 235)', () => {
+    expect(KLEBE_BLOCK).toBe('sticky top-0 z-30 bg-background md:top-16')
     const html = seite({ suche: 'reiter=produkte' })
     const block = ganzesDiv(html, 'data-klebe-block')
     expect(block).toContain(KLEBE_BLOCK)
     expect(block).toContain('data-hofzeile')
-    expect(block).toContain('aria-label="Bereiche der Hofseite"')
-    expect(block).toContain('data-chips-kleben')
+    // Reiter und Chips stehen im Fluss: Am Handy klebt laut Board nur die Leiste mit dem Hofnamen.
+    expect(block).not.toContain('aria-label="Bereiche der Hofseite"')
+    expect(block).not.toContain('Zu einer Kategorie springen')
     // Genau ein klebendes Element im Block (der Block selbst), und nur ein Block auf der Seite.
     expect(block.match(/sticky/g)).toHaveLength(1)
     expect(html.match(/data-klebe-block/g)).toHaveLength(1)
@@ -194,18 +197,30 @@ describe('2. Hofzeile, Reiter und Chips: EIN klebender Block unter dem Kopf', ()
     expect(element(block, 'data-klebe-block', '>')).not.toMatch(/\bh-\[|top-\[/)
   })
 
-  it('Gegenprobe: außerhalb des Blocks klebt nichts von Hofzeile, Reitern und Chips', () => {
+  it('Gegenprobe: Reiter und Chips gibt es — außerhalb des Blocks und ohne `sticky`', () => {
     const html = seite({ suche: 'reiter=produkte' })
     const ohneBlock = html.replace(ganzesDiv(html, 'data-klebe-block'), '')
     expect(ohneBlock).not.toContain('data-hofzeile')
-    expect(ohneBlock).not.toContain('aria-label="Bereiche der Hofseite"')
+    expect(element(ohneBlock, 'aria-label="Bereiche der Hofseite"', '>')).not.toContain('sticky')
     expect(element(ohneBlock, 'aria-label="Zu einer Kategorie springen"', '>')).not.toContain('sticky')
   })
 
-  it('ab md bleibt „‹ Alle Höfe" oben; „Teilen" steht nur einmal (in der Hofzeile)', () => {
+  it('ab md keine Zeile „‹ Alle Höfe" mehr (Board w1-hofseite); „Teilen" mit Namen steht nur einmal (in der Hofzeile)', () => {
     const html = seite()
-    expect(html).toMatch(/class="mx-auto hidden max-w-\[1200px\] px-6 pt-3 md:block"><a[^>]*>‹ Alle Höfe/)
+    expect(html).not.toContain('‹ Alle Höfe')
     expect(html.match(/aria-label="Hofseite teilen"/g)).toHaveLength(1)
+    // Gegenprobe: Im Kopf steht „Teilen" als sichtbarer Knopf.
+    expect(html).toMatch(/<button[^>]*>.*?Teilen<\/button>/)
+  })
+
+  it('im Reiter Produkte ist am Handy der Name der Hofzeile die h1 — der Kopf ist dort verborgen (Board s1-hofseite Bild 3)', () => {
+    const produkte = seite({ suche: 'reiter=produkte' })
+    expect(element(produkte, 'data-hofzeile', '</h1>')).toMatch(/<h1[^>]*>Hof Test<\/h1>/)
+    expect(produkte).toMatch(/<h1 class="[^"]*max-md:hidden[^"]*">Hof Test<\/h1>/)
+    // Gegenprobe: in der Übersicht ist nur die h1 im Kopf da, die Hofzeile nennt den Namen als Text.
+    const uebersicht = seite()
+    expect(uebersicht.match(/<h1\b/g)).toHaveLength(1)
+    expect(element(uebersicht, 'data-hofzeile', '</button>')).not.toContain('<h1')
   })
 
   it('ohne Produkte und Abholzeiten besteht der Block nur aus der Hofzeile', () => {
@@ -216,30 +231,20 @@ describe('2. Hofzeile, Reiter und Chips: EIN klebender Block unter dem Kopf', ()
   })
 })
 
-describe('3. Chips am Handy im Block', () => {
-  it('im Reiter Produkte hält der Block den Platz der Chips in voller Höhe frei (CHIPS_PX), nur unter md', () => {
-    const platz = element(seite({ suche: 'reiter=produkte' }), 'data-chips-kleben', '>')
-    expect(platz).toContain(`min-h-[${CHIPS_PX}px] md:hidden`)
-  })
-
-  it('die Reihe im Fluss gilt dann nur ab md; am Handy legt ProduktAbschnitte sie per Portal in den Platz', () => {
-    const nav = element(seite({ suche: 'reiter=produkte' }), 'aria-label="Zu einer Kategorie springen"', '>')
-    expect(nav).toContain('hidden md:block')
-    const abschnitte = quelle('src/components/hofseite/produkt-abschnitte.tsx')
-    expect(abschnitte).toMatch(/createPortal\(\s*\/\/[^\n]*\n\s*<nav aria-label="Zu einer Kategorie springen" className="border-b border-border bg-background">/)
-    expect(abschnitte).toMatch(/chipPlatz\s*\)\}/)
-    expect(quelle('src/components/hofseite/hofseite-kunde.tsx')).toContain('chipBlock={chipsKleben ? { platz: chipPlatz } : undefined}')
-  })
-
-  it('Gegenprobe: in der Übersicht gibt es weder Chip-Reihe noch Chip-Platz', () => {
-    const html = seite()
-    expect(html).not.toContain('Zu einer Kategorie springen')
+describe('3. Chips im Fluss (seit Nr. 235)', () => {
+  it('die Reihe steht in jeder Breite im Fluss — kein Platz im Block, kein Portal', () => {
+    const html = seite({ suche: 'reiter=produkte' })
     expect(html).not.toContain('data-chips-kleben')
+    expect(element(html, 'aria-label="Zu einer Kategorie springen"', '>')).not.toContain('hidden md:block')
+    expect(quelle('src/components/hofseite/produkt-abschnitte.tsx')).not.toContain('createPortal')
   })
 
-  it('Gegenprobe: mit nur einer Kategorie kein Chip-Platz', () => {
+  it('Gegenprobe: in der Übersicht gibt es keine Chip-Reihe, mit nur einer Kategorie auch im Reiter Produkte nicht', () => {
+    expect(seite()).not.toContain('Zu einer Kategorie springen')
     const einer = publicFarm({ products: [produkt('p_milch', 'Heumilch', 'MILCH')] })
-    expect(seite({ suche: 'reiter=produkte', farm: einer })).not.toContain('data-chips-kleben')
+    expect(seite({ suche: 'reiter=produkte', farm: einer })).not.toContain('Zu einer Kategorie springen')
+    // … mit mehreren aber schon.
+    expect(seite({ suche: 'reiter=produkte' })).toContain('Zu einer Kategorie springen')
   })
 })
 
@@ -291,13 +296,15 @@ describe('4. Korb: Fehlertexte und das erste Blatt einer Sitzung (Register N29, 
 describe('5. Maße', () => {
   it('der Kopf der KundeFokusShell ist 56 px hoch wie der der KundeShell (vorher 52)', () => {
     const fokus = quelle('src/components/shells/kunde-shell.tsx').split('export function KundeFokusShell(')[1]
-    expect(fokus).toMatch(/<div className="mx-auto flex h-14 max-w-\[1200px\][^"]*md:h-16/)
+    // Seit Lauf 31 über die volle Breite (Boards w1-kasse, w1-bestellung-link): Marke links, Rückweg rechts.
+    expect(fokus).toMatch(/<div className="flex h-14 items-center[^"]*md:h-16/)
     expect(fokus).not.toContain('h-[52px]')
   })
 
   it('die Beschriftung der Unterleiste ist 12 px — die Leiste bleibt 68 px hoch', () => {
     const leiste = quelle('src/components/ui/bottom-nav.tsx')
-    expect(leiste.match(/text-\[12px\] leading-none/g)).toHaveLength(2)
+    // Eintrag, erhobener Mittelknopf mit Wort (Kunde) und seit Nr. 233 der flache Mittelknopf (Hof „Neu“).
+    expect(leiste.match(/text-\[12px\] leading-none/g)).toHaveLength(3)
     expect(leiste).not.toContain('text-[10.5px]')
     expect(leiste).toMatch(/flex h-\[68px\] items-stretch/)
   })
@@ -334,17 +341,29 @@ describe('6. scroll-padding: der Fokus rutscht nie unter klebende Köpfe und die
     expect(unten).toBe(`calc(${px(masse('kunde-unterleiste').replace('calc(', '')) + px(masse('kunde-ueberstand'))}px + env(safe-area-inset-bottom))`)
   })
 
-  it('Hofseite: oben Kopf + gemessene Höhe des Blocks; bis zur Messung Hofzeile + Reiter (+ Chips), ab md Reiter', () => {
+  // Seit Nr. 247 (G9) scrollt der Kopf der Shell auf der Hofseite am Handy weg: oben zählt dort nur der Block.
+  it('Hofseite: am Handy oben nur die gemessene Höhe des Blocks; bis zur Messung Hofzeile + Reiter (+ Chips), ab md Kopf + Reiter', () => {
     const handyMedien = '@media (max-width: 767px) {\n    html:has([data-scroll-rand'
-    const kopf = px(masse('kunde-kopf'))
     expect(regel(css, "html:has([data-scroll-rand='kunde']):has([data-klebe-block])", 'scroll-padding-top', handyMedien)).toBe(
-      `calc(${kopf}px + var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX}px))`
+      `var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX}px)`
     )
     expect(regel(css, "html:has([data-scroll-rand='kunde']):has([data-chips-kleben])", 'scroll-padding-top', handyMedien)).toBe(
-      `calc(${kopf}px + var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX + CHIPS_PX}px))`
+      `var(${KLEBE_BLOCK_VAR}, ${HOFZEILE_PX + REITER_PX + CHIPS_PX}px)`
     )
+    // Der Block klebt dazu passend ganz oben, ab md unter dem Kopf.
+    expect(KLEBE_BLOCK).toMatch(/(^| )top-0( |$)/)
+    expect(KLEBE_BLOCK).toMatch(/(^| )md:top-16( |$)/)
     const breit = regel(css, "html:has([data-scroll-rand='kunde']):has([data-klebe-block])", 'scroll-padding-top', '@media (min-width: 768px) {\n    html:has([data-scroll-rand')
     expect(breit).toBe(`calc(${px(masse('kunde-kopf', true))}px + var(${KLEBE_BLOCK_VAR}, ${REITER_PX}px))`)
+  })
+
+  it('Produktseite: Scrollt der Kopf am Handy weg (data-kopf-scrollt), hält oben nichts Platz frei — und die Regel steht vor denen der Hofseite', () => {
+    const handyMedien = '@media (max-width: 767px) {\n    html:has([data-scroll-rand'
+    const wahl = "html:has([data-scroll-rand^='kunde'][data-kopf-scrollt])"
+    expect(regel(css, wahl, 'scroll-padding-top', handyMedien)).toBe('0px')
+    // Gleiche Stärke wie die Regeln der Hofseite: die spätere gewinnt, also muss diese vorher stehen.
+    expect(css.indexOf(wahl)).toBeLessThan(css.indexOf("html:has([data-scroll-rand='kunde']):has([data-klebe-block])"))
+    expect(quelle('src/components/shells/kunde-shell.tsx')).toContain("data-kopf-scrollt={kopfScrolltWeg ? '' : undefined}")
   })
 
   it('die Hofseite misst ihren Block und schreibt die Höhe an die Wurzel', () => {
@@ -362,7 +381,8 @@ describe('6. scroll-padding: der Fokus rutscht nie unter klebende Köpfe und die
   it('die Shells und der Unterseiten-Kopf tragen die Merkmale, auf die die Regeln zielen', () => {
     expect(quelle('src/components/shells/kunde-shell.tsx')).toContain(`data-scroll-rand={unterleiste ? 'kunde' : 'kunde-ohne-leiste'}`)
     expect(quelle('src/components/shells/hof-shell.tsx')).toContain('data-scroll-rand="hof"')
-    expect(quelle('src/components/hofbereich/unterseiten-kopf.tsx')).toContain('data-unterseiten-leiste=""')
+    // Seit 26.1 (Lauf 33) trägt nur der Werkzeug-Kopf das Merkmal (der alte Unterseiten-Kopf ist gelöscht).
+    expect(quelle('src/components/ui/werkzeug-kopf.tsx')).toContain('data-unterseiten-leiste=""')
     expect(seite()).toContain('data-scroll-rand="kunde"')
   })
 
@@ -391,57 +411,28 @@ describe('7. Rückweg im Hofbereich: dieselbe Regel wie auf den Kundenseiten', (
     expect(tippAufRueckweg(hofseite, '/', 'zeile')).toEqual(tippAufZiel('/hoefe', '/'))
   })
 
-  it('UnterseitenKopf fragt die Regel mit dem Vorgänger aus dem RueckwegMerker — beide Links', () => {
-    const kopf = quelle('src/components/hofbereich/unterseiten-kopf.tsx')
-    expect(kopf).toContain('tippAufZiel(ziel, eigenerVorgaengerJetzt())')
-    expect(kopf).toContain('window.history.back()')
-    expect(kopf.match(/onClick=\{beimTipp\(ziel\)\}/g)).toHaveLength(2)
+  it('der WerkzeugKopf fragt die Regel mit dem Vorgänger aus dem RueckwegMerker — beide Links', () => {
+    // Der Tipp steht in EINER Quelle (ui/rueckweg-tipp.ts, seit Nr. 245); der Werkzeug-Kopf nimmt sie.
+    const tipp = quelle('src/components/ui/rueckweg-tipp.ts')
+    expect(tipp).toContain('tippAufZiel(ziel, eigenerVorgaengerJetzt())')
+    expect(tipp).toContain('window.history.back()')
+    for (const datei of ['src/components/ui/werkzeug-kopf.tsx']) {
+      const kopf = quelle(datei)
+      expect(kopf, datei).toContain("from '@/components/ui/rueckweg-tipp'")
+      expect(kopf.match(/onClick=\{beimTipp\(ziel\)\}/g), datei).toHaveLength(2)
+    }
   })
 })
 
-describe('Zurück im Titelbild am Handy (Entscheidung 5, Nr. 195)', () => {
-  it('oben links im Titelbild, 44 px, nur unter md, mit dem Namen „Zu allen Höfen" für den Screenreader', () => {
-    expect(TITELBILD_ZURUECK).toBe('Zu allen Höfen')
+describe('Zurück am Handy (Entscheidung 5, Nr. 195; seit Nr. 235 über die Hofzeile ganz oben)', () => {
+  it('die Hofzeile mit Zurück steht vor dem Titelbild — Zurück ist von Anfang an zu sehen, ein Knopf im Bild entfällt', () => {
     const html = seite()
-    const knopf = element(html, 'data-titelbild-zurueck', '</a>')
-    expect(knopf).toContain('aria-label="Zu allen Höfen"')
-    expect(knopf).toMatch(/href="\/hoefe[^"]*"/)
-    expect(knopf).toContain('size-11')
-    expect(knopf).toContain('top-2 left-2')
-    expect(knopf).toContain('md:hidden')
-    // Theme-fest dunkel wie jedes Bild-Overlay, kein Palette-Wert.
-    expect(knopf).toContain('bg-primary-foreground/65')
-  })
-
-  it('steht vor der klebenden Hofzeile, nicht in ihr — vor dem Kleben (Server und erste Messung) ist er da', () => {
-    const html = seite()
-    expect(html.indexOf('data-titelbild-zurueck')).toBeGreaterThan(-1)
-    expect(html.indexOf('data-titelbild-zurueck')).toBeLessThan(html.indexOf('data-klebe-block'))
-    // Gegenprobe: Im klebenden Block bleibt das Zurück der Hofzeile, das mit dem langen Namen.
+    expect(html).not.toContain('data-titelbild-zurueck')
+    // Der Name des alten Knopfs im Bild („Zu allen Höfen“, bis Nr. 235 TITELBILD_ZURUECK) steht nirgends mehr.
+    expect(html).not.toContain('aria-label="Zu allen Höfen"')
     const block = ganzesDiv(html, 'data-klebe-block')
-    expect(block).not.toContain('data-titelbild-zurueck')
     expect(block).toContain('aria-label="Zurück zu allen Höfen"')
-  })
-
-  it('ab md bleibt es bei „‹ Alle Höfe": der Knopf im Titelbild ist dort verborgen, Teilen steht weiter nur einmal', () => {
-    const html = seite()
-    expect(html.match(/data-titelbild-zurueck/g)).toHaveLength(1)
-    expect(html.match(/aria-label="Hofseite teilen"/g)).toHaveLength(1)
-  })
-
-  it('hofzeileSteht: klebt, sobald die Oberkante des Blocks unter dem Kopf angekommen ist', () => {
-    expect(hofzeileSteht(56, 56)).toBe(true)
-    expect(hofzeileSteht(20, 56)).toBe(true)
-    // Gegenprobe: noch darunter im Fluss.
-    expect(hofzeileSteht(57, 56)).toBe(false)
-    expect(hofzeileSteht(420, 56)).toBe(false)
-    // Ohne Kopf zählt die Fensterkante.
-    expect(hofzeileSteht(0, 0)).toBe(true)
-    expect(hofzeileSteht(10, 0)).toBe(false)
-  })
-
-  it('der Knopf verschwindet, wenn der Block klebt (Quelltext: nur ohne `klebt` gerendert)', () => {
-    const q = quelle('src/components/hofseite/hofseite-kunde.tsx')
-    expect(q).toMatch(/\{!klebt && \(\s*<Link[^>]*\s+href=\{zurueck\.href\}[\s\S]*?data-titelbild-zurueck/)
+    // Gegenprobe: Der Block steht im Quelltext vor dem Titelbild.
+    expect(html.indexOf('data-klebe-block')).toBeLessThan(html.indexOf('data-abschnitt="titelbild"'))
   })
 })

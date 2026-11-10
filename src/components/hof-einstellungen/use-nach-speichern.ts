@@ -15,19 +15,22 @@ import { GESPEICHERT_TEXT, zielNachSpeichern } from '@/lib/bauern-navigation'
  *
  * Nur im Erfolgsfall aufrufen — bei einem Fehler bleibt die Seite mit der
  * Meldung stehen, die Eingaben sind noch da.
+ *
+ * `titel` ersetzt auf der Unterseite das Wort „Gespeichert“, wo das Board den
+ * Gegenstand nennt („Hofdaten gespeichert“, s2-hofdaten-zahlung; Nr. 224).
  */
-export function useNachSpeichern(): (sonst: string, zusatz?: string) => void {
+export function useNachSpeichern(): (sonst: string, zusatz?: string, titel?: string) => void {
   const pfad = usePathname()
   const router = useRouter()
   return useCallback(
-    (sonst: string, zusatz?: string) => {
+    (sonst: string, zusatz?: string, titel: string = GESPEICHERT_TEXT) => {
       const ziel = zielNachSpeichern(pfad)
       const optionen = zusatz ? { description: zusatz } : undefined
       if (!ziel) {
         toast.success(sonst, optionen)
         return
       }
-      toast.success(GESPEICHERT_TEXT, optionen)
+      toast.success(titel, optionen)
       router.push(ziel)
     },
     [pfad, router]

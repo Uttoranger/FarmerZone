@@ -2,11 +2,14 @@
 
 import { useId, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, MailCheck } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { PASSWORT_LINK_DAUER_TEXT } from '@/lib/anmeldecode'
 import { cn } from '@/lib/utils'
-import { FEHLER_TEXT, FELD, FELD_LABEL, HINWEIS_TEXT, KNOPF_ORANGE, TEXTKNOPF } from '@/components/anmelden/stil'
+import { FEHLER_TEXT, FELD, FELD_LABEL, KNOPF_ORANGE_KAUF, TEXTLINK } from '@/components/anmelden/stil'
+import { ErfolgKasten } from '@/components/ui/erfolg-kasten'
+// 16 px wie im Board (G8): die Rundungen aus einer Quelle statt freier Pixelwerte.
+import { RUNDUNG } from '@/components/ui/rundung'
 
 /**
  * „Passwort vergessen?" — das Formular (seit Nr. 54 in der Fokus-Shell, die
@@ -36,18 +39,18 @@ export function PasswortVergessenFormular(): React.JSX.Element {
         redirectTo: '/reset-password',
       })
       if (error?.status === 429) {
-        setFehler('Zu viele Versuche — bitte kurz warten.')
+        setFehler('Zu viele Versuche – bitte kurz warten.')
         return
       }
       if (error && !error.status) {
-        setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
+        setFehler('Verbindung fehlgeschlagen – bitte erneut versuchen.')
         return
       }
       // Erfolg UND „Konto existiert nicht"-artige Antworten bekommen dieselbe
       // neutrale Meldung — keine Konto-Enumeration über diese Seite
       setGesendet(true)
     } catch {
-      setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
+      setFehler('Verbindung fehlgeschlagen – bitte erneut versuchen.')
     } finally {
       setLaedt(false)
     }
@@ -55,30 +58,31 @@ export function PasswortVergessenFormular(): React.JSX.Element {
 
   if (gesendet) {
     return (
-      <div className="flex flex-col items-center gap-3 py-2 text-center">
-        <MailCheck className="size-8 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
-        <p role="status" aria-live="polite" className="text-[14.5px] leading-normal text-foreground">
-          Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt.
+      // Grün getönter Kasten mit Haken, links bündig, ein Absatz (Board s2-/w2-passwort, Bild 2);
+      // die Antwort bleibt für jede Adresse gleich.
+      // Liste Lauf 32 (passwort Bild 2): 16 px Rundung, Link 15 px wie im Board.
+      <ErfolgKasten titel="Schau in deine E-Mails" className={RUNDUNG.blatt}>
+        <p role="status" aria-live="polite">
+          {`Falls ein Konto mit dieser E-Mail existiert, haben wir dir einen Link geschickt. Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig. Schau auch im Spam-Ordner nach.`}
         </p>
-        <p className={HINWEIS_TEXT}>{`Der Link ist ${PASSWORT_LINK_DAUER_TEXT} gültig. Schau auch im Spam-Ordner nach.`}</p>
-        <Link href="/login" className={TEXTKNOPF}>
+        <Link href="/login" className={cn(TEXTLINK, 'text-[15px]')}>
           Zurück zur Anmeldung
         </Link>
-      </div>
+      </ErfolgKasten>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div>
-        <h2 className="font-heading text-[22px] leading-tight font-semibold text-foreground md:text-2xl">Passwort vergessen?</h2>
-        <p className="mt-1 text-[14px] leading-normal text-muted-foreground">Wir schicken dir einen Link zum Zurücksetzen.</p>
+        <h2 className="font-heading text-[24px] leading-tight font-semibold text-foreground">Passwort vergessen?</h2>
+        <p className="mt-1.5 text-[15px] leading-normal text-muted-foreground">Wir schicken dir einen Link zum Zurücksetzen.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={emailId} className={FELD_LABEL}>
-            E-Mail-Adresse
+            E-Mail
           </label>
           <input
             id={emailId}
@@ -86,7 +90,7 @@ export function PasswortVergessenFormular(): React.JSX.Element {
             inputMode="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@hof.at"
+            placeholder="name@beispiel.at"
             autoComplete="email"
             required
             aria-invalid={fehler ? true : undefined}
@@ -101,7 +105,7 @@ export function PasswortVergessenFormular(): React.JSX.Element {
           </p>
         )}
 
-        <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={KNOPF_ORANGE}>
+        <button type="submit" disabled={laedt} aria-busy={laedt || undefined} className={KNOPF_ORANGE_KAUF}>
           {laedt ? (
             <>
               <Loader2 className="size-4 animate-spin" strokeWidth={1.7} aria-hidden="true" />
@@ -112,10 +116,6 @@ export function PasswortVergessenFormular(): React.JSX.Element {
           )}
         </button>
       </form>
-
-      <Link href="/login" className={cn(TEXTKNOPF, 'self-center')}>
-        Zurück zur Anmeldung
-      </Link>
     </div>
   )
 }

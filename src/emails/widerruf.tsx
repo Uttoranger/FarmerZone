@@ -1,13 +1,16 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, BetragsZeile, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText, highlightBox, highlightLabel, highlightValue } from './_layout'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, ErstattungKasten, HinweisKasten, Knopf, KnopfReihe, Trenner, h1, bodyText, kleinText } from './_layout'
 import { formatEuro } from '@/lib/format'
 import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
 
 /*
  * Die Mails des Widerrufs (Nr. 200, Register N39). Sätze kurz, geduzt, ohne
- * Fachwörter. Name, Adresse und Nachricht der Kundin stehen NIE im Betreff
- * (sendRaw schreibt den Betreff ins Log).
+ * Fachwörter; sie sagen „Rücktritt“ (Register N43, Wortliste). Wörtlich bleiben
+ * bis zur Entscheidung der Anwältin nur der Betreff der Eingangsbestätigung samt
+ * Vorschautext (§ 13a FAGG, N43 (1)) und „Vertrag widerrufen“ als Einstieg.
+ * Name, Adresse und Nachricht der Kundin stehen NIE im Betreff (sendRaw
+ * schreibt den Betreff ins Log).
  */
 
 export interface WiderrufEingangProps {
@@ -20,43 +23,36 @@ export interface WiderrufEingangProps {
   naechsteSchritte: readonly string[]
   /** Der Hof als Vertragspartner, nur wenn der Widerruf über den signierten Link kam. */
   hofName: string | null
-  marke: string
 }
 
 /** Eingangsbestätigung (§ 13a FAGG): Inhalt, Datum und Uhrzeit, die nächsten Schritte. */
 export function WiderrufEingangEmail(p: WiderrufEingangProps) {
   return (
-    <EmailLayout previewText="Dein Widerruf ist eingegangen" fusszeile={`Versandt von ${p.marke}.`}>
-      <Text style={h1}>Dein Widerruf ist eingegangen</Text>
-      <Text style={bodyText}>Wir haben deinen Widerruf am {p.eingegangenAm} erhalten. Diese E-Mail ist deine Eingangsbestätigung.</Text>
-      {p.bestellnummer && <BetragsZeile links="Bestellnummer" rechts={p.bestellnummer} />}
+    <EmailLayout fuss={{ art: 'plattform' }} previewText="Dein Widerruf ist eingegangen">
+      <Text style={h1}>Dein Rücktritt ist eingegangen</Text>
+      {/* § 13a FAGG: Inhalt, Datum und Uhrzeit stehen als Zeilen (Board s3/w3-mail-storno Bild 5). */}
+      <Text style={bodyText}>Diese E-Mail ist deine Eingangsbestätigung.</Text>
+      {p.bestellnummer && <BestellnummerKasten nummer={p.bestellnummer} />}
       {p.hofName && <BetragsZeile umbrechen links="Vertragspartner" rechts={p.hofName} />}
       <BetragsZeile umbrechen links="Eingegangen" rechts={p.eingegangenAm} />
-      <Trenner />
-      <Text style={bodyText}>
-        <strong>Widerrufen:</strong>
-      </Text>
       {p.umfang.map((zeile, i) => (
-        <Text key={i} style={kleinText}>
-          {zeile}
-        </Text>
+        <BetragsZeile key={i} umbrechen links={i === 0 ? 'Umfang' : ''} rechts={umfangImSatz(zeile)} />
       ))}
       <Trenner />
-      <Text style={bodyText}>
-        <strong>So geht es weiter</strong>
-      </Text>
-      {p.naechsteSchritte.map((satz, i) => (
-        <Text key={i} style={kleinText}>
-          {satz}
-        </Text>
-      ))}
+      <Text style={{ ...bodyText, fontSize: '15px', fontWeight: '600', margin: '8px 0 6px' }}>So geht es weiter</Text>
+      <Text style={bodyText}>{p.naechsteSchritte.join(' ')}</Text>
     </EmailLayout>
   )
 }
 
+/** „Die ganze Bestellung“ steht mitten im Satz bzw. in der Zeile klein (Board: „die ganze Bestellung“); Artikel bleiben, wie sie sind. */
+function umfangImSatz(zeile: string): string {
+  return zeile === 'Die ganze Bestellung' ? 'die ganze Bestellung' : zeile
+}
+
 export interface WiderrufHofProps {
   bestellnummer: string
-  /** Die widerrufenen Artikel bzw. „Die ganze Bestellung“. */
+  /** Die Artikel des Rücktritts bzw. „Die ganze Bestellung“. */
   umfang: string[]
   eingegangenAm: string
   bestellungUrl: string
@@ -66,18 +62,13 @@ export interface WiderrufHofProps {
 /** An den Hof: ein Widerruf nach der Abholung — prüfen, erstatten oder mit Grund ablehnen. */
 export function WiderrufHofEmail(p: WiderrufHofProps) {
   return (
-    <EmailLayout previewText={`Widerruf zu Bestellung ${p.bestellnummer}`}>
-      <Text style={h1}>Eine Kundin hat widerrufen</Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Rücktritt zu Bestellung ${p.bestellnummer}`}>
+      <Text style={h1}>Eine Kundin ist zurückgetreten</Text>
       <Text style={bodyText}>
-        Zur Bestellung <strong>{p.bestellnummer}</strong> ist am {p.eingegangenAm} ein Widerruf eingegangen. Bitte prüf die Rückgabe und erstatte –
-        oder lehne mit Grund ab.
+        Zur Bestellung <strong>{p.bestellnummer}</strong> ist am {p.eingegangenAm} ein Rücktritt eingegangen: {p.umfang.map(umfangImSatz).join(', ')}.
       </Text>
-      {p.umfang.map((zeile, i) => (
-        <Text key={i} style={kleinText}>
-          {zeile}
-        </Text>
-      ))}
-      <Text style={kleinText}>{p.ausnahmeSatz}</Text>
+      {/* Die Ausnahme prüft der Hof selbst — als orange Karte, weil er handeln muss (Board s3/w3-mail-hof-bestellung Bild 4). */}
+      <HinweisKasten art="orange">{p.ausnahmeSatz}</HinweisKasten>
       <KnopfReihe>
         <Knopf href={p.bestellungUrl}>Bestellung öffnen</Knopf>
       </KnopfReihe>
@@ -98,18 +89,25 @@ export interface WiderrufErgebnisProps {
   teilweise?: boolean
 }
 
+/** Überschrift und Betreff des Ergebnisses — eine Quelle für Vorlage und src/lib/email.ts. */
+export const WIDERRUF_ERGEBNIS_TITEL = {
+  abgelehnt: 'Dein Rücktritt wurde abgelehnt',
+  teilweise: 'Dein Rücktritt ist zum Teil erledigt',
+  erledigt: 'Dein Rücktritt ist erledigt',
+} as const
+
 /** Das Ergebnis an die Kundin: erstattet (mit Betrag) oder abgelehnt (mit Grund). */
 export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
   const abgelehnt = p.grund !== null
   const teilweise = !abgelehnt && p.vorAbholung === true && p.teilweise === true
-  const titel = abgelehnt ? 'Dein Widerruf wurde abgelehnt' : teilweise ? 'Dein Widerruf ist zum Teil erledigt' : 'Dein Widerruf ist erledigt'
+  const titel = abgelehnt ? WIDERRUF_ERGEBNIS_TITEL.abgelehnt : teilweise ? WIDERRUF_ERGEBNIS_TITEL.teilweise : WIDERRUF_ERGEBNIS_TITEL.erledigt
   return (
-    <EmailLayout previewText={titel}>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={titel}>
       <Text style={h1}>{titel}</Text>
       {abgelehnt ? (
         <>
           <Text style={bodyText}>
-            {p.hofName} hat deinen Widerruf zur Bestellung <strong>{p.bestellnummer}</strong>
+            {p.hofName} hat deinen Rücktritt zur Bestellung <strong>{p.bestellnummer}</strong>
             {p.teilweise ? ' für die übrigen Artikel' : ''} abgelehnt. Der Grund:
           </Text>
           <Text style={bodyText}>{p.grund}</Text>
@@ -119,23 +117,20 @@ export function WiderrufErgebnisEmail(p: WiderrufErgebnisProps) {
         <>
           {teilweise ? (
             <Text style={bodyText}>
-              Einen Teil der widerrufenen Artikel haben wir aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen. Die übrigen prüft der Hof.
+              Einen Teil der Artikel, von denen du zurückgetreten bist, haben wir aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen. Die übrigen prüft der Hof.
             </Text>
           ) : p.vorAbholung ? (
             <Text style={bodyText}>
-              Die widerrufenen Artikel sind aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen.
+              Die Artikel, von denen du zurückgetreten bist, sind aus deiner Bestellung <strong>{p.bestellnummer}</strong> bei {p.hofName} gestrichen.
             </Text>
           ) : (
             <Text style={bodyText}>
-              {p.hofName} hat die Rückgabe zur Bestellung <strong>{p.bestellnummer}</strong> bestätigt.
+              {`${p.hofName} hat die Rückgabe deiner Bestellung bestätigt.`}
             </Text>
           )}
+          {!teilweise && !p.vorAbholung && <BestellnummerKasten nummer={p.bestellnummer} />}
           {p.erstattet !== null ? (
-            <div style={highlightBox}>
-              <Text style={highlightLabel}>Zurück an dich</Text>
-              <Text style={highlightValue}>{formatEuro(p.erstattet)}</Text>
-              <Text style={{ ...kleinText, margin: 0 }}>Das Geld ist in 5–10 Werktagen wieder auf deinem Konto.</Text>
-            </div>
+            <ErstattungKasten betrag={formatEuro(p.erstattet)} zeile="auf demselben Weg, wie du bezahlt hast" />
           ) : p.vorAbholung ? (
             <Text style={bodyText}>Bei der Abholung zahlst du nur noch die übrigen Artikel.</Text>
           ) : (

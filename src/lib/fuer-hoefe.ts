@@ -7,7 +7,8 @@
  * Connect, „Nicht abgeholt" in servicegebuehr-Sprint, Pausieren über
  * Farm.isPaused) — keine Zusage darüber hinaus.
  */
-import { ONLINE_ZAHLUNG_START_KURZ, ONLINE_ZAHLUNG_START_SCHRITT, SERVICEGEBUEHR_SATZ_TEXT, mitBarAusnahme } from '@/lib/konditionen'
+import { ONLINE_ZAHLUNG_START_KURZ, ONLINE_ZAHLUNG_START_SCHRITT, gebuehrGrundsatz } from '@/lib/konditionen'
+import { gebuehrWortFuerModell, type GebuehrModell } from '@/lib/plattformgebuehr'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 
 export type Vorteil = { titel: string; text: string; kurz: string }
@@ -25,8 +26,10 @@ export const FUER_HOEFE_VORTEILE: readonly Vorteil[] = [
   },
   {
     titel: 'Voller Preis für dich',
-    text: 'Die Servicegebühr zahlt der Kunde. Online-Zahlungen kommen per Stripe direkt auf dein Konto.',
-    kurz: 'die Servicegebühr zahlt der Kunde',
+    // In beiden Modellen wahr (Board t-/w-o-fuer-hoefe: „Du bekommst deinen vollen Warenpreis.“) —
+    // wer die Gebühr wie trägt, sagen Preise und Fragen je Modell (gebuehrGrundsatz).
+    text: 'Du bekommst deinen vollen Warenpreis. Online-Zahlungen kommen per Stripe direkt auf dein Konto.',
+    kurz: 'du bekommst deinen vollen Warenpreis',
   },
   {
     titel: 'Mehr Stammkunden',
@@ -75,15 +78,15 @@ export const FUER_HOEFE_FRAGEN: readonly Frage[] = [
   },
   {
     frage: 'Wie kommt das Geld zu mir?',
+    // Der Satz zur Gebühr kommt je Modell dazu (fuerHoefeFragen, gebuehrGrundsatz).
     antwort:
       'Online-Zahlungen laufen über Stripe und kommen direkt auf dein Konto. Barzahlungen kassierst du bei der ' +
-      `Abholung selbst. Die Servicegebühr von ${SERVICEGEBUEHR_SATZ_TEXT} zahlt der Kunde zusätzlich.`,
+      'Abholung selbst.',
   },
   {
     frage: 'Was, wenn ein Kunde nicht abholt?',
-    antwort:
-      'Du markierst die Bestellung als „Nicht abgeholt". Online bezahlt bleibt der Warenpreis bei dir; die ' +
-      'Servicegebühr fällt dann weg.',
+    // Der Satz zur Gebühr kommt je Modell dazu (fuerHoefeFragen): markAsNotPickedUp erstattet sie in beiden.
+    antwort: 'Du markierst die Bestellung als „Nicht abgeholt". Online bezahlt bleibt der Warenpreis bei dir.',
   },
   {
     frage: 'Kann ich pausieren, z. B. im Urlaub?',
@@ -99,14 +102,23 @@ export const FUER_HOEFE_SCHLUSS = {
   text: 'Registrieren dauert zwei Minuten. Einrichten kannst du in Ruhe.',
 } as const
 
-/** Die Frage, deren Antwort die Bar-Ausnahme bekommt (Register B1). */
+/** Die Frage, deren Antwort den Grundsatz der Gebühr bekommt (samt Bar-Ausnahme, Register B1). */
 const FRAGE_GELD = 'Wie kommt das Geld zu mir?'
 
+/** Die Frage, deren Antwort sagt, dass die Gebühr beim Nicht-Abholen entfällt. */
+const FRAGE_NICHT_ABGEHOLT = 'Was, wenn ein Kunde nicht abholt?'
+
 /**
- * Die Fragen, wie /fuer-hoefe sie zeigt: vor dem Stichtag mit der
- * Bar-Ausnahme in der Antwort zum Geld (Satz aus konditionen.ts), danach
- * unverändert. `jetzt` beim Bauen bzw. Revalidieren der Seite.
+ * Die Fragen, wie /fuer-hoefe sie zeigt — die Gebühr je Modell (V62, N38):
+ * Die Antwort zum Geld bekommt `gebuehrGrundsatz(modell, jetzt)` (im Modell
+ * „bisher“ vor dem Stichtag mit der Bar-Ausnahme), die zum Nicht-Abholen das
+ * Wort des Modells. `modell` kommt von der Seite (`gebuehrModellFuer`), `jetzt`
+ * beim Bauen bzw. Revalidieren.
  */
-export function fuerHoefeFragen(jetzt: Date): readonly Frage[] {
-  return FUER_HOEFE_FRAGEN.map((f) => (f.frage === FRAGE_GELD ? { ...f, antwort: mitBarAusnahme(f.antwort, jetzt) } : f))
+export function fuerHoefeFragen(jetzt: Date, modell: GebuehrModell): readonly Frage[] {
+  return FUER_HOEFE_FRAGEN.map((f) => {
+    if (f.frage === FRAGE_GELD) return { ...f, antwort: `${f.antwort} ${gebuehrGrundsatz(modell, jetzt)}` }
+    if (f.frage === FRAGE_NICHT_ABGEHOLT) return { ...f, antwort: `${f.antwort} Die ${gebuehrWortFuerModell(modell)} fällt dann weg.` }
+    return f
+  })
 }

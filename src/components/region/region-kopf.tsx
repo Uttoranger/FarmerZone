@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { REGION_SATZ_KARTE } from '@/components/region/region-spalten'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
 import type { UmfeldKm } from '@/lib/umfeld'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
 import type { AbholungWahl } from '@/schemas/hoefe-filter'
 import { regionReiterLink, type FutterAnsichtWahl, type RegionReiter } from '@/schemas/region'
 
@@ -18,7 +21,14 @@ import { regionReiterLink, type FutterAnsichtWahl, type RegionReiter } from '@/s
  * N14): Die alte Ansicht bleibt stehen, statt als Skelett aufzublitzen.
  */
 
-export const REGION_RAHMEN = 'mx-auto w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10'
+/** Der Satz unter der Überschrift, wörtlich wie im Board s1-/w1-region (mit Punkt). */
+export const REGION_SATZ = 'Rund um deinen Hof – Preise vergleichen und Futter kaufen.'
+
+/**
+ * Der Rahmen der Seite: bis 1024 px eine Spalte, ab 1024 px Liste und Karte nebeneinander mit Inhalt bis 1400 px
+ * (Liste Lauf 32 region, Nr. 272). `group/region` trägt die Kartenansicht am Handy zum Satz im Kopf (region-spalten.ts).
+ */
+export const REGION_RAHMEN = 'group/region w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 lg:max-w-[1400px] xl:px-10'
 
 const REITER: readonly { id: RegionReiter; label: string }[] = [
   { id: 'preise', label: 'Preise vergleichen' },
@@ -31,6 +41,8 @@ export function RegionKopf({
   ansicht = 'liste',
   abholung = null,
   ladePunkt = false,
+  hofName,
+  jetzt,
 }: {
   reiter: RegionReiter | null
   km: UmfeldKm
@@ -40,14 +52,20 @@ export function RegionKopf({
   abholung?: AbholungWahl | null
   /** Der Ladepunkt am gewählten Reiter, solange er lädt — braucht einen `LadeRahmen` drumherum (wie `Unterreiter`). */
   ladePunkt?: boolean
+  /** Für die Zeile „<Hof> · Stand …“ unter der Überschrift (Board s1-/w1-region). */
+  hofName: string
+  jetzt: Date
 }): React.JSX.Element {
   return (
     <header className="flex flex-col gap-4">
       <div>
-        <h1 className="font-heading text-2xl font-semibold text-foreground md:text-[26px]">Region</h1>
-        <p className="mt-1 text-[13.5px] leading-normal text-muted-foreground">Rund um deinen Hof – Preise vergleichen und Futter kaufen</p>
+        {/* Kopfstreifen mit Linie am Handy (G1, Liste Lauf 32 region). */}
+        <WerkzeugKopf titel="Region" unterzeile={<HofUnterzeile hofName={hofName} jetzt={jetzt} />} />
+        {/* In der Kartenansicht am Handy fällt der Satz weg (Board s1-region Bild 6). */}
+        <p className={cn('text-[13.5px] leading-normal text-muted-foreground md:text-sm', REGION_SATZ_KARTE)}>{REGION_SATZ}</p>
       </div>
-      <nav aria-label="Region" className="flex gap-6 border-b border-border">
+      {/* Zwei gleich breite Reiter über die volle Breite, der gewählte grün unterstrichen (Board s1-/w1-region). */}
+      <nav aria-label="Region" className="flex border-b border-border">
         {REITER.map((r) => {
           const gewaehlt = r.id === reiter
           return (
@@ -56,14 +74,16 @@ export function RegionKopf({
               href={regionReiterLink(r.id, km, { ansicht, abholung })}
               aria-current={gewaehlt ? 'page' : undefined}
               className={cn(
-                'relative -mb-px inline-flex min-h-11 items-center border-b-2 px-0.5 text-[15px] transition-colors duration-[250ms]',
-                gewaehlt ? 'border-foreground font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
+                'relative -mb-px inline-flex min-h-12 flex-1 items-center justify-center border-b-2 px-0.5 text-[15px] transition-colors duration-[250ms]',
+                gewaehlt ? 'border-status-fertig font-semibold text-foreground' : 'border-transparent font-medium text-muted-foreground hover:text-foreground',
                 FOKUS_RAHMEN
               )}
             >
-              {r.label}
-              {/* Rechts neben dem Wort, im Abstand zum nächsten Reiter — der Reiter hat kein Polster. */}
-              {ladePunkt && <LadePunkt className="-right-3" />}
+              {/* Der Ladepunkt rechts neben dem Wort, nicht am Rand des breiten Reiters. */}
+              <span className="relative">
+                {r.label}
+                {ladePunkt && <LadePunkt className="-right-3" />}
+              </span>
             </Link>
           )
         })}

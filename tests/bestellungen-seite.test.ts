@@ -72,7 +72,7 @@ function bestellung(teil: Partial<ListenBestellung> = {}): ListenBestellung {
     pickupTimeStart: '15:00',
     pickupTimeEnd: '18:00',
     createdAt: new Date(Date.now() - 60 * 60 * 1000),
-    gesamtCents: 1082,
+    summen: { totalAmount: '10.22', serviceFeeCents: 60, serviceFeeRefundedAt: null },
     artikel: 2,
     ...teil,
   }
@@ -88,7 +88,9 @@ describe('ohne bewiesene Adresse', () => {
     const html = await render()
     expect(html).toContain('Meine Bestellungen')
     expect(html).toContain('Code schicken')
-    expect(html).toContain('ein Konto brauchst du dafür nicht')
+    // Liste Lauf 32 (meine-bestellungen Bild 1): „ohne Konto“ steht unter der Überschrift, nicht mehr in der Karte.
+    expect(html).toContain('ohne Konto, nur für diesen Besuch')
+    expect(html).not.toContain('ein Konto brauchst du dafür nicht')
     expect(html).not.toContain('Kein Passwort nötig')
     expect(html).not.toContain('abgelaufen')
     expect(laden).not.toHaveBeenCalled()
@@ -132,9 +134,13 @@ describe('mit bewiesener Adresse', () => {
     expect(html).toContain('href="/hof-test/confirm/alt?sig=def456"')
     // Kein Link ohne Signatur zu einer Bestellung.
     expect(html).not.toMatch(/href="\/[^"]*\/confirm\/[^"?]*"/)
-    expect(html).toContain('€ 10,82')
+    // Seit Nr. 227 (Board s1-/w1-meine-bestellungen): Status, Abholung und Bestellnummer je Zeile, kein Betrag
+    // (der steht auf der Bestellseite); „Abmelden“ heißt „Ansicht beenden“ (V26).
+    expect(html).toContain('HT-0001')
+    expect(html).not.toContain('€ 10,82')
     expect(html).toContain('kundin@example.com')
-    expect(html).toContain('Abmelden')
+    expect(html).toContain('Ansicht beenden')
+    expect(html).not.toContain('Abmelden')
   })
 
   it('leer: Satz und Ausweg — Höfe entdecken, andere E-Mail-Adresse', async () => {
@@ -148,9 +154,9 @@ describe('mit bewiesener Adresse', () => {
     const lang = 'Hof '.padEnd(80, 'x')
     laden.mockResolvedValueOnce([bestellung({ hofName: lang }), bestellung({ id: 'f', status: 'PICKED_UP', hofName: lang, pickupDate: new Date(Date.now() - 9 * 24 * 3600_000) })])
     const html = await render()
-    expect(html).toContain(`title="HT-0001 · ${lang}"`)
     expect(html).toContain(`title="${lang}"`)
-    expect(html).toMatch(/truncate[^"]*" title="HT-0001/)
+    // Die Karte „Aktuell“ kürzt den Namen selbst (Board: Name fett, darunter Stand · Abholung · Nummer).
+    expect(html).toMatch(/truncate[^"]*" title="Hof x/)
   })
 
   it('Fehler beim Laden: inline mit Ausweg, Sentry ohne Adresse', async () => {

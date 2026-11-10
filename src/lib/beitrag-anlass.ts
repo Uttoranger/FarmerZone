@@ -29,5 +29,56 @@ export const BEITRAG_ANLASS: Record<BeitragAnlass, { wort: string; symbol: Lucid
   FRESH_PRODUCT: { wort: 'Frisches Produkt', symbol: Leaf },
   NEW_SEASON: { wort: 'Neue Saison', symbol: CalendarDays },
   PROMOTION: { wort: 'Aktion', symbol: Tag },
-  ANNOUNCEMENT: { wort: 'Mitteilung', symbol: MessageCircle },
+  // Register N42 c (Lauf 30, Nr. 225): das Etikett heißt „Hinweis“ – „Mitteilung“ steht in der Wortliste unter „nicht“; das Enum bleibt.
+  ANNOUNCEMENT: { wort: 'Hinweis', symbol: MessageCircle },
+}
+
+/**
+ * Sätze im Ablauf „Neuer Beitrag“ (Boards s2/w2-beitraege, Lauf 30, Nr. 225), die
+ * der Lauf geändert hat — Wortliste N42 c („Hofseite“ zusammen, „Neuigkeiten“ statt
+ * „E-Mail-Updates“, „die Kundin“ in Sätzen). Die Zahl der Tage zwischen zwei Mails
+ * kommt als Parameter aus `MAILABSTAND_TAGE` (beitrag-mailabstand.ts).
+ */
+export const BEITRAG_ABLAUF_TEXT = {
+  vorschauSchritt: 'Überprüfen und absenden',
+  anredeTipp: 'wird automatisch ersetzt. Auf der Hofseite steht die Anrede ohne Namen.',
+  hofseiteTitel: 'Auf meiner Hofseite anzeigen',
+  hofseiteSatz: 'Alle Besucher sehen es · für 7 Tage oben',
+  mailTitel: 'Per E-Mail an Abonnentinnen',
+  mailAbonniert: (anzahl: number, tage: number): string =>
+    `${anzahl} ${anzahl === 1 ? 'Kundin bekommt' : 'Kundinnen bekommen'} deine Neuigkeiten per E-Mail · einmal in ${tage} Tagen möglich`,
+  mailGesperrt: (vorTagen: number, tage: number): string =>
+    `Die letzte E-Mail ging vor ${vorTagen} ${vorTagen === 1 ? 'Tag' : 'Tagen'} raus · einmal in ${tage} Tagen möglich`,
+  mailKeine: 'Noch keine Abonnentinnen',
+  zustimmung:
+    'Nur Kundinnen, die selbst zugestimmt haben, bekommen E-Mail oder WhatsApp. WhatsApp verschickst du nach dem Veröffentlichen selbst – mit einem Tipp je Person.',
+  hofseiteZusammenfassung: 'Auf deiner Hofseite für 7 Tage oben',
+  /** Empfänger-Zeile der Vorschau: Bei genau einer Empfängerin steht die Einzahl, sonst liest es sich falsch. */
+  mailZusammenfassung: (anzahl: number): string =>
+    `${anzahl} ${anzahl === 1 ? 'E-Mail wird' : 'E-Mails werden'} automatisch versendet`,
+  /** Klein unter der Vorschau: Der Beispielname steht nur hier (Liste Lauf 32 Z. 430). */
+  vorschauNameHinweis: 'Name wird je Person eingesetzt.',
+  veroeffentlichtHofseite: 'auf der Hofseite',
+} as const
+
+/** Beispielname der Vorschau „Neuer Beitrag“ (Board s2-/w2-beitraege Bild 4: „Hallo Anna!“). */
+export const VORSCHAU_BEISPIELNAME = 'Anna'
+
+/**
+ * Der Text der Vorschau, wie er bei einer Kundin ankommt: `{Vorname}` durch den Beispielnamen ersetzt.
+ * Nur Anzeige — abgeschickt wird der Text mit Platzhalter, ersetzt wird je Empfängerin beim Versand.
+ */
+export function beitragVorschauText(body: string): string {
+  return body.replace(VORNAME_MUSTER, VORSCHAU_BEISPIELNAME)
+}
+
+/**
+ * Dasselbe Muster wie beim Versand (`setzeVorname`, src/server/beitrag-vorname.ts: Groß- und Kleinschreibung
+ * egal) — sonst zeigte die Vorschau „{vorname}“, während die Mail den Namen einsetzt.
+ */
+const VORNAME_MUSTER = /\{Vorname\}/gi
+
+/** Steht ein Platzhalter im Text? Dann nennt die Vorschau darunter, dass der Name je Person eingesetzt wird. */
+export function enthaeltVorname(body: string): boolean {
+  return /\{Vorname\}/i.test(body)
 }

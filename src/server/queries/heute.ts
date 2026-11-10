@@ -13,12 +13,13 @@ import {
   abholfensterHeute,
   abholtage,
   abholtagName,
+  abspracheKontakt,
   abholWhere,
   brauchtDich,
-  fensterAnzahl,
+  fensterMitBestellungen,
+  karteNaechsteAbholung,
   heuteHofSichtbar,
   naechsteAbholungWhere,
-  naechstesAbholfenster,
   packliste,
   packlistenZahlen,
   ueberfaelligWhere,
@@ -63,11 +64,13 @@ export type Heute = {
   abholfensterHeute: string | null
   /** Das nächste Abholfenster laut Abholzeiten und wie viele Bestellungen dafür offen sind. */
   naechstesFenster: { fenster: NaechstesFenster; anzahl: number } | null
-  /** Der nächste Abholtag nach heute mit offenen Bestellungen; null = keiner in Sicht (die Zeile entfällt). */
-  naechsteAbholung: NaechsteAbholung | null
+  /** Was die Karte „Nächste Abholung“ nennt: das Fenster nach dem heutigen, wenn heute schon in der Packliste steht (karteNaechsteAbholung). */
+  naechsteAbholungKarte: { fenster: NaechstesFenster; anzahl: number } | null
   brauchtDich: BrauchtDichEintrag[]
   woche: Wochenvergleich
   wochenBalken: WochenBalken[]
+  /** Die Tage dieser Woche (Kürzel der Balken), an denen ein selbst eingetragener Verkauf steckt (selbstEingetragenSatz). */
+  selbstEingetrageneTage: string[]
   /**
    * „Zu tun" (Nr. 53): Erste Schritte und die Liste der Hofseite als EINE
    * Liste — ohne das, was der Stripe-Kasten oben schon sagt (zuTun).
@@ -124,8 +127,12 @@ export async function getHeute(
               status: true,
               totalAmount: true,
               serviceFeeCents: true,
-              // Fehlende Artikel (E14) werden nicht gepackt.
-              items: { where: { fehltSeit: null }, select: { productName: true, quantity: true } },
+              // N47 (Nr. 257): nur gelesen, um „Anrufen“ und „Mail schreiben“ zu füllen — abspracheKontakt unten gibt
+              // sie nur für offene Bestellungen mit Absprache weiter, alle anderen Zeilen tragen keinen Kontakt.
+              customerPhone: true,
+              customerEmail: true,
+              // Fehlende Artikel (E14) werden nicht gepackt — und brauchen keine Absprache.
+              items: { where: { fehltSeit: null }, select: { productName: true, quantity: true, product: { select: { abholhinweise: true } } } },
             },
           }),
           prisma.order.findFirst({
@@ -221,15 +228,17 @@ export async function getHeute(
   }
 
   const zeilen = packliste(
-    heutige.map(({ totalAmount, serviceFeeCents, ...b }) => ({
+    heutige.map(({ totalAmount, serviceFeeCents, customerPhone, customerEmail, items, ...b }) => ({
       ...b,
+      items: items.map(({ productName, quantity }) => ({ productName, quantity })),
       // Der Betrag aus dem Snapshot der Bestellung (Ware + Gebühr), nie neu gerechnet.
       gesamtCents: bestellSummen({ totalAmount, serviceFeeCents }).gesamtCents,
+      absprache: abspracheKontakt({ status: b.status, customerPhone, customerEmail, hinweiseJePosition: items.map((i) => i.product.abholhinweise) }),
     }))
   )
   const slots = hof?.pickupSlots ?? []
-  const fenster = naechstesAbholfenster(slots, jetzt)
-  const fensterZahl = fensterAnzahl(fenster, wienKalendertag(jetzt), zeilen, naechsteAbholung)
+  // Leer nennt „Nächste Abholung“ das nächste Fenster MIT Bestellungen (Liste Lauf 32, heute Bild 3).
+  const fensterMitZahl = fensterMitBestellungen(slots, jetzt, zeilen.length, naechsteAbholung)
   const auswertung = auswerten(buchungen, wochenfenster)
   const sektionen = hof?.sectionsConfig
   const fortschritt = hof
@@ -258,8 +267,8 @@ export async function getHeute(
       umsatzHeuteCent: umsatzHeuteCent(buchungen, jetzt),
     },
     abholfensterHeute: abholfensterHeute(slots, jetzt),
-    naechstesFenster: fenster ? { fenster, anzahl: fensterZahl } : null,
-    naechsteAbholung,
+    naechstesFenster: fensterMitZahl,
+    naechsteAbholungKarte: karteNaechsteAbholung(slots, jetzt, zeilen.length, naechsteAbholung),
     brauchtDich: brauchtDich({
       ueberfaellig: { anzahl: ueberfaelligAnzahl, juengste: ueberfaelligJuengste },
       ausverkauft,
@@ -268,6 +277,13 @@ export async function getHeute(
     }),
     woche: wochenvergleich(auswertung.summeCent, auswertung.vergleichCent),
     wochenBalken: wochenBalken(auswertung.balken, jetzt),
+    // Dieselbe Regel und dieselben Fenster, nur über die selbst eingetragenen Verkäufe (Board s1-heute Bild 2).
+    selbstEingetrageneTage: auswerten(
+      buchungen.filter((b) => b.quelle === 'verkauf'),
+      wochenfenster
+    )
+      .balken.filter((b) => b.cent > 0)
+      .map((b) => b.label),
     // Was der Kasten oben zeigt, steht nicht noch einmal in der Liste (F4, Vermerk 10.10.2026).
     zuTun: fortschritt
       ? zuTun(ersteSchritte(ersteSchritteDaten(hof, { produkte, aktiveAbholzeiten: slots.length })), fortschritt, { stripeImKasten })

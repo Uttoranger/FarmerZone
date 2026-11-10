@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { EXPORT_AUSWAHL, EXPORT_MAX, type ExportMeldung } from '@/lib/briefkasten-export'
 import {
@@ -9,7 +10,6 @@ import {
   fuerHof,
   istMeldungArt,
   istMeldungStatus,
-  kurznummer,
   liegedauerGrenze,
   type AblaufMeldung,
   type BuendelStand,
@@ -19,6 +19,7 @@ import {
   type MeldungStand,
   type MeldungStatus,
 } from '@/lib/meldung'
+import { ALTE_LAENGE, KURZNUMMER_LAENGE, kurznummerAus, kurznummerEingabe, waehleZurKurznummer, type KurznummerWahl } from '@/lib/kurznummer'
 
 /**
  * Lesezugriffe des Fehlerbriefkastens. Zwei Sichten, streng getrennt:
@@ -127,7 +128,7 @@ export async function getMeldungenFuerAdmin(filter: AdminMeldungFilter): Promise
   })
   return zeilen.map((z) => ({
     id: z.id,
-    kurznummer: kurznummer(z.id),
+    kurznummer: kurznummerAus(z.id),
     art: z.art,
     status: z.status,
     createdAt: z.createdAt,
@@ -220,14 +221,50 @@ export type AdminMeldungDetail = {
   farm: { id: string; name: string; slug: string } | null
 }
 
-/** Detail für den Admin — per voller ID oder Kurznummer (Präfix). */
-export async function getMeldungDetail(idOderKurz: string): Promise<AdminMeldungDetail | null> {
-  const zeile = await prisma.meldung.findFirst({
-    where: idOderKurz.length >= 20 ? { id: idOderKurz } : { id: { startsWith: idOderKurz } },
+/**
+ * Die Vorauswahl in der Datenbank für eine Nummer: volle ID, Ende (neue Kurznummer) oder Anfang (alte). Nur ein
+ * Sieb — entschieden wird danach in `waehleZurKurznummer` nach DER Regel (`passtZurKurznummer`). Ein Stück der ID
+ * kommt nur hinein, wenn es aus Zeichen einer Kennung besteht: `%` und `_` wären in LIKE Platzhalter.
+ */
+function kurznummerVorauswahl(eingabe: string): Prisma.MeldungWhereInput | null {
+  const wert = kurznummerEingabe(eingabe)
+  if (wert === '') return null
+  const stueck = /^[a-z0-9-]+$/.test(wert)
+  return {
+    OR: [
+      { id: eingabe.trim().replace(/^#/, '') },
+      { id: wert },
+      ...(stueck && wert.length === KURZNUMMER_LAENGE ? [{ id: { endsWith: wert, mode: 'insensitive' as const } }] : []),
+      ...(stueck && wert.length === ALTE_LAENGE ? [{ id: { startsWith: wert, mode: 'insensitive' as const } }] : []),
+    ],
+  }
+}
+
+/**
+ * EINE Meldung zu einer Nummer (neue, alte oder volle; Admin-Suche und Duplikat-Verweis der Triage, Nr. 263):
+ * Passen mehrere, `mehrdeutig` — nie eine beliebige. Wenige Kandidaten reichen: Mehr als einer ist schon die
+ * Antwort, und die volle ID gewinnt in `waehleZurKurznummer` immer.
+ */
+export async function findeMeldungZurKurznummer(eingabe: string): Promise<KurznummerWahl<{ id: string; status: MeldungStatus }>> {
+  const where = kurznummerVorauswahl(eingabe)
+  if (where === null) return { art: 'keine' }
+  const kandidaten = await prisma.meldung.findMany({ where, select: { id: true, status: true }, take: 10 })
+  return waehleZurKurznummer(kandidaten, eingabe)
+}
+
+/**
+ * Detail für den Admin — per voller ID, Kurznummer oder alter Kurznummer (Lesezeichen, ältere Mails). Passt die
+ * Nummer zu mehreren Meldungen, öffnet sie keine (nie eine beliebige): `mehrdeutig`, ohne IDs und ohne Anzahl.
+ */
+export async function getMeldungDetail(idOderKurz: string): Promise<KurznummerWahl<AdminMeldungDetail>> {
+  const wahl = await findeMeldungZurKurznummer(idOderKurz)
+  if (wahl.art !== 'eine') return wahl
+  const zeile = await prisma.meldung.findUnique({
+    where: { id: wahl.meldung.id },
     include: { farm: { select: { id: true, name: true, slug: true } } },
   })
-  if (!zeile) return null
-  return { ...zeile, kurznummer: kurznummer(zeile.id) }
+  if (!zeile) return { art: 'keine' }
+  return { art: 'eine', meldung: { ...zeile, kurznummer: kurznummerAus(zeile.id) } }
 }
 
 /**
@@ -282,7 +319,7 @@ export async function getDuplikateVon(hauptmeldungId: string): Promise<Array<{ i
     orderBy: { createdAt: 'desc' },
     select: { id: true, text: true, createdAt: true, farm: { select: { name: true } } },
   })
-  return zeilen.map((z) => ({ id: z.id, kurznummer: kurznummer(z.id), ersteZeile: ersteZeile(z.text), hofName: z.farm?.name ?? null, createdAt: z.createdAt }))
+  return zeilen.map((z) => ({ id: z.id, kurznummer: kurznummerAus(z.id), ersteZeile: ersteZeile(z.text), hofName: z.farm?.name ?? null, createdAt: z.createdAt }))
 }
 
 // ─── Wünsche, gebündelt ─────────────────────────────────────────────────────
@@ -392,7 +429,7 @@ export function gruppiereWuensche(meldungen: readonly WunschRoh[], beispieleJeCl
       sprintName: sprints.size === 1 ? (sprint ?? null) : null,
       meldungen: alle.map((w) => ({
         id: w.id,
-        kurznummer: kurznummer(w.id),
+        kurznummer: kurznummerAus(w.id),
         ersteZeile: ersteZeile(w.text),
         hofName: w.hofName,
         createdAt: w.createdAt,
@@ -402,7 +439,7 @@ export function gruppiereWuensche(meldungen: readonly WunschRoh[], beispieleJeCl
       beispiele: eigene
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, beispieleJeCluster)
-        .map((w) => ({ id: w.id, kurznummer: kurznummer(w.id), ersteZeile: ersteZeile(w.text), hofName: w.hofName, createdAt: w.createdAt })),
+        .map((w) => ({ id: w.id, kurznummer: kurznummerAus(w.id), ersteZeile: ersteZeile(w.text), hofName: w.hofName, createdAt: w.createdAt })),
     }
   })
   return cluster.sort((a, b) => {
@@ -460,7 +497,7 @@ export async function zaehleFuerWochenlauf(jetzt: Date): Promise<WochenZaehler> 
     liegenGeblieben,
     offen,
     neueste: neueste.map((m) => ({
-      kurznummer: kurznummer(m.id),
+      kurznummer: kurznummerAus(m.id),
       art: m.art,
       ersteZeile: ersteZeile(m.text),
       hofName: m.farm?.name ?? null,

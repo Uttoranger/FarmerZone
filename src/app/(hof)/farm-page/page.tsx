@@ -15,7 +15,8 @@ import { meinHofReiterAus } from '@/lib/bauern-navigation'
 import { MEIN_HOF_REITER_PARAMETER } from '@/schemas/mein-hof-reiter'
 import { HofseiteEditor } from '@/components/farmer/hofseite-editor'
 import { MeinHofSeitenkopf } from '@/components/mein-hof/seitenkopf'
-import { MEIN_HOF_KOPF_HUELLE } from '@/components/mein-hof/mein-hof-kopf'
+import { MEIN_HOF_KOPF_HUELLE, MEIN_HOF_KOPF_KLEBT, MeinHofZustandsKarte } from '@/components/mein-hof/mein-hof-kopf'
+import { cn } from '@/lib/utils'
 import { BeitraegeReiter } from '@/components/mein-hof/beitraege-reiter'
 import { AbschnitteListe } from '@/components/mein-hof/abschnitte-liste'
 import type { AbschnittHof } from '@/components/mein-hof/abschnitt-inhalt'
@@ -51,6 +52,9 @@ export const dynamic = 'force-dynamic'
  * unter dem Kopf der Umschalter „Bearbeiten · So sieht’s die Kundin"
  * (MeinHofAnsicht, ?ansicht=kundin); „Bearbeiten" ist der Inhalt darunter.
  * Unter md trägt der Kopf zusätzlich den Reiter „Produkte".
+ *
+ * Seit Nr. 274 kleben Titel und Reiter unter lg oben (MEIN_HOF_KOPF_KLEBT); die
+ * Zustandskarte steht dafür am Anfang des Inhalts und scrollt mit.
  *
  * Seit Nr. 143 (Register N3, Ergänzung 22.10.2026) ist der Kopf unter lg auf
  * beiden Reitern derselbe wie auf /products (mein-hof-kopf.tsx, gleiche Hülle):
@@ -88,13 +92,12 @@ export default async function FarmPageOwnerRoute({
         reiter="beitraege"
         slug={farm.slug}
         kopf={
-          <div className={MEIN_HOF_KOPF_HUELLE}>
-            <MeinHofSeitenkopf hof={kopf} aktiv="beitraege" zustand={zustand} />
+          <div className={cn(MEIN_HOF_KOPF_HUELLE, MEIN_HOF_KOPF_KLEBT)}>
+            <MeinHofSeitenkopf hof={kopf} aktiv="beitraege" zustand={zustand} jetzt={jetzt} />
           </div>
         }
       >
         <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8 lg:max-w-none lg:pt-0">
-          <h1 className="sr-only">Beiträge</h1>
           <BeitraegeReiter uebersicht={uebersicht} />
         </div>
       </MeinHofAnsicht>
@@ -139,17 +142,17 @@ export default async function FarmPageOwnerRoute({
         reiter="hofseite"
         slug={farm.slug}
         kopf={
-          <div className={MEIN_HOF_KOPF_HUELLE}>
-            <MeinHofSeitenkopf hof={kopf} aktiv="hofseite" zustand={zustand} />
+          <div className={cn(MEIN_HOF_KOPF_HUELLE, MEIN_HOF_KOPF_KLEBT)}>
+            <MeinHofSeitenkopf hof={kopf} aktiv="hofseite" zustand={zustand} jetzt={jetzt} />
           </div>
         }
       >
         {/* Unter lg, „Bearbeiten": die Liste der Abschnitte, bearbeitet im
-            Blatt von unten. Sichtbar ist der Hofname im Kopf; die H1 hört nur
-            der Screenreader. */}
+            Blatt von unten. Die h1 „Mein Hof“ steht sichtbar im Kopf (Lauf 31). */}
         <div className="lg:hidden">
-          <div className="mx-auto max-w-3xl px-4 pt-5 pb-12 md:px-8">
-            <h1 className="sr-only">Hofseite bearbeiten</h1>
+          <div className="mx-auto flex max-w-3xl flex-col gap-2.5 px-4 pt-3 pb-12 md:px-8">
+            {/* Die Zustandskarte unter den Reitern, im Inhalt: Sie scrollt weg, Titel und Reiter kleben (Nr. 274). */}
+            {kopf && <MeinHofZustandsKarte hof={kopf} zustand={zustand} />}
             <AbschnitteListe fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />
           </div>
         </div>
@@ -157,8 +160,7 @@ export default async function FarmPageOwnerRoute({
 
       {/* Ab lg: Liste links, Vorschau rechts. */}
       <div className="hidden px-8 pb-12 lg:block">
-        {/* Sichtbar ist der Hofname im Kopf; die H1 hört nur der Screenreader. */}
-        <h1 className="sr-only">Hofseite bearbeiten</h1>
+        {/* Die h1 „Mein Hof“ steht sichtbar im Kopf (Lauf 31, Board w1-mein-hof). */}
         <HofseiteEditor fortschritt={fortschritt} hof={hof} einstellungen={einstellungen} auftritt={auftritt} aktuell={aktuell} />
       </div>
     </>

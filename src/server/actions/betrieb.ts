@@ -14,14 +14,17 @@ import { letzteMessungAm } from '@/server/queries/betrieb'
 import { ladeGescheiterteDerArt, ladeNochmalStaende, ladeNochmalStand, problemBedingung, zaehleNochmalHeute, zaehleNochmalHeuteJe, type NochmalBezugStand } from '@/server/queries/mails'
 import { ladeBestellungFuerMail } from '@/server/mail-arten/bestellung'
 import { baueMailVorschau } from '@/server/mail-arten/vorschau'
+import { baueMailBeispiel, mailBeispielEingabeSchema } from '@/server/mail-arten/beispiele'
 import { ADMIN_BETRIEB_HREF, BETRIEB_TEXT, fehlerKlasse } from '@/lib/betrieb'
 import {
   ALLE_MAILS_TEXT,
+  BEISPIELE_TEXT,
   CODES_OHNE_JETZT_SCHICKEN,
   MAIL_TEXT,
   NOCHMAL_JE_TAG,
   adresseQuelle,
   artName,
+  beispielName,
   nochmalErlaubt,
   nochmalNieGrund,
   nochmalStandGrund,
@@ -357,6 +360,27 @@ export async function zeigeMailVorschauAction(eingabe: unknown): Promise<{ ok: t
     return { ok: true, titel: ALLE_MAILS_TEXT.vorschauTitel(artName(m.art)), betreff: gebaut.betreff, html: gebaut.html }
   } catch (err) {
     meldeNochmal('Betrieb: Vorschau einer Mail gescheitert', err)
+    return { error: MAIL_TEXT.aktionFehler }
+  }
+}
+
+/**
+ * „Beispiel ansehen“ in Admin › Betrieb › Mails (Register N48, Nr. 270): eine
+ * Mail-Art mit festen, erfundenen Daten, Codes als Nullen, Links unkenntlich.
+ * Nur lesend wie die Vorschau (N27) — Admin-Recht genügt; kein Versand, kein
+ * MailAuftrag, kein Protokolleintrag, keine Datenbank. Das HTML geht nur an
+ * die Seite, nie ins Log und nie nach Sentry (dort nur die Fehlerklasse).
+ */
+export async function zeigeMailBeispielAction(eingabe: unknown): Promise<{ ok: true; titel: string; betreff: string; html: string } | { error: string }> {
+  const wache = await verlangeAdminAktion({ recht: 'ansehen' })
+  if ('error' in wache) return { error: wache.error }
+  const gelesen = mailBeispielEingabeSchema.safeParse(eingabe)
+  if (!gelesen.success) return { error: MAIL_TEXT.eingabeUngueltig }
+  try {
+    const mail = await baueMailBeispiel(gelesen.data.beispiel)
+    return { ok: true, titel: BEISPIELE_TEXT.rahmenTitel(beispielName(gelesen.data.beispiel)), betreff: mail.betreff, html: mail.html }
+  } catch (err) {
+    meldeNochmal('Betrieb: Beispiel einer Mail gescheitert', err)
     return { error: MAIL_TEXT.aktionFehler }
   }
 }

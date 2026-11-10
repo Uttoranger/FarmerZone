@@ -177,7 +177,7 @@ export const POSTFACH_TEXT = {
   ungelesenSr: 'ungelesen',
   /** Wofür die Zahl an „Postfach" zählt (Screenreader, HofShell). */
   zaehler: 'ungelesene Nachrichten',
-  erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Du kannst auf jede Nachricht antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „${PROBLEM_MELDEN}“.`,
+  erklaerung: `Hier schreibt dir das ${MARKE_TEAM}: Neues, Abrechnung, Rechtliches. Auf die meisten Nachrichten kannst du antworten. Ein Problem oder einen Wunsch meldest du wie bisher unter „${PROBLEM_MELDEN}“.`,
   antwortFeld: 'Antwort an das Team …',
   antwortBeschriftung: 'Deine Antwort',
   antwortHinweis: `Deine Antwort geht nur an das ${MARKE_TEAM}.`,
@@ -223,7 +223,7 @@ export const POSTFACH_MAIL_TEXT = {
   zu: 'Zu',
   link: 'Ansehen',
   oeffnen: 'Im Postfach öffnen',
-  antwortenInDerApp: 'Antworten geht in der App: Öffne die Nachricht in deinem Postfach und schreib dort zurück.',
+  antwortenInDerApp: 'Antworten geht in der App, im Postfach.',
   gruss: `Dein ${MARKE_TEAM}`,
   /** Der Satz unter der Karte (EmailLayout `fusszeile`): Absender ist das Team, nicht ein Hof. */
   fuss: `Versandt vom ${MARKE_TEAM}.`,
@@ -239,7 +239,12 @@ export const POSTFACH_LEER = {
 } as const
 
 /** Filter „Ungelesen" ohne Treffer — der Ausweg zeigt wieder alle. */
-export const POSTFACH_ALLES_GELESEN = { titel: 'Alles gelesen', satz: 'Neue Nachrichten vom Team erscheinen hier.', ausweg: 'Alle zeigen' } as const
+export const POSTFACH_ALLES_GELESEN = {
+  titel: 'Alles gelesen',
+  // Wörtlich nach Board s2-/w2-postfach Bild 5 (Liste Lauf 32 postfach, B-Zeile „Leer-Zustand …“; Nr. 274).
+  satz: 'Neue Nachrichten vom Team erscheinen hier und als Karte auf Heute.',
+  ausweg: 'Alle Nachrichten zeigen',
+} as const
 
 /** Fehler an der Oberfläche (deutsch, geduzt, mit Ausweg). */
 export const POSTFACH_FEHLER = {
@@ -760,7 +765,8 @@ export const EINGANG_TEXT = {
     'Freischalten stellt den Hof online, vergibt den Gründungsplatz, solange einer frei ist, und schickt ihm die Zusage. Ablehnen löscht den wartenden Hof samt Konto – das geht nur ohne Bestellungen. Die Aufgabe verschwindet aus dem Eingang, sobald du entschieden hast.',
   erstattungKopf: (nummer: string) => `Erstattung offen – Bestellung ${nummer}`,
   offenSeit: (hof: string, datum: string) => `${hof} · offen seit ${datum}`,
-  bezahlt: 'Online bezahlt (Waren und Servicegebühr)',
+  // Ohne Wort des Modells (V62, Nr. 225): der Eingang kennt das Modell der Bestellung nicht, „Gebühr“ stimmt für beide.
+  bezahlt: 'Online bezahlt (Waren und Gebühr)',
   schonErstattet: 'Davon schon erstattet',
   /** Der Eingang rechnet nicht nach: Was offen ist und was zu tun ist, steht nur in der Mail (Betreff = erstattungKopf). */
   erstattungMail: (betreff: string) =>

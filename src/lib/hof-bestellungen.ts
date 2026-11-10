@@ -9,15 +9,33 @@
  * Abholtags und fällt sicher in den Wiener Tag.
  */
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
-import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, abholChip, abholtagName, PACK_MARKE } from '@/lib/heute'
+import { ABHOLUNG_ERLEDIGT, HEUTE_ABHOLEN, abholChip, abholTagMitDatum, abholtagName, PACK_MARKE } from '@/lib/heute'
 import { formatSlotTime } from '@/lib/pickup-days'
 import { artikelFehltErlaubt } from '@/lib/artikel-fehlt'
 import type { HofBestellFilter } from '@/schemas/hof-bestellungen'
 import type { PaymentMethod, PaymentStatus } from '@prisma/client'
 import type { MarkeArt } from '@/lib/marke-art'
+import { GEBUEHR_MODELL_HOFPREIS, gebuehrBezeichnungFuer, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import {
+  barZuKassierenCents,
+  centsAlsEuro,
+  gebuehrEntfallen,
+  type BestellungFuerGebuehrStatus,
+  type BestellungMitGebuehr,
+} from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
+// Prisma-frei: Diese Datei erreicht auch Client-Bauteile (admin/bestellungen/bestellung-aktionen.tsx
+// über admin-bestellung.ts); die Abfrage-Datei reicht dieselbe Liste nur weiter.
+import { OPEN_STATUSES } from '@/lib/bestellstatus-offen'
 
-/** Noch nicht übergeben und nicht storniert — „offen" in Kopf und Filter. */
-export const OFFEN_STATUS: readonly string[] = ['PENDING_CONFIRMATION', 'PAID', 'CONFIRMED', 'IN_PREPARATION', 'READY']
+/**
+ * Offen = alles außer abgeholt, storniert, nicht abgeholt — auch „Bestätigung offen“
+ * (Register N41 e). Die EINE Liste ist `OPEN_STATUSES` (src/lib/bestellstatus-offen.ts):
+ * Danach zählen die Navigation (getOpenOrdersCount) und hier Kopf und Chip „Noch offen · n“.
+ * OFFEN_STATUS ist dieselbe Liste als Text-Liste (Status kommen hier als string an);
+ * tests/hof-bestellungen-zaehler.test.ts prüft, dass Chip und Navigation dieselbe Zahl liefern.
+ */
+export const OFFEN_STATUS: readonly string[] = OPEN_STATUSES
 const PACKEN_STATUS: readonly string[] = ['PAID', 'CONFIRMED', 'IN_PREPARATION']
 /** Durch — dieselben Status, die Heute aus der Packliste nimmt (ABHOLUNG_ERLEDIGT). */
 const ERLEDIGT_STATUS: readonly string[] = ABHOLUNG_ERLEDIGT
@@ -81,11 +99,11 @@ export function bestellListeHref(filter: HofBestellFilter): string {
   return filter === 'offen' ? '/orders' : `/orders?filter=${filter}`
 }
 
-/** „5 offen · 2 gepackt" unter der Überschrift. */
+/** „6 offen, davon 1 gepackt" unter der Überschrift (Board s1-bestellungen); ohne Gepacktes „2 offen". */
 export function bestellKopfzeile(bestellungen: readonly Pick<ListenBestellung, 'status'>[]): string {
   const offen = bestellungen.filter((b) => OFFEN_STATUS.includes(b.status)).length
   const gepackt = bestellungen.filter((b) => b.status === 'READY').length
-  return `${offen} offen · ${gepackt} gepackt`
+  return gepackt > 0 ? `${offen} offen, davon ${gepackt} gepackt` : `${offen} offen`
 }
 
 /** „15–18 Uhr" bzw. „9:30–12 Uhr" — Schreibweise der Hofseite (formatSlotTime). */
@@ -102,16 +120,19 @@ export function abholTag(pickupDate: Date, jetzt: Date): string {
   return abholtagName(heute, tag)
 }
 
-/** „heute, 15–18 Uhr" bzw. „Samstag, 9–12 Uhr" — mitten im Satz klein, Wochentage bleiben groß. */
+/**
+ * „heute, Mi 3. März, 15–18 Uhr" bzw. „Sa, 6. März, 9–12 Uhr" — mit Wochentag und Datum
+ * (V9, Board s1-bestellung); „heute“, „morgen“, „gestern“ mitten im Satz klein.
+ */
 export function abholungKurz(pickupDate: Date, start: string, ende: string, jetzt: Date): string {
-  const tag = abholTag(pickupDate, jetzt)
-  const imSatz = tag === 'Heute' || tag === 'Morgen' || tag === 'Gestern' ? tag.toLowerCase() : tag
+  const tag = abholTagMitDatum(wienKalendertag(jetzt), wienKalendertag(pickupDate))
+  const imSatz = /^(Heute|Morgen|Gestern),/.test(tag) ? tag[0].toLowerCase() + tag.slice(1) : tag
   return `${imSatz}, ${fensterZeit(start, ende)}`
 }
 
 export type BestellGruppe<T> = {
   schluessel: string
-  /** „Heute, 15–18 Uhr · 3 Bestellungen" */
+  /** „Heute, Mi 3. März, 15–18 Uhr · 3" */
   titel: string
   bestellungen: T[]
 }
@@ -149,7 +170,8 @@ export function gruppiereNachAbholfenster<T extends ListenBestellung>(
     const anzahl = g.bestellungen.length
     return {
       ...g,
-      titel: `${abholTag(erste.pickupDate, jetzt)}, ${fensterZeit(erste.pickupTimeStart, erste.pickupTimeEnd)} · ${anzahl} ${anzahl === 1 ? 'Bestellung' : 'Bestellungen'}`,
+      // Board s1-bestellungen: Tag mit Datum (V9), Fenster, die Zahl ohne Wort — die Zeilen darunter sind die Bestellungen.
+      titel: `${abholTagMitDatum(wienKalendertag(jetzt), wienKalendertag(erste.pickupDate))}, ${fensterZeit(erste.pickupTimeStart, erste.pickupTimeEnd)} · ${anzahl}`,
     }
   })
 }
@@ -170,6 +192,10 @@ export function positionenText(items: readonly { productName: string; quantity: 
  */
 export function bestellMarke(status: string): { text: string; art: MarkeArt } {
   switch (status) {
+    case 'PENDING_CONFIRMATION':
+      // V22: am Bildschirm „Bestätigung offen“ (orange, der Hof sieht, dass noch etwas fehlt);
+      // nur Packliste und Papier sagen „Wartet auf Kunde“ (PACK_MARKE, papierMarke).
+      return { text: 'Bestätigung offen', art: 'tun' }
     case 'PICKED_UP':
       return { text: 'Abgeholt', art: 'erledigt' }
     case 'CANCELLED':
@@ -179,6 +205,79 @@ export function bestellMarke(status: string): { text: string; art: MarkeArt } {
     default:
       return PACK_MARKE[abholChip(status)]
   }
+}
+
+/**
+ * Die Marke auf dem Papier (Abholzettel, Packliste; V57 „Papier = Bildschirm“): offene
+ * Bestellungen mit den Wörtern der Packliste („Zum Packen“, „Wartet auf Kunde“, „Gepackt“),
+ * abgeschlossene wie am Bildschirm.
+ */
+export function papierMarke(status: string): { text: string; art: MarkeArt } {
+  return OFFEN_STATUS.includes(status) ? PACK_MARKE[abholChip(status)] : bestellMarke(status)
+}
+
+// ─── Papier (Abholzettel, Packliste; Boards s2-druck, w2-druck) ─────────────
+
+/** Unter dem Abholzettel — derselbe Satz wie am Bildschirm sinngemäß, auf Papier kurz. */
+export const DRUCK_ABGLEICH = 'Bestellnummer nur zum Abgleich – bitte zusätzlich den Namen prüfen.'
+
+/**
+ * Die eigene Zeile mit der Gebühr auf dem Papier — nur im Modell „bisher“ und nur mit
+ * Gebühr (Wort über gebuehrBezeichnungFuer). Im Hofpreis-Modell steckt die
+ * Plattformgebühr im Preis (N38): keine Zeile, dafür druckGesamtHinweis am Gesamt.
+ */
+export function druckGebuehrZeile(bestellung: { gebuehrModell: string | null }, gebuehrCents: number): string | null {
+  if (istHofpreisBestellung(bestellung) || gebuehrCents <= 0) return null
+  return gebuehrBezeichnungFuer(bestellung)
+}
+
+/*
+ * Abholzettel und Packliste (Nr. 249b, seit Nr. 277 hier statt in components/orders/druck-kasse.ts):
+ * Titel des Kastens unter „Gesamt“ und der Satz zur Gebühr.
+ * NUR ANZEIGE — der Betrag kommt unverändert aus `barZuKassierenCents` (Snapshot); hier wird nichts
+ * gerechnet, nur gewählt, welches Wort darüber steht.
+ */
+
+export type DruckKasse = {
+  /** „Bar zu kassieren“, „Zu kassieren“ (Karte bei Abholung, Altbestand) oder „Nichts zu kassieren“. */
+  titel: 'Bar zu kassieren' | 'Zu kassieren' | 'Nichts zu kassieren'
+  /** Der Betrag aus barZuKassierenCents; null bei „Nichts zu kassieren“ — dann steht kein Betrag da. */
+  cents: number | null
+}
+
+/**
+ * Was der Kasten unter „Gesamt“ sagt (Antwort 8 der Projektleitung, 7.11.2026). Online: kein Kasten (null).
+ * Nicht abgeholt, storniert oder mit entfallener Gebühr gibt es nichts mehr zu kassieren — der Snapshot-
+ * Betrag bliebe dort stehen und läse sich wie eine offene Forderung. Storniert zählt auch ohne
+ * Erstattungszeitpunkt (Altbestand ohne Gebühr), weil eine stornierte Bestellung nie kassiert wird.
+ */
+export function druckKasse(
+  bestellung: BestellungMitGebuehr & Pick<BestellungFuerGebuehrStatus, 'status' | 'paymentMethod' | 'serviceFeeRefundedAt'>
+): DruckKasse | null {
+  const cents = barZuKassierenCents(bestellung)
+  if (cents === null) return null
+  if (bestellung.status === 'NOT_PICKED_UP' || bestellung.status === 'CANCELLED' || gebuehrEntfallen(bestellung)) {
+    return { titel: 'Nichts zu kassieren', cents: null }
+  }
+  // Mit Karte zahlt niemand bar — „Bar zu kassieren“ wäre bei diesem Altbestand falsch.
+  if (bestellung.paymentMethod === 'ONSITE_CARD') return { titel: 'Zu kassieren', cents }
+  return { titel: 'Bar zu kassieren', cents }
+}
+
+/**
+ * Der Satz zur Gebühr am Gesamt — nur im Hofpreis-Modell, und nur, wenn das gezeigte Gesamt die
+ * Gebühr wirklich enthält (Gebühr > 0, nicht entfallen). Er spricht vom Gesamt, nicht von „Preisen“: Die
+ * Positionen stehen mit dem Warenpreis aus dem Snapshot, also OHNE Gebühr (Mangel Zwischen-Durchgang A,
+ * druck Bild 1: Positionen € 12,20, Gesamt € 12,95). Positionen inkl. Gebühr umzurechnen wäre eine neue
+ * Geldrechnung. Das Wort kommt aus gebuehrBezeichnungFuer, nie fest. Abholzettel und Packliste (Antwort 4
+ * der Projektleitung, Nr. 277) fragen je Bestellung — auf der Packliste steht er an jedem Betrag, dessen
+ * Gesamt die Gebühr enthält, nie einmal für die ganze Seite.
+ */
+export function druckGesamtHinweis(
+  bestellung: { gebuehrModell: string | null } & Pick<BestellungFuerGebuehrStatus, 'serviceFeeCents' | 'serviceFeeRefundedAt'>
+): string | null {
+  if (!istHofpreisBestellung(bestellung) || bestellung.serviceFeeCents <= 0 || gebuehrEntfallen(bestellung)) return null
+  return `Gesamt inkl. ${gebuehrBezeichnungFuer(bestellung)}.`
 }
 
 const ZAHLART: Record<string, string> = {
@@ -192,6 +291,57 @@ export function zahlartText(paymentMethod: string, paymentStatus: string): strin
   if (paymentMethod === 'ONLINE' && paymentStatus === 'REFUNDED') return 'Online, erstattet'
   if (paymentMethod === 'ONLINE' && paymentStatus !== 'PAID') return 'Online, noch offen'
   return ZAHLART[paymentMethod] ?? paymentMethod
+}
+
+/** Das Modell einer Bestellung aus der Anzeige (`betrag.hofpreis`) — für die Wort-Helfer aus plattformgebuehr.ts. */
+export function modellDerBestellung(betrag: { hofpreis: boolean }): { gebuehrModell: string | null } {
+  return { gebuehrModell: betrag.hofpreis ? GEBUEHR_MODELL_HOFPREIS : null }
+}
+
+/** Was der Betragsblock einer Bestellung braucht — in Cent, wie getHofBestellDetail ihn liefert. */
+export type BetragFuerSatz = {
+  warenCents: number
+  gebuehrCents: number
+  gesamtCents: number
+  /** Vor Ort: holt die Monatsabrechnung die Gebühr? */
+  gebuehrFuerAbrechnung: boolean
+  hofpreis: boolean
+}
+
+/**
+ * Der Satz unter dem Betrag einer offenen Bestellung (Board s1-bestellung): was beim Hof
+ * bleibt und wie sich der Betrag zusammensetzt — das Wort der Gebühr je Modell der
+ * Bestellung (gebuehrBezeichnungFuer, V62/V63), nie ein festes Wort.
+ * - Hofpreis-Modell (N38): „Du bekommst € 18,00 · die Kundin zahlt € 19,12 – die Gebühr
+ *   ist online einbehalten.“ bzw. bar „… – die Gebühr holt die Monatsabrechnung.“; holt
+ *   sie keine Abrechnung (Gründungshof, „erlassen“), „Du bekommst die vollen € 17,31 – auf
+ *   diese Barbestellung zahlst du keine Plattformgebühr.“
+ * - Modell „bisher“: „Warenpreis € 10,00 + Servicegebühr € 0,50“ mit demselben Zusatz.
+ * Gerechnet wird nichts: alle Beträge kommen aus dem Snapshot der Bestellung.
+ */
+export function betragSatz(betrag: BetragFuerSatz, vorOrt: boolean): string {
+  const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
+  const wort = gebuehrBezeichnungFuer(modellDerBestellung(betrag))
+  if (betrag.hofpreis && vorOrt && !betrag.gebuehrFuerAbrechnung) {
+    return `Du bekommst die vollen ${euro(betrag.gesamtCents)} – auf diese Barbestellung zahlst du keine ${wort}.`
+  }
+  const teile = betrag.hofpreis
+    ? `Du bekommst ${euro(betrag.warenCents)} · die Kundin zahlt ${euro(betrag.gesamtCents)}`
+    : betrag.gebuehrCents > 0
+      ? `Warenpreis ${euro(betrag.warenCents)} + ${wort} ${euro(betrag.gebuehrCents)}`
+      : `Warenpreis ${euro(betrag.warenCents)}`
+  if (betrag.gebuehrCents <= 0) return teile
+  if (vorOrt) return teile + (betrag.gebuehrFuerAbrechnung ? ' – die Gebühr holt die Monatsabrechnung.' : '')
+  return `${teile} – die Gebühr ist online einbehalten.`
+}
+
+/**
+ * Der Satz zu einer Bar-Bestellung mit „Bestätigung offen“ (V87): bis wann die Kundin
+ * bestätigt und was sonst geschieht (verwaiste Bestellungen geben ihre Ware frei,
+ * src/server/verwaiste-bestellungen.ts). `bis` ist „heute, 09:50 Uhr“ aus fristVon.
+ */
+export function bestaetigungOffenSatz(vorname: string, bis: string): string {
+  return `${vorname} hat noch nicht bestätigt. Ohne Bestätigung bis ${bis} entfällt die Bestellung, die Ware kommt zurück in deinen Vorrat.`
 }
 
 /** „Anna Beispiel" → „Anna" — für „Anna bekommt zurück". Lange oder leere Namen: „Die Kundin". */

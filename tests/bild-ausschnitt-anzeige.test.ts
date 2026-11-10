@@ -102,7 +102,7 @@ describe('Produktkarte — der Ausschnitt am Foto', () => {
         wirdHinzugefuegt: false,
         href: '/hof-test/produkt/p_eier',
         onInDenKorb: () => {},
-        onMenge: () => {},
+       
       })
     )
 
@@ -198,8 +198,8 @@ describe('Wache — „Problem melden“ und die Rohfoto-Stellen ohne Ausschnitt
     expect(MELDUNG).toEqual(
       expect.arrayContaining([
         'src/components/shared/use-meldung-formular.ts',
-        'src/components/shared/meldung-form.tsx',
-        'src/components/hof-hilfe/meldung-abgeben.tsx',
+        // Seit Nr. 225 zeichnet der gemeinsame Baustein beide Formulare (meldung-form.tsx ruft nur den Hook).
+        'src/components/ui/meldung-formular-ansicht.tsx',
       ])
     )
   }, 30_000)

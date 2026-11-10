@@ -1,8 +1,10 @@
 'use client'
 
-import { cloneElement, isValidElement } from 'react'
-import { Check, Lock, Plus, X } from 'lucide-react'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { cloneElement, isValidElement, useId, useState } from 'react'
+import { Check, ChevronDown, Lock, Plus, X } from 'lucide-react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
+import { PFLICHT_KNOPF_RAHMEN } from '@/components/heute/pflicht-karte'
 import { Button } from '@/components/ui/button'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { ABHOLHINWEIS_SYMBOL, ABHOLHINWEIS_TEXT, ABHOLHINWEIS_VALUES, ABHOLUNG_ABSCHNITT, schalteAbholhinweis, type AbholhinweisValue } from '@/lib/abholhinweise'
@@ -11,6 +13,8 @@ import { cn } from '@/lib/utils'
 import { EuroCentFeld, KeinRuecktrittHaken } from '@/components/products/ruecktritt-felder'
 import { FREIWILLIG } from '@/lib/profil-meldungen'
 import { RUECKTRITT_TEXT, type RuecktrittAngabe } from '@/lib/ruecktritt-angaben'
+import { HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { FORMULAR_PRUEFEN, type SpeicherFehlerAnzeige } from '@/lib/produkte-hof'
 
 /*
  * Bausteine der beiden Formulare mit Verkaufsgrößen (Futter, Brennmaterial;
@@ -29,48 +33,55 @@ export function FamilienDialog({
   open,
   onClose,
   titel,
+  art,
   satz,
   hinweis,
   speichernText,
   speichert,
   onSpeichern,
+  meldung,
   children,
 }: {
   open: boolean
   onClose: () => void
   titel: string
+  /** Die Produktart als Unterzeile am Handy (Liste Lauf 32, produkt-neu 390). */
+  art: string
   satz: string
   /** Satz über den Knöpfen, z. B. was sofort online geht (speichernHinweis). */
   hinweis?: string | null
   speichernText: string
   speichert: boolean
   onSpeichern: () => void
+  /** Die orange Karte über den Feldern (V17): „Bitte prüfe die markierten Felder." oder ein Speicherfehler. */
+  meldung?: React.ReactNode
   children: React.ReactNode
 }): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && !speichert && onClose()}>
       <DialogContent
         data-app-palette="neu"
-        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-[760px] sm:rounded-[16px]"
+        showCloseButton={false}
       >
-        <div className="shrink-0 px-5 pt-5 pb-3 sm:px-6 sm:pt-6">
-          <DialogTitle className="pr-10 font-heading text-xl font-semibold text-foreground md:text-2xl">{titel}</DialogTitle>
-          <DialogDescription className="mt-1 text-[13px] text-muted-foreground">{satz}</DialogDescription>
-        </div>
+        <ProduktDialogKopf titel={titel} art={art} satz={satz} zurueckGesperrt={speichert} />
         <form
           noValidate
           onSubmit={(e) => {
             e.preventDefault()
             onSpeichern()
           }}
-          className="flex min-h-0 flex-1 flex-col"
+          className={cn('flex min-h-0 flex-1 flex-col', FELD_FEHLER_IM_FORMULAR)}
         >
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 sm:px-6">
-            <div className="flex flex-col gap-6">{children}</div>
+            <div className="flex flex-col gap-6">
+              {meldung}
+              {children}
+            </div>
           </div>
           <div className="flex shrink-0 flex-col gap-2 border-t border-border bg-card px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6">
             {hinweis && (
-              <p className="text-[12.5px] leading-snug text-muted-foreground" aria-live="polite">
+              <p className="text-[13px] leading-snug text-muted-foreground" aria-live="polite">
                 {hinweis}
               </p>
             )}
@@ -78,7 +89,7 @@ export function FamilienDialog({
               <Button type="button" variant="ghost" onClick={onClose} disabled={speichert} className="min-h-11">
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={speichert} className="min-h-11 w-full rounded-xl sm:w-auto sm:min-w-[160px] sm:rounded-full">
+              <Button type="submit" disabled={speichert} className="min-h-12 w-full rounded-[10px] text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
                 {speichert ? 'Speichere …' : speichernText}
               </Button>
             </div>
@@ -110,6 +121,79 @@ export function Abschnitt({
         {satz && <p className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">{satz}</p>}
       </div>
       {children}
+    </section>
+  )
+}
+
+const KLAPP_SATZ = 'text-[14px] leading-snug text-muted-foreground'
+
+/**
+ * Eine aufklappbare Karte wie die Abschnitte des Produktdialogs (Board s1-/w1-produkt-neu, Bild 3 und 4; Abnahme
+ * Lauf 32, Nr. 277): Kopf als Knopf mit Titel und Kurzstand („Pflicht · noch offen“), darunter der Inhalt. Zu
+ * steht unter dem Kopf ein Satz und der Knopf, der sie öffnet („Angaben eintragen“; Form `PFLICHT_KNOPF_RAHMEN`), offen
+ * steht derselbe Satz oben im Inhalt. `immerOffen` öffnet sie
+ * von außen — nach einem Fehler darin muss das Feld sichtbar sein, sonst findet der Sprung zum Feld nichts.
+ * Der Inhalt bleibt eingehängt (nur `hidden`), damit Eingaben beim Zuklappen nie verloren gehen.
+ */
+export function KlappKarte({
+  titel,
+  stand,
+  satz,
+  oeffnenText,
+  anfangsOffen = false,
+  immerOffen = false,
+  fehler = false,
+  children,
+}: {
+  titel: string
+  /** Die Zeile unter dem Titel — offen wie zu (Liste Lauf 32, produkt-neu: Kartenköpfe mit Zusammenfassung). */
+  stand: string
+  /** Steht zugeklappt unter dem Kopf. */
+  satz?: string
+  /** Der Knopf der zugeklappten Karte; ohne ihn öffnet nur der Kopf. */
+  oeffnenText?: string
+  anfangsOffen?: boolean
+  immerOffen?: boolean
+  /** Ein Feld darin hat einen Fehler: der Kurzstand wird orange (wie „Bitte prüfen“ im Produktdialog). */
+  fehler?: boolean
+  children: React.ReactNode
+}): React.JSX.Element {
+  const [offenGewaehlt, setOffenGewaehlt] = useState(anfangsOffen)
+  const offen = offenGewaehlt || immerOffen
+  const id = useId()
+  return (
+    <section aria-labelledby={`${id}-titel`} className="rounded-[14px] border border-border bg-card px-4">
+      <h3 id={`${id}-titel`} className="m-0">
+        <button
+          type="button"
+          aria-expanded={offen}
+          aria-controls={`${id}-inhalt`}
+          onClick={() => setOffenGewaehlt(!offen)}
+          className={cn('flex min-h-14 w-full items-center gap-3 rounded-md py-3 text-left', FOKUS_RAHMEN)}
+        >
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-[16px] font-bold text-foreground">{titel}</span>
+            <span className={cn('text-[13px]', fehler ? 'font-semibold text-status-offen' : 'text-muted-foreground')}>{stand}</span>
+          </span>
+          <ChevronDown className={cn('size-5 shrink-0 text-muted-foreground transition-transform', offen && 'rotate-180')} strokeWidth={1.7} aria-hidden="true" />
+        </button>
+      </h3>
+      {!offen && (satz || oeffnenText) && (
+        <div className="flex flex-col gap-3 pb-4">
+          {satz && <p className={KLAPP_SATZ}>{satz}</p>}
+          {oeffnenText && (
+            <button type="button" onClick={() => setOffenGewaehlt(true)} className={PFLICHT_KNOPF_RAHMEN}>
+              {oeffnenText}
+            </button>
+          )}
+        </div>
+      )}
+      <div id={`${id}-inhalt`} hidden={!offen} className="flex flex-col gap-4 pb-4">
+        {/* Geöffnet bleibt die Erklärung oben im Inhalt stehen — gerade beim Ausfüllen braucht der Hof sie (freigabe.md
+            §12: Fachwörter wie „Kennzeichnung“ mit einem Satz erklären). Zugeklappt steht sie über dem Knopf, nie doppelt. */}
+        {offen && satz && <p className={KLAPP_SATZ}>{satz}</p>}
+        {children}
+      </div>
     </section>
   )
 }
@@ -149,7 +233,8 @@ export function Feld({
   const eingabe = isValidElement<Record<string, unknown>>(children) && Object.keys(verbindung).length > 0 ? cloneElement(children, verbindung) : children
   return (
     <div className="flex min-w-0 flex-col gap-1.5" data-feld={feld}>
-      <label htmlFor={id} className={cn('text-[13px] font-medium text-foreground', labelKlasse)}>
+      {/* Fett und 15 px wie im Board s1-produkt-neu (Lauf 31). */}
+      <label htmlFor={id} className={cn('text-[15px] font-semibold text-foreground', labelKlasse)}>
         {label}
         {labelZusatz && <span className="sr-only"> {labelZusatz}</span>}
       </label>
@@ -165,9 +250,48 @@ export function Feld({
   )
 }
 
+/**
+ * Der orange Rand jedes Felds mit Fehler im Formular (V17; Board s1/w1-produkt-neu, Bild 5): 2 px
+ * `status-offen` über `aria-invalid` — für alle Felder darunter, auch DezimalFeld und Textarea, deren
+ * Grundbausteine sonst rot zeichnen. Wie FELD_FEHLER_RAHMEN (ui/feld-fehler.tsx), nur für einen
+ * ganzen Teilbaum; wichtig (`!`), weil die Grundbausteine dieselbe Spezifität tragen. Den Fokusring
+ * nimmt `ring-0!` nur ohne Fokus: Mit der Tastatur darauf zeigt das Feld ihn wieder (WCAG 2.4.7).
+ */
+export const FELD_FEHLER_IM_FORMULAR =
+  '[&_[aria-invalid=true]]:border-2! [&_[aria-invalid=true]]:border-status-offen! [&_[aria-invalid=true]]:ring-0! [&_[aria-invalid=true]:focus-visible]:ring-2! [&_[aria-invalid=true]:focus-visible]:ring-ring!'
+
+/**
+ * Die eine orange Karte über den Feldern (V17; Board s1/w1-produkt-neu, Bild 5 und 6): ein
+ * Speicherfehler (mit „Nochmal", wo er wiederholbar ist) geht vor „Bitte prüfe die markierten
+ * Felder." — beides nie als Toast. Ohne Anlass nichts.
+ */
+export function FormularMeldung({
+  pruefen,
+  fehler,
+  onNochmal,
+  laeuft,
+}: {
+  /** Nach einem Versuch mit markierten Feldern. */
+  pruefen: boolean
+  fehler: SpeicherFehlerAnzeige | null
+  onNochmal?: () => void
+  laeuft?: boolean
+}): React.JSX.Element | null {
+  if (fehler) {
+    return (
+      <HinweiskarteFehler titel={fehler.titel} nochmal={fehler.nochmal ? onNochmal : undefined} laeuft={laeuft}>
+        {fehler.satz}
+      </HinweiskarteFehler>
+    )
+  }
+  if (pruefen) return <HinweiskarteFehler titel={FORMULAR_PRUEFEN} />
+  return null
+}
+
+/** Der Satz unter dem Feld: orange, 14 px halbfett, mit role="alert" (V17, wie FeldMitFehler). */
 export function FeldFehler({ id, children }: { id?: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <p id={id} role="alert" className="text-xs font-medium text-status-offen">
+    <p id={id} role="alert" className="text-[14px] leading-snug font-semibold text-status-offen">
       {children}
     </p>
   )

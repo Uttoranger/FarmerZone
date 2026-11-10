@@ -25,15 +25,19 @@ import type { Betriebsstatus, Tarif } from '@prisma/client'
 import { aufzaehlung, abholzeitenKurz, EINSTELLUNG_FUER_ZEILE, type HofseiteZeile } from '@/lib/hofseite-fortschritt'
 import type { WeeklySlot } from '@/lib/pickup-days'
 import { ABHOLZEITEN_FEHLEN_ZEILE } from '@/lib/pickup-slot-rules'
-import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS } from '@/lib/taxonomie'
+import { BETRIEBSNUMMER_ANKER, BETRIEBSSTATUS, type BetriebsstatusValue } from '@/lib/taxonomie'
+import { MARKE } from '@/lib/marke'
 import {
+  BAR_GEBUEHR_SEPA_SATZ,
   BAR_OHNE_GEBUEHR_SATZ,
   HOFTOR_ABHOLZEITEN_JE_WOCHE,
   HOFTOR_PRODUKTE,
   IM_MONAT,
+  LASTSCHRIFT_TEXT,
   OHNE_WAHL_SATZ,
   ONLINE_GEBUEHR_ABGETRENNT_SATZ,
   ONLINE_GEBUEHR_MIT_PROVISION_SATZ,
+  PLATTFORMGEBUEHR_BEZEICHNUNG,
   PREIS_BEDINGUNGEN,
   START_TARIF,
   TARIFE,
@@ -50,6 +54,7 @@ import {
   type TarifZustand,
 } from '@/lib/konditionen'
 import { barOhneServicegebuehr, berechneServicegebuehr, type ServicegebuehrEinstellung } from '@/lib/servicegebuehr'
+import { barMoeglich, bestellGebuehr, einzugFuer, letzterFreierTag, satzText, type GebuehrEinzug, type GebuehrLage } from '@/lib/plattformgebuehr'
 import { calcPlatformFeeAmount, decimalZuCents, type DecimalEingabe } from '@/lib/order-totals'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
 import { Decimal } from '@prisma/client/runtime/index-browser'
@@ -94,6 +99,57 @@ export const TON_TEXT: Record<EinstellungTon, string> = {
 export const EINSTELLUNGEN_TITEL = 'Einstellungen'
 export const EINSTELLUNGEN_SATZ = 'Alles rund um deinen Hof an einem Ort.'
 
+/**
+ * Der Bereich mit der Pause (Farm.isPaused): Zeile der Übersicht, Titel von
+ * /settings/pause und der Verweis beim Stilllegen heißen gleich (Boards
+ * s1-/w1-einstellungen, s2-konto-hof, V8; Nr. 224). Die Aktion in Mein Hof
+ * bleibt „Pausieren“.
+ */
+export const URLAUB_UND_PAUSE = 'Urlaub und Pause'
+
+/** Seite und Knopf mit den Angaben des Hofs (Register N42 c, V43, V49; Board s2-hofdaten-zahlung). */
+export const HOFDATEN_TEXT = {
+  titel: 'Hofdaten',
+  satz: 'Informationen, die auf deiner öffentlichen Hofseite sichtbar sind.',
+  speichern: 'Hofdaten speichern',
+  gespeichert: 'Hofdaten gespeichert',
+  /** Satz unter „Was für ein Betrieb bist du?“ ohne Wahl — mit Halbgeviertstrich (Abnahme 269 „—“). */
+  betriebsnummerOhneWahl: 'LFBIS-Nummer, BAES- bzw. BVL-Registrierung oder α-Nummer – je nachdem, was du mit Futter machst.',
+  /** Vorsatz bei „Eigene Ernte“ (Board s2-/w2-hofdaten-zahlung Bild 1: unter dem Feld Betriebsnummer). */
+  lfbisVorsatz: 'Das ist deine Futtermittel-Nummer (LFBIS).',
+} as const
+
+/**
+ * Der Hilfesatz unter dem Feld Betriebsnummer (Board s2-/w2-hofdaten-zahlung Bild 1, Nr. 278): bei „Eigene
+ * Ernte“ mit dem Vorsatz zur LFBIS-Nummer, sonst der Satz des Status; der Gedankenstrich als Halbgeviertstrich
+ * mit Leerzeichen wie im Board (der Wortlaut in src/lib/taxonomie.ts bleibt unverändert).
+ */
+export function betriebsnummerHilfe(status: BetriebsstatusValue | null): string {
+  if (!status) return HOFDATEN_TEXT.betriebsnummerOhneWahl
+  const satz = BETRIEBSSTATUS[status].hilfe.replaceAll(' — ', ' – ')
+  return status === 'PRIMAERPRODUKTION' ? `${HOFDATEN_TEXT.lfbisVorsatz} ${satz}` : satz
+}
+
+/**
+ * Konto und Sicherheit (Board s2-/w2-konto-hof; N42 c „Anmelde-Adresse“,
+ * N42 d „Hof“ statt „Hofladen“, V55). Der Verweis auf die Pause nimmt
+ * `URLAUB_UND_PAUSE`.
+ */
+export const KONTO_TEXT = {
+  anmeldeAdresseTitel: 'Anmelde-Adresse',
+  anmeldeAdresse: 'Deine Anmelde-Adresse:',
+  anmeldeAdresseAendern: 'Um sie zu ändern,',
+  passwortTitel: 'Passwort ändern',
+  stilllegenSatz: 'Deinen Hof dauerhaft schließen.',
+  nurVoruebergehend: 'Nur vorübergehend zusperren? Dann nutze lieber',
+  nurVoruebergehendNach: '– dabei bleibt deine Hofseite mit einem Hinweis sichtbar.',
+  /** Konto löschen wörtlich nach Board s2-/w2-konto-hof Bild 2 (nennt die 7 Jahre Aufbewahrung). */
+  loeschenTitel: 'Konto löschen',
+  loeschenSatz: `Schreib dem ${MARKE}-Support – die Nachricht ist bereits vorausgefüllt. Bestelldaten müssen wir aus steuerrechtlichen Gründen 7 Jahre aufbewahren. Nur den Hof schließen? Dann nutze „Hof stilllegen“ – dabei bleiben alle Daten erhalten.`,
+  loeschenKnopf: 'Support schreiben',
+  anmeldeAdresseNach: '. Die Nachricht ist bereits vorausgefüllt.',
+} as const
+
 export type EinstellungenDaten = {
   name: string
   address: string
@@ -132,6 +188,25 @@ function esFehlt(teile: readonly string[]): string {
   return `Es ${teile.length === 1 ? 'fehlt' : 'fehlen'}: ${aufzaehlung(teile)}`
 }
 
+/** Nimmt ein führendes „LFBIS“ (mit Leerzeichen, Bindestrich oder Doppelpunkt) weg; bleibt nichts übrig, die Eingabe. */
+function ohneLfbisVorsatz(nummer: string): string {
+  const rest = nummer.trim().replace(/^LFBIS[\s:-]*/i, '')
+  return rest === '' ? nummer.trim() : rest
+}
+
+/**
+ * Die Zeile „Futtermittel-Registrierung“ mit Nummer (Liste Lauf 32, einstellungen „Eigene Ernte“, Nr. 250):
+ * ohne das Fachwort der Betriebsart, immer „Futtermittel-Nummer (LFBIS) …“; ist der Hof beim BAES
+ * registriert oder zugelassen, steht zusätzlich „BAES-Meldung“ dahinter. Ohne zweite Nummer: Der Hof speichert
+ * nur eine (Farm.betriebsnummer), die BAES-Meldung kommt aus dem Status (wie in lib/futter-registrierung.ts).
+ */
+export function futtermittelZeile(betriebsstatus: Betriebsstatus | null, nummer: string): string {
+  // Höfe tragen die Nummer oft samt Vorsatz ein („LFBIS 1234567“); die Beschriftung nennt LFBIS schon,
+  // darum fällt der Vorsatz nur in der Anzeige weg — gespeichert bleibt, was der Hof eingetragen hat.
+  const lfbis = `Futtermittel-Nummer (LFBIS) ${ohneLfbisVorsatz(nummer)}`
+  return betriebsstatus === 'REGISTRIERT' || betriebsstatus === 'ZUGELASSEN' ? `${lfbis} · BAES-Meldung` : lfbis
+}
+
 /**
  * Die neun Bereiche der Übersicht, in der Reihenfolge des Mockups (Mein
  * Auftritt gleich nach den Hofdaten, wo er inhaltlich hingehört). Seit Nr. 30
@@ -163,7 +238,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
       titel: 'Abholzeiten',
       zeile:
         d.abholzeiten.length > 0
-          ? abholzeitenKurz(d.abholzeiten)
+          ? abholzeitenKurz(d.abholzeiten, { mitUhr: true })
           : d.abholzeitenGesamt > 0
             ? 'Alle Abholzeiten sind pausiert — gerade kann niemand bestellen'
             : ABHOLZEITEN_FEHLEN_ZEILE,
@@ -193,11 +268,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     {
       id: 'futtermittel',
       titel: 'Futtermittel-Registrierung',
-      zeile: nummer
-        ? d.betriebsstatus
-          ? `${BETRIEBSSTATUS[d.betriebsstatus].name} · ${nummer}`
-          : nummer
-        : 'Keine Nummer — brauchst du nur, wenn du Futter verkaufst',
+      zeile: nummer ? futtermittelZeile(d.betriebsstatus, nummer) : 'Keine Nummer — brauchst du nur, wenn du Futter verkaufst',
       ton: nummer ? 'fertig' : 'neutral',
       href: `/settings/profile#${BETRIEBSNUMMER_ANKER}`,
     },
@@ -217,7 +288,7 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
     },
     {
       id: 'urlaubsmodus',
-      titel: 'Urlaubsmodus',
+      titel: URLAUB_UND_PAUSE,
       zeile: d.isPaused ? 'An · Kunden können gerade nicht bestellen' : 'Aus · du nimmst Bestellungen an',
       ton: d.isPaused ? 'offen' : 'neutral',
       href: '/settings/pause',
@@ -230,6 +301,25 @@ export function einstellungenBereiche(d: EinstellungenDaten, jetzt: Date): Einst
       href: EINSTELLUNG_KONTO.href,
     },
   ]
+}
+
+/** Eine Gruppe der Übersicht: Überschrift und ihre Bereiche, in der Reihenfolge von `einstellungenBereiche`. */
+export type EinstellungGruppe = { id: 'hof' | 'konto'; titel: string; bereiche: EinstellungBereich[] }
+
+/** Was in die Gruppe „Konto“ gehört (Boards s1-/w1-einstellungen); alles andere steht unter „Dein Hof“. */
+const KONTO_BEREICHE: readonly EinstellungBereichId[] = ['konditionen', 'konto']
+
+/**
+ * Die Bereiche in zwei Gruppen wie die Boards s1-/w1-einstellungen: „Dein
+ * Hof“ und „Konto“ (Nr. 224). Reihenfolge und Inhalt bleiben aus
+ * `einstellungenBereiche`; eine leere Gruppe steht nicht da.
+ */
+export function einstellungenGruppen(bereiche: readonly EinstellungBereich[]): EinstellungGruppe[] {
+  const gruppen: EinstellungGruppe[] = [
+    { id: 'hof', titel: 'Dein Hof', bereiche: bereiche.filter((b) => !KONTO_BEREICHE.includes(b.id)) },
+    { id: 'konto', titel: 'Konto', bereiche: bereiche.filter((b) => KONTO_BEREICHE.includes(b.id)) },
+  ]
+  return gruppen.filter((g) => g.bereiche.length > 0)
 }
 
 // ─── Zahlungs-Seite ─────────────────────────────────────────────────────────
@@ -267,6 +357,71 @@ export function zahlungHinweis(d: {
   return d.rueckmeldung === 'success' ? 'geschafft' : null
 }
 
+/** Die Karte „Bar bei Abholung“ auf /settings/payments (Board s2-/w2-hofdaten-zahlung, V46, V61, V71). */
+export type BarKarte = {
+  /** Die Marke mit Wort — nie nur die Farbe. */
+  marke: string
+  ton: 'fertig' | 'offen'
+  /** Ein Satz unter der Beschreibung, oder null. */
+  satz: string | null
+  /** „Lastschrift einrichten“ zeigen (Weg auf „Deine Konditionen“, dort richtet Stripe sie ein). */
+  lastschrift: boolean
+  /** Bei „Bar gesperrt“ der Weg zur offenen Monatsabrechnung auf „Deine Konditionen“. */
+  zuKonditionen: boolean
+}
+
+export const BAR_KARTE_TEXT = {
+  titel: 'Bar bei Abholung',
+  beschreibung: 'Kundinnen können bei der Abholung auch bar zahlen – zusätzlich zur Online-Zahlung.',
+  aktiv: 'Aktiv',
+  brauchtLastschrift: 'Braucht Lastschrift',
+  /**
+   * Eine offene Monatsabrechnung sperrt bar (Nr. 198). Nie „Pausiert“: Das Wort gehört dem
+   * Hofzustand (Urlaub und Pause) — Register N38, Ergänzung 5.11.2026 (Rückfragen Lauf 30, Punkt 5).
+   */
+  gesperrt: 'Bar gesperrt',
+  lastschriftSatz:
+    'Barzahlung gibt es, sobald du die Lastschrift für die Monatsabrechnung eingerichtet hast. ' +
+    'Darüber ziehen wir einmal im Monat die Plattformgebühr aus Barbestellungen ein.',
+  /** Eine Monatsabrechnung sperrt bar (Nr. 198) — eine Lastschrift hilft da nicht, auch wenn eine fehlt. */
+  gesperrtSatz: 'Barzahlung ist gesperrt, solange eine Monatsabrechnung offen ist.',
+  /** Der Weg bei „Bar gesperrt“ — dort stehen Barzahlung und Monatsabrechnungen (Nr. 198). */
+  zuKonditionen: 'Zu „Deine Konditionen“',
+  gruendungSatz: (bis: string): string =>
+    `Bis ${bis} zahlst du als Gründungshof auf Barverkäufe keine Plattformgebühr; die Lastschrift brauchst du erst danach.`,
+  einrichten: LASTSCHRIFT_TEXT.einrichten,
+  /** Dort steht die Karte „Barzahlung“ mit Stripes Formular (Nr. 198). */
+  einrichtenHref: '/settings/konditionen#barzahlung',
+} as const
+
+/**
+ * Was die Karte „Bar bei Abholung“ sagt — keine neue Regel: Ob bar geht,
+ * entscheidet `barMoeglich` (dieselbe Quelle wie Kasse und /api/checkout).
+ * Geht es nicht, weil eine Monatsabrechnung sperrt (`barGesperrt`), heißt die
+ * Marke „Bar gesperrt“ — eine Lastschrift höbe die Sperre nicht auf. Sonst
+ * (Hofpreis-Modell, Einzug fällig, Lastschrift Pflicht und keine da) heißt sie
+ * „Braucht Lastschrift“ mit dem Weg dorthin (N42 g). Ist die Bargebühr noch
+ * erlassen (`einzugFuer` → `erlassen`), nennt der Satz „Bis <Tag>“ den letzten
+ * Tag ohne Gebühr — den Wiener Tag vor `einzugAb` aus der Lage (`letzterFreierTag`,
+ * Register N48; wie die Karte „Barzahlung“) — als Gründungshof nur, wenn
+ * `Farm.einzugAb` leer ist (dann kommt der Tag aus der Gründung), sonst neutral.
+ * Im Modell „bisher“ kein Satz.
+ */
+export function barKarte(lage: GebuehrLage, jetzt: Date, hof: { einzugAb: Date | null }): BarKarte {
+  const T = BAR_KARTE_TEXT
+  if (!barMoeglich(lage, jetzt)) {
+    if (lage.modell === 'hofpreis' && lage.barGesperrt) return { marke: T.gesperrt, ton: 'offen', satz: T.gesperrtSatz, lastschrift: false, zuKonditionen: true }
+    return { marke: T.brauchtLastschrift, ton: 'offen', satz: T.lastschriftSatz, lastschrift: true, zuKonditionen: false }
+  }
+  let satz: string | null = null
+  if (lage.modell === 'hofpreis' && einzugFuer(lage, 'ONSITE_CASH', jetzt) === 'erlassen') {
+    // Derselbe Tag wie die Karte „Barzahlung“ (ladeBarzahlung: letzterFreierTagText) — eine Quelle.
+    const bis = letzterFreierTag(lage.einzugAb)
+    satz = hof.einzugAb === null ? T.gruendungSatz(bis) : LASTSCHRIFT_TEXT.erlassen(bis)
+  }
+  return { marke: T.aktiv, ton: 'fertig', satz, lastschrift: false, zuKonditionen: false }
+}
+
 export const ONLINE_AUS_TITEL = 'Online-Zahlung ist noch aus'
 export const ONLINE_AUS_SATZ =
   'Dein Stripe-Konto ist fertig, die Online-Zahlung ist für deinen Hof aber noch aus. ' +
@@ -284,7 +439,14 @@ export function konditionenZeile(hof: TarifHof, jetzt: Date): string {
   const zeile = baueTarifZeile({ tarif: hof.tarif, gruendungBis: hof.gruendungBis, produkteImShop: 0 }, jetzt)
   if (zeile === null) return tarifText('HOFLADEN').name
   // Bei Hoftor nur der Titel: „Produkte im Shop" ohne die Zahl sagte nichts.
-  return zeile.zustand === 'hoftor' ? zeile.titel : `${zeile.titel} · ${zeile.zeile}`
+  if (zeile.zustand === 'hoftor') return zeile.titel
+  // Gründungshof in der Übersicht wörtlich nach Board s1-/w1-einstellungen (Liste Lauf 32, Nr. 250): „Gründungshof
+  // bis <Datum> · ohne Grundgebühr“ — das Datum aus dem Stand wie in der Tarif-Zeile (formatDatumLang); „gruendungshof“
+  // gibt es nur mit gruendungBis. „ohne Grundgebühr“ ohne „bis“ hat in konditionen.ts keinen eigenen Eintrag (Bericht 250).
+  if (zeile.zustand === 'gruendungshof' && hof.gruendungBis) {
+    return `${zeile.titel} bis ${formatDatumLang(hof.gruendungBis)} · ohne Grundgebühr`
+  }
+  return `${zeile.titel} · ${zeile.zeile}`
 }
 
 // ─── Konditionen: Rechenbeispiel ────────────────────────────────────────────
@@ -341,15 +503,21 @@ function keineGebuehrGrund(hof: KonditionenHof, jetzt: Date): string | null {
 
 /**
  * Das Rechenbeispiel für eine Bestellung über € 20, heute bestellt, mit den
- * gespeicherten Sätzen dieses Hofs. Gebühr nur über berechneServicegebuehr
- * (E4, B1), Provision über calcPlatformFeeAmount wie im Checkout — keine
- * zweite Rechnung.
+ * gespeicherten Sätzen dieses Hofs. `lage` ist die Gebührenlage des Hofs
+ * (`ladeGebuehrLage`, N38): im Modell „bisher“ die Servicegebühr über
+ * berechneServicegebuehr (E4, B1), sonst sein Satz der Plattformgebühr,
+ * gerechnet über bestellGebuehr wie Kasse und /api/checkout, und bar nach
+ * `einzugFuer` (Nr. 224). Die
+ * Provision über calcPlatformFeeAmount wie im Checkout — keine zweite Rechnung.
  */
-export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rechenbeispiel {
+export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date, lage: GebuehrLage): Rechenbeispiel {
   const waren = RECHENBEISPIEL_WARENPREIS_CENTS
+  const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
+  const titel = `Rechenbeispiel: eine Bestellung über ${euro(waren)}`
+  if (lage.modell === 'hofpreis') return rechenbeispielHofpreis(waren, provision, lage, jetzt, titel)
+
   const online = berechneServicegebuehr(waren, hof, jetzt, 'ONLINE').gebuehrCents
   const bar = berechneServicegebuehr(waren, hof, jetzt, 'ONSITE_CASH').gebuehrCents
-  const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
   const grund = keineGebuehrGrund(hof, jetzt)
   const prozent = Number(hof.serviceFeePercent.toString())
 
@@ -362,7 +530,7 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
   onlineZeilen.push({ label: 'Deine Auszahlung', betrag: euro(waren - provision), summe: true })
 
   return {
-    titel: `Rechenbeispiel: eine Bestellung über ${euro(waren)}`,
+    titel,
     satz:
       grund === null && Number.isFinite(prozent)
         ? `Servicegebühr ${formatZahl(prozent)} %, mind. ${euro(hof.serviceFeeMinCents)} – zahlt der Kunde`
@@ -393,6 +561,66 @@ export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date): Rec
           : (grund ?? ''),
     },
   }
+}
+
+/** Die Zeile der Plattformgebühr im Rechenbeispiel: Sie steckt im Preis, den die Kundin sieht (N38). */
+export const RECHENBEISPIEL_GEBUEHR_IM_PREIS = `${PLATTFORMGEBUEHR_BEZEICHNUNG} (im Preis)`
+
+/**
+ * Das Beispiel im Hofpreis-Modell (N38): Die Kundin zahlt den Endpreis
+ * (Warenpreis + Gebühr je Stück, aufgerundet), online behält Stripe die Gebühr
+ * ein. Bar entscheidet `einzugFuer` (dieselbe Quelle wie /api/checkout), wohin
+ * die kassierte Gebühr geht: `erlassen` — sie bleibt beim Hof, ihm bleibt der
+ * ganze Betrag; `sepa` — die Monatsabrechnung holt sie per Lastschrift;
+ * `ueberweisung` — per Rechnung; null — bar geht gerade nicht (Sperre bzw.
+ * Lastschrift fehlt), der Satz sagt warum.
+ */
+function rechenbeispielHofpreis(
+  waren: number,
+  provision: number,
+  lage: Extract<GebuehrLage, { modell: 'hofpreis' }>,
+  jetzt: Date,
+  titel: string
+): Rechenbeispiel {
+  const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: waren, menge: 1 }], lage.hundertstel)
+  const gebuehrZeile: RechenZeile = { label: RECHENBEISPIEL_GEBUEHR_IM_PREIS, betrag: `+ ${euro(gebuehrCents)}` }
+  const onlineZeilen: RechenZeile[] = [
+    { label: 'Warenpreis', betrag: euro(waren) },
+    gebuehrZeile,
+    { label: 'Kunde zahlt', betrag: euro(gesamtCents), summe: true },
+  ]
+  if (provision > 0) onlineZeilen.push({ label: 'Provision', betrag: `− ${euro(provision)}` })
+  onlineZeilen.push({ label: 'Deine Auszahlung', betrag: euro(waren - provision), summe: true })
+  const einzug = einzugFuer(lage, 'ONSITE_CASH', jetzt)
+  return {
+    titel,
+    satz: `${PLATTFORMGEBUEHR_BEZEICHNUNG} ${satzText(lage.hundertstel)} % je Stück, aufgerundet – steckt im Preis, den die Kundin zahlt`,
+    mitProvision: provision > 0,
+    online: {
+      titel: 'Online bezahlt',
+      zeilen: onlineZeilen,
+      satz: provision > 0 ? ONLINE_GEBUEHR_MIT_PROVISION_SATZ : ONLINE_GEBUEHR_ABGETRENNT_SATZ,
+    },
+    bar: {
+      titel: 'Bar bei Abholung',
+      zeilen: [
+        { label: 'Warenpreis', betrag: euro(waren) },
+        gebuehrZeile,
+        { label: 'Du kassierst („Bar zu kassieren“)', betrag: euro(gesamtCents), summe: true },
+        { label: 'Dir bleibt', betrag: euro(einzug === 'erlassen' ? gesamtCents : waren), summe: true },
+      ],
+      satz: barSatzHofpreis(lage, einzug),
+    },
+  }
+}
+
+/** Der Satz unter der Bar-Spalte im Hofpreis-Modell — nur bestehende Texte, gewählt nach `einzugFuer`. */
+function barSatzHofpreis(lage: Extract<GebuehrLage, { modell: 'hofpreis' }>, einzug: GebuehrEinzug | null): string {
+  // „Bis <Tag>“ ist der letzte freie Tag wie in der Karte „Barzahlung“ darunter (letzterFreierTag), nie ein anderer.
+  if (einzug === 'erlassen') return LASTSCHRIFT_TEXT.erlassen(letzterFreierTag(lage.einzugAb))
+  if (einzug === 'ueberweisung') return LASTSCHRIFT_TEXT.mandatFrei
+  if (einzug === null) return lage.barGesperrt ? BAR_KARTE_TEXT.gesperrtSatz : LASTSCHRIFT_TEXT.mandatPflicht
+  return BAR_GEBUEHR_SEPA_SATZ
 }
 
 // ─── Konditionen, Fassung 2: Stand, Tarif-Karten, Vergleich (Nr. 61) ────────

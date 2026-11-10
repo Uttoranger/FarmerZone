@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, Knopf, KnopfReihe } from './_layout'
+import { EmailLayout, h1, bodyText, leiseZeile, Knopf, KnopfReihe } from './_layout'
 import { MARKE } from '@/lib/marke'
 
 export interface RegistrierungHinweisProps {
@@ -19,35 +19,22 @@ export interface RegistrierungHinweisProps {
  * die echte Person, dass es ihr Konto schon gibt. Hell wie alle Mails, ohne
  * Emojis, Palette aus _layout.tsx; keine Werbung.
  */
-export function RegistrierungHinweisEmail({ weg, anmelden, passwortZuruecksetzen }: RegistrierungHinweisProps) {
+export function RegistrierungHinweisEmail({ weg, anmelden }: RegistrierungHinweisProps) {
   return (
-    <EmailLayout previewText={`Zu deiner E-Mail-Adresse gibt es schon ein Konto bei ${MARKE}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Zu deiner Adresse gibt es schon ein Konto bei ${MARKE}.`}>
       <Text style={h1}>Zu deiner Adresse gibt es schon ein Konto</Text>
+      {/* Board s3/w3-mail-sicherheit Bild 6: ein Knopf; „Passwort vergessen“ steht auf der Anmeldeseite. */}
       <Text style={bodyText}>
-        Hallo,
-        <br />
-        {`jemand wollte sich mit deiner E-Mail-Adresse bei ${MARKE} registrieren. Zu dieser Adresse gibt es aber schon ein Konto.`}
+        {weg === 'passwort'
+          ? 'Gerade wollte sich jemand mit dieser Adresse neu registrieren. Warst du das? Dann melde dich einfach an.'
+          : 'Gerade wollte sich jemand mit dieser Adresse neu registrieren. Warst du das? Dann melde dich einfach an – wir schicken dir dafür einen Code an diese Adresse.'}
       </Text>
-      {weg === 'passwort' ? (
-        <Text style={bodyText}>Warst du das? Dann melde dich an. Hast du dein Passwort vergessen, setze es zurück.</Text>
-      ) : (
-        <Text style={bodyText}>
-          Warst du das? Dann melde dich an – wir schicken dir dafür einen Code an diese Adresse.
-        </Text>
-      )}
 
       <KnopfReihe>
         <Knopf href={anmelden}>Anmelden</Knopf>
-        {passwortZuruecksetzen && (
-          <Knopf href={passwortZuruecksetzen} art="rahmen">
-            Passwort zurücksetzen
-          </Knopf>
-        )}
       </KnopfReihe>
 
-      <Text style={mutedText}>
-        Warst du es nicht, kannst du diese E-Mail ignorieren. An deinem Konto hat sich nichts geändert.
-      </Text>
+      <Text style={leiseZeile}>Warst du das nicht? Dann musst du nichts tun.</Text>
     </EmailLayout>
   )
 }

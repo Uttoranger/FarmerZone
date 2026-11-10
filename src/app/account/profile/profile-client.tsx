@@ -1,10 +1,10 @@
 'use client'
 
-import { useId, useState, useTransition } from 'react'
+import { useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Mail, MessageCircle, Trash2, BellOff, ExternalLink, LogOut, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { cn } from '@/lib/utils'
 import { updateSubscription, deleteCustomerAccount } from '@/server/actions/subscriptions'
@@ -12,17 +12,14 @@ import { ABO_TEXT } from '@/lib/abo-bestaetigung'
 import { ADMIN_ANMELDEN_TEXT, ADMIN_PFAD } from '@/lib/admin-anmeldung'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { EmptyState } from '@/components/ui/empty-state'
-import { AngemeldeteGeraete } from '@/components/konto/angemeldete-geraete'
+import { AngemeldeteGeraete, KONTO_ETIKETT } from '@/components/konto/angemeldete-geraete'
 import type { GeraeteZeile } from '@/lib/geraete'
-import { Button } from '@/components/ui/button'
-import { KARTE, KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { KARTE, KNOPF_RAHMEN } from '@/components/bestaetigung/bestaetigung-teile'
+import { Dialog, DialogDescription, DialogMitte } from '@/components/ui/dialog'
+import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { useMindestbreite } from '@/lib/use-mindestbreite'
+import { textlinkKlassen } from '@/components/ui/textlink'
+import { KNOPF_GRUEN_KAUF, KNOPF_UMRISS_KRAEFTIG } from '@/components/anmelden/stil'
 
 /*
  * „Mein Konto" der freiwilligen Kunden-Anmeldung — seit Nr. 14 im neuen Design
@@ -31,6 +28,15 @@ import {
  * Seit Nr. 178 (Register S18) dazu die angemeldeten Geräte mit „Überall
  * abmelden" (Baustein AngemeldeteGeraete, `fuerKundin`).
  * Zerstörendes steht orange umrandet, nie grün (DESIGN_SYSTEM, „Dialoge").
+ * Seit Lauf 30 (Boards s2/w2-kundenkonto): im Browser zwei Spalten
+ * (Abonnements | Geräte und Konto), „Neuigkeiten“ statt „Benachrichtigungen“
+ * (Wortliste N42 c), der Lösch-Dialog zentriert mit genau einem
+ * Schließen-Element (DialogMitte, N41 d).
+ * Seit Nr. 239 (Lauf 31, Abnahme der Boards): Kennzeilen 13 px, die Abos als
+ * EINE Karte mit Trennlinien ohne Symbole, „Abmelden“ ohne Symbol, die
+ * Geräte als Kennzeile mit Karte und eigenem Knopf; „Konto löschen?“ am Handy
+ * als Blatt, im Browser als Dialog mit „Abbrechen“ | „Konto löschen“
+ * nebeneinander, der Fokus startet auf „Abbrechen“ (Maßstab Punkt 5).
  */
 
 interface SubscriptionRow {
@@ -53,11 +59,12 @@ interface Props {
   geraete?: readonly GeraeteZeile[]
 }
 
-const ETIKETT = 'text-[11px] font-semibold tracking-[1.1px] text-muted-foreground uppercase'
-
-/** Zerstörende Aktion: orange Rahmen, oranger Text (text-status-offen hält 4,5:1 in beiden Themes). */
+/**
+ * Zerstörende Aktion: kräftiger oranger Rahmen (1,5 px in `status-offen`, Liste Lauf 32 kundenkonto), oranger Text
+ * (text-status-offen hält 4,5:1 in beiden Themes); volle Breite, 14 px Rundung.
+ */
 const KNOPF_ZERSTOEREND = cn(
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-primary/60 px-[18px] text-[14px] font-semibold text-status-offen transition-colors duration-[250ms] hover:bg-primary/12',
+  'inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-status-offen px-4 text-[16px] font-bold text-status-offen transition-colors duration-[250ms] hover:bg-primary/12',
   FOKUS_RAHMEN
 )
 
@@ -67,6 +74,9 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
+  const breit = useMindestbreite(768)
+  // Bei einer Rückfrage vor dem Löschen startet der Fokus auf „Abbrechen“ (Maßstab Punkt 5), nie auf der Aktion.
+  const abbrechenRef = useRef<HTMLButtonElement>(null)
 
   function toggleEmail(farmId: string) {
     const sub = subs.find((s) => s.farmId === farmId)
@@ -134,16 +144,21 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
     router.push('/account/login')
   }
 
+  const loeschenSatz =
+    'Dein Konto und alle Neuigkeiten-Abos werden gelöscht. Bestehende Bestellungen bleiben aus steuerlichen Gründen erhalten.'
+  const loeschenKnopf = (
+    <button type="button" onClick={handleDeleteAccount} disabled={isDeleting} className={cn(KNOPF_ZERSTOEREND, 'disabled:opacity-60')}>
+      {isDeleting ? 'Lösche…' : 'Konto löschen'}
+    </button>
+  )
+  const loeschenWechsel = (o: boolean) => !o && !isDeleting && setDeleteDialogOpen(false)
+
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-8 px-4 pt-6 pb-12 md:pt-10">
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5 px-4 pt-5 pb-12 md:pt-6 lg:max-w-[1032px]">
       {/* Kopf */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-heading text-[26px] leading-tight font-semibold md:text-[30px]">Mein Konto</h1>
-          <p className="mt-0.5 text-[13.5px] break-words text-muted-foreground [overflow-wrap:anywhere]">{user.email}</p>
-        </div>
-        <button type="button" onClick={handleLogout} className={KNOPF_RAHMEN}>
-          <LogOut className="size-4" strokeWidth={1.7} aria-hidden="true" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="min-w-0 font-heading text-[26px] leading-tight font-semibold">Mein Konto</h1>
+        <button type="button" onClick={handleLogout} className={cn(KNOPF_RAHMEN, 'border-foreground/70 font-semibold')}>
           Abmelden
         </button>
       </div>
@@ -155,118 +170,137 @@ export function ProfileClient({ user, subscriptions: initialSubs, adminBereich =
         </Link>
       )}
 
-      {/* Abonnements */}
-      <section aria-labelledby="abos-titel" className="flex flex-col gap-3">
-        <h2 id="abos-titel" className={ETIKETT}>
-          Meine Abonnements
-        </h2>
-
-        {subs.length === 0 ? (
-          <EmptyState
-            symbol={BellOff}
-            titel="Du hast noch keine Benachrichtigungen abonniert."
-            satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
-            ausweg={
-              <Link href="/hoefe" className={KNOPF_GRUEN}>
-                Höfe entdecken
-              </Link>
-            }
-          />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {subs.map((sub) => (
-              <li key={sub.farmId} className={cn(KARTE, 'transition-opacity', isPending && 'opacity-70')}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate font-semibold" title={sub.farmName}>
-                    {sub.farmName}
-                  </p>
-                  <Link
-                    href={`/${sub.farmSlug}`}
-                    target="_blank"
-                    aria-label={`Hofseite von ${sub.farmName} öffnen (neuer Tab)`}
-                    className={cn(
-                      'flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
-                      FOKUS_RAHMEN
-                    )}
-                  >
-                    <ExternalLink className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                  </Link>
-                </div>
-
-                <div className="flex flex-col">
-                  <ToggleRow
-                    icon={Mail}
-                    label="E-Mail-Neuigkeiten"
-                    hof={sub.farmName}
-                    active={sub.optInEmail || sub.emailWartet}
-                    hinweis={sub.emailWartet ? ABO_TEXT.schalterWartet : undefined}
-                    onToggle={() => toggleEmail(sub.farmId)}
-                  />
-                  <ToggleRow
-                    icon={MessageCircle}
-                    label="WhatsApp-Neuigkeiten"
-                    hof={sub.farmName}
-                    active={sub.optInWhatsApp}
-                    disabled={!sub.customerPhone}
-                    disabledNote="Keine Telefonnummer hinterlegt"
-                    onToggle={() => toggleWhatsApp(sub.farmId)}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+      {/* Im Browser zwei Spalten, solange es Abos gibt; ohne Abo steht alles untereinander (Board w2-kundenkonto, Bild 5). */}
+      <div
+        className={cn(
+          'flex flex-col gap-5',
+          subs.length > 0 && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-4'
         )}
-      </section>
+      >
+        {/* Abonnements */}
+        <section aria-labelledby="abos-titel" className="flex flex-col gap-3">
+          <h2 id="abos-titel" className={KONTO_ETIKETT}>
+            Meine Abonnements
+          </h2>
 
-      {/* Angemeldete Geräte (S18): je Gerät abmelden, „Überall abmelden" */}
-      {geraete.length > 0 && (
-        <section aria-label="Angemeldete Geräte" className="flex flex-col gap-3">
-          <AngemeldeteGeraete zeilen={geraete} fuerKundin />
+          {subs.length === 0 ? (
+            // Leerzustand wie im Board (Bild 5): die Karten-Form des EmptyState, links bündig, ohne Symbol, Titel
+            // fett ohne Serifen, Knopf über die volle Breite.
+            <EmptyState
+              titel="Du hast noch keine Neuigkeiten abonniert."
+              satz="Beim nächsten Einkauf kannst du dich für Neuigkeiten anmelden."
+              ausweg={
+                <Link href="/hoefe" className={KNOPF_GRUEN_KAUF}>
+                  Höfe entdecken
+                </Link>
+              }
+            />
+          ) : (
+            <ul className={cn(KARTE, 'flex flex-col divide-y divide-border p-0 transition-opacity', isPending && 'opacity-70')}>
+              {subs.map((sub) => (
+                <li key={sub.farmId} className="px-4 py-3.5">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-[16px] font-bold" title={sub.farmName}>
+                      {sub.farmName}
+                    </p>
+                    <Link
+                      href={`/${sub.farmSlug}`}
+                      target="_blank"
+                      aria-label={`Hofseite von ${sub.farmName} öffnen (neuer Tab)`}
+                      className={cn(textlinkKlassen({ ton: 'gruen' }), 'shrink-0 text-[14px] font-medium underline')}
+                    >
+                      Hofseite
+                    </Link>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <ToggleRow
+                      label="E-Mail-Neuigkeiten"
+                      hof={sub.farmName}
+                      active={sub.optInEmail || sub.emailWartet}
+                      hinweis={sub.emailWartet ? ABO_TEXT.schalterWartet : undefined}
+                      onToggle={() => toggleEmail(sub.farmId)}
+                    />
+                    <ToggleRow
+                      label="WhatsApp-Neuigkeiten"
+                      hof={sub.farmName}
+                      active={sub.optInWhatsApp}
+                      disabled={!sub.customerPhone}
+                      disabledNote="Keine Telefonnummer hinterlegt – gib sie bei deiner nächsten Bestellung an."
+                      onToggle={() => toggleWhatsApp(sub.farmId)}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
-      )}
 
-      {/* Konto löschen */}
-      <section aria-labelledby="konto-titel" className="flex flex-col gap-3">
-        <h2 id="konto-titel" className={ETIKETT}>
-          Konto
-        </h2>
-        <div className={cn(KARTE, 'flex flex-col items-start gap-2')}>
-          <button type="button" onClick={() => setDeleteDialogOpen(true)} className={KNOPF_ZERSTOEREND}>
-            <Trash2 className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            Konto und alle Abos löschen (DSGVO)
-          </button>
-          <p className="text-[12.5px] leading-normal text-muted-foreground">
-            Deine Bestellungen bleiben aus steuerlichen Gründen gespeichert.
-          </p>
+        <div className="flex flex-col gap-5 lg:gap-4">
+          {/* Angemeldete Geräte (S18): je Gerät abmelden, „Überall abmelden"; Kennzeile und Karte bringt der Baustein. */}
+          {geraete.length > 0 && <AngemeldeteGeraete zeilen={geraete} fuerKundin />}
+
+          {/* Konto löschen */}
+          <section aria-labelledby="konto-titel" className="flex flex-col gap-3">
+            <h2 id="konto-titel" className={KONTO_ETIKETT}>
+              Konto
+            </h2>
+            <div className={cn(KARTE, 'flex flex-col gap-2.5')}>
+              <p className="text-[15px] break-words [overflow-wrap:anywhere]">
+                Angemeldet als <strong className="font-semibold">{user.email}</strong>
+              </p>
+              <button type="button" onClick={() => setDeleteDialogOpen(true)} className={cn(KNOPF_ZERSTOEREND, 'w-full')}>
+                Konto und alle Neuigkeiten-Abos löschen (DSGVO)
+              </button>
+              <p className="text-[13px] leading-normal text-muted-foreground">
+                Deine Bestellungen bleiben aus steuerlichen Gründen gespeichert.
+              </p>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
-      {/* Löschen bestätigen */}
-      <Dialog open={deleteDialogOpen} onOpenChange={(o) => !o && setDeleteDialogOpen(false)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Konto wirklich löschen?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Dein Konto und alle Benachrichtigungs-Abonnements werden gelöscht. Bestehende
-            Bestellungen bleiben aus steuerlichen Gründen erhalten.
-          </p>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
-              Abbrechen
-            </Button>
-            <button type="button" onClick={handleDeleteAccount} disabled={isDeleting} className={cn(KNOPF_ZERSTOEREND, 'disabled:opacity-60')}>
-              {isDeleting ? 'Lösche…' : 'Konto löschen'}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Löschen bestätigen: am Handy das Blatt, im Browser der Dialog — beide mit „Abbrechen“ | „Konto löschen“
+          gleich breit nebeneinander, „Abbrechen“ ist das eine Schließen-Element und bekommt den Startfokus.
+          Während gelöscht wird, bleibt die Rückfrage offen. */}
+      {breit ? (
+        <Dialog open={deleteDialogOpen} onOpenChange={loeschenWechsel}>
+          {/* „Abbrechen“ ist unten das eine Schließen-Element (Board w2-kundenkonto, Bild 4): DialogMitte mit
+              `aktionen` lässt den Knopf im Kopf weg. */}
+          <DialogMitte
+            titel="Konto wirklich löschen?"
+            initialFocus={abbrechenRef}
+            aktionen={
+              <>
+                <button type="button" ref={abbrechenRef} onClick={() => loeschenWechsel(false)} disabled={isDeleting} className={KNOPF_UMRISS_KRAEFTIG}>
+                  Abbrechen
+                </button>
+                {loeschenKnopf}
+              </>
+            }
+          >
+            <DialogDescription className="text-[15px] leading-normal text-foreground">{loeschenSatz}</DialogDescription>
+          </DialogMitte>
+        </Dialog>
+      ) : (
+        <Sheet open={deleteDialogOpen} onOpenChange={loeschenWechsel}>
+          <SheetBlatt schleier="abgedunkelt" initialFocus={abbrechenRef}>
+            <SheetTitle className="font-heading text-[21px] leading-tight font-semibold">Konto wirklich löschen?</SheetTitle>
+            <SheetDescription className="text-[15px] leading-normal text-foreground">{loeschenSatz}</SheetDescription>
+            <div className="mt-1 grid grid-cols-2 gap-2.5">
+              <SheetClose ref={abbrechenRef} disabled={isDeleting} className={KNOPF_UMRISS_KRAEFTIG}>
+                Abbrechen
+              </SheetClose>
+              {loeschenKnopf}
+            </div>
+          </SheetBlatt>
+        </Sheet>
+      )}
     </div>
   )
 }
 
 function ToggleRow({
-  icon: Symbol,
   label,
   hof,
   active,
@@ -275,7 +309,6 @@ function ToggleRow({
   hinweis,
   onToggle,
 }: {
-  icon: typeof Mail
   label: string
   hof: string
   active: boolean
@@ -288,20 +321,22 @@ function ToggleRow({
   const hinweisId = useId()
   return (
     <div className="flex min-h-11 items-center justify-between gap-3 py-1">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <Symbol className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-        <div className="min-w-0">
-          <span className={cn('text-[14px]', disabled ? 'text-muted-foreground' : 'text-foreground')}>{label}</span>
-          {disabled && disabledNote && <p className="text-[12px] text-muted-foreground">{disabledNote}</p>}
-          {hinweis && (
-            <p id={hinweisId} className="text-[12px] text-status-offen">
-              {hinweis}
-            </p>
-          )}
-        </div>
+      {/* Ohne Symbol, die Bezeichnung fett in Textfarbe — auch, wenn der Schalter gesperrt ist (Board s2-kundenkonto). */}
+      <div className="min-w-0">
+        <span className="text-[15px] font-semibold text-foreground">{label}</span>
+        {disabled && disabledNote && <p className="text-[13px] leading-snug text-muted-foreground">{disabledNote}</p>}
+        {/* Der Stand in Worten, nicht nur als Schalterfarbe (Board s2-kundenkonto). */}
+        {!disabled && !hinweis && <p className="text-[13px] text-muted-foreground">{active ? 'an' : 'aus'}</p>}
+        {hinweis && (
+          <p id={hinweisId} className="text-[13px] text-status-offen">
+            {hinweis}
+          </p>
+        )}
       </div>
       {/* Ein Schalter: Rolle „switch" sagt dem Screenreader Zustand und Zweck.
-          Sichtbar 24 px hoch, die Trefferfläche über ::before 44 px. */}
+          Sichtbar 46 × 26 px wie im Board, die Trefferfläche über ::before 44 px. Aus: helle Schiene mit Kontur und
+          grauer Knopf (Kontrast ≥ 3:1 für Bedienelemente, Liste Lauf 32 kundenkonto) statt einer blassen Fläche — auch
+          gesperrt nicht verblasst; warum er gesperrt ist, sagt der Satz daneben. */}
       <button
         type="button"
         role="switch"
@@ -311,17 +346,16 @@ function ToggleRow({
         onClick={onToggle}
         disabled={disabled}
         className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-2.5 before:content-[''] disabled:cursor-not-allowed disabled:opacity-40",
-          active ? 'bg-accent' : 'bg-muted-foreground/45',
+          "relative h-[26px] w-[46px] shrink-0 rounded-full border transition-colors duration-200 before:absolute before:-inset-x-0 before:-inset-y-[9px] before:content-[''] disabled:cursor-not-allowed",
+          active ? 'border-accent bg-accent' : 'border-input bg-muted',
           FOKUS_RAHMEN
         )}
       >
-        {/* Der Schieber in Crème (accent-foreground): im neuen Design in beiden
-            Themes hell — er liegt auf grüner wie auf grauer Schiene sichtbar. */}
+        {/* Der Schieber: an in Crème (accent-foreground) auf der grünen Schiene, aus in der Farbe der Feldkontur. */}
         <span
           className={cn(
-            'absolute top-0.5 left-0.5 size-5 rounded-full bg-accent-foreground shadow transition-transform duration-200',
-            active ? 'translate-x-5' : 'translate-x-0'
+            'absolute top-[3px] left-[3px] size-[18px] rounded-full transition-transform duration-200',
+            active ? 'translate-x-5 bg-accent-foreground' : 'translate-x-0 bg-input'
           )}
         />
       </button>

@@ -63,6 +63,7 @@ vi.mock('@/components/hofseite/aktuell-vom-hof', () => ({
   },
 }))
 vi.mock('@/components/hofseite/produkt-karte', () => ({
+  PRODUKT_LISTE: '',
   ProduktKarte: (props: Record<string, unknown>) => {
     fang.karten.push(props)
     return null

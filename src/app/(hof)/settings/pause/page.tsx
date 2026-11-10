@@ -3,32 +3,35 @@ import type { Metadata } from 'next'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmSettings } from '@/server/queries/farm'
 import { PauseClient } from '@/components/settings/pause-client'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
-import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { UNTERSEITE_RAHMEN, UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
+import { URLAUB_UND_PAUSE } from '@/lib/hof-einstellungen'
 
-/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise. */
-const TITEL = 'Urlaubsmodus'
+/** Titel der Seite — für den Kopf und den Tab, eine Schreibweise (wie die Zeile der Übersicht, V8). */
+const TITEL = URLAUB_UND_PAUSE
 
 export const metadata: Metadata = { title: `${TITEL} — ${MARKE}` }
 
 /*
- * Urlaubsmodus (Pause, Farm.isPaused) in der HofShell (Nachtlauf Nr. 22d):
+ * Urlaub und Pause (Pause, Farm.isPaused) in der HofShell (Nachtlauf Nr. 22d):
  * derselbe Schalter und dieselbe Action setPause, nur Kopf und Rahmen neu.
- * „Urlaubsmodus" heißt die Seite wie in den Mockups (Umsetzungsprompt §2).
+ * Seit Nr. 224 heißt die Seite „Urlaub und Pause“ wie die Zeile der
+ * Übersicht (Boards s1-/w1-einstellungen, V8); die Aktion in Mein Hof bleibt „Pausieren“.
  */
 export default async function PausePage(): Promise<React.JSX.Element> {
   const { userId } = await verlangeHofDerSitzung()
 
   const farm = await getFarmSettings(userId)
   if (!farm) redirect('/onboarding')
+  const jetzt = new Date()
 
   return (
     <div className={UNTERSEITE_RAHMEN}>
-      <UnterseitenKopf
-        titel={TITEL}
-        satz="Pausiere Bestellungen während Urlaub oder Betriebsferien. Bestehende Bestellungen bleiben erhalten."
-      />
+      {/* Werkzeug-Kopf (G1, Nr. 250) mit Hof-Unterzeile, der Satz darunter (Boards s2-/w2-hofdaten-zahlung). */}
+      <WerkzeugKopf titel={TITEL} unterzeile={<HofUnterzeile hofName={farm.name} jetzt={jetzt} />} />
+      <p className={UNTERSEITE_SATZ}>Pausiere Bestellungen während Urlaub oder Betriebsferien. Bestehende Bestellungen bleiben erhalten.</p>
       <div data-app-palette="neu">
         <PauseClient initialPaused={farm.isPaused} initialMessage={farm.pauseMessage} />
       </div>

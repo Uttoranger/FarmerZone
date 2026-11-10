@@ -6,6 +6,7 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { MenueZielAnbieter } from "@/components/ui/menue-ziel"
+import { FOKUS_RAHMEN } from "@/components/ui/fokus"
 import { XIcon } from "lucide-react"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
@@ -93,6 +94,13 @@ function SheetContent({
 }
 
 /**
+ * Der Schleier der Boards von Lauf 30 (w1-korb, s1-mehr-neu): hell die
+ * Textfarbe zu 55 %, dunkel der Schleier des Blatts; abgedunkelt, nicht
+ * verwischt — die Seite darunter bleibt erkennbar.
+ */
+const BLATT_SCHLEIER = "bg-foreground/55 supports-backdrop-filter:backdrop-blur-none"
+
+/**
  * Blatt mit Griff: die Handy-Form eines Dialogs (docs/ai/DESIGN_SYSTEM.md,
  * „Dialoge und Blätter") — von unten, oben rund (22 px), ein Griff als
  * Zeichen, dass es ein Blatt ist. Kein Kreuz: Geschlossen wird mit
@@ -105,25 +113,108 @@ function SheetContent({
  *
  * Jedes Blatt braucht einen SheetTitle (oder ein aria-label), sonst hat der
  * Dialog keinen Namen.
+ *
+ * `seite="rechts"` (Register N41 d, Board w1-korb; für den Warenkorb): am Handy
+ * dasselbe Blatt von unten mit Griff, ab 768 px ein Blatt von rechts über die
+ * volle Höhe, höchstens 448 px breit, ohne Griff und ohne Rundung, Polster
+ * 24 px. Den Kopf mit Titel und dem einen Schließen-Element bringt SheetKopf.
+ * Ohne `seite` bleibt alles, wie es war.
+ *
+ * `kopf` (Nr. 233, Board s1-mehr-neu): Griff und Kopf stehen fest, nur der
+ * Inhalt darunter scrollt — beim Scrollen scheint nichts über dem Kopf durch,
+ * und der Griff bleibt stehen. Ohne `kopf` scrollt das ganze Blatt wie bisher.
+ *
+ * Startfokus (Nr. 246): Fragt das Blatt nach etwas, das sich nicht mit einem
+ * Tipp zurücknehmen lässt (löschen, stornieren, pausieren, stilllegen — der
+ * Hauptknopf ist orange), setzt der Aufrufer `initialFocus` auf „Abbrechen“;
+ * ein Enter zu viel löst sonst die Aktion aus. Wache
+ * tests/startfokus-wache.test.ts (Bestandsliste, die nur schrumpft).
  */
-function SheetBlatt({ className, children, ...props }: SheetPrimitive.Popup.Props) {
+function SheetBlatt({
+  className,
+  children,
+  seite = "unten",
+  schleier,
+  kopf,
+  ...props
+}: SheetPrimitive.Popup.Props & {
+  /** „unten": Blatt von unten (Standard). „rechts": ab 768 px von rechts, volle Höhe, max. 448 px. */
+  seite?: "unten" | "rechts"
+  /** „abgedunkelt": der Schleier der Boards von Lauf 30 (dunkelt ab, verwischt nicht; Board s1-mehr-neu); rechts gilt er immer. */
+  schleier?: "abgedunkelt"
+  /** Der feste Kopf (meist SheetKopf): steht mit dem Griff still, der Inhalt scrollt darunter. */
+  kopf?: React.ReactNode
+}) {
+  const rechts = seite === "rechts"
   return (
     <SheetPortal>
-      <SheetOverlay />
+      {/* Rechts wie der zentrierte Dialog: hell die Textfarbe zu 55 % (Board w1-korb), dunkel der Schleier des Blatts. */}
+      <SheetOverlay className={rechts || schleier === "abgedunkelt" ? BLATT_SCHLEIER : undefined} />
       <MenueZielAnbieter ziel={null}>
         <SheetPrimitive.Popup
           data-slot="sheet-blatt"
+          data-seite={seite}
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-2rem)] flex-col gap-3 overflow-y-auto *:shrink-0 rounded-t-[22px] border-t border-border bg-popover px-[18px] pt-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-out data-ending-style:translate-y-10 data-ending-style:opacity-0 data-starting-style:translate-y-10 data-starting-style:opacity-0",
-            className
+            rechts &&
+              "md:top-0 md:left-auto md:h-dvh md:max-h-none md:w-full md:max-w-[448px] md:gap-2.5 md:rounded-none md:border-t-0 md:border-l md:p-6 md:data-ending-style:translate-x-10 md:data-ending-style:translate-y-0 md:data-starting-style:translate-x-10 md:data-starting-style:translate-y-0",
+            className,
+            // Mit festem Kopf scrollt nicht das Blatt, sondern nur der Körper darunter.
+            kopf !== undefined && "overflow-hidden"
           )}
           {...props}
         >
-          <div data-slot="sheet-griff" aria-hidden="true" className="h-1 w-10 shrink-0 self-center rounded-full bg-muted-foreground/40" />
-          {children}
+          <div data-slot="sheet-griff" aria-hidden="true" className={cn("h-1 w-10 shrink-0 self-center rounded-full bg-muted-foreground/40", rechts && "md:hidden")} />
+          {kopf === undefined ? (
+            children
+          ) : (
+            <>
+              {kopf}
+              {/* Der Körper schrumpft als Einziger (shrink! gegen *:shrink-0 des Blatts) und scrollt; seine Kinder
+                  behalten ihre Höhe. 4 px Rand ringsum mit Gegenrand, damit der Fokusrahmen (2 px Abstand, 2 px breit)
+                  am Rand des scrollenden Kastens nicht abgeschnitten wird. */}
+              <div
+                data-slot="sheet-koerper"
+                className="-mx-1 -my-1 flex min-h-0 shrink! flex-col gap-[inherit] overflow-y-auto overscroll-contain p-1 *:shrink-0"
+              >
+                {children}
+              </div>
+            </>
+          )}
         </SheetPrimitive.Popup>
       </MenueZielAnbieter>
     </SheetPortal>
+  )
+}
+
+/**
+ * Kopf eines Blatts mit Titel (Fraunces 21 px) links und GENAU EINEM
+ * Schließen-Element rechts: ein Textknopf mit 44 px, kein Kreuz (Boards
+ * s1-korb, w1-korb; DESIGN_SYSTEM „Dialoge und Blätter"). Für das Blatt rechts
+ * (Warenkorb); im Blatt von unten bleibt „Abbrechen" unter der Hauptaktion.
+ */
+function SheetKopf({
+  titel,
+  schliessen = "Schließen",
+  className,
+}: {
+  titel: React.ReactNode
+  /** Der Text des einen Schließen-Elements. */
+  schliessen?: string
+  className?: string
+}) {
+  return (
+    <div data-slot="sheet-kopf" className={cn("flex items-start justify-between gap-2", className)}>
+      <SheetPrimitive.Title data-slot="sheet-title" className="min-w-0 pt-2 font-heading text-[21px] leading-tight font-semibold text-foreground">
+        {titel}
+      </SheetPrimitive.Title>
+      <SheetPrimitive.Close
+        data-slot="sheet-close"
+        className={cn("-mr-2 inline-flex min-h-11 shrink-0 items-center rounded-full px-2 text-[15px] font-semibold text-foreground hover:bg-muted", FOKUS_RAHMEN)}
+      >
+        {schliessen}
+      </SheetPrimitive.Close>
+    </div>
   )
 }
 
@@ -179,6 +270,7 @@ export {
   SheetClose,
   SheetContent,
   SheetBlatt,
+  SheetKopf,
   SheetHeader,
   SheetFooter,
   SheetTitle,

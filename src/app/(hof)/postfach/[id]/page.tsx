@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { z } from 'zod'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { ladeFadenHof } from '@/server/queries/postfach'
 import { ANTWORT_NICHT_MOEGLICH, POSTFACH_TEXT, fadenEintraege, istNeuFuer, neuesteDerAnderenSeite, rundschreibenVomText } from '@/lib/postfach'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { Textlink } from '@/components/ui/textlink'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
 import { MARKE } from '@/lib/marke'
 import { FadenVerlauf, POSTFACH_RAHMEN, TeamZeichen } from '../teile'
 import { AntwortFormular } from './antwort-formular'
@@ -59,13 +59,14 @@ export default async function FadenPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className={POSTFACH_RAHMEN}>
-      <UnterseitenKopf />
+      {/* Werkzeug-Kopf (G1, Board s2-/w2-postfach Bild 2): „Nachricht“ mit „Postfach“ darunter; im Web „‹ Postfach“. */}
+      <WerkzeugKopf titel="Nachricht" unterzeile={<p className="text-[13px] text-muted-foreground md:hidden">{POSTFACH_TEXT.titel}</p>} />
       <header className="mb-5 flex items-start gap-3">
         <TeamZeichen />
         <div className="min-w-0">
-          <h1 className="font-heading text-[22px] leading-tight font-semibold break-words text-foreground md:text-[26px]">
+          <h2 className="font-heading text-[22px] leading-tight font-semibold break-words text-foreground md:text-[28px]">
             {faden.titel ?? POSTFACH_TEXT.ohneTitel}
-          </h1>
+          </h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
             {POSTFACH_TEXT.absender}
             {faden.rundschreiben && ` · ${rundschreibenVomText(faden.rundschreiben.gesendetAm, jetzt)}`}
@@ -76,11 +77,12 @@ export default async function FadenPage({ params }: { params: Promise<{ id: stri
       <FadenVerlauf eintraege={eintraege} seite="HOF" fussErste={fuss} nameAndereSeite={POSTFACH_TEXT.absender} />
 
       {faden.rundschreiben && !faden.rundschreiben.antwortMoeglich ? (
-        <p className="mt-5 rounded-2xl border border-border bg-card px-4 py-3.5 text-[14px] leading-relaxed text-muted-foreground">
+        // Grau gefüllt, Link unterstrichen ohne Anführungszeichen (Liste Lauf 32 postfach).
+        <p className={cn('mt-5 bg-muted px-4 py-3.5 text-[14px] leading-relaxed text-foreground', RUNDUNG.hinweis)}>
           {ANTWORT_NICHT_MOEGLICH.satz}{' '}
-          <Link href={ANTWORT_NICHT_MOEGLICH.href} className={cn('rounded font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
-            „{ANTWORT_NICHT_MOEGLICH.link}“
-          </Link>
+          <Textlink href={ANTWORT_NICHT_MOEGLICH.href} form="im-satz">
+            {ANTWORT_NICHT_MOEGLICH.link}
+          </Textlink>
           .
         </p>
       ) : (

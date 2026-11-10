@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { CheckCheck, Inbox } from 'lucide-react'
 import { z } from 'zod'
 import * as Sentry from '@sentry/nextjs'
 import { getAdminFarms } from '@/server/queries/admin'
@@ -28,12 +27,15 @@ import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { KARTE, KICKER, LEISE } from '@/components/hof-bestellungen/stil'
 import { MeldungEntscheidenSpalte, Wunschliste, type WunschBuendel } from '@/components/admin/briefkasten-teile'
 import { FadenSpalte, type AkteHinweis } from './faden-spalte'
+import { KURZNUMMER_MEHRDEUTIG } from '@/lib/kurznummer'
 
 const SPALTE = cn(KARTE, 'flex min-w-0 flex-col overflow-hidden dark:ring-1 dark:ring-border')
 
 type Detail =
   | { art: 'antwort'; faden: AdminFaden; akte: AkteHinweis | null }
   | { art: 'meldung'; meldung: AdminMeldungDetail; duplikate: Awaited<ReturnType<typeof getDuplikateVon>> }
+  // Nr. 263: Die Kurznummer passt zu mehreren Meldungen — der Satz statt einer beliebigen, ohne IDs und Anzahl.
+  | { art: 'mehrdeutig' }
 
 export type EingangDaten = {
   filter: EingangFilter
@@ -83,9 +85,10 @@ export async function ladeEingangReiter(filter: EingangFilter, auswahl: EingangA
     const faden = id.success ? await ladeFadenAdmin(id.data) : null
     detail = faden ? { art: 'antwort', faden, akte: await ladeAkteHinweis(faden.hof.id, jetzt) } : null
   } else if (auswahl?.art === 'meldung') {
-    const meldung = await getMeldungDetail(auswahl.id)
+    const wahl = await getMeldungDetail(auswahl.id)
     // „Woraus" (Nr. 101): die Duplikate dieser Meldung, mit „Trennen".
-    detail = meldung ? { art: 'meldung', meldung, duplikate: await getDuplikateVon(meldung.id) } : null
+    if (wahl.art === 'eine') detail = { art: 'meldung', meldung: wahl.meldung, duplikate: await getDuplikateVon(wahl.meldung.id) }
+    else if (wahl.art === 'mehrdeutig') detail = { art: 'mehrdeutig' }
   }
 
   let wuensche: WunschBuendel[] | null = null
@@ -140,6 +143,13 @@ function Zeile({ e, filter, aktiv, jetzt }: { e: EingangEintrag; filter: Eingang
 function DetailSpalte({ detail, wuensche, jetzt }: { detail: Detail | null; wuensche: WunschBuendel[] | null; jetzt: Date }): React.JSX.Element {
   if (detail?.art === 'antwort') return <FadenSpalte faden={detail.faden} akte={detail.akte} jetzt={jetzt} />
   if (detail?.art === 'meldung') return <MeldungEntscheidenSpalte m={detail.meldung} jetzt={jetzt} duplikate={detail.duplikate} />
+  if (detail?.art === 'mehrdeutig') {
+    return (
+      <div className="flex flex-col gap-4 p-4 md:p-5">
+        <p className={cn('py-6 text-center text-sm', LEISE)}>{KURZNUMMER_MEHRDEUTIG}</p>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-4 p-4 md:p-5">
       <p className={cn('py-6 text-center text-sm', LEISE)}>{EINGANG_TEXT.waehlen}</p>
@@ -182,7 +192,6 @@ export function EingangReiter({ daten, jetzt }: { daten: EingangDaten; jetzt: Da
           </div>
           {eintraege.length === 0 ? (
             <EmptyState
-              symbol={filter === 'offen' ? CheckCheck : Inbox}
               titel={leer.titel}
               satz={leer.satz}
               className="rounded-none border-0 py-8"

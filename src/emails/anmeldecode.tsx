@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Text } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, MAIL_FARBE } from './_layout'
+import { EmailLayout, CodeKasten, bodyText, kleinText, leiseZeile } from './_layout'
 import { MARKE } from '@/lib/marke'
 
 export interface AnmeldecodeProps {
@@ -15,40 +15,17 @@ export interface AnmeldecodeProps {
   zweck?: 'anmelden' | 'bestellungen'
 }
 
+// Board s3/w3-mail-zugang Bild 1 und 2: keine Überschrift im Körper — die Anrede führt zum Code.
 const TEXTE = {
   anmelden: {
-    titel: 'Dein Anmeldecode',
-    wozu: `gib diesen Code auf ${MARKE} ein, um dich anzumelden:`,
-    nichtDu: 'Du wolltest dich nicht anmelden?',
-    kurztext: `Dein Code für ${MARKE}`,
+    wozu: `Hallo, gib diesen Code auf ${MARKE} ein, um dich anzumelden:`,
+    nichtDu: 'Du wolltest dich nicht anmelden? Dann ignorier diese Mail einfach. Gib den Code nie weiter – wir fragen dich nie danach.',
   },
   bestellungen: {
-    titel: 'Dein Code für deine Bestellungen',
-    wozu: `gib diesen Code auf ${MARKE} ein, um deine Bestellungen zu sehen:`,
-    nichtDu: 'Du wolltest deine Bestellungen nicht ansehen?',
-    kurztext: 'Dein Code für deine Bestellungen',
+    wozu: `Hallo, gib diesen Code auf ${MARKE} ein, um deine Bestellungen zu sehen:`,
+    nichtDu: 'Du hast keinen Code angefordert? Dann ignorier diese Mail einfach.',
   },
 } as const
-
-const codeKasten: React.CSSProperties = {
-  backgroundColor: MAIL_FARBE.gruenFlaeche,
-  border: `1px solid ${MAIL_FARBE.gruenRand}`,
-  borderRadius: '12px',
-  padding: '18px 12px',
-  margin: '24px 0',
-  textAlign: 'center' as const,
-}
-
-const codeText: React.CSSProperties = {
-  color: MAIL_FARBE.text,
-  fontSize: '34px',
-  fontWeight: '700',
-  letterSpacing: '0.3em',
-  lineHeight: '1.2',
-  margin: 0,
-  // Die Ziffern gleich breit, damit 1 und 7 nicht verrutschen.
-  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
-}
 
 /**
  * Die Mail mit dem Anmeldecode für Kundinnen (E7, Nr. 08). Hell wie alle
@@ -63,25 +40,11 @@ const codeText: React.CSSProperties = {
 export function AnmeldecodeEmail({ code, minuten, zweck = 'anmelden' }: AnmeldecodeProps) {
   const text = TEXTE[zweck]
   return (
-    <EmailLayout previewText={`${text.kurztext} – ${minuten} Minuten gültig`}>
-      <Text style={h1}>{text.titel}</Text>
-      <Text style={bodyText}>
-        Hallo,
-        <br />
-        {text.wozu}
-      </Text>
-
-      <div style={codeKasten}>
-        <Text style={codeText}>{code}</Text>
-      </div>
-
-      <Text style={{ ...mutedText, margin: '0 0 6px' }}>
-        Der Code ist <strong>{minuten} Minuten</strong> gültig und funktioniert nur einmal.
-      </Text>
-      <Text style={mutedText}>
-        {text.nichtDu} Dann kannst du diese E-Mail einfach ignorieren. Gib den Code
-        nie an andere weiter – wir fragen dich nie danach.
-      </Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`Der Code ist ${minuten} Minuten gültig.`}>
+      <Text style={bodyText}>{text.wozu}</Text>
+      <CodeKasten code={code} />
+      <Text style={leiseZeile}>{`Der Code ist ${minuten} Minuten gültig und funktioniert nur einmal.`}</Text>
+      <Text style={kleinText}>{text.nichtDu}</Text>
     </EmailLayout>
   )
 }

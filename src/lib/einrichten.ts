@@ -24,6 +24,7 @@
 import { aufzaehlung } from '@/lib/hofseite-fortschritt'
 import { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT, ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
+import type { WarteStand } from '@/lib/farm-approval'
 
 export type EinrichtenDaten = {
   /** Name aus dem Konto (User.name). */
@@ -84,9 +85,9 @@ export type EinrichtenStand = {
   /** Erledigte unter den zählenden Schritten (ohne Hinweis). */
   erledigt: number
   gesamt: number
-  /** „Noch 3 Schritte bis zum ersten Verkauf". */
+  /** „1 von 5 Schritten erledigt" (Board w2-registrieren, Lauf 30). */
   ueberschrift: string
-  /** „Noch 3 Schritte" — am Handy. */
+  /** Am Handy dieselbe Zeile (Board s2-registrieren); bleibt als eigenes Feld für die Aufrufer. */
   ueberschriftKurz: string
 }
 
@@ -121,7 +122,7 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           id: 'hofseite',
           titel: 'Hofseite einrichten',
           titelKurz: 'Hofseite einrichten',
-          text: fertig ? `${stand} – Kunden sehen deinen Hof vollständig` : `${stand} – es fehlen ${aufzaehlung(hof.hofseite.fehlend)}`,
+          text: fertig ? `${stand} – Kunden sehen deinen Hof vollständig` : `${hof.hofseite.erledigt} von ${hof.hofseite.gesamt} – es fehlen ${aufzaehlung(hof.hofseite.fehlend)}`,
           textKurz: stand,
           zustand: fertig ? 'erledigt' : 'offen',
           aktion: fertig ? null : { art: 'link', href: '/farm-page', label: 'Weiter', primaer: false },
@@ -182,7 +183,7 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
           // Auch am Handy der volle Satz — er ist der Grund für die Pflicht.
           textKurz: ONLINE_ZAHLUNG_EINRICHTEN_SATZ,
           zustand: 'offen',
-          aktion: { art: 'link', href: '/settings/payments', label: 'Mit Stripe einrichten', primaer: true },
+          aktion: { art: 'link', href: '/settings/payments', label: 'Mit Stripe einrichten', primaer: false },
         }
 
   // Nr. 198: der Mandat-Schritt — ein Hinweis mit dem Weg zu „Lastschrift einrichten“, zählt nicht mit.
@@ -200,8 +201,12 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
         id: 'sepa',
         titel: 'Lastschrift für die Monatsabrechnung',
         titelKurz: 'Lastschrift',
-        text: 'Für die Plattformgebühr aus Barbestellungen, einmal im Monat. Ohne Lastschrift bieten wir bei dir ab dem Einzug nur Online-Bezahlen an.',
-        textKurz: 'für Barbestellungen · einmal im Monat',
+        // Wortlaut Board w2-registrieren; „ab dem Einzug“ bleibt aus dem Code: Vorher und in der
+        // Gründungszeit geht bar auch ohne Lastschrift (barMoeglich, einzugAbFuer).
+        text:
+          'Ohne Lastschrift gibt es bei dir ab dem Einzug kein „Bar bei Abholung“: Darüber ziehen wir einmal im Monat ' +
+          'die Plattformgebühr aus Barbestellungen ein. Für die Freischaltung brauchst du sie nicht.',
+        textKurz: 'für Barbestellungen',
         zustand: 'hinweis',
         aktion: hof ? { art: 'link', href: LASTSCHRIFT_HREF, label: LASTSCHRIFT_TEXT.einrichten, primaer: false } : null,
       }
@@ -262,20 +267,35 @@ export function einrichtenStand(daten: EinrichtenDaten): EinrichtenStand {
               aktion: null,
             }
 
-  const schritte = [konto, hofSchritt, produkte, zahlung, sepa, freischaltung].map((s, i) => ({ ...s, nummer: i + 1 }))
+  // „Alles ist eingerichtet“ nur, wenn die Freischaltung wirklich als letztes offen ist:
+  // `wartet` gilt schon mit E-Mail, Stripe und Abholzeit, auch bei unfertiger Hofseite.
+  const vorher = [konto, hofSchritt, produkte, zahlung]
+  const freischaltungFertig: Omit<EinrichtenSchritt, 'nummer'> =
+    freischaltung.zustand === 'wartet' && vorher.every((s) => s.zustand === 'erledigt')
+      ? { ...freischaltung, text: 'Alles ist eingerichtet. Wir schauen drüber und schalten deinen Hof frei – du bekommst dann eine E-Mail.' }
+      : freischaltung
+
+  const schritte = [...vorher, sepa, freischaltungFertig].map((s, i) => ({ ...s, nummer: i + 1 }))
+  // Eine Hauptaktion (Register N1): orange ist nur der Knopf am ersten offenen Schritt in der Reihenfolge
+  // (Liste Lauf 32, registrieren „Orange auf ‚Mit Stripe einrichten‘ statt auf ‚Weiter‘“); alle anderen Wege bleiben Umriss.
+  const erster = schritte.find((s) => s.zustand === 'offen' && s.aktion !== null)
+  for (const s of schritte) {
+    if (s.aktion?.art === 'link') s.aktion = { ...s.aktion, primaer: s === erster }
+  }
   const zaehlend = schritte.filter((s) => s.zustand !== 'hinweis')
   const erledigt = zaehlend.filter((s) => s.zustand === 'erledigt').length
   const gesamt = zaehlend.length
-  const offen = gesamt - erledigt
+  const zeile = `${erledigt} von ${gesamt} Schritten erledigt`
 
-  return {
-    schritte,
-    erledigt,
-    gesamt,
-    ueberschrift:
-      offen === 0
-        ? 'Alles erledigt – dein Hof ist startklar'
-        : `Noch ${offen === 1 ? 'ein Schritt' : `${offen} Schritte`} bis zum ersten Verkauf`,
-    ueberschriftKurz: offen === 0 ? 'Alles erledigt' : `Noch ${offen === 1 ? 'ein Schritt' : `${offen} Schritte`}`,
-  }
+  return { schritte, erledigt, gesamt, ueberschrift: zeile, ueberschriftKurz: zeile }
+}
+
+/**
+ * Welcher Warte-Balken gilt (Register N42 e, V59): Solange ein Schritt offen
+ * oder gesperrt ist, muss der Hof noch etwas tun („Richte deinen Hof fertig
+ * ein“); sonst liegt nur noch die Freischaltung beim Team („wird noch
+ * geprüft“). Dieselben Schritte wie die Seite — keine zweite Zählung.
+ */
+export function warteStand(stand: EinrichtenStand): WarteStand {
+  return stand.schritte.some((s) => s.zustand === 'offen' || s.zustand === 'gesperrt') ? 'einrichten' : 'pruefung'
 }

@@ -18,7 +18,7 @@ export type AbzeichenGroesse = 'normal' | 'klein'
  * Rundung — bewusst eine eigene Gestalt, weder `Marke` (Zustände, G5) noch
  * `Chip` (rund). Spross (aria-hidden) und das Wort; Großbuchstaben nur per CSS,
  * Vorlesehilfen lesen „Gründungshof“. Größen `normal` (26 px, Hofseite) und
- * `klein` (21 px, Höfe-Liste, Startseite). Farben nur aus den Tokens
+ * `klein` (22 px, Höfe-Liste, Startseite), Schrift in beiden 12 px (nie kleiner, Nr. 233). Farben nur aus den Tokens
  * `--fz-abzeichen`/`--fz-abzeichen-grund` (hell Creme auf Markengrün, dunkel
  * Tannengrün auf Creme, beide ≥ 4,5:1). `aufBild`: ein Schatten, damit es auf
  * dem Titelbild steht. Keine Nummer — die sieht nur der Hof selbst.
@@ -36,7 +36,7 @@ export function Abzeichen({
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-[5px] rounded-[6px] bg-abzeichen-grund font-bold whitespace-nowrap text-abzeichen',
-        groesse === 'normal' ? 'h-[26px] pr-2.5 pl-[9px] text-[11.5px]' : 'h-[21px] pr-2 pl-[7px] text-[10.5px]',
+        groesse === 'normal' ? 'h-[26px] pr-2.5 pl-[9px] text-[12px]' : 'h-[22px] pr-2 pl-[7px] text-[12px]',
         aufBild && 'shadow-md',
         className
       )}

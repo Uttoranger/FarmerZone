@@ -9,6 +9,8 @@
  *  - Monatsabschluss: Prüfliste mit Wort je Punkt; der Knopf gesperrt mit
  *    Grund, solange etwas offen ist oder der Monat läuft; abgeschlossen mit Datum.
  *  - Kosten: die Zeile „Stripe-Gebühren“ über den Posten, Summe beider.
+ *  - Das Wort der Gebühr (V63, Nr. 230): nach dem Stichtag kein „Servicegebühr“
+ *    (Kachel, Abgleich, Regel), über den Stichtag „Gebühren“ — gerendert.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -36,6 +38,12 @@ vi.mock('@/server/actions/finanzen', () => ({
   kostenpostenLoeschen: vi.fn(),
   monatAbschliessen: vi.fn(),
 }))
+// Der Stichtag „Hofpreis-Modell ab“ (V63): ohne Zeile die Vorgabe wie in der Produktion vor dem Speichern.
+const hofpreis = vi.hoisted(() => ({ einstellung: { hofpreisModellAb: null as Date | null } }))
+vi.mock('@/server/queries/plattform-einstellung', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/queries/plattform-einstellung')>()),
+  ladeHofpreisEinstellung: async () => hofpreis.einstellung,
+}))
 const abfragen = vi.hoisted(() => ({ getFinanzen: vi.fn(), ladeGeldMonat: vi.fn(), ladeAbgeschlosseneMonate: vi.fn() }))
 vi.mock('@/server/queries/finanzen', () => ({ getFinanzen: abfragen.getFinanzen, aktuellerFinanzMonat: () => '2026-10' }))
 vi.mock('@/server/queries/geld', () => ({ ladeGeldMonat: abfragen.ladeGeldMonat, ladeAbgeschlosseneMonate: abfragen.ladeAbgeschlosseneMonate }))
@@ -43,6 +51,7 @@ vi.mock('@/server/queries/geld', () => ({ ladeGeldMonat: abfragen.ladeGeldMonat,
 import AdminGeldPage from '@/app/admin/geld/page'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { formatEuro } from '@/lib/format'
+import { MARKE } from '@/lib/marke'
 import { ergebnisText } from '@/lib/finanzen'
 import { GELD_TEXT } from '@/app/admin/geld/texte'
 import type { FinanzenDaten } from '@/server/queries/finanzen'
@@ -99,6 +108,7 @@ const knopf = (html: string): string => {
 }
 
 beforeEach(() => {
+  hofpreis.einstellung = { hofpreisModellAb: null }
   abfragen.getFinanzen.mockResolvedValue(daten())
   abfragen.ladeGeldMonat.mockResolvedValue(geld())
   abfragen.ladeAbgeschlosseneMonate.mockResolvedValue(new Map())
@@ -206,5 +216,44 @@ describe('Admin › Geld', () => {
     const html = await seite()
     expect(html).toContain('Wir konnten Geld gerade nicht laden.')
     expect(html).not.toContain('Geld in Zahlen')
+  })
+})
+
+describe('Admin › Geld: das Wort der Gebühr (V63, Nr. 230)', () => {
+  it('nach dem Stichtag kein „Servicegebühr“: Kachel, Abgleich und Regel sagen „Plattformgebühr“', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-08-31T22:00:00Z') } // 1. September 2026, Wiener Mitternacht
+    const html = await seite()
+    expect(html).not.toContain('Servicegebühr')
+    expect(html).toMatch(/<span class="hidden md:inline">Plattformgebühr<\/span>/)
+    expect(html).toContain('Betrag, Plattformgebühr und Erstattung gleich')
+    expect(html).toContain(`${MARKE} behält nur die Plattformgebühr;`)
+  })
+
+  it('Gegenprobe: Stichtag = Monatsende → Servicegebühr (September 2026, Stichtag 1. Oktober)', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-09-30T22:00:00Z') } // 1. Oktober 2026, Wiener Mitternacht = Ende September
+    const html = await seite()
+    expect(html).toContain('Betrag, Servicegebühr und Erstattung gleich')
+    expect(html).toContain(`${MARKE} behält nur die Servicegebühr;`)
+    expect(html).not.toContain('Plattformgebühr und Erstattung')
+  })
+
+  it('fällt der Stichtag in den Monat, heißt es „Gebühren“ (beide Modelle in einer Summe)', async () => {
+    hofpreis.einstellung = { hofpreisModellAb: new Date('2026-09-14T22:00:00Z') } // 15. September 2026
+    const html = await seite()
+    expect(html).not.toContain('Servicegebühr')
+    expect(html).toContain('Betrag, Gebühren und Erstattung gleich')
+    expect(html).toContain(`${MARKE} behält nur die Gebühren;`)
+  })
+
+  it('Kachel nach Board: „online … · bar …“, Ergebnis „gedeckt“ bzw. „noch nicht gedeckt“', async () => {
+    const minus = (await seite()).replaceAll('\u00a0', ' ')
+    expect(minus).toContain(`online ${formatEuro(72.4)} · bar ${formatEuro(61.2)}`)
+    expect(minus).not.toContain('vor Ort €')
+    expect(minus).toContain('noch nicht gedeckt')
+    abfragen.ladeGeldMonat.mockResolvedValueOnce(geld({ stripeGebuehrCents: 0 }))
+    abfragen.getFinanzen.mockResolvedValueOnce(daten({ kosten: { cents: 0, anzahl: 0 } }))
+    const plus = await seite()
+    expect(plus).toContain('>gedeckt<')
+    expect(plus).not.toContain('noch nicht gedeckt')
   })
 })

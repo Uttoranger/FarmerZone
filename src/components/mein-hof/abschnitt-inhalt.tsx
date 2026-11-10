@@ -134,7 +134,7 @@ export function AbschnittInhalt({
         return (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Bar bei Abholung geht immer. Online-Zahlung läuft über ein Stripe-Konto — das richtest du in den Einstellungen ein.
+              Bar bei Abholung geht immer. Online-Zahlung läuft über ein Stripe-Konto – das richtest du in den Einstellungen ein.
             </p>
             <Link
               href="/settings/payments"

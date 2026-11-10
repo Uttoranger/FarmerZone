@@ -207,8 +207,19 @@ export function istGruendungshof(hofId: string, hoefe: readonly HofFuerPlatz[], 
 
 /** Wie viele der Plätze vergeben sind — höchstens `plaetze` (Standard: die Plätze an den Zeilen); festgeschrieben alle gespeicherten. */
 export function vergebeneGruendungsplaetze(hoefe: readonly HofFuerPlatz[], plaetze: number = plaetzeDerVergabe(hoefe)): number {
-  const vergeben = gruendungsplaetze(hoefe).size
-  return vergabeFest(hoefe) ? vergeben : Math.min(vergeben, plaetze)
+  return vergebeneGruendungsplaetzeAus(gruendungsplaetze(hoefe).size, plaetze, vergabeFest(hoefe))
+}
+
+/**
+ * Dieselbe Zählregel aus Zahlen (Nr. 265): `inDerVergabe` = Höfe mit Platz in
+ * der Vergabe (`gruendungsplaetze(hoefe).size`, vor dem Festschreiben alle im
+ * Rennen). Für das Formular in Admin › Einstellungen, das keine Hofliste
+ * bekommt und „vergeben“ beim Tippen mit den eingegebenen Plätzen vorausrechnet.
+ * Vor dem Festschreiben höchstens die Plätze — 36 Höfe im Rennen bei 12 Plätzen
+ * sind 12 vergebene; danach die festgeschriebenen Nummern.
+ */
+export function vergebeneGruendungsplaetzeAus(inDerVergabe: number, plaetze: number, fest: boolean): number {
+  return fest ? inDerVergabe : Math.min(inDerVergabe, plaetze)
 }
 
 /**
@@ -317,8 +328,13 @@ export type GruendungEinstellung = {
   festAm: Date | null
 }
 
-/** Monate ohne Grundgebühr je neuer Zusage, solange niemand etwas anderes einträgt (Spalten-Standard). */
-export const GRUENDUNG_MONATE_STANDARD = 24
+/**
+ * Monate ohne Grundgebühr je neuer Zusage (Register N44: 12 statt 24).
+ * Standard nur, wenn die Zeile fehlt; Produktion trägt den Wert in der Zeile.
+ * Der Spalten-Default in prisma/schema.prisma bleibt 24 (keine Migration,
+ * Lauf 30) — den Wert 12 setzt die Projektleitung in Admin › Einstellungen.
+ */
+export const GRUENDUNG_MONATE_STANDARD = 12
 
 /** Ohne Einstellung gelten die Konstanten — wie vor Nr. 93; nicht festgeschrieben. */
 export const GRUENDUNG_EINSTELLUNG_STANDARD: GruendungEinstellung = {
@@ -479,8 +495,9 @@ export function spaetererTag(a: string, b: string): string {
 /**
  * Das Ende einer neuen Zusage als Wiener Kalendertag: Beginn = der spätere Tag
  * von Tarifstart (`TARIFE_AB_TAG`) und Freischaltung, Ende = der Tag vor
- * (Beginn + `monate` Monate) — ab dem Tarifstart also der letzte Jänner zwei
- * Jahre später, ab einem 15. März der 14. März (Beispiele im Test).
+ * (Beginn + `monate` Monate) — bei 12 Monaten (N44) ab dem Tarifstart also
+ * der 31. Jänner 2028, ab einem 12. März der 11. März ein Jahr später
+ * (Beispiele im Test).
  * Fehlt der Tag im Zielmonat (31. eines kurzen Monats, 29. des Februars ohne
  * Schaltjahr), endet die Zusage am letzten Tag dieses Monats: volle Monate,
  * nie einen Tag weniger (K1). Reine Kalenderrechnung ohne Uhrzeit.
@@ -680,7 +697,8 @@ export const GRUENDUNG_TEXT = {
     g.art === 'bisher'
       ? [`Kostenlos bis ${gruendungTagLang(g.bisTag)}`, 'danach Tarif nach Wahl', MONATLICH_KUENDBAR]
       : [
-          `${g.monate} Monate ohne Grundgebühr ab Tarifstart am ${TARIFE_AB_TEXT} bzw. ab deiner Freischaltung`,
+          // Wortlaut N44: ab der Freischaltung, frühestens ab Tarifstart (Beginn = der spätere Tag, `zusageEnde`).
+          `${g.monate} Monate ohne Grundgebühr ab der Freischaltung, frühestens ab Tarifstart am ${TARIFE_AB_TEXT}`,
           'Freischaltung mit mindestens einem Produkt und Stripe',
           ...(g.aktionBisTag ? [`Aktion bis ${gruendungTagLang(g.aktionBisTag)}`] : []),
           `danach Tarif nach Wahl, ohne Wahl bleibt ${HOFTOR.name}, ${KOSTENLOS}`,
@@ -719,9 +737,10 @@ export const GRUENDUNG_TEXT = {
       `Die ersten ${g.gesamt} Höfe bekommen den ${HOFLADEN.name} ${g.monate} Monate ohne Grundgebühr – im Wert von ${gruendungWertText(g.monate)} inkl. USt.`,
       `Die ${g.monate} Monate laufen ab dem Tarifstart am ${TARIFE_AB_TEXT} bzw. ab der Freischaltung, wenn sie später ist. Das Ende steht danach für den Hof fest.`,
       'Ein Platz zählt erst mit der Freischaltung. Dafür braucht es eine bestätigte E-Mail, ein fertiges Stripe-Konto und mindestens ein Produkt im Shop.',
-      g.aktionBisTag
+      // Der Zähler wie überall erst ab GRUENDUNG_ZAEHLER_AB vergebenen (`zaehler`; Board w3-rechtstexte Bild 5).
+      (g.aktionBisTag
         ? `Die Aktion läuft bis ${gruendungTagLang(g.aktionBisTag)} oder bis alle Plätze vergeben sind.`
-        : 'Die Aktion läuft, bis alle Plätze vergeben sind.',
+        : 'Die Aktion läuft, bis alle Plätze vergeben sind.') + (g.zaehler ? ` Noch ${g.frei} von ${g.gesamt} Plätzen.` : ''),
       `Danach wählt der Hof seinen Tarif – ohne Wahl bleibt ${HOFTOR.name}, ${KOSTENLOS}.`,
     ],
   }),

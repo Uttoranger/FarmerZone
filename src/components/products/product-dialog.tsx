@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useId, useState, useEffect, useRef, type ReactNode } from 'react'
 import type { PreisAnzeige } from '@/lib/plattformgebuehr'
 import Link from 'next/link'
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { Camera, Crop, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles, Plus } from 'lucide-react'
+import { Crop, X, Leaf, Thermometer, Snowflake, ChevronRight, Info, Sparkles, Plus } from 'lucide-react'
 import { ladeFotoHoch, pruefeLesbarkeit, stufenText, type UploadStufe } from '@/components/shared/image-upload'
 import { useFotoQuellen, type FotoAuswahl } from '@/components/shared/foto-quellen'
 import { enterTaste, weiterMitEnter } from '@/lib/feld-attribute'
@@ -31,15 +31,16 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
+  FormMessage as UiFormMessage,
 } from '@/components/ui/form'
+import { FotoHinzufuegen } from '@/components/ui/bild-platzhalter'
 import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
   AccordionPanel,
 } from '@/components/ui/accordion'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button, TREFFER_44, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
@@ -54,7 +55,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createProduct, updateProduct, pruefeDualUse } from '@/server/actions/products'
-import type { ProduktAngelegt } from '@/lib/produkte-hof'
+import {
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  type ProduktAngelegt,
+  type SpeicherFehlerAnzeige,
+} from '@/lib/produkte-hof'
 import type { ProductData } from '@/server/queries/products'
 import {
   productFormSchema,
@@ -101,9 +107,10 @@ import {
   formatBestand,
 } from '@/lib/format'
 import { KategorieSheet } from './kategorie-sheet'
-import { AbholhinweisWahl } from '@/components/produkte/familien-teile'
+import { AbholhinweisWahl, FELD_FEHLER_IM_FORMULAR, FormularMeldung } from '@/components/produkte/familien-teile'
+import { istNetzFehler } from '@/lib/netz'
 import { LebensmittelVorschau } from './lebensmittel-vorschau'
-import { produktBereich } from '@/lib/produkte-hof'
+import { PRODUKTE_FILTER_LABEL, produktBereich } from '@/lib/produkte-hof'
 import { KAEUFER_VORSCHAU } from '@/lib/hofseite-kunde'
 import { AUSSCHNITT_STANDARD, bildStil } from '@/lib/bild-ausschnitt'
 import {
@@ -121,6 +128,8 @@ import { speichereBildAusschnittAction } from '@/server/actions/bild-ausschnitt'
 import type { NeuBereich } from '@/schemas/url-auftrag'
 import { FUTTER_ANLEGEN_HREF } from '@/lib/bauern-navigation'
 import { cn } from '@/lib/utils'
+import { ProduktDialogKopf } from '@/components/produkte/produkt-dialog-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
 import {
   FUTTER_BESTAETIGUNG_AUSNAHME,
   FUTTER_BESTAETIGUNG_NEU,
@@ -150,7 +159,6 @@ import {
   abschnitteMitFehlern,
   auswahlLabel,
   erstesFehlerfeld,
-  fehlendeAngaben,
   saisonVorbelegung,
   speichernText,
   dialogTitel,
@@ -163,6 +171,20 @@ import {
  * (feste Pakete, im Shop verfügbar, saisonal). Der ganze Kasten ist klickbar,
  * das Touch-Ziel damit deutlich über 44 px.
  */
+/**
+ * Der Feldfehler im Produktdialog (V17; Board s1/w1-produkt-neu, Bild 5): orange, 14 px halbfett,
+ * mit role="alert" — wie FeldMitFehler und die Formulare mit Verkaufsgrößen. Der Grundbaustein
+ * (ui/form.tsx) zeichnet rot; hier nur die Gestalt, Text und Verbindung zum Feld bleiben seine.
+ */
+function FormMessage({ className, ...props }: React.ComponentProps<typeof UiFormMessage>): React.JSX.Element {
+  return <UiFormMessage role="alert" className={cn('text-[14px] leading-snug font-semibold text-status-offen', className)} {...props} />
+}
+
+// Die Abschnitte als eigene Karten mit fetter Überschrift und der Zusammenfassung darunter
+// (Board s1-/w1-produkt-neu, Lauf 31) statt Trennlinien mit kleiner Überschrift.
+const ABSCHNITT_KARTE = 'rounded-[14px] border border-border bg-card px-4 last:border'
+const ABSCHNITT_KOPF = 'text-[16px] font-bold'
+
 function SchalterZeile({
   id,
   titel,
@@ -181,10 +203,11 @@ function SchalterZeile({
       htmlFor={id}
       className="flex min-h-14 items-center gap-3 rounded-lg border border-border p-3"
     >
-      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      {/* Grün wie „Im Shop“ in der Liste (ImShopSchalter, Board s1-produkt-neu); 44 px Trefferfläche über ::before. */}
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} className={cn(TREFFER_44, 'data-checked:bg-accent')} />
       <span className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-foreground">{titel}</span>
-        <span className="text-xs text-muted-foreground">{untertitel}</span>
+        <span className="text-[15px] font-semibold text-foreground">{titel}</span>
+        <span className="text-[13px] text-muted-foreground">{untertitel}</span>
       </span>
     </label>
   )
@@ -198,6 +221,8 @@ type Props = {
   hofBetriebsnummer: string | null
   /** N38 (Nr. 197): im Hofpreis-Modell der Satz — „Du bekommst … · die Kundin zahlt …“ unter dem Preis. */
   preisAnzeige?: PreisAnzeige
+  /** „Bar bis … ohne Gebühr für dich.“ unter dem Geldsatz (Liste Lauf 32, produkt-neu; aus geldsaetzeFuer). */
+  barOhneGebuehr?: string | null
   /**
    * Die Wahl aus „Was legst du an?" (Nachtlauf Nr. 18), nur beim Anlegen:
    * Brennmaterial setzt Brennholz, Futtermittel startet die Kategorie bei den
@@ -325,17 +350,20 @@ function toFormDefaults(p: ProductData): Partial<ProductFormData> {
   }
 }
 
-/** Die Zeile unter dem Abschnittstitel, wenn er zugeklappt ist. */
+/** Die Zeile unter dem Abschnittstitel — offen wie zugeklappt (Liste Lauf 32, produkt-neu: Kartenköpfe mit Zusammenfassung). */
 function zusammenfassung(abschnitt: Abschnitt, w: ProductFormData): string {
   switch (abschnitt) {
-    case 'grunddaten':
-      return w.category ? formatKategorie(w.category, w.subcategory) : 'Noch keine Kategorie'
+    case 'grunddaten': {
+      // Board s1/w1-produkt-neu: „Waldhonig · Honig und Aufstriche“ — der Name zuerst, sobald einer dasteht.
+      const kategorie = w.category ? formatKategorie(w.category, w.subcategory) : 'Noch keine Kategorie'
+      return w.name.trim() ? `${w.name.trim()} · ${kategorie}` : kategorie
+    }
     case 'preis': {
       // Ohne gültigen Preis derselbe ruhige Satz wie die Käufer-Vorschau statt „€ 0,00" (Nr. 51).
       const preis = gueltigerPreis(w.price)
       const teile = [
         preis === null ? KAEUFER_VORSCHAU.preisFehlt : formatGrundpreis(preis, w.unit, w.unitSize),
-        `${Number.isFinite(w.stock) ? w.stock : 0} im Vorrat`,
+        `Vorrat ${Number.isFinite(w.stock) ? w.stock : 0}`,
       ]
       if (!w.isAvailable) teile.push(NICHT_IM_SHOP_IM_SATZ)
       return teile.join(' · ')
@@ -371,7 +399,7 @@ function chipKlasse(aktiv: boolean): string {
   )
 }
 
-export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preisAnzeige = null, vorwahl = null, onLoeschen, onAngelegt }: Props) {
+export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preisAnzeige = null, barOhneGebuehr = null, vorwahl = null, onLoeschen, onAngelegt }: Props) {
   const isEdit = product !== null
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Nur während des Foto-Uploads gesetzt — danach zeigt der Knopf wieder
@@ -392,6 +420,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   // Welche Abschnitte aufgeklappt sind. Anlegen: nur Grunddaten; Bearbeiten:
   // alle zu, die Titel tragen dann eine Zusammenfassung.
   const [offen, setOffen] = useState<Abschnitt[]>([])
+  // Kennungen der Meldungen unter der Zeile „Kategorie“ — der Knopf verweist mit aria-describedby darauf (WCAG 3.3.1).
+  const kategorieFehlerId = useId()
   // Kategoriewechsel weg von den Futtermitteln wartet auf Bestätigung — die
   // Kennzeichnung würde beim Speichern gelöscht.
   const [kategorieWechsel, setKategorieWechsel] = useState<{
@@ -419,6 +449,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   const [ausschnittOffen, setAusschnittOffen] = useState<false | 'nachUpload' | 'anpassen'>(false)
   // Geschrieben wird nach einer Wahl im Baustein und bei jedem neuen Foto: Dessen alter Ausschnitt gehörte zum alten.
   const [ausschnittSpeichern, setAusschnittSpeichern] = useState(false)
+  // Die orange Karte über den Abschnitten (V17): nach einem Versuch mit markierten Feldern bzw. ein Speicherfehler.
+  const [pruefenKarte, setPruefenKarte] = useState(false)
+  const [speicherFehler, setSpeicherFehler] = useState<SpeicherFehlerAnzeige | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   // Über welchen Weg und warum das gewählte Foto kam — nur für die
   // Sentry-Meldung; der Upload läuft hier erst beim Absenden, also bis dahin merken.
@@ -496,7 +529,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
   )
   // Nur ein Vorschlag, nie eine Wahl — und nur, solange keine Kategorie gewählt ist.
   const vorschlag = category == null ? kategorieVorschlag(werte.name) : null
-  const fehlend = fehlendeAngaben(werte, schema)
   const erlaubteArten = futtermittelartenFuer(category)
   const betriebsnummer = betriebsnummerFuerAnzeige(
     { betriebsnummer: hofBetriebsnummer },
@@ -515,7 +547,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       setAusschnitt(isEdit ? product.bildAusschnitt : null)
       setAusschnittOffen(false)
       setAusschnittSpeichern(false)
-      setOffen(isEdit ? [] : ['grunddaten'])
+      // Anlegen: Grunddaten und „Preis & Verfügbarkeit“ offen wie im Board s1-/w1-produkt-neu Bild 1 (Abnahme Lauf 32,
+      // Nr. 277) — Einheit und Preis stehen gleich nebeneinander da.
+      setOffen(isEdit ? [] : ['grunddaten', 'preis'])
       setKategorieWechsel(null)
       setKategorieSheetOffen(false)
       setDualUseHinweis(null)
@@ -524,6 +558,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       setFestePakete(isEdit && product.unitSize != null)
       setSaisonal(isEdit && product.seasonStart != null && product.seasonEnd != null)
       setBestandBasis(isEdit ? product.stock : null)
+      setPruefenKarte(false)
+      setSpeicherFehler(null)
       // „Brennmaterial" im Neu-Menü: Es gibt genau eine Kategorie dafür.
       if (!isEdit && vorwahl === 'brennmaterial') kategorieSetzen('BRENNHOLZ', null)
     } else {
@@ -786,7 +822,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
     const treffer = erstesFehlerfeld(errors)
     if (!treffer) return
     abschnittOeffnen(treffer.abschnitt)
-    toast.error('Bitte prüfe die markierten Felder.')
+    // Statt eines Toasts die Karte über den Abschnitten (Board s1/w1-produkt-neu, Bild 5).
+    setSpeicherFehler(null)
+    setPruefenKarte(true)
     // Erst nach dem Aufklappen scrollen — ein zugeklappter Abschnitt hat keine
     // Höhe, und die Öffnung braucht eine Animation lang.
     window.setTimeout(() => {
@@ -831,6 +869,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       bestaetigungVerlangen(FUTTER_BESTAETIGUNG_NEU)
       return
     }
+    setPruefenKarte(false)
+    setSpeicherFehler(null)
     setIsSubmitting(true)
     try {
       let imageUrl = data.imageUrl ?? ''
@@ -871,7 +911,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             lesen: gewaehlteLesung.current,
           })
           const { text } = bildFehlerMeldung(e)
-          toast.error(text)
+          // Das Produkt ist nicht gespeichert: Karte am Formular wie jeder Speicherfehler (V17).
+          setSpeicherFehler(speicherFehlerAusAntwort(text))
           return
         } finally {
           setUploadFortschritt(null)
@@ -890,7 +931,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           bestaetigungVerlangen(ergebnis.error)
           return
         }
-        toast.error(ergebnis.error)
+        // Ein Fehler ohne Feld steht als orange Karte am Formular, nie als Toast (V17).
+        setSpeicherFehler(speicherFehlerAusAntwort(ergebnis.error))
         if ('code' in ergebnis && ergebnis.code === 'GEAENDERT' && ergebnis.vorrat !== undefined) {
           // Das Feld zeigt jetzt den echten Stand; der Hof prüft und speichert erneut.
           setBestandBasis(ergebnis.vorrat)
@@ -916,26 +958,26 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
       onClose()
       if (ergebnis.angelegt) onAngelegt?.({ anlass: ergebnis.angelegt.id, name: payload.name, kaufbar: ergebnis.angelegt.kaufbar })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.')
+      // Am Netz mit „Nochmal" nur beim Bearbeiten: Anlegen könnte der Server schon ausgeführt haben (speicherFehlerNachWurf).
+      setSpeicherFehler(speicherFehlerNachWurf(istNetzFehler(e), isEdit, 'Wir konnten das Produkt nicht speichern. Bitte versuch es noch einmal.'))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   function abschnittTitel(abschnitt: Abschnitt, pflicht = false) {
-    const zu = !offen.includes(abschnitt)
     const fehler = fehlerhafteAbschnitte.has(abschnitt)
+    // Liste Lauf 32 (produkt-neu): Die Unterzeile steht immer; bei einem Fehler ist NUR sie farbig
+    // („Bitte prüfen“), der Kartentitel bleibt in Textfarbe.
     return (
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className={cn(fehler && 'text-destructive')}>
+        <span>
           {ABSCHNITT_TITEL[abschnitt]}
           {pflicht && ' *'}
         </span>
-        {zu && (
-          <span className={cn('truncate text-xs font-normal', fehler ? 'text-destructive' : 'text-muted-foreground')}>
-            {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
-          </span>
-        )}
+        <span className={cn('truncate text-[13px]', fehler ? 'font-semibold text-status-offen' : 'font-normal text-muted-foreground')}>
+          {fehler ? 'Bitte prüfen' : zusammenfassung(abschnitt, werte)}
+        </span>
       </span>
     )
   }
@@ -953,11 +995,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
           --app-*) im Teilbaum die Werte des Design-Systems (DESIGN_SYSTEM „Mein Hof"). */}
       <DialogContent
         data-app-palette="neu"
-        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-2xl"
+        className="flex h-[100dvh] max-h-[100dvh] max-w-full flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-[16px]"
+        showCloseButton={false}
       >
-        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-          <DialogTitle className="font-heading text-xl font-semibold">{dialogTitel(isEdit, vorwahl)}</DialogTitle>
-        </DialogHeader>
+        {/* Liste Lauf 32 (produkt-neu 390): am Handy „‹“ links, Titel, Produktart darunter. */}
+        <ProduktDialogKopf titel={dialogTitel(isEdit, vorwahl)} art={PRODUKTE_FILTER_LABEL[produktBereich(category)]} zurueckGesperrt={isSubmitting} />
 
         {/* Die drei Datei-Felder bewusst HIER, außerhalb des Akkordeons (#135):
             Base UI hängt einen zugeklappten Abschnitt aus dem DOM aus
@@ -972,18 +1014,30 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             ref={formRef}
             onSubmit={form.handleSubmit(onSubmit, onInvalid)}
             onKeyDown={weiterMitEnter}
-            className="flex flex-col flex-1 min-h-0"
+            // Feldfehler orange (V17): Rand am Feld, Beschriftung bleibt in der Textfarbe. Beschriftungen fett
+            // und 15 px wie im Board s1-produkt-neu (Lauf 31) — eine Stelle für alle Felder des Dialogs.
+            className={cn(
+              'flex min-h-0 flex-1 flex-col [&_[data-slot=form-label]]:text-[15px] [&_[data-slot=form-label]]:font-semibold [&_[data-slot=form-label][data-error=true]]:text-foreground!',
+              FELD_FEHLER_IM_FORMULAR
+            )}
           >
             {/* Scrollbarer Inhalt — pb-8, damit die letzte Karte nie unter dem Fuß liegt */}
             <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-1 pb-8">
+              <FormularMeldung
+                pruefen={pruefenKarte && fehlerhafteAbschnitte.size > 0}
+                fehler={speicherFehler}
+                onNochmal={() => formRef.current?.requestSubmit()}
+                laeuft={isSubmitting}
+              />
               <Accordion
                 multiple
+                className="flex flex-col gap-3"
                 value={offen}
                 onValueChange={(v) => setOffen(v as Abschnitt[])}
               >
                 {/* === 1. GRUNDDATEN === */}
-                <AccordionItem value="grunddaten">
-                  <AccordionTrigger>{abschnittTitel('grunddaten')}</AccordionTrigger>
+                <AccordionItem value="grunddaten" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('grunddaten')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
                       {/* Foto zuerst (Vorbild Depop, Shopify, Nextdoor): der schnellste
@@ -1007,7 +1061,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                             onAbbrechen={() => setAusschnittOffen(false)}
                           />
                         ) : previewUrl ? (
-                          <div className="relative overflow-hidden rounded-xl border border-border bg-muted/30">
+                          <div className="relative overflow-hidden rounded-[12px] border border-border bg-muted/30">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={previewUrl}
@@ -1052,24 +1106,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                             </button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={fotoQuellen.oeffnen}
-                            disabled={isSubmitting || pruefeFoto}
-                            className="flex min-h-[120px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-5 text-center transition-colors hover:bg-muted/50 disabled:opacity-60"
-                          >
-                            <Camera className="h-7 w-7 text-brand-text" aria-hidden />
-                            <span className="text-sm font-medium text-foreground">
-                              {pruefeFoto
-                                ? 'Foto wird geprüft …'
-                                : selectedFile
-                                  ? 'Foto ausgewählt — tippen zum Ersetzen'
-                                  : 'Foto hinzufügen'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              Freiwillig — ohne Foto zeigen wir ein Bild zur Kategorie.
-                            </span>
-                          </button>
+                          // „Foto hinzufügen" (V15; Board s1/w1-produkt-neu, Bild 1): die Fläche des
+                          // Bild-Platzhalters als Knopf; er öffnet dieselben zwei Wege wie bisher (useFotoQuellen).
+                          <FotoHinzufuegen onClick={fotoQuellen.oeffnen} disabled={isSubmitting || pruefeFoto}>
+                            {pruefeFoto ? 'Foto wird geprüft …' : selectedFile ? 'Foto ausgewählt — tippen zum Ersetzen' : undefined}
+                          </FotoHinzufuegen>
                         )}
                       </div>
 
@@ -1129,7 +1170,21 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                               type="button"
                               data-feld="subcategory"
                               onClick={() => setKategorieSheetOffen(true)}
-                              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm"
+                              aria-describedby={
+                                [
+                                  form.formState.errors.category ? `${kategorieFehlerId}-kategorie` : null,
+                                  form.formState.errors.subcategory?.message ? `${kategorieFehlerId}-sorte` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ') || undefined
+                              }
+                              // Fehlerrand wie an jedem Feld (G6, FELD_FEHLER_IM_FORMULAR: 2 px orange; Abnahme Lauf 32,
+                              // produkt-neu Bild 5): die Zeile hatte die Meldung, aber keinen Rand. Als Klasse, nicht über
+                              // aria-invalid — die Zeile ist ein Knopf, der das Auswahl-Blatt öffnet.
+                              className={cn(
+                                'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-left text-sm',
+                                (form.formState.errors.category || form.formState.errors.subcategory) && 'border-2 border-status-offen'
+                              )}
                             >
                               <span className={cn(!category && 'text-muted-foreground')}>
                                 {category
@@ -1140,9 +1195,11 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                               </span>
                               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                             </button>
-                            <FormMessage />
+                            <FormMessage id={`${kategorieFehlerId}-kategorie`} />
                             {form.formState.errors.subcategory?.message && (
-                              <p role="alert" className="text-sm text-destructive">{form.formState.errors.subcategory.message}</p>
+                              <p id={`${kategorieFehlerId}-sorte`} role="alert" className="text-sm text-destructive">
+                                {form.formState.errors.subcategory.message}
+                              </p>
                             )}
                             {category && hatUnterkategorien(category) && !werte.subcategory && !futterBereich && (
                               <FormDescription className="text-xs">
@@ -1176,44 +1233,87 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                 </AccordionItem>
 
                 {/* === 2. PREIS & VERFÜGBARKEIT === */}
-                <AccordionItem value="preis">
-                  <AccordionTrigger>{abschnittTitel('preis')}</AccordionTrigger>
+                <AccordionItem value="preis" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('preis')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-3">
-                      {/* Reihenfolge Einheit → Gebinde → Preis: Das Preisfeld heißt je
-                          nach Gebinde anders („Preis je kg" / „Preis für das 2-kg-Paket"),
-                          also stehen die beiden zuerst. */}
-                      <FormField
-                        control={form.control}
-                        name="unit"
-                        render={({ field }) => (
-                          <FormItem data-feld="unit">
-                            <FormLabel>Einheit</FormLabel>
-                            <Select
-                              onValueChange={(v) => einheitSetzen(v as ProductFormData['unit'])}
-                              value={field.value}
-                            >
+                      {/* Einheit und Preis in einer Reihe (Liste Lauf 32, produkt-neu). Das Preisfeld heißt je nach
+                          Gebinde anders („Preis je kg“ / „Preis für das 2-kg-Paket“) — die Beschriftung folgt live. */}
+                      <div className="grid grid-cols-2 items-start gap-3">
+                        <FormField
+                          control={form.control}
+                          name="unit"
+                          render={({ field }) => (
+                            <FormItem data-feld="unit">
+                              <FormLabel>Einheit</FormLabel>
+                              <Select
+                                onValueChange={(v) => einheitSetzen(v as ProductFormData['unit'])}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    {/* Base UI zeigt ohne Formatierer den ROHWERT („KG") —
+                                        die Kinder-Funktion macht daraus das Label. */}
+                                    <SelectValue placeholder="Wählen…">
+                                      {(v: string | null) => auswahlLabel(UNIT_OPTIONS, v) ?? 'Wählen…'}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {unitOptionsFuer(category).map((u) => (
+                                    <SelectItem key={u.value} value={u.value}>
+                                      {u.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="price"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)}</FormLabel>
                               <FormControl>
-                                <SelectTrigger>
-                                  {/* Base UI zeigt ohne Formatierer den ROHWERT („KG") —
-                                      die Kinder-Funktion macht daraus das Label. */}
-                                  <SelectValue placeholder="Wählen…">
-                                    {(v: string | null) => auswahlLabel(UNIT_OPTIONS, v) ?? 'Wählen…'}
-                                  </SelectValue>
-                                </SelectTrigger>
+                                <DezimalFeld
+                                  name={field.name}
+                                  value={field.value}
+                                  placeholder="0,00"
+                                  enterKeyHint={enterTaste(false)}
+                                  praefix="€"
+                                  stellen={2}
+                                  onBlur={field.onBlur}
+                                  onChange={(neu) => field.onChange(neu ?? Number.NaN)}
+                                />
                               </FormControl>
-                              <SelectContent>
-                                {unitOptionsFuer(category).map((u) => (
-                                  <SelectItem key={u.value} value={u.value}>
-                                    {u.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {/* Live-Vorschau direkt unter Einheit und Preis: was Kundinnen aus Preis und Gebinde lesen werden.
+                          Im Hofpreis-Modell der grüne Kasten (V1, Liste Lauf 32 produkt-neu): „Du bekommst … · die
+                          Kundin zahlt …“, darunter „Bar bis … ohne Gebühr für dich.“ aus der Geldsatz-Hilfe — nie als
+                          fester Text. Im Modell „bisher“ die leise Zeile „Kunden sehen: …“ (dort stimmt sie noch). */}
+                      {preisVorschau &&
+                        (preisAnzeige ? (
+                          // Form wie der Geld-Kasten der Vorschau /intern/bausteine (Nr. 248, DESIGN_SYSTEM).
+                          <div
+                            className={cn('flex flex-col gap-0.5 border border-status-fertig/40 bg-status-fertig/10 px-3.5 py-2.5 text-[14px] text-foreground', RUNDUNG.hinweis)}
+                            aria-live="polite"
+                          >
+                            <p className="font-semibold">{preisVorschau}</p>
+                            {barOhneGebuehr && <p className="text-muted-foreground">{barOhneGebuehr}</p>}
+                          </div>
+                        ) : (
+                          <p className="-mt-1 text-xs text-muted-foreground" aria-live="polite">
+                            {preisVorschau}
+                          </p>
+                        ))}
 
                       {/* Futtermittel: Das Gewicht je Gebinde steht direkt unter der Einheit
                           und übernimmt die Rolle der festen Pakete — es sind dieselben
@@ -1327,35 +1427,6 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                         />
                       )}
 
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{preisFeldLabel(werte.unit, werte.unitSize)}</FormLabel>
-                            <FormControl>
-                              <DezimalFeld
-                                name={field.name}
-                                value={field.value}
-                                placeholder="0,00"
-                                enterKeyHint={enterTaste(false)}
-                                praefix="€"
-                                stellen={2}
-                                onBlur={field.onBlur}
-                                onChange={(neu) => field.onChange(neu ?? Number.NaN)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Live-Vorschau: was Kundinnen aus Preis und Gebinde lesen werden */}
-                      {preisVorschau && (
-                        <p className="text-xs text-muted-foreground -mt-1" aria-live="polite">
-                          {preisVorschau}
-                        </p>
-                      )}
                       {preisFraglich && (
                         <div
                           className="rounded-lg bg-amber-50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200"
@@ -1530,8 +1601,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                 </AccordionItem>
 
                 {/* === 3. DETAILS === */}
-                <AccordionItem value="details">
-                  <AccordionTrigger>{abschnittTitel('details')}</AccordionTrigger>
+                <AccordionItem value="details" className={ABSCHNITT_KARTE}>
+                  <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('details')}</AccordionTrigger>
                   <AccordionPanel>
                     <div className="space-y-4">
                       {/* Siegel — drei Zeilen mit Erklärsatz */}
@@ -1698,8 +1769,8 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
 
                 {/* === 4. KENNZEICHNUNG — nur bei Futtermitteln === */}
                 {futterBereich && (
-                  <AccordionItem value="kennzeichnung">
-                    <AccordionTrigger>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
+                  <AccordionItem value="kennzeichnung" className={ABSCHNITT_KARTE}>
+                    <AccordionTrigger className={ABSCHNITT_KOPF}>{abschnittTitel('kennzeichnung', true)}</AccordionTrigger>
                     <AccordionPanel>
                       <div className="space-y-4">
                         <p className="text-xs text-muted-foreground">
@@ -1957,7 +2028,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                               <SchalterZeile
                                 id="nur-betriebe"
                                 titel="Nur an landwirtschaftliche Betriebe"
-                                untertitel="Wer bestellt, muss in der Kasse eine Betriebsnummer angeben."
+                                untertitel="Dann fragt die Kasse nach der Betriebsnummer."
                                 checked={field.value === 'NUR_BETRIEBE'}
                                 onCheckedChange={(an) => field.onChange(an ? 'NUR_BETRIEBE' : 'ALLE')}
                               />
@@ -2018,7 +2089,9 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
             {/* Fuß: fest am unteren Rand als eigene Flex-Zone — kein sticky, keine
                 negativen Ränder (die von DialogFooter ragten bei p-0 über die
                 Kante). Hintergrund card, feine Linie oben, Safe-Area-Abstand. */}
-            <div className="flex shrink-0 flex-row justify-end gap-2 border-t border-border bg-card px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {/* Am Handy wie Futter und Brennmaterial (Board s1-produkt-neu): „Speichern“ über die volle Breite,
+                „Abbrechen“ darunter; ab 640 px in einer Zeile rechts. */}
+            <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-card px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6 sm:pt-4">
               {/* Löschen nur beim Bearbeiten, links und leise — die Rückfrage stellt die Liste. */}
               {isEdit && onLoeschen && (
                 <Button
@@ -2026,7 +2099,7 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
                   variant="ghost"
                   onClick={() => onLoeschen(product)}
                   disabled={isSubmitting}
-                  className="mr-auto text-status-offen hover:bg-primary/10"
+                  className="text-status-offen hover:bg-primary/10 sm:mr-auto"
                 >
                   Löschen
                 </Button>
@@ -2034,16 +2107,16 @@ export function ProductDialog({ open, product, onClose, hofBetriebsnummer, preis
               <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
                 Abbrechen
               </Button>
-              {/* Fehlt noch etwas, sagt der Knopf wie viel; ein Tipp prüft trotzdem
-                  und springt zum ersten fehlenden Feld (onInvalid). */}
+              {/* Immer „Speichern“ (Liste Lauf 32, produkt-neu; G6): geprüft wird beim Tipp, der springt zum
+                  ersten fehlenden Feld (onInvalid). */}
               {/* Solange das Foto geprüft wird, gibt es noch nichts zu speichern —
                   sonst ginge das Produkt ohne (oder mit dem vorigen) Foto hinaus. */}
-              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-w-[100px]">
+              <Button type="submit" disabled={isSubmitting || pruefeFoto} className="min-h-12 w-full rounded-[10px] text-[15px] font-bold sm:min-h-11 sm:w-auto sm:min-w-[160px] sm:rounded-full">
                 {isSubmitting
                   ? uploadFortschritt
                     ? stufenText(uploadFortschritt)
                     : 'Speichere…'
-                  : speichernText(fehlend, isEdit, isAvailable)}
+                  : speichernText(isEdit, isAvailable)}
               </Button>
             </div>
           </form>
@@ -2124,12 +2197,12 @@ function ProduktfotoAusschnitt({
 }): React.JSX.Element {
   const zeilen = (klein: boolean) => (
     <div className={cn('min-w-0', klein ? 'px-2 py-1.5' : 'flex-1')}>
-      <div className={cn('truncate font-semibold text-foreground', klein ? 'text-[11.5px]' : 'text-[13px]')}>{name}</div>
-      <div className={cn('truncate text-muted-foreground', klein ? 'text-[10px]' : 'text-[11.5px]')}>{preis}</div>
+      <div className={cn('truncate font-semibold text-foreground', klein ? 'text-xs' : 'text-[13px]')}>{name}</div>
+      <div className="truncate text-xs text-muted-foreground">{preis}</div>
     </div>
   )
   const karte = (rahmen: ReactNode) => (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div className="overflow-hidden rounded-[12px] border border-border bg-card">
       {rahmen}
       {zeilen(true)}
     </div>
@@ -2142,8 +2215,8 @@ function ProduktfotoAusschnitt({
       verhaeltnis: PRODUKT_VORSCHAU_LISTE_HANDY,
       // Die Zeile der Hofseite am Handy: Foto 64 × 64, Name, Preis, Plus.
       umgebung: (rahmen) => (
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2">
-          <div className="w-16 shrink-0 overflow-hidden rounded-xl">{rahmen}</div>
+        <div className="flex items-center gap-2.5 rounded-[12px] border border-border bg-card p-2">
+          <div className="w-16 shrink-0 overflow-hidden rounded-[10px]">{rahmen}</div>
           {zeilen(false)}
           <span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <Plus className="size-4" strokeWidth={1.7} aria-hidden="true" />
@@ -2168,7 +2241,7 @@ function ProduktfotoAusschnitt({
     },
   ]
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border p-3">
+    <div className="flex flex-col gap-3 rounded-[12px] border border-border p-3">
       <div>
         <h3 className="font-heading text-lg font-semibold text-foreground">{BILD_RAHMEN_TEXT.produkt.titel}</h3>
         <p className="mt-0.5 text-[13px] text-muted-foreground">

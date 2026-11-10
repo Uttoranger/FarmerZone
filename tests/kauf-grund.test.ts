@@ -37,6 +37,9 @@ vi.mock('@/components/ui/sheet', async (original) => {
     ...echt,
     Sheet: (p: Kinder) => createElement('div', null, p.children),
     SheetContent: (p: Kinder) => createElement('section', null, p.children),
+    // Nr. 227: Der Warenkorb steht im Blatt rechts (SheetBlatt seite="rechts", SheetKopf) — ebenso an Ort und Stelle.
+    SheetBlatt: (p: Kinder) => createElement('section', null, p.children),
+    SheetKopf: (p: { titel?: ReactNode }) => createElement('h2', null, p.titel),
     SheetTitle: (p: Kinder) => createElement('h2', null, p.children),
   }
 })
@@ -55,7 +58,7 @@ const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
 function spalte(sperre: KaufSperre = null): string {
   return renderToStaticMarkup(
-    createElement(HofseiteSeitenspalte, { hof: HOF, sperre, zahlungsarten: [], gebuehrKurz: null, gebuehrKorb: null, mitKorb: true, jetzt: '2026-10-26T08:00:00.000Z' })
+    createElement(HofseiteSeitenspalte, { hof: HOF, sperre, zahlungsarten: [], gebuehrHinweis: null, gebuehrKorb: null, mitKorb: true, jetzt: '2026-10-26T08:00:00.000Z' })
   )
 }
 
@@ -97,7 +100,7 @@ describe('Korb-Blatt: Grund statt „Zur Kasse“ (Nr. 205)', () => {
         items: [posten],
         total: 3,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { hofName: 'Musterdorf', pauseMessage: null, sperre },
       })

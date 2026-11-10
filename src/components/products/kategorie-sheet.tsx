@@ -99,7 +99,7 @@ export function KategorieSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="max-h-[92dvh] gap-0 p-0 sm:mx-auto sm:max-w-lg sm:rounded-t-2xl"
+        className="max-h-[92dvh] gap-0 p-0 sm:mx-auto sm:max-w-lg sm:rounded-t-[16px]"
       >
         {/* Der Inhalt wird bei jedem Öffnen neu aufgebaut — so startet der
             Entwurf immer beim gespeicherten Wert, ohne Effekt zum Zurücksetzen. */}
@@ -186,7 +186,7 @@ function SheetInhalt({
                   aria-checked={aktiv}
                   onClick={() => kachelWaehlen(k)}
                   className={cn(
-                    'relative flex min-h-24 flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-colors',
+                    'relative flex min-h-24 flex-col items-start gap-1 rounded-[12px] border-2 p-3 text-left transition-colors',
                     aktiv ? 'border-primary bg-primary/10' : 'border-border bg-card hover:bg-muted/40'
                   )}
                 >
@@ -205,7 +205,7 @@ function SheetInhalt({
         </Abschnitt>
 
         {istFutterKachel && futterAnlegenHref ? (
-          <section className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
+          <section className="space-y-3 rounded-[12px] border border-border bg-muted/40 p-4">
             <p className="text-sm text-foreground">
               Futtermittel legst du mit Verkaufsgrößen an – vom Sackerl bis zum Rundballen, mit deiner Registrierung.
             </p>
@@ -222,7 +222,7 @@ function SheetInhalt({
           </section>
         ) : (
         <Abschnitt titel="Kategorie">
-          <ul className="overflow-hidden rounded-xl border border-border" role="listbox" aria-label="Kategorie">
+          <ul className="overflow-hidden rounded-[12px] border border-border" role="listbox" aria-label="Kategorie">
             {kategorien.map((l1) => (
               <KategorieZeile
                 key={l1}

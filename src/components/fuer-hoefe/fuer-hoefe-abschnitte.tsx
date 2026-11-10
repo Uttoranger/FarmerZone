@@ -7,7 +7,8 @@ import {
   FUER_HOEFE_VORTEILE,
   fuerHoefeFragen,
 } from '@/lib/fuer-hoefe'
-import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, grundgebuehrText, servicegebuehrZahltKunde, type TarifText } from '@/lib/konditionen'
+import { KONDITIONEN_UEBERGANG, PRO_MONAT, TARIFE, gebuehrGrundsatz, grundgebuehrText, type TarifText } from '@/lib/konditionen'
+import type { GebuehrModell } from '@/lib/plattformgebuehr'
 import { GRUENDUNG_TEXT, type GruendungSeiten } from '@/lib/gruendungshof'
 import { categoryImagePath } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
@@ -166,8 +167,19 @@ function TarifKarte({ tarif, hervorgehoben, gruendung = null }: { tarif: TarifTe
   )
 }
 
-/** `jetzt` von der Seite (beim Bauen bzw. Revalidieren): die Bar-Ausnahme (B1) steht nur vor dem Stichtag da. */
-export function FuerHoefePreise({ jetzt, gruendung = null }: { jetzt: Date; gruendung?: GruendungSeiten | null }): React.JSX.Element {
+/**
+ * `jetzt` von der Seite (beim Bauen bzw. Revalidieren): die Bar-Ausnahme (B1) steht nur vor dem Stichtag da.
+ * `modell` von der Seite (`gebuehrModellFuer`): ab „Hofpreis-Modell ab“ der Grundsatz der Plattformgebühr (V62).
+ */
+export function FuerHoefePreise({
+  jetzt,
+  modell,
+  gruendung = null,
+}: {
+  jetzt: Date
+  modell: GebuehrModell
+  gruendung?: GruendungSeiten | null
+}): React.JSX.Element {
   const gruendungKarte = gruendung?.zeigen ? gruendung : null
   return (
     <section aria-labelledby="preise-titel" className="py-12 md:py-16">
@@ -186,7 +198,7 @@ export function FuerHoefePreise({ jetzt, gruendung = null }: { jetzt: Date; grue
           {/* Die Karten zeigen die Tarife ab dem Stichtag — der Satz davor sagt
               das, damit kein Preis als heute fällig gelesen wird (K1). */}
           <p className="text-[14.5px] leading-normal font-semibold text-foreground">{KONDITIONEN_UEBERGANG}</p>
-          <p className="text-[14.5px] leading-normal text-foreground">{servicegebuehrZahltKunde(jetzt)}</p>
+          <p className="text-[14.5px] leading-normal text-foreground">{gebuehrGrundsatz(modell, jetzt)}</p>
           <Link
             href="/konditionen"
             className={cn(
@@ -230,7 +242,8 @@ export function FuerHoefeFutter(): React.JSX.Element {
   )
 }
 
-export function FuerHoefeFragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
+/** Die Antworten nennen die Gebühr je Modell (`fuerHoefeFragen`). */
+export function FuerHoefeFragen({ jetzt, modell }: { jetzt: Date; modell: GebuehrModell }): React.JSX.Element {
   return (
     <section aria-labelledby="fragen-titel" className="pb-12 md:pb-16">
       <div className={cn(CONTAINER, 'flex flex-col gap-4 md:flex-row md:gap-[60px]')}>
@@ -241,7 +254,7 @@ export function FuerHoefeFragen({ jetzt }: { jetzt: Date }): React.JSX.Element {
           </h2>
         </div>
         <div className="flex flex-1 flex-col border-t border-border">
-          {fuerHoefeFragen(jetzt).map((eintrag, i) => (
+          {fuerHoefeFragen(jetzt, modell).map((eintrag, i) => (
             <details key={eintrag.frage} name="fragen-hoefe" open={i === 0} className="group border-b border-border last:border-b-0">
               <summary
                 className={cn(

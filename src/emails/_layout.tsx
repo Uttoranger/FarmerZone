@@ -1,6 +1,10 @@
 import * as React from 'react'
 import { Html, Head, Body, Container, Section, Text, Hr, Preview, Row, Column, Link } from '@react-email/components'
 import { MARKE } from '@/lib/marke'
+import { PRODUKTION_ADRESSE, PRODUKTION_HOST } from '@/lib/umgebung'
+import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
+import { ZUSTELLUNG_MAIL_TEXT } from '@/lib/zustellung'
+import type { Positionszeile } from '@/lib/positionszeile'
 
 /**
  * Die Mail-Palette — die EINZIGE Stelle mit Farbwerten unter src/emails/
@@ -42,6 +46,17 @@ export const MAIL_FARBE = {
 /** Schriften: Fraunces/Instrument Sans, wo installiert — Mails laden keine Webfonts (kein CDN). */
 const SCHRIFT = "'Instrument Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 export const SCHRIFT_UEBERSCHRIFT = "Fraunces,Georgia,'Times New Roman',serif"
+
+/**
+ * Am Handy (Board s3-mail-*) steht die Karte mit 10 px Rand und 18 px Innenabstand,
+ * im Web (w3-mail-*, Karte bis 600 px) mit 12 px und 26 px. Inline steht die Web-Fassung —
+ * Mailprogramme ohne Media Queries zeigen sie; die übrigen nehmen am Handy die schmale.
+ * Werte mit Datum oder Adresse (`BetragsZeile umbrechen`) stehen am Handy mit 13 px und engerem
+ * Abstand zur Beschriftung, damit „Hof Müller, Dorfstraße 12, 5280 Braunau am Inn“ bei 390 px in
+ * einer Zeile bleibt (Board s3-mail-kauf Bild 1, Nr. 280); längere Werte brechen weiter um, statt
+ * über den Rand zu laufen.
+ */
+const SCHMAL_CSS = `@media only screen and (max-width:480px){.fz-grund>table>tbody>tr>td{padding:16px 10px !important}.fz-kopf{padding:20px 18px 0 !important}.fz-inhalt{padding:18px 18px 22px !important}.fz-wert{font-size:13px !important;letter-spacing:-0.1px}.fz-wert-name{padding-right:8px !important}}`
 
 const body: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.seite,
@@ -87,40 +102,93 @@ const footerText: React.CSSProperties = {
   textAlign: 'center' as const,
 }
 
+/**
+ * Wer die Mail schickt — der Satz unter der Karte (V68, V79; Auftrag Lauf 30,
+ * „E-Mails“). Jede Vorlage wählt ihre Art selbst (Pflicht-Prop, Liste in
+ * tests/mail-vorschau.test.ts):
+ *  - `hof`: Bestellmails an die Kundin — der Vertrag besteht mit dem Hof.
+ *  - `plattform`: Konto, Code, Passwort, Sicherheit, Freischaltung, Lastschrift,
+ *    Team und alle Mails an den Hof — kein Hof löst sie aus.
+ *  - `betrieb`: Mails an das Team (Betrieb), intern und ohne Anbieterzeile.
+ *  - `postfach`: Nachrichten vom Team an einen Hof (Register N12).
+ *  - `beitrag`: Neuigkeiten eines Hofs an seine Abonnentinnen.
+ */
+export type MailFuss = { art: 'hof' } | { art: 'plattform' } | { art: 'betrieb' } | { art: 'postfach' } | { art: 'beitrag'; hof: string }
+
+export type MailFussArt = MailFuss['art']
+
+/** Die Sätze des Fußes — eine Quelle für Vorlagen und Tests. Betrieb und Postfach behalten ihren Satz aus zustellung.ts bzw. postfach.ts. */
+export const MAIL_FUSS_TEXT = {
+  hof: `Versandt von ${MARKE} im Auftrag eines Hofes.`,
+  plattform: `Versandt von ${MARKE}.`,
+  betrieb: ZUSTELLUNG_MAIL_TEXT.fuss,
+  postfach: POSTFACH_MAIL_TEXT.fuss,
+  /** Ohne Anschrift des Hofs: Ob sie in den Fuß gehört, prüft das Recht (ECG § 6, MedienG § 24/25). */
+  beitrag: (hof: string) => `Im Auftrag von ${hof} · versandt von ${MARKE}`,
+  /** Der Link unter dem Fuß: in Beitrags-Mails die Neuigkeiten (Wortliste N42 c), sonst die Benachrichtigungen. */
+  verwalten: 'Benachrichtigungen verwalten',
+  verwaltenBeitrag: 'Neuigkeiten verwalten',
+} as const
+
+/** Der Satz unter der Karte für diese Art. */
+export function fussSatz(fuss: MailFuss): string {
+  if (fuss.art === 'beitrag') return MAIL_FUSS_TEXT.beitrag(fuss.hof)
+  return MAIL_FUSS_TEXT[fuss.art]
+}
+
+/** Die Seite, auf die die Anbieterzeile zeigt. Betreiberdaten stehen nur dort (A001), nie im Code — das Repo ist öffentlich. */
+const IMPRESSUM_PFAD = '/impressum'
+
+/**
+ * Die Anbieterzeile unter dem Fuß (V68): Name und Link auf das Impressum der
+ * echten Seite — auch in Mails aus der Vorschau, denn gelesen wird die Mail
+ * außerhalb unseres Servers. Betriebs-Mails tragen sie nicht (intern).
+ */
+export function Anbieterzeile(): React.JSX.Element {
+  return (
+    <Text style={{ ...footerText, marginTop: '4px' }}>
+      {`${MARKE} · `}
+      <a href={`${PRODUKTION_ADRESSE}${IMPRESSUM_PFAD}`} style={{ color: MAIL_FARBE.textLeise }}>
+        {`${PRODUKTION_HOST}${IMPRESSUM_PFAD}`}
+      </a>
+    </Text>
+  )
+}
+
 interface EmailLayoutProps {
   previewText: string
   children: React.ReactNode
+  /** Der Link „… verwalten“ unter dem Fuß; in Beitrags-Mails der Abmelde-Link (Register S11, unverändert). */
   manageUrl?: string
-  /**
-   * Der Satz unter der Karte. Ohne ihn der Satz der Mails im Namen eines Hofs;
-   * Mails des Teams (Postfach, Register N12) nennen das Team als Absender.
-   */
-  fusszeile?: string
+  /** Wer die Mail schickt — Pflicht, damit jede Vorlage ihre Art selbst wählt. */
+  fuss: MailFuss
 }
 
-export function EmailLayout({ previewText, children, manageUrl, fusszeile }: EmailLayoutProps): React.JSX.Element {
+export function EmailLayout({ previewText, children, manageUrl, fuss }: EmailLayoutProps): React.JSX.Element {
   return (
     <Html lang="de">
       <Head>
         {/* Bitte nicht automatisch abdunkeln — die Mail ist bewusst hell. */}
         <meta name="color-scheme" content="light" />
         <meta name="supported-color-schemes" content="light" />
+        <style>{SCHMAL_CSS}</style>
       </Head>
       <Preview>{previewText}</Preview>
-      <Body style={body}>
+      <Body style={body} className="fz-grund">
         <Container style={container}>
           <Section style={karte}>
-            <Section style={kopf}>
+            <Section style={kopf} className="fz-kopf">
               <Text style={wortmarke}>{MARKE}</Text>
             </Section>
-            <Section style={content}>{children}</Section>
+            <Section style={content} className="fz-inhalt">{children}</Section>
           </Section>
           <Section style={{ padding: '16px 24px 0' }}>
-            <Text style={footerText}>{fusszeile ?? `Versandt von ${MARKE} im Auftrag eines Hofes.`}</Text>
+            <Text style={footerText}>{fussSatz(fuss)}</Text>
+            {fuss.art !== 'betrieb' && <Anbieterzeile />}
             {manageUrl && (
               <Text style={{ ...footerText, marginTop: '6px' }}>
                 <a href={manageUrl} style={{ color: MAIL_FARBE.textLeise }}>
-                  Benachrichtigungen verwalten
+                  {fuss.art === 'beitrag' ? MAIL_FUSS_TEXT.verwaltenBeitrag : MAIL_FUSS_TEXT.verwalten}
                 </a>
               </Text>
             )}
@@ -142,6 +210,14 @@ export const h1: React.CSSProperties = {
   fontWeight: '600',
   margin: '0 0 10px',
   lineHeight: '1.3',
+}
+
+/**
+ * Die Überschrift einer Mail als echtes `<h1>` (Nr. 255) — Bildschirmleser und die Textfassung erkennen sie als
+ * Überschrift; `<Text style={h1}>` ergäbe nur einen Absatz. Aussehen genau wie `h1`.
+ */
+export function Ueberschrift({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <h1 style={h1}>{children}</h1>
 }
 
 export const bodyText: React.CSSProperties = {
@@ -171,31 +247,18 @@ export const kleinText: React.CSSProperties = {
 /** Links im Text: grün und unterstrichen, damit sie ohne Farbe erkennbar bleiben. */
 export const textLink: React.CSSProperties = {
   color: MAIL_FARBE.gruen,
+  fontWeight: '600',
   textDecoration: 'underline',
 }
 
-export const highlightBox: React.CSSProperties = {
-  backgroundColor: MAIL_FARBE.seite,
-  borderRadius: '12px',
-  padding: '16px 20px',
-  margin: '16px 0',
-}
-
+/** Die kleine Kennzeile in Großbuchstaben (wie im Board: 12 px, fett) — nie kleiner als 12 px (Lauf 31). */
 export const highlightLabel: React.CSSProperties = {
   color: MAIL_FARBE.textLeise,
-  fontSize: '11px',
-  fontWeight: '600',
+  fontSize: '12px',
+  fontWeight: '700',
   textTransform: 'uppercase' as const,
-  letterSpacing: '1.2px',
+  letterSpacing: '0.06em',
   margin: '0 0 6px',
-}
-
-export const highlightValue: React.CSSProperties = {
-  color: MAIL_FARBE.text,
-  fontSize: '17px',
-  fontWeight: '600',
-  margin: '0 0 4px',
-  lineHeight: '1.3',
 }
 
 export const tableRow: React.CSSProperties = {
@@ -209,7 +272,11 @@ export const totalRow: React.CSSProperties = {
   marginTop: '4px',
 }
 
-/** Der grüne Knopf — die Hauptaktion einer Mail (Pille wie im Mockup). */
+/**
+ * Der grüne Knopf — die Hauptaktion einer Mail (Pille wie im Mockup). Mindestens
+ * 44 px hoch (V78): 13 + 16 + 13 px und 1 px Rand oben und unten; die Zeilenhöhe
+ * steht fest, damit kein Mailprogramm den Knopf mit seiner eigenen kleiner macht.
+ */
 export const ctaButton: React.CSSProperties = {
   backgroundColor: MAIL_FARBE.gruen,
   border: `1px solid ${MAIL_FARBE.gruen}`,
@@ -218,7 +285,8 @@ export const ctaButton: React.CSSProperties = {
   display: 'inline-block',
   fontSize: '14px',
   fontWeight: '600',
-  padding: '11px 18px',
+  lineHeight: '16px',
+  padding: '13px 18px',
   textDecoration: 'none',
   textAlign: 'center' as const,
   margin: '16px 0',
@@ -275,14 +343,28 @@ export function BetragsZeile({
   const gewicht = stark ? '600' : '400'
   return (
     <Row style={{ width: '100%' }}>
-      <Column style={{ color: leise ? MAIL_FARBE.textLeise : MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 12px 3px 0', verticalAlign: 'top' }}>
+      {/* Bei Zeilen mit Datum oder Adresse ist die Beschriftung kurz („Wo“): Sie nimmt nur ihre Breite, der Wert den Rest (Board: eine Zeile bei 390 px). */}
+      <Column className={umbrechen ? 'fz-wert-name' : undefined} style={{ color: leise ? MAIL_FARBE.textLeise : MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 12px 3px 0', verticalAlign: 'top', ...(umbrechen ? { width: '1%', whiteSpace: 'nowrap' as const } : {}) }}>
         {links}
       </Column>
-      <Column align="right" style={{ color: MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 0', textAlign: 'right' as const, verticalAlign: 'top', whiteSpace: umbrechen ? ('normal' as const) : ('nowrap' as const) }}>
+      <Column align="right" className={umbrechen ? 'fz-wert' : undefined} style={{ color: MAIL_FARBE.text, fontSize: groesse, fontWeight: gewicht, lineHeight: '1.5', padding: '3px 0', textAlign: 'right' as const, verticalAlign: 'top', whiteSpace: umbrechen ? ('normal' as const) : ('nowrap' as const) }}>
         {rechts}
       </Column>
     </Row>
   )
+}
+
+/**
+ * Die Gebührenzeile der Kunden-Mails im Modell „bisher“ (N38): Wort, Erklärsatz und Betrag aus dem Snapshot.
+ * `vermerk` steht, wenn die Gebühr entfallen bzw. erstattet ist (gebuehrEntfallenVermerk, Nr. 255) — dann
+ * „Servicegebühr (entfällt)“ mit durchgestrichenem Betrag, und „Gesamt“ darunter zählt sie nicht mit.
+ */
+export type MailGebuehrZeile = { wort: string; betrag: number; hinweis: string; vermerk?: 'erstattet' | 'entfällt' }
+
+/** Eine Gebührenzeile nach `MailGebuehrZeile` — dieselbe Schreibweise wie Bestätigungsseite und Abholzettel (Nr. 244). */
+export function GebuehrBetragsZeile({ zeile, betrag }: { zeile: MailGebuehrZeile; betrag: string }): React.JSX.Element {
+  if (!zeile.vermerk) return <BetragsZeile links={zeile.wort} rechts={betrag} />
+  return <BetragsZeile links={`${zeile.wort} (${zeile.vermerk})`} rechts={<span style={{ color: MAIL_FARBE.textLeise, textDecoration: 'line-through' }}>{betrag}</span>} />
 }
 
 /** Trennlinie in der Randfarbe. */
@@ -318,4 +400,109 @@ export function Knopf({ href, art = 'gruen', children }: { href: string; art?: '
 /** Knöpfe nebeneinander, am Handy umbrechend. */
 export function KnopfReihe({ children }: { children: React.ReactNode }): React.JSX.Element {
   return <Section style={{ margin: '16px 0 6px' }}>{children}</Section>
+}
+
+/**
+ * Hinweiskarte wie im Board: grün für Gutes (Erstattung, „Bring bitte … mit“),
+ * orange für „du musst etwas tun“ (Frist, Warnung) — dann ist auch die Schrift
+ * orange. 14 px, ein Absatz; Fettes setzt die Vorlage selbst.
+ */
+export function HinweisKasten({ art, children }: { art: 'gruen' | 'orange'; children: React.ReactNode }): React.JSX.Element {
+  const kasten = art === 'gruen' ? gruenBox : amberBox
+  return (
+    <Section style={kasten}>
+      <Text style={{ color: art === 'gruen' ? MAIL_FARBE.text : MAIL_FARBE.orangeText, fontSize: '14px', lineHeight: '1.5', margin: 0 }}>{children}</Text>
+    </Section>
+  )
+}
+
+/**
+ * Sechs Ziffern in Dreiergruppen („615 204“, Board s3/w3-mail-zugang). Nur für Codes,
+ * deren Feld beim Einfügen alles außer Ziffern entfernt (`codeAusEingabe` in
+ * src/lib/anmeldecode.ts) — sonst bliebe das Leerzeichen im kopierten Code hängen.
+ */
+export function codeGruppiert(code: string): string {
+  return /^\d{6}$/.test(code) ? `${code.slice(0, 3)} ${code.slice(3)}` : code
+}
+
+/**
+ * Der Code groß zum Abtippen (Boards s3/w3-mail-zugang, -team): Überschriften-Serife,
+ * neutrale Fläche ohne Rand, in Dreiergruppen. Kein Link — der Code steht nie im Betreff.
+ */
+export function CodeKasten({ code, gruppiert = true }: { code: string; gruppiert?: boolean }): React.JSX.Element {
+  return (
+    <Text
+      style={{
+        backgroundColor: MAIL_FARBE.seite,
+        borderRadius: '12px',
+        color: MAIL_FARBE.text,
+        fontFamily: SCHRIFT_UEBERSCHRIFT,
+        fontSize: '34px',
+        fontWeight: '600',
+        letterSpacing: '6px',
+        lineHeight: '1.3',
+        margin: '6px 0 14px',
+        padding: '12px',
+        textAlign: 'center' as const,
+      }}
+    >
+      {gruppiert ? codeGruppiert(code) : code}
+    </Text>
+  )
+}
+
+/**
+ * Die Telefonnummer des Hofs wie im Board: fett in Textfarbe, als Anruf-Link
+ * (tel:), damit sie am Handy mit einem Tippen wählt. Ohne gültige Nummer nur Text.
+ */
+export function TelefonFett({ href, nummer }: { href: string | null; nummer: string }): React.JSX.Element {
+  const stil: React.CSSProperties = { color: MAIL_FARBE.text, fontWeight: '600', textDecoration: 'none' }
+  return href ? (
+    <Link href={href} style={stil}>
+      {nummer}
+    </Link>
+  ) : (
+    <strong style={{ color: MAIL_FARBE.text }}>{nummer}</strong>
+  )
+}
+
+/**
+ * Eine Position nach G14 (Nr. 280): die Anzahl fett vorn, das Gebinde in Klammern — „**4** × Heumilch frisch
+ * (1 L)“, wie Packliste und Abholzettel (`positionszeile`, src/lib/positionszeile.ts). Der Text ist derselbe
+ * wie `name`; ohne Teile steht `name`, wie er kommt.
+ */
+export function PositionsName({ name, teile }: { name: string; teile?: Positionszeile }): React.JSX.Element {
+  if (!teile) return <>{name}</>
+  // Ein Textknoten nach der Anzahl: Sonst setzt React einen Kommentar zwischen die Teile.
+  return (
+    <>
+      <strong style={{ fontWeight: '700' }}>{teile.anzahl}</strong>
+      {` × ${teile.name}${teile.gebinde ? ` (${teile.gebinde})` : ''}`}
+    </>
+  )
+}
+
+/** Leiser Satz wie im Board (13 px): Fristen, „Fragen? …“. */
+export const leiseZeile: React.CSSProperties = { ...mutedText, margin: '0 0 6px' }
+
+/** Zwischenüberschrift fett in Textfarbe (z. B. „Deine Rechte jetzt:“). */
+export const zwischenTitel: React.CSSProperties = { ...bodyText, fontWeight: '600', margin: '0 0 6px' }
+
+/** „Hof Müller, Dorfstraße 12, 5280 Braunau am Inn“ — die Zeile „Wo“ der Bestellmails. */
+export function woZeile(hof: string, adresse: string, plz: string | undefined, ort: string): string {
+  return `${hof}, ${adresse}, ${plz ? `${plz} ` : ''}${ort}`
+}
+
+/**
+ * „Zurück an dich … € 19,12“ als grüne Karte (Board s3/w3-mail-storno Bild 4 und 6):
+ * Beschriftung links, Betrag rechts in einer Zeile (15 px, fett), darunter ein leiser Satz.
+ * Der Betrag kommt fertig gerechnet; die Vorlage formatiert ihn nur.
+ */
+export function ErstattungKasten({ betrag, zeile }: { betrag: string; zeile: string }): React.JSX.Element {
+  return (
+    <Section style={gruenBox}>
+      <BetragsZeile stark links="Zurück an dich" rechts={betrag} />
+      <Text style={{ color: MAIL_FARBE.textLeise, fontSize: '13px', lineHeight: '1.5', margin: 0 }}>{zeile}</Text>
+    </Section>
+  )
 }

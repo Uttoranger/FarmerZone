@@ -30,8 +30,12 @@ export const REITER_PX = 49
 /** Die Chip-Zeile: 36 px Chips, 4 px Luft oben und unten, 1 px Linie (nur unter md, nur im Reiter Produkte). */
 export const CHIPS_PX = 45
 
-/** Der klebende Block: am Handy unter dem 56-px-Kopf (`top-14`), ab md unter dem 64-px-Kopf (`top-16`), wie bisher die Reiter. */
-export const KLEBE_BLOCK = 'sticky top-14 z-30 bg-background md:top-16'
+/**
+ * Der klebende Block: am Handy ganz oben (`top-0`) — seit Nr. 247 (G9) scrollt der Kopf der KundeShell auf der
+ * Hofseite am Handy weg, nur der Kopf des Hofs klebt (kopfScrolltWegAmHandy); ab md unter dem 64-px-Kopf
+ * (`top-16`), wie bisher die Reiter.
+ */
+export const KLEBE_BLOCK = 'sticky top-0 z-30 bg-background md:top-16'
 
 /** Die gemessene Höhe des Blocks am Wurzelelement — globals.css rechnet scroll-padding damit. */
 export const KLEBE_BLOCK_VAR = '--hof-klebeblock'
@@ -40,26 +44,6 @@ export const KLEBE_BLOCK_VAR = '--hof-klebeblock'
 
 /** Der Name des Rückwegs für den Screenreader — sichtbar ist nur der Pfeil. */
 export const HOFZEILE_ZURUECK = 'Zurück zu allen Höfen'
-
-/**
- * Der Name des Zurück-Knopfs im Titelbild für den Screenreader (Entscheidung 5,
- * Morgenbericht 25) — sichtbar ist nur der Pfeil. Er ersetzt am Handy die Hofzeile,
- * solange diese noch nicht klebt (am Seitenanfang steht sie noch im Fluss unter
- * dem Titelbild); danach übernimmt sie (HOFZEILE_ZURUECK).
- */
-export const TITELBILD_ZURUECK = 'Zu allen Höfen'
-
-/**
- * Steht der klebende Block schon oben? Dann ist die Hofzeile mit ihrem eigenen
- * Zurück da, und der Knopf im Titelbild geht weg (wer weiter oben scrollt, hat
- * ihn gleich wieder; die Hofzeile klebt oben, der Knopf bliebe ohnehin zurück).
- * `blockOben` ist die Oberkante des Blocks im Fenster, `kopfHoehe` die Höhe des
- * Seitenkopfs, unter dem er klebt (0, wenn es keinen gibt). Eine halbe Pixelzeile
- * Luft, weil die Messung beim Kleben auf Bruchteile rundet.
- */
-export function hofzeileSteht(blockOben: number, kopfHoehe: number): boolean {
-  return blockOben <= kopfHoehe + 0.5
-}
 
 /** Der Zustand des Hofs, wenn er Bestellungen annimmt (Wortlaut des Boards). */
 export const NIMMT_BESTELLUNGEN_AN = 'Nimmt Bestellungen an'

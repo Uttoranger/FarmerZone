@@ -167,8 +167,8 @@ export function NochmalAlleKnopf({ art, text, fehlerText }: { art: MailArt; text
  * und ohne `allow-same-origin` — die Mail kann nichts ausführen und nichts
  * von der Seite lesen. Die Links sind schon auf dem Server unkenntlich.
  */
-export function VorschauRahmen({ titel, html }: { titel: string; html: string }): React.JSX.Element {
-  return <iframe title={titel} sandbox="" srcDoc={html} referrerPolicy="no-referrer" className="h-[420px] w-full rounded-xl border border-border bg-background" />
+export function VorschauRahmen({ titel, html, className }: { titel: string; html: string; className?: string }): React.JSX.Element {
+  return <iframe title={titel} sandbox="" srcDoc={html} referrerPolicy="no-referrer" className={cn('h-[420px] w-full rounded-xl border border-border bg-background', className)} />
 }
 
 export type VorschauTexte = { knopf: string; fehler: string }

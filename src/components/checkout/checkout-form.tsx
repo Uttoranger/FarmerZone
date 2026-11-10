@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm, type FieldErrors } from 'react-hook-form'
-import { Info, Loader2, ShoppingBasket } from 'lucide-react'
+import { Info, Loader2 } from 'lucide-react'
 import { hoefeAdresse } from '@/lib/startseite'
 import { KasseSkelett } from '@/components/checkout/kasse-skelett'
 // Ohne Zod (Nr. 196): Die Kasse prüft mit reinen Funktionen, Zod bleibt auf dem Server.
@@ -14,9 +14,10 @@ import {
   leseZahlungsBetrag,
   type KasseFormularDaten as CheckoutFormData,
 } from '@/lib/kasse-pruefung'
-import { formatEuro } from '@/lib/format'
+import { formatEuro, positionMengeVorn } from '@/lib/format'
 import { BAR_NICHT_MOEGLICH_SATZ, INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
+import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
 import { BETRIEBSNACHWEIS_FEHLER, CODE_BETRIEBSNACHWEIS_FEHLT } from '@/lib/betriebsnachweis'
 import type { PublicFarm } from '@/server/queries/farm'
@@ -44,24 +45,30 @@ import {
   bestellungSenden,
   KASSE_DATENSCHUTZ_LINK,
   KASSE_NOCHMAL,
+  KASSE_ZAHLART_UEBERSCHRIFT,
   KASSE_ZEITLIMIT_SATZ,
   weiterBeiEnter,
   kassenBetraege,
   kassenZahlarten,
   mindestbestellwertGrund,
+  mindestbestellwertKarte,
+  MINDESTBESTELLWERT_AUSWEG,
   CODE_BAR_NICHT_MOEGLICH,
   kassenZahlweg,
   kassenZurueck,
   kaufknopfZeile,
   reservierungsStand,
   zahlungsGebuehrText,
+  type TitelSatz,
   type ZahlungsBetrag,
 } from '@/lib/kasse'
 import { CODE_ZAHLUNG_NICHT_MOEGLICH, KONTAKT_UNTER_ANGABEN_ZUM_HOF } from '@/lib/stripe-konto'
 import { EMAIL_MAX, NOTIZ_MAX, PERSONENNAME_MAX, TELEFON_MAX } from '@/lib/eingabegrenzen'
-import { KASSE_AGB_SATZ } from '@/lib/rechtstexte/agb-einbindung'
+import { AGB_PFAD, kasseAgbSatz } from '@/lib/rechtstexte/agb-einbindung'
+import { agbFassungPfad, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { WIDERRUF_TEXT } from '@/lib/widerruf'
 import { cn } from '@/lib/utils'
+import { ABHOLHINWEIS_SYMBOL, ABSPRACHE_TEXT, korbBrauchtAbsprache } from '@/lib/abholhinweise'
 import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
@@ -75,6 +82,9 @@ import { KaufZusammenfassung } from './kauf-zusammenfassung'
 import { AngabenZumHof, hofAdresse, type AngabenHof } from './angaben-zum-hof'
 import { KaufSperreHinweis } from '@/components/hofseite/kauf-sperre-hinweis'
 import {
+  ABSCHLUSS_LINKS,
+  ABSCHLUSS_RECHTS,
+  ABSCHNITT,
   AbholWahl,
   AktionsLeiste,
   FELD,
@@ -84,6 +94,8 @@ import {
   KARTE,
   KARTEN_TITEL,
   KNOPF_GRUEN,
+  KNOPF_GRUEN_IM_BROWSER,
+  HinweiskarteStatus,
   KassenRaster,
   TEXTLINK,
   KontaktHinweis,
@@ -168,6 +180,7 @@ export type Zahlung = {
 export function CheckoutForm({
   farm,
   nurBetriebeIds,
+  abspracheIds = [],
   vorbelegung,
   ausgebuchteAbholfenster,
   sperre,
@@ -191,6 +204,11 @@ export function CheckoutForm({
   sperre: KaufSperre
   /** Produkte dieses Hofs mit abgabe = NUR_BETRIEBE — aus der DB, nicht aus dem Korb. */
   nurBetriebeIds: string[]
+  /**
+   * Produkte dieses Hofs mit „Abholung nach Absprache“ (N47, Nr. 257) — aus der DB, nicht aus dem Korb.
+   * Nur Anzeige: Hinweis über der Terminwahl und das Wort am Notizfeld; Feld, Termin-Pflicht und Prüfung bleiben.
+   */
+  abspracheIds?: string[]
   /** Ist der Besteller selbst ein Hof: Käuferart Betrieb und seine Nummer (Konzept 6.4). */
   vorbelegung: { kaeuferArt: 'BETRIEB'; betriebsnummer: string } | null
   /** Register Z2: Die Produktion läuft mit Test-Schlüssel — nur der Wahrheitswert, nie der Schlüssel. */
@@ -275,8 +293,10 @@ export function CheckoutForm({
         setReserviertBis(typeof befund.reserviertBis === 'string' ? befund.reserviertBis : null)
         setJetzt(new Date())
         if (!befund.meldung) return
-        uebernehmeBerichtigung(positionen, befund.items ?? [], { farmId: farm.id, farmSlug: farm.slug }, setCart)
-        setKorbHinweis(befund.meldung)
+        const nachher = uebernehmeBerichtigung(positionen, befund.items ?? [], { farmId: farm.id, farmSlug: farm.slug }, setCart)
+        // Board s1-/w1-korb Bild 2 (Nr. 276): Die Antwort kennt keine Produktnamen, der Korb vorher schon — der Satz zu
+        // entfernten Positionen nennt sie; alles andere in `meldung` bleibt wörtlich (korbHinweisMitNamen).
+        setKorbHinweis(korbHinweisMitNamen(befund.meldung, entfernteNamen(positionen, nachher)))
       } catch {
         // Kein Netz oder Serverfehler: Der Warenkorb bleibt, wie er ist.
         // Der Checkout prüft ohnehin noch einmal verbindlich.
@@ -326,6 +346,8 @@ export function CheckoutForm({
 
   // Abschnitt „Betrieb" nur, wenn eine NUR_BETRIEBE-Position im Korb liegt.
   const betriebAbschnitt = nachweisVomServer || cart.some((i) => nurBetriebeIds.includes(i.productId))
+  // N47: Liegt ein Produkt mit „Abholung nach Absprache“ im Korb, meldet sich der Hof — gewählt wird trotzdem ein Termin.
+  const absprache = korbBrauchtAbsprache(cart, abspracheIds)
   // Der Wert fließt in die Komfortprüfung des Formulars (pruefeKasseFormular);
   // verbindlich prüft der Checkout-Handler mit seinen eigenen Daten.
   useEffect(() => {
@@ -349,7 +371,9 @@ export function CheckoutForm({
   const zahlweg = kassenZahlweg(zahlarten, paymentMethod)
   const gebuehr = gebuehrZeile(farm, jetzt, zahlweg)
   // N38: Unter dem Mindestbestellwert ruht der Knopf, der Grund steht darunter. Steht die Bestellung, zählt sie.
-  const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents)
+  // Mit dem Satz des Hofs (Register N41 a, A3): „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € …).
+  // Dir fehlen noch Waren für € …“ — nur Anzeige; verbindlich prüft /api/checkout mit MINDESTBESTELLWERT_SATZ.
+  const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents, farm.preisAnzeige?.hundertstel)
   const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const gebuehrTitel = zahlung?.gebuehrText ?? gebuehr.titel
   // Der Zusatz am Gesamtbetrag der Zusammenfassung (Nr. 210): nur Worte zu Beträgen aus `betraege`, nichts gerechnet.
@@ -433,11 +457,16 @@ export function CheckoutForm({
         // auf den geprüften Stand gebracht und bleibt SICHTBAR (Befund 3).
         if (err.code === CODE_RESERVIERUNG_ABGELAUFEN || err.code === 'WARENKORB_GEAENDERT') {
           let stand = cart
-          if (Array.isArray(err.items)) stand = uebernehmeBerichtigung(stand, err.items, hof, setCart)
+          // Die Namen der entfernten Positionen (Nr. 276) — nur, wenn die Antwort den berichtigten Korb mitbringt.
+          let namen: string[] | null = null
+          if (Array.isArray(err.items)) {
+            stand = uebernehmeBerichtigung(stand, err.items, hof, setCart)
+            namen = entfernteNamen(cart, stand)
+          }
           // Preis geändert: den gültigen Preis übernehmen, damit die neue
           // Summe sichtbar ist, bevor erneut abgeschickt wird.
           if (Array.isArray(err.preise)) stand = uebernehmePreise(stand, err.preise, hof, setCart)
-          setKorbHinweis(err.error ?? 'Dein Warenkorb hat sich geändert.')
+          setKorbHinweis(typeof err.error === 'string' ? korbHinweisMitNamen(err.error, namen) : 'Dein Warenkorb hat sich geändert.')
           // Die Halte neu setzen (wie beim Öffnen der Kasse) — sonst lehnte
           // der Server jeden weiteren Versuch wieder als abgelaufen ab.
           if (err.code === CODE_RESERVIERUNG_ABGELAUFEN) await pruefeKorb(stand, sessionId)
@@ -533,12 +562,18 @@ export function CheckoutForm({
     }
   }
 
-  const fokusShell = (titel: string, inhalt: React.ReactNode) => {
+  // h1InSeiteAbMd: Nur das Formular setzt ab 768 px seine h1 selbst („Bestellen bei <Hof>“, Board w1-kasse);
+  // Skelett, leerer Korb und Zahlungsschritt behalten den Titel im Kopf.
+  // `spalte`: die Breite der Zeile „Vertrag widerrufen“ am Ende — so breit wie der Inhalt der Ansicht (Board w1-kasse Bild 5).
+  const fokusShell = (titel: string, inhalt: React.ReactNode, h1InSeiteAbMd = false, spalte?: string) => {
     const zurueck = kassenZurueck({ farmSlug: farm.slug, schritt, bestellungAngelegt })
     return (
       <KundeFokusShell
         titel={titel}
-        rechts={<span title={farm.name}>{farm.name}</span>}
+        // Board s1-kasse: unter „Bestellen“ die Zeile „bei Hof Müller“ statt des Hofnamens rechts.
+        unterzeile={`bei ${farm.name}`}
+        h1InSeiteAbMd={h1InSeiteAbMd}
+        spalte={spalte}
         zurueck={
           zurueck.art === 'link'
             ? { href: zurueck.href, label: zurueck.label }
@@ -591,8 +626,36 @@ export function CheckoutForm({
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
         privat={privat}
-        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} hofpreis={farm.preisAnzeige !== null} agbPfad={AGB_PFAD} />}
       />
+    )
+  }
+
+  // Unter dem Mindestbestellwert (Boards s1-/w1-kasse Bild 5, Lauf 31): kein Formular und keine Leiste — oben die Karte
+  // mit dem Satz des Hofs und dem Weg zurück zum Angebot, darunter nur die Übersicht. Verbindlich prüft /api/checkout.
+  const mindestKarte = bestellungAngelegt ? null : mindestbestellwertKarte(farm, betraege.warenCents, farm.preisAnzeige?.hundertstel)
+  if (mindestKarte) {
+    return fokusShell(
+      'Bestellen',
+      <KasseUnterMindestwert
+        karte={mindestKarte}
+        hofSlug={farm.slug}
+        hofName={farm.name}
+        uebersicht={
+          <UebersichtKarte
+            betraege={betraege}
+            gebuehrText={gebuehrTitel}
+            gebuehrErklaerung={gebuehr.erklaerung}
+            gebuehrEntfaellt={gebuehr.entfaellt}
+            hofpreis={farm.preisAnzeige !== null}
+            mitErklaerung={false}
+            positionen={korbPositionen.map((p) => positionMengeVorn({ name: p.name, quantity: p.quantity, unit: p.unit, unitSize: p.unitSize }))}
+          />
+        }
+      />,
+      // Board w1-kasse Bild 5: im Browser die h1 „Bestellen bei <Hof>“ über der Karte, im Kopf nur Marke und „← Zurück zum Hof“.
+      true,
+      KASSE_SCHMAL
     )
   }
 
@@ -620,6 +683,11 @@ export function CheckoutForm({
     >
       <KassenRaster
         uebersichtZuletzt
+        kopf={
+          <h1 className="font-heading text-[28px] leading-tight font-semibold break-words text-foreground">
+            Bestellen bei {farm.name}
+          </h1>
+        }
         korb={
           <div className="flex flex-col gap-3">
             {/* Oben dieselbe Karte wie auf Hof- und Produktseite (N24). */}
@@ -643,6 +711,7 @@ export function CheckoutForm({
         uebersicht={
           <KassenAbschluss
             hof={farm}
+            hofpreis={farm.preisAnzeige !== null}
             uebersicht={
               <UebersichtKarte
                 betraege={betraege}
@@ -709,16 +778,20 @@ export function CheckoutForm({
             über den Idempotenz-Schlüssel ohnehin dieselbe Bestellung zurück. */}
         <fieldset disabled={bestellungAngelegt} className="flex min-w-0 flex-col gap-4">
           {/* N10: Korb → Abholung → Deine Daten → (Betrieb) → Bezahlen, jede Karte in voller Breite. */}
-          <section aria-labelledby="kasse-abholung" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-            {/* Die Adresse rechts im Kopf, am Handy unter dem Titel. */}
-            <div className="flex flex-col gap-0.5 md:flex-row md:items-baseline md:justify-between md:gap-4">
-              <h2 id="kasse-abholung" className={KARTEN_TITEL}>
-                Abholung wählen
-              </h2>
-              <p className={cn(HINWEIS, 'min-w-0 text-[13px] break-words md:text-right')}>{hofAdresse(farm)}</p>
-            </div>
+          {/* Boards s1-/w1-kasse (Nr. 227): Abholung, Deine Daten und Bezahlen ohne Karte auf dem Grund. Die Adresse
+              des Hofs steht in „Angaben zum Hof“ und in der Zusammenfassung über dem Knopf. */}
+          <section aria-labelledby="kasse-abholung" className={ABSCHNITT}>
+            <h2 id="kasse-abholung" className={KARTEN_TITEL}>
+              Abholung wählen
+            </h2>
             {/* Mit Kaufsperre nennt die Karte oben den Grund schon — hier nur noch der Weg zum Hof
                 (DESIGN_SYSTEM: Ein Zustand hat eine Fassung, auf der ganzen Seite). */}
+            {/* N47 (Nr. 257): über der Terminwahl, als Hinweis-Baustein (G3) — grün, weil es die Kundin betrifft. */}
+            {absprache && (
+              <Hinweiskarte ton="gruen" symbol={ABHOLHINWEIS_SYMBOL.NACH_ABSPRACHE}>
+                {ABSPRACHE_TEXT.kasseHinweis}
+              </Hinweiskarte>
+            )}
             {kacheln.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">
                 {sperre === null ? `Gerade gibt es keine Abholzeiten. ${KONTAKT_UNTER_ANGABEN_ZUM_HOF}` : KONTAKT_UNTER_ANGABEN_ZUM_HOF}
@@ -726,21 +799,13 @@ export function CheckoutForm({
             ) : (
               <AbholWahl kacheln={kacheln} feld={form.register('pickupSlotKey')} fehler={fehlerAm.pickupSlotKey?.message} />
             )}
-            {bestellschluss && <p className={HINWEIS}>Bestellschluss für heute: {bestellschluss} Uhr</p>}
+            {bestellschluss && <p className={cn(HINWEIS, '-mt-1 text-[13px]')}>Bestellschluss für heute: {bestellschluss} Uhr.</p>}
           </section>
 
-          <section aria-labelledby="kasse-daten" className={cn(KARTE, 'flex min-w-0 flex-col gap-3')}>
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 id="kasse-daten" className={KARTEN_TITEL}>
-                Deine Daten
-              </h2>
-              {/* Die Kasse hat keinen Seitenfuß: Der Weg zur Datenschutzerklärung steht dort, wo Daten eingegeben werden.
-                  Neuer Tab, damit die Eingaben stehen bleiben. */}
-              <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'shrink-0')}>
-                {KASSE_DATENSCHUTZ_LINK}
-                <span className="sr-only"> (öffnet in neuem Tab)</span>
-              </Link>
-            </div>
+          <section aria-labelledby="kasse-daten" className={ABSCHNITT}>
+            <h2 id="kasse-daten" className={KARTEN_TITEL}>
+              Deine Daten
+            </h2>
             {/* Ab 768 px zwei Spalten in Lesereihenfolge: E-Mail · Name / Telefon · Notiz. */}
             <div className="grid gap-3.5 md:grid-cols-2 md:items-start md:gap-x-5">
               <Feld id="customerEmail" label="E-Mail" fehler={fehlerAm.customerEmail?.message}>
@@ -753,14 +818,11 @@ export function CheckoutForm({
                   inputMode="email"
                   enterKeyHint="next"
                   aria-invalid={fehlerAm.customerEmail ? true : undefined}
-                  aria-describedby={fehlerAm.customerEmail ? 'customerEmail-fehler' : 'customerEmail-hinweis'}
+                  aria-describedby={fehlerAm.customerEmail ? 'customerEmail-fehler' : undefined}
                   placeholder="du@beispiel.at"
                   className={FELD}
                 />
                 <FeldZaehler control={form.control} name="customerEmail" max={EMAIL_MAX} />
-                <div id="customerEmail-hinweis">
-                  <KontaktHinweis />
-                </div>
               </Feld>
               <Feld id="customerName" label="Name" fehler={fehlerAm.customerName?.message}>
                 <input
@@ -791,12 +853,15 @@ export function CheckoutForm({
                   className={FELD}
                 />
                 <FeldZaehler control={form.control} name="customerPhone" max={TELEFON_MAX} />
-                <p id="customerPhone-hinweis" className={cn(HINWEIS, 'mt-1.5')}>
-                  Nur für den Hof, falls bei der Abholung etwas ist.
+                {/* Am Handy unter dem Feld (Board s1-kasse Bild 2), im Browser ohne sichtbare Hilfe (w1-kasse) — dort `sr-only`
+                    statt `hidden`, damit `aria-describedby` nicht auf einen verborgenen Satz zeigt. */}
+                <p id="customerPhone-hinweis" className={cn(HINWEIS, 'mt-1.5 md:sr-only')}>
+                  Nur für Rückfragen des Hofs.
                 </p>
               </Feld>
-              <Feld id="customerNote" label="Notiz an den Hof (freiwillig)" fehler={fehlerAm.customerNote?.message}>
-                {/* Eine Zeile wie die Felder daneben; wächst mit dem Text (field-sizing),
+              <Feld id="customerNote" label={absprache ? ABSPRACHE_TEXT.notizMitAbsprache : ABSPRACHE_TEXT.notizOhneAbsprache} fehler={fehlerAm.customerNote?.message}>
+                {/* Am Handy zwei Zeilen hoch wie im Board (s1-kasse, 66 px), ab 768 px einzeilig wie die anderen Felder
+                    (w1-kasse, 48 px; Register N10 „Notiz einzeilig und wächst“). Wächst mit dem Text (field-sizing),
                     wo der Browser das nicht kann, lässt sie sich größer ziehen. */}
                 <textarea
                   id="customerNote"
@@ -804,18 +869,25 @@ export function CheckoutForm({
                   rows={1}
                   aria-invalid={fehlerAm.customerNote ? true : undefined}
                   aria-describedby={fehlerAm.customerNote ? 'customerNote-fehler' : undefined}
-                  placeholder="z. B. Ich komme erst gegen 17:30"
-                  className={cn(FELD, 'field-sizing-content h-auto max-h-40 min-h-[46px] resize-y py-2.5 supports-[field-sizing:content]:resize-none')}
+                  placeholder="z. B. komme später"
+                  className={cn(FELD, 'field-sizing-content h-auto max-h-40 min-h-[66px] resize-y py-2.5 leading-[1.4] supports-[field-sizing:content]:resize-none md:min-h-12 md:py-3')}
                 />
                 <FeldZaehler control={form.control} name="customerNote" max={NOTIZ_MAX} />
               </Feld>
             </div>
+            {/* Die Kasse hat keinen Seitenfuß: Der Weg zur Datenschutzerklärung steht dort, wo Daten eingegeben werden —
+                unter den Feldern (Board w1-kasse). Neuer Tab, damit die Eingaben stehen bleiben. In normaler Stärke wie im
+                Board s1-/w1-kasse Bild 2 (UI-Runde 3): ein Hinweis neben den Feldern, kein Knopf. */}
+            <Link href="/datenschutz" target="_blank" rel="noopener noreferrer" className={cn(TEXTLINK, 'self-start font-normal underline')}>
+              {KASSE_DATENSCHUTZ_LINK}
+              <span className="sr-only"> (öffnet in neuem Tab)</span>
+            </Link>
           </section>
 
           {/* Betrieb (Sprint Bereiche 1, Konzept 6.4) — nur, wenn ein Futtermittel
               im Korb liegt, das der Hof nur an landwirtschaftliche Betriebe abgibt. */}
           {betriebAbschnitt && (
-            <section aria-labelledby="kasse-betrieb" className={cn(KARTE, 'flex flex-col gap-3')}>
+            <section aria-labelledby="kasse-betrieb" className={ABSCHNITT}>
               <div>
                 <h2 id="kasse-betrieb" className={KARTEN_TITEL}>
                   Betrieb
@@ -862,9 +934,9 @@ export function CheckoutForm({
             </section>
           )}
 
-          <section aria-labelledby="kasse-bezahlen" className={cn(KARTE, 'flex flex-col gap-3')}>
+          <section aria-labelledby="kasse-bezahlen" className={ABSCHNITT}>
             <h2 id="kasse-bezahlen" className={KARTEN_TITEL}>
-              Bezahlen
+              Bezahlen · {KASSE_ZAHLART_UEBERSCHRIFT}
             </h2>
             {zahlarten.length === 0 ? (
               <p className="text-[13.5px] text-muted-foreground">
@@ -882,7 +954,8 @@ export function CheckoutForm({
           </section>
         </fieldset>
       </KassenRaster>
-    </form>
+    </form>,
+    true
   )
 }
 
@@ -911,7 +984,6 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
         </div>
       )}
       <EmptyState
-        symbol={ShoppingBasket}
         titel="Dein Warenkorb ist leer"
         satz={`Leg bei ${hof.name} etwas in den Warenkorb, dann kannst du hier bestellen.`}
         ausweg={
@@ -920,6 +992,49 @@ export function KasseLeer({ hof, hinweis }: { hof: Pick<PublicFarm, 'name' | 'sl
           </Link>
         }
       />
+    </div>
+  )
+}
+
+/**
+ * Unter dem Mindestbestellwert (Boards s1-/w1-kasse Bild 5, Lauf 31): eine Spalte, auch im Browser — oben die Karte im
+ * Bedeutungs-Paar „tun“ (`HinweiskarteStatus`: wie `HinweiskarteFehler`, aber `role="status"`)
+ * mit dem Satz des Hofs, was fehlt, und „Zurück zum Angebot“ mit Rand über die volle Breite; darunter die Übersicht.
+ * Kein Formular und keine feste Leiste: Es gibt nichts zu bestellen, bis genug im Korb liegt.
+ */
+/** Die Spalte der Kasse unter dem Mindestbestellwert (Board w1-kasse Bild 5: 560 px Inhalt, mit Rand 592 px). */
+const KASSE_SCHMAL = 'max-w-[592px]'
+
+export function KasseUnterMindestwert({
+  karte,
+  hofSlug,
+  hofName,
+  uebersicht,
+}: {
+  karte: TitelSatz
+  hofSlug: string
+  hofName: string
+  uebersicht: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <div className={cn('mx-auto flex w-full flex-col gap-3 px-4 pt-4 pb-6 md:pt-8', KASSE_SCHMAL)}>
+      {/* Die eine h1 der Seite ab 768 px (KundeFokusShell `h1InSeiteAbMd`); am Handy steht „Bestellen“ im Kopf. */}
+      <h1 className="hidden font-heading text-[28px] leading-tight font-semibold break-words text-foreground md:mb-1 md:block">
+        Bestellen bei {hofName}
+      </h1>
+      <HinweiskarteStatus titel={karte.titel}>
+        <p className="text-[14px] leading-normal">{karte.satz}</p>
+        <Link
+          href={`/${hofSlug}#${WARENKORB_ANKER}`}
+          className={cn(
+            'mt-1.5 inline-flex min-h-[52px] w-full items-center justify-center rounded-[14px] border-[1.5px] border-foreground bg-card px-3 text-[16px] font-bold text-foreground hover:bg-muted',
+            FOKUS_RAHMEN
+          )}
+        >
+          {MINDESTBESTELLWERT_AUSWEG}
+        </Link>
+      </HinweiskarteStatus>
+      {uebersicht}
     </div>
   )
 }
@@ -956,7 +1071,7 @@ export function KasseNetzFehler({ onNochmal, wirdGesendet }: { onNochmal: () => 
  */
 export function KassePausiert({ farm }: { farm: Pick<PublicFarm, 'name' | 'slug' | 'pauseMessage'> }): React.JSX.Element {
   return (
-    <KundeFokusShell titel="Bestellen" rechts={<span title={farm.name}>{farm.name}</span>} zurueck={{ href: `/${farm.slug}`, label: 'Zurück zum Hof' }}>
+    <KundeFokusShell titel="Bestellen" unterzeile={`bei ${farm.name}`} zurueck={{ href: `/${farm.slug}`, label: 'Zurück zum Hof' }}>
       <div className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-12">
         <KaufSperreHinweis sperre="pause" hofName={farm.name} pauseMessage={farm.pauseMessage} />
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -985,6 +1100,7 @@ export function KassenAbschluss({
   fussnote,
   privat = true,
   zusammenfassung,
+  hofpreis = false,
 }: {
   hof: AngabenHof
   /** Die Übersicht mit Frist, Beträgen und einem Fehler der Anfrage. */
@@ -1000,18 +1116,26 @@ export function KassenAbschluss({
   privat?: boolean
   /** Ware, Gesamtpreis, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210). */
   zusammenfassung?: React.ReactNode
+  /** Hofpreis-Modell (farm.preisAnzeige !== null): der Satz unter dem Knopf ohne Zustimmung zur sofortigen Vermittlung (N45). */
+  hofpreis?: boolean
 }): React.JSX.Element {
   return (
-    // max-md:mb-8: Mit dem AGB-Satz ist die feste Leiste am Handy rund 190 px hoch (vorher 125);
+    // max-md:mb-6: Mit den Sätzen ist die feste Leiste am Handy bis 200 px hoch (Lauf 31, vorher rund 250);
     // der Platz unten im Raster (pb-44) war dafür bemessen und ließ die Unterkante der letzten Karte darunter.
-    <div className="flex flex-col gap-3.5 max-md:mb-8">
-      {uebersicht}
-      <AngabenZumHof hof={hof} />
+    // Ab 1024 px teilt sich der Abschluss (KassenRaster mit `kopf`, Board w1-kasse): rechts Übersicht und Angaben, links
+    // unter „Bezahlen“ Zusammenfassung, Gewährleistung und Knopf. Die Reihenfolge im Quelltext bleibt dieselbe.
+    <div className="flex flex-col gap-3.5 max-md:mb-6 lg:contents">
+      <div className={ABSCHLUSS_RECHTS}>
+        {uebersicht}
+        <AngabenZumHof hof={hof} />
+      </div>
+      <div className={ABSCHLUSS_LINKS}>
       {zusammenfassung}
-      {/* Nr. 211: die Gewährleistungs-Mitteilung (Anhang II FAGG) im Fluss über der Leiste, nie in ihr — nur bei Privat. */}
-      {privat && <GewaehrleistungsMitteilung karte />}
+      {/* Nr. 211: die Gewährleistungs-Mitteilung (Anhang II FAGG) im Fluss über der Leiste, nie in ihr — nur bei Privat.
+          Im Browser rechts bündig über dem Knopf, so breit wie die Übersicht — unverändert, nie schmaler als ihre Karte. */}
+      {privat && <GewaehrleistungsMitteilung karte className="lg:w-[380px] lg:self-end" />}
       <AktionsLeiste>
-        <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={KNOPF_GRUEN}>
+        <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={cn(KNOPF_GRUEN, KNOPF_GRUEN_IM_BROWSER)}>
           {wirdGesendet ? (
             <>
               <Loader2 className="size-5 animate-spin" aria-hidden="true" />
@@ -1025,9 +1149,11 @@ export function KassenAbschluss({
             `Zahlungspflichtig bestellen · ${gesamt}`
           )}
         </button>
-        {fussnote && <p className={cn(HINWEIS, 'text-center md:text-left')}>{fussnote}</p>}
-        <KaufknopfSaetze privat={privat} />
+        {/* Am Handy 12 px wie die Sätze darunter (Lauf 31: die Leiste knapp halten). */}
+        {fussnote && <p className={cn(HINWEIS, 'text-center max-md:text-[12px] max-md:leading-[1.35] md:text-left lg:text-right')}>{fussnote}</p>}
+        <KaufknopfSaetze privat={privat} hofpreis={hofpreis} agbPfad={AGB_PFAD} />
       </AktionsLeiste>
+      </div>
     </div>
   )
 }
@@ -1038,17 +1164,36 @@ export function KassenAbschluss({
  * zusätzlich unter „Weiter zur Zahlung“. EINE Quelle für Formular (`KassenAbschluss`) und
  * Zahlungsschritt (`StripeZahlung`, Prop `kaufknopfSaetze`), damit beide Leisten nie auseinanderlaufen.
  */
-export function KaufknopfSaetze({ privat }: { privat: boolean }): React.JSX.Element {
+export function KaufknopfSaetze({
+  privat,
+  hofpreis,
+  agbPfad,
+}: {
+  privat: boolean
+  /** Hofpreis-Modell (N45): ohne die Zustimmung zur sofortigen Vermittlung. In der Kasse aus farm.preisAnzeige, bei einer bestehenden Bestellung aus ihrem Snapshot. */
+  hofpreis: boolean
+  /** Ziel des AGB-Links: in der Kasse /agb, bei einer bestehenden Bestellung /agb/<Fassung ihres Snapshots>. */
+  agbPfad: string
+}): React.JSX.Element {
+  // Lauf 31 (Board s1-kasse: Knopf und Satz kompakt): Am Handy laufen beide Sätze als EIN Absatz in 12 px — derselbe
+  // Wortlaut, nur ohne Zwischenraum zwischen zwei Absätzen; ab 768 px wie bisher zwei Absätze.
+  const satz = 'max-md:inline text-[12px] leading-[1.35] text-muted-foreground md:text-[12.5px] md:leading-normal'
   return (
-    <>
-      {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und mit dem Tippen auf den
-          Knopf fällt die Zustimmung zur sofortigen Ausführung — ohne Haken. Der Link öffnet
-          in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
-      <AgbSatz stuecke={KASSE_AGB_SATZ} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />
+    // Schrift und Zeilenhöhe auch an der Hülle: Die Zeilen eines Absatzes aus Inline-Teilen messen sich an ihr.
+    <div className="text-center text-[12px] leading-[1.35] text-muted-foreground md:flex md:flex-col md:gap-2 md:text-left md:text-[12.5px] md:leading-normal lg:text-right">
+      {/* Register O4: Die AGB gelten, der Hof ist Vertragspartner, und im Modell „bisher“ fällt mit dem
+          Tippen auf den Knopf die Zustimmung zur sofortigen Ausführung — ohne Haken (im Hofpreis-Modell
+          entfällt dieser Teil, N45). Der Link öffnet in einem neuen Tab, damit Kasse und Reservierung stehen bleiben. */}
+      <AgbSatz stuecke={kasseAgbSatz({ hofpreis, agbPfad })} neuerTab className={satz} />
       {/* § 4 Abs. 1 Z 8 FAGG (Nr. 200, N39): der Hinweis zum Rücktritt neben dem Kaufknopf; der Link öffnet /widerruf
           im neuen Tab. Bei „Betrieb“ gibt es kein Rücktrittsrecht, also keinen Satz. */}
-      {privat && <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={cn(HINWEIS, 'text-center md:text-left')} />}
-    </>
+      {privat && (
+        <>
+          <span className="md:hidden"> </span>
+          <AgbSatz stuecke={WIDERRUF_TEXT.kasseSatz} neuerTab className={satz} />
+        </>
+      )}
+    </div>
   )
 }
 
@@ -1094,6 +1239,7 @@ export function ZahlungFortsetzen({
   anzeige,
   jetztIso,
   privat,
+  agbFassung,
 }: {
   farm: PublicFarm
   zahlung: Zahlung
@@ -1106,6 +1252,8 @@ export function ZahlungFortsetzen({
   jetztIso: string
   /** Käuferart der Bestellung ist PRIVAT (Seite, aus der Datenbank) — nur dann die Gewährleistungs-Mitteilung (Nr. 211). */
   privat: boolean
+  /** Die AGB-Fassung aus dem Snapshot der Bestellung (N45) — die Seite ermittelt sie auf dem Server und meldet einen unbekannten Wert. */
+  agbFassung: AgbKennung
 }): React.JSX.Element {
   const [jetzt, setJetzt] = useState(() => new Date(jetztIso))
   useEffect(() => {
@@ -1113,10 +1261,15 @@ export function ZahlungFortsetzen({
     return () => window.clearInterval(uhr)
   }, [])
   const zeilen = useMemo(() => new Map(Object.entries(zeilenCents)), [zeilenCents])
+  // N45: Satz und AGB-Link folgen dem Snapshot der Bestellung (`anzeige` ≠ null ⇔ Hofpreis-Modell, fortsetzungsKorb;
+  // die Fassung ermittelt die Seite auf dem Server), nie der heutigen Lage des Hofs — eine Bestellung „bisher“
+  // behält nach dem Stichtag den Satz mit Vermittlung und 0.9.
+  const hofpreis = anzeige !== null
+  const agbPfad = agbFassungPfad(agbFassung)
   return (
     <KundeFokusShell
       titel="Bezahlen"
-      rechts={<span title={farm.name}>{farm.name}</span>}
+      unterzeile={`bei ${farm.name}`}
       zurueck={{ href: zahlung.bestaetigung, label: 'Zurück zur Bestellung' }}
     >
       <TesthofHinweis farm={farm} className="pt-4 md:pt-6" />
@@ -1128,12 +1281,12 @@ export function ZahlungFortsetzen({
         stand={reservierungsStand(zahlung.reserviertBis, jetzt)}
         betrag={zahlung.betrag}
         gebuehrText={zahlung.gebuehrText}
-        hofpreis={anzeige !== null}
+        hofpreis={hofpreis}
         korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
         zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
         privat={privat}
-        kaufknopfSaetze={<KaufknopfSaetze privat={privat} />}
+        kaufknopfSaetze={<KaufknopfSaetze privat={privat} hofpreis={hofpreis} agbPfad={agbPfad} />}
       />
     </KundeFokusShell>
   )

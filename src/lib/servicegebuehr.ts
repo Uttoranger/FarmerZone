@@ -54,7 +54,23 @@ export type ServicegebuehrErgebnis = {
   prozentAngewendet: number | null
 }
 
-/** Die Zeile im Checkout, auf den Bestellseiten und in den Mails. */
+/**
+ * Das Wort der Gebühr im Modell „bisher“ (E4, B1) — die Zeile im Checkout,
+ * auf den Bestellseiten und in den Mails von Bestellungen vor dem Stichtag
+ * „Hofpreis-Modell ab“. Ab dem Stichtag heißt es überall „Plattformgebühr“
+ * (V62, V63): Wer das Wort zu einer Bestellung braucht, nimmt
+ * `gebuehrBezeichnungFuer`, für einen Zeitraum `gebuehrWortFuerZeitraum`
+ * (plattformgebuehr.ts) — nie diese Konstante ohne Bedingung.
+ *
+ * Der Schutz (tests/gebuehr-wort-wache.test.ts, RUECKFALL_WERTE): Die Wache
+ * meldet jede Verwendung außerhalb dieser Datei und plattformgebuehr.ts, jeden
+ * Aufruf eines Helfers, dessen Wort-Parameter auf diese Konstante zurückfällt,
+ * ohne Wort (z. B. `inklGebuehr`, `jahrAlsCsv`), jeden Aufruf mit Wort-Feld
+ * (`lage.gebuehrWort ?? …`) ohne das Feld und jeden Leser einer Modul-Konstante,
+ * die sie festhält. Jede Meldung steht entweder mit Grund „nur Modell bisher“ in
+ * der festen Liste oder als offen bei der Nummer, der die Datei gehört — die
+ * Typprüfung allein verhindert den Rückfall nicht.
+ */
 export const SERVICEGEBUEHR_BEZEICHNUNG = 'Servicegebühr'
 
 /**
@@ -69,7 +85,8 @@ export const SERVICEGEBUEHR_ADMIN_ERKLAERUNG =
   'Neue Höfe sind gebührenfrei, bis du hier ein Datum setzt. Bestehende Bestellungen bleiben unverändert.'
 
 /** Der Vermerk im Bauern-Bereich, wenn die Stripe-Erstattung der Gebühr
- *  fehlgeschlagen ist — der Statuswechsel ist trotzdem durch. */
+ *  fehlgeschlagen ist — der Statuswechsel ist trotzdem durch. Fassung „bisher“;
+ *  mit dem Wort der Bestellung: `gebuehrErstattungOffenHinweisFuer` (plattformgebuehr.ts). */
 export const GEBUEHR_ERSTATTUNG_OFFEN_HINWEIS =
   'Servicegebühr-Erstattung ausstehend.'
 
@@ -233,6 +250,35 @@ export type BestellungFuerGebuehrStatus = {
  */
 export function gebuehrEntfallen(b: Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt'>): boolean {
   return b.serviceFeeRefundedAt !== null && b.serviceFeeRefundedAt !== undefined
+}
+
+/**
+ * Das „Gesamt“, das Bestätigung und Bestellseite einer Kundin zeigen (Nr. 244): Warenpreis + Gebühr, solange die
+ * Gebühr gilt; ist sie entfallen bzw. erstattet (`gebuehrEntfallen`), nur der Warenpreis — die Gebührenzeile steht
+ * dann durchgestrichen daneben, und die Summe darunter darf sie nicht wieder mitzählen.
+ *
+ * NUR ANZEIGE, nie für Buchung, Erstattung, Abrechnung. Was gezahlt, kassiert oder erstattet wird, bleibt
+ * `bestellSummen(…).gesamtCents` bzw. `barZuKassierenCents` aus dem Snapshot (Wache:
+ * tests/geldanzeige-gesamt-wache.test.ts — kein Import aus src/server, src/app/api, plattformgebuehr*).
+ */
+export function anzeigeGesamtCents(
+  bestellung: BestellungMitGebuehr & Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt'>
+): number {
+  const s = bestellSummen(bestellung)
+  return gebuehrEntfallen(bestellung) ? s.warenpreisCents : s.gesamtCents
+}
+
+/**
+ * Der Vermerk hinter einer entfallenen Gebührenzeile — „erstattet“ (online, über Stripe zurück) bzw. „entfällt“
+ * (vor Ort, nicht kassiert); null, solange die Gebühr gilt (`gebuehrEntfallen`). Die EINE Quelle für Bestätigung,
+ * Bestellseite (`BestellPositionen`) und Abholzettel, damit die Zeile auf Bildschirm und Papier gleich heißt
+ * (Nr. 244). Nur Anzeige.
+ */
+export function gebuehrEntfallenVermerk(
+  b: Pick<BestellungFuerGebuehrStatus, 'serviceFeeRefundedAt' | 'paymentMethod'>
+): 'erstattet' | 'entfällt' | null {
+  if (!gebuehrEntfallen(b)) return null
+  return b.paymentMethod === 'ONLINE' ? 'erstattet' : 'entfällt'
 }
 
 /**

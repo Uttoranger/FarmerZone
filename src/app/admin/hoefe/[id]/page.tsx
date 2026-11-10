@@ -4,7 +4,10 @@ import * as Sentry from '@sentry/nextjs'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeAdminHoefe, ladeHofAkte } from '@/server/queries/admin-hof'
 import { hofAkteAnsicht, ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
-import { hofZustand } from '@/lib/admin-hoefe-liste'
+import { aktivitaetSeit, hofZustand } from '@/lib/admin-hoefe-liste'
+import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { gebuehrModellFuer, gebuehrWortFuerZeitraum, hofpreisModellAb } from '@/lib/plattformgebuehr'
 import { maskiereAdresse } from '@/lib/betrieb-mails'
 import { LAND_LABEL, alsLand } from '@/lib/laender'
 import { HofAkteAnsicht } from '@/components/admin/hof-akte-ansicht'
@@ -43,6 +46,13 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'hof-akte' } })
   }
   if (geladen === 'fehlt') notFound()
+  // Wort und Modell entscheidet der Server einmal (kein Datum im Browser): die 30 Tage der Aktivität gegen den Stichtag (V63), A1 nach dem Modell jetzt.
+  const gebuehr = geladen
+    ? {
+        gebuehrWort: gebuehrWortFuerZeitraum(aktivitaetSeit(jetzt), jetzt, hofpreisModellAb(geladen.einstellung)),
+        gebuehrModell: gebuehrModellFuer(geladen.einstellung, jetzt),
+      }
+    : null
 
   // Abschnitt „Plattformgebühr“ (N38, Nr. 198): ein eigener Teil — scheitert er, bleibt die Akte.
   let plattformgebuehr: PlattformgebuehrAkteAnzeige | null = null
@@ -67,7 +77,7 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className={ADMIN_RAHMEN}>
-      {geladen ? (
+      {geladen && gebuehr ? (
         <HofAkteAnsicht
           // Die Anmelde-E-Mail verlässt den Server nur gekürzt (Freigabe 187, Punkt 2) — auch in den Daten der Dialoge.
           hof={{ ...geladen.hof, ownerEmail: maskiereAdresse(geladen.hof.ownerEmail) }}
@@ -81,6 +91,7 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
               stripeBereit: geladen.hof.stripeBereit,
               onlineAn: geladen.hof.onlineAn,
               ich,
+              ...gebuehr,
             },
             jetzt
           )}
@@ -95,11 +106,11 @@ export default async function HofAktePage({ params }: { params: Promise<{ id: st
 }
 
 async function laden(id: string, jetzt: Date) {
-  const [{ rows, hoefe }, akte, kontoStand] = await Promise.all([ladeAdminHoefe(jetzt), ladeHofAkte(id, jetzt), ladeKontoStand(id)])
+  const [{ rows, hoefe }, akte, kontoStand, einstellung] = await Promise.all([ladeAdminHoefe(jetzt), ladeHofAkte(id, jetzt), ladeKontoStand(id), lesePlattformEinstellung()])
   const hof = hoefe.find((h) => h.id === id)
   const row = rows.find((r) => r.id === id)
   if (!hof || !row || !akte) return 'fehlt' as const
-  return { hof, zustand: hofZustand(row), akte, kontoStand }
+  return { hof, zustand: hofZustand(row), akte, kontoStand, einstellung: hofpreisEinstellungAus(einstellung) }
 }
 
 /** Die Konto-Knöpfe (Nr. 190): Zustand als Text, nie als Date; die Adresse nur gekürzt. */

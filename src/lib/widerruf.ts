@@ -1,6 +1,5 @@
 import type { DbBremse } from '@/lib/bremse-datenbank'
 import { tagVersetzt, wienKalendertag } from '@/lib/kalender'
-import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 import { formatiereTelefon } from '@/lib/telefon-anzeige'
 import type { MarkeArt } from '@/lib/marke-art'
@@ -206,41 +205,67 @@ export function alsWiderrufStand(roh: string): WiderrufStand {
   return (WIDERRUF_STAENDE as readonly string[]).includes(roh) ? (roh as WiderrufStand) : 'eingegangen'
 }
 
-/** Der Anker der Liste „Widerrufe ohne Bestellung“ in Admin › Bestellungen (Ziel der Aufgabe). */
+/** Der Anker der Liste „Rücktritte ohne Bestellung“ in Admin › Bestellungen (Ziel der Aufgabe). */
 export const WIDERRUF_OHNE_BESTELLUNG_ANKER = 'widerrufe-ohne-bestellung'
 
-/** Die Sätze im Admin (Bestellungen, Akte) — sachlich (Nachbesserung Runde 2). */
+/**
+ * Die Sätze im Admin (Bestellungen, Akte) — sachlich (Nachbesserung Runde 2).
+ * Seit Nr. 231 (N43) mit dem Wort „Rücktritt“; Bezeichner, Anker und Tabelle
+ * heißen weiter „Widerruf“.
+ */
 export const WIDERRUF_ADMIN_TEXT = {
-  titel: 'Widerrufe',
+  titel: 'Rücktritte',
   eingang: (zeit: string) => `Eingang ${zeit}`,
   nachricht: 'Nachricht der Kundin',
   grundHof: 'Grund des Hofs',
-  ohneBestellungTitel: 'Widerrufe ohne Bestellung',
-  ohneBestellungSatz: 'Nummer und E-Mail passten zu keiner Bestellung. Prüf die Angaben, such die Bestellung und ordne den Widerruf zu – danach läuft er wie jeder andere: vor der Abholung Storno, sonst an den Hof.',
+  ohneBestellungTitel: 'Rücktritte ohne Bestellung',
+  ohneBestellungSatz: 'Nummer und E-Mail passten zu keiner Bestellung. Prüf die Angaben, such die Bestellung und ordne den Rücktritt zu – danach läuft er wie jeder andere: vor der Abholung Storno, sonst an den Hof.',
   eingegebeneNummer: (nummer: string | null) => (nummer ? `eingegeben: ${nummer}` : 'ohne Nummer'),
   freitext: 'Einzelne Artikel (Freitext)',
   zuordnen: 'Zuordnen …',
-  zuordnenTitel: 'Widerruf einer Bestellung zuordnen',
-  zuordnenSatz: 'Vor der Abholung storniert das die Bestellung bzw. erstattet online bezahlte Artikel, danach geht der Widerruf an den Hof. Die Kundin hat die Eingangsbestätigung schon.',
+  zuordnenTitel: 'Rücktritt einer Bestellung zuordnen',
+  zuordnenSatz: 'Vor der Abholung storniert das die Bestellung bzw. erstattet online bezahlte Artikel, danach geht der Rücktritt an den Hof. Die Kundin hat die Eingangsbestätigung schon.',
   bestellnummer: 'Bestellnummer',
   zuordnenKnopf: 'Zuordnen',
   nummerFehlt: 'Gib bitte die Bestellnummer ein.',
   nummerZuLang: 'Die Bestellnummer ist zu lang.',
   nummerUnbekannt: 'Diese Bestellnummer gibt es nicht.',
-  schonZugeordnet: 'Dieser Widerruf ist schon zugeordnet. Lade die Seite neu.',
+  schonZugeordnet: 'Dieser Rücktritt ist schon zugeordnet. Lade die Seite neu.',
   fertigErstattet: 'Zugeordnet. Vor der Abholung storniert – die Kundin bekommt die Mail dazu.',
-  fertigHof: 'Zugeordnet. Der Hof hat den Widerruf im Postfach.',
-  akteLeer: 'Zu Bestellungen dieses Hofs gibt es keinen Widerruf.',
-  akteSatz: 'Die neuesten Widerrufe zu Bestellungen dieses Hofs – ohne Name, Adresse und Nachricht.',
+  fertigHof: 'Zugeordnet. Der Hof hat den Rücktritt im Postfach.',
+  akteLeer: 'Zu Bestellungen dieses Hofs gibt es keinen Rücktritt.',
+  akteSatz: 'Die neuesten Rücktritte zu Bestellungen dieses Hofs – ohne Name, Adresse und Nachricht.',
 } as const
 
-/** Alle Sätze aus einer Quelle (Freigabe 200: Knöpfe wörtlich). */
-export const WIDERRUF_TEXT = {
+/**
+ * Die Beschriftung der Online-Funktion nach § 13a FAGG (N39) — wörtlich, bis
+ * die Anwältin entscheidet (N43 (1), V88): Einstieg und Knöpfe sagen weiter
+ * „Vertrag widerrufen“ bzw. „Widerruf bestätigen“, alles andere „Rücktritt“.
+ * tests/widerruf-n39-wortlaut.test.ts hält sie gleich dem Stand auf main.
+ */
+const N39_BESCHRIFTUNG = {
   knopfWiderrufen: 'Vertrag widerrufen',
   knopfBestaetigen: 'Widerruf bestätigen',
   fussLink: 'Vertrag widerrufen',
-  titel: 'Vertrag widerrufen',
-  einleitung: `Hier kannst du deinen Kaufvertrag mit dem Hof widerrufen. Dein Vertragspartner ist der Hof, bei dem du bestellt hast – ${MARKE} leitet deinen Widerruf an ihn weiter und bestätigt dir den Eingang sofort per E-Mail.`,
+} as const
+
+/**
+ * Alle Sätze aus einer Quelle (Freigabe 200: Knöpfe wörtlich). Seit Nr. 231
+ * (N43, Boards s3/w3-widerruf) sagen Titel und Sätze „Rücktritt“; die Route
+ * /widerruf und die Bezeichner bleiben.
+ */
+export const WIDERRUF_TEXT = {
+  ...N39_BESCHRIFTUNG,
+  titel: 'Rücktrittsrecht',
+  einleitung: 'Hier kannst du vom Kaufvertrag mit dem Hof zurücktreten. Du bekommst sofort eine Eingangsbestätigung per E-Mail.',
+  schritt: (nummer: 1 | 2) => `Schritt ${nummer} von 2`,
+  bestellung: 'Bestellung',
+  hof: 'Hof',
+  bestellungBei: (nummer: string, hof: string) => `${nummer} bei ${hof}`,
+  was: 'Was',
+  // In der Zusammenfassung kurz „Name“ (Board w3-widerruf Bild 3); das Feld heißt „Dein Name“.
+  nameZeile: 'Name',
+  eingangsbestaetigungAn: 'Eingangsbestätigung an',
   // Kasse (Freigabe 200 Punkt 8): neben dem Kaufknopf, nicht bei „Betrieb“.
   kasseSatz: [
     'Du kannst vom Kauf innerhalb von 14 Tagen nach der Abholung zurücktreten – außer bei schnell verderblicher Ware. So geht’s: ',
@@ -250,7 +275,7 @@ export const WIDERRUF_TEXT = {
   teil: 'Einzelne Artikel',
   // Admin › Bestellungen und Hof-Akte: statt einer leeren Liste, wenn vor der Abholung schon alles Gewählte gestrichen wurde (Nr. 217.1).
   alleGestrichen: 'Alle gewählten Positionen wurden schon vor der Abholung storniert',
-  positionenTitel: 'Was willst du widerrufen?',
+  positionenTitel: 'Wovon möchtest du zurücktreten?',
   name: 'Dein Name',
   email: 'Deine E-Mail-Adresse',
   emailHinweis: 'An diese Adresse schicken wir die Eingangsbestätigung.',
@@ -258,27 +283,34 @@ export const WIDERRUF_TEXT = {
   bestellnummerHinweis: 'Steht in deiner Bestellbestätigung, z. B. HM-2611-A4F2.',
   freitext: 'Welche Artikel?',
   freitextHinweis: 'Schreib kurz, welche Artikel du zurückgeben willst.',
+  artikelFehlt: 'Bitte wähl mindestens einen Artikel.',
   nachricht: 'Nachricht an den Hof (freiwillig)',
-  zusammenfassung: 'Bitte prüfe deinen Widerruf',
-  zusammenfassungSatz: 'Mit „Widerruf bestätigen“ schickst du den Widerruf ab.',
+  zusammenfassung: 'Bitte prüfe deinen Rücktritt',
   zurueck: 'Zurück',
-  eingangTitel: 'Dein Widerruf ist bei uns eingegangen',
+  eingangTitel: 'Dein Rücktritt ist bei uns eingegangen',
   eingangAm: (zeit: string) => `Eingegangen am ${zeit}.`,
   eingangMail: 'Wir haben dir eine Bestätigung per E-Mail geschickt.',
   naechsteSchritte: [
-    'Der Hof, bei dem du bestellt hast, ist dein Vertragspartner. Wir leiten deinen Widerruf an ihn weiter.',
+    'Der Hof, bei dem du bestellt hast, ist dein Vertragspartner. Wir leiten deinen Rücktritt an ihn weiter.',
     'Hast du noch nicht abgeholt, wird die Bestellung storniert; was du online bezahlt hast, bekommst du zurück.',
     'Hast du die Ware schon abgeholt, bring sie bitte innerhalb von 14 Tagen zum Hof zurück. Der Hof meldet sich und erstattet dir den Betrag.',
   ],
   speichern: 'Drucken oder speichern',
   fehlerEingabe: 'Bitte prüf deine Angaben.',
   fehlerZuViele: 'Zu viele Versuche. Bitte versuch es später noch einmal.',
-  fehlerSpeichern: 'Wir konnten deinen Widerruf nicht speichern. Versuch es bitte gleich noch einmal.',
-  nichtMehr: 'Diese Bestellung lässt sich hier nicht mehr widerrufen. Wende dich bitte direkt an den Hof.',
+  fehlerTitel: 'Das hat nicht geklappt',
+  // Steht in Schritt 2 über der Zusammenfassung — die Angaben bleiben, der Knopf ist der wörtliche aus N39.
+  fehlerSpeichern: `Wir konnten deinen Rücktritt nicht speichern. Deine Angaben sind noch da – tipp bitte noch einmal auf „${N39_BESCHRIFTUNG.knopfBestaetigen}“.`,
+  // Antwort der Action (Frist vorbei, Betrieb); die Seite zeigt dasselbe als Titel und Satz (nichtMehrTitel, nichtMehrSatz).
+  nichtMehr: 'Von dieser Bestellung kannst du hier nicht mehr zurücktreten. Wende dich bitte direkt an den Hof.',
+  nichtMehrTitel: 'Von dieser Bestellung kannst du hier nicht mehr zurücktreten.',
+  nichtMehrSatz: (hof: { name: string; telefon: string } | null) =>
+    hof && hof.telefon ? `Wende dich bitte direkt an den Hof: ${hof.name}, ${hof.telefon}.` : 'Wende dich bitte direkt an den Hof.',
+  anrufen: (hofName: string) => `${hofName} anrufen`,
   linkUngueltig: 'Dieser Link ist nicht gültig',
   // Hof
-  hofKarteTitel: 'Widerruf eingegangen',
-  hofKarteSatz: (n: number) => (n === 1 ? 'Eine Kundin hat einen Kauf widerrufen.' : `${n} Kundinnen haben einen Kauf widerrufen.`),
+  hofKarteTitel: 'Rücktritt eingegangen',
+  hofKarteSatz: (n: number) => (n === 1 ? 'Eine Kundin ist von einem Kauf zurückgetreten.' : `${n} Kundinnen sind von einem Kauf zurückgetreten.`),
   hofErstatten: 'Rückgabe erhalten – erstatten …',
   hofAblehnen: 'Ablehnen …',
   hofGrund: 'Grund der Ablehnung',
@@ -289,7 +321,7 @@ export const WIDERRUF_TEXT = {
   hofErstattet: 'Erstattung gespeichert',
   hofAbgelehnt: 'Ablehnung gespeichert',
   hofFehler: 'Das hat nicht geklappt. Versuch es bitte gleich noch einmal.',
-  hofPostfach: (nummer: string) => `Widerruf zu Bestellung ${nummer}: Bitte prüf die Rückgabe und erstatte oder lehne mit Grund ab.`,
+  hofPostfach: (nummer: string) => `Rücktritt zu Bestellung ${nummer}: Bitte prüf die Rückgabe und erstatte oder lehne mit Grund ab.`,
   hofAusnahme: 'Ausnahmen nach § 18 FAGG (etwa schnell verderbliche Ware) prüfst du im Einzelfall.',
 } as const
 

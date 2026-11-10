@@ -2,12 +2,11 @@
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { MailCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 
 const KNOPF_ORANGE = cn(
-  'inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-primary-foreground/30 bg-primary px-[18px] text-[14px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
+  'inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-primary px-[18px] text-[15px] font-bold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
   FOKUS_RAHMEN
 )
 
@@ -30,18 +29,18 @@ export function PostfachHinweis({ email }: { email: string }): React.JSX.Element
 
   return (
     <section aria-labelledby="postfach-titel" className="flex flex-col gap-4">
+      {/* Ohne Symbol und ohne Karte (Board s2-/w2-registrieren, Bild 3; seit Nr. 239). */}
       <div className="flex items-start gap-3">
-        <MailCheck className="mt-1 size-6 shrink-0 text-status-offen" strokeWidth={1.7} aria-hidden="true" />
         <div className="min-w-0">
           <h2
             id="postfach-titel"
             ref={titel}
             tabIndex={-1}
-            className={cn('font-heading text-[22px] leading-tight font-semibold md:text-2xl', 'rounded-sm', FOKUS_RAHMEN)}
+            className={cn('font-heading text-[24px] leading-tight font-semibold', 'rounded-sm', FOKUS_RAHMEN)}
           >
             Schau in dein Postfach
           </h2>
-          <div className="mt-1 text-[14px] leading-normal text-muted-foreground">
+          <div className="mt-1.5 text-[15px] leading-normal text-foreground">
             <p>
               Wir haben dir eine E-Mail geschickt – an{' '}
               <strong className="font-semibold break-all text-foreground">{email}</strong>. Öffne den Link darin und bestätige

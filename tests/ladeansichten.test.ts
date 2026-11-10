@@ -173,7 +173,8 @@ describe('Ladeansichten — jede öffentliche Route, die auf Daten wartet, zeigt
   it('die Kasse: Kopf-Platzhalter in den Maßen der Fokus-Shell', () => {
     // Die Fokus-Shell hat wirklich 56 px / ab md 64 px (Nr. 177) — und keine 52 px mehr (Gegenprobe zum alten Stand).
     const fokusShell = liesDatei('src/components/shells/kunde-shell.tsx').split('export function KundeFokusShell(')[1]
-    expect(fokusShell).toMatch(/flex h-14 max-w-\[1200px\][^"]*md:h-16/)
+    // Seit Lauf 31 über die volle Breite (Boards w1-kasse, w1-bestellung-link).
+    expect(fokusShell).toMatch(/flex h-14 items-center[^"]*md:h-16/)
     expect(fokusShell).not.toMatch(/h-\[52px\]/)
     expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).not.toMatch(/h-\[52px\]/)
     expect(liesDatei('src/app/(public)/[farmSlug]/checkout/loading.tsx')).toContain('data-design="neu"')
@@ -381,7 +382,11 @@ describe('Hofseite und Produktseite — die 404 kommt vor dem Skelett (Nr. 117)'
   it('die Infoseiten der Gruppe warten auf nichts — ohne Ladeansicht davor', () => {
     for (const ordner of ['agb', 'datenschutz', 'impressum', 'konditionen', 'fuer-hoefe']) {
       const text = liesDatei(`src/app/(public)/${ordner}/page.tsx`)
-      expect(text, ordner).not.toMatch(/force-dynamic|searchParams|from 'next\/headers'/)
+      expect(text, ordner).not.toMatch(/searchParams|from 'next\/headers'/)
+      expect(existiert(`src/app/(public)/${ordner}/loading.tsx`), ordner).toBe(false)
+      // N45 (A005 4a/4e): /agb und /konditionen werden je Aufruf frisch gebaut, lesen aber nur den Data Cache
+      // (ladePlattformEinstellung) — keine Anfrage, keine Wartezeit, also keine Ladeansicht. Die anderen bleiben statisch.
+      if (ordner !== 'agb' && ordner !== 'konditionen') expect(text, ordner).not.toMatch(/force-dynamic/)
     }
     // Gegenprobe: Die Hofseite ist dynamisch und fiele hier auf.
     expect(liesDatei('src/app/(public)/[farmSlug]/page.tsx')).toMatch(/force-dynamic/)
@@ -675,6 +680,7 @@ describe('Die Fehlernummer auf dem Weg in den Briefkasten', () => {
       'src/lib/bauern-navigation.ts': 'Navigation des Hofbereichs, dort baut Nr. 87 den Punkt Postfach (Nacharbeit)',
       'src/app/(public)/datenschutz/page.tsx': 'ein Satz der Datenschutzerklärung (Rechtstext)',
       'src/lib/rechtstexte/agb.ts': 'die AGB Wort für Wort aus docs/recht/agb.md (Nr. 90; Rechtstext ist von Textwachen ausgenommen, Freigabe §17 §2)',
+      'src/lib/rechtstexte/agb-0-9.ts': 'Fassung 0.9 eingefroren (N45/A005)',
     }
     const quellen = (ordner: string): string[] =>
       fs.readdirSync(ordner, { withFileTypes: true }).flatMap((e) => {

@@ -87,7 +87,7 @@ describe('Produktkarte', () => {
     publicProduct({ id: 'p_eier', name: 'Freilandeier', category: 'EIER', categoryImageUrl: '/categories/eier.webp', ...teil })
   const karte = (p: PublicProduct) =>
     renderToStaticMarkup(
-      createElement(ProduktKarte, { produkt: p, zustand: { art: 'kaufbar' }, imKorb: 0, wirdHinzugefuegt: false, href: '/hof-test/produkt/p_eier', onInDenKorb: () => {}, onMenge: () => {} })
+      createElement(ProduktKarte, { produkt: p, zustand: { art: 'kaufbar' }, imKorb: 0, wirdHinzugefuegt: false, href: '/hof-test/produkt/p_eier', onInDenKorb: () => {} })
     )
 
   it('das Produktfoto heißt wie das Produkt', () => {

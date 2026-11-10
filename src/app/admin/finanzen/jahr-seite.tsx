@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
-import { Download, Wallet } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { aktuellerFinanzMonat, getFinanzenJahr, type FinanzenJahrDaten } from '@/server/queries/finanzen'
 import { monatsschluessel } from '@/lib/servicegebuehr'
 import {
@@ -7,12 +7,17 @@ import {
   finanzenExportAdresse,
   finanzenJahrAdresse,
   finanzenJahrUnterreiter,
+  gebuehrWortFuerJahr,
+  gebuehrWortFuerMonat,
   jahrKennzahlen,
   jahrMonateFuerAnzeige,
   testzahlungenHinweisImJahr,
 } from '@/lib/finanzen'
 import { FINANZEN_REITER_OHNE_INHALT, FINANZEN_SEITE, finanzenAdresse, finanzenReiterLabel, type FinanzenReiterId } from '@/lib/admin-finanzen-seite'
 import { finanzenJahrAus } from '@/schemas/admin-reiter'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
+import { GELD_TEXT, jahrGebuehrTexte } from '../geld/texte'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
@@ -45,15 +50,20 @@ export async function ladeJahrSeite({
   const laufendesJahr = Number(aktuellerFinanzMonat(jetzt).slice(0, 4))
 
   let daten: FinanzenJahrDaten | null = null
+  // Der Stichtag nur für das Wort der Gebühr (V63); ladeHofpreisEinstellung wirft nicht, sondern nimmt die Vorgabe.
+  let stichtag = hofpreisModellAb(null)
   try {
-    daten = await getFinanzenJahr(finanzenJahrAus(jahrParameter, laufendesJahr), jetzt)
+    const [jahrDaten, hofpreis] = await Promise.all([getFinanzenJahr(finanzenJahrAus(jahrParameter, laufendesJahr), jetzt), ladeHofpreisEinstellung()])
+    daten = jahrDaten
+    stichtag = hofpreisModellAb(hofpreis)
   } catch (fehler) {
     Sentry.captureException(fehler, { tags: { bereich: 'admin', seite: 'finanzen-jahr' } })
   }
   if (!daten) {
     return (
       <div className={ADMIN_RAHMEN}>
-        <AdminFehler titel="Geld" satz="Wir konnten die Zahlen gerade nicht laden." nochmal="/admin/geld?zeitraum=jahr" />
+        {/* Derselbe Fehler wie im Monat (Board w3-admin-geld Bild 6) — eine Quelle in geld/texte.ts. */}
+        <AdminFehler titel={GELD_TEXT.titel} satz={GELD_TEXT.fehler} nochmal="/admin/geld?zeitraum=jahr" />
       </div>
     )
   }
@@ -62,6 +72,9 @@ export async function ladeJahrSeite({
   const text = FINANZEN_JAHR_TEXT
   // Zurück zum Monat: im laufenden Jahr der heutige, sonst der Dezember.
   const monat = jahr === laufendesJahr ? aktuellerFinanzMonat(jetzt) : monatsschluessel(jahr, 12)
+  const gebuehrWort = gebuehrWortFuerJahr(jahr, stichtag)
+  const vorjahrWort = daten.vorjahr === null ? null : gebuehrWortFuerJahr(daten.vorjahr.jahr, stichtag)
+  const monatsWorte = rechnung.monate.map((m) => gebuehrWortFuerMonat(m.monat, stichtag))
 
   return (
     <div className={cn(ADMIN_RAHMEN, 'flex flex-col gap-5')}>
@@ -104,7 +117,7 @@ export async function ladeJahrSeite({
         />
 
         <LadeInhalt className="flex flex-col gap-5">
-          <Kennzahlen beschriftung={FINANZEN_SEITE.kennzahlen} eintraege={jahrKennzahlen(rechnung, laufendesJahr)} />
+          <Kennzahlen beschriftung={FINANZEN_SEITE.kennzahlen} eintraege={jahrKennzahlen(rechnung, laufendesJahr, gebuehrWort)} />
 
           <Unterreiter beschriftung={FINANZEN_SEITE.reiter} eintraege={finanzenJahrUnterreiter(jahr, rechnung.posten.length)} aktiv={reiter} ladePunkt />
 
@@ -113,6 +126,7 @@ export async function ladeJahrSeite({
               jahr={jahr}
               monate={jahrMonateFuerAnzeige(rechnung, daten.vorjahr)}
               vorjahr={daten.vorjahr === null ? null : daten.vorjahr.jahr}
+              gebuehr={jahrGebuehrTexte(gebuehrWort, vorjahrWort, rechnung.monate.map((m) => m.monat), monatsWorte)}
               vergleichAb={daten.vergleichAb}
               hinweisImVergleich={rechnung.testzahlungAusgelassen ? null : testzahlungenHinweisImJahr(daten.testzahlungenHinweis, rechnung, daten.vorjahr, true)}
             />
@@ -122,7 +136,6 @@ export async function ladeJahrSeite({
 
           {(reiter === 'auszahlungen' || reiter === 'entfallen') && (
             <EmptyState
-              symbol={Wallet}
               titel={finanzenReiterLabel(reiter)}
               satz={FINANZEN_REITER_OHNE_INHALT}
               ausweg={{ ohne: 'Zu diesem Reiter hat die Finanzseite keine Zahlen; es gibt nichts, wohin der Weg führen könnte' }}
@@ -135,3 +148,4 @@ export async function ladeJahrSeite({
     </div>
   )
 }
+

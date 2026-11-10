@@ -30,8 +30,9 @@ const quelle = (pfad: string): string => readFileSync(join(process.cwd(), pfad),
 describe('Dauer des Passwort-Links aus einer Quelle', () => {
   it('die Reset-Mail nennt die Dauer der Konstante – in der Vorschau und im Text', () => {
     const html = renderToStaticMarkup(createElement(PasswordResetEmail, { resetUrl: 'https://example.com/neu' }))
-    expect(html).toContain('<strong>2 Stunden</strong>')
-    expect(html).toContain('Link gültig 2 Stunden')
+    // Wortlaut des Boards s3/w3-mail-zugang Bild 3 (Nr. 241); die Dauer kommt weiter aus der Konstante.
+    expect(html).toContain('Dieser Link ist 2 Stunden gültig')
+    expect(html).toContain('Der Link ist 2 Stunden gültig.')
     expect(html).not.toContain('1 Stunde')
   })
 

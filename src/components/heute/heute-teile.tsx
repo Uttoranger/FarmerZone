@@ -1,25 +1,13 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import {
-  Check,
-  ChevronRight,
-  Clock,
-  CreditCard,
-  Megaphone,
-  MessageCircle,
-  PackageOpen,
-  PackageX,
-  Printer,
-  Share2,
-  Sprout,
-  Tags,
-  type LucideIcon,
-} from 'lucide-react'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
+import { Check, ChevronRight, Inbox, MessageCircle, Printer, Sprout } from 'lucide-react'
 import { Marke } from '@/components/ui/marke'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { Zaehler } from '@/components/ui/zaehler'
+import { PFLICHT_KNOPF, PFLICHT_KNOPF_RAHMEN, PflichtKarte } from '@/components/heute/pflicht-karte'
 import { POSTFACH_HREF, POSTFACH_TEXT, weitereText, type HeuteNachricht } from '@/lib/postfach'
 import { markiereGelesenFormular } from '@/server/actions/postfach'
-import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN, FOKUS_RAHMEN_INNEN } from '@/components/ui/fokus'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { TeilenFensterKnopf } from '@/components/teilen/teilen-fenster'
@@ -27,15 +15,15 @@ import type { TeilenFensterDaten } from '@/lib/teilen-fenster'
 import {
   BRAUCHT_DICH_LEER,
   brauchtDichAnzeige,
+  zuTunLinkText,
   HEUTE_KEINE_BESTELLUNGEN,
   HEUTE_NIEMAND,
   KENNZAHL_TEXT,
+  TEILEN_KARTE_SATZ,
   kennzahlBreiteEm,
   mitTrennstellen,
   PACK_MARKE,
-  naechsteAbholungText,
   type BrauchtDichEintrag,
-  type NaechsteAbholung,
   type NaechstesFenster,
   type PacklistenZeile,
   type WochenBalken,
@@ -44,10 +32,12 @@ import { onlinePausiertHinweis } from '@/lib/stripe-konto'
 import { SPERRE_KARTE_TITEL, sperreKarteSatz } from '@/lib/admin-hof-akte'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
-import { ERSTE_SCHRITTE_WARTET, ZU_TUN_TEXT, type ZuTunAufgabe } from '@/lib/erste-schritte'
+import { ZU_TUN_TEXT, type ZuTunAufgabe } from '@/lib/erste-schritte'
+import { DIAGRAMM_BALKEN, DIAGRAMM_LEER } from '@/components/ui/diagramm-farbe'
 import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { AbspracheKnoepfe, AbspracheMarke } from '@/components/heute/absprache'
 
 /*
  * Die Bausteine von „Heute" im neuen Design (Gate 5, Nachtlauf Nr. 17;
@@ -58,7 +48,8 @@ import { cn } from '@/lib/utils'
  * (shadcn-Namen im Geltungsbereich data-design="neu"), beide Themes.
  */
 
-const KARTE = 'rounded-2xl border border-border bg-card'
+// Karten 12 px (G8, RUNDUNG.karte) statt rounded-2xl, das mit --radius auf 29 px wächst.
+const KARTE = cn(RUNDUNG.karte, 'border border-border bg-card')
 const LEISE = 'text-muted-foreground'
 // Orange gefüllte Pille = Hof-Aktion (Farbrollen); 44 px Trefferfläche.
 const KNOPF_ORANGE = cn(
@@ -66,6 +57,8 @@ const KNOPF_ORANGE = cn(
   FOKUS_RAHMEN
 )
 const TEXTLINK = cn('inline-flex min-h-11 items-center rounded-md text-[13.5px] font-semibold text-status-fertig hover:underline underline-offset-2', FOKUS_RAHMEN)
+// Die Köpfe der Abschnitte (Board s1-heute): klein, fett, in Großbuchstaben, leise.
+const KOPF = 'text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase'
 
 function mehrzahl(n: number, eins: string, viele: string): string {
   return `${n} ${n === 1 ? eins : viele}`
@@ -83,7 +76,8 @@ function mehrzahl(n: number, eins: string, viele: string): string {
  */
 export function PostfachKarte({ nachricht, weitere }: { nachricht: HeuteNachricht; weitere: number }): React.JSX.Element {
   const knopf = cn(
-    'flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
+    RUNDUNG.feld,
+    'flex min-h-11 flex-1 items-center justify-center gap-2 border border-border px-3 text-sm font-semibold text-foreground transition-colors duration-[250ms] hover:bg-muted',
     FOKUS_RAHMEN
   )
   return (
@@ -105,7 +99,8 @@ export function PostfachKarte({ nachricht, weitere }: { nachricht: HeuteNachrich
           <Link
             href={nachricht.link}
             className={cn(
-              'flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
+              RUNDUNG.feld,
+              'flex min-h-11 items-center justify-center bg-accent px-4 text-sm font-semibold text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90',
               FOKUS_RAHMEN
             )}
           >
@@ -138,20 +133,56 @@ export function PostfachKarte({ nachricht, weitere }: { nachricht: HeuteNachrich
 
 // ─── Kopf ───────────────────────────────────────────────────────────────────
 
-export function HeuteKopf({ datum, abholungHeute }: { datum: string; abholungHeute: string | null }): React.JSX.Element {
+/**
+ * Titel und Wiener Datum — ganz oben, vor jeder Pflicht- und Stripe-Karte
+ * (Board s1-heute, Bild 3–5). Die Marke „Abholung heute" steht getrennt
+ * darunter (AbholungHeuteMarke), nach den Karten und vor den Zahlen.
+ *
+ * Am Handy (Board s1-heute) eine feste Leiste oben: „Heute“, das Datum
+ * darunter und rechts das Postfach mit dem Zähler der ungelesenen
+ * Nachrichten — die Seitenleiste mit dem Postfach gibt es dort nicht. Ab
+ * 768 px die freistehende Überschrift; das Postfach steht in der Seitenleiste.
+ * Wartet der Hof auf die Freischaltung, steht sein Name vor dem Datum
+ * (Board Bild 4: „Hof am Moos · Mittwoch, 3. März 2027“).
+ */
+export function HeuteKopf({ datum, hofName = null, postfach = 0 }: { datum: string; hofName?: string | null; postfach?: number }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
-      <div className="min-w-0">
-        <h1 className="font-heading text-[27px] font-semibold md:text-[30px]">Heute</h1>
-        <p className={cn('mt-0.5 text-sm', LEISE)}>{datum}</p>
-      </div>
-      {abholungHeute && (
-        <p className="inline-flex min-h-10 items-center gap-2 self-start rounded-full border border-accent/50 bg-accent/12 px-4 text-[13.5px] font-semibold text-status-fertig md:self-auto">
-          <Clock className="size-[15px] shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          Abholung heute, {abholungHeute}
+    // Seit Nr. 249 der Werkzeug-Kopf (G1) ohne Rückweg — Heute ist eine Seite der Leiste. Damit steht der
+    // Freischalt-Balken (G3) unter dem Kopf in der Inhaltsspalte statt über ihm (Liste Lauf 32, heute).
+    <WerkzeugKopf
+      titel="Heute"
+      unterzeile={
+        <p className={cn('truncate text-[13px] md:text-sm', LEISE)}>
+          {hofName && <>{hofName} · </>}
+          {datum}
         </p>
-      )}
-    </div>
+      }
+      aktion={<PostfachKopfKnopf anzahl={postfach} />}
+    />
+  )
+}
+
+/**
+ * Das Postfach rechts im Kopf, nur am Handy (im Web steht es in der Seitenleiste) — derselbe Zähler wie in der
+ * Navigation. Mein-Hof-Kopf nach Board s1-heute bzw. s1-produkte (PL).
+ */
+export function PostfachKopfKnopf({ anzahl }: { anzahl: number }): React.JSX.Element {
+  return (
+    <Link
+      href={POSTFACH_HREF}
+      aria-label="Postfach"
+      className={cn('relative inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted md:hidden', FOKUS_RAHMEN)}
+    >
+      <Inbox className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+      <Zaehler anzahl={anzahl} wofuer="ungelesene Nachrichten" klein className="absolute top-0.5 right-0" />
+    </Link>
+  )
+}
+
+/** „Abholung heute, Mi 3. März, 15–18 Uhr" — grün getönt wie die Marke „läuft", ohne Rand (Board s1-heute). */
+export function AbholungHeuteMarke({ text }: { text: string }): React.JSX.Element {
+  return (
+    <p className="inline-flex min-h-8 items-center self-start rounded-full bg-zustand-laeuft-grund px-3 text-sm font-bold text-zustand-laeuft">{text}</p>
   )
 }
 
@@ -173,22 +204,22 @@ function Kennzahl({
 }) {
   return (
     // Jede Karte ist ein Container: Die Zahl misst sich an ihrer Breite (cqw).
-    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-4', className)}>
-      {/* In der halben Karte (2 + 1, Nr. 53) passt jede Bezeichnung in eine Zeile; ein langes Wort trennt
-          trotzdem an seinen weichen Trennstellen — gekürzt wird auch die Bezeichnung nie. */}
-      <p className={cn('text-xs leading-snug break-words md:text-[13px]', LEISE)}>{mitTrennstellen(titel)}</p>
+    <div className={cn(KARTE, '@container min-w-0 px-3 py-3 md:px-[18px] md:py-3', className)}>
       {/* Ein Betrag wird nie gekürzt: höchstens 22 bzw. 26 px, in einer schmalen Karte so groß, wie er hineinpasst
           (kennzahlBreiteEm), nie unter 12 px — passt er dann nicht, bricht er um, statt über den Rand zu laufen. */}
       <p
         style={{ '--kz-em': kennzahlBreiteEm(wert) } as React.CSSProperties}
         className={cn(
-          'mt-1 font-heading leading-7 font-semibold tabular-nums [overflow-wrap:anywhere] md:mt-1.5 md:leading-8',
+          'font-heading leading-7 font-semibold tabular-nums [overflow-wrap:anywhere] md:leading-8',
           'text-[length:max(12px,min(22px,calc(100cqw/var(--kz-em))))] md:text-[length:max(12px,min(26px,calc(100cqw/var(--kz-em))))]',
           offen && 'text-status-offen'
         )}
       >
         {wert}
       </p>
+      {/* Die Bezeichnung unter der Zahl (Board s1-heute). In der halben Karte (2 + 1, Nr. 53) passt jede
+          in eine Zeile; ein langes Wort trennt an seinen weichen Trennstellen — gekürzt wird sie nie. */}
+      <p className={cn('mt-0.5 text-xs leading-snug break-words md:text-[13px]', LEISE)}>{mitTrennstellen(titel)}</p>
       {zusatz && <p className={cn('mt-0.5 text-xs leading-snug md:text-[13px]', LEISE)}>{zusatz}</p>}
     </div>
   )
@@ -218,7 +249,6 @@ export function Kennzahlen({
       <Kennzahl
         titel={KENNZAHL_TEXT.eingenommen}
         wert={formatEuro(centsAlsEuro(umsatzHeuteCent))}
-        zusatz={KENNZAHL_TEXT.eingenommenMit}
         className="col-span-2 lg:col-span-1"
       />
     </section>
@@ -235,18 +265,16 @@ export function Kennzahlen({
 export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.JSX.Element {
   const { titel, satz } = onlinePausiertHinweis(barMoeglich)
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={CreditCard}
+    <PflichtKarte
       titel={titel}
-      aktion={
-        <Link href="/settings/payments" className={KNOPF_ORANGE}>
+      knoepfe={
+        <Link href="/settings/payments" className={PFLICHT_KNOPF}>
           Bei Stripe ergänzen
         </Link>
       }
     >
-      <p className="text-[12.5px]">{satz}</p>
-    </Hinweiskarte>
+      <p>{satz}</p>
+    </PflichtKarte>
   )
 }
 
@@ -257,18 +285,16 @@ export function StripeHinweis({ barMoeglich }: { barMoeglich: boolean }): React.
  */
 export function TeamSperreKarte({ grund }: { grund: string | null }): React.JSX.Element {
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={MessageCircle}
+    <PflichtKarte
       titel={SPERRE_KARTE_TITEL}
-      aktion={
-        <Link href={POSTFACH_HREF} className={KNOPF_ORANGE}>
+      knoepfe={
+        <Link href={POSTFACH_HREF} className={PFLICHT_KNOPF}>
           Zum Postfach
         </Link>
       }
     >
-      <p className="text-[12.5px]">{sperreKarteSatz(grund)}</p>
-    </Hinweiskarte>
+      <p>{sperreKarteSatz(grund)}</p>
+    </PflichtKarte>
   )
 }
 
@@ -281,31 +307,30 @@ export function TeamSperreKarte({ grund }: { grund: string | null }): React.JSX.
  */
 export function StripeEinrichtenHinweis(): React.JSX.Element {
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={CreditCard}
+    <PflichtKarte
       titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}
-      aktion={
-        <Link href="/settings/payments" className={KNOPF_ORANGE}>
+      knoepfe={
+        // Board s1-heute Bild 4: ein Weg in die Einstellungen, kein Auftrag mit Frist — Umriss statt Orange.
+        <Link href="/settings/payments" className={PFLICHT_KNOPF_RAHMEN}>
           Jetzt einrichten
         </Link>
       }
     >
-      <p className="text-[12.5px]">{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</p>
-    </Hinweiskarte>
+      <p>{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</p>
+    </PflichtKarte>
   )
 }
 
-// ─── Teilen-Zeile ───────────────────────────────────────────────────────────
+// ─── Teilen-Karte ───────────────────────────────────────────────────────────
 
 /**
- * Teilen als EINE kompakte Zeile zuletzt in der Hauptspalte, nach Packliste und
- * „Braucht dich" (freigabe.md §12 Nr. 45, Register N11) — an jedem Tag; bis dahin stand sie an Abholtagen oben neben dem
- * Stripe-Hinweis und an anderen Tagen als große Karte in der Seitenspalte.
- * Knopf rechts statt darunter, auch am Handy (Mockup
- * mobil-h3-heute-mit-teilen-karte). Seit Nr. 21 (Gate 7) öffnet der Knopf das
- * Teilen-Fenster mit Bild und Kanälen, wenn die Seite dessen Daten mitgibt;
- * sonst bleibt es beim einfachen Teilen der Hofseite (teileHof).
+ * Teilen zuletzt in der Hauptspalte, nach Packliste und „Braucht dich"
+ * (freigabe.md §12 Nr. 45, Register N11) — an jedem Tag. Seit Lauf 30 nach
+ * Board s1-heute, Bild 2: „Diese Woche bei dir: …" als Titel, darunter der
+ * Satz und „Teilen" als Umriss über die volle Breite — eine Einladung, keine
+ * Hauptaktion. Seit Nr. 21 (Gate 7) öffnet der Knopf das Teilen-Fenster mit
+ * Bild und Kanälen, wenn die Seite dessen Daten mitgibt; sonst bleibt es beim
+ * einfachen Teilen der Hofseite (teileHof).
  */
 export function TeilenKarte({
   hofName,
@@ -322,18 +347,25 @@ export function TeilenKarte({
   /** „14 Besuche über deine Links" der letzten Woche (teilenWirkungSatz). */
   wirkung?: string | null
 }): React.JSX.Element {
+  // „Teilen“ ohne Symbol (Liste Lauf 32, heute Bild 2) — die Knöpfe gehören anderen Nummern, das Symbol blendet die
+  // Karte aus (Nachfahre statt Kind-Selektor, die Kind-Selektoren-Wache lässt `[&>` nur an Bausteinen zu).
+  // Seit Nr. 277 (Abnahme Lauf 32, heute Bild 1/2) dieselbe Form wie „So geht’s“ und „Jetzt einrichten“ auf dieser
+  // Seite (Board s1-heute: 52 px, Rand 1,5 px in Textfarbe, 15 px fett) — vorher 44 px mit dünnem grauem Rand.
+  const knopf = cn(PFLICHT_KNOPF_RAHMEN, '[&_svg]:hidden')
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-primary/45 bg-primary/12 py-2.5 pr-2.5 pl-3.5 text-[13px] md:gap-3.5 md:px-4 md:py-3 md:text-[13.5px]">
-      <Share2 className="hidden size-5 shrink-0 text-status-offen sm:block" strokeWidth={1.7} aria-hidden="true" />
-      <p className="min-w-0 flex-1 line-clamp-2 break-words">
-        <strong className="font-semibold">Diese Woche bei dir:</strong> {satz}
-        {wirkung && <span className="text-muted-foreground"> · letzte Woche {wirkung}</span>}
+    <div className={cn(KARTE, 'flex flex-col gap-2 p-4 md:px-[18px]')}>
+      <p className="text-[15px] leading-snug font-semibold break-words">Diese Woche bei dir: {satz}</p>
+      <p className={cn('text-[13.5px] leading-snug', LEISE)}>
+        {TEILEN_KARTE_SATZ}
+        {wirkung && <> · letzte Woche {wirkung}</>}
       </p>
-      {fenster ? (
-        <TeilenFensterKnopf daten={fenster} label="Teilen" className={KNOPF_ORANGE} />
-      ) : (
-        <HofTeilenKnopf name={hofName} slug={hofSlug} label="Teilen" className={KNOPF_ORANGE} />
-      )}
+      <div className="mt-1">
+        {fenster ? (
+          <TeilenFensterKnopf daten={fenster} label="Teilen" className={knopf} />
+        ) : (
+          <HofTeilenKnopf name={hofName} slug={hofSlug} label="Teilen" className={knopf} />
+        )}
+      </div>
     </div>
   )
 }
@@ -348,248 +380,257 @@ function PacklistenEintrag({ zeile }: { zeile: PacklistenZeile }) {
         href={`/orders/${zeile.id}`}
         className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:gap-3.5 md:px-[18px]', FOKUS_RAHMEN_INNEN)}
       >
-        <span className={cn('hidden w-[92px] shrink-0 text-[13px] font-semibold tabular-nums md:block', LEISE)}>{zeile.uhrzeit}</span>
+        {/* Antwort 2 der Projektleitung (Lauf 32): Kurzname ohne Uhrzeit — die Zeit steht im Kopf des Fensters
+            („Abholung heute, …, 15–18 Uhr“), abgeholt wird bei allen im selben Fenster (V60). Die Positionen
+            dürfen zwei Zeilen nehmen statt abgeschnitten zu werden. */}
         <span className="min-w-0 flex-1">
-          {/* Eine Zeile — ein Name bis 80 Zeichen bräche sonst über mehrere; voll im title. */}
           <span className="block truncate text-[14.5px] font-semibold" title={zeile.kunde}>
             {zeile.kunde}
           </span>
-          <span className={cn('mt-0.5 block truncate text-[12.5px] md:text-[13px]', LEISE)} title={zeile.positionen}>
-            <span className="md:hidden">{zeile.uhrzeit} · </span>
+          <span className={cn('mt-0.5 line-clamp-2 text-[12.5px] leading-snug break-words md:text-[13px]', LEISE)} title={zeile.positionen}>
             {zeile.positionen} · {zeile.zahlart}
           </span>
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-1 md:flex-row md:items-center md:gap-3.5">
+        <span className="flex shrink-0 flex-col items-end gap-1">
           <span className="text-[13.5px] font-semibold tabular-nums md:text-sm">{formatEuro(centsAlsEuro(zeile.gesamtCents))}</span>
-          <Marke art={marke.art} className="md:w-[124px] md:justify-center">
+          <Marke art={marke.art} form="schild">
             {marke.text}
           </Marke>
         </span>
       </Link>
+      {/* N47 (Nr. 257): Abholung nach Absprache — Marke und Knöpfe UNTER der Zeile, nicht im Zeilen-Link;
+          der Kontakt steht nur als Ziel der Knöpfe da, nie als Text. */}
+      {zeile.absprache && (
+        <div className="-mt-1 flex flex-wrap items-center gap-2 px-4 pb-3 md:px-[18px]">
+          <AbspracheMarke />
+          <AbspracheKnoepfe anrufen={zeile.absprache.anrufen} email={zeile.absprache.email} name={zeile.kunde} />
+        </div>
+      )}
     </li>
   )
 }
 
 /**
  * Die Packliste für heute — dieselben Bestellungen wie das Papier
- * (/orders/today/print, abholWhere). Zeilen führen in die Bestellung; dort
- * wird gepackt und übergeben (bestehende Aktionen, keine neuen hier).
+ * (/orders/today/print, abholWhere). Nach Board s1-heute steht der Kopf über
+ * der Karte („Packliste · 2 zu packen · 1 wartet", rechts Drucken), die
+ * Zeilen in der Karte, „Alle Bestellungen ansehen →" darunter. Zeilen führen
+ * in die Bestellung; dort wird gepackt und übergeben (keine Knöpfe hier). Die
+ * nächste Abholung steht nur in der Seitenspalte („Nächste Abholung“), nicht
+ * noch einmal als Zeile unter der Liste (Board s1-/w1-heute, Lauf 31).
+ *
+ * Leer: mit Abholzeit eine Karte mit HEUTE_NIEMAND und der nächsten Abholung
+ * samt ihrer Zahl (V40) — es gibt nichts zu tun, also kein Knopf; ohne
+ * Abholzeit dieselbe Karte mit ABHOLZEITEN_FEHLEN und dem Knopf (Board Bild 4).
  */
 export function Packliste({
   zeilen,
-  zuPacken,
-  naechsteAbholung,
+  stand,
   leer,
 }: {
   zeilen: PacklistenZeile[]
-  zuPacken: number
-  /** Der nächste Abholtag mit offenen Bestellungen — ohne ihn entfällt die Zeile. */
-  naechsteAbholung: NaechsteAbholung | null
-  /** Für den Leerzustand: das nächste Abholfenster laut Abholzeiten (null = keine eingetragen). */
-  leer: { abholfenster: NaechstesFenster | null }
+  /** „2 zu packen · 1 wartet" (packlistenStand). */
+  stand: string
+  /** Für den Leerzustand: der Satz zur nächsten Abholung (naechsteAbholungSatz), null = keine Abholzeit eingetragen. */
+  leer: { naechsteAbholung: string | null }
 }): React.JSX.Element {
   return (
-    <section aria-labelledby="heute-packliste" className={cn(KARTE, 'overflow-hidden')}>
-      <div className="flex min-h-[60px] items-center gap-2.5 border-b border-border px-4 py-2 md:px-[18px]">
-        <h2 id="heute-packliste" className="text-[15px] font-semibold md:text-[15.5px]">
-          <span className="md:hidden">Packliste</span>
-          <span className="hidden md:inline">Packliste für heute</span>
+    <section aria-labelledby="heute-packliste" className="flex flex-col gap-2">
+      <div className="flex min-h-11 items-center gap-2">
+        <h2 id="heute-packliste" className={cn(KOPF, 'min-w-0 flex-1')}>
+          {/* Board w1-heute: ab 768 px „Packliste für heute“, am Handy kurz „Packliste“ (s1-heute). */}
+          Packliste<span className="max-md:hidden"> für heute</span>
+          {zeilen.length > 0 && <> · {stand}</>}
         </h2>
-        {zeilen.length > 0 && <span className={cn('text-[12.5px] md:text-[13px]', LEISE)}>{zuPacken} offen</span>}
         {zeilen.length > 0 && (
           <Link
             href="/orders/today/print"
             aria-label="Packliste drucken"
+            // Board w1-heute: Umriss-Pille mit kräftigem Feldrand, 14 px halbfett in Textfarbe, Symbol 20 px
+            // (Abnahme Lauf 32: „Drucken“ war im Web blass und klein).
             className={cn(
-              'ml-auto inline-flex size-11 shrink-0 items-center justify-center gap-2 rounded-full border border-border text-[12.5px] font-semibold transition-colors hover:bg-muted md:w-auto md:px-4 print:hidden',
+              'inline-flex size-11 shrink-0 items-center justify-center gap-2 rounded-full text-foreground transition-colors hover:bg-muted md:w-auto md:border md:border-input md:px-3.5 md:text-sm md:font-semibold print:hidden',
               FOKUS_RAHMEN
             )}
           >
-            <Printer className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            <Printer className="size-5" strokeWidth={2} aria-hidden="true" />
             <span className="hidden md:inline" aria-hidden="true">
-              Packliste drucken
+              Drucken
             </span>
           </Link>
         )}
       </div>
 
       {zeilen.length === 0 ? (
-        <EmptyState
-          symbol={PackageOpen}
-          titel={HEUTE_NIEMAND}
-          satz={leer.abholfenster ? `Nächste Abholung: ${leer.abholfenster.name}, ${leer.abholfenster.zeit}.` : ABHOLZEITEN_FEHLEN.satz}
-          ausweg={
-            leer.abholfenster ? (
-              { ohne: 'Mit Abholzeit gibt es in der leeren Packliste nichts zu tun, der Satz nennt die nächste Abholung; nur ohne Abholzeit trägt sie den Knopf' }
-            ) : (
-              <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={KNOPF_ORANGE}>
+        leer.naechsteAbholung ? (
+          <div className={cn(KARTE, 'flex flex-col gap-1 px-4 py-3.5 md:px-[18px]')}>
+            <p className="text-[15px] font-semibold">{HEUTE_NIEMAND}</p>
+            <p className={cn('text-[13.5px]', LEISE)}>{leer.naechsteAbholung}</p>
+          </div>
+        ) : (
+          // Board s1-heute Bild 4: eine Karte wie „Heute holt niemand etwas ab.“ — Titel, Satz, oranger Knopf
+          // über die volle Breite, ohne Symbol und ohne gestrichelten Rand (das Board zeigt den Zustand, es geht
+          // dem allgemeinen EmptyState vor).
+          <div className={cn(KARTE, 'flex flex-col gap-2 px-3.5 py-3')}>
+            <p className="text-base font-semibold">{ABHOLZEITEN_FEHLEN.titel}</p>
+            <p className={cn('text-sm', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
+            <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'h-auto min-h-[52px] w-full rounded-[14px] text-base font-bold')}>
+              {ABHOLZEITEN_FEHLEN.aktion.text}
+            </Link>
+          </div>
+        )
+      ) : (
+        <div className={cn(KARTE, 'overflow-hidden')}>
+          <ul>
+            {zeilen.map((z) => (
+              <PacklistenEintrag key={z.id} zeile={z} />
+            ))}
+          </ul>
+          {!leer.naechsteAbholung && (
+            // Bestellungen für heute, aber keine aktive Abholzeit: Satz und Knopf stehen trotzdem (sonst nur im ausblendbaren „Zu tun").
+            <div className="flex flex-col gap-2.5 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-[18px]">
+              <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
+              <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'shrink-0 self-start sm:self-auto')}>
                 {ABHOLZEITEN_FEHLEN.aktion.text}
               </Link>
-            )
-          }
-          className="rounded-none border-0 py-8"
-        />
-      ) : (
-        <ul>
-          {zeilen.map((z) => (
-            <PacklistenEintrag key={z.id} zeile={z} />
-          ))}
-        </ul>
-      )}
-
-      {zeilen.length > 0 && !leer.abholfenster && (
-        // Bestellungen für heute, aber keine aktive Abholzeit: Satz und Knopf stehen trotzdem (sonst nur im ausblendbaren „Zu tun").
-        <div className="flex flex-col gap-2.5 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-[18px]">
-          <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.satz}</p>
-          <Link href={ABHOLZEITEN_FEHLEN.aktion.href} className={cn(KNOPF_ORANGE, 'shrink-0 self-start sm:self-auto')}>
-            {ABHOLZEITEN_FEHLEN.aktion.text}
-          </Link>
+            </div>
+          )}
         </div>
       )}
-      {naechsteAbholung && (
-        <Link
-          href="/orders"
-          className={cn('flex min-h-11 items-center gap-2 border-t border-border bg-muted/40 px-4 py-2.5 text-[13px] transition-colors hover:bg-muted md:px-[18px]', LEISE, FOKUS_RAHMEN_INNEN)}
-        >
-          <span className="flex-1">{naechsteAbholungText(naechsteAbholung)}</span>
-          <ChevronRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-        </Link>
-      )}
-      <div className="border-t border-border px-4 py-1 md:px-[18px]">
-        <Link href="/orders" className={TEXTLINK}>
+      {zeilen.length > 0 && (
+        <Link href="/orders" className={cn(TEXTLINK, 'self-start underline underline-offset-2')}>
           Alle Bestellungen ansehen →
         </Link>
-      </div>
+      )}
     </section>
   )
 }
 
 // ─── Braucht dich ───────────────────────────────────────────────────────────
 
-const BRAUCHT_DICH_SYMBOL: Record<BrauchtDichEintrag['art'], LucideIcon> = {
-  ueberfaellig: Clock,
-  ausverkauft: PackageX,
-  'ohne-kategorie': Tags,
-  status: Megaphone,
-}
-
 /**
- * „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts).
- * Ohne Eintrag keine Karte, sondern eine leise Zeile (Register N11): gedämpft
- * und ohne Rahmen wie „Zu tun einblenden" unten auf der Seite (13 px, `font-medium`),
- * nur ohne Knopf — es gibt nichts zu tippen. Die Zeile steht nur, wenn auch die
- * Packliste leer ist (brauchtDichAnzeige); unter einer vollen Packliste steht nichts.
+ * „Braucht dich" — nur, was eine Handlung verlangt (brauchtDich in src/lib/heute.ts),
+ * nach Board s1-heute mit dem Kopf über der Karte („Braucht dich · 1"). Ohne
+ * Eintrag steht nur bei leerer Packliste die eine Zeile BRAUCHT_DICH_LEER in
+ * einer Karte (Register N11, Board Bild 3: kleine Zeile in einer Karte, ohne
+ * Aktion); unter einer vollen Packliste steht nichts (brauchtDichAnzeige).
  */
 export function BrauchtDichKarte({ eintraege, packlisteLeer }: { eintraege: BrauchtDichEintrag[]; packlisteLeer: boolean }): React.JSX.Element | null {
   const anzeige = brauchtDichAnzeige(eintraege.length, packlisteLeer)
   if (anzeige === null) return null
-  if (anzeige === 'zeile') {
-    return <p className={cn('text-center text-[13px] font-medium', LEISE)}>{BRAUCHT_DICH_LEER}</p>
-  }
   return (
-    <section aria-labelledby="heute-braucht-dich" className={cn(KARTE, 'overflow-hidden')}>
-      <h2 id="heute-braucht-dich" className="border-b border-border px-4 py-3.5 text-[15px] font-semibold md:px-[18px]">
-        Braucht dich
+    <section aria-labelledby="heute-braucht-dich" className="flex flex-col gap-2">
+      <h2 id="heute-braucht-dich" className={cn(KOPF, 'flex min-h-8 items-center')}>
+        Braucht dich{anzeige === 'karte' && <> · {eintraege.length}</>}
       </h2>
-      <ul>
-        {eintraege.map((eintrag) => {
-          const Symbol = BRAUCHT_DICH_SYMBOL[eintrag.art]
-          return (
-            <li key={`${eintrag.art}-${eintrag.href}-${eintrag.text}`} className="border-t border-border first:border-t-0">
-              <Link
-                href={eintrag.href}
-                className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/12 text-status-offen">
-                  <Symbol className="size-4" strokeWidth={1.7} aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1 text-sm break-words">{eintrag.text}</span>
-                <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
-              </Link>
-              {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
-                <ul className="pr-4 pb-2 pl-16">
-                  {eintrag.unterpunkte.map((u) => (
-                    <li key={`${u.href}-${u.text}`}>
-                      <Link
-                        href={u.href}
-                        className={cn('flex min-h-11 items-center gap-2 rounded-lg px-2 text-[13px] transition-colors hover:bg-muted', LEISE, FOKUS_RAHMEN_INNEN)}
-                      >
-                        <span className="min-w-0 flex-1 truncate" title={u.text}>
-                          {u.text}
-                        </span>
-                        <ChevronRight className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          )
-        })}
-      </ul>
+      {anzeige === 'zeile' ? (
+        <p className={cn(KARTE, 'px-4 py-3.5 text-[14.5px] md:px-[18px]')}>{BRAUCHT_DICH_LEER}</p>
+      ) : (
+        <ul className={cn(KARTE, 'overflow-hidden')}>
+          {eintraege.map((eintrag) => {
+            return (
+              <li key={`${eintrag.art}-${eintrag.href}-${eintrag.text}`} className="border-t border-border first:border-t-0">
+                <Link
+                  href={eintrag.href}
+                  className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
+                >
+                  {/* Board s1-heute Bild 2: Titel fett, ohne Symbol im Kästchen davor, darunter leise die Erklärzeile. */}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14.5px] font-semibold break-words">{eintrag.text}</span>
+                    <span className={cn('mt-0.5 block text-[13px] leading-snug break-words', LEISE)}>{eintrag.erklaerung}</span>
+                  </span>
+                  <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
+                </Link>
+                {eintrag.unterpunkte && eintrag.unterpunkte.length > 0 && (
+                  <ul className="pr-4 pb-2 pl-4 md:pl-[18px]">
+                    {eintrag.unterpunkte.map((u) => (
+                      <li key={`${u.href}-${u.text}`}>
+                        <Link
+                          href={u.href}
+                          className={cn('flex min-h-11 items-center gap-2 rounded-lg px-2 text-[13px] transition-colors hover:bg-muted', LEISE, FOKUS_RAHMEN_INNEN)}
+                        >
+                          <span className="min-w-0 flex-1 truncate" title={u.text}>
+                            {u.text}
+                          </span>
+                          <ChevronRight className="size-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }
 
 // ─── Seitenspalte ───────────────────────────────────────────────────────────
 
-export function NaechsteAbholungKarte({ fenster, anzahl }: { fenster: NaechstesFenster | null; anzahl: number }): React.JSX.Element {
+/**
+ * „Nächste Abholung" mit Wochentag und Datum (V9, Board s1-heute): „Sa, 6. März,
+ * 9–12 Uhr", darunter die Zahl. `tag` kommt fertig von der Seite (abholTagMitDatum).
+ */
+export function NaechsteAbholungKarte({ fenster, tag, anzahl }: { fenster: NaechstesFenster | null; tag: string | null; anzahl: number }): React.JSX.Element | null {
+  // Ohne Abholzeit entfällt die Karte (Liste Lauf 32, heute Bild 4): Satz und Knopf stehen schon in der Packliste.
+  if (!fenster) return null
   return (
     <section aria-labelledby="heute-naechste-abholung" className={cn(KARTE, 'flex flex-col gap-1.5 p-[18px]')}>
-      <h2 id="heute-naechste-abholung" className={cn('text-[13px] font-normal', LEISE)}>
+      <h2 id="heute-naechste-abholung" className={KOPF}>
         Nächste Abholung
       </h2>
-      {/* Ohne Abholzeit nur der Titel als eine Zeile: Satz und Knopf stehen schon in der Packliste (N9, ein Zustand eine Fassung). */}
-      {fenster ? (
-        <>
-          {/* Umbruch nur nach dem Komma — „15–18 Uhr" bleibt zusammen. */}
-          <p className="font-heading text-[22px] leading-tight font-semibold break-words">
-            {fenster.name}, <span className="whitespace-nowrap">{fenster.zeit}</span>
-          </p>
-          <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : HEUTE_KEINE_BESTELLUNGEN}</p>
-        </>
-      ) : (
-        <p className={cn('text-[13px]', LEISE)}>{ABHOLZEITEN_FEHLEN.titel}</p>
-      )}
+      {/* Umbruch nur nach dem Komma — „15–18 Uhr" bleibt zusammen. */}
+      <p className="text-[17px] leading-tight font-semibold break-words">
+        {tag ?? fenster.name}, <span className="whitespace-nowrap">{fenster.zeit}</span>
+      </p>
+      <p className={cn('text-[13px]', LEISE)}>{anzahl > 0 ? mehrzahl(anzahl, 'Bestellung', 'Bestellungen') : HEUTE_KEINE_BESTELLUNGEN}</p>
     </section>
   )
 }
 
 /**
- * Umsatz diese Woche (Mo–So, gemeinsame Umsatzregel): Summe, Tagesbalken mit
- * dem heutigen Tag in Orange, Vergleich mit der Vorwoche bis jetzt. Die
+ * Umsatz diese Woche (Mo–So, gemeinsame Umsatzregel): Summe, Tagesbalken in
+ * Grün (heute fett beschriftet), Vergleich mit der Vorwoche bis jetzt. Die
  * Balken sind Anschauung (aria-hidden); die Werte stehen als Liste für den
- * Screenreader daneben.
+ * Screenreader daneben. Nach Board s1-heute der Betrag groß unter dem Kopf.
  */
 export function WocheKarte({
   summeCent,
   vergleich,
   balken,
+  selbstEingetragen = null,
 }: {
   summeCent: number
   vergleich: string
   balken: WochenBalken[]
+  /** „Mo und Di: Verkäufe, die du selbst eingetragen hast.“ (selbstEingetragenSatz) — null, wenn es keine gibt. */
+  selbstEingetragen?: string | null
 }): React.JSX.Element {
   return (
     <section aria-labelledby="heute-woche" className={cn(KARTE, 'flex flex-col gap-3 p-[18px]')}>
-      <div className="flex items-baseline gap-2.5">
-        <h2 id="heute-woche" className={cn('text-[13px] font-normal', LEISE)}>
+      <div className="flex flex-col gap-1">
+        <h2 id="heute-woche" className={KOPF}>
           Umsatz diese Woche
         </h2>
-        <p className="ml-auto text-[17px] font-semibold tabular-nums">{formatEuro(centsAlsEuro(summeCent))}</p>
+        <p className="font-heading text-[26px] leading-tight font-semibold tabular-nums">{formatEuro(centsAlsEuro(summeCent))}</p>
       </div>
       <div aria-hidden="true">
-        <div className="flex h-[78px] items-end gap-2">
+        {/* Board s1-/w1-heute: Balkenfläche 48 px, Balken leicht gerundet (4 px), 6 px Abstand (Abnahme Lauf 32). */}
+        <div className="flex h-12 items-end gap-1.5">
           {balken.map((b) => (
             <div
               key={b.label}
-              className={cn('flex-1 rounded-t-md rounded-b-sm', b.heute ? 'bg-primary' : b.cent > 0 ? 'bg-accent/45' : 'bg-border')}
+              // Board s1-heute: alle Tage mit Umsatz grün (heute ohne eigene Farbe, der Tag steht fett darunter);
+              // im Dunkeln helles Mint statt Dunkelgrün (G13, DIAGRAMM_BALKEN), leere Tage als Strich (DIAGRAMM_LEER).
+              className={cn('flex-1 rounded-[4px]', b.cent > 0 ? DIAGRAMM_BALKEN : DIAGRAMM_LEER)}
               // Höhe ist Messwert, keine Farbe: mindestens ein Strich, damit leere Tage sichtbar bleiben.
               style={{ height: b.hoeheProzent > 0 ? `${b.hoeheProzent}%` : '3px' }}
             />
           ))}
         </div>
-        <div className="mt-1.5 flex gap-2 text-center text-[11px]">
+        <div className="mt-0.5 flex gap-1.5 text-center text-xs">
           {balken.map((b) => (
             <span key={b.label} className={cn('flex-1', b.heute ? 'font-semibold text-foreground' : LEISE)}>
               {b.label}
@@ -605,8 +646,9 @@ export function WocheKarte({
           </li>
         ))}
       </ul>
-      <p className={cn('text-[12.5px]', LEISE)}>{vergleich}</p>
-      <Link href="/analytics" className={cn(TEXTLINK, 'self-start')}>
+      {selbstEingetragen && <p className={cn('text-[13px]', LEISE)}>{selbstEingetragen}</p>}
+      <p className={cn('text-[13px]', LEISE)}>{vergleich}</p>
+      <Link href="/analytics" className={cn(TEXTLINK, 'self-start text-[15px] underline underline-offset-2')}>
         Auswertung →
       </Link>
     </section>
@@ -619,46 +661,35 @@ export function WocheKarte({
  * „Zu tun" (freigabe.md §13 Nr. 53): EINE Liste statt „Erste Schritte" und
  * „Deine Hofseite". Was darin steht und in welcher Reihenfolge, entscheidet
  * zuTun (src/lib/erste-schritte.ts) — nur Offenes, jede Aufgabe einmal, ohne
- * das, was der Stripe-Kasten oben schon sagt. Aufbau wie „Braucht dich":
- * Zeilen sind Links in die Einstellungen, ihre Sätze brechen um statt
- * gekürzt zu werden (ein Hofname hat bis zu 80 Zeichen). Der leere Kreis ist
- * Schmuck; erledigt wird nichts auf Heute, deshalb kein Haken und kein Balken.
+ * das, was der Stripe-Kasten oben schon sagt. Nach Board s1-heute schlank:
+ * Kopf „Zu tun · n" und je Aufgabe ein grüner Textlink mit ihrem Titel
+ * (44 px). Seit Nr. 249 (Liste Lauf 32, heute Bild 4) ohne Einleitungssatz
+ * und ohne Beschreibung unter den Links — nur Überschrift und Links.
+ * „Ausblenden" bleibt im Kopf — sonst ließe sich die Karte nicht mehr
+ * wegnehmen (Nr. 53, C-Zeile der Liste).
  */
 export function ZuTunKarte({
   aufgaben,
-  wartetAufFreigabe,
   ausblenden,
 }: {
   aufgaben: readonly ZuTunAufgabe[]
-  wartetAufFreigabe: boolean
   /** Der Knopf „Ausblenden" (ErsteSchritteSchalter) — von der Seite gereicht, damit die Karte ohne Server-Aktion rendert. */
   ausblenden: ReactNode
 }): React.JSX.Element {
   return (
-    <section aria-labelledby="heute-zu-tun" className={cn(KARTE, 'overflow-hidden')}>
-      <div className="flex min-h-[52px] items-center gap-2.5 border-b border-border py-1 pr-2 pl-4 md:pl-[18px]">
-        <h2 id="heute-zu-tun" className="text-[15px] font-semibold">
-          {ZU_TUN_TEXT.titel}
+    <section aria-labelledby="heute-zu-tun" className={cn(KARTE, 'flex flex-col gap-1 py-2 pr-2 pl-4 md:pl-[18px]')}>
+      <div className="flex min-h-11 items-center gap-2.5">
+        <h2 id="heute-zu-tun" className={KOPF}>
+          {ZU_TUN_TEXT.titel} · {aufgaben.length}
         </h2>
-        <span className={cn('text-[12.5px] md:text-[13px]', LEISE)}>{aufgaben.length} offen</span>
         <span className="ml-auto shrink-0">{ausblenden}</span>
       </div>
-      {wartetAufFreigabe && (
-        <p className={cn('border-b border-border px-4 py-3 text-[12.5px] leading-relaxed md:px-[18px]', LEISE)}>{ERSTE_SCHRITTE_WARTET}</p>
-      )}
-      <ul>
+      <ul className="flex flex-col">
         {aufgaben.map((aufgabe) => (
-          <li key={aufgabe.id} className="border-t border-border first:border-t-0">
-            <Link
-              href={aufgabe.href}
-              className={cn('flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted md:px-[18px]', FOKUS_RAHMEN_INNEN)}
-            >
-              <span aria-hidden="true" className="size-5 shrink-0 rounded-full border-[1.5px] border-muted-foreground/60" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold break-words">{aufgabe.titel}</span>
-                <span className={cn('mt-0.5 block text-[12.5px] leading-snug break-words', LEISE)}>{aufgabe.satz}</span>
-              </span>
-              <ChevronRight className={cn('size-4 shrink-0', LEISE)} strokeWidth={1.7} aria-hidden="true" />
+          <li key={aufgabe.id}>
+            {/* Über die volle Breite: Ein kurzer Titel („Logo“) wäre sonst schmaler als 44 px (Messung Gate A, Lauf 31). */}
+            <Link href={aufgabe.href} className={cn(TEXTLINK, 'flex w-full underline underline-offset-2 break-words')}>
+              {zuTunLinkText(aufgabe)}
             </Link>
           </li>
         ))}

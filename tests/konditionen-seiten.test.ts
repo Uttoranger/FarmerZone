@@ -23,15 +23,29 @@ vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => createElement('img', { alt }),
 }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
+// Seit Nr. 226 (/fuer-hoefe) und Nr. 231 (/konditionen) lesen die Seiten den Stichtag „Hofpreis-Modell ab“ —
+// hier weit weg, also Modell „bisher“ (Zusammenführung im Sammel-PR Lauf 30).
+// Seit N45 liest /konditionen den Stichtag über ladePlattformEinstellung (ohne stille Vorgabe).
+vi.mock('@/server/queries/plattform-einstellung', async () => {
+  const { PLATTFORM_EINSTELLUNG_STANDARD } = await import('@/lib/plattform-einstellung')
+  return {
+    gruendungFuerSeiten: async () => null,
+    ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: new Date('2099-01-01T00:00:00Z') }),
+    ladePlattformEinstellung: async () => ({ ...PLATTFORM_EINSTELLUNG_STANDARD, hofpreisModellAb: '2099-01-01T00:00:00.000Z' }),
+  }
+})
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
   KundeShellMitSitzung: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }))
 
-import KonditionenPage, { revalidate as konditionenRevalidate } from '@/app/(public)/konditionen/page'
+import KonditionenPage, { dynamic as konditionenDynamic } from '@/app/(public)/konditionen/page'
 import FuerHoefePage from '@/app/(public)/fuer-hoefe/page'
-import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT, TARIFE, servicegebuehrZahltKunde, vorBarStichtag } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_SATZ, SERVICEGEBUEHR_SATZ_TEXT, TARIFE, konditionenStichtagZeile, servicegebuehrZahltKunde, vorBarStichtag } from '@/lib/konditionen'
+import { formatDatumLang } from '@/lib/format'
 import { FUER_HOEFE_FRAGEN } from '@/lib/fuer-hoefe'
+
+/** Seit Nr. 231 asynchron (Stichtag „Hofpreis-Modell ab“) — einmal aufgelöst, dann gerendert. */
+const KONDITIONEN_SEITE = await KonditionenPage()
 
 /** Die Seite ist seit Nr. 93 asynchron (Zahlen der Gründungshöfe) — einmal aufgelöst, dann gerendert. */
 const FUER_HOEFE_SEITE = await FuerHoefePage()
@@ -54,14 +68,13 @@ const PREISSEITEN = [
  */
 const ZAHL_LITERAL = /((?<![\w-])\d+(?:[.,]\d+)?\s*(?:€|%|Euro|Prozent))|(€\s*\d)/
 
-describe('Register F6 (19a): /konditionen wird stündlich neu gebaut', () => {
-  it('revalidate = 3600 als Segment-Konfiguration, ohne die Seite dynamisch zu machen', () => {
-    // Nach dem Stichtag (B1) verschwindet die Bar-Ausnahme so spätestens nach
-    // einer Stunde plus erstem Aufruf — vorher erst mit dem nächsten Deploy.
-    expect(konditionenRevalidate).toBe(3600)
+describe('N45 (ersetzt F6/19a): /konditionen wird bei jedem Aufruf frisch gebaut', () => {
+  it('force-dynamic, kein revalidate, und die Seite liest keine Anfrage', () => {
+    // Mit dem Stichtag schalten Gebühr und Bar-Ausnahme sofort um — nicht erst nach bis zu einer Stunde.
+    expect(konditionenDynamic).toBe('force-dynamic')
     const quelle = lies('src/app/(public)/konditionen/page.tsx')
-    expect(quelle).toMatch(/^export const revalidate = 3600$/m)
-    expect(quelle).not.toMatch(/export const dynamic|headers\(\)|cookies\(\)/)
+    expect(quelle).not.toMatch(/^export const revalidate/m)
+    expect(quelle).not.toMatch(/headers\(\)|cookies\(\)/)
   })
 })
 
@@ -96,7 +109,7 @@ describe('Quelltext — eine Quelle für Preise', () => {
 })
 
 describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
-  const konditionen = renderToStaticMarkup(createElement(KonditionenPage))
+  const konditionen = renderToStaticMarkup(KONDITIONEN_SEITE)
   const fuerHoefe = renderToStaticMarkup(FUER_HOEFE_SEITE)
 
   it.each([
@@ -124,8 +137,10 @@ describe('Gerendert — dieselben Preise auf beiden Seiten', () => {
   it.each([
     ['/konditionen', konditionen],
     ['/fuer-hoefe', fuerHoefe],
-  ])('%s spricht nicht mehr von Plattformgebühr oder Gründungshöfen', (_seite, html) => {
-    expect(html).not.toMatch(/Plattformgebühr|Gründungs/)
+  ])('%s spricht nicht mehr von Plattformgebühr oder Gründungshöfen — außer im Satz zum Stichtag (N45)', (_seite, html) => {
+    // Vor dem Stichtag kündigt /konditionen das Hofpreis-Modell mit dem Tag an (A005 4e); nur dieser Satz nennt die Plattformgebühr.
+    const satz = konditionenStichtagZeile('bisher', formatDatumLang(new Date('2099-01-01T00:00:00Z')), new Date())
+    expect(html.split(satz).join('')).not.toMatch(/Plattformgebühr|Gründungs/)
   })
 })
 

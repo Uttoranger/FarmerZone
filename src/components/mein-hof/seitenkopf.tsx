@@ -1,8 +1,5 @@
-import Image from 'next/image'
-import { ArrowUpRight } from 'lucide-react'
 import type { MeinHofReiterId } from '@/lib/bauern-navigation'
-import { hofInitialen } from '@/lib/hof-initialen'
-import { schildTon } from '@/lib/mein-hof'
+import { schildTon, MEIN_HOF_KOPF_TEXT } from '@/lib/mein-hof'
 import { vorschauLink } from '@/lib/hofseite-vorschau'
 import { MEIN_HOF_ANSICHT_TEXT } from '@/lib/mein-hof-ansicht'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
@@ -12,8 +9,7 @@ import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
-import { MeinHofKopf } from '@/components/mein-hof/mein-hof-kopf'
-import { bildStil } from '@/lib/bild-ausschnitt'
+import { MeinHofKopf, MeinHofZustandsKarte } from '@/components/mein-hof/mein-hof-kopf'
 import { cn } from '@/lib/utils'
 
 /*
@@ -23,8 +19,12 @@ import { cn } from '@/lib/utils'
  * Reiter Hofseite | Beiträge als Links (?reiter=, E12).
  *
  * Unter lg seit Nr. 143 der Kopf am Handy (mein-hof-kopf.tsx, Register N3,
- * Ergänzung 22.10.2026: Titelbild-Streifen, Zustandszeile, Reiter — derselbe
- * wie auf /products unter md), ab lg die kompakte Zeile wie bisher. Seit
+ * Ergänzung 22.10.2026; seit der Ergänzung 5.11.2026 Titel „Mein Hof“ mit
+ * Schild statt Titelbild-Streifen, dann Reiter und Zustandskarte — derselbe wie
+ * auf /products unter md). Ab lg seit Lauf 31 (Nr. 238, Board w1-mein-hof) die
+ * sichtbare h1 „Mein Hof“, darunter Schild · Hofname · Adresse, rechts Teilen und
+ * Kundenansicht, darunter breite Reiter und dieselbe Zustandskarte wie am Handy.
+ * Je Breite steht genau eine h1 sichtbar (die andere Fassung ist ausgeblendet). Seit
  * Nr. 22e der einzige Kopf von Mein Hof (der Bestandskopf fiel mit der
  * Umleitung von /status weg).
  *
@@ -43,41 +43,35 @@ const KNOPF = cn(
   FOKUS_RAHMEN
 )
 
-/** Logo oder Initialen, rund — auch für den Kopf am Handy (mein-hof-kopf.tsx). */
-export function Hofbild({ hof, klasse }: { hof: MeinHofKopfDaten; klasse: string }): React.JSX.Element {
-  return hof.logoUrl ? (
-    // Rund geschnitten im Kasten: Mit Zoom ragte das Logo sonst über den Kreis; ohne Filter (Register N17, Nr. 98).
-    <span className={cn(klasse, 'block shrink-0 overflow-hidden rounded-full')}>
-      <Image src={hof.logoUrl} alt="" width={112} height={112} className="size-full object-cover" style={bildStil(hof.logoAusschnitt, { filter: false })} />
-    </span>
-  ) : (
-    <span
-      aria-hidden="true"
-      className={cn(klasse, 'flex shrink-0 items-center justify-center rounded-full bg-muted font-heading font-semibold text-foreground')}
-    >
-      {hofInitialen(hof.name)}
-    </span>
-  )
-}
-
 function Zustand({ hof }: { hof: MeinHofKopfDaten }) {
-  if (!hof.zustand.schild) return null
+  // Vorsatz „Öffentlich ·“ für eine öffentliche Hofseite ohne Schild (Board w1-mein-hof, Liste Lauf 32 mein-hof).
+  if (!hof.zustand.schild) {
+    return hof.zustand.oeffentlich ? (
+      <span className="flex items-center gap-2.5 text-[15px] font-semibold text-status-fertig">
+        Öffentlich
+        <span aria-hidden="true" className="font-normal text-muted-foreground">
+          ·
+        </span>
+      </span>
+    ) : null
+  }
   return <StatusBadge status={schildTon(hof.zustand.schild.farbe)}>{hof.zustand.schild.text}</StatusBadge>
 }
 
 function Adresse({ hof }: { hof: MeinHofKopfDaten }) {
   if (!hof.zustand.oeffentlich) {
-    return <span className="block min-w-0 truncate text-[13px] text-muted-foreground">{hof.adresse.anzeige}</span>
+    return <span className="block min-w-0 truncate text-[15px] text-muted-foreground">{hof.adresse.anzeige}</span>
   }
   return (
     <span className="flex min-w-0 items-center gap-0.5">
+      {/* Der Link selbst ist 44 px hoch (WCAG 2.5.8); gekürzt wird nur das Wort darin. */}
       <a
         href={hof.adresse.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn('min-w-0 truncate rounded-sm text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline', FOKUS_RAHMEN)}
+        className={cn('inline-flex min-h-11 min-w-0 items-center rounded-sm text-[15px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline', FOKUS_RAHMEN)}
       >
-        {hof.adresse.anzeige}
+        <span className="min-w-0 truncate">{hof.adresse.anzeige}</span>
         <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>
       </a>
       <AdresseKopierenKnopf url={hof.adresse.url} className={cn('text-muted-foreground hover:bg-muted hover:text-foreground', FOKUS_RAHMEN)} />
@@ -89,9 +83,9 @@ function Knoepfe({ hof }: { hof: MeinHofKopfDaten }) {
   return (
     <div className="flex shrink-0 gap-2">
       {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} className={KNOPF} label="Teilen" />}
+      {/* Ohne Pfeil wie im Board w1-mein-hof; den neuen Tab nennt der Screenreader-Zusatz. */}
       <a href={vorschauLink(hof.slug)} target="_blank" rel="noopener noreferrer" className={KNOPF}>
         {MEIN_HOF_ANSICHT_TEXT.kundenansicht}
-        <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
         <span className="sr-only">{MEIN_HOF_ANSICHT_TEXT.neuerTabHinweis}</span>
       </a>
     </div>
@@ -102,11 +96,14 @@ export function MeinHofSeitenkopf({
   hof,
   aktiv,
   zustand,
+  jetzt,
 }: {
   hof: MeinHofKopfDaten | null
   aktiv: MeinHofReiterId
-  /** Für die Zustandszeile am Handy (ladeMeinHofZustand); ab lg zeigt die Zeile weiter das Schild. */
+  /** Für die Zustandskarte (ladeMeinHofZustand) — am Handy und ab lg unter den Reitern. */
   zustand: MeinHofZustand | null
+  /** Der Zeitpunkt der Seite — für „Stand …“ im Kopf am Handy. */
+  jetzt: Date
 }): React.JSX.Element | null {
   if (!hof) return null
 
@@ -115,29 +112,35 @@ export function MeinHofSeitenkopf({
     <header className="print:hidden lg:mb-6">
       {/* ===== Unter lg: der Kopf am Handy, mit den Reitern ===== */}
       <div className="lg:hidden">
-        <MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} />
+        {/* Die Zustandskarte steht unter lg im Inhalt (farm-page/page.tsx): Titel und Reiter kleben, die Karte scrollt. */}
+        <MeinHofKopf hof={hof} zustand={zustand} aktiv={aktiv} jetzt={jetzt} titelAlsH1 ohneKarte />
       </div>
 
-      {/* ===== Ab lg: kompakte Zeile ===== */}
+      {/* ===== Ab lg: Überschrift „Mein Hof“ wie im Board w1-mein-hof ===== */}
       <div className="hidden lg:block">
-        <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4">
-          <Hofbild hof={hof} klasse="size-12 text-base" />
+        <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <p className="min-w-0 truncate font-heading text-lg leading-snug font-semibold text-foreground" title={hof.name}>
-                {hof.name}
-              </p>
+            <h1 className="font-heading text-[30px] leading-tight font-semibold text-foreground">{MEIN_HOF_KOPF_TEXT.titel}</h1>
+            {/* Schild, Hofname und Adresse in einer Zeile (Board: „Öffentlich · Hof Müller · Adresse“). */}
+            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5">
               <Zustand hof={hof} />
-            </div>
-            <div className="mt-0.5">
-              <Adresse hof={hof} />
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="max-w-[24rem] truncate text-[15px] text-muted-foreground" title={hof.name}>
+                  {hof.name}
+                </span>
+                <span aria-hidden="true" className="text-muted-foreground">
+                  ·
+                </span>
+                <Adresse hof={hof} />
+              </span>
             </div>
           </div>
           <Knoepfe hof={hof} />
         </div>
 
-        {/* Reiter links gruppiert (Mockup). */}
-        <MeinHofReiterLeiste aktiv={aktiv} className="mt-4" />
+        {/* Breite Reiter wie im Board, darunter die Zustandskarte (nicht auf Beiträge). */}
+        <MeinHofReiterLeiste aktiv={aktiv} breit className="mt-3" />
+        {aktiv !== 'beitraege' && <MeinHofZustandsKarte hof={hof} zustand={zustand} className="mt-4 max-w-[760px]" />}
       </div>
     </header>
   )

@@ -112,10 +112,15 @@ describe('Verdrahtung in den Bauteilen', () => {
   })
 
   it('lässt die Datei-Felder der Meldung stehen, auch wenn ein Bildschirmfoto ankommt', () => {
-    const text = quelltext('src/components/shared/meldung-form.tsx')
+    // Seit Nr. 225 zeichnet der gemeinsame Baustein das Formular beider Welten (meldung-form.tsx ruft nur den Hook).
+    const text = quelltext('src/components/ui/meldung-formular-ansicht.tsx')
 
-    expect(text.match(/\{upload\.fileInput\}/g)).toHaveLength(1)
-    expect(text.indexOf('{upload.fileInput}')).toBeLessThan(text.indexOf('{screenshotUrl ?'))
+    expect(text.match(/f\.upload\.fileInput\}/g)).toHaveLength(1)
+    // Seit Nr. 268 steht die Fallunterscheidung (Foto da oder Knopf) in `bildschirmfoto`, je Welt vor oder nach der
+    // Fehlernummer gesetzt; die Datei-Felder bleiben außerhalb davon.
+    const fall = text.slice(text.indexOf('const bildschirmfoto'), text.indexOf('return (', text.indexOf('const bildschirmfoto')))
+    expect(fall).toContain('f.screenshotUrl ? (')
+    expect(fall).not.toContain('fileInput')
   })
 
   it('hält die Datei-Felder des Produktdialogs außerhalb des Akkordeons', () => {

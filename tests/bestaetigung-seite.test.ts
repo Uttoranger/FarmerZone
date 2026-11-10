@@ -16,8 +16,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-const { shellProps, teilenProps, neuigkeitenProps } = vi.hoisted(() => ({
+const { shellProps, platzProps, teilenProps, neuigkeitenProps } = vi.hoisted(() => ({
   shellProps: [] as Array<Record<string, unknown>>,
+  platzProps: [] as Array<boolean | undefined>,
   teilenProps: [] as Array<Record<string, unknown>>,
   neuigkeitenProps: [] as Array<Record<string, unknown>>,
 }))
@@ -33,8 +34,9 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
 }))
 vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
-  KundeShellMitSitzung: (p: { unterleiste?: boolean; children?: ReactNode }) => {
+  KundeShellMitSitzung: (p: { unterleiste?: boolean; platzFuerLeiste?: boolean; children?: ReactNode }) => {
     shellProps.push({ unterleiste: p.unterleiste })
+    platzProps.push(p.platzFuerLeiste)
     return createElement('div', { 'data-shell': 'kunde' }, p.children)
   },
 }))
@@ -160,9 +162,11 @@ describe('Bar, wartet auf Bestätigung', () => {
     const t = text(await seite())
     expect(t).toContain('Fast geschafft – bitte bestätige per E-Mail')
     expect(t).toContain('erika@example.org')
-    // 10:12 Uhr bestellt + zwei Stunden, vor dem Abholbeginn 15:00 Uhr.
-    expect(t).toContain('Bestätigen bis heute, 12:12 Uhr')
-    expect(t).toContain('Danach geben wir die Ware wieder frei')
+    // 10:12 Uhr bestellt + zwei Stunden, vor dem Abholbeginn 15:00 Uhr — seit Nr. 227 mit Wochentag und Datum (V9),
+    // im Wortlaut des Boards s1-/w1-bestaetigung (Bild 3), samt Satz an die Kundin und Termin in derselben Karte.
+    expect(t).toMatch(/Bitte bis heute, Mo, 5\.\sOkt, 12:12 Uhr bestätigen/)
+    expect(t).toContain('Erst nach deiner Bestätigung packt der Hof.')
+    expect(t).toMatch(/Abholung: heute, Mo, 5\.\sOkt, 15:00–18:00 Uhr\./)
   })
 
   it('der Schritt „Bestätigt" ist dran, nicht erledigt', async () => {
@@ -243,12 +247,14 @@ describe('Online bezahlt', () => {
 })
 
 describe('Status aus der Datenbank', () => {
-  it('abholbereit: „Gepackt" erledigt, „Abgeholt" ist dran', async () => {
+  it('abholbereit: „Abholbereit" erledigt, „Abgeholt" ist dran — die Kundin liest nie „Gepackt"', async () => {
     findUnique.mockResolvedValue(bestellung({ status: 'READY' }) as never)
     const html = await seite()
     expect(text(html)).toContain('Deine Bestellung liegt bereit')
     expect(html).toMatch(/data-schritt="gepackt"[^>]*data-stand="erledigt"/)
     expect(html).toMatch(/data-schritt="abgeholt"[^>]*data-stand="naechster"/)
+    expect(text(html)).toContain('Abholbereit')
+    expect(text(html)).not.toContain('Gepackt')
   })
 
   it('Zahlung wird geprüft: Abholkarte ohne „In den Kalender" — der Termin steht erst mit der Zahlung', async () => {
@@ -302,7 +308,10 @@ describe('„Hof teilen" teilt die öffentliche Hofseite', () => {
 })
 
 describe('Neuigkeiten per E-Mail auf der Bestätigungsseite (Register N2, Nr. 46)', () => {
-  it('bar offen: die Karte steht da — mit Kennung, gültiger Signatur, Hofname und der Adresse der Bestellung', async () => {
+  it('bar offen: keine Karte (Board s1-/w1-bestaetigung Bild 3, Lauf 31) — bar bestätigt: die Karte mit Kennung, gültiger Signatur, Hofname und der Adresse der Bestellung', async () => {
+    expect(await seite()).not.toContain('data-neuigkeiten')
+    findUnique.mockResolvedValue(bestellung({ status: 'CONFIRMED' }) as never)
+    neuigkeitenProps.length = 0
     const html = await seite()
     expect(html).toContain('data-neuigkeiten="karte"')
     expect(neuigkeitenProps).toEqual([{ orderId: 'order-1', sig: GUELTIG, hofName: 'Hof Test', email: 'erika@example.org' }])
@@ -412,5 +421,42 @@ describe('„Vertrag widerrufen“ (Nr. 200, Nachbesserung Runde 2): nur bei wid
     expect(widerrufLinks(await seite())).toEqual([])
     findUnique.mockResolvedValue(bestellung({ status: 'READY', kaeuferArt: 'PRIVAT', pickedUpAt: null }) as never)
     expect(widerrufLinks(await seite())).toHaveLength(1)
+  })
+})
+
+describe('Nach den Boards s1-/w1-bestaetigung (Lauf 31, Runde 2)', () => {
+  beforeEach(() => {
+    findUnique.mockResolvedValue(bestellung({ paymentMethod: 'ONLINE', paymentStatus: 'PAID', status: 'PAID' }) as never)
+  })
+
+  it('Positionen mit der Menge vorn: „1 × Freilandeier · € 4,50“', async () => {
+    const t = text(await seite())
+    expect(t).toContain('1 × Freilandeier · € 4,50')
+    expect(t).not.toContain('Freilandeier · 1 Stück')
+  })
+
+  it('der Kicker „Bestellung bei <Hof>“ erst ab 768 px — am Handy nennt ihn die Titelzeile', async () => {
+    const html = await seite()
+    expect(html).toMatch(/<p class="[^"]*\bhidden\b[^"]*\bmd:block\b[^"]*" title="Bestellung bei Hof Test">/)
+  })
+
+  it('erledigte Schritte: das Wort fett in der Textfarbe, der Balken grün', async () => {
+    const html = await seite()
+    const schritt = html.match(/<li[^>]*data-schritt="bezahlt"[^>]*>([\s\S]*?)<\/li>/)?.[1] ?? ''
+    expect(schritt).toContain('bg-status-fertig')
+    expect(schritt).toMatch(/<span class="[^"]*font-bold text-foreground[^"]*">Bezahlt/)
+  })
+
+  it('die Hauptaktion steht ab 768 px fest am Fensterrand, der Seitenfuß hält dafür Platz frei', async () => {
+    const html = await seite()
+    const leiste = html.match(/<div data-unten-fest="" class="([^"]*)"/)?.[1] ?? ''
+    expect(leiste).toMatch(/\bmd:fixed\b/)
+    expect(leiste).toMatch(/\bbottom-0\b/)
+    expect(platzProps.at(-1)).toBe(true)
+  })
+
+  it('ohne Signatur: der Satz gedämpft (Bild 4)', async () => {
+    const html = await seite({ sig: undefined })
+    expect(html).toMatch(/<p class="[^"]*text-muted-foreground[^"]*">Danke – alle Details stehen in deiner E-Mail\.<\/p>/)
   })
 })

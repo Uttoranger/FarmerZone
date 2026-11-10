@@ -102,9 +102,21 @@ const KENNZEICHNUNG_ERLAUBT: Erlaubt[] = [
   },
   {
     datei: 'src/lib/rechtstexte/agb.ts',
-    // Punkt 18.2 der AGB; der Satz geht danach mit dem Namen (MARKE) weiter, der JSX-Text bzw. die Vorlage endet dort.
+    // Punkt 18.1 der AGB 1.0; das Stück nach dem Fettdruck nennt die Kennzeichnung der Ware.
+    text: /^und für die du alle Bewilligungen hast, und beschreibst sie richtig und vollständig/,
+    grund: 'AGB 1.0: Rechtstext, wörtlich aus docs/recht/agb.md (Register O4, N45)',
+  },
+  {
+    datei: 'src/lib/rechtstexte/agb.ts',
+    // Punkt 18.2 der AGB 1.0 (wie 0.9); der Satz geht danach mit dem Namen (MARKE) weiter.
     text: /^Du bist für Registrierung und Kennzeichnung nach dem Futtermittelrecht verantwortlich/,
-    grund: 'Rechtstext, wörtlich aus docs/recht/agb.md (Register O4)',
+    grund: 'AGB 1.0: Rechtstext, wörtlich aus docs/recht/agb.md (Register O4, N45)',
+  },
+  {
+    datei: 'src/lib/rechtstexte/agb-0-9.ts',
+    // Punkt 18.2 der AGB 0.9; der Satz geht danach mit dem Namen (MARKE) weiter, der JSX-Text bzw. die Vorlage endet dort.
+    text: /^Du bist für Registrierung und Kennzeichnung nach dem Futtermittelrecht verantwortlich/,
+    grund: 'Fassung 0.9 eingefroren (N45/A005)',
   },
   {
     datei: 'src/lib/laender.ts',
@@ -220,7 +232,7 @@ describe('Fachwort-Wache', () => {
     const zeigen = [...quelldateien(join(WURZEL, 'src'))]
       .map((p) => relative(WURZEL, p).split(sep).join('/'))
       .filter((p) => p !== UMSATZGRENZE_QUELLE && /\bJAHRESSUMME_TEXT\b/.test(quelle(p)))
-    expect(zeigen.length).toBeGreaterThan(0)
+    // Seit Nr. 251 zeigt Verkäufe die Jahressumme nicht mehr (Board ohne Karte „Diese Woche“); wer sie wieder zeigt, braucht den Satz.
     for (const datei of zeigen) expect(quelle(datei), datei).toMatch(/\bUMSATZGRENZE_ERKLAERUNG\b/)
   }, 30_000)
 

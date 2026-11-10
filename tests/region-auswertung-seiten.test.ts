@@ -46,13 +46,13 @@ import { umfeldLink, umfeldUmleitung } from '@/schemas/umfeld-filter'
 import UmfeldUmleitung from '@/app/(hof)/analytics/umfeld/page'
 import { RegionKopf } from '@/components/region/region-kopf'
 import { FutterKaufenAnsicht } from '@/components/region/futter-kaufen-ansicht'
-import { KennzahlenReihe, ServicegebuehrenKarte, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
+import { GebuehrenKarte, KennzahlenReihe, TEILEN_FUSS, TeilenWirkungKarte, UmsatzKarte } from '@/components/auswertung/auswertung-teile'
+import { gebuehrTitel } from '@/components/auswertung/gebuehr-titel'
 import { baueFutterKaufen } from '@/lib/futter-kaufen'
-import { kennzahlen, servicegebuehrenSaetze, teilenKarte } from '@/lib/auswertung'
-import { UMSATZ_TEXT } from '@/lib/umsatz'
+import { PLATTFORMGEBUEHR_KARTE_BAR, PLATTFORMGEBUEHR_KARTE_ERKLAERUNG, gebuehrenKarteText, kennzahlen, teilenKarte } from '@/lib/auswertung'
+import { UMSATZ_TEXT, umsatzfenster } from '@/lib/umsatz'
 import { KENNZAHL_TEXT } from '@/lib/heute'
 import { fasseTeilenWirkungZusammen } from '@/lib/teilen-wirkung'
-import { TEILEN_ZAEHLUNG_HINWEIS } from '@/lib/teilen-kanal'
 import { BAR_OHNE_GEBUEHR_SATZ, BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -141,16 +141,18 @@ describe('Routen und Navigation', () => {
     }
   })
 
-  it('Servicegebühren: keine Zahl, kein Datum, kein SEPA-Abschnitt im Quelltext der Karte', () => {
+  it('Gebühren-Karte: keine Zahl, kein Datum, kein SEPA-Abschnitt und kein Gebühren-Wort im Quelltext der Karte', () => {
     const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
-    const karte = teile.slice(teile.indexOf('export function ServicegebuehrenKarte'), teile.indexOf('// ─── Kanäle'))
-    expect(karte).not.toMatch(/2027|Februar|Lastschrift|SEPA|\d+ ?%/)
+    const karte = teile.slice(teile.indexOf('export function GebuehrenKarte'), teile.indexOf('// ─── Kanäle'))
+    // Den Titel baut gebuehrTitel (auswertung/gebuehr-titel.ts) aus gebuehrWortFuerZeitraum; die Karte nimmt ihn nur entgegen.
+    expect(karte).toContain('{titel}')
+    expect(karte).not.toMatch(/2027|Februar|Lastschrift|SEPA|\d+ ?%|Servicegebühr|Plattformgebühr/)
   })
 })
 
 describe('Karten im neuen Design', () => {
   it('RegionKopf: zwei Reiter als Links, der offene mit aria-current', () => {
-    const html = renderToStaticMarkup(createElement(RegionKopf, { reiter: 'futter', km: 25 }))
+    const html = renderToStaticMarkup(createElement(RegionKopf, { reiter: 'futter', km: 25, hofName: 'Hof Test', jetzt: new Date('2027-03-03T10:00:00Z') }))
     expect(html).toContain('<h1')
     expect(html).toMatch(/href="\/region\?reiter=futter&amp;km=25"[^>]*aria-current="page"/)
     expect(html).toContain('href="/region?km=25"')
@@ -211,8 +213,11 @@ describe('Karten im neuen Design', () => {
     // Seit Nr. 29 mit `?kaeufer=betrieb`: Die Kasse belegt „Betrieb" vor. Vorgewählt ist die erste kaufbare Größe.
     expect(html).toContain('href="/testhof/produkt/p?kaeufer=betrieb"')
     expect(html).toContain('Bestellen · Kleinballen · € 4,50')
-    expect(html).toMatch(/<fieldset[^>]*><legend[^>]*>Größe<\/legend>/)
-    expect(html).toContain('günstigster Kilopreis')
+    // Seit Nr. 272 die Größen als Optionen über die Größenkachel G5 (Radiogruppe „Größe“, Zeilen mit Kilopreis).
+    expect(html).toMatch(/role="radiogroup"[^>]*aria-label="Größe"|aria-label="Größe"[^>]*role="radiogroup"/)
+    expect(html).toContain('data-form="zeile"')
+    // Kopf der Futterkarte: Produkt als Titel, darunter „Hof · km“ ohne PLZ und Ort (Board s1-/w1-region Bild 2).
+    expect(html).toContain('>Testhof A · 3,0 km</p>')
     expect(html).toContain('Anhänger nötig')
     expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;art=HEU_STROH"')
     expect(html).toContain('href="/region?reiter=futter&amp;km=25&amp;abholung=morgen"')
@@ -245,21 +250,48 @@ describe('Karten im neuen Design', () => {
   it('Servicegebühren dieses Monats vor dem Stichtag: Summe, Bar-Ausnahme, keine Lastschrift', () => {
     const jetzt = new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 30 * 24 * 3600 * 1000)
     const html = renderToStaticMarkup(
-      createElement(ServicegebuehrenKarte, {
-        monat: { monat: '2027-01', onlineCents: 153, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 153, bezeichnung: 'Jänner 2027' },
-        saetze: servicegebuehrenSaetze(jetzt),
+      createElement(GebuehrenKarte, {
+        titel: gebuehrTitel(umsatzfenster('monat', jetzt), { hofpreisModellAb: null }),
+        gebuehr: { onlineCents: 153, onlineAnzahl: 3, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 153 },
+        text: gebuehrenKarteText('2027-01', { hofpreisModellAb: null }, jetzt),
       })
     )
-    expect(html).toContain('Servicegebühren dieses Monats')
+    expect(html).toMatch(/Servicegebühr im (Dezember|Jänner)/)
     expect(html).toContain('€ 1,53')
     expect(html).toContain(BAR_OHNE_GEBUEHR_SATZ)
-    expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt/)
+    expect(html).not.toMatch(/Lastschrift|SEPA|Grundgebühr|Vor Ort bezahlt|Bar bei Abholung/)
+  })
+
+  // Rendertest „kein ‚Servicegebühr‘ nach dem Stichtag“ (V62, V63; Lauf 30, Nr. 225): die Auswertung im Hofpreis-Modell.
+  it('Gebühren-Karte nach dem Stichtag: „Plattformgebühr im März“, nirgends „Servicegebühr“, Bar-Zeile mit Lastschrift', () => {
+    const stichtag = new Date('2027-02-01T00:00:00+01:00')
+    const jetzt = new Date('2027-03-03T10:00:00+01:00')
+    const html = renderToStaticMarkup(
+      createElement(GebuehrenKarte, {
+        titel: gebuehrTitel(umsatzfenster('monat', jetzt), { hofpreisModellAb: stichtag }),
+        gebuehr: { onlineCents: 4982, onlineAnzahl: 22, vorOrtCents: 0, vorOrtAnzahl: 0, summeCents: 4982 },
+        text: gebuehrenKarteText('2027-03', { hofpreisModellAb: stichtag }, jetzt),
+      })
+    )
+    expect(html).toContain('Plattformgebühr im März')
+    // Gewählter Zeitraum (Nr. 251): die laufende Woche heißt „diese Woche“, eine frühere ausgeschrieben.
+    expect(gebuehrTitel(umsatzfenster('woche', jetzt), { hofpreisModellAb: stichtag })).toBe('Plattformgebühr diese Woche')
+    expect(gebuehrTitel(umsatzfenster('woche', jetzt, 1), { hofpreisModellAb: stichtag })).toBe('Plattformgebühr 22.–28. Februar')
+    expect(gebuehrTitel(umsatzfenster('jahr', jetzt), { hofpreisModellAb: stichtag })).toBe('Gebühren im Jahr 2027')
+    expect(html).toContain('Bar bei Abholung (0 Bestellungen)')
+    expect(html).toContain(PLATTFORMGEBUEHR_KARTE_ERKLAERUNG)
+    expect(html).toContain(PLATTFORMGEBUEHR_KARTE_BAR)
+    expect(html).not.toMatch(/Servicegebühr/)
+    // Gegenprobe: im Monat des Stichtags (beide Modelle) heißt es „Gebühren“, davor wieder „Servicegebühren“.
+    expect(gebuehrenKarteText('2027-02', { hofpreisModellAb: new Date('2027-02-15T00:00:00+01:00') }, jetzt).titel).toBe('Gebühren dieses Monats')
+    expect(gebuehrenKarteText('2027-01', { hofpreisModellAb: stichtag }, new Date('2027-01-20T10:00:00+01:00')).titel).toBe('Servicegebühren dieses Monats')
   })
 
   it(`Kennzahl „Über ${MARKE}" zählt die abgeholten Bestellungen — kein „Warenumsatz" mehr (Nr. 53)`, () => {
-    const html = renderToStaticMarkup(createElement(KennzahlenReihe, { k: kennzahlen([], 0), zeitraum: 'Diese Woche' }))
+    const html = renderToStaticMarkup(createElement(KennzahlenReihe, { k: kennzahlen([], 0), zeitraum: 'Februar 2027', satzZeitraum: 'im Februar' }))
     expect(html).toMatch(new RegExp(`<dt[^>]*>${UMSATZ_TEXT.ueberPlattform}</dt>`))
-    expect(html).toContain('Diese Woche · abgeholte Bestellungen')
+    // Wörtlich nach Board s2-/w2-auswertung (Lauf 31): „abgeholt im Februar“.
+    expect(html).toContain('abgeholt im Februar')
     expect(html).not.toMatch(/Warenumsatz|Gesamt/)
   })
 
@@ -274,19 +306,25 @@ describe('Karten im neuen Design', () => {
         vergleichLabel: 'Woche davor',
       })
     )
-    expect(html).toMatch(new RegExp(`<h2[^>]*>${UMSATZ_TEXT.mitHofladen}</h2>`))
+    // Seit Lauf 31 (Board s2-/w2-auswertung) sagt der Titel selbst, was zählt — aus derselben Quelle.
+    expect(html).toMatch(new RegExp(`<h2[^>]*>${UMSATZ_TEXT.karteTitel}<span class="sr-only"> · Diese Woche</span></h2>`))
     expect(html).toContain('€ 206,00')
     expect(html).toContain('Abgeholte Bestellungen und eingetragene Verkäufe')
     expect(html).not.toMatch(/Umsatz pro (Tag|Woche|Monat)|Warenumsatz|Gesamt/)
   })
 
   it('Texte aus EINER Quelle: Auswertung und Heute nehmen UMSATZ_TEXT, keine Seite schreibt die Wörter selbst', () => {
-    expect(UMSATZ_TEXT).toEqual({ ueberPlattform: `Über ${MARKE}`, mitHofladen: 'Mit Hofladen', mitHofladenKlein: 'mit Hofladen' })
+    expect(UMSATZ_TEXT).toEqual({
+      ueberPlattform: `Über ${MARKE}`,
+      mitHofladen: 'Mit Hofladen',
+      mitHofladenKlein: 'mit Hofladen',
+      karteTitel: 'Abgeholte Bestellungen und eingetragene Verkäufe',
+    })
     // „Heute eingenommen · mit Hofladen" ist dasselbe Wort wie die Umsatzkarte der Auswertung.
     expect(KENNZAHL_TEXT.eingenommenMit).toBe(UMSATZ_TEXT.mitHofladenKlein)
     const teile = quelle('src/components/auswertung/auswertung-teile.tsx')
     expect(teile).toContain('UMSATZ_TEXT.ueberPlattform')
-    expect(teile).toContain('UMSATZ_TEXT.mitHofladen')
+    expect(teile).toContain('UMSATZ_TEXT.karteTitel')
     for (const datei of ['src/components/auswertung/auswertung-teile.tsx', 'src/app/(hof)/analytics/page.tsx', 'src/components/heute/heute-teile.tsx', 'src/lib/heute.ts', 'src/lib/auswertung.ts']) {
       const text = quelle(datei).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
       expect(text, datei).not.toMatch(SELBST_GESCHRIEBEN)
@@ -301,7 +339,7 @@ describe('Karten im neuen Design', () => {
     expect('UMSATZ_TEXT.mitHofladen').not.toMatch(suche)
   })
 
-  it('Teilen-Karte: Kanäle mit Balken, ohne Besuche ein Ausweg nach Heute', () => {
+  it('Teilen-Karte: Kanäle mit Balken, ohne Besuche ohne Knopf (Board)', () => {
     const voll = renderToStaticMarkup(
       createElement(TeilenWirkungKarte, {
         karte: teilenKarte(fasseTeilenWirkungZusammen([{ kanal: 'QR', besuche: 9 }])),
@@ -311,11 +349,13 @@ describe('Karten im neuen Design', () => {
     expect(voll).toContain('Über deine geteilten Links')
     expect(voll).toContain('9 Besuche')
     // T1: nur Besuche — keine Bestellungen, kein Euro-Betrag; der Satz zur Zählung aus der einen Quelle.
-    expect(voll).not.toMatch(/Bestellung|€/)
-    expect(voll).toContain(TEILEN_ZAEHLUNG_HINWEIS)
+    // Der Fußsatz nach Board (Liste Lauf 32 auswertung) sagt ausdrücklich „keine Bestellungen“ — außer ihm keine.
+    expect(voll.replace(TEILEN_FUSS, '')).not.toMatch(/Bestellung|€/)
+    expect(voll).toContain(TEILEN_FUSS)
     const leer = renderToStaticMarkup(createElement(TeilenWirkungKarte, { karte: { kopf: null, zeilen: [] }, zeitraum: 'Diese Woche' }))
-    expect(leer).toContain('href="/dashboard"')
-    expect(leer).toContain(TEILEN_ZAEHLUNG_HINWEIS)
-    expect(leer).not.toMatch(/Bestellung|€/)
+    // Ohne Knopf „Hof teilen auf Heute“ (Board ohne Knopf).
+    expect(leer).not.toContain('href="/dashboard"')
+    expect(leer).toContain(TEILEN_FUSS)
+    expect(leer.replace(TEILEN_FUSS, '')).not.toMatch(/Bestellung|€/)
   })
 })

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import * as Sentry from '@sentry/nextjs'
-import { ArrowLeft, ExternalLink, PackageSearch } from 'lucide-react'
+import { ChevronLeft, ExternalLink } from 'lucide-react'
 import { verlangeAdminSeite } from '@/server/admin-wache'
 import { ladeBestellDetail, ladeBestellListe, type BestellDetail, type BestellZeile } from '@/server/queries/admin-bestellungen'
 import { ladeHofAuswahl } from '@/server/queries/mails'
@@ -261,7 +261,7 @@ function Detail({ d, jetzt }: { d: BestellDetail; jetzt: Date }): React.JSX.Elem
         <Feld titel={T.abholung}>{`${formatTagKurz(kalendertagInWien(d.pickupDate))}, ${d.pickupTimeStart}–${d.pickupTimeEnd} Uhr`}</Feld>
         <Feld titel={T.zahlung}>
           {`${zahlartText(d.paymentMethod, d.paymentStatus)} · ${euro(summen.gesamtCents)}`}
-          {summen.gebuehrCents > 0 && ` ${T.inklGebuehr(euro(summen.gebuehrCents))}`}
+          {summen.gebuehrCents > 0 && ` ${T.inklGebuehr(euro(summen.gebuehrCents), T.gebuehrZeile({ gebuehrModell: d.gebuehrModell }))}`}
         </Feld>
       </dl>
 
@@ -273,7 +273,7 @@ function Detail({ d, jetzt }: { d: BestellDetail; jetzt: Date }): React.JSX.Elem
         ))}
         {summen.gebuehrCents > 0 && (
           <p className={cn('flex border-t border-border py-2 text-[14px]', LEISE)}>
-            <span>{T.servicegebuehr}</span>
+            <span>{T.gebuehrZeile({ gebuehrModell: d.gebuehrModell })}</span>
             <span className="ml-auto tabular-nums">{euro(summen.gebuehrCents)}</span>
           </p>
         )}
@@ -339,8 +339,10 @@ function Detail({ d, jetzt }: { d: BestellDetail; jetzt: Date }): React.JSX.Elem
  * Admin › Bestellungen (Register N32, N34; Nr. 186; Mockup
  * admin-bestellungen): Suche (Bestellnummer oder ganze Adresse — dieselbe
  * Abfrage wie Admin › Betrieb › E-Mails) und Filter, links die Liste (480 px
- * ab 1024 px), rechts das Detail (`?bestellung=`). Am Handy ersetzt das
- * Detail die Liste wie ein Blatt, mit „Zur Liste“ zurück. Ein Wechsel lässt
+ * ab 1024 px), rechts das Detail (`?bestellung=`). Nur am Handy (unter
+ * 768 px) ersetzt das Detail die Liste wie ein Blatt, mit „‹ Zur Liste“
+ * zurück (Board s3-admin-bestellungen); dazwischen stehen beide gestapelt,
+ * das gewählte Detail oben, die Liste darunter bleibt zum Wechseln. Ein Wechsel lässt
  * den alten Inhalt stehen (LadeRahmen, keine loading.tsx — der Filter steht
  * in der Adresse). Erste Anweisung ist die Admin-Prüfung (Recht „ansehen“).
  */
@@ -386,14 +388,13 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
           {suche.art === 'ungueltig' && <Hinweiskarte ton="orange">{MAIL_TEXT.sucheUngueltig}</Hinweiskarte>}
           {ohneBestellung.length > 0 && <WiderrufeOhneBestellungListe liste={ohneBestellung} />}
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[480px_minmax(0,1fr)]">
-            <section aria-label={T.listeBeschriftung} className={cn(SPALTE, mitDetail ? 'hidden lg:flex' : 'flex')}>
+            <section aria-label={T.listeBeschriftung} className={cn(SPALTE, mitDetail ? 'hidden md:flex' : 'flex')}>
               <div className="flex items-baseline gap-2 px-3.5 pt-3 pb-2">
                 <p className={KICKER}>{trefferKopf(suche)}</p>
                 <p className={cn('ml-auto text-[12.5px]', LEISE)}>{T.anzahl(zeilen.length)}</p>
               </div>
               {zeilen.length === 0 ? (
                 <EmptyState
-                  symbol={PackageSearch}
                   titel={T.leerTitel}
                   satz={T.leerSatz}
                   className="rounded-none border-0 py-8"
@@ -413,10 +414,10 @@ export default async function AdminBestellungenPage({ searchParams }: { searchPa
                 </ul>
               )}
             </section>
-            <section aria-label={T.detailBeschriftung} className={cn(SPALTE, mitDetail ? 'flex' : 'hidden lg:flex')}>
+            <section aria-label={T.detailBeschriftung} className={cn(SPALTE, mitDetail ? 'order-first flex lg:order-none' : 'hidden lg:flex')}>
               {mitDetail && (
-                <Link href={bestellungenHref(f, { suche: sucheRoh })} scroll={false} className={cn(KNOPF_RAHMEN, 'm-3 mb-0 self-start border-transparent lg:hidden')}>
-                  <ArrowLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
+                <Link href={bestellungenHref(f, { suche: sucheRoh })} scroll={false} className={cn(KNOPF_RAHMEN, 'm-3 mb-0 self-start border-transparent md:hidden')}>
+                  <ChevronLeft className="size-4" strokeWidth={1.7} aria-hidden="true" />
                   {T.zurListe}
                 </Link>
               )}

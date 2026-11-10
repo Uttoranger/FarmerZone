@@ -50,9 +50,10 @@ import {
   meldungZeilen,
   meldungenStand,
   seiteKurz,
+  seiteName,
 } from '@/lib/hof-hilfe'
 import { MeineMeldungen } from '@/components/hof-hilfe/meine-meldungen'
-import { MeldungAbgeben } from '@/components/hof-hilfe/meldung-abgeben'
+import { MeldungForm } from '@/components/shared/meldung-form'
 import { HilfeSeitenspalte } from '@/components/hof-hilfe/hilfe-seitenspalte'
 
 const quelle = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
@@ -187,9 +188,10 @@ describe('/status leitet in den Reiter um, Unterseiten unter (hof)', () => {
     const client = quelle('src/app/(hof)/status/new/status-new-client.tsx')
     expect(client).toContain('router.push(BEITRAEGE_HREF)')
     expect(client).not.toContain("router.push('/status')")
-    // Seit Nr. 44 kommt der Rückweg aus dem UnterseitenKopf — Ziel weiter der Reiter.
+    // Der Rückweg kommt aus dem Werkzeug-Kopf (G1, seit Nr. 250) — Ziel ist der Reiter.
     const whatsapp = quelle('src/app/(hof)/status/[id]/send-whatsapp/page.tsx')
-    expect(whatsapp).toContain('<UnterseitenKopf')
+    expect(whatsapp).toContain('<WerkzeugKopf')
+    expect(quelle('src/app/(hof)/status/new/page.tsx')).toContain('<WerkzeugKopf')
     expect(elternseite('/status/abc/send-whatsapp')?.href).toBe(BEITRAEGE_HREF)
     expect(elternseite('/status/new')?.href).toBe(BEITRAEGE_HREF)
   })
@@ -215,28 +217,36 @@ describe('Hilfe und Meine Meldungen unter (hof)', () => {
     }
   })
 
-  it('/problem-melden (Kundinnen) bleibt beim Bestandsformular', () => {
+  it('/problem-melden (Kundinnen) nimmt den gemeinsamen Baustein in Grün (Nr. 225, V52)', () => {
     const seite = quelle('src/app/(public)/problem-melden/page.tsx')
     expect(seite).toContain('<MeldungForm')
-    expect(seite).not.toContain('hof-hilfe')
+    expect(seite).toContain('welt="kunde"')
+    expect(seite).not.toContain('components/hof-hilfe')
   })
 
   it('/fehler-melden nimmt die Fehlernummer aus der Adresse nur geprüft', () => {
     const seite = quelle('src/app/(hof)/fehler-melden/page.tsx')
     expect(seite).toContain('bereinigeKennung(')
     expect(seite).toContain('generateFormToken(\'meldung\')')
-    expect(seite).toContain('<MeldungAbgeben')
+    expect(seite).toContain('<MeldungForm')
+    expect(seite).toContain('welt="hof"')
   })
 
   it('das neue Formular und das Bestandsformular teilen dieselbe Logik', () => {
+    // Seit Nr. 225 dieselbe Komponente für beide Welten: sie ruft den Hook und gibt ihn an den Baustein.
     expect(quelle('src/components/shared/meldung-form.tsx')).toContain('useMeldungFormular(')
-    expect(quelle('src/components/hof-hilfe/meldung-abgeben.tsx')).toContain('useMeldungFormular(')
+    expect(quelle('src/components/shared/meldung-form.tsx')).toContain('<MeldungFormularAnsicht')
+    expect(gibt('src/components/hof-hilfe/meldung-abgeben.tsx')).toBe(false)
   })
 
   it('die Datei-Felder stehen außerhalb der Fallunterscheidung (PR 135)', () => {
-    const text = quelle('src/components/hof-hilfe/meldung-abgeben.tsx')
-    expect(text.match(/\{upload\.fileInput\}/g)).toHaveLength(1)
-    expect(text.indexOf('{upload.fileInput}')).toBeLessThan(text.indexOf('{screenshotUrl ?'))
+    const text = quelle('src/components/ui/meldung-formular-ansicht.tsx')
+    expect(text.match(/f\.upload\.fileInput\}/g)).toHaveLength(1)
+    // Seit Nr. 268 steht die Fallunterscheidung (Foto da oder Knopf) in `bildschirmfoto`, je Welt vor oder nach der
+    // Fehlernummer gesetzt; die Datei-Felder bleiben außerhalb davon.
+    const fall = text.slice(text.indexOf('const bildschirmfoto'), text.indexOf('return (', text.indexOf('const bildschirmfoto')))
+    expect(fall).toContain('f.screenshotUrl ? (')
+    expect(fall).not.toContain('fileInput')
   })
 })
 
@@ -291,7 +301,7 @@ describe('Meldungen: Ton, Zähler, Zeilen', () => {
       status: 'In Arbeit',
       statusTon: 'fertig',
       antwort: 'Liegt am Bildformat — eine Umwandlung kommt.',
-      kurznummer: 'cmabcdef',
+      kurznummer: '456789',
     })
     // 23:30 Uhr in Wien am Folgetag = schon „Gestern" (Wiener Tag, nie UTC).
     expect(meldungZeilen([fuerHof(VOLL)], new Date('2026-10-07T21:30:00.000Z'))[0].datum).toBe('Gestern')
@@ -313,6 +323,10 @@ describe('Meldungen: Ton, Zähler, Zeilen', () => {
     expect(geraetKurz('')).toBe('–')
     expect(seiteKurz('http://localhost:3000/orders?filter=heute')).toBe('/orders?filter=heute')
     expect(seiteKurz('')).toBe('–')
+    expect(seiteName('http://localhost:3000/orders?filter=heute')).toBe('Bestellungen')
+    expect(seiteName('/dashboard#oben')).toBe('Heute')
+    expect(seiteName('http://localhost:3000/unbekannt/x?a=1#b')).toBe('/unbekannt/x')
+    expect(seiteName('')).toBe('–')
   })
 
   it('das Textfeld fragt passend zur Art', () => {
@@ -335,15 +349,16 @@ describe('Meine Meldungen (gerendert)', () => {
     expect(NEUE_MELDUNG_HREF).toBe('/fehler-melden')
     expect(html).toMatch(/<h1[^>]*>Meine Meldungen<\/h1>/)
     expect(html).toContain(`href="${NEUE_MELDUNG_HREF}"`)
-    expect(html).toContain('data-status="offen"')
+    // Seit Nr. 251 (Board s2-/w2-meldungen Bild 4): die Art als Wort in der Kopfzeile, der Stand als Marke.
     expect(html).toContain('In Arbeit')
+    expect(html).toContain('Antwort lesen')
     expect(html).toContain('Antwort:')
     expect(html).toContain('Liegt am Bildformat')
   })
 
-  it('F6 (22e): je Meldung „Tag · Nr. <Kurznummer>" bleibt', () => {
+  it('F6 (22e): je Meldung die Kurznummer (seit Nr. 251 „· <Kurznummer>“ hinter dem Titel, Board s2-meldungen)', () => {
     expect(zeilen[0].kurznummer).toMatch(/\S/)
-    expect(html).toContain(`Nr. <span class="font-mono">${zeilen[0].kurznummer}</span>`)
+    expect(html).toContain(`· ${zeilen[0].kurznummer}</span>`)
   })
 
   it('Fremdtext bleibt Text', () => {
@@ -359,11 +374,16 @@ describe('Meine Meldungen (gerendert)', () => {
 })
 
 describe('Meldung abgeben (gerendert)', () => {
-  const html = renderToStaticMarkup(createElement(MeldungAbgeben, { formToken: 't', hofName: 'Hof Test', kennungVorbelegt: '' }))
+  const html = renderToStaticMarkup(
+    createElement(MeldungForm, { formToken: 't', alsHof: true, welt: 'hof', abbrechenHref: MEINE_MELDUNGEN_HREF, kennungVorbelegt: '' })
+  )
 
-  it('drei Arten als Knöpfe mit aria-pressed, Fehler vorgewählt', () => {
-    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1)
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(2)
+  it('drei Arten als Optionsfelder, Fehler vorgewählt; Ton der Welt Hof (orange, V51)', () => {
+    expect(html.match(/type="radio"/g)).toHaveLength(3)
+    expect(html.match(/checked=""/g)).toHaveLength(1)
+    expect(html).toContain('data-welt="hof"')
+    expect(html).toContain('bg-primary')
+    expect(html).not.toContain('bg-accent text-accent-foreground')
     expect(html).toContain('Etwas funktioniert nicht')
     expect(html).toContain('Was ist passiert?')
   })
@@ -373,7 +393,11 @@ describe('Meldung abgeben (gerendert)', () => {
     expect(html).toContain('Absenden')
     expect(html).toContain(`href="${MEINE_MELDUNGEN_HREF}"`)
     expect(html).toContain('name="website"')
+    // Seit Nr. 233 (Board s2-meldungen): im Hofbereich die Karte statt des Satzes — Seite und Gerät, ohne IP und Cookies.
     expect(html).toContain('Das schicken wir automatisch mit')
+    expect(html).toMatch(/<dt[^>]*>Seite<\/dt>/)
+    expect(html).toMatch(/<dt[^>]*>Gerät<\/dt>/)
+    expect(html).not.toContain('Mitgeschickt:')
     expect(html).toContain('Keine IP-Adresse, keine Cookies.')
     expect(html).toContain('Bildschirmfoto hinzufügen')
   })
@@ -401,10 +425,9 @@ describe('Tokens statt Farbwerte (neue und umgezogene Dateien)', () => {
     'src/components/mein-hof/beitraege-reiter.tsx',
     'src/components/mein-hof/beitrag-zeile.tsx',
     'src/components/hof-hilfe/meine-meldungen.tsx',
-    'src/components/hof-hilfe/meldung-abgeben.tsx',
+    'src/components/shared/meldung-form.tsx',
     'src/components/hof-hilfe/hilfe-seitenspalte.tsx',
     'src/components/hof-hilfe/hilfe-laden.tsx',
-    'src/components/hofbereich/unterseiten-kopf.tsx',
     'src/app/(hof)/fehler-melden/page.tsx',
     'src/app/(hof)/meldungen/page.tsx',
     'src/app/(hof)/status/new/status-new-client.tsx',

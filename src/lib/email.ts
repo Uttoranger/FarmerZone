@@ -3,12 +3,16 @@ import * as React from 'react'
 import * as Sentry from '@sentry/nextjs'
 import type { Resend } from 'resend'
 import { SUPPORT_EMAIL } from '@/lib/support'
-import { generateReorderToken } from '@/lib/reorder-token'
-import { formatEuro, formatPosition } from '@/lib/format'
+import { formatEuro, formatZeitpunktMitWochentag } from '@/lib/format'
+import { positionszeile, type Positionszeile } from '@/lib/positionszeile'
 import { barBestaetigungsPfad, bestellungPfad, widerrufPfad } from '@/lib/bestell-link'
 import type { OrderLineProduct } from '@/lib/order-line'
-import { SERVICEGEBUEHR_BEZEICHNUNG, barOhneServicegebuehr, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
-import { istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { abspracheMailSatz, brauchtAbsprache } from '@/lib/abholhinweise'
+import { SERVICEGEBUEHR_BEZEICHNUNG, anzeigeGesamtCents, barOhneServicegebuehr, barZuKassierenCents, bestellSummen, centsAlsEuro, gebuehrEntfallen, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
+import { gebuehrHinweisFuer, hofpreisModellAb, istHofpreisBestellung } from '@/lib/plattformgebuehr'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
+import { agbFassungMitMeldung } from '@/lib/rechtstexte/agb-fassung-melden'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
 import { alsCents, calcLineTotal, decimalZuCents } from '@/lib/order-totals'
 import { fristVon, zeitpunktFuerMail } from '@/lib/fristen'
@@ -21,13 +25,13 @@ import { ABO_BESTAETIGUNG_GUELTIG_TAGE } from '@/lib/abo-bestaetigung'
 import { env } from '@/lib/env'
 import { darfMailEmpfangen, leseTestEmpfaenger, sperrtTrotzProduktion } from '@/lib/testumgebung'
 import { abmeldeSeitenPfad, listUnsubscribeKoepfe } from '@/lib/abmelde-link'
-import { MARKE, MARKE_TEAM } from '@/lib/marke'
-import { WUENSCHE_TEXT, bescheidMailHtml } from '@/lib/meldung'
+import { MARKE } from '@/lib/marke'
+import { WUENSCHE_TEXT } from '@/lib/meldung'
 import { EINGANG_TEXT, POSTFACH_MAIL_TEXT, eingangAdresse, eingangMeldungAdresse, fadenHref, offenSatz, type EingangZahlen } from '@/lib/postfach'
 import { ZUSTELLUNG_MAIL_TEXT, bestaetigenPfad } from '@/lib/zustellung'
 import { ADMIN_BETRIEB_HREF, betriebMail, fehlerKlasse, type BetriebMailAnlass } from '@/lib/betrieb'
 import { empfaengerFingerabdruck } from '@/lib/mail-empfaenger'
-import { hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
+import { hofEmailFehlt, hofKontaktEmail, type HofKontakt } from '@/lib/hof-kontakt'
 import { belehrungHof, belehrungMitHof, belehrungMitKostenschaetzung, type Belehrung } from '@/lib/widerruf'
 import { ruecksendekostenSchaetzungEuro } from '@/lib/ruecktritt-angaben'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
@@ -93,12 +97,55 @@ async function toHtml(element: React.ReactElement): Promise<string> {
 }
 
 /**
+ * Betreff und HTML einer Mail, ohne Empfänger — was eine Inhalts-Funktion
+ * (`<art>Inhalt`, Nr. 270) liefert. Die `send…`-Funktion ruft sie und dann
+ * sendRaw; die Beispiele in Admin › Betrieb › Mails rufen nur sie.
+ */
+export type MailInhalt = { betreff: string; html: string }
+
+/**
+ * Laden oder Rendern der Vorlage ist in einer Inhalts-Funktion gescheitert
+ * (Nr. 270) — trägt die Nachricht des ursprünglichen Fehlers. Nur dieser
+ * Fehler wird in `inhaltOderFehler` zu `{ error }`; alles davor (etwa das
+ * Laden der Texte) wirft wie vor Nr. 270 weiter.
+ */
+class VorlageFehler extends Error {
+  constructor(nachricht: string) {
+    super(nachricht)
+    this.name = 'VorlageFehler'
+  }
+}
+
+/** Die Vorlage einer Inhalts-Funktion rendern. Loggt nie — das tut der Versand (`inhaltOderFehler`). */
+async function vorlageHtml(baue: () => Promise<React.ReactElement>): Promise<string> {
+  try {
+    return await toHtml(await baue())
+  } catch (err) {
+    throw new VorlageFehler(err instanceof Error ? err.message : String(err))
+  }
+}
+
+/**
  * Für die Versandfunktionen, die ein Ergebnis liefern statt zu werfen
  * (Anmeldecode, Code für „Bestellungen finden", E-Mail bestätigen): Laden und
  * Rendern der Vorlage im selben Fehlerweg wie der Versand — seit die Vorlage
  * dynamisch kommt (Nr. 31), könnte schon das Laden scheitern. Dann
  * `{ error }` wie bei einem Resend-Fehler; auth.ts schreibt den Code lokal ins Log.
+ * Seit Nr. 270 um die Inhalts-Funktion gelegt: Nur ein Fehler der Vorlage
+ * wird zu `{ error }`, jeder andere wirft wie vorher. Derselbe Satz im Log
+ * wie `htmlOderFehler` (der Rücktrittseingang, ohne Inhalts-Funktion davor).
  */
+async function inhaltOderFehler(baue: () => Promise<MailInhalt>): Promise<({ ok: true } & MailInhalt) | { ok: false; error: string }> {
+  try {
+    return { ok: true, ...(await baue()) }
+  } catch (err) {
+    if (!(err instanceof VorlageFehler)) throw err
+    console.error(`[E-Mail] Vorlage nicht erzeugt: ${err.message}`)
+    return { ok: false, error: err.message }
+  }
+}
+
+/** Wie `inhaltOderFehler`, nur um die Vorlage allein — für den Rücktrittseingang (Nr. 200), der seine Inhalts-Funktion schon hat. */
 async function htmlOderFehler(
   baue: () => Promise<React.ReactElement>
 ): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
@@ -139,6 +186,8 @@ export type MailOptionen = {
   headers?: Record<string, string>
   /** Dateien im Anhang (Nr. 207: die AGB) — nie Text der Kundin. */
   anhaenge?: readonly MailAnhang[]
+  /** „Antwort an“ (V86): nur die Hof-E-Mail aus dem Profil, nur bei Bestellmails an die Kundin — siehe `antwortAnHof`. */
+  antwortAn?: string
 }
 
 /**
@@ -263,6 +312,7 @@ export async function sendRaw(to: string, subject: string, html: string, optione
       subject,
       html,
       ...(optionen.headers ? { headers: optionen.headers } : {}),
+      ...(optionen.antwortAn ? { replyTo: optionen.antwortAn } : {}),
       ...(attachments ? { attachments } : {}),
     })
     if (result.error) {
@@ -283,8 +333,12 @@ export async function sendRaw(to: string, subject: string, html: string, optione
   return ergebnis
 }
 
-/** Eine fertige Mail für den Stapelversand des Workers — die Adresse lebt nur im Speicher, nie in der Tabelle. */
-export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string>; anhaenge?: readonly MailAnhang[] }
+/**
+ * Eine fertige Mail für den Stapelversand des Workers — die Adresse lebt nur im
+ * Speicher, nie in der Tabelle. `antwortAn` (V86) baut der Renderer beim
+ * Versand frisch aus dem Hof der Bestellung; auch sie steht nie im Auftrag.
+ */
+export type StapelMail = { an: string; betreff: string; html: string; headers?: Record<string, string>; anhaenge?: readonly MailAnhang[]; antwortAn?: string }
 
 /** Trägt die Mail einen Anhang? Dann geht sie nie im Stapel (Resend nimmt Anhänge nur einzeln), sondern allein. */
 export function hatAnhang(mail: Pick<StapelMail, 'anhaenge'>): boolean {
@@ -301,7 +355,8 @@ export type StapelErgebnis = { ok: true; ids: string[] } | { ok: false; statusCo
  * Bis zu 100 Mails in EINER Anfrage an Resend (`batch.send`, Nr. 158) — nur
  * für den Worker der Warteschlange, der vorher die Post-Sperre über
  * `postSperreLaesstDurch` geprüft hat. `batch.send` nimmt je Mail dieselben
- * Felder wie `emails.send` ohne Anhänge und ohne Termin, also auch `headers`;
+ * Felder wie `emails.send` ohne Anhänge und ohne Termin, also auch `headers`
+ * und `replyTo`;
  * der Idempotenz-Schlüssel gilt für die ganze Anfrage. Strikte Prüfung (alles
  * oder nichts): So gehört die n-te ID sicher zur n-ten Mail. Gezählt werden
  * die angenommenen Mails in EINEM Schritt. Wirft nie.
@@ -317,7 +372,14 @@ export async function versendeStapel(mails: readonly StapelMail[], idempotenzSch
   try {
     const resend = await resendClient(apiKey)
     const result = await resend.batch.send(
-      mails.map((m) => ({ from: FROM, to: m.an, subject: m.betreff, html: m.html, ...(m.headers ? { headers: m.headers } : {}) })),
+      mails.map((m) => ({
+        from: FROM,
+        to: m.an,
+        subject: m.betreff,
+        html: m.html,
+        ...(m.headers ? { headers: m.headers } : {}),
+        ...(m.antwortAn ? { replyTo: m.antwortAn } : {}),
+      })),
       { idempotencyKey: idempotenzSchluessel }
     )
     if (result.error) {
@@ -347,6 +409,7 @@ async function versendeMitAnhang(mails: readonly StapelMail[], idempotenzSchlues
         subject: m.betreff,
         html: m.html,
         ...(m.headers ? { headers: m.headers } : {}),
+        ...(m.antwortAn ? { replyTo: m.antwortAn } : {}),
         attachments: alsResendAnhaenge(m.anhaenge),
       },
       { idempotencyKey: idempotenzSchluessel }
@@ -393,9 +456,11 @@ async function sendeAnListe(an: readonly string[], subject: string, html: string
 
 function formatPickupDate(date: Date): string {
   // Wiener Kalendertag, nie die Zeitzone des Servers (CODING_STANDARDS §2).
-  return date.toLocaleDateString('de-AT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna',
-  })
+  // Kurzer Wochentag ohne Punkt wie in den Boards („Mi, 3. März 2027“, Lauf 31):
+  // Ausgeschrieben bricht „Uhr“ am Handy allein in die nächste Zeile.
+  const wochentag = date.toLocaleDateString('de-AT', { weekday: 'short', timeZone: 'Europe/Vienna' }).replace(/\.$/, '')
+  const datum = date.toLocaleDateString('de-AT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Vienna' })
+  return `${wochentag}, ${datum}`
 }
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
@@ -410,6 +475,12 @@ export type OrderForEmail = {
   totalAmount: { toString(): string } | number
   /** Servicegebühr in Cent aus dem Bestell-Snapshot; fehlt sie, gilt 0. */
   serviceFeeCents?: number
+  /**
+   * Gesetzt, wenn die Gebühr entfallen bzw. erstattet ist (Storno, „nicht abgeholt“, verfallen) — dann zeigt
+   * das „Gesamt“ der Kunden-Mails nur den Warenpreis (anzeigeGesamtCents, Nr. 255). Das betrifft fast nur
+   * die Admin-Vorschau: Die echten Mails gehen vorher hinaus. Fehlt es, gilt die Gebühr.
+   */
+  serviceFeeRefundedAt?: Date | string | null
   /** Gebührenmodell aus dem Snapshot (N38): 'hofpreis' oder null/fehlend = bisher. */
   gebuehrModell?: string | null
   /** Einzugsweg aus dem Snapshot (N38): 'erlassen' heißt, die Bargebühr bleibt beim Hof. */
@@ -455,7 +526,8 @@ export type OrderForEmail = {
     // fehlt sie, bleibt die Darstellung wie bisher. ruecksendekostenCents
     // (Nr. 214): die Schätzung des Hofs für den Satz aus Gestaltungshinweis 5 b
     // in der Belehrung — die Lader der drei Bestätigungsmails lesen sie mit.
-    product?: (NonNullable<OrderLineProduct> & { ruecksendekostenCents?: number | null }) | null
+    // abholhinweise (N47, Nr. 257): Trägt eine Position „Abholung nach Absprache“, sagt die Bestätigung es im Abholblock.
+    product?: (NonNullable<OrderLineProduct> & { ruecksendekostenCents?: number | null; abholhinweise?: readonly string[] }) | null
   }>
 }
 
@@ -466,19 +538,17 @@ export type OrderForEmail = {
 export type OrderForHofMail = OrderForEmail & { farm: OrderForEmail['farm'] & HofKontakt }
 
 /**
- * „Heumilch frisch · 2 × 1 L" — die Positionszeile in DERSELBEN Schreibweise
- * wie Warenkorb, Checkout, Bestätigungsseite und Bauern-Backend
- * (src/lib/format.ts, Bug-Report Befund 13). Vorher stand die Menge in den
- * Vorlagen selbst („2× Name (1 l)"), also in einer fünften Variante.
- * Die Menge steckt jetzt IN der Zeile — die Vorlagen stellen ihr deshalb
- * keine Anzahl mehr voran.
+ * „**4** × Heumilch frisch (1 L)" — die Positionszeile nach G14 (Nr. 280), wie
+ * Packliste, Abholzettel und Verkäufe (src/lib/positionszeile.ts). `text` ist
+ * die ganze Zeile; die Vorlagen setzen mit `PositionsName` die Anzahl fett.
+ * Nur Anzeige: Menge, Gebinde und Betrag kommen unverändert aus der Position.
  */
 function positionsZeile(i: {
   productName: string
   quantity: number
   product?: OrderLineProduct
-}): string {
-  return formatPosition({
+}): Positionszeile {
+  return positionszeile({
     name: i.productName,
     quantity: i.quantity,
     unit: i.product?.unit ?? null,
@@ -506,24 +576,101 @@ function imHofpreis(order: OrderForEmail): boolean {
   return istHofpreisBestellung({ gebuehrModell: order.gebuehrModell ?? null })
 }
 
-/**
- * Positionen für die Kunden-Mails: Zeile in der gemeinsamen Schreibweise,
- * Betrag fertig gerechnet — im Hofpreis-Modell der Endpreis inkl.
- * Plattformgebühr (N38), sonst der Warenpreis.
- */
-function mailPositionen(order: OrderForEmail): Array<{ name: string; betrag: number }> {
-  const hofpreis = imHofpreis(order)
-  return order.items.map((i) => ({ name: positionsZeile(i), betrag: zeilenBetrag(i, hofpreis) }))
+/** Ist die Gebühr dieser Bestellung entfallen bzw. erstattet (gebuehrEntfallen)? Fehlt das Feld, gilt sie. NUR Anzeige. */
+function mailGebuehrEntfallen(order: OrderForEmail): boolean {
+  return gebuehrEntfallen({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })
 }
 
 /**
- * Die Gebühr in den Kunden-Mails: im Modell `bisher` eine eigene Zeile
- * „Servicegebühr“ (`serviceFee`), im Hofpreis-Modell keine Zeile — sie steckt
- * in den Endpreisen, der Satz darunter nennt sie (`plattformgebuehr`).
+ * Zeitpunkte in Sicherheits- und Team-Mails nach V9 (Nr. 280): „Di, 2. März 2027, 21:14 Uhr“ — der
+ * Datumshelfer aus Nr. 279 (formatZeitpunktMitWochentag, Wiener Zeit) mit „Uhr“ wie in den Boards.
+ * Nur Anzeige; Fristen und Pausen selbst rechnet weiter ihr Aufrufer.
  */
-function kundenGebuehr(order: OrderForEmail): { serviceFee: number; plattformgebuehr: number } {
+function zeitpunktMitUhr(am: Date): string {
+  return `${formatZeitpunktMitWochentag(am)} Uhr`
+}
+
+/** Nur der Tag daraus, „Di, 2. März 2027“ — für den Satz über den Zeilen (Board s3/w3-mail-sicherheit Bild 1). */
+function tagMitWochentag(am: Date): string {
+  const voll = formatZeitpunktMitWochentag(am)
+  return voll.slice(0, voll.lastIndexOf(', '))
+}
+
+/** Eine Zeile der Positionsliste in Mails: Text, Teile für die fette Anzahl (G14) und der Zeilenbetrag. */
+export type MailPosition = { name: string; teile?: Positionszeile; betrag: number }
+
+/**
+ * Positionen für die Mails: Zeile in der gemeinsamen Schreibweise, Betrag
+ * fertig gerechnet — im Hofpreis-Modell der Endpreis inkl. Plattformgebühr
+ * (N38), sonst der Warenpreis. `mitGebuehr` überschreibt das für die
+ * Kunden-Mails (`kundenPositionen`); die Hof-Mails rufen ohne.
+ */
+function mailPositionen(order: OrderForEmail, mitGebuehr: boolean = imHofpreis(order)): MailPosition[] {
+  return order.items.map((i) => {
+    const zeile = positionsZeile(i)
+    return { name: zeile.text, teile: zeile, betrag: zeilenBetrag(i, mitGebuehr) }
+  })
+}
+
+/**
+ * Positionen der Kunden-Mails mit „Gesamt“ (Bestätigung, „Bitte bestätige“):
+ * Endpreise inkl. Gebühr nur, solange die Gebühr gilt. Ist sie entfallen,
+ * zeigt „Gesamt“ den Warenpreis (anzeigeGesamtCents) — dann auch die Zeilen,
+ * sonst wäre die Zeilensumme größer als „Gesamt“ (Nr. 255 Runde 1, wie die
+ * Bestätigungsseite). NUR Anzeige; gespeicherte Beträge bleiben.
+ */
+function kundenPositionen(order: OrderForEmail): MailPosition[] {
+  return mailPositionen(order, imHofpreis(order) && !mailGebuehrEntfallen(order))
+}
+
+/**
+ * Die Gebühr in den Kunden-Mails: im Modell `bisher` eine eigene Zeile mit dem
+ * Wort und dem Erklärsatz der Bestellung (`gebuehrZeile`), im Hofpreis-Modell
+ * keine Zeile — sie steckt in den Endpreisen, der Satz darunter nennt sie
+ * (`plattformgebuehr`).
+ */
+function kundenGebuehr(order: OrderForEmail): {
+  gebuehrZeile?: { wort: string; betrag: number; hinweis: string; vermerk?: 'erstattet' | 'entfällt' }
+  plattformgebuehr: number
+} {
   const { gebuehr } = betraege(order)
-  return imHofpreis(order) ? { serviceFee: 0, plattformgebuehr: gebuehr } : { serviceFee: gebuehr, plattformgebuehr: 0 }
+  // Hofpreis-Modell: bei entfallener Gebühr kein „inkl.“-Satz (freigabe §36 „Seiten“, wie zahlzeile.ts) — 0 heißt „kein Satz“.
+  if (imHofpreis(order)) return { plattformgebuehr: mailGebuehrEntfallen(order) ? 0 : gebuehr }
+  // Nr. 255: „erstattet“/„entfällt“ wie Bestätigungsseite und Abholzettel (gebuehrEntfallenVermerk) — sonst zählte die Zeile über „Gesamt“ scheinbar mit.
+  const vermerk = gebuehrEntfallenVermerk({ serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null, paymentMethod: order.paymentMethod })
+  return {
+    gebuehrZeile: { wort: gebuehrWort(order), betrag: gebuehr, hinweis: gebuehrHinweisFuer({ gebuehrModell: order.gebuehrModell ?? null }), ...(vermerk ? { vermerk } : {}) },
+    plattformgebuehr: 0,
+  }
+}
+
+/**
+ * „Antwort an“ in den Bestellmails an die Kundin (V86): nur die Hof-E-Mail aus
+ * dem Profil, nur wenn sie gesetzt ist — sonst keine, und die Antwort landet
+ * wie bisher bei der Absenderadresse. Nie die Anmelde-Adresse und nie
+ * hofKontaktEmail: Die fällt auf die Anmelde-Adresse zurück, und die sähe die
+ * Kundin sonst beim Antworten (Kopfkommentar von src/lib/hof-kontakt.ts).
+ * Nur die Adresse, ohne Namen davor: Der Hofname ist Fremdtext.
+ */
+function antwortAnHof(farm: { email: string }): string | undefined {
+  return hofEmailFehlt(farm) ? undefined : farm.email.trim()
+}
+
+/** `antwortAn` für eine Bestellmail an die Kundin — ohne Hof-E-Mail fehlt das Feld ganz. */
+function mitAntwortAn(farm: { email: string }): { antwortAn?: string } {
+  const adresse = antwortAnHof(farm)
+  return adresse ? { antwortAn: adresse } : {}
+}
+
+/**
+ * Abholung nach Absprache in der Bestätigung (N47, Nr. 257): Bedingung und
+ * „Antwort an“ aus EINER Stelle — der Satz verspricht „einfach antworten“ nur,
+ * wenn der Kopf der Mail wirklich die Hof-E-Mail als Antwort-Adresse trägt.
+ */
+function bestaetigungMitAbsprache(order: OrderForEmail): { abspracheSatz?: string; kopf: { antwortAn?: string } } {
+  const kopf = mitAntwortAn(order.farm)
+  if (!brauchtAbsprache(order.items.map((i) => i.product?.abholhinweise))) return { kopf }
+  return { abspracheSatz: abspracheMailSatz(kopf.antwortAn !== undefined), kopf }
 }
 
 /** Das Wort für die Gebühr in den Hof-Mails (N8): „Plattformgebühr“ im Hofpreis-Modell, sonst „Servicegebühr“. */
@@ -559,10 +706,26 @@ function belehrungFuer(order: OrderForEmail): Belehrung | undefined {
   return belehrungMitKostenschaetzung(belehrung, euro)
 }
 
-/** Die AGB als Datei im Anhang (Nr. 207) — erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). */
-async function agbAnhang(): Promise<MailAnhang> {
+/**
+ * Die AGB als Datei im Anhang (Nr. 207) in der Fassung der Bestellung (N45) —
+ * erst beim Bauen geladen, wie die Vorlagen (ARCHITECTURE §4). Für 1.0 braucht
+ * der Stand-Vermerk den Stichtag; scheitert das Laden, steht der Ersatzwert
+ * („ab dem Stichtag auf <Domain>/konditionen“) da, es geht eine Meldung an
+ * Sentry, und es wird nie geworfen: Die Bar-Bestätigungsmail geht „Sofort“ und
+ * darf an keinem Nachlauf scheitern (N26).
+ */
+async function agbAnhang(fassung: AgbKennung): Promise<MailAnhang> {
   const { agbAlsHtml, agbDateiname } = await import('@/lib/rechtstexte/agb-datei')
-  return { dateiname: agbDateiname(), inhalt: agbAlsHtml() }
+  let inkrafttreten: Date | null = null
+  if (fassung !== AGB_BISHER) {
+    try {
+      const { ladePlattformEinstellung } = await import('@/server/queries/plattform-einstellung')
+      inkrafttreten = hofpreisModellAb(hofpreisEinstellungAus(await ladePlattformEinstellung()))
+    } catch (err) {
+      Sentry.captureException(err, { tags: { bereich: 'agb-anhang-stichtag' } })
+    }
+  }
+  return { dateiname: agbDateiname(fassung), inhalt: agbAlsHtml(fassung, { inkrafttreten }) }
 }
 
 function routeUrl(order: OrderForEmail): string {
@@ -570,20 +733,61 @@ function routeUrl(order: OrderForEmail): string {
 }
 
 /**
- * Die drei Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
+ * Die Beträge einer Bestellung in Euro — aus dem SNAPSHOT der Bestellung
  * (src/lib/servicegebuehr.ts), damit Mail, Bestellseite und Checkout dieselbe
  * Rechnung zeigen: Warenpreis, Servicegebühr, Gesamt (= was die Kundin zahlt).
+ * `anzeigeGesamt` ist das „Gesamt“ der Kunden-Mails (Nr. 255): wie Bestätigung
+ * und Bestellseite ohne entfallene Gebühr (anzeigeGesamtCents) — NUR Anzeige;
+ * „Bar zu kassieren“ und „Die Kundin hat … bezahlt“ bleiben `gesamt`.
  */
-function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number } {
-  const s = bestellSummen({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 })
+function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; gesamt: number; anzeigeGesamt: number } {
+  const summen = { totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0 }
+  const s = bestellSummen(summen)
   return {
     warenpreis: centsAlsEuro(s.warenpreisCents),
     gebuehr: centsAlsEuro(s.gebuehrCents),
     gesamt: centsAlsEuro(s.gesamtCents),
+    anzeigeGesamt: centsAlsEuro(anzeigeGesamtCents({ ...summen, serviceFeeRefundedAt: order.serviceFeeRefundedAt ?? null })),
   }
 }
 
+/**
+ * Der Betrag in „Bring bitte … in bar mit“ (bar) / „Bitte zahle … mit Karte“
+ * (Karte bei Abholung, E5): was der Hof kassiert, aus dem Snapshot
+ * (barZuKassierenCents) — dieselbe Zahl wie „Bar zu kassieren“ in der Hof-Mail,
+ * nie das Anzeige-Gesamt (Nr. 255 Runde 1). Beide Zahlarten gehen denselben Weg.
+ * Online kassiert der Hof nichts und die Mail zeigt keinen Kasten; der Rückfall
+ * auf das Gesamt aus dem Snapshot wird dort nie gelesen.
+ * null = kein Kasten: Ist die Gebühr entfallen (Storno, „nicht abgeholt“,
+ * verfallen — nur die Admin-Vorschau), ist bei der Abholung nichts mehr zu
+ * zahlen; der Snapshot-Betrag stünde sonst neben „Servicegebühr (entfällt)“.
+ */
+function vorOrtBetrag(order: OrderForEmail): number | null {
+  if (mailGebuehrEntfallen(order)) return null
+  const cents = barZuKassierenCents({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0, paymentMethod: order.paymentMethod })
+  return cents === null ? betraege(order).gesamt : centsAlsEuro(cents)
+}
+
 // ─── Send-Funktionen ──────────────────────────────────────────────────────────
+
+/*
+ * Inhalts-Funktionen (Nr. 270): Je Sofort-Art baut `<art>Inhalt(daten)` nur
+ * Betreff und HTML — ohne Empfänger, ohne Log, ohne Versand. Die
+ * `send…`-Funktion ruft sie und dann sendRaw; Text und Ablauf sind dieselben
+ * wie vorher (Vorher-nachher-Test tests/mail-inhalt-gleich.test.ts). Die
+ * Beispiele in Admin › Betrieb › Mails (src/server/mail-arten/beispiele.ts)
+ * rufen nur die Inhalts-Funktion, mit festen Platzhaltern.
+ */
+
+/** Anmeldecode → Kundin: nur Betreff und HTML (Nr. 270). Der Betreff trägt den Code nicht. */
+export async function anmeldecodeInhalt(daten: { code: string }): Promise<MailInhalt> {
+  const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
+  const html = await vorlageHtml(async () => {
+    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
+    return React.createElement(AnmeldecodeEmail, { code: daten.code, minuten })
+  })
+  return { betreff: `Dein Anmeldecode für ${MARKE}`, html }
+}
 
 /**
  * Anmeldecode → Kundin (E7). Der Betreff trägt den Code NICHT: sendRaw
@@ -592,13 +796,19 @@ function betraege(order: OrderForEmail): { warenpreis: number; gebuehr: number; 
  * ID (kein Schlüssel, Resend-Fehler) schreibt auth.ts den Code lokal ins Log.
  */
 export async function sendAnmeldeCodeEmail(email: string, code: string): Promise<VersandErgebnis> {
+  const inhalt = await inhaltOderFehler(() => anmeldecodeInhalt({ code }))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'anmeldecode' })
+}
+
+/** Code für „Bestellungen finden": nur Betreff und HTML (Nr. 270). */
+export async function bestellcodeInhalt(daten: { code: string }): Promise<MailInhalt> {
   const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const vorlage = await htmlOderFehler(async () => {
+  const html = await vorlageHtml(async () => {
     const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
-    return React.createElement(AnmeldecodeEmail, { code, minuten })
+    return React.createElement(AnmeldecodeEmail, { code: daten.code, minuten, zweck: 'bestellungen' })
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Dein Anmeldecode für ${MARKE}`, vorlage.html, { art: 'anmeldecode' })
+  return { betreff: `Dein Code für deine Bestellungen · ${MARKE}`, html }
 }
 
 /**
@@ -607,13 +817,18 @@ export async function sendAnmeldeCodeEmail(email: string, code: string): Promise
  * ohne Code (Begründung wie oben). Gibt das Versandergebnis zurück.
  */
 export async function sendBestellCodeEmail(email: string, code: string): Promise<VersandErgebnis> {
-  const minuten = ANMELDECODE_GUELTIG_SEKUNDEN / 60
-  const vorlage = await htmlOderFehler(async () => {
-    const { AnmeldecodeEmail } = await import('@/emails/anmeldecode')
-    return React.createElement(AnmeldecodeEmail, { code, minuten, zweck: 'bestellungen' })
+  const inhalt = await inhaltOderFehler(() => bestellcodeInhalt({ code }))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'bestellcode' })
+}
+
+/** „Bestätige deine E-Mail" → neuer Hof: nur Betreff und HTML (Nr. 270). `url` trägt den signierten Token. */
+export async function emailBestaetigungInhalt(daten: { url: string }): Promise<MailInhalt> {
+  const html = await vorlageHtml(async () => {
+    const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
+    return React.createElement(EmailBestaetigungEmail, { url: daten.url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Dein Code für deine Bestellungen · ${MARKE}`, vorlage.html, { art: 'bestellcode' })
+  return { betreff: `Bestätige deine E-Mail-Adresse · ${MARKE}`, html }
 }
 
 /**
@@ -622,12 +837,9 @@ export async function sendBestellCodeEmail(email: string, code: string): Promise
  * keinen Link; gibt das Versandergebnis zurück (sendRaw wirft nie).
  */
 export async function sendEmailBestaetigung(email: string, url: string): Promise<VersandErgebnis> {
-  const vorlage = await htmlOderFehler(async () => {
-    const { EmailBestaetigungEmail } = await import('@/emails/email-bestaetigung')
-    return React.createElement(EmailBestaetigungEmail, { url, stunden: BESTAETIGUNG_GUELTIG_SEKUNDEN / 3600 })
-  })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `Bestätige deine E-Mail-Adresse · ${MARKE}`, vorlage.html, { art: 'email-bestaetigung' })
+  const inhalt = await inhaltOderFehler(() => emailBestaetigungInhalt({ url }))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'email-bestaetigung' })
 }
 
 /**
@@ -644,6 +856,18 @@ export async function baueAboBestaetigung(email: string, daten: { hofName: strin
 }
 
 /**
+ * Registrierungs-Hinweis: nur Betreff und HTML (Nr. 270). Wirft wie der
+ * Versand bisher, wenn die Vorlage scheitert (kein `{ error }`).
+ */
+export async function registrierungsHinweisInhalt(ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }): Promise<MailInhalt> {
+  // Vorlage erst beim Bauen laden: Seitenmodule, die email.ts einbinden,
+  // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
+  const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
+  const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
+  return { betreff: `Jemand wollte sich mit deiner Adresse registrieren · ${MARKE}`, html }
+}
+
+/**
  * Hinweis an ein bestehendes Konto: Jemand wollte sich mit seiner Adresse
  * registrieren (Register F6 „19b", Nachtlauf Nr. 27). Der Betreff nennt die
  * Adresse nicht. Gibt wie sendRaw `{ error }` zurück statt zu werfen — der
@@ -653,18 +877,32 @@ export async function sendRegistrierungsHinweis(
   email: string,
   ziele: { weg: 'passwort' | 'code'; anmelden: string; passwortZuruecksetzen: string | null }
 ): Promise<VersandErgebnis> {
-  // Vorlage erst beim Versand laden: Seitenmodule, die email.ts einbinden,
-  // sollen sie nicht mitziehen (Nachtlauf Nr. 31, „schwere Module nur bei Bedarf").
-  const { RegistrierungHinweisEmail } = await import('@/emails/registrierung-hinweis')
-  const html = await toHtml(React.createElement(RegistrierungHinweisEmail, ziele))
-  return sendRaw(email, `Jemand wollte sich mit deiner Adresse registrieren · ${MARKE}`, html, { art: 'registrierungs-hinweis' })
+  const inhalt = await registrierungsHinweisInhalt(ziele)
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'registrierungs-hinweis' })
+}
+
+/** Passwort-Reset → Bauer: nur Betreff und HTML (Nr. 270). Wirft wie der Versand, wenn die Vorlage scheitert. */
+export async function passwortLinkInhalt(daten: { url: string }): Promise<MailInhalt> {
+  const { PasswordResetEmail } = await import('@/emails/password-reset')
+  const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: daten.url }))
+  return { betreff: `Passwort zurücksetzen · ${MARKE}`, html }
 }
 
 /** Passwort-Reset → Bauer */
 export async function sendPasswordResetEmail(email: string, url: string): Promise<void> {
-  const { PasswordResetEmail } = await import('@/emails/password-reset')
-  const html = await toHtml(React.createElement(PasswordResetEmail, { resetUrl: url }))
-  await send(email, `Passwort zurücksetzen · ${MARKE}`, html, { art: 'passwort-link' })
+  const inhalt = await passwortLinkInhalt({ url })
+  await send(email, inhalt.betreff, inhalt.html, { art: 'passwort-link' })
+}
+
+/** „Zu viele falsche Codes" bzw. „… Passwörter": nur Betreff und HTML (Nr. 270). */
+export async function zuVieleVersucheInhalt(daten: { art: import('@/lib/anmeldecode').FehlversuchArt; bis: Date }): Promise<MailInhalt> {
+  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
+  const { ZU_VIELE_VERSUCHE_MAIL } = await import('@/lib/anmeldecode')
+  const html = await vorlageHtml(async () => {
+    const { ZuVieleVersucheEmail } = await import('@/emails/zu-viele-versuche')
+    return React.createElement(ZuVieleVersucheEmail, { art: daten.art, bis: zeitpunktMitUhr(daten.bis) })
+  })
+  return { betreff: `${ZU_VIELE_VERSUCHE_MAIL[daten.art].betreff} · ${MARKE}`, html }
 }
 
 /**
@@ -678,14 +916,21 @@ export async function sendZuVieleVersucheEmail(
   art: import('@/lib/anmeldecode').FehlversuchArt,
   bis: Date
 ): Promise<VersandErgebnis> {
+  const inhalt = await inhaltOderFehler(() => zuVieleVersucheInhalt({ art, bis }))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'zu-viele-versuche' })
+}
+
+/** „Neue Anmeldung bei deinem Hof-Konto": nur Betreff und HTML (Nr. 270). `link` trägt einen Einmal-Token. */
+export async function neueAnmeldungInhalt(daten: { hof: boolean; name: string | null; geraet: string; zeitpunkt: Date; link: string }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { ZU_VIELE_VERSUCHE_MAIL } = await import('@/lib/anmeldecode')
-  const vorlage = await htmlOderFehler(async () => {
-    const { ZuVieleVersucheEmail } = await import('@/emails/zu-viele-versuche')
-    return React.createElement(ZuVieleVersucheEmail, { art, bis: zeitpunktFuerMail(bis) })
+  const { NEUE_ANMELDUNG_MAIL } = await import('@/lib/geraete')
+  const html = await vorlageHtml(async () => {
+    const { NeueAnmeldungEmail } = await import('@/emails/neue-anmeldung')
+    const { zeitpunkt, ...rest } = daten
+    return React.createElement(NeueAnmeldungEmail, { ...rest, wann: zeitpunktMitUhr(zeitpunkt), tag: tagMitWochentag(zeitpunkt) })
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${ZU_VIELE_VERSUCHE_MAIL[art].betreff} · ${MARKE}`, vorlage.html, { art: 'zu-viele-versuche' })
+  return { betreff: `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, html }
 }
 
 /**
@@ -699,15 +944,25 @@ export async function sendNeueAnmeldungEmail(
   email: string,
   daten: { hof: boolean; name: string | null; geraet: string; zeitpunkt: Date; link: string }
 ): Promise<VersandErgebnis> {
+  const inhalt = await inhaltOderFehler(() => neueAnmeldungInhalt(daten))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'neue-anmeldung' })
+}
+
+/** „Admin-Sicherheit": nur Betreff und HTML (Nr. 270). `code` nur beim Einrichtungscode, nie im Betreff. */
+export async function adminSicherheitInhalt(daten: {
+  anlass: import('@/lib/admin-anmeldung').AdminSicherheitAnlass
+  geraet: string
+  zeitpunkt: Date
+  code?: string
+}): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { NEUE_ANMELDUNG_MAIL, anmeldeZeitpunkt } = await import('@/lib/geraete')
-  const vorlage = await htmlOderFehler(async () => {
-    const { NeueAnmeldungEmail } = await import('@/emails/neue-anmeldung')
-    const { zeitpunkt, ...rest } = daten
-    return React.createElement(NeueAnmeldungEmail, { ...rest, wann: anmeldeZeitpunkt(zeitpunkt) })
+  const { ADMIN_SICHERHEIT_MAIL } = await import('@/lib/admin-anmeldung')
+  const html = await vorlageHtml(async () => {
+    const { AdminSicherheitEmail } = await import('@/emails/admin-sicherheit')
+    return React.createElement(AdminSicherheitEmail, { anlass: daten.anlass, geraet: daten.geraet, wann: zeitpunktMitUhr(daten.zeitpunkt), code: daten.code })
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${NEUE_ANMELDUNG_MAIL.betreff(daten.hof)} · ${MARKE}`, vorlage.html, { art: 'neue-anmeldung' })
+  return { betreff: `${ADMIN_SICHERHEIT_MAIL.betreff[daten.anlass]} · ${MARKE}`, html }
 }
 
 /**
@@ -722,15 +977,20 @@ export async function sendAdminSicherheitEmail(
   anlass: import('@/lib/admin-anmeldung').AdminSicherheitAnlass,
   daten: { geraet: string; zeitpunkt: Date; code?: string }
 ): Promise<VersandErgebnis> {
+  const inhalt = await inhaltOderFehler(() => adminSicherheitInhalt({ anlass, geraet: daten.geraet, zeitpunkt: daten.zeitpunkt, code: daten.code }))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'admin-sicherheit' })
+}
+
+/** „Bestätige deine neue Anmelde-Adresse": nur Betreff und HTML (Nr. 270). `link` trägt einen Einmal-Token. */
+export async function emailAendernLinkInhalt(daten: { hof: string | null; link: string }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { ADMIN_SICHERHEIT_MAIL } = await import('@/lib/admin-anmeldung')
-  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
-  const vorlage = await htmlOderFehler(async () => {
-    const { AdminSicherheitEmail } = await import('@/emails/admin-sicherheit')
-    return React.createElement(AdminSicherheitEmail, { anlass, geraet: daten.geraet, wann: anmeldeZeitpunkt(daten.zeitpunkt), code: daten.code })
+  const { EMAIL_AENDERN_MAIL } = await import('@/lib/konto-anfragen')
+  const html = await vorlageHtml(async () => {
+    const { EmailAendernEmail } = await import('@/emails/email-aendern')
+    return React.createElement(EmailAendernEmail, daten)
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`, vorlage.html, { art: 'admin-sicherheit' })
+  return { betreff: `${EMAIL_AENDERN_MAIL.betreff} · ${MARKE}`, html }
 }
 
 /**
@@ -739,14 +999,20 @@ export async function sendAdminSicherheitEmail(
  * nie im Betreff und nie im Log. Gibt das Versandergebnis zurück.
  */
 export async function sendEmailAendernLink(email: string, daten: { hof: string | null; link: string }): Promise<VersandErgebnis> {
+  const inhalt = await inhaltOderFehler(() => emailAendernLinkInhalt(daten))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'email-aendern-link' })
+}
+
+/** „Deine Anmelde-Adresse wurde geändert": nur Betreff und HTML (Nr. 270). */
+export async function emailGeaendertHinweisInhalt(daten: { hof: string | null; zeitpunkt: Date; link: string }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { EMAIL_AENDERN_MAIL } = await import('@/lib/konto-anfragen')
-  const vorlage = await htmlOderFehler(async () => {
-    const { EmailAendernEmail } = await import('@/emails/email-aendern')
-    return React.createElement(EmailAendernEmail, daten)
+  const { EMAIL_GEAENDERT_MAIL } = await import('@/lib/konto-anfragen')
+  const html = await vorlageHtml(async () => {
+    const { EmailGeaendertEmail } = await import('@/emails/email-aendern')
+    return React.createElement(EmailGeaendertEmail, { hof: daten.hof, wann: zeitpunktMitUhr(daten.zeitpunkt), link: daten.link })
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${EMAIL_AENDERN_MAIL.betreff} · ${MARKE}`, vorlage.html, { art: 'email-aendern-link' })
+  return { betreff: `${EMAIL_GEAENDERT_MAIL.betreff} · ${MARKE}`, html }
 }
 
 /**
@@ -754,15 +1020,20 @@ export async function sendEmailAendernLink(email: string, daten: { hof: string |
  * Nr. 190), mit „Das war ich nicht" (Einmal-Link, nur in der Mail).
  */
 export async function sendEmailGeaendertHinweis(email: string, daten: { hof: string | null; zeitpunkt: Date; link: string }): Promise<VersandErgebnis> {
+  const inhalt = await inhaltOderFehler(() => emailGeaendertHinweisInhalt(daten))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'email-geaendert-hinweis' })
+}
+
+/** Sicherheitsmail an eine Person im Admin-Team: nur Betreff und HTML (Nr. 270). */
+export async function teamRechtGeaendertInhalt(daten: { anlass: import('@/lib/admin-team').TeamAnlass; name: string | null; rechte: string[] }): Promise<MailInhalt> {
   // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { EMAIL_GEAENDERT_MAIL } = await import('@/lib/konto-anfragen')
-  const { anmeldeZeitpunkt } = await import('@/lib/geraete')
-  const vorlage = await htmlOderFehler(async () => {
-    const { EmailGeaendertEmail } = await import('@/emails/email-aendern')
-    return React.createElement(EmailGeaendertEmail, { hof: daten.hof, wann: anmeldeZeitpunkt(daten.zeitpunkt), link: daten.link })
+  const { TEAM_MAIL } = await import('@/lib/admin-team')
+  const html = await vorlageHtml(async () => {
+    const { TeamRechtGeaendertEmail } = await import('@/emails/team-recht-geaendert')
+    return React.createElement(TeamRechtGeaendertEmail, daten)
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${EMAIL_GEAENDERT_MAIL.betreff} · ${MARKE}`, vorlage.html, { art: 'email-geaendert-hinweis' })
+  return { betreff: `${TEAM_MAIL.betreff[daten.anlass]} · ${MARKE}`, html }
 }
 
 /**
@@ -773,14 +1044,9 @@ export async function sendTeamRechtGeaendert(
   email: string,
   daten: { anlass: import('@/lib/admin-team').TeamAnlass; name: string | null; rechte: string[] }
 ): Promise<VersandErgebnis> {
-  // Dynamisch statt in der Importzeile oben: email.ts teilen sich mehrere Nummern eines Laufs.
-  const { TEAM_MAIL } = await import('@/lib/admin-team')
-  const vorlage = await htmlOderFehler(async () => {
-    const { TeamRechtGeaendertEmail } = await import('@/emails/team-recht-geaendert')
-    return React.createElement(TeamRechtGeaendertEmail, daten)
-  })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, `${TEAM_MAIL.betreff[daten.anlass]} · ${MARKE}`, vorlage.html, { art: 'team-recht-geaendert' })
+  const inhalt = await inhaltOderFehler(() => teamRechtGeaendertInhalt(daten))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'team-recht-geaendert' })
 }
 
 /** Neuer Hof registriert → EINE Betreiber-Adresse (Freischaltung nötig); die Adressen aus empfaengerFuer('hofWartet'), je Adresse ein Auftrag. */
@@ -791,17 +1057,24 @@ export async function baueNewFarmNotification(
     slug: string
     ownerEmail: string
     createdAt: Date
+    /** PLZ und Ort für die Zeile „Hof“ (Board Bild 1); fehlen sie, steht nur der Name. */
+    postalCode?: string
+    city?: string
+    /** Was zum Verkaufen noch fehlt („Stripe“, „Produkte“, „Abholzeit“); leer oder fehlend = keine Zeile. */
+    fehlt?: string[]
   },
   an: string
 ): Promise<StapelMail> {
-  const registeredAt = farm.createdAt.toLocaleString('de-AT', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Europe/Vienna',
-  })
+  // Kurzer Wochentag, Datum und Uhrzeit wie in den Boards („Do, 15. Oktober 2026, 10:00“, Wiener Zeit).
+  const registeredAt = `${formatPickupDate(farm.createdAt)}, ${farm.createdAt.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' })}`
   const { NewFarmNotificationEmail } = await import('@/emails/new-farm-notification')
+  const { ADMIN_HOEFE_HREF } = await import('@/lib/admin-hof-akte')
   const html = await toHtml(
     React.createElement(NewFarmNotificationEmail, {
+      pruefenUrl: `${APP_URL}${ADMIN_HOEFE_HREF}`,
       farmName: farm.name,
+      farmOrt: [farm.postalCode, farm.city].filter(Boolean).join(' ') || undefined,
+      fehlt: farm.fehlt,
       farmId: farm.id,
       farmSlug: farm.slug,
       ownerEmail: farm.ownerEmail,
@@ -947,8 +1220,10 @@ export type ErstattungOffenMeldung = {
  */
 export async function baueErstattungOffen(m: ErstattungOffenMeldung, an: string): Promise<StapelMail> {
   const { ErstattungOffenEmail } = await import('@/emails/erstattung-offen')
+  const { ADMIN_BESTELLUNGEN_HREF } = await import('@/lib/admin-bestellung')
   const html = await toHtml(
     React.createElement(ErstattungOffenEmail, {
+      bestellungenUrl: `${APP_URL}${ADMIN_BESTELLUNGEN_HREF}`,
       was: m.was,
       bestellnummer: m.bestellnummer,
       bestellId: m.bestellId,
@@ -972,6 +1247,9 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
   // Der signierte Weg zurück zur Bestellung — der einzige, den die Kundin
   // nach dem Schließen des Tabs noch hat (kein Konto, keine Historie).
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
+  // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
+  const agbFassung = agbFassungMitMeldung(order)
+  const { abspracheSatz, kopf } = bestaetigungMitAbsprache(order)
 
   const { OrderConfirmationEmail } = await import('@/emails/order-confirmation')
   const html = await toHtml(React.createElement(OrderConfirmationEmail, {
@@ -980,25 +1258,30 @@ export async function baueOrderConfirmation(order: OrderForEmail): Promise<Stape
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
+    abspracheSatz,
     zahlart: mailZahlart(order.paymentMethod),
-    items: mailPositionen(order),
+    items: kundenPositionen(order),
     ...kundenGebuehr(order),
-    total: betraege(order).gesamt,
+    total: betraege(order).anzeigeGesamt,
+    vorOrtBetrag: vorOrtBetrag(order),
     routeUrl: routeUrl(order),
     manageUrl: `${APP_URL}/account/profile`,
     orderUrl,
     widerrufUrl: widerrufUrl(order),
     belehrung: belehrungFuer(order),
+    agbFassung,
   }))
 
-  // Nr. 207: die AGB als Datei im Anhang — auch bei „Betrieb“ (nur Belehrung und Formular entfallen).
+  // Nr. 207: die AGB als Datei im Anhang — auch bei „Betrieb“ (nur Belehrung und Formular entfallen); N45: in der Fassung der Bestellung.
   return {
     an: order.customerEmail,
     betreff: `Deine Bestellung bei ${order.farm.name} – Abholung ${formatPickupDate(order.pickupDate)}`,
     html,
-    anhaenge: [await agbAnhang()],
+    anhaenge: [await agbAnhang(agbFassung)],
+    ...kopf,
   }
 }
 
@@ -1027,6 +1310,8 @@ export async function onsiteConfirmationInhalt(
         pickupTimeStart: order.pickupTimeStart,
       })
     : null
+  // N45: die Fassung aus dem Snapshot, nie aus der Uhr; ein unbekannter Wert ergibt 0.9 und eine Meldung.
+  const agbFassung = agbFassungMitMeldung(order)
 
   const { OnsiteConfirmationEmail } = await import('@/emails/onsite-confirmation')
   const html = await toHtml(React.createElement(OnsiteConfirmationEmail, {
@@ -1034,19 +1319,27 @@ export async function onsiteConfirmationInhalt(
     farmName: order.farm.name,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: mailPositionen(order),
+    items: kundenPositionen(order),
     ...kundenGebuehr(order),
-    total: betraege(order).gesamt,
+    total: betraege(order).anzeigeGesamt,
     confirmationUrl,
     bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
     belehrung: belehrungFuer(order),
     widerrufUrl: widerrufUrl(order),
+    agbFassung,
   }))
 
-  // Nr. 207: die AGB als Datei im Anhang, wie in der Bestätigung.
-  return { an: order.customerEmail, betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`, html, anhaenge: [await agbAnhang()] }
+  // Nr. 207: die AGB als Datei im Anhang, wie in der Bestätigung (N45: Fassung der Bestellung).
+  return {
+    an: order.customerEmail,
+    betreff: `Bitte bestätige deine Bestellung bei ${order.farm.name}`,
+    html,
+    anhaenge: [await agbAnhang(agbFassung)],
+    ...mitAntwortAn(order.farm),
+  }
 }
 
 /**
@@ -1066,7 +1359,23 @@ export async function sendOnsiteConfirmation(
     farmId: order.farm.id,
     ...(protokoll.nochmalVon ? { nochmalVon: protokoll.nochmalVon } : {}),
     ...(mail.anhaenge ? { anhaenge: mail.anhaenge } : {}),
+    ...(mail.antwortAn ? { antwortAn: mail.antwortAn } : {}),
   })
+}
+
+/**
+ * Die Abholzeit in den Hof-Mails ohne führende Null der Stunde: „9:00–12:00“ (Board s3/w3-mail-hof-bestellung, V9).
+ * Die Kunden-Mails behalten „09:00“ wie die Bestätigungsseite — die Frist „bis …, 09:40 Uhr“ ebenso (C-Zeile mail-kauf).
+ */
+function hofAbholzeit(order: Pick<OrderForEmail, 'pickupTimeStart' | 'pickupTimeEnd'>): string {
+  const ohneNull = (zeit: string) => zeit.replace(/^0(\d:)/, '$1')
+  return `${ohneNull(order.pickupTimeStart)}–${ohneNull(order.pickupTimeEnd)}`
+}
+
+/** „Bei Heute ansehen →“ in den Hof-Mails: die Startseite des Hofbereichs (Wortliste N42 c), dieselbe Adresse wie in der Navigation. */
+async function heuteUrl(): Promise<string> {
+  const { hauptPunktHref } = await import('@/lib/bauern-navigation')
+  return `${APP_URL}${hauptPunktHref('heute')}`
 }
 
 /** Online-Zahlung → Bauer */
@@ -1078,8 +1387,9 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
+    pickupTime: hofAbholzeit(order),
+    // Zeilenbeträge wie in der Mail an die Kundin (mailPositionen: dieselbe Rechnung über Cent), Board s3/w3-mail-hof-bestellung Bild 1.
+    items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
     // Für den Hof zählt der Warenpreis — das ist, was ihm überwiesen wird.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
@@ -1087,16 +1397,55 @@ export async function baueOrderPaidToFarmer(order: OrderForHofMail): Promise<Sta
     customerTotal: betraege(order).gesamt,
     paymentLabel: 'Online (bereits bezahlt)',
     isOnline: true,
-    dashboardUrl: `${APP_URL}/orders`,
+    heuteUrl: await heuteUrl(),
   }))
 
   return { an: hofKontaktEmail(order.farm), betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber}`, html }
 }
 
-/** Vor-Ort bestätigt → Bauer */
+/**
+ * Neue Barbestellung → Hof (Nr. 256, N46; Board s3/w3-mail-hof-bestellung
+ * Bild 2), solange die Kundin noch bestätigen muss. Ob sie noch passt (Status,
+ * Frist), entscheidet der Renderer `rendereBestellungBarHof` — hier wird nur
+ * gebaut. Ohne Telefonnummer, ohne E-Mail-Adresse und ohne Notiz der Kundin:
+ * Vor ihrer Bestätigung braucht der Hof nur, was er packen und kassieren wird.
+ * Kein Reply-To: Antworten an die Kundin laufen über die Bestellung.
+ */
+export async function baueBarBestellungAnHof(order: OrderForHofMail): Promise<StapelMail> {
+  // „Bar zu kassieren“ allein aus dem Snapshot (barZuKassierenCents) — nie aus dem Warenpreis als Rückfall.
+  const kassierenCents = barZuKassierenCents({ totalAmount: order.totalAmount, serviceFeeCents: order.serviceFeeCents ?? 0, paymentMethod: order.paymentMethod })
+  if (kassierenCents === null) throw new Error('Bar-Mail an den Hof für eine Online-Bestellung')
+  // Dieselbe Frist wie die Mail „Bitte bestätige“ an die Kundin und das Verfallen (fristen.ts), als fester Tag mit Uhrzeit (C-Zeile mail-kauf).
+  const frist = order.createdAt
+    ? // Vor Ort, nie online (oben ausgeschlossen): fristVon rechnet bar und Karte vor Ort gleich.
+      fristVon({ paymentMethod: 'ONSITE_CASH', createdAt: order.createdAt, pickupDate: order.pickupDate, pickupTimeStart: order.pickupTimeStart })
+    : null
+
+  const { NewOrderNotificationEmail } = await import('@/emails/new-order-notification')
+  const html = await toHtml(React.createElement(NewOrderNotificationEmail, {
+    farmerName: order.farm.ownerName,
+    customerName: order.customerName,
+    orderNumber: order.orderNumber,
+    pickupDate: formatPickupDate(order.pickupDate),
+    pickupTime: hofAbholzeit(order),
+    items: mailPositionen(order).map((zeile, i) => ({ ...zeile, quantity: order.items[i]?.quantity ?? 0 })),
+    paymentLabel: 'Bar bei Abholung',
+    isOnline: false,
+    barZuKassieren: centsAlsEuro(kassierenCents),
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
+    heuteUrl: await heuteUrl(),
+  }))
+
+  return {
+    an: hofKontaktEmail(order.farm),
+    betreff: `Neue Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (Bar bei Abholung)`,
+    html,
+  }
+}
+
+/** Bar bestätigt → Bauer (alte Bestellungen mit Karte bei Abholung, E5, gehen denselben Weg) */
 export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promise<StapelMail> {
-  const paymentLabel =
-    order.paymentMethod === 'ONSITE_CASH' ? 'Bar bei Abholung' : 'Karte bei Abholung'
+  const bar = order.paymentMethod === 'ONSITE_CASH'
 
   const { OrderConfirmedEmail } = await import('@/emails/order-confirmed')
   const html = await toHtml(React.createElement(OrderConfirmedEmail, {
@@ -1105,8 +1454,8 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
     customerPhone: order.customerPhone,
     orderNumber: order.orderNumber,
     pickupDate: formatPickupDate(order.pickupDate),
-    pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
-    items: order.items.map(i => ({ name: positionsZeile(i), quantity: i.quantity })),
+    pickupTime: hofAbholzeit(order),
+    items: order.items.map(i => ({ name: positionsZeile(i).text, quantity: i.quantity })),
     // Warenpreis für den Hof; „Bar zu kassieren" ist Warenpreis + Gebühr.
     total: betraege(order).warenpreis,
     serviceFee: betraege(order).gebuehr,
@@ -1120,20 +1469,22 @@ export async function baueOrderConfirmedToFarmer(order: OrderForHofMail): Promis
       : order.paymentMethod === 'ONSITE_CASH' && order.createdAt
         ? barOhneServicegebuehr('ONSITE_CASH', order.createdAt)
         : false,
-    dashboardUrl: `${APP_URL}/orders`,
+    zahlart: bar ? 'bar' : 'karte',
+    heuteUrl: await heuteUrl(),
   }))
 
+  // Wortliste (N42 c, V57): „Bar-Bestellung bestätigt“ wie am Bildschirm, nie „Vor-Ort-Bestellung“.
   return {
     an: hofKontaktEmail(order.farm),
-    betreff: `Neue Vor-Ort-Bestellung für ${formatPickupDate(order.pickupDate)} – ${order.orderNumber} (${paymentLabel})`,
+    betreff: bar ? `Bar-Bestellung ${order.orderNumber} bestätigt` : `Bestellung ${order.orderNumber} bestätigt (Karte bei Abholung)`,
     html,
   }
 }
 
 /** Bauer markiert als bereit → Kunde */
 export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> {
-  const reorderToken = generateReorderToken(order.id, order.farm.id)
-  const reorderUrl = `${APP_URL}/${order.farm.slug}?reorder=${reorderToken}`
+  // Antwort 8 (Lauf 32, Nr. 255): kein „Dieselbe Bestellung nochmal aufgeben“ mehr — Vertragsmail ohne Werbung (S11).
+  // Die Route ?reorder= bleibt für Links in alten Mails.
   const orderUrl = `${APP_URL}${bestellungPfad(order.farm.slug, order.id)}`
 
   const { OrderReadyEmail } = await import('@/emails/pickup-reminder')
@@ -1143,15 +1494,15 @@ export async function baueOrderReady(order: OrderForEmail): Promise<StapelMail> 
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
-    reorderUrl,
     orderUrl,
     widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`, html }
+  return { an: order.customerEmail, betreff: `${order.farm.name}: Deine Bestellung ist bereit zur Abholung`, html, ...mitAntwortAn(order.farm) }
 }
 
 /** Fertig-Rückschritt → Kunde (optional, Haken im Dialog): neutrales Update,
@@ -1164,13 +1515,14 @@ export async function baueOrderNotReady(order: OrderForEmail): Promise<StapelMai
     farmPhone: order.farm.phone,
     farmAddress: order.farm.address,
     farmCity: order.farm.city,
+    farmPostalCode: order.farm.postalCode,
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
     routeUrl: routeUrl(order),
     widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `Kurzes Update zu deiner Bestellung ${order.orderNumber}`, html }
+  return { an: order.customerEmail, betreff: `Kurzes Update zu deiner Bestellung ${order.orderNumber}`, html, ...mitAntwortAn(order.farm) }
 }
 
 /** Was eine Beitragsmail braucht — gemeinsam für den Versand heute und den Renderer der Warteschlange (Nr. 158). */
@@ -1228,12 +1580,14 @@ export async function baueOrderCancelled(
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
+    farmPhone: order.farm.phone,
+    zahlart: mailZahlart(order.paymentMethod),
     total: n(order.totalAmount),
     refundAmount: erstattetCents === null ? null : centsAlsEuro(erstattetCents),
     cancelReason: cancelReason ?? undefined,
   }))
 
-  return { an: order.customerEmail, betreff: `Deine Bestellung ${order.orderNumber} wurde storniert`, html }
+  return { an: order.customerEmail, betreff: `Deine Bestellung ${order.orderNumber} wurde storniert`, html, ...mitAntwortAn(order.farm) }
 }
 
 /**
@@ -1249,15 +1603,23 @@ export async function baueArtikelFehlt(
     bisherCents: number
     neuCents: number
     erstattetCents: number | null
+    /** Was in der Bestellung bleibt (Board s3/w3-mail-kauf Bild 6); fehlt es, keine Zeilen. */
+    uebrig?: OrderForEmail['items']
   }
 ): Promise<StapelMail> {
   const { ArtikelFehltEmail } = await import('@/emails/artikel-fehlt')
+  const hofpreis = imHofpreis(order)
   const html = await toHtml(React.createElement(ArtikelFehltEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
     farmPhone: order.farm.phone,
-    artikel: positionsZeile(fehlt.position),
+    artikel: positionsZeile(fehlt.position).text,
+    // Dieselbe Zeilenrechnung wie die Bestätigung (mailPositionen): Decimal/Cent, im Hofpreis-Modell der Endpreis.
+    uebrig: (fehlt.uebrig ?? []).map((i) => {
+      const zeile = positionsZeile(i)
+      return { name: zeile.text, teile: zeile, betrag: zeilenBetrag(i, hofpreis) }
+    }),
     gebuehrWort: gebuehrWort(order),
     pickupDate: formatPickupDate(order.pickupDate),
     pickupTime: `${order.pickupTimeStart}–${order.pickupTimeEnd}`,
@@ -1269,13 +1631,13 @@ export async function baueArtikelFehlt(
     widerrufUrl: widerrufUrl(order),
   }))
 
-  return { an: order.customerEmail, betreff: `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html }
+  return { an: order.customerEmail, betreff: `Ein Artikel fehlt in deiner Bestellung ${order.orderNumber}`, html, ...mitAntwortAn(order.farm) }
 }
 
 /** Zahlung nach dem Storno eingegangen und sofort voll erstattet → Kunde */
 export async function baueZahlungZuSpaet(
   order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
-    farm: Pick<OrderForEmail['farm'], 'name'>
+    farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
   },
   erstattetCents: number
 ): Promise<StapelMail> {
@@ -1288,23 +1650,31 @@ export async function baueZahlungZuSpaet(
     supportEmail: SUPPORT_EMAIL,
   }))
 
-  return { an: order.customerEmail, betreff: 'Deine Zahlung kam zu spät – das Geld ist zurück', html }
+  return { an: order.customerEmail, betreff: 'Deine Zahlung kam zu spät – das Geld ist zurück', html, ...mitAntwortAn(order.farm) }
 }
 
-/** Vor-Ort-Bestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
+/** Barbestellung nicht rechtzeitig bestätigt, Ware freigegeben → Kunde */
 export async function baueBestellungVerfallen(
-  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> & {
-    farm: Pick<OrderForEmail['farm'], 'name'>
-  }
+  order: Pick<OrderForEmail, 'customerName' | 'customerEmail' | 'orderNumber'> &
+    Partial<Pick<OrderForEmail, 'createdAt' | 'pickupDate' | 'pickupTimeStart'>> & {
+      farm: Pick<OrderForEmail['farm'], 'name' | 'email'>
+    }
 ): Promise<StapelMail> {
+  // Board s3/w3-mail-storno Bild 3 (V87): die Frist, die verstrichen ist — dieselbe Rechnung wie „Bitte bestätige“
+  // (fristVon, nur gelesen), als fester Tag. Fehlt ein Zeitpunkt, bleibt „nicht rechtzeitig“.
+  const frist =
+    order.createdAt && order.pickupDate && order.pickupTimeStart
+      ? fristVon({ paymentMethod: 'ONSITE_CASH', createdAt: order.createdAt, pickupDate: order.pickupDate, pickupTimeStart: order.pickupTimeStart })
+      : null
   const { BestellungVerfallenEmail } = await import('@/emails/bestellung-verfallen')
   const html = await toHtml(React.createElement(BestellungVerfallenEmail, {
     customerName: order.customerName,
     orderNumber: order.orderNumber,
     farmName: order.farm.name,
+    bestaetigenBis: frist ? zeitpunktFuerMail(frist) : undefined,
   }))
 
-  return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html }
+  return { an: order.customerEmail, betreff: 'Deine Bestellung ist verfallen, weil sie nicht bestätigt wurde', html, ...mitAntwortAn(order.farm) }
 }
 
 /**
@@ -1344,12 +1714,13 @@ export async function bauePostfachMail(m: {
 
 /**
  * Bescheid an eine Kundin, die einen Wunsch gemeldet hat (Register N14,
- * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Text und Team-Name
- * baut `bescheidMailHtml` (src/lib/meldung.ts); die Antwort lädt der Renderer
- * frisch aus der Meldung.
+ * Nr. 105) — Kann warten, je Meldung ein Auftrag (Nr. 159). Die Vorlage
+ * src/emails/bescheid.tsx; die Antwort lädt der Renderer frisch aus der Meldung.
  */
 export async function baueBescheidMail(an: string, antwort: string): Promise<StapelMail> {
-  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: bescheidMailHtml(antwort, MARKE_TEAM) }
+  // Seit Nr. 241 in der Karte aller Mails (Board s3/w3-mail-neuigkeiten Bild 4) statt als rohes HTML.
+  const { BescheidEmail } = await import('@/emails/bescheid')
+  return { an, betreff: WUENSCHE_TEXT.bescheidTitel, html: await toHtml(React.createElement(BescheidEmail, { antwort })) }
 }
 
 /**
@@ -1359,12 +1730,18 @@ export async function baueBescheidMail(an: string, antwort: string): Promise<Sta
  * öffnen Links ungefragt. Gibt das Versandergebnis zurück (sendRaw wirft nie).
  */
 export async function sendBetreiberBestaetigung(email: string, token: string): Promise<VersandErgebnis> {
-  const vorlage = await htmlOderFehler(async () => {
+  const inhalt = await inhaltOderFehler(() => betreiberBestaetigungInhalt({ token }))
+  if (!inhalt.ok) return { error: inhalt.error }
+  return sendRaw(email, inhalt.betreff, inhalt.html, { art: 'betreiber-bestaetigung' })
+}
+
+/** „Bitte bestätige deine Adresse" (Zustellung): nur Betreff und HTML (Nr. 270). `token` steht nur im Link. */
+export async function betreiberBestaetigungInhalt(daten: { token: string }): Promise<MailInhalt> {
+  const html = await vorlageHtml(async () => {
     const { BetreiberBestaetigungEmail } = await import('@/emails/betreiber-bestaetigung')
-    return React.createElement(BetreiberBestaetigungEmail, { url: `${APP_URL}${bestaetigenPfad(token)}` })
+    return React.createElement(BetreiberBestaetigungEmail, { url: `${APP_URL}${bestaetigenPfad(daten.token)}` })
   })
-  if (!vorlage.ok) return { error: vorlage.error }
-  return sendRaw(email, ZUSTELLUNG_MAIL_TEXT.bestaetigungBetreff, vorlage.html, { art: 'betreiber-bestaetigung' })
+  return { betreff: ZUSTELLUNG_MAIL_TEXT.bestaetigungBetreff, html }
 }
 
 /**
@@ -1392,7 +1769,7 @@ export async function baueHofAntwortAnTeam(
 /** „Testmail an alle senden" (Postfach › Zustellung) → EINE Adresse der Liste (je Adresse ein Auftrag). */
 export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {
   const { BetreiberTestmailEmail } = await import('@/emails/betreiber-testmail')
-  const html = await toHtml(React.createElement(BetreiberTestmailEmail, { url: `${APP_URL}${eingangAdresse('offen')}` }))
+  const html = await toHtml(React.createElement(BetreiberTestmailEmail))
   return { an, betreff: ZUSTELLUNG_MAIL_TEXT.testBetreff, html }
 }
 
@@ -1405,13 +1782,19 @@ export async function baueBetreiberTestmail(an: string): Promise<StapelMail> {
  */
 export async function sendBetriebWarnung(anlass: BetriebMailAnlass, an: readonly string[]): Promise<ListenErgebnis> {
   if (an.length === 0) return { gesendet: 0, gescheitert: 0 }
+  const inhalt = await inhaltOderFehler(() => betriebWarnungInhalt(anlass))
+  if (!inhalt.ok) return { gesendet: 0, gescheitert: an.length }
+  return sendeAnListe(an, inhalt.betreff, inhalt.html, 'betrieb-warnung')
+}
+
+/** Warn-Mail des Betriebs: nur Betreff und HTML (Nr. 270), Sätze aus der reinen `betriebMail`. */
+export async function betriebWarnungInhalt(anlass: BetriebMailAnlass): Promise<MailInhalt> {
   const mail = betriebMail(anlass)
-  const vorlage = await htmlOderFehler(async () => {
+  const html = await vorlageHtml(async () => {
     const { BetriebWarnungEmail } = await import('@/emails/betrieb-warnung')
     return React.createElement(BetriebWarnungEmail, { mail, url: `${APP_URL}${ADMIN_BETRIEB_HREF}` })
   })
-  if (!vorlage.ok) return { gesendet: 0, gescheitert: an.length }
-  return sendeAnListe(an, mail.betreff, vorlage.html, 'betrieb-warnung')
+  return { betreff: mail.betreff, html }
 }
 
 // ─── Widerruf (Nr. 200, Register N39) ────────────────────────────────────────
@@ -1437,7 +1820,7 @@ export async function sendWiderrufEingang(
 ): Promise<VersandErgebnis> {
   const vorlage = await htmlOderFehler(async () => {
     const { WiderrufEingangEmail } = await import('@/emails/widerruf')
-    return React.createElement(WiderrufEingangEmail, { ...daten, marke: MARKE })
+    return React.createElement(WiderrufEingangEmail, daten)
   })
   if (!vorlage.ok) return { error: vorlage.error }
   return sendRaw(an, WIDERRUF_EINGANG_BETREFF, vorlage.html, { art: 'widerruf-eingang', ...protokoll })
@@ -1448,10 +1831,10 @@ const WIDERRUF_EINGANG_BETREFF = `Dein Widerruf ist eingegangen · ${MARKE}`
 /** Dieselbe Mail nur gebaut — für die Vorschau in Admin › Betrieb (Nr. 167) und das Bild der Abnahme. */
 export async function widerrufEingangInhalt(an: string, daten: WiderrufEingangDaten): Promise<StapelMail> {
   const { WiderrufEingangEmail } = await import('@/emails/widerruf')
-  return { an, betreff: WIDERRUF_EINGANG_BETREFF, html: await toHtml(React.createElement(WiderrufEingangEmail, { ...daten, marke: MARKE })) }
+  return { an, betreff: WIDERRUF_EINGANG_BETREFF, html: await toHtml(React.createElement(WiderrufEingangEmail, daten)) }
 }
 
-/** Widerruf nach der Abholung → Hof (Wichtig): prüfen, erstatten oder mit Grund ablehnen. */
+/** Rücktritt nach der Abholung → Hof (Wichtig): prüfen, erstatten oder mit Grund ablehnen. Wortlaut „Rücktritt“ (N43). */
 export async function baueWiderrufHof(
   an: string,
   daten: { bestellnummer: string; umfang: string[]; eingegangenAm: string; bestellungPfad: string; ausnahmeSatz: string }
@@ -1466,15 +1849,27 @@ export async function baueWiderrufHof(
       ausnahmeSatz: daten.ausnahmeSatz,
     })
   )
-  return { an, betreff: `Widerruf zu Bestellung ${daten.bestellnummer}`, html }
+  return { an, betreff: `Rücktritt zu Bestellung ${daten.bestellnummer}`, html }
 }
 
-/** Ergebnis → Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder abgelehnt (Grund des Hofs). */
+/**
+ * Ergebnis → Kundin (Wichtig): erstattet (Betrag in Cent, bar null) oder
+ * abgelehnt (Grund des Hofs). Eine Bestellmail an die Kundin: „Antwort an“
+ * den Hof der Bestellung (V86), über `hof` aus dem Renderer.
+ */
 export async function baueWiderrufErgebnis(
   an: string,
-  daten: { bestellnummer: string; hofName: string; erstattetCents: number | null; grund: string | null; vorAbholung?: boolean; teilweise?: boolean }
+  daten: {
+    bestellnummer: string
+    hofName: string
+    erstattetCents: number | null
+    grund: string | null
+    vorAbholung?: boolean
+    teilweise?: boolean
+    hof: { email: string }
+  }
 ): Promise<StapelMail> {
-  const { WiderrufErgebnisEmail } = await import('@/emails/widerruf')
+  const { WiderrufErgebnisEmail, WIDERRUF_ERGEBNIS_TITEL } = await import('@/emails/widerruf')
   const html = await toHtml(
     React.createElement(WiderrufErgebnisEmail, {
       bestellnummer: daten.bestellnummer,
@@ -1485,11 +1880,11 @@ export async function baueWiderrufErgebnis(
       teilweise: daten.teilweise === true,
     })
   )
-  const betreff =
+  const titel =
     daten.grund !== null
-      ? `Dein Widerruf wurde abgelehnt · ${daten.bestellnummer}`
+      ? WIDERRUF_ERGEBNIS_TITEL.abgelehnt
       : daten.teilweise === true
-        ? `Dein Widerruf ist zum Teil erledigt · ${daten.bestellnummer}`
-        : `Dein Widerruf ist erledigt · ${daten.bestellnummer}`
-  return { an, betreff, html }
+        ? WIDERRUF_ERGEBNIS_TITEL.teilweise
+        : WIDERRUF_ERGEBNIS_TITEL.erledigt
+  return { an, betreff: `${titel} · ${daten.bestellnummer}`, html, ...mitAntwortAn(daten.hof) }
 }

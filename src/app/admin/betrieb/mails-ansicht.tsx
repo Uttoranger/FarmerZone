@@ -1,10 +1,13 @@
 import * as Sentry from '@sentry/nextjs'
-import { CircleAlert, CircleCheck, Clock, Info } from 'lucide-react'
+import { CircleAlert, Clock, Info } from 'lucide-react'
 import { ADMIN_BETRIEB_HREF, ADMIN_BETRIEB_MAILS_HREF, BETRIEB_TEXT, TARIFE } from '@/lib/betrieb'
 import {
   ADMIN_BETRIEB_ALLE_MAILS_HREF,
   ADMIN_BETRIEB_MAILS_ALLE_ARTEN_HREF,
   ALLE_MAILS_TEXT,
+  BEISPIEL_GRUPPEN,
+  BEISPIELE_TEXT,
+  MAIL_BEISPIELE,
   MAIL_TEXT,
   alleMailsHref,
   brauchtDich,
@@ -42,6 +45,7 @@ import { BetriebUnterreiter, GrenzBalken, Karte, Klappkarte, Warnkarte } from '.
 import { MailKnoepfe, type MailKnoepfeTexte } from './mails-aktionen'
 import { NochmalAlleKnopf } from './mails-nochmal'
 import { MinutenNachladen } from './minuten-nachladen'
+import { MailBeispiele, type BeispielGruppeAnzeige } from './mails-beispiele'
 
 /*
  * Admin › Betrieb › E-Mails (Register N26, N18-Ergänzung 24.10.2026; Nr. 161;
@@ -243,7 +247,7 @@ function BrauchtDichListe({ zeilen, gruppen, anker }: { zeilen: readonly Braucht
         <span className={cn('text-[12.5px]', LEISE)}>{`${zeilen.length} ${zeilen.length === 1 ? 'Mail' : 'Mails'}`}</span>
       </div>
       {zeilen.length === 0 ? (
-        <EmptyState symbol={CircleCheck} titel={MAIL_TEXT.brauchtLeer} satz={MAIL_TEXT.brauchtLeerSatz} ausweg={{ ohne: 'Es gibt nichts zu tun; die Seite lädt jede Minute neu.' }} className="py-6" />
+        <EmptyState titel={MAIL_TEXT.brauchtLeer} satz={MAIL_TEXT.brauchtLeerSatz} ausweg={{ ohne: 'Es gibt nichts zu tun; die Seite lädt jede Minute neu.' }} className="py-6" />
       ) : (
         <>
           {gruppen.map((g) => (
@@ -396,13 +400,13 @@ function MailVerlaufBild({ verlauf }: { verlauf: MailVerlauf }): React.JSX.Eleme
             </g>
           )
         })}
-        <text x={V_LINKS} y={V_HOEHE - 6} className="fill-muted-foreground text-[11px]">
+        <text x={V_LINKS} y={V_HOEHE - 6} className="fill-muted-foreground text-[12px]">
           {verlauf.von}
         </text>
-        <text x={V_BREITE / 2} y={V_HOEHE - 6} textAnchor="middle" className="fill-muted-foreground text-[11px]">
+        <text x={V_BREITE / 2} y={V_HOEHE - 6} textAnchor="middle" className="fill-muted-foreground text-[12px]">
           {verlauf.mitte}
         </text>
-        <text x={V_BREITE - V_RECHTS} y={V_HOEHE - 6} textAnchor="end" className="fill-muted-foreground text-[11px]">
+        <text x={V_BREITE - V_RECHTS} y={V_HOEHE - 6} textAnchor="end" className="fill-muted-foreground text-[12px]">
           heute
         </text>
       </svg>
@@ -429,6 +433,25 @@ function SchlangeInhalt({ karte }: { karte: SchlangeKarte }): React.JSX.Element 
         {karte.durchlauf}
       </p>
     </div>
+  )
+}
+
+// ─── Beispiele ───────────────────────────────────────────────────────────────
+
+/** Die Gruppen der Beispiele für den Client — Namen und Knopf-Beschriftung fertig (Register N48, Nr. 270). */
+const BEISPIEL_ANZEIGE: readonly BeispielGruppeAnzeige[] = BEISPIEL_GRUPPEN.map((g) => ({
+  id: g.id,
+  name: g.name,
+  beispiele: MAIL_BEISPIELE.filter((b) => b.gruppe === g.id).map((b) => ({ id: b.id, name: b.name, label: BEISPIELE_TEXT.knopfLabel(b.name) })),
+}))
+
+/** „Beispiele“: jede Mail-Art mit erfundenen Daten — kein Versand, kein Mail-Auftrag, nichts gespeichert. Braucht keine Datenbank, steht also immer. */
+function BeispieleKarte(): React.JSX.Element {
+  return (
+    <Karte titel={BEISPIELE_TEXT.titel} zusatz={BEISPIELE_TEXT.zusatz}>
+      <p className="text-[13px] leading-snug text-foreground">{BEISPIELE_TEXT.satz}</p>
+      <MailBeispiele gruppen={BEISPIEL_ANZEIGE} texte={{ knopf: BEISPIELE_TEXT.knopf, schliessen: BEISPIELE_TEXT.schliessen, betreff: BEISPIELE_TEXT.betreff, fehler: MAIL_TEXT.aktionFehler }} />
+    </Karte>
   )
 }
 
@@ -574,6 +597,8 @@ export async function MailsAnsicht({ jetzt, suche, sucheRoh, alle }: { jetzt: Da
               {schlangenKarte ? <SchlangeInhalt karte={schlangenKarte} /> : <TeilFehler />}
             </Klappkarte>
           </div>
+
+          <BeispieleKarte />
 
           <p className={cn('text-[12.5px] leading-snug', LEISE)}>{MAIL_TEXT.regel}</p>
         </div>

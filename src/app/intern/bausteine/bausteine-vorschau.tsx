@@ -2,21 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import {
-  BarChart3,
-  CalendarCheck,
-  Check,
-  Compass,
-  FlaskConical,
-  Info,
-  Package,
-  Plus,
-  ReceiptText,
-  SearchX,
-  ShoppingBasket,
-  SlidersHorizontal,
-  Users,
-} from 'lucide-react'
+import { BarChart3, CalendarCheck, Check, Compass, FlaskConical, Info, Package, Plus, ReceiptText, ShoppingBasket, SlidersHorizontal, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { Chip, FilterChip, FilterChipReihe } from '@/components/ui/chip'
@@ -26,21 +12,42 @@ import { ListGruppe, ListRow } from '@/components/ui/list-row'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { Marke } from '@/components/ui/marke'
+import { AusverkauftMarke, Marke } from '@/components/ui/marke'
 import { MARKE_ARTEN, type MarkeArt } from '@/lib/marke-art'
 import { GroessenWahl, Groessenkachel } from '@/components/ui/groessenkachel'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { BottomNav, BottomNavLink, BottomNavMitte, mittelknopfKlassen, mittelknopfMitWortKlassen, mittelkreisKlassen } from '@/components/ui/bottom-nav'
+import { Hinweiskarte, HinweiskarteFehler } from '@/components/ui/hinweiskarte'
+import { BottomNav, BottomNavLink, BottomNavMitte, mittelflaecheKlassen, mittelknopfFlachKlassen, mittelknopfKlassen } from '@/components/ui/bottom-nav'
 import { SidebarEintrag, SidebarGruppe } from '@/components/ui/sidebar-gruppe'
 import { Zaehler } from '@/components/ui/zaehler'
-import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetBlatt, SheetClose, SheetDescription, SheetKopf, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Dialog, DialogMitte, DialogTrigger } from '@/components/ui/dialog'
+import { FeldMitFehler } from '@/components/ui/feld-fehler'
+import { Textlink } from '@/components/ui/textlink'
+import { BildPlatzhalter, FotoHinzufuegen } from '@/components/ui/bild-platzhalter'
+import { HofkarteRahmen, hofkarteKlassen } from '@/components/ui/hofkarte-rahmen'
+import { MeldungFormularAnsicht, type MeldungWelt } from '@/components/ui/meldung-formular-ansicht'
+import type { MeldungFormular } from '@/components/shared/use-meldung-formular'
+import type { MeldungArt } from '@/lib/meldung'
+import { Input } from '@/components/ui/input'
 import { ThemeUmschalter } from '@/components/shared/theme-umschalter'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { UnterDemWerkzeugKopf, WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG, RUNDUNG_PX, type RundungArt } from '@/components/ui/rundung'
+import { HINWEISKASTEN_LINK, Hinweiskasten } from '@/components/ui/hinweiskasten'
+import { AKTIONSLEISTE_KNOPF, AKTIONSLEISTE_ZURUECK, FesteAktionsleiste } from '@/components/ui/feste-aktionsleiste'
+import { HofBalken } from '@/components/hofbereich/hof-balken'
+import { HofUnterzeile } from '@/components/mein-hof/hof-unterzeile'
+import { Vorschau246 } from '@/app/intern/bausteine/vorschau-246'
+import { Vorschau247 } from '@/app/intern/bausteine/vorschau-247'
+import { Vorschau248 } from '@/app/intern/bausteine/vorschau-248'
+import { Vorschau267 } from '@/app/intern/bausteine/vorschau-267'
 import { KarteLaedt } from '@/components/karte/karte-laedt'
 import { KaufZusammenfassung, type ZusammenfassungPosition } from '@/components/checkout/kauf-zusammenfassung'
 import { SHELL_VARIANTEN } from './shell/[variante]/varianten'
 import { HOF_NEU_KNOPF, HOF_NEU_KNOPF_NAME } from '@/lib/bauern-navigation'
 import { TESTHOF_HINWEIS } from '@/lib/testhof'
+import { PROBLEM_MELDEN } from '@/lib/fehlerseite'
+import { Vorschau269 } from '@/app/intern/bausteine/vorschau-269'
+import { Vorschau268 } from '@/app/intern/bausteine/vorschau-268'
 
 /*
  * Die Vorschau der Bausteine aus Gate 2. Jeder Baustein steht mit seinen
@@ -69,6 +76,9 @@ const KORB_ONLINE: ZusammenfassungPosition[] = [
 ]
 
 /** Knopf-Gestalt für die Beispiel-Aktionen (Pille, Inhaltsbreite). */
+/** Fester Zeitpunkt der Vorschau — die Unterzeile „Stand …“ hängt nicht an der Uhr (kein Hydration-Unterschied). */
+const VORSCHAU_JETZT = new Date('2027-03-03T10:00:00Z')
+
 const KNOPF = {
   gruen: cn('inline-flex h-10 items-center rounded-full bg-accent px-4 text-[14px] font-semibold text-accent-foreground hover:bg-accent-hover', FOKUS_RAHMEN),
   orange: cn('inline-flex h-10 items-center rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground hover:bg-primary/90', FOKUS_RAHMEN),
@@ -77,7 +87,7 @@ const KNOPF = {
 
 function Abschnitt({ id, titel, satz, children }: { id: string; titel: string; satz: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-titel`} className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:p-5">
+    <section aria-labelledby={`${id}-titel`} className={cn('flex min-w-0 flex-col gap-3 border border-border bg-card p-4 md:p-5', RUNDUNG.karte)}>
       <div>
         <h2 id={`${id}-titel`} className="font-heading text-lg font-semibold">
           {titel}
@@ -86,6 +96,62 @@ function Abschnitt({ id, titel, satz, children }: { id: string; titel: string; s
       </div>
       {children}
     </section>
+  )
+}
+
+/** Zustände der Meldungs-Vorschau — gezeigt, nie geschickt. */
+type MeldungZustand = 'leer' | 'fehler' | 'danke'
+
+/**
+ * Ein Formular-Zustand nur zum Ansehen: Die Vorschau ruft NIE useMeldungFormular — Absenden
+ * schickte sonst eine echte Meldung in den Briefkasten. Absenden zeigt hier nur den Dank.
+ */
+function useVorschauFormular(zustand: MeldungZustand, setZustand: (z: MeldungZustand) => void): MeldungFormular {
+  const [art, setArt] = useState<MeldungArt>('FEHLER')
+  const [text, setText] = useState('')
+  const [kennung, setKennung] = useState('')
+  const [email, setEmail] = useState('')
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null)
+  const [website, setWebsite] = useState('')
+  return {
+    art, setArt, text, setText, kennung, setKennung, email, setEmail, screenshotUrl, setScreenshotUrl, website, setWebsite,
+    fehler: zustand === 'fehler' ? 'Wir konnten deine Meldung gerade nicht speichern. Dein Text ist noch da – versuch es bitte gleich noch einmal.' : '',
+    kurznummer: zustand === 'danke' ? 'AB12' : null,
+    isPending: false,
+    kontext: { seiteUrl: '', userAgent: '', viewport: '' },
+    upload: { fileInput: null, openFilePicker: () => {}, isUploading: false, progress: null } as unknown as MeldungFormular['upload'],
+    absenden: (e) => {
+      e.preventDefault()
+      setZustand('danke')
+    },
+    nochEtwas: () => setZustand('leer'),
+  }
+}
+
+function MeldungVorschau({ welt }: { welt: MeldungWelt }): React.JSX.Element {
+  const [zustand, setZustand] = useState<MeldungZustand>('leer')
+  const formular = useVorschauFormular(zustand, setZustand)
+  return (
+    <div className="flex flex-col gap-3">
+      <Segment
+        beschriftung={welt === 'kunde' ? 'Zustand Kundschaft' : 'Zustand Hof'}
+        optionen={[
+          { wert: 'leer', label: 'Leer' },
+          { wert: 'fehler', label: 'Serverfehler' },
+          { wert: 'danke', label: 'Danke' },
+        ]}
+        wert={zustand}
+        onWertChange={(w) => setZustand(w as MeldungZustand)}
+      />
+      <MeldungFormularAnsicht
+        formular={formular}
+        welt={welt}
+        alsHof={welt === 'hof'}
+        abbrechenHref="/intern/bausteine#meldung"
+        titel={welt === 'kunde' ? PROBLEM_MELDEN : undefined}
+        satz={welt === 'kunde' ? 'Danke, dass du Bescheid gibst. Wir schauen uns das an.' : undefined}
+      />
+    </div>
   )
 }
 
@@ -108,7 +174,7 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
       </header>
 
       <main className="mx-auto flex max-w-[1200px] flex-col gap-4 px-4 py-5 pb-16 md:px-8">
-        <nav aria-label="Shells ansehen" className="rounded-2xl border border-border bg-card p-4 md:p-5">
+        <nav aria-label="Shells ansehen" className={cn('border border-border bg-card p-4 md:p-5', RUNDUNG.karte)}>
           <h2 className="font-heading text-lg font-semibold">Shells</h2>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             In voller Fenstergröße — am Handy mit Unterleiste, ab 768 px mit Kopfzeile bzw. Seitenleiste.
@@ -188,15 +254,81 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           </Abschnitt>
 
           <Abschnitt
-            id="unterseitenkopf"
-            titel="UnterseitenKopf"
-            satz="Kopf einer Unterseite im Hofbereich (Nr. 44): am Handy eine feste Leiste mit Pfeil und Elternseite – hier im Kasten scrollen –, im Browser die Zeile „‹ …“, darunter der Titel."
+            id="werkzeugkopf"
+            titel="WerkzeugKopf (G1) mit Hof-Balken (G3)"
+            satz="Am Handy die feste Leiste mit „‹“, Titel und Unterzeile – hier im Kasten scrollen –, im Web der grüne Textlink „‹ Elternseite“, h1 und Unterzeile. Der Hof-Balken steht unter dem Kopf in der Inhaltsspalte."
           >
-            {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5), damit die Leiste hier sichtbar klebt. */}
-            <div className="relative h-72 overflow-y-auto rounded-xl border border-border bg-background px-4 pt-5 md:px-8 md:pt-8">
-              <UnterseitenKopf pfad="/settings/profile" titel="Hof-Profil" satz="Informationen, die auf deiner öffentlichen Hof-Seite sichtbar sind." />
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="mb-3 h-24 rounded-2xl border border-border bg-card" />
+            {/* Ein eigener Scroll-Kasten mit dem Rand der Hof-Rahmen (px-4 pt-5). Die Leiste steht am Handy fest (Nr. 269);
+                `transform-gpu` am äußeren Kasten macht ihn zu ihrem Bezug, sie steht also oben im Kasten statt am Fenster. */}
+            <div className={cn('relative h-80 transform-gpu overflow-hidden border border-border', RUNDUNG.karte)}>
+              <div className="h-full overflow-y-auto bg-background px-4 pt-5 md:px-8 md:pt-8">
+                <UnterDemWerkzeugKopf
+                  inhalt={<HofBalken lage="unter-kopf" balken={{ art: 'wartet', farmId: 'farm_vorschau', farmName: 'Hof Beispielberg', country: 'AT', stand: 'einrichten' }} />}
+                >
+                  <WerkzeugKopf pfad="/settings/profile" titel="Hofdaten" unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />} />
+                </UnterDemWerkzeugKopf>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className={cn('mb-3 h-24 border border-border bg-card', RUNDUNG.karte)} />
+                ))}
+              </div>
+            </div>
+            <div className={cn('relative h-48 transform-gpu overflow-hidden border border-border', RUNDUNG.karte)}>
+              <div className="h-full overflow-y-auto bg-background px-4 pt-5 md:px-8 md:pt-8">
+                <WerkzeugKopf
+                  pfad="/settings"
+                  titel="Einstellungen"
+                  unterzeile={<HofUnterzeile hofName="Hof Beispielberg" jetzt={VORSCHAU_JETZT} />}
+                  aktion={
+                    <Link href="/intern/bausteine#werkzeugkopf" className={KNOPF.rand}>
+                      Postfach
+                    </Link>
+                  }
+                />
+                <p className="text-[13px] text-muted-foreground">Ohne Elternseite (Seite der Leiste): kein Rückweg, eine Aktion rechts.</p>
+              </div>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt
+            id="hinweiskasten"
+            titel="Hinweiskasten (G3)"
+            satz="Braun getönt, Radius 12 px, Titel in status-offen, ohne Symbol und ohne Uhr; die Hof-ID steckt nur im vorausgefüllten Link."
+          >
+            <HofBalken lage="unter-kopf" balken={{ art: 'wartet', farmId: 'farm_vorschau', farmName: 'Hof Beispielberg', country: 'AT', stand: 'pruefung' }} />
+            <HofBalken lage="unter-kopf" balken={{ art: 'stillgelegt' }} />
+            <Hinweiskasten
+              titel="Online-Zahlung noch nicht eingerichtet"
+              aktion={
+                <Link href="/intern/bausteine#hinweiskasten" className={HINWEISKASTEN_LINK}>
+                  Zahlung einrichten
+                </Link>
+              }
+            >
+              Kundinnen können bis dahin nur bar bei Abholung zahlen.
+            </Hinweiskasten>
+          </Abschnitt>
+
+          <Abschnitt
+            id="aktionsleiste"
+            titel="Feste Aktionsleiste (G2)"
+            satz="Am Handy fest über der Unterleiste, Hauptknopf über die volle Breite, optional „← Zurück“; der Inhalt endet darüber. Im Web am Formularende. Hier ohne feste Position, damit sie in der Vorschau steht."
+          >
+            <div className={cn('border border-border bg-background p-4', RUNDUNG.karte)}>
+              <FesteAktionsleiste className="static" zurueck={<Link href="/intern/bausteine#aktionsleiste" className={AKTIONSLEISTE_ZURUECK}>← Zurück</Link>}>
+                <button type="button" className={AKTIONSLEISTE_KNOPF}>
+                  Hofdaten speichern
+                </button>
+              </FesteAktionsleiste>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="rundungen" titel="Rundungen in Pixeln (G8)" satz="RUNDUNG aus ui/rundung.ts statt der Tailwind-Stufen xl und 2xl, die mit --radius wachsen.">
+            <div className="grid grid-cols-2 gap-3">
+              {(Object.keys(RUNDUNG) as RundungArt[]).map((art) => (
+                <div key={art} className={cn('flex h-20 flex-col justify-end border border-border bg-muted p-3', RUNDUNG[art])}>
+                  <span className="text-[14px] font-semibold">{art}</span>
+                  <span className="text-[13px] text-muted-foreground">{RUNDUNG_PX[art]} px</span>
+                </div>
               ))}
             </div>
           </Abschnitt>
@@ -279,12 +411,11 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
           </Abschnitt>
 
           <Abschnitt id="karte-laedt" titel="Karte lädt" satz="Platzhalter beider Karten, solange die Kartenbibliothek nachlädt — in der Größe der Karte, kein Spinner.">
-            <KarteLaedt className="h-[160px] rounded-2xl border border-border" />
+            <KarteLaedt className={cn('h-[160px] border border-border', RUNDUNG.karte)} />
           </Abschnitt>
 
           <Abschnitt id="leer" titel="EmptyState" satz="Symbol, ein Satz und immer ein Ausweg.">
             <EmptyState
-              symbol={SearchX}
               titel="Keine Höfe im Umkreis"
               satz="Im Umkreis von 10 km bietet gerade niemand Eier an."
               ausweg={
@@ -311,22 +442,146 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
             </Sheet>
           </Abschnitt>
 
-          <Abschnitt id="sidebar" titel="Sidebar-Gruppe mit Zähler" satz="Die Seitenleiste des Hofbereichs ab 768 px; aktiv in umgekehrter Textfarbe.">
-            <div className="w-full max-w-[264px] rounded-2xl border border-border bg-card p-3">
+          <Abschnitt
+            id="dialog-mitte"
+            titel="Dialog zentriert"
+            satz="Im Web höchstens 560 px, Titel links, genau ein Schließen-Element rechts (Textknopf, 44 px); am Handy nimmt die Seite das Blatt."
+          >
+            <Dialog>
+              <DialogTrigger className={KNOPF.rand}>Dialog öffnen</DialogTrigger>
+              <DialogMitte titel="Vorrat: Freilandeier" schliessen="Abbrechen">
+                <p className="text-muted-foreground">Wie viele Packungen à 10 Stück hast du gerade?</p>
+                <Stepper beschriftung="Vorrat Freilandeier" standardWert={3} min={0} max={99} />
+                <p className="text-[14px] text-muted-foreground">Bei 0 steht „Ausverkauft“, das Produkt bleibt sichtbar.</p>
+                <button type="button" className={cn(KNOPF.orange, 'h-12 self-start rounded-[14px] px-5 text-[16px]')}>
+                  Speichern
+                </button>
+              </DialogMitte>
+            </Dialog>
+          </Abschnitt>
+
+          <Abschnitt
+            id="blatt-rechts"
+            titel="Blatt rechts (Warenkorb)"
+            satz="Am Handy von unten mit Griff, ab 768 px von rechts über die volle Höhe, höchstens 448 px; Kopf mit Titel und „Schließen“."
+          >
+            <Sheet>
+              <SheetTrigger className={KNOPF.rand}>Warenkorb öffnen</SheetTrigger>
+              <SheetBlatt seite="rechts">
+                <SheetKopf titel="Warenkorb · Hof Beispielberg" />
+                <ListGruppe beschriftung="Im Warenkorb">
+                  <ListRow titel="Freilandeier, 10 Stk." untertitel="€ 0,48 / Stk." ende={<span className="text-[15px] font-semibold">€ 4,77</span>} />
+                  <ListRow titel="Bergkäse, 250 g" untertitel="€ 26,32 / kg" ende={<span className="text-[15px] font-semibold">€ 6,58</span>} />
+                </ListGruppe>
+                <div className="flex items-baseline justify-between border-t border-border pt-2.5">
+                  <strong className="text-base">Gesamt</strong>
+                  <strong className="text-[22px]">€ 11,35</strong>
+                </div>
+                <p className="text-[13px] text-muted-foreground">Inkl. Plattformgebühr · Reservierung gilt 15 Minuten.</p>
+                <SheetClose className={cn(KNOPF.gruen, 'h-[52px] w-full justify-center rounded-[14px] text-[16px]')}>Zur Kasse</SheetClose>
+              </SheetBlatt>
+            </Sheet>
+          </Abschnitt>
+
+          <Abschnitt id="ausverkauft" titel="Marke „Ausverkauft“" satz="Neutral (V19): die Art „erledigt“ als Schild, 22 px, ohne Rand — kein Orange, kein Rot.">
+            <div className="flex flex-wrap items-center gap-2">
+              <AusverkauftMarke />
+              <Marke art="laeuft" form="schild">
+                Sichtbar
+              </Marke>
+              <Marke art="tun" form="schild">
+                Nur noch 3
+              </Marke>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="feldfehler" titel="Feldfehler" satz="Orange am Feld (V17): Rand 2 px, Satz darunter mit role=alert, aria-invalid und aria-describedby am Feld.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FeldMitFehler id="vorschau-einheit" label="Einheit" hilfe="Glas, Stück, kg …">
+                {(feld) => <Input {...feld} defaultValue="Glas" />}
+              </FeldMitFehler>
+              <FeldMitFehler id="vorschau-preis" label="Preis je Glas" fehler="Trag einen Preis ein, z. B. 7,50.">
+                {(feld) => <Input {...feld} inputMode="decimal" />}
+              </FeldMitFehler>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="textlink" titel="Textlink" satz="Sieht aus wie Text, trifft sich wie ein Knopf (V16): in der Zeile 44 px hoch, im Satz über ::before.">
+            <div className="flex flex-wrap items-center gap-4">
+              <Textlink href="/intern/bausteine#textlink">Route planen →</Textlink>
+              <Textlink href="/intern/bausteine#textlink" ton="orange">
+                Hofseite ansehen
+              </Textlink>
+              <Textlink href="/intern/bausteine#textlink" ton="leise">
+                Impressum
+              </Textlink>
+            </div>
+            <p className="text-[14px] text-muted-foreground">
+              Fragen zur Abholung? Schreib dem Hof über die{' '}
+              <Textlink href="/intern/bausteine#textlink" form="im-satz">
+                Bestellseite
+              </Textlink>
+              .
+            </p>
+          </Abschnitt>
+
+          <Abschnitt id="bild-platzhalter" titel="Bild-Platzhalter" satz="Ohne Dateinamen (V15), dunkel mit eigenem Verlauf; im Formular „Foto hinzufügen“.">
+            <div className="grid grid-cols-3 gap-2">
+              <BildPlatzhalter className="h-24" />
+              <BildPlatzhalter className="h-24" gedaempft />
+              <BildPlatzhalter className="h-24 rounded-none border-0" />
+            </div>
+            <FotoHinzufuegen />
+          </Abschnitt>
+
+          {/* Ohne „Nochmal": Der Knopf nimmt beim Erscheinen den Fokus (G6) und spränge sonst beim Laden mitten in die Seite —
+              er steht erst nach einem Tipp im Abschnitt „Formularfehler und Nochmal (G6)" (vorschau-246.tsx). */}
+          <Abschnitt id="hinweis-fehler" titel="Hinweiskarte (Fehler)" satz="Orange für Fehler, die kein Feld betreffen (V17): Karten-Ablehnung, Speicherfehler. „Nochmal“ zeigt der Abschnitt G6 weiter unten nach einem Tipp.">
+            <HinweiskarteFehler titel="Deine Karte wurde abgelehnt">Es wurde nichts abgebucht. Deine Ware bleibt bis 07:55 Uhr für dich reserviert.</HinweiskarteFehler>
+            <HinweiskarteFehler titel="Speichern hat nicht geklappt">
+              Deine Eingaben sind noch da. Prüf den Empfang und versuch es noch einmal.
+            </HinweiskarteFehler>
+          </Abschnitt>
+
+          <Abschnitt id="hofkarte" titel="Hofkarte pausiert" satz="V18: ausgegraut, gestrichelt, neutraler Text — der Hof bleibt sichtbar und lesbar.">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[false, true].map((pausiert) => (
+                <HofkarteRahmen key={String(pausiert)} pausiert={pausiert}>
+                  <BildPlatzhalter className="h-24 rounded-none border-0" gedaempft={pausiert} />
+                  <div className="flex flex-col gap-1 px-3 py-2.5">
+                    <strong className="text-[17px]">{pausiert ? 'Hof am Weiher' : 'Hof am Bach'}</strong>
+                    <span className="text-[13px] text-muted-foreground">{pausiert ? '5282 Beispielort · 7 km' : '5280 Beispielort · 4 km'}</span>
+                    <span className={hofkarteKlassen(pausiert).abholung}>{pausiert ? 'Macht gerade Pause' : 'Abholung Sa, 6. März, 9–12 Uhr'}</span>
+                  </div>
+                </HofkarteRahmen>
+              ))}
+            </div>
+          </Abschnitt>
+
+          <Abschnitt id="meldung" titel={PROBLEM_MELDEN} satz="Eine Darstellung, Ton je Welt (V51): Kundschaft grün, Hof orange. Die Logik bleibt useMeldungFormular — hier wird nichts geschickt.">
+            <MeldungVorschau welt="kunde" />
+          </Abschnitt>
+
+          <Abschnitt id="meldung-hof" titel={`${PROBLEM_MELDEN} im Hofbereich`} satz="Dieselbe Darstellung in Orange; der angemeldete Hof sieht „Bildschirmfoto hinzufügen“ statt der E-Mail.">
+            <MeldungVorschau welt="hof" />
+          </Abschnitt>
+
+          <Abschnitt id="sidebar" titel="Sidebar-Gruppe mit Zähler" satz="Die Seitenleiste des Hofbereichs ab 768 px; ohne Symbole, aktiv grün getönt (Board w1-mehr-neu).">
+            <div className={cn('w-full max-w-[264px] border border-border bg-card p-3', RUNDUNG.karte)}>
               <SidebarGruppe>
-                <SidebarEintrag href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
-                <SidebarEintrag href="/intern/bausteine#sidebar" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
+                <SidebarEintrag href="/intern/bausteine" label="Heute" aktuell="page" />
+                <SidebarEintrag href="/intern/bausteine#sidebar" label="Bestellungen" zahl={3} zahlWofuer="offene Bestellungen" />
               </SidebarGruppe>
               <SidebarGruppe titel="Verkauf und Kunden">
-                <SidebarEintrag href="/intern/bausteine#sidebar" label="Kunden" symbol={Users} />
-                <SidebarEintrag href="/intern/bausteine#sidebar" label="Auswertung" symbol={BarChart3} />
+                <SidebarEintrag href="/intern/bausteine#sidebar" label="Kunden" />
+                <SidebarEintrag href="/intern/bausteine#sidebar" label="Auswertung" />
               </SidebarGruppe>
             </div>
           </Abschnitt>
 
-          <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht. Im Hofbereich steht das Wort „Neu“ unter dem Plus — Kreis und Wort sind ein Knopf.">
+          <Abschnitt id="bottomnav" titel="BottomNav mit Mittelknopf" satz="Die Unterleiste am Handy; hier ohne feste Position, damit sie in der Vorschau steht. Aktiv eine getönte Pille (grün bzw. orange). Im Hofbereich ist „Neu“ eine flache orange Fläche mit dem Wort darunter — Fläche und Wort sind ein Knopf.">
             <div className="flex flex-col gap-9 pt-6">
-              <BottomNav beschriftung="Beispiel: Unterleiste Kunde" className="relative z-0 rounded-2xl border md:block">
+              <BottomNav beschriftung="Beispiel: Unterleiste Kunde" className={cn('relative z-0 border md:block', RUNDUNG.karte)}>
                 <BottomNavLink href="/intern/bausteine" label="Entdecken" symbol={Compass} aktuell="page" />
                 <BottomNavMitte>
                   <Link href="/intern/bausteine#bottomnav" aria-label="Warenkorb öffnen, 2 Artikel" className={mittelknopfKlassen('gruen')}>
@@ -335,13 +590,13 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
                 </BottomNavMitte>
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} />
               </BottomNav>
-              <BottomNav beschriftung="Beispiel: Unterleiste Hof" className="relative z-0 rounded-2xl border md:block">
+              <BottomNav beschriftung="Beispiel: Unterleiste Hof" ton="orange" className={cn('relative z-0 border md:block', RUNDUNG.karte)}>
                 <BottomNavLink href="/intern/bausteine" label="Heute" symbol={CalendarCheck} aktuell="page" />
                 <BottomNavLink href="/intern/bausteine#bottomnav" label="Bestellungen" symbol={ReceiptText} zahl={3} zahlWofuer="offene Bestellungen" />
-                <BottomNavMitte>
-                  <Link href="/intern/bausteine#bottomnav" aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfMitWortKlassen()}>
-                    <span className={mittelkreisKlassen('orange')}>
-                      <Plus className="size-6" strokeWidth={2.2} aria-hidden="true" />
+                <BottomNavMitte flach>
+                  <Link href="/intern/bausteine#bottomnav" aria-label={HOF_NEU_KNOPF_NAME} className={mittelknopfFlachKlassen()}>
+                    <span className={mittelflaecheKlassen('orange')}>
+                      <Plus className="size-[22px]" strokeWidth={2.4} aria-hidden="true" />
                     </span>
                     <span>{HOF_NEU_KNOPF}</span>
                   </Link>
@@ -351,6 +606,15 @@ export function BausteineVorschau({ kategorie }: { kategorie: 'alle' | 'eier' | 
               </BottomNav>
             </div>
           </Abschnitt>
+
+          {/* Einhängepunkte der Baustein-Nummern 246–248 (Lauf 32): Jede ändert nur ihre eigene vorschau-<nr>.tsx,
+              nie diese Datei — so kommen sich die Nummern hier nicht in die Quere. */}
+          <Vorschau246 />
+          <Vorschau247 />
+          <Vorschau248 />
+          <Vorschau267 />
+          <Vorschau269 />
+          <Vorschau268 />
         </div>
       </main>
     </div>

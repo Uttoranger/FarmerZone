@@ -6,23 +6,32 @@ import {
   EmailLayout,
   BestellnummerKasten,
   BetragsZeile,
+  GebuehrBetragsZeile,
+  type MailGebuehrZeile,
+  HinweisKasten,
   Knopf,
   KnopfReihe,
+  TelefonFett,
   Trenner,
   h1,
   bodyText,
   kleinText,
+  leiseZeile,
   textLink,
+  woZeile,
+  PositionsName,
 } from './_layout'
-import { SERVICEGEBUEHR_BEZEICHNUNG, SERVICEGEBUEHR_HINWEIS } from '@/lib/servicegebuehr'
+import type { Positionszeile } from '@/lib/positionszeile'
 import { formatEuro } from '@/lib/format'
 import { inklPlattformgebuehrSatz } from '@/lib/konditionen'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 import { MAIL_AGB_ZEILE } from '@/lib/rechtstexte/agb-einbindung'
+import { AGB_BISHER, type AgbKennung } from '@/lib/rechtstexte/agb-fassung'
 import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+import { BESTAETIGUNG_TEXT as T, type BestaetigungZahlart } from './texte/bestaetigung'
 
 /** Wie bezahlt wird — entscheidet nur der Satz und die Gesamtzeile, nie der Betrag. */
-export type MailZahlart = 'online' | 'bar' | 'karte'
+export type MailZahlart = BestaetigungZahlart
 
 export interface OrderConfirmationProps {
   orderNumber: string
@@ -30,18 +39,33 @@ export interface OrderConfirmationProps {
   farmPhone: string
   farmAddress: string
   farmCity: string
+  /** PLZ des Hofs für die Zeile „Wo“; fehlt sie, steht nur der Ort. */
+  farmPostalCode?: string
   pickupDate: string
   pickupTime: string
+  /** N47 (Nr. 257): der Satz zur Abholung nach Absprache im Abholblock — je nach „Antwort an“ (src/lib/email.ts); fehlt er, kein Satz. */
+  abspracheSatz?: string
   /** Online bezahlt (Webhook) oder vor Ort bestätigt (Bar-Knopf, alte Karte-Bestellungen). */
   zahlart: MailZahlart
   /** Positionen mit fertig gerechnetem Zeilenbetrag in Euro (src/lib/email.ts, über Decimal). */
-  items: Array<{ name: string; betrag: number }>
-  /** Servicegebühr in Euro aus dem Snapshot; 0 oder fehlend = keine Zeile. */
-  serviceFee?: number
+  items: Array<{ name: string; teile?: Positionszeile; betrag: number }>
+  /**
+   * Die Gebührenzeile im Modell „bisher“ (N38): Wort und Erklärsatz der
+   * Bestellung (gebuehrWort, gebuehrHinweisFuer in src/lib/email.ts) und der
+   * Betrag in Euro aus dem Snapshot. Fehlt sie, gibt es keine Zeile — im
+   * Hofpreis-Modell steckt die Gebühr in den Preisen (`plattformgebuehr`).
+   */
+  gebuehrZeile?: MailGebuehrZeile
   /** Hofpreis-Modell (N38): die Plattformgebühr in Euro, schon in den Zeilen enthalten; 0 oder fehlend = kein Satz. */
   plattformgebuehr?: number
-  /** Was die Kundin zahlt bzw. gezahlt hat: Warenpreis + Servicegebühr. */
+  /** Das „Gesamt“: Warenpreis + Gebühr; ist die Gebühr entfallen bzw. erstattet, nur der Warenpreis (anzeigeGesamtCents in src/lib/email.ts, Nr. 255). */
   total: number
+  /**
+   * Der Betrag in „Bring bitte … in bar mit“ bzw. „Bitte zahle … mit Karte“: was der Hof kassiert, aus dem
+   * Snapshot (barZuKassierenCents, wie „Bar zu kassieren“ in der Hof-Mail). Fehlt er, gilt `total`; null =
+   * kein Kasten (Gebühr entfallen: bei der Abholung ist nichts mehr zu zahlen).
+   */
+  vorOrtBetrag?: number | null
   /** Google-Maps-Suche nach der Hofadresse (buildMapsUrl). */
   routeUrl: string
   manageUrl?: string
@@ -55,15 +79,13 @@ export interface OrderConfirmationProps {
    * fehlt sie, der Anhang mit den AGB bleibt.
    */
   belehrung?: Belehrung
+  /** Die Fassung der AGB dieser Bestellung (N45, aus ihrem Snapshot): Link und Anhang zeigen dieselbe. Ohne Angabe 0.9. */
+  agbFassung?: AgbKennung
   /** Die Adresse der Seite für den Link auf die AGB; ohne Angabe die echte Seite. */
   appUrl?: string
 }
 
-const GESAMT_LABEL: Record<MailZahlart, string> = {
-  online: 'Online bezahlt',
-  bar: 'Bar bei Abholung',
-  karte: 'Karte bei Abholung',
-}
+const GESAMT_LABEL: Record<MailZahlart, string> = T.gesamt
 
 /**
  * „Danke für deine Bestellung!" — Mail 1 aus dem Mockup
@@ -74,34 +96,52 @@ const GESAMT_LABEL: Record<MailZahlart, string> = {
  */
 export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Element {
   const anrufen = telefonLink(p.farmPhone)
-  const mitGebuehr = (p.serviceFee ?? 0) > 0
-  const satz =
-    p.zahlart === 'online'
-      ? `Deine Zahlung ist angekommen – ${p.farmName} packt deine Sachen.`
-      : `Deine Bestellung ist bestätigt – ${p.farmName} packt deine Sachen.`
+  const gebuehr = p.gebuehrZeile && p.gebuehrZeile.betrag > 0 ? p.gebuehrZeile : null
+  const satz = T.satz(p.zahlart, p.farmName)
+  const vorOrt = p.vorOrtBetrag === undefined ? p.total : p.vorOrtBetrag
 
   return (
-    <EmailLayout previewText={`Bestellung ${p.orderNumber} – Abholung ${p.pickupDate}, ${p.pickupTime} Uhr`} manageUrl={p.manageUrl}>
-      <Text style={h1}>Danke für deine Bestellung!</Text>
-      <Text style={bodyText}>{`${satz} Nenn bei der Abholung einfach deine Bestellnummer:`}</Text>
+    <EmailLayout fuss={{ art: 'hof' }} previewText={T.vorschauzeile(p.orderNumber, `${p.pickupDate}, ${p.pickupTime} Uhr`)} manageUrl={p.manageUrl}>
+      <Text style={h1}>{T.titel}</Text>
+      <Text style={bodyText}>{`${satz} ${T.nenneNummer}`}</Text>
 
       <BestellnummerKasten nummer={p.orderNumber} />
 
       <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
-      <BetragsZeile umbrechen links="Adresse" rechts={`${p.farmAddress}, ${p.farmCity}`} />
+      <BetragsZeile umbrechen links="Wo" rechts={woZeile(p.farmName, p.farmAddress, p.farmPostalCode, p.farmCity)} />
+      {p.abspracheSatz && <Text style={bodyText}>{p.abspracheSatz}</Text>}
       <Trenner />
       {p.items.map((item, i) => (
-        <BetragsZeile key={i} links={item.name} rechts={formatEuro(item.betrag)} />
+        <BetragsZeile key={i} links={<PositionsName name={item.name} teile={item.teile} />} rechts={formatEuro(item.betrag)} />
       ))}
-      {mitGebuehr && <BetragsZeile links={SERVICEGEBUEHR_BEZEICHNUNG} rechts={formatEuro(p.serviceFee ?? 0)} />}
+      {gebuehr && <GebuehrBetragsZeile zeile={gebuehr} betrag={formatEuro(gebuehr.betrag)} />}
+      <Trenner />
       <BetragsZeile stark links={GESAMT_LABEL[p.zahlart]} rechts={formatEuro(p.total)} />
+
+      {/* Board s3/w3-mail-kauf Bild 3: was die Kundin mitbringt, als grüne Karte direkt unter dem Betrag. */}
+      {p.zahlart === 'bar' && vorOrt !== null && (
+        <HinweisKasten art="gruen">
+          {T.barMitbringen[0]}
+          <strong>{formatEuro(vorOrt)}</strong>
+          {T.barMitbringen[1]}
+        </HinweisKasten>
+      )}
+      {p.zahlart === 'karte' && vorOrt !== null && (
+        <HinweisKasten art="gruen">
+          {T.karteZahlen[0]}
+          <strong>{formatEuro(vorOrt)}</strong>
+          {T.karteZahlen[1]}
+        </HinweisKasten>
+      )}
+      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
+      {gebuehr && <Text style={kleinText}>{`${gebuehr.wort}: ${gebuehr.hinweis}`}</Text>}
 
       <KnopfReihe>
         {/* Der Weg zurück zur Bestellung, wenn der Tab längst zu ist: Status,
             Abholzeit, Positionen und Kalendereintrag — ohne Anmeldung. */}
-        {p.orderUrl && <Knopf href={p.orderUrl}>Bestellung ansehen</Knopf>}
+        {p.orderUrl && <Knopf href={p.orderUrl}>{T.knopfBestellung}</Knopf>}
         <Knopf href={p.routeUrl} art={p.orderUrl ? 'rahmen' : 'gruen'}>
-          Route planen
+          {T.knopfRoute}
         </Knopf>
       </KnopfReihe>
 
@@ -109,7 +149,7 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           die abwechselnd Text und Link sind — nebeneinander stehende Textteile trennt
           react-email mit Kommentaren. */}
       <Text style={kleinText}>
-        {MAIL_AGB_ZEILE.map((stueck, i) =>
+        {MAIL_AGB_ZEILE(p.agbFassung ?? AGB_BISHER).map((stueck, i) =>
           typeof stueck === 'string' ? (
             stueck
           ) : (
@@ -119,11 +159,10 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           )
         )}
       </Text>
-
-      {p.zahlart === 'bar' && <Text style={kleinText}>{`Bring bitte ${formatEuro(p.total)} in bar mit.`}</Text>}
-      {p.zahlart === 'karte' && <Text style={kleinText}>{`Bitte zahle ${formatEuro(p.total)} bei der Abholung mit Karte.`}</Text>}
-      {mitGebuehr && <Text style={kleinText}>{SERVICEGEBUEHR_BEZEICHNUNG}: {SERVICEGEBUEHR_HINWEIS}</Text>}
-      {(p.plattformgebuehr ?? 0) > 0 && <Text style={kleinText}>{inklPlattformgebuehrSatz(formatEuro(p.plattformgebuehr ?? 0))}</Text>}
+      <Text style={leiseZeile}>
+        {T.fragen}
+        <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.farmPhone) : p.farmPhone} />
+      </Text>
       {/* Nr. 200 (N39): der Weg zum Widerruf online — signiert, ohne Anmeldung. Mit Belehrung steht er unter ihr. */}
       {p.widerrufUrl && !p.belehrung && (
         <Text style={kleinText}>
@@ -132,16 +171,6 @@ export function OrderConfirmationEmail(p: OrderConfirmationProps): React.JSX.Ele
           </Link>
         </Text>
       )}
-      <Text style={kleinText}>
-        Fragen? Ruf direkt beim Hof an:{' '}
-        {anrufen ? (
-          <Link href={anrufen} style={textLink}>
-            {formatiereTelefon(p.farmPhone)}
-          </Link>
-        ) : (
-          p.farmPhone
-        )}
-      </Text>
       {/* Nr. 207: Teil A, Teil B, Hinweis zur Rückgabe am Hof und der Link zum Widerruf. */}
       {p.belehrung && <BelehrungTeil belehrung={p.belehrung} widerrufUrl={p.widerrufUrl} />}
     </EmailLayout>

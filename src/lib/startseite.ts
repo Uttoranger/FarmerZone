@@ -11,9 +11,18 @@
  * (ARCHITECTURE §4, „Nie Standort/Koordinaten in die URL").
  */
 import type { ProductCategoryValue } from '@/schemas/product'
+import { MARKE } from '@/lib/marke'
 import { LEERER_HOEFE_FILTER, schreibeHoefeFilter, type HoefeFilter } from '@/schemas/hoefe-filter'
 import { KATEGORIE_LABEL } from '@/lib/taxonomie'
-import { formatiereAbholung, type NaechsteAbholung, type NeuerBeitrag } from '@/lib/hofuebersicht'
+import {
+  ABHOLZEILE_TEXT,
+  VORSCHAU_ZEILEN,
+  formatiereAbholung,
+  waehleVorschauProdukte,
+  type NaechsteAbholung,
+  type NeuerBeitrag,
+  type VorschauProdukt,
+} from '@/lib/hofuebersicht'
 import {
   SERVICEGEBUEHR_STANDARD_MIND_CENTS,
   SERVICEGEBUEHR_STANDARD_PROZENT,
@@ -22,8 +31,9 @@ import {
   barOhneServicegebuehr,
 } from '@/lib/servicegebuehr'
 import { formatEuro } from '@/lib/format'
-import { BAR_OHNE_GEBUEHR_HINWEIS, mitBarAusnahme } from '@/lib/konditionen'
-import { gruppenBeschriftung, type PinPunkt } from '@/lib/hoefe-anzeige'
+import { BAR_OHNE_GEBUEHR_HINWEIS, PLATTFORMGEBUEHR_PROZENT, mitBarAusnahme } from '@/lib/konditionen'
+import { GEBUEHR_MODELL_HOFPREIS, bestellGebuehr, gebuehrBezeichnungFuer, satzHundertstel, satzText, type GebuehrModell } from '@/lib/plattformgebuehr'
+import type { PinPunkt } from '@/lib/hoefe-anzeige'
 import { liegtImAusschnitt, type GeoPunkt } from '@/lib/regionskarte'
 
 /** Eine Adresse der Hofübersicht mit genau diesen Filtern; ohne Filter die nackte /hoefe. */
@@ -31,27 +41,6 @@ export function hoefeAdresse(teil: Partial<HoefeFilter> = {}): string {
   const query = schreibeHoefeFilter({ ...LEERER_HOEFE_FILTER, ...teil })
   return query ? `/hoefe?${query}` : '/hoefe'
 }
-
-// ─── „Oder direkt suchen" ───────────────────────────────────────────────────
-
-export type SuchChip = { label: string; filter: Partial<HoefeFilter> }
-
-/**
- * Die Chips unter „Höfe in deiner Nähe", Wortlaut aus dem Mockup. Futtermittel
- * ist ein Chip in derselben Reihe (E2) und öffnet den Bereich Futtermittel;
- * Brennmaterial ist die Kategorie BRENNHOLZ im Hofladen (E11) — der Chip
- * steht das ganze Jahr, nur das Werbeband hat Saison.
- */
-export const STARTSEITE_CHIPS: readonly SuchChip[] = [
-  { label: 'Eier', filter: { kategorien: ['EIER'] } },
-  { label: 'Gemüse & Obst', filter: { kategorien: ['GEMUESE', 'OBST'] } },
-  { label: 'Fleisch', filter: { kategorien: ['FLEISCH'] } },
-  { label: 'Milch & Käse', filter: { kategorien: ['MILCH'] } },
-  { label: 'Brot', filter: { kategorien: ['BROT'] } },
-  { label: 'Honig', filter: { kategorien: ['HONIG'] } },
-  { label: 'Futtermittel', filter: { bereich: 'FUTTERMITTEL' } },
-  { label: KATEGORIE_LABEL.BRENNHOLZ, filter: { kategorien: ['BRENNHOLZ'] } },
-]
 
 /** Die Karte im Kopf und „Alle Höfe auf der Karte" führen hierhin. */
 export const KARTE_ADRESSE = hoefeAdresse({ ansicht: 'karte' })
@@ -62,61 +51,47 @@ export const KARTE_KNOPF = 'Alle Höfe auf der Karte'
 /** Die Überschrift des Abschnitts mit der Karte am Handy (dasselbe Mockup); im Browser steht die Karte ohne sie im Kopf. */
 export const KARTE_UEBERSCHRIFT = 'Höfe in deiner Region'
 
-/** Die Pille unten rechts auf der Karte im Browser (Mockup web-k0-startseite-karte-region). */
-export const KARTE_OEFFNEN = 'Karte öffnen'
-
 /** „Brennmaterial finden" im Saisonband. */
 export const BRENNMATERIAL_ADRESSE = hoefeAdresse({ kategorien: ['BRENNHOLZ'] })
 
-// ─── Futter vom Hof: zwei Zielgruppen ───────────────────────────────────────
+// ─── Futter und Brennmaterial: zwei kurze Karten ────────────────────────────
 
-export type FutterZielgruppe = {
-  kicker: string
-  titel: string
-  punkte: readonly string[]
-  knopf: string
-  /** Die Hofübersicht im Bereich Futtermittel mit der passenden Gebinde-Facette (Grenze 25 kg). */
-  filter: Partial<HoefeFilter>
-  /** Die Illustration (public/categories/) — die Seite holt den Pfad über product-image.ts. */
-  bild: ProductCategoryValue
+/** Eine kurze Karte unter den Höfen (Board w1-/s1-startseite, Bild 2 und 3): Überzeile, ein Satz, ein Textlink. */
+export type KurzKarte = {
+  /** Die leise Überzeile — sie ist die Überschrift des Abschnitts (h2). */
+  ueberzeile: string
+  satz: string
+  link: string
+  adresse: string
 }
 
 /**
- * Wortlaut aus dem Mockup. „Kleinmengen" und „Ballen" sind die Gebinde-
- * Facette von /hoefe (bis 25 kg | darüber). Neutral statt Mockup: „Sackerl ab
- * 1 kg", „staubarm" und „Verladen mit Frontlader" sind Sache des einzelnen
- * Hofs, die Plattform sagt sie nicht zu — deshalb „je nach Hof". Bewusst NICHT übernommen:
- * „nur registrierte Futtermittelbetriebe" und „Bei Ballen zeigen wir die
- * Registrierung des Hofs gleich mit an" — beides gibt es erst mit Gate 6
- * (Sperre je Gebinde, Schild nach E9); vorher wäre es ein Versprechen, das
- * die Seite nicht hält.
+ * „Futter vom Hof" kurz wie im Board: ein Satz und der Weg in den Bereich
+ * Futtermittel. Die zwei Zielgruppen (Kleinmengen, Ballen) stehen seit Nr. 234
+ * nicht mehr auf der Startseite — die Mengen-Facette bietet /hoefe selbst an.
  */
-export const FUTTER_ZIELGRUPPEN: readonly FutterZielgruppe[] = [
-  {
-    kicker: 'Für Hase & Meerschwein',
-    titel: 'Heu und Einstreu in kleinen Mengen',
-    punkte: ['Kleine Mengen – Gebinde je nach Hof', 'direkt vom Hof aus der Region', 'mit Eiern und Gemüse gleich mitbestellen'],
-    knopf: 'Kleinmengen finden',
-    filter: { bereich: 'FUTTERMITTEL', gebinde: 'KLEIN' },
-    bild: 'HEU_STROH',
-  },
-  {
-    kicker: 'Für Pferd, Rind & Schaf',
-    titel: 'Ballen und Futtergetreide',
-    punkte: ['Kleinballen und Rundballen', 'Verladen am Hof – je nach Hof'],
-    knopf: 'Ballen finden',
-    filter: { bereich: 'FUTTERMITTEL', gebinde: 'GROSS' },
-    bild: 'GETREIDE_KOERNER',
-  },
-]
+export const FUTTER_KARTE: KurzKarte = {
+  ueberzeile: 'Futter vom Hof',
+  satz: 'Heu, Stroh und Futter – vom Sackerl bis zum Rundballen',
+  link: 'Futter in deiner Nähe',
+  adresse: hoefeAdresse({ bereich: 'FUTTERMITTEL' }),
+}
+
+/** „Brennmaterial vom Hof" kurz wie im Board; die Saison-Automatik der Liste bleibt (istBrennmaterialSaison). */
+export const BRENNMATERIAL_KARTE: KurzKarte = {
+  ueberzeile: 'Brennmaterial vom Hof',
+  satz: 'Brennholz und Hackschnitzel aus dem eigenen Wald',
+  link: 'Brennmaterial in deiner Nähe',
+  adresse: BRENNMATERIAL_ADRESSE,
+}
 
 // ─── Höfe in deiner Nähe ────────────────────────────────────────────────────
 
-/** So viele Höfe zeigt die Startseite — eine Reihe im Browser. */
-export const STARTSEITE_HOEFE_DECKEL = 4
+/** So viele Höfe zeigt die Startseite — eine Reihe aus drei Karten im Browser (Board w1-startseite, Bild 1 und 2). */
+export const STARTSEITE_HOEFE_DECKEL = 3
 
 /** So viele Kategorien stehen in der Angebotszeile einer Karte. */
-export const ANGEBOT_DECKEL = 4
+const ANGEBOT_DECKEL = 4
 
 /** Was die Auswahl von einem Hof der Übersicht braucht (HofUebersichtEintrag aus queries/farm.ts). */
 export type StartseitenHofEingabe = {
@@ -134,6 +109,8 @@ export type StartseitenHofEingabe = {
   gruendungshof?: boolean
   /** Der neueste aktive Beitrag, höchstens 7 Tage alt (Register N22, Nr. 129) — aus derselben Liste, keine zweite Abfrage. */
   neuerBeitrag?: NeuerBeitrag | null
+  /** Die Produktvorschau der Hofliste (in der Reihenfolge der Hofseite) — daraus die drei Preise der Karte (Nr. 234). */
+  produkte?: readonly VorschauProdukt[]
 }
 
 /** Eine Karte unter „Höfe in deiner Nähe" — fertig zum Zeichnen, ohne Decimal und Date. */
@@ -156,6 +133,13 @@ export type StartseitenHof = {
   gruendungshof?: boolean
   /** Für die Marke „Neu · vor …“ am Bild (BeitragMarke, Register N22) — fehlt es (Admin), ohne Marke. */
   neuerBeitrag?: NeuerBeitrag | null
+  /** Pausiert: die Karte ausgegraut und gestrichelt (V18, HofkarteRahmen) — fehlt es (Admin), offen. */
+  pausiert?: boolean
+  /**
+   * Bis zu drei verfügbare Produkte (VORSCHAU_ZEILEN, Auswahl wie auf /hoefe) für die Zeilen
+   * „Name … Preis" (ProduktKurzliste) — fehlt es (Admin), ohne Zeilen. Nur Zahlen und Texte.
+   */
+  produkte?: VorschauProdukt[]
 }
 
 /** Die Lage aus der Liste: nur mit beiden Koordinaten. */
@@ -168,13 +152,24 @@ function ordneOffeneZuerst(hoefe: readonly StartseitenHofEingabe[]): Startseiten
   return [...hoefe.filter((h) => !h.isPaused), ...hoefe.filter((h) => h.isPaused)]
 }
 
+/**
+ * Die drei Produkte einer Hofkarte der Startseite (Nacharbeit 226): dieselbe Auswahl wie die
+ * Hofkarte auf /hoefe (waehleVorschauProdukte — verfügbare zuerst, in der Reihenfolge der
+ * Hofseite), davon nur verfügbare: Ohne Suche gibt es keinen Grund, „derzeit aus" zu zeigen.
+ * Gerechnet wird nichts — der Preis kommt aus der Hofliste (im Hofpreis-Modell der Endpreis).
+ */
+function startseitenProdukte(hof: StartseitenHofEingabe): VorschauProdukt[] {
+  return waehleVorschauProdukte([...(hof.produkte ?? [])], [], undefined, VORSCHAU_ZEILEN).produkte.filter((p) => p.verfuegbar)
+}
+
 function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
   return {
     slug: hof.slug,
     name: hof.name,
     ort: `${hof.postalCode} ${hof.city}`.trim(),
+    // Derselbe Pause-Satz wie die Abholzeile auf /hoefe (Board w1-startseite, Bild 2).
     abholung: hof.isPaused
-      ? 'Macht gerade Pause'
+      ? ABHOLZEILE_TEXT.pause
       : hof.naechsteAbholung
         ? formatiereAbholung(hof.naechsteAbholung)
         : null,
@@ -187,7 +182,55 @@ function bereiteStartseitenHof(hof: StartseitenHofEingabe): StartseitenHof {
     lage: leseLage(hof),
     gruendungshof: hof.gruendungshof === true,
     neuerBeitrag: hof.neuerBeitrag ?? null,
+    pausiert: hof.isPaused,
+    produkte: startseitenProdukte(hof),
   }
+}
+
+/**
+ * Der Leerzustand der Hofkarten (Board w1-/s1-startseite, Bild 5) — Textquelle des EmptyState
+ * (DESIGN_SYSTEM, „Leerzustände"), auch für /hoefe ohne einen einzigen Hof. Der Ausweg führt zur
+ * Seite für Höfe statt gleich in die Registrierung: Wer hier landet, ist meist Kundin und erzählt
+ * einem Hof davon.
+ */
+export const HOEFE_LEER = {
+  titel: 'Die ersten Höfe kommen gerade dazu',
+  satz: `Schau bald wieder vorbei – oder erzähl einem Hof von ${MARKE}.`,
+  knopf: 'Für Höfe',
+  adresse: '/fuer-hoefe',
+} as const
+
+/** Die sichtbare Beschriftung des Suchfelds im Kopf und sein Platzhalter (A1, Board w1-/s1-startseite, Bild 1). */
+export const SUCHE_BESCHRIFTUNG = 'Hof oder Produkt'
+export const SUCHE_PLATZHALTER = 'z. B. Eier oder Heu'
+
+/**
+ * Die Abholzeile einer Hofkarte der Startseite (Board w1-startseite, „Abholung heute, …"): ein
+ * Termin mit „Abholung" davor, „Heute"/„Morgen" (formatiereAbholung schreibt sie für den
+ * Satzanfang) danach klein; ein Hinweis (Pause) steht, wie er ist; ohne Abholzeit null.
+ */
+export function abholzeileDerKarte(hof: Pick<StartseitenHof, 'abholung' | 'abholungIstTermin'>): string | null {
+  if (!hof.abholung) return null
+  if (!hof.abholungIstTermin) return hof.abholung
+  return `Abholung ${hof.abholung.replace(/^(Heute|Morgen)(?=\s)/, (wort) => wort.toLowerCase())}`
+}
+
+/** Die kurzen Karten, die nebeneinander stehen dürfen (Board w1-startseite, Bild 2). */
+const KURZ_ARTEN: ReadonlySet<string> = new Set(['FUTTER', 'BRENNMATERIAL'])
+
+/**
+ * Die Einträge der Startseite in Gruppen (Nr. 234): Folgen Futter und Brennmaterial in der Liste
+ * direkt aufeinander, bilden sie ein Paar (ab 768 px nebeneinander) — die Reihenfolge aus Admin ›
+ * Startseite bleibt, nur der Rahmen ist gemeinsam. Alles andere steht allein.
+ */
+export function gruppiereKurzkarten<T extends { art: string }>(eintraege: readonly T[]): T[][] {
+  const gruppen: T[][] = []
+  for (const eintrag of eintraege) {
+    const letzte = gruppen.at(-1)
+    if (letzte && letzte.length === 1 && KURZ_ARTEN.has(letzte[0].art) && KURZ_ARTEN.has(eintrag.art)) letzte.push(eintrag)
+    else gruppen.push([eintrag])
+  }
+  return gruppen
 }
 
 /** Wo der Browser merkt, dass die Person das Startvideo angehalten hat (nur „pause" wird gespeichert). */
@@ -226,10 +269,10 @@ export function waehleStartseitenHoefe(
 // ─── Karte der Region (Nr. 59) ──────────────────────────────────────────────
 
 /** So viele Kategorien nennt die Hofkarte auf der Karte (Mockup: „Mattighofen · Gemüse · Eier"). */
-export const KARTENHOF_KATEGORIEN = 2
+const KARTENHOF_KATEGORIEN = 2
 
 /** Die Hofkarte auf der Karte — Text im Link, ohne Bild. */
-export type KartenHofkarte = Pick<StartseitenHof, 'slug' | 'name' | 'abholung' | 'abholungIstTermin'> & {
+type KartenHofkarte = Pick<StartseitenHof, 'slug' | 'name' | 'abholung' | 'abholungIstTermin'> & {
   /** „Mattighofen · Gemüse · Eier" — Ort und bis zu zwei Kategorien. */
   zeile: string
 }
@@ -268,11 +311,6 @@ export function waehleKartenHoefe(hoefe: readonly StartseitenHofEingabe[]): Star
   return { pins, hervorgehoben: { slug, name, abholung, abholungIstTermin, zeile } }
 }
 
-/** Der Zähler oben links auf der Karte: „19 Höfe in der Region". */
-export function formatiereRegionsZaehler(anzahl: number): string {
-  return `${gruppenBeschriftung(anzahl)} in der Region`
-}
-
 /** Der Name des Kartenlinks für Screenreader — mit der Zahl, sobald es mehr als einen Hof gibt. */
 export function benenneKartenLink(anzahl: number): string {
   return anzahl > 1 ? `Alle ${anzahl} Höfe auf der Karte ansehen` : 'Alle Höfe auf der Karte ansehen'
@@ -290,6 +328,14 @@ export type Beispielrechnung = {
   hofBekommtCents: number
   /** Der Satz unter dem Beispiel: für welche Zahlart es gilt (Register B1). */
   fussnote: string
+  /**
+   * Nur im Hofpreis-Modell (N38, Board w1-startseite „Beispiel“): das Modell
+   * und der Satz „Der Hof verlangt … Du zahlst … – darin stecken 6 %
+   * Plattformgebühr. …“. Im Modell „bisher“ fehlen beide — das Beispiel ist
+   * dann genau das von vor Nr. 221.
+   */
+  modell?: 'hofpreis'
+  satz?: string
 }
 
 /** Unter dem Beispiel, sobald bar und online wieder gleich viel kosten. */
@@ -297,6 +343,23 @@ export const BEISPIEL_GLEICH = 'Egal ob online oder bar bei Abholung.'
 
 /** Der Warenpreis des Beispiels im Mockup: € 20,00. */
 export const BEISPIEL_WARENPREIS_CENTS = 2000
+
+/**
+ * Das Beispiel im Hofpreis-Modell mit dem Betrag des Boards (w1-/s1-startseite Bild 3/4, Abnahme Lauf 32
+ * startseite 7): „Der Hof verlangt € 4,50 für 10 Eier. …“ — nur Warenpreis und Ware stehen hier; Gebühr,
+ * Endpreis und Satz rechnet `beispielRechnung` mit den Funktionen der Kasse.
+ */
+export const BEISPIEL_HOFPREIS = { warenpreisCents: 450, ware: '10 Eier' } as const
+
+/**
+ * Das Beispiel der Startseite je Modell: im Hofpreis-Modell der Betrag des Boards (`BEISPIEL_HOFPREIS`), im
+ * Modell „bisher“ die Rechnung über € 20,00 wie bisher.
+ */
+export function startseitenBeispiel(jetzt: Date, modell: GebuehrModell): Beispielrechnung {
+  return modell === 'hofpreis'
+    ? beispielRechnung(jetzt, BEISPIEL_HOFPREIS.warenpreisCents, modell, BEISPIEL_HOFPREIS.ware)
+    : beispielRechnung(jetzt, BEISPIEL_WARENPREIS_CENTS, modell)
+}
 
 /**
  * Die Beispielrechnung „Der Hof bekommt den vollen Preis" — gerechnet, nicht
@@ -307,8 +370,21 @@ export const BEISPIEL_WARENPREIS_CENTS = 2000
  * Gerechnet wird die ONLINE-Zahlung. Vor dem SEPA-Start kostet bar keine
  * Gebühr (B1) — dann sagt die Fußnote genau das, statt „egal ob online oder
  * bar". `jetzt` kommt von der Seite (Server-Uhr), wie überall.
+ *
+ * Ab dem Stichtag „Hofpreis-Modell ab“ (`modell` = 'hofpreis', von der Seite
+ * über `gebuehrModellFuer`; V62, Nr. 221) rechnet das Beispiel über
+ * `bestellGebuehr` mit dem Standardsatz — dieselbe Funktion wie Kasse und
+ * /api/checkout, online und bar gleich. Ohne `modell` bleibt alles wie vor
+ * Nr. 221 (die Seite stellt Nr. 226 um).
  */
-export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL_WARENPREIS_CENTS): Beispielrechnung {
+export function beispielRechnung(
+  jetzt: Date,
+  warenpreisCents: number = BEISPIEL_WARENPREIS_CENTS,
+  modell: GebuehrModell = 'bisher',
+  /** Was der Hof verlangt („10 Eier“); ohne Angabe „deinen Einkauf“. Nur im Hofpreis-Modell. */
+  ware?: string
+): Beispielrechnung {
+  if (modell === 'hofpreis') return beispielImHofpreis(warenpreisCents, ware)
   const { gebuehrCents } = berechneServicegebuehr(
     warenpreisCents,
     {
@@ -329,6 +405,32 @@ export function beispielRechnung(jetzt: Date, warenpreisCents: number = BEISPIEL
     fussnote: barOhneServicegebuehr('ONSITE_CASH', jetzt)
       ? `Bei Online-Zahlung. ${BAR_OHNE_GEBUEHR_HINWEIS}`
       : BEISPIEL_GLEICH,
+  }
+}
+
+/**
+ * Das Beispiel im Hofpreis-Modell: Endpreis = Warenpreis + Gebühr je Stück (N38), der Hof bekommt den Warenpreis.
+ * Satz und Wort nie fest getippt: der Satz der Hof-Einstellung ohne eigenen Wert (Standardsatz, `satzHundertstel`),
+ * die Gebühr über `bestellGebuehr` wie Kasse und /api/checkout, das Wort über `gebuehrBezeichnungFuer`.
+ */
+function beispielImHofpreis(warenpreisCents: number, ware = 'deinen Einkauf'): Beispielrechnung {
+  // Der Standardsatz in Hundertstel über dieselbe Funktion wie Kasse und Hofseite (ohne eigenen Satz des Hofs).
+  const hundertstel = satzHundertstel({ plattformgebuehrProzent: null })
+  const wort = gebuehrBezeichnungFuer({ gebuehrModell: GEBUEHR_MODELL_HOFPREIS })
+  const { gebuehrCents, gesamtCents } = bestellGebuehr([{ preisCents: warenpreisCents, menge: 1 }], hundertstel)
+  const euro = (cents: number) => formatEuro(centsAlsEuro(cents))
+  return {
+    warenpreisCents,
+    gebuehrCents,
+    prozent: PLATTFORMGEBUEHR_PROZENT,
+    mindestCents: 0,
+    duZahlstCents: gesamtCents,
+    hofBekommtCents: warenpreisCents,
+    fussnote: BEISPIEL_GLEICH,
+    modell: 'hofpreis',
+    satz:
+      `Der Hof verlangt ${euro(warenpreisCents)} für ${ware}. Du zahlst ${euro(gesamtCents)} – darin stecken ` +
+      `${satzText(hundertstel)} % ${wort}. Der Hof bekommt seine vollen ${euro(warenpreisCents)}.`,
   }
 }
 
@@ -365,12 +467,26 @@ export const STARTSEITE_FRAGEN: readonly Frage[] = [
 ]
 
 /**
- * Die Fragen, wie die Startseite sie zeigt: vor dem Stichtag mit der
- * Bar-Ausnahme in „Wie bezahle ich?" (Register B1), danach unverändert.
- * `jetzt` von der Seite (Server-Uhr, revalidiert).
+ * „Wie bezahle ich?" ab dem Stichtag „Hofpreis-Modell ab“ (V62, N38; Board
+ * w1-startseite): Die Gebühr steckt im Endpreis, online und bar gleich — keine
+ * eigene Zeile, keine Bar-Ausnahme. Der Satz aus derselben Quelle wie das
+ * Beispiel (Standardsatz über `satzHundertstel`).
  */
-export function startseitenFragen(jetzt: Date): readonly Frage[] {
-  return STARTSEITE_FRAGEN.map((f) =>
-    f.frage === 'Wie bezahle ich?' ? { ...f, antwort: mitBarAusnahme(f.antwort, jetzt, BAR_OHNE_GEBUEHR_HINWEIS) } : f
-  )
+export const WIE_BEZAHLE_ICH_HOFPREIS =
+  'Online beim Bestellen oder bar bei der Abholung – was der Hof anbietet, siehst du vor dem Bestellen. Die Preise sind ' +
+  `Endpreise: Darin stecken ${satzText(satzHundertstel({ plattformgebuehrProzent: null }))} % ${gebuehrBezeichnungFuer({ gebuehrModell: GEBUEHR_MODELL_HOFPREIS })}, ` +
+  'online und bar gleich.'
+
+/**
+ * Die Fragen, wie die Startseite sie zeigt — „Wie bezahle ich?" je Modell:
+ * im Modell „bisher“ vor dem Bar-Stichtag mit der Bar-Ausnahme (Register B1),
+ * danach wie in STARTSEITE_FRAGEN; im Hofpreis-Modell `WIE_BEZAHLE_ICH_HOFPREIS`.
+ * `jetzt` von der Seite (Server-Uhr, revalidiert), `modell` aus `gebuehrModellFuer`.
+ */
+export function startseitenFragen(jetzt: Date, modell: GebuehrModell): readonly Frage[] {
+  return STARTSEITE_FRAGEN.map((f) => {
+    if (f.frage !== 'Wie bezahle ich?') return f
+    if (modell === 'hofpreis') return { ...f, antwort: WIE_BEZAHLE_ICH_HOFPREIS }
+    return { ...f, antwort: mitBarAusnahme(f.antwort, jetzt, BAR_OHNE_GEBUEHR_HINWEIS) }
+  })
 }

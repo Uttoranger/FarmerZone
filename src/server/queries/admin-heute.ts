@@ -1,4 +1,5 @@
 import { ladePlattformgebuehrAufgaben } from '@/server/queries/plattformgebuehr'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { STRIPE_LIVE_AB, UMGEBUNG } from '@/lib/umgebung-server'
 import { ladeErstattungAufgaben, ladeHofAufgaben } from '@/server/queries/postfach'
@@ -11,7 +12,7 @@ import { naechsterTermin } from '@/server/queries/startseite'
 import { centAusDecimal } from '@/server/queries/umsatz'
 import { MELDUNG_STATUS_OFFEN_IM_EINGANG } from '@/lib/postfach'
 import { ABHOLUNG_ERLEDIGT, abholtage } from '@/lib/heute'
-import { umsatzBestellungWhere, umsatzfenster } from '@/lib/umsatz'
+import { umsatzfenster, type Umsatzfenster } from '@/lib/umsatz'
 import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
 import { gruendungEinstellungAus, hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
@@ -118,7 +119,7 @@ export async function ladeAdminAufgaben(jetzt: Date, optionen: { mitBetrieb: boo
 export type HeuteRoh = {
   stand: AufgabenStand
   bestellungen: { zurAbholung: number; nichtGepackt: number; storniert: number }
-  /** Die Woche aller Höfe (Umsatzregel), Beträge in Cent. */
+  /** Die Woche aller Höfe, Beträge in Cent: Geld und Zahl nach derselben Zählregel (`geldKachelWhere`, Nr. 258). */
   woche: HeuteWoche
   hoefe: { verkaufen: number; warten: number }
   naechsteFassung: Date | null
@@ -158,28 +159,53 @@ async function ladeBestellungenHeute(jetzt: Date, stripeLiveAb: Date | null): Pr
 }
 
 /**
- * Die Woche aller Höfe nach der Umsatzregel (`umsatzBestellungWhere` ohne den
- * Hof): abgeholte Bestellungen seit Montag (Wien) ohne Testzahlungen — ihr
- * Warenwert, ihre Servicegebühr (ohne entfallene, wie die Monatsabrechnung)
- * und ihre Zahl gegen die Vorwoche bis zum selben Zeitpunkt (`umsatzfenster`).
+ * Die Zählregel der Geld-Kachel und der Zahl „Woche: n“ (Register N32,
+ * Ergänzung N46, 6.11.2026; Nr. 258 — ersetzt die Zählweise nach Nr. 240):
+ * alle Bestellungen, die im Fenster eingegangen sind (`createdAt`), außer
+ * storniert bzw. abgelaufen (verfallene Bestellungen sind CANCELLED); online
+ * nur bezahlt — eine Online-Bestellung vor der Zahlung oder mit Erstattung
+ * (REFUNDED, auch ohne Storno) zählt nicht —, vor Ort (bar, Altbestand Karte)
+ * ab Eingang, auch unbestätigt; ohne Testzahlungen. Der Abholstatus spielt
+ * keine Rolle: Eine in der Woche bestellte Bestellung zählt in dieser Woche,
+ * auch wenn sie erst später oder gar nicht abgeholt wird.
+ *
+ * EINE Quelle für Kachel, „Woche: n“ und Vorwoche — die Zahlen sprechen so
+ * immer über dieselben Bestellungen. Die Umsatzregel der Höfe
+ * (`umsatzBestellungWhere`: abgeholt, nach Abholzeitpunkt) gilt für
+ * Auswertung und Verkäufe unverändert. Nur Anzeige — keine Geldberechnung
+ * ändert sich. Die Testzahlungs-Regel kommt als Element in die eigene
+ * `AND`-Liste (CODING_STANDARDS §2), nie gespreizt neben ein zweites `AND`.
+ */
+function geldKachelWhere(fenster: Umsatzfenster, stripeLiveAb: Date | null): Prisma.OrderWhereInput {
+  return {
+    createdAt: { gte: fenster.von, lte: fenster.bis },
+    status: { not: 'CANCELLED' },
+    AND: [
+      { OR: [{ paymentMethod: 'ONLINE', paymentStatus: 'PAID' }, { paymentMethod: { in: ['ONSITE_CASH', 'ONSITE_CARD'] } }] },
+      ohneTestzahlungenWhere(stripeLiveAb),
+    ],
+  }
+}
+
+/**
+ * Die Woche aller Höfe seit Montag (Wien) bis jetzt, nach `geldKachelWhere`:
+ * Warenwert, Gebühr (ohne entfallene, wie die Monatsabrechnung) und die Zahl
+ * „Woche: n“ der Kachel „Bestellungen heute“ — gegen die Vorwoche bis zum
+ * selben Zeitpunkt (`umsatzfenster`) nach derselben Regel.
  */
 async function ladeWoche(jetzt: Date, stripeLiveAb: Date | null): Promise<HeuteRoh['woche']> {
   const fenster = umsatzfenster('woche', jetzt)
-  const alleHoefe = (f: typeof fenster.aktuell) => {
-    const where = umsatzBestellungWhere('', f, stripeLiveAb)
-    delete where.farmId
-    return where
-  }
-  const aktuell = alleHoefe(fenster.aktuell)
-  const [summe, gebuehr, anzahlVorwoche] = await Promise.all([
-    prisma.order.aggregate({ where: aktuell, _sum: { totalAmount: true }, _count: { _all: true } }),
-    prisma.order.aggregate({ where: { ...aktuell, serviceFeeRefundedAt: null }, _sum: { serviceFeeCents: true } }),
-    prisma.order.count({ where: alleHoefe(fenster.vergleich) }),
+  const geld = geldKachelWhere(fenster.aktuell, stripeLiveAb)
+  const [summe, gebuehr, anzahl, anzahlVorwoche] = await Promise.all([
+    prisma.order.aggregate({ where: geld, _sum: { totalAmount: true } }),
+    prisma.order.aggregate({ where: { ...geld, serviceFeeRefundedAt: null }, _sum: { serviceFeeCents: true } }),
+    prisma.order.count({ where: geld }),
+    prisma.order.count({ where: geldKachelWhere(fenster.vergleich, stripeLiveAb) }),
   ])
   return {
     umsatzCents: centAusDecimal(summe._sum.totalAmount),
     gebuehrCents: gebuehr._sum.serviceFeeCents ?? 0,
-    anzahl: summe._count._all,
+    anzahl,
     anzahlVorwoche,
   }
 }

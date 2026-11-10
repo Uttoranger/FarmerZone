@@ -3,17 +3,17 @@ import { cn } from '@/lib/utils'
 import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
 
 /**
- * Der Kopf eines Hofs (Register N22, N23): Name in Serif (höchstens zwei
- * Zeilen), rechts die Entfernung, darunter PLZ und Ort. EINE Quelle für die
+ * Der Kopf eines Hofs (Register N22, N23): Name fett (höchstens zwei Zeilen),
+ * darunter PLZ und Ort mit der Entfernung dahinter (Boards w1-/s1-hoefe,
+ * Nr. 234; vorher Serif und die Entfernung rechts neben dem Namen). EINE Quelle für die
  * Hofkarte der Liste, die kurze Hofkarte am Pin und Region — vorher stand er
  * in jeder Karte als eigene Kopie. Karussell (hoefe-karussell.tsx) und
  * Produkttreffer (`ProduktZeile` in entdecken-teile.tsx) haben bewusst ihren
  * eigenen Kopf: Sie sind keine Hofkarten, dort ist das Produkt bzw. die Reihe
  * die Hauptsache (Register F10).
  *
- * Ohne `bild` sind es zwei Geschwister (Zeile mit Name und Entfernung, Zeile
- * mit dem Ort) — die Karte stapelt sie in ihrer Spalte, so bleibt /hoefe
- * Zeichen für Zeichen, wie es war. Mit `bild` steht links ein Foto bzw. die
+ * Ohne `bild` sind es zwei Geschwister (Name, Zeile mit Ort und Entfernung) —
+ * die Karte stapelt sie in ihrer Spalte. Mit `bild` steht links ein Foto bzw. die
  * Illustration der Kategorie (Kante 40 rund wie in der Karte am Pin von
  * Region, 48 mit Ecken wie die Produktzeile).
  */
@@ -21,6 +21,7 @@ export function HofKopf({
   hof,
   als: Name = 'p',
   gedaempft = false,
+  aufTonung = false,
   bild,
 }: {
   hof: HofKopfDaten
@@ -28,25 +29,24 @@ export function HofKopf({
   als?: 'h2' | 'h3' | 'p'
   /** Pausierter Hof: der Name leiser, lesbar bleibt er. */
   gedaempft?: boolean
+  /** Auf der grün getönten Auswahlkarte: Die Zeile steht in Textfarbe zu 80 % — leise wäre dort unter 4,5 : 1 (Nr. 252). */
+  aufTonung?: boolean
   bild?: { foto: string | null; illustration: string; kante: 40 | 48 }
 }): React.JSX.Element {
   const zeilen = (
     <>
-      <div className="flex items-start gap-2">
-        <Name
-          className={cn(
-            'line-clamp-2 min-w-0 flex-1 font-heading text-[17px] leading-snug font-semibold break-words',
-            gedaempft ? 'text-muted-foreground' : 'text-foreground'
-          )}
-        >
-          {hof.name}
-        </Name>
-        {hof.entfernungKm !== null && (
-          <span className="shrink-0 pt-0.5 text-[13px] text-muted-foreground">{formatiereEntfernung(hof.entfernungKm)}</span>
+      <Name
+        className={cn(
+          'line-clamp-2 min-w-0 text-[17px] leading-snug font-bold break-words',
+          gedaempft ? 'text-muted-foreground' : 'text-foreground'
         )}
-      </div>
-      <p className="truncate text-[13px] text-muted-foreground">
+      >
+        {hof.name}
+      </Name>
+      {/* Die Entfernung hinter dem Ort, wie in den Boards w1-/s1-hoefe („5280 Braunau am Inn · 3 km"). */}
+      <p className={cn('truncate text-[13px]', aufTonung ? 'text-foreground/80' : 'text-muted-foreground')}>
         {hof.postalCode} {hof.city}
+        {hof.entfernungKm !== null && ` · ${formatiereEntfernung(hof.entfernungKm)}`}
       </p>
     </>
   )

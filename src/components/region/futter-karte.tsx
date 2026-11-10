@@ -1,16 +1,16 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Marke } from '@/components/ui/marke'
 import { KARTE, KNOPF_GRUEN } from '@/components/hof-bestellungen/stil'
 import { Abholzeile } from '@/components/hoefe/abholzeile'
-import { HofKopf } from '@/components/hoefe/hof-kopf'
 import { Vorschaubild } from '@/components/hoefe/hof-vorschaubild'
 import { FutterSchild } from '@/components/produkte/futter-schild'
-import { AbholhinweisZeile } from '@/components/region/futter-abholhinweise'
+import { Groessenkachel, GroessenWahl } from '@/components/ui/groessenkachel'
 import { FUTTER_KARTE_TEXT, bestellenText, type FutterAngebot, type FutterGroesse } from '@/lib/futter-kaufen'
+import { ABHOLHINWEIS_TEXT } from '@/lib/abholhinweise'
+import { hofMitEntfernung } from '@/lib/umfeld'
 
 /*
  * Die Futterkarte (Register N23, Board system-h5-region-v2 §3 „Futterkarte"
@@ -22,17 +22,20 @@ import { FUTTER_KARTE_TEXT, bestellenText, type FutterAngebot, type FutterGroess
  * — ein Link auf die Produktseite genau dieser Größe. Nur die Wahl der Größe
  * läuft im Browser; ohne JavaScript gilt die vorgewählte (erste kaufbare).
  *
- * Die Größen sind echte Radioknöpfe in fieldset/legend (Pfeiltasten, Ansage
- * „1 von 4" vom Browser), nicht `GroessenWahl`/`Groessenkachel`: Die Kachel hat
- * keinen Platz für die Marke „günstigster Kilopreis", ist 88 px hoch statt
- * 58 px, streicht bei „derzeit aus" den Preis statt den Kilopreis zu ersetzen,
- * und ihre Gruppe trägt ein aria-label statt fieldset/legend (Bericht 123).
+ * Seit Nr. 272 (Board s1-/w1-region Bild 2, Liste Lauf 32 region „Futterkarte
+ * anders, ohne Größenwahl“): Titel ist das Produkt, darunter „Hof · km“ (ohne
+ * PLZ und Ort), die Abholzeile mit den Abholhinweisen dahinter (Wortlaut nach
+ * N23), „ab € … / kg“ fett mit dem Schild (E9), „Größe“ und die Größen als
+ * Optionen über die Größenkachel G5 (`GroessenWahl form="zeile"`: Radio links,
+ * Name, darunter der Kilopreis bzw. „gerade nicht da“, Preis rechts; eine leere
+ * Größe zeigt ihren Preis und ist nicht wählbar). Die Marke „günstigster
+ * Kilopreis“ entfällt mit der Kachel (das Board zeigt sie nicht).
  */
 export function FutterKarte({ angebot, jetzt }: { angebot: FutterAngebot; jetzt: string }): React.JSX.Element {
   const [gewaehlt, setGewaehlt] = useState(angebot.vorgewaehlt)
   const groesse = angebot.groessen.find((g) => g.id === gewaehlt) ?? angebot.groessen[0]
   return (
-    <article aria-label={angebot.name} className={cn(KARTE, 'flex flex-col gap-3 px-4 py-3.5')}>
+    <article aria-label={angebot.name} className={cn(KARTE, 'flex flex-col gap-2.5 px-4 py-3.5')}>
       <div className="flex items-start gap-3">
         <Vorschaubild
           foto={angebot.bild.foto}
@@ -42,39 +45,33 @@ export function FutterKarte({ angebot, jetzt }: { angebot: FutterAngebot; jetzt:
           gedaempft={false}
           className="size-12 rounded-[10px] dark:ring-1 dark:ring-border"
         />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="line-clamp-2 text-[14.5px] font-semibold break-words text-foreground" title={angebot.name}>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h2 className="line-clamp-2 text-[15px] font-semibold break-words text-foreground" title={angebot.name}>
             {angebot.name}
           </h2>
-          <div className="flex min-w-0 flex-col">
-            <HofKopf hof={angebot.hof} als="p" />
-          </div>
-          <Abholzeile fenster={angebot.abholfenster} isPaused={false} jetzt={jetzt} />
+          <p className="truncate text-[14px] text-foreground tabular-nums" title={`${angebot.hof.name}, ${angebot.hof.postalCode} ${angebot.hof.city}`}>
+            {hofMitEntfernung(angebot.hof)}
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+      <FutterAbholung angebot={angebot} jetzt={jetzt} />
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        {angebot.grundpreis && <p className="text-[14px] font-semibold text-foreground tabular-nums">{angebot.grundpreis}</p>}
         {angebot.schild && <FutterSchild text={angebot.schild} />}
-        {angebot.grundpreis && (
-          <p className="ml-auto text-right">
-            <span className="block text-[11px] text-muted-foreground">{FUTTER_KARTE_TEXT.grundpreis}</span>
-            <span className="text-[13.5px] font-semibold text-foreground tabular-nums">{angebot.grundpreis}</span>
-          </p>
-        )}
       </div>
 
-      {angebot.abholhinweise.length > 0 && <AbholhinweisZeile hinweise={angebot.abholhinweise} />}
-
       {angebot.groessen.length > 1 ? (
-        <GroessenRadios angebot={angebot} gewaehlt={groesse.id} onWahl={setGewaehlt} />
+        <FutterGroessen groessen={angebot.groessen} gewaehlt={groesse.id} onWahl={setGewaehlt} />
       ) : (
-        <p className="text-[12.5px] text-muted-foreground tabular-nums">
+        <p className="text-[13px] text-muted-foreground tabular-nums">
           {/* Heißt die Größe wie das Angebot (Einzelprodukt), steht der Name nicht ein zweites Mal da. */}
           {[groesse.name !== angebot.name ? groesse.name : null, groesse.preis, groesse.kilopreis].filter(Boolean).join(' · ')}
         </p>
       )}
 
-      <Link href={groesse.kaufLink} className={cn(KNOPF_GRUEN, 'min-h-12 w-full text-[14px]')}>
+      <Link href={groesse.kaufLink} className={cn(KNOPF_GRUEN, 'min-h-12 w-full text-[15px]')}>
         {bestellenText(angebot, groesse)}
         <span className="sr-only">: {angebot.name}</span>
       </Link>
@@ -82,85 +79,53 @@ export function FutterKarte({ angebot, jetzt }: { angebot: FutterAngebot; jetzt:
   )
 }
 
-/** Die Größen als Radiogruppe: zwei Spalten, je Feld mindestens 58 px; „derzeit aus" nicht wählbar. */
-function GroessenRadios({
-  angebot,
-  gewaehlt,
-  onWahl,
-}: {
-  angebot: FutterAngebot
-  gewaehlt: string
-  onWahl: (id: string) => void
-}): React.JSX.Element {
-  const name = useId()
+/**
+ * Die Abholzeile mit den Abholhinweisen dahinter, leise wie im Board („Abholung Sa, 6. März, 9–12 Uhr · …“).
+ * Die Hinweise tragen den Wortlaut des Registers (N23: „Anhänger nötig“, „Verladen mit Frontlader“, „Abholung nach
+ * Absprache“); gilt einer nur für einzelne Größen, stehen sie davor.
+ */
+export function FutterAbholung({ angebot, jetzt }: { angebot: Pick<FutterAngebot, 'abholfenster' | 'abholhinweise'>; jetzt: string }): React.JSX.Element {
   return (
-    <fieldset className="min-w-0">
-      <legend className="sr-only">{FUTTER_KARTE_TEXT.groesse}</legend>
-      <div className="grid grid-cols-2 gap-2 pt-2">
-        {angebot.groessen.map((g) => (
-          <GroessenFeld key={g.id} groesse={g} name={name} gewaehlt={g.id === gewaehlt} onWahl={onWahl} />
-        ))}
-      </div>
-    </fieldset>
+    <div className="flex flex-wrap items-baseline gap-x-1 text-[13px] leading-snug text-muted-foreground">
+      <Abholzeile fenster={angebot.abholfenster} isPaused={false} jetzt={jetzt} className="font-normal text-muted-foreground" />
+      {angebot.abholhinweise.map(({ hinweis, groessen }) => (
+        <span key={hinweis}>
+          <span aria-hidden="true">· </span>
+          {groessen ? `${groessen}: ${ABHOLHINWEIS_TEXT[hinweis]}` : ABHOLHINWEIS_TEXT[hinweis]}
+        </span>
+      ))}
+    </div>
   )
 }
 
-function GroessenFeld({
-  groesse,
-  name,
+/** Die Größen als Optionen über die Größenkachel (G5, Variante „zeile“) — mit sichtbarem „Größe“ darüber. */
+export function FutterGroessen({
+  groessen,
   gewaehlt,
   onWahl,
 }: {
-  groesse: FutterGroesse
-  name: string
-  gewaehlt: boolean
+  groessen: readonly FutterGroesse[]
+  gewaehlt: string
   onWahl: (id: string) => void
 }): React.JSX.Element {
   return (
-    <label
-      className={cn(
-        'relative flex min-h-[58px] min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors duration-[250ms]',
-        groesse.kaufbar ? 'cursor-pointer hover:bg-muted' : 'cursor-not-allowed bg-muted',
-        gewaehlt ? 'border-[1.5px] border-accent bg-accent/12 hover:bg-accent/12' : 'border-border',
-        // Die Marke ragt über den oberen Rand ins Feld — Platz darunter, damit sie den Namen nicht verdeckt.
-        groesse.guenstigster && 'pt-4',
-        // Der Fokus liegt auf dem verborgenen Radioknopf — sichtbar wird er am Feld.
-        'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:focus-visible]:outline-solid'
-      )}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={groesse.id}
-        checked={gewaehlt}
-        disabled={!groesse.kaufbar}
-        onChange={() => onWahl(groesse.id)}
-        className="sr-only"
-      />
-      <span
-        aria-hidden="true"
-        className={cn(
-          'flex size-[18px] shrink-0 items-center justify-center rounded-full border-2',
-          gewaehlt ? 'border-status-fertig' : 'border-muted-foreground'
-        )}
-      >
-        {gewaehlt && <span className="size-2 rounded-full bg-status-fertig" />}
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[12.5px] font-semibold text-foreground" title={groesse.name}>
-          {groesse.name}
-        </span>
-        <span className="text-[12.5px] font-semibold text-foreground tabular-nums">{groesse.preis}</span>
-        <span className="text-[11.5px] text-muted-foreground tabular-nums">
-          {groesse.kaufbar ? groesse.kilopreis : FUTTER_KARTE_TEXT.derzeitAus}
-        </span>
-      </span>
-      {groesse.guenstigster && (
-        // Grün wie im Board (Art „läuft"); eine Angabe zum Angebot, kein eigener Zustand — keine neue Farbe (G5).
-        <Marke art="laeuft" className="absolute -top-2.5 right-2 px-2 text-[10.5px]">
-          {FUTTER_KARTE_TEXT.guenstigster}
-        </Marke>
-      )}
-    </label>
+    <div className="flex flex-col gap-2">
+      <p aria-hidden="true" className="text-[14px] font-semibold text-foreground">
+        {FUTTER_KARTE_TEXT.groesse}
+      </p>
+      <GroessenWahl beschriftung={FUTTER_KARTE_TEXT.groesse} wert={gewaehlt} onWertChange={onWahl} form="zeile">
+        {groessen.map((g) => (
+          <Groessenkachel
+            key={g.id}
+            wert={g.id}
+            name={g.name}
+            preis={g.preis}
+            grundpreis={g.kilopreis ?? undefined}
+            zustand={g.kaufbar ? 'normal' : 'ausverkauft'}
+            form="zeile"
+          />
+        ))}
+      </GroessenWahl>
+    </div>
   )
 }

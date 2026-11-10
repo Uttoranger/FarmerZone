@@ -4,18 +4,20 @@ import { Check, Info, Sprout } from 'lucide-react'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { KARTE, KICKER } from '@/components/hof-bestellungen/stil'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { KARTE } from '@/components/hof-bestellungen/stil'
+import { KICKER_12 } from '@/components/mein-hof/kicker-12'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { UNTERSEITE_SATZ } from '@/components/hof-einstellungen/einstellungen-laden'
 import {
   DEIN_STAND_TITEL,
-  KONDITIONEN_STAND,
   KONDITIONEN_UEBERGANG,
   KOSTENLOS,
-  MONATSABRECHNUNG_TEILE,
   TARIFE_TITEL,
   VERGLEICH_SATZ,
   VERGLEICH_TEXT,
-  VOLLER_WARENPREIS,
+  konditionenStand,
+  monatsabrechnungTeile,
+  vollerWarenpreis,
   type DeinStand,
   type TextTeil,
 } from '@/lib/konditionen'
@@ -27,6 +29,7 @@ import {
   type TarifKarteAnzeige,
   type VergleichZeile,
 } from '@/lib/hof-einstellungen'
+import type { GebuehrLage } from '@/lib/plattformgebuehr'
 import { cn } from '@/lib/utils'
 
 /**
@@ -47,19 +50,33 @@ import { cn } from '@/lib/utils'
 export function KonditionenAnsicht({
   hof,
   jetzt,
+  gebuehr,
   abzeichen = null,
 }: {
   hof: KonditionenHof
   jetzt: Date
+  /**
+   * Die Gebührenlage des Hofs (`ladeGebuehrLage`, N38) und der Stichtag
+   * „Hofpreis-Modell ab“. Die Lage wählt das Wort der Gebühr in Kopf,
+   * Rechenbeispiel und Abrechnung (V62, Nr. 224) und bar den Einzugsweg; ab
+   * dem Stichtag nennt der Fuß ihn als Stand (`konditionenStand`). null, wenn
+   * das Lesen scheiterte: dann fehlen Kopfsatz, Rechenbeispiel, Abrechnung und
+   * Stand — nie stillschweigend die Fassung „bisher“.
+   */
+  gebuehr: { lage: GebuehrLage; stichtag: Date } | null
   /** Der Schalter „Abzeichen zeigen“ im Block „Dein Stand“ (Register K2, Nr. 116) — nur für Gründungshöfe, sonst null. */
   abzeichen?: React.ReactNode
 }): React.JSX.Element {
-  const beispiel = konditionenRechenbeispiel(hof, jetzt)
+  const modell = gebuehr?.lage.modell ?? null
+  const beispiel = gebuehr ? konditionenRechenbeispiel(hof, jetzt, gebuehr.lage) : null
   const seite = baueKonditionenSeite(hof, jetzt)
 
   return (
     <div>
-      <UnterseitenKopf titel="Deine Konditionen" satz={beispiel.mitProvision ? undefined : VOLLER_WARENPREIS} />
+      {/* Werkzeug-Kopf (G1) statt des alten Unterseiten-Kopfs (Nr. 278, nur der Kopf); der Satz zum vollen Warenpreis
+          steht unverändert darunter wie auf den übrigen Einstellungs-Unterseiten. */}
+      <WerkzeugKopf titel="Deine Konditionen" />
+      {beispiel && modell && !beispiel.mitProvision && <p className={UNTERSEITE_SATZ}>{vollerWarenpreis(modell)}</p>}
 
       <div className="flex flex-col gap-5 md:gap-6">
         {/* Vor den Preisen, damit keiner als heute fällig gelesen wird (Register K1). */}
@@ -72,7 +89,7 @@ export function KonditionenAnsicht({
         )}
 
         <section aria-labelledby="tarife-titel">
-          <h2 id="tarife-titel" className={KICKER}>
+          <h2 id="tarife-titel" className={KICKER_12}>
             {TARIFE_TITEL}
           </h2>
           {/* Luft oben für die Marken, die auf der Kante der Karten sitzen. */}
@@ -85,28 +102,32 @@ export function KonditionenAnsicht({
 
         {seite.vergleich && <Vergleich zeilen={seite.vergleich} />}
 
-        <section aria-labelledby="beispiel-titel" className={cn(KARTE, 'p-5 md:p-6')}>
-          <h2 id="beispiel-titel" className="font-heading text-lg font-semibold text-foreground">
-            {beispiel.titel}
-          </h2>
-          {beispiel.satz && <p className="mt-1 text-[13px] text-muted-foreground">{beispiel.satz}</p>}
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <RechenKarte seite={beispiel.online} />
-            <RechenKarte seite={beispiel.bar} />
-          </div>
-        </section>
+        {beispiel && (
+          <section aria-labelledby="beispiel-titel" className={cn(KARTE, 'p-5 md:p-6')}>
+            <h2 id="beispiel-titel" className="font-heading text-lg font-semibold text-foreground">
+              {beispiel.titel}
+            </h2>
+            {beispiel.satz && <p className="mt-1 text-[13px] text-muted-foreground">{beispiel.satz}</p>}
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <RechenKarte seite={beispiel.online} />
+              <RechenKarte seite={beispiel.bar} />
+            </div>
+          </section>
+        )}
 
-        <section aria-labelledby="abrechnung-titel">
-          <h2 id="abrechnung-titel" className={cn(KICKER, 'mb-2.5')}>
-            So rechnen wir ab
-          </h2>
-          <p className="text-[14px] leading-relaxed text-foreground md:text-[13.5px]">
-            <Teile teile={MONATSABRECHNUNG_TEILE} />
-          </p>
-        </section>
+        {modell && (
+          <section aria-labelledby="abrechnung-titel">
+            <h2 id="abrechnung-titel" className={cn(KICKER_12, 'mb-2.5')}>
+              So rechnen wir ab
+            </h2>
+            <p className="text-[14px] leading-relaxed text-foreground md:text-[13.5px]">
+              <Teile teile={monatsabrechnungTeile(modell)} />
+            </p>
+          </section>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-[13px] text-muted-foreground">
-          <p>Stand: {KONDITIONEN_STAND}</p>
+          {gebuehr && <p>Stand: {konditionenStand(gebuehr.lage.modell, gebuehr.stichtag)}</p>}
           <Link
             href="/konditionen"
             className={cn('inline-flex min-h-11 items-center rounded-sm font-semibold text-brand-text underline-offset-2 hover:underline', FOKUS_RAHMEN)}
@@ -156,7 +177,7 @@ function DeinStandKarte({ stand, zusatz = null }: { stand: DeinStand; zusatz?: R
             <Sprout className="size-5" strokeWidth={1.8} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[1.2px] text-status-fertig uppercase">{DEIN_STAND_TITEL}</p>
+            <p className="text-xs font-semibold tracking-[1.2px] text-status-fertig uppercase">{DEIN_STAND_TITEL}</p>
             <h2 className="font-heading text-[19px] leading-tight font-semibold text-foreground md:text-xl">{stand.titel}</h2>
           </div>
         </div>
@@ -218,7 +239,7 @@ function Vergleich({ zeilen }: { zeilen: readonly VergleichZeile[] }): React.JSX
       </h2>
       <table className="w-full table-fixed text-left text-[14px] md:text-[13.5px]">
         <thead>
-          <tr className="text-[11.5px] tracking-[0.6px] text-muted-foreground uppercase">
+          <tr className="text-xs tracking-[0.6px] text-muted-foreground uppercase">
             <td className="w-2/5 pb-1.5" />
             <th scope="col" className="pb-1.5 font-semibold">
               {VERGLEICH_TEXT.heute}

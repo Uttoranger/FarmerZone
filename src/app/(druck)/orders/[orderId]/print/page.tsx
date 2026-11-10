@@ -1,16 +1,49 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getOrderDetail } from '@/server/queries/orders'
-import { statusLabel, paymentLabel } from '@/components/orders/order-status'
 import { PrintButton } from '@/components/orders/print-button'
-import { barZuKassierenCents, bestellSummen, centsAlsEuro } from '@/lib/servicegebuehr'
-import { formatDatumLang, formatEuro } from '@/lib/format'
+import { anzeigeGesamtCents, bestellSummen, centsAlsEuro, gebuehrEntfallenVermerk } from '@/lib/servicegebuehr'
+import { formatEuro } from '@/lib/format'
+import { uhrzeitInWien } from '@/lib/fristen'
 import { datumLang } from '@/lib/heute'
 import { formatiereTelefon } from '@/lib/telefon-anzeige'
+import { positionszeile } from '@/lib/positionszeile'
+import { DRUCK_ABGLEICH, druckGebuehrZeile, druckGesamtHinweis, druckKasse, papierMarke, zahlartText } from '@/lib/hof-bestellungen'
 
 export const dynamic = 'force-dynamic'
+
+function gebindeVon(item: { productName: string; quantity: number; product?: { unit: string; unitSize: { toString(): string } | null } | null }): string | null {
+  return positionszeile({ name: item.productName, quantity: item.quantity, unit: item.product?.unit ?? null, unitSize: item.product?.unitSize ?? null }).gebinde
+}
+
+/*
+ * Der Abholzettel einer Bestellung (Boards s2-druck, w2-druck; nur hell, V44).
+ * Papier sagt dasselbe wie der Bildschirm (V57): die Marke der Packliste
+ * („Zum Packen“, „Wartet auf Kunde“), „Bar bei Abholung“, „Bar zu kassieren“ —
+ * bzw. „Zu kassieren“ (Karte) und „Nichts zu kassieren“ (nicht abgeholt, storniert,
+ * Gebühr entfallen; druckKasse, Nr. 249b).
+ * Die Zeile mit der Gebühr steht nur bei Bestellungen im Modell „bisher“ — im
+ * Hofpreis-Modell steckt die Plattformgebühr im Gesamt (N38), darunter steht
+ * „Gesamt inkl. Plattformgebühr.“ (druckGebuehrZeile, druckGesamtHinweis): Die
+ * Positionen zeigen den Warenpreis ohne Gebühr, „Preise inkl.“ stimmte dort nicht.
+ * Ist die Gebühr entfallen bzw. erstattet (Storno, „nicht abgeholt“), steht die Zeile mit „(entfällt)“ bzw.
+ * „(erstattet)“ und gestrichenem Betrag da, „Gesamt“ ist der Warenpreis — wie auf der Bestätigung (Nr. 244).
+ */
+/** Die E-Mail mit einer Umbruchstelle nach dem „@“ — so bricht sie an der Stelle, die man noch lesen kann. */
+function EmailMitUmbruch({ adresse }: { adresse: string }) {
+  const at = adresse.indexOf('@')
+  if (at < 0) return <>{adresse}</>
+  return (
+    <>
+      {adresse.slice(0, at + 1)}
+      <wbr />
+      {adresse.slice(at + 1)}
+    </>
+  )
+}
 
 export default async function OrderPrintPage({
   params,
@@ -33,79 +66,82 @@ export default async function OrderPrintPage({
 
   // Wiener Tag, nie der der Serveruhr (CODING_STANDARDS „Tage und Wochen").
   const pickupDate = datumLang(order.pickupDate)
-  // Servicegebühr aus dem Snapshot: Zwischensumme/Gebühr/Gesamt wie im
-  // Checkout, „Bar zu kassieren" bei Vor-Ort-Zahlung
+  // Beträge aus dem Snapshot: Warenpreis, Gebühr, „Bar zu kassieren" vor Ort. „Gesamt“ ohne entfallene Gebühr
+  // (anzeigeGesamtCents, nur Anzeige) — sonst stünde die gestrichene Zeile darüber und die volle Summe darunter.
   const summen = bestellSummen(order)
-  const kassieren = barZuKassierenCents(order)
+  const gesamtCents = anzeigeGesamtCents(order)
+  const vermerk = gebuehrEntfallenVermerk(order)
+  const kasse = druckKasse(order)
+  const gebuehrZeile = druckGebuehrZeile(order, summen.gebuehrCents)
+  const preisHinweis = druckGesamtHinweis(order)
+  const marke = papierMarke(order.status)
 
   // Das Layout der Gruppe (druck) trägt keine Navigation: Papier aus Tokens, die
   // in beiden Themes gleich sind. Nur der Knopf und der Rückweg sind
   // `print:hidden` — ein eigener @media-print-Block wäre eine zweite Wahrheit.
   return (
-    <>
-      <div className="p-8 max-w-md mx-auto font-sans">
-        {/* Browser-only controls */}
-        <div className="flex items-center gap-4 mb-6 print:hidden">
-          <PrintButton />
-          <Link
-            href={`/orders/${orderId}`}
-            className="inline-flex min-h-11 items-center rounded-sm text-sm text-primary-foreground/70 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
-          >
-            Zurück
-          </Link>
-        </div>
+    <div className="min-h-screen font-sans print:text-sm">
+      {/* Zurück und Drucken — nicht auf dem Papier */}
+      <div className="flex items-center justify-between gap-4 border-b border-primary-foreground/20 px-4 py-2 print:hidden md:px-6">
+        <Link
+          href={`/orders/${orderId}`}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-[15px] font-semibold text-primary-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Zurück
+        </Link>
+        <PrintButton />
+      </div>
 
-        {/* Farm header */}
-        <div className="border-b-2 border-primary-foreground pb-4 mb-5">
-          <div className="text-xl font-bold">{farm.name}</div>
+      {/* Blatt wie im Board w2-druck: Inhalt rund 650 px breit. */}
+      <div className="mx-auto max-w-[746px] px-4 py-6 md:px-12 md:py-12">
+        {/* Hof */}
+        <div className="mb-5 border-b-2 border-primary-foreground pb-3">
+          <div className="font-heading text-xl font-semibold md:text-[22px]">{farm.name}</div>
           <div className="text-sm text-primary-foreground/70">
             {farm.address} · {farm.postalCode} {farm.city}
           </div>
           {farm.phone && <div className="text-sm text-primary-foreground/70">{formatiereTelefon(farm.phone)}</div>}
         </div>
 
-        {/* Order header */}
+        {/* Bestellung */}
         <div className="mb-5">
-          <div className="flex justify-between items-baseline">
-            <div className="text-lg font-bold">{order.orderNumber}</div>
-            <div className="text-sm">{statusLabel(order.status)}</div>
+          <div className="flex items-baseline justify-between gap-3">
+            {/* Die eine Überschrift des Zettels ist die Bestellnummer. */}
+            <h1 className="text-2xl font-bold tracking-wide md:text-[28px]">{order.orderNumber}</h1>
+            <div className="text-sm font-semibold">{marke.text}</div>
           </div>
-          <div className="text-xs text-primary-foreground/70 mt-0.5">
-            Eingang: {formatDatumLang(order.createdAt)}
-          </div>
+          <div className="mt-2 text-sm text-primary-foreground/70">Eingang: {datumLang(order.createdAt)}, {uhrzeitInWien(order.createdAt)} Uhr</div>
         </div>
 
-        {/* Pickup */}
-        <div className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-primary-foreground/70 mb-1">
-            Abholung
+        {/* Abholung und Kunde nebeneinander */}
+        <div className="mb-5 grid grid-cols-2 gap-4">
+          <div className="min-w-0">
+            <div className="mb-0.5 text-[13px] font-semibold tracking-wide text-primary-foreground/70 uppercase">Abholung</div>
+            <div className="font-semibold break-words">{pickupDate}</div>
+            <div className="text-sm text-primary-foreground/80">
+              {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
+            </div>
           </div>
-          <div className="font-medium">{pickupDate}</div>
-          <div className="text-sm text-primary-foreground/80">
-            {order.pickupTimeStart} – {order.pickupTimeEnd} Uhr
+          <div className="min-w-0">
+            <div className="mb-0.5 text-[13px] font-semibold tracking-wide text-primary-foreground/70 uppercase">Kunde</div>
+            <div className="font-semibold break-words">{order.customerName}</div>
+            <div className="text-sm text-primary-foreground/80">{formatiereTelefon(order.customerPhone)}</div>
+            {/* Umbruch zuerst nach dem „@“, mitten im Wort nur als letzter Ausweg (Liste Lauf 32, druck Bild 1). */}
+            <div className="text-sm break-words text-primary-foreground/80">
+              <EmailMitUmbruch adresse={order.customerEmail} />
+            </div>
           </div>
         </div>
+        {order.customerNote && <div className="mb-5 text-sm break-words text-primary-foreground/70 italic">{order.customerNote}</div>}
 
-        {/* Customer */}
-        <div className="mb-5">
-          <div className="text-xs font-semibold uppercase tracking-wide text-primary-foreground/70 mb-1">
-            Kunde
-          </div>
-          <div className="font-medium">{order.customerName}</div>
-          <div className="text-sm text-primary-foreground/80">{formatiereTelefon(order.customerPhone)}</div>
-          <div className="text-sm text-primary-foreground/80">{order.customerEmail}</div>
-          {order.customerNote && (
-            <div className="text-sm text-primary-foreground/70 mt-1 italic">{order.customerNote}</div>
-          )}
-        </div>
-
-        {/* Items */}
-        <table className="w-full text-sm mb-4 border-collapse">
+        {/* Positionen */}
+        <table className="mb-4 w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b-2 border-primary-foreground/30">
-              <th className="text-left py-1 font-semibold">Produkt</th>
-              <th className="text-center py-1 font-semibold w-12">Menge</th>
-              <th className="text-right py-1 font-semibold w-20">Preis</th>
+            <tr className="border-b border-primary-foreground/30">
+              <th className="py-1 text-left text-sm font-bold text-primary-foreground">Produkt</th>
+              <th className="w-16 py-1 text-right text-sm font-bold text-primary-foreground">Menge</th>
+              <th className="w-24 py-1 text-right text-sm font-bold text-primary-foreground">Betrag</th>
             </tr>
           </thead>
           <tbody>
@@ -113,51 +149,59 @@ export default async function OrderPrintPage({
               <tr key={item.id} className="border-b border-primary-foreground/10">
                 <td className={`py-1.5 ${item.fehltSeit ? 'line-through' : ''}`}>
                   {item.productName}
+                  {/* Gebinde wie auf der Bestellseite („1 L“, „6 Pakete“; Positionszeile G14). */}
+                  {gebindeVon(item) ? <> ({gebindeVon(item)})</> : null}
                   {item.fehltSeit && <span className="no-underline"> (fehlt)</span>}
                 </td>
-                <td className="text-center py-1.5">{item.quantity}×</td>
-                <td className="text-right py-1.5">{item.fehltSeit ? '–' : formatEuro(centsAlsEuro(item.totalPriceCents))}</td>
+                <td className="py-1.5 text-right">{item.quantity}×</td>
+                <td className="py-1.5 text-right">{item.fehltSeit ? '–' : formatEuro(centsAlsEuro(item.totalPriceCents))}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            {summen.gebuehrCents > 0 && (
+            {gebuehrZeile && (
               <>
-                <tr className="border-t-2 border-primary-foreground/30">
-                  <td colSpan={2} className="py-1.5">Zwischensumme (Warenpreis)</td>
-                  <td className="text-right py-1.5">{formatEuro(centsAlsEuro(summen.warenpreisCents))}</td>
+                <tr className="border-t-2 border-primary-foreground">
+                  <td colSpan={2} className="py-1.5">
+                    Zwischensumme (Warenpreis)
+                  </td>
+                  <td className="py-1.5 text-right">{formatEuro(centsAlsEuro(summen.warenpreisCents))}</td>
                 </tr>
                 <tr>
-                  <td colSpan={2} className="py-1.5">Servicegebühr</td>
-                  <td className="text-right py-1.5">{formatEuro(centsAlsEuro(summen.gebuehrCents))}</td>
+                  <td colSpan={2} className="py-1.5">
+                    {gebuehrZeile}
+                    {vermerk && <> ({vermerk})</>}
+                  </td>
+                  <td className={`py-1.5 text-right ${vermerk ? 'line-through' : ''}`}>{formatEuro(centsAlsEuro(summen.gebuehrCents))}</td>
                 </tr>
               </>
             )}
-            <tr className={summen.gebuehrCents > 0 ? 'border-t border-primary-foreground/30' : 'border-t-2 border-primary-foreground/30'}>
+            <tr className={gebuehrZeile ? 'border-t border-primary-foreground/30' : 'border-t-2 border-primary-foreground'}>
               <td colSpan={2} className="py-2 font-bold">
                 Gesamt
               </td>
-              <td className="text-right py-2 font-bold">
-                {formatEuro(centsAlsEuro(summen.gesamtCents))}
-              </td>
+              <td className="py-2 text-right text-base font-bold">{formatEuro(centsAlsEuro(gesamtCents))}</td>
             </tr>
           </tfoot>
         </table>
 
-        <div className="text-sm text-primary-foreground/80">
-          Zahlung: {paymentLabel(order.paymentMethod)}
-        </div>
-        {kassieren !== null && (
-          <div className="mt-1 text-sm font-semibold">
-            Bar zu kassieren: {formatEuro(centsAlsEuro(kassieren))}
-            {summen.gebuehrCents > 0 && (
-              <span className="font-normal text-primary-foreground/70">
-                {' '}(davon Servicegebühr {formatEuro(centsAlsEuro(summen.gebuehrCents))})
+        <div className="text-sm">Zahlung: {zahlartText(order.paymentMethod, order.paymentStatus)}</div>
+        {kasse && (
+          <div className="mt-3 rounded-md border-2 border-primary-foreground px-3.5 py-2.5 text-base font-bold md:text-lg">
+            {kasse.cents === null ? kasse.titel : `${kasse.titel}: ${formatEuro(centsAlsEuro(kasse.cents))}`}
+            {kasse.cents !== null && gebuehrZeile && (
+              <span className="text-sm font-normal text-primary-foreground/70">
+                {' '}
+                (davon {gebuehrZeile} {formatEuro(centsAlsEuro(summen.gebuehrCents))})
               </span>
             )}
           </div>
         )}
+        <p className="mt-4 text-sm text-primary-foreground/70">
+          {preisHinweis ? `${preisHinweis} ` : ''}
+          {DRUCK_ABGLEICH}
+        </p>
       </div>
-    </>
+    </div>
   )
 }

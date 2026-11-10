@@ -21,6 +21,9 @@
  * Konto" (/account/profile), mit einer Hof-Sitzung „Mein Hof" (/dashboard).
  * Seit Nr. 41 (Register N1) führt „Anmelden" auf /login — die Seite zeigt
  * beide Wege, die Hofkarte vorgewählt — und steht auch am Handy oben rechts.
+ * Seit Nr. 247 (G9, V12) ist der Kopf in jeder Sitzung derselbe: vier Links
+ * und rechts EIN Knopf als Umriss-Pille — auch „Mein Konto" (vorher ein
+ * Personen-Symbol mit Suchfeld und nur zwei Links).
  *
  * Bestehende Kundenseiten nutzen weiter KundenKopf (src/lib/kunden-kopf.ts);
  * für seinen Knopf gilt kopfKnopf aus dieser Quelle — dieselben drei
@@ -99,11 +102,37 @@ export const SEITENFUSS: { rechtlich: readonly FussLink[]; wege: readonly FussLi
   wege: [ENTDECKEN, FUER_HOEFE, SO_GEHTS].map(({ href, label }) => ({ href, label })),
 }
 
-export type KundenLeistenPlatz = { art: 'punkt'; punkt: KundenNavPunkt } | { art: 'warenkorb' }
+/**
+ * Die Wörter des Darstellungs-Schalters (Nr. 220): „Darstellung: hell“ im
+ * Seitenfuß der Kundschaft (Board s1-startseite), die Pillen „Hell“ und
+ * „Dunkel“ im Blatt „Mehr“ des Hofbereichs (Board s1-mehr-neu). Hier und nicht
+ * bei der HofShell, weil der Schalter jede Kundenseite mitlädt.
+ */
+export const DARSTELLUNG_TEXT = {
+  titel: 'Darstellung',
+  hell: 'Hell',
+  dunkel: 'Dunkel',
+  aufHell: 'auf hell umschalten',
+  aufDunkel: 'auf dunkel umschalten',
+} as const
+
+/** Das Wort unter dem grünen Mittelknopf der Unterleiste (V10, Board s1-startseite) — Wortliste: „Warenkorb“. */
+export const WARENKORB_WORT = 'Warenkorb'
+
+/**
+ * „Warenkorb · n“ im Browser-Kopf (N41 c, V12): nur bei gefülltem Warenkorb —
+ * die Shell zeigt leer gar nichts. Dieselbe Fassung nennt der Mittelknopf am
+ * Handy seinem Screenreader-Namen voran.
+ */
+export function warenkorbKopfText(anzahl: number): string {
+  return `${WARENKORB_WORT} · ${anzahl}`
+}
+
+export type KundenLeistenPlatz = { art: 'punkt'; punkt: KundenNavPunkt } | { art: 'warenkorb'; wort: string }
 
 const HANDY_LEISTE: readonly KundenLeistenPlatz[] = [
   { art: 'punkt', punkt: ENTDECKEN },
-  { art: 'warenkorb' },
+  { art: 'warenkorb', wort: WARENKORB_WORT },
   { art: 'punkt', punkt: BESTELLUNGEN },
 ]
 
@@ -115,33 +144,60 @@ const HANDY_LEISTE: readonly KundenLeistenPlatz[] = [
 export type KundenSitzung = 'gast' | 'kunde' | 'hof'
 
 export type KundenNavigation = {
-  /** Die Textlinks der Kopfzeile im Browser, links nach rechts. Suche und Warenkorb zeichnet die Shell. */
+  /** Die Textlinks der Kopfzeile im Browser, links nach rechts — in jeder Sitzung dieselben vier (V12). Den Warenkorb zeichnet die Shell. */
   web: readonly KundenNavPunkt[]
   /**
-   * Der Knopf rechts in der Kopfzeile, am Handy wie im Browser: „Anmelden"
-   * ohne Sitzung, „Mein Hof" mit Hof-Sitzung; mit Kundensitzung keiner.
+   * Der Knopf rechts in der Kopfzeile, am Handy wie im Browser, immer als
+   * Umriss-Pille (G9): „Anmelden" ohne Sitzung, „Mein Konto" mit
+   * Kundensitzung, „Mein Hof" mit Hof-Sitzung.
    */
-  knopf: KundenNavPunkt | null
-  /** Das Konto rechts in der Kopfzeile — nur mit Kundensitzung. */
-  konto: KundenNavPunkt | null
+  knopf: KundenNavPunkt
   /** Die Unterleiste am Handy. */
   handy: readonly KundenLeistenPlatz[]
 }
 
+const WEB_LINKS: readonly KundenNavPunkt[] = [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN]
+
 /**
- * Die Navigation passend zur Sitzung. Eine Hof-Sitzung sieht die Kundenseite
- * wie ohne Sitzung — nur der Knopf führt in den eigenen Bereich statt zur
- * Anmeldung (ein Hof bekäme sonst „Mein Konto" mit den Kunden-Abos).
+ * Die Navigation passend zur Sitzung. Die Links sind in jeder Sitzung
+ * dieselben (V12, G9 seit Nr. 247: auch mit Kundensitzung, ohne Suchfeld im
+ * Kopf — gesucht wird auf /hoefe); nur der Knopf rechts wechselt. Eine
+ * Hof-Sitzung bekommt „Mein Hof" statt „Mein Konto" (ein Hof bekäme sonst das
+ * Konto mit den Kunden-Abos).
  */
 export function kundenNavigation({ sitzung }: { sitzung: KundenSitzung }): KundenNavigation {
-  switch (sitzung) {
-    case 'kunde':
-      return { web: [ENTDECKEN, BESTELLUNGEN], knopf: null, konto: KONTO, handy: HANDY_LEISTE }
-    case 'hof':
-      return { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], knopf: MEIN_HOF, konto: null, handy: HANDY_LEISTE }
-    case 'gast':
-      return { web: [ENTDECKEN, SO_GEHTS, FUER_HOEFE, BESTELLUNGEN], knopf: ANMELDEN, konto: null, handy: HANDY_LEISTE }
-  }
+  return { web: WEB_LINKS, knopf: kopfKnopf(sitzung), handy: HANDY_LEISTE }
+}
+
+/**
+ * Die Seiten, die selbst die Anmeldung sind (Liste Lauf 32, Q2): /login, /register und die Anmeldung der Kundschaft
+ * /account/login (Projektleitung 7.11.2026, Nr. 253). Unterpfade zählen mit (/login/admin, /account/login/…), ein
+ * Pfad, der nur so anfängt (/loginhilfe, /account/loginx), nicht.
+ */
+const OHNE_KNOPF_AM_HANDY: readonly string[] = [ANMELDEN.href, '/register', '/account/login']
+
+/**
+ * Ob der Knopf rechts oben am Handy entfällt (Liste Lauf 32, Q2 und G9): auf
+ * /login und /register selbst — die Seite IST die Anmeldung, der Knopf führte
+ * im Kreis (Board s2-anmelden: nur die Marke). Im Browser bleibt er stehen
+ * (Board w2-anmelden: „Anmelden" als Pille im vollen Kopf).
+ */
+export function ohneKopfKnopfAmHandy(pfad: string): boolean {
+  return OHNE_KNOPF_AM_HANDY.some((ziel) => pfad === ziel || pfad.startsWith(ziel + '/'))
+}
+
+/**
+ * Ob der Kopf der Shell am Handy wegscrollt statt zu kleben (G9, Liste Lauf 32
+ * hofseite/produkt): Auf Hof- und Produktseite klebt dort nur der Kopf des
+ * Hofs — zwei feste Leisten übereinander waren unruhig. Die Shell erkennt die
+ * beiden Seiten an `aktiv` = `entdecken`: Nur sie setzen den Punkt selbst
+ * (Nr. 177), ihr Pfad sagt ihn nicht — so bleiben die Props der Shell gleich.
+ * Seit Nr. 252 auch auf der Produktseite (ohne Unterleiste): Dort klebt am
+ * Handy die Zeile „‹ Alle Produkte von <Hof>“ mit dem Warenkorb — der Weg zum
+ * Korb bleibt, ohne dass der Kopf der Shell kleben muss.
+ */
+export function kopfScrolltWegAmHandy(aktiv: KundenNavId | undefined): boolean {
+  return aktiv === ENTDECKEN.id
 }
 
 /**
@@ -216,4 +272,82 @@ export function kundenSitzung(nutzer: { role?: string | null } | null | undefine
   if (nutzer?.role === 'CUSTOMER') return 'kunde'
   if (nutzer?.role === 'FARMER') return 'hof'
   return 'gast'
+}
+
+/**
+ * aria-current in der Unterleiste am Handy (Nr. 220, Board s1-startseite): wie
+ * `kundenAriaAktuell`, nur steht auf der Startseite „Entdecken“ als Ort
+ * (`true`) — die Startseite IST am Handy der Einstieg ins Entdecken, die Leiste
+ * zeigt sonst keinen Ort. Der Web-Kopf bleibt dort ohne aktiven Punkt (V12).
+ */
+export function kundenHandyAriaAktuell(pfad: string, punkt: KundenNavPunkt, aktiv?: KundenNavId): 'page' | 'true' | undefined {
+  if (!aktiv && pfad === '/') return punkt.id === ENTDECKEN.id ? 'true' : undefined
+  return kundenAriaAktuell(pfad, punkt, aktiv)
+}
+
+/**
+ * Die Spalte, in der der Seitenfuß im Browser steht (G11, Liste Lauf 32 §3.2; Nr. 267): so breit wie die
+ * Inhaltsspalte der Seite, benannt nach deren Breite — `schmal` 520 px (Meine Bestellungen, Passwort, Neuigkeiten),
+ * `mittel` 896 px (Anmelden, Bestellseite, Bestätigung, Registrieren), `seite` 1000 px (Konto, Rechtstexte,
+ * Systemseiten, Widerruf, Problem melden, Fehlerseiten), `breit` 1200 px (Startseite, /hoefe, Hofseite, Produktseite,
+ * Für Höfe). Am Handy steht der Fuß immer über die volle Breite. Die Klassen je Art zeichnet der Fuß
+ * (components/shells/kunde-fuss.tsx); hier steht nur die Zuordnung.
+ */
+export type FussSpalte = 'schmal' | 'mittel' | 'seite' | 'breit'
+
+/**
+ * Route → Spalte, EINE Quelle für KundeShell (Seitenfuß) und KundeFokusShell (Zeile „Vertrag widerrufen“).
+ * Ein Muster passt Segment für Segment; `*` steht für genau ein Segment (Hof, Bestellung), `/**` am Ende auch für
+ * alle Unterseiten (/login/admin, /agb/<fassung>). Die Seiten der Spalte kommen aus ihren eigenen Klassen
+ * (z. B. `max-w-[1032px] px-4` = 1000 px Inhalt); wer eine Spalte ändert, zieht diese Liste nach.
+ */
+export const SPALTE_JE_ROUTE: readonly (readonly [muster: string, spalte: FussSpalte])[] = [
+  ['/', 'breit'],
+  ['/hoefe', 'breit'],
+  ['/fuer-hoefe', 'breit'],
+  ['/startseite-vorschau', 'breit'],
+  ['/login/**', 'mittel'],
+  ['/account/login', 'mittel'],
+  ['/register', 'mittel'],
+  ['/*/bestellung/*', 'mittel'],
+  ['/*/confirm/*', 'mittel'],
+  ['/bestellungen', 'schmal'],
+  ['/forgot-password', 'schmal'],
+  ['/reset-password', 'schmal'],
+  ['/account/neuigkeiten-bestaetigen', 'schmal'],
+  ['/account/profile', 'seite'],
+  ['/account/unsubscribe', 'seite'],
+  ['/konto/email-bestaetigen', 'seite'],
+  ['/sicherheit/nicht-ich', 'seite'],
+  ['/widerruf', 'seite'],
+  ['/agb/**', 'seite'],
+  ['/datenschutz', 'seite'],
+  ['/impressum', 'seite'],
+  ['/konditionen', 'seite'],
+  ['/problem-melden', 'seite'],
+]
+
+function segmente(pfad: string): string[] {
+  return pfad.split('/').filter(Boolean)
+}
+
+function passt(muster: string, pfad: readonly string[]): boolean {
+  const teile = segmente(muster)
+  const mitUnterseiten = teile.at(-1) === '**'
+  const feste = mitUnterseiten ? teile.slice(0, -1) : teile
+  if (mitUnterseiten ? pfad.length < feste.length : pfad.length !== feste.length) return false
+  return feste.every((teil, i) => teil === '*' || teil === pfad[i])
+}
+
+/**
+ * Die Spalte einer Kundenseite (G11, Nr. 267) — `null`, wenn die Route nicht in der Liste steht; dann entscheidet
+ * die Shell (KundeShell: `seite` wie die Fehlerseiten, deren Adresse beliebig ist; KundeFokusShell: `breit` wie
+ * bisher). Hof- und Produktseite erkennt die Shell an `aktiv` = `entdecken` wie bei kopfScrolltWegAmHandy: Ihr
+ * Pfad (/<hof>) sähe aus wie eine unbekannte Adresse, deren 404 in der Spalte der Fehlerseiten steht.
+ */
+export function spalteDerSeite(pfad: string | null, aktiv?: KundenNavId): FussSpalte | null {
+  if (aktiv === ENTDECKEN.id) return 'breit'
+  if (pfad === null) return null
+  const teile = segmente(pfad)
+  return SPALTE_JE_ROUTE.find(([muster]) => passt(muster, teile))?.[1] ?? null
 }

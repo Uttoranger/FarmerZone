@@ -44,8 +44,9 @@ const EIGENE_SAETZE: ReadonlySet<string> = new Set([
  * Wieder-Aktivieren. Gespeicherter Stand und vergebene Plätze werden erst
  * NACH der Sperre gelesen, so kann keine Freischaltung dazwischen einen Platz
  * vergeben, den die neue Zahl nicht mehr hätte. Die Regeln (Plätze nur
- * erhöhen und nie unter die vergebenen, Monate nur erhöhen, Stichtag nur
- * früher) prüft dieselbe reine Funktion wie das Formular.
+ * erhöhen und nie unter die vergebenen, Monate erst nach dem Festschreiben
+ * nur erhöhen — Register N44 —, Stichtag nur früher) prüft dieselbe reine
+ * Funktion wie das Formular, mit `festAm` aus der Zeile nach der Sperre.
  *
  * Geschrieben wird per upsert NUR in die Felder dieser Gruppe — Standard-Ende,
  * Festschreiben und Zustell-Regeln (Nr. 95) bleiben, wie sie sind; dazu wer
@@ -145,6 +146,10 @@ export async function speichereHofpreisStichtag(eingabe: unknown): Promise<{ ok:
 
   updateTag(PLATTFORM_EINSTELLUNG_TAG)
   revalidatePath('/')
+  // N45: /agb und /konditionen sind frisch je Aufruf; die zwei Seiten je Fassung und /fuer-hoefe sind statisch und nennen den Stichtag.
+  revalidatePath('/agb/0.9')
+  revalidatePath('/agb/1.0')
+  revalidatePath('/fuer-hoefe')
   revalidatePath(ADMIN_EINSTELLUNGEN_HREF)
   return { ok: true }
 }

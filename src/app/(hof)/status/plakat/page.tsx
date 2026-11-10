@@ -1,24 +1,28 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Printer } from 'lucide-react'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { getPlakatDaten } from '@/server/queries/teilen-bild'
-import { UnterseitenKopf } from '@/components/hofbereich/unterseiten-kopf'
+import { WerkzeugKopf } from '@/components/ui/werkzeug-kopf'
+import { FesteAktionsleiste, AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
+import { BeitraegeBrotkrumen } from '../beitraege-brotkrumen'
 import { QrPlakat } from '@/components/teilen/qr-plakat'
+import { PlakatVorschau } from '@/components/teilen/plakat-vorschau'
 import { DruckenKnopf } from '@/components/teilen/drucken-knopf'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { UNTERSEITE_RAHMEN } from '@/components/hof-einstellungen/einstellungen-laden'
 import { MARKE } from '@/lib/marke'
 
 export const metadata: Metadata = { title: `QR-Plakat — ${MARKE}` }
 
 export const dynamic = 'force-dynamic'
 
-const KNOPF_ORANGE = cn(
-  'inline-flex h-11 items-center justify-center gap-2 rounded-full border border-primary-foreground/25 bg-primary px-5 text-[13.5px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90',
+/** „Drucken“ im Web neben der h1: orange, 48 px, 14 px rund, fett, ohne Symbol (Board w2-whatsapp-plakat Bild 3). */
+const KNOPF_DRUCKEN = cn(
+  'inline-flex min-h-12 items-center justify-center rounded-[14px] bg-primary px-[22px] text-[16px] font-bold text-primary-foreground transition-colors duration-[250ms] hover:bg-primary/90',
   FOKUS_RAHMEN
 )
 
@@ -42,34 +46,43 @@ export default async function PlakatPage(): Promise<React.JSX.Element> {
   const daten = await getPlakatDaten(farm.id)
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 pt-5 pb-12 md:px-8 md:pt-8 print:m-0 print:max-w-none print:p-0">
+    // Spalte wie die Einstellungs-Unterseiten: 672 px Inhalt im Web (Abnahme Lauf 32 Bild 4 „815 statt 670 px“).
+    <div className={cn(UNTERSEITE_RAHMEN, 'print:m-0 print:max-w-none print:p-0')}>
       {/* A4 ohne Druckrand: Das Blatt bringt seinen eigenen Rand mit. */}
       <style>{'@page { size: A4; margin: 0; }'}</style>
-      {/* Direkt im Rahmen, nicht im Kasten um den Titel: Die Leiste am Handy
-          klebt nur, solange ihr Elternelement reicht. Gedruckt wird sie nie. */}
-      <UnterseitenKopf />
-      <div className="print:hidden">
-        <div className="mb-5 flex flex-wrap items-end gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-[26px] font-semibold md:text-[30px]">QR-Plakat</h1>
-            <p className="mt-1 text-[13.5px] text-muted-foreground">
-              Zum Aushängen im Hofladen, am Hoftor oder beim Bäcker. Der Code führt direkt zu deiner Hofseite.
-            </p>
-          </div>
-          {daten && <DruckenKnopf className={KNOPF_ORANGE} />}
-        </div>
-      </div>
+      {/* Werkzeug-Kopf (G1, Nr. 250): Elternseite „Beiträge“ (N1), Unterzeile „Mein Hof › Beiträge“; im Web
+          „Drucken“ bündig rechts neben der h1 (Liste Lauf 32, whatsapp-plakat), am Handy in der festen Leiste
+          unten (G2). Direkt im Rahmen: Die Leiste am Handy klebt nur, solange ihr Elternelement reicht. Gedruckt
+          wird nichts davon (print:hidden im Baustein). */}
+      <WerkzeugKopf
+        titel="QR-Plakat"
+        unterzeile={<BeitraegeBrotkrumen hofName={farm.name} />}
+        aktion={daten ? <div className="hidden md:block"><DruckenKnopf className={KNOPF_DRUCKEN} /></div> : undefined}
+      />
+      {/* Ohne Plakat keine Einleitung, nur der Leerzustand (Board Bild 4, Liste Lauf 32 „Einleitung weg“). */}
+      {daten && (
+        <p className="mb-5 text-[15px] leading-relaxed text-muted-foreground md:text-base print:hidden">
+          Zum Aushängen im Hofladen, am Hoftor oder beim Bäcker. Der Code führt direkt zu deiner Hofseite.
+        </p>
+      )}
 
       {daten ? (
-        <QrPlakat daten={daten} />
+        <>
+          <PlakatVorschau>
+            <QrPlakat daten={daten} />
+          </PlakatVorschau>
+          <FesteAktionsleiste className="md:hidden">
+            <DruckenKnopf className={AKTIONSLEISTE_KNOPF} />
+          </FesteAktionsleiste>
+        </>
       ) : (
         <EmptyState
-          symbol={Printer}
           titel="Das Plakat gibt es, sobald dein Hof online ist"
-          satz="Solange Kunden deine Hofseite nicht sehen können, würde der Code ins Leere führen."
+          satz="Solange Kundinnen deine Hofseite nicht sehen können, würde der Code ins Leere führen."
           ausweg={
-            <Link href="/farm-page" className={KNOPF_ORANGE}>
-              Zu Mein Hof
+            // Board s2/w2-whatsapp-plakat Bild 4: der Ausweg sagt, was zu tun ist — in Mein Hof wird die Hofseite eingerichtet.
+            <Link href="/farm-page" className={AKTIONSLEISTE_KNOPF}>
+              Hofseite einrichten
             </Link>
           }
         />

@@ -115,7 +115,7 @@ export function StandBand({ stand }: { stand: AblaufStand }): React.JSX.Element 
       <dl className="grid grid-cols-5 gap-1.5 md:gap-3.5">
         {STAND_TEILE.map((t) => (
           <div key={t} className="flex min-w-0 flex-col">
-            <dt className="order-2 flex items-center gap-2 text-[11.5px] leading-tight font-semibold text-foreground md:order-none md:text-[13.5px]">
+            <dt className="order-2 flex items-center gap-2 text-xs leading-tight font-semibold text-foreground md:order-none md:text-[13.5px]">
               <span className={cn('hidden size-2.5 shrink-0 rounded-[3px] md:block', BAND_FARBE[t])} aria-hidden="true" />
               {STAND_TEIL_TEXT[t].titel}
             </dt>
@@ -194,7 +194,7 @@ export function MeldungenKopf({ ansicht, stand }: { ansicht: MeldungenAnsicht; s
 // ─── Karten ─────────────────────────────────────────────────────────────────
 
 function Chip({ children }: { children: React.ReactNode }): React.JSX.Element {
-  return <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11.5px] text-muted-foreground">{children}</span>
+  return <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{children}</span>
 }
 
 function karteZeit(karte: AblaufKarte, jetzt: Date): string {
@@ -237,7 +237,7 @@ export function MeldungKarte({ karte, jetzt, ansicht, such }: { karte: AblaufKar
       <div className="flex items-center gap-1.5">
         <Marke art={MELDUNG_ART_MARKE[m.art]}>{MELDUNG_ART_LABEL[m.art]}</Marke>
         <span className="flex-1" />
-        <span className={cn('text-[11.5px] whitespace-nowrap', LEISE)}>{karteZeit(karte, jetzt)}</span>
+        <span className={cn('text-xs whitespace-nowrap', LEISE)}>{karteZeit(karte, jetzt)}</span>
       </div>
       <h3 className="text-[13.5px] leading-snug font-semibold break-words text-foreground" title={titel}>
         {titel}
@@ -548,7 +548,6 @@ export function WuenscheAnsicht({
         </FilterChipReihe>
         {mitStichwort.length === 0 ? (
           <EmptyState
-            symbol={Lightbulb}
             titel={WUENSCHE_LEER.titel}
             satz={WUENSCHE_LEER.satz}
             className="rounded-xl border-0 py-6"
@@ -558,7 +557,6 @@ export function WuenscheAnsicht({
           />
         ) : liste.length === 0 ? (
           <EmptyState
-            symbol={Lightbulb}
             titel={WUENSCHE_LEER_FILTER.titel}
             className="rounded-xl border-0 py-6"
             ausweg={
@@ -590,7 +588,7 @@ export function WuenscheAnsicht({
                 >
                   <span className="flex w-12 shrink-0 flex-col items-center">
                     <span className="font-heading text-[22px] leading-none font-semibold text-foreground tabular-nums">{c.stimmen}</span>
-                    <span className={cn('text-[11px]', LEISE)}>{WUENSCHE_TEXT.stimmen}</span>
+                    <span className={cn('text-xs', LEISE)}>{WUENSCHE_TEXT.stimmen}</span>
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate text-[13.5px] font-semibold text-foreground" title={c.clusterKey}>

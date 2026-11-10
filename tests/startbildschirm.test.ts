@@ -44,7 +44,12 @@ describe('Texte aus einer Quelle', () => {
 
   it('die Anleitung zeigt Titel und beide Geräte mit ihren Sätzen', () => {
     const html = renderToStaticMarkup(createElement(StartbildschirmAnleitung))
-    expect(html).toContain(STARTBILDSCHIRM_KARTE.titel)
+    // Board w1-heute (Lauf 31): der Titel in zwei Hälften — „Mit einem Tipp in deinem Hof“ als Überschrift, der Rest als Satz.
+    expect(html).toMatch(/<h2 id="heute-startbildschirm"[^>]*>Mit einem Tipp in deinem Hof<\/h2>/)
+    expect(html).toContain(`Leg ${MARKE} auf den Startbildschirm.`)
+    // „So geht’s“ klappt die Anleitung auf; sie steht im HTML, nur verborgen.
+    expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*>So geht’s<\/button>/)
+    expect(html).toMatch(/<dl[^>]*hidden=""/)
     for (const { geraet, saetze: teile } of STARTBILDSCHIRM_KARTE.anleitungen) {
       expect(html).toContain(`>${geraet}<`)
       for (const satz of teile) expect(html).toContain(satz.replace(/&/g, '&amp;'))

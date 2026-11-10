@@ -531,7 +531,8 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
     expect(html).toContain(`title="${LANG}"`)
     expect(html).toContain(`aria-label="${LANG} anrufen"`)
     expect(html).toContain('href="tel:+436990000000"')
-    expect(html).toContain('bekommt Neuigkeiten')
+    // Keine Glocke neben dem Namen (Board s2-/w2-kunden, Befund pruefer-ui Lauf 33, Nr. 273).
+    expect(html).not.toContain('bekommt Neuigkeiten')
     expect(html).toContain('€ 90,00')
     expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgb\(|green-|amber-|purple-|blue-/)
   })
@@ -665,7 +666,7 @@ describe('Ansicht /customers — vier Zustände, lange Namen, Tokens', () => {
 })
 
 describe('Kundendetail', () => {
-  // Der Rückweg (UnterseitenKopf, Nr. 44) hängt am Pfad der Seite.
+  // Der Rückweg (Werkzeug-Kopf, G1) hängt am Pfad der Seite.
   beforeEach(() => {
     navigation.pfad = '/customers/k-1'
   })
@@ -680,6 +681,9 @@ describe('Kundendetail', () => {
         betragCents: 1050,
         status: i === 0 ? 'READY' : 'PICKED_UP',
         items: [{ productName: 'Eier', quantity: 2 }],
+        pickupDate: vor(i).toISOString(),
+        pickupTimeStart: '15:00',
+        pickupTimeEnd: '18:00',
       })),
       subscription: { optInEmail: true, optInWhatsApp: false },
       ...teil,
@@ -760,5 +764,14 @@ describe('Kundendetail', () => {
   it('ohne Einwilligung keine Karte „Neuigkeiten"', () => {
     const html = renderToStaticMarkup(createElement(KundenDetail, { kunde: detail({ isSubscribed: false, subscription: null }), jetzt: JETZT }))
     expect(html).not.toContain('E-Mail-Neuigkeiten')
+  })
+})
+
+describe('„Zeigen“ nach Board s2-/w2-kunden (Lauf 31, Nr. 238)', () => {
+  it('nennt alle Filter genau einmal, in der Reihenfolge des Boards, mit den Wörtern der Marken', async () => {
+    const { ZEIGEN_REIHENFOLGE: reihe, KUNDEN_FILTER_LABEL: label } = await import('@/lib/hof-kunden')
+    const { KUNDEN_FILTER_WERTE: werte } = await import('@/schemas/hof-kunden')
+    expect([...reihe].sort()).toEqual([...werte].sort())
+    expect(reihe.map((f) => label[f])).toEqual(['Alle', 'Stammkunden', 'Neu', 'Lange nicht gesehen', 'Diesen Monat aktiv'])
   })
 })

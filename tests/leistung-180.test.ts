@@ -91,11 +91,12 @@ describe('Bilder über next/image', () => {
     expect('<Image src={x} alt="" fill sizes="56px" />').not.toMatch(altesBild)
   })
 
-  it('Korb-Blatt: 56 px, kein rohes img', () => {
+  // Seit Nr. 227 (Boards s1-/w1-korb) ist das Bild im Korb-Blatt 48 px groß; sizes folgt der Anzeige.
+  it('Korb-Blatt: 48 px, kein rohes img', () => {
     const t = lies('src/components/farm/cart-sheet.tsx')
     expect(t).toMatch(/import Image from 'next\/image'/)
     expect(t).not.toMatch(altesBild)
-    expect(t).toMatch(/<Image [^>]*sizes="56px"/)
+    expect(t).toMatch(/<Image [^>]*sizes="48px"/)
   })
 
   it('Produktliste: kleine Rahmen (44 px), kein rohes img', () => {

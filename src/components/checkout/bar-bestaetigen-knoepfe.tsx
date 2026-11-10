@@ -28,20 +28,23 @@ export function BarBestaetigenKnoepfe({ token }: { token: string }) {
   const fehler = bestaetigt.error ?? storniert.error
 
   return (
-    <div className="flex flex-col gap-[18px]">
-      <form action={bestaetigen}>
+    // Board s1-/w1-bestellung-link Bild 2: am Handy der grüne Knopf über die volle Breite, darunter leise das
+    // Stornieren; im Browser unter einer Linie rechts bündig — Stornieren links neben dem Knopf.
+    <div className="flex flex-col gap-1 md:flex-row-reverse md:items-center md:justify-start md:gap-4">
+      <form action={bestaetigen} className="md:shrink-0">
         <input type="hidden" name="token" value={token} />
         <Button
           type="submit"
           disabled={laeuft}
-          className="h-[54px] w-full rounded-full bg-accent px-[18px] text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
+          // Abgerundetes Rechteck auch im Browser (Board w1-bestellung-link Bild 2), keine Pille.
+          className="h-[52px] w-full rounded-[14px] bg-accent px-[18px] text-base font-semibold text-accent-foreground hover:bg-accent-hover md:w-auto md:px-5"
         >
           {bestaetigtLaeuft ? 'Wird bestätigt …' : 'Ja, ich hole verbindlich ab'}
         </Button>
       </form>
 
       {fehler && (
-        <p role="alert" className="text-center text-sm text-status-offen">
+        <p role="alert" className="text-center text-sm text-status-offen md:order-last md:mr-auto md:text-left">
           {fehler}
         </p>
       )}
@@ -52,7 +55,7 @@ export function BarBestaetigenKnoepfe({ token }: { token: string }) {
           type="submit"
           variant="ghost"
           disabled={laeuft}
-          className="h-11 rounded-full px-[18px] text-sm font-semibold text-status-offen hover:text-status-offen"
+          className="h-11 rounded-[14px] px-[18px] text-base font-semibold text-foreground"
         >
           {storniertLaeuft ? 'Wird storniert …' : 'Doch nicht – Bestellung stornieren'}
         </Button>

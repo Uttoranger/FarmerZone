@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition, type FormEvent } from 'react'
-import { Lock, SendHorizontal } from 'lucide-react'
 import { antworteAlsHof } from '@/server/actions/postfach'
 import { POSTFACH_TEXT, TEXT_MAX } from '@/lib/postfach'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
@@ -38,48 +37,47 @@ export function AntwortFormular({ unterhaltungId }: { unterhaltungId: string }):
   return (
     <form
       onSubmit={absenden}
-      className="sticky bottom-[calc(68px+env(safe-area-inset-bottom))] -mx-4 mt-5 flex flex-col gap-2 border-t border-border bg-background/95 px-4 pt-3 pb-7 backdrop-blur md:bottom-0 md:mx-0 md:rounded-2xl md:border md:bg-card md:px-4 md:pb-3"
+      className="sticky bottom-[calc(68px+env(safe-area-inset-bottom))] -mx-4 mt-5 flex flex-col gap-2 border-t border-border bg-background/95 px-4 pt-3 pb-7 backdrop-blur md:bottom-0 md:mx-0 md:rounded-[12px] md:border md:bg-card md:px-4 md:pb-3"
     >
-      <div className="flex items-end gap-2">
-        <label htmlFor="postfach-antwort" className="sr-only">
-          {POSTFACH_TEXT.antwortBeschriftung}
-        </label>
-        <textarea
-          id="postfach-antwort"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={POSTFACH_TEXT.antwortFeld}
-          rows={2}
-          aria-invalid={fehler !== null}
-          aria-describedby={fehler !== null ? 'postfach-antwort-fehler' : 'postfach-antwort-hinweis'}
-          className={cn(
-            'min-h-[46px] flex-1 resize-y rounded-[14px] border border-input bg-card px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground',
-            FOKUS_RAHMEN
-          )}
-        />
+      {/* Board s2/w2-postfach: „Deine Antwort" sichtbar über dem Feld, darunter Hinweis und „Senden" in Orange (V51: Hauptknopf im Hofbereich). */}
+      <label htmlFor="postfach-antwort" className="text-[15px] font-semibold text-foreground">
+        {POSTFACH_TEXT.antwortBeschriftung}
+      </label>
+      <textarea
+        id="postfach-antwort"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={POSTFACH_TEXT.antwortFeld}
+        rows={2}
+        aria-invalid={fehler !== null}
+        aria-describedby={fehler !== null ? 'postfach-antwort-fehler' : 'postfach-antwort-hinweis'}
+        className={cn(
+          'min-h-[46px] w-full resize-y rounded-[14px] border border-input bg-card px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground',
+          FOKUS_RAHMEN
+        )}
+      />
+      <ZeichenZaehler laenge={text.length} max={TEXT_MAX} />
+      {fehler !== null && (
+        <p id="postfach-antwort-fehler" role="alert" className="text-[14px] font-semibold text-status-offen">
+          {fehler}
+        </p>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <p id="postfach-antwort-hinweis" className="flex min-w-0 items-center gap-1.5 text-[12.5px] leading-snug text-muted-foreground">
+          {POSTFACH_TEXT.antwortHinweis}
+        </p>
         <button
           type="submit"
           disabled={laeuft}
           aria-busy={laeuft}
           className={cn(
-            'flex size-[46px] shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
+            'inline-flex min-h-12 shrink-0 items-center justify-center rounded-[14px] bg-primary px-[22px] text-[16px] font-bold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
             FOKUS_RAHMEN
           )}
         >
-          <SendHorizontal className="size-5" strokeWidth={1.8} aria-hidden="true" />
-          <span className="sr-only">{POSTFACH_TEXT.senden}</span>
+          {laeuft ? POSTFACH_TEXT.sendet : POSTFACH_TEXT.senden}
         </button>
       </div>
-      <ZeichenZaehler laenge={text.length} max={TEXT_MAX} />
-      {fehler !== null && (
-        <p id="postfach-antwort-fehler" role="alert" className="text-[13px] font-medium text-destructive">
-          {fehler}
-        </p>
-      )}
-      <p id="postfach-antwort-hinweis" className="flex items-center gap-1.5 text-[11.5px] leading-snug text-muted-foreground">
-        <Lock className="size-3 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-        {POSTFACH_TEXT.antwortHinweis}
-      </p>
     </form>
   )
 }

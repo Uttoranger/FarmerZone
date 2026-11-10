@@ -36,6 +36,11 @@
      Etiketts, je Modus eigen. Gezeichnet nur vom Baustein Abzeichen (components/ui/abzeichen.tsx). */
   --color-abzeichen: var(--fz-abzeichen);
   --color-abzeichen-grund: var(--fz-abzeichen-grund);
+  /* Kästchen (A-8, Nr. 269): Rand, Fläche und Haken des Bausteins Kaestchen
+     (components/ui/kaestchen.tsx), je Modus eigen. */
+  --color-kaestchen-rand: var(--fz-kaestchen-rand);
+  --color-kaestchen-flaeche: var(--fz-kaestchen-flaeche);
+  --color-kaestchen-haken: var(--fz-kaestchen-haken);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -289,6 +294,12 @@
      ≥ 3:1 auf Fläche (3,63) und Grund (3,38), WCAG 1.4.11. Kartenränder
      bleiben --fz-border. */
   --fz-feldrand: oklch(0.6052 0.0258 143.3); /* #798678 */
+  /* Kästchen (A-8, Nr. 269): Rand ≥ 3:1 auf Grund und Fläche (WCAG 1.4.11;
+     5,05 und 5,41), angehakt grün gefüllt wie die Boards (accent-color),
+     Haken auf der Fläche ≥ 4,5:1 (7,07). */
+  --fz-kaestchen-rand: oklch(0.5089 0.0269 143.2); /* #5D6A5C */
+  --fz-kaestchen-flaeche: oklch(0.4411 0.0761 153.8); /* #2D5F3F */
+  --fz-kaestchen-haken: oklch(0.9817 0.0095 93.6); /* #FBF9F2 */
 }
 
 [data-theme="dark"] {
@@ -417,6 +428,11 @@
   /* Feldrand nachts (Nr. 173): 60 % --fz-text-muted zum Rahmen hin —
      3,62:1 auf Fläche, 3,96:1 auf Grund. */
   --fz-feldrand: oklch(0.5472 0.0264 143.2); /* #687567 */
+  /* Kästchen nachts (A-8, Nr. 269): Rand 7,71 auf Grund, 7,06 auf Fläche;
+     Fläche helles Salbei wie die Boards, Haken dunkel darauf (10,14). */
+  --fz-kaestchen-rand: oklch(0.7162 0.0266 143.4); /* #9AA899 */
+  --fz-kaestchen-flaeche: oklch(0.8140 0.0691 155.1); /* #9FD0AF */
+  --fz-kaestchen-haken: oklch(0.2115 0.0181 148.3); /* #131B14 */
 }
 
 /* ── Neues Design im Geltungsbereich ─────────────────────────────────
@@ -555,7 +571,7 @@
      (--kunde-kopf 57/65 px, --kunde-unterleiste 69 px plus Home-Indicator,
      --kunde-ueberstand 20 px, src/lib/kunde-shell-masse.ts) — die Wurzel sieht
      die Variablen am Rahmen der Shell nicht, tests/hofseite-orientierung.test.ts
-     koppelt sie. Auf der Hofseite kommt der klebende Block dazu (Hofzeile,
+     koppelt sie. Auf der Hofseite klebt am Handy statt des Kopfs der Block (Hofzeile,
      Reiter, Chips — EIN Element, data-klebe-block): seine gemessene Höhe
      (--hof-klebeblock, hofseite-kunde.tsx), bis zur ersten Messung die Maße aus
      src/lib/hofseite-orientierung.ts (Hofzeile 48, Reiter 49, Chips 45 px —
@@ -572,14 +588,21 @@
     html:has([data-scroll-rand='hof']):has([data-unterseiten-leiste]) {
       scroll-padding-top: 57px;
     }
-    /* Hofseite: Kopf und Block kleben; unten zusätzlich Korb-Leiste und Bestätigungszeile. */
+    /* Seit Nr. 247 (G9): Auf der Hofseite scrollt der Kopf der Shell
+       am Handy weg (data-kopf-scrollt) — oben klebt dann nichts außer dem
+       Block des Hofs. Steht vor den Regeln der Hofseite: gleiche Stärke, die
+       spätere gewinnt. */
+    html:has([data-scroll-rand^='kunde'][data-kopf-scrollt]) {
+      scroll-padding-top: 0px;
+    }
+    /* Hofseite: oben nur der Block (ganz oben, KLEBE_BLOCK top-0); unten zusätzlich Korb-Leiste und Bestätigungszeile. */
     html:has([data-scroll-rand='kunde']):has([data-klebe-block]) {
-      scroll-padding-top: calc(57px + var(--hof-klebeblock, 97px));
+      scroll-padding-top: var(--hof-klebeblock, 97px);
       scroll-padding-bottom: calc(9.5rem + 3.75rem + env(safe-area-inset-bottom));
     }
     /* Im Reiter Produkte gehört die Chip-Reihe zum Block. */
     html:has([data-scroll-rand='kunde']):has([data-chips-kleben]) {
-      scroll-padding-top: calc(57px + var(--hof-klebeblock, 142px));
+      scroll-padding-top: var(--hof-klebeblock, 142px);
     }
   }
   @media (min-width: 768px) {

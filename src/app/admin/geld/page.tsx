@@ -9,12 +9,12 @@ import {
   ergebnisText,
   finanzenExportAdresse,
   geldErgebnisCents,
+  gebuehrWortFuerMonat,
   geldKosten,
   monatsabschlussMoeglich,
   monatsabschlussPruefliste,
   monatsabschlussZeile,
 } from '@/lib/finanzen'
-import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 import { ABLAEUFE, wannText, zuletztText } from '@/lib/betrieb'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import type { KennzahlDaten } from '@/lib/admin-seiten'
@@ -34,6 +34,8 @@ import { GELD_TEXT, geldAdresse, geldJahrAdresse } from './texte'
 import { MARKE } from '@/lib/marke'
 import { ladePlattformgebuehrGeld } from '@/server/queries/plattformgebuehr'
 import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 
 export const metadata: Metadata = { title: `Geld — Admin — ${MARKE}` }
 // Geld gehört in keinen Zwischenspeicher.
@@ -66,11 +68,19 @@ export default async function AdminGeldPage({
   let daten: FinanzenDaten | null = null
   let geld: GeldMonat | null = null
   let abgeschlossene: string[] = []
+  // Der Stichtag nur für das Wort der Gebühr (V63) — scheitert er, nimmt ladeHofpreisEinstellung die Vorgabe.
+  let stichtag = hofpreisModellAb(null)
   try {
-    const [finanzen, monatGeld, abgeschlossen] = await Promise.all([getFinanzen(monat, jetzt), ladeGeldMonat(monat), ladeAbgeschlosseneMonate()])
+    const [finanzen, monatGeld, abgeschlossen, hofpreis] = await Promise.all([
+      getFinanzen(monat, jetzt),
+      ladeGeldMonat(monat),
+      ladeAbgeschlosseneMonate(),
+      ladeHofpreisEinstellung(),
+    ])
     daten = finanzen
     geld = monatGeld
     abgeschlossene = [...abgeschlossen.keys()]
+    stichtag = hofpreisModellAb(hofpreis)
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'admin', seite: 'geld' } })
   }
@@ -95,6 +105,8 @@ export default async function AdminGeldPage({
   const monatName = daten.bezeichnung.split(' ')[0] ?? daten.bezeichnung
   const laufend = monatsAbstand(monat, aktuellerFinanzMonat(jetzt)) <= 0
   const abgleichOk = geld.lauf !== null && geld.lauf.ok && geld.lauf.beendetAm !== null
+  // Ein Wort für den ganzen Monat (V63): ganz vor dem Stichtag „Servicegebühr“, ganz danach „Plattformgebühr“, darüber „Gebühren“.
+  const gebuehrWort = gebuehrWortFuerMonat(monat, stichtag)
 
   const kennzahlen: KennzahlDaten[] = [
     {
@@ -106,16 +118,19 @@ export default async function AdminGeldPage({
     },
     {
       id: 'servicegebuehr',
-      titel: SERVICEGEBUEHR_BEZEICHNUNG,
+      titel: gebuehrWort,
       titelKurz: 'Gebühr',
       wert: formatEuro(centsAlsEuro(einnahmen.gezaehltCents)),
-      satz: `online ${formatEuro(centsAlsEuro(einnahmen.eingezogenCents))} · vor Ort ${formatEuro(centsAlsEuro(einnahmen.geschuldetCents))}`,
+      satz: GELD_TEXT.gebuehrSatz(formatEuro(centsAlsEuro(einnahmen.eingezogenCents)), formatEuro(centsAlsEuro(einnahmen.geschuldetCents))),
     },
     {
       id: 'erstattungen',
       titel: 'Erstattungen',
       wert: formatEuro(centsAlsEuro(geld.erstattungen.cents)),
-      satz: `${mitAnzahl(geld.erstattungen.anzahl, 'Bestellung', 'Bestellungen')}${geld.erstattungen.offen > 0 ? ` · ${geld.erstattungen.offen} offen` : ''}`,
+      satz: GELD_TEXT.erstattungenSatz(
+        geld.erstattungen.anzahl > 0 ? mitAnzahl(geld.erstattungen.anzahl, 'Bestellung', 'Bestellungen') : null,
+        geld.erstattungen.offen
+      ),
       ...(geld.erstattungen.offen > 0 ? { ton: 'tun' as const } : {}),
       amHandy: false,
     },
@@ -130,7 +145,7 @@ export default async function AdminGeldPage({
       id: 'ergebnis',
       titel: 'Ergebnis',
       wert: ergebnisText(ergebnisCents),
-      satz: ergebnisCents < 0 ? 'noch nicht gedeckt' : 'trägt sich',
+      satz: ergebnisCents < 0 ? GELD_TEXT.nichtGedeckt : GELD_TEXT.gedeckt,
       // Grün = trägt sich, Orange = noch nicht (kein Rot, Register O1).
       ton: ergebnisCents < 0 ? 'tun' : 'laeuft',
     },
@@ -155,7 +170,7 @@ export default async function AdminGeldPage({
       satz: !abgleichOk
         ? 'Der Abgleich ist noch nicht gelaufen.'
         : geld.abweichungen.length === 0
-          ? 'Betrag, Servicegebühr und Erstattung gleich'
+          ? GELD_TEXT.abgleichGleich(gebuehrWort)
           : `${mitAnzahl(geld.abweichungen.length, 'Abweichung', 'Abweichungen')} – steht in Heute`,
       wort: !abgleichOk ? 'offen' : geld.abweichungen.length === 0 ? 'stimmt' : 'abweichend',
       ton: abgleichOk && geld.abweichungen.length === 0 ? 'fertig' : 'offen',
@@ -275,7 +290,7 @@ export default async function AdminGeldPage({
             />
           </div>
 
-          <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{GELD_TEXT.regel}</p>
+          <p className={cn('text-[12.5px] leading-relaxed', LEISE)}>{GELD_TEXT.regel(gebuehrWort)}</p>
         </LadeInhalt>
       </LadeRahmen>
     </div>

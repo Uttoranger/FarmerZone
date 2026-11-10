@@ -4,11 +4,26 @@ import { useState } from 'react'
 import { authClient } from '@/lib/auth-client'
 import { validatePassword } from '@/lib/password-rules'
 import { changePasswordSchema } from '@/schemas/change-password'
-import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Check, Loader2 } from 'lucide-react'
 import { useNachSpeichern } from '@/components/hof-einstellungen/use-nach-speichern'
+import { HELLER_KNOPF } from '@/components/hof-einstellungen/knopf'
+import { FeldFehlerSatz, feldFehlerAttribute } from '@/components/shared/formular-meldungen'
+import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { cn } from '@/lib/utils'
+import { FELD } from '@/components/hof-bestellungen/stil'
+
+/** Der Satz am Feld „Aktuelles Passwort“, wörtlich nach Board s2-konto-hof Bild 3. */
+export const AKTUELLES_PASSWORT_FALSCH = 'Das aktuelle Passwort ist nicht korrekt.'
+
+/*
+ * Passwort ändern (Konto und Sicherheit). Seit Nr. 250 (Liste Lauf 32, konto-hof „Passwort falsch“): Ein
+ * falsches aktuelles Passwort leert die Felder nicht mehr — der Satz steht am Feld, darunter „Passwort
+ * vergessen?“, die neuen Passwörter bleiben stehen (die Regelliste zeigt weiter ihre Haken). Der Knopf ist
+ * hell mit Rand über die volle Breite und immer bedienbar; geprüft wird beim Absenden (G6).
+ */
 
 export function PasswordForm() {
   const [currentPassword, setCurrentPassword] = useState('')
@@ -16,6 +31,8 @@ export function PasswordForm() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [passwordTouched, setPasswordTouched] = useState(false)
   const [fehler, setFehler] = useState('')
+  // Der Satz am Feld „Aktuelles Passwort“ (falsch oder leer) — getrennt vom Satz über dem Knopf.
+  const [aktuellFehler, setAktuellFehler] = useState('')
   const [laedt, setLaedt] = useState(false)
   // Nach dem Speichern zurück zur Übersicht (Register N1, Nr. 44).
   const nachSpeichern = useNachSpeichern()
@@ -35,8 +52,19 @@ export function PasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!canSubmit) return
+    if (laedt) return
+    if (!canSubmit) {
+      // Beim Absenden zeigen, was fehlt — statt eines gesperrten Knopfs (G6).
+      setPasswordTouched(true)
+      // Fehlt das aktuelle Passwort, steht die Meldung des Schemas am Feld — eine Quelle (schemas/change-password.ts).
+      const fehltAktuell = changePasswordSchema
+        .safeParse({ currentPassword, password, passwordConfirm })
+        .error?.issues.find((i) => i.path[0] === 'currentPassword')
+      setAktuellFehler(fehltAktuell?.message ?? '')
+      return
+    }
     setFehler('')
+    setAktuellFehler('')
 
     const parsed = changePasswordSchema.safeParse({ currentPassword, password, passwordConfirm })
     if (!parsed.success) {
@@ -60,9 +88,8 @@ export function PasswordForm() {
         } else if (!error.status) {
           setFehler('Verbindung fehlgeschlagen — bitte erneut versuchen.')
         } else {
-          // Falsches aktuelles Passwort: Meldung am Formular, kein Ausloggen
-          setFehler('Das aktuelle Passwort ist nicht korrekt.')
-          leerePasswortfelder()
+          // Falsches aktuelles Passwort: Satz am Feld, kein Ausloggen; die Eingaben bleiben (Board Bild 3).
+          setAktuellFehler(AKTUELLES_PASSWORT_FALSCH)
         }
         return
       }
@@ -80,33 +107,46 @@ export function PasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="currentPassword" className="text-sm font-medium text-foreground">
+        <Label htmlFor="currentPassword" className="text-[15px] font-semibold text-foreground">
           Aktuelles Passwort
         </Label>
         <PasswordInput
           id="currentPassword"
           value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
+          onChange={(e) => {
+            setCurrentPassword(e.target.value)
+            if (aktuellFehler) setAktuellFehler('')
+          }}
           autoComplete="current-password"
           required
-          className="h-11 text-base"
+          {...feldFehlerAttribute('currentPassword', Boolean(aktuellFehler))}
+          feld={FELD}
+          className={cn(aktuellFehler && 'border-status-offen')}
         />
+        <FeldFehlerSatz feldId="currentPassword" text={aktuellFehler} />
+        {aktuellFehler === AKTUELLES_PASSWORT_FALSCH && (
+          <Link
+            href="/forgot-password"
+            className={cn('-my-1 inline-flex min-h-11 w-fit items-center text-sm font-semibold text-brand-text underline underline-offset-2', FOKUS_RAHMEN)}
+          >
+            Passwort vergessen?
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="newPassword" className="text-sm font-medium text-foreground">
+        <Label htmlFor="newPassword" className="text-[15px] font-semibold text-foreground">
           Neues Passwort
         </Label>
         <PasswordInput
           id="newPassword"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Mindestens 8 Zeichen"
           autoComplete="new-password"
           required
           aria-invalid={pwHasError || undefined}
           aria-describedby="account-password-checklist"
-          className="h-11 text-base"
+          feld={FELD}
           onBlur={() => setPasswordTouched(true)}
         />
 
@@ -137,14 +177,14 @@ export function PasswordForm() {
         </ul>
 
         {pwHasError && (
-          <p role="alert" aria-live="polite" className="mt-0.5 text-xs text-status-offen">
+          <p role="alert" aria-live="polite" className="mt-0.5 text-[14px] font-semibold text-status-offen">
             Bitte alle Passwort-Anforderungen erfüllen.
           </p>
         )}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="newPasswordConfirm" className="text-sm font-medium text-foreground">
+        <Label htmlFor="newPasswordConfirm" className="text-[15px] font-semibold text-foreground">
           Neues Passwort wiederholen
         </Label>
         <PasswordInput
@@ -155,14 +195,14 @@ export function PasswordForm() {
           required
           aria-invalid={confirmHasError || undefined}
           aria-describedby={confirmHasError ? 'account-confirm-error' : undefined}
-          className="h-11 text-base"
+          feld={FELD}
         />
         {confirmHasError && (
           <p
             id="account-confirm-error"
             role="alert"
             aria-live="polite"
-            className="text-xs text-status-offen"
+            className="text-[14px] font-semibold text-status-offen"
           >
             Passwörter stimmen nicht überein.
           </p>
@@ -173,17 +213,13 @@ export function PasswordForm() {
         <p
           role="alert"
           aria-live="polite"
-          className="rounded-xl border border-primary/45 bg-primary/12 px-3 py-2.5 text-sm leading-relaxed text-foreground"
+          className="rounded-[12px] border border-zustand-tun/30 bg-zustand-tun-grund px-3 py-2.5 text-[14px] leading-relaxed font-semibold text-zustand-tun"
         >
           {fehler}
         </p>
       )}
 
-      <Button
-        type="submit"
-        disabled={!canSubmit}
-        className="h-11 text-sm font-semibold rounded-xl w-full sm:w-auto sm:self-start sm:px-6"
-      >
+      <button type="submit" aria-busy={laedt || undefined} className={HELLER_KNOPF}>
         {laedt ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -192,7 +228,7 @@ export function PasswordForm() {
         ) : (
           'Passwort ändern'
         )}
-      </Button>
+      </button>
     </form>
   )
 }

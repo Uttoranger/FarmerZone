@@ -222,7 +222,7 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/components/products/product-dialog.tsx', text: 'Noch keine Kategorie', art: 'C', grund: 'Zusammenfassung unter dem zugeklappten Abschnittstitel im Produktdialog, kein Leerzustand' },
   { datei: 'src/components/products/product-dialog.tsx', text: 'Noch keine hinterlegt.', art: 'C', grund: 'Feldwert der „Betriebsnummer“, kein Leerzustand; der Link „In den Hof-Einstellungen ändern“ steht direkt darunter' },
   { datei: 'src/lib/umsatz.ts', text: /^Noch keine? (Vorwoche|Vormonat|Vorjahr) zum Vergleich$/, art: 'C', grund: 'Vergleichssatz unter der Umsatzsumme: ein Wert, keine leere Liste' },
-  { datei: 'src/lib/heute.ts', text: 'Noch kein Beitrag — erzähl deinen Kundinnen, was es gibt', art: 'C', grund: 'Eintrag in „Braucht dich“: eine Aufgabe, die selbst zum neuen Beitrag führt' },
+  { datei: 'src/lib/heute.ts', text: 'Noch kein Beitrag – erzähl deinen Kundinnen, was es gibt', art: 'C', grund: 'Eintrag in „Braucht dich“: eine Aufgabe, die selbst zum neuen Beitrag führt' },
   { datei: 'src/lib/heute.ts', text: /noch kein Umsatz$/, art: 'C', grund: 'Vergleichssatz unter der Wochensumme: ein Wert, keine leere Liste' },
   { datei: 'src/lib/einrichten.ts', text: 'noch keins', art: 'C', grund: 'Kurztext des Schritts „Erste Produkte“ in der Einrichtung (ein Zählwert); der Schritt trägt selbst den Link „Produkt anlegen“' },
   { datei: 'src/lib/futter-registrierung.ts', text: /^Noch keine Größe kann online gehen\./, art: 'C', grund: 'Infosatz zur Futter-Registrierung (was online gehen kann), kein Leerzustand' },
@@ -233,7 +233,8 @@ const AUSNAHMEN: Ausnahme[] = [
   { datei: 'src/lib/hoefe-anzeige.ts', text: /^Höfe haben noch keinen Kartenpunkt – (du findest sie in der Liste\.|Nr\.)$/, art: 'C', grund: 'Hinweis auf der Karte (mehrere Höfe fehlen dort); die Liste ist da, kein Leerzustand' },
   // Seit Nr. 122 (Register N23) EIN Hinweis für beide Reiter von Region (ohneStandortHinweis), über Liste und Karte.
   { datei: 'src/lib/region.ts', text: /^(hat|haben) noch keinen Standort auf der Karte und (fehlt|fehlen) hier\.$/, art: 'C', grund: 'Hinweis über Liste und Karte von Region (Höfe ohne Standort fehlen dort); die Liste ist da, kein Leerzustand' },
-  { datei: 'src/app/(hof)/status/new/status-new-client.tsx', text: 'Noch keine Abonnenten', art: 'C', grund: 'Zählzeile des Kanals „Per E-Mail an Abonnenten“ (der Schalter bleibt gesperrt), kein Leerzustand' },
+  // Seit Nr. 225 (Lauf 30) steht die Zählzeile als Text in src/lib/beitrag-anlass.ts (BEITRAG_ABLAUF_TEXT).
+  { datei: 'src/lib/beitrag-anlass.ts', text: 'Noch keine Abonnentinnen', art: 'C', grund: 'Zählzeile des Kanals „Per E-Mail an Abonnentinnen“ (der Schalter bleibt gesperrt), kein Leerzustand' },
   { datei: 'src/emails/order-cancelled.tsx', text: 'Da noch keine Zahlung erfolgt ist, entstehen dir keine Kosten.', art: 'C', grund: 'Satz in der Stornomail, kein Leerzustand' },
   { datei: 'src/components/teilen/teilen-fenster.tsx', text: /^Noch keine Produkte im Shop/, art: 'C', grund: 'Hinweissatz in der Karte des Teilen-Fensters, kein Leerzustand; die Datei gehört zu Nr. 76' },
 ]
@@ -249,7 +250,6 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
   { datei: 'src/components/admin/meldungen-teile.tsx', titel: 'WUENSCHE_LEER.titel' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', titel: 'Noch keine Höfe zum Vergleichen' },
   { datei: 'src/components/region/futter-kaufen-ansicht.tsx', titel: 'leer.titel' },
-  { datei: 'src/components/heute/heute-teile.tsx', titel: 'HEUTE_NIEMAND' },
   { datei: 'src/app/(hof)/postfach/page.tsx', titel: 'POSTFACH_LEER.titel' },
   { datei: 'src/app/admin/postfach/rundschreiben-reiter.tsx', titel: 'RUNDSCHREIBEN_LEER.titel' },
 ]
@@ -260,9 +260,8 @@ const BEKANNT_OHNE: Array<{ datei: string; titel: string }> = [
  * neuer Leerzustand gehört nicht hierher.
  */
 const ALTLAST_IM_AUFRUF: Array<{ datei: string; text: string }> = [
-  { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Benachrichtigungen abonniert.' },
+  { datei: 'src/app/account/profile/profile-client.tsx', text: 'Du hast noch keine Neuigkeiten abonniert.' },
   { datei: 'src/components/analytics/umfeld-anzeige.tsx', text: 'Noch keine Höfe zum Vergleichen' },
-  { datei: 'src/components/hof-bestellungen/bestellungen-ansicht.tsx', text: 'Noch keine Bestellungen' },
   { datei: 'src/components/hof-hilfe/meine-meldungen.tsx', text: 'Noch keine Meldungen' },
   { datei: 'src/components/hof-kunden/kunden-ansicht.tsx', text: 'Noch keine Kunden' },
   { datei: 'src/components/hof-verkaeufe/verkaeufe-ansicht.tsx', text: 'Noch keine Verkäufe' },

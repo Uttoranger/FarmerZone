@@ -2,11 +2,25 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { istNetzFehler } from '@/lib/netz'
+import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
 import { Textarea } from '@/components/ui/textarea'
 import { Stepper } from '@/components/ui/stepper'
+import { Switch } from '@/components/ui/switch'
+import { TREFFER_44 } from '@/components/ui/button'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { cn } from '@/lib/utils'
 import { DezimalFeld } from '@/components/shared/dezimal-feld'
 import { legeBrennmaterialFamilieAn } from '@/server/actions/produktfamilie'
-import type { ProduktAngelegt } from '@/lib/produkte-hof'
+import {
+  PRODUKTE_FILTER_LABEL,
+  hofpreisZeile,
+  speicherFehlerAusAntwort,
+  speicherFehlerNachWurf,
+  vorschauGebuehrSatz,
+  type ProduktAngelegt,
+  type SpeicherFehlerAnzeige,
+} from '@/lib/produkte-hof'
 import { BRENN_ARTEN, brennmaterialFamilieSchema, type BrennmaterialFamilieEingabe } from '@/schemas/produktfamilie'
 import { TROCKNUNG_VALUES, UNTERKATEGORIE_LABEL, type TrocknungValue } from '@/lib/taxonomie'
 import {
@@ -42,6 +56,8 @@ import {
   FamilienDialog,
   Feld,
   FeldFehler,
+  FormularMeldung,
+  KlappKarte,
   RuecktrittAbschnitt,
   Wahl,
   feldId,
@@ -79,10 +95,13 @@ function startZeilen(art: BrennArt, schluessel: (i: number) => string): Zeile[] 
 export function BrennmaterialFormular({
   onClose,
   onAngelegt,
+  preisAnzeige = null,
 }: {
   onClose: () => void
   /** Nach dem Anlegen: Anlass des Teilen-Moments „gespeichert" (Nr. 30); ob er kommt, entscheidet die Ansicht. */
   onAngelegt?: (angelegt: ProduktAngelegt) => void
+  /** N38: im Hofpreis-Modell der Satz des Hofs — dann „Du bekommst … · die Kundin zahlt …" und Endpreise in der Vorschau. */
+  preisAnzeige?: PreisAnzeige
 }): React.JSX.Element {
   const naechster = useRef(100)
   const neuerSchluessel = () => `z${naechster.current++}`
@@ -104,6 +123,7 @@ export function BrennmaterialFormular({
   const [zeilen, setZeilen] = useState<Zeile[]>(() => startZeilen('BRENNHOLZ_SCHEIT', (i) => `s${i}`))
   const [versucht, setVersucht] = useState(false)
   const [speichert, setSpeichert] = useState(false)
+  const [speicherFehler, setSpeicherFehler] = useState<SpeicherFehlerAnzeige | null>(null)
 
   const eingabe: BrennmaterialFamilieEingabe = {
     name,
@@ -122,6 +142,8 @@ export function BrennmaterialFormular({
   }
   const pruefung = brennmaterialFamilieSchema.safeParse(eingabe)
   const fehler = versucht && !pruefung.success ? fehlerJeFeld(pruefung.error.issues) : {}
+  // Ein Fehler in den Holz-Angaben hält die Karte offen — der Sprung zum ersten Feld braucht es sichtbar.
+  const holzFehler = ['art', 'holzart', 'scheitlaengeCm', 'wassergehalt', 'koernung', 'trocknung', 'gelagertJahre'].some((f) => f in fehler)
   const hackschnitzel = art === 'HACKSCHNITZEL'
 
   function artWaehlen(neu: BrennArt) {
@@ -151,8 +173,9 @@ export function BrennmaterialFormular({
 
   async function speichern() {
     setVersucht(true)
+    setSpeicherFehler(null)
     if (!pruefung.success) {
-      toast.error('Bitte prüfe die markierten Felder.')
+      // Die Karte „Bitte prüfe die markierten Felder." steht über den Feldern (V17), der Fokus springt.
       springeZuFeld(Object.keys(fehlerJeFeld(pruefung.error.issues))[0])
       return
     }
@@ -160,14 +183,15 @@ export function BrennmaterialFormular({
     try {
       const ergebnis = await legeBrennmaterialFamilieAn(eingabe)
       if ('error' in ergebnis) {
-        toast.error(ergebnis.error)
+        setSpeicherFehler(speicherFehlerAusAntwort(ergebnis.error))
         return
       }
       toast.success(gespeichertText(name, ergebnis.online, ergebnis.wartend.length))
       onClose()
       onAngelegt?.({ anlass: ergebnis.familieId, name: name.trim(), kaufbar: ergebnis.kaufbar })
-    } catch {
-      toast.error('Wir konnten das Brennmaterial nicht speichern. Bitte versuch es noch einmal.')
+    } catch (e) {
+      // Anlegen: ein zweiter Versuch legte womöglich doppelt an — darum ohne „Nochmal" (speicherFehlerNachWurf).
+      setSpeicherFehler(speicherFehlerNachWurf(istNetzFehler(e), false, 'Wir konnten das Brennmaterial nicht speichern. Bitte versuch es noch einmal.'))
     } finally {
       setSpeichert(false)
     }
@@ -190,12 +214,14 @@ export function BrennmaterialFormular({
       open
       onClose={onClose}
       titel="Neues Brennmaterial"
+      art={PRODUKTE_FILTER_LABEL.brennmaterial}
       satz="Brennholz, Anzündholz oder Hackschnitzel – jede Größe mit eigenem Preis und Vorrat. Nur Abholung am Hof."
       speichernText="Speichern"
       speichert={speichert}
       onSpeichern={() => void speichern()}
+      meldung={<FormularMeldung pruefen={versucht && !pruefung.success} fehler={speicherFehler} />}
     >
-      <Feld feld="name" label="Name" fehler={fehler.name} hilfe="Jede Größe heißt im Shop „Name + Größe“, z. B. „Buche, ofenfertig Raummeter“.">
+      <Feld feld="name" label="Name" fehler={fehler.name}>
         <input
           id={feldId('name')}
           value={name}
@@ -207,9 +233,11 @@ export function BrennmaterialFormular({
         />
       </Feld>
 
-      <Abschnitt id="brenn-angaben" titel="Holz-Angaben" satz="Die drei Fragen, die jede Kundin stellt.">
+      {/* Board s1-/w1-produkt-neu Bild 4 (Liste Lauf 32 „Holz-Angaben: Aufbau ohne Karte“, Nr. 277): eine aufklappbare
+          Karte, offen; Holzart und Scheitlänge als zwei Felder nebeneinander statt langer Chip-Reihen. */}
+      <KlappKarte titel="Holz-Angaben" stand="Die drei Fragen, die jede Kundin stellt." anfangsOffen immerOffen={holzFehler} fehler={holzFehler}>
         <div className="flex flex-col gap-2" data-feld="art">
-          <p id="brenn-art" className="text-[13px] font-medium text-foreground">
+          <p id="brenn-art" className="text-[15px] font-semibold text-foreground">
             Art
           </p>
           <div role="radiogroup" aria-labelledby="brenn-art" className="flex flex-wrap gap-2">
@@ -227,49 +255,49 @@ export function BrennmaterialFormular({
           )}
         </div>
 
-        <div className="flex flex-col gap-2" data-feld="holzart">
-          <p id="brenn-holzart" className="text-[13px] font-medium text-foreground">
-            Holzart
-          </p>
-          <div role="radiogroup" aria-labelledby="brenn-holzart" className="flex flex-wrap gap-2">
+        {/* Holzart und Scheitlänge als zwei Felder nebeneinander, auch am Handy (Board s1-produkt-neu Bild 4). Die
+            üblichen Holzarten schlägt das Feld vor (datalist) — eine andere tippt man einfach ein. */}
+        <div className={cn('grid items-start gap-3', hackschnitzel ? 'grid-cols-1' : 'grid-cols-2')}>
+          <Feld feld="holzart" label="Holzart" fehler={fehler.holzart}>
+            <input
+              id={feldId('holzart')}
+              value={holzart}
+              onChange={(e) => setHolzart(e.target.value)}
+              list="brenn-holzarten"
+              placeholder="z. B. Buche"
+              autoComplete="off"
+              className={EINGABE}
+            />
+          </Feld>
+          <datalist id="brenn-holzarten">
             {HOLZARTEN.map((h) => (
-              <Wahl key={h} rolle="radio" aktiv={holzart === h} onClick={() => setHolzart(h)}>
-                {h}
-              </Wahl>
+              <option key={h} value={h} />
             ))}
-          </div>
-          <label htmlFor={feldId('holzart')} className="text-xs text-muted-foreground">
-            Andere Holzart
-          </label>
-          <input
-            id={feldId('holzart')}
-            value={holzart}
-            onChange={(e) => setHolzart(e.target.value)}
-            placeholder="z. B. Esche"
-            autoComplete="off"
-            className={EINGABE}
-          />
-          {fehler.holzart && <FeldFehler>{fehler.holzart}</FeldFehler>}
+          </datalist>
+
+          {!hackschnitzel && (
+            <Feld feld="scheitlaengeCm" label={`Scheitlänge${art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}`} fehler={fehler.scheitlaengeCm}>
+              <select
+                id={feldId('scheitlaengeCm')}
+                value={scheitlaengeCm ?? ''}
+                onChange={(e) => setScheitlaengeCm(e.target.value === '' ? null : Number(e.target.value))}
+                className={EINGABE}
+              >
+                <option value="">Bitte wählen</option>
+                {SCHEITLAENGEN_CM.map((cm) => (
+                  <option key={cm} value={cm}>
+                    {cm === 100 ? '1 m' : `${cm} cm`}
+                  </option>
+                ))}
+              </select>
+            </Feld>
+          )}
         </div>
 
-        {!hackschnitzel ? (
-          <div className="flex flex-col gap-2" data-feld="scheitlaengeCm">
-            <p id="brenn-scheit" className="text-[13px] font-medium text-foreground">
-              Scheitlänge{art === 'ANZUENDHOLZ' ? ' (freiwillig)' : ''}
-            </p>
-            <div role="radiogroup" aria-labelledby="brenn-scheit" className="flex flex-wrap gap-2">
-              {SCHEITLAENGEN_CM.map((cm) => (
-                <Wahl key={cm} rolle="radio" aktiv={scheitlaengeCm === cm} onClick={() => setScheitlaengeCm(scheitlaengeCm === cm ? null : cm)}>
-                  {cm === 100 ? '1 m' : `${cm} cm`}
-                </Wahl>
-              ))}
-            </div>
-            {fehler.scheitlaengeCm && <FeldFehler>{fehler.scheitlaengeCm}</FeldFehler>}
-          </div>
-        ) : (
-          <>
+        {hackschnitzel && (
+          <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 sm:gap-4">
             <div className="flex flex-col gap-2" data-feld="wassergehalt">
-              <p id="brenn-w" className="text-[13px] font-medium text-foreground">
+              <p id="brenn-w" className="text-[15px] font-semibold text-foreground">
                 Wassergehalt
               </p>
               <div role="radiogroup" aria-labelledby="brenn-w" className="flex flex-wrap gap-2">
@@ -282,7 +310,7 @@ export function BrennmaterialFormular({
               {fehler.wassergehalt && <FeldFehler>{fehler.wassergehalt}</FeldFehler>}
             </div>
             <div className="flex flex-col gap-2" data-feld="koernung">
-              <p id="brenn-p" className="text-[13px] font-medium text-foreground">
+              <p id="brenn-p" className="text-[15px] font-semibold text-foreground">
                 Körnung
               </p>
               <div role="radiogroup" aria-labelledby="brenn-p" className="flex flex-wrap gap-2">
@@ -294,11 +322,11 @@ export function BrennmaterialFormular({
               </div>
               {fehler.koernung && <FeldFehler>{fehler.koernung}</FeldFehler>}
             </div>
-          </>
+          </div>
         )}
 
         <div className="flex flex-col gap-2" data-feld="trocknung">
-          <p id="brenn-trocknung" className="text-[13px] font-medium text-foreground">
+          <p id="brenn-trocknung" className="text-[15px] font-semibold text-foreground">
             Trocknung
           </p>
           <div role="radiogroup" aria-labelledby="brenn-trocknung" className="flex flex-wrap gap-2">
@@ -326,17 +354,18 @@ export function BrennmaterialFormular({
               ))}
             </select>
           </Feld>
+          {/* Liste Lauf 32 (produkt-neu Bild 4): Schalter „Überdacht gelagert“ statt Kästchen (das im Dunkeln hellgrau stand). */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-foreground" aria-hidden="true">
+            <span className="text-[15px] font-semibold text-foreground" aria-hidden="true">
               Lagerung
             </span>
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border px-3">
-              <input type="checkbox" checked={ueberdacht} onChange={(e) => setUeberdacht(e.target.checked)} className="size-4 shrink-0 accent-primary" />
-              <span className="text-sm text-foreground">überdacht gelagert</span>
+            <label htmlFor="brenn-ueberdacht" className={cn('flex min-h-11 items-center gap-3 border border-border px-3', RUNDUNG.feld)}>
+              <Switch id="brenn-ueberdacht" checked={ueberdacht} onCheckedChange={setUeberdacht} className={cn(TREFFER_44, 'data-checked:bg-accent')} />
+              <span className="text-sm text-foreground">Überdacht gelagert</span>
             </label>
           </div>
         </div>
-      </Abschnitt>
+      </KlappKarte>
 
       <Feld feld="description" label="Beschreibung (freiwillig)" fehler={fehler.description}>
         <Textarea
@@ -349,33 +378,12 @@ export function BrennmaterialFormular({
       </Feld>
 
       <Abschnitt id="brenn-groessen" titel="Verkaufsgrößen" satz="Jede Größe mit eigenem Preis und Vorrat.">
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="brenn-groessen" data-feld="groessen">
-          {vorlagen.map((v) => {
-            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
-            return (
-              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
-                {v.bezeichnung}
-              </Wahl>
-            )
-          })}
-          <EigeneGroesseKnopf
-            onClick={() =>
-              setZeilen((alt) =>
-                alt.length >= GROESSEN_MAX
-                  ? alt
-                  : [...alt, { schluessel: neuerSchluessel(), vorlageId: null, bezeichnung: '', unit: hackschnitzel ? 'SCHUETTRAUMMETER' : 'STUECK', price: null, stock: 0 }]
-              )
-            }
-            disabled={zeilen.length >= GROESSEN_MAX}
-          />
-        </div>
-        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
-
+        {/* Erst die gewählten Größen, dann die Schnellwahl (Liste Lauf 32, produkt-neu 390: Reihenfolge Board). */}
         <ul className="flex flex-col gap-2.5">
           {zeilen.map((z, i) => {
             const pfad = `groessen.${i}`
             return (
-              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3">
+              <li key={z.schluessel} className="flex flex-col gap-2.5 rounded-[12px] border border-border bg-card p-3">
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1">
                     <Feld feld={`${pfad}.bezeichnung`} labelZusatz={z.bezeichnung || 'neue Größe'} label="Größe" fehler={fehler[`${pfad}.bezeichnung`]}>
@@ -411,7 +419,7 @@ export function BrennmaterialFormular({
                     <DezimalFeld id={feldId(`${pfad}.price`)} value={z.price} praefix="€" stellen={2} onChange={(w) => zeileAendern(z.schluessel, { price: w })} />
                   </Feld>
                   <div className="flex flex-col gap-1.5" data-feld={`${pfad}.stock`}>
-                    <span className="text-[13px] font-medium text-foreground" aria-hidden="true">
+                    <span className="text-[15px] font-semibold text-foreground" aria-hidden="true">
                       Vorrat
                     </span>
                     <Stepper
@@ -425,10 +433,38 @@ export function BrennmaterialFormular({
                     {fehler[`${pfad}.stock`] && <FeldFehler>{fehler[`${pfad}.stock`]}</FeldFehler>}
                   </div>
                 </div>
+                {/* N38 (Board s1/w1-produkt-neu, Bild 4): was der Hof bekommt und was die Kundin zahlt. */}
+                {z.price !== null && hofpreisZeile(z.price, preisAnzeige) && (
+                  <p className="text-[12.5px] text-muted-foreground" aria-live="polite">
+                    {hofpreisZeile(z.price, preisAnzeige)}
+                  </p>
+                )}
               </li>
             )
           })}
         </ul>
+
+        <div className="flex flex-wrap gap-2" role="group" aria-labelledby="brenn-groessen" data-feld="groessen">
+          {vorlagen.map((v) => {
+            const aktiv = zeilen.some((z) => z.vorlageId === v.id)
+            return (
+              <Wahl key={v.id} aktiv={aktiv} onClick={() => vorlageUmschalten(v)} disabled={!aktiv && zeilen.length >= GROESSEN_MAX}>
+                {v.bezeichnung}
+              </Wahl>
+            )
+          })}
+          <EigeneGroesseKnopf
+            onClick={() =>
+              setZeilen((alt) =>
+                alt.length >= GROESSEN_MAX
+                  ? alt
+                  : [...alt, { schluessel: neuerSchluessel(), vorlageId: null, bezeichnung: '', unit: hackschnitzel ? 'SCHUETTRAUMMETER' : 'STUECK', price: null, stock: 0 }]
+              )
+            }
+            disabled={zeilen.length >= GROESSEN_MAX}
+          />
+        </div>
+        {fehler.groessen && <FeldFehler>{fehler.groessen}</FeldFehler>}
 
         {raummassErklaeren(zeilen.map((z) => z.unit)) && <RaummassErklaerung />}
       </Abschnitt>
@@ -444,8 +480,8 @@ export function BrennmaterialFormular({
         Für Holz brauchst du keine Futtermittel-Registrierung. Den Mehrwertsteuersatz bitte mit deinem Steuerberater abklären.
       </p>
 
-      <section aria-labelledby="brenn-vorschau" className="flex flex-col gap-2 rounded-2xl border border-border bg-muted/40 p-4">
-        <h3 id="brenn-vorschau" className="text-[11px] font-semibold tracking-[1px] text-muted-foreground uppercase">
+      <section aria-labelledby="brenn-vorschau" className="flex flex-col gap-2 rounded-[12px] border border-border bg-muted/40 p-4">
+        <h3 id="brenn-vorschau" className="text-[13px] font-bold tracking-[0.04em] text-muted-foreground uppercase">
           So sehen Kunden dein Holz
         </h3>
         <p className="font-heading text-lg font-semibold break-words text-foreground">{name.trim() || 'Dein Brennmaterial'}</p>
@@ -456,11 +492,13 @@ export function BrennmaterialFormular({
               .filter((z) => z.price !== null)
               .map((z) => (
                 <li key={z.schluessel} className="rounded-full border border-border bg-card px-2.5 py-1 text-xs break-words text-foreground tabular-nums">
-                  {z.bezeichnung || EINHEIT_WAHL[z.unit]} · {formatEuro(z.price ?? 0)}
+                  {/* Was die Kundin sieht: im Hofpreis-Modell der Endpreis (endpreisEuro, wie /api/checkout). */}
+                  {z.bezeichnung || EINHEIT_WAHL[z.unit]} · {formatEuro(endpreisEuro(z.price ?? 0, preisAnzeige))}
                 </li>
               ))}
           </ul>
         )}
+        <p className="text-xs text-muted-foreground">{vorschauGebuehrSatz(preisAnzeige)}</p>
       </section>
     </FamilienDialog>
   )

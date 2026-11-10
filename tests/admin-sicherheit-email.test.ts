@@ -11,6 +11,12 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MARKE } from '@/lib/marke'
 import { ADMIN_SICHERHEIT_MAIL } from '@/lib/admin-anmeldung'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+
+/** Die Links der Mail ohne die Anbieterzeile — den Link auf das Impressum trägt jede Mail außer den Betriebs-Mails (V68, Nr. 232). */
+const fremdeLinks = (html: string): string[] =>
+  [...html.matchAll(/<a\s[^>]*?href="([^"]*)"/gi)].map((m) => m[1]).filter((h) => h !== `${PRODUKTION_ADRESSE}/impressum`)
+
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -47,8 +53,8 @@ describe('sendAdminSicherheitEmail', () => {
       expect(aufruf.to).toBe('admin@example.com')
       expect(aufruf.subject).toBe(`${ADMIN_SICHERHEIT_MAIL.betreff[anlass]} · ${MARKE}`)
       expect(aufruf.html).toContain('Windows · Chrome')
-      expect(aufruf.html).toContain('20.10. um 12:05')
-      expect(aufruf.html).not.toMatch(/<a\s/i)
+      expect(aufruf.html).toContain('Di, 20. Oktober 2026, 12:05 Uhr')
+      expect(fremdeLinks(aufruf.html)).toEqual([])
     })
   }
 
@@ -63,6 +69,6 @@ describe('sendAdminSicherheitEmail', () => {
 
     expect(aufruf.html).toContain('QXJZKW')
     expect(aufruf.subject).not.toContain('QXJZKW')
-    expect(aufruf.html).not.toMatch(/<a\s/i)
+    expect(fremdeLinks(aufruf.html)).toEqual([])
   })
 })

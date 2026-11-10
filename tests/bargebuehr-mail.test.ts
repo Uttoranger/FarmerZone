@@ -97,7 +97,7 @@ describe('baueOrderConfirmedToFarmer — Bar-Ausnahme nach dem Bestellzeitpunkt'
   it('bar vor dem Stichtag bestellt, Gebühr 0: der ganze Betrag bleibt dem Hof', async () => {
     await gebaut(email.baueOrderConfirmedToFarmer)(bestellung({ serviceFeeCents: 0, createdAt: new Date('2026-10-06T10:00:00.000Z') }))
     const text = gesendeterText()
-    expect(text).toContain('Bar zu kassieren: € 10,30')
+    expect(text).toContain('Bar zu kassieren € 10,30')
     expect(text).toContain(`${normal(konditionen.BAR_OHNE_GEBUEHR_SATZ)} Der ganze Betrag bleibt dir.`)
     expect(text).not.toContain('Monatsabrechnung')
   })
@@ -106,7 +106,7 @@ describe('baueOrderConfirmedToFarmer — Bar-Ausnahme nach dem Bestellzeitpunkt'
     const danach = new Date(konditionen.BAR_SERVICEGEBUEHR_AB.getTime() + 60_000)
     await gebaut(email.baueOrderConfirmedToFarmer)(bestellung({ serviceFeeCents: 52, createdAt: danach }))
     const text = gesendeterText()
-    expect(text).toContain('Bar zu kassieren: € 10,82')
+    expect(text).toContain('Bar zu kassieren € 10,82')
     expect(text).toContain('die schuldest du der Monatsabrechnung')
     expect(text).not.toContain(normal(konditionen.BAR_OHNE_GEBUEHR_SATZ))
   })

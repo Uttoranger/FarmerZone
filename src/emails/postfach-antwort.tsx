@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, Text } from '@react-email/components'
 import { POSTFACH_MAIL_TEXT } from '@/lib/postfach'
-import { EmailLayout, bodyText, ctaButton, h1, highlightBox, highlightValue, mutedText, textLink } from './_layout'
+import { EmailLayout, Knopf, KnopfReihe, bodyText, h1, leiseZeile, mutedText, textLink } from './_layout'
 
 export interface PostfachAntwortProps {
   /** Titel des Fadens (des Rundschreibens), auf den das Team antwortet. */
@@ -19,12 +19,11 @@ export interface PostfachAntwortProps {
  */
 export function PostfachAntwortEmail(p: PostfachAntwortProps): React.JSX.Element {
   return (
-    <EmailLayout previewText={POSTFACH_MAIL_TEXT.antwortBetreff(p.titel)} fusszeile={POSTFACH_MAIL_TEXT.fuss}>
+    <EmailLayout fuss={{ art: 'postfach' }} previewText={POSTFACH_MAIL_TEXT.antwortBetreff(p.titel)}>
       <Text style={h1}>{POSTFACH_MAIL_TEXT.antwortTitel}</Text>
-      <Text style={mutedText}>{`${POSTFACH_MAIL_TEXT.zu}: ${p.titel}`}</Text>
-      <div style={highlightBox}>
-        <Text style={{ ...highlightValue, whiteSpace: 'pre-wrap' }}>{p.text}</Text>
-      </div>
+      <Text style={{ ...mutedText, margin: '0 0 6px' }}>{`${POSTFACH_MAIL_TEXT.zu}: ${p.titel}`}</Text>
+      {/* Board s3/w3-mail-hof-konto Bild 5: die Antwort als Fließtext, ohne Kasten und ohne Gruß. */}
+      <Text style={{ ...bodyText, whiteSpace: 'pre-wrap' }}>{p.text}</Text>
       {p.linkUrl && (
         <Text style={bodyText}>
           <Link href={p.linkUrl} style={textLink}>
@@ -32,11 +31,10 @@ export function PostfachAntwortEmail(p: PostfachAntwortProps): React.JSX.Element
           </Link>
         </Text>
       )}
-      <Link href={p.fadenUrl} style={ctaButton}>
-        {POSTFACH_MAIL_TEXT.oeffnen}
-      </Link>
-      <Text style={mutedText}>{POSTFACH_MAIL_TEXT.antwortenInDerApp}</Text>
-      <Text style={mutedText}>{POSTFACH_MAIL_TEXT.gruss}</Text>
+      <KnopfReihe>
+        <Knopf href={p.fadenUrl}>{POSTFACH_MAIL_TEXT.oeffnen}</Knopf>
+      </KnopfReihe>
+      <Text style={leiseZeile}>{POSTFACH_MAIL_TEXT.antwortenInDerApp}</Text>
     </EmailLayout>
   )
 }

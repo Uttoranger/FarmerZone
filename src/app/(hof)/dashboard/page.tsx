@@ -6,11 +6,12 @@ import * as Sentry from '@sentry/nextjs'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { getFarmForUser, ladeDeinenBeitrag } from '@/server/queries/dashboard'
 import { getHeute } from '@/server/queries/heute'
-import { ladeFaedenHof } from '@/server/queries/postfach'
+import { ladeFaedenHof, zaehleUngelesenHof } from '@/server/queries/postfach'
 import { heutePostfach } from '@/lib/postfach'
 import { gibVerwaisteFreiOhneRisiko } from '@/server/verwaiste-bestellungen'
 import { ErsteSchritteSchalter } from '@/components/farmer/erste-schritte-schalter'
 import {
+  AbholungHeuteMarke,
   BrauchtDichKarte,
   HeuteKopf,
   Kennzahlen,
@@ -34,10 +35,27 @@ import { WiderrufHeuteKarte } from '@/components/heute/widerruf-karte'
 import { AgbZustimmenKarte } from '@/components/heute/agb-karte'
 import { HofEmailKarte } from '@/components/heute/hof-email-karte'
 import { hofEmailFehlt } from '@/lib/hof-kontakt'
-import { agbFassung } from '@/lib/rechtstexte/agb-datei'
-import { brauchtAgbZustimmung } from '@/lib/agb-zustimmung'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
+import { agbKartenStichtag, brauchtAgbZustimmung, type AgbKartenStichtag } from '@/lib/agb-zustimmung'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { hofpreisModellAb } from '@/lib/plattformgebuehr'
+import { ladePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ERSTE_SCHRITTE_AUS_COOKIE, ersteSchritteAnzeige, ersteSchritteAusgeblendet } from '@/lib/erste-schritte'
-import { beitragBlock, datumLang, entferneBeitragErinnerung, heuteAufbau, teilenSatz, vergleichText, type HeuteBlock } from '@/lib/heute'
+import {
+  abholTagMitDatum,
+  abholungHeuteText,
+  beitragBlock,
+  datumLang,
+  entferneBeitragErinnerung,
+  heuteAufbau,
+  naechsteAbholungSatz,
+  packlistenStand,
+  selbstEingetragenSatz,
+  teilenSatz,
+  vergleichText,
+  type HeuteBlock,
+} from '@/lib/heute'
+import { wienKalendertag } from '@/lib/kalender'
 import { freischaltMomentMoeglich } from '@/lib/freischalt-moment'
 import { getTeilenFensterDaten } from '@/server/queries/teilen-bild'
 import { getTeilenWirkung } from '@/server/queries/teilen-wirkung'
@@ -61,8 +79,9 @@ export const metadata: Metadata = {
  * angeordnet. Oben höchstens EIN Kasten (Stripe), die Teilen-Zeile kompakt
  * zuletzt in der Hauptspalte, nach Packliste und „Braucht dich" (freigabe.md
  * §12 Nr. 45, Register N11). „Zu tun" ist EINE Liste statt
- * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten
- * (Hauptspalte links, Seitenspalte 360 px rechts) — bei 1024 px neben der
+ * Erster Schritte und „Deine Hofseite" (Nr. 53). Ab 1280 px zwei Spalten von
+ * oben (Board w1-heute, Lauf 31: Kopf, Karten und Zahlen nur in der
+ * Hauptspalte, die Seitenspalte 360 px rechts daneben) — bei 1024 px neben der
  * Seitenleiste wäre die Packliste zu schmal, dort steht die Seitenspalte als
  * Raster darunter; „Zu tun" geht dort über beide Spalten.
  */
@@ -82,7 +101,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   // eine verfallene Bestellung und ihre noch gebundene Ware. getHeute wartet
   // nur mit diesen Abfragen auf die Freigabe, alle anderen laufen daneben
   // (Nachtlauf Nr. 31); der Cookie ebenso.
-  const [heute, cookieJar, faeden, deinBeitrag, sperrKarte, widerrufe] = await Promise.all([
+  const [heute, cookieJar, faeden, deinBeitrag, sperrKarte, widerrufe, ungelesen] = await Promise.all([
     getHeute(farm.id, jetzt, gibVerwaisteFreiOhneRisiko(farm.id, jetzt)),
     cookies(),
     // Postfach (Register N12, Nr. 87): Ein Ladefehler nimmt nur die Karte weg, nie Heute — gemeldet ohne Nachrichtentext.
@@ -95,7 +114,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       Sentry.captureException(err, { tags: { bereich: 'dein-beitrag', seite: 'heute' }, extra: { farmId: farm.id } })
       return null
     }),
-    // Barzahlung pausiert nach offener Plattformgebühr (Register N38, Nr. 198): ein Ladefehler nimmt nur die Karte weg.
+    // Barzahlung gesperrt nach offener Plattformgebühr (Register N38, Nr. 198): ein Ladefehler nimmt nur die Karte weg.
     ladeSperrKarte(farm.id, jetzt).catch((err: unknown) => {
       Sentry.captureException(err, { tags: { bereich: 'monatsabrechnung', seite: 'heute' }, extra: { farmId: farm.id } })
       return null
@@ -105,11 +124,17 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       Sentry.captureException(err, { tags: { bereich: 'widerruf', seite: 'heute' }, extra: { farmId: farm.id } })
       return []
     }),
+    // Zähler am Postfach im Kopf (Handy, Board s1-heute) — derselbe Zähler wie in der Navigation; ein Fehler nimmt nur die Zahl weg.
+    zaehleUngelesenHof(farm.id).catch((err: unknown) => {
+      Sentry.captureException(err, { tags: { bereich: 'postfach', seite: 'heute' }, extra: { farmId: farm.id } })
+      return 0
+    }),
   ])
   const postfach = heutePostfach(faeden, jetzt)
   // Nr. 207 (§ 104 JN, P2B): einmal nach jeder neuen Fassung — bis der Hof zustimmt, steht die Karte; nie ein Lockout.
-  const fassung = agbFassung()
-  const agbOffen = brauchtAgbZustimmung(farm, fassung)
+  const fassung = AGB_NEUESTE
+  // N45: Die Karte nennt vor dem Stichtag den Tag — nur geladen, wenn sie steht; null heißt: keine Karte.
+  const agbStichtag = brauchtAgbZustimmung(farm, fassung) ? await ladeAgbKartenStichtag(jetzt, farm.id) : null
 
   // Der Cookie entscheidet auf dem Server, ob die Karte oder die Zeile
   // „Zu tun einblenden" kommt — so blitzt nichts auf und nichts rutscht nach.
@@ -140,6 +165,10 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     ? await Promise.all([getTeilenFensterDaten(farm.id, jetzt), getTeilenWirkung(farm.id, letzteTage(jetzt, 7))])
     : [null, null]
   const wirkungSatz = wirkung ? teilenWirkungSatz(wirkung) : null
+  // Tage immer mit Wochentag und Datum (V9): „Heute, Mi 3. März", „Sa, 6. März".
+  const heuteTag = wienKalendertag(jetzt)
+  const naechstes = heute.naechstesFenster
+  const karte = heute.naechsteAbholungKarte
 
   const bloecke: Record<HeuteBlock, ReactNode> = {
     postfach: postfach && <PostfachKarte nachricht={postfach.nachricht} weitere={postfach.weitere} />,
@@ -158,69 +187,91 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
     packliste: (
       <Packliste
         zeilen={heute.abholungen}
-        zuPacken={heute.zahlen.zuPacken}
-        naechsteAbholung={heute.naechsteAbholung}
-        leer={{ abholfenster: heute.naechstesFenster?.fenster ?? null }}
+        stand={packlistenStand(heute.abholungen)}
+        leer={{ naechsteAbholung: naechstes ? naechsteAbholungSatz(naechstes.fenster, naechstes.anzahl, heuteTag) : null }}
       />
     ),
     'braucht-dich': <BrauchtDichKarte eintraege={brauchtDichEintraege} packlisteLeer={heute.abholungen.length === 0} />,
     'zu-tun': (
       <ZuTunKarte
         aufgaben={heute.zuTun.aufgaben}
-        wartetAufFreigabe={heute.wartetAufFreigabe}
         ausblenden={<ErsteSchritteSchalter richtung="aus" />}
       />
     ),
-    'naechste-abholung': (
-      <NaechsteAbholungKarte fenster={heute.naechstesFenster?.fenster ?? null} anzahl={heute.naechstesFenster?.anzahl ?? 0} />
+    // Ohne Abholzeit keine Karte (Liste Lauf 32, heute Bild 4) — Satz und Knopf stehen in der Packliste.
+    // Steht heute schon in der Packliste, nennt die Karte das Fenster danach (karteNaechsteAbholung, Nr. 249b).
+    'naechste-abholung': karte && (
+      <NaechsteAbholungKarte fenster={karte.fenster} tag={abholTagMitDatum(heuteTag, karte.fenster.tag)} anzahl={karte.anzahl} />
     ),
     woche: (
       <WocheKarte
         summeCent={heute.woche.dieseWocheCent}
-        vergleich={vergleichText(heute.woche.prozent, jetzt)}
+        vergleich={vergleichText(heute.woche, jetzt)}
         balken={heute.wochenBalken}
+        selbstEingetragen={selbstEingetragenSatz(heute.selbstEingetrageneTage)}
       />
     ),
   }
   // „Zu tun" geht im Raster der Seitenspalte (768–1279 px) über beide Spalten — sonst bliebe neben der Woche ein Loch.
+  // Am Handy steht es nicht im Strom (Liste Lauf 32, heute: Braucht dich → Teilen → Was gibt’s Neues → Nächste
+  // Abholung → Umsatz → Tipp); der Weg zu den offenen Schritten bleibt der Balken bzw. „Hof einrichten“.
+  // Ein Block ohne Inhalt bekommt keine Hülle — sonst stünde im Raster eine leere Zelle.
   const zeige = (ids: HeuteBlock[]) =>
-    ids.map((id) => (
-      <div key={id} className={cn('min-w-0', id === 'zu-tun' && 'md:col-span-2 xl:col-span-1')}>
-        {bloecke[id]}
-      </div>
-    ))
+    ids
+      .filter((id) => Boolean(bloecke[id]))
+      .map((id) => (
+        <div key={id} className={cn('min-w-0', id === 'zu-tun' && 'max-md:hidden md:col-span-2 xl:col-span-1')}>
+          {bloecke[id]}
+        </div>
+      ))
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pt-5 pb-12 md:px-8 md:pt-8 xl:px-10">
-      <div className="flex flex-col gap-4 md:gap-5">
-        {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
-        {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
-        {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
-        <WiderrufHeuteKarte widerrufe={widerrufe} />
-        {agbOffen && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} />}
-        {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
-        {hofEmailFehlt(farm) && <HofEmailKarte />}
-        {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
-        {zeige(aufbau.oben)}
-        <HeuteKopf datum={datumLang(jetzt)} abholungHeute={heute.abholfensterHeute} />
-        <Kennzahlen
-          bestellungen={heute.zahlen.bestellungen}
-          zuPacken={heute.zahlen.zuPacken}
-          umsatzHeuteCent={heute.zahlen.umsatzHeuteCent}
-        />
-        <div className="flex flex-col gap-4 md:gap-5 xl:flex-row xl:items-start xl:gap-6">
-          <div className="flex min-w-0 flex-1 flex-col gap-4 md:gap-5">{zeige(aufbau.haupt)}</div>
-          <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:w-[360px] xl:shrink-0 xl:grid-cols-1">{zeige(aufbau.seite)}</div>
+      {/* Ab 1280 px zwei Spalten von oben (Board w1-heute): links Kopf, Karten, Zahlen und die Hauptspalte,
+          rechts die Seitenspalte auf der Höhe der Marke „Abholung heute“. Darunter steht alles untereinander,
+          die Seitenspalte als Raster unter der Hauptspalte. */}
+      <div className="flex flex-col gap-4 md:gap-5 xl:flex-row xl:items-start xl:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 md:gap-5">
+          {/* Reihenfolge nach Board s1-heute: Titel und Datum zuerst, dann die Pflicht- und Stripe-Karten,
+              dann die Marke „Abholung heute", die Zahlen und die Hauptspalte. */}
+          {/* Ab 1280 px bleiben Kopf (samt Balken darunter) und Seitenspalte stehen, nur die Hauptspalte scrollt
+              (Liste Lauf 32, heute Bild 2). Darunter klebt der Kopf als Leiste des Werkzeug-Kopfs selbst
+              (`contents`, damit sein sticky am Handy an der Seite hängt und nicht an dieser Hülle). */}
+          <div className="contents xl:sticky xl:top-0 xl:z-30 xl:-mt-8 xl:block xl:bg-background xl:pt-8">
+            <HeuteKopf datum={datumLang(jetzt)} hofName={heute.wartetAufFreigabe ? farm.name : null} postfach={ungelesen} />
+          </div>
+          {/* Die Sperre des Teams (N34, Nr. 187) steht über allem: Ohne sie kommt keine neue Bestellung. */}
+          {farm.adminGesperrtAm && <TeamSperreKarte grund={farm.adminSperrGrund} />}
+          {/* Nr. 200 (N39): Widerrufe warten auf den Hof (erstatten oder mit Grund ablehnen). */}
+          <WiderrufHeuteKarte widerrufe={widerrufe} />
+          {agbStichtag && <AgbZustimmenKarte fassung={fassung} geaendert={farm.agbFassung !== null} stichtag={agbStichtag} />}
+          {/* Nr. 212: Bestandshöfe ohne Hof-E-Mail — die Belehrung braucht die Adresse des Betriebs; weg, sobald das Feld gefüllt ist. */}
+          {hofEmailFehlt(farm) && <HofEmailKarte />}
+          {sperrKarte && <LastschriftSperreKarte abrechnungId={sperrKarte.abrechnungId} monatText={sperrKarte.monatText} stand={sperrKarte.stand} />}
+          {zeige(aufbau.oben)}
+          {heute.abholfensterHeute && (
+            <AbholungHeuteMarke text={abholungHeuteText(heuteTag, heute.abholfensterHeute)} />
+          )}
+          <Kennzahlen
+            bestellungen={heute.zahlen.bestellungen}
+            zuPacken={heute.zahlen.zuPacken}
+            umsatzHeuteCent={heute.zahlen.umsatzHeuteCent}
+          />
+          {zeige(aufbau.haupt)}
         </div>
-        {zuTunZeigen === 'zeile' && (
-          <p className="text-center">
-            <ErsteSchritteSchalter richtung="ein" />
-          </p>
-        )}
-        {/* Ganz unten (Register N1): die Karte „auf den Startbildschirm legen" —
-            nur im Browser, nicht in der installierten App; das entscheidet die
-            Karte selbst nach dem Mounten. */}
-        <StartbildschirmKarte />
+        <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:sticky xl:top-8 xl:mt-[76px] xl:w-[360px] xl:shrink-0 xl:grid-cols-1">
+          {zeige(aufbau.seite)}
+          {zuTunZeigen === 'zeile' && (
+            <p className="text-center md:col-span-2 xl:col-span-1">
+              <ErsteSchritteSchalter richtung="ein" />
+            </p>
+          )}
+          {/* Zuletzt (Register N1, Board w1-heute: unten in der Seitenspalte): die Karte „auf den Startbildschirm
+              legen" — nur im Browser, nicht in der installierten App; das entscheidet die Karte selbst nach dem Mounten. */}
+          <div className="min-w-0 md:col-span-2 xl:col-span-1">
+            <StartbildschirmKarte />
+          </div>
+        </div>
       </div>
 
       {freischaltMomentMoeglich(heute.hof, jetzt) && (
@@ -228,4 +279,19 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
       )}
     </div>
   )
+}
+
+/**
+ * Der Stichtag für die Karte „AGB bestätigen“ (N45) — aus der gecachten Zeile,
+ * nie über ladeHofpreisEinstellung (deren stille Vorgabe gehört nicht in einen
+ * Rechtstext). Scheitert das Laden, steht der Satz ohne Datum da, gemeldet mit
+ * festem Bereich; Heute bleibt.
+ */
+async function ladeAgbKartenStichtag(jetzt: Date, farmId: string): Promise<AgbKartenStichtag> {
+  try {
+    return agbKartenStichtag(hofpreisModellAb(hofpreisEinstellungAus(await ladePlattformEinstellung())), jetzt)
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'agb-karte-stichtag', seite: 'heute' }, extra: { farmId } })
+    return agbKartenStichtag(null, jetzt)
+  }
 }

@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { abzeichenSeit, zeigtAbzeichen, type AbzeichenBlatt } from '@/lib/gruendungshof'
-import { hofAdresse, hofZustand, titelbildFoto, type HofZustand } from '@/lib/mein-hof'
+import { hofAdresse, hofZustand, type HofZustand } from '@/lib/mein-hof'
 import { APP_URL } from '@/lib/umgebung-server'
 import { categoryImagePath } from '@/lib/product-image'
 import { zuProduktDto } from '@/lib/produkt-dto'
@@ -1130,10 +1130,6 @@ export type MeinHofKopfDaten = {
   logoUrl: string | null
   /** Ausschnitt des Logos (Register N17, Nr. 98) — schon geprüft; null = wie heute. */
   logoAusschnitt: BildAusschnitt | null
-  /** Ein hochgeladenes Titelbild; null = Verlauf (bannerValue). */
-  titelbildUrl: string | null
-  bannerValue: string | null
-  bannerFocusY: number
   zustand: HofZustand
 }
 
@@ -1146,10 +1142,6 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
       slug: true,
       logoUrl: true,
       logoAusschnitt: true,
-      bannerType: true,
-      bannerUrl: true,
-      bannerValue: true,
-      bannerFocusY: true,
       isActive: true,
       isPaused: true,
       approvedAt: true,
@@ -1163,9 +1155,6 @@ export async function getMeinHofKopf(ownerId: string): Promise<MeinHofKopfDaten 
     adresse: hofAdresse(APP_URL, hof.slug),
     logoUrl: hof.logoUrl,
     logoAusschnitt: leseAusschnitt(hof.logoAusschnitt),
-    titelbildUrl: titelbildFoto(hof),
-    bannerValue: hof.bannerValue,
-    bannerFocusY: hof.bannerFocusY,
     zustand: hofZustand(hof),
   }
 }

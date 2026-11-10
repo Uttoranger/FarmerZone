@@ -8,7 +8,7 @@ import { KundeFokusShell } from '@/components/shells/kunde-shell'
 import { RegisterForm } from './register-form'
 import { MARKE } from '@/lib/marke'
 import { gruendungFuerSeiten } from '@/server/queries/plattform-einstellung'
-import { RegistrierenSatz } from '@/components/gruendung/registrieren-satz'
+import { GruendungZeile } from './gruendung-zeile'
 
 export const metadata: Metadata = {
   title: `Hof registrieren — ${MARKE}`,
@@ -33,15 +33,17 @@ export const dynamic = 'force-dynamic'
  * registriert?".
  */
 export default async function RegisterPage(): Promise<React.JSX.Element> {
-  // Der voraussichtliche Gründungsplatz (Register K2-Ergänzung, Nr. 93) — die
-  // Seite ist ohnehin dynamisch, die Zahl also je Aufruf frisch.
+  // Die Zahlen der Gründungsaktion (Register K2, N44) — die Seite ist ohnehin
+  // dynamisch, der Zähler also je Aufruf frisch. Seit Lauf 30 ohne Platznummer.
   const gruendung = await gruendungFuerSeiten()
   return (
     <KundeFokusShell
       titel="Hof registrieren"
       zurueck={{ href: '/fuer-hoefe', label: 'Zurück zu Für Höfe' }}
       rechts={
-        <span className="flex items-center gap-3">
+        // Am Handy ohne Knopf (Liste Lauf 32, registrieren/Q2): Den Weg zur Anmeldung trägt dort „Schon dabei? Anmelden“
+        // unter dem Formular.
+        <span className="hidden items-center gap-3 md:flex">
           <span className="hidden md:inline">{SCHON_DABEI.frage}</span>
           <Link
             href={SCHON_DABEI.href}
@@ -56,7 +58,7 @@ export default async function RegisterPage(): Promise<React.JSX.Element> {
         </span>
       }
     >
-      <RegisterForm formToken={generateFormToken()} gruendungSatz={<RegistrierenSatz gruendung={gruendung} className="-mt-2 mb-5" />} />
+      <RegisterForm formToken={generateFormToken()} gruendungSatz={<GruendungZeile gruendung={gruendung} className="mb-2.5" />} />
     </KundeFokusShell>
   )
 }

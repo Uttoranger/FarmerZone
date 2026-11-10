@@ -3,12 +3,15 @@
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { ChevronRight, Clock, Plus, Wheat } from 'lucide-react'
+import { ChevronRight, Plus, Wheat } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FilterChip, FilterChipReihe } from '@/components/ui/chip'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { LadePunkt } from '@/components/ui/lade-punkt'
-import { Segment } from '@/components/ui/segment'
+import { AnsichtChips } from '@/components/region/ansicht-chips'
+import { REGION_KARTE_HOEHE, REGION_KARTE_MARKE, REGION_KARTEN_SPALTE, REGION_SPALTEN } from '@/components/region/region-spalten'
+import { useRegionAnsicht } from '@/components/region/use-region-ansicht'
+import { futterHinweisImUmkreis, futterZahlZeile } from '@/components/region/futter-hinweise'
 import { KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
 import { KmWahl } from '@/components/region/km-wahl'
 import { ErklaerKnopf } from '@/components/region/erklaer-knopf'
@@ -18,7 +21,6 @@ import { ABHOLUNG_TEXT } from '@/lib/hoefe-entdecken'
 import {
   FUTTER_ERKLAERUNG,
   FUTTER_KARTE_TEXT,
-  FUTTER_KAUFEN_HINWEIS,
   FUTTER_SELBST_VERKAUFEN,
   type FutterKaufenAnsicht as Ansicht,
   type FutterLeer,
@@ -32,13 +34,8 @@ import { futterKaufenLink, leseFutterAnsicht, type FutterAnsichtWahl, type Futte
 // (tests/futter-karte-import.test.ts prüft das am Import-Graph).
 const FutterKarteAnsicht = dynamic(() => import('@/components/region/futter-karte-ansicht'), {
   ssr: false,
-  loading: () => <div className="h-[60vh] min-h-[320px] animate-pulse rounded-2xl bg-muted" aria-hidden="true" />,
+  loading: () => <div className={cn(REGION_KARTE_HOEHE, 'animate-pulse rounded-[12px] bg-muted')} aria-hidden="true" />,
 })
-
-const ANSICHTEN = [
-  { wert: 'liste', label: 'Liste' },
-  { wert: 'karte', label: 'Karte' },
-] as const
 
 /*
  * Region › Futter kaufen (Nachtlauf Nr. 22c; seit Nr. 123 nach Board
@@ -51,6 +48,11 @@ const ANSICHTEN = [
  * gewechselt wird mit history.replaceState, die Links tragen die Ansicht mit.
  * Alles hat src/lib/futter-kaufen.ts entschieden und formatiert; hier wird nur
  * angeordnet.
+ *
+ * Seit Nr. 272 (Board s1-/w1-region Bild 2 und 6): ab 1024 px Liste und Karte
+ * nebeneinander, darüber der Satz „Höfe mit LFBIS-Nummer im Umkreis von 25 km –
+ * du kaufst für deine Tiere.“; am Handy die Zeile „2 Höfe mit LFBIS-Nummer“
+ * neben „Liste / Karte“, in der Kartenansicht nur Umkreis und „Liste / Karte“.
  */
 export function FutterKaufenAnsicht({
   ansicht,
@@ -67,6 +69,7 @@ export function FutterKaufenAnsicht({
   const pfad = usePathname()
   const suche = useSearchParams()
   const wahl = suche.has('ansicht') ? leseFutterAnsicht(suche.get('ansicht')) : ansichtBeimLaden
+  const { zeigeKarte, zeigeListe, nurUmkreis } = useRegionAnsicht(wahl)
   const link = (teil: Partial<FutterKaufenFilter>): string => futterKaufenLink({ ...filter, ...teil }, wahl)
 
   function waehle(neu: FutterAnsichtWahl): void {
@@ -75,83 +78,92 @@ export function FutterKaufenAnsicht({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" {...(nurUmkreis ? REGION_KARTE_MARKE : {})}>
       <div className="flex flex-col gap-3">
         <KmWahl
           stufen={UMFELD_KM.map((km) => ({ km, href: link({ km }), aktiv: km === filter.km }))}
           zahlen={ansicht.zahlenJeStufe}
           zahlLabel={FUTTER_KARTE_TEXT.umkreisZahl}
         />
-        <FilterChipReihe beschriftung="Futterart">
-          {ansicht.artChips.map((chip) => (
-            <FilterChip key={chip.wert ?? 'alle'} href={link({ art: chip.wert })} aktiv={chip.aktiv} ladePunkt>
-              {chip.label}
-            </FilterChip>
-          ))}
-        </FilterChipReihe>
-        {ansicht.mengeChips.length > 1 && (
-          <FilterChipReihe beschriftung="Menge">
-            {ansicht.mengeChips.map((chip) => (
-              <FilterChip key={chip.wert ?? 'alle'} href={link({ menge: chip.wert })} aktiv={chip.aktiv} ladePunkt>
-                {chip.label}
-              </FilterChip>
-            ))}
-          </FilterChipReihe>
+        {/* In der Kartenansicht am Handy nur der Umkreis (Liste Lauf 32 region, Board s1-region Bild 6). */}
+        {!nurUmkreis && (
+          <>
+            <FilterChipReihe beschriftung="Futterart">
+              {ansicht.artChips.map((chip) => (
+                <FilterChip key={chip.wert ?? 'alle'} href={link({ art: chip.wert })} aktiv={chip.aktiv} ladePunkt>
+                  {chip.label}
+                </FilterChip>
+              ))}
+            </FilterChipReihe>
+            {ansicht.mengeChips.length > 1 && (
+              <FilterChipReihe beschriftung="Menge">
+                {ansicht.mengeChips.map((chip) => (
+                  <FilterChip key={chip.wert ?? 'alle'} href={link({ menge: chip.wert })} aktiv={chip.aktiv} ladePunkt>
+                    {chip.label}
+                  </FilterChip>
+                ))}
+              </FilterChipReihe>
+            )}
+            {/* Abholung wie auf /hoefe: eine Liste von Links mit aria-current, am Handy waagrecht wischbar. */}
+            {/* Ohne Uhr-Symbol vor der Tage-Zeile (Liste Lauf 32 region). */}
+            <FilterChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} className="min-w-0">
+              {ansicht.abholungChips.map((chip) => (
+                <FilterChip key={chip.wert ?? 'alle'} href={link({ abholung: chip.wert })} aktiv={chip.aktiv} ladePunkt>
+                  {chip.label}
+                </FilterChip>
+              ))}
+            </FilterChipReihe>
+          </>
         )}
-        {/* Abholung wie auf /hoefe: eine Liste von Links mit aria-current, am Handy waagrecht wischbar. */}
-        <div className="flex items-center gap-2">
-          <Clock className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          <FilterChipReihe beschriftung={ABHOLUNG_TEXT.beschriftung} className="min-w-0 flex-1">
-            {ansicht.abholungChips.map((chip) => (
-              <FilterChip key={chip.wert ?? 'alle'} href={link({ abholung: chip.wert })} aktiv={chip.aktiv} ladePunkt>
-                {chip.label}
-              </FilterChip>
-            ))}
-          </FilterChipReihe>
-        </div>
       </div>
 
-      {/* Liste | Karte ist Zustand der Seite (replaceState), kein Filter — deshalb Segment, nicht FilterChips. */}
+      {/* Am Handy Zählzeile und „Liste / Karte“ in einer Zeile (Board s1-region Bild 2), im Web nur der Satz mit dem Umkreis. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="flex items-center gap-2 text-[12.5px] leading-normal text-muted-foreground">
-            {/* Am Handy die Zeile mit der Zahl (Board v2, Handy 3), am Computer der Satz (Board v3) — beide mit (i). */}
-            <span className="min-w-0 md:hidden">{ansicht.zahlZeile}</span>
-            <span className="hidden min-w-0 md:inline">{FUTTER_KAUFEN_HINWEIS}</span>
-            <ErklaerKnopf titel={FUTTER_ERKLAERUNG.titel} punkte={FUTTER_ERKLAERUNG.punkte} />
-          </p>
-          {ansicht.hinweise.map((hinweis) => (
-            <p key={hinweis} className="text-[12.5px] leading-normal text-muted-foreground">
-              {hinweis}
+        {!nurUmkreis && !ansicht.leer && (
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <p className="flex items-center gap-2 text-[13px] leading-normal text-muted-foreground">
+              <span className="min-w-0 lg:hidden">{futterZahlZeile(ansicht.karte.pins.length)}</span>
+              <span className="hidden min-w-0 lg:inline">{futterHinweisImUmkreis(filter.km)}</span>
+              <ErklaerKnopf titel={FUTTER_ERKLAERUNG.titel} punkte={FUTTER_ERKLAERUNG.punkte} />
             </p>
-          ))}
-        </div>
-        <Segment
-          beschriftung="Ansicht wählen"
-          optionen={ANSICHTEN}
-          wert={wahl}
-          onWertChange={(neu) => waehle(neu === 'karte' ? 'karte' : 'liste')}
-        />
+            {ansicht.hinweise.map((hinweis) => (
+              <p key={hinweis} className="text-[13px] leading-normal text-muted-foreground">
+                {hinweis}
+              </p>
+            ))}
+          </div>
+        )}
+        {/* Leer ohne „Liste / Karte“ (Board Bild 5) — außer man steht schon in der Karte und braucht den Weg zurück. */}
+        {(!ansicht.leer || wahl === 'karte') && <AnsichtChips wert={wahl} onWahl={waehle} className="lg:hidden" />}
       </div>
 
-      {ansicht.leer && <FutterLeerzustand leer={ansicht.leer} filter={filter} link={link} />}
+      <div className={REGION_SPALTEN}>
+        {/* Leer: Sorten-Chips bleiben mit der gewählten Sorte, keine Zählzeile (Liste Lauf 32 region, Bild 5). */}
+        {ansicht.leer ? (
+          <div className="min-w-0">
+            <FutterLeerzustand leer={ansicht.leer} filter={filter} link={link} />
+          </div>
+        ) : (
+          zeigeListe && (
+            <ul className="flex min-w-0 flex-col gap-2.5">
+              {ansicht.angebote.map((angebot) => (
+                <li key={angebot.schluessel}>
+                  <FutterKarte angebot={angebot} jetzt={jetzt} />
+                </li>
+              ))}
+            </ul>
+          )
+        )}
+        {zeigeKarte && (
+          <div className={REGION_KARTEN_SPALTE}>
+            <FutterKarteAnsicht karte={ansicht.karte} jetzt={jetzt} />
+          </div>
+        )}
+      </div>
 
-      {wahl === 'karte' ? (
-        <FutterKarteAnsicht karte={ansicht.karte} jetzt={jetzt} />
-      ) : (
-        !ansicht.leer && (
-          <ul className="flex flex-col gap-2.5">
-            {ansicht.angebote.map((angebot) => (
-              <li key={angebot.schluessel}>
-                <FutterKarte angebot={angebot} jetzt={jetzt} />
-              </li>
-            ))}
-          </ul>
-        )
-      )}
-
-      {ansicht.selbst?.art === 'anlegen' && (
-        <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border px-4 py-3.5">
+      {/* „Selbst verkaufen“ gehört zur Liste — in der Kartenansicht am Handy steht nur die Karte (Board s1-region Bild 6). */}
+      {!nurUmkreis && ansicht.selbst?.art === 'anlegen' && (
+        <div className="flex items-start gap-3 rounded-[12px] border border-dashed border-border px-4 py-3.5">
           <Plus className="mt-0.5 size-[17px] shrink-0 text-status-offen" strokeWidth={2} aria-hidden="true" />
           <div className="min-w-0 text-[12.5px] leading-normal text-muted-foreground">
             <p>{FUTTER_SELBST_VERKAUFEN}</p>
@@ -164,7 +176,7 @@ export function FutterKaufenAnsicht({
           </div>
         </div>
       )}
-      {ansicht.selbst?.art === 'zeile' && (
+      {!nurUmkreis && ansicht.selbst?.art === 'zeile' && (
         <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] leading-normal text-muted-foreground">
           <Wheat className="size-4 shrink-0 text-status-fertig" strokeWidth={1.8} aria-hidden="true" />
           <span>{ansicht.selbst.satz}</span>
@@ -202,12 +214,11 @@ function FutterLeerzustand({
           : link({ km: filter.km, art: null, menge: null, abholung: null })
   return (
     <EmptyState
-      symbol={Wheat}
       titel={leer.titel}
       satz={leer.satz}
       ausweg={
         ausweg && ziel ? (
-          <Link href={ziel} className={KNOPF_RAHMEN}>
+          <Link href={ziel} className={cn(KNOPF_RAHMEN, 'w-full justify-center rounded-[10px] border-primary text-status-offen')}>
             {ausweg.label}
             <LadePunkt />
           </Link>

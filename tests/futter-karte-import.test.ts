@@ -62,7 +62,9 @@ describe('Futter-Karte — erst beim Umschalten geladen', () => {
     const text = fs.readFileSync(path.join(WURZEL, 'src/components/region/futter-kaufen-ansicht.tsx'), 'utf8')
     expect(text).toMatch(/dynamic\(\s*\(\)\s*=>\s*import\('@\/components\/region\/futter-karte-ansicht'\)/)
     expect(text).toMatch(/ssr:\s*false/)
-    expect(text).toMatch(/wahl === 'karte' \? \(\s*<FutterKarteAnsicht/)
+    // Seit Nr. 272: gerendert nur, wenn die Karte zu sehen ist — ab 1024 px immer, darunter in der Ansicht „Karte“.
+    expect(text).toMatch(/\{zeigeKarte && \(\s*<div[^>]*>\s*<FutterKarteAnsicht/)
+    expect(text).toContain('useRegionAnsicht(wahl)')
     expect(text.match(/<FutterKarteAnsicht/g)).toHaveLength(1)
   })
 

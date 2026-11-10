@@ -193,6 +193,52 @@ export const UNTEN: readonly NavPunkt[] = [
 
 export const ABMELDEN_LABEL = 'Abmelden'
 
+// ─── Wörter der HofShell (Nr. 220, Boards s1-/w1-mehr-neu) ─────────────────
+
+/** Die Adresse eines Hauptpunkts — für die Marke oben in der Seitenleiste (führt nach Heute). */
+export function hauptPunktHref(id: NavPunktId): string {
+  return hauptPunkt(id).href
+}
+
+/** Der Name der Startseite des Hofbereichs (Wortliste „Heute“, N42 c) — im Namen der Marke in der Seitenleiste. */
+export const HEUTE_LABEL = hauptPunkt('heute').label
+
+/** Der Textlink in der Hofkarte der Seitenleiste. */
+export const HOFSEITE_ANSEHEN = 'Hofseite ansehen'
+
+/**
+ * Der Kopf eines Blatts der Shells bleibt beim Scrollen oben stehen (Board
+ * s1-mehr-neu, Bild 2: „Mehr · Schließen“ über der gescrollten Liste).
+ */
+export const BLATT_KOPF_KLEBT = 'sticky top-0 z-10 bg-popover'
+
+/** Titel und das eine Schließen-Element des Blatts „Mehr“. */
+export const HOF_MEHR_TITEL = 'Mehr'
+export const HOF_MEHR_SCHLIESSEN = 'Schließen'
+
+/** Das eine Schließen-Element des Blatts „Neu“ (oben rechts neben „Was legst du an?“). */
+export const HOF_NEU_ABBRECHEN = 'Abbrechen'
+
+/** Die Gruppe mit Person, Einstellungen, Problem melden, Admin, Darstellung und Abmelden im Mehr-Blatt. */
+export const KONTO_UND_HILFE_TITEL = 'Konto und Hilfe'
+
+/** „Konto · <Name>“ unten in der Seitenleiste (V13). */
+export const KONTO_KURZ = 'Konto'
+
+/** Die Unterzeile von Postfach im Mehr-Blatt: „1 neue Nachricht“, „3 neue Nachrichten“. */
+export function postfachUnterzeile(anzahl: number): string {
+  return anzahl === 1 ? '1 neue Nachricht' : `${anzahl} neue Nachrichten`
+}
+
+/**
+ * Ein Datum wie „31. Jänner 2028“ bricht nicht um (V13, Tarif-Zeile): Die
+ * Leerzeichen zwischen Tag, Monat und Jahr werden geschützt. Der übrige Text
+ * bleibt, wie er ist; die Zeile selbst baut `baueTarifZeile` (konditionen.ts).
+ */
+export function datumOhneUmbruch(text: string): string {
+  return text.replace(/(\d{1,2}\.)[ \u00a0]([A-Za-zÄÖÜäöüß]+)[ \u00a0](\d{4})/g, '$1\u00a0$2\u00a0$3')
+}
+
 const ALLE: readonly NavPunkt[] = [...HAUPT, ...VERKAUF_UND_KUNDEN, ...UNTEN]
 
 /** Wie weit `pfad` unter `ziel` liegt — die Länge des passenden Ziels, sonst -1. */
@@ -414,13 +460,17 @@ export function hofHandyAriaAktuell(pfad: string, punkt: HofNavPunkt): 'page' | 
 // ─── Rückweg auf Unterseiten (Nachtlauf Nr. 44, Register N1) ────────────────
 //
 // Am Handy hat jede Unterseite des Hofbereichs einen festen Kopf mit dem Weg
-// zur Elternseite (components/hofbereich/unterseiten-kopf.tsx). Wohin er führt
+// zur Elternseite (components/ui/werkzeug-kopf.tsx). Wohin er führt
 // und wie er heißt, steht nur hier — aus denselben Punkten wie Leiste und
 // Mehr-Blatt, damit es keine zweite Schreibweise gibt („‹ Alle Kunden",
 // „Zu den Beiträgen" und „Meine Meldungen" hießen vorher je Seite anders).
 
-/** Wohin der Rückweg einer Unterseite führt und wie die Elternseite heißt. */
-export type Elternseite = { href: string; name: string }
+/**
+ * Wohin der Rückweg einer Unterseite führt und wie die Elternseite heißt.
+ * `nurHandy`: Der Rückweg gilt nur unter 768 px — die Elternseite gibt es im
+ * Web nicht (das Mehr-Blatt; dort steht die Seite selbst in der Seitenleiste).
+ */
+export type Elternseite = { href: string; name: string; nurHandy?: true }
 
 /** Der sichtbare Name steht neben dem Pfeil; der Screenreader hört „Zurück zu …". */
 export const RUECKWEG_PRAEFIX = 'Zurück zu'
@@ -440,21 +490,64 @@ function beitraegeReiter(): MeinHofReiter {
 }
 
 /**
+ * „Mehr“ als Elternseite der Einstellungen am Handy (Register N1, Ergänzung
+ * 7.11.2026; Board s1-einstellungen „‹“). Das Mehr-Blatt hat keine eigene
+ * Adresse — es liegt über der Seite, von der aus man es öffnet. Der Rückweg
+ * führt deshalb nach Heute, der Startseite des Hofbereichs, von der aus das
+ * Blatt meist geöffnet wird; kam man von dort, ist der Tipp ein Schritt im
+ * Verlauf (`beimTipp`, ui/rueckweg-tipp.ts) und Heute steht da, wie man es
+ * verlassen hat. Nur am Handy: Im Web steht Einstellungen in der Seitenleiste
+ * und hat keinen Rückweg (Board w1-einstellungen „ohne Zurück“).
+ */
+function mehrBlatt(): Elternseite {
+  return { href: navPunkt('heute').href, name: HOF_MEHR_TITEL, nurHandy: true }
+}
+
+/** Das Formular „Problem melden“ im Hofbereich (Board s2-meldungen Bild 1–3). */
+const PROBLEM_MELDEN_FORMULAR_HREF = '/fehler-melden'
+
+/**
+ * „Problem melden“ als Elternseite von „Meine Meldungen“ am Handy (Register
+ * N1, Ergänzung aus N48; Board s2-meldungen Bild 4–6 „Zurück zu Problem
+ * melden“): Im Board ist „Problem melden“ das Formular, die Liste der eigenen
+ * Meldungen liegt darunter. Nur am Handy wie die übrigen Seiten des
+ * Mehr-Blatts — im Web steht „Problem melden“ in der Seitenleiste.
+ */
+function problemMeldenFormular(): Elternseite {
+  return { href: PROBLEM_MELDEN_FORMULAR_HREF, name: navPunkt('hilfe').label, nurHandy: true }
+}
+
+/**
  * Die Unterseiten mit Rückweg (freigabe.md §12 Nr. 44). Ein Muster je Route,
  * genau so tief wie die Route — /orders/today/print (Druckansicht ohne
  * HofShell) trifft deshalb nichts. /analytics/umfeld leitet seit Nr. 22c auf
  * /region um und zeigt den Kopf nie; die Zuordnung bleibt trotzdem, wie sie
- * beauftragt ist.
+ * beauftragt ist. Seiten der Leiste haben keinen Rückweg. Seiten des
+ * Mehr-Blatts haben ihn nur am Handy (`nurHandy`, Register N1, Ergänzungen
+ * 7.11.2026): /settings, Auswertung, Kunden, Verkäufe und Postfach nach
+ * „Mehr“ (Boards s2-auswertung, -kunden, -verkaeufe, -postfach Bild 1: „‹“
+ * ohne eigenen Namen wie s1-einstellungen; Nr. 269), Meine Meldungen nach
+ * „Problem melden“. Das Plakat gehört seit Nr. 250 zu den Beiträgen (Liste
+ * Lauf 32, whatsapp-plakat „Zurück-Ziel“; vorher Heute).
  */
 const UNTERSEITEN: readonly { muster: RegExp; eltern: () => Elternseite }[] = [
+  { muster: /^\/settings$/, eltern: mehrBlatt },
+  { muster: /^\/analytics$/, eltern: mehrBlatt },
+  { muster: /^\/customers$/, eltern: mehrBlatt },
+  { muster: /^\/sales$/, eltern: mehrBlatt },
+  { muster: /^\/postfach$/, eltern: mehrBlatt },
+  { muster: /^\/meldungen$/, eltern: problemMeldenFormular },
   { muster: /^\/settings\/.+$/, eltern: () => alsElternseite(navPunkt('einstellungen')) },
   { muster: /^\/customers\/[^/]+$/, eltern: () => alsElternseite(navPunkt('kunden')) },
   { muster: /^\/orders\/[^/]+$/, eltern: () => alsElternseite(navPunkt('bestellungen')) },
   { muster: /^\/postfach\/[^/]+$/, eltern: () => alsElternseite(navPunkt('postfach')) },
   { muster: /^\/status\/new$/, eltern: () => alsElternseite(beitraegeReiter()) },
   { muster: /^\/status\/[^/]+\/send-whatsapp$/, eltern: () => alsElternseite(beitraegeReiter()) },
-  { muster: /^\/status\/plakat$/, eltern: () => alsElternseite(navPunkt('heute')) },
+  { muster: /^\/status\/plakat$/, eltern: () => alsElternseite(beitraegeReiter()) },
   { muster: /^\/fehler-melden$/, eltern: () => alsElternseite(navPunkt('hilfe')) },
+  // /teilen steht ohne HofShell (Ziel des Teilens-Menüs), Rückweg nach Heute wie der Ausweg „Zu Heute“
+  // (Board s2-/w2-teilen, Liste Lauf 32 teilen „Kopfleiste fehlt“, Nr. 250).
+  { muster: /^\/teilen$/, eltern: () => alsElternseite(navPunkt('heute')) },
   { muster: /^\/analytics\/umfeld$/, eltern: () => alsElternseite(navPunkt('auswertung')) },
 ]
 
@@ -466,8 +559,9 @@ function nurPfad(pfad: string): string {
 
 /**
  * Die Elternseite zu einem Pfad — null für alles, was keine Unterseite ist:
- * Seiten der Leiste und des Mehr-Blatts haben keinen Rückweg (dorthin führt
- * die Navigation selbst), ebenso unbekannte Pfade.
+ * Seiten der Leiste haben keinen Rückweg (dorthin führt die Navigation
+ * selbst), ebenso unbekannte Pfade. Seiten des Mehr-Blatts haben ihn nur am
+ * Handy (`nurHandy`, Register N1, Ergänzungen 7.11.2026).
  */
 export function elternseite(pfad: string | null | undefined): Elternseite | null {
   if (!pfad) return null

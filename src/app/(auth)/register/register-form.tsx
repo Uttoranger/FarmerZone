@@ -1,11 +1,12 @@
 'use client'
 
 import { useId, useState } from 'react'
+import Link from 'next/link'
 import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2, Mail } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { registerFarmer } from '@/server/actions/register'
-import { passwortStaerke } from '@/lib/password-rules'
+import { validatePassword } from '@/lib/password-rules'
 import { schreibeHofnameEntwurf, sitzungsSpeicher } from '@/lib/hofname-entwurf'
 import { KONDITIONEN_UEBERGANG } from '@/lib/konditionen'
 import { REGISTRIEREN_SCHRITTE } from '@/lib/fuer-hoefe'
@@ -15,15 +16,17 @@ import { EMAIL_MAX, HOFNAME_MAX, PERSONENNAME_MAX } from '@/lib/eingabegrenzen'
 import { registrierenFormularSchema, type RegistrierenFormular } from '@/schemas/register'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { RUNDUNG } from '@/components/ui/rundung'
 import { Hinweiskarte } from '@/components/ui/hinweiskarte'
 import { PasswordInput } from '@/components/ui/password-input'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { HofAdresseVorschau } from '@/components/shared/hof-adresse-vorschau'
-import { SchonDabei } from '@/components/shared/schon-dabei'
+import { SCHON_DABEI } from '@/lib/kunden-navigation'
 import { FELD, FELD_LABEL, FeldFehler } from '@/components/checkout/kasse-teile'
-import { StartSchritte } from '@/components/fuer-hoefe/start-schritte'
 import { AgbSatz } from '@/components/rechtstexte/agb-stuecke'
+import { PasswortAnforderungen, PASSWORT_ANFORDERUNGEN_SATZ } from '@/components/anmelden/passwort-anforderungen'
 import { PostfachHinweis } from './postfach-hinweis'
+import { KNOPF_UMRISS_KRAEFTIG, TEXTLINK } from '@/components/anmelden/stil'
 
 /**
  * Der Honigtopf steht außerhalb des sichtbaren Bereichs statt auf
@@ -45,7 +48,7 @@ const HONIGTOPF_STIL: React.CSSProperties = {
 
 /** Der Hauptknopf der Hofwelt — Orange (DESIGN_SYSTEM, „Farbrollen"), volle Breite. */
 const KNOPF_ORANGE = cn(
-  'inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full border border-primary-foreground/30 bg-primary px-[18px] text-[15px] font-semibold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
+  'inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-primary px-[18px] text-[15px] font-bold text-primary-foreground transition-opacity duration-[250ms] hover:opacity-90 disabled:opacity-60',
   FOKUS_RAHMEN
 )
 
@@ -58,7 +61,7 @@ const KNOPF_ORANGE = cn(
  * danach zeigt das Formular „Schau in dein Postfach" (PostfachHinweis) und
  * meldet NICHT selbst an — eine scheiternde Anmeldung verriete, dass es die
  * Adresse schon gab (Register F6 „19b"). Neu im Formular (Nr. 15): Hofname mit der
- * künftigen Adresse, Passwortstärke, ein Satz mit Links zu AGB und
+ * künftigen Adresse, Passwort-Regeln zum Abhaken (seit Lauf 30 statt der Stärke-Balken), ein Satz mit Links zu AGB und
  * Konditionen (ohne Zustimmungs-Haken, siehe registrierenFormularSchema und
  * Register O4). Den Hof
  * selbst legt weiter Einrichten an; der Name wartet bis dahin im
@@ -81,7 +84,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
   })
   const { errors, isSubmitting } = form.formState
   const [hofname, name, email, password] = useWatch({ control: form.control, name: ['hofname', 'name', 'email', 'password'] })
-  const staerke = passwortStaerke(password)
+  const passwortGueltig = validatePassword(password).valid
 
   async function absenden(werte: RegistrierenFormular) {
     setFehler('')
@@ -111,19 +114,23 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
   const beschreibung = (...ids: (string | false)[]) => ids.filter(Boolean).join(' ') || undefined
 
   return (
-    <div className="mx-auto grid max-w-[1000px] gap-8 px-4 pt-5 pb-12 md:px-6 md:pt-10 lg:grid-cols-[minmax(0,580px)_minmax(0,1fr)] lg:gap-14">
-      {/* Nach dem Absenden nur so hoch wie der Hinweis, nicht so hoch wie die Spalte daneben. */}
-      <div className={cn('rounded-2xl border border-border bg-card p-5 md:p-7', gesendetAn !== null && 'self-start')}>
+    <div className="mx-auto grid max-w-[944px] gap-8 px-4 pt-5 pb-12 md:px-6 md:pt-5 lg:grid-cols-[minmax(0,560px)_minmax(0,320px)] lg:gap-4">
+      {/* Das Formular liegt direkt auf der Seite, ohne Karte (Board s2-/w2-registrieren); nach dem Absenden nur so hoch
+          wie der Hinweis, nicht so hoch wie die Spalte daneben. */}
+      <div className={cn(gesendetAn !== null && 'self-start')}>
         {gesendetAn !== null ? (
           <PostfachHinweis email={gesendetAn} />
         ) : (
           <>
+            {/* Die Fokus-Shell trägt die h1 „Hof registrieren“; die Karte wiederholt den Titel als h2 (Board w2-registrieren). */}
+            <h2 className="mb-2.5 font-heading text-[24px] leading-tight font-semibold">Hof registrieren</h2>
             {/* Der Übergang aus konditionen.ts (Register K1) statt eines Tarifs, der heute gälte. */}
-            <p className="mb-5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
-            {/* Der voraussichtliche Gründungsplatz (Register K2-Ergänzung) — die Seite rendert ihn, ohne Platz nichts. */}
+            <p className="mb-2.5 text-[14px] leading-normal text-muted-foreground">{KONDITIONEN_UEBERGANG}</p>
+            {/* Der Satz der Gründungsaktion ohne Platznummer (Lauf 30) — die Seite rendert ihn, ohne Aktion nichts. */}
             {gruendungSatz}
 
-            <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-4">
+            {/* 10 px zwischen den Feldern und 6 px von der Beschriftung zum Feld wie im Board (Nr. 275: das Formular war etwa 85 px länger). */}
+            <form onSubmit={form.handleSubmit(absenden)} noValidate className="flex flex-col gap-2.5">
               {/* Honigtopf — unsichtbar für Menschen, verlockend für Skripte.
                   aria-hidden hält ihn aus dem Screenreader heraus, tabIndex -1
                   aus der Tab-Reihenfolge, autoComplete="off" aus dem Ausfüllen
@@ -168,6 +175,8 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                   id={feldId('name')}
                   type="text"
                   autoComplete="name"
+                  // Platzhalter wie im Board w2-registrieren (Bild 1); der Name bleibt dort leer.
+                  placeholder="Vor- und Nachname"
                   aria-invalid={errors.name ? true : undefined}
                   aria-describedby={errors.name ? fehlerId('name') : undefined}
                   className={FELD}
@@ -203,32 +212,16 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                   id={feldId('password')}
                   autoComplete="new-password"
                   aria-invalid={errors.password ? true : undefined}
-                  aria-describedby={beschreibung(`${id}-staerke`, !!errors.password && fehlerId('password'))}
+                  aria-describedby={beschreibung(`${id}-passwort-satz`, `${id}-regeln`, !!errors.password && fehlerId('password'))}
                   feld={FELD}
                   {...form.register('password')}
                 />
-                {/* Vier Balken: orange, solange das Passwort nicht reicht, grün, sobald der Server es nimmt. */}
-                <div className="mt-2 grid grid-cols-4 gap-1.5" aria-hidden="true">
-                  {[1, 2, 3, 4].map((stufe) => (
-                    <span
-                      key={stufe}
-                      className={cn(
-                        'h-1 rounded-full',
-                        stufe > staerke.balken ? 'bg-border' : staerke.gueltig ? 'bg-accent' : 'bg-primary'
-                      )}
-                    />
-                  ))}
-                </div>
-                <p
-                  id={`${id}-staerke`}
-                  className={cn(
-                    'mt-1.5 text-[12.5px]',
-                    staerke.balken === 0 ? 'text-muted-foreground' : staerke.gueltig ? 'text-status-fertig' : 'text-status-offen'
-                  )}
-                >
-                  {staerke.text}
+                {/* Die Regeln haken sich beim Tippen ab (Board w2-registrieren) — wie beim neuen Passwort. */}
+                <p id={`${id}-passwort-satz`} className="mt-1.5 text-[13px] text-muted-foreground">
+                  {PASSWORT_ANFORDERUNGEN_SATZ}
                 </p>
-                {errors.password && !staerke.gueltig && (
+                <PasswortAnforderungen passwort={password} id={`${id}-regeln`} className="mt-1" />
+                {errors.password && !passwortGueltig && (
                   <FeldFehler id={fehlerId('password')}>
                     {password.length === 0 ? 'Bitte wähle ein Passwort.' : 'Das Passwort reicht noch nicht – darüber steht, was fehlt.'}
                   </FeldFehler>
@@ -238,7 +231,7 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
               {/* Register O4 (geändert 13.10.2026): AGB und Konditionen werden mit diesem
                   Satz einbezogen — Links, kein Haken. Beide öffnen in einem neuen Tab,
                   damit das ausgefüllte Formular stehen bleibt. */}
-              <AgbSatz stuecke={REGISTRIERUNG_AGB_SATZ} neuerTab className="text-[13.5px] leading-snug text-muted-foreground" />
+              <AgbSatz stuecke={REGISTRIERUNG_AGB_SATZ} neuerTab className="text-[14px] leading-snug text-muted-foreground" />
 
               {fehler && (
                 <div role="alert">
@@ -246,37 +239,53 @@ export function RegisterForm({ formToken, gruendungSatz = null }: { formToken: s
                 </div>
               )}
 
-              <button type="submit" disabled={isSubmitting} aria-busy={isSubmitting || undefined} className={cn(KNOPF_ORANGE, 'mt-1')}>
+              <button type="submit" disabled={isSubmitting} aria-busy={isSubmitting || undefined} className={KNOPF_ORANGE}>
                 {isSubmitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
                 {isSubmitting ? 'Einen Moment …' : 'Konto erstellen'}
               </button>
               {/* Register N1: Wer schon einen Hof hat, findet hier den Weg zur Anmeldung — auch am Handy, wo der Kopf nur „Anmelden" zeigt. */}
-              <SchonDabei className="-mt-1 text-center" />
+              {/* Liste Lauf 32 (registrieren): der ganze Satz ist der Link, 15 px halbfett wie im Board. */}
+              <Link href={SCHON_DABEI.href} className={cn(TEXTLINK, '-mt-1 text-[15px]')}>
+                {`${SCHON_DABEI.frage} ${SCHON_DABEI.link}`}
+              </Link>
             </form>
           </>
         )}
       </div>
 
-      <aside aria-labelledby={`${id}-weiter`} className="flex flex-col gap-5 lg:pt-4">
-        <h2 id={`${id}-weiter`} className="text-[12px] font-bold tracking-[1.6px] text-muted-foreground uppercase">
-          So geht es weiter
+      {/* Seitenspalte als EINE Karte (Board w2-registrieren): Serifen-Titel, die Schritte mit grün getönten Ziffern,
+          „Fragen vorab?“ und „E-Mail schreiben“ darin. StartSchritte (fuer-hoefe) zeichnet orange Ringe für /fuer-hoefe;
+          eine grüne Variante dort wäre Sache jener Nummer — darum die Liste hier aus derselben Quelle. */}
+      {/* Maße nach Board (Nr. 275): Titel 18 px, Ziffern 26 px mit 14 px, Text 14 px, 10 px Abstand. */}
+      <aside aria-labelledby={`${id}-weiter`} className={cn('flex flex-col gap-2.5 self-start border border-border bg-card p-4', RUNDUNG.blatt)}>
+        <h2 id={`${id}-weiter`} className="font-heading text-[18px] leading-tight font-semibold">
+          So geht’s weiter
         </h2>
-        <StartSchritte schritte={REGISTRIEREN_SCHRITTE} />
+        <ol className="flex flex-col gap-2.5">
+          {REGISTRIEREN_SCHRITTE.map((s, i) => (
+            <li key={s.titel} className="flex gap-2.5">
+              <span
+                aria-hidden="true"
+                className="flex size-[26px] shrink-0 items-center justify-center rounded-full bg-zustand-laeuft-grund text-[14px] font-bold text-zustand-laeuft"
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-bold">{s.titel}</span>
+                <span className="block text-[14px] leading-snug text-muted-foreground">{s.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
         {/* „Rückruf anfordern" (Mockup) braucht die Tabelle RueckrufAnfrage —
             nicht freigegeben (freigabe.md §2). Bis dahin der Weg per Mail. */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-          <p className="text-[14px]">Fragen vorab? Schreib uns, wir melden uns.</p>
-          <a
-            href={`mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Fragen zur Registrierung')}`}
-            className={cn(
-              'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border px-4 text-[14px] font-medium hover:bg-muted',
-              FOKUS_RAHMEN
-            )}
-          >
-            <Mail className="size-4" strokeWidth={1.7} aria-hidden="true" />
-            E-Mail schreiben
-          </a>
-        </div>
+        <p className="text-[14px] text-muted-foreground">Fragen vorab? Schreib uns, wir melden uns.</p>
+        <a
+          href={`mailto:${KONTAKT_EMAIL}?subject=${encodeURIComponent('Fragen zur Registrierung')}`}
+          className={cn(KNOPF_UMRISS_KRAEFTIG, 'w-auto')}
+        >
+          E-Mail schreiben
+        </a>
       </aside>
     </div>
   )

@@ -1,36 +1,20 @@
 import * as React from 'react'
-import { Section, Text } from '@react-email/components'
-import { EmailLayout, MAIL_FARBE, bodyText, h1, highlightBox, kleinText, mutedText } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, CodeKasten, bodyText, h1, leiseZeile } from './_layout'
 import { ADMIN_SICHERHEIT_MAIL, type AdminSicherheitAnlass } from '@/lib/admin-anmeldung'
 
 export interface AdminSicherheitProps {
   anlass: AdminSicherheitAnlass
   /** Gerät und Browser in festen Wörtern („Windows · Chrome", geraetName). */
   geraet: string
-  /** „19.10. um 14:32" — Wiener Zeit (anmeldeZeitpunkt). */
+  /** „Di, 2. März 2027, 21:14 Uhr“ — Wiener Zeit nach V9 (zeitpunktMitUhr in src/lib/email.ts). */
   wann: string
   /** Nur beim Anlass „einrichtungscode": die 6 Ziffern. */
   code?: string
 }
 
-const codeKasten: React.CSSProperties = {
-  backgroundColor: MAIL_FARBE.gruenFlaeche,
-  border: `1px solid ${MAIL_FARBE.gruenRand}`,
-  borderRadius: '12px',
-  padding: '18px 12px',
-  margin: '24px 0',
-  textAlign: 'center' as const,
-}
-
-const codeText: React.CSSProperties = {
-  color: MAIL_FARBE.text,
-  fontSize: '34px',
-  fontWeight: '700',
-  letterSpacing: '0.3em',
-  lineHeight: '1.2',
-  margin: 0,
-  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
-}
+/** Die Überschrift der Passkey-Mail nach Board s3/w3-mail-team Bild 2; der Betreff bleibt „Neuer Passkey bei deinem Admin-Konto“. */
+const PASSKEY_UEBERSCHRIFT = 'Neuer Passkey'
 
 /**
  * „Admin-Sicherheit" (Register N20; Nr. 115) — eine Vorlage für die Mails an
@@ -44,39 +28,38 @@ const codeText: React.CSSProperties = {
 export function AdminSicherheitEmail({ anlass, geraet, wann, code }: AdminSicherheitProps): React.JSX.Element {
   const text = ADMIN_SICHERHEIT_MAIL
   const betreff = text.betreff[anlass]
+  // Board s3/w3-mail-team Bild 1 und 2: die Anrede im selben Satz, das Gerät im Satz statt in einem Kasten.
   if (anlass === 'einrichtungscode') {
     return (
-      <EmailLayout previewText={betreff}>
-        <Text style={h1}>{betreff}</Text>
-        <Text style={bodyText}>
-          {text.anrede}
-          <br />
-          {text.satz.einrichtungscode}
-        </Text>
-        <div style={codeKasten}>
-          <Text style={codeText}>{code}</Text>
-        </div>
-        <Text style={{ ...mutedText, margin: '0 0 6px' }}>{text.codeGilt}</Text>
-        <Text style={mutedText}>{text.codeNichtDu}</Text>
-        <Text style={mutedText}>{text.fuss}</Text>
+      <EmailLayout fuss={{ art: 'plattform' }} previewText={betreff}>
+        <Text style={bodyText}>{`${text.anrede} ${text.satz.einrichtungscode}`}</Text>
+        {/* Ungegliedert: Das Feld der Einrichtung nimmt nur sechs Ziffern ohne Leerzeichen (einrichtungscodeSchema). */}
+        {code && <CodeKasten code={code} gruppiert={false} />}
+        <Text style={leiseZeile}>{text.codeGilt}</Text>
+      </EmailLayout>
+    )
+  }
+  // Board s3/w3-mail-team Bild 2 (Nr. 280): „Neuer Passkey“, der Passkey in Anführungszeichen, der Zeitpunkt in Klammern.
+  if (anlass === 'passkey-hinzugefuegt') {
+    return (
+      <EmailLayout fuss={{ art: 'plattform' }} previewText={`${betreff} · ${geraet}`}>
+        <Text style={h1}>{PASSKEY_UEBERSCHRIFT}</Text>
+        <Text style={bodyText}>{`Bei deinem Admin-Konto wurde der Passkey „${geraet}“ hinzugefügt (${wann}).`}</Text>
+        <Text style={bodyText}>{text.warstDu}</Text>
       </EmailLayout>
     )
   }
   return (
-    <EmailLayout previewText={`${betreff} · ${geraet}`}>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={`${betreff} · ${geraet}`}>
       <Text style={h1}>{betreff}</Text>
       <Text style={bodyText}>
-        {text.anrede}
-        <br />
-        {text.vorher} <strong>{wann}</strong> {text.satz[anlass]}
+        {`${text.anrede} ${text.vorher} `}
+        <strong>{wann}</strong>
+        {` ${text.satz[anlass]} `}
+        <strong>{geraet}</strong>.
       </Text>
-      <Section style={{ ...highlightBox, padding: '12px 16px' }}>
-        <Text style={{ ...bodyText, fontWeight: '600', margin: 0 }}>{geraet}</Text>
-        <Text style={{ ...kleinText, margin: 0 }}>{wann}</Text>
-      </Section>
       {anlass === 'ersatzcode-benutzt' && <Text style={bodyText}>{text.ersatzcodeFolge}</Text>}
       <Text style={bodyText}>{text.warstDu}</Text>
-      <Text style={mutedText}>{text.fuss}</Text>
     </EmailLayout>
   )
 }

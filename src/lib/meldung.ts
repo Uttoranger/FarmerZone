@@ -14,6 +14,7 @@
  * Zahl im Stand-Band.
  */
 import type { MarkeArt } from '@/lib/marke-art'
+import { ALTE_LAENGE, kurznummerAus, waehleZurKurznummer } from '@/lib/kurznummer'
 
 export const MELDUNG_ARTEN = ['FEHLER', 'WUNSCH', 'FRAGE'] as const
 export type MeldungArt = (typeof MELDUNG_ARTEN)[number]
@@ -200,6 +201,12 @@ export const MELDUNGEN_PRO_STUNDE = 5
 export const ZU_VIELE_MELDUNGEN =
   'Zu viele Meldungen in kurzer Zeit — bitte versuche es in einer Stunde noch einmal.'
 
+/**
+ * Die Meldung kam nicht an, weil die Anfrage scheiterte (Wurf der Aktion, nicht ihre Ablehnung) — wörtlich wie
+ * Board s3-/w3-problem-melden, Bild 6 (Nr. 242). Vorher fiel /problem-melden dann auf die 500, der Text war weg.
+ */
+export const MELDUNG_NICHT_GESPEICHERT = 'Wir konnten deine Meldung gerade nicht speichern. Dein Text ist noch da – versuch es bitte gleich noch einmal.'
+
 /** Wohin „PR #<nr>" in sprintName zeigt — das Repository ist öffentlich. */
 export const PR_BASIS_URL = 'https://github.com/Uttoranger/FarmerZone/pull/'
 
@@ -222,9 +229,12 @@ export function kiBegruendung(notiz: string | null): string | null {
   return zeilen.length > 0 ? zeilen.join(' ') : null
 }
 
-/** Die Kurznummer: die ersten acht Zeichen der ID — für Bestätigung, Listen und CLI. */
+/**
+ * Die ALTE Kurznummer: die ersten acht Zeichen der ID — nur noch für den CLI-Export (briefkasten-export.ts) und
+ * /api/triage, die bei ihr bleiben (Nr. 263). Was Hof, Kundschaft oder Admin sehen, nennt `kurznummerAus`.
+ */
 export function kurznummer(id: string): string {
-  return id.slice(0, 8)
+  return id.slice(0, ALTE_LAENGE)
 }
 
 /** Die erste Textzeile, gekürzt — für Listen. */
@@ -286,7 +296,7 @@ export function fuerHof(m: MeldungVollstaendig, hauptmeldung: MeldungStand | nul
   const ton = m.status === 'DUPLIKAT' && hauptmeldung?.status === 'ERLEDIGT' ? STATUS_TON.ERLEDIGT : STATUS_TON[m.status]
   return {
     id: m.id,
-    kurznummer: kurznummer(m.id),
+    kurznummer: kurznummerAus(m.id),
     art: m.art,
     text: m.text,
     createdAt: m.createdAt,
@@ -819,17 +829,6 @@ export const WUENSCHE_TEXT = {
   bescheidNichtGesendet: 'Der Stand ist gespeichert, die Nachricht an die Höfe aber nicht – schick sie über „Rundschreiben schreiben“.',
 } as const
 
-const HTML_ZEICHEN: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
-
-/**
- * Der Körper der Betriebsmail an Kundinnen eines Bündels (über sendRaw, Post-Sperre Z3):
- * die Antwort des Teams als maskierter Text — nie als Markup —, Zeilen bleiben Zeilen.
- */
-export function bescheidMailHtml(antwort: string, team: string): string {
-  const text = (s: string): string => s.replace(/[&<>"']/g, (z) => HTML_ZEICHEN[z] ?? z)
-  return `<p>${text(antwort).replace(/\r?\n/g, '<br>')}</p><p>${text(team)}</p>`
-}
-
 // ─── Suche in Zusammenfassen und Dazunehmen ─────────────────────────────────
 
 /** Eine Meldung, wie die Dialoge sie kennen: Kurztitel, Wer, Teil und der gespeicherte Stand für den Triage-Aufruf. */
@@ -848,7 +847,7 @@ export type SuchMeldung = {
 export function suchMeldungVon(m: AblaufMeldung, kundin: string): SuchMeldung {
   return {
     id: m.id,
-    kurznummer: kurznummer(m.id),
+    kurznummer: kurznummerAus(m.id),
     art: m.art,
     status: m.status,
     ersteZeile: m.ersteZeile,
@@ -872,9 +871,23 @@ export function kannHauptmeldungSein(status: MeldungStatus): boolean {
   return status !== 'DUPLIKAT' && status !== 'KEIN_FEHLER'
 }
 
-/** Treffer nach Kurznummer (Anfang) oder Wort im Kurztitel — höchstens `max`, ohne die ausgeschlossenen. */
-export function sucheMeldungen(liste: readonly SuchMeldung[], wort: string, erlaubt: (m: SuchMeldung) => boolean, max = 8): SuchMeldung[] {
+export type MeldungSuchErgebnis = {
+  treffer: SuchMeldung[]
+  /** Die Eingabe passt als Nummer zu mehreren Meldungen — die Ansicht sagt `KURZNUMMER_MEHRDEUTIG`. */
+  mehrdeutig: boolean
+}
+
+/**
+ * Treffer nach Nummer oder Wort im Kurztitel — höchstens `max`, ohne die ausgeschlossenen. Die Nummer nach DER
+ * Regel (`waehleZurKurznummer`: neue, alte, volle; ein Stück unter sechs Zeichen trifft keine Nummer). Passt sie zu
+ * mehreren Meldungen der Liste (auch zu ausgeschlossenen), kommt keine davon als Nummern-Treffer, sondern
+ * `mehrdeutig` — wie Admin-Suche und Duplikat-Verweis (Nr. 263). Die Wortsuche im Kurztitel bleibt davon unberührt.
+ */
+export function sucheMeldungen(liste: readonly SuchMeldung[], wort: string, erlaubt: (m: SuchMeldung) => boolean, max = 8): MeldungSuchErgebnis {
   const w = wort.trim().toLowerCase()
-  if (w === '') return []
-  return liste.filter((m) => erlaubt(m) && (m.id.startsWith(w) || m.ersteZeile.toLowerCase().includes(w))).slice(0, max)
+  if (w === '') return { treffer: [], mehrdeutig: false }
+  const nummer = waehleZurKurznummer(liste, wort)
+  const nummerId = nummer.art === 'eine' ? nummer.meldung.id : null
+  const treffer = liste.filter((m) => erlaubt(m) && (m.id === nummerId || m.ersteZeile.toLowerCase().includes(w))).slice(0, max)
+  return { treffer, mehrdeutig: nummer.art === 'mehrdeutig' }
 }

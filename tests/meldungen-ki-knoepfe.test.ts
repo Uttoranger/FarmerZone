@@ -50,7 +50,9 @@ describe('KiKnoepfe', () => {
     expect(ja).not.toContain('border')
 
     const nein = knopfKlassen(html, MELDUNG_KLICK_TEXT.neinFehler)
-    expect(nein).toContain('border')
+    // KNOPF_RAHMEN zeichnet seit Nr. 269 den Rand 1,5 px in Textfarbe (Board „So geht’s“).
+    expect(nein).toContain('border-[1.5px]')
+    expect(nein).toContain('border-foreground')
     expect(nein).toContain('text-foreground')
     expect(nein).not.toContain('bg-accent')
     expect(nein).not.toContain('text-status-fertig')
@@ -61,7 +63,8 @@ describe('KiKnoepfe', () => {
       const klassen = knopfKlassen(html, beschriftung)
       expect(klassen, beschriftung).toContain('flex-1')
       expect(klassen, beschriftung).toContain('lg:flex-none')
-      expect(klassen, beschriftung).toContain('min-h-11')
+      // Mindestens 44 px: der grüne Knopf min-h-11, der Umriss seit Nr. 269 nach Board 52 px (KNOPF_RAHMEN).
+      expect(klassen.some((k) => k === 'min-h-11' || k === 'min-h-[52px]'), beschriftung).toBe(true)
     }
     // Nebeneinander: die Zeile bricht am Handy nicht um.
     const zeile = html.match(/<div class="([^"]*)"><button/)?.[1].split(' ') ?? []

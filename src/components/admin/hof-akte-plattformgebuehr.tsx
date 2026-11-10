@@ -12,7 +12,6 @@ import { FELD, FELD_LABEL, KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/com
 import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 import { EmptyState } from '@/components/ui/empty-state'
-import { ReceiptText } from 'lucide-react'
 import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
 
 /** Was die Akte über die Plattformgebühr zeigt — nur Text, Zahlen und Cent (kein Date an den Browser). */
@@ -85,7 +84,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
       <div>
         <h3 className={cn('mb-1 text-[12.5px] font-semibold', LEISE)}>Letzte Abrechnungen</h3>
         {daten.abrechnungen.length === 0 ? (
-          <EmptyState symbol={ReceiptText} titel={LASTSCHRIFT_TEXT.abrechnungenLeer} satz={LASTSCHRIFT_TEXT.abrechnungenLeerSatz} ausweg={{ ohne: 'Sie entsteht am Abrechnungstag des Hofs von selbst.' }} />
+          <EmptyState titel={LASTSCHRIFT_TEXT.abrechnungenLeer} satz={LASTSCHRIFT_TEXT.abrechnungenLeerSatz} ausweg={{ ohne: 'Sie entsteht am Abrechnungstag des Hofs von selbst.' }} />
         ) : (
           <ul className="[&>li+li]:border-t [&>li+li]:border-border">
             {daten.abrechnungen.map((a) => (
@@ -111,7 +110,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
           <label htmlFor={`${id}-satz`} className={FELD_LABEL}>
             Satz in %
           </label>
-          <input id={`${id}-satz`} inputMode="decimal" value={werte.satz} onChange={(e) => setWerte({ ...werte, satz: e.target.value })} className={cn(FELD, FOKUS_RAHMEN)} />
+          <input id={`${id}-satz`} inputMode="decimal" value={werte.satz} onChange={(e) => setWerte({ ...werte, satz: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')} />
         </div>
         <div>
           <label htmlFor={`${id}-tage`} className={FELD_LABEL}>
@@ -124,7 +123,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             max={90}
             value={werte.sperreTage}
             onChange={(e) => setWerte({ ...werte, sperreTage: Number.parseInt(e.target.value || '0', 10) })}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </div>
         <div>
@@ -138,7 +137,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             max={28}
             value={werte.abrechnungsTag}
             onChange={(e) => setWerte({ ...werte, abrechnungsTag: Number.parseInt(e.target.value || '0', 10) })}
-            className={cn(FELD, FOKUS_RAHMEN)}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
         </div>
         <div>
@@ -146,7 +145,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             Einzug ab (Vorgabe {daten.einstellungen.vorgabeEinzugAb})
           </label>
           <div className="flex gap-2">
-            <input id={`${id}-einzug`} type="date" value={werte.einzugAb} onChange={(e) => setWerte({ ...werte, einzugAb: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-w-0 flex-1')} />
+            <input id={`${id}-einzug`} type="date" value={werte.einzugAb} onChange={(e) => setWerte({ ...werte, einzugAb: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-h-11 min-w-0 flex-1')} />
             <button type="button" className={KNOPF_RAHMEN} onClick={() => setWerte({ ...werte, einzugAb: '' })} disabled={werte.einzugAb === ''}>
               zurücksetzen
             </button>

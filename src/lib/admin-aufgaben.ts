@@ -15,7 +15,8 @@ import {
 } from '@/lib/betrieb'
 import { artName, fehlerText, wegName, type ProblemAuftrag } from '@/lib/betrieb-mails'
 import { eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } from '@/lib/postfach'
-import { MELDUNG_ART_LABEL, kurznummer } from '@/lib/meldung'
+import { MELDUNG_ART_LABEL } from '@/lib/meldung'
+import { kurznummerAus } from '@/lib/kurznummer'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
 import { TARIFE_AB_TAG } from '@/lib/konditionen'
 import { wienWochenbeginn, wienWochenMontag } from '@/lib/kalender'
@@ -30,7 +31,7 @@ import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremse
 import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { bestellungenHref } from '@/lib/admin-bestellung'
 import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
-import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
+import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type GebuehrWort, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import type { Umgebung } from '@/lib/umgebung'
 
@@ -359,7 +360,7 @@ function meldungNeu(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       'meldung_neu',
       {
         titel: meldungTitel(m),
-        bezug: { kennung: m.id, text: `${m.von} · ${MELDUNG_ART_LABEL[m.art]} · Nr. ${kurznummer(m.id)}` },
+        bezug: { kennung: m.id, text: `${m.von} · ${MELDUNG_ART_LABEL[m.art]} · Nr. ${kurznummerAus(m.id)}` },
         satz: 'Lesen, einordnen und dem Hof antworten.',
         seit: m.createdAt,
         wasTun: 'oeffnen',
@@ -666,7 +667,7 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       ? aufgabe(
           'widerruf_offen',
           {
-            titel: 'Widerruf offen',
+            titel: 'Rücktritt offen',
             bezug: { kennung: w.bestellnummer, text: [w.bestellnummer, ...(w.hofName ? [w.hofName] : [])].join(' · ') },
             satz: 'Der Hof erstattet nach der Rückgabe oder lehnt mit Grund ab. Frist 14 Tage ab Eingang.',
             seit: w.eingegangenAm,
@@ -678,9 +679,9 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       : aufgabe(
           'widerruf_offen',
           {
-            titel: 'Widerruf ohne Bestellung',
+            titel: 'Rücktritt ohne Bestellung',
             bezug: { kennung: w.id, text: 'nicht zugeordnet' },
-            satz: 'Der Widerruf passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
+            satz: 'Der Rücktritt passt zu keiner Bestellung. Bitte zuordnen und an den Hof weiterleiten.',
             seit: w.eingegangenAm,
             wasTun: 'pruefen',
             // Die Liste „Widerrufe ohne Bestellung“ mit Name, Nummer und „Zuordnen …“ (Nachbesserung Runde 2).
@@ -806,13 +807,18 @@ export const HEUTE_TEXT = {
 
 // ─── Lage ────────────────────────────────────────────────────────────────────
 
-/** Die Woche aller Höfe nach der Umsatzregel (abgeholt seit Montag, ohne Testzahlungen); Beträge in Cent. */
+/**
+ * Die Woche aller Höfe, ohne Testzahlungen; Beträge in Cent. Eine Zählregel für Geld und Zahlen (Nr. 258, N46,
+ * ersetzt die zwei Regeln aus Nr. 240): in der Woche eingegangen, nicht storniert, online nur bezahlt, vor Ort ab Eingang.
+ */
 export type HeuteWoche = {
+  /** Bestellwert der in der Woche eingegangenen Bestellungen (`geldKachelWhere`, Nr. 258). */
   umsatzCents: number
-  /** Servicegebühr dieser Bestellungen, ohne entfallene. */
+  /** Gebühr derselben Bestellungen (Service- bzw. Plattformgebühr), ohne entfallene. */
   gebuehrCents: number
+  /** Dieselben Bestellungen gezählt — „Woche: n“ zählt nach der Regel der Geld-Kachel (N46). */
   anzahl: number
-  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt. */
+  /** Dieselbe Zahl in der Vorwoche bis zum selben Zeitpunkt, nach derselben Regel. */
   anzahlVorwoche: number
 }
 
@@ -831,6 +837,12 @@ export type HeuteLage = {
   hoefe: { verkaufen: number; warten: number }
   /** Der letzte erfolgreiche Geld-Abgleich (Nr. 191); null = noch keiner (außerhalb der Produktion immer). */
   geldAbgleichOk?: boolean
+  /**
+   * Das Wort der Gebühr dieser Woche (V63): `gebuehrWortFuerZeitraum(Wochenbeginn,
+   * jetzt, hofpreisModellAb(einstellung))` — die Seite setzt es (Nr. 229). Ohne
+   * Wort die Fassung „bisher“.
+   */
+  gebuehrWort?: GebuehrWort
 }
 
 export type LageKachel = {
@@ -864,11 +876,11 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       id: 'geld',
       titel: 'Geld · Woche',
       wert: formatEuro(centsAlsEuro(lage.woche.umsatzCents), 0),
-      einheit: 'Umsatz der Höfe',
+      einheit: 'Bestellwert',
       // „stimmt“ nur nach einem erfolgreichen Abgleich (Nr. 191); „Auszahlung Do“ hat keine Quelle im Code und fehlt weiter.
       marke: lage.geldAbgleichOk ? (abweichungen === 0 ? { wort: 'stimmt', art: 'laeuft' } : { wort: mitAnzahlWort(abweichungen, 'Abweichung', 'Abweichungen'), art: 'tun' }) : null,
       zeilen: [
-        `${SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`,
+        `${lage.gebuehrWort ?? SERVICEGEBUEHR_BEZEICHNUNG} ${formatEuro(centsAlsEuro(lage.woche.gebuehrCents))}`,
         ...(lage.geldAbgleichOk ? [abweichungen === 0 ? 'Abgleich mit Stripe ohne Abweichung' : 'Abgleich mit Stripe: Abweichung in Braucht dich'] : []),
       ],
     },
@@ -984,8 +996,8 @@ export function routineZeile(erledigt: number): string {
  */
 export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   hof_freigeschaltet: 'Hof freigeschaltet',
-  widerruf_zugeordnet: 'Widerruf einer Bestellung zugeordnet',
-  widerruf_abgelehnt: 'Widerruf abgelehnt (Hof)',
+  widerruf_zugeordnet: 'Rücktritt einer Bestellung zugeordnet',
+  widerruf_abgelehnt: 'Rücktritt abgelehnt (Hof)',
   hof_freigabe_entzogen: 'Freischaltung zurückgenommen',
   hof_abgelehnt: 'Hof abgelehnt',
   servicegebuehr_geaendert: 'Servicegebühr geändert',

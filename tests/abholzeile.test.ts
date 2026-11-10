@@ -178,11 +178,15 @@ describe('Abholzeile — die Zeile mit der Uhr im Browser', () => {
     expect(zeile()).not.toBe(server)
   })
 
-  it('grün mit Uhr, Pause orange, ohne kaufbares Produkt oder ohne Abholzeiten grau „Noch nicht bestellbar"', () => {
+  it('fett grün ohne Uhr (Nr. 252), Pause neutral (V18), ohne kaufbares Produkt oder ohne Abholzeiten grau „Noch nicht bestellbar"', () => {
     const offen = zeile()
-    expect(offen).toContain('text-status-fertig')
-    expect(offen).toContain('lucide-clock')
-    expect(zeile({ isPaused: true })).toContain('text-status-offen')
+    expect(offen).toContain('text-brand-text')
+    expect(offen).toContain('font-semibold')
+    expect(offen).not.toContain('lucide-clock')
+    const pause = zeile({ isPaused: true })
+    expect(pause).toContain('text-muted-foreground')
+    expect(pause).toContain('data-abholung="pause"')
+    expect(pause).not.toContain('text-status-offen')
     expect(zeile({ isPaused: true, bestellbar: false })).toContain('Macht gerade Pause')
     expect(zeile({ bestellbar: false })).toContain('Noch nicht bestellbar')
     expect(zeile({ fenster: undefined })).toContain('Noch nicht bestellbar')

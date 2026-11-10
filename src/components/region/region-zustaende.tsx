@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { CircleAlert, MapPin } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Hinweiskarte } from '@/components/ui/hinweiskarte'
-import { KNOPF_GRUEN, KNOPF_RAHMEN } from '@/components/hof-bestellungen/stil'
+import { WerkzeugKopfLaden } from '@/components/ui/werkzeug-kopf'
+import { RUNDUNG } from '@/components/ui/rundung'
+import { AKTIONSLEISTE_KNOPF } from '@/components/ui/feste-aktionsleiste'
+import { LadeFehlerKasten } from '@/components/ui/lade-fehler-kasten'
 import { HofKarte, type KartenHof } from '@/components/hoefe/entdecken-teile'
 import { OHNE_STANDORT_TEXT, STANDORT_SETZEN_HREF } from '@/lib/region'
 import type { VorschauProdukt } from '@/lib/hofuebersicht'
@@ -37,19 +38,19 @@ export function StandortFehlt({ eigeneKarte, jetzt }: { eigeneKarte?: EigeneKart
   return (
     <div className="flex flex-col gap-3">
       <EmptyState
-        symbol={MapPin}
         titel={OHNE_STANDORT_TEXT.titel}
         titelStufe={2}
         satz={OHNE_STANDORT_TEXT.satz}
         ausweg={
-          <Link href={STANDORT_SETZEN_HREF} className={KNOPF_GRUEN}>
+          // G4, Knopf orange über die volle Breite (Hof, Liste Lauf 32 region).
+          <Link href={STANDORT_SETZEN_HREF} className={AKTIONSLEISTE_KNOPF}>
             {OHNE_STANDORT_TEXT.knopf}
           </Link>
         }
       />
       {eigeneKarte !== undefined && (
         <section aria-label={OHNE_STANDORT_TEXT.ueberschriftListe} className="flex flex-col gap-2">
-          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{OHNE_STANDORT_TEXT.ueberschriftListe}</p>
+          <p className="text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase">{OHNE_STANDORT_TEXT.ueberschriftListe}</p>
           {eigeneKarte ? (
             <HofKarte
               hof={eigeneKarte.hof}
@@ -68,21 +69,16 @@ export function StandortFehlt({ eigeneKarte, jetzt }: { eigeneKarte?: EigeneKart
   )
 }
 
-/** Ladefehler — der Weg zurück ist dieselbe Adresse (die Seite ist dynamisch, Hinlaufen heißt neu abfragen). */
+/** Ladefehler (G6) — der Weg zurück ist dieselbe Adresse (die Seite ist dynamisch, Hinlaufen heißt neu abfragen). */
 export function RegionFehler({ nochmal }: { nochmal: string }): React.JSX.Element {
+  // Satz wörtlich nach Board s1-/w1-region Bild 4 (am Handy ist meist das Netz schuld).
   return (
-    <Hinweiskarte
-      ton="orange"
-      symbol={CircleAlert}
+    <LadeFehlerKasten
       titel="Wir konnten die Höfe in deiner Nähe gerade nicht laden."
-      aktion={
-        <Link href={nochmal} className={KNOPF_RAHMEN}>
-          Noch einmal versuchen
-        </Link>
-      }
-    >
-      Es ist nichts verloren gegangen. Versuch es bitte gleich noch einmal.
-    </Hinweiskarte>
+      satz="Prüf den Empfang und versuch es noch einmal."
+      knopf="Nochmal"
+      nochmal={nochmal}
+    />
   )
 }
 
@@ -91,18 +87,20 @@ export function RegionLaden(): React.JSX.Element {
   return (
     <div className={cn(REGION_RAHMEN, 'animate-pulse')} aria-busy="true">
       <div className="flex flex-col gap-4">
-        <div>
-          <div className="h-8 w-28 rounded-lg bg-border" />
-          <div className="mt-2 h-4 w-72 max-w-full rounded bg-muted" />
-        </div>
+        <WerkzeugKopfLaden />
+        <div className="h-4 w-72 max-w-full rounded bg-muted" />
         <div className="flex gap-6 border-b border-border pb-3">
           <div className="h-5 w-36 rounded bg-border" />
           <div className="h-5 w-28 rounded bg-muted" />
         </div>
-        <div className="h-[52px] w-60 rounded-full bg-muted" />
+        <div className="flex gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-9 w-20 rounded-full bg-muted" />
+          ))}
+        </div>
         <div className="h-3 w-80 max-w-full rounded bg-muted" />
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-[132px] rounded-2xl border border-border bg-card" />
+          <div key={i} className={cn('h-[132px] border border-border bg-card', RUNDUNG.karte)} />
         ))}
       </div>
     </div>

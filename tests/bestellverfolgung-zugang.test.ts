@@ -243,9 +243,11 @@ describe('Bestellseite — die Signatur wird an der Seite selbst durchgesetzt', 
     const html = await seite('order-1', bestellSignatur('order-1'))
     expect(html).toContain('HM-2611-A4F2')
     expect(html).toContain('Abholbereit')
-    expect(html).toContain('Dein Paket wartet')
+    // Seit Lauf 31 (Board s1-/w1-bestellung-link) ohne den Satz unter der Nummer: Stand und Termin tragen Schild und Abholkarte.
+    expect(html).not.toContain('Dein Paket wartet')
     expect(html).toContain('Bergkäse')
-    expect(html).toContain('Termin in den Kalender')
+    // Seit Nr. 227 (Board s1-/w1-bestellung-link): „In den Kalender“ in der Abholkarte.
+    expect(html).toContain('In den Kalender')
     expect(html).toContain('Online')
   })
 
@@ -267,16 +269,16 @@ describe('Bestellseite — „Hof erreichen" nur hinter der Signatur (Nr. 60, S1
   const ANZEIGE = '+43 660 000 0000'
   const mitKontakt = (teil: Record<string, unknown> = {}) => bestellung({ farm: { ...bestellung().farm, ...KONTAKT }, ...teil })
 
-  it('gültige Signatur: Satz, Nummer und E-Mail des Hofs, Anrufen (tel:) und E-Mail (mailto:)', async () => {
+  it('gültige Signatur: Nummer und E-Mail des Hofs als Links (tel:, mailto:)', async () => {
     findUnique.mockResolvedValue(mitKontakt() as never)
     const text = await seite('order-1', bestellSignatur('order-1'))
     expect(text).toContain('Hof erreichen')
-    expect(text).toContain('Kommst du später oder kannst du nicht kommen? Sag dem Hof kurz Bescheid.')
     expect(text).toContain(ANZEIGE)
     expect(text).toContain(KONTAKT.email)
+    // Seit Nr. 227 (Board s1-/w1-bestellung-link): „<Nummer> anrufen“ und die Adresse als Textlinks.
     const links = await seitenLinks('order-1', bestellSignatur('order-1'))
-    expect(links).toContainEqual({ href: 'tel:+436600000000', text: 'Anrufen' })
-    expect(links).toContainEqual({ href: `mailto:${KONTAKT.email}`, text: 'E-Mail' })
+    expect(links).toContainEqual({ href: 'tel:+436600000000', text: `${ANZEIGE}\u00a0anrufen` })
+    expect(links).toContainEqual({ href: `mailto:${KONTAKT.email}`, text: KONTAKT.email })
   })
 
   it('Telefon und E-Mail des Hofs stehen in der Abfrage, die erst nach der Signatur läuft', async () => {
@@ -377,9 +379,12 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     const text = await seite('order-1', bestellSignatur('order-1'))
     expect(text).toContain('€ 12,34')
     expect(text).toContain('€ 3,21')
-    // Betrag direkt hinter seiner Bezeichnung: die Gebühr und die Summe mit Zahlart und Stand.
-    expect(text).toContain(`${SERVICEGEBUEHR_BEZEICHNUNG}€ 0,49`)
-    expect(text).toContain('Online · Bezahlt€ 16,04')
+    // Betrag direkt hinter seiner Bezeichnung (seit Lauf 31 „· € …“ wie im Board): die Gebühr und die Summe.
+    expect(text).toContain(`${SERVICEGEBUEHR_BEZEICHNUNG} · € 0,49`)
+    // Seit Nr. 236 UI-Runde 3 (Board s1-/w1-bestellung-link Bild 1): die Summe in der Zahlzeile, kein eigenes „Gesamt“ —
+    // derselbe Betrag wie vorher.
+    expect(text).toContain(`Online · Bezahlt · € 16,04 inkl. ${SERVICEGEBUEHR_BEZEICHNUNG}`)
+    expect(text).not.toContain('Gesamt')
     // Keine zweite, abweichende Summe (früher „Zwischensumme" und „Gesamt").
     expect(text).not.toContain('Zwischensumme')
     expect(text.match(/€ \d+,\d{2}/g)).toEqual(['€ 12,34', '€ 3,21', '€ 0,49', '€ 16,04'])
@@ -396,7 +401,7 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     expect(text).toContain('€ 12,34')
     expect(text).toContain('€ 3,21')
     // 1500 + 49 Cent — nicht 1555 + 49 aus den Zeilen.
-    expect(text).toContain('Online · Bezahlt€ 15,49')
+    expect(text).toContain('· € 15,49 inkl.')
     expect(text).not.toContain('€ 16,04')
   })
 
@@ -413,7 +418,7 @@ describe('Bestellseite — die angezeigten Beträge (Nr. 54: Bausteine der Best�
     expect(text).toContain('fehlt leider')
     expect(text).toContain('nicht berechnet')
     expect(text).not.toContain('€ 3,21')
-    expect(text).toContain('Online · Bezahlt€ 12,83')
+    expect(text).toContain('· € 12,83 inkl.')
   })
 })
 

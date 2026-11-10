@@ -15,6 +15,13 @@ import { ladeBestellungFuerMail } from '@/server/mail-arten/bestellung'
  * Codes, Passwort-Links und Admin-Mails zeigt die Vorschau nie. Der
  * Bar-Bestätigungslink hat keinen Renderer (Sofort) — er wird mit einem
  * Platzhalter statt Token gebaut, der ohnehin als „[Link]“ endet.
+ *
+ * Ergänzung Nr. 270 (Register N48): Codes, Einmal-Links, Sicherheits-, Team-,
+ * Betreiber- und Hof-Konto-Mails, Rundschreiben und Beiträge erscheinen in
+ * Admin › Betrieb › Mails nur als BEISPIEL mit festen, erfundenen Daten und
+ * Platzhaltern (src/server/mail-arten/beispiele.ts, `baueMailBeispiel`) —
+ * nie aus einem MailAuftrag. Diese Vorschau echter Mails bleibt, wie sie
+ * ist (N27): nur `NOCHMAL_ERLAUBT`, Codes und Admin-Mails zeigt sie nie.
  */
 
 /** Der Platzhalter statt Token: Zu ihm steht nirgends ein Hash, er bestätigt also nichts; lang genug, dass `entschaerfeLinks` ihn wie einen echten Token als „[Link]“ zeigt. */

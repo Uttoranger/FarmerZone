@@ -400,6 +400,8 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
     expect(bestellungen.zeilen).toEqual(['4 noch nicht gepackt · 1 Storno', 'Woche: 118 (+9 % zur Vorwoche)'])
     const geld = k.find((x) => x.id === 'geld')!
     expect(geld.wert).toMatch(/^€ 1\D840$/)
+    // Antwort 3 der Projektleitung (7.11.2026, N32-Ergänzung): Kachel-Wort „Bestellwert“, /admin/geld behält „Umsatz der Höfe“.
+    expect(geld.einheit).toBe('Bestellwert')
     expect(geld.zeilen).toEqual([expect.stringMatching(/^Servicegebühr € 92,00$/)])
   })
 

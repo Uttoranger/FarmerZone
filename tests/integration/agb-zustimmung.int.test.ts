@@ -13,6 +13,9 @@
  *    den Zeitpunkt nicht); ein fremder Hof bleibt unberührt.
  *  - Gegenprobe: Eine Zustimmung zu einer älteren Fassung wird durch die
  *    aktuelle ersetzt; eine veraltete Fassung aus dem Browser speichert nichts.
+ *  - N45: Ein Hof mit Fassung 0.9 stimmt 1.0 zu → '1.0' mit Zeitpunkt; die
+ *    Kennung '0.9' aus dem Browser lehnt die Action ab, nur der eigene Hof
+ *    (farmId der Sitzung) wird geschrieben.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
@@ -24,7 +27,7 @@ import { join } from 'node:path'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { stimmeAgbZu } from '@/server/actions/agb-zustimmung'
-import { agbFassung } from '@/lib/rechtstexte/agb-datei'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
 import { erstelleHof, erstelleHofMitAnmeldung, raeumeAuf } from './setup/basis'
 
 const MIGRATION = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261031100000_agb_zustimmung', 'migration.sql'), 'utf8')
@@ -75,13 +78,13 @@ describe('stimmeAgbZu mit echter Anmeldung', () => {
     await angemeldet(cookie)
     const vorher = Date.now()
 
-    expect(await stimmeAgbZu({ fassung: agbFassung() })).toEqual({ ok: true })
+    expect(await stimmeAgbZu({ fassung: AGB_NEUESTE })).toEqual({ ok: true })
     const erste = await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true, agbZugestimmtAm: true } })
-    expect(erste.agbFassung).toBe(agbFassung())
+    expect(erste.agbFassung).toBe(AGB_NEUESTE)
     expect(erste.agbZugestimmtAm!.getTime()).toBeGreaterThanOrEqual(vorher - 1_000)
 
     await new Promise((fertig) => setTimeout(fertig, 20))
-    expect(await stimmeAgbZu({ fassung: agbFassung() })).toEqual({ ok: true })
+    expect(await stimmeAgbZu({ fassung: AGB_NEUESTE })).toEqual({ ok: true })
     const zweite = await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true, agbZugestimmtAm: true } })
     expect(zweite).toEqual(erste)
 
@@ -95,17 +98,37 @@ describe('stimmeAgbZu mit echter Anmeldung', () => {
     const alt = new Date('2026-01-01T10:00:00Z')
     const { farm, cookie } = await erstelleHofMitAnmeldung({ agbFassung: '0.1', agbZugestimmtAm: alt })
 
-    expect(await stimmeAgbZu({ fassung: agbFassung() })).toEqual({ error: expect.any(String) })
+    expect(await stimmeAgbZu({ fassung: AGB_NEUESTE })).toEqual({ error: expect.any(String) })
     expect((await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true } })).agbFassung).toBe('0.1')
 
     await angemeldet(cookie)
     expect(await stimmeAgbZu({ fassung: '0.1' })).toEqual({ error: expect.any(String) })
     expect((await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true } })).agbFassung).toBe('0.1')
 
-    expect(await stimmeAgbZu({ fassung: agbFassung() })).toEqual({ ok: true })
+    expect(await stimmeAgbZu({ fassung: AGB_NEUESTE })).toEqual({ ok: true })
     const neu = await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true, agbZugestimmtAm: true } })
-    expect(neu.agbFassung).toBe(agbFassung())
+    expect(neu.agbFassung).toBe(AGB_NEUESTE)
     expect(neu.agbZugestimmtAm!.getTime()).toBeGreaterThan(alt.getTime())
+  })
+
+  it('N45: ein Hof mit 0.9 stimmt 1.0 zu; „0.9“ aus dem Browser speichert nichts; ein fremder Hof mit 0.9 bleibt bei 0.9', async () => {
+    const vorStichtag = new Date('2026-10-01T10:00:00Z')
+    const { farm, cookie } = await erstelleHofMitAnmeldung({ agbFassung: '0.9', agbZugestimmtAm: vorStichtag })
+    const { farm: fremd } = await erstelleHof({ agbFassung: '0.9', agbZugestimmtAm: vorStichtag })
+    await angemeldet(cookie)
+
+    expect(AGB_NEUESTE).toBe('1.0')
+    expect(await stimmeAgbZu({ fassung: '0.9' })).toEqual({ error: expect.any(String) })
+    expect((await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true } })).agbFassung).toBe('0.9')
+
+    expect(await stimmeAgbZu({ fassung: '1.0' })).toEqual({ ok: true })
+    const neu = await prisma.farm.findUniqueOrThrow({ where: { id: farm.id }, select: { agbFassung: true, agbZugestimmtAm: true } })
+    expect(neu.agbFassung).toBe('1.0')
+    expect(neu.agbZugestimmtAm!.getTime()).toBeGreaterThan(vorStichtag.getTime())
+    expect(await prisma.farm.findUniqueOrThrow({ where: { id: fremd.id }, select: { agbFassung: true, agbZugestimmtAm: true } })).toEqual({
+      agbFassung: '0.9',
+      agbZugestimmtAm: vorStichtag,
+    })
   })
 
   it('angemeldet, aber ohne eigenen Hof: kein Erfolg, nichts geschrieben (mit Hof: Erfolg, siehe oben)', async () => {
@@ -113,7 +136,7 @@ describe('stimmeAgbZu mit echter Anmeldung', () => {
     const { farm: fremd } = await erstelleHof()
     await prisma.farm.delete({ where: { id: farm.id } })
     await angemeldet(cookie)
-    expect(await stimmeAgbZu({ fassung: agbFassung() })).toEqual({ error: expect.any(String) })
+    expect(await stimmeAgbZu({ fassung: AGB_NEUESTE })).toEqual({ error: expect.any(String) })
     expect(await prisma.farm.findUniqueOrThrow({ where: { id: fremd.id }, select: { agbFassung: true } })).toEqual({ agbFassung: null })
   })
 })

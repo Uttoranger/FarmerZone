@@ -45,7 +45,7 @@ export function FinanzenDiagramm({ punkte }: { punkte: FinanzenVerlaufPunkt[] })
       </div>
       <div aria-hidden="true" className="mt-1.5 flex gap-1 sm:gap-2 md:gap-4">
         {punkte.map((p) => (
-          <span key={p.monat} className="min-w-0 flex-1 truncate text-center text-[11px] text-muted-foreground sm:text-[11.5px]">
+          <span key={p.monat} className="min-w-0 flex-1 truncate text-center text-xs text-muted-foreground">
             <span className="sm:hidden">{monatOhneJahr(p.monat)}</span>
             <span className="hidden sm:inline">{p.kurz}</span>
           </span>

@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { Eye } from 'lucide-react'
 import { ladeOeffentlicheHoefe } from '@/server/queries/oeffentliche-hoefe'
 import { schonGemeldet } from '@/server/oeffentlich-lesen'
-import { waehleKartenHoefe, waehleStartseitenHoefe, type StartseitenHof, type StartseitenKarte } from '@/lib/startseite'
+import { gruppiereKurzkarten, waehleKartenHoefe, waehleStartseitenHoefe, type StartseitenHof, type StartseitenKarte } from '@/lib/startseite'
 import { HOEFE_AUSWAHL_MAX, type RenderEintrag, type StartseitenBlockDaten } from '@/lib/startseite-gestalten'
 import { vorschauBandText } from '@/lib/startseite-fassung'
 import type { VorschauQuelle } from '@/schemas/startseite'
@@ -16,7 +16,7 @@ import { jsonLdSicher, startseiteJsonLd } from '@/lib/json-ld'
 import { MARKE } from '@/lib/marke'
 import { RegionsKarte, StartseiteKopf } from '@/components/startseite/startseite-kopf'
 import { HoefeInDerNaehe, HofKarten, HofKartenFehler, HofKartenSkelett } from '@/components/startseite/hoefe-in-der-naehe'
-import { STARTSEITE_ABSCHNITTE } from '@/components/startseite/startseite-abschnitte'
+import { BrennmaterialBand, FutterAbschnitt, STARTSEITE_ABSCHNITTE } from '@/components/startseite/startseite-abschnitte'
 import { StartseitenBlock } from '@/components/startseite/bloecke/startseiten-block'
 
 /*
@@ -128,6 +128,15 @@ function Eintrag({ eintrag, jetzt }: { eintrag: RenderEintrag; jetzt: Date }) {
   }
 }
 
+/** Futter und Brennmaterial als Paar: EIN Rahmen der Breite, zwei Spalten ab 768 px. */
+function KurzkartenPaar({ eintraege }: { eintraege: RenderEintrag[] }) {
+  return (
+    <div className="mx-auto grid max-w-[1146px] gap-5 px-4 pb-8 md:grid-cols-2 md:gap-4 md:px-6 md:pb-12">
+      {eintraege.map((e) => (e.art === 'FUTTER' ? <FutterAbschnitt key="FUTTER" imPaar /> : <BrennmaterialBand key="BRENNMATERIAL" imPaar />))}
+    </div>
+  )
+}
+
 /** Nur in der Vorschau: oben ein Band, damit niemand die Vorschau für die echte Seite hält — mit Quelle und Tag (Nr. 106). */
 function VorschauBand({ quelle, datum }: { quelle: VorschauQuelle; datum: Date }) {
   return (
@@ -161,9 +170,13 @@ export function StartseitenInhalt({
       {/* Strukturierte Daten (Nr. 117): Organization und WebSite, ohne Suchfeld — /hoefe? sperrt robots.txt. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSicher(startseiteJsonLd(metadatenBasis(UMGEBUNG.appUrl))) }} />
       {band && <VorschauBand quelle={band.quelle} datum={band.datum} />}
-      {eintraege.map((eintrag) => (
-        <Eintrag key={eintrag.art === 'BLOCK' ? eintrag.block.id : eintrag.art} eintrag={eintrag} jetzt={jetzt} />
-      ))}
+      {gruppiereKurzkarten(eintraege).map((gruppe) =>
+        gruppe.length === 2 ? (
+          <KurzkartenPaar key="kurzkarten" eintraege={gruppe} />
+        ) : (
+          <Eintrag key={gruppe[0].art === 'BLOCK' ? gruppe[0].block.id : gruppe[0].art} eintrag={gruppe[0]} jetzt={jetzt} />
+        )
+      )}
     </>
   )
 }

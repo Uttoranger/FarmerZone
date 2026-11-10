@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { HOF_KONTAKT_FELDER } from '@/lib/hof-kontakt'
+import { barBestellungWartet } from '@/lib/betrieb-mails'
 import type { OrderForEmail, OrderForHofMail, StapelMail } from '@/lib/email'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { MailRenderer, Verworfen } from '@/server/mail-arten'
@@ -30,6 +31,8 @@ const BESTELLUNG_FUER_MAIL = {
   customerPhone: true,
   totalAmount: true,
   serviceFeeCents: true,
+  // Nr. 255: Ist die Gebühr entfallen, zeigt das „Gesamt“ der Kunden-Mails (auch in der Admin-Vorschau) nur den Warenpreis — nur Anzeige.
+  serviceFeeRefundedAt: true,
   // N38 (Nr. 197): Modell und Einzug — die Kunden-Mails zeigen im Hofpreis-Modell Endpreise inkl. Plattformgebühr.
   gebuehrModell: true,
   gebuehrEinzug: true,
@@ -56,9 +59,12 @@ const BESTELLUNG_FUER_MAIL = {
       unitPrice: true,
       totalPrice: true,
       gebuehrCents: true,
+      // Nr. 255: „Ein Artikel fehlt“ listet, was bleibt — ohne die schon fehlenden Positionen.
+      fehltSeit: true,
       // Einheit nur für die Anzeige in der Mail
       // ruecksendekostenCents (Nr. 214): Schätzung für den 5-b-Satz der Belehrung in der Bestätigung.
-      product: { select: { unit: true, unitSize: true, ruecksendekostenCents: true } },
+      // abholhinweise (N47, Nr. 257): „Abholung nach Absprache“ sagt die Bestätigung im Abholblock.
+      product: { select: { unit: true, unitSize: true, ruecksendekostenCents: true, abholhinweise: true } },
     },
   },
 } satisfies Prisma.OrderSelect
@@ -66,7 +72,14 @@ const BESTELLUNG_FUER_MAIL = {
 type BestellungFuerMail = Prisma.OrderGetPayload<{ select: typeof BESTELLUNG_FUER_MAIL }>
 
 /** Die Arten, deren Auftrag nur die Bestellung kennt. */
-export type EinfacheBestellArt = 'bestellung-bestaetigung' | 'bestellung-bezahlt-hof' | 'bar-bestaetigt-hof' | 'abholbereit' | 'nicht-abholbereit' | 'verfallen'
+export type EinfacheBestellArt =
+  | 'bestellung-bestaetigung'
+  | 'bestellung-bezahlt-hof'
+  | 'bar-bestaetigt-hof'
+  | 'bestellung-bar-hof'
+  | 'abholbereit'
+  | 'nicht-abholbereit'
+  | 'verfallen'
 
 /**
  * Der Auftrag einer Bestellmail. Der fachliche Schlüssel ist `<art>:<orderId>`
@@ -211,6 +224,7 @@ function alsMailBestellung(b: BestellungFuerMail): OrderForHofMail {
     customerPhone: b.customerPhone,
     totalAmount: b.totalAmount,
     serviceFeeCents: b.serviceFeeCents,
+    serviceFeeRefundedAt: b.serviceFeeRefundedAt,
     gebuehrModell: b.gebuehrModell,
     gebuehrEinzug: b.gebuehrEinzug,
     createdAt: b.createdAt,
@@ -257,6 +271,19 @@ function einfach(baue: (email: typeof import('@/lib/email'), order: OrderForHofM
 export const rendereBestellungBestaetigung: MailRenderer = einfach((e, o) => e.baueOrderConfirmation(o))
 export const rendereBestellungBezahltHof: MailRenderer = einfach((e, o) => e.baueOrderPaidToFarmer(o))
 export const rendereBarBestaetigtHof: MailRenderer = einfach((e, o) => e.baueOrderConfirmedToFarmer(o))
+/**
+ * „Neue Bestellung bar“ an den Hof (Nr. 256) nur, solange die Kundin noch
+ * bestätigen kann: Ist sie bestätigt, storniert, abgeholt oder die Frist vorbei
+ * (`barBestellungWartet`, dieselbe Regel wie `passtNochmal`), käme die Mail zu
+ * spät oder führte zum Packen einer Bestellung, die verfällt — verworfen.
+ */
+export const rendereBestellungBarHof: MailRenderer = async (bezug) => {
+  const { orderId } = bestellungBezugSchema.parse(bezug)
+  const b = await ladeBestellung(orderId)
+  if (!b) return GELOESCHT
+  if (!barBestellungWartet(b, new Date())) return { verworfen: 'nicht_mehr_offen' }
+  return (await import('@/lib/email')).baueBarBestellungAnHof(alsMailBestellung(b))
+}
 /**
  * „Abholbereit“ nur, solange die Bestellung bereit ist (Nr. 195, Audit A4):
  * Nimmt der Hof „Gepackt“ zurück, bevor der Worker die Mail schickt, wäre sie
@@ -308,6 +335,10 @@ export async function rendereArtikelFehlt(bezug: Record<string, string>): Promis
     bisherCents: cents(f.bisherCents),
     neuCents: cents(f.neuCents),
     erstattetCents: f.erstattetCents === undefined ? null : cents(f.erstattetCents),
+    // Board s3/w3-mail-kauf Bild 6: die Positionen, die bleiben, vor „Neuer Betrag“ — ohne diese und früher fehlende.
+    uebrig: b.items
+      .filter((i) => i.id !== f.itemId && i.fehltSeit === null)
+      .map((i) => ({ productName: i.productName, quantity: i.quantity, unitPrice: i.unitPrice, totalPrice: i.totalPrice, gebuehrCents: i.gebuehrCents, product: i.product })),
   })
 }
 

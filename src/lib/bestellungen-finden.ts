@@ -23,11 +23,11 @@
  */
 import type { OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client'
 import { ANMELDECODE_GUELTIG_SEKUNDEN, ANMELDECODE_MAX_VERSUCHE, codesPausiertText, pauseBisText } from '@/lib/anmeldecode'
-import { abholZeitText } from '@/lib/bestaetigung'
 import { bestellStatusAnzeige, zahlungsAnzeige } from '@/lib/bestellstatus'
 import { formatEuro, mitAnzahl } from '@/lib/format'
+import { tagVersetzt, wochentagVon } from '@/lib/kalender'
 import type { MarkeArt } from '@/lib/marke-art'
-import { centsAlsEuro, kalendertagInWien } from '@/lib/servicegebuehr'
+import { anzeigeGesamtCents, centsAlsEuro, kalendertagInWien } from '@/lib/servicegebuehr'
 
 /** Die Seite — der Cookie gilt nur für diesen Pfad. */
 export const BESTELLUNGEN_PFAD = '/bestellungen'
@@ -141,8 +141,11 @@ export type ListenBestellung = {
   pickupTimeStart: string
   pickupTimeEnd: string
   createdAt: Date
-  /** Warenpreis + Servicegebühr (Snapshot), in Cent. */
-  gesamtCents: number
+  /**
+   * Der Snapshot für den Betrag (Warenpreis als Decimal-Text, Gebühr in Cent, entfallen am) — den Anzeige-Betrag
+   * bildet `bestellEintrag` über `anzeigeGesamtCents` (Nr. 253).
+   */
+  summen: { totalAmount: string; serviceFeeCents: number; serviceFeeRefundedAt: Date | null }
   artikel: number
 }
 
@@ -170,14 +173,45 @@ export function teileBestellungen<T extends ListenBestellung>(liste: readonly T[
   return { laufend, frueher }
 }
 
-// Fester Wortlaut statt Intl „short": je nach ICU-Stand stünde „Sept." oder „Sep.".
-const MONAT_KURZ = ['Jän.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'] as const
+// Fester Wortlaut statt Intl (je nach ICU-Stand anders); österreichisch „Jänner“.
+const MONAT_LANG = ['Jänner', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'] as const
+const WOCHENTAG = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'] as const
 
-/** „26. Sep." im laufenden Jahr, sonst „10. Jän. 2025" — der Wiener Kalendertag. */
-function kurzesDatum(zeitpunkt: Date, jetzt: Date): string {
-  const [jahr, monat, tag] = kalendertagInWien(zeitpunkt).split('-').map(Number)
+/** Wochentag, Tag und Monat eines Wiener Kalendertags („Sa“, 20, „Februar“) — der Wochentag ohne Zeitzone. */
+function tagTeile(kalendertag: string): { wochentag: string; tag: number; monat: string; jahr: number } {
+  const [jahr, monat, tag] = kalendertag.split('-').map(Number)
+  return { wochentag: WOCHENTAG[wochentagVon(kalendertag)], tag, monat: MONAT_LANG[monat - 1], jahr }
+}
+
+/** „15:00“ → „15“, „15:30“ bleibt (Board s1-/w1-meine-bestellungen: „15–18 Uhr“). */
+function uhrKurz(zeit: string): string {
+  return zeit.replace(/^(\d{1,2}):00$/, '$1')
+}
+
+/**
+ * Der Abholtermin einer laufenden Bestellung im Format des Boards s1-/w1-meine-bestellungen (Liste Lauf 32,
+ * Mangel „Zeilentexte“; Nr. 275): „heute, Mi 3. März, 15–18 Uhr“ — „heute“/„morgen“ klein und nur zusätzlich,
+ * immer Wochentag und Datum, volle Stunden ohne „:00“. Der Wiener Kalendertag (`kalendertagInWien`).
+ */
+export function listenTermin(
+  b: { pickupDate: Date; pickupTimeStart: string; pickupTimeEnd: string },
+  jetzt: Date
+): string {
+  const tag = kalendertagInWien(b.pickupDate)
+  const heute = kalendertagInWien(jetzt)
+  const { wochentag, tag: nr, monat } = tagTeile(tag)
+  const vorn = tag === heute ? 'heute, ' : tag === tagVersetzt(heute, 1) ? 'morgen, ' : ''
+  return `${vorn}${wochentag} ${nr}.\u00a0${monat}, ${uhrKurz(b.pickupTimeStart)}–${uhrKurz(b.pickupTimeEnd)} Uhr`
+}
+
+/**
+ * Der Abholtag einer früheren Bestellung wie im Board: „Sa, 20. Februar“, aus einem anderen Jahr mit Jahr
+ * („Fr, 10. Jänner 2025“). Der Wiener Kalendertag.
+ */
+export function listenTag(zeitpunkt: Date, jetzt: Date): string {
+  const { wochentag, tag, monat, jahr } = tagTeile(kalendertagInWien(zeitpunkt))
   const diesesJahr = Number(kalendertagInWien(jetzt).slice(0, 4))
-  return `${tag}. ${MONAT_KURZ[monat - 1]}${jahr === diesesJahr ? '' : ` ${jahr}`}`
+  return `${wochentag}, ${tag}.\u00a0${monat}${jahr === diesesJahr ? '' : ` ${jahr}`}`
 }
 
 /** Eine Zeile der Liste, fertig zum Anzeigen. */
@@ -193,7 +227,7 @@ export type BestellEintrag = {
    * Farbe trägt; storniert rot (abgebrochen).
    */
   art: MarkeArt
-  /** Laufend die Abholzeit („Morgen, 15:00–18:00 Uhr"), früher der Abholtag („26. Sep."). */
+  /** Laufend der Abholtermin („morgen, Do 4. März, 15–18 Uhr“), früher der Abholtag („Sa, 20. Februar“). */
   wann: string
   betrag: string
   zahlung: string
@@ -203,7 +237,7 @@ export type BestellEintrag = {
 /**
  * Was eine Zeile zeigt. Marke aus `bestellStatusAnzeige`, Zahlung aus
  * `zahlungsAnzeige` (dieselben Worte wie auf der Bestellseite), Betrag über
- * `formatEuro` aus ganzen Cent.
+ * `formatEuro` aus ganzen Cent (`anzeigeGesamtCents`, nur Anzeige).
  */
 export function bestellEintrag(b: ListenBestellung, jetzt: Date, laufend: boolean): BestellEintrag {
   const zahlung = zahlungsAnzeige(b.paymentMethod, b.paymentStatus)
@@ -215,8 +249,9 @@ export function bestellEintrag(b: ListenBestellung, jetzt: Date, laufend: boolea
     bestellnummer: b.bestellnummer,
     marke: anzeige.marke,
     art: anzeige.art,
-    wann: laufend ? abholZeitText(b, jetzt) : kurzesDatum(b.pickupDate, jetzt),
-    betrag: formatEuro(centsAlsEuro(b.gesamtCents)),
+    wann: laufend ? listenTermin(b, jetzt) : listenTag(b.pickupDate, jetzt),
+    // Wie die verlinkte Bestätigung: Ist die Gebühr entfallen bzw. erstattet, steht der Warenpreis (Nr. 244/253).
+    betrag: formatEuro(centsAlsEuro(anzeigeGesamtCents(b.summen))),
     zahlung: `${zahlung.art} · ${zahlung.zustand}`,
     artikel: mitAnzahl(b.artikel, 'Artikel', 'Artikel'),
   }

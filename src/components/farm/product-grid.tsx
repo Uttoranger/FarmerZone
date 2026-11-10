@@ -9,10 +9,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ShoppingCart, ShoppingBasket, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Sprout, Check, WifiOff } from 'lucide-react'
+import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Check, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
+import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
 import { MONTH_SHORT, centsAlsEuro, formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl, seasonLabel } from '@/lib/format'
 import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
@@ -34,11 +35,12 @@ import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 import { futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { produktPfad } from '@/lib/produktdetail'
-import { ProduktKarte } from '@/components/hofseite/produkt-karte'
+import { PRODUKT_LISTE, ProduktKarte } from '@/components/hofseite/produkt-karte'
 import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
@@ -104,12 +106,6 @@ type Props = {
    * Kein zweiter Warenkorb: Ein zweiter useCart führte seinen eigenen Korb.
    */
   inDenKorb?: Ref<InDenKorb>
-  /**
-   * Die Hofseite hält im klebenden Block einen Platz für die Kategorie-Chips
-   * bereit (Nr. 177): Am Handy kommen sie dorthin, ab md bleiben sie im Fluss.
-   * `platz` ist null, bis der Platz im Dokument steht. Ohne: wie bisher.
-   */
-  chipBlock?: { platz: HTMLElement | null }
 }
 
 
@@ -198,21 +194,16 @@ function ProductImageArea({
       {fileInput}
 
       {/* Gedimmter Bildrahmen — Foto ?? Illustration (Unterkategorie, sonst Kategorie, sonst „Sonstiges", categoryImageUrl) ?? Sand-Platzhalter */}
-      <div className="absolute inset-0" style={{ opacity: dim }}>
+      <div className={cn('absolute inset-0', !product.imageUrl && product.categoryImageUrl && 'dark:ring-1 dark:ring-border dark:ring-inset')} style={{ opacity: dim }}>
         {(product.imageUrl ?? product.categoryImageUrl) ? (
           <Image
             src={(product.imageUrl ?? product.categoryImageUrl)!}
             alt={product.name}
             fill
             sizes="(min-width: 768px) 33vw, 50vw"
-            // Nur die Kategorie-Illustration wird im Dunkeln gedämpft, sonst
-            // leuchtet ihr Crème-Grund als Fläche; Fotos bleiben, wie sie sind
-            // (CODING_STANDARDS §7, Altlast aus ARCHITECTURE §6 beim Anfassen
-            // nachgezogen — Werte wie in components/produkte/produkte-ansicht.tsx).
-            className={cn(
-              'object-contain',
-              !product.imageUrl && 'dark:brightness-[0.85] dark:saturate-[0.9]'
-            )}
+            // Die Kategorie-Illustration steht im Dunkeln wie ein Foto: gedämpft aus der einen Quelle
+            // (ILLUSTRATION_HUELLE, F041) und gerahmt; Fotos bleiben, wie sie sind (CODING_STANDARDS §7).
+            className={cn('object-contain', !product.imageUrl && ILLUSTRATION_HUELLE)}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -544,7 +535,6 @@ export function ProductGrid({
   produktLink = (id) => produktPfad(farmSlug, id),
   platzUnten = true,
   inDenKorb,
-  chipBlock,
 }: Props) {
   const isEditMode = ownerMode && mode !== 'preview'
   // Notbremse (Register N34, Nr. 189): Kaufknöpfe und Nachbestell-Link ruhen wie
@@ -639,7 +629,9 @@ export function ProductGrid({
     let satz = null as string | null
     ersetzeKorb((vorher) => {
       const abgleich = gleicheKorbMitHofseite(vorher, products, sperre)
-      satz = abgleich?.satz ?? null
+      // Board s1-/w1-korb Bild 2 (Nr. 276): der Satz zu entfernten Positionen mit dem Produktnamen — die Quelle kennt
+      // keine Namen, der Korb vorher schon. Alles andere im Satz bleibt wörtlich (korbHinweisMitNamen).
+      satz = abgleich?.satz ? korbHinweisMitNamen(abgleich.satz, entfernteNamen(vorher, abgleich.positionen)) : null
       return abgleich?.positionen ?? vorher
     })
     if (satz) zeigeKorbHinweis(farmId, satz)
@@ -778,20 +770,6 @@ export function ProductGrid({
     return items.find((i) => i.productId === produktId)?.quantity ?? 0
   }
 
-  function mengeAendern(produkt: PublicProduct, menge: number) {
-    if (!mitKorb) {
-      toast.info(VORSCHAU_KAUF_HINWEIS)
-      return
-    }
-    // Lehnt die Reservierung ab (jemand war schneller), sagt die Zeile es —
-    // die Menge bleibt dann, wie sie war. Am Netz der Satz aus N29 mit „Nochmal".
-    setKorbZeile(null)
-    void updateQuantity(produkt.id, menge).then((ergebnis) => {
-      if (ergebnis.ok) return
-      setKorbZeile({ art: 'fehler', nr: Date.now(), text: korbFehlerText(ergebnis, 'menge'), nochmal: ergebnis.nochmal ? () => mengeAendern(produkt, menge) : null })
-    })
-  }
-
   function karte(p: PublicProduct) {
     return (
       <ProduktKarte
@@ -801,12 +779,13 @@ export function ProductGrid({
         wirdHinzugefuegt={addingId === p.id}
         href={produktLink(p.id)}
         onInDenKorb={handleAddToCart}
-        onMenge={mengeAendern}
       />
     )
   }
 
-  const korbLeiste = mitKorb && isHydrated && count > 0
+  // Bei Pause keine Korb-Leiste (Board s1-hofseite Bild 4): Bestellen geht nicht, der Korb bleibt
+  // gespeichert und ist über den Warenkorb der Shell erreichbar. Nur Anzeige — die Sperre selbst bleibt.
+  const korbLeiste = mitKorb && isHydrated && count > 0 && sperreDesHofs !== 'pause'
 
   return (
     <>
@@ -833,7 +812,6 @@ export function ProductGrid({
         teil === 'keins' ? null : products.length === 0 ? (
           // Leer, mit Ausweg (DESIGN_SYSTEM, „Zustände").
           <EmptyState
-            symbol={Sprout}
             titel="Gerade keine Produkte"
             satz="Dieser Hof hat im Moment nichts im Angebot. Schau bald wieder vorbei – oder such dir einen anderen Hof in der Nähe."
             ausweg={
@@ -849,7 +827,7 @@ export function ProductGrid({
           // Das Schaufenster (Register N5): am Handy bis zu vier Zeilen, ab md
           // eine Reihe aus drei Kacheln, ab lg wie bisher — die Anzahl je
           // Breite über Klassen (stehtNurAmHandy), nie gemessen.
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <ul className={PRODUKT_LISTE}>
             {uebersichtProdukte(displayProducts, sperre, SCHAUFENSTER_PRODUKTE).map((p, i) => (
               <li key={p.id} className={stehtNurAmHandy(i) ? 'md:hidden' : undefined}>
                 {karte(p)}
@@ -862,7 +840,6 @@ export function ProductGrid({
             gebuehrHinweis={gebuehrHinweis}
             springeZu={springeZu}
             onGesprungen={onGesprungen}
-            chipBlock={chipBlock}
             renderKarte={karte}
           />
         )
@@ -1009,7 +986,7 @@ export function ProductGrid({
         </div>
       )}
 
-      {mitKorb && isHydrated && count > 0 && (
+      {korbLeiste && (
         <button
           type="button"
           onClick={() => {
@@ -1020,18 +997,17 @@ export function ProductGrid({
           // Der Cookie-Hinweis steht über der Korb-Leiste, nie darauf (src/lib/cookie-hinweis.ts).
           data-unten-fest=""
           className={cn(
-            'fixed inset-x-4 bottom-[calc(68px+env(safe-area-inset-bottom,0px)+1.75rem)] z-40 flex min-h-12 items-center gap-2.5 rounded-2xl bg-accent px-4 py-3 text-accent-foreground shadow-lg transition-transform duration-[250ms] active:scale-[0.98] md:inset-x-auto md:right-6 md:bottom-6 md:rounded-full md:px-5 lg:hidden',
+            'fixed inset-x-4 bottom-[calc(68px+env(safe-area-inset-bottom,0px)+1.75rem)] z-40 flex min-h-14 items-center gap-2.5 rounded-2xl bg-accent px-4 py-3 text-accent-foreground shadow-lg transition-transform duration-[250ms] active:scale-[0.98] md:inset-x-auto md:right-6 md:bottom-6 md:rounded-full md:px-5 lg:hidden',
             FOKUS_RAHMEN
           )}
         >
-          <ShoppingBasket className="size-5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-          <span className="min-w-0 truncate text-[13px] font-semibold">
-            {mitAnzahl(count, 'Artikel', 'Artikel')} · {formatEuro(total)}
+          <span className="min-w-0 truncate text-[16px] font-bold">
+            {mitAnzahl(count, 'Produkt', 'Produkte')} · {formatEuro(total)}
             {gebuehrKorb && !anzeige && <span className="font-normal"> + Gebühr</span>}
           </span>
-          <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[13px] font-semibold">
+          <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[16px] font-bold">
             Zum Warenkorb
-            <ChevronRight className="size-4" strokeWidth={1.7} aria-hidden="true" />
+            <ChevronRight className="size-[18px]" strokeWidth={2} aria-hidden="true" />
           </span>
         </button>
       )}

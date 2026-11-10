@@ -11,8 +11,11 @@
  * Spalte dafür gibt es nicht. Das Wort gilt seit Nr. 28 (Register B2); der
  * Filterwert in der Adresse bleibt `entwuerfe`, damit alte Links gelten.
  */
-import { NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
-import { formatMenge, formatZahl, hofVorratText, mitAnzahl } from '@/lib/format'
+import { IM_SHOP, NICHT_IM_SHOP, produktZustand } from '@/lib/produkt-sichtbarkeit'
+import { einheitLabel, formatEuro, formatGebinde, formatMenge, formatZahl, gebindeGroesse, hofVorratText } from '@/lib/format'
+import { PLATTFORMGEBUEHR_BEZEICHNUNG } from '@/lib/konditionen'
+import { endpreisEuro, gebuehrWortFuerModell, satzText, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import { KATEGORIE_LABEL, istFuttermittel, type ProductCategoryValue } from '@/lib/taxonomie'
 import { abholungText, type NaechstesFenster } from '@/lib/heute'
 import { teilenMomenteAn } from '@/lib/teilen-momente'
@@ -32,8 +35,12 @@ export type ProduktStatus = { text: string; ton: ProduktStatusTon }
  * „N Größen warten auf Meldung" gehört zu Gate 6 (Futter-Sperre je Gebinde)
  * und kommt mit Nr. 20.
  */
-export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null }): ProduktStatus {
+export function produktStatus(p: { isAvailable: boolean; stock: number; unit: string; unitSize: number | null; category?: string | null }): ProduktStatus {
   const zustand = produktZustand(p)
+  // Liste Lauf 32 (produkte 1440): Ohne Kategorie steht das Produkt nicht im Shop (Board, Heute „Braucht dich“) —
+  // das Schild sagt, was zu tun ist; der Vorschlag mit „Übernehmen“ bleibt darunter (Hinweise). Nur wenn die
+  // Kategorie ausdrücklich fehlt (null); Aufrufer ohne das Feld bekommen das Schild wie bisher.
+  if (zustand.art === 'im-shop' && p.category === null) return { text: 'Kategorie ergänzen', ton: 'offen' }
   switch (zustand.art) {
     case 'nicht-im-shop':
       return { text: NICHT_IM_SHOP, ton: 'neutral' }
@@ -43,12 +50,66 @@ export function produktStatus(p: { isAvailable: boolean; stock: number; unit: st
       // Mit der Einheit des Vorrats (N25): „Nur noch 3 kg", bei Gebinden „Nur noch 2 Pakete".
       return { text: `Nur noch ${hofVorratText(zustand.bestand, p.unit, p.unitSize)}`, ton: 'offen' }
     case 'im-shop':
-      return { text: 'Sichtbar', ton: 'fertig' }
+      // Boards s1/w1-produkte (Lauf 30): Das Schild heißt wie der Schalter „Im Shop“, nicht mehr „Sichtbar“.
+      return { text: IM_SHOP, ton: 'fertig' }
   }
 }
 
+// ─── Preis je Modell (N38; Boards s1/w1-produkte, s1/w1-produkt-neu) ────────
+
+/** Kürzel der Einheit in der Produktliste des Hofs, wo das Board vom allgemeinen Label abweicht (s1-/w1-produkte). */
+const EINHEIT_LISTE: Readonly<Record<string, { kurz: string; lang: string }>> = {
+  STUECK: { kurz: 'Stk.', lang: 'Stk.' },
+  RAUMMETER: { kurz: 'RM', lang: 'Raummeter' },
+  SCHUETTRAUMMETER: { kurz: 'SRM', lang: 'Schüttraummeter' },
+}
+
 /**
- * Die Liste ohne Produkte (Register N9): Titel und Satz des Leerzustands. Die Kopfzeile darüber
+ * Die Einheit eines Produkts in der Liste des Hofs, immer mit Zahl (Abnahme Lauf 32, produkte Bild 1; Nr. 277):
+ * „1 L“, „10 Stk.“, „500 g“, „1 RM“ (Tabelle, `kurz`) bzw. „1 Raummeter“ (Zeile am Handy, `lang`) — statt
+ * „je L“, „je m³“ aus `formatGebinde`. Ohne Gebindegröße zählt eine Einheit. Nur Anzeige.
+ */
+export function produktEinheit(unit: string, unitSize: number | { toString(): string } | null | undefined, form: 'kurz' | 'lang' = 'kurz'): string {
+  const groesse = gebindeGroesse(unitSize) ?? 1
+  const label = EINHEIT_LISTE[unit]?.[form] ?? einheitLabel(unit, groesse)
+  return `${formatZahl(groesse)} ${label}`
+}
+
+/**
+ * „Du bekommst € 7,50" und „die Kundin zahlt € 7,95" — nur im Hofpreis-Modell
+ * (`anzeige` gesetzt, preisAnzeigeFuer). Gerechnet wird nichts Neues: Der
+ * Endpreis kommt aus `endpreisEuro` (je Stück aufgerundet, wie /api/checkout).
+ * Im Modell „bisher" null — dann zahlt die Kundin die Servicegebühr erst in der
+ * Kasse dazu, und die Zeile zeigt den Preis wie bisher.
+ */
+export function hofpreisTeile(preis: number, anzeige: PreisAnzeige): { bekommst: string; zahlt: string } | null {
+  if (!anzeige || !Number.isFinite(preis) || preis < 0) return null
+  return {
+    bekommst: `Du bekommst ${formatEuro(preis)}`,
+    zahlt: `die Kundin zahlt ${formatEuro(endpreisEuro(preis, anzeige))}`,
+  }
+}
+
+/** Beides in einer Zeile: „Du bekommst € 7,50 · die Kundin zahlt € 7,95" (Karten-Zeile, Größe im Formular). */
+export function hofpreisZeile(preis: number, anzeige: PreisAnzeige): string | null {
+  const teile = hofpreisTeile(preis, anzeige)
+  return teile ? `${teile.bekommst} · ${teile.zahlt}` : null
+}
+
+/**
+ * Der Satz zur Gebühr unter „So sehen Kunden dein Futter" bzw. „… dein Holz"
+ * (V62; Board s1/w1-produkt-neu, Bild 2 und 4): ab dem Stichtag sind die
+ * gezeigten Preise Endpreise — „Preise inkl. Plattformgebühr (6 %)" mit dem
+ * Satz des Hofs; im Modell „bisher" der Satz von heute, mit dem Wort des Modells.
+ */
+export function vorschauGebuehrSatz(anzeige: PreisAnzeige): string {
+  if (anzeige) return `Preise inkl. ${PLATTFORMGEBUEHR_BEZEICHNUNG} (${satzText(anzeige.hundertstel)} %)`
+  return `Die ${gebuehrWortFuerModell('bisher')} zahlt die Kundin zusätzlich. Du bekommst genau deinen Preis.`
+}
+
+/**
+ * Die Liste ohne Produkte (Register N9): Titel und Satz des Leerzustands.
+ * `knopf` ist der Ausweg (Boards s1/w1-produkte, Bild 3: „Erstes Produkt anlegen"). Die Kopfzeile darüber
  * schweigt dann (`produkteKopfzeile`) — derselbe Satz stünde sonst zweimal untereinander.
  */
 export const PRODUKTE_LEER = {
@@ -56,7 +117,25 @@ export const PRODUKTE_LEER = {
   satz: 'Leg dein erstes Produkt an – deine Kundinnen sehen es sofort auf deiner Hofseite.',
   // Vor der Freischaltung sieht niemand die Hofseite: „sofort" wäre ein falsches Versprechen (Nr. 176, Board SterneHofStart 5).
   satzVorFreischaltung: 'Leg dein erstes Produkt an – deine Kundinnen sehen es, sobald dein Hof freigeschaltet ist.',
+  knopf: 'Erstes Produkt anlegen',
 } as const
+
+/**
+ * Kein Treffer (Boards s1/w1-produkte, Bild 4): mit Suche der Satz mit dem Wort,
+ * sonst der Satz zum Filter; der Ausweg setzt die Suche bzw. den Filter zurück.
+ */
+export const PRODUKTE_KEIN_TREFFER = {
+  titel: 'Kein Produkt passt',
+  filterSatz: 'In diesem Filter ist gerade kein Produkt.',
+  sucheKnopf: 'Suche zurücksetzen',
+  filterKnopf: 'Alle Produkte zeigen',
+} as const
+
+/** „Prüf die Schreibweise oder leg „Kürbis“ als neues Produkt an." — ohne Suche der Satz zum Filter. */
+export function keinTrefferSatz(suche: string): string {
+  const wort = suche.trim()
+  return wort ? `Prüf die Schreibweise oder leg „${wort}“ als neues Produkt an.` : PRODUKTE_KEIN_TREFFER.filterSatz
+}
 
 /** Der Satz des Leerzustands: nach der Freischaltung „sofort", davor erst mit der Freischaltung. */
 export function produkteLeerSatz(hofSichtbar: boolean): string {
@@ -64,7 +143,8 @@ export function produkteLeerSatz(hofSichtbar: boolean): string {
 }
 
 /**
- * „6 Produkte · 5 sichtbar" — ohne Produkt null (dann steht nur der Leerzustand). Gezählt wird isAvailable, NICHT der Bestand: Ein
+ * „Produkte · 6 · 5 sichtbar" (Board w1-produkte: Überschrift der Tabelle; vorher „6 Produkte · 5 sichtbar"
+ * unter der h1) — ohne Produkt null (dann steht nur der Leerzustand). Gezählt wird isAvailable, NICHT der Bestand: Ein
  * ausverkauftes Produkt steht für Kunden sichtbar als „Ausverkauft" da. Wer es
  * aus der Zählung nähme, ließe den Hof glauben, er habe weniger eingestellt,
  * als die Kundin sieht.
@@ -72,7 +152,7 @@ export function produkteLeerSatz(hofSichtbar: boolean): string {
 export function produkteKopfzeile(produkte: readonly { isAvailable: boolean }[]): string | null {
   if (produkte.length === 0) return null
   const sichtbar = produkte.filter((p) => p.isAvailable).length
-  return `${mitAnzahl(produkte.length, 'Produkt', 'Produkte')} · ${formatZahl(sichtbar)} sichtbar`
+  return `Produkte · ${formatZahl(produkte.length)} · ${formatZahl(sichtbar)} sichtbar`
 }
 
 // ─── Filter und Suche ───────────────────────────────────────────────────────
@@ -279,11 +359,73 @@ export function gespeichertTexte(name: string, fenster: NaechstesFenster | null)
   }
 }
 
-/** Der Satz unter der Tabelle (Mockup) — nur ab 1024 px, wo − und + in der Zeile stehen. */
-export const VORRAT_HINWEIS = 'Vorrat direkt hier ändern. Bei 0 wird das Produkt automatisch als ausverkauft angezeigt – nicht gelöscht.'
+// ─── Vorrat ändern (Boards s1/w1-produkte, Bild 2) ──────────────────────────
 
-/** Derselbe Platz unter 1024 px: Dort ändert ein Tipp auf den Vorrat ihn im Blatt (N25). */
-export const VORRAT_HINWEIS_ZEILEN = 'Tipp auf den Vorrat, um ihn zu ändern. Bei 0 steht das Produkt als ausverkauft da – es wird nicht gelöscht.'
+/** Der Satz im Blatt bzw. Dialog unter dem Stepper — ersetzt die Sätze unter Tabelle und Zeilen. */
+export const VORRAT_NULL_SATZ = 'Bei 0 steht „Ausverkauft“, das Produkt bleibt sichtbar.'
+
+/**
+ * „Dazu +5 +10 +25 +50" und „Ausverkauft" im Blatt bzw. Dialog (Register N25 nennt beide wörtlich;
+ * die Boards s1/w1-produkte zeigen sie nicht — bei Widerspruch gilt das Register). „Dazu" setzt nur
+ * das Feld, gespeichert wird erst mit „Speichern"; „Ausverkauft" speichert sofort 0.
+ */
+export const VORRAT_DAZU = [5, 10, 25, 50] as const
+export const VORRAT_DAZU_TITEL = 'Dazu'
+export const VORRAT_AUSVERKAUFT_KNOPF = 'Ausverkauft'
+
+/** Der Titel: „Vorrat: Freilandeier". */
+export function vorratTitel(name: string): string {
+  return `Vorrat: ${name}`
+}
+
+/**
+ * Die Frage über dem Stepper — in der Einheit, die der Vorrat zählt (dieselbe
+ * wie `hofVorratText`): „Wie viele Pakete à 10 Stück hast du gerade?" (das
+ * Board schreibt „Packungen"; der Hofbereich zählt Gebinde überall als Pakete),
+ * „Wie viele kg hast du gerade?", „Wie viele Ballen hast du gerade?".
+ */
+export function vorratFrage(unit: string, unitSize: number | null): string {
+  const zwei = hofVorratText(2, unit, unitSize)
+  const einheit = zwei.slice(formatZahl(2).length + 1)
+  // Ohne Gebinde sagt formatGebinde „je kg" — dann steht nichts dahinter; ebenso, wenn das Gebinde
+  // schon in Paketen zählt („6 Pakete"), sonst hieße es „Pakete à 6 Pakete".
+  const paket = formatGebinde(unit, unitSize)
+  const gebinde = paket.startsWith('je ') || paket.endsWith(` ${einheit}`) ? '' : ` à ${paket}`
+  return `Wie viele ${einheit}${gebinde} hast du gerade?`
+}
+
+// ─── Fehler im Formular (V17; Board s1/w1-produkt-neu, Bild 5 und 6) ────────
+
+/** Die Karte über dem Formular, wenn Felder markiert sind — statt eines Toasts (Quelle: lib/formular-saetze.ts). */
+export { FORMULAR_PRUEFEN } from '@/lib/formular-saetze'
+
+/** Speichern gescheitert: Titel und Sätze der orangen Karte (ohne Feld). */
+export const SPEICHERN_FEHLER = {
+  titel: 'Speichern hat nicht geklappt',
+  netz: 'Deine Eingaben sind noch da. Prüf den Empfang und versuch es noch einmal.',
+  unsicherTitel: 'Keine Verbindung',
+} as const
+
+/** Was die Karte zeigt: Titel, Satz und ob „Nochmal" daneben steht. */
+export type SpeicherFehlerAnzeige = { titel: string; satz: string; nochmal: boolean }
+
+/** Der Server hat mit einem Satz abgelehnt (`{ error }`): Er steht in der Karte statt in einem Toast (V17). */
+export function speicherFehlerAusAntwort(satz: string): SpeicherFehlerAnzeige {
+  return { titel: SPEICHERN_FEHLER.titel, satz, nochmal: false }
+}
+
+/**
+ * Der Aufruf ist geworfen. Am Netz (`istNetzFehler`) mit „Nochmal" (Register N29, Board
+ * s1/w1-produkt-neu Bild 6) — aber nur, wenn ein zweiter Versuch nichts doppelt anlegt
+ * (`wiederholbar`: Bearbeiten). Beim Anlegen kann der Server schon gespeichert haben, bevor
+ * die Antwort verloren ging; dann der Satz „Wir wissen nicht, ob es geklappt hat …" ohne
+ * Knopf (DESIGN_SYSTEM „Zustände", Ausnahme). Sonst der Satz des Formulars.
+ */
+export function speicherFehlerNachWurf(netz: boolean, wiederholbar: boolean, rueckfall: string): SpeicherFehlerAnzeige {
+  if (netz && wiederholbar) return { titel: SPEICHERN_FEHLER.titel, satz: SPEICHERN_FEHLER.netz, nochmal: true }
+  if (netz) return { titel: SPEICHERN_FEHLER.unsicherTitel, satz: NETZ_SATZ_UNSICHER, nochmal: false }
+  return { titel: SPEICHERN_FEHLER.titel, satz: rueckfall, nochmal: false }
+}
 
 /**
  * Die Sätze zum Löschen eines Produkts (Nr. 195, Audit A5): Eines mit

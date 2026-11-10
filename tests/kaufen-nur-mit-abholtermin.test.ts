@@ -36,7 +36,7 @@ vi.mock('@/server/queries/seo', () => ({
 vi.mock('@/server/queries/teilen-bild', () => ({ teilenVorschauAus: vi.fn(() => null) }))
 vi.mock('@/server/queries/status-posts', () => ({ getActiveStatusPosts: vi.fn(async () => []) }))
 vi.mock('@/server/queries/farm', () => ({ getPublicFarmGeteilt: vi.fn() }))
-vi.mock('@/server/queries/products', () => ({ getNurBetriebeProduktIds: vi.fn(async () => []), getBetriebsVorbelegung: vi.fn(async () => null) }))
+vi.mock('@/server/queries/products', () => ({ getNurBetriebeProduktIds: vi.fn(async () => []), getAbspracheProduktIds: vi.fn(async () => []), getBetriebsVorbelegung: vi.fn(async () => null) }))
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn(async () => {}) }))
 vi.mock('@/server/abholfenster', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/server/abholfenster')>()),
@@ -84,6 +84,11 @@ vi.mock('@/components/ui/sheet', async (importOriginal) => {
       blattInline.an ? createElement('section', null, (props as Kinder).children) : createElement(echt.SheetContent, props),
     SheetTitle: (props: Parameters<typeof echt.SheetTitle>[0]) =>
       blattInline.an ? createElement('h2', null, (props as Kinder).children) : createElement(echt.SheetTitle, props),
+    // Nr. 227: Der Warenkorb steht im Blatt rechts (SheetBlatt seite="rechts", SheetKopf) — ebenso an Ort und Stelle.
+    SheetBlatt: (props: Parameters<typeof echt.SheetBlatt>[0]) =>
+      blattInline.an ? createElement('section', null, (props as Kinder).children) : createElement(echt.SheetBlatt, props),
+    SheetKopf: (props: Parameters<typeof echt.SheetKopf>[0]) =>
+      blattInline.an ? createElement('h2', null, props.titel) : createElement(echt.SheetKopf, props),
   }
 })
 // Die Kasse prüft hier nur, was ihre Seite dem Formular gibt (die Props); das Formular selbst rendert
@@ -291,12 +296,15 @@ describe('Hofseite: ohne Abholtermin kein „+“, eine Hinweiskarte mit dem Gru
     for (const text of [TEXT.keineTitel, TEXT.vollTitel, `>${KAUFSPERRE_KNOPF}<`]) expect(html).not.toContain(text)
   })
 
-  it('Pause: weiter die Pause-Karte, der Knopf „Pausiert“ — nicht der neue Hinweis', async () => {
+  it('Pause: weiter die Pause-Karte, die Produkte ohne Bedienelement (Board w1-/s1-hofseite Bild 4) — nicht der neue Hinweis', async () => {
     const html = await hofseite({ ...HOF_OHNE, isPaused: true, pauseMessage: 'Wir sind im Urlaub.' }, { reiter: 'produkte' })
     expect(html).toContain('Hof Test pausiert gerade.')
     expect(html).toContain('Wir sind im Urlaub.')
-    expect(html).toContain(`>${SHOP_PAUSED_BUTTON_LABEL}<`)
+    expect(html).not.toContain(`>${SHOP_PAUSED_BUTTON_LABEL}<`)
+    expect(html).not.toContain('in den Korb legen')
     expect(html).not.toContain(TEXT.keineTitel)
+    // Gegenprobe: Die Produkte selbst stehen da.
+    expect(html).toContain('Karotten')
   })
 })
 
@@ -342,7 +350,7 @@ describe('Mini-Warenkorb: statt „Zur Kasse“ der Hinweis', () => {
         hof: HOF_SPALTE,
         sperre,
         zahlungsarten: [],
-        gebuehrKurz: null,
+        gebuehrHinweis: null,
         gebuehrKorb: null,
         mitKorb: true,
         jetzt: JETZT.toISOString(),
@@ -413,7 +421,7 @@ describe('Ein Zustand, eine Fassung: mit vollem Korb steht der Satz einmal auf d
       korb.positionen = [POSITION]
       const seiten = { hofseite: await hofseite(farm), produkte: await hofseite(farm, { reiter: 'produkte' }), produktseite: await produktseite(farm) }
       for (const [seite, html] of Object.entries(seiten)) {
-        expect(html, seite).toContain('Dein Warenkorb')
+        expect(html, seite).toContain('id="mini-warenkorb"')
         expect(vorkommen(html, satz), seite).toBe(1)
         expect(vorkommen(html, titel), seite).toBe(2)
       }
@@ -421,7 +429,8 @@ describe('Ein Zustand, eine Fassung: mit vollem Korb steht der Satz einmal auf d
 
     it(`${fall}: Gegenprobe — leerer Korb: kein Mini-Warenkorb, Titel und Satz je einmal`, async () => {
       for (const html of [await hofseite(farm), await produktseite(farm)]) {
-        expect(html).not.toContain('Dein Warenkorb')
+        // Am Kennzeichen, nicht am Wort: Die Pause sagt „Dein Warenkorb bleibt gespeichert.“ (Board, Nr. 235).
+        expect(html).not.toContain('id="mini-warenkorb"')
         expect(vorkommen(html, satz)).toBe(1)
         expect(vorkommen(html, titel)).toBe(1)
       }
@@ -447,7 +456,7 @@ describe('Korb-Blatt (unter 1024 px der einzige Weg zur Kasse): statt „Zur Kas
         items,
         total: 9,
         farmSlug: 'hof-test',
-        onUpdateQuantity: () => {},
+        onUpdateQuantity: async () => ({ ok: true }),
         onRemoveItem: () => {},
         kaufSperre: { sperre, hofName: 'Hof Test', pauseMessage: null },
       })

@@ -9,7 +9,7 @@
  *
  * Beweist:
  *  - Der Name im Kopf der KundeShell tritt nie bei 390 px oder breiter zurück.
- *  - „Schon dabei? Anmelden" (→ /login) im Band „Für Höfe" der Startseite,
+ *  - „Schon dabei? Anmelden" (→ /login) (seit Nr. 271 nicht mehr im Band „Für Höfe" der Startseite),
  *    auf /fuer-hoefe oben und unten und auf /register.
  *  - Die Sitzung liest weiter der Browser: Die statischen Seiten mit dem
  *    neuen Knopf lesen keine Anfrage (die Startseite bewacht zusätzlich
@@ -44,7 +44,7 @@ vi.mock('@/components/shells/kunde-shell-mit-sitzung', () => ({
 }))
 vi.mock('@/server/actions/register', () => ({ registerFarmer: vi.fn() }))
 // Seit Nr. 93 lädt die Seite die Zahlen der Gründungshöfe — ohne Zahlen rendert sie wie vorher.
-vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null }))
+vi.mock('@/server/queries/plattform-einstellung', () => ({ gruendungFuerSeiten: async () => null, ladeHofpreisEinstellung: async () => ({ hofpreisModellAb: null }) }))
 
 import { FuerHoefeBandInhalt } from '@/components/startseite/startseite-abschnitte'
 import { FuerHoefeEinstieg, FuerHoefeSchluss } from '@/components/fuer-hoefe/fuer-hoefe-abschnitte'
@@ -74,10 +74,12 @@ describe('Kopf der KundeShell — Platz für „Anmelden"', () => {
 describe('„Schon dabei? Anmelden" (→ /login)', () => {
   const MUSTER = new RegExp(`${SCHON_DABEI.frage.replace('?', '\\?')}[\\s\\S]{0,400}?<a [^>]*href="\\/login"[^>]*>${SCHON_DABEI.link}<\\/a>`)
 
-  it('im Band „Für Höfe" der Startseite — neben „Hof registrieren"', () => {
+  it('nicht im Band „Für Höfe" der Startseite — dort nur der Knopf „Für Höfe" (Abnahme Lauf 32, startseite 8; Nr. 271)', () => {
     const html = renderToStaticMarkup(createElement(FuerHoefeBandInhalt))
-    expect(html).toMatch(MUSTER)
-    expect(html).toContain('href="/register"')
+    expect(html).not.toContain(SCHON_DABEI.frage)
+    expect(html).toContain('href="/fuer-hoefe"')
+    // Gegenprobe: das Muster findet den Satz, wo er steht.
+    expect(renderToStaticMarkup(createElement(FuerHoefeEinstieg))).toMatch(MUSTER)
   })
 
   it('auf /fuer-hoefe oben (Einstieg) und unten (Abschluss) — je einmal', async () => {
@@ -89,7 +91,8 @@ describe('„Schon dabei? Anmelden" (→ /login)', () => {
 
   it('auf /register: unter „Konto erstellen" und als Frage vor „Anmelden" im Kopf', async () => {
     const formular = renderToStaticMarkup(createElement(RegisterForm, { formToken: 'token' }))
-    expect(formular).toMatch(MUSTER)
+    // Seit Nr. 253 (Liste Lauf 32, registrieren) ist unter dem Formular der ganze Satz der Link.
+    expect(formular).toMatch(new RegExp(`<a [^>]*href="\\/login"[^>]*>${SCHON_DABEI.frage.replace('?', '\\?')} ${SCHON_DABEI.link}<\\/a>`))
     expect(formular.indexOf(SCHON_DABEI.frage)).toBeGreaterThan(formular.indexOf('Konto erstellen'))
     const seite = renderToStaticMarkup(await RegisterPage())
     const kopfzeile = seite.slice(seite.indexOf('<header'), seite.indexOf('</header>'))
@@ -108,7 +111,7 @@ describe('„Schon dabei? Anmelden" (→ /login)', () => {
       expect(ohneKommentare(quelle(datei)), datei).not.toContain(SCHON_DABEI.frage)
     }
     // Gegenprobe: Ohne das Entfernen der Kommentare fände die Suche den Text in der Erklärung.
-    expect(quelle('src/components/startseite/startseite-abschnitte.tsx')).toContain(SCHON_DABEI.frage)
+    expect(quelle('src/components/fuer-hoefe/fuer-hoefe-abschnitte.tsx')).toContain(SCHON_DABEI.frage)
     // Gegenprobe: Die Quelle trägt den Text.
     expect(quelle('src/lib/kunden-navigation.ts')).toContain(`'${SCHON_DABEI.frage}'`)
   })

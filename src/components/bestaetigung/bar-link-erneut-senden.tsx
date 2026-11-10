@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { Loader2, MailCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FOKUS_RAHMEN } from '@/components/ui/fokus'
+import { KNOPF_BREIT_RAHMEN } from '@/components/bestaetigung/bestaetigung-stil'
 import { sendeBarLinkErneut, type BarLinkErneutStand } from '@/server/actions/bar-bestaetigung'
 
 /**
@@ -21,17 +21,15 @@ export function BarLinkErneutSenden({ orderId, sig }: { orderId: string; sig: st
   const [stand, senden, laeuft] = useActionState<BarLinkErneutStand, FormData>(sendeBarLinkErneut, {})
 
   return (
-    <form action={senden} className="flex flex-col items-center gap-1.5 text-center">
+    <form action={senden} className="flex flex-col gap-1.5">
       <input type="hidden" name="orderId" value={orderId} />
       <input type="hidden" name="sig" value={sig} />
       <button
         type="submit"
         aria-busy={laeuft}
         // Nicht `disabled` während der Anfrage: Ein deaktivierter Knopf gibt den Fokus an den Seitenanfang ab.
-        className={cn(
-          'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-[13.5px] font-semibold text-status-fertig underline underline-offset-2 aria-busy:opacity-60',
-          FOKUS_RAHMEN
-        )}
+        // Board s1-/w1-bestaetigung Bild 3: der Knopf mit Rand über die volle Breite, in der Karte mit der Frist.
+        className={cn(KNOPF_BREIT_RAHMEN, 'mt-1 px-3 text-[15px] aria-busy:opacity-60')}
       >
         {laeuft && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
         {laeuft ? 'Wird gesendet …' : 'Mail nicht bekommen? Erneut senden'}
@@ -39,11 +37,11 @@ export function BarLinkErneutSenden({ orderId, sig }: { orderId: string; sig: st
       {/* Dauerhaft im Baum: Eine Live-Region, die erst mit ihrem Text entsteht, sprechen manche Vorleseprogramme nicht. */}
       <p
         role="status"
-        className={stand.antwort ? 'flex items-start gap-2 text-[13px] leading-normal text-muted-foreground' : 'sr-only'}
+        className={stand.antwort ? 'flex items-start gap-2 text-[13px] leading-normal' : 'sr-only'}
       >
         {stand.antwort && (
           <>
-            <MailCheck className="mt-0.5 size-4 shrink-0 text-status-fertig" strokeWidth={1.7} aria-hidden="true" />
+            <MailCheck className="mt-0.5 size-4 shrink-0" strokeWidth={1.7} aria-hidden="true" />
             <span>{stand.antwort}</span>
           </>
         )}

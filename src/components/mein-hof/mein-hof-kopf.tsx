@@ -1,60 +1,75 @@
-import Image from 'next/image'
 import Link from 'next/link'
+import { Inbox } from 'lucide-react'
 import type { MeinHofReiterAlleId } from '@/lib/bauern-navigation'
-import { PRODUKTE_HREF } from '@/lib/bauern-navigation'
-import { titelbildVerlauf, zustandsZeile, type ZustandsKnopfArt, type ZustandsZeile } from '@/lib/mein-hof'
+import { POSTFACH_HREF, PRODUKTE_HREF } from '@/lib/bauern-navigation'
+import { datumLang } from '@/lib/heute'
+import { MEIN_HOF_KOPF_TEXT, kopfSchild, schildTon, zustandsZeile, type ZustandsKnopfArt, type ZustandsZeile } from '@/lib/mein-hof'
 import { ABHOLZEITEN_FEHLEN } from '@/lib/pickup-slot-rules'
 import type { MeinHofKopfDaten } from '@/server/queries/farm'
 import type { MeinHofZustand } from '@/server/mein-hof-zustand'
 import { HofTeilenKnopf } from '@/components/farmer/hof-teilen-knopf'
-import { Hofbild } from '@/components/mein-hof/seitenkopf'
 import { KundenansichtKnopf } from '@/components/mein-hof/kundenansicht-knopf'
 import { MeinHofReiterLeiste } from '@/components/mein-hof/reiter-leiste'
 import { PausierenBlatt } from '@/components/mein-hof/pausieren-blatt'
 import { KNOPF_ORANGE } from '@/components/hof-bestellungen/stil'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
 
 /*
  * Der Kopf von Mein Hof am Handy — EIN Baustein für Produkte, Hofseite und
- * Beiträge (Nachtlauf Nr. 143, Register N3, Ergänzung 22.10.2026; Board
- * system-h1-mein-hof-v3): auf /farm-page unter lg (in seitenkopf.tsx), auf
- * /products unter md. Oben das Titelbild als 76 px hoher Streifen mit Logo,
- * Name, Teilen (nur öffentlich) und Kundenansicht, darunter die Zustandszeile
- * mit dem nächsten Schritt, darunter die Reiter. Beide Seiten stecken ihn in
- * dieselbe Hülle (MEIN_HOF_KOPF_HUELLE) — so stehen die Reiter auf allen drei
- * Reitern an derselben Stelle. Ab lg bleibt die kompakte Zeile in seitenkopf.tsx.
+ * Beiträge (Nachtlauf Nr. 143, Register N3, Ergänzung 22.10.2026): auf
+ * /farm-page unter lg (in seitenkopf.tsx), auf /products unter md. Oben die
+ * Titelzeile nach Board s1-mein-hof (Register N3, Ergänzung 5.11.2026: „Mein
+ * Hof“ mit Schild statt des Titelbild-Streifens), darunter Hofname und Stand,
+ * rechts Teilen (nur öffentlich) und Kundenansicht als Symbole; darunter die
+ * Reiter (gleich breit), darunter die Zustandskarte mit dem nächsten Schritt
+ * (Lauf 31, Nr. 238: Reihenfolge wie im Board, die Karte getönt). Beide Seiten
+ * stecken ihn in dieselbe Hülle (MEIN_HOF_KOPF_HUELLE) — so stehen die Reiter
+ * auf allen drei Reitern an derselben Stelle. Ab lg bleibt die kompakte Zeile in
+ * seitenkopf.tsx. Das Titelbild selbst bearbeitet der Hof weiter in der Liste
+ * „Bearbeiten“ (Zeile „Titelbild“).
  *
- * Adresse und „Kopieren“ stehen hier nicht mehr: Den Link gibt „Teilen“ über das
- * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof).
+ * Adresse und „Kopieren“ stehen hier nicht: Den Link gibt „Teilen“ über das
+ * Teilen-Menü des Geräts weiter, sonst wird er kopiert (teileHof). Rechts in der
+ * Zeile seit Nr. 251 auch das Postfach als Symbol (Liste Lauf 32 mein-hof und
+ * produkte: „Postfach-Symbol fehlt“).
  */
 
 /** Die Hülle um den Kopf — dieselbe auf /farm-page und /products (tests/mein-hof-kopf.test.ts). */
 export const MEIN_HOF_KOPF_HUELLE = 'mx-auto max-w-3xl px-4 pt-5 md:px-8 md:pt-7 lg:max-w-none'
 
-/*
- * Der Schleier über dem Titelbild: das theme-feste Dunkel (`primary-foreground` ist im
- * neuen Design in beiden Themes dasselbe dunkle Braun) mit Deckkraft, nach links
- * dunkler. Schrift und Knöpfe darauf in `accent-foreground` (theme-festes Hell).
- * Gerechnet gegen ein weißes Foto (schlimmster Fall): Name bis 55 % der Breite
- * mindestens 7,3:1, Knöpfe auf ihrer eigenen Fläche (60 % über 40 %) mindestens
- * 7,6:1 (Bericht 143).
+/**
+ * Auf /farm-page kleben Titelzeile und Reiter unter lg oben (Board s1-mein-hof Bild 2, Liste Lauf 32
+ * mein-hof „Kopf und Reiter scrollen weg“, Nr. 274). Die Zustandskarte steht dort im Inhalt und
+ * scrollt mit (`ohneKarte`) — sonst klebte ein Drittel des Schirms. `sticky` reicht, weil die Hülle
+ * direkt im Inhalt der Seite steht (ihr Elternelement ist so hoch wie die Seite).
  */
-const SCHLEIER = 'bg-linear-to-r from-primary-foreground/90 via-primary-foreground/75 via-55% to-primary-foreground/40'
-const STREIFEN_KNOPF = cn(
-  'inline-flex h-11 shrink-0 items-center justify-center rounded-full border border-accent-foreground/25 bg-primary-foreground/60 text-accent-foreground transition-colors duration-[250ms] hover:bg-primary-foreground/80',
+export const MEIN_HOF_KOPF_KLEBT = 'max-lg:sticky max-lg:top-0 max-lg:z-30 max-lg:bg-background max-lg:pb-1 print:static'
+
+/** Teilen und Kundenansicht als Symbol, 44 px — wie im Board; das Wort trägt der Screenreader. */
+const SYMBOL_KNOPF = cn(
+  'inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground transition-colors duration-[250ms] hover:bg-muted',
   FOKUS_RAHMEN
 )
 
-const TON_RAHMEN: Record<ZustandsZeile['ton'], string> = {
-  gruen: 'border-border',
-  orange: 'border-primary/45',
-  grau: 'border-border',
+/*
+ * Die Karte ist getönt wie im Board (s1-/w1-mein-hof): grün, wenn der Hof Bestellungen annimmt,
+ * orange, wenn etwas zu tun ist — Fläche 12 %, Rand 45 % wie die Hinweiskarte; grau bleibt
+ * ruhig auf der Kartenfläche. Kein Punkt mehr davor: Die Bedeutung trägt der Titel.
+ */
+const TON_KARTE: Record<ZustandsZeile['ton'], string> = {
+  // Die Zustandsflächen statt Grün/Orange zu 12 %: Im Dunkeln wirkten die Karten sonst neutral (Liste Lauf 32 mein-hof).
+  gruen: 'border-zustand-laeuft/30 bg-zustand-laeuft-grund',
+  orange: 'border-zustand-tun/30 bg-zustand-tun-grund',
+  grau: 'border-border bg-card',
 }
-const TON_PUNKT: Record<ZustandsZeile['ton'], string> = {
-  gruen: 'bg-status-fertig ring-status-fertig/15',
-  orange: 'bg-status-offen ring-status-offen/15',
-  grau: 'bg-muted-foreground ring-muted-foreground/15',
+
+/** Die Überschrift der Karte in der Farbe ihres Zustands (Board: „mit farbiger Überschrift“). */
+const TON_TITEL: Record<ZustandsZeile['ton'], string> = {
+  gruen: 'text-status-fertig',
+  orange: 'text-status-offen',
+  grau: 'text-foreground',
 }
 
 /** Wohin „Eintragen“, „Abholzeiten“ und „Produkte“ führen — die Adressen aus ihren Quellen, keine zweite. */
@@ -75,54 +90,86 @@ function ZustandsKnopf({ knopf, hof, zustand }: { knopf: NonNullable<ZustandsZei
   )
 }
 
+/**
+ * Die Zustandskarte mit dem nächsten Schritt — EINE für den Kopf am Handy (hier) und den Kopf
+ * ab lg (seitenkopf.tsx). Steht unter den Reitern (Boards s1-/w1-mein-hof), nie auf Beiträge.
+ */
+export function MeinHofZustandsKarte({
+  hof,
+  zustand,
+  className,
+}: {
+  hof: MeinHofKopfDaten
+  /** Aus ladeMeinHofZustand; null ohne Daten — dann steht keine Karte da. */
+  zustand: MeinHofZustand | null
+  className?: string
+}): React.JSX.Element | null {
+  const zeile = zustand ? zustandsZeile(zustand) : null
+  if (!zeile || !zustand) return null
+  return (
+    <div className={cn('flex min-h-[70px] items-center gap-3 rounded-[14px] border py-2 pr-2 pl-3.5', TON_KARTE[zeile.ton], className)} data-zustands-karte="">
+      <div className="min-w-0 flex-1">
+        <p className={cn('text-[15px] leading-5 font-semibold', TON_TITEL[zeile.ton])}>{zeile.titel}</p>
+        {/* Nie gekürzt: Der Satz bricht um, die Karte hat Platz für zwei Satzzeilen. */}
+        {/* Auf der getönten Fläche in der Textfarbe (Kontrast wie die Hinweiskarte), auf Grau leise. */}
+        <p className={cn('text-[13px] leading-[1.35]', zeile.ton === 'grau' ? 'text-muted-foreground' : 'text-foreground')}>{zeile.satz}</p>
+      </div>
+      {zeile.knopf && <ZustandsKnopf knopf={zeile.knopf} hof={hof} zustand={zustand} />}
+    </div>
+  )
+}
+
 export function MeinHofKopf({
   hof,
   zustand,
   aktiv,
+  jetzt,
+  titelAlsH1 = false,
+  ohneKarte = false,
 }: {
   hof: MeinHofKopfDaten
-  /** Aus ladeMeinHofZustand; null ohne Daten — dann steht keine Zustandszeile da. */
+  /** Aus ladeMeinHofZustand; null ohne Daten — dann steht keine Zustandskarte da. */
   zustand: MeinHofZustand | null
   aktiv: MeinHofReiterAlleId
+  /** Der Zeitpunkt der Seite — für „Stand …“ (Wiener Datum, wie auf Heute). */
+  jetzt: Date
+  /**
+   * Auf /farm-page ist „Mein Hof“ die sichtbare Überschrift der Seite (eine h1 je Seite, Lauf 31);
+   * auf /products trägt die Seite ihre eigene h1, dort bleibt der Titel ein Absatz.
+   */
+  titelAlsH1?: boolean
+  /** Die Zustandskarte steht im Inhalt statt im Kopf (auf /farm-page, wo der Kopf klebt). */
+  ohneKarte?: boolean
 }): React.JSX.Element {
-  const zeile = zustand ? zustandsZeile(zustand) : null
+  const schild = kopfSchild(hof.zustand)
+  const Titel = titelAlsH1 ? 'h1' : 'p'
 
   return (
     <div className="flex flex-col gap-2.5" data-mein-hof-kopf="">
-      <div className="relative h-[76px] shrink-0 overflow-hidden rounded-2xl">
-        {/* Bildersatz, folgt dem Modus bewusst nicht; mittig ausgeschnitten. */}
-        {hof.titelbildUrl ? (
-          <Image src={hof.titelbildUrl} alt="" fill sizes="(min-width: 768px) 720px, 100vw" className="object-cover object-center" />
-        ) : (
-          <div className="absolute inset-0" style={{ background: titelbildVerlauf(hof.bannerValue) }} />
-        )}
-        <div aria-hidden="true" className={cn('absolute inset-0', SCHLEIER)} />
-        <div className="absolute inset-0 flex items-center gap-2.5 pr-2.5 pl-3">
-          <Hofbild hof={hof} klasse="size-11 text-sm ring-2 ring-primary-foreground/55" />
-          {/* Kein h1: Die Überschrift gehört der Seite darunter. */}
-          <p className="line-clamp-2 min-w-0 flex-1 font-heading text-lg leading-tight font-semibold break-words text-accent-foreground" title={hof.name}>
-            {hof.name}
+      <div className="flex min-h-14 items-center gap-0.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Titel className="font-heading text-[22px] leading-tight font-semibold text-foreground">{MEIN_HOF_KOPF_TEXT.titel}</Titel>
+            {schild && <StatusBadge status={schildTon(schild.farbe)}>{schild.text}</StatusBadge>}
+          </div>
+          {/* Nie gekürzt: Ein langer Hofname bricht um, das Datum bleibt lesbar. */}
+          <p className="mt-0.5 text-[13px] leading-snug break-words text-muted-foreground">
+            {MEIN_HOF_KOPF_TEXT.unterzeile(hof.name, datumLang(jetzt))}
           </p>
-          {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} label="Teilen" nurSymbol className={cn(STREIFEN_KNOPF, 'w-11')} />}
-          <KundenansichtKnopf slug={hof.slug} className={cn(STREIFEN_KNOPF, 'gap-1.5 px-3 text-[13px] font-semibold whitespace-nowrap')} />
         </div>
+        {hof.zustand.oeffentlich && <HofTeilenKnopf name={hof.name} slug={hof.slug} label="Teilen" nurSymbol className={SYMBOL_KNOPF} />}
+        <KundenansichtKnopf slug={hof.slug} nurSymbol className={SYMBOL_KNOPF} />
+        <Link href={POSTFACH_HREF} className={SYMBOL_KNOPF}>
+          <Inbox className="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+          <span className="sr-only">Postfach</span>
+        </Link>
       </div>
 
-      {zeile && (
-        <div className={cn('flex min-h-[70px] items-center gap-3 rounded-[14px] border bg-card py-2 pr-2 pl-3.5', TON_RAHMEN[zeile.ton])}>
-          {/* Der Punkt ist Schmuck — die Bedeutung sagt der Titel. */}
-          <span aria-hidden="true" className={cn('size-[9px] shrink-0 rounded-full ring-4', TON_PUNKT[zeile.ton])} />
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] leading-5 font-semibold text-foreground">{zeile.titel}</p>
-            {/* Nie gekürzt: Der Satz bricht um, die Zeile hat Platz für zwei Satzzeilen. */}
-            <p className="text-[12.5px] leading-[1.35] text-muted-foreground">{zeile.satz}</p>
-          </div>
-          {zeile.knopf && zustand && <ZustandsKnopf knopf={zeile.knopf} hof={hof} zustand={zustand} />}
-        </div>
-      )}
-
       {/* Auf /products gibt es die Reiter nur unter md (N3); ab md ist Produkte ein Punkt der Seitenleiste. */}
-      <MeinHofReiterLeiste aktiv={aktiv} nurUnterMd={aktiv === 'produkte'} className="mt-1" />
+      <MeinHofReiterLeiste aktiv={aktiv} nurUnterMd={aktiv === 'produkte'} gleichBreit />
+
+      {/* Unter den Reitern wie im Board; auf Beiträge zeigt das Board keine Karte. */}
+      {aktiv !== 'beitraege' && !ohneKarte && <MeinHofZustandsKarte hof={hof} zustand={zustand} className="mt-1.5" />}
     </div>
   )
 }

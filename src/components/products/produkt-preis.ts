@@ -28,7 +28,8 @@ import {
   type ProductSubcategoryValue,
 } from '@/lib/taxonomie'
 import { preisZahl } from '@/schemas/product'
-import { endpreisEuro, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import type { PreisAnzeige } from '@/lib/plattformgebuehr'
+import { hofpreisZeile } from '@/lib/produkte-hof'
 
 /** „Preis je kg" ohne Gebinde, „Preis für das 2-kg-Paket" mit, „Preis für 6 Pakete" bei Stück/Paket. */
 export function preisFeldLabel(unit: string, unitSize?: number | null): string {
@@ -56,7 +57,8 @@ export function kundenVorschau(
   anzeige: PreisAnzeige = null
 ): string | null {
   if (!Number.isFinite(price) || price <= 0) return null
-  if (anzeige) return `Du bekommst ${formatEuro(price)} · die Kundin zahlt ${formatEuro(endpreisEuro(price, anzeige))}`
+  // Dieselbe Zeile wie in der Produktliste (eine Quelle, produkte-hof.ts).
+  if (anzeige) return hofpreisZeile(price, anzeige)
   const teile = [formatGrundpreis(price, unit, unitSize)]
   const zeile = formatGrundpreisZeile(price, unit, unitSize)
   if (zeile) teile.push(zeile)

@@ -2,14 +2,15 @@
 
 import { useSyncExternalStore } from 'react'
 import { useTheme } from 'next-themes'
-import { Monitor, Moon, Sun } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { EINSTELLUNG_KARTE, KARTEN_TITEL } from '@/components/hof-einstellungen/knopf'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChipGruppe, type ChipGruppeOption } from '@/components/ui/segment'
 
-const MODI = [
-  { key: 'light', label: 'Hell', icon: Sun },
-  { key: 'dark', label: 'Dunkel', icon: Moon },
-  { key: 'system', label: 'System', icon: Monitor },
-] as const
+const MODI: readonly ChipGruppeOption[] = [
+  { wert: 'light', label: 'Hell' },
+  { wert: 'dark', label: 'Dunkel' },
+  { wert: 'system', label: 'System' },
+]
 
 // Die Wahl liegt im localStorage des Geräts. Der Server kennt sie nicht und
 // würde beim ersten Rendern zwangsläufig das falsche Segment markieren — die
@@ -26,56 +27,30 @@ function aufDemServer(): boolean {
   return false
 }
 
+/** „Gilt für dieses Gerät.“ wörtlich nach Board s2-/w2-konto-hof Bild 2 (Nr. 250). */
+export const DARSTELLUNG_SATZ = 'Gilt für dieses Gerät.'
+
+/**
+ * Darstellung als Chip-Gruppe (G11) mit dem einen Satz des Boards — vorher ein Segment mit Symbolen und
+ * einem Absatz (Liste Lauf 32, konto-hof „Darstellung als Segment“, Nr. 250).
+ */
 export function DarstellungKarte() {
   const { theme, setTheme } = useTheme()
   const montiert = useSyncExternalStore(nichtsAbonnieren, imBrowser, aufDemServer)
 
   return (
-    <Card>
+    <Card className={EINSTELLUNG_KARTE}>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Sun className="size-4 text-muted-foreground" strokeWidth={1.7} aria-hidden="true" />
-          <CardTitle>Darstellung</CardTitle>
-        </div>
-        <CardDescription>Hell, dunkel — oder so, wie dein Gerät es eingestellt hat.</CardDescription>
+        <CardTitle className={KARTEN_TITEL}>Darstellung</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">{DARSTELLUNG_SATZ}</p>
         {montiert ? (
-          <div
-            role="group"
-            aria-label="Darstellung"
-            className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1"
-          >
-            {MODI.map(({ key, label, icon: Icon }) => {
-              const aktiv = (theme ?? 'system') === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={aktiv}
-                  onClick={() => setTheme(key)}
-                  // min-h-11 = 44px: die kleinste Fläche, die ein Daumen auf
-                  // dem Handy zuverlässig trifft.
-                  className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-ring ${
-                    aktiv
-                      ? 'bg-card text-foreground ring-1 ring-border'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="size-4" aria-hidden="true" />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+          <ChipGruppe beschriftung="Darstellung" optionen={MODI} wert={theme ?? 'system'} onWertChange={setTheme} />
         ) : (
-          // 44px Knopf + 2×4px Wannenrand = 52px, damit die Karte nicht wächst.
-          <div className="h-13 rounded-xl bg-muted" aria-hidden="true" />
+          // So hoch wie eine Reihe Pillen (44 px), damit die Karte nicht wächst.
+          <div className="h-11" aria-hidden="true" />
         )}
-        <p className="text-sm text-muted-foreground">
-          Die Einstellung gilt nur auf diesem Gerät und in diesem Browser. Deine Hofseite sieht für
-          Besucher weiterhin so aus, wie deren Gerät eingestellt ist.
-        </p>
       </CardContent>
     </Card>
   )

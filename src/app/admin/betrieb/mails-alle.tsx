@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
-import { ChevronLeft, CircleAlert, Clock, Info, Inbox, X } from 'lucide-react'
+import { ChevronLeft, CircleAlert, Clock, Info, X } from 'lucide-react'
 import { ADMIN_BETRIEB_HREF, ADMIN_BETRIEB_MAILS_HREF } from '@/lib/betrieb'
 import {
   ALLE_MAILS_TEXT,
@@ -176,7 +176,7 @@ function ListeTabelle({ zeilen, gewaehlt, href }: { zeilen: readonly AlleMailZei
             <tr key={z.id} className={cn('border-b border-border last:border-0', gewaehlt === z.id && 'bg-muted')}>
               <td className={cn(zelle, 'whitespace-nowrap tabular-nums', LEISE)}>{z.zeit}</td>
               <th scope="row" className={cn(zelle, 'text-left font-semibold')}>
-                <a href={href(z.id)} aria-current={gewaehlt === z.id ? 'true' : undefined} className={cn('rounded-sm text-foreground underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
+                <a href={href(z.id)} aria-current={gewaehlt === z.id ? 'true' : undefined} className={cn('inline-flex min-h-11 items-center rounded-sm text-foreground underline-offset-2 hover:underline', FOKUS_RAHMEN)}>
                   {z.name}
                 </a>
                 {z.hinweis && <span className={cn('block text-[12px] font-normal', LEISE)}>{z.hinweis}</span>}
@@ -415,7 +415,6 @@ export async function MailsAlle({ jetzt, p, suche, sucheRoh }: { jetzt: Date; p:
           <TeilFehler />
         ) : zeilen.length === 0 ? (
           <EmptyState
-            symbol={Inbox}
             titel={ALLE_MAILS_TEXT.leer}
             satz={nurKannWarten ? ALLE_MAILS_TEXT.leerKannWarten : ALLE_MAILS_TEXT.leerSatz}
             ausweg={<a href={alleMailsHref({})} className={LINK}>{ALLE_MAILS_TEXT.filterZuruecksetzen}</a>}

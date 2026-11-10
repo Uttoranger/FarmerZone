@@ -357,12 +357,14 @@ describe('gebuehrFuerMonatsabrechnung — die Frage hinter jedem Hof-Satz zur Mo
   })
 
   it('die Bestellansicht des Hofs fragt sie (Satz „die Gebühr holt die Monatsabrechnung")', () => {
-    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toMatch(
+    // Der Satz steht seit Lauf 30 (Nr. 222) in betragSatz (src/lib/hof-bestellungen.ts); die Bestellansicht ruft ihn.
+    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).toContain('betragSatz(betrag, vorOrt)')
+    expect(lies('src/lib/hof-bestellungen.ts')).toMatch(
       /betrag\.gebuehrFuerAbrechnung \? ' – die Gebühr holt die Monatsabrechnung\.'/
     )
     expect(lies('src/server/queries/orders.ts')).toMatch(/gebuehrFuerAbrechnung: gebuehrFuerMonatsabrechnung(JeModell)?\(\{/)
     // Gegenprobe: die alte Bedingung (jede Gebühr > 0, auch bar vor dem Stichtag) ist weg.
-    expect(lies('src/components/hof-bestellungen/bestell-detail.tsx')).not.toContain(
+    expect(lies('src/lib/hof-bestellungen.ts')).not.toContain(
       "betrag.gebuehrCents > 0 ? ' – die Gebühr holt"
     )
   })
@@ -477,12 +479,13 @@ describe('Texte — ehrlich, aus einer Quelle', () => {
   })
 
   it('/fuer-hoefe „Wie kommt das Geld zu mir?" nennt sie vor dem Stichtag, danach nicht', () => {
-    const geld = (jetzt: Date) => fuerHoefeFragen(jetzt).find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort
+    // Seit Nr. 226 hängt der Grundsatz je Modell an (gebuehrGrundsatz); im Modell „bisher“ samt Bar-Ausnahme (B1).
+    const geld = (jetzt: Date) => fuerHoefeFragen(jetzt, 'bisher').find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort
     expect(geld(LANGE_VORHER)).toContain(BAR_OHNE_GEBUEHR_SATZ)
     expect(geld(GENAU)).not.toContain(BAR_OHNE_GEBUEHR_SATZ)
-    expect(geld(GENAU)).toBe(FUER_HOEFE_FRAGEN.find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort)
-    // Die übrigen Fragen bleiben unverändert.
-    expect(fuerHoefeFragen(LANGE_VORHER).filter((f) => f.antwort.includes(BAR_OHNE_GEBUEHR_SATZ))).toHaveLength(1)
+    expect(geld(GENAU)).toBe(`${FUER_HOEFE_FRAGEN.find((f) => f.frage === 'Wie kommt das Geld zu mir?')?.antwort} ${SERVICEGEBUEHR_ZAHLT_KUNDE}`)
+    // Die übrigen Fragen nennen die Bar-Ausnahme nicht.
+    expect(fuerHoefeFragen(LANGE_VORHER, 'bisher').filter((f) => f.antwort.includes(BAR_OHNE_GEBUEHR_SATZ))).toHaveLength(1)
   })
 
   it('mitBarAusnahme hängt nur vor dem Stichtag an', () => {
@@ -510,14 +513,14 @@ describe('Texte — ehrlich, aus einer Quelle', () => {
   })
 
   it('Startseite „Wie bezahle ich?" nennt die Bar-Ausnahme nur vor dem Stichtag', () => {
-    const zahlen = (jetzt: Date) => startseitenFragen(jetzt).find((f) => f.frage === 'Wie bezahle ich?')?.antwort
+    const zahlen = (jetzt: Date) => startseitenFragen(jetzt, 'bisher').find((f) => f.frage === 'Wie bezahle ich?')?.antwort
     expect(zahlen(LANGE_VORHER)).toContain(BAR_OHNE_GEBUEHR_HINWEIS)
     expect(zahlen(GENAU)).not.toContain(BAR_OHNE_GEBUEHR_HINWEIS)
     expect(zahlen(GENAU)).toBe(STARTSEITE_FRAGEN.find((f) => f.frage === 'Wie bezahle ich?')?.antwort)
   })
 })
 
-describe('Mail „Vor-Ort-Bestellung bestätigt" an den Hof', () => {
+describe('Mail „Bar-Bestellung bestätigt" an den Hof', () => {
   const GRUND = {
     farmerName: 'Franz',
     customerName: 'Anna',
@@ -527,7 +530,7 @@ describe('Mail „Vor-Ort-Bestellung bestätigt" an den Hof', () => {
     pickupTime: '09:00–12:00',
     items: [{ name: 'Eier', quantity: 1 }],
     total: 10.3,
-    dashboardUrl: 'http://localhost:3000/orders',
+    heuteUrl: 'http://localhost:3000/dashboard',
   }
   const text = (props: Partial<Parameters<typeof OrderConfirmedEmail>[0]>): string =>
     normal(
@@ -539,7 +542,7 @@ describe('Mail „Vor-Ort-Bestellung bestätigt" an den Hof', () => {
 
   it('bar vor dem Stichtag ohne Gebühr: der ganze Betrag bleibt dem Hof, mit dem Satz aus konditionen.ts', () => {
     const t = text({ serviceFee: 0, barZuKassieren: 10.3, barOhneGebuehr: true })
-    expect(t).toContain('Bar zu kassieren: € 10,30')
+    expect(t).toContain('Bar zu kassieren € 10,30')
     expect(t).toContain(`${normal(BAR_OHNE_GEBUEHR_SATZ)} Der ganze Betrag bleibt dir.`)
     expect(t).not.toContain('Monatsabrechnung')
   })

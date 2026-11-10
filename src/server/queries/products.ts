@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { categoryImagePath } from '@/lib/product-image'
-import { preisAnzeigeFuer, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { geldsaetzeFuer, preisAnzeigeFuer, type PreisAnzeige } from '@/lib/plattformgebuehr'
+import { ladeGruendungBis } from '@/server/queries/admin'
 import { ladeHofpreisEinstellung } from '@/server/queries/plattform-einstellung'
 import { zuProduktDto } from '@/lib/produkt-dto'
 import { heuteHofSichtbar, naechstesAbholfenster, type NaechstesFenster } from '@/lib/heute'
@@ -176,6 +177,11 @@ export type ProdukteSeite = {
   teilenMomenteAus: boolean
   /** N38 (Nr. 197): im Hofpreis-Modell der Satz — das Formular zeigt „Du bekommst … · die Kundin zahlt …“. */
   preisAnzeige: PreisAnzeige
+  /**
+   * „Bar bis <Tag> ohne Gebühr für dich.“ im grünen Kasten unter dem Preis (Liste Lauf 32, produkt-neu; V1) —
+   * aus der Geldsatz-Hilfe (geldsaetzeFuer, Nr. 248), nur solange die Bargebühr erlassen ist; sonst null.
+   */
+  barOhneGebuehr: string | null
 }
 
 /**
@@ -197,6 +203,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
         archivedAt: true,
         teilenMomenteAus: true,
         plattformgebuehrProzent: true,
+        einzugAb: true,
         pickupSlots: {
           where: { isActive: true },
           orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
@@ -206,6 +213,10 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
     }),
   ])
   const einstellung = await ladeHofpreisEinstellung()
+  // Das wirksame Gründungsende nur, wo kein Einzugsbeginn gesetzt ist — dieselben Werte wie beim Einzug (orders.ts).
+  const gruendungBis = hof && !hof.einzugAb ? await ladeGruendungBis({ id: farmId }) : null
+  // Nur der Bar-Hinweis zählt hier; die Beträge je Produkt rechnet das Formular aus preisAnzeige (keine Positionen).
+  const barOhneGebuehr = hof ? (geldsaetzeFuer({ art: 'angebot', positionen: [] }, hof, einstellung, gruendungBis, jetzt)?.barOhneGebuehr ?? null) : null
   const registrierung: HofRegistrierung = {
     betriebsnummer: hof?.betriebsnummer ?? null,
     betriebsstatus: hof?.betriebsstatus ?? null,
@@ -220,6 +231,7 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
     // Ohne Hof keine Momente — „aus" ist die sichere Seite.
     teilenMomenteAus: hof?.teilenMomenteAus ?? true,
     preisAnzeige: hof ? preisAnzeigeFuer(hof, einstellung, jetzt) : null,
+    barOhneGebuehr,
   }
 }
 
@@ -232,6 +244,21 @@ export async function getProdukteSeite(farmId: string, jetzt: Date): Promise<Pro
 export async function getNurBetriebeProduktIds(farmId: string): Promise<string[]> {
   const produkte = await prisma.product.findMany({
     where: { farmId, abgabe: 'NUR_BETRIEBE' },
+    select: { id: true },
+  })
+  return produkte.map((p) => p.id)
+}
+
+/**
+ * IDs der Produkte eines Hofs mit dem Abholhinweis „Abholung nach Absprache"
+ * (Register N47, Nr. 257). Für die Kasse: Liegt eines davon im Korb, steht
+ * über der Terminwahl der Hinweis, und das Notizfeld heißt „Notiz zur
+ * Abholung" (korbBrauchtAbsprache). Öffentliche Angabe des Produkts — nur
+ * Anzeige, Termin, Preis und Zahlung bleiben unverändert.
+ */
+export async function getAbspracheProduktIds(farmId: string): Promise<string[]> {
+  const produkte = await prisma.product.findMany({
+    where: { farmId, abholhinweise: { has: 'NACH_ABSPRACHE' } },
     select: { id: true },
   })
   return produkte.map((p) => p.id)

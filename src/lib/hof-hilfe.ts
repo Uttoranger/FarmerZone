@@ -11,9 +11,14 @@
 import { MELDUNG_ART_LABEL, ersteZeile, type MeldungArt, type MeldungFuerHof, type MeldungTon } from '@/lib/meldung'
 import { wienKalendertag } from '@/lib/kalender'
 import { UNBEKANNTES_GERAET, geraeteTeile } from '@/lib/geraete'
+import { hofAktiverPunkt, hofNavigation } from '@/lib/bauern-navigation'
 import { datumKurz } from '@/lib/verkauf-eintragen'
 
 export const MEINE_MELDUNGEN_HREF = '/meldungen'
+
+/** Der Satz unter „Problem melden“ je Welt — Kundschaft auf /problem-melden, Hof auf /fehler-melden (Boards s3-problem-melden, s2-meldungen). */
+export const PROBLEM_MELDEN_SATZ_KUNDE = 'Danke, dass du Bescheid gibst. Wir schauen uns das an.'
+export const PROBLEM_MELDEN_SATZ_HOF = 'Etwas klemmt, du wünschst dir etwas oder hast eine Frage? Schreib uns – wir lesen alles.'
 export const NEUE_MELDUNG_HREF = '/fehler-melden'
 
 /** Art als Marke wie im Mockup: Fehler orange (etwas klemmt), Wunsch grün, Frage neutral. */
@@ -128,4 +133,29 @@ export function seiteKurz(url: string): string {
   } catch {
     return roh
   }
+}
+
+/**
+ * Die Seite in Worten für „Das schicken wir automatisch mit" („Bestellungen"):
+ * der Name des Navigationspunkts, zu dem der Pfad gehört (eine Quelle mit der
+ * Seitenleiste, `hofAktiverPunkt`). Ohne Treffer der Pfad ohne Abfrage und
+ * Anker; ohne Angabe „–". Mitgeschickt wird weiter die volle Adresse.
+ */
+export function seiteName(url: string): string {
+  const roh = url.trim()
+  if (roh === '') return '–'
+  let pfad = roh
+  try {
+    pfad = new URL(roh).pathname
+  } catch {
+    pfad = roh.split(/[?#]/)[0] || roh
+  }
+  const id = hofAktiverPunkt(pfad)
+  if (id) {
+    const n = hofNavigation({ isAdmin: true })
+    const punkte = [...n.haupt, ...n.verkaufUndKunden, ...n.unten, ...n.mehr]
+    const treffer = punkte.find((p) => p.id === id)
+    if (treffer) return treffer.label
+  }
+  return pfad
 }

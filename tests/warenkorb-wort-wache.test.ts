@@ -59,7 +59,11 @@ function findeKorb(quelltext: string, datei = 'schnipsel.tsx'): Fund[] {
 }
 
 /** Wörtlicher Rechtstext, den kein Lauf umschreibt (Register O4). */
-const AUSNAHME_DATEIEN = ['src/lib/rechtstexte/agb.ts']
+const AUSNAHME_DATEIEN = [
+  'src/lib/rechtstexte/agb.ts',
+  // Fassung 0.9 eingefroren (N45/A005).
+  'src/lib/rechtstexte/agb-0-9.ts',
+]
 
 /** Name oder Aufschrift eines Knopfes — dort heißt es „In den Korb“. Nur streichen, nie ergänzen. */
 const BESTAND: { datei: string; text: RegExp; grund: string }[] = [
@@ -67,9 +71,8 @@ const BESTAND: { datei: string; text: RegExp; grund: string }[] = [
   { datei: 'src/components/hofseite/produkt-karte.tsx', text: /^In den Korb$/, grund: 'Aufschrift des Knopfs der Produktkarte' },
   { datei: 'src/components/produktdetail/produktdetail-kunde.tsx', text: /^In den Korb ·$/, grund: 'Aufschrift des Kaufknopfs der Produktseite, mit Betrag' },
   { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: /^in den Korb legen$/, grund: 'Name des Plus-Knopfs bei „Gleich mit abholen“ (aria-label)' },
-  { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: /^Im Korb$/, grund: 'Aufschrift desselben Knopfs, wenn alles im Warenkorb liegt' },
-  { datei: 'src/components/produktdetail/produktdetail-teile.tsx', text: /^In den Korb$/, grund: 'Aufschrift desselben Knopfs' },
   { datei: 'src/lib/hofseite-kunde.ts', text: /^in den Korb$/, grund: 'Name des Plus-Knopfs in „Aktuell vom Hof“ (aria-label, Vorlage mit dem Produktnamen)' },
+  { datei: 'src/lib/notbremse.ts', text: /^– als Band über jeder Hofseite und in der Kasse, „In den Korb“ ist aus\.$/, grund: 'zitiert den Knopf „In den Korb“ im Notbremse-Dialog des Admins (V21, Board w3-admin-heute Bild 4; Nr. 229)' },
 ]
 
 function alleFunde(): Fund[] {

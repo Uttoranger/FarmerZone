@@ -25,6 +25,13 @@ export function hofBestellFilterAus(wert: string | string[] | undefined): HofBes
 /** IDs aus Prisma (cuid) — nur Länge und Zeichen, Besitz prüft die Servergrenze. */
 const kennung = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/)
 
+/** Die gewählte Bestellung aus `?bestellung=` (erster Wert; unlesbar oder leer = keine Wahl, nie ein Fehler). */
+export function hofBestellWunschAus(wert: string | string[] | undefined): string | null {
+  const erster = Array.isArray(wert) ? wert[0] : wert
+  const gelesen = kennung.safeParse(erster)
+  return gelesen.success ? gelesen.data : null
+}
+
 export const artikelFehltEingabeSchema = z.object({ orderId: kennung, itemId: kennung })
 
 export const stornoEingabeSchema = z.object({

@@ -1,17 +1,31 @@
 import * as React from 'react'
-import { Text, Link, Hr } from '@react-email/components'
-import { EmailLayout, h1, bodyText, mutedText, highlightBox, highlightLabel, highlightValue, ctaButton, textLink, MAIL_FARBE } from './_layout'
+import { Text } from '@react-email/components'
+import { EmailLayout, BestellnummerKasten, BetragsZeile, HinweisKasten, Knopf, KnopfReihe, Trenner, Ueberschrift, bodyText, kleinText, zwischenTitel, PositionsName, TelefonFett } from './_layout'
+import type { Positionszeile } from '@/lib/positionszeile'
 import { formatEuro } from '@/lib/format'
 import { formatiereTelefon, telefonLink } from '@/lib/telefon-anzeige'
 
-export interface NewOrderNotificationProps {
+type GemeinsameProps = {
   farmerName: string
   customerName: string
-  customerPhone: string
+  /**
+   * Nur online (Nr. 81): Der Hof ruft an, wenn etwas fehlt. Fehlt sie, steht
+   * in der Zeile „Kundin“ nur der Name — so die Bar-Mail (Nr. 256): kein
+   * tel:-Link, keine Nummer der Kundin vor ihrer Bestätigung.
+   */
+  customerPhone?: string
   orderNumber: string
   pickupDate: string
   pickupTime: string
-  items: Array<{ name: string; quantity: number }>
+  /** Positionen; mit `betrag` (Endpreis der Zeile in Euro, gerechnet in src/lib/email.ts) steht er rechts. */
+  items: Array<{ name: string; teile?: Positionszeile; quantity: number; betrag?: number }>
+  paymentLabel: string
+  /** Zu Heute im Hofbereich (Wortliste N42 c: „Heute“, nie „Dashboard“). */
+  heuteUrl: string
+}
+
+type OnlineProps = {
+  isOnline: true
   /** Der WARENPREIS — das, was dem Hof überwiesen wird. */
   total: number
   /** Servicegebühr in Euro (von der Plattform einbehalten); 0 = keine Zeile. */
@@ -20,65 +34,91 @@ export interface NewOrderNotificationProps {
   gebuehrWort?: string
   /** Was die Kundin bezahlt hat: Warenpreis + Servicegebühr. */
   customerTotal?: number
-  paymentLabel: string
-  isOnline: boolean
-  dashboardUrl: string
 }
 
+type BarProps = {
+  isOnline: false
+  /**
+   * „Bar zu kassieren“ in Euro — allein aus `barZuKassierenCents` der
+   * Bestellung (Nr. 256). Pflicht und ohne Rückfall auf den Warenpreis: Ein
+   * fehlender Betrag soll beim Bauen auffallen, nicht als zu kleine Summe beim Hof.
+   */
+  barZuKassieren: number
+  /** „Mittwoch, 3. März, 09:40 Uhr“ — bis dahin bestätigt die Kundin (fristVon, zeitpunktFuerMail); fehlt er, der allgemeine Satz. */
+  bestaetigenBis?: string
+}
+
+export type NewOrderNotificationProps = GemeinsameProps & (OnlineProps | BarProps)
+
+/**
+ * „Neue bezahlte Bestellung“ an den Hof (Board s3/w3-mail-hof-bestellung Bild 1;
+ * Bild 2 ist der Zweig ohne Online-Zahlung, Art 'bestellung-bar-hof', Nr. 256).
+ * Aufbau wie die Bestellmails der Kundin: Nummer groß, Abholung, Produkte mit
+ * Preis, darunter der Anteil des Hofs bzw. was bar zu kassieren ist.
+ */
 export function NewOrderNotificationEmail(p: NewOrderNotificationProps) {
-  const mitGebuehr = (p.serviceFee ?? 0) > 0
-  const anrufen = telefonLink(p.customerPhone)
+  const anrufen = p.customerPhone === undefined ? null : telefonLink(p.customerPhone)
   return (
-    <EmailLayout previewText={`Neue Bestellung ${p.orderNumber} – ${p.customerName}`}>
-      <Text style={h1}>
-        {p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}
-      </Text>
+    <EmailLayout fuss={{ art: 'plattform' }} previewText={p.isOnline ? `${p.customerName} hat bestellt und online bezahlt.` : `${p.customerName} hat bestellt, bar bei Abholung.`}>
+      <Ueberschrift>{p.isOnline ? 'Neue bezahlte Bestellung' : 'Neue Bestellung eingegangen'}</Ueberschrift>
       <Text style={bodyText}>
-        Hallo {p.farmerName},<br />
-        <strong>{p.customerName}</strong> hat eine Bestellung aufgegeben.
-        {p.isOnline
-          ? ' Die Zahlung wurde bereits online abgewickelt.'
-          : ` Die Zahlung (${p.paymentLabel}) erfolgt bei der Abholung.`}
+        {`Hallo ${p.farmerName}, ${p.customerName} hat eine Bestellung aufgegeben.`}
+        {p.isOnline ? ' Die Zahlung wurde bereits online abgewickelt.' : ` Die Zahlung (${p.paymentLabel}) erfolgt bei der Abholung.`}
       </Text>
 
-      <div style={highlightBox}>
-        <Text style={highlightLabel}>Abholtermin</Text>
-        <Text style={highlightValue}>{p.pickupDate}</Text>
-        <Text style={{ ...highlightValue, fontSize: '15px' }}>{p.pickupTime} Uhr</Text>
-      </div>
+      <BestellnummerKasten nummer={p.orderNumber} />
+      <BetragsZeile umbrechen links="Abholung" rechts={`${p.pickupDate}, ${p.pickupTime} Uhr`} />
+      {/* Board s3/w3-mail-hof-bestellung: Linie unter „Abholung“, wie in „Bar-Bestellung bestätigt“. */}
+      <Trenner />
 
-      <Text style={{ ...mutedText, fontWeight: '600', color: MAIL_FARBE.text, margin: '0 0 8px' }}>
-        Bestellte Produkte
-      </Text>
-      {p.items.map((item, i) => (
-        <Text key={i} style={{ ...mutedText, margin: '2px 0' }}>
-          • {item.name}
-        </Text>
-      ))}
-
-      <Hr style={{ borderColor: MAIL_FARBE.rand, margin: '16px 0' }} />
-      <Text style={{ ...bodyText, margin: '0 0 4px' }}>
-        <strong>{mitGebuehr ? 'Warenpreis (dein Anteil):' : 'Gesamtbetrag:'}</strong> {formatEuro(p.total)}
-      </Text>
-      {mitGebuehr && (
-        <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-          <strong>{p.gebuehrWort ?? 'Servicegebühr'}:</strong> {formatEuro(p.serviceFee ?? 0)} — von der Plattform
-          einbehalten, dir wird der Warenpreis überwiesen. Die Kundin hat{' '}
-          {formatEuro(p.customerTotal ?? p.total)} bezahlt.
-        </Text>
+      {/* Bar: Erst die Bestätigung der Kundin gibt die Bestellung zum Packen frei. */}
+      {!p.isOnline && (
+        <HinweisKasten art="orange">
+          {p.bestaetigenBis ? `${p.customerName} bestätigt bis ${p.bestaetigenBis}. Erst dann packst du.` : `${p.customerName} bestätigt die Bestellung per E-Mail. Erst dann packst du.`}
+        </HinweisKasten>
       )}
-      <Text style={{ ...mutedText, margin: '0 0 4px' }}>
-        <strong>Zahlung:</strong> {p.paymentLabel}
-      </Text>
-      <Text style={mutedText}>
-        <strong>Bestellnummer:</strong> {p.orderNumber}
-      </Text>
-      <Text style={mutedText}>
-        <strong>Kunde:</strong> {p.customerName} ·{' '}
-        {anrufen ? <Link href={anrufen} style={textLink}>{formatiereTelefon(p.customerPhone)}</Link> : p.customerPhone}
-      </Text>
 
-      <Link href={p.dashboardUrl} style={ctaButton}>Im Dashboard ansehen →</Link>
+      {p.isOnline && <Text style={{ ...zwischenTitel, margin: '12px 0 4px' }}>Bestellte Produkte</Text>}
+      {p.items.map((item, i) => (
+        <BetragsZeile key={i} links={<PositionsName name={item.name} teile={item.teile} />} rechts={item.betrag !== undefined ? formatEuro(item.betrag) : ''} />
+      ))}
+      <Trenner />
+      {p.isOnline ? <OnlineBetraege {...p} /> : <BetragsZeile stark links="Bar zu kassieren" rechts={formatEuro(p.barZuKassieren)} />}
+
+      {/* Die Nummer der Kundin bleibt online (Nr. 81): Der Hof ruft an, wenn etwas fehlt. Ohne Nummer nur der Name. */}
+      <BetragsZeile
+        umbrechen
+        links="Kundin"
+        rechts={
+          p.customerPhone === undefined ? (
+            p.customerName
+          ) : (
+            <>
+              {`${p.customerName} · `}
+              {/* Telefonnummer fett wie in den Mails an die Kundin (Nr. 280): ein Tippen wählt. */}
+              <TelefonFett href={anrufen} nummer={anrufen ? formatiereTelefon(p.customerPhone) : p.customerPhone} />
+            </>
+          )
+        }
+      />
+
+      <KnopfReihe>
+        <Knopf href={p.heuteUrl}>Bei Heute ansehen →</Knopf>
+      </KnopfReihe>
     </EmailLayout>
+  )
+}
+
+/** Online: Warenpreis (Anteil des Hofs), Gebühr und was die Kundin bezahlt hat (Board Bild 1). */
+function OnlineBetraege(p: OnlineProps) {
+  const mitGebuehr = (p.serviceFee ?? 0) > 0
+  const wort = p.gebuehrWort ?? 'Servicegebühr'
+  const bezahlt = p.customerTotal ?? p.total
+  return (
+    <>
+      <BetragsZeile stark links={mitGebuehr ? 'Warenpreis (dein Anteil)' : 'Gesamtbetrag'} rechts={formatEuro(p.total)} />
+      {mitGebuehr && <BetragsZeile links={wort} rechts={formatEuro(p.serviceFee ?? 0)} />}
+      {mitGebuehr && <Text style={{ ...kleinText, marginTop: '6px' }}>{`Die ${wort} behält Stripe gleich ein. Die Kundin hat ${formatEuro(bezahlt)} bezahlt.`}</Text>}
+    </>
   )
 }

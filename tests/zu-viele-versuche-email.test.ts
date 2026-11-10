@@ -13,6 +13,12 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MARKE } from '@/lib/marke'
+import { PRODUKTION_ADRESSE } from '@/lib/umgebung'
+
+/** Die Links der Mail ohne die Anbieterzeile — den Link auf das Impressum trägt jede Mail außer den Betriebs-Mails (V68, Nr. 232). */
+const fremdeLinks = (html: string): string[] =>
+  [...html.matchAll(/<a\s[^>]*?href="([^"]*)"/gi)].map((m) => m[1]).filter((h) => h !== `${PRODUKTION_ADRESSE}/impressum`)
+
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }))
 
@@ -58,9 +64,9 @@ describe('sendZuVieleVersucheEmail', () => {
     expect(ergebnis.id).toBe('email_1')
     expect(aufruf.to).toBe('kundin@example.com')
     expect(aufruf.subject).toBe(`Zu viele falsche Codes · ${MARKE}`)
-    expect(aufruf.html).toContain('Montag, 19. Oktober, 15:00 Uhr')
+    expect(aufruf.html).toContain('Mo, 19. Oktober 2026, 15:00 Uhr')
     expect(aufruf.html).toContain('keinen Code mehr an')
-    expect(aufruf.html).not.toMatch(/<a\s|href=/)
+    expect(fremdeLinks(aufruf.html)).toEqual([])
     expect(aufruf.html.replace(/<[^>]+>/g, ' ')).not.toMatch(/\d{6}/)
   })
 
@@ -68,7 +74,7 @@ describe('sendZuVieleVersucheEmail', () => {
     const { aufruf } = await versende('passwort')
     expect(aufruf.subject).toBe(`Zu viele falsche Passwörter · ${MARKE}`)
     expect(aufruf.html).toContain('Passwort vergessen')
-    expect(aufruf.html).not.toMatch(/<a\s|href=/)
+    expect(fremdeLinks(aufruf.html)).toEqual([])
   })
 
   it('ohne Schlüssel: kein Versand, im Log nur der Betreff — kein Code, kein Link', async () => {
