@@ -21,6 +21,9 @@
  *    zweites Mal und ein abgelaufener Link: neutral, nichts passiert.
  *    Scheitert das Abmelden, bleibt der Link gültig (eine Transaktion).
  *  - Aufräumen: abgelaufene und seit 7 Tagen benutzte Links fallen, offene bleiben.
+ *  - Anmeldung mit Passwort über HTTP (Nr. 284, nach dem Update auf Better
+ *    Auth 1.7): Der Hof bekommt eine Sitzung; ein falsches Passwort antwortet
+ *    genau wie eine unbekannte Adresse und legt keine Sitzung an.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import pg from 'pg'
@@ -60,6 +63,8 @@ import { GERAETE_COOKIE, NICHT_ICH_PFAD } from '@/lib/geraete'
 import { einmalTokenHash, erzeugeEinmalLink, geraeteKennungHash, ladeAngemeldeteGeraete, ladeNichtIch } from '@/server/geraete'
 import { meldeAlleAnderenAb, meldeAllesAbNichtIch, meldeGeraetAb } from '@/server/actions/geraete'
 import { raeumeAltesAuf } from '@/server/aufraeumen'
+import { env } from '@/lib/env'
+import { DB_BREMSEN, adressMerkmal, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { intKennung, raeumeAuf } from './setup/basis'
 
 const PASSWORT = 'test-passwort-1234'
@@ -490,5 +495,62 @@ describe('Aufräumen der Einmal-Links', () => {
     const uebrig = await prisma.einmalLink.findMany({ where: { userId: hof.id }, select: { tokenHash: true } })
     expect(uebrig.map((z) => z.tokenHash).sort()).toEqual([einmalTokenHash(offen), einmalTokenHash(frischBenutzt)].sort())
     expect(uebrig.map((z) => z.tokenHash)).not.toContain(einmalTokenHash(abgelaufen))
+  })
+})
+
+describe('Anmeldung mit Passwort über HTTP (Nr. 284)', () => {
+  const HERKUNFT = 'http://localhost:3000'
+  const adressen: string[] = []
+
+  afterEach(async () => {
+    // Fehlversuche zählen je Adresse in RateLimitZaehler (nur als HMAC, ohne int-Präfix) — selbst wegräumen.
+    const schluessel = adressen.map((a) => bremsSchluessel(env.BETTER_AUTH_SECRET, DB_BREMSEN.passwortFehler.zweck, adressMerkmal(a)))
+    await prisma.rateLimitZaehler.deleteMany({ where: { schluessel: { in: schluessel } } })
+    adressen.length = 0
+  })
+
+  /** Wie das Anmeldeformular: POST an den Routen-Handler, mit Herkunft und Browserangabe. */
+  async function meldeUeberHttpAn(email: string, password: string): Promise<Response> {
+    adressen.push(email)
+    return auth.handler(
+      new Request(`${HERKUNFT}/api/auth/sign-in/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: HERKUNFT, 'user-agent': UA.windows },
+        body: JSON.stringify({ email, password }),
+      })
+    )
+  }
+
+  it('Hof meldet sich mit Passwort an und bekommt eine Sitzung', async () => {
+    const hof = await erstelleKonto('FARMER')
+
+    const antwort = await meldeUeberHttpAn(hof.email, PASSWORT)
+
+    expect(antwort.status).toBe(200)
+    const cookie = antwort.headers
+      .getSetCookie()
+      .map((k) => k.split(';')[0])
+      .join('; ')
+    expect(cookie).toContain('session_token=')
+    const sitzung = await auth.api.getSession({ headers: new Headers({ cookie }) })
+    expect(sitzung?.user.id).toBe(hof.id)
+    expect(sitzung?.user.role).toBe('FARMER')
+    expect(await prisma.session.count({ where: { userId: hof.id, id: sitzung?.session.id } })).toBe(1)
+  })
+
+  it('falsches Passwort → gleiche Antwort wie unbekannte Adresse', async () => {
+    const hof = await erstelleKonto('FARMER')
+    const unbekannt = `${intKennung('niemand')}@example.com`
+    const falsch = PASSWORT.split('').reverse().join('')
+
+    const beimHof = await meldeUeberHttpAn(hof.email, falsch)
+    const ohneKonto = await meldeUeberHttpAn(unbekannt, falsch)
+
+    expect(beimHof.status).toBe(401)
+    expect(ohneKonto.status).toBe(beimHof.status)
+    expect(ohneKonto.headers.get('content-type')).toBe(beimHof.headers.get('content-type'))
+    expect(await ohneKonto.json()).toEqual(await beimHof.json())
+    expect(beimHof.headers.getSetCookie().some((k) => k.includes('session_token=') && !/max-age=0/i.test(k))).toBe(false)
+    expect(await prisma.session.count({ where: { userId: hof.id } })).toBe(0)
   })
 })

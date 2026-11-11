@@ -135,13 +135,20 @@ export async function verbrauche(
   return { allowed: false, retryAfter: sekundenBisFensterEnde(jetzt, bremse.fensterMs) }
 }
 
+/** Ein Stand im Ersatz, wie ihn `get`/`set` lesen und schreiben (Form des alten Speichers von Better Auth). */
+type ErsatzStand = { key: string; count: number; lastRequest: number }
+
 /**
- * Für `rateLimit.customStorage`. `get`/`set` ruft Better Auth nur für einen
- * Speicher OHNE `consume` (rate-limiter/index.mjs, legacyConsume); der Typ
- * verlangt sie trotzdem. Sie lesen und schreiben den Ersatz im Arbeitsspeicher
- * — fiele `consume` je weg, zählte die Instanz für sich, nie offen.
+ * Für `rateLimit.customStorage`. Better Auth 1.7 ruft nur noch `consume`
+ * (rate-limiter/index.mjs); einen Speicher nur mit `get`/`set` nimmt es nicht
+ * mehr an, und sein Typ kennt die beiden nicht mehr (Nr. 284). Sie bleiben
+ * vorerst als Zugriff auf den Ersatz im Arbeitsspeicher stehen, damit das
+ * Update keinen Test ändert; Better Auth ruft sie nie.
  */
-export const AUTH_BREMSE_SPEICHER: BetterAuthRateLimitStorage = {
+export const AUTH_BREMSE_SPEICHER: BetterAuthRateLimitStorage & {
+  get: (schluessel: string) => Promise<ErsatzStand | null>
+  set: (schluessel: string, stand: ErsatzStand) => Promise<void>
+} = {
   get: async (schluessel) => {
     const eintrag = ZUSTAND_DIESER_INSTANZ.ersatz.get(schluessel)
     return eintrag ? { key: schluessel, count: eintrag.zaehler, lastRequest: eintrag.fensterStartMs } : null
