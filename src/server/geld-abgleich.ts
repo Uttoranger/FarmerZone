@@ -4,11 +4,17 @@ import { prisma } from '@/lib/prisma'
 import { utcTagesbeginn } from '@/lib/betrieb'
 import {
   GELD_ABGLEICH_FENSTER_MS,
+  KUNDENSTREIT_ART,
   STRIPE_GEBUEHR_ART,
   abweichungArt,
   abweichungCents,
   gleicheAb,
+  kundenstreitAnfang,
+  kundenstreitArt,
+  kundenstreitArtVonStand,
+  kundenstreitOffen,
   leseAbweichungArt,
+  leseKundenstreitArt,
   stripeGebuehrenJeTag,
   type SaldoBuchung,
   type StripeZahlung,
@@ -36,6 +42,15 @@ import { ladeAbweichungZeilen, ladeBestellungenFuerAbgleich } from '@/server/que
  * NACHLADEN_HOECHSTENS). So verschwindet eine Abweichung erst, wenn Datenbank
  * und Stripe wieder übereinstimmen („erledigt verschwindet von selbst“, N32).
  *
+ * Streitfälle zu Kundenzahlungen (Nr. 289, E-022): Der Lauf liest dazu die
+ * Streitfälle der letzten 120 Tage — in einem EIGENEN Versuch. Scheitert er
+ * oder ist die Liste abgeschnitten, geht eine Warnung an Sentry (Schritt
+ * `streit`), die Zeilen `kundenstreit:*` bleiben, wie sie sind, und der übrige
+ * Abgleich läuft weiter. Sonst: ein offener Fall mit Bestellung ohne Zeile
+ * bekommt eine (der Webhook kam nicht an), eine Zeile, deren Fall Stripe nicht
+ * mehr offen führt, wird gelöscht; eine Zeile, deren Fall nicht in der Liste
+ * steht, bleibt (Warnung nur mit der Kennung).
+ *
  * Nie Adresse, Name, Inhalt oder Token: gelesen werden nur Kennungen,
  * Stände und Beträge; gespeichert nur Kennung und Cent.
  */
@@ -45,6 +60,12 @@ export const NACHLADEN_HOECHSTENS = 50
 
 /** Schutz gegen eine endlose Liste: mehr Einträge je Liste liest ein Lauf nicht. */
 export const LISTE_HOECHSTENS = 10_000
+
+/** Wie weit der Lauf Streitfälle zurückliest (Nr. 289) — länger, als Stripe einen Fall offen führt. */
+const STREIT_FENSTER_MS = 120 * 24 * 60 * 60 * 1000
+
+/** Ohne Antwortfrist von Stripe gilt Eingang + 7 Tage (E-022) — in Sekunden wie `created`. */
+const STREIT_FRIST_OHNE_S = 7 * 24 * 60 * 60
 
 /** Stripe war beim Lesen nicht erreichbar oder lehnte ab — der Lauf schreibt nichts. */
 export class GeldAbgleichStripeFehler extends Error {
@@ -131,6 +152,16 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
     throw new GeldAbgleichStripeFehler()
   }
 
+  // Streitfälle (Nr. 289): eigener Versuch — null heißt „nicht vollständig gelesen“, dann bleiben die Zeilen unberührt.
+  let streitfaelle: Stripe.Dispute[] | null = null
+  try {
+    const gelesen = await alleMitRand(stripe.disputes.list({ created: { gte: Math.floor((jetzt.getTime() - STREIT_FENSTER_MS) / 1000) }, limit: 100 }))
+    if (gelesen.abgeschnitten) meldeStreitAbgeschnitten()
+    else streitfaelle = gelesen.eintraege
+  } catch (err) {
+    meldeStripe(err, 'streit')
+  }
+
   // ─── Bestellungen: Zahlungen aus Stripe, bezahlte der letzten 48 h, offene Abweichungen ───
   const bestellungen = await ladeBestellungenFuerAbgleich({
     paymentIntentIds: [...zahlungen.keys()],
@@ -181,6 +212,8 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
     await prisma.betriebMessung.updateMany({ where: { tag: alt.tag, art: alt.art }, data: { wert: BigInt(abweichungCents(a)), gemessenAm: jetzt } })
   }
 
+  if (streitfaelle) await gleicheStreitfaelleAb(streitfaelle, jetzt)
+
   // Abgeschnittene Saldo-Liste: Die Tagessummen wären zu klein und gälten danach als vollständig —
   // dann lieber gar nicht schreiben (die alten Werte bleiben) und warnen.
   const gebuehren = saldoAbgeschnitten ? new Map<string, number>() : stripeGebuehrenJeTag(buchungen)
@@ -197,13 +230,65 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
   return { zahlungen: zahlungen.size, verglichen: verglichen.length, abweichungen: abweichungen.length, neu: neu.length, geklaert: geklaert.length, stripeGebuehrTage: gebuehren.size }
 }
 
+function zahlungVon(streit: Stripe.Dispute): string | null {
+  const pi: string | { id: string } | null = streit.payment_intent
+  if (!pi) return null
+  return typeof pi === 'string' ? pi : pi.id
+}
+
+/**
+ * Die Zeilen `kundenstreit:*` gegen die vollständig gelesenen Streitfälle
+ * (Nr. 289, E-022): offen mit Bestellung und ohne Zeile → anlegen (Eingang
+ * jetzt, Frist `due_by`, sonst Eingang bei Stripe + 7 Tage); Fall gelesen und
+ * nicht mehr offen → löschen; Fall nicht in der Liste → bleibt, Warnung.
+ * Eine Zahlung ohne Bestellung (Rechnung der Monatsabrechnung) bekommt nie eine Zeile.
+ */
+async function gleicheStreitfaelleAb(faelle: readonly Stripe.Dispute[], jetzt: Date): Promise<void> {
+  const vorhanden = await prisma.betriebMessung.findMany({ where: { art: { startsWith: `${KUNDENSTREIT_ART}:` } }, select: { art: true } })
+  const zeilen = vorhanden.flatMap((z) => {
+    const gelesen = leseKundenstreitArt(z.art)
+    return gelesen ? [{ ...gelesen, zeile: z.art }] : []
+  })
+  const nachKennung = new Map(faelle.map((f) => [f.id, f]))
+  const offen = faelle.filter((f) => kundenstreitOffen(f.status))
+  const zahlungen = [...new Set(offen.flatMap((f) => zahlungVon(f) ?? []))]
+  const bestellungen = zahlungen.length === 0 ? [] : await prisma.order.findMany({ where: { stripePaymentIntentId: { in: zahlungen } }, select: { id: true, stripePaymentIntentId: true } })
+  const bestellungJeZahlung = new Map(bestellungen.map((b) => [b.stripePaymentIntentId, b.id]))
+  const angefangen = new Set(zeilen.map((z) => kundenstreitAnfang(z.orderId, z.streitId)))
+  const heute = utcTagesbeginn(jetzt)
+  const neu = offen.flatMap((f) => {
+    const zahlung = zahlungVon(f)
+    const orderId = zahlung === null ? undefined : bestellungJeZahlung.get(zahlung)
+    if (!orderId || angefangen.has(kundenstreitAnfang(orderId, f.id))) return []
+    const frist = f.evidence_details?.due_by ?? f.created + STREIT_FRIST_OHNE_S
+    return [{ tag: heute, art: kundenstreitArt(orderId, f.id, kundenstreitArtVonStand(f.status)), wert: BigInt(frist), gemessenAm: jetzt }]
+  })
+  if (neu.length > 0) await prisma.betriebMessung.createMany({ data: neu, skipDuplicates: true })
+  const geschlossen = zeilen.filter((z) => {
+    const fall = nachKennung.get(z.streitId)
+    return fall !== undefined && !kundenstreitOffen(fall.status)
+  })
+  if (geschlossen.length > 0) await prisma.betriebMessung.deleteMany({ where: { art: { in: geschlossen.map((z) => z.zeile) } } })
+  for (const z of zeilen) if (!nachKennung.has(z.streitId)) meldeStreitUnbekannt(z.streitId)
+}
+
+/** Warnung: Die Liste der Streitfälle war länger als LISTE_HOECHSTENS — die Zeilen bleiben, wie sie sind. */
+function meldeStreitAbgeschnitten(): void {
+  Sentry.captureMessage('Geld-Abgleich: Liste der Streitfälle abgeschnitten, Zeilen nicht geändert', { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'streit' } })
+}
+
+/** Warnung: Eine Zeile `kundenstreit:*` hat keinen Fall in der Liste (älter als 120 Tage?) — sie bleibt. Nur die Kennung. */
+function meldeStreitUnbekannt(streitId: string): void {
+  Sentry.captureMessage('Geld-Abgleich: Streitfall nicht in der Liste, Zeile bleibt', { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'streit-unbekannt' }, extra: { streit: streitId } })
+}
+
 /** Warnung an Sentry: Die Saldo-Liste war länger als LISTE_HOECHSTENS — ohne Betrag und Kennung. */
 function meldeAbgeschnitten(): void {
   Sentry.captureMessage('Geld-Abgleich: Saldo-Liste abgeschnitten, Stripe-Gebühren nicht geschrieben', { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'saldo' } })
 }
 
 /** Warnung an Sentry — nur Schritt und Fehlerklasse, nie Text, Betrag oder Kennung. */
-function meldeStripe(err: unknown, schritt: 'liste' | 'nachladen'): void {
+function meldeStripe(err: unknown, schritt: 'liste' | 'nachladen' | 'streit'): void {
   const meldung = new Error('Geld-Abgleich: Stripe nicht gelesen')
   if (err instanceof Error && /^[A-Za-z][A-Za-z0-9_]{0,59}$/.test(err.name)) meldung.name = err.name
   Sentry.captureException(meldung, { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt } })

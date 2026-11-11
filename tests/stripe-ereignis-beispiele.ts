@@ -33,6 +33,12 @@ export const BEISPIELE: Record<VerarbeiteterStripeTyp, { gueltig: Record<string,
   'invoice.paid': { gueltig: { id: 'in_1' }, ungueltig: { id: null }, feld: 'id' },
   'invoice.payment_failed': { gueltig: { id: 'in_1', attempt_count: 2 }, ungueltig: { id: 'in_1', attempt_count: -1 }, feld: 'attempt_count' },
   'charge.dispute.created': { gueltig: { id: 'dp_1', payment_intent: 'pi_1' }, ungueltig: { id: 'dp_1' }, feld: 'payment_intent' },
+  // Nr. 289 (E-022): der Ausgang eines Streitfalls zu einer Kundenzahlung.
+  'charge.dispute.closed': {
+    gueltig: { id: 'dp_1', object: 'dispute', payment_intent: 'pi_1', amount: 2100, status: 'won', evidence_details: { due_by: 1_790_000_000 } },
+    ungueltig: { id: 'dp_1', payment_intent: 'pi_1', status: 7 },
+    feld: 'status',
+  },
   'setup_intent.succeeded': {
     gueltig: { id: 'seti_1', customer: 'cus_1', payment_method: 'pm_1', payment_method_types: ['sepa_debit'], metadata: { farmId: 'hof_1' } },
     ungueltig: { id: 'seti_1', customer: 'cus_1', payment_method: 'pm_1', payment_method_types: 'sepa_debit' },

@@ -5,8 +5,9 @@
  * Beweist: Je verarbeitetem Typ geht ein gültiges Objekt durch (mit
  * zusätzlichen Feldern, wie Stripe sie schickt) und ein ungültiges nicht —
  * das Ergebnis nennt dann nur Feldpfade, nie Werte. Dazu: Die Liste der Typen
- * ist genau die der Route (Lauf 26 plus account.updated und capability.updated), ein fremder Typ ist
- * keiner.
+ * ist genau die der Route (Lauf 26 plus account.updated, capability.updated und
+ * charge.dispute.closed), ein fremder Typ ist keiner. Ein Streitfall (Nr. 289,
+ * E-022) bleibt mit nur `id` und `payment_intent` gültig (SEPA-Rückbuchung).
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -16,9 +17,24 @@ import { BEISPIELE } from './stripe-ereignis-beispiele'
 const TYPEN = Object.keys(BEISPIELE) as VerarbeiteterStripeTyp[]
 
 describe('Schemas der verarbeiteten Stripe-Ereignisse', () => {
-  it('die Liste ist die der Route: Lauf 26 plus account.updated und capability.updated', () => {
+  it('die Liste ist die der Route: Lauf 26 plus account.updated, capability.updated und charge.dispute.closed', () => {
     expect(Object.keys(STRIPE_EREIGNIS_SCHEMAS).sort()).toEqual([...TYPEN].sort())
-    expect(TYPEN).toHaveLength(12)
+    expect(TYPEN).toHaveLength(13)
+    expect(istVerarbeiteterStripeTyp('charge.dispute.closed')).toBe(true)
+  })
+
+  it('Streitfall (Nr. 289): mit und ohne Betrag, Stand und Antwortfrist gültig; falsche Werte nennen nur das Feld', () => {
+    for (const typ of ['charge.dispute.created', 'charge.dispute.closed'] as const) {
+      // Eine SEPA-Rückbuchung trägt für die Behandlung nur Kennung und Zahlung.
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1' }), typ).toEqual({ ok: true })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1', amount: null, status: null, evidence_details: null }), typ).toEqual({ ok: true })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: { id: 'pi_1' }, amount: 1234567, status: 'needs_response', evidence_details: { due_by: 1_790_000_000, past_due: false } }), typ).toEqual({ ok: true })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1', evidence_details: { due_by: null } }), typ).toEqual({ ok: true })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1', amount: -1 }), typ).toEqual({ ok: false, felder: ['amount'] })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1', amount: 12.5 }), typ).toEqual({ ok: false, felder: ['amount'] })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1', status: 'x'.repeat(51) }), typ).toEqual({ ok: false, felder: ['status'] })
+      expect(pruefeStripeObjekt(typ, { id: 'dp_1', payment_intent: 'pi_1', evidence_details: { due_by: '2026-11-20' } }), typ).toEqual({ ok: false, felder: ['evidence_details.due_by'] })
+    }
   })
 
   it('Wache: jeder Typ, den die Route abfragt, hat ein Schema — und jedes Schema einen Zweig', () => {

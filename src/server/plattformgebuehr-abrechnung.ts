@@ -2,7 +2,10 @@ import * as Sentry from '@sentry/nextjs'
 import type Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { formatDatumLang } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro } from '@/lib/format'
+import { utcTagesbeginn } from '@/lib/betrieb'
+import { kundenstreitAnfang, kundenstreitArt, kundenstreitArtVonStand } from '@/lib/geld-abgleich'
+import { adminGrundSchema } from '@/schemas/admin-aktion'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { LASTSCHRIFT_HREF, ankuendigungText, lastschriftGescheitertText } from '@/lib/konditionen'
 import {
@@ -51,6 +54,7 @@ import { RECHNUNGSANGABEN_FEHLEN_ART, monatsGrenzen } from '@/server/queries/pla
  *
  * Webhooks (src/app/api/stripe/webhook/route.ts, nur die Verteilung):
  * `invoice.paid`, `invoice.payment_failed`, `charge.dispute.created`,
+ * `charge.dispute.closed` (nur Kundenzahlungen, Nr. 289),
  * `setup_intent.succeeded`, `mandate.updated` — die Behandlung steht hier.
  *
  * Nie IBAN, Mandatstext, Adresse oder Name in Datenbank, Log oder Protokoll:
@@ -566,18 +570,110 @@ export async function behandleRechnungGescheitert(rechnung: Stripe.Invoice, jetz
  * `charge.dispute.created` zu einer Rechnungszahlung → zurückgebucht, sofort
  * gesperrt. Die Rechnung zur Zahlung kennt Stripe über die Rechnungszahlungen
  * (`invoicePayments`, nur lesend); eine Rückbuchung einer Bestellung der
- * Kundschaft gehört zu keiner Rechnung und bleibt hier unberührt.
+ * Kundschaft gehört zu keiner Rechnung und wird nur sichtbar gemacht
+ * (`kundenzahlungZurueckgebucht`, Nr. 289, E-022).
  */
 export async function behandleRueckbuchung(streit: Stripe.Dispute, jetzt = new Date()): Promise<void> {
   const zahlung = kennung(streit.payment_intent)
   if (!zahlung) return
   const liste = await stripe.invoicePayments.list({ payment: { type: 'payment_intent', payment_intent: zahlung }, limit: 1 })
   const rechnungId = kennung(liste.data[0]?.invoice as string | { id: string } | undefined)
-  if (!rechnungId) return
+  if (!rechnungId) return kundenzahlungZurueckgebucht(streit, zahlung, jetzt)
   const abr = await prisma.monatsabrechnung.findFirst({ where: { rechnungBarId: rechnungId }, select: { id: true, farmId: true } })
   if (!abr) return unbekannt('charge.dispute.created', rechnungId)
   const { count } = await prisma.monatsabrechnung.updateMany({ where: { id: abr.id, stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: jetzt } })
   if (count === 1) await protokolliere({ wer: null, art: 'lastschrift_zurueckgebucht', bezugArt: 'hof', bezugId: abr.farmId, mitPasskey: false })
+}
+
+// ─── Rückbuchung einer Kundenzahlung (Nr. 289, E-022) ───────────────────────
+//
+// Sichtbar machen, kein Geld bewegen: kein Refund, kein reverse_transfer, kein
+// geänderter Bestell- oder Zahlstand, keine Mail. Protokoll (Bezug die
+// Bestellung) und eine Zeile `kundenstreit:…` in BetriebMessung, aus der Heute
+// die Aufgabe mit der Antwortfrist liest. Antwort an Stripe und Rückgriff auf
+// den Hof (AGB 21.3) macht das Team von Hand.
+
+/** Ohne Antwortfrist von Stripe gilt Eingang + 7 Tage (E-022). */
+const KUNDENSTREIT_FRIST_OHNE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Was die Behandlung am Streitfall liest — Betrag, Stand und Frist kann Stripe weglassen (Schema: nullish). */
+type Kundenstreit = { id: string; amount?: number | null; status?: string | null; evidence_details?: { due_by?: number | null } | null }
+
+/**
+ * Der Grund mit Kennung des Streitfalls. Trägt die Kennung sieben Ziffern am
+ * Stück (oder wird der Grund zu lang), verwürfe das Protokoll den ganzen Grund
+ * wie eine Telefonnummer — dann derselbe Grund ohne Kennung und eine Warnung.
+ */
+function grundMitKennung(mit: string, ohne: string): string {
+  if (adminGrundSchema.safeParse(mit).success) return mit
+  warnung('Rückbuchung einer Kundenzahlung: Grund ohne Kennung des Streitfalls', 'rueckbuchung-grund')
+  return ohne
+}
+
+async function bestellungZurZahlung(zahlung: string): Promise<{ id: string } | null> {
+  return prisma.order.findUnique({ where: { stripePaymentIntentId: zahlung }, select: { id: true } })
+}
+
+/**
+ * `charge.dispute.created` zu einer Zahlung ohne Rechnung: gehört sie zu einer
+ * Bestellung, ein Eintrag `kundenzahlung_zurueckgebucht` bzw. (Stand
+ * `warning_…`) `kundenzahlung_rueckfrage` mit Betrag und Antwortfrist und die
+ * Zeile für Heute. Erst die Zeile (idempotent über skipDuplicates), dann das
+ * Protokoll (wirft nie): Scheitert die Zeile, wiederholt Stripe das Ereignis,
+ * ohne dass ein Eintrag doppelt steht.
+ */
+async function kundenzahlungZurueckgebucht(streit: Kundenstreit, zahlung: string, jetzt: Date): Promise<void> {
+  const bestellung = await bestellungZurZahlung(zahlung)
+  if (!bestellung) {
+    warnung('Rückbuchung ohne Rechnung und ohne Bestellung', 'rueckbuchung-unbekannt', { streit: streit.id })
+    return
+  }
+  const art = kundenstreitArtVonStand(streit.status)
+  const dueBy = streit.evidence_details?.due_by
+  const fristSekunden = typeof dueBy === 'number' ? dueBy : Math.floor((jetzt.getTime() + KUNDENSTREIT_FRIST_OHNE_MS) / 1000)
+  const betrag = typeof streit.amount === 'number' ? formatEuro(centsAlsEuro(streit.amount)) : null
+  if (betrag === null) warnung('Rückbuchung einer Kundenzahlung ohne Betrag', 'rueckbuchung-betrag', { streit: streit.id })
+  const wort = art === 'rueckfrage' ? 'Rückfrage' : 'Rückbuchung'
+  const teile = [...(betrag === null ? [] : [betrag]), `Antwort bis ${formatDatumLang(new Date(fristSekunden * 1000))}`]
+  const grund = grundMitKennung([`${wort} ${streit.id}`, ...teile].join(' · '), [wort, ...teile].join(' · '))
+  await prisma.betriebMessung.createMany({
+    data: [{ tag: utcTagesbeginn(jetzt), art: kundenstreitArt(bestellung.id, streit.id, art), wert: BigInt(fristSekunden), gemessenAm: jetzt }],
+    skipDuplicates: true,
+  })
+  await protokolliere({ wer: null, art: art === 'rueckfrage' ? 'kundenzahlung_rueckfrage' : 'kundenzahlung_zurueckgebucht', bezugArt: 'bestellung', bezugId: bestellung.id, mitPasskey: false, grund })
+}
+
+/** Der Ausgang als Wort: gewonnen, verloren, sonst „ohne Rückbuchung beendet (<Stand>)“ (Rückfrage beendet, verhindert …). */
+function streitAusgang(status: string | null | undefined): string {
+  if (status === 'won') return 'gewonnen'
+  if (status === 'lost') return 'verloren'
+  return `ohne Rückbuchung beendet (${(status ?? 'unbekannt').slice(0, 50)})`
+}
+
+/**
+ * `charge.dispute.closed` (Nr. 289, E-022): nur für Kundenzahlungen. Gehört die
+ * Zahlung zu einer Rechnung, nichts — SEPA-Rückbuchungen sind endgültig, der
+ * Weg zurück ist die Nachforderung (Register N38). Sonst zur Bestellung ein
+ * Eintrag `kundenzahlung_rueckbuchung_abgeschlossen` mit dem Ausgang, und die
+ * Zeile für Heute ist weg. Erst löschen, dann protokollieren (wie oben).
+ */
+export async function behandleRueckbuchungAbgeschlossen(streit: Stripe.Dispute): Promise<void> {
+  const zahlung = kennung(streit.payment_intent)
+  if (!zahlung) return
+  const liste = await stripe.invoicePayments.list({ payment: { type: 'payment_intent', payment_intent: zahlung }, limit: 1 })
+  if (kennung(liste.data[0]?.invoice as string | { id: string } | undefined)) return
+  const bestellung = await bestellungZurZahlung(zahlung)
+  if (!bestellung) return
+  const ausgang = streitAusgang(streit.status)
+  await prisma.betriebMessung.deleteMany({ where: { art: { startsWith: kundenstreitAnfang(bestellung.id, streit.id) } } })
+  await protokolliere({
+    wer: null,
+    art: 'kundenzahlung_rueckbuchung_abgeschlossen',
+    bezugArt: 'bestellung',
+    bezugId: bestellung.id,
+    mitPasskey: false,
+    grund: grundMitKennung(`${streit.id} · ${ausgang}`, ausgang),
+  })
 }
 
 /**

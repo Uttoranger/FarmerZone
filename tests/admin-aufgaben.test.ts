@@ -111,6 +111,8 @@ const VOLL: AufgabenStand = {
       { farmId: 'hof-c', hofName: 'Hof Quote', bar: 11, nicht: 3, seit: JETZT },
       { farmId: 'hof-d', hofName: 'Hof Wenig', bar: 9, nicht: 5, seit: JETZT },
     ],
+    // Nr. 289 (E-022): eine offene Rückbuchung einer Kundenzahlung, Antwort in 5 Tagen.
+    kundenstreit: [{ orderId: 'bestellung-streit', bestellnummer: 'HM-2610-S7R1', hofName: 'Hof am Bach', art: 'rueckbuchung', seit: vor(STUNDE), frist: new Date(JETZT.getTime() + 5 * TAG) }],
   },
   // Nr. 201 (N40): Stripe live in der Produktion, der Stichtag liegt noch in der Zukunft.
   liveSignal: { umgebung: { art: 'produktion', stripe: 'live' }, einstellung: { hofpreisModellAb: new Date('2027-02-01T00:00:00.000+01:00') }, liveSeit: vor(2 * STUNDE) },
@@ -137,6 +139,8 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   einzug_gescheitert: { plattformgebuehr: { ...VOLL.plattformgebuehr, gescheitert: [] } },
   rueckbuchung: { plattformgebuehr: { ...VOLL.plattformgebuehr, zurueckgebucht: [] } },
   rechnungsangaben_fehlen: { plattformgebuehr: { ...VOLL.plattformgebuehr, rechnungsangabenFehlenSeit: null } },
+  // Nr. 289: Stripe führt den Fall nicht mehr offen — der Abgleich bzw. charge.dispute.closed löschte die Zeile.
+  kundenstreit: { plattformgebuehr: { ...VOLL.plattformgebuehr, kundenstreit: [] } },
   // 11 bar, 2 nicht abgeholt = 18 % — unter 20 %, die Aufgabe verschwindet.
   nicht_abgeholt_auffaellig: { plattformgebuehr: { ...VOLL.plattformgebuehr, nichtAbgeholt: [{ farmId: 'hof-c', hofName: 'Hof Quote', bar: 11, nicht: 2, seit: JETZT }] } },
   // Stichtag vorgezogen (erreicht) — das Signal verschwindet von selbst.
@@ -155,6 +159,38 @@ describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {
     const [r] = ADMIN_AUFGABEN.rueckbuchung(VOLL, JETZT)
     expect(r.frist.dauerMs).toBe(STUNDE)
     expect(r.bereich).toBe('Geld')
+  })
+
+  it('Rückbuchung einer Kundenzahlung (Nr. 289): Frist aus der Zeile (Antwortfrist bei Stripe), Bezug Nummer · Hof, Ziel die Bestellung', () => {
+    const [a] = ADMIN_AUFGABEN.kundenstreit(VOLL, JETZT)
+    expect(a).toEqual(
+      expect.objectContaining({
+        quelle: 'kundenstreit',
+        bereich: 'Geld',
+        titel: 'Rückbuchung einer Kundenzahlung',
+        bezug: { kennung: 'HM-2610-S7R1', text: 'HM-2610-S7R1 · Hof am Bach' },
+        satz: 'Agrilo ist mit Betrag und Gebühr belastet. Entscheide: annehmen → Transfer bei Stripe zurückholen; widersprechen → Belege in Stripe vor der Frist, nach dem Ausgang bei ‚verloren‘ zurückholen (AGB 21.3), die Gebühr per Rechnung bzw. Lastschrift.',
+        seit: vor(STUNDE),
+        wasTun: 'pruefen',
+        ziel: '/admin/bestellungen?bestellung=bestellung-streit',
+      })
+    )
+    expect(a.frist).toEqual({ ziel: new Date(JETZT.getTime() + 5 * TAG), dauerMs: 5 * TAG + STUNDE, ueberfaellig: false })
+    expect(AUFGABE_ZIEL_MS.kundenstreit).toBe(7 * TAG)
+  })
+
+  it('Rückfrage zu einer Kundenzahlung: eigener Titel und Satz; Frist vorbei → überfällig; Frist vor dem Eingang → mindestens 1 h', () => {
+    const rueckfrage = (frist: Date) =>
+      ADMIN_AUFGABEN.kundenstreit(
+        { ...VOLL, plattformgebuehr: { ...VOLL.plattformgebuehr, kundenstreit: [{ ...VOLL.plattformgebuehr.kundenstreit[0]!, art: 'rueckfrage', seit: vor(3 * TAG), frist }] } },
+        JETZT
+      )[0]!
+    const a = rueckfrage(vor(TAG))
+    expect(a.titel).toBe('Rückfrage zu einer Kundenzahlung')
+    expect(a.satz).toBe('In Stripe vor der Frist antworten.')
+    expect(a.frist).toEqual({ ziel: vor(TAG), dauerMs: 2 * TAG, ueberfaellig: true })
+    expect(fristText(a, JETZT)).toBe('überfällig · seit 3 Tagen')
+    expect(rueckfrage(vor(4 * TAG)).frist).toEqual({ ziel: vor(3 * TAG - STUNDE), dauerMs: STUNDE, ueberfaellig: true })
   })
 
   it('Quote nicht abgeholt: ab 10 Barbestellungen und über 20 % — 9 Bestellungen zählen nie, genau 20 % nicht', () => {

@@ -5,6 +5,7 @@ import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import { bestimmeGruendungBis } from '@/lib/gruendungshof'
 import { abrechnungSperrtBar, einzugAbFuer, folgemonat, gebuehrModellFuer, letzterFreierTag, monatText, satzHundertstel, satzText } from '@/lib/plattformgebuehr'
 import type { PlattformgebuehrStand } from '@/lib/admin-aufgaben'
+import { KUNDENSTREIT_ART, leseKundenstreitArt } from '@/lib/geld-abgleich'
 import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { ladeHoefeFuerGruendung } from '@/server/queries/admin'
 
@@ -55,15 +56,40 @@ export async function ladeNichtAbgeholt(jetzt: Date, farmId?: string): Promise<M
 
 const monatSchluessel = (d: Date): string => d.toISOString().slice(0, 7)
 
+/**
+ * Offene Streitfälle zu Kundenzahlungen (Nr. 289, E-022): die Zeilen
+ * `kundenstreit:…` (Eingang = `gemessenAm`, Antwortfrist = `wert` in Sekunden)
+ * und dazu Bestellnummer und Hofname in einer Abfrage. Eine Zeile ohne
+ * Bestellung oder mit fremder Art fällt weg.
+ */
+async function ladeKundenstreit(): Promise<PlattformgebuehrStand['kundenstreit']> {
+  const zeilen = await prisma.betriebMessung.findMany({ where: { art: { startsWith: `${KUNDENSTREIT_ART}:` } }, select: { art: true, wert: true, gemessenAm: true } })
+  const gelesen = zeilen.flatMap((z) => {
+    const art = leseKundenstreitArt(z.art)
+    return art ? [{ ...art, seit: z.gemessenAm, frist: new Date(Number(z.wert) * 1000) }] : []
+  })
+  if (gelesen.length === 0) return []
+  const bestellungen = await prisma.order.findMany({
+    where: { id: { in: [...new Set(gelesen.map((g) => g.orderId))] } },
+    select: { id: true, orderNumber: true, farm: { select: { name: true } } },
+  })
+  const je = new Map(bestellungen.map((b) => [b.id, b]))
+  return gelesen.flatMap((g) => {
+    const b = je.get(g.orderId)
+    return b ? [{ orderId: g.orderId, bestellnummer: b.orderNumber, hofName: b.farm.name, art: g.art, seit: g.seit, frist: g.frist }] : []
+  })
+}
+
 /** Der Stand für die Quellen in Admin › Heute (src/lib/admin-aufgaben.ts). */
 export async function ladePlattformgebuehrAufgaben(jetzt: Date): Promise<PlattformgebuehrStand> {
-  const [abrechnungen, angaben, quote] = await Promise.all([
+  const [abrechnungen, angaben, quote, kundenstreit] = await Promise.all([
     prisma.monatsabrechnung.findMany({
       where: { stand: { in: ['gescheitert', 'zurueckgebucht'] } },
       select: { id: true, farmId: true, monat: true, stand: true, offenSeit: true, zurueckgebuchtAm: true, updatedAt: true, farm: { select: { name: true } } },
     }),
     prisma.betriebMessung.findFirst({ where: { art: RECHNUNGSANGABEN_FEHLEN_ART }, orderBy: { tag: 'asc' }, select: { tag: true } }),
     ladeNichtAbgeholt(jetzt),
+    ladeKundenstreit(),
   ])
   const roh = (a: (typeof abrechnungen)[number], seit: Date | null) => ({ abrechnungId: a.id, farmId: a.farmId, hofName: a.farm.name, monat: monatText(monatSchluessel(a.monat)), seit: seit ?? a.updatedAt })
   const auffaellig = [...quote].filter(([, z]) => z.bar >= 10)
@@ -74,6 +100,7 @@ export async function ladePlattformgebuehrAufgaben(jetzt: Date): Promise<Plattfo
     zurueckgebucht: abrechnungen.filter((a) => a.stand === 'zurueckgebucht').map((a) => roh(a, a.zurueckgebuchtAm)),
     rechnungsangabenFehlenSeit: angaben?.tag ?? null,
     nichtAbgeholt: auffaellig.map(([farmId, z]) => ({ farmId, hofName: name.get(farmId) ?? farmId, bar: z.bar, nicht: z.nicht, seit: jetzt })),
+    kundenstreit,
   }
 }
 

@@ -28,7 +28,8 @@ import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/sch
 import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
-import { ABWEICHUNG_FELD_TEXT, type OffeneAbweichung } from '@/lib/geld-abgleich'
+import { ABWEICHUNG_FELD_TEXT, type KundenstreitArt, type OffeneAbweichung } from '@/lib/geld-abgleich'
+import { MARKE } from '@/lib/marke'
 import { bestellungenHref } from '@/lib/admin-bestellung'
 import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
 import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type GebuehrWort, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
@@ -77,6 +78,7 @@ export const AUFGABE_QUELLEN = [
   'stripe_live_ohne_hofpreis',
   'widerruf_offen',
   'hof_online_haengt',
+  'kundenstreit',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -175,6 +177,11 @@ export type PlattformgebuehrStand = {
   rechnungsangabenFehlenSeit: Date | null
   /** Barbestellungen der letzten 90 Tage je Hof: gesamt und nicht abgeholt (die Quelle prüft die Schwelle). */
   nichtAbgeholt: readonly { farmId: string; hofName: string; bar: number; nicht: number; seit: Date }[]
+  /**
+   * Offene Streitfälle zu Kundenzahlungen (Nr. 289, E-022) aus den Zeilen `kundenstreit:…` — hier, weil derselbe
+   * Lader sie füllt und er in jeder Umgebung läuft. `seit` = Eingang, `frist` = Antwortfrist bei Stripe.
+   */
+  kundenstreit: readonly { orderId: string; bestellnummer: string; hofName: string; art: KundenstreitArt; seit: Date; frist: Date }[]
 }
 
 /** Ein leerer Stand — Ausgangspunkt für Tests und für Bereiche, die außerhalb der Produktion nichts melden. */
@@ -189,7 +196,7 @@ export const LEERER_STAND: AufgabenStand = {
   hoefeAktiv: [],
   bestellstopp: null,
   geldAbweichungen: [],
-  plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] },
+  plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [], kundenstreit: [] },
   liveSignal: null,
   widerrufe: [],
 }
@@ -227,6 +234,8 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   widerruf_offen: 14 * TAG_MS,
   // Register N49 (A012): Online-Zahlung eines verkaufenden Hofs hängt bei Stripe — 24 h.
   hof_online_haengt: 24 * STUNDE_MS,
+  // Nr. 289 (E-022): nur der Rahmen — die Frist je Fall ist die Antwortfrist bei Stripe (kundenstreitQuelle).
+  kundenstreit: 7 * TAG_MS,
 }
 
 /** Ein Widerruf ohne Bestellung braucht das Team schneller: 2 Tage (Freigabe 200 Punkt 6). */
@@ -251,6 +260,7 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   stripe_live_ohne_hofpreis: 'Betrieb',
   widerruf_offen: 'Geld',
   hof_online_haengt: 'Höfe',
+  kundenstreit: 'Geld',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -632,6 +642,39 @@ function rueckbuchung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   )
 }
 
+/** Titel und Satz je Art (E-022, wörtlich). */
+const KUNDENSTREIT_TEXT: Record<KundenstreitArt, { titel: string; satz: string }> = {
+  rueckbuchung: {
+    titel: 'Rückbuchung einer Kundenzahlung',
+    satz: `${MARKE} ist mit Betrag und Gebühr belastet. Entscheide: annehmen → Transfer bei Stripe zurückholen; widersprechen → Belege in Stripe vor der Frist, nach dem Ausgang bei ‚verloren‘ zurückholen (AGB 21.3), die Gebühr per Rechnung bzw. Lastschrift.`,
+  },
+  rueckfrage: { titel: 'Rückfrage zu einer Kundenzahlung', satz: 'In Stripe vor der Frist antworten.' },
+}
+
+/**
+ * Rückbuchung einer Kundenzahlung (Nr. 289, E-022): je Streitfall, den Stripe
+ * offen führt, eine Aufgabe — die Frist ist die Antwortfrist bei Stripe
+ * (`frist − seit`, mindestens 1 h). Schließt Stripe den Fall
+ * (`charge.dispute.closed` oder der Geld-Abgleich), ist die Zeile weg und mit
+ * ihr die Aufgabe.
+ */
+function kundenstreitQuelle(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  return stand.plattformgebuehr.kundenstreit.map((k) =>
+    aufgabe(
+      'kundenstreit',
+      {
+        ...KUNDENSTREIT_TEXT[k.art],
+        bezug: { kennung: k.bestellnummer, text: `${k.bestellnummer} · ${k.hofName}` },
+        seit: k.seit,
+        wasTun: 'pruefen',
+        ziel: bestellungenHref({}, { bestellung: k.orderId }),
+      },
+      jetzt,
+      Math.max(STUNDE_MS, k.frist.getTime() - k.seit.getTime())
+    )
+  )
+}
+
 function rechnungsangabenFehlen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   const seit = stand.plattformgebuehr.rechnungsangabenFehlenSeit
   if (!seit) return []
@@ -768,6 +811,7 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   stripe_live_ohne_hofpreis: stripeLiveOhneHofpreis,
   widerruf_offen: widerrufOffen,
   hof_online_haengt: hofOnlineHaengt,
+  kundenstreit: kundenstreitQuelle,
 }
 
 /**

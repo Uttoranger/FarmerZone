@@ -194,6 +194,58 @@ export function leseAbweichungArt(art: string): { orderId: string; feld: Abweich
   return bekannt ? { orderId, feld: bekannt } : null
 }
 
+// ─── Streitfälle zu Kundenzahlungen (Nr. 289, E-022) ─────────────────────────
+
+/**
+ * Vorsatz eines offenen Streitfalls zu einer Kundenzahlung in BetriebMessung
+ * (`wert` = Antwortfrist in Sekunden seit 1970). Kein Messwert, darum nicht in
+ * BETRIEB_ARTEN. Angelegt vom Webhook (`charge.dispute.created`) bzw. vom
+ * Geld-Abgleich, gelöscht bei `charge.dispute.closed` bzw. vom Abgleich, sobald
+ * Stripe den Fall nicht mehr offen führt — so steht er in Heute, solange er
+ * offen ist (N32: erledigt verschwindet von selbst).
+ */
+export const KUNDENSTREIT_ART = 'kundenstreit'
+
+/** Rückbuchung (Geld ist weg) oder Rückfrage der Bank (Stand beginnt mit `warning_`). */
+export const KUNDENSTREIT_ARTEN = ['rueckbuchung', 'rueckfrage'] as const
+
+export type KundenstreitArt = (typeof KUNDENSTREIT_ARTEN)[number]
+
+/** Stände, in denen Stripe eine Antwort erwartet — nur sie stehen als Aufgabe in Heute. */
+export const KUNDENSTREIT_OFFEN = ['needs_response', 'warning_needs_response'] as const
+
+/** Die Art nach dem Stand des Streitfalls: `warning_…` ist eine Rückfrage, alles andere eine Rückbuchung. */
+export function kundenstreitArtVonStand(status: string | null | undefined): KundenstreitArt {
+  return status?.startsWith('warning_') ? 'rueckfrage' : 'rueckbuchung'
+}
+
+/** Ob Stripe den Fall noch offen führt (eine Antwort erwartet). */
+export function kundenstreitOffen(status: string | null | undefined): boolean {
+  return KUNDENSTREIT_OFFEN.some((s) => s === status)
+}
+
+/** `kundenstreit:<Bestellung>:<Streitfall>:<art>` — die Art der Zeile in BetriebMessung. */
+export function kundenstreitArt(orderId: string, streitId: string, art: KundenstreitArt): string {
+  return `${KUNDENSTREIT_ART}:${orderId}:${streitId}:${art}`
+}
+
+/** Der Anfang aller Zeilen eines Streitfalls, gleich welche Art — zum Suchen und Löschen. */
+export function kundenstreitAnfang(orderId: string, streitId: string): string {
+  return `${KUNDENSTREIT_ART}:${orderId}:${streitId}:`
+}
+
+const KUNDENSTREIT_TEIL = /^[\w-]{1,100}$/
+
+/** Die Art einer Zeile zurück in Bestellung, Streitfall und Art — eine fremde oder kaputte Zeile ist null. */
+export function leseKundenstreitArt(art: string): { orderId: string; streitId: string; art: KundenstreitArt } | null {
+  const teile = art.split(':')
+  if (teile.length !== 4 || teile[0] !== KUNDENSTREIT_ART) return null
+  const [, orderId, streitId, welche] = teile
+  if (!orderId || !KUNDENSTREIT_TEIL.test(orderId) || !streitId || !KUNDENSTREIT_TEIL.test(streitId)) return null
+  const bekannt = KUNDENSTREIT_ARTEN.find((a) => a === welche)
+  return bekannt ? { orderId, streitId, art: bekannt } : null
+}
+
 /** Eine Buchung im Saldo des Plattformkontos (Balance Transaction) — nur, was die Gebühren brauchen. */
 export type SaldoBuchung = { created: number; fee: number; type: string; amount: number }
 

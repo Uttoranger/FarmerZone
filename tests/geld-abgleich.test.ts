@@ -12,6 +12,10 @@
  *    werden einzeln nachgeladen.
  *  - Stripe-Fehler → Warnung an Sentry (ohne Betrag, ohne Kennung), nichts
  *    geschrieben, Fehler an den Herzschlag; die Route antwortet 502.
+ *  - Streitfälle zu Kundenzahlungen (Nr. 289, E-022): ein offener Fall mit
+ *    Bestellung bekommt eine Zeile `kundenstreit:…`, ein geschlossener verliert
+ *    sie; scheitert das Lesen der Streitfälle, bleiben die Zeilen, und der Rest
+ *    des Abgleichs schreibt wie sonst.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -20,6 +24,7 @@ const stripeAttrappe = vi.hoisted(() => ({
   paymentIntents: { list: vi.fn(), retrieve: vi.fn() },
   refunds: { list: vi.fn() },
   balanceTransactions: { list: vi.fn() },
+  disputes: { list: vi.fn() },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
@@ -40,7 +45,9 @@ import {
   abweichungArt,
   erwartetLautDatenbank,
   gleicheAb,
+  kundenstreitArt,
   leseAbweichungArt,
+  leseKundenstreitArt,
   stripeGebuehrenJeTag,
   vergleicheBestellung,
   type BestellungFuerAbgleich,
@@ -187,6 +194,23 @@ describe('Art der Zeile und Stripe-Gebühren', () => {
     for (const fremd of ['geldAbweichung:x', 'geldAbweichung:x:unsinn', 'mails', 'geldAbweichung:a b:betrag', 'anders:x:betrag']) expect(leseAbweichungArt(fremd), fremd).toBeNull()
   })
 
+  it('Streitfall (Nr. 289): Art hin und zurück; fremde und kaputte Zeilen sind null', () => {
+    expect(kundenstreitArt('bestellung-1', 'dp_1', 'rueckbuchung')).toBe('kundenstreit:bestellung-1:dp_1:rueckbuchung')
+    expect(leseKundenstreitArt(kundenstreitArt('bestellung-1', 'dp_1', 'rueckfrage'))).toEqual({ orderId: 'bestellung-1', streitId: 'dp_1', art: 'rueckfrage' })
+    for (const fremd of [
+      'kundenstreit:bestellung-1:dp_1',
+      'kundenstreit:bestellung-1:dp_1:unsinn',
+      'kundenstreit:bestellung-1:dp_1:rueckbuchung:mehr',
+      'kundenstreit:a b:dp_1:rueckbuchung',
+      'kundenstreit::dp_1:rueckbuchung',
+      `kundenstreit:bestellung-1:${'d'.repeat(101)}:rueckbuchung`,
+      'geldAbweichung:bestellung-1:betrag',
+      'anders:bestellung-1:dp_1:rueckbuchung',
+    ]) {
+      expect(leseKundenstreitArt(fremd), fremd).toBeNull()
+    }
+  })
+
   it('Gebühren je UTC-Tag: fee jeder Buchung, dazu Stripe-Gebühren als eigene Buchung; Tage ohne Gebühr fehlen', () => {
     const tag = (iso: string) => Math.floor(new Date(iso).getTime() / 1000)
     const jeTag = stripeGebuehrenJeTag([
@@ -248,6 +272,8 @@ beforeEach(() => {
   stripeAttrappe.balanceTransactions.list.mockReturnValue(liste([{ created: Math.floor(Date.parse('2026-10-26T09:00:00Z') / 1000), fee: 52, type: 'charge', amount: 2573 }]))
   db.betriebMessung.findMany.mockResolvedValue([])
   db.order.findMany.mockResolvedValue([zeile('bestellung-aaaa', 'pi_1'), zeile('bestellung-bbbb', 'pi_2')] as never)
+  // Nr. 289: ohne Streitfälle — sonst meldete jeder Fall eine Warnung.
+  stripeAttrappe.disputes.list.mockReturnValue(liste([]))
 })
 
 describe('gleicheGeldAb', () => {
@@ -328,6 +354,103 @@ describe('gleicheGeldAb', () => {
     await expect(gleicheGeldAb(JETZT)).rejects.toBeInstanceOf(GeldAbgleichStripeFehler)
     expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
     expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('gleicheGeldAb: Streitfälle zu Kundenzahlungen (Nr. 289, E-022)', () => {
+  const DUE_BY = Math.floor(Date.parse('2026-11-05T22:59:59Z') / 1000)
+  const streit = (id: string, status: string, piId: string, teil: Record<string, unknown> = {}) => ({
+    id,
+    status,
+    payment_intent: piId,
+    created: Math.floor(Date.parse('2026-10-26T12:00:00Z') / 1000),
+    evidence_details: { due_by: DUE_BY },
+    ...teil,
+  })
+  const ZEILE_ZU = { tag: new Date('2026-10-20T00:00:00Z'), art: 'kundenstreit:bestellung-zu:dp_zu:rueckbuchung', wert: BigInt(DUE_BY), gemessenAm: new Date('2026-10-20T08:00:00Z') }
+  const ZEILE_OFFEN_ALT = { tag: new Date('2026-10-21T00:00:00Z'), art: 'kundenstreit:bestellung-alt:dp_alt:rueckfrage', wert: BigInt(DUE_BY), gemessenAm: new Date('2026-10-21T08:00:00Z') }
+
+  /** BetriebMessung: Abweichungen leer, Streit-Zeilen wie angegeben; Bestellungen zum Abgleich wie oben, zu Streitfällen nur Kennungen. */
+  function richteEin(streitZeilen: unknown[], streitBestellungen: Array<{ id: string; stripePaymentIntentId: string }>): void {
+    db.betriebMessung.findMany.mockImplementation((async (a: { where: { art: { startsWith: string } } }) => (a.where.art.startsWith === 'kundenstreit:' ? streitZeilen : [])) as never)
+    db.order.findMany.mockImplementation((async (a: { select: Record<string, unknown> }) =>
+      a.select.orderNumber ? [zeile('bestellung-aaaa', 'pi_1'), zeile('bestellung-bbbb', 'pi_2')] : streitBestellungen) as never)
+  }
+
+  it('liest Streitfälle der letzten 120 Tage nur lesend; offener Fall mit Bestellung → Zeile, geschlossener → Zeile gelöscht', async () => {
+    stripeAttrappe.disputes.list.mockReturnValue(
+      liste([
+        streit('dp_neu', 'needs_response', 'pi_kunde'),
+        streit('dp_frage', 'warning_needs_response', 'pi_frage', { evidence_details: null }),
+        streit('dp_zu', 'won', 'pi_zu'),
+        // Ein offener Fall zu einer Rechnung (keine Bestellung): keine Zeile.
+        streit('dp_rechnung', 'needs_response', 'pi_rechnung'),
+      ])
+    )
+    richteEin([ZEILE_ZU], [
+      { id: 'bestellung-kunde', stripePaymentIntentId: 'pi_kunde' },
+      { id: 'bestellung-frage', stripePaymentIntentId: 'pi_frage' },
+    ])
+    const ergebnis = await gleicheGeldAb(JETZT)
+    expect(stripeAttrappe.disputes.list).toHaveBeenCalledWith({ created: { gte: Math.floor((JETZT.getTime() - 120 * 24 * 3_600_000) / 1000) }, limit: 100 })
+    expect(db.order.findMany).toHaveBeenCalledWith({ where: { stripePaymentIntentId: { in: ['pi_kunde', 'pi_frage', 'pi_rechnung'] } }, select: { id: true, stripePaymentIntentId: true } })
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith({
+      data: [
+        { tag: new Date('2026-10-27T00:00:00Z'), art: 'kundenstreit:bestellung-kunde:dp_neu:rueckbuchung', wert: BigInt(DUE_BY), gemessenAm: JETZT },
+        // Ohne Antwortfrist: Eingang (created) + 7 Tage.
+        { tag: new Date('2026-10-27T00:00:00Z'), art: 'kundenstreit:bestellung-frage:dp_frage:rueckfrage', wert: BigInt(Math.floor(Date.parse('2026-11-02T12:00:00Z') / 1000)), gemessenAm: JETZT },
+      ],
+      skipDuplicates: true,
+    })
+    expect(db.betriebMessung.deleteMany).toHaveBeenCalledWith({ where: { art: { in: ['kundenstreit:bestellung-zu:dp_zu:rueckbuchung'] } } })
+    // Der übrige Abgleich lief wie sonst (eine Abweichung, die Gebühr des Tages).
+    expect(ergebnis).toMatchObject({ verglichen: 2, abweichungen: 1, neu: 1 })
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+    expect(Sentry.captureMessage).not.toHaveBeenCalled()
+  })
+
+  it('ein offener Fall, der schon eine Zeile hat (auch mit anderer Art), bekommt keine zweite', async () => {
+    stripeAttrappe.disputes.list.mockReturnValue(liste([streit('dp_zu', 'needs_response', 'pi_zu')]))
+    richteEin([{ ...ZEILE_ZU, art: 'kundenstreit:bestellung-zu:dp_zu:rueckfrage' }], [{ id: 'bestellung-zu', stripePaymentIntentId: 'pi_zu' }])
+    await gleicheGeldAb(JETZT)
+    expect(db.betriebMessung.createMany).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(db.betriebMessung.createMany).mock.calls[0]?.[0]).toEqual(expect.objectContaining({ data: [expect.objectContaining({ art: 'geldAbweichung:bestellung-bbbb:gebuehr' })] }))
+    expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('disputes.list wirft: Streit-Zeilen unverändert, der Rest schreibt wie sonst, der Lauf wirft nicht, eine Warnung (Schritt streit)', async () => {
+    stripeAttrappe.disputes.list.mockReturnValue(kaputt())
+    richteEin([ZEILE_ZU], [])
+    const ergebnis = await gleicheGeldAb(JETZT)
+    expect(ergebnis).toMatchObject({ verglichen: 2, abweichungen: 1, neu: 1, stripeGebuehrTage: 1 })
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith({
+      data: [{ tag: new Date('2026-10-27T00:00:00Z'), art: 'geldAbweichung:bestellung-bbbb:gebuehr', wert: BigInt(23) }],
+      skipDuplicates: true,
+    })
+    expect(db.betriebMessung.upsert).toHaveBeenCalled()
+    expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.objectContaining({ name: 'StripeConnectionError' }), {
+      level: 'warning',
+      tags: { aufgabe: 'geld-abgleich', schritt: 'streit' },
+    })
+  })
+
+  it('abgeschnittene Liste der Streitfälle: Streit-Zeilen unverändert, Warnung; der Rest läuft', async () => {
+    stripeAttrappe.disputes.list.mockReturnValue(liste(Array.from({ length: LISTE_HOECHSTENS + 1 }, (_, i) => streit(`dp_${i}`, 'won', 'pi_zu'))))
+    richteEin([ZEILE_ZU], [])
+    expect(await gleicheGeldAb(JETZT)).toMatchObject({ neu: 1 })
+    expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(expect.stringContaining('Streitfälle'), { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'streit' } })
+  })
+
+  it('eine Zeile zu einem Fall, der nicht in der Liste steht, bleibt — eine Warnung nur mit der Kennung', async () => {
+    stripeAttrappe.disputes.list.mockReturnValue(liste([streit('dp_zu', 'lost', 'pi_zu')]))
+    richteEin([ZEILE_ZU, ZEILE_OFFEN_ALT], [])
+    await gleicheGeldAb(JETZT)
+    expect(db.betriebMessung.deleteMany).toHaveBeenCalledWith({ where: { art: { in: ['kundenstreit:bestellung-zu:dp_zu:rueckbuchung'] } } })
+    expect(vi.mocked(Sentry.captureMessage).mock.calls).toEqual([
+      ['Geld-Abgleich: Streitfall nicht in der Liste, Zeile bleibt', { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'streit-unbekannt' }, extra: { streit: 'dp_alt' } }],
+    ])
   })
 })
 
