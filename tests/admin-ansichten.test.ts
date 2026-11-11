@@ -125,6 +125,12 @@ describe('Akte: Freischalten und Kontakt (Nr. 187, vorher Liste Nr. 22f)', () =>
     expect(html).not.toMatch(/nur bar/i)
   })
 
+  it('Register N49: die Marke im Kopf nennt den Grund — nur für das Team, auch „EPS“', () => {
+    expect(akte(hof({ name: 'Waldhof', approvedAt: JETZT, stripeAnzeige: 'eps_fehlt' }, 1), ZUSTAND.verkauft)).toContain('>Stripe: EPS nicht aktiv<')
+    expect(akte(hof({ name: 'Waldhof', approvedAt: JETZT, stripeAnzeige: 'pruefung' }, 1), ZUSTAND.verkauft)).toContain('>Stripe prüft<')
+    expect(akte(hof({ name: 'Waldhof', stripeAnzeige: 'gesperrt' }))).toContain('>Stripe: gesperrt<')
+  })
+
   it('die Betriebsnummer steht als Nummer da — laut Angabe des Hofs, ohne Prüfvermerk (E9)', () => {
     const html = akte(hof({ approvedAt: JETZT, stripeBereit: true, betriebsnummer: '1234567' }, 1), ZUSTAND.verkauft)
     expect(html).toContain('1234567')

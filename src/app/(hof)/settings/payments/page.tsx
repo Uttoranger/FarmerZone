@@ -17,7 +17,16 @@ import { cn } from '@/lib/utils'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ, ONLINE_ZAHLUNG_EINRICHTEN_TITEL } from '@/lib/konditionen'
 import { BAR_KARTE_TEXT, ONLINE_AUS_SATZ, ONLINE_AUS_TITEL, barKarte, zahlungHinweis, type BarKarte } from '@/lib/hof-einstellungen'
 import { HOF_FUER_GEBUEHR_LAGE, ladeGebuehrLage } from '@/server/queries/plattform-einstellung'
-import { NEU_EINRICHTEN_MARKE, NEU_EINRICHTEN_TITEL, neuEinrichtenSatz } from '@/lib/stripe-konto'
+import {
+  NEU_EINRICHTEN_MARKE,
+  NEU_EINRICHTEN_TITEL,
+  ZAHLUNG_STUFE_TEXT,
+  hofStufe,
+  istHofWarteStufe,
+  neuEinrichtenSatz,
+  stripeAnzeige,
+  type HofStripeStufe,
+} from '@/lib/stripe-konto'
 import { TESTBETRIEB_TEXT } from '@/lib/stripe-modus'
 import { TESTBETRIEB } from '@/lib/umgebung-server'
 import { alsLand, stripeLandSatz } from '@/lib/laender'
@@ -34,6 +43,8 @@ async function getFarmPaymentData(userId: string) {
       name: true,
       stripeAccountId: true,
       stripeAccountReady: true,
+      // Der grobe Stand des Stripe-Kontos (Register N49) für Kasten, Marke und Knöpfe.
+      stripeKontoStand: true,
       acceptsOnline: true,
       // Nur für den Satz „neu einrichten": Barzahlung versprechen, wo es sie gibt.
       acceptsOnsite: true,
@@ -64,6 +75,10 @@ async function getFarmPaymentData(userId: string) {
  * gespeicherte Konto nicht (`?stripe=neu`, gesetzt von den Actions und der
  * Rückkehr aus dem Onboarding), heißt die Karte oben „Online-Zahlung neu
  * einrichten" und der orange Knopf richtet über den vorhandenen Weg neu ein.
+ *
+ * Register N49: Prüft Stripe, gibt noch nicht frei oder hat gesperrt, sagt der
+ * Kasten das, die Marke nennt den Stand, und der Weg ins Stripe-Formular
+ * entfällt („Status prüfen“ bleibt). Der Stand geht vor ?stripe=pending.
  */
 export default async function PaymentsPage({
   searchParams,
@@ -75,13 +90,21 @@ export default async function PaymentsPage({
   // Nie mehr eine leere Seite (Nr. 156): ohne Hof wie jede Hof-Seite nach Einrichten.
   const farm = await getFarmPaymentData(userId)
   if (!farm) redirect('/onboarding')
+  // Was der Hof über sein Stripe-Konto sieht (Register N49) — die Kennung bleibt auf dem Server.
+  const stufe = hofStufe(
+    stripeAnzeige({ stripeKontoDa: farm.stripeAccountId !== null, stripeAccountReady: farm.stripeAccountReady, stripeKontoStand: farm.stripeKontoStand })
+  )
   const hinweis = zahlungHinweis({
     rueckmeldung: stripeStatus,
     stripeBereit: farm.stripeAccountReady,
     onlineAn: farm.acceptsOnline,
     stripeKontoDa: farm.stripeAccountId !== null,
+    stufe,
   })
   const neuEinrichten = hinweis === 'neu-einrichten'
+  // Der Weg ins Stripe-Formular nur, wo der Hof dort etwas tun kann (Register N49):
+  // kein Konto, Angaben fehlen, neu einrichten. Prüft Stripe oder wartet der Hof, nicht.
+  const formularOffen = neuEinrichten || stufe === 'kein_konto' || stufe === 'angaben_fehlen'
   // Ob bar geht, sagt barMoeglich (keine neue Regel); der Tag im Satz kommt aus derselben Lage (einzugAb).
   // Scheitert das Lesen, steht die Karte ohne Marke da (kein falsches „Aktiv“), der Rest der Seite bleibt.
   const jetzt = new Date()
@@ -115,6 +138,12 @@ export default async function PaymentsPage({
         {hinweis === 'einrichten' && <Hinweiskasten titel={ONLINE_ZAHLUNG_EINRICHTEN_TITEL}>{ONLINE_ZAHLUNG_EINRICHTEN_SATZ}</Hinweiskasten>}
         {hinweis === 'einschalten' && <Hinweiskasten titel={ONLINE_AUS_TITEL}>{ONLINE_AUS_SATZ}</Hinweiskasten>}
         {neuEinrichten && <Hinweiskasten titel={NEU_EINRICHTEN_TITEL}>{neuEinrichtenSatz(farm.acceptsOnsite)}</Hinweiskasten>}
+        {/* Der Hof wartet auf Stripe (Register N49): sagen, dass er nichts tun muss bzw. wohin er sich wendet. */}
+        {hinweis === 'pruefung' && <Hinweiskasten titel={ZAHLUNG_STUFE_TEXT.pruefung.titel}>{ZAHLUNG_STUFE_TEXT.pruefung.text}</Hinweiskasten>}
+        {hinweis === 'noch-nicht' && (
+          <Hinweiskasten titel={ZAHLUNG_STUFE_TEXT.noch_nicht.titel}>{ZAHLUNG_STUFE_TEXT.noch_nicht.text}</Hinweiskasten>
+        )}
+        {hinweis === 'gesperrt' && <Hinweiskasten titel={ZAHLUNG_STUFE_TEXT.gesperrt.titel}>{ZAHLUNG_STUFE_TEXT.gesperrt.text}</Hinweiskasten>}
 
         <section aria-labelledby="online-titel" className={cn(KARTE, 'p-5')}>
           {/* Titel in der Serifenschrift, die Marke rechts daneben statt darunter (Liste Lauf 32, hofdaten-zahlung). */}
@@ -132,6 +161,7 @@ export default async function PaymentsPage({
               ready={farm.stripeAccountReady}
               onlineAn={farm.acceptsOnline}
               neuEinrichten={neuEinrichten}
+              stufe={stufe}
             />
           </div>
           {/* Testbetrieb (Register Z2): mit Live-Schlüssel verschwindet der Satz von selbst. */}
@@ -157,6 +187,7 @@ export default async function PaymentsPage({
               isReady={farm.stripeAccountReady}
               onlineAn={farm.acceptsOnline}
               neuEinrichten={neuEinrichten}
+              formularOffen={formularOffen}
             />
           </div>
         </section>
@@ -191,16 +222,20 @@ function StripeStatus({
   ready,
   onlineAn,
   neuEinrichten,
+  stufe,
 }: {
   accountId: string | null
   ready: boolean
   onlineAn: boolean
   neuEinrichten: boolean
+  stufe: HofStripeStufe
 }): React.JSX.Element {
   // Orange statt grau: Ohne Stripe fehlt etwas, das jeder Hof braucht (Z1).
   if (!accountId) return <StatusBadge status="offen">Noch nicht verbunden</StatusBadge>
   // Stripe kennt das gespeicherte Konto nicht (Register Z2).
   if (neuEinrichten) return <StatusBadge status="offen">{NEU_EINRICHTEN_MARKE}</StatusBadge>
+  // Der Hof wartet auf Stripe (Register N49): die Marke sagt, warum.
+  if (!ready && istHofWarteStufe(stufe)) return <StatusBadge status="offen">{ZAHLUNG_STUFE_TEXT[stufe].marke}</StatusBadge>
   if (!ready) return <StatusBadge status="offen">Einrichtung nicht fertig</StatusBadge>
   // Stripe fertig, Online aber aus (Bestandshof vor Z1): nicht „aktiv" nennen — der Checkout bietet online dann nicht an.
   if (!onlineAn) return <StatusBadge status="offen">Online-Zahlung aus</StatusBadge>

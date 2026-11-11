@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { einrichtenStand, vorname, warteStand, type EinrichtenDaten } from '@/lib/einrichten'
 import { FARM_PENDING_OWNER_BANNER, FARM_PENDING_OWNER_HINT, warteBalkenText } from '@/lib/farm-approval'
 import { ONLINE_ZAHLUNG_EINRICHTEN_SATZ } from '@/lib/konditionen'
+import { ZAHLUNG_STUFE_TEXT } from '@/lib/stripe-konto'
 
 const OHNE_HOF: EinrichtenDaten = { personName: 'Max Mustermann', email: 'max@example.com', hof: null }
 
@@ -104,6 +105,29 @@ describe('einrichtenStand — mit Hof', () => {
   it('Zahlung: führt nur in die bestehende Stripe-Einrichtung', () => {
     expect(schritt(mitHof(), 'zahlung').aktion).toMatchObject({ href: '/settings/payments', label: 'Mit Stripe einrichten' })
     expect(schritt(mitHof({ stripeBereit: true }), 'zahlung')).toMatchObject({ zustand: 'erledigt', aktion: null })
+  })
+
+  it.each([
+    ['pruefung', 'Stripe prüft deine Angaben.', 'Stripe prüft'],
+    ['noch_nicht', 'Stripe hat die Online-Zahlung noch nicht ganz freigegeben.', 'Noch nicht freigegeben'],
+    ['gesperrt', 'Online-Zahlung ist bei Stripe gesperrt.', 'Bei Stripe gesperrt'],
+  ] as const)('Zahlung, Register N49 — %s: Kasten-Titel und -Text der Zahlungsseite, Marke kurz, „Zahlung ansehen“', (stufe, titel, marke) => {
+    const s = schritt(mitHof({ stripeStufe: stufe }), 'zahlung')
+    expect(s.text).toBe(`${ZAHLUNG_STUFE_TEXT[stufe].titel} ${ZAHLUNG_STUFE_TEXT[stufe].text}`)
+    expect(s.text.startsWith(titel)).toBe(true)
+    expect(s.textKurz).toBe(marke)
+    expect(s.zustand).toBe('offen')
+    expect(s.aktion).toEqual({ art: 'link', href: '/settings/payments', label: 'Zahlung ansehen', primaer: false })
+  })
+
+  it('Zahlung, Register N49 — angaben_fehlen und kein_konto unverändert („Mit Stripe einrichten“)', () => {
+    for (const stripeStufe of ['angaben_fehlen', 'kein_konto'] as const) {
+      const s = schritt(mitHof({ stripeStufe }), 'zahlung')
+      expect(s.text).toBe(ONLINE_ZAHLUNG_EINRICHTEN_SATZ)
+      expect(s.aktion).toMatchObject({ href: '/settings/payments', label: 'Mit Stripe einrichten' })
+    }
+    // Bereit bleibt erledigt, gleich welche Stufe.
+    expect(schritt(mitHof({ stripeBereit: true, stripeStufe: 'bereit' }), 'zahlung').zustand).toBe('erledigt')
   })
 
   it('Lastschrift (Nr. 198) ist ein Hinweis mit dem Weg zu „Lastschrift einrichten“ und zählt nie mit', () => {

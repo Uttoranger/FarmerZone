@@ -3,8 +3,9 @@ import { POSTFACH_TEXT } from '@/lib/postfach'
 import type { StapelMail } from '@/lib/email'
 import type { EinstellAuftrag } from '@/server/mail-warteschlange'
 import type { Verworfen } from '@/server/mail-arten'
-import { VORRANG, abrechnungBezugSchema, fadenBezugSchema, hofBezugSchema, nachrichtBezugSchema } from '@/schemas/mail-auftrag'
+import { VORRANG, abrechnungBezugSchema, fadenBezugSchema, hofBezugSchema, nachrichtBezugSchema, onlineZahlungBezugSchema } from '@/schemas/mail-auftrag'
 import { hofSichtbar } from '@/lib/hof-sichtbar'
+import type { OnlineZahlungAnlass } from '@/lib/stripe-konto'
 
 /*
  * Die Mails an einen Hof (Register N12, N26; Nr. 159): die Freischaltung und
@@ -29,6 +30,22 @@ export function freischaltungAuftrag(farmId: string, freigeschaltetAm: Date): Ei
 /** Plattformgebühr: Ankündigung des Einzugs → Hof (Nr. 198), genau einmal je Hof. */
 export function ankuendigungAuftrag(farmId: string): EinstellAuftrag {
   return { art: 'plattformgebuehr-ankuendigung', vorrang: VORRANG.wichtig, schluessel: `plattformgebuehr-ankuendigung:${farmId}`, bezug: { farmId }, farmId }
+}
+
+/**
+ * Online-Zahlung (Register N49, A012) → Hof: aktiv bzw. (W-A) Stripe braucht
+ * noch Angaben. Der Zeitpunkt, zu dem das Konto gelesen wurde, macht den
+ * Schlüssel eindeutig — derselbe Wechsel stellt nur einmal ein, ein späterer
+ * wieder (die Bremse hält es bei einer Mail je Anlass und Tag).
+ */
+export function onlineZahlungAuftrag(farmId: string, anlass: OnlineZahlungAnlass, gelesenAm: Date): EinstellAuftrag {
+  return {
+    art: 'online-zahlung',
+    vorrang: VORRANG.wichtig,
+    schluessel: `online-zahlung:${farmId}:${anlass}:${gelesenAm.getTime()}`,
+    bezug: { farmId, anlass },
+    farmId,
+  }
 }
 
 /** Lastschrift gescheitert → Hof (Nr. 198): je Versuch von Stripe ein Auftrag. */
@@ -120,6 +137,41 @@ export async function renderePlattformgebuehrAnkuendigung(bezug: Record<string, 
   if (daten.archiviert) return { verworfen: 'hof_stillgelegt' }
   const { bauePlattformgebuehrAnkuendigung } = await import('@/lib/email')
   return bauePlattformgebuehrAnkuendigung({ an: daten.an, text: daten.text, datum: daten.datum })
+}
+
+/**
+ * Online-Zahlung (Register N49, A012). Vor dem Versand dieselbe Regel wie der
+ * Nachlauf (onlineZahlungNachrichtPasst): Hof da und nicht stillgelegt, will
+ * online kassieren, und der Anlass stimmt noch — sonst verworfen. Der Text
+ * („ab sofort“ oder „sobald dein Hof online ist“) entsteht beim Versand frisch.
+ */
+export async function rendereOnlineZahlung(bezug: Record<string, string>): Promise<StapelMail | Verworfen> {
+  const { farmId, anlass } = onlineZahlungBezugSchema.parse(bezug)
+  const hof = await prisma.farm.findUnique({
+    where: { id: farmId },
+    select: {
+      archivedAt: true,
+      geschlossenAm: true,
+      acceptsOnline: true,
+      stripeAccountReady: true,
+      stripeKontoStand: true,
+      isActive: true,
+      isPaused: true,
+      approvedAt: true,
+      adminGesperrtAm: true,
+      owner: { select: { email: true } },
+    },
+  })
+  if (!hof) return { verworfen: 'hof_fehlt' }
+  if (!hofSichtbar(hof)) return { verworfen: 'hof_stillgelegt' }
+  if (!hof.acceptsOnline) return { verworfen: 'online_aus' }
+  const { onlineZahlungNachrichtPasst } = await import('@/lib/stripe-konto')
+  // Nicht mehr bereit (aktiv) bzw. Stand nicht mehr „Angaben fehlen“ (angaben).
+  if (!onlineZahlungNachrichtPasst(anlass, hof)) return { verworfen: anlass === 'aktiv' ? 'nicht_mehr_bereit' : 'stand_geaendert' }
+  const { heuteHofSichtbar } = await import('@/lib/heute')
+  const { baueOnlineZahlungEmail } = await import('@/lib/email')
+  // „Ab sofort“ nur, wenn Kundinnen jetzt bestellen können — dieselbe Frage wie im Nachlauf (stripe-konto-stand.ts).
+  return baueOnlineZahlungEmail({ an: hof.owner.email, anlass, hofSichtbar: heuteHofSichtbar(hof) && hof.adminGesperrtAm === null })
 }
 
 /** Lastschrift gescheitert (Nr. 198). Inzwischen bezahlt: Die Mail stimmte nicht mehr. */

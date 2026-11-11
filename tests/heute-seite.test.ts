@@ -78,6 +78,7 @@ import {
   type PacklistenZeile,
 } from '@/lib/heute'
 import { onlinePausiertHinweis, onlineZahlungPausiert } from '@/lib/stripe-konto'
+import { barMoeglich } from '@/lib/plattformgebuehr'
 import { formatTagKurz } from '@/lib/format'
 import { umsatzBestellungWhere } from '@/lib/umsatz'
 import {
@@ -351,10 +352,11 @@ describe('Stripe-Hinweis: der eine Kasten oben auf Heute — der Balken der Shel
     expect(quelle('src/app/(hof)/dashboard/page.tsx')).toContain('stripeHinweis: heute.stripeImKasten')
     expect(quelle('src/lib/heute.ts')).not.toMatch(/STRIPE_BRAUCHT_DICH_TEXT|art: 'stripe'|'braucht-dich' \| null/)
     expect(quelle('src/server/hofbereich.ts')).not.toContain('hofBalkenArt')
-    // Wortlaut F4 bleibt.
-    expect(onlinePausiertHinweis(false)).toEqual({
-      titel: 'Online-Zahlung ist pausiert',
-      satz: 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden bei dir nicht bestellen.',
+    // Wortlaut seit A012 je Stufe (Register N49; Titel abweichend vom Mockup, Koordinator 09.11.2026).
+    expect(onlinePausiertHinweis('angaben_fehlen', false)).toEqual({
+      titel: 'Stripe braucht noch Angaben von dir',
+      satz: 'Erst danach können Kunden online bezahlen. Bis dahin können Kunden bei dir nicht bestellen.',
+      knopf: 'Bei Stripe ergänzen',
     })
   })
 })
@@ -377,12 +379,15 @@ describe('Stripe-Hinweis', () => {
     expect(onlineZahlungPausiert({ acceptsOnline: true, stripeAccountReady: false, stripeAccountId: null })).toBe(false)
   })
 
-  it('Wortlaut nach Mockup, Satz nach Barzahlung', () => {
-    expect(onlinePausiertHinweis(true)).toEqual({
-      titel: 'Online-Zahlung ist pausiert',
-      satz: 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.',
+  it('Wortlaut je Stufe, Satz nach Barzahlung', () => {
+    expect(onlinePausiertHinweis('angaben_fehlen', true)).toEqual({
+      titel: 'Stripe braucht noch Angaben von dir',
+      satz: 'Erst danach können Kunden online bezahlen. Bis dahin können Kunden nur bar bei Abholung bestellen.',
+      knopf: 'Bei Stripe ergänzen',
     })
-    expect(onlinePausiertHinweis(false).satz).not.toContain('bar')
+    for (const stufe of ['angaben_fehlen', 'pruefung', 'noch_nicht', 'gesperrt'] as const) {
+      expect(onlinePausiertHinweis(stufe, false).satz).not.toContain('bar')
+    }
   })
 
   it('„nur bar bei Abholung" nur, solange Kunden den Hof sehen und er bar annimmt — wartend und stillgelegt bekommen die zweite Fassung (Runde 2)', () => {
@@ -396,28 +401,93 @@ describe('Stripe-Hinweis', () => {
       acceptsOnsite: true,
       stripeAccountReady: false,
       stripeAccountId: konto,
+      stripeKontoStand: null,
     }
-    expect(onlinePausiertDaten(sichtbar)).toEqual({ barMoeglich: true })
-    expect(onlinePausiertDaten({ ...sichtbar, approvedAt: null })).toEqual({ barMoeglich: false })
-    expect(onlinePausiertDaten({ ...sichtbar, archivedAt: freigabe })).toEqual({ barMoeglich: false })
-    expect(onlinePausiertDaten({ ...sichtbar, isPaused: true })).toEqual({ barMoeglich: false })
-    expect(onlinePausiertDaten({ ...sichtbar, acceptsOnsite: false })).toEqual({ barMoeglich: false })
+    const angaben = { barMoeglich: true, stufe: 'angaben_fehlen' }
+    expect(onlinePausiertDaten(sichtbar, true)).toEqual(angaben)
+    expect(onlinePausiertDaten({ ...sichtbar, approvedAt: null }, true)).toEqual({ ...angaben, barMoeglich: false })
+    expect(onlinePausiertDaten({ ...sichtbar, archivedAt: freigabe }, true)).toEqual({ ...angaben, barMoeglich: false })
+    expect(onlinePausiertDaten({ ...sichtbar, isPaused: true }, true)).toEqual({ ...angaben, barMoeglich: false })
+    expect(onlinePausiertDaten({ ...sichtbar, acceptsOnsite: false }, true)).toEqual({ ...angaben, barMoeglich: false })
+    // Bar geht gerade nicht (ladeBarMoeglich, Register N49): zweite Fassung, auch beim sichtbaren Hof.
+    expect(onlinePausiertDaten(sichtbar, false)).toEqual({ ...angaben, barMoeglich: false })
     // Nicht pausiert: kein Hinweis.
-    expect(onlinePausiertDaten({ ...sichtbar, stripeAccountReady: true })).toBeNull()
-    expect(onlinePausiertDaten({ ...sichtbar, stripeAccountId: null })).toBeNull()
-    // Die Abfrage nimmt genau diese Regel.
-    expect(quelle('src/server/queries/heute.ts')).toContain('onlinePausiertDaten(hof)')
+    expect(onlinePausiertDaten({ ...sichtbar, stripeAccountReady: true }, true)).toBeNull()
+    expect(onlinePausiertDaten({ ...sichtbar, stripeAccountId: null }, true)).toBeNull()
+    // Die Abfrage nimmt genau diese Regel, bar aus derselben Quelle wie Kasse und Zahlungsseite.
+    expect(quelle('src/server/queries/heute.ts')).toContain('onlinePausiertDaten(hof, await barJetztFuerHinweis(hof, jetzt))')
+    expect(quelle('src/server/queries/heute.ts')).toContain('return await ladeBarMoeglich(hof, jetzt)')
   })
 
-  it.each([true, false])(
-    'rendert beide Fassungen (barMoeglich=%s): Titel, Satz und genau EIN Link — in die Zahlungs-Einstellungen; Stripe ruft die Seite nicht auf',
-    (barMoeglich) => {
-      const h = html(createElement(StripeHinweis, { barMoeglich }))
-      const { titel, satz } = onlinePausiertHinweis(barMoeglich)
+  it('die Stufe kommt aus dem gespeicherten Stand: eps_fehlt und unklar heißen für den Hof „noch nicht“', () => {
+    const hof = {
+      isActive: true,
+      isPaused: false,
+      approvedAt: new Date('2026-10-01T09:00:00Z'),
+      archivedAt: null,
+      acceptsOnline: true,
+      acceptsOnsite: true,
+      stripeAccountReady: false,
+      stripeAccountId: konto,
+    }
+    const stufe = (stripeKontoStand: string | null) => onlinePausiertDaten({ ...hof, stripeKontoStand }, true)?.stufe
+    expect(stufe('pruefung')).toBe('pruefung')
+    expect(stufe('eps_fehlt')).toBe('noch_nicht')
+    expect(stufe('unklar')).toBe('noch_nicht')
+    expect(stufe('gesperrt')).toBe('gesperrt')
+    expect(stufe('angaben_fehlen')).toBe('angaben_fehlen')
+    // Gespeichert „bereit“ bei nicht bereit, NULL, Unbekanntes: wie bisher „Angaben fehlen“.
+    expect(stufe('bereit')).toBe('angaben_fehlen')
+    expect(stufe(null)).toBe('angaben_fehlen')
+    expect(stufe('irgendwas')).toBe('angaben_fehlen')
+  })
+
+  it('[BAR]: Hof ohne Mandat nach dem Einzugsbeginn und Hof mit gesperrter Barzahlung → zweite Fassung', () => {
+    const jetzt = new Date('2026-12-01T09:00:00Z')
+    const lage = { modell: 'hofpreis' as const, hundertstel: 600, einzugAb: new Date('2026-11-01T00:00:00Z'), barMandatPflicht: true, sepaMandatAm: null, barGesperrt: false }
+    const hof = {
+      isActive: true,
+      isPaused: false,
+      approvedAt: new Date('2026-10-01T09:00:00Z'),
+      archivedAt: null,
+      acceptsOnline: true,
+      acceptsOnsite: true,
+      stripeAccountReady: false,
+      stripeAccountId: konto,
+      stripeKontoStand: 'pruefung',
+    }
+    const ohneMandat = onlinePausiertDaten(hof, barMoeglich(lage, jetzt))
+    const gesperrt = onlinePausiertDaten(hof, barMoeglich({ ...lage, sepaMandatAm: new Date('2026-10-02T09:00:00Z'), barGesperrt: true }, jetzt))
+    const mitMandat = onlinePausiertDaten(hof, barMoeglich({ ...lage, sepaMandatAm: new Date('2026-10-02T09:00:00Z') }, jetzt))
+    expect(ohneMandat?.barMoeglich).toBe(false)
+    expect(gesperrt?.barMoeglich).toBe(false)
+    expect(mitMandat?.barMoeglich).toBe(true)
+    if (!ohneMandat || !gesperrt) throw new Error('Hinweis fehlt')
+    for (const daten of [ohneMandat, gesperrt]) {
+      const h = html(createElement(StripeHinweis, daten))
+      expect(h).toContain('Bis dahin können Kunden bei dir nicht bestellen.')
+      expect(h).not.toContain('nur bar bei Abholung')
+    }
+  })
+
+  it.each([
+    ['angaben_fehlen', true],
+    ['angaben_fehlen', false],
+    ['pruefung', true],
+    ['noch_nicht', false],
+    ['gesperrt', true],
+  ] as const)(
+    'rendert %s (barMoeglich=%s): Titel, Satz und genau EIN Link — in die Zahlungs-Einstellungen; Stripe ruft die Seite nicht auf',
+    (stufe, barMoeglich) => {
+      const h = html(createElement(StripeHinweis, { barMoeglich, stufe }))
+      const { titel, satz, knopf } = onlinePausiertHinweis(stufe, barMoeglich)
       expect(h).toContain(titel)
       expect(h).toContain(satz)
       expect([...h.matchAll(/href="([^"]*)"/g)].map((m) => m[1])).toEqual(['/settings/payments'])
-      expect(h).toMatch(/<a [^>]*href="\/settings\/payments"[^>]*>Bei Stripe ergänzen<\/a>/)
+      expect(h).toMatch(new RegExp(`<a [^>]*href="/settings/payments"[^>]*>${knopf}</a>`))
+      // „Bei Stripe ergänzen“ nur, wenn der Hof bei Stripe etwas tun kann (Register N49).
+      expect(h.includes('Bei Stripe ergänzen')).toBe(stufe === 'angaben_fehlen')
+      expect(h.includes('Zahlung ansehen')).toBe(stufe !== 'angaben_fehlen')
       // Kein Formular, keine Aktion, kein Knopf, der etwas auslöst — nur der Weg in die Einstellungen.
       expect(h).not.toMatch(/<form|<button|formaction/i)
       expect(quelle('src/components/heute/heute-teile.tsx')).not.toContain('createOnboardingLink')
@@ -928,7 +998,7 @@ describe('Bausteine — gefüllt, leer, lange Namen', () => {
 
   it('jedes Symbol ist aria-hidden', () => {
     const alle = [
-      html(createElement(StripeHinweis, { barMoeglich: true })),
+      html(createElement(StripeHinweis, { barMoeglich: true, stufe: 'angaben_fehlen' })),
       html(createElement(TeilenKarte, { hofName: 'Hof Test', hofSlug: 'hof-test', satz: 'x' })),
       html(createElement(HeuteKopf, { datum: 'x' })),
       html(createElement(Packliste, { zeilen: [zeile({ id: 'o1', chip: 'vorbereiten' })], stand: '1 zu packen', leer: { naechsteAbholung: null } })),

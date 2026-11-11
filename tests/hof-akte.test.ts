@@ -80,11 +80,28 @@ describe('Aktivität und Zustand', () => {
     ])
   })
 
+  it('Register N49: die Zeile „Online-Zahlung“ nennt den genauen Grund je Stand', () => {
+    const online = (stripeAnzeige: Parameters<typeof zustandZeilen>[0]['stripeAnzeige'], stripeBereit = false) =>
+      zustandZeilen({ abholTage: [1], produkteImShop: 1, ausverkauft: 0, isPaused: false, gesperrt: false, stripeBereit, stripeAnzeige, onlineAn: true, erstattungenOffen: 0 }).find(
+        (x) => x.titel === 'Online-Zahlung'
+      )?.text
+    expect(online('kein_konto')).toBe('Stripe fehlt')
+    expect(online('angaben_fehlen')).toBe('Stripe: Angaben fehlen')
+    expect(online('pruefung')).toBe('Stripe prüft')
+    expect(online('eps_fehlt')).toBe('Stripe: EPS nicht aktiv')
+    expect(online('unklar')).toBe('Stripe: nicht freigegeben, Grund unklar')
+    expect(online('gesperrt')).toBe('Stripe: gesperrt')
+    expect(online('bereit', true)).toBe('Stripe eingerichtet')
+  })
+
   it('Protokoll: „Du“, „Team“, „System“ — und ein lesbarer Text auch für unbekannte Arten', () => {
     expect(protokollWer('u1', 'u1')).toBe('Du')
     expect(protokollWer('u2', 'u1')).toBe('Team')
     expect(protokollWer(null, 'u1')).toBe('System')
     expect(protokollArtText('hof_gesperrt')).toBe('Vorübergehend gesperrt')
+    // Register N49: die Wechsel des Bereit-Werts (System).
+    expect(protokollArtText('online_zahlung_aktiv')).toBe('Online-Zahlung aktiv (Stripe)')
+    expect(protokollArtText('online_zahlung_pausiert')).toBe('Online-Zahlung pausiert (Stripe)')
     expect(protokollArtText('neue_art_spaeter')).toBe('neue art spaeter')
   })
 })
@@ -111,7 +128,7 @@ describe('hofAkteAnsicht — kein Date, keine volle Anmelde-E-Mail', () => {
     nachrichten: [],
     protokoll: [{ id: 'p1', wann: JETZT, wer: null, art: 'hof_gesperrt', grund: 'Beschwerden klären', mitPasskey: true }],
   }
-  const ansicht = hofAkteAnsicht(roh, { anmeldungGekuerzt: 'h•••@example.com', emailBestaetigt: 'ja', stripeBereit: true, onlineAn: true, ich: 'u1', gebuehrWort: 'Servicegebühr', gebuehrModell: 'bisher' }, JETZT)
+  const ansicht = hofAkteAnsicht(roh, { anmeldungGekuerzt: 'h•••@example.com', emailBestaetigt: 'ja', stripeBereit: true, stripeAnzeige: 'bereit', onlineAn: true, ich: 'u1', gebuehrWort: 'Servicegebühr', gebuehrModell: 'bisher' }, JETZT)
 
   it('Werte als Text und Cent; „Hof-E-Mail fehlt“ bei leerem Feld (Nr. 212); Gerät gekürzt', () => {
     expect(ansicht.kontakt).toMatchObject({ anmeldung: 'h•••@example.com', hofEmail: 'Hof-E-Mail fehlt', ort: '1234 Musterort · Österreich' })

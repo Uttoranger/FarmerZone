@@ -574,6 +574,12 @@ model Farm {
   // Stripe Connect
   stripeAccountId    String?  @unique
   stripeAccountReady Boolean  @default(false)
+  // Grober Stand des Stripe-Kontos (nur Werte aus STRIPE_KONTO_STAENDE in
+  // src/lib/stripe-konto.ts) und wann er bei Stripe gelesen wurde — für den
+  // bedingten Schreiber (kein älteres Lesen überschreibt ein neueres). Nie
+  // disabled_reason, Listen oder Kennungen aus requirements (Auftrag A012).
+  stripeKontoStand     String?
+  stripeKontoGelesenAm DateTime?
 
   // Zahlungsoptionen
   acceptsOnline      Boolean  @default(true)

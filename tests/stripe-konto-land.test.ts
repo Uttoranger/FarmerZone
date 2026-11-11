@@ -21,6 +21,8 @@ vi.mock('@/lib/stripe', () => ({
 }))
 vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn(), captureException: vi.fn() }))
 vi.mock('@/server/bremse-datenbank', () => ({ bremseUeberAlleInstanzen: vi.fn() }))
+// Der eine Schreiber des Kontostands (Register N49) — eigene Tests; hier zählt, dass das Land nie mitgeschrieben wird.
+vi.mock('@/server/stripe-konto-stand', () => ({ schreibeStripeKontoStand: vi.fn(async () => ({ bereit: false, stand: 'angaben_fehlen' })) }))
 
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
@@ -29,6 +31,7 @@ import { bremseUeberAlleInstanzen } from '@/server/bremse-datenbank'
 import { DB_BREMSEN } from '@/lib/bremse-datenbank'
 import { STRIPE_LAND, LAENDER } from '@/lib/laender'
 import { meldeAbweichendesKontoLand } from '@/server/hofkonto-unbekannt'
+import { schreibeStripeKontoStand } from '@/server/stripe-konto-stand'
 import { checkConnectStatus, createConnectAccount } from '@/server/actions/stripe-connect'
 import { GET as rueckkehr } from '@/app/api/stripe/return/route'
 import { NextRequest } from 'next/server'
@@ -133,23 +136,24 @@ describe('bestehendes Konto mit abweichendem Land', () => {
 
   it('checkConnectStatus: Hof DE, Konto AT → eine Meldung, Konto bleibt unverändert', async () => {
     hofSuche.mockResolvedValue(hof('DE', 'acct_erfunden_alt') as never)
-    kontoLesen.mockResolvedValue({ id: 'acct_erfunden_alt', country: 'AT', charges_enabled: false, payouts_enabled: false, details_submitted: false } as never)
+    kontoLesen.mockResolvedValue({ id: 'acct_erfunden_alt', country: 'AT', charges_enabled: false, payouts_enabled: false, details_submitted: false, capabilities: { card_payments: 'inactive', transfers: 'inactive', eps_payments: 'inactive' } } as never)
     await checkConnectStatus()
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
     expect(kontoErzeugen).not.toHaveBeenCalled()
     expect(JSON.stringify(vi.mocked(prisma.farm.update).mock.calls)).not.toContain('country')
+    expect(vi.mocked(schreibeStripeKontoStand)).toHaveBeenCalledWith(expect.objectContaining({ farmId: 'farm_1', stripeAccountId: 'acct_erfunden_alt' }))
   })
 
   it('checkConnectStatus: gleiches Land → keine Meldung', async () => {
     hofSuche.mockResolvedValue(hof('AT', 'acct_erfunden_alt') as never)
-    kontoLesen.mockResolvedValue({ id: 'acct_erfunden_alt', country: 'AT', charges_enabled: false, payouts_enabled: false, details_submitted: false } as never)
+    kontoLesen.mockResolvedValue({ id: 'acct_erfunden_alt', country: 'AT', charges_enabled: false, payouts_enabled: false, details_submitted: false, capabilities: { card_payments: 'inactive', transfers: 'inactive', eps_payments: 'inactive' } } as never)
     await checkConnectStatus()
     expect(Sentry.captureMessage).not.toHaveBeenCalled()
   })
 
   it('Rückkehr aus dem Onboarding: Hof DE, Konto AT → eine Meldung; das Select holt country', async () => {
     hofSuche.mockResolvedValue(hof('DE', 'acct_erfunden_alt') as never)
-    kontoLesen.mockResolvedValue({ id: 'acct_erfunden_alt', country: 'AT', charges_enabled: false, payouts_enabled: false, details_submitted: false } as never)
+    kontoLesen.mockResolvedValue({ id: 'acct_erfunden_alt', country: 'AT', charges_enabled: false, payouts_enabled: false, details_submitted: false, capabilities: { card_payments: 'inactive', transfers: 'inactive', eps_payments: 'inactive' } } as never)
     await rueckkehr(new NextRequest('http://localhost:3000/api/stripe/return?account_id=acct_erfunden_alt'))
     expect((hofSuche.mock.calls[0][0] as { select: Record<string, boolean> }).select.country).toBe(true)
     expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)

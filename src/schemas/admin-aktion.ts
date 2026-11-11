@@ -65,6 +65,9 @@ export const ADMIN_AKTIONEN = [
   'lastschrift_bezahlt',
   'lastschrift_gescheitert',
   'lastschrift_zurueckgebucht',
+  // Wechsel des Bereit-Werts des Stripe-Kontos eines Hofs (System, N33; Register N49, A012)
+  'online_zahlung_aktiv',
+  'online_zahlung_pausiert',
   // Benachrichtigungen (Recht benachrichtigungen)
   'empfaenger_hinzugefuegt',
   'empfaenger_entfernt',

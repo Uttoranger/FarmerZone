@@ -34,6 +34,7 @@ import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
 import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeholtAuffaellig, type GebuehrWort, type HofpreisEinstellung } from '@/lib/plattformgebuehr'
 import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import type { Umgebung } from '@/lib/umgebung'
+import { istHofOnlineHaengtStand, stripeGrundAdmin, type HofOnlineHaengtStand, type StripeAnzeige } from '@/lib/stripe-konto'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -75,6 +76,7 @@ export const AUFGABE_QUELLEN = [
   'nicht_abgeholt_auffaellig',
   'stripe_live_ohne_hofpreis',
   'widerruf_offen',
+  'hof_online_haengt',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -121,8 +123,19 @@ export type Aufgabe = {
 /** Eine Meldung im Eingang — nur Art, erste Zeile und wer sie schickte (Hofname oder ein Wort, nie die Adresse). */
 export type AufgabeMeldung = { id: string; art: MeldungArt; createdAt: Date; ersteZeile: string; von: string }
 
-/** Ein verkaufender Hof für die Signale (freigeschaltet, nicht stillgelegt, nicht pausiert, kein Testhof). */
-export type AufgabeHof = { id: string; name: string; approvedAt: Date; abholzeitAktiv: boolean; letzteBestellungAm: Date | null }
+/**
+ * Ein verkaufender Hof für die Signale (freigeschaltet, nicht stillgelegt, nicht pausiert, kein Testhof).
+ * `stripeAnzeige` und `onlineAn` (Register N49): ob seine Online-Zahlung bei Stripe hängt — nie die Kennung.
+ */
+export type AufgabeHof = {
+  id: string
+  name: string
+  approvedAt: Date
+  abholzeitAktiv: boolean
+  letzteBestellungAm: Date | null
+  stripeAnzeige: StripeAnzeige
+  onlineAn: boolean
+}
 
 /** Alles, woraus die Quellen ihre Aufgaben bilden — geladen von ladeAufgabenStand. */
 export type AufgabenStand = {
@@ -212,6 +225,8 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   stripe_live_ohne_hofpreis: STUNDE_MS,
   // Nr. 200 (N39): 14 Tage ab Eingang (Erstattungsfrist); nicht zugeordnet 2 Tage (WIDERRUF_NICHT_ZUGEORDNET_MS).
   widerruf_offen: 14 * TAG_MS,
+  // Register N49 (A012): Online-Zahlung eines verkaufenden Hofs hängt bei Stripe — 24 h.
+  hof_online_haengt: 24 * STUNDE_MS,
 }
 
 /** Ein Widerruf ohne Bestellung braucht das Team schneller: 2 Tage (Freigabe 200 Punkt 6). */
@@ -235,6 +250,7 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   nicht_abgeholt_auffaellig: 'Höfe',
   stripe_live_ohne_hofpreis: 'Betrieb',
   widerruf_offen: 'Geld',
+  hof_online_haengt: 'Höfe',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -258,7 +274,8 @@ function hofWartet(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   return stand.hoefeWartend.map((h) => {
     const angaben = [
       `Hofseite ${h.hofseite.erledigt} von ${h.hofseite.gesamt}`,
-      h.stripeBereit ? 'Stripe eingerichtet' : 'Stripe fehlt',
+      // Der genaue Grund (Register N49): fehlt, Angaben fehlen, prüft, EPS, gesperrt …
+      stripeGrundAdmin(h.stripeAnzeige),
       ...(h.futter && !h.lfbis ? ['LFBIS-Nummer fehlt'] : []),
       ...(h.email === 'bestaetigt' ? [] : ['E-Mail noch nicht bestätigt']),
     ]
@@ -473,6 +490,44 @@ function hofOhneBestellung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
           bezug: { kennung: h.id, text: h.letzteBestellungAm ? `${h.name} · letzte ${zuletztText(h.letzteBestellungAm, jetzt)}` : `${h.name} · nie bestellt` },
           satz: 'Nachfragen, ob Angebot, Fotos und Abholzeit stimmen.',
           seit: new Date(letzte.getTime() + grenze),
+          wasTun: 'hofAnsehen',
+          ziel: adminHofHref(h.id),
+        },
+        jetzt
+      ),
+    ]
+  })
+}
+
+/** Aufgabe 'hof_online_haengt' (Register N49): fester Titel ohne Daten, Satz je Stand. */
+export const HOF_ONLINE_HAENGT_TITEL = 'Online-Zahlung eines Hofs hängt bei Stripe'
+export const HOF_ONLINE_HAENGT_SATZ: Record<HofOnlineHaengtStand, string> = {
+  eps_fehlt: 'Bei Stripe ist EPS nicht aktiv. Im Stripe-Dashboard beim Konto des Hofs nachsehen und EPS anfordern.',
+  unklar: 'Stripe gibt die Online-Zahlung nicht frei, nennt aber keine offene Angabe. Im Stripe-Dashboard nachsehen.',
+  gesperrt: 'Stripe hat das Konto abgelehnt oder gesperrt. Im Stripe-Dashboard nachsehen und den Hof anschreiben.',
+}
+
+/**
+ * Die Online-Zahlung eines verkaufenden Hofs hängt bei Stripe (Register N49,
+ * W1): Konto da, der Hof will online kassieren, und Stripe gibt nicht frei,
+ * ohne dass der Hof etwas tun kann (EPS nicht aktiv, Grund unklar, gesperrt).
+ * „Angaben fehlen“ und „prüft“ sieht der Hof selbst. Gemessen wie
+ * hofOhneAbholzeit; verschwindet von selbst, sobald der Stand nicht mehr passt.
+ * Titel fest, ohne Daten; im Bezug nur Hof-ID und Hofname, nie die Kennung.
+ */
+function hofOnlineHaengt(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
+  const wochenbeginn = wienWochenbeginn(jetzt)
+  return stand.hoefeAktiv.flatMap((h) => {
+    const anzeige = h.stripeAnzeige
+    if (!h.onlineAn || !istHofOnlineHaengtStand(anzeige)) return []
+    return [
+      aufgabe(
+        'hof_online_haengt',
+        {
+          titel: HOF_ONLINE_HAENGT_TITEL,
+          bezug: { kennung: h.id, text: h.name },
+          satz: HOF_ONLINE_HAENGT_SATZ[anzeige],
+          seit: new Date(Math.max(h.approvedAt.getTime(), wochenbeginn.getTime())),
           wasTun: 'hofAnsehen',
           ziel: adminHofHref(h.id),
         },
@@ -712,6 +767,7 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   nicht_abgeholt_auffaellig: nichtAbgeholtAuffaelligQuelle,
   stripe_live_ohne_hofpreis: stripeLiveOhneHofpreis,
   widerruf_offen: widerrufOffen,
+  hof_online_haengt: hofOnlineHaengt,
 }
 
 /**
@@ -1032,6 +1088,8 @@ export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
   lastschrift_gescheitert: 'Lastschrift gescheitert',
   lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
+  online_zahlung_aktiv: 'Online-Zahlung aktiv (Stripe)',
+  online_zahlung_pausiert: 'Online-Zahlung pausiert (Stripe)',
   erstattung_erledigt: 'Erstattung als erledigt markiert',
   empfaenger_hinzugefuegt: 'Empfänger hinzugefügt',
   empfaenger_entfernt: 'Empfänger entfernt',

@@ -97,6 +97,7 @@ export const MAIL_ART_NAME: Record<MailArt, string> = {
   'abo-bestaetigung': 'Abo bestätigen',
   'plattformgebuehr-ankuendigung': 'Plattformgebühr: Ankündigung',
   'lastschrift-gescheitert': 'Lastschrift gescheitert',
+  'online-zahlung': 'Online-Zahlung (Stripe)',
   'widerruf-eingang': 'Widerruf: Eingangsbestätigung',
   'widerruf-hof': 'Widerruf (an den Hof)',
   'widerruf-erstattet': 'Widerruf: erstattet',
@@ -1088,6 +1089,9 @@ export const NOCHMAL_NIE = [
   'zu-viele-versuche',
   'betrieb-warnung',
   'betreiber-bestaetigung',
+  // Register N49 (A012, Fund 14): Die Nachricht steht im Postfach des Hofs; ein
+  // „Nochmal“ wiederholte einen Stand, der sich inzwischen geändert haben kann.
+  'online-zahlung',
   'testmail',
   'betreiber-testmail',
   'erstattung-offen',
@@ -1273,6 +1277,7 @@ export const MAIL_BEISPIELE = [
   { id: 'freischaltung', gruppe: 'hof-konto', name: 'Freischaltung' },
   { id: 'plattformgebuehr-ankuendigung', gruppe: 'hof-konto', name: 'Plattformgebühr ankündigen' },
   { id: 'lastschrift-gescheitert', gruppe: 'hof-konto', name: 'Lastschrift gescheitert' },
+  { id: 'online-zahlung', gruppe: 'hof-konto', name: 'Online-Zahlung (Stripe)' },
   { id: 'rundschreiben', gruppe: 'hof-konto', name: 'Rundschreiben' },
   { id: 'postfach-antwort', gruppe: 'hof-konto', name: 'Antwort vom Team' },
   { id: 'abo-bestaetigung', gruppe: 'neuigkeiten', name: 'Anmeldung bestätigen' },
@@ -1402,7 +1407,7 @@ export function passtNochmal(art: string, stand: NochmalStand, jetzt: Date): Noc
 /** Woher die Adresse einer Art kommt — frisch geladen, nie aus dem Protokoll. `null`: nirgends gespeichert. */
 export function adresseQuelle(art: string): 'bestellung' | 'hof' | 'hofInhaber' | null {
   if (art === 'bestellung-bezahlt-hof' || art === 'bar-bestaetigt-hof' || art === 'bestellung-bar-hof' || art === 'widerruf-hof') return 'hof'
-  if (art === 'freischaltung' || art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert') return 'hofInhaber'
+  if (art === 'freischaltung' || art === 'plattformgebuehr-ankuendigung' || art === 'lastschrift-gescheitert' || art === 'online-zahlung') return 'hofInhaber'
   if (nochmalErlaubt(art)) return 'bestellung'
   return null
 }

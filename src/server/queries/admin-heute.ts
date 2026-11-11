@@ -1,6 +1,7 @@
 import { ladePlattformgebuehrAufgaben } from '@/server/queries/plattformgebuehr'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { stripeAnzeige } from '@/lib/stripe-konto'
 import { STRIPE_LIVE_AB, UMGEBUNG } from '@/lib/umgebung-server'
 import { ladeErstattungAufgaben, ladeHofAufgaben } from '@/server/queries/postfach'
 import { ladeProbleme } from '@/server/queries/mails'
@@ -45,6 +46,11 @@ async function ladeHoefeAktiv(): Promise<AufgabeHof[]> {
       id: true,
       name: true,
       approvedAt: true,
+      // Ob die Online-Zahlung bei Stripe hängt (Register N49) — die Kennung nur als Wahrheitswert.
+      stripeAccountId: true,
+      stripeAccountReady: true,
+      stripeKontoStand: true,
+      acceptsOnline: true,
       pickupSlots: { where: { isActive: true }, select: { id: true }, take: 1 },
       // Storno und Testzahlung sind keine Bestellung im Sinn des Signals.
       orders: { where: { status: { not: 'CANCELLED' }, AND: [ohneTestzahlungenWhere(STRIPE_LIVE_AB)] }, orderBy: { createdAt: 'desc' }, select: { createdAt: true }, take: 1 },
@@ -52,7 +58,17 @@ async function ladeHoefeAktiv(): Promise<AufgabeHof[]> {
   })
   return hoefe.flatMap((h) =>
     h.approvedAt
-      ? [{ id: h.id, name: h.name, approvedAt: h.approvedAt, abholzeitAktiv: h.pickupSlots.length > 0, letzteBestellungAm: h.orders[0]?.createdAt ?? null }]
+      ? [
+          {
+            id: h.id,
+            name: h.name,
+            approvedAt: h.approvedAt,
+            abholzeitAktiv: h.pickupSlots.length > 0,
+            letzteBestellungAm: h.orders[0]?.createdAt ?? null,
+            stripeAnzeige: stripeAnzeige({ stripeKontoDa: h.stripeAccountId !== null, stripeAccountReady: h.stripeAccountReady, stripeKontoStand: h.stripeKontoStand }),
+            onlineAn: h.acceptsOnline,
+          },
+        ]
       : []
   )
 }

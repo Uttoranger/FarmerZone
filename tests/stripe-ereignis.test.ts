@@ -5,7 +5,7 @@
  * Beweist: Je verarbeitetem Typ geht ein gültiges Objekt durch (mit
  * zusätzlichen Feldern, wie Stripe sie schickt) und ein ungültiges nicht —
  * das Ergebnis nennt dann nur Feldpfade, nie Werte. Dazu: Die Liste der Typen
- * ist genau die der Route (Lauf 26 plus account.updated), ein fremder Typ ist
+ * ist genau die der Route (Lauf 26 plus account.updated und capability.updated), ein fremder Typ ist
  * keiner.
  */
 import { describe, expect, it } from 'vitest'
@@ -16,9 +16,9 @@ import { BEISPIELE } from './stripe-ereignis-beispiele'
 const TYPEN = Object.keys(BEISPIELE) as VerarbeiteterStripeTyp[]
 
 describe('Schemas der verarbeiteten Stripe-Ereignisse', () => {
-  it('die Liste ist die der Route: Lauf 26 plus account.updated', () => {
+  it('die Liste ist die der Route: Lauf 26 plus account.updated und capability.updated', () => {
     expect(Object.keys(STRIPE_EREIGNIS_SCHEMAS).sort()).toEqual([...TYPEN].sort())
-    expect(TYPEN).toHaveLength(11)
+    expect(TYPEN).toHaveLength(12)
   })
 
   it('Wache: jeder Typ, den die Route abfragt, hat ein Schema — und jedes Schema einen Zweig', () => {

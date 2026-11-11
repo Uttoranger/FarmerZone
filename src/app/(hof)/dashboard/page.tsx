@@ -173,7 +173,7 @@ export default async function HeutePage(): Promise<React.JSX.Element> {
   const bloecke: Record<HeuteBlock, ReactNode> = {
     postfach: postfach && <PostfachKarte nachricht={postfach.nachricht} weitere={postfach.weitere} />,
     stripe: heute.onlinePausiert ? (
-      <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} />
+      <StripeHinweis barMoeglich={heute.onlinePausiert.barMoeglich} stufe={heute.onlinePausiert.stufe} />
     ) : (
       heute.stripeEinrichten && <StripeEinrichtenHinweis />
     ),

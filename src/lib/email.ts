@@ -35,6 +35,7 @@ import { hofEmailFehlt, hofKontaktEmail, type HofKontakt } from '@/lib/hof-konta
 import { belehrungHof, belehrungMitHof, belehrungMitKostenschaetzung, type Belehrung } from '@/lib/widerruf'
 import { ruecksendekostenSchaetzungEuro } from '@/lib/ruecktritt-angaben'
 import type { MailArt, MailStatus } from '@/schemas/mail-auftrag'
+import type { OnlineZahlungAnlass } from '@/lib/stripe-konto'
 
 const apiKey = process.env.RESEND_API_KEY
 const FROM = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
@@ -1114,6 +1115,20 @@ export async function bauePlattformgebuehrAnkuendigung(d: { an: string; text: st
     React.createElement(PlattformgebuehrAnkuendigungEmail, { text: d.text, datum: d.datum, lastschriftUrl: `${APP_URL}${LASTSCHRIFT_HREF}`, knopf: LASTSCHRIFT_TEXT.einrichten })
   )
   return { an: d.an, betreff: `Plattformgebühr ab ${d.datum}`, html }
+}
+
+/**
+ * Online-Zahlung (Register N49, A012) → Hof: aktiv bzw. Stripe braucht noch
+ * Angaben. Betreff und Text aus `onlineZahlungNachricht` — dieselben Worte
+ * wie die Postfach-Nachricht; der Knopf „Zahlung ansehen“ führt in die
+ * Zahlungs-Einstellungen.
+ */
+export async function baueOnlineZahlungEmail(d: { an: string; anlass: OnlineZahlungAnlass; hofSichtbar: boolean }): Promise<StapelMail> {
+  const { ZAHLUNG_ANSEHEN, ZAHLUNG_HREF, onlineZahlungNachricht } = await import('@/lib/stripe-konto')
+  const { betreff, text } = onlineZahlungNachricht(d.anlass, d.hofSichtbar)
+  const { OnlineZahlungEmail } = await import('@/emails/online-zahlung')
+  const html = await toHtml(React.createElement(OnlineZahlungEmail, { betreff, text, zahlungUrl: `${APP_URL}${ZAHLUNG_HREF}`, knopf: ZAHLUNG_ANSEHEN }))
+  return { an: d.an, betreff, html }
 }
 
 /** Lastschrift der Monatsabrechnung gescheitert → Hof (Register N38, Nr. 198); Text aus `lastschriftGescheitertText`. */

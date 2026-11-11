@@ -19,18 +19,274 @@ import {
   onlineZahlungPausiert,
   stripeKontoBereit,
   zahlungNichtMoeglichText,
+  ANGABEN_NACHRICHT,
+  BEI_STRIPE_ERGAENZEN,
+  STRIPE_KONTO_STAENDE,
+  ZAHLUNG_ANSEHEN,
+  ZAHLUNG_STUFE_TEXT,
+  ZAHLUNG_ZEILE_TEXT,
+  hofStufe,
+  istStripeKontoStand,
+  onlineZahlungNachricht,
+  stripeAnzeige,
+  stripeGrundAdmin,
+  stripeKontoStand,
+  type StripeKontoDaten,
 } from '@/lib/stripe-konto'
+import { SUPPORT_EMAIL } from '@/lib/support'
 
-describe('stripeKontoBereit', () => {
-  it('nur wenn Zahlungen UND Auszahlungen frei sind', () => {
-    expect(stripeKontoBereit({ charges_enabled: true, payouts_enabled: true })).toBe(true)
-    expect(stripeKontoBereit({ charges_enabled: false, payouts_enabled: true })).toBe(false)
-    expect(stripeKontoBereit({ charges_enabled: true, payouts_enabled: false })).toBe(false)
+/** Ein fertiges Konto: alles, was E1 verlangt (erfundene Werte, kein Netz). */
+const FERTIG: StripeKontoDaten = {
+  charges_enabled: true,
+  payouts_enabled: true,
+  details_submitted: true,
+  capabilities: { card_payments: 'active', transfers: 'active', eps_payments: 'active' },
+  requirements: { disabled_reason: null, currently_due: [], past_due: [], pending_verification: [] },
+}
+
+function konto(teil: {
+  charges_enabled?: boolean | null
+  payouts_enabled?: boolean | null
+  details_submitted?: boolean | null
+  capabilities?: StripeKontoDaten['capabilities']
+  requirements?: Partial<NonNullable<StripeKontoDaten['requirements']>>
+}): StripeKontoDaten {
+  const { requirements, ...rest } = teil
+  return { ...FERTIG, ...rest, requirements: { ...FERTIG.requirements, ...requirements } }
+}
+
+const faehig = (teil: Partial<Record<'card_payments' | 'transfers' | 'eps_payments', string>>) => ({
+  card_payments: 'active',
+  transfers: 'active',
+  eps_payments: 'active',
+  ...teil,
+})
+
+describe('stripeKontoBereit (E1: bereit erst mit EPS)', () => {
+  it('alle fünf Bedingungen erfüllt → bereit', () => {
+    expect(stripeKontoBereit(FERTIG)).toBe(true)
+  })
+
+  it.each([
+    ['Zahlungen gesperrt', konto({ charges_enabled: false })],
+    ['Auszahlungen gesperrt', konto({ payouts_enabled: false })],
+    ['Karte inaktiv', konto({ capabilities: faehig({ card_payments: 'inactive' }) })],
+    ['Karte in Prüfung', konto({ capabilities: faehig({ card_payments: 'pending' }) })],
+    ['Überweisung inaktiv', konto({ capabilities: faehig({ transfers: 'inactive' }) })],
+    ['Überweisung in Prüfung', konto({ capabilities: faehig({ transfers: 'pending' }) })],
+    ['EPS inaktiv', konto({ capabilities: faehig({ eps_payments: 'inactive' }) })],
+    ['EPS in Prüfung', konto({ capabilities: faehig({ eps_payments: 'pending' }) })],
+    ['EPS fehlt', konto({ capabilities: { card_payments: 'active', transfers: 'active' } })],
+    ['Karte fehlt', konto({ capabilities: { transfers: 'active', eps_payments: 'active' } })],
+    ['Überweisung fehlt', konto({ capabilities: { card_payments: 'active', eps_payments: 'active' } })],
+    ['capabilities null', konto({ capabilities: null })],
+  ])('%s → nicht bereit', (_name, k) => {
+    expect(stripeKontoBereit(k)).toBe(false)
+  })
+
+  it('die alte Regel (nur Zahlungen und Auszahlungen frei) reicht nicht mehr', () => {
+    expect(stripeKontoBereit({ charges_enabled: true, payouts_enabled: true })).toBe(false)
   })
 
   it('fehlende Angaben zählen als nicht bereit', () => {
     expect(stripeKontoBereit({})).toBe(false)
     expect(stripeKontoBereit({ charges_enabled: true, payouts_enabled: null })).toBe(false)
+  })
+})
+
+describe('stripeKontoStand (E2: die erste Stufe, die zutrifft)', () => {
+  it('bereit', () => {
+    expect(stripeKontoStand(FERTIG)).toBe('bereit')
+  })
+
+  it.each([
+    ['rejected.fraud', konto({ charges_enabled: false, requirements: { disabled_reason: 'rejected.fraud' } })],
+    ['rejected.other mit offenen Angaben', konto({ charges_enabled: false, requirements: { disabled_reason: 'rejected.other', currently_due: ['x'] } })],
+    ['platform_paused', konto({ charges_enabled: false, requirements: { disabled_reason: 'platform_paused' } })],
+  ])('gesperrt: %s', (_name, k) => {
+    expect(stripeKontoStand(k)).toBe('gesperrt')
+  })
+
+  it.each([
+    ['Formular nicht abgeschickt', konto({ details_submitted: false, charges_enabled: false })],
+    ['details_submitted fehlt', konto({ details_submitted: null, payouts_enabled: false })],
+    ['currently_due nicht leer', konto({ payouts_enabled: false, requirements: { currently_due: ['individual.dob.day'] } })],
+    ['past_due nicht leer', konto({ charges_enabled: false, requirements: { past_due: ['external_account'] } })],
+    ['requirements.past_due bei leeren Listen', konto({ charges_enabled: false, requirements: { disabled_reason: 'requirements.past_due' } })],
+    ['offene Angaben gehen vor EPS', konto({ capabilities: faehig({ eps_payments: 'inactive' }), requirements: { currently_due: ['x'] } })],
+  ])('angaben_fehlen: %s', (_name, k) => {
+    expect(stripeKontoStand(k)).toBe('angaben_fehlen')
+  })
+
+  it.each([
+    ['EPS inaktiv', konto({ capabilities: faehig({ eps_payments: 'inactive' }) })],
+    ['EPS fehlt', konto({ capabilities: { card_payments: 'active', transfers: 'active' } })],
+  ])('eps_fehlt: %s', (_name, k) => {
+    expect(stripeKontoStand(k)).toBe('eps_fehlt')
+  })
+
+  it.each([
+    ['EPS in Prüfung bei sonst fertigem Konto', konto({ capabilities: faehig({ eps_payments: 'pending' }) })],
+    ['Karte in Prüfung', konto({ charges_enabled: false, capabilities: faehig({ card_payments: 'pending' }) })],
+    ['Überweisung in Prüfung', konto({ payouts_enabled: false, capabilities: faehig({ transfers: 'pending' }) })],
+    ['pending_verification nicht leer', konto({ charges_enabled: false, requirements: { pending_verification: ['individual.verification.document'] } })],
+    ['requirements.pending_verification', konto({ charges_enabled: false, requirements: { disabled_reason: 'requirements.pending_verification' } })],
+    ['under_review', konto({ charges_enabled: false, requirements: { disabled_reason: 'under_review' } })],
+    ['listed', konto({ charges_enabled: false, requirements: { disabled_reason: 'listed' } })],
+  ])('pruefung: %s', (_name, k) => {
+    expect(stripeKontoStand(k)).toBe('pruefung')
+  })
+
+  it.each([
+    ['nichts davon (Zahlungen aus, kein Grund)', konto({ charges_enabled: false })],
+    ['Karte inaktiv ohne Grund', konto({ capabilities: faehig({ card_payments: 'inactive' }) })],
+    ['capabilities null bei sonst fertigem Konto', konto({ capabilities: null })],
+    ['anderer Grund', konto({ charges_enabled: false, requirements: { disabled_reason: 'other' } })],
+  ])('unklar: %s', (_name, k) => {
+    expect(stripeKontoStand(k)).toBe('unklar')
+  })
+
+  it('liefert nur Werte aus STRIPE_KONTO_STAENDE', () => {
+    expect(STRIPE_KONTO_STAENDE).toEqual(['bereit', 'gesperrt', 'angaben_fehlen', 'eps_fehlt', 'pruefung', 'unklar'])
+    expect(istStripeKontoStand('pruefung')).toBe(true)
+    expect(istStripeKontoStand('rejected.fraud')).toBe(false)
+    expect(istStripeKontoStand(null)).toBe(false)
+  })
+})
+
+describe('stripeAnzeige und hofStufe (E4)', () => {
+  it('ohne Konto: kein_konto, egal was gespeichert ist', () => {
+    expect(stripeAnzeige({ stripeKontoDa: false, stripeAccountReady: false, stripeKontoStand: 'pruefung' })).toBe('kein_konto')
+  })
+
+  it('NULL + bereit → bereit; NULL + nicht bereit → angaben_fehlen (bisheriges Verhalten)', () => {
+    expect(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: true, stripeKontoStand: null })).toBe('bereit')
+    expect(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: false, stripeKontoStand: null })).toBe('angaben_fehlen')
+  })
+
+  it('bereit gilt nur über stripeAccountReady: gespeichertes „bereit“ bei nicht bereit → angaben_fehlen', () => {
+    expect(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: false, stripeKontoStand: 'bereit' })).toBe('angaben_fehlen')
+    expect(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: true, stripeKontoStand: 'pruefung' })).toBe('bereit')
+  })
+
+  it('unbekannter Text → angaben_fehlen; gültiger Stand → der Stand', () => {
+    expect(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: false, stripeKontoStand: 'irgendwas' })).toBe('angaben_fehlen')
+    for (const stand of ['gesperrt', 'angaben_fehlen', 'eps_fehlt', 'pruefung', 'unklar'] as const) {
+      expect(stripeAnzeige({ stripeKontoDa: true, stripeAccountReady: false, stripeKontoStand: stand })).toBe(stand)
+    }
+  })
+
+  it('der Hof sieht eps_fehlt und unklar als „noch nicht freigegeben“', () => {
+    expect(hofStufe('eps_fehlt')).toBe('noch_nicht')
+    expect(hofStufe('unklar')).toBe('noch_nicht')
+    for (const a of ['kein_konto', 'bereit', 'gesperrt', 'angaben_fehlen', 'pruefung'] as const) expect(hofStufe(a)).toBe(a)
+  })
+})
+
+describe('Texte für den Hof (E5, wörtlich)', () => {
+  it('W-A gilt: „Stripe prüft“ ohne Rückfall-Satz', () => {
+    expect(ANGABEN_NACHRICHT).toBe(true)
+    expect(ZAHLUNG_STUFE_TEXT.pruefung).toEqual({
+      titel: 'Stripe prüft deine Angaben.',
+      text: 'Du musst nichts tun, wir melden uns. Das dauert meist nur kurz, manchmal ein paar Werktage. Sobald die Online-Zahlung aktiv ist, siehst du es hier.',
+      marke: 'Stripe prüft',
+    })
+  })
+
+  it('Kasten und Marke: noch nicht freigegeben, gesperrt (mit der Support-Adresse)', () => {
+    expect(ZAHLUNG_STUFE_TEXT.noch_nicht).toEqual({
+      titel: 'Stripe hat die Online-Zahlung noch nicht ganz freigegeben.',
+      text: 'Du musst nichts tun, wir kümmern uns darum und melden uns.',
+      marke: 'Noch nicht freigegeben',
+    })
+    expect(ZAHLUNG_STUFE_TEXT.gesperrt).toEqual({
+      titel: 'Online-Zahlung ist bei Stripe gesperrt.',
+      text: `Online bezahlen geht bei dir deshalb gerade nicht. Schreib uns bitte an ${SUPPORT_EMAIL}, wir helfen dir weiter.`,
+      marke: 'Bei Stripe gesperrt',
+    })
+  })
+
+  it('Zeile „Zahlung“ in den Einstellungen', () => {
+    expect(ZAHLUNG_ZEILE_TEXT).toEqual({
+      pruefung: 'Stripe prüft deine Angaben · du musst nichts tun',
+      noch_nicht: 'Stripe hat noch nicht ganz freigegeben · wir kümmern uns darum',
+      gesperrt: 'Online-Zahlung bei Stripe gesperrt · schreib uns',
+    })
+  })
+
+  const BAR = 'Bis dahin können Kunden nur bar bei Abholung bestellen.'
+  const OHNE = 'Bis dahin können Kunden bei dir nicht bestellen.'
+
+  it.each([
+    ['angaben_fehlen', 'Stripe braucht noch Angaben von dir', 'Erst danach können Kunden online bezahlen.', BEI_STRIPE_ERGAENZEN],
+    ['pruefung', 'Stripe prüft deine Angaben', 'Du musst nichts tun, wir melden uns.', ZAHLUNG_ANSEHEN],
+    [
+      'noch_nicht',
+      'Online-Zahlung noch nicht freigegeben',
+      'Stripe hat die Online-Zahlung noch nicht ganz freigegeben. Du musst nichts tun, wir kümmern uns darum und melden uns.',
+      ZAHLUNG_ANSEHEN,
+    ],
+    [
+      'gesperrt',
+      'Online-Zahlung ist bei Stripe gesperrt',
+      `Online bezahlen geht bei dir deshalb gerade nicht. Schreib uns bitte an ${SUPPORT_EMAIL}, wir helfen dir weiter.`,
+      ZAHLUNG_ANSEHEN,
+    ],
+  ] as const)('Heute bei %s: Titel, Satz mit [BAR], Knopf', (stufe, titel, satz, knopf) => {
+    expect(onlinePausiertHinweis(stufe, true)).toEqual({ titel, satz: `${satz} ${BAR}`, knopf })
+    expect(onlinePausiertHinweis(stufe, false)).toEqual({ titel, satz: `${satz} ${OHNE}`, knopf })
+  })
+
+  it('Knöpfe: „Bei Stripe ergänzen“ und „Zahlung ansehen“', () => {
+    expect(BEI_STRIPE_ERGAENZEN).toBe('Bei Stripe ergänzen')
+    expect(ZAHLUNG_ANSEHEN).toBe('Zahlung ansehen')
+  })
+
+  it('kein „EPS“ in einem Hof-Text der Stufen', () => {
+    const texte = [
+      ...Object.values(ZAHLUNG_STUFE_TEXT).flatMap((t) => [t.titel, t.text, t.marke]),
+      ...Object.values(ZAHLUNG_ZEILE_TEXT),
+      ...(['angaben_fehlen', 'pruefung', 'noch_nicht', 'gesperrt'] as const).flatMap((s) =>
+        [true, false].flatMap((b) => Object.values(onlinePausiertHinweis(s, b)))
+      ),
+      ...(['aktiv', 'angaben'] as const).flatMap((a) => [true, false].flatMap((b) => Object.values(onlineZahlungNachricht(a, b)))),
+    ]
+    for (const t of texte) expect(t, t).not.toMatch(/\bEPS\b/i)
+  })
+})
+
+describe('Nachrichten an den Hof (E6, wörtlich)', () => {
+  it('aktiv — sichtbarer Hof', () => {
+    expect(onlineZahlungNachricht('aktiv', true)).toEqual({
+      betreff: 'Online-Zahlung ist aktiv',
+      text: 'Stripe hat dein Konto freigegeben. Ab sofort können Kunden bei dir online bezahlen.',
+    })
+  })
+
+  it('aktiv — Hof noch nicht online', () => {
+    expect(onlineZahlungNachricht('aktiv', false)).toEqual({
+      betreff: 'Online-Zahlung ist aktiv',
+      text: 'Stripe hat dein Konto freigegeben. Sobald dein Hof online ist, können Kunden dort auch online bezahlen.',
+    })
+  })
+
+  it('angaben (W-A)', () => {
+    expect(onlineZahlungNachricht('angaben', true)).toEqual({
+      betreff: 'Stripe braucht noch Angaben von dir',
+      text: 'Stripe braucht noch Angaben von dir. Öffne Einstellungen › Zahlung und tippe auf ‚Einrichtung fortsetzen‘.',
+    })
+  })
+})
+
+describe('Für das Team (E8, wörtlich)', () => {
+  it('stripeGrundAdmin je Anzeige', () => {
+    expect(stripeGrundAdmin('kein_konto')).toBe('Stripe fehlt')
+    expect(stripeGrundAdmin('angaben_fehlen')).toBe('Stripe: Angaben fehlen')
+    expect(stripeGrundAdmin('pruefung')).toBe('Stripe prüft')
+    expect(stripeGrundAdmin('eps_fehlt')).toBe('Stripe: EPS nicht aktiv')
+    expect(stripeGrundAdmin('unklar')).toBe('Stripe: nicht freigegeben, Grund unklar')
+    expect(stripeGrundAdmin('gesperrt')).toBe('Stripe: gesperrt')
+    expect(stripeGrundAdmin('bereit')).toBe('Stripe eingerichtet')
   })
 })
 
@@ -50,9 +306,9 @@ describe('onlineZahlungPausiert', () => {
 
 describe('Texte — Barzahlung nur versprechen, wenn es sie gibt', () => {
   it('Hinweis auf Heute', () => {
-    // Seit Nr. 17 als Titel und Satz der Hinweiskarte (onlinePausiertHinweis).
-    expect(onlinePausiertHinweis(true).satz).toContain('nur bar bei Abholung')
-    expect(onlinePausiertHinweis(false).satz).not.toContain('bar')
+    // Seit Nr. 17 als Titel und Satz der Hinweiskarte, seit A012 je Stufe (onlinePausiertHinweis).
+    expect(onlinePausiertHinweis('angaben_fehlen', true).satz).toContain('nur bar bei Abholung')
+    expect(onlinePausiertHinweis('angaben_fehlen', false).satz).not.toContain('bar')
   })
 
   it('Antwort des Checkouts', () => {

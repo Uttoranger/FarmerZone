@@ -3,6 +3,7 @@ import { hofseiteFortschritt, hofseiteStand } from '@/lib/hofseite-fortschritt'
 import type { EinstellungenDaten, KonditionenHof } from '@/lib/hof-einstellungen'
 import type { TarifId } from '@/lib/konditionen'
 import { getFarmSettings, getOwnerFarm } from './farm'
+import { hofStufe, stripeAnzeige } from '@/lib/stripe-konto'
 import { ladeGruendungBis } from './admin'
 
 /**
@@ -18,7 +19,15 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
   const [hof, farm, einstellungen, gruendungBis] = await Promise.all([
     prisma.farm.findUnique({
       where: { ownerId },
-      select: { stripeAccountId: true, acceptsOnline: true, tarif: true, archivedAt: true, teilenMomenteAus: true },
+      select: {
+        stripeAccountId: true,
+        // Der grobe Stand für die Zeile „Zahlung“ (Register N49); stripeAccountReady kommt aus getOwnerFarm.
+        stripeKontoStand: true,
+        acceptsOnline: true,
+        tarif: true,
+        archivedAt: true,
+        teilenMomenteAus: true,
+      },
     }),
     getOwnerFarm(ownerId),
     getFarmSettings(ownerId),
@@ -40,6 +49,9 @@ export async function ladeEinstellungenUebersicht(ownerId: string): Promise<Eins
     abholzeitenGesamt: einstellungen.pickupSlots.length,
     stripeKontoDa: hof.stripeAccountId !== null,
     stripeBereit: farm.stripeAccountReady,
+    stripeStufe: hofStufe(
+      stripeAnzeige({ stripeKontoDa: hof.stripeAccountId !== null, stripeAccountReady: farm.stripeAccountReady, stripeKontoStand: hof.stripeKontoStand })
+    ),
     onlineAn: hof.acceptsOnline,
     betriebsnummer: einstellungen.betriebsnummer,
     betriebsstatus: einstellungen.betriebsstatus,

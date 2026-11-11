@@ -88,6 +88,7 @@ import { zaehleOffenImEingang } from '@/server/queries/postfach'
 import { zaehleFuerWochenlauf } from '@/server/queries/meldung'
 import { ankuendigungDaten } from '@/server/plattformgebuehr-abrechnung'
 import type { OrderForEmail, StapelMail } from '@/lib/email'
+import { NOCHMAL_ERLAUBT, NOCHMAL_NIE } from '@/lib/betrieb-mails'
 
 let email: typeof import('@/lib/email')
 
@@ -188,6 +189,18 @@ type Fall = {
   /** null: Die Mail hat kein EmailLayout (siehe ohne Layout unten). */
   fuss: MailFussArt | null
   rendere: () => Promise<Gerendert>
+}
+
+/** Ein sichtbarer Hof, der online kassieren will — der Stand des Stripe-Kontos kommt je Fall dazu. */
+const ONLINE_ZAHLUNG_HOF = {
+  archivedAt: null,
+  geschlossenAm: null,
+  acceptsOnline: true,
+  isActive: true,
+  isPaused: false,
+  approvedAt: JETZT,
+  adminGesperrtAm: null,
+  owner: { email: ANMELDE_ADRESSE },
 }
 
 async function ausRenderer(art: MailArt, bezug: Record<string, string>): Promise<Gerendert> {
@@ -404,6 +417,25 @@ const FAELLE: Fall[] = [
       return ausRenderer('plattformgebuehr-ankuendigung', { farmId: HOF.id })
     },
   },
+  // Register N49 (A012): Online-Zahlung aktiv bzw. Stripe braucht noch Angaben (W-A).
+  {
+    name: 'online-zahlung-aktiv',
+    art: 'online-zahlung',
+    fuss: 'plattform',
+    rendere: () => {
+      db.farm.findUnique.mockResolvedValue({ ...ONLINE_ZAHLUNG_HOF, stripeAccountReady: true, stripeKontoStand: 'bereit' })
+      return ausRenderer('online-zahlung', { farmId: HOF.id, anlass: 'aktiv' })
+    },
+  },
+  {
+    name: 'online-zahlung-angaben',
+    art: 'online-zahlung',
+    fuss: 'plattform',
+    rendere: () => {
+      db.farm.findUnique.mockResolvedValue({ ...ONLINE_ZAHLUNG_HOF, stripeAccountReady: false, stripeKontoStand: 'angaben_fehlen' })
+      return ausRenderer('online-zahlung', { farmId: HOF.id, anlass: 'angaben' })
+    },
+  },
   {
     name: 'lastschrift-gescheitert',
     art: 'lastschrift-gescheitert',
@@ -610,6 +642,58 @@ describe.each(FAELLE.map((f) => [f.name, f] as const))('Mail „%s“', (_name, 
   })
 })
 
+describe('Online-Zahlung (Register N49, A012): Renderer verwirft, wenn der Anlass nicht mehr stimmt', () => {
+  const rendere = async (anlass: 'aktiv' | 'angaben', hof: unknown) => {
+    db.farm.findUnique.mockResolvedValue(hof)
+    const renderer = RENDERER['online-zahlung']
+    if (!renderer) throw new Error('kein Renderer für online-zahlung')
+    return renderer({ farmId: HOF.id, anlass })
+  }
+  const bereit = { ...ONLINE_ZAHLUNG_HOF, stripeAccountReady: true, stripeKontoStand: 'bereit' }
+  const angaben = { ...ONLINE_ZAHLUNG_HOF, stripeAccountReady: false, stripeKontoStand: 'angaben_fehlen' }
+
+  it('Hof fehlt, stillgelegt, Online aus → verworfen', async () => {
+    expect(await rendere('aktiv', null)).toEqual({ verworfen: 'hof_fehlt' })
+    expect(await rendere('aktiv', { ...bereit, archivedAt: JETZT })).toEqual({ verworfen: 'hof_stillgelegt' })
+    expect(await rendere('aktiv', { ...bereit, geschlossenAm: JETZT })).toEqual({ verworfen: 'hof_stillgelegt' })
+    expect(await rendere('aktiv', { ...bereit, acceptsOnline: false })).toEqual({ verworfen: 'online_aus' })
+    expect(await rendere('angaben', { ...angaben, acceptsOnline: false })).toEqual({ verworfen: 'online_aus' })
+  })
+
+  it('aktiv: nicht mehr bereit → verworfen; angaben: Stand nicht mehr „Angaben fehlen“ → verworfen', async () => {
+    expect(await rendere('aktiv', { ...bereit, stripeAccountReady: false })).toEqual({ verworfen: 'nicht_mehr_bereit' })
+    expect(await rendere('angaben', { ...angaben, stripeKontoStand: 'pruefung' })).toEqual({ verworfen: 'stand_geaendert' })
+    expect(await rendere('angaben', { ...angaben, stripeAccountReady: true })).toEqual({ verworfen: 'stand_geaendert' })
+  })
+
+  it('Betreff = Überschrift, Text wie im Postfach, Knopf „Zahlung ansehen“ in die Zahlungs-Einstellungen', async () => {
+    const aktiv = await rendere('aktiv', bereit)
+    if ('verworfen' in aktiv) throw new Error('verworfen')
+    expect(aktiv.betreff).toBe('Online-Zahlung ist aktiv')
+    expect(aktiv.html).toContain('Ab sofort können Kunden bei dir online bezahlen.')
+    expect(aktiv.html).toContain('/settings/payments')
+    expect(aktiv.html).toContain('Zahlung ansehen')
+    // Noch nicht freigeschaltet: der zweite Satz.
+    const wartet = await rendere('aktiv', { ...bereit, approvedAt: null })
+    if ('verworfen' in wartet) throw new Error('verworfen')
+    expect(wartet.html).toContain('Sobald dein Hof online ist, können Kunden dort auch online bezahlen.')
+    // Vom Team gesperrt: Bestellen geht gerade nicht — kein „ab sofort“ (E6 „nicht gesperrt“).
+    const gesperrt = await rendere('aktiv', { ...bereit, adminGesperrtAm: JETZT })
+    if ('verworfen' in gesperrt) throw new Error('verworfen')
+    expect(gesperrt.html).toContain('Sobald dein Hof online ist, können Kunden dort auch online bezahlen.')
+    expect(gesperrt.html).not.toContain('Ab sofort')
+    const mehr = await rendere('angaben', angaben)
+    if ('verworfen' in mehr) throw new Error('verworfen')
+    expect(mehr.betreff).toBe('Stripe braucht noch Angaben von dir')
+    expect(mehr.html).not.toMatch(/\bEPS\b/)
+  })
+
+  it('nie „nochmal schicken“ — die Nachricht steht im Postfach (Fund 14)', () => {
+    expect(NOCHMAL_NIE).toContain('online-zahlung')
+    expect((NOCHMAL_ERLAUBT as readonly string[]).includes('online-zahlung')).toBe(false)
+  })
+})
+
 describe('Knopf-Höhe: die Rechnung', () => {
   it('Gegenprobe: der alte Knopf (11 px Abstand) ist zu klein, ohne feste Zeilenhöhe zählt er nicht', () => {
     expect(knopfHoehe('border:1px solid #2E6B45;line-height:16px;padding:11px 18px')).toBe(40)
@@ -721,6 +805,7 @@ const FUSS_JE_VORLAGE: Record<string, MailFussArt[]> = {
   'password-reset.tsx': ['plattform'],
   'pickup-reminder.tsx': ['hof'],
   'plattformgebuehr-ankuendigung.tsx': ['plattform'],
+  'online-zahlung.tsx': ['plattform'],
   'postfach-antwort.tsx': ['postfach'],
   'postfach-rundschreiben.tsx': ['postfach'],
   'registrierung-hinweis.tsx': ['plattform'],

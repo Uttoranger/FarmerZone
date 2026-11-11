@@ -318,6 +318,18 @@
       "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
     }
   ],
+  "vorschau:online-zahlung-aktiv": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
+  "vorschau:online-zahlung-angaben": [
+    {
+      "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
+      "sha256": "be43636a97d5b4fa097d42b59c73f2b1eab9d4dece0d0babcf52e9a0ae98b6ee"
+    }
+  ],
   "vorschau:lastschrift-gescheitert": [
     {
       "anfang": "{{MARKE}} · {{DOMAIN}}/impressum",
@@ -502,6 +514,7 @@
     }
   ],
   "beispiel:lastschrift-gescheitert": [],
+  "beispiel:online-zahlung": [],
   "beispiel:rundschreiben": [],
   "beispiel:postfach-antwort": [
     {

@@ -1004,6 +1004,30 @@ Die folgenden Punkte hat der Mensch am 07.10.2026 unter dem Kürzel B nummeriert
 - **Umsetzung:** Nr. 261–281 (freigabe.md §37); keine Migration.
 - Ergänzung (uttoranger, im Chat, 9.11.2026; F041): Im dunklen Design steht die Kategorie-Illustration wie ein Foto: auf ihrem eigenen Grund, gedämpft wie ein Foto (FOTO_HUELLE), gerahmt. Kartenkacheln bleiben mit der Fläche verrechnet, Platzhalter ohne Bild gedämpft. Die Regel ‚keine hellen Flecken‘ (freigabe.md §35, Maßstab Punkt 4) gilt für Illustrationen nicht mehr. I1 und N22 bleiben. Umsetzung: Nr. 271 (freigabe.md §37.1).
 
+### N49 · Stripe-Kontostatus: bereit erst mit EPS (10.11.2026)
+- **Entscheidung (uttoranger, im Chat, 9.11.2026; F055, E-036, E-047):**
+  „Ein Hof gilt erst als ‚bereit‘ für Online-Zahlung, wenn bei seinem
+  Stripe-Konto auch EPS aktiv ist.“ „Die Zahlungsseite des Hofs bekommt
+  einen eigenen Zustand ‚Stripe prüft deine Angaben. Du musst nichts tun,
+  wir melden uns.‘ statt ‚Bitte setz sie fort‘, wenn der Hof bei Stripe
+  alles abgeschickt hat und Stripe nur noch prüft. Dazu bekommt der Hof
+  eine Nachricht, sobald die Online-Zahlung aktiv ist.“
+- **Regel:** Bereit heißt: Zahlungen und Auszahlungen frei, Karte,
+  Überweisung und EPS bei Stripe aktiv (`stripeKontoBereit`). Gespeichert
+  wird dazu nur ein grober Stand des Stripe-Kontos und wann er gelesen
+  wurde. Der Hof sieht „Stripe prüft“, „Angaben fehlen“ (nur dann ein Weg
+  zurück ins Stripe-Formular), „Noch nicht freigegeben“ oder „bei Stripe
+  gesperrt“; das Team sieht den genauen Grund in der Akte und bekommt
+  für einen verkaufenden Hof, dessen Online-Zahlung bei Stripe hängt,
+  eine Aufgabe in Heute. Wird ein Hof bereit, bekommt er eine Nachricht
+  im Postfach und per E-Mail; ebenso, wenn Stripe nach der Prüfung doch
+  noch Angaben braucht, höchstens eine je Anlass und Tag.
+- **Verhältnis zu anderen Einträgen:** ergänzt Z1 (die Notbremse
+  „pausiert“ nennt jetzt den Grund) und setzt N33 für den Wechsel des
+  Bereit-Werts um (System-Einträge „Online-Zahlung aktiv/pausiert“).
+- **Umsetzung:** Auftrag A012 (/sprint); eine Migration (zwei nullbare
+  Spalten an Farm).
+
 ---
 
 ## I – Illustrationen

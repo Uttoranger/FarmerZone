@@ -21,7 +21,7 @@ import {
   nimmGescheiterteErstattungZurueck,
   type GescheitertAusgang,
 } from '@/server/erstattung-gescheitert'
-import { stripeKontoBereit } from '@/lib/stripe-konto'
+import { schreibeStripeKontoStand } from '@/server/stripe-konto-stand'
 import { istModusSperre } from '@/lib/stripe-modus'
 import { istVerarbeiteterStripeTyp, pruefeStripeObjekt, type VerarbeiteterStripeTyp } from '@/schemas/stripe-ereignis'
 import {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Zwei Endpunkte in Stripe, eine Route: Plattform-Events (Zahlungen) und
-  // Connect-Events der verbundenen Höfe (account.updated) kommen mit je
+  // Connect-Events der verbundenen Höfe (account.updated, capability.updated) kommen mit je
   // eigenem Signatur-Secret. Gültig ist, was gegen eines davon passt.
   const secrets = [webhookSecret, env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(
     (s): s is string => typeof s === 'string' && s.length > 0
@@ -89,10 +89,14 @@ export async function POST(request: NextRequest) {
 
   // Vor jeder Verarbeitung die Form (Nr. 203, src/schemas/stripe-ereignis.ts).
   // Geprüft wird genau, was verarbeitet wird: von einem verbundenen Konto nur
-  // account.updated, sonst die Typen der Liste. Ungültig → 200 ohne
+  // account.updated und capability.updated (Register N49), sonst die Typen der
+  // Liste — capability.updated ohne Konto wie ein fremder Typ (200, vermerkt,
+  // keine Prüfung, kein Sentry). Ungültig → 200 ohne
   // Verarbeitung und ohne Vermerk: Eine andere Antwort ließe Stripe tagelang
   // dasselbe kaputte Ereignis zustellen, und das Ergebnis wäre jedes Mal gleich.
-  const verarbeitet = event.account ? event.type === 'account.updated' : istVerarbeiteterStripeTyp(event.type)
+  const verarbeitet = event.account
+    ? event.type === 'account.updated' || event.type === 'capability.updated'
+    : istVerarbeiteterStripeTyp(event.type) && event.type !== 'capability.updated'
   const typ: VerarbeiteterStripeTyp | null = verarbeitet && istVerarbeiteterStripeTyp(event.type) ? event.type : null
   if (typ) {
     const pruefung = pruefeStripeObjekt(typ, event.data.object)
@@ -118,7 +122,11 @@ export async function POST(request: NextRequest) {
     // Destination Charge auf der Plattform und kommen ohne `account`.
     if (event.account) {
       if (event.type === 'account.updated') {
-        await handleKontoAktualisiert(event.data.object as Stripe.Account)
+        await handleKontoAktualisiert((event.data.object as Stripe.Account).id)
+      } else if (event.type === 'capability.updated') {
+        // Eine Fähigkeit (Karte, Überweisung, EPS) hat sich geändert — das
+        // Konto ist das verbundene, das Stripe am Ereignis nennt (Register N49).
+        await handleKontoAktualisiert(event.account)
       }
     } else if (event.type === 'payment_intent.succeeded') {
       await handlePaymentSucceeded(event.data.object as Stripe.PaymentIntent)
@@ -128,7 +136,7 @@ export async function POST(request: NextRequest) {
       await handlePaymentCanceled(event.data.object as Stripe.PaymentIntent)
     } else if (event.type === 'account.updated') {
       // Auch über den Plattform-Endpunkt möglich (abonniert); dieselbe Regel.
-      await handleKontoAktualisiert(event.data.object as Stripe.Account)
+      await handleKontoAktualisiert((event.data.object as Stripe.Account).id)
     } else if (event.type === 'refund.failed' || event.type === 'charge.refund.updated') {
       // Beide Ereignisse können für DIESELBE Erstattung kommen — die
       // Zurücknahme ist je Erstattung idempotent (src/server/erstattung-gescheitert.ts).
@@ -265,25 +273,24 @@ async function handlePaymentFailed(pi: Stripe.PaymentIntent) {
 }
 
 /**
- * Stripe hat das Konto eines Hofs geändert — etwa gesperrt, weil Angaben
- * fehlen, oder wieder freigegeben. Vorher setzte nur das Onboarding
+ * Stripe hat das Konto eines Hofs geändert (account.updated) oder eine seiner
+ * Fähigkeiten (capability.updated) — etwa gesperrt, weil Angaben fehlen, EPS
+ * aktiviert oder wieder freigegeben. Vorher setzte nur das Onboarding
  * `stripeAccountReady`; eine spätere Sperre blieb unbemerkt, der Checkout bot
  * Online weiter an, und jede Zahlung scheiterte erst bei Stripe. Kein Hof mit
  * dieser Konto-ID (fremdes Konto, das Plattformkonto selbst): nichts zu tun.
  */
-async function handleKontoAktualisiert(konto: Stripe.Account) {
-  const hof = await prisma.farm.findFirst({ where: { stripeAccountId: konto.id }, select: { id: true } })
+async function handleKontoAktualisiert(kontoId: string) {
+  const hof = await prisma.farm.findFirst({ where: { stripeAccountId: kontoId }, select: { id: true } })
   if (!hof) return
   // Stripe liefert Ereignisse nicht garantiert in der richtigen Reihenfolge.
-  // Ein verspätetes, älteres account.updated überschriebe sonst einen
-  // neueren Stand — also den aktuellen nachlesen. Scheitert das: 500, Stripe
-  // stellt erneut zu.
+  // Ein verspätetes, älteres Ereignis überschriebe sonst einen neueren Stand —
+  // also den aktuellen nachlesen; der Zeitpunkt davor hält zwei Schreiber
+  // auseinander (Register N49). Scheitert das Lesen: 500, Stripe stellt erneut zu.
   // Kurze Leine: Hängt Stripe, bricht die Zustellung sonst ab und kommt erneut.
-  const aktuell = await stripe.accounts.retrieve(konto.id, {}, { timeout: 10_000, maxNetworkRetries: 1 })
-  await prisma.farm.update({
-    where: { id: hof.id },
-    data: { stripeAccountReady: stripeKontoBereit(aktuell) },
-  })
+  const gelesenAm = new Date()
+  const aktuell = await stripe.accounts.retrieve(kontoId, {}, { timeout: 10_000, maxNetworkRetries: 1 })
+  await schreibeStripeKontoStand({ farmId: hof.id, stripeAccountId: kontoId, konto: aktuell, gelesenAm })
 }
 
 /** Der PaymentIntent ist endgültig abgebrochen — jetzt erst stornieren und die Ware freigeben. */

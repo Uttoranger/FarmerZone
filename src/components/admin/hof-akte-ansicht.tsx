@@ -27,6 +27,7 @@ import { TesthofDialog, type TesthofHof } from './testhof-dialog'
 import { HofSperreDialog, type HofSperreWahl } from './hof-akte-sperre-dialog'
 import { HofAkteKonto, type HofKontoDaten } from './hof-akte-konto'
 import { KONTO_ANFRAGE_TEXT } from '@/lib/konto-anfragen'
+import { stripeGrundAdmin } from '@/lib/stripe-konto'
 
 /**
  * Die Akte eines Hofs (Register N32, N33, N34; Nachtlauf Nr. 187; Mockup
@@ -78,7 +79,8 @@ export function HofAkteAnsicht({
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px]">
               <StatusBadge status={zustand.ton}>{zustand.text}</StatusBadge>
               {hof.freigeschaltetAm && <span className={LEISE}>freigeschaltet seit {hof.freigeschaltetAm}</span>}
-              <StatusBadge status={hof.stripeBereit ? 'fertig' : 'offen'}>{hof.stripeBereit ? 'Stripe eingerichtet' : 'Stripe fehlt'}</StatusBadge>
+              {/* Der genaue Grund nur für das Team (Register N49). */}
+              <StatusBadge status={hof.stripeBereit ? 'fertig' : 'offen'}>{stripeGrundAdmin(hof.stripeBereit ? 'bereit' : hof.stripeAnzeige)}</StatusBadge>
               {hof.gruendungsplatz !== null && <StatusBadge status="neutral">Gründungshof · Platz {hof.gruendungsplatz}</StatusBadge>}
               {/* Ein Testhof trägt nur seine Marke, nie zusätzlich „ausgenommen“ (Register N21). */}
               {hof.istTesthof ? (

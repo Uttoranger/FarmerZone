@@ -135,7 +135,20 @@ beforeEach(() => {
   ])
   // Der Bestand trägt Adresse und E-Mail — Heute darf beides nie zeigen.
   db.farm.findMany.mockResolvedValue([
-    { id: 'hof-2', name: 'Hof Ohne Zeit', approvedAt: new Date('2026-08-01T08:00:00.000Z'), address: ADRESSE, email: EMAIL, pickupSlots: [], orders: [{ createdAt: new Date(JETZT.getTime() - 24 * STUNDE), customerAddress: ADRESSE }] },
+    {
+      id: 'hof-2',
+      name: 'Hof Ohne Zeit',
+      approvedAt: new Date('2026-08-01T08:00:00.000Z'),
+      address: ADRESSE,
+      email: EMAIL,
+      // Register N49: Stripe-Stand für die Aufgabe hof_online_haengt (hier fertig, also keine).
+      stripeAccountId: 'acct_platzhalter',
+      stripeAccountReady: true,
+      stripeKontoStand: 'bereit',
+      acceptsOnline: true,
+      pickupSlots: [],
+      orders: [{ createdAt: new Date(JETZT.getTime() - 24 * STUNDE), customerAddress: ADRESSE }],
+    },
   ])
   db.farm.count.mockResolvedValue(3)
   db.order.groupBy.mockResolvedValue([

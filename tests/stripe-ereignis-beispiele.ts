@@ -15,6 +15,11 @@ export const BEISPIELE: Record<VerarbeiteterStripeTyp, { gueltig: Record<string,
   'payment_intent.payment_failed': { gueltig: { id: 'pi_1', application_fee_amount: null }, ungueltig: { id: 42 }, feld: 'id' },
   'payment_intent.canceled': { gueltig: { id: 'pi_1' }, ungueltig: { id: '' }, feld: 'id' },
   'account.updated': { gueltig: { id: 'acct_1', charges_enabled: true }, ungueltig: { charges_enabled: true }, feld: 'id' },
+  'capability.updated': {
+    gueltig: { id: 'eps_payments', object: 'capability', account: 'acct_1', status: 'active', requested: true },
+    ungueltig: { id: 'eps_payments', object: 'capability', status: 'active' },
+    feld: 'account',
+  },
   'refund.failed': {
     gueltig: { id: 're_1', amount: 2100, status: 'failed', failure_reason: 'expired_or_canceled_card', payment_intent: 'pi_1', metadata: { orderId: 'o_1' } },
     ungueltig: { id: 're_1', amount: '2100', status: 'failed', payment_intent: 'pi_1' },

@@ -1,22 +1,210 @@
+import { SUPPORT_EMAIL } from '@/lib/support'
+import { hofSichtbar } from '@/lib/hof-sichtbar'
+
+/**
+ * Was die Regeln dieser Datei vom Stripe-Konto lesen — ein Ausschnitt von
+ * `Stripe.Account`, damit die Datei ohne SDK bleibt (das volle Konto ist
+ * zuweisbar). Geprüft am SDK stripe 22.1.1 (API 2026-04-22.dahlia): Die
+ * Fähigkeiten tragen je 'active' | 'inactive' | 'pending'.
+ */
+export type StripeKontoDaten = {
+  charges_enabled?: boolean | null
+  payouts_enabled?: boolean | null
+  details_submitted?: boolean | null
+  capabilities?: {
+    card_payments?: string | null
+    transfers?: string | null
+    eps_payments?: string | null
+  } | null
+  requirements?: {
+    disabled_reason?: string | null
+    currently_due?: readonly string[] | null
+    past_due?: readonly string[] | null
+    pending_verification?: readonly string[] | null
+  } | null
+}
+
+/** Die drei Fähigkeiten, die die App bei Stripe anfordert (createConnectAccount) und für „bereit“ verlangt. */
+const PFLICHT_FAEHIGKEITEN = ['card_payments', 'transfers', 'eps_payments'] as const
+
 /**
  * Wann das Stripe-Konto eines Hofs Online-Zahlungen tragen kann — EINE Regel
  * für alle, die `Farm.stripeAccountReady` schreiben: die Rückkehr aus dem
  * Onboarding (api/stripe/return), „Status prüfen" (actions/stripe-connect.ts)
- * und das Ereignis `account.updated` (api/stripe/webhook).
+ * und die Ereignisse `account.updated` und `capability.updated`
+ * (api/stripe/webhook) — alle über `schreibeStripeKontoStand`
+ * (src/server/stripe-konto-stand.ts).
  *
- * Vorher galt beim Onboarding `charges_enabled && details_submitted`. Zwei
- * Regeln an zwei Stellen hätten den Wert je nach Schreiber hin- und
- * herspringen lassen. Fachlich festgelegt: Das Konto muss Zahlungen annehmen
- * UND auszahlen dürfen.
+ * Bereit heißt (Register N49, E-036): Zahlungen UND Auszahlungen frei, und
+ * Karte, Überweisung und EPS bei Stripe aktiv. Fehlt nur EPS, ist online ganz
+ * aus, auch Karte — gewollt: Im Hofpreis-Modell (on_behalf_of) lehnt Stripe
+ * ohne aktive EPS-Fähigkeit jeden Zahlungsvorgang mit EPS ab, und die Kasse
+ * bietet EPS immer an (KASSE_ZAHLARTEN). Fehlt `capabilities` oder ein
+ * Schlüssel darin: nicht bereit.
  *
  * Rein, ohne Stripe-SDK (tests/stripe-konto.test.ts).
  */
-export function stripeKontoBereit(konto: {
-  charges_enabled?: boolean | null
-  payouts_enabled?: boolean | null
-}): boolean {
-  return konto.charges_enabled === true && konto.payouts_enabled === true
+export function stripeKontoBereit(konto: StripeKontoDaten): boolean {
+  if (konto.charges_enabled !== true || konto.payouts_enabled !== true) return false
+  const faehigkeiten = konto.capabilities
+  if (!faehigkeiten) return false
+  return PFLICHT_FAEHIGKEITEN.every((f) => faehigkeiten[f] === 'active')
 }
+
+// ─── Grober Stand des Stripe-Kontos (Register N49) ─────────────────────────
+
+/**
+ * Die Werte, die in `Farm.stripeKontoStand` stehen dürfen — geprüft beim
+ * Schreiben. Nur dieser grobe Stand wird gespeichert, nie `disabled_reason`,
+ * Listen oder Kennungen aus `requirements`.
+ */
+export const STRIPE_KONTO_STAENDE = ['bereit', 'gesperrt', 'angaben_fehlen', 'eps_fehlt', 'pruefung', 'unklar'] as const
+export type StripeKontoStand = (typeof STRIPE_KONTO_STAENDE)[number]
+
+export function istStripeKontoStand(wert: unknown): wert is StripeKontoStand {
+  return typeof wert === 'string' && (STRIPE_KONTO_STAENDE as readonly string[]).includes(wert)
+}
+
+function nichtLeer(liste: readonly string[] | null | undefined): boolean {
+  return Array.isArray(liste) && liste.length > 0
+}
+
+/** disabled_reason, die „Stripe prüft“ heißen (ohne Zutun des Hofs). */
+const GRUND_PRUEFUNG: ReadonlySet<string> = new Set(['requirements.pending_verification', 'under_review', 'listed'])
+
+/**
+ * Der grobe Stand des Kontos: die erste Stufe, die zutrifft.
+ * 1 bereit — `stripeKontoBereit`.
+ * 2 gesperrt — Stripe hat abgelehnt (`rejected.…`) oder die Plattform pausiert.
+ * 3 angaben_fehlen — der Hof muss im Stripe-Formular noch etwas tun.
+ * 4 eps_fehlt — alles fertig, nur EPS ist weder aktiv noch in Prüfung.
+ * 5 pruefung — Stripe prüft, der Hof muss nichts tun.
+ * 6 unklar — sonst (das Team sieht nach, Aufgabe 'hof_online_haengt').
+ *
+ * GRENZE (DEVELOPMENT.md): Anforderungen mit der Endung „.support“ kann der
+ * Hof im Formular nicht lösen; er sieht trotzdem „Angaben fehlen“.
+ */
+export function stripeKontoStand(konto: StripeKontoDaten): StripeKontoStand {
+  if (stripeKontoBereit(konto)) return 'bereit'
+  const anforderungen = konto.requirements ?? null
+  const grund = anforderungen?.disabled_reason ?? null
+  if (grund !== null && (grund.startsWith('rejected.') || grund === 'platform_paused')) return 'gesperrt'
+  if (
+    konto.details_submitted !== true ||
+    nichtLeer(anforderungen?.currently_due) ||
+    nichtLeer(anforderungen?.past_due) ||
+    grund === 'requirements.past_due'
+  ) {
+    return 'angaben_fehlen'
+  }
+  const faehigkeiten = konto.capabilities ?? null
+  const eps = faehigkeiten?.eps_payments ?? null
+  if (
+    konto.charges_enabled === true &&
+    konto.payouts_enabled === true &&
+    faehigkeiten?.card_payments === 'active' &&
+    faehigkeiten?.transfers === 'active' &&
+    eps !== 'active' &&
+    eps !== 'pending'
+  ) {
+    return 'eps_fehlt'
+  }
+  if (
+    nichtLeer(anforderungen?.pending_verification) ||
+    (grund !== null && GRUND_PRUEFUNG.has(grund)) ||
+    PFLICHT_FAEHIGKEITEN.some((f) => faehigkeiten?.[f] === 'pending')
+  ) {
+    return 'pruefung'
+  }
+  return 'unklar'
+}
+
+/** Was eine Seite zeigt: ohne Konto 'kein_konto', sonst ein Stand. */
+export type StripeAnzeige = 'kein_konto' | StripeKontoStand
+
+/**
+ * Die Anzeige aus dem, was die Datenbank trägt. Bereit gilt nur über
+ * `stripeAccountReady` (die eine Quelle von Kasse und Hofseite); ein
+ * gespeichertes 'bereit' bei nicht bereit, NULL (Bestand ohne Backfill) oder
+ * ein unbekannter Text zeigen 'angaben_fehlen' — das bisherige Verhalten.
+ * Abfragen geben nur `stripeKontoDa` weiter, nie die Kennung.
+ */
+export function stripeAnzeige(d: {
+  stripeKontoDa: boolean
+  stripeAccountReady: boolean
+  stripeKontoStand: string | null
+}): StripeAnzeige {
+  if (!d.stripeKontoDa) return 'kein_konto'
+  if (d.stripeAccountReady) return 'bereit'
+  if (istStripeKontoStand(d.stripeKontoStand) && d.stripeKontoStand !== 'bereit') return d.stripeKontoStand
+  return 'angaben_fehlen'
+}
+
+/** Was der Hof sieht: eps_fehlt und unklar heißen für ihn gleich („noch nicht freigegeben“). */
+export type HofStripeStufe = 'kein_konto' | 'bereit' | 'gesperrt' | 'angaben_fehlen' | 'pruefung' | 'noch_nicht'
+
+export function hofStufe(anzeige: StripeAnzeige): HofStripeStufe {
+  return anzeige === 'eps_fehlt' || anzeige === 'unklar' ? 'noch_nicht' : anzeige
+}
+
+/**
+ * Weiche W-A (Register N49): Der Hof bekommt eine Nachricht, wenn Stripe nach
+ * der Prüfung doch noch Angaben braucht. Projektleitung, 10.11.2026: ja.
+ */
+export const ANGABEN_NACHRICHT: boolean = true
+
+// ─── Texte für den Hof (Register N49; das Wort EPS steht in keinem) ─────────
+
+/** Die Stufen, in denen der Hof nichts im Stripe-Formular tun kann. */
+export type HofWarteStufe = 'pruefung' | 'noch_nicht' | 'gesperrt'
+
+export function istHofWarteStufe(stufe: HofStripeStufe): stufe is HofWarteStufe {
+  return stufe === 'pruefung' || stufe === 'noch_nicht' || stufe === 'gesperrt'
+}
+
+const PRUEFUNG_TEXT_ANFANG =
+  'Du musst nichts tun, wir melden uns. Das dauert meist nur kurz, manchmal ein paar Werktage. Sobald die Online-Zahlung aktiv ist, siehst du es hier.'
+
+/**
+ * Zahlungsseite: Kasten (Titel, Text) und Marke an der Karte
+ * „Online-Zahlung (Stripe)“ — dieselben Wörter im Einrichten-Schritt.
+ * Ohne W-A sagt „Stripe prüft“ zusätzlich, wo der Hof erfährt, wenn doch noch
+ * etwas fehlt (dann gibt es keine Nachricht).
+ */
+export const ZAHLUNG_STUFE_TEXT: Record<HofWarteStufe, { titel: string; text: string; marke: string }> = {
+  pruefung: {
+    titel: 'Stripe prüft deine Angaben.',
+    text: ANGABEN_NACHRICHT
+      ? PRUEFUNG_TEXT_ANFANG
+      : `${PRUEFUNG_TEXT_ANFANG} Braucht Stripe noch etwas von dir, steht es hier und auf Heute.`,
+    marke: 'Stripe prüft',
+  },
+  noch_nicht: {
+    titel: 'Stripe hat die Online-Zahlung noch nicht ganz freigegeben.',
+    text: 'Du musst nichts tun, wir kümmern uns darum und melden uns.',
+    marke: 'Noch nicht freigegeben',
+  },
+  gesperrt: {
+    titel: 'Online-Zahlung ist bei Stripe gesperrt.',
+    text: `Online bezahlen geht bei dir deshalb gerade nicht. Schreib uns bitte an ${SUPPORT_EMAIL}, wir helfen dir weiter.`,
+    marke: 'Bei Stripe gesperrt',
+  },
+}
+
+/** Zeile „Zahlung“ in den Einstellungen für die Stufen, in denen der Hof wartet. */
+export const ZAHLUNG_ZEILE_TEXT: Record<HofWarteStufe, string> = {
+  pruefung: 'Stripe prüft deine Angaben · du musst nichts tun',
+  noch_nicht: 'Stripe hat noch nicht ganz freigegeben · wir kümmern uns darum',
+  gesperrt: 'Online-Zahlung bei Stripe gesperrt · schreib uns',
+}
+
+/** Knopf des Hinweises auf Heute, wenn der Hof nichts bei Stripe ergänzen kann. */
+export const ZAHLUNG_ANSEHEN = 'Zahlung ansehen'
+/** Knopf, wenn der Hof bei Stripe etwas ergänzen muss. */
+export const BEI_STRIPE_ERGAENZEN = 'Bei Stripe ergänzen'
+
+/** Die Stufen, für die Heute einen Hinweis zeigt (Konto da, nicht bereit). */
+export type HofPausiertStufe = 'angaben_fehlen' | HofWarteStufe
 
 /**
  * Der Hof will online kassieren, hat ein Stripe-Konto, aber Stripe lässt es
@@ -50,19 +238,127 @@ export function zahlungNichtMoeglichText(barMoeglich: boolean): string {
 }
 
 /**
- * Der Hinweis auf Heute als Titel und Satz für die Hinweiskarte (Mockup
- * „Online-Zahlung pausiert", Nachtlauf Nr. 17), ohne Fachbegriffe. Ohne
- * Barzahlung gibt es keinen Ausweg für die Kunden; dann darf der Satz ihn
- * nicht versprechen.
+ * Der Hinweis auf Heute (Titel, Satz, Knopf) je Stufe, ohne Fachbegriffe.
+ * Ohne Barzahlung gibt es keinen Ausweg für die Kunden; dann darf der Satz
+ * ihn nicht versprechen — `barMoeglich` ist dieselbe Frage wie in Kasse und
+ * Zahlungsseite (ladeBarMoeglich), nicht nur „nimmt bar an“.
+ *
+ * Abweichung vom Mockup (Koordinator, 09.11.2026): Der Titel bei fehlenden
+ * Angaben heißt „Stripe braucht noch Angaben von dir“ statt „Online-Zahlung
+ * ist pausiert“.
  */
-export function onlinePausiertHinweis(barMoeglich: boolean): { titel: string; satz: string } {
-  return {
-    titel: 'Online-Zahlung ist pausiert',
-    satz: barMoeglich
-      ? 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden nur bar bei Abholung bestellen.'
-      : 'Stripe braucht noch Angaben von dir. Bis dahin können Kunden bei dir nicht bestellen.',
+export function onlinePausiertHinweis(
+  stufe: HofPausiertStufe,
+  barMoeglich: boolean
+): { titel: string; satz: string; knopf: string } {
+  const bar = barMoeglich
+    ? 'Bis dahin können Kunden nur bar bei Abholung bestellen.'
+    : 'Bis dahin können Kunden bei dir nicht bestellen.'
+  switch (stufe) {
+    case 'angaben_fehlen':
+      return { titel: 'Stripe braucht noch Angaben von dir', satz: `Erst danach können Kunden online bezahlen. ${bar}`, knopf: BEI_STRIPE_ERGAENZEN }
+    case 'pruefung':
+      return { titel: 'Stripe prüft deine Angaben', satz: `Du musst nichts tun, wir melden uns. ${bar}`, knopf: ZAHLUNG_ANSEHEN }
+    case 'noch_nicht':
+      return {
+        titel: 'Online-Zahlung noch nicht freigegeben',
+        satz: `Stripe hat die Online-Zahlung noch nicht ganz freigegeben. Du musst nichts tun, wir kümmern uns darum und melden uns. ${bar}`,
+        knopf: ZAHLUNG_ANSEHEN,
+      }
+    case 'gesperrt':
+      return {
+        titel: 'Online-Zahlung ist bei Stripe gesperrt',
+        satz: `Online bezahlen geht bei dir deshalb gerade nicht. Schreib uns bitte an ${SUPPORT_EMAIL}, wir helfen dir weiter. ${bar}`,
+        knopf: ZAHLUNG_ANSEHEN,
+      }
   }
 }
+
+// ─── Nachrichten an den Hof (Register N49) ──────────────────────────────────
+
+/** Anlass einer Nachricht: Online-Zahlung aktiv, oder (W-A) Stripe braucht nach der Prüfung noch Angaben. */
+export const ONLINE_ZAHLUNG_ANLAESSE = ['aktiv', 'angaben'] as const
+export type OnlineZahlungAnlass = (typeof ONLINE_ZAHLUNG_ANLAESSE)[number]
+
+/** Wohin Nachricht und Mail führen. */
+export const ZAHLUNG_HREF = '/settings/payments'
+
+/**
+ * Postfach-Nachricht (nur der Text; eine Nachricht hat keine Überschrift) und
+ * Mail (Überschrift = Betreff, Knopf „Zahlung ansehen“) mit demselben Text.
+ * „aktiv“ verspricht online bezahlen „ab sofort“ nur, wenn Kundinnen den Hof
+ * gerade sehen (heuteHofSichtbar).
+ */
+export function onlineZahlungNachricht(
+  anlass: OnlineZahlungAnlass,
+  hofSichtbar: boolean
+): { betreff: string; text: string } {
+  if (anlass === 'angaben') {
+    return {
+      betreff: 'Stripe braucht noch Angaben von dir',
+      text: 'Stripe braucht noch Angaben von dir. Öffne Einstellungen › Zahlung und tippe auf ‚Einrichtung fortsetzen‘.',
+    }
+  }
+  return {
+    betreff: 'Online-Zahlung ist aktiv',
+    text: hofSichtbar
+      ? 'Stripe hat dein Konto freigegeben. Ab sofort können Kunden bei dir online bezahlen.'
+      : 'Stripe hat dein Konto freigegeben. Sobald dein Hof online ist, können Kunden dort auch online bezahlen.',
+  }
+}
+
+/**
+ * Darf die Nachricht (Postfach und Mail, Register N49) jetzt noch hinaus?
+ * EINE Regel für den Nachlauf nach dem Wechsel und den Renderer der Mail:
+ * Hof da und nicht stillgelegt oder geschlossen (hofSichtbar), will online
+ * kassieren, und der Anlass stimmt noch — bei „aktiv“ ist das Konto bereit,
+ * bei „angaben“ steht der Stand auf 'angaben_fehlen'.
+ */
+export function onlineZahlungNachrichtPasst(
+  anlass: OnlineZahlungAnlass,
+  hof: {
+    archivedAt: Date | null
+    geschlossenAm: Date | null
+    acceptsOnline: boolean
+    stripeAccountReady: boolean
+    stripeKontoStand: string | null
+  } | null
+): boolean {
+  if (!hof || !hofSichtbar(hof) || !hof.acceptsOnline) return false
+  return anlass === 'aktiv' ? hof.stripeAccountReady : !hof.stripeAccountReady && hof.stripeKontoStand === 'angaben_fehlen'
+}
+
+// ─── Für das Team (Register N49) ────────────────────────────────────────────
+
+/** Der genaue Grund — nur für das Team (Akte, Hofliste, „Hof wartet auf Freischaltung“). */
+export function stripeGrundAdmin(anzeige: StripeAnzeige): string {
+  switch (anzeige) {
+    case 'kein_konto':
+      return 'Stripe fehlt'
+    case 'angaben_fehlen':
+      return 'Stripe: Angaben fehlen'
+    case 'pruefung':
+      return 'Stripe prüft'
+    case 'eps_fehlt':
+      return 'Stripe: EPS nicht aktiv'
+    case 'unklar':
+      return 'Stripe: nicht freigegeben, Grund unklar'
+    case 'gesperrt':
+      return 'Stripe: gesperrt'
+    case 'bereit':
+      return 'Stripe eingerichtet'
+  }
+}
+
+/** Die Stände, bei denen ein verkaufender Hof eine Aufgabe für das Team bekommt. */
+export type HofOnlineHaengtStand = 'eps_fehlt' | 'unklar' | 'gesperrt'
+
+export function istHofOnlineHaengtStand(anzeige: StripeAnzeige): anzeige is HofOnlineHaengtStand {
+  return anzeige === 'eps_fehlt' || anzeige === 'unklar' || anzeige === 'gesperrt'
+}
+
+// Titel und Satz der Aufgabe 'hof_online_haengt' stehen in src/lib/admin-aufgaben.ts:
+// Sie nennen das „Stripe-Dashboard“, und das Wort gehört nur in Admin-Texte (Wortliste).
 
 // ─── Hof-Konto, das Stripe nicht kennt (Register Z2, Nachtlauf Nr. 42) ─────
 

@@ -170,6 +170,8 @@ describe('Hinweis aus der Akte im Faden (N32, Nr. 193)', () => {
   it('nennt Hof und Signale in einem Satz — der Link heißt „Akte öffnen“', () => {
     expect(akteHinweisText('Hof Test', ['ohne Abholzeit'])).toBe('Hinweis aus der Akte: Hof Test – ohne Abholzeit.')
     expect(akteHinweisText('Hof Test', ['Stripe fehlt', 'ohne Abholzeit'])).toBe('Hinweis aus der Akte: Hof Test – Stripe fehlt, ohne Abholzeit.')
+    // Register N49: das Signal nennt den Grund (stripeGrundAdmin).
+    expect(akteHinweisText('Hof Test', ['Stripe: EPS nicht aktiv'])).toBe('Hinweis aus der Akte: Hof Test – Stripe: EPS nicht aktiv.')
     expect(AKTE_OEFFNEN).toBe('Akte öffnen')
   })
 })

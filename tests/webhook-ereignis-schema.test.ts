@@ -12,8 +12,10 @@
  *  - Sentry höchstens einmal je Typ und Tag (BetriebMessung, ON CONFLICT DO
  *    NOTHING): eine zweite Zustellung am selben Tag schweigt, ein anderer Typ
  *    meldet; scheitert die Datenbank, wird nicht gemeldet, die Antwort bleibt 200.
- *  - Ereignisse eines verbundenen Kontos: nur account.updated wird geprüft und
- *    verarbeitet; ein unbekannter Typ bleibt wie bisher 200 ohne Wirkung.
+ *  - Ereignisse eines verbundenen Kontos: nur account.updated und
+ *    capability.updated (Register N49) werden geprüft und verarbeitet;
+ *    capability.updated ohne Konto und ein unbekannter Typ bleiben wie bisher
+ *    200 ohne Wirkung.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -77,6 +79,7 @@ const BEHANDLUNG: Record<VerarbeiteterStripeTyp, () => unknown> = {
   'payment_intent.payment_failed': () => prisma.order.updateMany,
   'payment_intent.canceled': () => prisma.order.findUnique,
   'account.updated': () => prisma.farm.findFirst,
+  'capability.updated': () => prisma.farm.findFirst,
   'refund.failed': () => nimmGescheiterteErstattungZurueck,
   'charge.refund.updated': () => nimmGescheiterteErstattungZurueck,
   'invoice.paid': () => abrechnung.behandleRechnungBezahlt,
@@ -86,6 +89,11 @@ const BEHANDLUNG: Record<VerarbeiteterStripeTyp, () => unknown> = {
   'mandate.updated': () => abrechnung.behandleMandatGeaendert,
 }
 const TYPEN = Object.keys(BEHANDLUNG) as VerarbeiteterStripeTyp[]
+
+/** Was ein Typ zusätzlich am Ereignis braucht: capability.updated kommt nur von einem verbundenen Konto. */
+const ZUSATZ: Partial<Record<VerarbeiteterStripeTyp, Record<string, unknown>>> = {
+  'capability.updated': { account: 'acct_1' },
+}
 
 /** Jeder Tag der Tests beginnt mit einer leeren Zeile je Typ: die erste Anfrage legt an. */
 let angelegt: Set<string>
@@ -134,7 +142,7 @@ describe('Signatur ungültig: 400 ohne Einzelheiten', () => {
 
 describe('Je verarbeitetem Typ: erst das Schema, dann die Behandlung', () => {
   it.each(TYPEN)('%s gültig → verarbeitet und vermerkt', async (typ) => {
-    const antwort = await zustellen(typ, BEISPIELE[typ].gueltig)
+    const antwort = await zustellen(typ, BEISPIELE[typ].gueltig, ZUSATZ[typ])
     expect(antwort.status).toBe(200)
     expect(BEHANDLUNG[typ]()).toHaveBeenCalled()
     expect(prisma.webhookEvent.create).toHaveBeenCalledWith({ data: { stripeEventId: 'evt_1', type: typ } })
@@ -142,7 +150,7 @@ describe('Je verarbeitetem Typ: erst das Schema, dann die Behandlung', () => {
   })
 
   it.each(TYPEN)('%s ungültig → 200, keine Behandlung, kein Vermerk, Sentry mit Feld und ohne Werte', async (typ) => {
-    const antwort = await zustellen(typ, BEISPIELE[typ].ungueltig)
+    const antwort = await zustellen(typ, BEISPIELE[typ].ungueltig, ZUSATZ[typ])
     expect(antwort.status).toBe(200)
     expect(await antwort.json()).toEqual({ received: true, skipped: true })
     expect(BEHANDLUNG[typ]()).not.toHaveBeenCalled()
@@ -192,6 +200,15 @@ describe('Ereignisse verbundener Konten und unbekannte Typen', () => {
     expect(captureMessage).toHaveBeenCalledTimes(1)
     await zustellen('account.updated', BEISPIELE['account.updated'].gueltig, { account: 'acct_1' }, 'evt_2')
     expect(prisma.farm.findFirst).toHaveBeenCalled()
+  })
+
+  it('capability.updated ohne account → 200, kein findFirst, kein Sentry', async () => {
+    const antwort = await zustellen('capability.updated', BEISPIELE['capability.updated'].ungueltig)
+    expect(antwort.status).toBe(200)
+    expect(await antwort.json()).toEqual({ received: true })
+    expect(prisma.farm.findFirst).not.toHaveBeenCalled()
+    expect(captureMessage).not.toHaveBeenCalled()
+    expect(queryRaw).not.toHaveBeenCalled()
   })
 
   it('ein anderer Typ eines verbundenen Kontos und ein unbekannter Typ: wie bisher 200, vermerkt, ohne Prüfung', async () => {

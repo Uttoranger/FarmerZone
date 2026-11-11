@@ -25,6 +25,13 @@ const zahlungSchema = z.object({ id: kennungSchema, application_fee_amount: cent
 /** account.updated — der Stand selbst wird bei Stripe nachgelesen, gebraucht wird nur die Kennung. */
 const kontoSchema = z.object({ id: kennungSchema })
 
+/**
+ * capability.updated (Register N49, A012) — nur von einem verbundenen Konto
+ * verarbeitet; den Stand liest die Behandlung bei Stripe nach, das Konto kommt
+ * aus `event.account`. Das Capability-Objekt trägt sein Konto selbst.
+ */
+const faehigkeitSchema = z.object({ id: kennungSchema, account: verweisSchema })
+
 /** refund.failed, charge.refund.updated — src/server/erstattung-gescheitert.ts und das Löschen von „Erstattung offen“. */
 const erstattungSchema = z.object({
   id: kennungSchema,
@@ -56,15 +63,18 @@ const einrichtungSchema = z.object({
 const mandatSchema = z.object({ id: kennungSchema, status: z.string().max(50), payment_method: verweisSchema })
 
 /**
- * Die verarbeiteten Typen (Liste aus Nachtlauf 26 plus `account.updated`) und
- * ihr Schema für `event.data.object`. Ein Typ, der hier fehlt, wird nicht
- * verarbeitet — wie bisher, 200 ohne Wirkung.
+ * Die verarbeiteten Typen (Liste aus Nachtlauf 26 plus `account.updated` und
+ * `capability.updated`) und ihr Schema für `event.data.object`. Ein Typ, der
+ * hier fehlt, wird nicht verarbeitet — wie bisher, 200 ohne Wirkung.
+ * `capability.updated` zählt nur mit `event.account` (Connect-Endpunkt);
+ * ohne gilt es wie ein fremder Typ (Route).
  */
 export const STRIPE_EREIGNIS_SCHEMAS = {
   'payment_intent.succeeded': zahlungSchema,
   'payment_intent.payment_failed': zahlungSchema,
   'payment_intent.canceled': zahlungSchema,
   'account.updated': kontoSchema,
+  'capability.updated': faehigkeitSchema,
   'refund.failed': erstattungSchema,
   'charge.refund.updated': erstattungSchema,
   'invoice.paid': rechnungSchema,

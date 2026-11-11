@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ONLINE_ZAHLUNG_ANLAESSE } from '@/lib/stripe-konto'
 
 /*
  * Die Mail-Warteschlange (Register N26, Nr. 158): welche Arten es gibt, welche
@@ -59,6 +60,8 @@ export const MAIL_ARTEN = [
   // Plattformgebühr (N38, Nr. 198): Ankündigung des Einzugs und gescheiterte Lastschrift an den Hof.
   'plattformgebuehr-ankuendigung',
   'lastschrift-gescheitert',
+  // Stripe-Konto des Hofs (Register N49, A012): Online-Zahlung aktiv bzw. Stripe braucht noch Angaben.
+  'online-zahlung',
   // Widerruf (Nr. 200, N39): an den Hof, und das Ergebnis an die Kundin.
   'widerruf-hof',
   'widerruf-erstattet',
@@ -127,6 +130,7 @@ export const MAIL_WEG = {
   'abo-bestaetigung': 'wichtig',
   'plattformgebuehr-ankuendigung': 'wichtig',
   'lastschrift-gescheitert': 'wichtig',
+  'online-zahlung': 'wichtig',
   'widerruf-hof': 'wichtig',
   'widerruf-erstattet': 'wichtig',
   'widerruf-abgelehnt': 'wichtig',
@@ -227,6 +231,11 @@ export const erstattungOffenBezugSchema = z
   .strict()
 export const hofBetreiberBezugSchema = z.object({ farmId: kennung, empfaengerId: kennung }).strict()
 export const hofBezugSchema = z.object({ farmId: kennung }).strict()
+/**
+ * Online-Zahlung (Register N49): der Hof und der Anlass (fester Code) — Text
+ * und Adresse lädt der Renderer frisch und prüft dabei, ob der Anlass noch stimmt.
+ */
+export const onlineZahlungBezugSchema = z.object({ farmId: kennung, anlass: z.enum(ONLINE_ZAHLUNG_ANLAESSE) }).strict()
 /** Gescheiterte Lastschrift (Nr. 198): nur die Kennung der Monatsabrechnung — Monat und Hof lädt der Renderer. */
 export const abrechnungBezugSchema = z.object({ monatsabrechnungId: kennung }).strict()
 export const meldungBetreiberBezugSchema = z.object({ meldungId: kennung, empfaengerId: kennung }).strict()
@@ -268,6 +277,7 @@ const BEZUG_JE_ART: Partial<Record<MailArt, z.ZodType<Record<string, string>>>> 
   freischaltung: hofBezugSchema,
   'plattformgebuehr-ankuendigung': hofBezugSchema,
   'lastschrift-gescheitert': abrechnungBezugSchema,
+  'online-zahlung': onlineZahlungBezugSchema,
   meldung: meldungBetreiberBezugSchema,
   wochenbericht: wochenberichtBezugSchema,
   postfach: nachrichtBezugSchema,

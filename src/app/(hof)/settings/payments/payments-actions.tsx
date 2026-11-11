@@ -30,6 +30,12 @@ interface PaymentsActionsProps {
   onlineAn: boolean
   /** Register Z2: Stripe kennt das gespeicherte Konto nicht (?stripe=neu, von der Seite entschieden). */
   neuEinrichten?: boolean
+  /**
+   * Register N49: Der Weg ins Stripe-Formular steht nur, wo der Hof dort etwas
+   * tun kann — kein Konto, Angaben fehlen, neu einrichten. Prüft Stripe oder
+   * wartet der Hof, bleibt nur „Status prüfen“. Fehlt der Wert, wie bisher.
+   */
+  formularOffen?: boolean
 }
 
 /** Die Zahlungs-Seite mit „Online-Zahlung neu einrichten" (zahlungHinweis, Register Z2). */
@@ -57,7 +63,13 @@ function Warten(): React.JSX.Element {
  * selbst bei Stripe, ob das alte Konto wirklich unbekannt ist, bevor es die
  * Kennung ersetzt.
  */
-export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten = false }: PaymentsActionsProps): React.JSX.Element {
+export function PaymentsActions({
+  hasAccount,
+  isReady,
+  onlineAn,
+  neuEinrichten = false,
+  formularOffen = true,
+}: PaymentsActionsProps): React.JSX.Element {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -103,7 +115,8 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
       }
       if (res.ready) {
         toast.success('Dein Stripe-Konto ist bestätigt.')
-      } else {
+      } else if (res.stufe === undefined || res.stufe === 'angaben_fehlen') {
+        // Nur wenn der Hof bei Stripe noch etwas tun muss; sonst sagt es der Kasten (Register N49).
         toast.info('Die Einrichtung bei Stripe ist noch nicht fertig.')
       }
       router.refresh()
@@ -147,6 +160,15 @@ export function PaymentsActions({ hasAccount, isReady, onlineAn, neuEinrichten =
   }
 
   if (isReady) {
+    return (
+      <button type="button" onClick={handleRefresh} disabled={loading} className={NEBEN}>
+        {loading ? <Warten /> : 'Status prüfen'}
+      </button>
+    )
+  }
+
+  // Der Hof wartet auf Stripe (Register N49): kein Weg ins Formular, nur prüfen.
+  if (hasAccount && !neuEinrichten && !formularOffen) {
     return (
       <button type="button" onClick={handleRefresh} disabled={loading} className={NEBEN}>
         {loading ? <Warten /> : 'Status prüfen'}

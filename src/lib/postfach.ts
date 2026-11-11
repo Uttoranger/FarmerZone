@@ -32,6 +32,7 @@ import type { DbBremse } from '@/lib/bremse-datenbank'
 import type { z } from 'zod'
 import { POSTFACH_HREF } from '@/lib/bauern-navigation'
 import type { empfaengerRegelSchema, nachrichtArtSchema, unterhaltungSeiteSchema } from '@/schemas/postfach'
+import type { StripeAnzeige } from '@/lib/stripe-konto'
 
 // ─── Ziele ───────────────────────────────────────────────────────────────────
 
@@ -684,6 +685,8 @@ export type HofAufgabeRoh = {
   createdAt: Date
   hofseite: { erledigt: number; gesamt: number }
   stripeBereit: boolean
+  /** Der Stand des Stripe-Kontos für den Grund (stripeGrundAdmin, Register N49) — nie die Kennung. */
+  stripeAnzeige: StripeAnzeige
   sepaErteilt: boolean
   /** Futtermittel im Shop — nur dann zählt die LFBIS-Nummer. */
   futter: boolean
