@@ -8,6 +8,9 @@
  * gebührenfrei (null); ungültige Werte werden mit einem deutschen Satz
  * abgelehnt (Prozent nur als Zahl, Nr. 35); jede Änderung wird
  * außerhalb der Produktion mit Zeitstempel und Admin-ID protokolliert.
+ * Ab dem Stichtag „Hofpreis-Modell ab“ lehnt die Action ab (Register N38,
+ * Ergänzung E-023, Nr. 286): kein Schreiben, kein Protokoll — die Wache und
+ * die Prüfung der Eingabe antworten weiter zuerst.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -18,6 +21,10 @@ vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: vi.fn() } } }))
 vi.mock('@/lib/prisma', async () => ({
   prisma: {
     farm: { findUnique: vi.fn(), update: vi.fn() },
+    // Seit Nr. 286 liest die Action das Modell frisch (Stichtag „Hofpreis-Modell ab“, E-023).
+    plattformEinstellung: { findUnique: vi.fn() },
+    // Das Protokoll der Admin-Aktion (protokolliere) — für den Beweis „ein Eintrag“ bzw. „keiner“.
+    adminAktion: { create: vi.fn() },
     // Die Wache liest seit Nr. 115 die Pflicht „erst Passkey“ (tests/admin-sitzung.ts).
     ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
@@ -34,18 +41,29 @@ import {
   MINDESTGEBUEHR_NEGATIV,
   MINDESTGEBUEHR_ZU_HOCH,
   PROZENT_UNGUELTIG,
+  SERVICEGEBUEHR_AB_STICHTAG_GESPERRT,
 } from '@/schemas/servicegebuehr'
+import { BAR_SERVICEGEBUEHR_AB } from '@/lib/konditionen'
 import { MINDESTGEBUEHR_UNGUELTIG } from '@/lib/admin-hoefe'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { adminSitzung, alteAdminSitzung } from './admin-sitzung'
 import { FRISCH_FEHLER } from '@/lib/admin-anmeldung'
+import { einstellungsZeile } from './fabrik/plattform-einstellung'
 
 const getSession = vi.mocked(auth.api.getSession)
 const userFindUnique = vi.mocked(prisma.user.findUnique)
 const farmFindUnique = vi.mocked(prisma.farm.findUnique)
 const farmUpdate = vi.mocked(prisma.farm.update)
+const einstellungLesen = vi.mocked(prisma.plattformEinstellung.findUnique)
+const protokollSchreiben = vi.mocked(prisma.adminAktion.create)
+
+/**
+ * Für die Fälle ohne Stichtag-Bezug: „Hofpreis-Modell ab“ weit in der Zukunft
+ * — unabhängig von der Uhr, damit sie nicht am Vorgabe-Stichtag (1.2.2027) kippen.
+ */
+const STICHTAG_FERN = new Date('2099-01-01T00:00:00.000Z')
 
 const GUELTIG = { percent: 4.9, minCents: 50, activeFrom: '2026-10-01' }
 
@@ -55,9 +73,12 @@ beforeEach(() => {
   userFindUnique.mockResolvedValue({ isAdmin: true, adminInhaber: true } as never)
   farmFindUnique.mockResolvedValue({ slug: 'welszucht' } as never)
   farmUpdate.mockResolvedValue({} as never)
+  einstellungLesen.mockResolvedValue(einstellungsZeile(STICHTAG_FERN) as never)
+  protokollSchreiben.mockResolvedValue({ id: 'protokoll_1' } as never)
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -226,5 +247,84 @@ describe('setServiceFeeAction — Validierung', () => {
       expect(satz).toMatch(/\b(?:Gib|Wähle|du|dein|Lade|versuch)\b/)
       expect(satz).not.toMatch(/Invalid|expected|received/)
     }
+  })
+})
+
+describe('setServiceFeeAction — ab dem Stichtag „Hofpreis-Modell ab“ gesperrt (E-023, Nr. 286)', () => {
+  /** 1. Februar 2027, 00:00 Wien (Winterzeit) = 31.1. 23:00 UTC — als Admin-Einstellung. */
+  const STICHTAG = new Date('2027-01-31T23:00:00.000Z')
+
+  function uhrAuf(zeitpunkt: Date): void {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(zeitpunkt)
+  }
+
+  beforeEach(() => {
+    einstellungLesen.mockResolvedValue(einstellungsZeile(STICHTAG) as never)
+  })
+
+  it('der Satz steht wörtlich so da (A008-3)', () => {
+    expect(SERVICEGEBUEHR_AB_STICHTAG_GESPERRT).toBe(
+      'Ab dem Stichtag gilt die Plattformgebühr. Den Satz änderst du in der Karte ‚Plattformgebühr‘.'
+    )
+  })
+
+  it('eine Millisekunde vor dem Stichtag: geschrieben, genau ein Protokolleintrag', async () => {
+    uhrAuf(new Date(STICHTAG.getTime() - 1))
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({})
+    expect(farmUpdate).toHaveBeenCalledTimes(1)
+    expect(protokollSchreiben).toHaveBeenCalledTimes(1)
+    expect(protokollSchreiben).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ art: 'servicegebuehr_geaendert', bezugId: 'farm_1' }) })
+    )
+  })
+
+  it.each([
+    ['genau am Stichtag (00:00 Wien)', STICHTAG],
+    ['einen Tag danach', new Date(STICHTAG.getTime() + 24 * 60 * 60 * 1000)],
+  ])('%s: der Satz, kein Schreiben am Hof, kein Protokoll', async (_fall, jetzt) => {
+    uhrAuf(jetzt)
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({ error: SERVICEGEBUEHR_AB_STICHTAG_GESPERRT })
+    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(protokollSchreiben).not.toHaveBeenCalled()
+    // Vor dem Lesen des Hofs abgelehnt — die Action fasst den Hof gar nicht an.
+    expect(farmFindUnique).not.toHaveBeenCalled()
+  })
+
+  it('ohne Zeile gilt die Vorgabe BAR_SERVICEGEBUEHR_AB: ab dann gesperrt, davor geschrieben', async () => {
+    einstellungLesen.mockResolvedValue(null as never)
+    uhrAuf(BAR_SERVICEGEBUEHR_AB)
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({ error: SERVICEGEBUEHR_AB_STICHTAG_GESPERRT })
+    expect(farmUpdate).not.toHaveBeenCalled()
+    // Gegenprobe: eine Millisekunde davor schreibt sie.
+    uhrAuf(new Date(BAR_SERVICEGEBUEHR_AB.getTime() - 1))
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({})
+    expect(farmUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('ohne Recht: wie heute „Kein Zugriff.“ — auch nach dem Stichtag antwortet die Wache zuerst', async () => {
+    uhrAuf(new Date(STICHTAG.getTime() + 1))
+    userFindUnique.mockResolvedValue({ isAdmin: false } as never)
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({ error: 'Kein Zugriff.' })
+    expect(einstellungLesen).not.toHaveBeenCalled()
+    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(protokollSchreiben).not.toHaveBeenCalled()
+  })
+
+  it('ohne frische Bestätigung: wie heute der Satz der Wache — auch nach dem Stichtag', async () => {
+    uhrAuf(new Date(STICHTAG.getTime() + 1))
+    getSession.mockResolvedValue(alteAdminSitzung('user_1') as never)
+    expect(await setServiceFeeAction('farm_1', GUELTIG)).toEqual({ error: FRISCH_FEHLER })
+    expect(einstellungLesen).not.toHaveBeenCalled()
+    expect(farmUpdate).not.toHaveBeenCalled()
+    expect(protokollSchreiben).not.toHaveBeenCalled()
+  })
+
+  it('ungültige Eingabe nach dem Stichtag: zuerst der Satz zur Eingabe, das Modell wird nicht gelesen', async () => {
+    uhrAuf(new Date(STICHTAG.getTime() + 1))
+    expect(await setServiceFeeAction('farm_1', null as never)).toEqual({ error: EINSTELLUNG_UNGUELTIG })
+    expect(await setServiceFeeAction('farm_1', { ...GUELTIG, activeFrom: '01.02.2027' })).toEqual({ error: GILT_AB_UNGUELTIG })
+    expect(einstellungLesen).not.toHaveBeenCalled()
+    expect(farmUpdate).not.toHaveBeenCalled()
   })
 })

@@ -12,7 +12,16 @@ import {
   FARM_REJECT_HAS_DATA_MESSAGE,
   FARM_REJECT_OWNER_IS_ADMIN_MESSAGE,
 } from '@/lib/farm-approval'
-import { EINSTELLUNG_UNGUELTIG, GILT_AB_UNGUELTIG, PROZENT_UNGUELTIG, servicegebuehrEinstellungSchema } from '@/schemas/servicegebuehr'
+import {
+  EINSTELLUNG_UNGUELTIG,
+  GILT_AB_UNGUELTIG,
+  PROZENT_UNGUELTIG,
+  SERVICEGEBUEHR_AB_STICHTAG_GESPERRT,
+  servicegebuehrEinstellungSchema,
+} from '@/schemas/servicegebuehr'
+import { gebuehrModellFuer } from '@/lib/plattformgebuehr'
+import { hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
+import { lesePlattformEinstellung } from '@/server/queries/plattform-einstellung'
 import { wienerMitternacht } from '@/lib/servicegebuehr'
 import { ablegenSchema, buendelStandSchema, triageEingabeSchema, trennenSchema, zusammenfassenSchema, type TriageEingabe } from '@/schemas/meldung'
 import { BUENDEL_STAND_STATUS, MELDUNG_GEAENDERT, MELDUNG_VERWEIS_GEAENDERT, WUENSCHE_TEXT, triageAufruf, type TriageStand } from '@/lib/meldung'
@@ -390,6 +399,15 @@ export async function setServiceFeeAction(
 
   const giltAb = parsed.data.activeFrom === null ? null : wienerMitternacht(parsed.data.activeFrom)
   if (parsed.data.activeFrom !== null && giltAb === null) return { error: GILT_AB_UNGUELTIG }
+
+  // Ab dem Stichtag „Hofpreis-Modell ab“ gesperrt (Register N38, Ergänzung E-023,
+  // Nr. 286): Dort wirkt Farm.serviceFee* auf keinen Betrag; ein Schreiben
+  // erweckte nur den Anschein, es ändere etwas. Kein Schreiben, kein Protokoll.
+  // Das Modell frisch, nie aus dem Cache — wie die Kasse (ladeGebuehrLage).
+  // Erst nach Wache und Eingabe: Eine ungültige Eingabe antwortet wie bisher zuerst.
+  if (gebuehrModellFuer(hofpreisEinstellungAus(await lesePlattformEinstellung()), new Date()) === 'hofpreis') {
+    return { error: SERVICEGEBUEHR_AB_STICHTAG_GESPERRT }
+  }
 
   const farm = await prisma.farm.findUnique({ where: { id: farmId }, select: { slug: true } })
   if (!farm) return { error: 'Hof nicht gefunden.' }

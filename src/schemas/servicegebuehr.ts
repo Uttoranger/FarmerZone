@@ -24,6 +24,14 @@ export const GILT_AB_UNGUELTIG =
 export const EINSTELLUNG_UNGUELTIG =
   'Wir konnten die Einstellung nicht lesen. Lade die Seite neu und versuch es noch einmal.'
 
+/**
+ * Ab dem Stichtag „Hofpreis-Modell ab“ lehnt die Action ab (Register N38,
+ * Ergänzung E-023, Nr. 286): Die Servicegebühr wirkt dort auf keinen Betrag,
+ * der eine Weg zum Satz ist die Karte „Plattformgebühr“ (Wortlaut A008-3).
+ */
+export const SERVICEGEBUEHR_AB_STICHTAG_GESPERRT =
+  'Ab dem Stichtag gilt die Plattformgebühr. Den Satz änderst du in der Karte ‚Plattformgebühr‘.'
+
 /** Höchste Mindestgebühr in Cent (€ 1.000,00) — darüber lehnt das Schema ab. */
 export const MINDESTGEBUEHR_MAX_CENTS = 100_000
 
