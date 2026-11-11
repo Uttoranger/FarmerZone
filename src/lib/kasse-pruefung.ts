@@ -62,8 +62,11 @@ const BETRIEBSNUMMER_MAX = 100
 /**
  * Die Form einer E-Mail-Adresse — derselbe Ausdruck wie Zods `.email()`
  * (zod/v4/core regexes.email); tests/leistung-196.test.ts vergleicht beide.
+ * Seit zod 4.6.6 schreibt Zod ihn ohne Vorausschau `(?!.*\.\.)`; was er
+ * annimmt, bleibt gleich (kein Punkt am Anfang, keine zwei Punkte hintereinander;
+ * Nr. 284).
  */
-export const EMAIL_MUSTER = /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/
+export const EMAIL_MUSTER = /^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/
 
 export type KasseFormularErgebnis =
   | { ok: true; daten: KasseFormularDaten }
