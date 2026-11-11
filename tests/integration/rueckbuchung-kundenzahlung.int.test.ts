@@ -172,7 +172,7 @@ describe('Rückbuchung einer Kundenzahlung: sichtbar, ohne Geld zu bewegen', () 
     expect(await prisma.mailAuftrag.count({ where: { bestellungId: bestellung.id } })).toBe(0)
   })
 
-  it('Rückfrage der Bank ohne Antwortfrist: Eintrag „Rückfrage“, Zeile mit Eingang + 7 Tagen', async () => {
+  it('Rückfrage der Bank ohne Antwortfrist: Eintrag „Rückfrage“, Zeile mit Eingang + 7 Tagen; eine zweite Zeile derselben Art zählt nicht', async () => {
     const { bestellung, paymentIntentId } = await bezahlteBestellung()
     const streitId = streitKennung()
     const vorAufruf = Math.floor(Date.now() / 1000)
@@ -184,5 +184,10 @@ describe('Rückbuchung einer Kundenzahlung: sichtbar, ohne Geld zu bewegen', () 
     const frist = Number(zeile?.wert)
     expect(frist).toBeGreaterThanOrEqual(vorAufruf + 7 * 24 * 60 * 60)
     expect(frist).toBeLessThanOrEqual(nachAufruf + 7 * 24 * 60 * 60)
+
+    // Stellt Stripe dasselbe Ereignis an einem anderen Tag noch einmal zu (Schlüssel Tag und Art), zeigt Heute den Fall einmal.
+    await prisma.betriebMessung.create({ data: { tag: new Date(Date.now() + 2 * TAG_MS), art: `kundenstreit:${bestellung.id}:${streitId}:rueckfrage`, wert: BigInt(frist + 60) } })
+    const heute = (await ladePlattformgebuehrAufgaben(new Date())).kundenstreit.filter((k) => k.orderId === bestellung.id)
+    expect(heute).toEqual([expect.objectContaining({ art: 'rueckfrage', frist: new Date(frist * 1000) })])
   })
 })

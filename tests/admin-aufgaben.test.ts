@@ -34,6 +34,7 @@ import {
 import type { HofAufgabeRoh, ErstattungAufgabeRoh } from '@/lib/postfach'
 import type { ProblemAuftrag } from '@/lib/betrieb-mails'
 import { MAIL_WARN_TEXT } from '@/lib/betrieb'
+import { MARKE } from '@/lib/marke'
 
 // Montag, 26. Okt 2026, 09:42 in Wien (MEZ).
 const JETZT = new Date('2026-10-26T08:42:00.000Z')
@@ -169,7 +170,8 @@ describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {
         bereich: 'Geld',
         titel: 'Rückbuchung einer Kundenzahlung',
         bezug: { kennung: 'HM-2610-S7R1', text: 'HM-2610-S7R1 · Hof am Bach' },
-        satz: 'Agrilo ist mit Betrag und Gebühr belastet. Entscheide: annehmen → Transfer bei Stripe zurückholen; widersprechen → Belege in Stripe vor der Frist, nach dem Ausgang bei ‚verloren‘ zurückholen (AGB 21.3), die Gebühr per Rechnung bzw. Lastschrift.',
+        // Wörtlich aus E-022 (Nr. 289), die Marke an ihrer einen Stelle (M1).
+        satz: `${MARKE} ist mit Betrag und Gebühr belastet. Entscheide: annehmen → Transfer bei Stripe zurückholen; widersprechen → Belege in Stripe vor der Frist, nach dem Ausgang bei ‚verloren‘ zurückholen (AGB 21.3), die Gebühr per Rechnung bzw. Lastschrift.`,
         seit: vor(STUNDE),
         wasTun: 'pruefen',
         ziel: '/admin/bestellungen?bestellung=bestellung-streit',

@@ -63,8 +63,12 @@ const monatSchluessel = (d: Date): string => d.toISOString().slice(0, 7)
  * Bestellung oder mit fremder Art fällt weg.
  */
 async function ladeKundenstreit(): Promise<PlattformgebuehrStand['kundenstreit']> {
-  const zeilen = await prisma.betriebMessung.findMany({ where: { art: { startsWith: `${KUNDENSTREIT_ART}:` } }, select: { art: true, wert: true, gemessenAm: true } })
-  const gelesen = zeilen.flatMap((z) => {
+  // Älteste zuerst: Stellt Stripe dasselbe Ereignis an einem anderen Tag noch einmal zu, stünde die Art ein
+  // zweites Mal da (Schlüssel Tag und Art) — gezählt wird je Art nur die erste Zeile.
+  const zeilen = await prisma.betriebMessung.findMany({ where: { art: { startsWith: `${KUNDENSTREIT_ART}:` } }, orderBy: { gemessenAm: 'asc' }, select: { art: true, wert: true, gemessenAm: true } })
+  const gesehen = new Set<string>()
+  const erste = zeilen.filter((z) => !gesehen.has(z.art) && Boolean(gesehen.add(z.art)))
+  const gelesen = erste.flatMap((z) => {
     const art = leseKundenstreitArt(z.art)
     return art ? [{ ...art, seit: z.gemessenAm, frist: new Date(Number(z.wert) * 1000) }] : []
   })

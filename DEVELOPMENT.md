@@ -6865,3 +6865,15 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - **zod 4.6:** Der Ausdruck hinter `.email()` ist neu geschrieben (ohne Vorausschau, gleiche Wirkung). Die Kasse prüft ohne Zod mit einer Kopie (`EMAIL_MUSTER`, Nr. 196); `tests/leistung-196.test.ts` vergleicht beide und schlug an — Kopie nachgezogen.
 - **Skript:** `pnpm pruefen:audit` (= `pnpm audit --prod --audit-level critical`) endet mit 0, solange kein kritischer Treffer da ist.
 - **Bleibt:** hohe Treffer in Unterpaketen (u. a. zod 4.1.11 und 3.25.76 über `@vercel/cli-config` bzw. shadcn, nanoid 3.3.16 über postcss); Zahl im Bericht 284.
+
+## Rückbuchung einer Kundenzahlung sichtbar machen (E-022; Register N38, N33, N37, N32; Nr. 289, Lauf 34, 11.11.2026)
+
+**Anlass.** Der Webhook gab jedes `charge.dispute.created` an `behandleRueckbuchung`; gehörte die Zahlung zu keiner Rechnung der Monatsabrechnung, endete die Funktion ohne Spur. Eine Kundin, die eine Kartenzahlung bei ihrer Bank zurückbucht, belastet Agrilo mit Betrag und Gebühr (Destination Charges) — davon sah das Team nichts, und die Antwortfrist bei Stripe lief unbemerkt ab (Befund H2, F052 §2).
+
+**Fachregel (E-022).**
+- Sichtbar machen, kein Geld bewegen: kein Refund, kein `reverse_transfer`, kein geänderter Bestell- oder Zahlstand, keine Mail an Kundin oder Hof. Antwort an Stripe und Rückgriff auf den Hof (AGB 21.3) macht das Team von Hand.
+- `created` zu einer Bestellung: Protokoll `kundenzahlung_zurueckgebucht` bzw. bei einer Rückfrage der Bank (Stand `warning_…`) `kundenzahlung_rueckfrage`, Grund mit Kennung, Betrag und Antwortfrist; dazu eine Zeile `kundenstreit:<Bestellung>:<Streitfall>:<art>` in `BetriebMessung` mit der Frist. Daraus liest Heute die Aufgabe „Rückbuchung einer Kundenzahlung“ bzw. „Rückfrage zu einer Kundenzahlung“ (Bereich Geld, Frist = Antwortfrist, ohne Frist Eingang + 7 Tage).
+- `closed`: Ausgang ins Protokoll (gewonnen, verloren, ohne Rückbuchung beendet), die Zeile ist weg und mit ihr die Aufgabe. Kam ein Ereignis nicht an, zieht der Geld-Abgleich die Zeilen nach (Streitfälle der letzten 120 Tage, in eigenem Versuch — scheitert er, bleibt alles, wie es ist).
+- SEPA-Rückbuchungen der Rechnung bleiben, wie sie waren: `closed` wird für sie nicht ausgewertet (endgültig, Weg zurück über die Nachforderung).
+- Warum die Zeile in `BetriebMessung` und keine Spalte: keine Migration vor dem Go-live; `WebhookEvent.bestellungId` ist eine eigene Nummer danach. Warum erst die Zeile, dann das Protokoll: `protokolliere` wirft nie; scheitert die Zeile, wiederholt Stripe das Ereignis, ohne dass ein Eintrag doppelt steht.
+- Warum der Grund ohne Kennung, wenn sie sieben Ziffern trägt: `protokolliere` verwirft sonst den ganzen Grund (er sähe aus wie eine Telefonnummer), und Betrag und Frist gingen mit verloren.

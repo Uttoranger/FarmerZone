@@ -60,7 +60,7 @@ Mit dem Live-Schlüssel verschwinden alle drei von selbst. Den Modus liest die A
 
 Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route prüft jede Zustellung gegen beide Secrets. Die alte Adresse farmerzone.at leitet auf agrilo.at um; Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen.
 
-- [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), die 10 Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet, plus `account.updated`:
+- [ ] **Endpunkt A – Plattform** („Ereignisse in deinem Konto“), die 11 Ereignisse, die `src/app/api/stripe/webhook/route.ts` verarbeitet, plus `account.updated`:
 
   | Ereignis | Wozu |
   |---|---|
@@ -71,7 +71,8 @@ Beide Endpunkte zeigen auf **`https://agrilo.at/api/stripe/webhook`**. Die Route
   | `charge.refund.updated` | dasselbe, wenn eine Erstattung später scheitert |
   | `invoice.paid` | Monatsabrechnung der Plattformgebühr: Rechnung als bezahlt vermerken (N38) |
   | `invoice.payment_failed` | Einzug gescheitert: Hof im Postfach und per Mail informieren, Sperre für Barbestellungen nach Frist |
-  | `charge.dispute.created` | Rückbuchung des Einzugs: Hof nimmt sofort nur noch online an |
+  | `charge.dispute.created` | Rückbuchung des Einzugs: Hof nimmt sofort nur noch online an; auch Kundenzahlung: Protokoll und Heute (Nr. 289) |
+  | `charge.dispute.closed` | nur Kundenzahlung: Ausgang des Streitfalls ins Protokoll, die Aufgabe in Heute verschwindet; kein Geld bewegt (Nr. 289) |
   | `setup_intent.succeeded` | SEPA-Mandat des Hofs eingerichtet |
   | `mandate.updated` | Mandat geändert oder widerrufen: Stand beim Hof nachziehen |
   | `account.updated` | Kontostand eines Hofs aktuell halten (kommt auch über diesen Endpunkt) |
