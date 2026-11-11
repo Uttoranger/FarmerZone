@@ -6843,3 +6843,15 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 
 **Webhook.** Der Connect-Zweig verarbeitet zusätzlich `capability.updated` (Konto aus `event.account`, Stand bei Stripe nachgelesen, idempotent wie `account.updated`); ohne `event.account` wird es wie ein fremder Typ behandelt (200, vermerkt). In Stripe muss Endpunkt B das Ereignis abonnieren (`docs/betrieb/stripe-live.md` §3).
 
+
+## Sicherheits-Updates 11/2026: @sentry/nextjs, better-auth mit Passkey-Plugin, zod, nanoid (Register G6; Nr. 284, Lauf 34, 11.11.2026)
+
+- **Anlass:** `pnpm audit --prod` meldete zwei kritische Treffer in direkten Paketen und hohe in zwei weiteren. Je Paket die kleinste Version, die die Meldung behebt und mindestens 14 Tage alt ist (G6, ohne Ausnahme in `minimumReleaseAgeExclude`), installiert mit `pnpm add`:
+  - `@sentry/nextjs` 10.66.0 → 10.75.2: GHSA-mchm-gjx6-7h55 (kritisch, Middleware-Umgehung über die Tunnel-Route). Wir nutzen keine Tunnel-Route; behoben ist es trotzdem.
+  - `better-auth` und `@better-auth/passkey` 1.6.23 → 1.7.7: GHSA-965c-763c-88jm (kritisch, OAuth-State als Magic Link), GHSA-r4xp-prcw-77qf (hoch, OAuth Proxy), GHSA-q84f-53jg-9ppm (hoch, Geräte-Anmeldung). Keiner dieser Wege ist bei uns eingeschaltet (kein OAuth, kein Magic Link, kein Device-Plugin).
+  - `zod` 4.4.3 → 4.6.6: GHSA-mrhx-c7xc-m3w5 (hoch, Speicher bei übergroßen Sammlungen mit Grenzen).
+  - `nanoid` 5.1.11 → 5.1.16: GHSA-28wg-ghj8-5hjv (hoch, Endlosschleife bei negativer Größe). Nebenbei nahm `pnpm add` für postcss das schon vorhandene nanoid 3.3.16 statt 3.3.12.
+- **better-auth 1.7:** Ein eigener Speicher für die Login-Bremse (`rateLimit.customStorage`) braucht nur noch `consume`; `get`/`set` kennt der Typ nicht mehr, und Better Auth ruft sie nie (`src/server/auth-bremse.ts` hat `consume` seit Nr. 125). Die 1.7.0 bis 1.7.2 verlangten `Account.issuer`; ab 1.7.3 nicht mehr — deshalb keine Migration. Die Liste der HTTP-Wege ist für unsere Plugins (emailOTP, passkey, eigener Ersatzcode) gleich geblieben, `disabledPaths` unverändert. Neu ab 1.7.3: Better Auth prüft beim Start das Schema (mit Kysely gegen die Datenbank) und lehnt Anfragen bei fehlenden Spalten ab; mit unserem Prisma-Adapter laufen alle Integrationstests grün.
+- **zod 4.6:** Der Ausdruck hinter `.email()` ist neu geschrieben (ohne Vorausschau, gleiche Wirkung). Die Kasse prüft ohne Zod mit einer Kopie (`EMAIL_MUSTER`, Nr. 196); `tests/leistung-196.test.ts` vergleicht beide und schlug an — Kopie nachgezogen.
+- **Skript:** `pnpm pruefen:audit` (= `pnpm audit --prod --audit-level critical`) endet mit 0, solange kein kritischer Treffer da ist.
+- **Bleibt:** hohe Treffer in Unterpaketen (u. a. zod 4.1.11 und 3.25.76 über `@vercel/cli-config` bzw. shadcn, nanoid 3.3.16 über postcss); Zahl im Bericht 284.

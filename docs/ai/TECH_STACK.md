@@ -13,10 +13,10 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | `typescript` | ^5 | `strict: true` |
 | `prisma` / `@prisma/client` | **^7.8.0** | Treiber-Adapter Pflicht (s. u.) |
 | `@prisma/adapter-pg` + `pg` | ^7.8.0 / ^8.21.0 | Verbindung läuft über den Adapter |
-| `zod` | **^4.4.3** | **Zod 4**, nicht 3 (s. u.) |
+| `zod` | **^4.6.6** | **Zod 4**, nicht 3 (s. u.) |
 | `tailwindcss` | **^4** | **Tailwind 4**, CSS-basiert, keine `tailwind.config.js` |
-| `better-auth` | ^1.6.23 | Sessions, kein NextAuth |
-| `@better-auth/passkey` | **1.6.23** (genau, gleich `better-auth`) | Passkey-Anmeldung für Admins (N20). Offizielles Plugin von better-auth — keine eigene WebAuthn-Logik. Installiert vor Nr. 115, importiert erst dort. |
+| `better-auth` | ^1.7.7 | Sessions, kein NextAuth. Ab 1.7 nimmt `rateLimit.customStorage` nur noch `consume` (Prüfen und Zählen in einem Schritt), kein `get`/`set` mehr (`src/server/auth-bremse.ts`). |
+| `@better-auth/passkey` | **1.7.7** (genau, gleich `better-auth`) | Passkey-Anmeldung für Admins (N20). Offizielles Plugin von better-auth — keine eigene WebAuthn-Logik. Installiert vor Nr. 115, importiert erst dort. |
 | `stripe` | ^22.1.1 | Connect + Webhooks |
 | `sharp` | **^0.35.5** | Nur serverseitig (Upload-Verarbeitung, Teilen-Bild, Skripte). Override `sharp@<0.35.5` in `pnpm-workspace.yaml`, damit auch `next` kein älteres zieht. Fremde Formate: ARCHITECTURE, Uploads. |
 | `@vercel/blob` | ^2.8.0 | Verlangt undici `^6.23.0`; in der 6er-Reihe hält es der Override `undici@<6.27.0: '^6.27.0'`. Bringt `@vercel/oidc` mit. |
@@ -43,7 +43,7 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 
 **sharp 0.35:** ESM mit eigenen Typen. Den Typ als benannten Import holen (`import sharp, { type Sharp } from 'sharp'`), den Namensraum `sharp.Sharp` gibt es nicht mehr. `sharp.block`/`sharp.unblock` gelten für den ganzen Prozess; eine Attrappe in Tests braucht beide (`Object.assign(vi.fn(…), { block: vi.fn(), unblock: vi.fn() })`). `withGainMap()` ist da, fehlt aber in den Typen von 0.35.5.
 
-**Sentry-Quelltextkarten (`@sentry/nextjs` 10.66):** `withSentryConfig` in `next.config.ts` trägt `org: 'farmerzone'` und `project: 'javascript-nextjs'` fest; geheim ist nur `authToken`, gelesen aus `process.env.SENTRY_AUTH_TOKEN` (Build-Werkzeug, deshalb nicht über `@/lib/env`; in Vercel für Production und Preview). Keine `SENTRY_URL`: Der Organisations-Token (`sntrys_…`) trägt die Adresse seiner Region (de.sentry.io), und sentry-cli zieht sie der voreingestellten sentry.io vor. `sourcemaps.deleteSourcemapsAfterUpload: true` löscht die Karten nach dem Upload — ausgeliefert werden sie nie. Ohne Token überspringt der Build den Upload und bleibt grün. Das Upload-Programm kommt aus dem Einrichtungs-Skript von `@sentry/cli`; es muss deshalb in `allowBuilds` stehen (pnpm 10.33 liest nur diese Liste, `onlyBuiltDependencies` gibt es nicht mehr daneben). Fehlt es dort, meldet `pnpm ignored-builds` das Paket.
+**Sentry-Quelltextkarten (`@sentry/nextjs` 10.75):** `withSentryConfig` in `next.config.ts` trägt `org: 'farmerzone'` und `project: 'javascript-nextjs'` fest; geheim ist nur `authToken`, gelesen aus `process.env.SENTRY_AUTH_TOKEN` (Build-Werkzeug, deshalb nicht über `@/lib/env`; in Vercel für Production und Preview). Keine `SENTRY_URL`: Der Organisations-Token (`sntrys_…`) trägt die Adresse seiner Region (de.sentry.io), und sentry-cli zieht sie der voreingestellten sentry.io vor. `sourcemaps.deleteSourcemapsAfterUpload: true` löscht die Karten nach dem Upload — ausgeliefert werden sie nie. Ohne Token überspringt der Build den Upload und bleibt grün. Das Upload-Programm kommt aus dem Einrichtungs-Skript von `@sentry/cli`; es muss deshalb in `allowBuilds` stehen (pnpm 10.33 liest nur diese Liste, `onlyBuiltDependencies` gibt es nicht mehr daneben). Fehlt es dort, meldet `pnpm ignored-builds` das Paket.
 
 **Tailwind 4:** Konfiguration lebt in `src/app/globals.css` per `@theme` / `@import "tailwindcss"`. **Keine** `tailwind.config.js` anlegen. Keine `content`-Pfade pflegen.
 

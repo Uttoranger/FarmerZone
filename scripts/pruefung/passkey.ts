@@ -46,7 +46,7 @@ export function coseSchluessel(x: Buffer, y: Buffer): Buffer {
 }
 
 export type PruefPasskey = {
-  /** Die Zeile für model Passkey — Felder wie @better-auth/passkey 1.6.23 sie speichert. */
+  /** Die Zeile für model Passkey — Felder wie @better-auth/passkey 1.7.7 sie speichert (seit 1.6.23 unverändert). */
   zeile: {
     id: string
     name: string
