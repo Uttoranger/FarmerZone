@@ -11,7 +11,8 @@
  *             nicht scheitern lassen.
  *   dazu      Der Bestand wird bedingt gebucht: Wer zwischen Prüfung und
  *             Buchung schneller war, führt nicht zu negativem Bestand, und
- *             bereits gebuchte Positionen werden wieder gutgeschrieben.
+ *             scheitert danach etwas, endet die Transaktion mit dem Fehler
+ *             (Nr. 287: zurück rollt die Datenbank, keine Gutschrift von Hand).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
@@ -36,6 +37,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Nr. 287: Vorrat und Bestellung in einer Transaktion (imAbholfenster) — der Rückruf bekommt dieselbe Attrappe.
+    $transaction: vi.fn(async (f: (tx: unknown) => unknown) => f((await import('@/lib/prisma')).prisma)),
     // Keine Notbremse (Nr. 189) und ohne Zeile gilt der Stichtag aus konditionen.ts — Modell `bisher` (N38, Nr. 197).
     plattformEinstellung: { findUnique: vi.fn().mockResolvedValue(null) },
     farm: { findUnique: vi.fn() },
@@ -260,10 +263,11 @@ describe('Idempotenz', () => {
 
     expect(res.status).toBe(200)
     expect((await res.json())).toMatchObject({ orderId: 'order_erst', wiederholt: true })
-    // Der bereits gebuchte Bestand wurde wieder gutgeschrieben.
-    expect(productUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { stock: { increment: 2 } } })
-    )
+    // Nr. 287: Keine Gutschrift von Hand mehr — die Transaktion endet mit dem
+    // Fehler des Index, und die Datenbank rollt den gebuchten Bestand zurück
+    // (echt geprüft: tests/integration/checkout-idempotenz.int.test.ts).
+    expect(productUpdate).not.toHaveBeenCalled()
+    await expect(vi.mocked(prisma.$transaction).mock.results[0]?.value).rejects.toThrow('Unique constraint failed')
   })
 
   /** Am Eingang unbekannt, beim letzten Blick vor der Absage schon da. */
@@ -518,7 +522,9 @@ describe('Bestandsbuchung', () => {
     expect(orderCreate).not.toHaveBeenCalled()
   })
 
-  it('schreibt bereits gebuchte Positionen wieder gut, wenn eine spätere scheitert', async () => {
+  // Nr. 287: Statt der Gutschrift von Hand endet die Transaktion mit dem Fehler; zurück rollt die Datenbank
+  // (echt geprüft: tests/integration/checkout-bestand.int.test.ts und kasse-transaktion.int.test.ts).
+  it('scheitert eine spätere Position, endet die Transaktion mit dem Fehler — keine Gutschrift von Hand, 409', async () => {
     productUpdateMany
       .mockResolvedValueOnce({ count: 1 } as never)
       .mockResolvedValueOnce({ count: 0 } as never)
@@ -533,22 +539,18 @@ describe('Bestandsbuchung', () => {
     )
 
     expect(res.status).toBe(409)
-    expect(productUpdate).toHaveBeenCalledTimes(1)
-    expect(productUpdate).toHaveBeenCalledWith({
-      where: { id: 'prod_1' },
-      data: { stock: { increment: 2 } },
-    })
+    expect((await res.json()).code).toBe('WARENKORB_GEAENDERT')
+    expect(productUpdate).not.toHaveBeenCalled()
+    await expect(vi.mocked(prisma.$transaction).mock.results[0]?.value).rejects.toThrow('Vorrat reicht nicht')
     expect(orderCreate).not.toHaveBeenCalled()
   })
 
-  it('scheitert das Anlegen der Bestellung, geht der Bestand zurück', async () => {
+  it('scheitert das Anlegen der Bestellung, endet die Transaktion mit dem Fehler — keine Gutschrift von Hand, 500', async () => {
     orderCreate.mockRejectedValue(new Error('DB weg'))
     const res = await POST(anfrage())
 
     expect(res.status).toBe(500)
-    expect(productUpdate).toHaveBeenCalledWith({
-      where: { id: 'prod_1' },
-      data: { stock: { increment: 2 } },
-    })
+    expect(productUpdate).not.toHaveBeenCalled()
+    await expect(vi.mocked(prisma.$transaction).mock.results[0]?.value).rejects.toThrow('DB weg')
   })
 })

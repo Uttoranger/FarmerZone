@@ -30,6 +30,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Nr. 287: Vorrat und Bestellung in einer Transaktion (imAbholfenster) — der Rückruf bekommt dieselbe Attrappe.
+    $transaction: vi.fn(async (f: (tx: unknown) => unknown) => f((await import('@/lib/prisma')).prisma)),
     // Keine Notbremse (Nr. 189): die Zeile trägt keine Felder der Notbremse.
     // N38 (Nr. 197): Diese Datei prüft das Modell `bisher` (Servicegebühr, E4/B1) auch
     // nach BAR_SERVICEGEBUEHR_AB — der Stichtag „Hofpreis-Modell ab“ liegt hier

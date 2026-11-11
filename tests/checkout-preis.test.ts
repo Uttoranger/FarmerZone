@@ -28,6 +28,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Nr. 287: Vorrat und Bestellung in einer Transaktion (imAbholfenster) — der Rückruf bekommt dieselbe Attrappe.
+    $transaction: vi.fn(async (f: (tx: unknown) => unknown) => f((await import('@/lib/prisma')).prisma)),
     // Keine Notbremse (Nr. 189) und ohne Zeile gilt der Stichtag aus konditionen.ts — Modell `bisher` (N38, Nr. 197).
     plattformEinstellung: { findUnique: vi.fn().mockResolvedValue(null) },
     farm: { findUnique: vi.fn() },

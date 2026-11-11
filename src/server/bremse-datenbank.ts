@@ -7,12 +7,17 @@ import { getClientIp } from '@/lib/rate-limit'
 import { genauesIlikeMuster } from '@/lib/ilike-muster'
 import { nachDerAntwort } from '@/lib/nach-der-antwort'
 import type { FehlversuchArt } from '@/lib/anmeldecode'
+import { BESTAETIGUNGSFRIST_BAR_MINUTEN } from '@/lib/fristen'
 import {
+  BAR_UNBESTAETIGT_JE_ADRESSE,
+  CODE_BAR_GEBREMST,
   DB_BREMSEN,
   DB_BREMSE_ZEITLIMIT_MS,
   FEHLVERSUCH_BREMSEN,
   ZU_VIELE_ANFRAGEN,
   adressMerkmal,
+  barBremse,
+  barGebremstSatz,
   bremsMeldungFaellig,
   bremsSchluessel,
   fehlversuchSperreBis,
@@ -172,6 +177,73 @@ export async function bremseCheckout(
     { error: ZU_VIELE_ANFRAGEN },
     { status: 429, headers: { 'Retry-After': String(sekundenBisFensterEnde(jetzt, DB_BREMSEN.checkoutIp.fensterMs)) } }
   )
+}
+
+/**
+ * Unbestätigte Bar-Bestellungen einer Adresse oder eines Hofs, die noch Ware
+ * halten (Nr. 287): Zahlart bar, Status PENDING_CONFIRMATION, angelegt vor
+ * weniger als `BESTAETIGUNGSFRIST_BAR_MINUTEN`. Ältere gelten als verfallen,
+ * auch wenn das Aufräumen sie noch nicht storniert hat (die Frist gilt beim
+ * Lesen). Die EINE Zählung für die Bremse der Kasse und die Erinnerungsmail
+ * (Nr. 296). Die Adresse kommt bereinigt und klein geschrieben (emailSchema),
+ * wie sie in `customerEmail` steht. Wirft bei einem Datenbankfehler — ob dann
+ * durchgelassen wird, entscheidet der Aufrufer.
+ */
+export async function zaehleUnbestaetigteBar(wo: { customerEmail: string } | { farmId: string }, jetzt: Date): Promise<number> {
+  return prisma.order.count({
+    where: {
+      ...('customerEmail' in wo ? { customerEmail: wo.customerEmail } : { farmId: wo.farmId }),
+      paymentMethod: 'ONSITE_CASH',
+      status: 'PENDING_CONFIRMATION',
+      createdAt: { gt: new Date(jetzt.getTime() - BESTAETIGUNGSFRIST_BAR_MINUTEN * 60_000) },
+    },
+  })
+}
+
+/** Nur für die Sentry-Meldung einer gescheiterten Zählung offener Bar-Bestellungen: der Zweck, nie ein Merkmal. */
+const BAR_UNBESTAETIGT_ZAEHLUNG: DbBremse = { zweck: 'bar-unbestaetigt', max: BAR_UNBESTAETIGT_JE_ADRESSE, fensterMs: 0 }
+
+/**
+ * Bremse für neue Bar-Bestellungen (Nr. 287, Missbrauchsschutz M5) — nur in
+ * Produktion wie `bremseCheckout`, nur für Zahlart bar; die Kasse ruft sie nach
+ * dem Abgleich des Gesamtbetrags und vor der Transaktion. Der Reihe nach:
+ * unbestätigte je Adresse (3) und, mit `mitHofGrenze`, je Hof (15) — gezählt in
+ * `Order`, nichts geschrieben —, danach neue Bar-Bestellungen je IP (10 in der
+ * Stunde über alle Instanzen). Wer schon an Adresse oder Hof scheitert,
+ * verbraucht so nichts vom Kontingent seiner IP.
+ *
+ * FAIL-OPEN wie jede zweite Stufe: Scheitert die Zählung oder dauert sie zu
+ * lange, geht die Bestellung durch, und Sentry erfährt es gedrosselt
+ * (`meldeBremsFehler`). null = weiter, sonst 429 mit `CODE_BAR_GEBREMST`.
+ */
+export async function bremseBarBestellung(
+  request: Request,
+  bestellung: { customerEmail: string; farmId: string; onlineMoeglich: boolean; mitHofGrenze: boolean },
+  jetzt: Date = new Date(),
+  meldungen: BremsMeldungen = MELDUNGEN_DIESER_INSTANZ
+): Promise<NextResponse | null> {
+  if (process.env.NODE_ENV !== 'production') return null
+  const gebremst = (headers?: HeadersInit) =>
+    NextResponse.json({ error: barGebremstSatz(bestellung.onlineMoeglich), code: CODE_BAR_GEBREMST }, { status: 429, headers })
+
+  let stand = { unbestaetigtAdresse: 0, unbestaetigtHof: 0 }
+  try {
+    const [unbestaetigtAdresse, unbestaetigtHof] = await mitFrist(
+      Promise.all([
+        zaehleUnbestaetigteBar({ customerEmail: bestellung.customerEmail }, jetzt),
+        bestellung.mitHofGrenze ? zaehleUnbestaetigteBar({ farmId: bestellung.farmId }, jetzt) : Promise.resolve(0),
+      ]),
+      DB_BREMSE_ZEITLIMIT_MS
+    )
+    stand = { unbestaetigtAdresse, unbestaetigtHof }
+  } catch (err) {
+    meldeBremsFehler(err, [{ bremse: BAR_UNBESTAETIGT_ZAEHLUNG, merkmal: '' }], jetzt, meldungen)
+  }
+  if (barBremse({ ...stand, mitHofGrenze: bestellung.mitHofGrenze })) return gebremst()
+
+  const bremse = DB_BREMSEN.barBestellungIp
+  if (await bremseUeberAlleInstanzen([{ bremse, merkmal: getClientIp(request.headers) }], jetzt, meldungen)) return null
+  return gebremst({ 'Retry-After': String(sekundenBisFensterEnde(jetzt, bremse.fensterMs)) })
 }
 
 /**
