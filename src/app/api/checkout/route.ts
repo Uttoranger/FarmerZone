@@ -4,7 +4,7 @@ import type Stripe from 'stripe'
 import * as Sentry from '@sentry/nextjs'
 import type { Prisma } from '@prisma/client'
 import { enforceRateLimit } from '@/lib/rate-limit'
-import { bremseCheckout } from '@/server/bremse-datenbank'
+import { bremseBarBestellung, bremseCheckout } from '@/server/bremse-datenbank'
 import { SHOP_PAUSED_MESSAGE } from '@/lib/shop-pause'
 import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
@@ -105,20 +105,25 @@ function generateOrderNumber(farmSlug: string): string {
   return `${initials}-${dd}${mm}-${suffix}`
 }
 
-/** Bereits gebuchte Mengen wieder gutschreiben — Ausgleich, wenn danach etwas scheitert. */
-async function gibBestandZurueck(gebucht: Array<{ productId: string; quantity: number }>) {
-  for (const g of gebucht) {
-    try {
-      await prisma.product.update({
-        where: { id: g.productId },
-        data: { stock: { increment: g.quantity } },
-      })
-    } catch (e) {
-      // Der Ausgleich darf die Fehlerantwort nicht selbst zum Absturz bringen.
-      console.error('[/api/checkout] Bestand-Ausgleich fehlgeschlagen', g.productId, e)
-    }
+/**
+ * Eine Position hat beim bedingten Buchen keinen Vorrat mehr (0 Zeilen): Wurf
+ * in der Transaktion von Schritt 8/9 — die Datenbank rollt alles zurück, was
+ * diese Bestellung schon gebucht hat, und der catch antwortet mit 409.
+ */
+class VorratReichtNicht extends Error {
+  constructor(readonly produktName: string) {
+    super('Vorrat reicht nicht')
+    this.name = 'VorratReichtNicht'
   }
 }
+
+/** Feste Sperr-Reihenfolge: zwei Körbe mit denselben Produkten sperren deren Zeilen in derselben Folge — keine Verklemmung. */
+function nachProduktId<T extends { productId: string }>(positionen: readonly T[]): T[] {
+  return [...positionen].sort((a, b) => (a.productId < b.productId ? -1 : a.productId > b.productId ? 1 : 0))
+}
+
+/** Satz zum Abgleich des Gesamtbetrags (N10, Nr. 287) — die Kasse zeigt ihn am Korb. */
+const GESAMT_GEAENDERT_SATZ = 'Der Gesamtbetrag hat sich geändert. Bitte prüf ihn und bestell dann noch einmal.'
 
 /** 600 Hundertstel → „6.00“ — der Satz für `serviceFeePercentApplied` (Decimal) ohne Gleitkomma. */
 function hundertstelAlsDezimal(hundertstel: number): string {
@@ -723,6 +728,46 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // 5d. ABGLEICH DES GESAMTBETRAGS (Register N10, Nr. 287). Die Kundin zahlt
+  //     nie einen Betrag, den sie nicht gesehen hat: Der Preisabgleich (3b)
+  //     sieht nur die Positionen — ändert sich zwischen Anzeige und Klick die
+  //     Gebühr (Satz des Hofs, Stichtag), stimmt der Gesamtbetrag nicht mehr.
+  //     Dann entsteht keine Bestellung, nichts wird gebucht, und die Antwort
+  //     nennt den Betrag des Servers — die Kasse zeigt ihn, und der nächste
+  //     Klick schickt genau ihn (keine Schleife). Ohne Feld (alter Tab) wie bisher.
+  const gesamtCents = warenpreisCents + gebuehr.gebuehrCents
+  if (data.gesamtCents !== undefined && data.gesamtCents !== gesamtCents) {
+    return konflikt(data.idempotencyKey, data.sessionId, {
+      error: GESAMT_GEAENDERT_SATZ,
+      code: 'GESAMT_GEAENDERT',
+      amountCents: gesamtCents,
+      serviceFeeCents: gebuehr.gebuehrCents,
+    })
+  }
+
+  // 5e. BREMSE FÜR BAR-BESTELLUNGEN (Nr. 287, Missbrauchsschutz M5) — nur bar,
+  //     nur in Produktion, vor der Transaktion: Jede Bar-Bestellung schickt
+  //     sofort zwei Mails und hält Ware bis zu zwei Stunden. Je Adresse 3 und
+  //     je Hof 15 unbestätigte (die Grenze je Hof mit dem Startsatz „Bremse je
+  //     Hof für Bar-Bestellungen freigegeben“, Lauf 34 A), je IP 10 neue in der
+  //     Stunde (src/server/bremse-datenbank.ts). Antwortet die Datenbank dafür
+  //     nicht, geht die Bestellung durch (Register R1). Der letzte Blick: Zu
+  //     einem bekannten Schlüssel gibt es die Bestellung, nie ein 429.
+  if (data.paymentMethod === 'ONSITE_CASH') {
+    const barGebremst = await bremseBarBestellung(
+      request,
+      {
+        customerEmail: data.customerEmail,
+        farmId: farm.id,
+        // Dieselbe Bedingung wie Schritt 2 für online — nur dann zeigt der Satz auf online.
+        onlineMoeglich: Boolean(farm.acceptsOnline && farm.stripeAccountReady && farm.stripeAccountId),
+        mitHofGrenze: true,
+      },
+      now
+    )
+    if (barGebremst) return (await antwortFuerBestehendeBestellung(data.idempotencyKey, data.sessionId)) ?? barGebremst
+  }
+
   // 6. Order number (retry on collision — astronomically unlikely)
   let orderNumber = generateOrderNumber(data.farmSlug)
   const collision = await prisma.order.findUnique({ where: { orderNumber } })
@@ -732,32 +777,25 @@ export async function POST(request: NextRequest) {
   const [y, mo, d] = data.pickupDate.split('-').map(Number)
   const pickupDate = new Date(y, mo - 1, d, 12, 0, 0)
 
-  // 8. BESTAND BEDINGT BUCHEN — vor der Bestellung, damit im Fehlerfall keine
-  //    halbe Bestellung übrig bleibt. `updateMany` mit `stock >= Menge` schlägt
-  //    fehl (count 0), wenn zwischen Prüfung und Buchung jemand schneller war;
-  //    ein blindes `decrement` hätte den Bestand ins Minus gezogen.
-  const gebucht: Array<{ productId: string; quantity: number }> = []
-  for (const item of positionen) {
-    const res = await prisma.product.updateMany({
-      where: { id: item.productId, stock: { gte: item.quantity } },
-      data: { stock: { decrement: item.quantity } },
-    })
-    if (res.count === 0) {
-      await gibBestandZurueck(gebucht)
-      return konflikt(
-        data.idempotencyKey,
-        data.sessionId,
-        {
-          error: `"${item.name}" wurde gerade von jemand anderem gekauft. Bitte prüfe deinen Warenkorb.`,
-          code: 'WARENKORB_GEAENDERT',
-        },
-      )
-    }
-    gebucht.push({ productId: item.productId, quantity: item.quantity })
-  }
+  // 7b. BAR: der Bestätigungs-Token VOR der Transaktion, sein Hash steht im
+  //     Anlegen (Nr. 287). Vorher setzte ihn ein drittes Schreiben; scheiterte
+  //     es, stand die Bestellung ohne Token da — ohne Mail, und „Erneut
+  //     senden" verlangt einen Token. Gespeichert wird nur der Hash (Register
+  //     S17 Punkt 2, Nr. 151); der Token selbst steht allein in der Mail.
+  //     Der Zahlweg trägt den Token im Typ: In 11b (nach dem Zweig für online)
+  //     ist er da, ohne Prüfung, die eine gültige Bestellung mit 500 enden ließe.
+  const zahlweg = data.paymentMethod === 'ONLINE' ? { art: 'online' as const } : { art: 'bar' as const, token: neuerBarToken() }
 
-  // 9. Bestellung anlegen. Scheitert das, wird der Bestand wieder gutgeschrieben —
-  //    sonst wäre Ware verschwunden, die nie verkauft wurde.
+  // 8./9. VORRAT UND BESTELLUNG IN EINER TRANSAKTION (Nr. 287; imAbholfenster,
+  //    src/server/abholfenster.ts). Zuerst der Vorrat, bedingt: `updateMany`
+  //    mit `stock >= Menge` trifft 0 Zeilen, wenn zwischen Prüfung und Buchung
+  //    jemand schneller war — ein blindes `decrement` zöge ins Minus. Die
+  //    Positionen nach `productId` sortiert (feste Sperr-Reihenfolge). Dann die
+  //    Bestellung. Scheitert irgendetwas davon, rollt die Datenbank ALLES
+  //    zurück — auch wenn der Prozess den Fehler nicht mehr erlebt. Vorher
+  //    buchte die Kasse Position für Position außerhalb jeder Transaktion und
+  //    schrieb im Fehlerfall von Hand gut; brach sie dazwischen ab, fehlte
+  //    Ware ohne Bestellung.
   // Die Geldwerte kommen so zurück, wie die Datenbank sie gespeichert hat —
   // genau daraus rechnet intentParameter, auch bei einer Wiederholung.
   let order: {
@@ -771,72 +809,90 @@ export async function POST(request: NextRequest) {
     gebuehrModell: string | null
   }
   try {
-    // Bei einem Fenster mit Höchstzahl: zählen und anlegen in EINER
-    // Transaktion unter der Sperre des Fensters (src/server/abholfenster.ts).
-    order = await imAbholfenster(farm.id, abholung.fenster, (db) => db.order.create({
-      data: {
-        orderNumber,
-        idempotencyKey: data.idempotencyKey ?? null,
-        farmId: farm.id,
-        customerEmail: data.customerEmail,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        customerNote: data.customerNote || null,
-        status: 'PENDING_CONFIRMATION',
-        totalAmount,
-        pickupDate,
-        pickupTimeStart: data.pickupTimeStart,
-        pickupTimeEnd: data.pickupTimeEnd,
-        paymentMethod: data.paymentMethod as 'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD',
-        paymentStatus: 'PENDING',
-        platformFeeAmount,
-        // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
-        // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
-        serviceFeeCents: gebuehr.gebuehrCents,
-        serviceFeePercentApplied: gebuehr.prozent,
-        // Snapshot der Mindestgebühr (E14, Nr. 19): „Artikel fehlt" rechnet die
-        // Gebühr auf den Rest mit genau dieser Regel neu, nie mit der heutigen
-        // Hofeinstellung. null, wenn keine Gebühr gilt — wie der Prozentsatz,
-        // also auch bar vor dem SEPA-Start (B1): Gebühr 0 bleibt dort 0.
-        // Im Hofpreis-Modell 0 (N38: keine Mindestgebühr).
-        serviceFeeMinCentsApplied: gebuehr.mindestCents,
-        // N38: Modell und Einzugsweg im Snapshot — null im Modell `bisher`.
-        gebuehrModell: gebuehr.modell,
-        gebuehrEinzug: gebuehr.einzug,
-        kaeuferArt: data.kaeuferArt,
-        betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
-        items: {
-          create: positionen.map((i, index) => ({
-            productId: i.productId,
-            productName: i.name,
-            unitPrice: i.unitPrice,
-            quantity: i.quantity,
-            totalPrice: calcLineTotal(i.unitPrice, i.quantity),
-            // SNAPSHOT des MwSt-Satzes — im selben create wie die Bestellung,
-            // also atomar mit ihr. Später nie aus Product nachlesen, nie
-            // rückwirkend ändern (Invariante ARCHITECTURE.md §5). Die Map ist
-            // oben vollständig geprüft (3b).
-            vatRate: produktJeId.get(i.productId)!.vatRate,
-            // N38: die Gebühr dieser Position (Menge × Gebühr je Stück) — „Artikel fehlt“ zieht genau sie ab.
-            gebuehrCents: gebuehr.jePosition?.[index] ?? 0,
-          })),
+    // Bei einem Fenster mit Höchstzahl zählt imAbholfenster vorher unter der
+    // Sperre des Fensters — Vorrat erst danach, in derselben Transaktion.
+    order = await imAbholfenster(farm.id, abholung.fenster, async (db) => {
+      for (const item of nachProduktId(positionen)) {
+        const gebucht = await db.product.updateMany({
+          where: { id: item.productId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        })
+        if (gebucht.count === 0) throw new VorratReichtNicht(item.name)
+      }
+      return db.order.create({
+        data: {
+          orderNumber,
+          idempotencyKey: data.idempotencyKey ?? null,
+          farmId: farm.id,
+          customerEmail: data.customerEmail,
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          customerNote: data.customerNote || null,
+          status: 'PENDING_CONFIRMATION',
+          totalAmount,
+          pickupDate,
+          pickupTimeStart: data.pickupTimeStart,
+          pickupTimeEnd: data.pickupTimeEnd,
+          paymentMethod: data.paymentMethod as 'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD',
+          paymentStatus: 'PENDING',
+          // Nur bar (7b): der Hash des Tokens, im selben Anlegen.
+          confirmationToken: zahlweg.art === 'bar' ? zahlweg.token.hash : null,
+          platformFeeAmount,
+          // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
+          // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
+          serviceFeeCents: gebuehr.gebuehrCents,
+          serviceFeePercentApplied: gebuehr.prozent,
+          // Snapshot der Mindestgebühr (E14, Nr. 19): „Artikel fehlt" rechnet die
+          // Gebühr auf den Rest mit genau dieser Regel neu, nie mit der heutigen
+          // Hofeinstellung. null, wenn keine Gebühr gilt — wie der Prozentsatz,
+          // also auch bar vor dem SEPA-Start (B1): Gebühr 0 bleibt dort 0.
+          // Im Hofpreis-Modell 0 (N38: keine Mindestgebühr).
+          serviceFeeMinCentsApplied: gebuehr.mindestCents,
+          // N38: Modell und Einzugsweg im Snapshot — null im Modell `bisher`.
+          gebuehrModell: gebuehr.modell,
+          gebuehrEinzug: gebuehr.einzug,
+          kaeuferArt: data.kaeuferArt,
+          betriebsnummer: betriebsnummerFuerBestellung(data.kaeuferArt, data.betriebsnummer),
+          items: {
+            create: positionen.map((i, index) => ({
+              productId: i.productId,
+              productName: i.name,
+              unitPrice: i.unitPrice,
+              quantity: i.quantity,
+              totalPrice: calcLineTotal(i.unitPrice, i.quantity),
+              // SNAPSHOT des MwSt-Satzes — im selben create wie die Bestellung,
+              // also atomar mit ihr. Später nie aus Product nachlesen, nie
+              // rückwirkend ändern (Invariante ARCHITECTURE.md §5). Die Map ist
+              // oben vollständig geprüft (3b).
+              vatRate: produktJeId.get(i.productId)!.vatRate,
+              // N38: die Gebühr dieser Position (Menge × Gebühr je Stück) — „Artikel fehlt“ zieht genau sie ab.
+              gebuehrCents: gebuehr.jePosition?.[index] ?? 0,
+            })),
+          },
         },
-      },
-      select: {
-        id: true,
-        createdAt: true,
-        orderNumber: true,
-        farmId: true,
-        totalAmount: true,
-        platformFeeAmount: true,
-        serviceFeeCents: true,
-        gebuehrModell: true,
-      },
-    }))
+        select: {
+          id: true,
+          createdAt: true,
+          orderNumber: true,
+          farmId: true,
+          totalAmount: true,
+          platformFeeAmount: true,
+          serviceFeeCents: true,
+          gebuehrModell: true,
+        },
+      })
+    })
   } catch (e) {
-    await gibBestandZurueck(gebucht)
+    // Die Transaktion ist zurückgerollt: nichts gebucht, keine Bestellung.
+    // Jemand war schneller und hat den Vorrat einer Position gekauft.
+    if (e instanceof VorratReichtNicht) {
+      return konflikt(data.idempotencyKey, data.sessionId, {
+        error: `"${e.produktName}" wurde gerade von jemand anderem gekauft. Bitte prüfe deinen Warenkorb.`,
+        code: 'WARENKORB_GEAENDERT',
+      })
+    }
     // Der letzte Platz im Fenster ging an eine gleichzeitige Bestellung: keine
-    // Bestellung, Bestand zurück, die Kundin wählt ein anderes Fenster.
+    // Bestellung, kein Vorrat gebucht, die Kundin wählt ein anderes Fenster.
     if (e instanceof AbholfensterVoll) {
       return konflikt(data.idempotencyKey, data.sessionId, {
         error: ABHOLFENSTER_NICHT_VERFUEGBAR,
@@ -877,7 +933,7 @@ export async function POST(request: NextRequest) {
   //      Mit festem Stripe-Schlüssel je Bestellung und NIE ungeschützt:
   //      Bestellung und Bestand stehen schon. Scheitert Stripe, wird storniert
   //      und zurückgebucht, statt beides ohne Zahlungsweg stehen zu lassen.
-  if (data.paymentMethod === 'ONLINE') {
+  if (zahlweg.art === 'online') {
     let paymentIntent: Stripe.PaymentIntent
     // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
     const hofKonto = farm.stripeAccountId!
@@ -936,15 +992,9 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 11b. ONSITE — Bestätigungs-Token jetzt, E-Mail NACH der Antwort.
+  // 11b. ONSITE — der Token steht seit dem Anlegen (7b), die E-Mail geht NACH der Antwort.
   await gibHalteFrei()
-  // Gespeichert wird nur der Hash (Register S17 Punkt 2, Nr. 151) — der
-  // Token selbst steht allein in der Mail.
-  const { token: confirmationToken, hash: confirmationHash } = neuerBarToken()
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { confirmationToken: confirmationHash },
-  })
+  const confirmationToken = zahlweg.token.token
 
   // Der Versand hängt an Resend und dauert Sekunden. Er gehört nicht in die
   // Antwortzeit der Kundin: `after()` führt ihn aus, NACHDEM die Antwort

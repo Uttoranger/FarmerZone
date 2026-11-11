@@ -136,7 +136,53 @@ export const DB_BREMSEN = {
   // je Hof und Tag nach Sentry, Merkmal ist die Hof-ID. Eigener Zweck, damit
   // die Zähler von „Konto unbekannt" und „Konto-Land" nie ineinanderlaufen.
   stripeKontoLand: { zweck: 'stripe-konto-land', max: 1, fensterMs: TAG_MS },
+  // Neue Bar-Bestellungen je IP (Nr. 287, Missbrauchsschutz M5): 10 je Stunde
+  // über alle Instanzen, ohne eigene erste Stufe — davor wirkt die Bremse der
+  // Kasse (20 je Minute). Jede Bar-Bestellung schickt sofort zwei Mails und
+  // hält Ware bis zu zwei Stunden; online bleibt frei (bremseBarBestellung).
+  barBestellungIp: { zweck: 'bar-bestellung-ip', max: 10, fensterMs: STUNDE_MS },
 } as const satisfies Record<string, DbBremse>
+
+/*
+ * BREMSE FÜR BAR-BESTELLUNGEN (Nr. 287). Neben der Grenze je IP oben zählen
+ * zwei Grenzen keine Versuche, sondern offene Bestellungen in `Order`:
+ * unbestätigte Bar-Bestellungen (PENDING_CONFIRMATION, jünger als die
+ * Bestätigungsfrist) je Adresse und je Hof. Eine bestätigte oder verfallene
+ * zählt nicht mehr — die Grenze gibt sich von selbst frei, ohne Fenster.
+ * Die Zählung steht in src/server/bremse-datenbank.ts (`zaehleUnbestaetigteBar`).
+ */
+
+/** Höchstens so viele unbestätigte Bar-Bestellungen je Adresse gleichzeitig; die nächste wird gebremst. */
+export const BAR_UNBESTAETIGT_JE_ADRESSE = 3
+
+/** Höchstens so viele unbestätigte Bar-Bestellungen je Hof gleichzeitig (Startsatz „Bremse je Hof …“, Lauf 34 A). */
+export const BAR_UNBESTAETIGT_JE_HOF = 15
+
+export const CODE_BAR_GEBREMST = 'BAR_GEBREMST'
+
+/**
+ * Die Sätze verraten nicht, ob zu einer Adresse schon Bestellungen offen sind,
+ * und fordern niemanden auf, fremde Bestellungen zu bestätigen — wer eine
+ * fremde Adresse eintippt, erfährt nichts über sie.
+ */
+export const BAR_GEBREMST_SATZ = 'Bar bestellen geht gerade nicht. Bitte versuch es später noch einmal.'
+export const BAR_GEBREMST_SATZ_ONLINE = 'Bar bestellen geht gerade nicht. Bezahl online oder versuch es später noch einmal.'
+
+/** Der Satz zur gebremsten Bar-Bestellung — mit Ausweg online nur, wenn der Hof online annimmt. */
+export function barGebremstSatz(onlineMoeglich: boolean): string {
+  return onlineMoeglich ? BAR_GEBREMST_SATZ_ONLINE : BAR_GEBREMST_SATZ
+}
+
+/**
+ * Bremst eine neue Bar-Bestellung, wenn schon so viele unbestätigte offen sind
+ * wie erlaubt: die 4. einer Adresse, die 16. eines Hofs. `mitHofGrenze: false`
+ * (Startsatz fehlt) lässt den Hof nie zählen. null = weiter.
+ */
+export function barBremse(stand: { unbestaetigtAdresse: number; unbestaetigtHof: number; mitHofGrenze: boolean }): 'adresse' | 'hof' | null {
+  if (stand.unbestaetigtAdresse >= BAR_UNBESTAETIGT_JE_ADRESSE) return 'adresse'
+  if (stand.mitHofGrenze && stand.unbestaetigtHof >= BAR_UNBESTAETIGT_JE_HOF) return 'hof'
+  return null
+}
 
 /** Welche Bremsen je Art zählen: Codes je Stunde und je Tag, Passwörter je Stunde. */
 export const FEHLVERSUCH_BREMSEN = {

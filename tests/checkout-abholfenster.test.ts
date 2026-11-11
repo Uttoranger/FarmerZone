@@ -261,7 +261,7 @@ describe('Abholtermin — volles Fenster: 409 ABHOLFENSTER_VOLL', () => {
     })
   })
 
-  it('der letzte Platz geht beim Anlegen weg: Bestand zurück, 409, keine Bestellung', async () => {
+  it('der letzte Platz geht beim Anlegen weg: die Transaktion endet, kein Bestand gebucht, 409, keine Bestellung', async () => {
     // Vorprüfung sieht einen freien Platz, in der Transaktion ist er weg —
     // eine gleichzeitige Bestellung war schneller.
     orderCount.mockResolvedValueOnce(1).mockResolvedValueOnce(2)
@@ -271,10 +271,10 @@ describe('Abholtermin — volles Fenster: 409 ABHOLFENSTER_VOLL', () => {
     expect(res.status).toBe(409)
     expect((await res.json()).code).toBe('ABHOLFENSTER_VOLL')
     expect(orderCreate).not.toHaveBeenCalled()
-    // Der gebuchte Bestand ist wieder gutgeschrieben.
-    expect(productUpdate).toHaveBeenCalledWith({
-      where: { id: 'prod_1' },
-      data: { stock: { increment: 2 } },
-    })
+    // Nr. 287: Gezählt wird vor dem Vorrat, in derselben Transaktion — keine Gutschrift von Hand, die
+    // Transaktion endet mit dem Fehler (echt geprüft: tests/integration/checkout-abholfenster.int.test.ts).
+    expect(productUpdateMany).not.toHaveBeenCalled()
+    expect(productUpdate).not.toHaveBeenCalled()
+    await expect(vi.mocked(prisma.$transaction).mock.results[0]?.value).rejects.toThrow('Abholfenster voll')
   })
 })

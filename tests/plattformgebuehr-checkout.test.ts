@@ -31,6 +31,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Nr. 287: Vorrat und Bestellung in einer Transaktion (imAbholfenster) — der Rückruf bekommt dieselbe Attrappe.
+    $transaction: vi.fn(async (f: (tx: unknown) => unknown) => f((await import('@/lib/prisma')).prisma)),
     plattformEinstellung: { findUnique: vi.fn() },
     // Die Platzvergabe der Gründungshöfe (ladeHoefeFuerGruendung) — nur im Hofpreis-Modell ohne Farm.einzugAb gelesen.
     farm: { findUnique: vi.fn(), findMany: vi.fn() },
