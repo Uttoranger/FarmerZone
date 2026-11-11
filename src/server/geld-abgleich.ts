@@ -212,8 +212,6 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
     await prisma.betriebMessung.updateMany({ where: { tag: alt.tag, art: alt.art }, data: { wert: BigInt(abweichungCents(a)), gemessenAm: jetzt } })
   }
 
-  if (streitfaelle) await gleicheStreitfaelleAb(streitfaelle, jetzt)
-
   // Abgeschnittene Saldo-Liste: Die Tagessummen wären zu klein und gälten danach als vollständig —
   // dann lieber gar nicht schreiben (die alten Werte bleiben) und warnen.
   const gebuehren = saldoAbgeschnitten ? new Map<string, number>() : stripeGebuehrenJeTag(buchungen)
@@ -225,6 +223,15 @@ export async function gleicheGeldAb(jetzt: Date): Promise<GeldAbgleichErgebnis> 
       create: { tag: tagDatum, art: STRIPE_GEBUEHR_ART, wert: BigInt(cents) },
       update: { wert: BigInt(cents), gemessenAm: jetzt },
     })
+  }
+
+  // Streitfälle zuletzt und in eigenem Versuch: Ein Fehler beim Schreiben dort hält Abweichungen und Gebühren nicht auf.
+  if (streitfaelle) {
+    try {
+      await gleicheStreitfaelleAb(streitfaelle, jetzt)
+    } catch (err) {
+      meldeStreitNichtGeschrieben(err)
+    }
   }
 
   return { zahlungen: zahlungen.size, verglichen: verglichen.length, abweichungen: abweichungen.length, neu: neu.length, geklaert: geklaert.length, stripeGebuehrTage: gebuehren.size }
@@ -270,6 +277,13 @@ async function gleicheStreitfaelleAb(faelle: readonly Stripe.Dispute[], jetzt: D
   })
   if (geschlossen.length > 0) await prisma.betriebMessung.deleteMany({ where: { art: { in: geschlossen.map((z) => z.zeile) } } })
   for (const z of zeilen) if (!nachKennung.has(z.streitId)) meldeStreitUnbekannt(z.streitId)
+}
+
+/** Warnung: Die Zeilen der Streitfälle ließen sich nicht schreiben — nur die Fehlerklasse; der Lauf gilt. */
+function meldeStreitNichtGeschrieben(err: unknown): void {
+  const meldung = new Error('Geld-Abgleich: Streitfälle nicht geschrieben')
+  if (err instanceof Error && /^[A-Za-z][A-Za-z0-9_]{0,59}$/.test(err.name)) meldung.name = err.name
+  Sentry.captureException(meldung, { level: 'warning', tags: { aufgabe: 'geld-abgleich', schritt: 'streit-schreiben' } })
 }
 
 /** Warnung: Die Liste der Streitfälle war länger als LISTE_HOECHSTENS — die Zeilen bleiben, wie sie sind. */

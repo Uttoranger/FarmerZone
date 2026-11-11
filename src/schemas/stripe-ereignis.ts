@@ -61,6 +61,9 @@ const rueckbuchungSchema = z.object({
   evidence_details: z.object({ due_by: z.number().int().nullish() }).nullish(),
 })
 
+/** Ein Streitfall, wie die Behandlung ihn liest (Nr. 289) — `Stripe.Dispute` passt hinein. */
+export type StripeStreitfall = z.infer<typeof rueckbuchungSchema>
+
 /** setup_intent.succeeded — Lastschrift-Mandat des Hofs. */
 const einrichtungSchema = z.object({
   id: kennungSchema,

@@ -219,7 +219,7 @@ Dieses Kapitel nennt nur Ablauf und Fristen. Es ist keine Rechtsauskunft; bei de
 #### Danach
 
 - Nach der Erstattung steht die Bestellung nicht mehr in „Erstattung offen“. Prüfe das in Heute.
-- Hat die Kundin bei ihrer Bank widersprochen (Rückbuchung), erscheint ein Einspruch in Stripe mit einer Antwortfrist: Antworte dort, bevor sie abläuft, und erstatte nicht zusätzlich. In Heute steht dann „Rückbuchung einer Kundenzahlung“ (fragt die Bank nur nach: „Rückfrage zu einer Kundenzahlung“ – in Stripe vor der Frist antworten), im Protokoll der Bestellung Betrag und Frist. Agrilo ist mit Betrag und Gebühr belastet. Entscheide: annehmen → Transfer bei Stripe zurückholen; widersprechen → Belege in Stripe vor der Frist, nach dem Ausgang bei ‚verloren‘ zurückholen (AGB 21.3), die Gebühr per Rechnung bzw. Lastschrift. Die Aufgabe steht in Heute, solange Stripe den Fall offen führt; den Ausgang (gewonnen, verloren) schreibt die App ins Protokoll. Die App bewegt dabei kein Geld.
+- Hat die Kundin bei ihrer Bank widersprochen (Rückbuchung), erscheint ein Einspruch in Stripe mit einer Antwortfrist: Antworte dort, bevor sie abläuft, und erstatte nicht zusätzlich. Agrilo ist mit Betrag und Gebühr belastet. Entscheide: annehmen → Transfer bei Stripe zurückholen; widersprechen → Belege in Stripe vor der Frist, nach dem Ausgang bei ‚verloren‘ zurückholen (AGB 21.3), die Gebühr per Rechnung bzw. Lastschrift. Die Aufgabe steht in Heute, solange Stripe den Fall offen führt.
 - Ist der Fehler ein Fehler der App (zu hoher Betrag, doppelte Gebühr), ist das ein Geld-Fund: Betrag nicht von Hand ändern, sondern mit Bestellnummer als Fehler melden und mit Test beheben lassen.
 - Schreib Bestellnummer, Ursache und Ergebnis in deine Notizen.
 

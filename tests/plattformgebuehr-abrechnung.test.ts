@@ -690,6 +690,8 @@ describe('Rückbuchung einer Kundenzahlung (Nr. 289, E-022): sichtbar machen, ke
       data: [{ tag: new Date('2027-03-05T00:00:00.000Z'), art: 'kundenstreit:bestellung-kunde:dp_kunde_a:rueckbuchung', wert: BigInt(DUE_BY), gemessenAm: STREIT_JETZT }],
       skipDuplicates: true,
     })
+    // Erst das Protokoll, dann die Zeile (Block 289, Umsetzung 3).
+    expect(vi.mocked(protokolliere).mock.invocationCallOrder[0]).toBeLessThan(db.betriebMessung.createMany.mock.invocationCallOrder[0] ?? 0)
     expect(captureException).not.toHaveBeenCalled()
     nichtsBewegt()
   })
@@ -735,6 +737,8 @@ describe('Rückbuchung einer Kundenzahlung (Nr. 289, E-022): sichtbar machen, ke
       { wer: null, art: 'kundenzahlung_rueckbuchung_abgeschlossen', bezugArt: 'bestellung', bezugId: 'bestellung-kunde', mitPasskey: false, grund },
     ])
     expect(db.betriebMessung.deleteMany).toHaveBeenCalledWith({ where: { art: { startsWith: 'kundenstreit:bestellung-kunde:dp_kunde_a:' } } })
+    // Protokoll wie bei created, dann die Zeile weg (Umsetzung 4).
+    expect(vi.mocked(protokolliere).mock.invocationCallOrder[0]).toBeLessThan(db.betriebMessung.deleteMany.mock.invocationCallOrder[0] ?? 0)
     expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
     nichtsBewegt()
   })

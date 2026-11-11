@@ -6,6 +6,7 @@ import { centsAlsEuro, formatDatumLang, formatEuro } from '@/lib/format'
 import { utcTagesbeginn } from '@/lib/betrieb'
 import { kundenstreitAnfang, kundenstreitArt, kundenstreitArtVonStand } from '@/lib/geld-abgleich'
 import { adminGrundSchema } from '@/schemas/admin-aktion'
+import type { StripeStreitfall } from '@/schemas/stripe-ereignis'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { LASTSCHRIFT_HREF, ankuendigungText, lastschriftGescheitertText } from '@/lib/konditionen'
 import {
@@ -596,9 +597,6 @@ export async function behandleRueckbuchung(streit: Stripe.Dispute, jetzt = new D
 /** Ohne Antwortfrist von Stripe gilt Eingang + 7 Tage (E-022). */
 const KUNDENSTREIT_FRIST_OHNE_MS = 7 * 24 * 60 * 60 * 1000
 
-/** Was die Behandlung am Streitfall liest — Betrag, Stand und Frist kann Stripe weglassen (Schema: nullish). */
-type Kundenstreit = { id: string; amount?: number | null; status?: string | null; evidence_details?: { due_by?: number | null } | null }
-
 /**
  * Der Grund mit Kennung des Streitfalls. Trägt die Kennung sieben Ziffern am
  * Stück (oder wird der Grund zu lang), verwürfe das Protokoll den ganzen Grund
@@ -617,12 +615,10 @@ async function bestellungZurZahlung(zahlung: string): Promise<{ id: string } | n
 /**
  * `charge.dispute.created` zu einer Zahlung ohne Rechnung: gehört sie zu einer
  * Bestellung, ein Eintrag `kundenzahlung_zurueckgebucht` bzw. (Stand
- * `warning_…`) `kundenzahlung_rueckfrage` mit Betrag und Antwortfrist und die
- * Zeile für Heute. Erst die Zeile (idempotent über skipDuplicates), dann das
- * Protokoll (wirft nie): Scheitert die Zeile, wiederholt Stripe das Ereignis,
- * ohne dass ein Eintrag doppelt steht.
+ * `warning_…`) `kundenzahlung_rueckfrage` mit Betrag und Antwortfrist, dann die
+ * Zeile für Heute. Betrag, Stand und Frist kann Stripe weglassen (Schema: nullish).
  */
-async function kundenzahlungZurueckgebucht(streit: Kundenstreit, zahlung: string, jetzt: Date): Promise<void> {
+async function kundenzahlungZurueckgebucht(streit: StripeStreitfall, zahlung: string, jetzt: Date): Promise<void> {
   const bestellung = await bestellungZurZahlung(zahlung)
   if (!bestellung) {
     warnung('Rückbuchung ohne Rechnung und ohne Bestellung', 'rueckbuchung-unbekannt', { streit: streit.id })
@@ -636,11 +632,11 @@ async function kundenzahlungZurueckgebucht(streit: Kundenstreit, zahlung: string
   const wort = art === 'rueckfrage' ? 'Rückfrage' : 'Rückbuchung'
   const teile = [...(betrag === null ? [] : [betrag]), `Antwort bis ${formatDatumLang(new Date(fristSekunden * 1000))}`]
   const grund = grundMitKennung([`${wort} ${streit.id}`, ...teile].join(' · '), [wort, ...teile].join(' · '))
+  await protokolliere({ wer: null, art: art === 'rueckfrage' ? 'kundenzahlung_rueckfrage' : 'kundenzahlung_zurueckgebucht', bezugArt: 'bestellung', bezugId: bestellung.id, mitPasskey: false, grund })
   await prisma.betriebMessung.createMany({
     data: [{ tag: utcTagesbeginn(jetzt), art: kundenstreitArt(bestellung.id, streit.id, art), wert: BigInt(fristSekunden), gemessenAm: jetzt }],
     skipDuplicates: true,
   })
-  await protokolliere({ wer: null, art: art === 'rueckfrage' ? 'kundenzahlung_rueckfrage' : 'kundenzahlung_zurueckgebucht', bezugArt: 'bestellung', bezugId: bestellung.id, mitPasskey: false, grund })
 }
 
 /** Der Ausgang als Wort: gewonnen, verloren, sonst „ohne Rückbuchung beendet (<Stand>)“ (Rückfrage beendet, verhindert …). */
@@ -654,8 +650,8 @@ function streitAusgang(status: string | null | undefined): string {
  * `charge.dispute.closed` (Nr. 289, E-022): nur für Kundenzahlungen. Gehört die
  * Zahlung zu einer Rechnung, nichts — SEPA-Rückbuchungen sind endgültig, der
  * Weg zurück ist die Nachforderung (Register N38). Sonst zur Bestellung ein
- * Eintrag `kundenzahlung_rueckbuchung_abgeschlossen` mit dem Ausgang, und die
- * Zeile für Heute ist weg. Erst löschen, dann protokollieren (wie oben).
+ * Eintrag `kundenzahlung_rueckbuchung_abgeschlossen` mit dem Ausgang, dann ist
+ * die Zeile für Heute weg.
  */
 export async function behandleRueckbuchungAbgeschlossen(streit: Stripe.Dispute): Promise<void> {
   const zahlung = kennung(streit.payment_intent)
@@ -665,7 +661,6 @@ export async function behandleRueckbuchungAbgeschlossen(streit: Stripe.Dispute):
   const bestellung = await bestellungZurZahlung(zahlung)
   if (!bestellung) return
   const ausgang = streitAusgang(streit.status)
-  await prisma.betriebMessung.deleteMany({ where: { art: { startsWith: kundenstreitAnfang(bestellung.id, streit.id) } } })
   await protokolliere({
     wer: null,
     art: 'kundenzahlung_rueckbuchung_abgeschlossen',
@@ -674,6 +669,7 @@ export async function behandleRueckbuchungAbgeschlossen(streit: Stripe.Dispute):
     mitPasskey: false,
     grund: grundMitKennung(`${streit.id} · ${ausgang}`, ausgang),
   })
+  await prisma.betriebMessung.deleteMany({ where: { art: { startsWith: kundenstreitAnfang(bestellung.id, streit.id) } } })
 }
 
 /**

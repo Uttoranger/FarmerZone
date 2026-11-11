@@ -435,6 +435,19 @@ describe('gleicheGeldAb: Streitfälle zu Kundenzahlungen (Nr. 289, E-022)', () =
     })
   })
 
+  it('Schreiben der Streit-Zeilen scheitert: Abweichung und Gebühren stehen trotzdem, der Lauf wirft nicht, eine Warnung (Schritt streit-schreiben)', async () => {
+    stripeAttrappe.disputes.list.mockReturnValue(liste([streit('dp_zu', 'won', 'pi_zu')]))
+    richteEin([ZEILE_ZU], [])
+    vi.mocked(db.betriebMessung.deleteMany).mockRejectedValueOnce(Object.assign(new Error('Verbindung weg'), { name: 'PrismaClientKnownRequestError' }))
+    expect(await gleicheGeldAb(JETZT)).toMatchObject({ neu: 1, stripeGebuehrTage: 1 })
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ art: 'geldAbweichung:bestellung-bbbb:gebuehr' })] }))
+    expect(db.betriebMessung.upsert).toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.objectContaining({ name: 'PrismaClientKnownRequestError', message: 'Geld-Abgleich: Streitfälle nicht geschrieben' }), {
+      level: 'warning',
+      tags: { aufgabe: 'geld-abgleich', schritt: 'streit-schreiben' },
+    })
+  })
+
   it('abgeschnittene Liste der Streitfälle: Streit-Zeilen unverändert, Warnung; der Rest läuft', async () => {
     stripeAttrappe.disputes.list.mockReturnValue(liste(Array.from({ length: LISTE_HOECHSTENS + 1 }, (_, i) => streit(`dp_${i}`, 'won', 'pi_zu'))))
     richteEin([ZEILE_ZU], [])
