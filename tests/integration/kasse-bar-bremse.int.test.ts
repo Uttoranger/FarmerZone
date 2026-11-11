@@ -40,6 +40,7 @@ import { stripe } from '@/lib/stripe'
 import { env } from '@/lib/env'
 import { BAR_UNBESTAETIGT_JE_HOF, DB_BREMSEN, bremsSchluessel } from '@/lib/bremse-datenbank'
 import { zaehleVersuche } from '@/server/bremse-datenbank'
+import { BESTAETIGUNGSFRIST_BAR_MINUTEN } from '@/lib/fristen'
 import { checkoutAnfrage, erstelleHof, erstelleProdukt, intKennung, raeumeAuf, setzeHalt } from './setup/basis'
 
 const SATZ = 'Bar bestellen geht gerade nicht. Bitte versuch es später noch einmal.'
@@ -124,6 +125,8 @@ describe('Bremse für Bar-Bestellungen je Adresse (Nr. 287, a)', () => {
 
     expect(vierte.status).toBe(429)
     expect(await vierte.json()).toEqual({ error: SATZ, code: 'BAR_GEBREMST' })
+    // 8a verlangt nur den Satz wie b), kein `Retry-After` (Bericht 287, Runde 1).
+    expect(vierte.headers.get('Retry-After')).toBeNull()
     expect(await prisma.order.count({ where: { farmId: farm.id } })).toBe(3)
     expect(await vorrat(produkt.id)).toBe(7)
     expect(nachlauf.aufgaben.length).toBe(mailsVorher)
@@ -224,6 +227,8 @@ describe('Bremse für Bar-Bestellungen je Hof (Nr. 287, c — Startsatz ja)', ()
     expect(fuenfzehnte.status).toBe(200)
     expect(sechzehnte.status).toBe(429)
     expect(await sechzehnte.json()).toEqual({ error: SATZ, code: 'BAR_GEBREMST' })
+    // „Antwort und Satz wie b)“: mit `Retry-After` — die Bestätigungsfrist (2 h), spätestens dann ist ein Platz frei.
+    expect(sechzehnte.headers.get('Retry-After')).toBe(String(BESTAETIGUNGSFRIST_BAR_MINUTEN * 60))
     expect(await prisma.order.count({ where: { farmId: farm.id } })).toBe(BAR_UNBESTAETIGT_JE_HOF)
     expect(await vorrat(produkt.id)).toBe(9)
   })
@@ -233,14 +238,23 @@ describe('Bremse für Bar-Bestellungen: fail-open (Register R1)', () => {
   it('scheitert die Zählung in der Datenbank, geht die Bestellung durch — und Sentry erfährt es', async () => {
     const { farm } = await erstelleHof()
     const produkt = await erstelleProdukt(farm.id, { stock: 10 })
-    vi.spyOn(prisma.order, 'count').mockRejectedValue(new Error('Datenbank weg'))
+    const ip = neueIp()
+    const email = neueAdresse()
+    // Der Fehlertext trägt Adresse und IP — in der Meldung darf davon nichts ankommen.
+    vi.spyOn(prisma.order, 'count').mockRejectedValue(new Error(`Datenbank weg bei ${email} von ${ip}`))
 
-    const antwort = await bestellen({ farm, produktId: produkt.id, ip: neueIp(), email: neueAdresse() })
+    const antwort = await bestellen({ farm, produktId: produkt.id, ip, email })
 
     expect(antwort.status).toBe(200)
-    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledWith(
+    const meldung = vi.mocked(Sentry.captureException)
+    expect(meldung).toHaveBeenCalledTimes(1)
+    expect(meldung).toHaveBeenCalledWith(
       expect.any(Error),
-      expect.objectContaining({ tags: expect.objectContaining({ aufgabe: 'bremse-datenbank' }) })
+      expect.objectContaining({ tags: expect.objectContaining({ aufgabe: 'bremse-datenbank', zweck: 'bar-unbestaetigt' }) })
     )
+    const [fehler, kontext] = meldung.mock.calls[0] ?? []
+    const gesendet = `${(fehler as Error).name} ${(fehler as Error).message} ${JSON.stringify(kontext)}`
+    expect(gesendet).not.toContain(email)
+    expect(gesendet).not.toContain(ip)
   })
 })

@@ -210,7 +210,10 @@ const BAR_UNBESTAETIGT_ZAEHLUNG: DbBremse = { zweck: 'bar-unbestaetigt', max: BA
  * unbestätigte je Adresse (3) und, mit `mitHofGrenze`, je Hof (15) — gezählt in
  * `Order`, nichts geschrieben —, danach neue Bar-Bestellungen je IP (10 in der
  * Stunde über alle Instanzen). Wer schon an Adresse oder Hof scheitert,
- * verbraucht so nichts vom Kontingent seiner IP.
+ * verbraucht so nichts vom Kontingent seiner IP. Bekannte Lücke: Adresse und
+ * Hof werden ohne Sperre vor der Transaktion gezählt — gleichzeitige Anfragen
+ * von mehreren IPs können die Grenze knapp überschreiten (begrenzt durch die
+ * Grenzen je IP).
  *
  * FAIL-OPEN wie jede zweite Stufe: Scheitert die Zählung oder dauert sie zu
  * lange, geht die Bestellung durch, und Sentry erfährt es gedrosselt
@@ -239,7 +242,12 @@ export async function bremseBarBestellung(
   } catch (err) {
     meldeBremsFehler(err, [{ bremse: BAR_UNBESTAETIGT_ZAEHLUNG, merkmal: '' }], jetzt, meldungen)
   }
-  if (barBremse({ ...stand, mitHofGrenze: bestellung.mitHofGrenze })) return gebremst()
+  const grenze = barBremse({ ...stand, mitHofGrenze: bestellung.mitHofGrenze })
+  // Je Adresse verlangt die Freigabe nur den Satz (8a), kein `Retry-After`. Je Hof „Antwort und Satz wie b)“ (9):
+  // `Retry-After` mit der Bestätigungsfrist — spätestens dann ist die älteste unbestätigte verfallen und ein Platz
+  // frei. Fest statt aus der ältesten Bestellung gerechnet: kein weiteres Lesen genau dann, wenn jemand den Hof flutet.
+  if (grenze === 'adresse') return gebremst()
+  if (grenze === 'hof') return gebremst({ 'Retry-After': String(BESTAETIGUNGSFRIST_BAR_MINUTEN * 60) })
 
   const bremse = DB_BREMSEN.barBestellungIp
   if (await bremseUeberAlleInstanzen([{ bremse, merkmal: getClientIp(request.headers) }], jetzt, meldungen)) return null

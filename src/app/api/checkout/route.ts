@@ -782,7 +782,9 @@ export async function POST(request: NextRequest) {
   //     es, stand die Bestellung ohne Token da — ohne Mail, und „Erneut
   //     senden" verlangt einen Token. Gespeichert wird nur der Hash (Register
   //     S17 Punkt 2, Nr. 151); der Token selbst steht allein in der Mail.
-  const barToken = data.paymentMethod === 'ONLINE' ? null : neuerBarToken()
+  //     Der Zahlweg trägt den Token im Typ: In 11b (nach dem Zweig für online)
+  //     ist er da, ohne Prüfung, die eine gültige Bestellung mit 500 enden ließe.
+  const zahlweg = data.paymentMethod === 'ONLINE' ? { art: 'online' as const } : { art: 'bar' as const, token: neuerBarToken() }
 
   // 8./9. VORRAT UND BESTELLUNG IN EINER TRANSAKTION (Nr. 287; imAbholfenster,
   //    src/server/abholfenster.ts). Zuerst der Vorrat, bedingt: `updateMany`
@@ -834,7 +836,7 @@ export async function POST(request: NextRequest) {
           paymentMethod: data.paymentMethod as 'ONLINE' | 'ONSITE_CASH' | 'ONSITE_CARD',
           paymentStatus: 'PENDING',
           // Nur bar (7b): der Hash des Tokens, im selben Anlegen.
-          confirmationToken: barToken?.hash ?? null,
+          confirmationToken: zahlweg.art === 'bar' ? zahlweg.token.hash : null,
           platformFeeAmount,
           // Snapshot der Servicegebühr — spätere Änderungen der Hofeinstellung
           // lassen diese Bestellung unverändert (prisma/schema.prisma, Order).
@@ -931,7 +933,7 @@ export async function POST(request: NextRequest) {
   //      Mit festem Stripe-Schlüssel je Bestellung und NIE ungeschützt:
   //      Bestellung und Bestand stehen schon. Scheitert Stripe, wird storniert
   //      und zurückgebucht, statt beides ohne Zahlungsweg stehen zu lassen.
-  if (data.paymentMethod === 'ONLINE') {
+  if (zahlweg.art === 'online') {
     let paymentIntent: Stripe.PaymentIntent
     // Das ! ist sicher: Schritt 2 lehnt ONLINE ohne stripeAccountId ab.
     const hofKonto = farm.stripeAccountId!
@@ -992,9 +994,7 @@ export async function POST(request: NextRequest) {
 
   // 11b. ONSITE — der Token steht seit dem Anlegen (7b), die E-Mail geht NACH der Antwort.
   await gibHalteFrei()
-  // Bar hat immer einen Token (7b: nur online keinen) — ohne ihn gäbe es keinen Link für die Mail.
-  if (!barToken) throw new Error('Barbestellung ohne Bestätigungs-Token')
-  const confirmationToken = barToken.token
+  const confirmationToken = zahlweg.token.token
 
   // Der Versand hängt an Resend und dauert Sekunden. Er gehört nicht in die
   // Antwortzeit der Kundin: `after()` führt ihn aus, NACHDEM die Antwort

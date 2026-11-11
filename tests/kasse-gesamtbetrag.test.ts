@@ -5,16 +5,18 @@
  *
  * Beweist:
  *  - Schema: `gesamtCents` ist optional (alter Tab), ganze Cent zwischen 0 und 100 000 000.
- *  - Absenden: die Kasse schickt den Gesamtbetrag mit, den sie zeigt; auf GESAMT_GEAENDERT lädt sie die Seite nach.
- *  - Nach GESAMT_GEAENDERT zeigt die Kasse den Betrag des Servers — in der Zusammenfassung, auf „Weiter zur
- *    Zahlung“ und auf „Zahlungspflichtig bestellen“; nach einer Mengenänderung oder mit anderer Zahlart wieder den
- *    eigenen (Gegenprobe).
+ *  - Die Kette: Die Kasse schickt den Gesamtbetrag, den sie zeigt; auf 409 GESAMT_GEAENDERT lädt sie die Seite nach,
+ *    zeigt danach den Betrag des Servers (Zusammenfassung, „Weiter zur Zahlung“ bzw. „Zahlungspflichtig bestellen“,
+ *    Hinweis am Korb), und der nächste Klick schickt genau ihn.
+ *  - Ändern sich Menge oder Zahlart, wird der Betrag des Servers leer: auch nach dem Zurückstellen gilt wieder der
+ *    eigene (Runde 1, B2).
  *
- * Prüfstand wie tests/kasse-zustaende.test.ts (TESTING_GUIDELINES §1): `useEffect` läuft je Quelltext einmal sofort
- * (die Kasse liest den Korb im Effekt); `useState` gibt dem Zustand mit dem Anfang `keinServerBetrag` auf Wunsch
- * einen Betrag des Servers — gesetzt wird er im Browser erst nach der Antwort, auf dem Server verpufft das. Zum
- * Absenden hält eine Hülle um `useForm` den Absende-Griff fest, den die Kasse selbst baut, und `useTransition`
- * lässt den Rückruf laufen (TESTING_GUIDELINES §1, „Ein Formular absenden geht auch ohne DOM“).
+ * Prüfstand (TESTING_GUIDELINES §1): `useEffect` läuft je Quelltext einmal sofort (die Kasse liest den Korb im
+ * Effekt). `useState` merkt sich für die Kasse (checkout-form.tsx) jeden gesetzten Wert je Aufrufstelle und beginnt
+ * den nächsten Aufbau damit — so trägt ein Wert, den die Kasse nach der Antwort setzt, in den nächsten Aufbau, wie im
+ * Browser; während des Renderns wirkt das Setzen wie gewohnt. Zum Absenden hält eine Hülle um `useForm` den
+ * Absende-Griff fest, den die Kasse selbst baut, und `useTransition` lässt den Rückruf laufen („Ein Formular absenden
+ * geht auch ohne DOM“). Gegenprobe: das alte Formular (ohne `gesamtCents`, ohne Zurücksetzen) macht die Fälle rot.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElement, type ReactNode } from 'react'
@@ -22,7 +24,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 const pruefstand = vi.hoisted(() => ({
   gelaufen: new Set<string>(),
-  serverBetrag: null as null | { betrag: { amountCents: number; serviceFeeCents: number }; fuer: string },
+  /** Gesetzte Werte der Kasse je Aufrufstelle von useState (Zeile des Stapels). */
+  zustand: new Map<string, unknown>(),
+  rendert: false,
   vorbelegung: {} as Record<string, string>,
   absenden: null as null | ((e?: unknown) => Promise<void>),
   laeufe: [] as Array<Promise<unknown>>,
@@ -38,11 +42,19 @@ vi.mock('react', async (importOriginal) => {
     effekt()
   }
   function useState<S>(start: S | (() => S)): [S, (wert: S | ((alt: S) => S)) => void] {
-    const paar = echt.useState(start)
-    if (typeof start === 'function' && start.name === 'keinServerBetrag' && pruefstand.serverBetrag) {
-      return [pruefstand.serverBetrag as S, paar[1]]
+    const stelle = new Error().stack?.split('\n')[2] ?? ''
+    const eigen = stelle.includes('checkout-form')
+    const paar = echt.useState<S>(eigen && pruefstand.zustand.has(stelle) ? (pruefstand.zustand.get(stelle) as S) : start)
+    if (!eigen) return paar
+    const [wert, setze] = paar
+    const merkeUndSetze = (neu: S | ((alt: S) => S)): void => {
+      const alt = (pruefstand.zustand.has(stelle) ? pruefstand.zustand.get(stelle) : wert) as S
+      const naechster = typeof neu === 'function' ? (neu as (alt: S) => S)(alt) : neu
+      pruefstand.zustand.set(stelle, naechster)
+      // Nach dem Aufbau gibt es auf dem Server nichts mehr zu setzen — der nächste Aufbau beginnt mit dem Wert.
+      if (pruefstand.rendert) setze(naechster)
     }
-    return paar
+    return [wert, merkeUndSetze]
   }
   // Auf dem Server wirft startTransition — hier läuft der Rückruf, und der Test wartet auf ihn.
   function useTransition(): [boolean, (rueckruf: () => unknown) => void] {
@@ -80,7 +92,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/lib/auth-client', () => ({ useSession: () => ({ data: null }), signOut: vi.fn() }))
 
-import { CheckoutForm, kassenStand } from '@/components/checkout/checkout-form'
+import { CheckoutForm } from '@/components/checkout/checkout-form'
 import { checkoutRequestSchema } from '@/schemas/checkout'
 import { abholKacheln } from '@/lib/kasse'
 import { SITZUNG_SCHLUESSEL, WARENKORB_SCHLUESSEL } from '@/lib/warenkorb-speicher'
@@ -92,11 +104,14 @@ const JETZT = new Date('2026-10-05T08:00:00.000Z')
 const HOF: PublicFarm = publicFarm({ name: 'Hof Beispiel', pickupSlots: [{ dayOfWeek: 6, startTime: '14:00', endTime: '16:00' }] })
 const [KACHEL] = abholKacheln(HOF.pickupSlots, JETZT, [])
 const EIER = { productId: 'eier', name: 'Freilandeier 10er', price: 4.9, unit: 'STUECK', unitSize: null, imageUrl: null }
+const SATZ = 'Der Gesamtbetrag hat sich geändert. Bitte prüf ihn und bestell dann noch einmal.'
 /** Der Betrag des Servers aus der Antwort GESAMT_GEAENDERT: Ware € 9,80 und eine Gebühr von € 0,70. */
 const VOM_SERVER = { amountCents: 1050, serviceFeeCents: 70 }
 
-/** Die Kasse mit zwei Eier-Packungen (bzw. `menge`), Zahlart und Termin vorbelegt. */
-function kasse(paymentMethod: 'ONLINE' | 'ONSITE_CASH', menge = 2): string {
+type Zahlart = 'ONLINE' | 'ONSITE_CASH'
+
+/** Ein Aufbau der Kasse mit `menge` Eier-Packungen, Zahlart und Termin vorbelegt — mit dem gemerkten Zustand. */
+function kasse(paymentMethod: Zahlart, menge = 2): string {
   pruefstand.gelaufen.clear()
   pruefstand.vorbelegung = {
     pickupSlotKey: KACHEL?.key ?? '',
@@ -110,16 +125,41 @@ function kasse(paymentMethod: 'ONLINE' | 'ONSITE_CASH', menge = 2): string {
     [WARENKORB_SCHLUESSEL]: JSON.stringify({ farmId: HOF.id, farmSlug: HOF.slug, items: [{ ...EIER, quantity: menge }] }),
   }
   vi.stubGlobal('localStorage', { getItem: (k: string) => daten[k] ?? null, setItem: () => {}, removeItem: () => {} })
-  return renderToStaticMarkup(
-    createElement(CheckoutForm, { farm: HOF, nurBetriebeIds: [], vorbelegung: null, ausgebuchteAbholfenster: [], sperre: null })
-  )
+  pruefstand.rendert = true
+  try {
+    return renderToStaticMarkup(
+      createElement(CheckoutForm, { farm: HOF, nurBetriebeIds: [], vorbelegung: null, ausgebuchteAbholfenster: [], sperre: null })
+    )
+  } finally {
+    pruefstand.rendert = false
+  }
+}
+
+/** Den Kaufknopf des letzten Aufbaus drücken; der Server antwortet mit 409 GESAMT_GEAENDERT. Gibt den gesendeten Körper zurück. */
+async function absendenMitGesamtGeaendert(): Promise<Record<string, unknown>> {
+  const gesendet: Array<Record<string, unknown>> = []
+  vi.stubGlobal('document', { getElementById: () => null })
+  vi.stubGlobal('fetch', async (_url: string, init: { body: string }) => {
+    gesendet.push(JSON.parse(init.body) as Record<string, unknown>)
+    return new Response(JSON.stringify({ error: SATZ, code: 'GESAMT_GEAENDERT', ...VOM_SERVER }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  })
+  expect(pruefstand.absenden).not.toBeNull()
+  await pruefstand.absenden?.({ preventDefault: () => {}, persist: () => {} })
+  await Promise.all(pruefstand.laeufe.splice(0))
+  vi.stubGlobal('document', undefined)
+  vi.stubGlobal('fetch', () => new Promise(() => {}))
+  expect(gesendet).toHaveLength(1)
+  return gesendet[0] ?? {}
 }
 
 /** Der Text der Zusammenfassung „Deine Bestellung“ bis zum Knopf. */
 const zusammenfassung = (html: string): string => html.slice(html.indexOf('Deine Bestellung'), html.indexOf('type="submit"'))
 
 beforeEach(() => {
-  pruefstand.serverBetrag = null
+  pruefstand.zustand.clear()
   pruefstand.absenden = null
   pruefstand.laeufe.length = 0
   pruefstand.refresh.mockClear()
@@ -162,62 +202,63 @@ describe('checkoutRequestSchema: gesamtCents', () => {
   })
 })
 
-describe('Kasse: Absenden mit dem Gesamtbetrag', () => {
-  it('schickt den gezeigten Gesamtbetrag mit; auf GESAMT_GEAENDERT lädt sie die Seite nach, statt zu bestellen', async () => {
-    const gesendet: unknown[] = []
-    kasse('ONLINE')
-    vi.stubGlobal('document', { getElementById: () => null })
-    vi.stubGlobal('fetch', async (_url: string, init: { body: string }) => {
-      gesendet.push(JSON.parse(init.body))
-      return new Response(
-        JSON.stringify({ error: 'Der Gesamtbetrag hat sich geändert. Bitte prüf ihn und bestell dann noch einmal.', code: 'GESAMT_GEAENDERT', ...VOM_SERVER }),
-        { status: 409, headers: { 'Content-Type': 'application/json' } }
-      )
-    })
+describe('Kasse: die Kette nach GESAMT_GEAENDERT', () => {
+  it('online: schickt den gezeigten Betrag, zeigt nach 409 den des Servers, und der nächste Klick schickt genau ihn', async () => {
+    const vorher = kasse('ONLINE')
+    expect(vorher).toContain('Weiter zur Zahlung · € 10,30')
 
-    await pruefstand.absenden?.({ preventDefault: () => {}, persist: () => {} })
-    await Promise.all(pruefstand.laeufe)
-
-    expect(pruefstand.absenden).not.toBeNull()
     // Online: € 9,80 Ware + € 0,50 Mindestgebühr = € 10,30, so wie die Kasse ihn zeigt.
-    expect(gesendet).toEqual([expect.objectContaining({ gesamtCents: 1030, paymentMethod: 'ONLINE' })])
+    expect(await absendenMitGesamtGeaendert()).toMatchObject({ gesamtCents: 1030, paymentMethod: 'ONLINE' })
     expect(pruefstand.refresh).toHaveBeenCalledTimes(1)
+
+    const danach = kasse('ONLINE')
+    expect(danach).toContain('Weiter zur Zahlung · € 10,50')
+    expect(zusammenfassung(danach)).toContain('€ 10,50')
+    expect(zusammenfassung(danach)).not.toContain('€ 10,30')
+    expect(danach).toContain(SATZ)
+
+    // Der nächste Klick schickt den Betrag des Servers — keine Schleife.
+    expect(await absendenMitGesamtGeaendert()).toMatchObject({ gesamtCents: 1050 })
+  })
+
+  it('bar: „Zahlungspflichtig bestellen“ zeigt danach den Betrag des Servers', async () => {
+    kasse('ONSITE_CASH')
+    expect(await absendenMitGesamtGeaendert()).toMatchObject({ gesamtCents: 980, paymentMethod: 'ONSITE_CASH' })
+
+    const danach = kasse('ONSITE_CASH')
+
+    expect(danach).toContain('Zahlungspflichtig bestellen · € 10,50')
+    expect(zusammenfassung(danach)).toContain('€ 10,50')
   })
 })
 
-describe('Kasse: nach GESAMT_GEAENDERT der Betrag des Servers', () => {
-  it('online: Zusammenfassung und „Weiter zur Zahlung“ zeigen € 10,50 statt der eigenen € 10,30', () => {
-    const eigen = kasse('ONLINE')
-    pruefstand.serverBetrag = { betrag: VOM_SERVER, fuer: kassenStand([{ productId: 'eier', quantity: 2, price: 4.9 }], 'ONLINE') }
-
-    const html = kasse('ONLINE')
-
-    expect(eigen).toContain('Weiter zur Zahlung · € 10,30')
-    expect(html).toContain('Weiter zur Zahlung · € 10,50')
-    expect(zusammenfassung(html)).toContain('€ 10,50')
-    expect(zusammenfassung(html)).not.toContain('€ 10,30')
-  })
-
-  it('bar: „Zahlungspflichtig bestellen“ zeigt den Betrag des Servers', () => {
-    pruefstand.serverBetrag = { betrag: VOM_SERVER, fuer: kassenStand([{ productId: 'eier', quantity: 2, price: 4.9 }], 'ONSITE_CASH') }
-
-    const html = kasse('ONSITE_CASH')
-
-    expect(html).toContain('Zahlungspflichtig bestellen · € 10,50')
-    expect(zusammenfassung(html)).toContain('€ 10,50')
-  })
-
-  it('Gegenprobe: nach einer Mengenänderung oder mit anderer Zahlart wieder der eigene Betrag', () => {
-    pruefstand.serverBetrag = { betrag: VOM_SERVER, fuer: kassenStand([{ productId: 'eier', quantity: 2, price: 4.9 }], 'ONLINE') }
+describe('Kasse: der Betrag des Servers wird leer, sobald sich Korb oder Zahlart ändern', () => {
+  it('Menge ändern und zurückstellen: wieder der eigene Betrag, nie mehr der des Servers', async () => {
+    kasse('ONLINE')
+    await absendenMitGesamtGeaendert()
+    expect(kasse('ONLINE')).toContain('Weiter zur Zahlung · € 10,50')
 
     const mehr = kasse('ONLINE', 3)
-    const bar = kasse('ONSITE_CASH')
+    const zurueck = kasse('ONLINE', 2)
 
-    // Drei Packungen: € 14,70 + € 0,74 (5 %) = € 15,44 — die eigene Rechnung, nicht der Betrag des Servers.
+    // Drei Packungen: € 14,70 + € 0,74 (5 %) = € 15,44 — die eigene Rechnung.
     expect(mehr).toContain('Weiter zur Zahlung · € 15,44')
     expect(mehr).not.toContain('€ 10,50')
+    expect(zurueck).toContain('Weiter zur Zahlung · € 10,30')
+    expect(zurueck).not.toContain('€ 10,50')
+  })
+
+  it('Zahlart wechseln und zurück: wieder der eigene Betrag', async () => {
+    kasse('ONLINE')
+    await absendenMitGesamtGeaendert()
+
+    const bar = kasse('ONSITE_CASH')
+    const online = kasse('ONLINE')
+
     // Bar vor dem Stichtag: ohne Gebühr, € 9,80.
     expect(bar).toContain('Zahlungspflichtig bestellen · € 9,80')
     expect(bar).not.toContain('€ 10,50')
+    expect(online).toContain('Weiter zur Zahlung · € 10,30')
+    expect(online).not.toContain('€ 10,50')
   })
 })

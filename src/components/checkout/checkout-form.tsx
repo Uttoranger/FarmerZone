@@ -185,11 +185,6 @@ export function kassenStand(korb: readonly { productId: string; quantity: number
   return JSON.stringify([zahlart, korb.map((p) => [p.productId, p.quantity, p.price])])
 }
 
-/** Kein Betrag des Servers — der Anfang (benannt, damit der Prüfstand in tests/kasse-gesamtbetrag.test.ts ihn findet). */
-function keinServerBetrag(): { betrag: ZahlungsBetrag; fuer: string } | null {
-  return null
-}
-
 export function CheckoutForm({
   farm,
   nurBetriebeIds,
@@ -243,8 +238,8 @@ export function CheckoutForm({
   const [zahlung, setZahlung] = useState<Zahlung | null>(null)
   // Nr. 287 (Register N10): Lehnt der Server den Gesamtbetrag ab (GESAMT_GEAENDERT), zeigt die Kasse SEINEN Betrag
   // in Übersicht, Zusammenfassung und auf dem Knopf, und der nächste Klick schickt genau ihn — keine Schleife. Er gilt
-  // nur für den Korb und die Zahlart, zu denen er kam (`kassenStand`); danach rechnet die Kasse wieder selbst.
-  const [serverBetrag, setServerBetrag] = useState(keinServerBetrag)
+  // nur für den Korb und die Zahlart, zu denen er kam (`kassenStand`); ändert sich eins davon, wird er leer.
+  const [serverBetrag, setServerBetrag] = useState<{ betrag: ZahlungsBetrag; fuer: string } | null>(null)
   const [schritt, setSchritt] = useState<'formular' | 'zahlung'>('formular')
   // Frist der Halte dieser Sitzung (StockReservation.expiresAt) — von
   // /api/warenkorb/pruefen beim Öffnen erneuert und mitgeteilt.
@@ -381,7 +376,11 @@ export function CheckoutForm({
   // gilt nur noch ihr Betrag bei Stripe (angezeigteBetraege) — die Uhr läuft
   // weiter, die Gebühr der Bestellung nicht. Mit der gewählten Zahlart (B1):
   // Der Wechsel auf bar rechnet sofort neu, zurück auf online ebenso.
-  const vomServer = serverBetrag?.fuer === kassenStand(cart, paymentMethod) ? serverBetrag.betrag : null
+  const korbStand = kassenStand(cart, paymentMethod)
+  // React-Muster „Zustand zurücksetzen, wenn sich Werte ändern“: beim Rendern, nicht im Effekt — so zeigt schon dieser
+  // Durchgang den eigenen Betrag, und Zurückstellen holt den alten Betrag des Servers nicht wieder.
+  if (serverBetrag && serverBetrag.fuer !== korbStand) setServerBetrag(null)
+  const vomServer = serverBetrag?.fuer === korbStand ? serverBetrag.betrag : null
   const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt, paymentMethod), zahlung?.betrag ?? vomServer)
   // Die Gebührenzeile (N10) nur in Worten; steht die Bestellung, bleibt der
   // beim Anlegen festgehaltene Titel samt Erklärsatz (zahlungsGebuehrText).
