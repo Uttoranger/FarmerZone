@@ -1,0 +1,27 @@
+# Zeitbuch Lauf 34 (11.11.2026, Cloud-Sitzung Linux)
+
+Vom Dirigenten geführt (freigabe.md §38, Auftrag A013). Rechner: **4 Kerne**, 15 GB (Cloud-Container). Typecheck und Bau mit `NODE_OPTIONS=--max-old-space-size=6144` (Umgebungsvariable des Laufs, keine Projektvariable). Node v22.23.4 (`node --version`), Unicode 17.0 (`node -p process.versions.unicode`) – die Emoji-Wache ist damit lokal nicht von der Ausnahme aus Rahmen §0a 1.7 betroffen; für die CI (Node 22, Unicode-Fassung dort) gilt die Ausnahme bis zum Merge von 285 weiter.
+
+## Abschnitt A (11.11.2026)
+
+Start Abschnitt A: 11.11.2026 18:42 UTC (19:42 Wien, aus `date -u`) auf die Startnachricht der Projektleitung vom 11.11.2026 („Nachtlauf 34 starten“), von der Schaltzentrale wörtlich weitergegeben. Branches `nacht/2026-11-11/<nr>-<kurz>`.
+
+Zeitbudget (Wanduhr ab Start, a013-lauf34-a.md „Plan“): Vorprüfung 0–0,25 h · 283 0,25–1,0 h · Platz 1: 286 1,0–3,0 h → 287 3,0–7,5 h · Platz 2: 284 1,0–4,0 h → 289 4,0–8,0 h · Merges 0,5 h · Sammel-PR, Aufräumen, Zwischen-Morgenbericht 1,5 h. Keine neue Nummer nach Stunde 7 (01:42 UTC); Sammel-PR spätestens ab Stunde 9,5 (04:12 UTC); Haltepunkt A gegen Stunde 10 (04:42 UTC), spätestens nach 11,5 h (06:12 UTC). Abbruchregel: Rahmen §5 5.2.
+
+- Startsätze von Abschnitt A (§0a 1.3): „Bremse je Hof für Bar-Bestellungen freigegeben“ – **ja** (dritte Zeile der Startnachricht, eigene Zeile, außerhalb jedes Codeblocks und außerhalb des Auftragstexts). Weitere Zeilen der Startnachricht: „Nachtlauf 34 starten“ und „Auftrag: docs/nachtlauf/berichte/a013-lauf34-rahmen.md (ganz) und docs/nachtlauf/berichte/a013-lauf34-a.md (Abschnitt A).“ – kein Startsatz.
+- Register-Kennung F (§0a 1.2): **N50** (erste freie N-Nummer auf main d88ace724726; N49 hat Auftrag A012 belegt: „Stripe-Kontostatus: bereit erst mit EPS“).
+
+## Dirigent
+
+- 18:42 §0a 1.1: main = d88ace724726 („Add files via upload“: die acht Auftragsdateien a013-lauf34-rahmen.md und a013-lauf34-a.md bis -g.md) auf d60959c32450 (Merge #530, A012). Seit dem geprüften Stand efc52874b7da dazugekommen: #448 (Impressum A004b), A011 (Probelauf-Checkliste, #528), #529 (Datenschutz A006b), #530 (A012), die Auftragsdateien. Lauf 33: integration/lauf33 auf GitHub gelöscht; PR #508 „merged“, Merge-Commit efc52874b7da ist Vorfahr von origin/main (`git merge-base --is-ancestor`). A012: `git grep -c -F "'hof_online_haengt'" origin/main -- src/lib/admin-aufgaben.ts` = 3 (≥ 1); PR #530 „feat: Stripe-Kontostatus …“ gemergt am 11.11.2026 14:54 UTC (statt `gh pr list` über die GitHub-Schnittstelle der Sitzung gelesen). Rahmen und alle sieben Abschnittsdateien liegen auf main.
+- 18:42 §0a 1.4: keine offenen PRs (`list_pull_requests` open: leer). status.md: keine Zeile „läuft“ oder „in Prüfung“ eines anderen Laufs (Treffer nur in historischen Zeilen 53, 142 und 175). A011 steht in status.md noch auf „PR offen“ (#528 ist laut `git log` gemergt) – nicht Teil von 283, unverändert.
+- 18:42 §0a 1.5: agent-browser 0.39.1, Bild einer lokalen Seite gelungen (.nachtlauf/screens/0a/probe.png).
+- 18:45 §0a 1.6: Postgres 16 im Container gestartet (localhost:5432); `.env.test` aus der Vorlage, TEST_DATABASE_URL auf localhost.
+- §0a 1.8: kein `sk_live_`/`rk_live_` in der Umgebung (nur das Präfix geprüft).
+- §0a 1.9 Anker gegen d88ace724726 (`git grep -c -F`): alle Anker von 283, 284, 286, 287 und 289 stehen wie in der Ausgangslage (je genau einmal, wo verlangt; „if (provision > 0) onlineZeilen.push({ label: 'Provision'“ zweimal, wie erwartet; `gibBestandZurueck` dreimal, Definition und zwei Aufrufe). In den A012-Dateien: `} else if (event.type === 'charge.dispute.created') {` steht jetzt in webhook/route.ts Z. 149 (statt 141), Anker gleich; `charge.dispute.closed` fehlt in stripe-ereignis.ts (wie erwartet). docs/betrieb/stripe-live.md: Anker „die 10 Ereignisse“ einmal vorhanden (289 prüft die Zahl nach A012 selbst). Keine Abweichung, die ein Tor auslöst.
+- §0a 1.10 und Schritt 0, Paket-Recht (284 Tor T2): `.claude/settings.json` sperrt nur `mcp__claude-in-chrome__*`; der Hook `gefahr-blocken.mjs` blockt npm/yarn-Installationen, nicht `pnpm add`; keine Sitzungsliste mit `Bash(pnpm add*)`. Ohne zu installieren geprüft: `pnpm add` ist erlaubt → T2 greift nicht.
+- Worktrees unter /home/user/wt/<nr>, Integrations-DB je Nummer fz_int_<nr> auf localhost:5432; Sperren (schwer.lock, integration.lock) und laeufe/ unter .nachtlauf/dirigent/ im Haupt-Klon.
+- 283: §38 vom Dirigenten mechanisch eingetragen (Überschrift, Leerzeile, Rahmen, Leerzeile, Abschnitt A); `diff` des eingefügten Texts gegen beide Dateien leer. Register, Warteschlange, status.md, Mockup-Index und Ergänzungsliste vom Umsetzer (Sonnet).
+- 18:43–18:49 Grundlauf auf main d88ace724726 (n=1, 3 Worker, unter schwer.lock): `pnpm install --frozen-lockfile` und `prisma generate` grün, Typecheck grün, Lint 0 Fehler (2 Warnungen), Test 756 Dateien, 14036 Tests grün, Doku-Wachen 3 Dateien, 49 Tests grün (362 s). Keine Ausnahme nach §0a 1.7 nötig (Unicode 17.0). §0a bestanden.
+- 283: Umsetzer (Sonnet) fertig; Dirigent hat eine Abschnittsnummer berichtigt (292a liegt in E, also §38.4, nicht §38.5; in nachtlauf.md und status.md). `git grep -c 'Empfehlung F027'` = 10, `'Stand F027'` = 1, `'<<'` ohne Treffer.
+- 19:02–19:08 283 voller Lauf (n=1, 3 Worker, unter schwer.lock): Typecheck grün, Lint 0 Fehler (2 Warnungen), 756 Dateien, 14036 Tests grün, Doku-Wachen 3 Dateien, 49 Tests grün (349 s).

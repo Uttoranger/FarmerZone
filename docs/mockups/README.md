@@ -429,10 +429,10 @@ Zielbild für Nr. 184–198 (`docs/nachtlauf/freigabe.md` §30). Was ein Board n
 | Datei | Bildschirm | Route im Code | Arbeit | Größe |
 |---|---|---|---|---|
 | `admin-umbau-karte.html` | Admin · Umbau: was bleibt, was umzieht, was wegfällt | Übersicht, keine Route | Bezugsrahmen für Nr. 185–193 (Reiter, Umzüge, alte Wege mit 308) | 1440 |
-| `admin-heute.html` | Admin · Heute: Braucht dich, Lage, läuft von selbst, Notbremse | `/admin` | neu (Nr. 185) | 1440 |
+| `admin-heute.html` | Admin · Heute: Braucht dich, Lage, läuft von selbst, Notbremse. Knopf orange umrandet statt rot (DESIGN_SYSTEM ‚Zerstörendes orange umrandet‘, F027/MB26 Nr. 7) | `/admin` | neu (Nr. 185) | 1440 |
 | `mobil-admin-heute.html` | Admin am Handy · Heute | `/admin` (Handy) | neu (Nr. 185) | 390 |
 | `mobil-admin-mehr.html` | Admin am Handy · Mehr-Blatt unter der Leiste | alle Admin-Seiten (Handy) | neu (Nr. 193) | 390 |
-| `mobil-admin-notbremse.html` | Admin am Handy · Notbremse „Bestellungen anhalten“ | Blatt in `/admin` (Handy) | neu (Nr. 189) | 390 |
+| `mobil-admin-notbremse.html` | Admin am Handy · Notbremse „Bestellungen anhalten“. Knopf orange umrandet statt rot (DESIGN_SYSTEM ‚Zerstörendes orange umrandet‘, F027/MB26 Nr. 7) | Blatt in `/admin` (Handy) | neu (Nr. 189) | 390 |
 | `admin-hoefe-neu.html` | Admin · Höfe: Braucht Blick, Liste, Akte | `/admin/hoefe` | neu (Nr. 187) | 1440 |
 | `admin-hof-akte.html` | Admin · Höfe › Akte: Kontakt, Aktivität, Eingreifen, Konto-Anfragen | `/admin/hoefe/[id]` | neu (Nr. 187; die Konto-Knöpfe füllt Nr. 190, der Abschnitt „Plattformgebühr“ Nr. 198) | 1440 |
 | `admin-konto-anfrage.html` | Admin · Höfe › Akte › Anmelde-E-Mail ändern | Dialog in `/admin/hoefe/[id]`, Bestätigungsseite `/konto/email-bestaetigen` | neu (Nr. 190) | 1440 |
