@@ -30,6 +30,7 @@ import {
   behandleRechnungBezahlt,
   behandleRechnungGescheitert,
   behandleRueckbuchung,
+  behandleRueckbuchungAbgeschlossen,
 } from '@/server/plattformgebuehr-abrechnung'
 
 // Next.js App Router does not pre-parse the body — raw text needed for Stripe sig verification
@@ -148,6 +149,9 @@ export async function POST(request: NextRequest) {
       await behandleRechnungGescheitert(event.data.object as Stripe.Invoice)
     } else if (event.type === 'charge.dispute.created') {
       await behandleRueckbuchung(event.data.object as Stripe.Dispute)
+    } else if (event.type === 'charge.dispute.closed') {
+      // Nur Kundenzahlungen (Nr. 289, E-022): Ausgang ins Protokoll, Aufgabe in Heute weg — kein Geld bewegt.
+      await behandleRueckbuchungAbgeschlossen(event.data.object as Stripe.Dispute)
     } else if (event.type === 'setup_intent.succeeded') {
       await behandleMandatEingerichtet(event.data.object as Stripe.SetupIntent)
     } else if (event.type === 'mandate.updated') {

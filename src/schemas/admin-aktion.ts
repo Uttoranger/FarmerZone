@@ -65,6 +65,10 @@ export const ADMIN_AKTIONEN = [
   'lastschrift_bezahlt',
   'lastschrift_gescheitert',
   'lastschrift_zurueckgebucht',
+  // Rückbuchung einer Kundenzahlung (Nr. 289, E-022) — System, Bezug die Bestellung
+  'kundenzahlung_zurueckgebucht',
+  'kundenzahlung_rueckfrage',
+  'kundenzahlung_rueckbuchung_abgeschlossen',
   // Wechsel des Bereit-Werts des Stripe-Kontos eines Hofs (System, N33; Register N49, A012)
   'online_zahlung_aktiv',
   'online_zahlung_pausiert',

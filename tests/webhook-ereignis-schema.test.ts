@@ -56,6 +56,7 @@ vi.mock('@/server/plattformgebuehr-abrechnung', () => ({
   behandleRechnungBezahlt: vi.fn(),
   behandleRechnungGescheitert: vi.fn(),
   behandleRueckbuchung: vi.fn(),
+  behandleRueckbuchungAbgeschlossen: vi.fn(),
 }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 
@@ -85,6 +86,7 @@ const BEHANDLUNG: Record<VerarbeiteterStripeTyp, () => unknown> = {
   'invoice.paid': () => abrechnung.behandleRechnungBezahlt,
   'invoice.payment_failed': () => abrechnung.behandleRechnungGescheitert,
   'charge.dispute.created': () => abrechnung.behandleRueckbuchung,
+  'charge.dispute.closed': () => abrechnung.behandleRueckbuchungAbgeschlossen,
   'setup_intent.succeeded': () => abrechnung.behandleMandatEingerichtet,
   'mandate.updated': () => abrechnung.behandleMandatGeaendert,
 }
