@@ -51,7 +51,7 @@ import {
   type EinstellungBereich,
 } from '@/lib/hof-einstellungen'
 import { barMoeglich, bestellGebuehr, letzterFreierTag, type GebuehrLage } from '@/lib/plattformgebuehr'
-import { BAR_GEBUEHR_SEPA_SATZ, BAR_SERVICEGEBUEHR_AB, LASTSCHRIFT_TEXT } from '@/lib/konditionen'
+import { BAR_GEBUEHR_SEPA_SATZ, BAR_SERVICEGEBUEHR_AB, LASTSCHRIFT_TEXT, ONLINE_GEBUEHR_ABGETRENNT_SATZ } from '@/lib/konditionen'
 import { KonditionenAnsicht } from '@/components/hof-einstellungen/konditionen-ansicht'
 import { EinstellungenUebersicht } from '@/components/hof-einstellungen/einstellungen-uebersicht'
 import { farmArchiveBlockedMessage } from '@/lib/farm-archive'
@@ -165,6 +165,20 @@ describe('Rechenbeispiel im Hofpreis-Modell', () => {
     expect(online['Deine Auszahlung']).toBe('€ 20,00')
     expect(JSON.stringify(r)).not.toContain('Servicegebühr')
     expect(r.satz).toContain('Plattformgebühr 6 %')
+  })
+
+  it('Hof mit Provision 3 %: keine Zeile „Provision“, Auszahlung = Warenpreis, Satz „… unberührt“ (E-023, Nr. 286)', () => {
+    const r = konditionenRechenbeispiel(hof({ platformFeePercent: '3' }), NACH, lage({ sepaMandatAm: STICHTAG }))
+    const online = Object.fromEntries(r.online.zeilen.map((z) => [z.label, z.betrag]))
+    expect(r.online.zeilen.map((z) => z.label)).not.toContain('Provision')
+    expect(online['Deine Auszahlung']).toBe('€ 20,00')
+    expect(r.mitProvision).toBe(false)
+    expect(r.online.satz).toBe(ONLINE_GEBUEHR_ABGETRENNT_SATZ)
+    expect(r.online.satz).toContain('unberührt')
+    // Gegenprobe Modell „bisher“ mit demselben Hof: dort bleibt die Provision (tests/hof-einstellungen.test.ts).
+    const bisher = konditionenRechenbeispiel(hof({ platformFeePercent: '3' }), NACH, { modell: 'bisher' })
+    expect(bisher.online.zeilen.map((z) => z.label)).toContain('Provision')
+    expect(bisher.mitProvision).toBe(true)
   })
 
   it('bar mit Lastschrift (sepa): dir bleibt der Warenpreis, die Monatsabrechnung holt die Gebühr per SEPA', () => {

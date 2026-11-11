@@ -660,7 +660,6 @@ export async function POST(request: NextRequest) {
 
   // 5. Totals — totalAmount ist und bleibt der WARENPREIS (Umsatz des Hofes)
   const totalAmount = calcTotalAmount(positionen)
-  const platformFeeAmount = calcPlatformFeeAmount(totalAmount, farm.platformFeePercent)
 
   // 5b. Servicegebühr — aus der Hofeinstellung ZUM BESTELLZEITPUNKT berechnet
   //     und im Snapshot der Bestellung eingefroren (src/lib/servicegebuehr.ts).
@@ -675,6 +674,9 @@ export async function POST(request: NextRequest) {
   //     Die Gebühr ist die Summe aus Menge × Gebühr je Stück (aufgerundet),
   //     für online und bar dieselbe; jede Summe kommt aus plattformgebuehr.ts.
   const lage = await ladeGebuehrLage(farm, now)
+  // Provision (Farm.platformFeePercent): im Hofpreis-Modell immer 0 — die Gebühr der
+  // Plattform ist dort allein die Plattformgebühr (N38, Ergänzung E-023, Nr. 286).
+  const platformFeeAmount = calcPlatformFeeAmount(totalAmount, lage.modell === 'hofpreis' ? 0 : farm.platformFeePercent)
   let gebuehr: {
     gebuehrCents: number
     /** Der Satz für `serviceFeePercentApplied`: Decimal-Text im Hofpreis-Modell, sonst wie bisher. */

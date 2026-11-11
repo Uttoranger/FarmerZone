@@ -6843,3 +6843,13 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 
 **Webhook.** Der Connect-Zweig verarbeitet zusätzlich `capability.updated` (Konto aus `event.account`, Stand bei Stripe nachgelesen, idempotent wie `account.updated`); ohne `event.account` wird es wie ein fremder Typ behandelt (200, vermerkt). In Stripe muss Endpunkt B das Ereignis abonnieren (`docs/betrieb/stripe-live.md` §3).
 
+
+## Hofpreis-Modell ohne Provision; Servicegebühr ab dem Stichtag nicht mehr änderbar (F027, E-023; Register N38, N40; Nr. 286, Lauf 34, 11.11.2026)
+
+**Anlass.** N38 sagt: „der Hof bekommt 100 % des Warenpreises“. Die Kasse zog aber in beiden Modellen die Provision (`Farm.platformFeePercent`) vom Warenpreis ab und schlug sie auf `application_fee_amount` auf; das Rechenbeispiel in „Deine Konditionen“ zeigte sie auch im Hofpreis-Modell. Und `setServiceFeeAction` schrieb nach dem Stichtag weiter `Farm.serviceFee*`, obwohl das dort auf keinen Betrag wirkt (nur der Knopf in der Akte war weg, Lauf 30 A1).
+
+**Fachregel (E-023).**
+- Im Hofpreis-Modell ist die Provision immer 0: `/api/checkout` bestimmt `platformFeeAmount` erst nach der Gebührenlage (`ladeGebuehrLage`), im Zweig `hofpreis` mit Satz 0, sonst wie bisher — eine Stelle, kein zweiter Rechenweg. `application_fee_amount` ist damit genau die Plattformgebühr, dem Hof fließt der volle Warenpreis zu. `intentParameter` rechnet unverändert aus dem gespeicherten Snapshot. Das Modell „bisher“ bleibt, wie es war.
+- Das Rechenbeispiel im Hofpreis-Modell kennt keine Provision mehr: keine Zeile „Provision“, „Deine Auszahlung“ = Warenpreis, Satz „… dein Warenpreis bleibt unberührt“.
+- Ab dem Stichtag „Hofpreis-Modell ab“ lehnt `setServiceFeeAction` ab: kein Schreiben, kein Protokoll, der Satz `SERVICEGEBUEHR_AB_STICHTAG_GESPERRT` verweist auf die Karte „Plattformgebühr“. Das Modell liest die Action frisch (wie die Kasse), nach der Wache und nach der Prüfung der Eingabe — ohne Recht, ohne frische Bestätigung oder mit ungültiger Eingabe antwortet sie wie bisher zuerst.
+- Alle Leser von `Order.platformFeeAmount` (Storno, Widerruf, Bestellungen, Finanzen, Auswertung, Geld, Postfach, Stripe-Parameter) lesen den Snapshot; gespeicherte Bestellungen bleiben, wie sie sind. `Farm.serviceFee*` und `Farm.platformFeePercent` bleiben als Spalten (Contract später).
