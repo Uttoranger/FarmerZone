@@ -181,7 +181,7 @@ export type Zahlung = {
  * Wofür ein Betrag des Servers gilt (Nr. 287, Register N10): Korb (Produkt, Menge, Preis) und Zahlart. Ändert sich
  * eins davon, passt der Betrag nicht mehr — die Kasse rechnet wieder selbst. Nur Anzeige, kein Geldweg.
  */
-export function kassenStand(korb: readonly { productId: string; quantity: number; price: number }[], zahlart: string): string {
+function kassenStand(korb: readonly { productId: string; quantity: number; price: number }[], zahlart: string): string {
   return JSON.stringify([zahlart, korb.map((p) => [p.productId, p.quantity, p.price])])
 }
 
@@ -239,7 +239,8 @@ export function CheckoutForm({
   // Nr. 287 (Register N10): Lehnt der Server den Gesamtbetrag ab (GESAMT_GEAENDERT), zeigt die Kasse SEINEN Betrag
   // in Übersicht, Zusammenfassung und auf dem Knopf, und der nächste Klick schickt genau ihn — keine Schleife. Er gilt
   // nur für den Korb und die Zahlart, zu denen er kam (`kassenStand`); ändert sich eins davon, wird er leer.
-  const [serverBetrag, setServerBetrag] = useState<{ betrag: ZahlungsBetrag; fuer: string } | null>(null)
+  const [serverBetrag, setServerBetrag] = useState<ZahlungsBetrag | null>(null)
+  const [serverBetragFuer, setServerBetragFuer] = useState<string | null>(null)
   const [schritt, setSchritt] = useState<'formular' | 'zahlung'>('formular')
   // Frist der Halte dieser Sitzung (StockReservation.expiresAt) — von
   // /api/warenkorb/pruefen beim Öffnen erneuert und mitgeteilt.
@@ -379,9 +380,11 @@ export function CheckoutForm({
   const korbStand = kassenStand(cart, paymentMethod)
   // React-Muster „Zustand zurücksetzen, wenn sich Werte ändern“: beim Rendern, nicht im Effekt — so zeigt schon dieser
   // Durchgang den eigenen Betrag, und Zurückstellen holt den alten Betrag des Servers nicht wieder.
-  if (serverBetrag && serverBetrag.fuer !== korbStand) setServerBetrag(null)
-  const vomServer = serverBetrag?.fuer === korbStand ? serverBetrag.betrag : null
-  const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt, paymentMethod), zahlung?.betrag ?? vomServer)
+  if (serverBetragFuer !== null && serverBetragFuer !== korbStand) {
+    setServerBetrag(null)
+    setServerBetragFuer(null)
+  }
+  const betraege = angezeigteBetraege(kassenBetraege(cart, farm, jetzt, paymentMethod), zahlung?.betrag ?? serverBetrag)
   // Die Gebührenzeile (N10) nur in Worten; steht die Bestellung, bleibt der
   // beim Anlegen festgehaltene Titel samt Erklärsatz (zahlungsGebuehrText).
   // „entfällt" und „bar am Hof" nur bei angebotener Barzahlung (N10, kassenZahlweg).
@@ -496,7 +499,10 @@ export function CheckoutForm({
         // zeigt den Betrag des Servers, lädt die Seite nach und sagt es am Korb; der nächste Klick schickt ihn.
         if (err.code === 'GESAMT_GEAENDERT') {
           const betrag = leseZahlungsBetrag(err)
-          if (betrag) setServerBetrag({ betrag, fuer: kassenStand(cart, data.paymentMethod) })
+          if (betrag) {
+            setServerBetrag(betrag)
+            setServerBetragFuer(kassenStand(cart, data.paymentMethod))
+          }
           router.refresh()
           setKorbHinweis(typeof err.error === 'string' ? err.error : 'Der Gesamtbetrag hat sich geändert.')
           document.getElementById('kasse-korb')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
