@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { adminGrundSchema } from '@/schemas/admin-aktion'
 
 /*
  * Die Einstellungen der Plattformgebühr je Hof im Admin (Register N38,
@@ -48,13 +49,26 @@ export type PlattformgebuehrHofEingabe = z.input<typeof plattformgebuehrHofSchem
 
 /**
  * Hof › Rechnung öffnen (`oeffneRechnung`): welche Abrechnung, welche
- * Rechnung (bar oder online) und wohin — PDF oder die gehostete Seite zum
- * Bezahlen. Die Kennung prüft die Action zusätzlich gegen den Hof der Sitzung.
+ * Rechnung (bar, online oder die Nachforderung nach einer Rückbuchung, Nr. 290)
+ * und wohin — PDF oder die gehostete Seite zum Bezahlen. Die Kennung prüft die
+ * Action zusätzlich gegen den Hof der Sitzung.
  */
 export const rechnungSchema = z
   .object({
     abrechnungId: z.string().regex(/^[\w-]{1,64}$/),
-    art: z.enum(['bar', 'online']),
+    art: z.enum(['bar', 'online', 'nachforderung']),
     ziel: z.enum(['pdf', 'bezahlen']),
+  })
+  .strict()
+
+/**
+ * Admin › Hof-Akte › „Sperre nach Rückbuchung aufheben“ (Notweg, Nr. 290,
+ * A007): welche Abrechnung und warum. Der Grund steht im Protokoll — ohne
+ * E-Mail-Adresse und Telefonnummer (`adminGrundSchema`).
+ */
+export const rueckbuchungKlaerenSchema = z
+  .object({
+    abrechnungId: z.string().regex(/^[\w-]{1,64}$/),
+    grund: adminGrundSchema,
   })
   .strict()

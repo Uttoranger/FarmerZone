@@ -64,6 +64,7 @@ export async function oeffneRechnung(eingabe: unknown): Promise<{ url: string } 
   const geprueft = rechnungSchema.safeParse(eingabe)
   if (!geprueft.success) return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
   const { abrechnungId, art, ziel } = geprueft.data
+  if (art === 'nachforderung') return oeffneNachforderung(farmId, abrechnungId, ziel)
   const abr = await prisma.monatsabrechnung.findFirst({ where: { id: abrechnungId, farmId }, select: { rechnungBarId: true, rechnungOnlineId: true } })
   const rechnungId = art === 'bar' ? abr?.rechnungBarId : abr?.rechnungOnlineId
   if (!rechnungId) return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
@@ -74,6 +75,26 @@ export async function oeffneRechnung(eingabe: unknown): Promise<{ url: string } 
     return url ? { url } : { error: LASTSCHRIFT_TEXT.rechnungFehlt }
   } catch (err) {
     Sentry.captureException(err, { tags: { bereich: 'lastschrift', aufgabe: 'rechnung' }, extra: { farmId } })
+    return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
+  }
+}
+
+/**
+ * Die Nachforderung nach einer Rückbuchung (Nr. 290): Ihre Kennung steht an
+ * keiner Spalte — gesucht wird sie bei Stripe über die Metadaten, mit dem
+ * Kunden des eigenen Hofs. Die Abrechnung nur über die farmId der Sitzung.
+ */
+async function oeffneNachforderung(farmId: string, abrechnungId: string, ziel: 'pdf' | 'bezahlen'): Promise<{ url: string } | { error: string }> {
+  const abr = await prisma.monatsabrechnung.findFirst({ where: { id: abrechnungId, farmId }, select: { id: true, farm: { select: { stripeKundeId: true } } } })
+  const kunde = abr?.farm.stripeKundeId
+  if (!abr || !kunde) return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
+  try {
+    const { findeNachforderung } = await import('@/server/plattformgebuehr-abrechnung')
+    const rechnung = await findeNachforderung(kunde, abr.id)
+    const url = ziel === 'pdf' ? rechnung?.invoice_pdf : rechnung?.hosted_invoice_url
+    return url ? { url } : { error: LASTSCHRIFT_TEXT.rechnungFehlt }
+  } catch (err) {
+    Sentry.captureException(err, { tags: { bereich: 'lastschrift', aufgabe: 'nachforderung' }, extra: { farmId } })
     return { error: LASTSCHRIFT_TEXT.rechnungFehlt }
   }
 }

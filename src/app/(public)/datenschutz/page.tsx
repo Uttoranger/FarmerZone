@@ -594,14 +594,14 @@ export default function DatenschutzPage() {
               Monatsrechnungen; du findest sie unter „Deine Konditionen“. Vor dem ersten Einzug bekommst du
               eine Nachricht im Postfach und eine E-Mail.
             </li>
-            {/* Der Satz zur Rückbuchung steht auf einer Zeile: Lauf 34 Nr. 290 sucht und ersetzt ihn
-                wörtlich (tests/datenschutz-struktur.test.ts). */}
+            {/* Der Satz zur Rückbuchung (Wortlaut von Recht, Lauf 34 Nr. 290) steht auf einer Zeile —
+                tests/datenschutz-struktur.test.ts sucht ihn dort. */}
             <li>
               <strong className={FETT}>Wenn der Einzug scheitert:</strong> Stripe versucht es erneut,
               und du bekommst eine Nachricht. Bleibt ein Betrag länger offen, als in deinen Konditionen
               steht (Vorgabe 14 Tage), nimmt dein Hof keine Barbestellungen mehr an, bis der Betrag bezahlt
               ist; danach geht es von selbst wieder.
-              Bucht deine Bank eine Lastschrift zurück, nimmt dein Hof sofort keine Barbestellungen mehr an, bis ein Mensch aus unserem Team es mit dir geklärt hat – schreib uns dazu an die Adresse in Abschnitt 1.
+              Bucht deine Bank eine Lastschrift zurück, nimmt dein Hof sofort keine Barbestellungen mehr an, bis der zurückgebuchte Betrag bezahlt ist; danach geht es von selbst wieder. Das entscheidet die App nach einer festen Regel (AGB Punkt 19.6). Hast du anders bezahlt oder war die Rückbuchung nicht berechtigt, schreib uns – dann prüft ein Mensch und kann die Sperre aufheben.
               Beides geschieht nach dieser festen Regel automatisch. Wir bewerten dabei nicht deine Person
               oder deine Zahlungsfähigkeit und fragen keine Auskunftei. Schreibst du uns, sieht sich ein
               Mensch die Sperre an.

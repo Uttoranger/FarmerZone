@@ -54,8 +54,8 @@ const OHNE_PROTOKOLL: Record<string, string> = {
   pruefeFrischFuerPasskey: 'nur die Prüfung „frisch“ vor dem Anlegen eines Passkeys, schreibt nichts',
 }
 
-/** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“; Nr. 186: +2 in admin-bestellung.ts; Nr. 187: +2 Hof sperren/aufheben; Nr. 189: +2 Notbremse; Nr. 190: +5 Konto-Anfragen, +4 Team; Nr. 191: +1 Monatsabschluss; Nr. 197: +1 Hofpreis-Stichtag; Nr. 198: +1 Plattformgebühr je Hof; Nr. 200: +1 Widerruf zuordnen; Nr. 270: +1 Mail-Beispiel). */
-const ANZAHL_ADMIN_ACTIONS = 65
+/** So viele exportierte Actions rufen die Admin-Wache (Bericht 188: „alle Einstiege geprüft“; Nr. 186: +2 in admin-bestellung.ts; Nr. 187: +2 Hof sperren/aufheben; Nr. 189: +2 Notbremse; Nr. 190: +5 Konto-Anfragen, +4 Team; Nr. 191: +1 Monatsabschluss; Nr. 197: +1 Hofpreis-Stichtag; Nr. 198: +1 Plattformgebühr je Hof; Nr. 200: +1 Widerruf zuordnen; Nr. 270: +1 Mail-Beispiel; Nr. 290: +1 Sperre nach Rückbuchung aufheben). */
+const ANZAHL_ADMIN_ACTIONS = 66
 
 type Aktion = { datei: string; name: string; rechte: Array<string | null>; protokoll: boolean }
 

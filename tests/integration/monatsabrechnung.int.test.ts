@@ -11,21 +11,32 @@
  *    selben Tag ändert nichts und ruft Stripe nicht noch einmal.
  *  - Die Sperre liest die Abrechnungen frisch (`ladeGebuehrLage`):
  *    gescheitert seit mehr als `barSperreNachTagen` → bar aus; bezahlt → frei.
+ *  - Rücklastschrift (Nr. 290): Rückbuchung → zurückgebucht, bar aus, eine
+ *    Nachricht und genau eine Nachforderung; `invoice.paid` der Nachforderung →
+ *    bezahlt, bar wieder frei. Notweg „Sperre nach Rückbuchung aufheben“ →
+ *    geklärt, bar frei, ein zweiter Klick ändert nichts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const stripeAttrappe = vi.hoisted(() => ({
   customers: { create: vi.fn() },
-  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn(), del: vi.fn() },
+  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn(), del: vi.fn(), list: vi.fn() },
   invoiceItems: { create: vi.fn(), list: vi.fn() },
+  // Nr. 290: Die Rückbuchung führt über die Rechnungszahlung zur Rechnung bar.
+  invoicePayments: { list: vi.fn() },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 // Das Protokoll hat eigene Tests; hier zählt der Zustand der Abrechnung.
 vi.mock('@/server/admin-protokoll', () => ({ protokolliere: vi.fn(async () => true) }))
+// Nr. 290, Notweg: Recht und Passkey prüft die Admin-Wache (eigene Tests); hier zählt der Zustand.
+vi.mock('@/server/admin-wache', () => ({ verlangeAdminAktion: vi.fn(async () => ({ ok: true, userId: 'int-admin', sitzungId: 'int-sitzung', mitPasskey: true })) }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }))
 
 import { prisma } from '@/lib/prisma'
-import { rechneHofAb } from '@/server/plattformgebuehr-abrechnung'
+import { behandleRechnungBezahlt, behandleRueckbuchung, rechneHofAb } from '@/server/plattformgebuehr-abrechnung'
+import { klaereRueckbuchung } from '@/server/actions/admin-plattformgebuehr'
+import type Stripe from 'stripe'
 import { ladeGebuehrLage } from '@/server/queries/plattform-einstellung'
 import { barMoeglich } from '@/lib/plattformgebuehr'
 import { erstelleHof, erstelleProdukt, intKennung, raeumeAuf } from './setup/basis'
@@ -40,10 +51,12 @@ afterEach(async () => {
   await raeumeAuf()
 })
 
+let rechnungen: ReturnType<typeof richteRechnungenEin>
+
 beforeEach(() => {
   vi.clearAllMocks()
   stripeAttrappe.customers.create.mockResolvedValue({ id: 'cus_int' })
-  richteRechnungenEin(stripeAttrappe, (art) => `in_int_${art}`)
+  rechnungen = richteRechnungenEin(stripeAttrappe, (art) => `in_int_${art}`)
 })
 
 type Bestellung = {
@@ -163,5 +176,101 @@ describe('Monatsabrechnung in der echten Datenbank', () => {
     } finally {
       await prisma.plattformEinstellung.update({ where: { id: 'plattform' }, data: { hofpreisModellAb: vorher?.hofpreisModellAb ?? null } })
     }
+  })
+})
+
+describe('Rücklastschrift in der echten Datenbank (Nr. 290)', () => {
+  /** Metadaten je angelegter Rechnung — die Rechnungs-Attrappe kennt nur Stand und Positionen. */
+  let metadaten: Map<string, Record<string, string>>
+
+  async function zurueckgebuchteLage(): Promise<{ farmId: string; abrechnungId: string; lage: () => Promise<boolean> }> {
+    const { farm } = await erstelleHof({ sepaMandatAm: new Date('2028-01-05T00:00:00.000Z'), sepaZahlungsmittelId: 'pm_int', einzugAb: new Date('2028-02-01T00:00:00.000Z'), stripeKundeId: intKennung('cus') })
+    const zeile = await prisma.monatsabrechnung.create({
+      data: {
+        farmId: farm.id,
+        monat: new Date('2028-02-01T00:00:00.000Z'),
+        tarif: 'HOFTOR',
+        grundgebuehrCents: 0,
+        servicegebuehrBarCents: 72,
+        barBestellungen: 1,
+        servicegebuehrOnlineCents: 0,
+        nichtAbgeholtBestellungen: 0,
+        summeCents: 72,
+        stand: 'bezahlt',
+        rechnungBarId: 'in_int_monat_bar',
+      },
+    })
+    rechnungen.set('in_int_monat_bar', { status: 'paid', posten: [{ id: 'ii_int_bar', schluessel: 'b1', amount: 72 }], collection_method: 'charge_automatically' })
+    const hof = await prisma.farm.findUniqueOrThrow({
+      where: { id: farm.id },
+      select: { id: true, gruendungBis: true, plattformgebuehrProzent: true, einzugAb: true, barMandatPflicht: true, sepaMandatAm: true, barSperreNachTagen: true },
+    })
+    return { farmId: farm.id, abrechnungId: zeile.id, lage: async () => barMoeglich(await ladeGebuehrLage(hof, JETZT), JETZT) }
+  }
+
+  /** Wie im ersten Fall: das Modell hängt am Stichtag; mit einem Stichtag in der Vergangenheit gilt hofpreis. */
+  async function mitHofpreis(f: () => Promise<void>): Promise<void> {
+    await prisma.plattformEinstellung.upsert({ where: { id: 'plattform' }, create: { id: 'plattform' }, update: {} })
+    const vorher = await prisma.plattformEinstellung.findUnique({ where: { id: 'plattform' }, select: { hofpreisModellAb: true } })
+    await prisma.plattformEinstellung.update({ where: { id: 'plattform' }, data: { hofpreisModellAb: new Date('2027-01-01T00:00:00.000Z') } })
+    try {
+      await f()
+    } finally {
+      await prisma.plattformEinstellung.update({ where: { id: 'plattform' }, data: { hofpreisModellAb: vorher?.hofpreisModellAb ?? null } })
+    }
+  }
+
+  beforeEach(() => {
+    metadaten = new Map()
+    const anlegen = stripeAttrappe.invoices.create.getMockImplementation()
+    stripeAttrappe.invoices.create.mockImplementation(async (p: { metadata: Record<string, string> }, o?: { idempotencyKey?: string }) => {
+      const r = await anlegen?.(p, o)
+      metadaten.set(r.id, p.metadata)
+      return r
+    })
+    stripeAttrappe.invoices.list.mockImplementation(async () => ({
+      data: [...metadaten].map(([id, metadata]) => ({ id, status: rechnungen.get(id)?.status ?? 'void', metadata })),
+      has_more: false,
+    }))
+    stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_int_monat_bar' }] })
+  })
+
+  it('Rückbuchung → bar gesperrt, Nachricht, genau eine Nachforderung über die Summe → invoice.paid der Nachforderung → bezahlt, bar frei', async () => {
+    const { farmId, abrechnungId, lage } = await zurueckgebuchteLage()
+    await mitHofpreis(async () => {
+      expect(await lage()).toBe(true)
+      const streit = { id: 'dp_int', payment_intent: 'pi_int', amount: 72 } as unknown as Stripe.Dispute
+      await behandleRueckbuchung(streit, JETZT)
+      expect(await prisma.monatsabrechnung.findUnique({ where: { id: abrechnungId }, select: { stand: true } })).toEqual({ stand: 'zurueckgebucht' })
+      expect(await lage()).toBe(false)
+      expect(await prisma.unterhaltung.count({ where: { farmId } })).toBe(1)
+      // Doppeltes Ereignis: nichts Neues.
+      await behandleRueckbuchung(streit, JETZT)
+      expect(await prisma.unterhaltung.count({ where: { farmId } })).toBe(1)
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledTimes(1)
+      const [nachforderung, meta] = [...metadaten][0]
+      expect(meta).toEqual({ farmId, monat: '2028-02', art: 'nachforderung', abrechnungId })
+      expect(rechnungen.get(nachforderung)?.posten.map((p) => p.amount)).toEqual([72])
+
+      await behandleRechnungBezahlt({ id: nachforderung, metadata: meta } as unknown as Stripe.Invoice, JETZT)
+      expect(await prisma.monatsabrechnung.findUnique({ where: { id: abrechnungId }, select: { stand: true, eingezogenAm: true, offenSeit: true } })).toEqual({ stand: 'bezahlt', eingezogenAm: JETZT, offenSeit: null })
+      expect(await lage()).toBe(true)
+    })
+  })
+
+  it('Notweg: Sperre nach Rückbuchung aufheben → geklärt, bar frei, Nachricht an den Hof; ein zweiter Klick ändert nichts', async () => {
+    const { farmId, abrechnungId, lage } = await zurueckgebuchteLage()
+    await prisma.monatsabrechnung.update({ where: { id: abrechnungId }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: JETZT } })
+    await mitHofpreis(async () => {
+      expect(await lage()).toBe(false)
+      expect(await klaereRueckbuchung({ abrechnungId, grund: 'Hof hat bar im Büro bezahlt' })).toEqual({ ok: true })
+      expect(await prisma.monatsabrechnung.findUnique({ where: { id: abrechnungId }, select: { stand: true } })).toEqual({ stand: 'geklaert' })
+      expect(await lage()).toBe(true)
+      expect(await prisma.unterhaltung.count({ where: { farmId } })).toBe(1)
+      expect(await klaereRueckbuchung({ abrechnungId, grund: 'Hof hat bar im Büro bezahlt' })).toEqual({ error: expect.stringContaining('nicht mehr zurückgebucht') })
+      expect(await prisma.unterhaltung.count({ where: { farmId } })).toBe(1)
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+    })
   })
 })

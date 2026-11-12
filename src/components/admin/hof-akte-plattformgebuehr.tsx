@@ -13,6 +13,8 @@ import { DialogFehler } from '@/components/hof-bestellungen/bestell-dialog'
 import { useFrischBestaetigt } from '@/components/admin/frisch-bestaetigen'
 import { EmptyState } from '@/components/ui/empty-state'
 import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
+import { RUECKBUCHUNG_TEXT } from '@/lib/admin-hof-akte'
+import { RueckbuchungKlaerenDialog, type RueckbuchungWahl } from '@/components/admin/rueckbuchung-klaeren-dialog'
 
 /** Was die Akte über die Plattformgebühr zeigt — nur Text, Zahlen und Cent (kein Date an den Browser). */
 export type PlattformgebuehrAkteAnzeige = {
@@ -36,7 +38,9 @@ function quoteText(bar: number, nicht: number): string {
  * Nr. 187): Mandat, die letzten Abrechnungen, die Quote „nicht abgeholt bei
  * bar, 90 Tage“ und die Einstellungen je Hof. Speichern verlangt das Recht
  * „Geld“ und frischen Passkey (`speichereHofPlattformgebuehr`); Satz und
- * Einzug gelten nur für neue Bestellungen.
+ * Einzug gelten nur für neue Bestellungen. Eine zurückgebuchte Abrechnung trägt
+ * den Notweg „Sperre nach Rückbuchung aufheben …“ (Nr. 290) — der Knopf steht
+ * allen, die die Akte sehen; das Recht „Geld“ prüft der Server.
  */
 export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkteAnzeige }): React.JSX.Element {
   const router = useRouter()
@@ -44,6 +48,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
   const [werte, setWerte] = useState(daten.einstellungen)
   const [fehler, setFehler] = useState<string | null>(null)
   const frisch = useFrischBestaetigt(speichereHofPlattformgebuehr)
+  const [klaeren, setKlaeren] = useState<RueckbuchungWahl | null>(null)
   const id = useId()
 
   function speichern(): void {
@@ -94,6 +99,11 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
                   bar {euro(a.barCents)} · online {euro(a.onlineCents)}
                 </span>
                 <span className="text-foreground">{abrechnungStandWort(a.stand)}</span>
+                {a.stand === 'zurueckgebucht' && (
+                  <button type="button" className={KNOPF_RAHMEN} onClick={() => setKlaeren({ abrechnungId: a.id, monatText: a.monatText })}>
+                    {RUECKBUCHUNG_TEXT.knopf}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -164,6 +174,7 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
       </form>
       <DialogFehler text={fehler} />
       {frisch.dialog}
+      <RueckbuchungKlaerenDialog wahl={klaeren} onClose={() => setKlaeren(null)} />
     </section>
   )
 }

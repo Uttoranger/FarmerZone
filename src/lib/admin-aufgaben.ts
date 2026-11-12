@@ -632,7 +632,7 @@ function rueckbuchung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       {
         titel: 'Lastschrift zurückgebucht',
         bezug: { kennung: a.farmId, text: `${a.hofName} · ${a.monat}` },
-        satz: 'Der Hof nimmt keine Barbestellungen mehr an. Mit dem Hof sprechen und die Zahlung bei Stripe klären.',
+        satz: 'Der Hof nimmt keine Barbestellungen mehr an und hat eine Rechnung über den Betrag bekommen. Zahlt er sie, ist er von selbst wieder frei. Hat er anders gezahlt: in der Hof-Akte „Sperre nach Rückbuchung aufheben“.',
         seit: a.seit,
         wasTun: 'hofAnsehen',
         ziel: adminHofHref(a.farmId),
@@ -1132,6 +1132,9 @@ export const PROTOKOLL_TEXT: Partial<Record<AdminAktionArt, string>> = {
   lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
   lastschrift_gescheitert: 'Lastschrift gescheitert',
   lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
+  lastschrift_nachforderung_erstellt: 'Nachforderung nach Rückbuchung erstellt',
+  lastschrift_nachforderung_bezahlt: 'Nachforderung bezahlt',
+  lastschrift_rueckbuchung_geklaert: 'Sperre nach Rückbuchung aufgehoben',
   online_zahlung_aktiv: 'Online-Zahlung aktiv (Stripe)',
   online_zahlung_pausiert: 'Online-Zahlung pausiert (Stripe)',
   erstattung_erledigt: 'Erstattung als erledigt markiert',

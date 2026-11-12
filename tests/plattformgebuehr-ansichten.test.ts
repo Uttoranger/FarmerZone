@@ -15,7 +15,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 vi.mock('@/server/actions/lastschrift', () => ({ starteLastschrift: vi.fn(), oeffneRechnung: vi.fn() }))
-vi.mock('@/server/actions/admin-plattformgebuehr', () => ({ speichereHofPlattformgebuehr: vi.fn() }))
+vi.mock('@/server/actions/admin-plattformgebuehr', () => ({ speichereHofPlattformgebuehr: vi.fn(), klaereRueckbuchung: vi.fn() }))
 vi.mock('@/lib/stripe-client', () => ({ getStripePromise: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('@/components/admin/frisch-bestaetigen', () => ({ useFrischBestaetigt: () => ({ ausfuehren: vi.fn(), dialog: null }) }))
@@ -25,6 +25,7 @@ import { LastschriftSperreKarte } from '@/components/heute/lastschrift-karte'
 import { HofAktePlattformgebuehr } from '@/components/admin/hof-akte-plattformgebuehr'
 import { einrichtenStand, type EinrichtenDaten } from '@/lib/einrichten'
 import { LASTSCHRIFT_TEXT } from '@/lib/konditionen'
+import { RUECKBUCHUNG_TEXT } from '@/lib/admin-hof-akte'
 
 const html = (el: React.ReactElement): string => renderToStaticMarkup(el).replaceAll(' ', ' ')
 
@@ -83,7 +84,7 @@ describe('Hof › Heute: Karte „Barzahlung ist gesperrt“', () => {
   it('zurückgebucht: kein „Jetzt bezahlen“ auf die schon bezahlte Rechnung, sondern ein Satz ohne Fachbegriff und der Weg ins Postfach', () => {
     const h = html(createElement(LastschriftSperreKarte, { abrechnungId: 'a2', monatText: 'März 2028', stand: 'zurueckgebucht' }))
     expect(h).toContain(LASTSCHRIFT_TEXT.heuteTitel)
-    expect(h).toContain('Die Lastschrift für März 2028 wurde zurückgebucht. Barzahlung ist gesperrt – das Team meldet sich bei dir.')
+    expect(h).toContain('Die Lastschrift für März 2028 wurde zurückgebucht. Barzahlung ist gesperrt, bis der Betrag bezahlt ist – die Rechnung dazu findest du unter Deine Konditionen.')
     expect(h).not.toContain('Jetzt bezahlen')
     expect(h).not.toContain(LASTSCHRIFT_TEXT.heuteSatz('März 2028'))
     expect(h).toContain('href="/postfach"')
@@ -127,5 +128,42 @@ describe('Einrichten: Mandat-Schritt', () => {
     const mit = einrichtenStand(daten(true))
     expect(mit.schritte.find((s) => s.id === 'sepa')).toEqual(expect.objectContaining({ zustand: 'hinweis', aktion: null, textKurz: 'eingerichtet' }))
     expect(mit.gesamt).toBe(einrichtenStand(daten(false)).gesamt)
+  })
+})
+
+describe('Rücklastschrift (Nr. 290): Knöpfe für Nachforderung und Notweg', () => {
+  it('Deine Konditionen: bei „zurückgebucht“ der Knopf „Jetzt bezahlen“ (Nachforderung); „geklärt“ als Wort, ohne Knopf', () => {
+    const zurueck = html(
+      createElement(Barzahlung, {
+        daten: { ...DATEN, abrechnungen: [{ id: 'a2', monatText: 'März 2028', barCents: 342, onlineCents: 0, stand: 'zurueckgebucht', rechnungBar: true, rechnungOnline: false }] },
+      })
+    )
+    expect(zurueck).toContain('zurückgebucht')
+    expect(zurueck).toContain(`>${LASTSCHRIFT_TEXT.bezahlen}<`)
+    // Gegenprobe: dieselbe Zeile im Stand „geklärt“ (Notweg) bzw. „gescheitert“ hat keinen Knopf zur Nachforderung.
+    for (const stand of ['geklaert', 'gescheitert']) {
+      const h = html(createElement(Barzahlung, { daten: { ...DATEN, abrechnungen: [{ id: 'a2', monatText: 'März 2028', barCents: 342, onlineCents: 0, stand, rechnungBar: true, rechnungOnline: false }] } }))
+      expect(h).not.toContain(LASTSCHRIFT_TEXT.bezahlen)
+    }
+    expect(html(createElement(Barzahlung, { daten: { ...DATEN, abrechnungen: [{ id: 'a2', monatText: 'März 2028', barCents: 342, onlineCents: 0, stand: 'geklaert', rechnungBar: true, rechnungOnline: false }] } }))).toContain('geklärt')
+  })
+
+  it('Akte: „Sperre nach Rückbuchung aufheben …“ nur bei einer zurückgebuchten Abrechnung', () => {
+    const akte = (stand: string) =>
+      html(
+        createElement(HofAktePlattformgebuehr, {
+          daten: {
+            farmId: 'hof_1',
+            mandat: true,
+            abrechnungen: [{ id: 'a1', monatText: 'März 2028', barCents: 342, onlineCents: 120, stand }],
+            nichtAbgeholt: { bar: 0, nicht: 0 },
+            einstellungen: { satz: '6', mandatPflicht: true, sperreTage: 14, abrechnungsTag: 3, einzugAb: '', vorgabeEinzugAb: '2028-02-01' },
+          },
+        })
+      )
+    expect(akte('zurueckgebucht')).toContain(`>${RUECKBUCHUNG_TEXT.knopf}<`)
+    expect(RUECKBUCHUNG_TEXT.knopf).toBe('Sperre nach Rückbuchung aufheben …')
+    for (const stand of ['geklaert', 'bezahlt', 'offen']) expect(akte(stand)).not.toContain(RUECKBUCHUNG_TEXT.knopf)
+    expect(akte('geklaert')).toContain('geklärt')
   })
 })
