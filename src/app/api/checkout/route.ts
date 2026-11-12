@@ -10,6 +10,7 @@ import { FARM_ARCHIVED_MESSAGE } from '@/lib/farm-archive'
 import { FARM_NOT_APPROVED_MESSAGE } from '@/lib/farm-approval'
 import { HOF_GESPERRT_SATZ } from '@/lib/bereiche-anzeige'
 import { prisma } from '@/lib/prisma'
+import { fehlerArt } from '@/lib/fehler-art'
 import { stripe } from '@/lib/stripe'
 import { sendOnsiteConfirmation } from '@/lib/email'
 import { stelleEinOhneRisiko } from '@/server/mail-warteschlange'
@@ -904,7 +905,10 @@ export async function POST(request: NextRequest) {
     // dessen Bestellung — kein Fehler für die Kundin.
     const wiederholung = await antwortFuerBestehendeBestellung(data.idempotencyKey, data.sessionId)
     if (wiederholung) return wiederholung
-    console.error('[/api/checkout] Bestellung konnte nicht angelegt werden', e)
+    // Sentry bekommt den Fehler (Nr. 288), das Log nur seine Art: Die Meldung
+    // eines Datenbankfehlers kann Werte der Anfrage tragen (Adresse, Name).
+    Sentry.captureException(e, { tags: { aufgabe: 'checkout', grund: 'bestellung_nicht_angelegt' }, extra: { farmId: farm.id } })
+    console.error('[/api/checkout] Bestellung konnte nicht angelegt werden', fehlerArt(e))
     return NextResponse.json(
       { error: 'Die Bestellung konnte nicht angelegt werden. Bitte versuche es erneut.' },
       { status: 500 }
@@ -1060,7 +1064,8 @@ export async function POST(request: NextRequest) {
       // Die Bestellung steht. Ein gescheiterter Versand wird protokolliert und
       // NICHT zurückgerollt — sonst verlöre die Kundin eine gültige Bestellung,
       // weil ein Mailserver hakte.
-      console.error('[/api/checkout] Bestätigungsmail fehlgeschlagen', orderNumber, e)
+      Sentry.captureException(e, { tags: { aufgabe: 'checkout', grund: 'bar_mail_fehlgeschlagen' }, extra: { orderId: order.id } })
+      console.error('[/api/checkout] Bestätigungsmail fehlgeschlagen', orderNumber, fehlerArt(e))
     }
     await stelleEinOhneRisiko('bestellung-bar-hof', order.id, bestellMailAuftrag('bestellung-bar-hof', order))
   })

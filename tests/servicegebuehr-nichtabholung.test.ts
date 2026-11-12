@@ -23,6 +23,8 @@ vi.mock('@/lib/stripe', () => ({
 // Die Hilfen der Warteschlange bleiben echt (Nr. 168, tests/mail-attrappe.ts).
 vi.mock('@/server/mail-warteschlange', async (o) => (await import('./mail-attrappe')).warteschlangeEcht(await o()))
 vi.mock('@/lib/nach-der-antwort', () => ({ nachDerAntwort: vi.fn() }))
+// Nr. 288: Eine gescheiterte Erstattung der Gebühr geht an Sentry.
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 vi.mock('@/lib/prisma', () => {
   const order = { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() }
   const product = { update: vi.fn() }
@@ -53,7 +55,8 @@ import { markAsNotPickedUp, cancelOrder } from '@/server/actions/orders'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
-import { stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
+import * as Sentry from '@sentry/nextjs'
+import { stelleEinOhneRisiko, stelleMailEinInTransaktion } from '@/server/mail-warteschlange'
 import { ergebnis } from './mail-attrappe'
 
 const stelleMailEin = vi.mocked(stelleMailEinInTransaktion)
@@ -202,7 +205,9 @@ describe('markAsNotPickedUp — online', () => {
     expect(daten[1]).toEqual({ serviceFeeRefundedAt: expect.any(Date) })
   })
 
-  it('Erstattung schlägt fehl → Status trotzdem gesetzt, Vermerk bleibt leer, Rückgabe meldet „offen", Fehler im Log', async () => {
+  // Nr. 288 (M2): Statt nur im Log wird die offene Gebühr zur Aufgabe „Erstattung offen“ — weitere Fälle
+  // dazu in tests/nicht-abgeholt-gebuehr-offen.test.ts.
+  it('Erstattung schlägt fehl → Status trotzdem gesetzt, Gebühr nicht als entfallen, Erstattung offen vermerkt, Sentry und Mail, Fehler im Log', async () => {
     orderFindFirst.mockResolvedValue(ONLINE as never)
     refundCreate.mockRejectedValue(new Error('insufficient_funds'))
     const fehlerLog = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -210,7 +215,12 @@ describe('markAsNotPickedUp — online', () => {
     const result = await markAsNotPickedUp('order_online')
 
     expect(result).toEqual({ gebuehrErstattungOffen: true })
-    expect(updateDaten()).toEqual([{ status: 'NOT_PICKED_UP' }])
+    expect(updateDaten()).toEqual([{ status: 'NOT_PICKED_UP' }, { erstattungOffenSeit: expect.any(Date) }])
+    const meldungen = vi.mocked(Sentry.captureException).mock.calls.filter(
+      (c) => (c[1] as { tags?: { aktion?: string } } | undefined)?.tags?.aktion === 'markAsNotPickedUp'
+    )
+    expect(meldungen).toHaveLength(1)
+    expect(vi.mocked(stelleEinOhneRisiko)).toHaveBeenCalledTimes(1)
     expect(fehlerLog).toHaveBeenCalledTimes(1)
     expect(String(fehlerLog.mock.calls[0]?.[0])).toContain('order_online')
   })

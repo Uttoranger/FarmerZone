@@ -8,6 +8,7 @@ import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
 import type { ErstattungOffenFall } from '@/schemas/mail-auftrag'
 import { erneuereHoflisteNachStorno } from '@/server/hofliste-erneuern'
+import { brichZahlungAb } from '@/server/verwaiste-bestellungen'
 import {
   nachTeilerstattung,
   onlineBezahlt,
@@ -18,6 +19,7 @@ import {
   type StornoBetraege,
 } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
+import { fehlerArt } from '@/lib/fehler-art'
 import { ABHOLUNG_ERLEDIGT } from '@/lib/heute'
 import { MELDE_VERMERK_TYP, meldeVermerk } from '@/server/erstattung-gescheitert'
 import {
@@ -216,6 +218,19 @@ export async function storniere(
     provisionCents: alsCents(storno.platformFeeAmount),
     serviceFeeCents: storno.serviceFeeCents,
   })
+  // N8 (Nr. 288): Online, aber nicht bezahlt — den Zahlungsvorgang bei Stripe
+  // abbrechen, sonst kann die Kundin die stornierte Bestellung noch bezahlen
+  // (dann erstattet der Webhook voll). Derselbe Aufruf wie beim Fristablauf;
+  // er bewegt kein Geld. `false` (Stripe hat bezahlt oder bearbeitet gerade)
+  // oder ein Wurf ändern nichts am Storno — das Netz „zu spät bezahlt → voll
+  // erstattet“ bleibt. Nach dem Commit und nach `nachSperre`.
+  if (storno.stripePaymentIntentId && !betraege) {
+    try {
+      await brichZahlungAb(storno.stripePaymentIntentId)
+    } catch (err) {
+      Sentry.captureException(err, { tags: { aktion: 'cancelOrder', grund: 'intent_nicht_abgebrochen' }, extra: { orderId } })
+    }
+  }
   const teilweiseErstattet = nachTeilerstattung({
     erstattetCents: storno.erstattetCents ?? 0,
     fehlendePositionen: storno.items.filter((i) => i.fehltSeit).length,
@@ -350,7 +365,7 @@ export async function storniere(
         erstattetStripeCents = refund.amount
       }
     } catch (err) {
-      console.error('[cancelOrder] Stripe refund failed:', err)
+      console.error('[cancelOrder] Stripe refund failed:', fehlerArt(err))
       // Offenes Geld darf nicht nur im Log stehen: Die Bestellung ist
       // storniert, ein zweiter Anlauf in der App ist durch die Sperre
       // ausgeschlossen — erstatten kann nur der Betreiber über das

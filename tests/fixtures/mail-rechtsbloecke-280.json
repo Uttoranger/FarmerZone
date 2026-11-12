@@ -360,6 +360,12 @@
       "sha256": "fc494d93fb97fe68a9a8ae40aaadb18f30187ede9fa35107a9dfe858da5304f6"
     }
   ],
+  "vorschau:erstattung-offen-gebuehr": [
+    {
+      "anfang": "Der Hof hat die Bestellung als nicht abgeholt vermerkt. Die ",
+      "sha256": "7a5a05263f3744540ce9a138942064e1a7a5f8c660a32fbf107a2cb4d3a90746"
+    }
+  ],
   "vorschau:wochenbericht": [],
   "vorschau:antwort-an-team": [
     {

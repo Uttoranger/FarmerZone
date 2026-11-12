@@ -38,7 +38,7 @@ import { stripeAnzeige } from '@/lib/stripe-konto'
 import { platzBeiFreischaltung } from '@/lib/admin-hoefe-seite'
 import { stornoBetraege } from '@/lib/storno'
 import { alsCents } from '@/lib/order-totals'
-import { monatsgrenzenWien } from '@/lib/servicegebuehr'
+import { gebuehrErstattungOffen, monatsgrenzenWien } from '@/lib/servicegebuehr'
 import { DEFAULT_SECTIONS, type SectionConfig } from '@/server/queries/appearance'
 import { ladeHoefeFuerGruendung, leseGruendungEinstellung } from '@/server/queries/admin'
 import { getMeldungenFuerAdmin } from '@/server/queries/meldung'
@@ -451,6 +451,9 @@ export async function ladeHofAufgaben(jetzt: Date): Promise<HofAufgabeRoh[]> {
  * Bestellungen mit offener Erstattung, älteste zuerst. Der Betrag ist, was
  * die Kundin online bezahlt hat — `stornoBetraege` wie Storno-Dialog und
  * Mail, keine neue Rechnung; die Anweisung je Weg steht in Mail und Sentry.
+ * Ausnahme seit Nr. 288: Steht nach „Nicht abgeholt“ nur die Gebühr aus
+ * (`gebuehrErstattungOffen`), ist der Betrag die Gebühr — der Warenpreis
+ * bleibt beim Hof, das Bezahlte wäre der falsche Betrag.
  * Keine Daten der Kundin.
  */
 export async function ladeErstattungAufgaben(): Promise<ErstattungAufgabeRoh[]> {
@@ -468,6 +471,10 @@ export async function ladeErstattungAufgaben(): Promise<ErstattungAufgabeRoh[]> 
       platformFeeAmount: true,
       serviceFeeCents: true,
       erstattetCents: true,
+      // Für den Gebühr-Fall nach „Nicht abgeholt“ (gebuehrErstattungOffen, Nr. 288).
+      status: true,
+      paymentMethod: true,
+      serviceFeeRefundedAt: true,
       farm: { select: { name: true } },
     },
   })
@@ -486,7 +493,7 @@ export async function ladeErstattungAufgaben(): Promise<ErstattungAufgabeRoh[]> 
         bestellnummer: b.orderNumber,
         hofName: b.farm.name,
         seit: b.erstattungOffenSeit,
-        bezahltCents: betraege?.erstattetCents ?? null,
+        bezahltCents: gebuehrErstattungOffen(b) ? b.serviceFeeCents : (betraege?.erstattetCents ?? null),
         schonErstattetCents: b.erstattetCents,
         zahlungKennung: b.stripePaymentIntentId,
       },

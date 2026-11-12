@@ -113,7 +113,7 @@ describe('Notfall-Storno nur vor der Abholung — dieselbe Liste wie beim Hof', 
 })
 
 describe('Fälle und Verlauf', () => {
-  const basis = { status: 'PAID', paymentMethod: 'ONLINE', paymentStatus: 'PAID', erstattungOffenSeit: null }
+  const basis = { status: 'PAID', paymentMethod: 'ONLINE', paymentStatus: 'PAID', erstattungOffenSeit: null, serviceFeeCents: 0, serviceFeeRefundedAt: null }
   it('die offene Erstattung geht vor; sonst nach Stand und Zahlung', () => {
     expect(bestellFall({ ...basis, status: 'CANCELLED', erstattungOffenSeit: new Date() })).toBe('erstattung_offen')
     expect(bestellFall({ ...basis, status: 'CANCELLED', paymentStatus: 'REFUNDED' })).toBe('storniert_erstattet')
@@ -149,10 +149,26 @@ describe('Adresse der Seite', () => {
 })
 
 describe('„Außerhalb erstattet“ — nur das Merkmal, nie Stripe', () => {
-  it('mit Grund: genau EIN bedingtes Schreiben, Protokoll mit Grund, kein Stripe-Aufruf', async () => {
+  // Nr. 288 (Schritt 9): Zuerst das Schreiben für eine offene Gebühr nach „Nicht abgeholt“ (mit der gelesenen farmId);
+  // trifft es nicht, das bisherige. Den Gebühr-Fall selbst prüft tests/gebuehr-erstattung-schliessen.test.ts.
+  it('mit Grund: ein Schreiben, das trifft — Protokoll mit Grund, kein Stripe-Aufruf', async () => {
+    db.order.updateMany.mockResolvedValueOnce({ count: 0 })
     expect(await markiereErstattungErledigt({ orderId: BESTELLUNG, grund: 'Selbst überwiesen' })).toEqual({ ok: true })
-    expect(db.order.updateMany).toHaveBeenCalledTimes(1)
-    expect(db.order.updateMany).toHaveBeenCalledWith({ where: { id: BESTELLUNG, erstattungOffenSeit: { not: null } }, data: { erstattungOffenSeit: null } })
+    expect(db.order.findUnique).toHaveBeenCalledWith({ where: { id: BESTELLUNG }, select: { farmId: true } })
+    expect(db.order.updateMany).toHaveBeenCalledTimes(2)
+    expect(db.order.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        id: BESTELLUNG,
+        farmId: HOF,
+        status: 'NOT_PICKED_UP',
+        paymentMethod: 'ONLINE',
+        serviceFeeCents: { gt: 0 },
+        serviceFeeRefundedAt: null,
+        erstattungOffenSeit: { not: null },
+      },
+      data: { erstattungOffenSeit: null, serviceFeeRefundedAt: expect.any(Date) },
+    })
+    expect(db.order.updateMany).toHaveBeenNthCalledWith(2, { where: { id: BESTELLUNG, erstattungOffenSeit: { not: null } }, data: { erstattungOffenSeit: null } })
     expect(eintraege()).toEqual([{ wer: 'admin_1', art: 'erstattung_erledigt', bezugArt: 'bestellung', bezugId: BESTELLUNG, grund: 'Selbst überwiesen', mitPasskey: true }])
     expect(stripe.refunds.create).not.toHaveBeenCalled()
   })
