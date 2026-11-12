@@ -13,7 +13,7 @@
  *  - Galerie, Produktbilder, Titelbild und /teilen nehmen alle diesen Weg —
  *    es gibt keinen zweiten Token-Ausgeber (Quelltext-Suche mit Gegenprobe).
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -65,10 +65,16 @@ const fetchSpion = vi.fn()
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Seit Nr. 294b (N7) verarbeitet die Route nur Originale aus dem eigenen Speicher — der kommt aus dem Blob-Schlüssel.
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_x_nurFuerTests')
   vi.stubGlobal('fetch', fetchSpion)
   // Die Sitzung behauptet bestätigt — entscheiden darf nur die Datenbank.
   vi.mocked(auth.api.getSession).mockResolvedValue({ user: { id: 'user-1', role: 'FARMER', emailVerified: true } } as never)
   vi.mocked(prisma.farm.findUnique).mockResolvedValue({ id: 'farm-1' } as never)
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('neues Konto ohne bestätigte Adresse', () => {

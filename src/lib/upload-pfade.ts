@@ -167,25 +167,30 @@ export function zielPfad(farmId: string, zweck: UploadZweck): string {
   return `${zielPrefix(farmId)}${zweck}/${Date.now()}.webp`
 }
 
-/** Host-Muster des eigenen Blob-Speichers. */
+/** Host-Muster aller Blob-Speicher bei Vercel — nur die Vorprüfung; welcher davon unserer ist, entscheidet `liegtImEigenenSpeicher`. */
 const BLOB_HOST = /^[a-z0-9-]+\.public\.blob\.vercel-storage\.com$/i
 
 /**
  * Darf diese URL für diesen Hof verarbeitet werden?
  *
  * Zwei Bedingungen, beide notwendig:
- *   1. Die URL zeigt auf unseren eigenen Blob-Speicher. Sonst ließe sich die
- *      Verarbeitungs-Route als Werkzeug missbrauchen, beliebige fremde Adressen
- *      abzurufen — der Server würde für einen Angreifer Netzwerkzugriffe tun.
+ *   1. Die URL zeigt auf unseren eigenen Blob-Speicher (`speicher` aus
+ *      `blobSpeicherAusSchluessel`). Sonst ließe sich die Verarbeitungs-Route
+ *      als Werkzeug missbrauchen, beliebige fremde Adressen abzurufen — der
+ *      Server würde für einen Angreifer Netzwerkzugriffe tun. Das Host-Muster
+ *      allein reicht nicht (Nr. 294b, N7): Es trifft jeden Blob-Speicher bei
+ *      Vercel, auch einen, den ein Angreifer selbst anlegt und in dem er den
+ *      Pfad `originals/<unsereHofId>/…` frei wählt.
  *   2. Der Pfad liegt unter `originals/{farmId}/` GENAU DIESES Hofes. Sonst
  *      könnte ein angemeldeter Bauer die Originale eines anderen Hofes
  *      verarbeiten und sich als eigenes Bild ablegen lassen.
  *
- * Reine Funktion, kein Netzzugriff — deshalb ohne Browser und ohne Datenbank
- * prüfbar. Sie entscheidet, bevor irgendetwas geladen wird.
+ * Ohne Speicher-Kennung ist nichts erlaubt (fail-closed). Reine Funktion, kein
+ * Netzzugriff — deshalb ohne Browser und ohne Datenbank prüfbar. Sie
+ * entscheidet, bevor irgendetwas geladen wird.
  */
-export function darfVerarbeitetWerden(url: string, farmId: string): boolean {
-  return liegtImEigenenPfad(url, originalPrefix(farmId))
+export function darfVerarbeitetWerden(url: string, farmId: string, speicher: string | null): boolean {
+  return liegtImEigenenSpeicher(url, originalPrefix(farmId), speicher)
 }
 
 /**
@@ -202,9 +207,13 @@ export function darfGeloeschtWerden(url: string, farmId: string): boolean {
   return liegtImEigenenPfad(url, zielPrefix(farmId))
 }
 
-/** Darf dieses Original als Startseiten-Bild verarbeitet werden? Nur aus dem Ordner der Startseite (Admin-Sitzung prüft die Route). */
-export function darfStartseitenBildVerarbeitetWerden(url: string): boolean {
-  return liegtImEigenenPfad(url, STARTSEITE_ORIGINAL_PREFIX)
+/**
+ * Darf dieses Original als Startseiten-Bild verarbeitet werden? Nur aus dem
+ * Ordner der Startseite im eigenen Speicher (Admin-Sitzung prüft die Route);
+ * dieselben Bedingungen wie `darfVerarbeitetWerden`.
+ */
+export function darfStartseitenBildVerarbeitetWerden(url: string, speicher: string | null): boolean {
+  return liegtImEigenenSpeicher(url, STARTSEITE_ORIGINAL_PREFIX, speicher)
 }
 
 /** Zielpfad eines fertigen Startseiten-Bilds. */
@@ -218,8 +227,17 @@ export function startseitenZielPfad(): string {
  * `istEigeneBildUrl`, nur der Ordner der Startseite statt des Hofs.
  */
 export function istEigeneStartseitenBildUrl(url: string, speicher: string | null): boolean {
+  return liegtImEigenenSpeicher(url, STARTSEITE_ZIEL_PREFIX, speicher)
+}
+
+/**
+ * Pfad-Prüfung plus genau unser Speicher als Host. Keine Anmeldedaten, keine
+ * Abfrage, kein Anker: Nichts davon erzeugt unser Upload je. Ohne Speicher
+ * (Schlüssel fehlt oder unbrauchbar) immer false.
+ */
+function liegtImEigenenSpeicher(url: string, prefix: string, speicher: string | null): boolean {
   if (!speicher) return false
-  if (!liegtImEigenenPfad(url, STARTSEITE_ZIEL_PREFIX)) return false
+  if (!liegtImEigenenPfad(url, prefix)) return false
   const zerlegt = new URL(url)
   if (zerlegt.username || zerlegt.password || zerlegt.search || zerlegt.hash) return false
   return zerlegt.hostname.toLowerCase() === `${speicher}.public.blob.vercel-storage.com`
@@ -282,9 +300,6 @@ export function blobSpeicherAusSchluessel(schluessel: string | null | undefined)
  * keine Abfrage, kein Anker: Nichts davon erzeugt unser Upload je.
  */
 export function istEigeneBildUrl(url: string, farmId: string, speicher: string | null): boolean {
-  if (!speicher || !farmId) return false
-  if (!liegtImEigenenPfad(url, zielPrefix(farmId))) return false
-  const zerlegt = new URL(url)
-  if (zerlegt.username || zerlegt.password || zerlegt.search || zerlegt.hash) return false
-  return zerlegt.hostname.toLowerCase() === `${speicher}.public.blob.vercel-storage.com`
+  if (!farmId) return false
+  return liegtImEigenenSpeicher(url, zielPrefix(farmId), speicher)
 }
