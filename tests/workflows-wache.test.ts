@@ -176,3 +176,167 @@ describe('Workflow-Wache — Auslöser, Gruppe und Zeitgrenzen von ci.yml (G3, N
     })
   })
 })
+
+// ─── Nr. 285: Sicherheitsmeldungen wöchentlich, Lint blockierend, Node aus .nvmrc ───────────────────────
+
+const NVMRC = '.nvmrc'
+const ENGINES_NODE = '>=22.12.0 <25'
+
+type Schritt = { name?: unknown; uses?: unknown; run?: unknown; with?: Record<string, unknown>; 'continue-on-error'?: unknown }
+
+/** Die Schritte je Job eines Workflow-Dokuments. */
+function schritteJeJob(dokument: Record<string, unknown> | null): [string, Schritt[]][] {
+  return Object.entries(alsObjekt(dokument?.jobs) ?? {}).map(([name, job]) => {
+    const schritte = alsObjekt(job)?.steps
+    return [name, Array.isArray(schritte) ? (schritte as Schritt[]) : []]
+  })
+}
+
+/**
+ * Verstöße von audit.yml (Abgleich gegen Sicherheitsmeldungen) gegen seine Regel. Leer = in Ordnung.
+ * Nur Zeitplan und Handstart — nie ein PR-Auslöser, sonst machte eine neue Meldung jeden PR rot —, nur Leserechte,
+ * kein Secret; Node aus .nvmrc, der Lauf ist `pnpm pruefen:audit`.
+ */
+function pruefeAudit(text: string): string[] {
+  let dokument: Record<string, unknown> | null
+  try {
+    dokument = alsObjekt(leseYaml(text))
+  } catch (fehler) {
+    return [`ungültiges YAML: ${(fehler instanceof Error ? fehler.message : String(fehler)).split('\n')[0]}`]
+  }
+  const befunde: string[] = []
+  const ausloeser = alsObjekt(dokument?.on)
+  const schluessel = Object.keys(ausloeser ?? {}).sort()
+  if (JSON.stringify(schluessel) !== JSON.stringify(['schedule', 'workflow_dispatch'])) {
+    befunde.push(`Auslöser sind ${schluessel.join(', ') || String(dokument?.on)} statt schedule, workflow_dispatch`)
+  }
+  if (alsObjekt(dokument?.permissions)?.contents !== 'read') befunde.push('permissions.contents ist nicht read')
+  if (/secrets\./.test(ohneKommentare(text))) befunde.push('nennt ein Secret (secrets.)')
+  const schritte = schritteJeJob(dokument).flatMap(([, liste]) => liste)
+  if (!schritte.some((s) => s.run === 'pnpm pruefen:audit')) befunde.push('kein Schritt ruft pnpm pruefen:audit')
+  return befunde
+}
+
+/** Verstöße eines Workflows gegen „Node aus .nvmrc“: jeder setup-node-Schritt liest die Datei, keiner nennt eine Fassung. */
+function pruefeNodeAusNvmrc(dokument: Record<string, unknown> | null): string[] {
+  return schritteJeJob(dokument).flatMap(([job, schritte]) => {
+    const setup = schritte.filter((s) => typeof s.uses === 'string' && s.uses.startsWith('actions/setup-node'))
+    if (setup.length === 0) return [`Job ${job}: kein setup-node`]
+    return setup.flatMap((s) => [
+      ...(s.with?.['node-version-file'] !== NVMRC ? [`Job ${job}: setup-node liest nicht ${NVMRC}`] : []),
+      ...(s.with?.['node-version'] !== undefined ? [`Job ${job}: setup-node nennt node-version`] : []),
+    ])
+  })
+}
+
+/** Verstöße von ci.yml gegen „Lint blockiert“: Den Schritt „Lint“ gibt es, ohne continue-on-error. */
+function pruefeLintBlockiert(dokument: Record<string, unknown> | null): string[] {
+  const lint = schritteJeJob(dokument).flatMap(([, schritte]) => schritte.filter((s) => s.name === 'Lint'))
+  if (lint.length === 0) return ['kein Schritt „Lint“']
+  return lint.some((s) => s['continue-on-error'] !== undefined) ? ['Schritt „Lint“ hat continue-on-error'] : []
+}
+
+/** Verstöße des Inhalts von .nvmrc: eine ganze Hauptfassung im erlaubten Bereich 22 ≤ n < 25 (von Hand verglichen). */
+function pruefeNvmrc(inhalt: string): string[] {
+  const text = inhalt.trim()
+  if (!/^\d+$/.test(text)) return [`„${text}“ ist keine ganze Hauptfassung`]
+  const fassung = Number.parseInt(text, 10)
+  return fassung >= 22 && fassung < 25 ? [] : [`${fassung} liegt nicht in ${ENGINES_NODE}`]
+}
+
+describe('Workflow-Wache — Sicherheitsmeldungen, blockierender Lint, Node aus .nvmrc (Nr. 285)', () => {
+  const audit = workflows.find((w) => w.name === 'audit.yml')?.text ?? ''
+  const ci = workflows.find((w) => w.name === 'ci.yml')?.text ?? ''
+
+  it('audit.yml läuft nur nach Zeitplan und von Hand, mit Leserechten, ohne Secret, mit pnpm pruefen:audit', () => {
+    expect(workflows.map((w) => w.name)).toContain('audit.yml')
+    expect(pruefeAudit(audit)).toEqual([])
+    expect(pruefeNodeAusNvmrc(alsObjekt(leseYaml(audit)))).toEqual([])
+  })
+
+  it('ci.yml: der Schritt „Lint“ blockiert, beide Jobs lesen .nvmrc', () => {
+    const dokument = alsObjekt(leseYaml(ci))
+    expect(pruefeLintBlockiert(dokument)).toEqual([])
+    expect(pruefeNodeAusNvmrc(dokument)).toEqual([])
+    expect(schritteJeJob(dokument).map(([job]) => job)).toEqual(['ci', 'integration'])
+  })
+
+  it('package.json erlaubt genau >=22.12.0 <25, .nvmrc nennt eine Hauptfassung darin', () => {
+    const paket = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { engines?: { node?: unknown } }
+    expect(paket.engines?.node).toBe(ENGINES_NODE)
+    expect(pruefeNvmrc(readFileSync(join(process.cwd(), NVMRC), 'utf8'))).toEqual([])
+  })
+
+  describe('Gegenprobe: jede Abweichung schlägt an', () => {
+    const attrappe = [
+      'name: Attrappe',
+      'on:',
+      '  schedule:',
+      "    - cron: '17 5 * * 1'",
+      '  workflow_dispatch:',
+      'permissions:',
+      '  contents: read',
+      'jobs:',
+      '  pruefen:',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - uses: actions/setup-node@v4',
+      '        with:',
+      '          node-version-file: .nvmrc',
+      '      - run: pnpm pruefen:audit',
+      '',
+    ].join('\n')
+
+    it('die Attrappe selbst ist in Ordnung', () => {
+      expect(pruefeAudit(attrappe)).toEqual([])
+      expect(pruefeNodeAusNvmrc(alsObjekt(leseYaml(attrappe)))).toEqual([])
+    })
+
+    const abwandlungen: Record<string, (t: string) => string> = {
+      'ein PR-Auslöser dazu': (t) => t.replace('  workflow_dispatch:\n', '  workflow_dispatch:\n  pull_request:\n'),
+      'Push statt Handstart': (t) => t.replace('  workflow_dispatch:\n', '  push:\n'),
+      'Schreibrechte': (t) => t.replace('contents: read', 'contents: write'),
+      'keine Rechte-Angabe': (t) => t.replace('permissions:\n  contents: read\n', ''),
+      'ein Secret im Schritt': (t) => t.replace('      - run: pnpm pruefen:audit', '      - run: pnpm pruefen:audit\n        env:\n          T: ${{ secrets.TOKEN }}'),
+      'ein anderer Befehl': (t) => t.replace('pnpm pruefen:audit', 'pnpm audit --fix'),
+    }
+    for (const [name, abwandeln] of Object.entries(abwandlungen)) {
+      it(`audit: ${name}`, () => {
+        const abgewandelt = abwandeln(attrappe)
+        expect(abgewandelt).not.toBe(attrappe)
+        expect(pruefeAudit(abgewandelt).length).toBeGreaterThan(0)
+      })
+    }
+
+    it('Node: feste Fassung statt .nvmrc, in der Attrappe und im echten ci.yml', () => {
+      expect(pruefeNodeAusNvmrc(alsObjekt(leseYaml(attrappe.replace('node-version-file: .nvmrc', 'node-version: 22'))))).toEqual([
+        'Job pruefen: setup-node liest nicht .nvmrc',
+        'Job pruefen: setup-node nennt node-version',
+      ])
+      const zweiterJob = ci.lastIndexOf('node-version-file: .nvmrc')
+      expect(zweiterJob).toBeGreaterThan(ci.indexOf('node-version-file: .nvmrc'))
+      const abgewandelt = `${ci.slice(0, zweiterJob)}node-version: 22${ci.slice(zweiterJob + 'node-version-file: .nvmrc'.length)}`
+      expect(pruefeNodeAusNvmrc(alsObjekt(leseYaml(abgewandelt)))).toEqual([
+        'Job integration: setup-node liest nicht .nvmrc',
+        'Job integration: setup-node nennt node-version',
+      ])
+    })
+
+    it('Lint: continue-on-error am echten Schritt und ein fehlender Schritt', () => {
+      const mitAusnahme = ci.replace('      - name: Lint\n', '      - name: Lint\n        continue-on-error: true\n')
+      expect(mitAusnahme).not.toBe(ci)
+      expect(pruefeLintBlockiert(alsObjekt(leseYaml(mitAusnahme)))).toEqual(['Schritt „Lint“ hat continue-on-error'])
+      expect(pruefeLintBlockiert(alsObjekt(leseYaml(ci.replace('      - name: Lint\n', '      - name: Prüfen\n'))))).toEqual(['kein Schritt „Lint“'])
+    })
+
+    it('.nvmrc: nur eine ganze Hauptfassung von 22 bis 24', () => {
+      expect(pruefeNvmrc('24\n')).toEqual([])
+      expect(pruefeNvmrc('22')).toEqual([])
+      expect(pruefeNvmrc('24.1')).toHaveLength(1)
+      expect(pruefeNvmrc('lts/*')).toHaveLength(1)
+      expect(pruefeNvmrc('v24')).toHaveLength(1)
+      expect(pruefeNvmrc('21')).toEqual([`21 liegt nicht in ${ENGINES_NODE}`])
+      expect(pruefeNvmrc('25')).toEqual([`25 liegt nicht in ${ENGINES_NODE}`])
+    })
+  })
+})

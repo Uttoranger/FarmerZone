@@ -3,7 +3,7 @@ import { getFarmForUser } from '@/server/queries/dashboard'
 import { verlangeHofDerSitzung } from '@/server/hofbereich'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Square } from 'lucide-react'
 import { PrintButton } from '@/components/orders/print-button'
 import { positionszeile } from '@/lib/positionszeile'
 import { PositionsText } from '@/components/hof-bestellungen/positions-text'
@@ -183,7 +183,7 @@ export default async function PrintPacklistPage() {
                       {order.items.map((item, k) => (
                         <div key={k} className="text-sm text-primary-foreground/90">
                           {/* Ein Kästchen zum Abhaken mit dem Stift — Schmuck für den Bildschirm, Zweck auf dem Papier. */}
-                          <span aria-hidden="true">☐ </span>
+                          <Square aria-hidden="true" strokeWidth={1.7} className="mr-1.5 inline size-3.5 align-[-2px]" />
                           {/* „**4** × Heumilch frisch (1 L)“ — dieselbe Positionszeile G14 wie die Bestellseite. */}
                           <PositionsText zeile={item.productName} teile={zeileVon(item)} anzahlKlasse="text-primary-foreground" />
                         </div>
