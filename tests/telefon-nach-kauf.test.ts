@@ -199,7 +199,7 @@ describe('Kasse: die Angaben zum Hof stehen vor dem Kaufknopf', () => {
 
   for (const [art, knopf] of [
     ['online', 'Weiter zur Zahlung · € 14,91'],
-    ['bar', 'Zahlungspflichtig bestellen · € 14,91'],
+    ['bar', '>Zahlungspflichtig bestellen</button>'],
   ] as const) {
     it(`${art}: Übersicht, dann alle vier Angaben, dann der Knopf „${knopf}"`, () => {
       const html = abschluss(art === 'online')

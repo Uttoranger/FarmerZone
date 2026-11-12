@@ -172,7 +172,11 @@ describe('Kasse glätten (N10): das ganze Formular', () => {
 
   it('Bar (Hof ohne Online-Zahlung): „entfällt", verbindlicher Knopf, kein Stripe-Satz, „bar am Hof"', () => {
     const html = kasse({ ...HOF, stripeAccountReady: false })
-    expect(html).toContain('Zahlungspflichtig bestellen · € 9,80')
+    // Nr. 309 (§ 8 Abs. 2 FAGG): Der Knopf trägt nur sein Wort, der Betrag steht in der Zusammenfassung davor.
+    expect(html).toContain('>Zahlungspflichtig bestellen</button>')
+    const zusammenfassung = html.slice(html.indexOf('data-kauf-zusammenfassung'))
+    expect(zusammenfassung.slice(0, zusammenfassung.indexOf('</section>'))).toMatch(/Gesamt[\s\S]*€ 9,80/)
+    expect(zusammenfassung.indexOf('</section>')).toBeLessThan(zusammenfassung.indexOf('>Zahlungspflichtig bestellen</button>'))
     expect(html).toContain('entfällt')
     expect(html).toContain('Wähl noch, wann du abholst · bar am Hof · Bestätigung per E-Mail')
     expect(html).toContain(BAR_OHNE_GEBUEHR_ZAHLART)

@@ -6915,3 +6915,14 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - Nicht gebaut: die Sperre zusätzlich per E-Mail (Schritt 3a). Der Satz von Recht sagt „antworte auf diese Mail“, die Postfach-Mail endet mit „Antworten geht in der App, im Postfach.“ (Tor T4). Bis Recht einen passenden Satz freigibt, bekommt der Hof die Sperre nur im Postfach.
 - Dazu der Satz zum Kleinbetrag auf /konditionen (E-021, Startsatz zu Schritt 9): unter 0,50 € Bargebühr im Monat keine Bar-Rechnung. Die Regel selbst baut Nr. 291.
 
+
+## Kaufknopf ohne Betrag (§ 8 Abs. 2 FAGG, Recht 10.11.2026; Register N2 mit der Ergänzung aus F027, O4; Nr. 309, Lauf 34, 12.11.2026)
+
+**Anlass (R-Boards k5, Frage 2; R2 Teil 4a und Teil 9, Startbedingung 4).** Die verbindlichen Knöpfe trugen den Betrag („Zahlungspflichtig bestellen · € …“, „Jetzt bezahlen · € …“, „Erneut bezahlen · € …“). § 8 Abs. 2 FAGG verlangt einen Knopf, der „nur“ bzw. „ausschließlich“ sein Wort trägt; ein Verstoß bindet die Kundin nicht an ihre Bestellung. Dazu lag bei Privat die Gewährleistungs-Mitteilung zwischen Zusammenfassung und Knopf — gegen die Ergänzung zu N2 aus F027 („Mitteilung über der Zusammenfassung; Zusammenfassung unmittelbar über dem Kaufknopf“).
+
+**Fachregel.**
+- Die verbindlichen Knöpfe tragen nur ihr Wort; „Weiter zur Zahlung · € …“ schließt nichts ab (AGB 9.4) und behält den Betrag. „Wird gesendet …“ und „Wird bezahlt …“ bleiben.
+- Der Gesamtpreis steht in jedem Schritt in der Zusammenfassung unmittelbar über dem Knopf, auch im Zahlungsschritt und bei „Zahlung fortsetzen“. Betrag und Zusatz kommen aus `gesamtAnzeige` (`src/lib/kasse.ts`, nur Anzeige): im Formular aus `angezeigteBetraege` wie bisher, im Zahlungsschritt aus `zahlungsBetraege(betrag)` — also der Betrag, den Stripe abbucht, derselbe wie in der Übersicht. Deshalb ist die Prop `zusammenfassung` von `StripeZahlung` eine Funktion: Der Zahlungsschritt reicht ihr seinen Betrag, das Formular rechnet keinen zweiten.
+- Reihenfolge in beiden Schritten: Gewährleistungs-Mitteilung (nur Privat) → Zusammenfassung mit „Gesamt“ → Knopf; im Zahlungsschritt dazwischen höchstens ein Zahlungsfehler. Die Sätze unter dem Knopf (`KaufknopfSaetze`) bleiben, wie sie sind.
+- Wache `tests/kaufknopf-ohne-betrag.test.ts`: In checkout-form.tsx und stripe-payment.tsx verbindet kein Vorlagentext ein Wort der verbindlichen Knöpfe mit einem Platzhalter.
+- Nicht gebaut (später mit eigenem Auftrag, Board k5): die klebende Leiste „Weiter zum Bestellen“, der Zahlungsschritt im Fluss. Bis dahin steht der Betrag im Zahlungsschritt zweimal in der Karte (Zeile „Gesamt“ der Übersicht und in der Zusammenfassung). Gegen Board w1-kasse weicht die Reihenfolge ab (Ergänzungsliste Lauf 34, Entsch. „C“).

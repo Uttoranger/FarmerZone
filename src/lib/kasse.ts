@@ -13,7 +13,7 @@ import type { OrderStatus, PaymentStatus } from '@prisma/client'
 import { istVerwaist, uhrzeitInWien, type FristBestellung } from '@/lib/fristen'
 import { tagVersetzt } from '@/lib/kalender'
 import { korbBetraege, zahlungsarten } from '@/lib/hofseite-kunde'
-import { BAR_OHNE_GEBUEHR_ZAHLART, MINDESTBESTELLWERT_CENTS, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
+import { BAR_OHNE_GEBUEHR_ZAHLART, INKL_PLATTFORMGEBUEHR, MINDESTBESTELLWERT_CENTS, MINDESTBESTELLWERT_SATZ, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_SATZ } from '@/lib/konditionen'
 import {
   bestellGebuehr,
   endpreisJeStueckCents,
@@ -292,6 +292,23 @@ export function zahlungsBetraege(betrag: ZahlungsBetrag): Pick<KassenBetraege, '
     gebuehrCents: betrag.serviceFeeCents,
     gesamtCents: betrag.amountCents,
   }
+}
+
+/**
+ * Nur Anzeige: der Gesamtbetrag und sein Zusatz für die Zusammenfassung über dem Kaufknopf
+ * (`KaufZusammenfassung`, Nr. 210) — im Formular und im Zahlungsschritt aus EINER Regel. Seit Nr. 309
+ * (§ 8 Abs. 2 FAGG) tragen die verbindlichen Knöpfe nur ihr Wort; der Gesamtpreis steht in jedem Schritt
+ * in der Zusammenfassung unmittelbar darüber. Nichts gerechnet: Die Cent-Werte kommen fertig aus
+ * `angezeigteBetraege` bzw. `zahlungsBetraege` — im Zahlungsschritt also der Betrag, den Stripe abbucht.
+ * Im Hofpreis-Modell steckt die Gebühr in den Preisen und hat keinen eigenen Betrag (N38); im Modell
+ * „bisher“ nennt der Zusatz Titel und Betrag der Gebühr, ohne Gebühr gibt es keinen Zusatz.
+ */
+export function gesamtAnzeige(k: { gesamtCents: number; gebuehrCents: number; hofpreis: boolean; gebuehrTitel: string }): {
+  betrag: string
+  zusatz: string | null
+} {
+  const zusatz = k.hofpreis ? INKL_PLATTFORMGEBUEHR : k.gebuehrCents > 0 ? `inkl. ${k.gebuehrTitel} ${formatEuro(centsAlsEuro(k.gebuehrCents))}` : null
+  return { betrag: formatEuro(centsAlsEuro(k.gesamtCents)), zusatz }
 }
 
 /**
