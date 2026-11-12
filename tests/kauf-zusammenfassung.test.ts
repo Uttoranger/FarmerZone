@@ -10,7 +10,9 @@
  *  - Positionen, Gesamtpreis, Abholtermin und Hofname stehen im Markup VOR dem Knopf.
  *  - Bei sechs Positionen stehen fünf offen, die sechste klappt mit „und 1 weitere“ auf.
  *  - Unter „Jetzt bezahlen“ steht keine Fußzeile mehr (Abholung zog nach oben).
- *  - Der Gesamtbetrag der Zusammenfassung ist derselbe Wert wie auf dem Knopf (eine Quelle).
+ *  - Der Gesamtbetrag steht seit Nr. 309 in jedem Schritt in der Zusammenfassung (die Knöpfe tragen nur
+ *    ihr Wort, § 8 Abs. 2 FAGG) — im Zahlungsschritt derselbe Betrag wie in der Übersicht; eine Regel
+ *    (`gesamtAnzeige`) für Formular und Zahlungsschritt, kein zweiter Rechenweg.
  *  - AGB- und Rücktrittssatz bleiben unter dem Knopf des Formulars, unverändert.
  */
 import { describe, it, expect, vi } from 'vitest'
@@ -100,7 +102,7 @@ describe('Zahlungsschritt: die Zusammenfassung unmittelbar über „Jetzt bezahl
         gebuehrText: 'Servicegebühr',
         korb: null,
         angaben: null,
-        zusammenfassung: createElement(KaufZusammenfassung, { positionen, abholung: ABHOLUNG, hofName: HOFNAME }),
+        zusammenfassung: (gesamt: { betrag: string; zusatz: string | null }) => createElement(KaufZusammenfassung, { positionen, abholung: ABHOLUNG, hofName: HOFNAME, gesamt }),
         privat: true,
         // Die Sätze unter dem Knopf prüft tests/kaufknopf-saetze.test.ts (Nr. 215); hier geht es um die Zusammenfassung.
         kaufknopfSaetze: null,
@@ -108,7 +110,10 @@ describe('Zahlungsschritt: die Zusammenfassung unmittelbar über „Jetzt bezahl
     )
 
   it('Positionen, Gesamtpreis, Abholtermin und Hofname stehen vor dem Knopf', () => {
-    vorDemKnopf(schritt(), 'Jetzt bezahlen · € 10,82', ['Ware 1', 'Ware 2', 'Gesamt', '€ 10,82', ABHOLUNG, HOFNAME])
+    vorDemKnopf(schritt(), '>Jetzt bezahlen</button>', ['Ware 1', 'Ware 2', 'Gesamt', '€ 10,82', ABHOLUNG, HOFNAME])
+    // Nr. 309: Der Gesamtpreis steht in der Zusammenfassung selbst, nicht nur in der Übersicht darüber.
+    const zusammenfassung = schritt().split('data-kauf-zusammenfassung')[1] ?? ''
+    expect(zusammenfassung.slice(0, zusammenfassung.indexOf('</section>'))).toMatch(/Gesamt[\s\S]*€ 10,82/)
   })
 
   it('unter dem Knopf steht keine Fußzeile mehr — die Abholung zog nach oben', () => {
@@ -122,7 +127,7 @@ describe('Zahlungsschritt: die Zusammenfassung unmittelbar über „Jetzt bezahl
   })
 
   it('sechs Positionen: „und 1 weitere“ vor dem Knopf', () => {
-    vorDemKnopf(schritt(SECHS), 'Jetzt bezahlen', ['Ware 5', 'und 1 weitere'])
+    vorDemKnopf(schritt(SECHS), '>Jetzt bezahlen</button>', ['Ware 5', 'und 1 weitere'])
   })
 
   it('am Handy steht die Übersicht samt Zusammenfassung zuletzt, direkt über der festen Leiste', () => {
@@ -156,11 +161,13 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit Zusammenfas
         agbFassung: '0.9',
       })
     )
-    vorDemKnopf(html, 'Jetzt bezahlen · € 10,30', ['Gesamt', ABHOLUNG])
+    vorDemKnopf(html, '>Jetzt bezahlen</button>', ['Gesamt', ABHOLUNG])
     // Positionen und Hof stehen auch in der Zusammenfassung vor dem Knopf, nicht nur im Korb oben.
     const zusammenfassung = html.slice(html.indexOf('data-kauf-zusammenfassung'))
     expect(zusammenfassung.indexOf('Ware 2')).toBeLessThan(zusammenfassung.indexOf('Jetzt bezahlen'))
     expect(zusammenfassung.indexOf(HOFNAME)).toBeLessThan(zusammenfassung.indexOf('Jetzt bezahlen'))
+    // Nr. 309: Gesamt € 10,30 (der Betrag der Bestellung) steht in der Zusammenfassung vor dem Knopf.
+    expect(zusammenfassung.slice(0, zusammenfassung.indexOf('</section>'))).toMatch(/Gesamt[\s\S]*€ 10,30/)
   })
 })
 
@@ -189,7 +196,7 @@ describe('Formular: dieselben Angaben über „Zahlungspflichtig bestellen“ un
     )
 
   for (const [art, knopf, online] of [
-    ['bar', 'Zahlungspflichtig bestellen · € 10,82', false],
+    ['bar', '>Zahlungspflichtig bestellen</button>', false],
     ['online', 'Weiter zur Zahlung · € 10,82', true],
   ] as const) {
     for (const privat of [true, false]) {
@@ -206,11 +213,17 @@ describe('Formular: dieselben Angaben über „Zahlungspflichtig bestellen“ un
     }
   }
 
-  it('eine Quelle: das Formular gibt der Zusammenfassung denselben Gesamtbetrag wie dem Knopf', () => {
+  it('eine Quelle: Formular und Zahlungsschritt nehmen Gesamtbetrag und Zusatz aus gesamtAnzeige', () => {
     const quelle = lies('src/components/checkout/checkout-form.tsx')
-    // Der Knopf zeigt `gesamt`, die Zusammenfassung bekommt ihn unverändert — kein zweiter Rechenweg.
-    expect(quelle).toMatch(/gesamt=\{\{ betrag: gesamt, zusatz:/)
-    expect(quelle).toMatch(/const gesamt = formatEuro\(centsAlsEuro\(betraege\.gesamtCents\)\)/)
+    // „Weiter zur Zahlung“ zeigt `gesamt`, die Zusammenfassung bekommt ihn unverändert — kein zweiter Rechenweg (Nr. 309).
+    expect(quelle).toMatch(/gesamt=\{\{ betrag: gesamt, zusatz: gesamtZusatz \}\}/)
+    expect(quelle).toMatch(/const \{ betrag: gesamt, zusatz: gesamtZusatz \} = gesamtAnzeige\(\{/)
+    expect(quelle).not.toMatch(/formatEuro\(centsAlsEuro\(betraege\.gesamtCents\)\)/)
+    const zahlung = lies('src/components/checkout/stripe-payment.tsx')
+    expect(zahlung).toMatch(/const gesamt = gesamtAnzeige\(\{ gesamtCents: betraege\.gesamtCents,/)
+    expect(zahlung).not.toMatch(/formatEuro/)
+    // Beide Aufrufe des Zahlungsschritts reichen den Betrag des Zahlungsschritts durch, je auf einer Zeile.
+    expect(quelle.match(/zusammenfassung=\{\(gesamt\) => <KaufZusammenfassung [^\n]*gesamt=\{gesamt\} \/>\}/g)).toHaveLength(2)
     // Alle drei Einstiege nutzen den Baustein, keiner reicht mehr eine Fußzeile an den Zahlungsschritt.
     expect(quelle.match(/<KaufZusammenfassung\b/g)?.length).toBeGreaterThanOrEqual(3)
     expect(lies('src/components/checkout/stripe-payment.tsx')).not.toMatch(/fussnote/)

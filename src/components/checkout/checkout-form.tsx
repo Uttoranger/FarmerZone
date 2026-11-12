@@ -14,8 +14,8 @@ import {
   leseZahlungsBetrag,
   type KasseFormularDaten as CheckoutFormData,
 } from '@/lib/kasse-pruefung'
-import { formatEuro, positionMengeVorn } from '@/lib/format'
-import { BAR_NICHT_MOEGLICH_SATZ, INKL_PLATTFORMGEBUEHR } from '@/lib/konditionen'
+import { positionMengeVorn } from '@/lib/format'
+import { BAR_NICHT_MOEGLICH_SATZ } from '@/lib/konditionen'
 import { CODE_RESERVIERUNG_ABGELAUFEN } from '@/lib/reservierung'
 import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { ABHOLFENSTER_NICHT_VERFUEGBAR, CODE_ABHOLFENSTER_UNGUELTIG, CODE_ABHOLFENSTER_VOLL } from '@/lib/abholfenster'
@@ -33,7 +33,6 @@ import {
   positionenFuer,
   schreibeWarenkorb,
 } from '@/lib/warenkorb-speicher'
-import { centsAlsEuro } from '@/lib/servicegebuehr'
 import {
   CODE_ZAHLART_NICHT_ANGEBOTEN,
   abholKacheln,
@@ -42,6 +41,7 @@ import {
   barGuenstiger,
   bestellschlussHeute,
   gebuehrZeile,
+  gesamtAnzeige,
   bestellungSenden,
   KASSE_DATENSCHUTZ_LINK,
   KASSE_NOCHMAL,
@@ -394,15 +394,15 @@ export function CheckoutForm({
   // Mit dem Satz des Hofs (Register N41 a, A3): „Mindestbestellwert: Waren für 10 € (mit Plattformgebühr ab € …).
   // Dir fehlen noch Waren für € …“ — nur Anzeige; verbindlich prüft /api/checkout mit MINDESTBESTELLWERT_SATZ.
   const mindestGrund = bestellungAngelegt ? null : mindestbestellwertGrund(farm, betraege.warenCents, farm.preisAnzeige?.hundertstel)
-  const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
   const gebuehrTitel = zahlung?.gebuehrText ?? gebuehr.titel
-  // Der Zusatz am Gesamtbetrag der Zusammenfassung (Nr. 210): nur Worte zu Beträgen aus `betraege`, nichts gerechnet.
-  const gesamtZusatz =
-    farm.preisAnzeige !== null
-      ? INKL_PLATTFORMGEBUEHR
-      : betraege.gebuehrCents > 0
-        ? `inkl. ${gebuehrTitel} ${formatEuro(centsAlsEuro(betraege.gebuehrCents))}`
-        : null
+  // Gesamtbetrag und Zusatz der Zusammenfassung (Nr. 210) aus derselben Regel wie im Zahlungsschritt (Nr. 309):
+  // nur Worte zu Beträgen aus `betraege`, nichts gerechnet.
+  const { betrag: gesamt, zusatz: gesamtZusatz } = gesamtAnzeige({
+    gesamtCents: betraege.gesamtCents,
+    gebuehrCents: betraege.gebuehrCents,
+    hofpreis: farm.preisAnzeige !== null,
+    gebuehrTitel,
+  })
   const hof = { farmId: farm.id, farmSlug: farm.slug }
 
   /** Nach einer fehlgeschlagenen Prüfung zum ERSTEN Fehlerfeld springen (Befund 6). */
@@ -659,7 +659,7 @@ export function CheckoutForm({
         hofpreis={farm.preisAnzeige !== null}
         korb={<KorbKarte hofName={farm.name} positionen={korbPositionen} zeilenCents={betraege.zeilenCents} anzeige={farm.preisAnzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
-        zusammenfassung={<KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
+        zusammenfassung={(gesamt) => <KaufZusammenfassung positionen={korbPositionen} abholung={zahlung.abholung || null} hofName={farm.name} gesamt={gesamt} />}
         privat={privat}
         kaufknopfSaetze={<KaufknopfSaetze privat={privat} hofpreis={farm.preisAnzeige !== null} agbPfad={AGB_PFAD} />}
       />
@@ -1158,17 +1158,19 @@ export function KassenAbschluss({
     // max-md:mb-6: Mit den Sätzen ist die feste Leiste am Handy bis 200 px hoch (Lauf 31, vorher rund 250);
     // der Platz unten im Raster (pb-44) war dafür bemessen und ließ die Unterkante der letzten Karte darunter.
     // Ab 1024 px teilt sich der Abschluss (KassenRaster mit `kopf`, Board w1-kasse): rechts Übersicht und Angaben, links
-    // unter „Bezahlen“ Zusammenfassung, Gewährleistung und Knopf. Die Reihenfolge im Quelltext bleibt dieselbe.
+    // unter „Bezahlen“ Gewährleistung, Zusammenfassung und Knopf (Nr. 309, Register N2 mit der Ergänzung aus F027; Board
+    // w1-kasse zeigt noch Zusammenfassung vor Gewährleistung, Board k5 diese Reihenfolge). Die Reihenfolge im Quelltext bleibt dieselbe.
     <div className="flex flex-col gap-3.5 max-md:mb-6 lg:contents">
       <div className={ABSCHLUSS_RECHTS}>
         {uebersicht}
         <AngabenZumHof hof={hof} />
       </div>
       <div className={ABSCHLUSS_LINKS}>
-      {zusammenfassung}
       {/* Nr. 211: die Gewährleistungs-Mitteilung (Anhang II FAGG) im Fluss über der Leiste, nie in ihr — nur bei Privat.
-          Im Browser rechts bündig über dem Knopf, so breit wie die Übersicht — unverändert, nie schmaler als ihre Karte. */}
+          Seit Nr. 309 über der Zusammenfassung (Register N2, Ergänzung F027; R2 Teil 4a Punkt 3): Zwischen Zusammenfassung
+          und Knopf liegt nichts. Im Browser rechts bündig, so breit wie die Übersicht — nie schmaler als ihre Karte. */}
       {privat && <GewaehrleistungsMitteilung karte className="lg:w-[380px] lg:self-end" />}
+      {zusammenfassung}
       <AktionsLeiste>
         <button type="submit" disabled={gesperrt} aria-busy={wirdGesendet} className={cn(KNOPF_GRUEN, KNOPF_GRUEN_IM_BROWSER)}>
           {wirdGesendet ? (
@@ -1179,9 +1181,9 @@ export function KassenAbschluss({
           ) : online ? (
             `Weiter zur Zahlung · ${gesamt}`
           ) : (
-            // Vor Ort ist dieser Knopf der verbindliche Abschluss: die
-            // Zahlungspflicht steht deshalb auf dem Knopf selbst.
-            `Zahlungspflichtig bestellen · ${gesamt}`
+            // Vor Ort ist dieser Knopf der verbindliche Abschluss. Nach § 8 Abs. 2 FAGG trägt er nur sein
+            // Wort; der Gesamtpreis steht in der Zusammenfassung darüber (Nr. 309).
+            'Zahlungspflichtig bestellen'
           )}
         </button>
         {/* Am Handy 12 px wie die Sätze darunter (Lauf 31: die Leiste knapp halten). */}
@@ -1319,7 +1321,7 @@ export function ZahlungFortsetzen({
         hofpreis={hofpreis}
         korb={<KorbKarte hofName={farm.name} positionen={positionen} zeilenCents={zeilen} anzeige={anzeige} />}
         angaben={<FesteAngaben zahlung={zahlung} adresse={hofAdresse(farm)} />}
-        zusammenfassung={<KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} />}
+        zusammenfassung={(gesamt) => <KaufZusammenfassung positionen={positionen} abholung={zahlung.abholung || null} hofName={farm.name} gesamt={gesamt} />}
         privat={privat}
         kaufknopfSaetze={<KaufknopfSaetze privat={privat} hofpreis={hofpreis} agbPfad={agbPfad} />}
       />

@@ -4,9 +4,9 @@ import { HINWEIS, KARTE, TEXTLINK, type KorbPosition } from './kasse-teile'
 
 /*
  * Die Zusammenfassung unmittelbar über dem Kaufknopf (§ 8 Abs. 1 FAGG, Nr. 210):
- * Ware, Abholtermin und Vertragspartner — der Gesamtpreis steht im
- * Zahlungsschritt direkt darüber in derselben Übersicht, in der Bar-Kasse
- * als eigene Zeile hier. EIN Baustein für Zahlungsschritt, „Zahlung
+ * Ware, Abholtermin, Vertragspartner und der Gesamtpreis — seit Nr. 309 in
+ * jedem Schritt als eigene Zeile hier, weil die verbindlichen Knöpfe nur ihr
+ * Wort tragen (§ 8 Abs. 2 FAGG). EIN Baustein für Zahlungsschritt, „Zahlung
  * fortsetzen“ und das Formular (bar und „Weiter zur Zahlung“).
  *
  * Nur Anzeige: Positionen, Termin und Betrag kommen fertig aus der Kasse,
@@ -46,7 +46,10 @@ export function KaufZusammenfassung({
   /** Der Abholtermin als Satzteil (`abholSatz` bzw. aus der Bestellung); ohne Wahl null. */
   abholung: string | null
   hofName: string
-  /** Gesamtbetrag (fertig formatiert, derselbe Wert wie auf dem Knopf) und sein Zusatz — nur, wo die Übersicht nicht direkt darüber steht. */
+  /**
+   * Gesamtbetrag (fertig formatiert, `gesamtAnzeige`) und sein Zusatz — in jedem Schritt der Kasse (Nr. 309): derselbe
+   * Wert wie in der Übersicht, im Zahlungsschritt der Betrag bei Stripe. Ohne ihn keine Zeile „Gesamt“.
+   */
   gesamt?: { betrag: string; zusatz?: string | null }
   /** Eigene Karte (Formular: zwischen „Angaben zum Hof“ und Knopf); sonst ein Abschnitt in der Übersicht. */
   karte?: boolean

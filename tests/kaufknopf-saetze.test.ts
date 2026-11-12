@@ -154,7 +154,8 @@ describe('Zahlungsschritt: die Sätze unter „Jetzt bezahlen“ und „Erneut b
         gebuehrText: 'Servicegebühr',
         korb: null,
         angaben: null,
-        zusammenfassung: createElement(KaufZusammenfassung, { positionen: POSITIONEN, abholung: ABHOLUNG, hofName: HOFNAME }),
+        zusammenfassung: (gesamt: { betrag: string; zusatz: string | null }) =>
+          createElement(KaufZusammenfassung, { positionen: POSITIONEN, abholung: ABHOLUNG, hofName: HOFNAME, gesamt }),
         privat,
         kaufknopfSaetze: saetze ? createElement(KaufknopfSaetze, { privat, hofpreis: false, agbPfad: '/agb' }) : null,
       })
@@ -162,11 +163,11 @@ describe('Zahlungsschritt: die Sätze unter „Jetzt bezahlen“ und „Erneut b
   }
 
   it('„Jetzt bezahlen“, Privat: AGB- und Rücktrittssatz je einmal nach dem Knopf', () => {
-    saetzeNachDemKnopf(schritt(true), 'Jetzt bezahlen · € 10,82', true)
+    saetzeNachDemKnopf(schritt(true), '>Jetzt bezahlen</button>', true)
   })
 
   it('„Jetzt bezahlen“, Betrieb: nur der AGB-Satz', () => {
-    saetzeNachDemKnopf(schritt(false), 'Jetzt bezahlen · € 10,82', false)
+    saetzeNachDemKnopf(schritt(false), '>Jetzt bezahlen</button>', false)
   })
 
   it('„Erneut bezahlen“ nach einer Ablehnung: dieselben Sätze nach dem Knopf', () => {
@@ -175,17 +176,17 @@ describe('Zahlungsschritt: die Sätze unter „Jetzt bezahlen“ und „Erneut b
     // Gegenprobe des Prüfstands: Es ist wirklich der Zustand „abgelehnt“ — die Karte dazu steht da.
     expect(html).toContain(zahlungAbgelehntText(null).titel)
     expect(html).not.toContain('Jetzt bezahlen')
-    saetzeNachDemKnopf(html, 'Erneut bezahlen · € 10,82', true)
+    saetzeNachDemKnopf(html, '>Erneut bezahlen</button>', true)
   })
 
   it('„Erneut bezahlen“, Betrieb: nur der AGB-Satz', () => {
     pruefstand.abgelehnt = true
-    saetzeNachDemKnopf(schritt(false), 'Erneut bezahlen · € 10,82', false)
+    saetzeNachDemKnopf(schritt(false), '>Erneut bezahlen</button>', false)
   })
 
   it('Gegenprobe: ohne die Sätze findet die Suche keinen von beiden', () => {
     const html = schritt(true, false)
-    expect(html).toContain('Jetzt bezahlen · € 10,82')
+    expect(html).toContain('>Jetzt bezahlen</button>')
     expect(html).not.toContain(AGB)
     expect(html).not.toContain(RUECKTRITT)
   })
@@ -229,11 +230,11 @@ describe('Zahlung fortsetzen (Nr. 202): derselbe Zahlungsschritt mit den Sätzen
     )
 
   it('Privat: AGB- und Rücktrittssatz je einmal nach „Jetzt bezahlen“', () => {
-    saetzeNachDemKnopf(fortsetzen(true), 'Jetzt bezahlen · € 5,00', true)
+    saetzeNachDemKnopf(fortsetzen(true), '>Jetzt bezahlen</button>', true)
   })
 
   it('Betrieb: nur der AGB-Satz', () => {
-    saetzeNachDemKnopf(fortsetzen(false), 'Jetzt bezahlen · € 5,00', false)
+    saetzeNachDemKnopf(fortsetzen(false), '>Jetzt bezahlen</button>', false)
   })
 
   it('N45: eine Bestellung „bisher“ zeigt nach dem Stichtag den Satz MIT Vermittlung und den Link /agb/0.9 — auch wenn der Hof heute im Hofpreis-Modell ist', () => {
@@ -332,19 +333,19 @@ describe('Formular: der Abholtermin einmal im Bar-Formular', () => {
 
   it('bar mit Termin: der Termin genau einmal (in „Deine Bestellung“), keine Zeile unter dem Knopf', () => {
     const html = kasse(HOF, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' })
-    const knopf = html.indexOf('Zahlungspflichtig bestellen · € 9,80')
+    const knopf = html.indexOf('>Zahlungspflichtig bestellen</button>')
     expect(knopf).toBeGreaterThan(-1)
     expect(anzahl(html, TERMIN)).toBe(1)
     expect(html.indexOf(TERMIN)).toBeLessThan(knopf)
     expect(html).not.toContain(`Abholung ${TERMIN}`)
     expect(html).not.toContain('bar am Hof · Bestätigung per E-Mail')
     // Die Sätze bleiben unter dem Knopf.
-    saetzeNachDemKnopf(html, 'Zahlungspflichtig bestellen · € 9,80', true)
+    saetzeNachDemKnopf(html, '>Zahlungspflichtig bestellen</button>', true)
   })
 
   it('bar ohne Online-Angebot (nur bar): ebenso nur einmal', () => {
     const html = kasse({ ...HOF, stripeAccountReady: false }, { pickupSlotKey: KACHEL.key })
-    expect(html).toContain('Zahlungspflichtig bestellen · € 9,80')
+    expect(html).toContain('>Zahlungspflichtig bestellen</button>')
     expect(anzahl(html, TERMIN)).toBe(1)
   })
 

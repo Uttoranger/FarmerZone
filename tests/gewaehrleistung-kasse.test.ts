@@ -6,14 +6,16 @@
  *  - Formular (`KassenAbschluss`, bar „Zahlungspflichtig bestellen“ und online
  *    „Weiter zur Zahlung“) und Zahlungsschritt (`StripeZahlung`, „Jetzt
  *    bezahlen“, auch über „Zahlung fortsetzen“): bei Privat genau EIN Bild mit
- *    dem Alt-Text der Quelle und der Überschrift, zwischen Zusammenfassung und
- *    Knopf, im Fluss und nicht in der festen Leiste;
+ *    dem Alt-Text der Quelle und der Überschrift, VOR der Zusammenfassung, die
+ *    unmittelbar über dem Knopf steht (Nr. 309, Register N2 mit der Ergänzung
+ *    aus F027), im Fluss und nicht in der festen Leiste; der Knopf trägt nur
+ *    sein Wort, der Gesamtbetrag steht in der Zusammenfassung;
  *  - bei „Betrieb“ kein Bild und keine Überschrift (Gegenprobe: die
  *    Zusammenfassung steht weiter da);
  *  - das Bild ist die amtliche SVG mit Maßen, ohne `loading="lazy"`, ohne
  *    Filter, nicht über `next/image`;
- *  - Zahlungsschritt: ein Zahlungsfehler steht weiter direkt am Knopf, nach
- *    der Grafik (Gegenprobe zum Satz im Kommentar);
+ *  - Zahlungsschritt: Grafik → Zusammenfassung → ein Zahlungsfehler direkt am
+ *    Knopf (Reihenfolge im Quelltext);
  *  - die Käuferart erreicht den Zahlungsschritt auf allen Einstiegen
  *    (Formular, „Zahlung fortsetzen“ aus der Bestellung).
  */
@@ -61,7 +63,7 @@ const bilder = (html: string): string[] => [...html.matchAll(/<img\b[^>]*>/g)].m
 /** React schreibt Text und Attribute maskiert: Apostroph, Anführungszeichen, & und spitze Klammern. */
 const maskiert = (text: string): string => text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
 
-/** Bei Privat: genau ein Bild mit Alt-Text, Maßen und Überschrift — nach der Zusammenfassung, vor dem Knopf, nicht in der festen Leiste. */
+/** Bei Privat: genau ein Bild mit Alt-Text, Maßen und Überschrift — vor der Zusammenfassung, die vor dem Knopf steht, nicht in der festen Leiste (Nr. 309). */
 function einmalVorDemKnopf(html: string, knopf: string): void {
   const [bild, ...mehr] = bilder(html)
   expect(mehr).toEqual([])
@@ -75,11 +77,22 @@ function einmalVorDemKnopf(html: string, knopf: string): void {
 
   // Gemessen am <img> selbst: React setzt für ein Bild ohne loading="lazy" zusätzlich ein <link rel="preload"> an den Anfang.
   const stelle = html.indexOf(bild ?? '<img')
-  expect(html.indexOf('data-kauf-zusammenfassung')).toBeLessThan(stelle)
-  expect(stelle).toBeLessThan(html.indexOf(knopf))
+  const zusammenfassung = html.indexOf('data-kauf-zusammenfassung')
+  expect(stelle).toBeLessThan(zusammenfassung)
+  expect(zusammenfassung).toBeLessThan(html.indexOf(knopf))
   // Die feste Leiste am Handy beginnt erst nach der Grafik — sie trägt nur Knopf und Sätze.
   expect(stelle).toBeLessThan(html.indexOf('data-unten-fest'))
   expect(html.indexOf(`>${G.ueberschrift}<`)).toBeLessThan(stelle)
+}
+
+/** Der Gesamtbetrag steht in der Zusammenfassung vor dem Knopf (Nr. 309: nicht mehr auf dem Knopf). */
+function gesamtVorDemKnopf(html: string, knopf: string, betrag: string): void {
+  const start = html.indexOf('data-kauf-zusammenfassung')
+  const ende = html.indexOf('</section>', start)
+  const zusammenfassung = html.slice(start, ende)
+  expect(zusammenfassung).toContain('Gesamt')
+  expect(zusammenfassung).toContain(betrag)
+  expect(ende).toBeLessThan(html.indexOf(knopf))
 }
 
 /** Bei „Betrieb“: keine Grafik, keine Überschrift — die Zusammenfassung bleibt (Gegenprobe gegen ein leeres Rendern). */
@@ -109,11 +122,13 @@ describe('Formular: über „Zahlungspflichtig bestellen“ und „Weiter zur Za
     )
 
   for (const [art, knopf, online] of [
-    ['bar', 'Zahlungspflichtig bestellen · € 10,82', false],
+    ['bar', '>Zahlungspflichtig bestellen</button>', false],
     ['online', 'Weiter zur Zahlung · € 10,82', true],
   ] as const) {
-    it(`${art}, Privat: die Grafik genau einmal zwischen Zusammenfassung und Knopf`, () => {
-      einmalVorDemKnopf(abschluss(online, true), knopf)
+    it(`${art}, Privat: die Grafik genau einmal vor der Zusammenfassung, die Zusammenfassung mit Gesamt vor dem Knopf`, () => {
+      const html = abschluss(online, true)
+      einmalVorDemKnopf(html, knopf)
+      gesamtVorDemKnopf(html, knopf, '€ 10,82')
     })
 
     it(`${art}, Betrieb: keine Grafik`, () => {
@@ -135,29 +150,36 @@ describe('Zahlungsschritt: über „Jetzt bezahlen“', () => {
         gebuehrText: 'Servicegebühr',
         korb: null,
         angaben: null,
-        zusammenfassung: createElement(KaufZusammenfassung, { positionen: POSITIONEN, abholung: ABHOLUNG, hofName: HOFNAME }),
+        zusammenfassung: (gesamt: { betrag: string; zusatz: string | null }) =>
+          createElement(KaufZusammenfassung, { positionen: POSITIONEN, abholung: ABHOLUNG, hofName: HOFNAME, gesamt }),
         privat,
         kaufknopfSaetze: createElement(KaufknopfSaetze, { privat, hofpreis: false, agbPfad: '/agb' }),
       })
     )
 
-  it('Privat: die Grafik genau einmal zwischen Zusammenfassung und Knopf', () => {
-    einmalVorDemKnopf(schritt(true), 'Jetzt bezahlen · € 10,82')
+  it('Privat: die Grafik genau einmal vor der Zusammenfassung, die Zusammenfassung mit Gesamt vor dem Knopf', () => {
+    const html = schritt(true)
+    einmalVorDemKnopf(html, '>Jetzt bezahlen</button>')
+    gesamtVorDemKnopf(html, '>Jetzt bezahlen</button>', '€ 10,82')
   })
 
   it('Betrieb: keine Grafik', () => {
-    ohneGrafik(schritt(false), 'Jetzt bezahlen · € 10,82')
+    ohneGrafik(schritt(false), '>Jetzt bezahlen</button>')
   })
 
-  it('ein Zahlungsfehler steht nach der Grafik, direkt vor der Leiste mit dem Knopf (Reihenfolge im Quelltext)', () => {
+  it('Grafik → Zusammenfassung → Zahlungsfehler → Leiste mit dem Knopf (Reihenfolge im Quelltext)', () => {
     // Der Fehler entsteht erst nach dem Klick (Zustand) — auf dem Server nicht renderbar, also an der Reihenfolge im JSX.
     const quelle = lies('src/components/checkout/stripe-payment.tsx')
     const grafik = quelle.indexOf('{privat && <GewaehrleistungsMitteilung />}')
+    const zusammenfassung = quelle.indexOf('{zusammenfassung(', grafik)
     const fehler = quelle.indexOf('{fehler && (', grafik)
     const leiste = quelle.indexOf('<AktionsLeiste>', grafik)
-    expect(grafik).toBeGreaterThan(quelle.indexOf('{zusammenfassung}'))
-    expect(fehler).toBeGreaterThan(grafik)
+    expect(grafik).toBeGreaterThan(-1)
+    expect(zusammenfassung).toBeGreaterThan(grafik)
+    expect(fehler).toBeGreaterThan(zusammenfassung)
     expect(leiste).toBeGreaterThan(fehler)
+    // Die Zusammenfassung steht genau einmal da — nicht zusätzlich vor der Grafik.
+    expect(quelle.split('{zusammenfassung(')).toHaveLength(2)
   })
 
   it('beide Aufrufe des Zahlungsschritts im Formular geben die Käuferart weiter', () => {
@@ -195,12 +217,14 @@ describe('Zahlung fortsetzen (Nr. 202): die Käuferart der Bestellung entscheide
       })
     )
 
-  it('Privat: die Grafik genau einmal vor dem Knopf', () => {
-    einmalVorDemKnopf(fortsetzen(true), 'Jetzt bezahlen · € 5,00')
+  it('Privat: die Grafik genau einmal vor der Zusammenfassung, Gesamt in der Zusammenfassung vor dem Knopf', () => {
+    const html = fortsetzen(true)
+    einmalVorDemKnopf(html, '>Jetzt bezahlen</button>')
+    gesamtVorDemKnopf(html, '>Jetzt bezahlen</button>', '€ 5,00')
   })
 
   it('Betrieb: keine Grafik', () => {
-    ohneGrafik(fortsetzen(false), 'Jetzt bezahlen · € 5,00')
+    ohneGrafik(fortsetzen(false), '>Jetzt bezahlen</button>')
   })
 
   it('die Seite liest die Käuferart aus der Bestellung und reicht nur ein privat weiter', () => {

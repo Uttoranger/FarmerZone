@@ -3,9 +3,10 @@
  * Stichtag“ auf den Seiten des Kaufs.
  *
  * Beweist (echte Komponenten, serverseitig gerendert; die Reihenfolge im HTML ist die Reihenfolge im DOM):
- *  - bar und online: Recht vor Mockup — „Deine Bestellung“ (KaufZusammenfassung, Nr. 210) unmittelbar über dem
- *    Kaufknopf, die Gewährleistungs-Grafik (Nr. 211) dazwischen, AGB- und Rücktrittssatz (Nr. 215) darunter; der
- *    Kaufknopf ist grün (Register N41 f).
+ *  - bar und online: Recht vor Mockup — die Gewährleistungs-Grafik (Nr. 211) über „Deine Bestellung“
+ *    (KaufZusammenfassung, Nr. 210) mit Gesamt, die unmittelbar über dem Kaufknopf steht (Nr. 309, Register N2 mit
+ *    der Ergänzung aus F027); der Kaufknopf trägt nur sein Wort (§ 8 Abs. 2 FAGG), AGB- und Rücktrittssatz
+ *    (Nr. 215) darunter; der Kaufknopf ist grün (Register N41 f).
  *  - abgelehnt: die orange Hinweiskarte (`HinweiskarteFehler`, V17) im Bezahlen-Block, der Knopf heißt
  *    „Erneut bezahlen“, die Sätze bleiben darunter.
  *  - Mindestbestellwert: der Hinweis mit dem Satz des Hofs (A3) unter dem gesperrten Knopf, nie
@@ -99,6 +100,14 @@ const RUECKTRITT = 'Du kannst vom Kauf innerhalb von 14 Tagen'
 /** Das öffnende Tag des Kaufknopfs (der eine `type="submit"` der Kasse). */
 const kaufknopf = (html: string): string => html.match(/<button type="submit"[^>]*>/)?.[0] ?? ''
 
+/** Nr. 309: „Gesamt“ und der Betrag stehen in der Zusammenfassung (bis zu ihrem Ende). */
+function gesamtInZusammenfassung(html: string, betrag: string): void {
+  const start = html.indexOf('data-kauf-zusammenfassung')
+  const zusammenfassung = html.slice(start, html.indexOf('</section>', start))
+  expect(zusammenfassung).toContain('Gesamt')
+  expect(zusammenfassung).toContain(betrag)
+}
+
 /** Die Merkmale stehen in dieser Reihenfolge, jedes genau dort. */
 function inReihenfolge(html: string, merkmale: readonly string[]): void {
   const stellen = merkmale.map((m) => html.indexOf(m))
@@ -159,16 +168,18 @@ describe('Formular: bar, online, Mindestbestellwert, Betrieb', () => {
     vi.unstubAllGlobals()
   })
 
-  it('bar: Zusammenfassung → Gewährleistung → „Zahlungspflichtig bestellen“ (grün) → AGB- und Rücktrittssatz', () => {
+  it('bar: Gewährleistung → Zusammenfassung mit Gesamt → „Zahlungspflichtig bestellen“ (grün, ohne Betrag) → AGB- und Rücktrittssatz', () => {
     const html = kasse(HOF, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' })
-    inReihenfolge(html, [ZUSAMMENFASSUNG, GRAFIK, 'Zahlungspflichtig bestellen · € 9,80', AGB, RUECKTRITT])
+    inReihenfolge(html, [GRAFIK, ZUSAMMENFASSUNG, '>Zahlungspflichtig bestellen</button>', AGB, RUECKTRITT])
+    gesamtInZusammenfassung(html, '€ 9,80')
     expect(kaufknopf(html)).toContain('bg-accent')
     expect(kaufknopf(html)).not.toMatch(/\bdisabled=""/)
   })
 
-  it('online: dieselbe Reihenfolge mit „Weiter zur Zahlung“', () => {
+  it('online: dieselbe Reihenfolge mit „Weiter zur Zahlung“ (behält den Betrag)', () => {
     const html = kasse(HOF, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONLINE' })
-    inReihenfolge(html, [ZUSAMMENFASSUNG, GRAFIK, 'Weiter zur Zahlung · € 10,30', AGB, RUECKTRITT])
+    inReihenfolge(html, [GRAFIK, ZUSAMMENFASSUNG, 'Weiter zur Zahlung · € 10,30', AGB, RUECKTRITT])
+    gesamtInZusammenfassung(html, '€ 10,30')
     expect(kaufknopf(html)).toContain('bg-accent')
   })
 
@@ -203,7 +214,7 @@ describe('Formular: bar, online, Mindestbestellwert, Betrieb', () => {
   it('Betrieb: nur der AGB-Satz — keine Gewährleistungs-Grafik, kein Rücktrittssatz', () => {
     const html = kasse(HOF, { pickupSlotKey: KACHEL.key, paymentMethod: 'ONSITE_CASH' }, { nurBetriebeIds: ['eier'], betrieb: true })
     expect(html).toContain('id="kasse-betrieb"')
-    inReihenfolge(html, [ZUSAMMENFASSUNG, 'Zahlungspflichtig bestellen', AGB])
+    inReihenfolge(html, [ZUSAMMENFASSUNG, '>Zahlungspflichtig bestellen</button>', AGB])
     expect(html).not.toContain(RUECKTRITT)
     expect(html).not.toContain(GRAFIK)
     // Gegenprobe: dieselbe Kasse privat trägt beides.
@@ -235,11 +246,13 @@ describe('Zahlungsschritt: Zahlung abgelehnt', () => {
         gebuehrText: 'Servicegebühr',
         korb: null,
         angaben: null,
-        zusammenfassung: createElement(KaufZusammenfassung, {
-          positionen: [{ productId: 'p1', name: 'Ware 1', quantity: 1, unit: 'STUECK', unitSize: null }],
-          abholung: 'Sa, 10. Okt, 09:00–12:00 Uhr',
-          hofName: HOFNAME,
-        }),
+        zusammenfassung: (gesamt: { betrag: string; zusatz: string | null }) =>
+          createElement(KaufZusammenfassung, {
+            positionen: [{ productId: 'p1', name: 'Ware 1', quantity: 1, unit: 'STUECK', unitSize: null }],
+            abholung: 'Sa, 10. Okt, 09:00–12:00 Uhr',
+            hofName: HOFNAME,
+            gesamt,
+          }),
         privat: true,
         kaufknopfSaetze: createElement(KaufknopfSaetze, { privat: true, hofpreis: false, agbPfad: '/agb' }),
       })
@@ -253,13 +266,16 @@ describe('Zahlungsschritt: Zahlung abgelehnt', () => {
     expect(karte).toBeGreaterThan(html.indexOf('id="kasse-bezahlen"'))
     expect(html.slice(karte - 200, karte)).toContain('role="alert"')
     expect(html).toContain(zahlungAbgelehntText(null).titel)
-    inReihenfolge(html, [ZUSAMMENFASSUNG, GRAFIK, 'Erneut bezahlen · € 10,82', AGB, RUECKTRITT])
+    inReihenfolge(html, [GRAFIK, ZUSAMMENFASSUNG, '>Erneut bezahlen</button>', AGB, RUECKTRITT])
+    gesamtInZusammenfassung(html, '€ 10,82')
   })
 
   it('Gegenprobe: ohne Ablehnung keine Karte und „Jetzt bezahlen“', () => {
     const html = schritt()
     expect(html).not.toContain('data-slot="hinweiskarte-fehler"')
-    expect(html).toContain('Jetzt bezahlen · € 10,82')
+    expect(html).toContain('>Jetzt bezahlen</button>')
+    expect(html).not.toContain('Erneut bezahlen')
+    gesamtInZusammenfassung(html, '€ 10,82')
   })
 })
 

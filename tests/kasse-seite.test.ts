@@ -151,7 +151,9 @@ describe('E5: keine Karte bei Abholung für neue Bestellungen', () => {
   it('die Kasse zeigt keinen Pflicht-Haken und keine Neuigkeiten mehr; der Kaufknopf bleibt „Zahlungspflichtig bestellen"', () => {
     const form = lies('src/components/checkout/checkout-form.tsx')
     expect(form).not.toMatch(/onsiteConfirmed|optInEmail|optInWhatsApp|Neuigkeiten vom Hof|zahle vor Ort bar/)
-    expect(form).toContain('`Zahlungspflichtig bestellen · ${gesamt}`')
+    // Nr. 309 (§ 8 Abs. 2 FAGG): nur das Wort, der Betrag steht in der Zusammenfassung darüber.
+    expect(form).toContain("'Zahlungspflichtig bestellen'")
+    expect(form).not.toContain('`Zahlungspflichtig bestellen · ${gesamt}`')
     // Gegenprobe: die Suche erkennt den alten Haken.
     expect("{...form.register('onsiteConfirmed')}").toMatch(/onsiteConfirmed|optInEmail|optInWhatsApp|Neuigkeiten vom Hof|zahle vor Ort bar/)
   })
@@ -358,7 +360,8 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
         gebuehrText: 'Servicegebühr',
         korb: null,
         angaben: null,
-        zusammenfassung: null,
+        // Nr. 309: Der Zahlungsschritt reicht der Zusammenfassung seinen Gesamtbetrag — hier als Text sichtbar gemacht.
+        zusammenfassung: (gesamt: { betrag: string; zusatz: string | null }) => createElement('p', null, `Zusammenfassung ${gesamt.betrag}`),
         privat: true,
         // Die Sätze unter dem Knopf prüft tests/kaufknopf-saetze.test.ts (Nr. 215); hier geht es um den Betrag.
         kaufknopfSaetze: null,
@@ -366,14 +369,15 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
     )
   }
 
-  it('Knopf und Übersicht zeigen den Stripe-Betrag, auch wenn die lokale Rechnung inzwischen höher ist', () => {
+  it('Zusammenfassung und Übersicht zeigen den Stripe-Betrag, der Knopf nur sein Wort — auch wenn die lokale Rechnung inzwischen höher ist', () => {
     // Gegenprobe: Die lokale Rechnung ist wirklich gewandert (€ 10,30 → € 10,82).
     expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, JETZT, 'ONLINE').gesamtCents).toBe(1030)
     expect(kassenBetraege(korb, GEBUEHR_AB_GLEICH, SPAETER, 'ONLINE').gesamtCents).toBe(1082)
 
     const html = zahlungsschritt({ amountCents: 1030, serviceFeeCents: 0 })
 
-    expect(html).toContain('Jetzt bezahlen · € 10,30')
+    expect(html).toContain('>Jetzt bezahlen</button>')
+    expect(html).toContain('Zusammenfassung € 10,30')
     expect(html).not.toContain('€ 10,82')
     expect(html).not.toContain('€ 0,52')
   })
@@ -381,7 +385,8 @@ describe('Nachbesserung 1: der Zahlungsschritt zeigt den Betrag des Servers', ()
   it('Gegenprobe: mit Gebühr im Server-Betrag steht sie als Zeile da', () => {
     const html = zahlungsschritt({ amountCents: 1082, serviceFeeCents: 52 })
 
-    expect(html).toContain('Jetzt bezahlen · € 10,82')
+    expect(html).toContain('>Jetzt bezahlen</button>')
+    expect(html).toContain('Zusammenfassung € 10,82')
     expect(html).toContain('€ 10,30')
     expect(html).toContain('€ 0,52')
   })
