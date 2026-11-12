@@ -149,9 +149,11 @@ export async function gibVerwaisteBestellungenFrei(jetzt: Date, farmId?: string)
 /**
  * Bricht den PaymentIntent ab. `true`: Die Bestellung darf storniert werden
  * (abgebrochen, schon abgebrochen oder nie entstanden). `false`: Stripe hat
- * bezahlt oder bearbeitet gerade — stehen lassen.
+ * bezahlt oder bearbeitet gerade — stehen lassen. Wirft nur, wenn der Stand
+ * nach einem gescheiterten Abbruch weiter unklar ist. Auch für den Storno
+ * einer unbezahlten Online-Bestellung (src/server/stornieren.ts, Nr. 288).
  */
-async function brichZahlungAb(paymentIntentId: string | null): Promise<boolean> {
+export async function brichZahlungAb(paymentIntentId: string | null): Promise<boolean> {
   // Kein Intent: Der Checkout scheiterte nach dem Anlegen der Bestellung.
   // Es gibt nichts, womit die Kundin noch zahlen könnte.
   if (!paymentIntentId) return true

@@ -500,6 +500,16 @@ const FAELLE: Fall[] = [
     },
   },
   {
+    // Nr. 288 (M2): Die Gebühr nach „Nicht abgeholt“ ist nicht zurück — nur die Gebühr, nie der Warenpreis.
+    name: 'erstattung-offen-gebuehr',
+    art: 'erstattung-offen',
+    fuss: 'betrieb',
+    rendere: () => {
+      db.order.findUnique.mockResolvedValue({ orderNumber: 'HM-2702-5D20', farm: { name: HOF.name } })
+      return ausRenderer('erstattung-offen', { empfaengerId: 'support', fall: 'gebuehr_nicht_abgeholt', orderId: BESTELLUNG.id, kundinCents: '162' })
+    },
+  },
+  {
     name: 'wochenbericht',
     art: 'wochenbericht',
     fuss: 'betrieb',

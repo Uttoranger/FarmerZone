@@ -30,7 +30,7 @@ vi.mock('@/lib/prisma', async () => ({
     ...(await import('./admin-sitzung')).passkeyAttrappen(),
     user: { findUnique: vi.fn() },
     session: { deleteMany: vi.fn() },
-    order: { updateMany: vi.fn(async () => ({ count: 0 })) },
+    order: { updateMany: vi.fn(async () => ({ count: 0 })), findUnique: vi.fn() },
     mailAuftrag: { updateMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),

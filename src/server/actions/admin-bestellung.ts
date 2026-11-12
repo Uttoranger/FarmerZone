@@ -28,10 +28,16 @@ type Ergebnis = { ok: true } | { error: string }
 /**
  * „Außerhalb erstattet …“ (Register N14, Ergänzung; seit Nr. 186 hier statt
  * im Postfach, mit Grund): Der Admin hat selbst erstattet (Stripe-Dashboard
- * oder Überweisung) und schließt die Aufgabe. Es ändert sich NUR das Merkmal
- * Order.erstattungOffenSeit — kein Geld, keine Mail, kein Aufruf bei Stripe.
- * Bedingt geschrieben: Eine unbekannte oder schon erledigte Bestellung ergibt
- * 0 Zeilen und keinen Fehler — der gewünschte Zustand gilt dann schon.
+ * oder Überweisung) und schließt die Aufgabe. Es ändern sich NUR Merkmale —
+ * kein Geld, keine Mail, kein Aufruf bei Stripe. Bedingt geschrieben: Eine
+ * unbekannte oder schon erledigte Bestellung ergibt 0 Zeilen und keinen
+ * Fehler — der gewünschte Zustand gilt dann schon.
+ *
+ * Offene Gebühr nach „Nicht abgeholt“ (Nr. 288): zuerst dieses Schreiben; es
+ * setzt zusätzlich `serviceFeeRefundedAt` — der Vermerk beim Hof verschwindet,
+ * und die Gebühr zählt nicht als Einnahme. Die Action kennt keinen Hof aus
+ * der Sitzung; sie liest die farmId der Bestellung und schreibt mit ihr
+ * (tests/hof-schreiben-farmid-wache.test.ts). Trifft es nichts, das bisherige.
  */
 export async function markiereErstattungErledigt(eingabe: unknown): Promise<Ergebnis> {
   const wache = await verlangeFrischeBestaetigung({ recht: 'geld' })
@@ -40,10 +46,28 @@ export async function markiereErstattungErledigt(eingabe: unknown): Promise<Erge
   if (!geprueft.success) return { error: adminBestellFehler(geprueft.error) }
   const { orderId, grund } = geprueft.data
 
-  const { count } = await prisma.order.updateMany({
-    where: { id: orderId, erstattungOffenSeit: { not: null } },
-    data: { erstattungOffenSeit: null },
-  })
+  const bestellung = await prisma.order.findUnique({ where: { id: orderId }, select: { farmId: true } })
+  const gebuehr = bestellung
+    ? await prisma.order.updateMany({
+        where: {
+          id: orderId,
+          farmId: bestellung.farmId,
+          status: 'NOT_PICKED_UP',
+          paymentMethod: 'ONLINE',
+          serviceFeeCents: { gt: 0 },
+          serviceFeeRefundedAt: null,
+          erstattungOffenSeit: { not: null },
+        },
+        data: { erstattungOffenSeit: null, serviceFeeRefundedAt: new Date() },
+      })
+    : { count: 0 }
+  const { count } =
+    gebuehr.count > 0
+      ? gebuehr
+      : await prisma.order.updateMany({
+          where: { id: orderId, erstattungOffenSeit: { not: null } },
+          data: { erstattungOffenSeit: null },
+        })
   if (count > 0) await protokolliere({ wer: wache.userId, art: 'erstattung_erledigt', bezugArt: 'bestellung', bezugId: orderId, grund, mitPasskey: wache.mitPasskey })
   revalidatePath(ADMIN_BESTELLUNGEN_HREF)
   revalidatePath(ADMIN_POSTFACH_HREF)
