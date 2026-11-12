@@ -15,7 +15,7 @@
  *  - Die übrigen Zwecke laufen unverändert (Gegenprobe: Hof mit Produktbild).
  */
 import { adminSitzung } from './admin-sitzung'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const s = vi.hoisted(() => {
   const kette = {
@@ -83,10 +83,16 @@ function alsHof(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Seit Nr. 294b (N7) verarbeitet die Route nur Originale aus dem eigenen Speicher — der kommt aus dem Blob-Schlüssel.
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_speicher_nurFuerTests')
   // Ein JPEG-Kopf: Seit dem Sicherheitsupdate (20.10.2026) prüft die Route die ersten Bytes vor sharp.
   vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]))))
   s.kette.metadata.mockResolvedValue({ width: 2400, height: 1800 })
   s.pfad.wert = 'startseite/originale/foto.jpg'
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('der Pfad des Zwecks', () => {

@@ -8,6 +8,7 @@ import {
   MAX_LONG_SIDE,
   STARTSEITE_MIN_KANTE,
   WEBP_QUALITAET,
+  blobSpeicherAusSchluessel,
   darfStartseitenBildVerarbeitetWerden,
   darfVerarbeitetWerden,
   istUploadZweck,
@@ -155,7 +156,7 @@ async function verarbeiteStartseitenBild(url: string): Promise<NextResponse> {
   if (!('ok' in (await verlangeAdminAktion({ recht: 'startseite_veroeffentlichen' })))) {
     return NextResponse.json({ error: 'Kein Zugriff', art: 'server' }, { status: 403 })
   }
-  if (!darfStartseitenBildVerarbeitetWerden(url)) {
+  if (!darfStartseitenBildVerarbeitetWerden(url, blobSpeicherAusSchluessel(process.env.BLOB_READ_WRITE_TOKEN))) {
     return NextResponse.json({ error: 'URL nicht erlaubt', art: 'server' }, { status: 403 })
   }
   return verarbeiteUndLege(
@@ -236,8 +237,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Der Guard steht VOR dem ersten Netzzugriff: Was hier durchfällt, wird nicht
   // einmal geladen. Sonst wäre diese Route ein Werkzeug, mit dem sich beliebige
-  // fremde Adressen von unserem Server abrufen ließen.
-  if (!darfVerarbeitetWerden(url, farm.id)) {
+  // fremde Adressen von unserem Server abrufen ließen. Der Speicher kommt aus
+  // demselben Schlüssel, mit dem der Upload schreibt (Nr. 294b, N7).
+  if (!darfVerarbeitetWerden(url, farm.id, blobSpeicherAusSchluessel(process.env.BLOB_READ_WRITE_TOKEN))) {
     return NextResponse.json({ error: 'URL nicht erlaubt', art: 'server' }, { status: 403 })
   }
 
