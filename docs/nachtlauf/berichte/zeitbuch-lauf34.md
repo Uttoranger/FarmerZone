@@ -93,3 +93,7 @@ Zeitbudget (Wanduhr ab Start, a013-lauf34-b.md „Plan“): Vorprüfung und Doku
 - Worktrees unter /home/user/wt/<nr>, Integrations-DB je Nummer fz_int_<nr> auf localhost:5432; Sperren (schwer.lock, integration.lock) und laeufe/ unter .nachtlauf/dirigent/ im Haupt-Klon.
 - Doku-Schritt 3.3: a013-lauf34-b.md als „### 38.1 Abschnitt B“ an §38 angehängt (Leerzeile, Überschrift, Leerzeile, Datei); `diff` des eingefügten Texts gegen die Datei leer.
 - 20:33–20:39 §0a 1.7 Grundlauf auf main f3c2a22b6b66 (n=1, 3 Worker, unter schwer.lock): `pnpm install --frozen-lockfile` und `prisma generate` grün, Typecheck grün, Lint 0 Fehler (2 Warnungen), 758 Dateien, 14089 Tests grün, Doku-Wachen 3 Dateien, 49 Tests grün (389 s). Keine Ausnahme nach §0a 1.7 nötig (Unicode 17.0). §0a bestanden.
+- 20:39 Doku-Schritt gepusht: integration/lauf34b e2900c5b03ba (von main f3c2a22b6b66), Doku-Wachen grün.
+- 20:40 Welle 1 gestartet: 290 (Opus, Platz 1, /home/user/wt/290, Branch nacht/2026-11-11/290-ruecklastschrift, DB fz_int_290) und 285 (Opus, Platz 2, /home/user/wt/285, Branch nacht/2026-11-11/285-wachen-ci, DB fz_int_285), beide von e2900c5b03ba. 290 mit Schritt 9, ohne Schritt 3a (T4), mit Datenschutz-Satz (T3 greift nicht).
+- Wiederaufnahme 290: Branch nacht/2026-11-11/290-ruecklastschrift, /home/user/wt/290, Basis e2900c5b03ba, Runde 0, DB fz_int_290.
+- Wiederaufnahme 285: Branch nacht/2026-11-11/285-wachen-ci, /home/user/wt/285, Basis e2900c5b03ba, Runde 0, DB fz_int_285.
