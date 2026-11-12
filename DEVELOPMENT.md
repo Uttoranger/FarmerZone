@@ -6888,3 +6888,18 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - SEPA-Rückbuchungen der Rechnung bleiben, wie sie waren: `closed` wird für sie nicht ausgewertet (endgültig, Weg zurück über die Nachforderung).
 - Warum die Zeile in `BetriebMessung` und keine Spalte: keine Migration vor dem Go-live; `WebhookEvent.bestellungId` ist eine eigene Nummer danach. Erst das Protokoll, dann die Zeile (Wortlaut des Blocks); doppelte Ereignisse fängt `WebhookEvent`. Scheitert die Zeile nach dem Protokoll, wiederholt Stripe das Ereignis und der Eintrag steht zweimal (selten, Nacharbeit im Bericht 289).
 - Warum der Grund ohne Kennung, wenn sie sieben Ziffern trägt: `protokolliere` verwirft sonst den ganzen Grund (er sähe aus wie eine Telefonnummer), und Betrag und Frist gingen mit verloren.
+
+## Rücklastschrift: Nachforderung und Notweg (A007; E-012 (6), E-021; Register N38, N33; Nr. 290, Lauf 34, 11.11.2026)
+
+**Anlass.** Nach einer SEPA-Rückbuchung der Monatsrechnung bar stand die Abrechnung auf `zurueckgebucht` und sperrte bar für immer: Kein Code verließ den Stand, der Hof las „das Team meldet sich bei dir“, und im Postfach, wohin die Heute-Karte führte, lag nichts.
+
+**Fachregel „Rückbuchung → Nachforderung → frei“ (Weg B+A aus A007).**
+- B: Nach der Rückbuchung geht von selbst eine Rechnung zur Überweisung über genau den zurückgebuchten Betrag (`summeCents`) an den Hof, ohne Kosten der Rücklastschrift (E-012 (6)). Wird sie bezahlt, ist der Hof von selbst frei (Stand `bezahlt`). Der Hof bekommt dazu eine Nachricht im Postfach mit dem Satz von Heute.
+- A: Hat der Hof anders bezahlt oder war die Rückbuchung nicht berechtigt, hebt das Team die Sperre in der Akte auf (Recht „Geld“, frischer Passkey, Grund Pflicht, Protokoll, Nachricht an den Hof). Stand `geklaert` — er sperrt nicht. Eine offene Nachforderung bleibt bei Stripe stehen; das Team storniert sie von Hand. Zahlt der Hof sie trotzdem, steht ein Protokolleintrag da, und das Team erstattet in Stripe.
+- Warum ohne Spalte für die Kennung der Nachforderung: keine Migration. Sie trägt ihre Abrechnung in den Metadaten und wird über die Rechnungsliste des Kunden gefunden — nicht über die Suche von Stripe, die einige Minuten nachhinkt; ein zweiter Lauf legte sonst eine zweite an.
+- Warum „offen gefunden → nichts“: Stripe schickt die Rechnung beim Senden per Mail; jeder Lauf schickte sonst eine weitere. Gesendet wird nur in dem Aufruf, der finalisiert.
+- Warum zwei Betragswachen: Weicht der Betrag der Rückbuchung oder der Rechnung bar bei Stripe von der eigenen Summe ab, bucht die App nichts und meldet es (Sentry `nachforderung-betrag`) — im Zweifel nichts buchen.
+- Wortlaut: „gesperrt“ statt „pausiert“ aus A007 (Register N38, Ergänzung 5.11.2026, Punkt 5; `tests/bar-gesperrt.test.ts`). Die Datenschutzerklärung nennt den Weg zu einem Menschen (Art. 22 Abs. 3 DSGVO) im Satz von Recht.
+- Nicht gebaut: die Sperre zusätzlich per E-Mail (Schritt 3a). Der Satz von Recht sagt „antworte auf diese Mail“, die Postfach-Mail endet mit „Antworten geht in der App, im Postfach.“ (Tor T4). Bis Recht einen passenden Satz freigibt, bekommt der Hof die Sperre nur im Postfach.
+- Dazu der Satz zum Kleinbetrag auf /konditionen (E-021, Startsatz zu Schritt 9): unter 0,50 € Bargebühr im Monat keine Bar-Rechnung. Die Regel selbst baut Nr. 291.
+
