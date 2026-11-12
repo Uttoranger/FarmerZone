@@ -9,6 +9,10 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  ABRECHNUNG_STAENDE,
+  SPERRE_STAENDE,
+  abrechnungSperrtBar,
+  abrechnungStandWort,
   anzeigePreisCents,
   barMoeglich,
   bestellGebuehr,
@@ -214,5 +218,24 @@ describe('Register N8: Hof-Bestelldetail nimmt die Gebührenwörter aus den Kons
   it('Gegenprobe: ein selbst geschriebenes Wort fällt auf, ein Kommentar nicht', () => {
     expect(woerterImCode("const wort = betrag.hofpreis ? 'Plattformgebühr' : 'Servicegebühr'")).toHaveLength(2)
     expect(woerterImCode('// Die Plattformgebühr ist Teil des Preises')).toEqual([])
+  })
+})
+
+describe('Stände der Monatsabrechnung nach einer Rückbuchung (Nr. 290)', () => {
+  const JETZT = new Date('2027-03-03T05:30:00.000Z')
+
+  it('zurückgebucht sperrt sofort; geklärt (Notweg) und bezahlt (Nachforderung bezahlt) nicht', () => {
+    expect(abrechnungSperrtBar([{ stand: 'zurueckgebucht', offenSeit: null }], 14, JETZT)).toBe(true)
+    expect(abrechnungSperrtBar([{ stand: 'geklaert', offenSeit: null }], 14, JETZT)).toBe(false)
+    // Auch mit einem alten offenSeit sperrt „geklärt“ nicht — es ist kein offener Stand.
+    expect(abrechnungSperrtBar([{ stand: 'geklaert', offenSeit: new Date(0) }], 14, JETZT)).toBe(false)
+    expect(abrechnungSperrtBar([{ stand: 'bezahlt', offenSeit: null }], 14, JETZT)).toBe(false)
+  })
+
+  it('„geklärt“ ist ein Stand mit Wort, aber keiner, der die Sperre auslösen kann', () => {
+    expect(ABRECHNUNG_STAENDE).toContain('geklaert')
+    expect(abrechnungStandWort('geklaert')).toBe('geklärt')
+    expect(SPERRE_STAENDE).not.toContain('geklaert')
+    expect(SPERRE_STAENDE).toContain('zurueckgebucht')
   })
 })

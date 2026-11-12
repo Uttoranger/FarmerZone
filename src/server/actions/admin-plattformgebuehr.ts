@@ -4,11 +4,13 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { verlangeAdminAktion } from '@/server/admin-wache'
 import { protokolliere } from '@/server/admin-protokoll'
-import { adminHofHref } from '@/lib/admin-hof-akte'
+import { RUECKBUCHUNG_TEXT, SPERRE_TEXT, adminHofHref, rueckbuchungGeklaertNachricht } from '@/lib/admin-hof-akte'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
+import { LASTSCHRIFT_HREF } from '@/lib/konditionen'
 import { kalendertagInWien, wienerMitternacht } from '@/lib/wiener-tag'
-import { satzHundertstel, satzText } from '@/lib/plattformgebuehr'
-import { PLATTFORMGEBUEHR_HOF_FEHLER, plattformgebuehrHofSchema } from '@/schemas/plattformgebuehr'
+import { monatText, satzHundertstel, satzText } from '@/lib/plattformgebuehr'
+import { ADMIN_GRUND_FEHLER } from '@/schemas/admin-aktion'
+import { PLATTFORMGEBUEHR_HOF_FEHLER, plattformgebuehrHofSchema, rueckbuchungKlaerenSchema } from '@/schemas/plattformgebuehr'
 
 /**
  * Admin › Hof-Akte › Plattformgebühr (Register N38, Nr. 198): Satz, Mandat
@@ -49,5 +51,42 @@ export async function speichereHofPlattformgebuehr(eingabe: unknown): Promise<{ 
   revalidatePath(adminHofHref(d.farmId))
   revalidatePath(`/${vorher.slug}`)
   updateTag(HOEFE_CACHE_TAG)
+  return { ok: true }
+}
+
+/**
+ * Admin › Hof-Akte › „Sperre nach Rückbuchung aufheben“ (Notweg, Nr. 290,
+ * A007): nur wenn der Hof den Betrag anders bezahlt hat oder die Rückbuchung
+ * nicht berechtigt war. Recht `geld`, frisch mit Passkey, Grund Pflicht (ins
+ * Protokoll). Die Abrechnung geht bedingt von „zurueckgebucht“ auf „geklaert“
+ * — mit dem Hof der Abrechnung in der Bedingung (gelesen über die Kennung,
+ * tests/hof-schreiben-farmid-wache.test.ts) —, der Hof bekommt eine Nachricht
+ * ins Postfach. Kein Aufruf an Stripe: Eine offene Nachforderung bleibt
+ * stehen, das Team storniert sie dort von Hand.
+ */
+export async function klaereRueckbuchung(eingabe: unknown): Promise<{ ok: true } | { error: string }> {
+  const wache = await verlangeAdminAktion({ frisch: true, recht: 'geld' })
+  if ('error' in wache) return { error: wache.error }
+  const geprueft = rueckbuchungKlaerenSchema.safeParse(eingabe)
+  if (!geprueft.success) {
+    const amGrund = geprueft.error.issues.filter((i) => i.path[0] === 'grund')
+    if (amGrund.length === 0) return { error: RUECKBUCHUNG_TEXT.nichtMehr }
+    return { error: amGrund.some((i) => i.message === ADMIN_GRUND_FEHLER) ? ADMIN_GRUND_FEHLER : SPERRE_TEXT.eingabe }
+  }
+  const { abrechnungId, grund } = geprueft.data
+
+  const abr = await prisma.monatsabrechnung.findUnique({ where: { id: abrechnungId }, select: { farmId: true, monat: true } })
+  if (!abr) return { error: RUECKBUCHUNG_TEXT.nichtMehr }
+  const { count } = await prisma.monatsabrechnung.updateMany({
+    where: { id: abrechnungId, farmId: abr.farmId, stand: 'zurueckgebucht' },
+    data: { stand: 'geklaert' },
+  })
+  if (count !== 1) return { error: RUECKBUCHUNG_TEXT.nichtMehr }
+
+  await protokolliere({ wer: wache.userId, art: 'lastschrift_rueckbuchung_geklaert', bezugArt: 'hof', bezugId: abr.farmId, mitPasskey: wache.mitPasskey, grund })
+  // Dynamisch: Die Akte bindet diese Action ein, das Abrechnungs-Modul zieht Stripe statisch (tests/schwere-module.test.ts).
+  const { schreibeHofNachricht } = await import('@/server/plattformgebuehr-abrechnung')
+  await schreibeHofNachricht(abr.farmId, rueckbuchungGeklaertNachricht(monatText(abr.monat.toISOString().slice(0, 7))), LASTSCHRIFT_HREF, 'geklaert')
+  revalidatePath(adminHofHref(abr.farmId))
   return { ok: true }
 }

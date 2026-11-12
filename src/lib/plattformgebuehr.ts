@@ -528,9 +528,14 @@ export function gebuehrFuerMonatsabrechnungJeModell(b: {
  *   offen           Rechnung bar finalisiert, Einzug bzw. Überweisung läuft
  *   bezahlt         `invoice.paid`
  *   gescheitert     `invoice.payment_failed` — Stripe versucht es erneut
- *   zurueckgebucht  `charge.dispute.created` zur Rechnungszahlung
+ *   zurueckgebucht  `charge.dispute.created` zur Rechnungszahlung — sperrt sofort
+ *   geklaert        Notweg des Teams nach einer Rückbuchung (Nr. 290, A007) — sperrt nicht
+ *
+ * Aus „zurueckgebucht“ führen zwei Wege (Nr. 290): Die Nachforderung (Rechnung
+ * zur Überweisung über den zurückgebuchten Betrag) wird bezahlt → „bezahlt“;
+ * oder das Team hebt die Sperre auf (Recht „Geld“, Passkey, Grund) → „geklaert“.
  */
-export const ABRECHNUNG_STAENDE = ['entwurf', 'nichts', 'offen', 'bezahlt', 'gescheitert', 'zurueckgebucht'] as const
+export const ABRECHNUNG_STAENDE = ['entwurf', 'nichts', 'offen', 'bezahlt', 'gescheitert', 'zurueckgebucht', 'geklaert'] as const
 export type AbrechnungStand = (typeof ABRECHNUNG_STAENDE)[number]
 
 /** Das Wort für den Stand — nie nur als Farbe (DESIGN_SYSTEM). */
@@ -541,6 +546,7 @@ export const ABRECHNUNG_STAND_WORT: Record<AbrechnungStand, string> = {
   bezahlt: 'bezahlt',
   gescheitert: 'Lastschrift gescheitert',
   zurueckgebucht: 'zurückgebucht',
+  geklaert: 'geklärt',
 }
 
 /** Der Stand als Wort; ein unbekannter Text bleibt, wie er ist. */
@@ -549,7 +555,7 @@ export function abrechnungStandWort(stand: string): string {
   return bekannt ? ABRECHNUNG_STAND_WORT[bekannt] : stand
 }
 
-/** Die Stände, die eine Sperre auslösen können — für die Abfrage der Lage. */
+/** Die Stände, die eine Sperre auslösen können — für die Abfrage der Lage. „geklaert“ gehört nie dazu (Notweg, Nr. 290). */
 export const SPERRE_STAENDE: readonly AbrechnungStand[] = ['offen', 'gescheitert', 'zurueckgebucht']
 
 const TAG_MS = 24 * 60 * 60 * 1000

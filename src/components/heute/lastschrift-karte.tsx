@@ -13,9 +13,11 @@ import { oeffneRechnung } from '@/server/actions/lastschrift'
  * öffnet die gehostete Rechnung von Stripe — die Adresse holt der Server erst
  * beim Klick. Nach `invoice.paid` verschwindet die Karte von selbst.
  *
- * Zurückgebucht: Die Rechnung ist schon bezahlt, ein Knopf „Jetzt bezahlen“
- * liefe ins Leere. Dann ein Satz ohne Fachbegriff und der Weg ins Postfach —
- * das Team klärt die Rückbuchung und hebt die Sperre auf.
+ * Zurückgebucht: Die Rechnung bar ist bei Stripe schon bezahlt, „Jetzt bezahlen“
+ * auf sie liefe ins Leere. Dann der Satz ohne Fachbegriff und der Weg ins
+ * Postfach — dort liegt seit Nr. 290 dieselbe Nachricht, und die Nachforderung
+ * über den Betrag steht unter Deine Konditionen („Jetzt bezahlen“). Bezahlt der
+ * Hof sie, ist er von selbst frei; sonst hebt das Team die Sperre auf (Notweg).
  */
 export function LastschriftSperreKarte({
   abrechnungId,

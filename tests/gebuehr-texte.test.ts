@@ -173,6 +173,15 @@ describe('Konditionen je Modell (V62)', () => {
     expect(text).not.toContain('Servicegebühr')
   })
 
+  it('Kleinbetrag (E-021, Nr. 290 Schritt 9): der Satz steht im Hofpreis-Modell genau einmal, als dritter Absatz, im Modell „bisher“ nicht', () => {
+    const SATZ = 'Kommen in einem Monat aus Barbestellungen weniger als 0,50 € Plattformgebühr zusammen, fällt sie für diesen Monat nicht an; eine Bar-Rechnung gibt es dann nicht.'
+    const hofpreis = konditionenGebuehrAbschnitt('hofpreis', JETZT).absaetze
+    expect(hofpreis[2]).toBe(SATZ)
+    expect(hofpreis.filter((a) => a.includes(SATZ))).toHaveLength(1)
+    expect(konditionenGebuehrAbschnitt('hofpreis', JETZT, '6,5').absaetze.join(' ').split(SATZ)).toHaveLength(2)
+    expect(konditionenGebuehrAbschnitt('bisher', JETZT).absaetze.join(' ')).not.toContain(SATZ)
+  })
+
   it('mit dem Satz eines Hofs steht dessen Satz, ohne den Standard-Zusatz', () => {
     const text = konditionenGebuehrAbschnitt('hofpreis', JETZT, '6,5').absaetze.join(' ')
     expect(text).toContain('beträgt 6,5 % vom Warenpreis')

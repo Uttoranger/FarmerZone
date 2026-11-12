@@ -44,8 +44,12 @@ const erstattungSchema = z.object({
   created: z.number().int().optional(),
 })
 
-/** invoice.paid, invoice.payment_failed — Monatsabrechnung (N38). */
-const rechnungSchema = z.object({ id: kennungSchema, attempt_count: z.number().int().nonnegative().nullish() })
+/**
+ * invoice.paid, invoice.payment_failed — Monatsabrechnung (N38). Die Metadaten
+ * liest nur `invoice.paid` einer Nachforderung nach einer Rückbuchung (Nr. 290:
+ * `art`, `abrechnungId`, `farmId`); ihre Kennung steht an keiner Abrechnung.
+ */
+const rechnungSchema = z.object({ id: kennungSchema, attempt_count: z.number().int().nonnegative().nullish(), metadata: metadataSchema.nullish() })
 
 /**
  * charge.dispute.created, charge.dispute.closed — die Zahlung führt zur

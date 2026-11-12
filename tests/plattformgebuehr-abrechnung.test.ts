@@ -30,7 +30,8 @@ const stripeAttrappe = vi.hoisted(() => ({
   webhooks: { constructEvent: vi.fn() },
   customers: { create: vi.fn() },
   setupIntents: { create: vi.fn() },
-  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn(), del: vi.fn() },
+  // Nr. 290: `list` sucht die Nachforderung nach einer Rückbuchung.
+  invoices: { create: vi.fn(), finalizeInvoice: vi.fn(), pay: vi.fn(), sendInvoice: vi.fn(), retrieve: vi.fn(), del: vi.fn(), list: vi.fn() },
   invoiceItems: { create: vi.fn(), list: vi.fn() },
   invoicePayments: { list: vi.fn() },
   accounts: { retrieveCurrent: vi.fn() },
@@ -66,9 +67,11 @@ import { POST } from '@/app/api/stripe/webhook/route'
 import { stelleEinOhneRisiko } from '@/server/mail-warteschlange'
 import { protokolliere } from '@/server/admin-protokoll'
 import { verlangeAdminAktion } from '@/server/admin-wache'
-import { kuendigeEinzugAn, rechneHofAb, rechneMonatsabrechnungen } from '@/server/plattformgebuehr-abrechnung'
-import { starteLastschrift } from '@/server/actions/lastschrift'
-import { speichereHofPlattformgebuehr } from '@/server/actions/admin-plattformgebuehr'
+import { kuendigeEinzugAn, rechneHofAb, rechneMonatsabrechnungen, stelleNachforderung } from '@/server/plattformgebuehr-abrechnung'
+import { oeffneRechnung, starteLastschrift } from '@/server/actions/lastschrift'
+import { klaereRueckbuchung, speichereHofPlattformgebuehr } from '@/server/actions/admin-plattformgebuehr'
+import { pruefeStripeObjekt } from '@/schemas/stripe-ereignis'
+import { RUECKBUCHUNG_TEXT, SPERRE_TEXT, rueckbuchungGeklaertNachricht } from '@/lib/admin-hof-akte'
 import {
   abrechnungSperrtBar,
   ankuendigungFaellig,
@@ -80,7 +83,7 @@ import {
   vormonat,
   type BestellungFuerAbrechnung,
 } from '@/lib/plattformgebuehr'
-import { LASTSCHRIFT_TEXT, lastschriftGescheitertText } from '@/lib/konditionen'
+import { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT, lastschriftGescheitertText } from '@/lib/konditionen'
 import { summeGebuehrPositionen } from '@/lib/plattformgebuehr'
 import { captureException } from '@sentry/nextjs'
 import { richteRechnungenEin } from './stripe-rechnungen-attrappe'
@@ -88,7 +91,7 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { rechnungSchema } from '@/schemas/plattformgebuehr'
 import { ladeSperrKarte } from '@/server/queries/plattformgebuehr'
-import { adminGrundSchema } from '@/schemas/admin-aktion'
+import { ADMIN_GRUND_FEHLER, adminGrundSchema } from '@/schemas/admin-aktion'
 import { centsAlsEuro, formatEuro } from '@/lib/format'
 
 const TAG = 24 * 60 * 60 * 1000
@@ -572,7 +575,8 @@ describe('Webhooks der Monatsabrechnung', () => {
 
   it('charge.dispute.created zur Rechnungszahlung → zurückgebucht; eine Rückbuchung ohne Rechnung und ohne Bestellung: eine Warnung, nichts geschrieben', async () => {
     stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
-    db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1' })
+    // Nr. 290: Monat und Summe braucht der Nachlauf (Nachricht, Nachforderung).
+    db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1', monat: new Date('2027-02-01T00:00:00.000Z'), summeCents: 342 })
     await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung' })
     expect(stripeAttrappe.invoicePayments.list).toHaveBeenCalledWith({ payment: { type: 'payment_intent', payment_intent: 'pi_rechnung' }, limit: 1 })
     expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: expect.any(Date) } })
@@ -661,7 +665,8 @@ describe('Rückbuchung einer Kundenzahlung (Nr. 289, E-022): sichtbar machen, ke
 
   it('(a) created zu einer Rechnungszahlung: zurückgebucht wie bisher, kein Eintrag zur Kundenzahlung, keine Zeile', async () => {
     stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
-    db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1' })
+    // Nr. 290: Monat und Summe braucht der Nachlauf (Nachricht, Nachforderung).
+    db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1', monat: new Date('2027-02-01T00:00:00.000Z'), summeCents: BETRAG })
     await ereignis('charge.dispute.created', streit({ payment_intent: 'pi_rechnung' }))
     expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: STREIT_JETZT } })
     expect(vi.mocked(protokolliere).mock.calls.map(([e]) => e.art)).toEqual(['lastschrift_zurueckgebucht'])
@@ -819,5 +824,355 @@ describe('Hof › Heute: welche Abrechnung die Karte zeigt', () => {
     expect(await ladeSperrKarte('hof_1', JETZT)).toEqual({ abrechnungId: 'a_jan', monatText: 'Jänner 2027', stand: 'offen' })
     db.monatsabrechnung.findMany.mockResolvedValue([])
     expect(await ladeSperrKarte('hof_1', JETZT)).toBeNull()
+  })
+})
+
+// ─── Rücklastschrift: Nachforderung und Notweg (Nr. 290, A007) ───────────────
+
+describe('Rücklastschrift: Nachforderung und Notweg (Nr. 290)', () => {
+  /** Die Abrechnung, wie die Datenbank sie hält — die Attrappe schreibt bedingt wie Postgres. */
+  type Zeile = { id: string; farmId: string; monat: Date; summeCents: number; rechnungBarId: string | null; stand: string; eingezogenAm: Date | null; offenSeit: Date | null; zurueckgebuchtAm: Date | null }
+  let zeile: Zeile
+  /** Metadaten je Rechnung bei Stripe (die Rechnungs-Attrappe kennt nur Stand und Positionen). */
+  let metadaten: Map<string, Record<string, string>>
+  const NACHFORDERUNG = 'in_nachforderung'
+  const META = { farmId: 'hof_1', monat: '2027-02', art: 'nachforderung', abrechnungId: 'abr_1' }
+
+  function passt(bedingung: unknown, wert: unknown): boolean {
+    if (bedingung === undefined) return true
+    if (bedingung !== null && typeof bedingung === 'object') {
+      const b = bedingung as { not?: unknown; in?: unknown[] }
+      if ('not' in b) return wert !== b.not
+      if ('in' in b) return (b.in ?? []).includes(wert)
+    }
+    return bedingung === wert
+  }
+  function trifft(where: Record<string, unknown>): boolean {
+    return ['id', 'farmId', 'stand', 'rechnungBarId', 'offenSeit'].every((k) => passt(where[k], zeile[k as keyof Zeile]))
+  }
+  function waehle<T extends Record<string, unknown>>(select: Record<string, unknown> | undefined, z: T): Partial<T> {
+    if (!select) return z
+    return Object.fromEntries(Object.keys(select).filter((k) => k !== 'farm').map((k) => [k, z[k]])) as Partial<T>
+  }
+  const HOF_ZUR_ABRECHNUNG = { stripeKundeId: 'cus_1', barSperreNachTagen: 14 }
+
+  function warnungen(): string[] {
+    return vi.mocked(captureException).mock.calls.map(([, k]) => (k as { tags: { aufgabe: string } }).tags.aufgabe)
+  }
+  function arten(): string[] {
+    return vi.mocked(protokolliere).mock.calls.map(([e]) => e.art)
+  }
+
+  beforeEach(() => {
+    zeile = { id: 'abr_1', farmId: 'hof_1', monat: new Date('2027-02-01T00:00:00.000Z'), summeCents: 342, rechnungBarId: 'in_bar', stand: 'offen', eingezogenAm: null, offenSeit: null, zurueckgebuchtAm: null }
+    metadaten = new Map()
+    // Die Rechnung bar des Monats: bezahlt per Lastschrift, Betrag = Summe.
+    rechnungen.set('in_bar', { status: 'paid', posten: [{ id: 'ii_bar', schluessel: 'b1', amount: 342 }], collection_method: 'charge_automatically' })
+    const anlegen = stripeAttrappe.invoices.create.getMockImplementation()
+    stripeAttrappe.invoices.create.mockImplementation(async (p: { metadata: Record<string, string> }, o?: { idempotencyKey?: string }) => {
+      const r = await anlegen?.(p, o)
+      metadaten.set(r.id, p.metadata)
+      return r
+    })
+    stripeAttrappe.invoices.list.mockImplementation(async (p: { customer: string }) => ({
+      data: p.customer === 'cus_1' ? [...metadaten].map(([id, metadata]) => ({ id, status: rechnungen.get(id)?.status ?? 'void', metadata, hosted_invoice_url: `https://rechnung.example.com/${id}`, invoice_pdf: `https://rechnung.example.com/${id}.pdf` })) : [],
+      has_more: false,
+    }))
+    stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
+    db.monatsabrechnung.findFirst.mockImplementation(async (a: { where: Record<string, unknown>; select?: Record<string, unknown> }) => {
+      const oder = a.where.OR as Record<string, unknown>[] | undefined
+      const gefunden = oder ? oder.some((o) => o.rechnungBarId === zeile.rechnungBarId) : trifft(a.where)
+      return gefunden ? { ...waehle(a.select, zeile), ...(a.select?.farm ? { farm: HOF_ZUR_ABRECHNUNG } : {}) } : null
+    })
+    db.monatsabrechnung.findUnique.mockImplementation(async (a: { where: { id: string }; select?: Record<string, unknown> }) =>
+      a.where.id === zeile.id ? { ...waehle(a.select, zeile), ...(a.select?.farm ? { farm: HOF_ZUR_ABRECHNUNG } : {}) } : null
+    )
+    db.monatsabrechnung.findMany.mockImplementation(async (a: { where: Record<string, unknown> }) => (a.where.stand === 'zurueckgebucht' && zeile.stand === 'zurueckgebucht' ? [{ id: zeile.id }] : []))
+    db.monatsabrechnung.updateMany.mockImplementation(async (a: { where: Record<string, unknown>; data: Partial<Zeile> }) => {
+      if (!trifft(a.where)) return { count: 0 }
+      Object.assign(zeile, a.data)
+      return { count: 1 }
+    })
+    db.farm.findMany.mockResolvedValue([])
+    vi.mocked(verlangeAdminAktion).mockResolvedValue({ ok: true, userId: 'admin_1', sitzungId: 's', mitPasskey: true })
+    return () => {
+      db.monatsabrechnung.findFirst.mockReset()
+      db.monatsabrechnung.findUnique.mockReset()
+      db.monatsabrechnung.findMany.mockReset()
+      db.monatsabrechnung.updateMany.mockReset()
+      db.farm.findMany.mockReset()
+      stripeAttrappe.invoices.list.mockReset()
+      stripeAttrappe.invoicePayments.list.mockReset()
+    }
+  })
+
+  describe('Rückbuchung → Nachricht und Nachforderung', () => {
+    it('(a) created zur Rechnungszahlung: zurückgebucht, eine Nachricht, genau eine Nachforderung über die Summe – angelegt, finalisiert, gesendet; dasselbe Ereignis noch einmal legt nichts an', async () => {
+      const res = await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung', amount: 342 })
+      expect(res.status).toBe(200)
+      expect(zeile.stand).toBe('zurueckgebucht')
+      expect(db.unterhaltung.create).toHaveBeenCalledTimes(1)
+      const nachricht = db.unterhaltung.create.mock.calls[0][0].data
+      expect(nachricht.farmId).toBe('hof_1')
+      expect(nachricht.nachrichten.create).toEqual(expect.objectContaining({ art: 'SYSTEM', linkUrl: LASTSCHRIFT_HREF, text: LASTSCHRIFT_TEXT.zurueckgebuchtSatz('Februar 2027') }))
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customer: 'cus_1',
+          currency: 'eur',
+          auto_advance: false,
+          collection_method: 'send_invoice',
+          days_until_due: 14,
+          description: 'Plattformgebühr Februar 2027 · zurückgebuchte Lastschrift',
+          metadata: META,
+        }),
+        { idempotencyKey: 'abr-hof_1-2027-02-nachforderung' }
+      )
+      expect(stripeAttrappe.invoiceItems.create.mock.calls.map(([p, o]) => [p.invoice, p.amount, o.idempotencyKey])).toEqual([[NACHFORDERUNG, 342, 'abr-hof_1-2027-02-nachforderung-pos-nachforderung']])
+      expect(stripeAttrappe.invoices.finalizeInvoice).toHaveBeenCalledWith(NACHFORDERUNG, { auto_advance: false }, { idempotencyKey: 'abr-hof_1-2027-02-nachforderung-fertig' })
+      expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledWith(NACHFORDERUNG, {}, { idempotencyKey: 'abr-hof_1-2027-02-nachforderung-senden' })
+      expect(arten()).toEqual(['lastschrift_zurueckgebucht', 'lastschrift_nachforderung_erstellt'])
+      expect(vi.mocked(protokolliere).mock.calls[1][0]).toEqual(expect.objectContaining({ wer: null, bezugArt: 'hof', bezugId: 'hof_1', mitPasskey: false, grund: 'Monatsabrechnung 2027-02' }))
+      // Ohne den Startsatz zu Schritt 3a (Tor T4): keine Mail.
+      expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
+      expect(warnungen()).toEqual([])
+
+      // Dasselbe Ereignis mit neuer Ereignis-Kennung: das bedingte Setzen trifft nichts — keine zweite Nachricht, keine zweite Rechnung.
+      await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung', amount: 342 }, 'evt_2')
+      // Und ein Nachziehen findet die offene Nachforderung über die Liste — nichts neu, nichts noch einmal gesendet.
+      await stelleNachforderung('abr_1', JETZT)
+      expect(db.unterhaltung.create).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.list).toHaveBeenCalledWith({ customer: 'cus_1', limit: 100 })
+    })
+
+    it('(a2) Betrag der Rückbuchung weicht von der Summe ab: keine Nachforderung, eine Warnung, Stand bleibt zurückgebucht', async () => {
+      await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung', amount: 341 })
+      expect(zeile.stand).toBe('zurueckgebucht')
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+      expect(warnungen()).toEqual(['nachforderung-betrag'])
+      expect(arten()).toEqual(['lastschrift_zurueckgebucht'])
+    })
+
+    it('(a3) Rechnung bar bei Stripe über einen anderen Betrag als die Summe: nichts angelegt, Warnung („im Zweifel nichts buchen“)', async () => {
+      rechnungen.set('in_bar', { status: 'paid', posten: [{ id: 'ii_bar', schluessel: 'b1', amount: 400 }] })
+      await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung' })
+      expect(zeile.stand).toBe('zurueckgebucht')
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+      expect(warnungen()).toEqual(['nachforderung-betrag'])
+    })
+
+    it('(e) Stripe-Fehler beim Anlegen: Warnung, Stand bleibt, Antwort 200; der tägliche Lauf legt sie an', async () => {
+      stripeAttrappe.invoices.create.mockRejectedValueOnce(new Error('Stripe nicht erreichbar'))
+      const res = await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung', amount: 342 })
+      expect(res.status).toBe(200)
+      expect(zeile.stand).toBe('zurueckgebucht')
+      expect(warnungen()).toEqual(['nachforderung'])
+      expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+
+      await rechneMonatsabrechnungen(JETZT)
+      expect(db.monatsabrechnung.findMany).toHaveBeenCalledWith({ where: { stand: 'zurueckgebucht' }, select: { id: true } })
+      expect(metadaten.get(NACHFORDERUNG)).toEqual(META)
+      expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledTimes(1)
+      expect(arten()).toEqual(['lastschrift_zurueckgebucht', 'lastschrift_nachforderung_erstellt'])
+    })
+
+    it('Rückbuchung zu einer Rechnung ohne Monatsabrechnung (etwa einer bezahlten Nachforderung): Warnung, nichts geändert', async () => {
+      stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_fremd' }] })
+      const res = await ereignis('charge.dispute.created', { id: 'dp_9', payment_intent: 'pi_x' })
+      expect(res.status).toBe(200)
+      expect(zeile.stand).toBe('offen')
+      expect(warnungen()).toEqual(['rueckbuchung-unbekannt'])
+      expect(vi.mocked(captureException).mock.calls[0][0]).toEqual(expect.objectContaining({ message: 'Rückbuchung zu einer Rechnung ohne Monatsabrechnung' }))
+      expect(db.unterhaltung.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('täglicher Lauf holt Fehlendes nach', () => {
+    it('(f) vorhandene offene Nachforderung: kein invoices.create, kein sendInvoice', async () => {
+      zeile.stand = 'zurueckgebucht'
+      rechnungen.set('in_nf_alt', { status: 'open', posten: [{ id: 'ii_nf', schluessel: 'nachforderung', amount: 342 }] })
+      metadaten.set('in_nf_alt', META)
+      await rechneMonatsabrechnungen(JETZT)
+      expect(stripeAttrappe.invoices.list).toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+      expect(zeile.stand).toBe('zurueckgebucht')
+    })
+
+    it('Gegenprobe: eine stornierte (void) Nachforderung zählt nicht — eine neue wird angelegt', async () => {
+      zeile.stand = 'zurueckgebucht'
+      rechnungen.set('in_nf_alt', { status: 'void', posten: [] })
+      metadaten.set('in_nf_alt', META)
+      await rechneMonatsabrechnungen(JETZT)
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledTimes(1)
+    })
+
+    it('(g) Nachforderung schon bezahlt, Stand noch zurückgebucht (Ereignis verloren): bezahlt, ein Protokolleintrag', async () => {
+      zeile.stand = 'zurueckgebucht'
+      rechnungen.set('in_nf_alt', { status: 'paid', posten: [{ id: 'ii_nf', schluessel: 'nachforderung', amount: 342 }] })
+      metadaten.set('in_nf_alt', META)
+      await rechneMonatsabrechnungen(JETZT)
+      expect(zeile).toEqual(expect.objectContaining({ stand: 'bezahlt', eingezogenAm: JETZT, offenSeit: null }))
+      expect(arten()).toEqual(['lastschrift_nachforderung_bezahlt'])
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+    })
+
+    it('Nachforderung einer fremden Abrechnung zählt nicht (andere abrechnungId)', async () => {
+      zeile.stand = 'zurueckgebucht'
+      rechnungen.set('in_nf_fremd', { status: 'open', posten: [] })
+      metadaten.set('in_nf_fremd', { ...META, abrechnungId: 'abr_2' })
+      await stelleNachforderung('abr_1', JETZT)
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('ohne Stand zurückgebucht, ohne Rechnung bar oder ohne Stripe-Kunde: nichts', async () => {
+      zeile.stand = 'offen'
+      await stelleNachforderung('abr_1', JETZT)
+      zeile.stand = 'zurueckgebucht'
+      zeile.rechnungBarId = null
+      await stelleNachforderung('abr_1', JETZT)
+      expect(stripeAttrappe.invoices.list).not.toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('invoice.paid der Nachforderung', () => {
+    const bezahlt = (metadata: Record<string, string> = META) => ereignis('invoice.paid', { id: NACHFORDERUNG, metadata }, 'evt_paid')
+
+    it('(b) bei zurückgebucht → bezahlt, eingezogen, offenSeit null; Protokoll — der Hof ist von selbst frei', async () => {
+      zeile.stand = 'zurueckgebucht'
+      expect((await bezahlt()).status).toBe(200)
+      expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', farmId: 'hof_1', stand: 'zurueckgebucht' }, data: { stand: 'bezahlt', eingezogenAm: expect.any(Date), offenSeit: null } })
+      expect(zeile.stand).toBe('bezahlt')
+      expect(abrechnungSperrtBar([zeile], 14, JETZT)).toBe(false)
+      expect(arten()).toEqual(['lastschrift_nachforderung_bezahlt'])
+      expect(warnungen()).toEqual([])
+    })
+
+    it('(c) fremde farmId oder anderer Stand: nichts geändert, Warnung (ohne Kennung des Hofs im Text)', async () => {
+      zeile.stand = 'zurueckgebucht'
+      await bezahlt({ ...META, farmId: 'hof_fremd' })
+      expect(zeile.stand).toBe('zurueckgebucht')
+      zeile.stand = 'offen'
+      await bezahlt()
+      expect(zeile.stand).toBe('offen')
+      expect(warnungen()).toEqual(['nachforderung-bezahlt', 'nachforderung-bezahlt'])
+      for (const [fehler] of vi.mocked(captureException).mock.calls) expect((fehler as Error).message).toBe('Nachforderung bezahlt, aber keine passende Abrechnung')
+      expect(protokolliere).not.toHaveBeenCalled()
+    })
+
+    it('(c2) nach dem Notweg (geklärt) bezahlt: Stand bleibt, ein Protokolleintrag mit dem Grund, eine Warnung', async () => {
+      zeile.stand = 'geklaert'
+      await bezahlt()
+      expect(zeile.stand).toBe('geklaert')
+      expect(vi.mocked(protokolliere).mock.calls.map(([e]) => e)).toEqual([
+        expect.objectContaining({ art: 'lastschrift_nachforderung_bezahlt', bezugArt: 'hof', bezugId: 'hof_1', wer: null, mitPasskey: false, grund: 'Nach dem Notweg bezahlt – Betrag an den Hof zurück' }),
+      ])
+      expect(warnungen()).toEqual(['nachforderung-bezahlt'])
+    })
+
+    it('(c3) schon bezahlt (der Lauf hat es nachgeholt): nichts geändert, keine Warnung, kein Protokoll', async () => {
+      zeile.stand = 'bezahlt'
+      await bezahlt()
+      expect(zeile.stand).toBe('bezahlt')
+      expect(warnungen()).toEqual([])
+      expect(protokolliere).not.toHaveBeenCalled()
+    })
+
+    it('(d) invoice.paid der Monatsrechnung bar bei zurückgebucht: unverändert (der Weg der Monatsrechnungen bleibt)', async () => {
+      zeile.stand = 'zurueckgebucht'
+      await ereignis('invoice.paid', { id: 'in_bar' })
+      expect(zeile.stand).toBe('zurueckgebucht')
+      expect(protokolliere).not.toHaveBeenCalled()
+    })
+
+    it('Metadaten im Schema: Texte gehen durch, eine Zahl nicht', () => {
+      expect(pruefeStripeObjekt('invoice.paid', { id: 'in_1', metadata: META })).toEqual({ ok: true })
+      expect(pruefeStripeObjekt('invoice.paid', { id: 'in_1', metadata: null })).toEqual({ ok: true })
+      expect(pruefeStripeObjekt('invoice.paid', { id: 'in_1', metadata: { abrechnungId: 7 } })).toEqual({ ok: false, felder: ['metadata.abrechnungId'] })
+    })
+  })
+
+  describe('Notweg: klaereRueckbuchung (Recht „Geld“, frischer Passkey, Grund)', () => {
+    const eingabe = { abrechnungId: 'abr_1', grund: 'Hof hat bar im Büro bezahlt' }
+    beforeEach(() => {
+      zeile.stand = 'zurueckgebucht'
+    })
+
+    function nichtsGeschrieben(): void {
+      expect(zeile.stand).toBe('zurueckgebucht')
+      expect(protokolliere).not.toHaveBeenCalled()
+      expect(db.unterhaltung.create).not.toHaveBeenCalled()
+    }
+
+    it('ohne Recht → Fehler, nichts geschrieben; ohne frische Bestätigung → Fehler', async () => {
+      vi.mocked(verlangeAdminAktion).mockResolvedValueOnce({ error: 'Dafür fehlt dir das Recht.' })
+      expect(await klaereRueckbuchung(eingabe)).toEqual({ error: 'Dafür fehlt dir das Recht.' })
+      expect(verlangeAdminAktion).toHaveBeenCalledWith({ frisch: true, recht: 'geld' })
+      vi.mocked(verlangeAdminAktion).mockResolvedValueOnce({ error: 'Bestätige es bitte mit deinem Passkey.' })
+      expect(await klaereRueckbuchung(eingabe)).toEqual({ error: 'Bestätige es bitte mit deinem Passkey.' })
+      expect(db.monatsabrechnung.updateMany).not.toHaveBeenCalled()
+      nichtsGeschrieben()
+    })
+
+    it('ohne Grund bzw. Grund mit @ → Fehler, nichts geschrieben', async () => {
+      expect(await klaereRueckbuchung({ abrechnungId: 'abr_1', grund: '  ' })).toEqual({ error: SPERRE_TEXT.eingabe })
+      expect(await klaereRueckbuchung({ abrechnungId: 'abr_1' })).toEqual({ error: SPERRE_TEXT.eingabe })
+      expect(await klaereRueckbuchung({ abrechnungId: 'abr_1', grund: 'Mail von hof@example.com' })).toEqual({ error: ADMIN_GRUND_FEHLER })
+      expect(db.monatsabrechnung.updateMany).not.toHaveBeenCalled()
+      nichtsGeschrieben()
+    })
+
+    it('zweimal: einmal geschrieben (geklärt, mit der gelesenen farmId in der Bedingung), ein Protokolleintrag, eine Nachricht mit dem Monat als Wort', async () => {
+      expect(await klaereRueckbuchung(eingabe)).toEqual({ ok: true })
+      expect(await klaereRueckbuchung(eingabe)).toEqual({ error: RUECKBUCHUNG_TEXT.nichtMehr })
+      expect(zeile.stand).toBe('geklaert')
+      expect(abrechnungSperrtBar([zeile], 14, JETZT)).toBe(false)
+      expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', farmId: 'hof_1', stand: 'zurueckgebucht' }, data: { stand: 'geklaert' } })
+      expect(vi.mocked(protokolliere).mock.calls.map(([e]) => e)).toEqual([
+        expect.objectContaining({ art: 'lastschrift_rueckbuchung_geklaert', bezugArt: 'hof', bezugId: 'hof_1', wer: 'admin_1', mitPasskey: true, grund: 'Hof hat bar im Büro bezahlt' }),
+      ])
+      expect(db.unterhaltung.create).toHaveBeenCalledTimes(1)
+      const nachricht = db.unterhaltung.create.mock.calls[0][0].data
+      expect(nachricht.farmId).toBe('hof_1')
+      expect(nachricht.nachrichten.create).toEqual(expect.objectContaining({ art: 'SYSTEM', linkUrl: LASTSCHRIFT_HREF, text: rueckbuchungGeklaertNachricht('Februar 2027') }))
+      expect(rueckbuchungGeklaertNachricht('Februar 2027')).toBe('Die zurückgebuchte Lastschrift für Februar 2027 ist geklärt. Sie sperrt deine Barzahlung nicht mehr.')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/hoefe/hof_1')
+      // Kein Aufruf an Stripe, keine Mail.
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.list).not.toHaveBeenCalled()
+      expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
+    })
+
+    it('anderer Stand → Fehlersatz, nichts geschrieben; unbekannte Abrechnung → Fehlersatz, kein Schreiben', async () => {
+      zeile.stand = 'offen'
+      expect(await klaereRueckbuchung(eingabe)).toEqual({ error: RUECKBUCHUNG_TEXT.nichtMehr })
+      expect(zeile.stand).toBe('offen')
+      expect(protokolliere).not.toHaveBeenCalled()
+      db.monatsabrechnung.updateMany.mockClear()
+      expect(await klaereRueckbuchung({ ...eingabe, abrechnungId: 'abr_gibts_nicht' })).toEqual({ error: RUECKBUCHUNG_TEXT.nichtMehr })
+      expect(db.monatsabrechnung.updateMany).not.toHaveBeenCalled()
+      expect(db.unterhaltung.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Hof › „Jetzt bezahlen“ der Nachforderung (oeffneRechnung)', () => {
+    it('eigene Abrechnung → Adresse der gehosteten Rechnung; fremde Abrechnung oder keine Nachforderung → rechnungFehlt', async () => {
+      zeile.stand = 'zurueckgebucht'
+      rechnungen.set('in_nf_alt', { status: 'open', posten: [] })
+      metadaten.set('in_nf_alt', META)
+      expect(await oeffneRechnung({ abrechnungId: 'abr_1', art: 'nachforderung', ziel: 'bezahlen' })).toEqual({ url: 'https://rechnung.example.com/in_nf_alt' })
+      expect(db.monatsabrechnung.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'abr_1', farmId: 'hof_1' } }))
+      // Fremd: die Abrechnung gehört einem anderen Hof — sieht aus wie eine fehlende.
+      zeile.farmId = 'hof_anders'
+      expect(await oeffneRechnung({ abrechnungId: 'abr_1', art: 'nachforderung', ziel: 'bezahlen' })).toEqual({ error: LASTSCHRIFT_TEXT.rechnungFehlt })
+      zeile.farmId = 'hof_1'
+      metadaten.clear()
+      expect(await oeffneRechnung({ abrechnungId: 'abr_1', art: 'nachforderung', ziel: 'bezahlen' })).toEqual({ error: LASTSCHRIFT_TEXT.rechnungFehlt })
+    })
   })
 })

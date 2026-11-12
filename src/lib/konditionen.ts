@@ -284,8 +284,13 @@ export const LASTSCHRIFT_TEXT = {
   heuteTitel: 'Barzahlung ist gesperrt',
   heuteSatz: (monat: string): string =>
     `Die Plattformgebühr für ${monat} ist noch offen. Bis sie bezahlt ist, nehmen wir bei dir keine Barbestellungen an – laufende Bestellungen bleiben.`,
-  /** Nach einer Rückbuchung ist die Rechnung bezahlt — es gibt nichts zu bezahlen, das Team klärt es. */
-  zurueckgebuchtSatz: (monat: string): string => `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist gesperrt – das Team meldet sich bei dir.`,
+  /**
+   * Nach einer Rückbuchung (Nr. 290, A007): Postfach und Heute. Die Nachforderung über den Betrag steht unter
+   * Deine Konditionen („Jetzt bezahlen“). Wortlaut der Projektleitung mit dem Wort des Registers („gesperrt“ statt
+   * „pausiert“, N38, Ergänzung 5.11.2026, Punkt 5).
+   */
+  zurueckgebuchtSatz: (monat: string): string =>
+    `Die Lastschrift für ${monat} wurde zurückgebucht. Barzahlung ist gesperrt, bis der Betrag bezahlt ist – die Rechnung dazu findest du unter Deine Konditionen.`,
   zumPostfach: 'Zum Postfach',
 } as const
 
@@ -477,6 +482,9 @@ export function konditionenStichtagZeile(modell: GebuehrModell, tag: string, jet
   return jetzt.getTime() < TARIFE_AB.getTime() ? `${seit} ${TARIFE_AB_SATZ}` : seit
 }
 
+/** Kleinbetrag (E-021): unter 0,50 € Bargebühr im Monat keine Bar-Rechnung — Satz auf /konditionen, Wortlaut der Freigabe. */
+export const KLEINBETRAG_SATZ = `Kommen in einem Monat aus Barbestellungen weniger als 0,50 € ${PLATTFORMGEBUEHR_BEZEICHNUNG} zusammen, fällt sie für diesen Monat nicht an; eine Bar-Rechnung gibt es dann nicht.`
+
 /** Ein Abschnitt der Konditionen-Seite: Überschrift, Kennzeichnung (null = keine) und Absätze. */
 export type KonditionenAbschnitt = { titel: string; entwurf: string | null; absaetze: readonly string[] }
 
@@ -504,6 +512,8 @@ export function konditionenGebuehrAbschnitt(modell: GebuehrModell, jetzt: Date, 
       'Online behält Stripe die Gebühr gleich bei der Zahlung ein – der Hof ist dabei Händler. ' +
         'Bar ziehen wir sie einmal im Monat per SEPA-Lastschrift ein, fällig erst mit „Abgeholt“; dafür richtest du eine Lastschrift ein. ' +
         'Gründungshöfe zahlen sie bar erst nach ihrer Gründungszeit und brauchen bis dahin keine Lastschrift.',
+      // E-021 (Nr. 290 Schritt 9, Startsatz „Konditionen-Satz Kleinbetrag vor Tag T freigegeben“), wörtlich.
+      KLEINBETRAG_SATZ,
     ],
   }
 }

@@ -601,7 +601,7 @@ export default function DatenschutzPage() {
               und du bekommst eine Nachricht. Bleibt ein Betrag länger offen, als in deinen Konditionen
               steht (Vorgabe 14 Tage), nimmt dein Hof keine Barbestellungen mehr an, bis der Betrag bezahlt
               ist; danach geht es von selbst wieder.
-              Bucht deine Bank eine Lastschrift zurück, nimmt dein Hof sofort keine Barbestellungen mehr an, bis ein Mensch aus unserem Team es mit dir geklärt hat – schreib uns dazu an die Adresse in Abschnitt 1.
+              Bucht deine Bank eine Lastschrift zurück, nimmt dein Hof sofort keine Barbestellungen mehr an, bis der zurückgebuchte Betrag bezahlt ist; danach geht es von selbst wieder. Das entscheidet die App nach einer festen Regel (AGB Punkt 19.6). Hast du anders bezahlt oder war die Rückbuchung nicht berechtigt, schreib uns – dann prüft ein Mensch und kann die Sperre aufheben.
               Beides geschieht nach dieser festen Regel automatisch. Wir bewerten dabei nicht deine Person
               oder deine Zahlungsfähigkeit und fragen keine Auskunftei. Schreibst du uns, sieht sich ein
               Mensch die Sperre an.

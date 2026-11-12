@@ -65,6 +65,10 @@ export const ADMIN_AKTIONEN = [
   'lastschrift_bezahlt',
   'lastschrift_gescheitert',
   'lastschrift_zurueckgebucht',
+  // Rücklastschrift (Nr. 290, A007): Nachforderung (System) und Notweg „Sperre nach Rückbuchung aufheben“ (Recht geld)
+  'lastschrift_nachforderung_erstellt',
+  'lastschrift_nachforderung_bezahlt',
+  'lastschrift_rueckbuchung_geklaert',
   // Rückbuchung einer Kundenzahlung (Nr. 289, E-022) — System, Bezug die Bestellung
   'kundenzahlung_zurueckgebucht',
   'kundenzahlung_rueckfrage',

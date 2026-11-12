@@ -30,7 +30,8 @@ export const BEISPIELE: Record<VerarbeiteterStripeTyp, { gueltig: Record<string,
     ungueltig: { id: 're_1', amount: 500, payment_intent: 'pi_1' },
     feld: 'status',
   },
-  'invoice.paid': { gueltig: { id: 'in_1' }, ungueltig: { id: null }, feld: 'id' },
+  // Nr. 290: die Nachforderung nach einer Rückbuchung trägt ihre Abrechnung in den Metadaten.
+  'invoice.paid': { gueltig: { id: 'in_1', metadata: { art: 'nachforderung', abrechnungId: 'abr_1', farmId: 'hof_1', monat: '2027-02' } }, ungueltig: { id: null }, feld: 'id' },
   'invoice.payment_failed': { gueltig: { id: 'in_1', attempt_count: 2 }, ungueltig: { id: 'in_1', attempt_count: -1 }, feld: 'attempt_count' },
   'charge.dispute.created': { gueltig: { id: 'dp_1', payment_intent: 'pi_1' }, ungueltig: { id: 'dp_1' }, feld: 'payment_intent' },
   // Nr. 289 (E-022): der Ausgang eines Streitfalls zu einer Kundenzahlung.
