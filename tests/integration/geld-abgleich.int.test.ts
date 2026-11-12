@@ -25,6 +25,8 @@ const stripeAttrappe = vi.hoisted(() => ({
   paymentIntents: { list: vi.fn(), retrieve: vi.fn() },
   refunds: { list: vi.fn() },
   balanceTransactions: { list: vi.fn() },
+  // Nr. 289: keine Streitfälle — sonst meldete jeder Lauf eine Warnung (Schritt streit).
+  disputes: { list: vi.fn(() => ({ async *[Symbol.asyncIterator]() {} })) },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))

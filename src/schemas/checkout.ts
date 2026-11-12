@@ -101,6 +101,11 @@ export const checkoutRequestSchema = z.object({
   // bestehende Bestellung zurück; eine NEUE lehnt die Route ab (E5,
   // zahlartFuerNeueBestellung in src/lib/kasse.ts).
   paymentMethod: z.enum(['ONLINE', 'ONSITE_CASH', 'ONSITE_CARD']),
+  // Der Gesamtbetrag in Cent, den die Kasse zeigte (Register N10, Nr. 287):
+  // Weicht er von Warenpreis + Gebühr des Servers ab, entsteht keine
+  // Bestellung (409 GESAMT_GEAENDERT). Optional — ein alter Tab ohne das Feld
+  // bestellt wie vorher.
+  gesamtCents: z.number().int().min(0).max(100_000_000).optional(),
   // Kein `onsiteConfirmed`, `optInEmail`, `optInWhatsApp` mehr (Register N2,
   // Nr. 46): Der Checkout prüft keinen Haken und legt kein Abo an — die
   // Neuigkeiten meldet die Kundin auf der Bestätigungsseite an. Ein alter

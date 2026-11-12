@@ -17,6 +17,10 @@
  *    zurückgebucht; Mandat gilt nur über `setup_intent.succeeded` (der Start
  *    im Browser schreibt nichts); `mandate.updated` inactive → Mandat weg;
  *    unbekannte Rechnung → nichts geändert.
+ *  - Rückbuchung einer Kundenzahlung (Nr. 289, E-022) über die echte Route:
+ *    Protokoll mit Betrag und Antwortfrist und eine Zeile `kundenstreit:…` für
+ *    Heute; `charge.dispute.closed` schreibt den Ausgang und löscht die Zeile.
+ *    Nie eine Änderung an der Bestellung, nie ein schreibender Stripe-Aufruf.
  *  - Einstellungen je Hof ohne Recht → Fehler, nichts geschrieben.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -31,15 +35,19 @@ const stripeAttrappe = vi.hoisted(() => ({
   invoicePayments: { list: vi.fn() },
   accounts: { retrieveCurrent: vi.fn() },
   paymentMethods: { retrieve: vi.fn() },
+  // Nr. 289: nur da, damit ein Aufruf auffiele — die Rückbuchung einer Kundenzahlung bewegt kein Geld.
+  refunds: { create: vi.fn() },
+  transfers: { createReversal: vi.fn() },
+  disputes: { update: vi.fn(), close: vi.fn() },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))
 
 const db = vi.hoisted(() => ({
   farm: { findUnique: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-  order: { findMany: vi.fn(), groupBy: vi.fn() },
+  order: { findMany: vi.fn(), groupBy: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   monatsabrechnung: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   unterhaltung: { create: vi.fn() },
-  betriebMessung: { upsert: vi.fn(), deleteMany: vi.fn() },
+  betriebMessung: { upsert: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
   webhookEvent: { findUnique: vi.fn(), create: vi.fn() },
 }))
 vi.mock('@/lib/prisma', () => ({ prisma: db }))
@@ -80,6 +88,8 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { HOEFE_CACHE_TAG } from '@/lib/hofuebersicht'
 import { rechnungSchema } from '@/schemas/plattformgebuehr'
 import { ladeSperrKarte } from '@/server/queries/plattformgebuehr'
+import { adminGrundSchema } from '@/schemas/admin-aktion'
+import { centsAlsEuro, formatEuro } from '@/lib/format'
 
 const TAG = 24 * 60 * 60 * 1000
 // Dienstag, 3. März 2027, 06:30 in Wien — der Abrechnungstag (Vorgabe der 3.) für Februar.
@@ -560,16 +570,26 @@ describe('Webhooks der Monatsabrechnung', () => {
     expect(db.unterhaltung.create).not.toHaveBeenCalled()
   })
 
-  it('charge.dispute.created zur Rechnungszahlung → zurückgebucht; eine Rückbuchung ohne Rechnung bleibt unberührt', async () => {
+  it('charge.dispute.created zur Rechnungszahlung → zurückgebucht; eine Rückbuchung ohne Rechnung und ohne Bestellung: eine Warnung, nichts geschrieben', async () => {
     stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
     db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1' })
     await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung' })
     expect(stripeAttrappe.invoicePayments.list).toHaveBeenCalledWith({ payment: { type: 'payment_intent', payment_intent: 'pi_rechnung' }, limit: 1 })
     expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: expect.any(Date) } })
     db.monatsabrechnung.updateMany.mockClear()
+    vi.mocked(protokolliere).mockClear()
+    // Nr. 289 (E-022, Fall c): Zahlung ohne Rechnung, aber auch keine Bestellung — eine Warnung mit der Kennung, sonst nichts.
     stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [] })
-    await ereignis('charge.dispute.created', { id: 'dp_2', payment_intent: 'pi_bestellung' }, 'evt_3')
+    db.order.findUnique.mockResolvedValue(null)
+    const res = await ereignis('charge.dispute.created', { id: 'dp_2', payment_intent: 'pi_bestellung' }, 'evt_3')
+    expect(res.status).toBe(200)
+    expect(db.order.findUnique).toHaveBeenCalledWith({ where: { stripePaymentIntentId: 'pi_bestellung' }, select: { id: true } })
     expect(db.monatsabrechnung.updateMany).not.toHaveBeenCalled()
+    expect(protokolliere).not.toHaveBeenCalled()
+    expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
+    expect(vi.mocked(captureException).mock.calls).toEqual([
+      [expect.objectContaining({ message: 'Rückbuchung ohne Rechnung und ohne Bestellung' }), { level: 'warning', tags: { bereich: 'monatsabrechnung', aufgabe: 'rueckbuchung-unbekannt' }, extra: { streit: 'dp_2' } }],
+    ])
   })
 
   it('Mandat gilt nur über setup_intent.succeeded — der Start im Browser schreibt nichts an den Hof', async () => {
@@ -601,6 +621,149 @@ describe('Webhooks der Monatsabrechnung', () => {
   it('Fehler bei Stripe beim Start der Lastschrift: neutraler Satz', async () => {
     stripeAttrappe.setupIntents.create.mockRejectedValue(new Error('down'))
     expect(await starteLastschrift()).toEqual({ error: LASTSCHRIFT_TEXT.fehler })
+  })
+})
+
+// ─── Rückbuchung einer Kundenzahlung (Nr. 289, E-022) ───────────────────────
+
+describe('Rückbuchung einer Kundenzahlung (Nr. 289, E-022): sichtbar machen, kein Geld bewegen', () => {
+  // Freitag, 5. März 2027, 10:15 in Wien — die Route setzt ihren Zeitpunkt selbst, darum steht die Uhr.
+  const STREIT_JETZT = new Date('2027-03-05T09:15:00.000Z')
+  // Sonntag, 14. März 2027, 23:59:59 in Wien.
+  const DUE_BY = Math.floor(Date.parse('2027-03-14T22:59:59.000Z') / 1000)
+  const SIEBEN_TAGE = Math.floor((STREIT_JETZT.getTime() + 7 * TAG) / 1000)
+  const BETRAG = 1234567
+
+  function streit(teil: Record<string, unknown> = {}): Record<string, unknown> {
+    return { id: 'dp_kunde_a', object: 'dispute', payment_intent: 'pi_kunde', amount: BETRAG, status: 'needs_response', evidence_details: { due_by: DUE_BY }, ...teil }
+  }
+
+  /** Kein Geld, keine Bestellung, kein Stripe-Schreiben — für jeden Fall dasselbe. */
+  function nichtsBewegt(): void {
+    expect(db.order.update).not.toHaveBeenCalled()
+    expect(db.order.updateMany).not.toHaveBeenCalled()
+    expect(db.monatsabrechnung.updateMany).not.toHaveBeenCalled()
+    for (const schreiben of [stripeAttrappe.refunds.create, stripeAttrappe.transfers.createReversal, stripeAttrappe.disputes.update, stripeAttrappe.disputes.close, stripeAttrappe.invoices.create]) {
+      expect(schreiben).not.toHaveBeenCalled()
+    }
+    expect(stelleEinOhneRisiko).not.toHaveBeenCalled()
+    expect(db.unterhaltung.create).not.toHaveBeenCalled()
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now: STREIT_JETZT, toFake: ['Date'] })
+    stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [] })
+    db.order.findUnique.mockResolvedValue({ id: 'bestellung-kunde' })
+    db.betriebMessung.createMany.mockResolvedValue({ count: 1 })
+    db.betriebMessung.deleteMany.mockResolvedValue({ count: 1 })
+    return () => vi.useRealTimers()
+  })
+
+  it('(a) created zu einer Rechnungszahlung: zurückgebucht wie bisher, kein Eintrag zur Kundenzahlung, keine Zeile', async () => {
+    stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
+    db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1' })
+    await ereignis('charge.dispute.created', streit({ payment_intent: 'pi_rechnung' }))
+    expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: STREIT_JETZT } })
+    expect(vi.mocked(protokolliere).mock.calls.map(([e]) => e.art)).toEqual(['lastschrift_zurueckgebucht'])
+    expect(db.order.findUnique).not.toHaveBeenCalled()
+    expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
+  })
+
+  it('(b) created zu einer Bestellung, needs_response, 12.345,67 €: genau ein Eintrag „zurückgebucht“, Grund mit Betrag und Frist, Zeile mit der Frist', async () => {
+    const res = await ereignis('charge.dispute.created', streit())
+    expect(res.status).toBe(200)
+    expect(db.order.findUnique).toHaveBeenCalledWith({ where: { stripePaymentIntentId: 'pi_kunde' }, select: { id: true } })
+    const eintraege = vi.mocked(protokolliere).mock.calls.map(([e]) => e)
+    expect(eintraege).toEqual([
+      {
+        wer: null,
+        art: 'kundenzahlung_zurueckgebucht',
+        bezugArt: 'bestellung',
+        bezugId: 'bestellung-kunde',
+        mitPasskey: false,
+        grund: `Rückbuchung dp_kunde_a · ${formatEuro(centsAlsEuro(BETRAG))} · Antwort bis 14.\u00a0März 2027`,
+      },
+    ])
+    // Der Grund überlebt die Prüfung des Protokolls — sonst stünde der Eintrag ohne Grund da.
+    expect(adminGrundSchema.safeParse(eintraege[0]?.grund).success).toBe(true)
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith({
+      data: [{ tag: new Date('2027-03-05T00:00:00.000Z'), art: 'kundenstreit:bestellung-kunde:dp_kunde_a:rueckbuchung', wert: BigInt(DUE_BY), gemessenAm: STREIT_JETZT }],
+      skipDuplicates: true,
+    })
+    // Erst das Protokoll, dann die Zeile (Block 289, Umsetzung 3).
+    expect(vi.mocked(protokolliere).mock.invocationCallOrder[0]).toBeLessThan(db.betriebMessung.createMany.mock.invocationCallOrder[0] ?? 0)
+    expect(captureException).not.toHaveBeenCalled()
+    nichtsBewegt()
+  })
+
+  it('(b2) warning_needs_response: Eintrag „Rückfrage“, Grund beginnt mit „Rückfrage“, Zeile als rueckfrage', async () => {
+    await ereignis('charge.dispute.created', streit({ status: 'warning_needs_response' }))
+    const [eintrag] = vi.mocked(protokolliere).mock.calls.map(([e]) => e)
+    expect(eintrag).toEqual(expect.objectContaining({ art: 'kundenzahlung_rueckfrage', bezugArt: 'bestellung', bezugId: 'bestellung-kunde', wer: null }))
+    expect(eintrag?.grund).toMatch(/^Rückfrage dp_kunde_a · /)
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ art: 'kundenstreit:bestellung-kunde:dp_kunde_a:rueckfrage' })] }))
+    nichtsBewegt()
+  })
+
+  it('(b3) Kennung mit sieben Ziffern: Eintrag mit Grund ohne Kennung, eine Warnung; die Zeile behält die Kennung', async () => {
+    await ereignis('charge.dispute.created', streit({ id: 'dp_1234567ab' }))
+    const [eintrag] = vi.mocked(protokolliere).mock.calls.map(([e]) => e)
+    expect(eintrag?.grund).toBe(`Rückbuchung · ${formatEuro(centsAlsEuro(BETRAG))} · Antwort bis 14.\u00a0März 2027`)
+    expect(adminGrundSchema.safeParse(eintrag?.grund).success).toBe(true)
+    expect(vi.mocked(captureException).mock.calls).toEqual([[expect.any(Error), expect.objectContaining({ tags: { bereich: 'monatsabrechnung', aufgabe: 'rueckbuchung-grund' } })]])
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ art: 'kundenstreit:bestellung-kunde:dp_1234567ab:rueckbuchung' })] }))
+  })
+
+  it('ohne Betrag: Grund ohne Betrag und eine Warnung — der Eintrag steht trotzdem', async () => {
+    await ereignis('charge.dispute.created', streit({ amount: null }))
+    const [eintrag] = vi.mocked(protokolliere).mock.calls.map(([e]) => e)
+    expect(eintrag?.grund).toBe('Rückbuchung dp_kunde_a · Antwort bis 14.\u00a0März 2027')
+    expect(vi.mocked(captureException).mock.calls).toEqual([[expect.any(Error), expect.objectContaining({ tags: { bereich: 'monatsabrechnung', aufgabe: 'rueckbuchung-betrag' } })]])
+  })
+
+  it('(d) ohne evidence_details: Frist Eingang + 7 Tage', async () => {
+    await ereignis('charge.dispute.created', streit({ evidence_details: undefined }))
+    expect(vi.mocked(protokolliere).mock.calls[0]?.[0].grund).toBe(`Rückbuchung dp_kunde_a · ${formatEuro(centsAlsEuro(BETRAG))} · Antwort bis 12.\u00a0März 2027`)
+    expect(db.betriebMessung.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ wert: BigInt(SIEBEN_TAGE) })] }))
+  })
+
+  it.each([
+    ['won', 'dp_kunde_a · gewonnen'],
+    ['lost', 'dp_kunde_a · verloren'],
+    ['warning_closed', 'dp_kunde_a · ohne Rückbuchung beendet (warning_closed)'],
+  ])('(e) closed mit %s: Eintrag „abgeschlossen“ mit dem Ausgang, Zeile gelöscht', async (status, grund) => {
+    await ereignis('charge.dispute.closed', streit({ status }))
+    expect(vi.mocked(protokolliere).mock.calls.map(([e]) => e)).toEqual([
+      { wer: null, art: 'kundenzahlung_rueckbuchung_abgeschlossen', bezugArt: 'bestellung', bezugId: 'bestellung-kunde', mitPasskey: false, grund },
+    ])
+    expect(db.betriebMessung.deleteMany).toHaveBeenCalledWith({ where: { art: { startsWith: 'kundenstreit:bestellung-kunde:dp_kunde_a:' } } })
+    // Protokoll wie bei created, dann die Zeile weg (Umsetzung 4).
+    expect(vi.mocked(protokolliere).mock.invocationCallOrder[0]).toBeLessThan(db.betriebMessung.deleteMany.mock.invocationCallOrder[0] ?? 0)
+    expect(db.betriebMessung.createMany).not.toHaveBeenCalled()
+    nichtsBewegt()
+  })
+
+  it('(e) closed: ein langer fremder Stand wird auf 50 Zeichen gekürzt', async () => {
+    const lang = 'x'.repeat(50)
+    await ereignis('charge.dispute.closed', streit({ status: lang }))
+    expect(vi.mocked(protokolliere).mock.calls[0]?.[0].grund).toBe(`dp_kunde_a · ohne Rückbuchung beendet (${lang})`)
+  })
+
+  it('(f) closed zu einer Rechnungszahlung: nichts — kein Eintrag, keine Zeile, keine Bestellung gesucht', async () => {
+    stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
+    await ereignis('charge.dispute.closed', streit({ status: 'lost' }))
+    expect(protokolliere).not.toHaveBeenCalled()
+    expect(db.order.findUnique).not.toHaveBeenCalled()
+    expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
+    expect(db.monatsabrechnung.findFirst).not.toHaveBeenCalled()
+    nichtsBewegt()
+  })
+
+  it('closed ohne Bestellung: nichts', async () => {
+    db.order.findUnique.mockResolvedValue(null)
+    await ereignis('charge.dispute.closed', streit({ status: 'won' }))
+    expect(protokolliere).not.toHaveBeenCalled()
+    expect(db.betriebMessung.deleteMany).not.toHaveBeenCalled()
   })
 })
 

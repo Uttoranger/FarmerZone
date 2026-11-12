@@ -62,7 +62,7 @@ vi.mock('@/server/queries/meldung', () => quellen)
 vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () => 1) }))
 // Die Quellen der Plattformgebühr (Nr. 198) haben eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
 vi.mock('@/server/queries/plattformgebuehr', () => ({
-  ladePlattformgebuehrAufgaben: vi.fn(async () => ({ gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [] })),
+  ladePlattformgebuehrAufgaben: vi.fn(async () => ({ gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [], kundenstreit: [] })),
 }))
 vi.mock('@/server/queries/startseite', () => ({ naechsterTermin: vi.fn(async () => null) }))
 // Nr. 200: „Widerruf offen“ — hier ohne Widerrufe (die Quelle prüft tests/widerruf.test.ts).

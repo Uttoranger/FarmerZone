@@ -64,11 +64,11 @@ Vercel → Settings → Environment Variables → „Add". Umgebung **Preview**,
 - [ ] Stripe-Dashboard, **Testmodus** → Entwickler → Webhooks → Endpunkt hinzufügen: **`https://test.agrilo.at/api/stripe/webhook`**.
   - **Zusätzlich, nicht statt des bestehenden** Endpunkts `https://agrilo.at/api/stripe/webhook`: Die Produktion läuft bis zur Live-Schaltung selbst im Testmodus und braucht ihren Test-Endpunkt weiter.
   - Stripe folgt keiner Weiterleitung; der Webhook muss direkt auf agrilo.at zeigen.
-  - Ereignisse (die 10, die `src/app/api/stripe/webhook/route.ts` verarbeitet; Stand Lauf 26, Liste mit Wirkung in `docs/betrieb/stripe-live.md`, Schritt 3):
+  - Ereignisse (die 11, die `src/app/api/stripe/webhook/route.ts` verarbeitet; Stand Lauf 34, Liste mit Wirkung in `docs/betrieb/stripe-live.md`, Schritt 3):
     - `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.canceled`
     - `refund.failed`, `charge.refund.updated`
     - `invoice.paid`, `invoice.payment_failed`
-    - `charge.dispute.created`
+    - `charge.dispute.created` (auch Kundenzahlung: Protokoll und Heute), `charge.dispute.closed` (nur Kundenzahlung, Nr. 289)
     - `setup_intent.succeeded`, `mandate.updated`
   - `account.updated` gehört zum Connect-Endpunkt und wird hier nicht eingetragen (siehe „Nicht nötig“ unten).
 - [ ] **Vercel-Sperre für Stripe öffnen:** Stripe kann sich nicht bei Vercel anmelden und bekäme sonst 401.

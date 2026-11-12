@@ -22,8 +22,8 @@ import type { AbholFenster } from '@/lib/hofuebersicht'
  * sperrt die Zeile des Fensters (`SELECT … FOR UPDATE`), zählt und legt die
  * Bestellung in DERSELBEN Transaktion an. Zwei gleichzeitige Bestellungen auf
  * den letzten Platz laufen so nacheinander — die zweite zählt die erste mit.
- * Die Vorprüfung in `pruefeAbholfenster` erspart nur die Bestandsbuchung,
- * wenn das Fenster schon vorher voll ist; verbindlich ist die Transaktion.
+ * Die Vorprüfung in `pruefeAbholfenster` erspart nur die Transaktion, wenn
+ * das Fenster schon vorher voll ist; verbindlich ist die Transaktion.
  */
 
 type Db = Prisma.TransactionClient | typeof prisma
@@ -97,22 +97,32 @@ export class AbholfensterVoll extends Error {
 }
 
 /**
- * Legt die Bestellung an — bei einem Fenster mit Höchstzahl unter der Sperre
- * seiner Zeile, mit erneuter Zählung. Voll → `AbholfensterVoll`, nichts
- * angelegt. Ohne Höchstzahl ist nichts zu zählen: direkt anlegen.
+ * Legt die Bestellung an — IMMER in einer Transaktion (Nr. 287): Die Kasse
+ * bucht im Rückruf zuerst den Vorrat, dann die Bestellung; scheitert etwas
+ * davon, rollt die Datenbank beides zurück, auch wenn der Prozess den Fehler
+ * nicht mehr erlebt. Bei einem Fenster mit Höchstzahl zuerst die Sperre seiner
+ * Zeile und die erneute Zählung — voll → `AbholfensterVoll`, nichts gebucht.
+ * Ohne Höchstzahl ist nichts zu zählen: gleich `anlegen(tx)`.
+ *
+ * Kurze Leine: höchstens 5 s auf eine Verbindung warten, 10 s für alles —
+ * eine hängende Sperre hält die Kundin nicht minutenlang fest.
  */
 export async function imAbholfenster<T>(
   farmId: string,
   fenster: HofFenster,
-  anlegen: (db: Db) => Promise<T>
+  anlegen: (db: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
   const { id, maxOrders } = fenster.slot
-  if (maxOrders === null) return anlegen(prisma)
-  return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "PickupSlot" WHERE id = ${id} FOR UPDATE`
-    if (istVoll(await belegung(tx, farmId, fenster), maxOrders)) throw new AbholfensterVoll()
-    return anlegen(tx)
-  })
+  return prisma.$transaction(
+    async (tx) => {
+      if (maxOrders !== null) {
+        await tx.$queryRaw`SELECT id FROM "PickupSlot" WHERE id = ${id} FOR UPDATE`
+        if (istVoll(await belegung(tx, farmId, fenster), maxOrders)) throw new AbholfensterVoll()
+      }
+      return anlegen(tx)
+    },
+    { maxWait: 5_000, timeout: 10_000 }
+  )
 }
 
 /** Eine Abholzeit, wie Hofliste und Hofseite sie kennen: Wochentag, Beginn, Ende. */

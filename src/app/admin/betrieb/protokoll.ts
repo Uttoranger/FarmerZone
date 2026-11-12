@@ -87,6 +87,9 @@ const ART_TEXT_WEITERE: Partial<Record<AdminAktionArt, string>> = {
   team_entfernt: 'Aus dem Team entfernt',
   ersatzcodes_erstellt: 'Ersatzcodes erstellt',
   passkey_entfernt: 'Passkey entfernt',
+  kundenzahlung_zurueckgebucht: 'Kundenzahlung zurückgebucht',
+  kundenzahlung_rueckfrage: 'Rückfrage zu einer Kundenzahlung',
+  kundenzahlung_rueckbuchung_abgeschlossen: 'Rückbuchung einer Kundenzahlung abgeschlossen',
 }
 
 export function protokollArtName(art: string): string {

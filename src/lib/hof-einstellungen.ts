@@ -535,13 +535,15 @@ function keineGebuehrGrund(hof: KonditionenHof, jetzt: Date): string | null {
  * berechneServicegebuehr (E4, B1), sonst sein Satz der Plattformgebühr,
  * gerechnet über bestellGebuehr wie Kasse und /api/checkout, und bar nach
  * `einzugFuer` (Nr. 224). Die
- * Provision über calcPlatformFeeAmount wie im Checkout — keine zweite Rechnung.
+ * Provision nur im Modell „bisher“, über calcPlatformFeeAmount wie im Checkout —
+ * keine zweite Rechnung; im Hofpreis-Modell gibt es keine (E-023, Nr. 286).
  */
 export function konditionenRechenbeispiel(hof: KonditionenHof, jetzt: Date, lage: GebuehrLage): Rechenbeispiel {
   const waren = RECHENBEISPIEL_WARENPREIS_CENTS
-  const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
   const titel = `Rechenbeispiel: eine Bestellung über ${euro(waren)}`
-  if (lage.modell === 'hofpreis') return rechenbeispielHofpreis(waren, provision, lage, jetzt, titel)
+  // Im Hofpreis-Modell gibt es keine Provision (N38, Ergänzung E-023, Nr. 286) — wie /api/checkout.
+  if (lage.modell === 'hofpreis') return rechenbeispielHofpreis(waren, lage, jetzt, titel)
+  const provision = decimalZuCents(calcPlatformFeeAmount(new Decimal(waren).div(100), hof.platformFeePercent))
 
   const online = berechneServicegebuehr(waren, hof, jetzt, 'ONLINE').gebuehrCents
   const bar = berechneServicegebuehr(waren, hof, jetzt, 'ONSITE_CASH').gebuehrCents
@@ -604,7 +606,6 @@ export const RECHENBEISPIEL_GEBUEHR_IM_PREIS = `${PLATTFORMGEBUEHR_BEZEICHNUNG} 
  */
 function rechenbeispielHofpreis(
   waren: number,
-  provision: number,
   lage: Extract<GebuehrLage, { modell: 'hofpreis' }>,
   jetzt: Date,
   titel: string
@@ -615,18 +616,18 @@ function rechenbeispielHofpreis(
     { label: 'Warenpreis', betrag: euro(waren) },
     gebuehrZeile,
     { label: 'Kunde zahlt', betrag: euro(gesamtCents), summe: true },
+    // Ohne Provision (E-023): dem Hof fließt der volle Warenpreis zu.
+    { label: 'Deine Auszahlung', betrag: euro(waren), summe: true },
   ]
-  if (provision > 0) onlineZeilen.push({ label: 'Provision', betrag: `− ${euro(provision)}` })
-  onlineZeilen.push({ label: 'Deine Auszahlung', betrag: euro(waren - provision), summe: true })
   const einzug = einzugFuer(lage, 'ONSITE_CASH', jetzt)
   return {
     titel,
     satz: `${PLATTFORMGEBUEHR_BEZEICHNUNG} ${satzText(lage.hundertstel)} % je Stück, aufgerundet – steckt im Preis, den die Kundin zahlt`,
-    mitProvision: provision > 0,
+    mitProvision: false,
     online: {
       titel: 'Online bezahlt',
       zeilen: onlineZeilen,
-      satz: provision > 0 ? ONLINE_GEBUEHR_MIT_PROVISION_SATZ : ONLINE_GEBUEHR_ABGETRENNT_SATZ,
+      satz: ONLINE_GEBUEHR_ABGETRENNT_SATZ,
     },
     bar: {
       titel: 'Bar bei Abholung',

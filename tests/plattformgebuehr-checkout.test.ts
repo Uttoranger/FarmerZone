@@ -31,6 +31,8 @@ vi.mock('@/server/abholfenster', async (original) => ({
 }))
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    // Nr. 287: Vorrat und Bestellung in einer Transaktion (imAbholfenster) — der Rückruf bekommt dieselbe Attrappe.
+    $transaction: vi.fn(async (f: (tx: unknown) => unknown) => f((await import('@/lib/prisma')).prisma)),
     plattformEinstellung: { findUnique: vi.fn() },
     // Die Platzvergabe der Gründungshöfe (ladeHoefeFuerGruendung) — nur im Hofpreis-Modell ohne Farm.einzugAb gelesen.
     farm: { findUnique: vi.fn(), findMany: vi.fn() },
@@ -250,6 +252,49 @@ describe('Hofpreis-Modell: derselbe Korb kostet online und bar dasselbe', () => 
     // 1,01 € × 6 % = 6,06 Cent → 7 Cent je Stück; 10 Stück = 70 Cent (nicht 61 auf die Summe).
     expect(createData()).toEqual(expect.objectContaining({ serviceFeeCents: 70 }))
     expect(intentParams()).toEqual(expect.objectContaining({ amount: 1080, application_fee_amount: 70 }))
+  })
+})
+
+describe('Provision im Hofpreis-Modell immer 0 (Register N38, Ergänzung E-023, Nr. 286)', () => {
+  /** Ein Hof mit Provision (Farm.platformFeePercent) — kein Code schreibt sie, die Spalte bleibt bis zum Contract. */
+  const mitProvision = (prozent: string) => ({ ...HOF, platformFeePercent: { toString: () => prozent } })
+
+  it('online, Hof mit 5 %: gespeichert 0, application_fee = nur die Plattformgebühr, amount = Ware + Gebühr', async () => {
+    farmFindUnique.mockResolvedValue(mitProvision('5') as never)
+    const res = await POST(anfrage())
+    expect(res.status).toBe(200)
+    expect(createData()).toEqual(expect.objectContaining({ totalAmount: 12, platformFeeAmount: 0, serviceFeeCents: 72, gebuehrModell: 'hofpreis' }))
+    expect(intentParams()).toEqual(expect.objectContaining({ amount: 1272, application_fee_amount: 72, on_behalf_of: 'acct_hof' }))
+    // Dem Hof bleibt der volle Warenpreis — nichts geht als Provision ab.
+    const p = intentParams() as { amount: number; application_fee_amount: number }
+    expect(p.amount - p.application_fee_amount).toBe(1200)
+  })
+
+  it('Gegenprobe Hof mit 0 %: dasselbe Ergebnis', async () => {
+    farmFindUnique.mockResolvedValue(mitProvision('0') as never)
+    const res = await POST(anfrage())
+    expect(res.status).toBe(200)
+    expect(createData()).toEqual(expect.objectContaining({ totalAmount: 12, platformFeeAmount: 0, serviceFeeCents: 72 }))
+    expect(intentParams()).toEqual(expect.objectContaining({ amount: 1272, application_fee_amount: 72 }))
+  })
+
+  it('bar mit Mandat, Hof mit 5 %: gespeichert 0 — die Monatsabrechnung kennt nur die Plattformgebühr', async () => {
+    farmFindUnique.mockResolvedValue({ ...mitProvision('5'), sepaMandatAm: new Date('2026-10-10T00:00:00.000Z') } as never)
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+    expect(res.status).toBe(200)
+    expect(createData()).toEqual(expect.objectContaining({ platformFeeAmount: 0, serviceFeeCents: 72, gebuehrEinzug: 'sepa' }))
+    expect(paymentIntentCreate).not.toHaveBeenCalled()
+  })
+
+  it('Modell bisher, Hof mit 5 %: wie heute — die Provision steht im Snapshot und in application_fee', async () => {
+    stichtag(new Date('2099-01-01T00:00:00.000Z'))
+    farmFindUnique.mockResolvedValue(mitProvision('5') as never)
+    const res = await POST(anfrage())
+    expect(res.status).toBe(200)
+    // 12 € × 5 % = 0,60 € Provision; Servicegebühr 12 € × 4,9 % = 59 Cent (E4).
+    expect(createData()).toEqual(expect.objectContaining({ totalAmount: 12, platformFeeAmount: 0.6, serviceFeeCents: 59, gebuehrModell: null }))
+    expect(intentParams()).toEqual(expect.objectContaining({ amount: 1259, application_fee_amount: 119 }))
+    expect(intentParams()).not.toHaveProperty('on_behalf_of')
   })
 })
 

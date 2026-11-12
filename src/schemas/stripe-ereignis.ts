@@ -47,8 +47,22 @@ const erstattungSchema = z.object({
 /** invoice.paid, invoice.payment_failed — Monatsabrechnung (N38). */
 const rechnungSchema = z.object({ id: kennungSchema, attempt_count: z.number().int().nonnegative().nullish() })
 
-/** charge.dispute.created — die Zahlung führt zur Rechnung. */
-const rueckbuchungSchema = z.object({ id: kennungSchema, payment_intent: verweisSchema.nullable() })
+/**
+ * charge.dispute.created, charge.dispute.closed — die Zahlung führt zur
+ * Rechnung oder zur Bestellung. Betrag, Stand und Antwortfrist braucht nur
+ * die Rückbuchung einer Kundenzahlung (Nr. 289, E-022); alle drei nullish,
+ * damit ein SEPA-Streitfall nur mit Kennung und Zahlung gültig bleibt.
+ */
+const rueckbuchungSchema = z.object({
+  id: kennungSchema,
+  payment_intent: verweisSchema.nullable(),
+  amount: centSchema.nullish(),
+  status: z.string().max(50).nullish(),
+  evidence_details: z.object({ due_by: z.number().int().nullish() }).nullish(),
+})
+
+/** Ein Streitfall, wie die Behandlung ihn liest (Nr. 289) — `Stripe.Dispute` passt hinein. */
+export type StripeStreitfall = z.infer<typeof rueckbuchungSchema>
 
 /** setup_intent.succeeded — Lastschrift-Mandat des Hofs. */
 const einrichtungSchema = z.object({
@@ -63,8 +77,8 @@ const einrichtungSchema = z.object({
 const mandatSchema = z.object({ id: kennungSchema, status: z.string().max(50), payment_method: verweisSchema })
 
 /**
- * Die verarbeiteten Typen (Liste aus Nachtlauf 26 plus `account.updated` und
- * `capability.updated`) und ihr Schema für `event.data.object`. Ein Typ, der
+ * Die verarbeiteten Typen (Liste aus Nachtlauf 26 plus `account.updated`,
+ * `capability.updated` und `charge.dispute.closed`) und ihr Schema für `event.data.object`. Ein Typ, der
  * hier fehlt, wird nicht verarbeitet — wie bisher, 200 ohne Wirkung.
  * `capability.updated` zählt nur mit `event.account` (Connect-Endpunkt);
  * ohne gilt es wie ein fremder Typ (Route).
@@ -80,6 +94,7 @@ export const STRIPE_EREIGNIS_SCHEMAS = {
   'invoice.paid': rechnungSchema,
   'invoice.payment_failed': rechnungSchema,
   'charge.dispute.created': rueckbuchungSchema,
+  'charge.dispute.closed': rueckbuchungSchema,
   'setup_intent.succeeded': einrichtungSchema,
   'mandate.updated': mandatSchema,
 } as const

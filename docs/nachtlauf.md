@@ -363,6 +363,45 @@ Zusätzlich zu allen Regeln aus `CLAUDE.md`:
 | 281 | Admin: messbare Mängel und Schrift-Wache (Abschnitt C, nach 263, 265 und 270) | `freigabe.md` §37 | N46 |
 | 262b | Werkzeug-Nacharbeit: Leistungstests in einem eigenen Lauf ohne Parallelität, Messung zählt offene `role="dialog"`-Blätter als „Dialog offen“ (Regelvorschläge 1 und 2 aus dem Zwischen-Morgenbericht 33 A) | `freigabe.md` §37, Zwischen-Morgenbericht 33 A (freigegeben 9.11.2026) | – |
 | Sammel 33 | Sammel-PR `integration/lauf33` (Entwurf an den Haltepunkten A und B, am Ende „bereit“), danach Schluss-Durchgang | `freigabe.md` §37 | G3, G10 |
+| 283 | Doku: Freigabe §38, Register (F027 und Lauf 34), Warteschlange, Zeitbuch, Ergänzungsliste (nur Doku; von `main`) | `freigabe.md` §38 (Abschnitt A) | N50, E-021, E-022, E-023 |
+| 284 | Sicherheits-Updates: @sentry/nextjs, better-auth mit Passkey-Plugin, zod, nanoid | `freigabe.md` §38 (Abschnitt A) | G6 |
+| 285 | Emoji-Wache unabhängig von der Unicode-Fassung | `freigabe.md` §38 (Abschnitt B) | – |
+| 286 | Hofpreis-Modell ohne Provision, Servicegebühr ab Stichtag gesperrt (E-023) | `freigabe.md` §38 (Abschnitt A) | N38, E-023 |
+| 287 | Kasse: Vorrat und Bestellung in einer Transaktion, Abgleich des Gesamtbetrags, Bremse für Bar-Bestellungen | `freigabe.md` §38 (Abschnitt A) | Startsatz |
+| 288 | Titel in `freigabe.md` §38.1 | `freigabe.md` §38 (Abschnitt B) | – |
+| 289 | Rückbuchung einer Kundenzahlung sichtbar machen | `freigabe.md` §38 (Abschnitt A) | N38, E-022 |
+| 290 | Titel in `freigabe.md` §38.1 | `freigabe.md` §38 (Abschnitt B) | N38, Startsatz |
+| 291 | Kleinbetrag in der Monatsabrechnung (nach bestandener Stripe-Probe) | `freigabe.md` §38 (Abschnitt D) | N38, E-021, Startsatz |
+| 292a | Titel in `freigabe.md` §38.4 | `freigabe.md` §38 (Abschnitt E) | – |
+| 292b | Monatsabrechnung erst ab dem Live-Tag, Mandat bei unbekanntem Stripe-Kunden zurücksetzen | `freigabe.md` §38 (Abschnitt E) | Startsatz |
+| 292c | Auslöser der Monatsabrechnung in der Testumgebung | `freigabe.md` §38 (Abschnitt D) | Startsatz |
+| 293 | Bestellung zeigt auf ihre Monatsabrechnung (Migration) | `freigabe.md` §38 (Abschnitt F) | Startsatz |
+| 294a | Titel in `freigabe.md` §38.1 | `freigabe.md` §38 (Abschnitt B) | – |
+| 294b | Titel in `freigabe.md` §38.1 | `freigabe.md` §38 (Abschnitt B) | Startsatz |
+| 295 | Titel in `freigabe.md` §38.3 | `freigabe.md` §38 (Abschnitt D) | – |
+| 296 | Bar-Bestätigung: Hilfesatz und Erinnerungsmail | `freigabe.md` §38 (Abschnitt E) | Startsatz |
+| 297 | Nicht abgeholt | `freigabe.md` §38 (Abschnitt E) | Startsatz |
+| 298 | Titel in `freigabe.md` §38.5 | `freigabe.md` §38 (Abschnitt F) | Startsatz |
+| 299 | Titel in `freigabe.md` §38.5 | `freigabe.md` §38 (Abschnitt F) | – |
+| 300 | Titel in `freigabe.md` §38.3 | `freigabe.md` §38 (Abschnitt D) | – |
+| 301 | Titel in `freigabe.md` §38.6 | `freigabe.md` §38 (Abschnitt G) | Startsatz |
+| 302 | Handbuch | `freigabe.md` §38 (Abschnitt D) | – |
+| 303 | Titel in `freigabe.md` §38.2 | `freigabe.md` §38 (Abschnitt C) | Startsatz |
+| 304 | Titel in `freigabe.md` §38.2 | `freigabe.md` §38 (Abschnitt C) | Startsatz |
+| 304a | Zwei Abweichungen von N32 und N33 schließen | `freigabe.md` §38 (Abschnitt C) | N32, N33 |
+| 304b | Tägliche Mail „Braucht dich“ | `freigabe.md` §38 (Abschnitt G) | Startsatz |
+| 305 | Titel in `freigabe.md` §38.5 | `freigabe.md` §38 (Abschnitt F) | Startsatz |
+| 306 | Titel in `freigabe.md` §38.2 | `freigabe.md` §38 (Abschnitt C) | – |
+| 307 | Titel in `freigabe.md` §38.6 | `freigabe.md` §38 (Abschnitt G) | – |
+| 308 | Titel in `freigabe.md` §38.2 | `freigabe.md` §38 (Abschnitt C) | – |
+| 309 | Kaufknopf ohne Betrag | `freigabe.md` §38 (Abschnitt B) | N2, N10, Startsatz |
+| Sammel 34 A | Sammel-PR `integration/lauf34` (Entwurf bis „bereit“ am Haltepunkt A) | `freigabe.md` §38 (Abschnitt A) | G10 |
+| Sammel 34 B | Sammel-PR `integration/lauf34b` (Entwurf bis „bereit“ am Haltepunkt B) | `freigabe.md` §38 (Abschnitt B) | G10 |
+| Sammel 34 C | Sammel-PR `integration/lauf34c` (Entwurf bis „bereit“ am Haltepunkt C) | `freigabe.md` §38 (Abschnitt C) | G10 |
+| Sammel 34 D | Sammel-PR `integration/lauf34d` (Entwurf bis „bereit“ am Haltepunkt D) | `freigabe.md` §38 (Abschnitt D) | G10 |
+| Sammel 34 E | Sammel-PR `integration/lauf34e` (Entwurf bis „bereit“ am Haltepunkt E) | `freigabe.md` §38 (Abschnitt E) | G10 |
+| Sammel 34 F | Sammel-PR `integration/lauf34f` (Entwurf bis „bereit“ am Haltepunkt F) | `freigabe.md` §38 (Abschnitt F) | G10 |
+| Sammel 34 G | Sammel-PR `integration/lauf34g` (Entwurf bis „bereit“ am Haltepunkt G) | `freigabe.md` §38 (Abschnitt G) | G10 |
 
 **17a–17d** sind Aufträge außerhalb der Gates; ihr genauer Umfang steht in `docs/nachtlauf/freigabe.md` §8. **19c, 19a, 19b** und die Aufteilung von Gate 8 in **22a–22f** stehen in §9.
 
@@ -516,6 +555,8 @@ Genau eine Migration (188, nur Expand), kein neues Paket, keine neue Variable. P
 **Reihenfolge in Lauf 32** (`freigabe.md` §36, zwei Abschnitte mit Haltepunkt A): Abschnitt A: Doku-PR (243a, von `main`) → Welle 1: 243 ∥ 244 (von `docs/lauf32`), 259 von `docs/lauf32` auf dem ersten frei werdenden Platz → Welle 2: 245 vom Zwischenstand `integration/lauf32` → Welle 3: 247, 248, 246 (erst nach 259), 256 (nach 259), 258 → Welle 4a: 249, nur wenn es bis Stunde 11 beginnen kann → Haltepunkt A: Zwischenstand `integration/lauf32` mit allen fertigen Nummern, Zwischen-Durchgang, Aufräumen, Zwischen-Morgenbericht, Sammel-PR als Entwurf, danach endet die Sitzung. Abschnitt B startet nur mit „Nachtlauf 32 fortsetzen“: 252 ∥ 253, 250, 257, 251, 255, 254, 258b, Sammel-PR, Schluss-Durchgang. Rangfolge: 243a → 243 → 244 → 259 → 245 → 247 → 246 → 248 → 256 → 258 → 249 ‖ HALTEPUNKT A ‖ 252 → 253 → 250 → 257 → 251 → 255 → 254 → 258b → Sammel-PR → Schluss-Durchgang. Höchstens zwei Umsetzer gleichzeitig. Keine Migration, kein neues Paket, keine neue Variable. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §36).
 
 **Reihenfolge in Lauf 33** (`freigabe.md` §37, drei Abschnitte mit Haltepunkten A und B): Abschnitt A: Doku-PR (261, von `main`) → Welle 1: 262 ∥ 264 (von `docs/lauf33`) → danach auf jedem frei werdenden Platz die nächste startbare Nummer vom Zwischenstand `integration/lauf33`. Rangfolge A: 261 → 262 → 264 → 263 → 265 → 266 → 267 → 269 → 270 → 268 ‖ HALTEPUNKT A. Startbedingungen: 265 nach 263 und 264; 268 nach 263 und 269; 269 nach 264; 270 nach 263 und 264; übrige nach 261. Haltepunkt A: Zwischenstand `integration/lauf33` mit allen fertigen Nummern, Zwischen-Durchgang, Aufräumen, Zwischen-Morgenbericht, Sammel-PR als Entwurf, danach endet die Sitzung. Abschnitt B startet nur mit „Nachtlauf 33 fortsetzen“: (am Haltepunkt A gesicherte und verschobene Nummern zuerst) 271 → 272 → 274 → 273 → 275 → 276 → 279 ‖ HALTEPUNKT B; Startbedingungen: 276 nach 271, 279 nach 275. Haltepunkt B wie Haltepunkt A, Sammel-PR als Entwurf. Abschnitt C startet nur mit „Nachtlauf 33 fortsetzen“: (gesicherte und verschobene Nummern zuerst) 277 → 278 → 280 → 281 → Sammel-PR → Schluss-Durchgang; Startbedingungen: 277 nach 274 und 275, 280 nach 274, 275, 278 und 279. Höchstens zwei Umsetzer gleichzeitig. Keine Migration, kein neues Paket, keine neue Variable. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §37).
+
+**Reihenfolge in Lauf 34** (`freigabe.md` §38, sieben Abschnitte A–G mit Haltepunkt nach jedem Abschnitt): Abschnitt A (vor dem Live-Schlüssel, Integrationszweig `integration/lauf34`): Doku-PR (283, von `main`, Branch `docs/lauf34`) → Platz 1: 286 → 287 · Platz 2: 284 → 289 (alle vom Zwischenstand `integration/lauf34`, 286 und 284 von `docs/lauf34`). Rangfolge A: 283 → 286 → 284 → 287 → 289 ‖ HALTEPUNKT A. Startbedingungen: 286 und 284 nach 283; 287 nach 286 (beide ändern `src/app/api/checkout/route.ts`); 289 nach 283, auf Platz 2 nach 284; 287 wartet nicht auf 284, holt aber vor dem Push den Zwischenstand mit 284 und lässt `pnpm test:integration` ganz laufen. 309 läuft in Abschnitt B. Abschnitt B (Geldpfad, Wachen, Rücklastschrift, Kaufknopf; `integration/lauf34b`): Platz 1: 290 → 309 · Platz 2: 285 → 288 → 294b → 294a (309, 294b und 294a nehmen in dieser Reihenfolge den Platz, der zuerst frei wird; 294a startet erst nach 285). Abschnitt C (Admin im Regelbetrieb; `integration/lauf34c`): Platz 1: 303 → 304 · Platz 2: 304a → 306 → 308. Abschnitt D (Handbuch, Monatsabrechnung härten Teil 1, Hof-Alltag; `integration/lauf34d`): Platz 1: 291 → 292c · Platz 2: 302 → 295 → 300. Abschnitt E (Monatsabrechnung härten Teil 2, Bar-Bestätigung, Nicht abgeholt; `integration/lauf34e`): Platz 1: 292a → 292b · Platz 2: 296 → 297. Abschnitt F (Abrechnung und Bestellung verknüpfen, Hof einrichten, CSV, Tempo; `integration/lauf34f`): Platz 1: 293 → 298 · Platz 2: 299 → 305. Abschnitt G (Rest; `integration/lauf34g`): Platz 1: 307 · Platz 2: 301 → 304b (304b nur mit Startsatz und nur, wenn Zeit). Haltepunkt nach jedem Abschnitt: Zwischenstand des Abschnitts mit allen fertigen Nummern, Zwischen-Durchgang, Aufräumen, Zwischen-Morgenbericht, Sammel-PR als Entwurf bzw. „bereit“, danach endet die Sitzung; nach Stunde 7 eines Abschnitts beginnt keine neue Nummer, der Sammel-PR beginnt spätestens bei Stunde 9,5, der Haltepunkt ist spätestens 11,5 h nach dem Start erreicht. Abschnitt A startet mit der Startnachricht „Nachtlauf 34 starten“; die Abschnitte B bis G starten nur mit „Nachtlauf 34 fortsetzen“ in einer neuen Sitzung, mit den Startsätzen des Abschnitts als eigene Zeilen. Was hinter einem Startsatz steht, wird nur mit diesem Satz gebaut. Höchstens zwei Umsetzer gleichzeitig. Migrationen: nur 293 und, nur mit Startsatz, 296. Pakete: nur 284. Keine neue Variable. Nie zwei Nummern an derselben Datei außerhalb der Grenzen (`freigabe.md` §38). Branches `nacht/2026-11-11/<nr>-<kurz>`; Sammel-PRs je Abschnitt per Merge-Commit, nicht Squash.
 
 **06b – Reservierte Slugs vollständig:** `RESERVED_SLUGS` in `src/lib/slug.ts` um alle Ordner aus `KEINE_HOFSEITE` (`next.config.ts`) ergänzen (u. a. `teilen`, `verify`, `konditionen`, `meldungen`, `fehler-melden`, `problem-melden`, `farm-page`, `forgot-password`, `reset-password`, `intern`), plus Test, der beide Listen gegeneinander prüft. Braucht keine Freigabe. In Produktion ist keiner dieser Slugs belegt (geprüft am 05.10.2026).
 
