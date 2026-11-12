@@ -349,7 +349,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 292c | Auslöser der Monatsabrechnung in der Testumgebung | offen | – | – | vom Zwischenstand `integration/lauf34d` | – | 11.11.2026 |
 | 293 | Bestellung zeigt auf ihre Monatsabrechnung (Migration) | offen | – | – | vom Zwischenstand `integration/lauf34f` | – | 11.11.2026 |
 | 294a | Titel in `freigabe.md` §38.1 | offen | – | – | vom Zwischenstand `integration/lauf34b` | – | 11.11.2026 |
-| 294b | Titel in `freigabe.md` §38.1 | offen | – | – | vom Zwischenstand `integration/lauf34b` | – | 11.11.2026 |
+| 294b | Sicherheit, kleine Punkte: Bild-Abruf nur vom eigenen Speicher (Teil A) | läuft (B) | `nacht/2026-11-11/294b-bild-abruf` | – | vom Zwischenstand `integration/lauf34b` (8e186f4db1e1) | Teil B nicht gebaut – Startsatz fehlt | 12.11.2026 |
 | 295 | Titel in `freigabe.md` §38.3 | offen | – | – | vom Zwischenstand `integration/lauf34d` | – | 11.11.2026 |
 | 296 | Bar-Bestätigung: Hilfesatz und Erinnerungsmail | offen | – | – | vom Zwischenstand `integration/lauf34e` | – | 11.11.2026 |
 | 297 | Nicht abgeholt | offen | – | – | vom Zwischenstand `integration/lauf34e` | – | 11.11.2026 |
