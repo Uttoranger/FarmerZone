@@ -67,3 +67,29 @@ Zeitbudget (Wanduhr ab Start, a013-lauf34-a.md „Plan“): Vorprüfung 0–0,25
 - 22:20 Sammel-PR #536 (integration/lauf34 → main) auf „bereit“ geöffnet (Kopf 2388f9fc). Aufräumen bestätigt: keine Prüf-Server, kein Prüf- oder Passkey-Browser, kein dev-Worktree, Port 3000 frei; Integrations-DBs fz_int_* (neun) gelöscht, keine Prüf-DB und keine Kopie mehr; keine pruef-env, pruef-links.json, admin-passkey.json in den Worktrees; .next und .env.test in den Worktrees gelöscht. Bilder unter .nachtlauf/screens/ bleiben.
 - Zwischen-Morgenbericht docs/nachtlauf/morgenbericht-2026-11-11-lauf34-a.md, status.md (283, 284, 286, 287, 289 fertig; Sammel 34 A fertig, PR bereit).
 - **Haltepunkt A erreicht** 22:21 UTC (Stunde 3,7 nach dem Start). Keine WIP-Stände, keine verschobenen Nummern. Danach endet die Sitzung; Abschnitt B startet nur mit „Nachtlauf 34 fortsetzen“ in einer neuen Sitzung.
+
+## Abschnitt B (12.11.2026)
+
+Start Abschnitt B: 12.11.2026 20:32 UTC (aus `date -u`, erster Befehl nach dem Lesen des Auftrags) auf die Startnachricht der Projektleitung vom 12.11.2026 („Nachtlauf 34 fortsetzen“), von der Schaltzentrale wörtlich weitergegeben. Neue Sitzung, neuer Container. Rechner: 4 Kerne, 15 GB. Node v22.23.4 (`node --version`), Unicode 17.0 (`node -p process.versions.unicode`). Branches weiter `nacht/2026-11-11/<nr>-<kurz>`.
+
+Integrationszweig: `integration/lauf34b` von main f3c2a22b6b66 (Rahmen §1 3.2, erster Fall): Der Sammel-PR von A (#536) ist per Merge-Commit gemergt (f3c2a22b6b66 hat zwei Eltern, d88ace724726 und 000a7d9a1353; `git merge-base --is-ancestor f3c2a22b6b66 origin/main`). Der Zweig integration/lauf34 ist auf GitHub gelöscht.
+
+Zeitbudget (Wanduhr ab Start, a013-lauf34-b.md „Plan“): Vorprüfung und Doku-Schritt 0–0,25 h · Platz 1: 290 0,25–5,75 h (ohne Schritt 3a, Tor T4) → 309 bis 7,75 h · Platz 2: 285 0,25–2,25 h → 288 2,25–6,25 h → 294b (nur Teil A, 1,0 h) → 294a (1,25 h). Keine neue Nummer nach Stunde 7 (03:32 UTC; Nummern mit höchstens 1,5 h nach Stunde 8, 04:32 UTC); Sammel-PR spätestens ab Stunde 9,5 (06:02 UTC); Haltepunkt spätestens 11,5 h nach dem Start (08:02 UTC). Abbruchregel: Rahmen §5 5.2.
+
+- Startsätze von Abschnitt B (§0a 1.3), Startnachricht: Zeile 1 „Nachtlauf 34 fortsetzen“, Zeile 2 „Auftrag: …“ (kein Startsatz), Zeilen 3 bis 5 je eine eigene Zeile außerhalb jedes Codeblocks und außerhalb des Auftragstexts:
+  - „Konditionen-Satz Kleinbetrag vor Tag T freigegeben“ – **ja** (Zeile 3) → 290 Schritt 9 wird gebaut.
+  - „Sperre nach Rückbuchung auch per E-Mail freigegeben“ – **ja** (Zeile 4) → 290 Schritt 3a; es greift aber Tor T4 (siehe 1.9), Schritt 3a entfällt.
+  - „Kaufknopf ohne Betrag freigegeben“ – **ja** (Zeile 5) → 309 wird gebaut.
+  - „Secrets je Umgebung getrennt“ – **nein** (fehlt in der Startnachricht) → 294b Teil B entfällt.
+
+## Dirigent (Abschnitt B)
+
+- 20:32 §0a 1.5: agent-browser 0.39.1, Bild einer lokalen Seite gelungen (.nachtlauf/screens/0a-b/probe.png).
+- 20:32 §0a 1.1: origin/main = f3c2a22b6b66 (Merge #536, Merge-Commit). Rahmen und alle sieben Abschnittsdateien liegen auf main. Seit dem Haltepunkt A ist nur der Merge von #536 dazugekommen.
+- 20:33 §0a 1.4: keine offenen PRs (`list_pull_requests` open: leer; statt `gh pr list` über die GitHub-Schnittstelle der Sitzung). status.md: keine Zeile „läuft“ oder „in Prüfung“ außerhalb von Lauf 34.
+- 20:34 §0a 1.6: Postgres 16 im Container gestartet (localhost:5432), dem Benutzer postgres ein lokales Passwort gesetzt (nur im Container, unter .nachtlauf/dirigent/); `.env.test` je Worktree mit TEST_DATABASE_URL auf localhost.
+- §0a 1.8: kein `sk_live_`/`rk_live_` in der Umgebung (nur das Präfix gezählt: 0).
+- §0a 1.9 Anker gegen origin/main f3c2a22b6b66 (`git grep -c -F`): „Erwartet im Stand“ aus A vollständig (E-023 im Register, `pruefen:audit` und better-auth ^1.7.7, `SERVICEGEBUEHR_AB_STICHTAG_GESPERRT`, `VorratReichtNicht`, `zaehleUnbestaetigteBar`, `serverBetrag`, 'kundenstreit', `charge.dispute.closed`). Alle Anker von 290, 309, 288, 285, 294b und 294a stehen je genau einmal (bzw. wie erwartet dreimal: „stand: { in: ['offen', 'gescheitert', 'entwurf'] }“); Zeilen verschoben (checkout/route.ts :907 und :1063, webhook/route.ts :162 und :176), Anker gleich. Tore aus den Ankern: **290 T3 greift nicht** – `src/app/(public)/datenschutz/page.tsx` enthält seit A006b (#529) den Satzanfang „Bucht deine Bank eine Lastschrift zurück“ (Z. 604) → der Datenschutz-Satz aus Schritt 8 wird gebaut. **290 T4 greift** – `src/emails/postfach-antwort.tsx` enthält `antwortenInDerApp` und „Entschieden“ trägt weiter den Satz mit „antworte auf diese Mail“ → Schritt 3a entfällt trotz Startsatz. 290 T2 greift nicht (kein `'geklaert'`, kein `nachforderung` unter src/). 294b T1, T2 greifen nicht. 294a T1 greift nicht. 285 T3 greift nicht (☐ steht noch), T4 greift nicht (`pruefen:audit` vorhanden). 309 T2 greift nicht (beide Knöpfe tragen den Betrag), T4 greift nicht (287 ist auf main).
+- Worktrees unter /home/user/wt/<nr>, Integrations-DB je Nummer fz_int_<nr> auf localhost:5432; Sperren (schwer.lock, integration.lock) und laeufe/ unter .nachtlauf/dirigent/ im Haupt-Klon.
+- Doku-Schritt 3.3: a013-lauf34-b.md als „### 38.1 Abschnitt B“ an §38 angehängt (Leerzeile, Überschrift, Leerzeile, Datei); `diff` des eingefügten Texts gegen die Datei leer.
+- 20:33–20:39 §0a 1.7 Grundlauf auf main f3c2a22b6b66 (n=1, 3 Worker, unter schwer.lock): `pnpm install --frozen-lockfile` und `prisma generate` grün, Typecheck grün, Lint 0 Fehler (2 Warnungen), 758 Dateien, 14089 Tests grün, Doku-Wachen 3 Dateien, 49 Tests grün (389 s). Keine Ausnahme nach §0a 1.7 nötig (Unicode 17.0). §0a bestanden.

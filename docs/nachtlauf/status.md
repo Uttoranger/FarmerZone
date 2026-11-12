@@ -368,7 +368,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 308 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
 | 309 | Kaufknopf ohne Betrag | offen | – | – | vom Zwischenstand `integration/lauf34b` | – | 11.11.2026 |
 | Sammel 34 A | Sammel-PR `integration/lauf34` (283, 286, 284, 287, 289) | fertig, PR bereit | `integration/lauf34` | #536 | main | per --no-ff 286, 284, 287, 289 auf 283; voller Lauf 758 Dateien, 14089 Tests; Integration 106 Dateien, 851 Tests; keine Migration; Zwischen-Morgenbericht `morgenbericht-2026-11-11-lauf34-a.md` | 11.11.2026 |
-| Sammel 34 B | Sammel-PR `integration/lauf34b` (Entwurf bis „bereit“ am Haltepunkt B) | offen | – | – | main bzw. voriger Integrationszweig (Rahmen §1 3.2) | – | 11.11.2026 |
+| Sammel 34 B | Sammel-PR `integration/lauf34b` (Entwurf bis „bereit“ am Haltepunkt B) | läuft (Abschnitt B) | `integration/lauf34b` | – | main (f3c2a22b6b66, nach Merge von #536) | – | 12.11.2026 |
 | Sammel 34 C | Sammel-PR `integration/lauf34c` (Entwurf bis „bereit“ am Haltepunkt C) | offen | – | – | main bzw. voriger Integrationszweig (Rahmen §1 3.2) | – | 11.11.2026 |
 | Sammel 34 D | Sammel-PR `integration/lauf34d` (Entwurf bis „bereit“ am Haltepunkt D) | offen | – | – | main bzw. voriger Integrationszweig (Rahmen §1 3.2) | – | 11.11.2026 |
 | Sammel 34 E | Sammel-PR `integration/lauf34e` (Entwurf bis „bereit“ am Haltepunkt E) | offen | – | – | main bzw. voriger Integrationszweig (Rahmen §1 3.2) | – | 11.11.2026 |
