@@ -29,8 +29,10 @@ jobs:
     env:
       # Dummy-Werte, keine echten Secrets: `next build` importiert Module, die
       # Stripe/Prisma/Auth beim Laden instanziieren und dafür gesetzte
-      # ENV-Variablen erwarten. Es wird keine echte Verbindung aufgebaut —
-      # DB-Zugriffe passieren erst zur Laufzeit (alle Seiten sind dynamisch).
+      # ENV-Variablen erwarten. `next build` baut einige Seiten statisch und
+      # liest dafür aus der Datenbank (Startseite, Höfe-Liste, Sitemap, AGB).
+      # Ohne erreichbare Datenbank fängt der Code das ab und der Build bleibt
+      # grün; diese Seiten tragen dann Rückfall-Inhalt.
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci-dummy
       DIRECT_URL: postgresql://ci:ci@localhost:5432/ci-dummy
       BETTER_AUTH_SECRET: ci-dummy-secret-0123456789abcdefghijklmnop
@@ -49,7 +51,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Dieselbe Fassung wie lokal und bei Vercel (Nr. 285; erlaubt: engines in package.json).
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -59,16 +62,12 @@ jobs:
         run: pnpm exec prisma generate
 
       - name: Lint
-        # 19 vorbestehende Lint-Fehler in UI-Komponenten (Stand Sprint 15) —
-        # bewusst nicht-blockierend, das Aufräumen ist ein eigener Folge-Sprint.
-        # Sobald `pnpm lint` lokal grün ist: continue-on-error entfernen!
-        continue-on-error: true
         run: pnpm lint
 
       - name: Illustrationen prüfen
-        # Eigener Schritt statt Teil des Lints: Der Lint ist nicht blockierend,
-        # diese Prüfung schon (WebP, 1024 × 1024, höchstens 80 KB, einfarbiger
-        # Rand — scripts/illustrationen.ts, Register I1).
+        # Eigener Schritt neben dem Lint: Er prüft Bilddateien, nicht Quelltext
+        # (WebP, 1024 × 1024, höchstens 80 KB, einfarbiger Rand —
+        # scripts/illustrationen.ts, Register I1).
         run: pnpm illustrationen
 
       - name: Typecheck
@@ -147,7 +146,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies

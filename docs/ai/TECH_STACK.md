@@ -24,7 +24,7 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 | `jsdom` | ^30.1.2 (Entwicklungspaket) | Nur für `tests/hydrieren.test.ts` (`// @vitest-environment jsdom`, TESTING_GUIDELINES §1). Verlangt Node ≥ 22.22.2 (`engines`); 30.1.3 ist noch keine 14 Tage alt und braucht ein `undici`, das es auch nicht ist. |
 | `yaml` | ^2.9.1 (Entwicklungspaket) | YAML-Parser der Wachen über `.github/workflows/` (`tests/yaml-lader.ts`, `parse`). Liest YAML 1.2: `on` bleibt der Text „on“. Ohne Abhängigkeiten; ersetzt den Umweg über das `js-yaml` von ESLint. |
 | `pnpm` | **10.33.0** | Exklusiv |
-| Node | **22** | CI-Version |
+| Node | **24** (`.nvmrc`) | Vercel baut mit 24.x (Einstellung des Projekts), die CI liest `.nvmrc` (beide Jobs in `ci.yml`, der Audit-Lauf). `engines` in package.json erlaubt `>=22.12.0 <25` — ein Rechner mit 22 bleibt arbeitsfähig; `tests/hydrieren.test.ts` braucht wegen jsdom 22.22.2 oder neuer. `pnpm typecheck` startet tsc über node mit 6144 MB Speicher (mit dem Standard-Speicher bricht tsc ab; die Form läuft auch unter Windows) (Nr. 285). |
 
 ### Versionsfallen — hier verrät sich veraltetes Trainingswissen
 
@@ -40,6 +40,8 @@ Stand: 2026-10. Bei Abweichung gilt `package.json`, nicht diese Datei — und da
 
 **pnpm-Einstellungen:** `overrides` und `allowBuilds` stehen in `pnpm-workspace.yaml`, **nicht** im Feld `"pnpm"` der `package.json` — das Feld ist abgekündigt. Ein neuer Sicherheits-Override kommt dorthin; danach muss er im Kopf von `pnpm-lock.yaml` unter `overrides:` stehen.
 - **Ziel eines neuen Overrides mit `^`, nicht mit `>=`:** pnpm ersetzt jede Anforderung, deren Bereich sich mit dem Wähler `paket@<x.y.z` überschneidet, durch das Ziel. Steht dort `>=`, nimmt pnpm die neueste Version — auch eine neue Hauptversion (unter 1.0: eine neue Nebenversion). `^x.y.z` hebt ältere Reihen genauso an und bleibt in der Reihe des Ziels. Verlauf: DEVELOPMENT, Sicherheitsupdate 20.10.2026. Ausnahmen mit `>=`: `sharp@<0.35.5: '>=0.35.5'` (neu, so beauftragt; greift derzeit nicht, weil next 16.4.2 selbst `^0.35.5` verlangt) und aus dem Bestand `hono@<4.12.25` und `ws@>=8.0.0 <8.21.0` — die Umstellung auf `^` kommt in einen eigenen Auftrag.
+
+**Sicherheitsmeldungen (seit Nr. 285):** `.github/workflows/audit.yml` ruft wöchentlich (montags 5:17 UTC) und von Hand `pnpm pruefen:audit` (`pnpm audit --prod --audit-level critical`). Nur Zeitplan und Handstart, nie als Schritt in `ci.yml` und nie bei einem PR: Eine neue Meldung machte sonst jeden offenen PR rot. Kein Secret, nur Leserechte, kein automatisches Update. Scheitert der Lauf, schickt GitHub die Mail; das Update selbst läuft nach den Regeln oben (Override, 14 Tage Mindestalter).
 
 **sharp 0.35:** ESM mit eigenen Typen. Den Typ als benannten Import holen (`import sharp, { type Sharp } from 'sharp'`), den Namensraum `sharp.Sharp` gibt es nicht mehr. `sharp.block`/`sharp.unblock` gelten für den ganzen Prozess; eine Attrappe in Tests braucht beide (`Object.assign(vi.fn(…), { block: vi.fn(), unblock: vi.fn() })`). `withGainMap()` ist da, fehlt aber in den Typen von 0.35.5.
 
