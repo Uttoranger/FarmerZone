@@ -16,6 +16,11 @@
  *  - Ausgenommen: ©, ® und ™ (Schriftzeichen, z. B. die Pflichtangabe
  *    „© OpenStreetMap") und Server-Logs (console.*), die niemand in der
  *    Oberfläche liest.
+ *  - Seit Nr. 285 kommen die Bildzeichen aus der festen Liste
+ *    `tests/bildzeichen-bereiche.ts` (sortiert, ohne Überlappung, mit ☐ U+2610),
+ *    nicht aus einer Unicode-Eigenschaft der Laufzeit: Mit Node auf Unicode 16
+ *    war die Wache rot, auf Unicode 17 grün. Die Gegenprobe findet ☐, 😀, ✅
+ *    und ✓ auf jeder Fassung, nicht →, €, −, ≥, ✦ und ©.
  *
  * Fremdtext — Produktnamen, Beiträge und Werte der Höfe — liegt in der
  * Datenbank, nicht im Quelltext, und bleibt unangetastet.
@@ -29,11 +34,21 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import ts from 'typescript'
+import { BILDZEICHEN_BEREICHE } from './bildzeichen-bereiche'
 
 const WURZEL = process.cwd()
 
-/** Bildzeichen nach Unicode, dazu Haken und Kreuze, die dort nicht mitzählen. */
-const BILDZEICHEN = /\p{Extended_Pictographic}|[✓✗]/gu
+/** Ein Codepunkt als Escape für eine Zeichenklasse mit Schalter `u`. */
+const alsEscape = (codepunkt: number): string => `\\u{${codepunkt.toString(16)}}`
+
+/**
+ * Bildzeichen nur aus der festen Liste (Nr. 285), dazu ☐, Haken und Kreuze. Nie aus einer Unicode-Eigenschaft
+ * der Laufzeit: Die änderte sich mit Unicode 17, und die Wache war je nach Rechner rot oder grün.
+ */
+const BILDZEICHEN = new RegExp(
+  `[${BILDZEICHEN_BEREICHE.map(([von, bis]) => (von === bis ? alsEscape(von) : `${alsEscape(von)}-${alsEscape(bis)}`)).join('')}]`,
+  'gu'
+)
 /** Schriftzeichen, die Unicode ebenfalls als Bildzeichen führt. */
 const SCHRIFTZEICHEN = new Set(['©', '®', '™'])
 
@@ -96,6 +111,41 @@ describe('keine Emojis', () => {
       'schnipsel.tsx:4 🌿',
       'schnipsel.tsx:5 ✓',
     ])
+  })
+
+  it('Gegenprobe (Nr. 285): findet ☐, 😀, ✅ und ✓ — nicht →, €, −, ≥, ✦ und ©, auf jeder Unicode-Fassung', () => {
+    const schnipsel = [
+      'const a = <span aria-hidden="true">☐ </span>',
+      "const b = '\u{1F600}'",
+      "const c = '✅ Erledigt'",
+      "const d = '✓'",
+      'const e = <p>Alle → € 5 − 1 ≥ 3 ✦ © OpenStreetMap</p>',
+    ].join('\n')
+    expect(findeEmojis(schnipsel)).toEqual([
+      'schnipsel.tsx:1 ☐',
+      'schnipsel.tsx:2 \u{1F600}',
+      'schnipsel.tsx:3 ✅',
+      'schnipsel.tsx:4 ✓',
+    ])
+  })
+
+  it('die feste Liste ist sortiert, ohne Überlappung und enthält ☐ (U+2610)', () => {
+    const befunde: string[] = []
+    BILDZEICHEN_BEREICHE.forEach(([von, bis], i) => {
+      if (!Number.isInteger(von) || !Number.isInteger(bis) || von > bis || von < 0 || bis > 0x10ffff) befunde.push(`Bereich ${i} ungültig`)
+      const vorher = BILDZEICHEN_BEREICHE[i - 1]
+      if (vorher && von <= vorher[1]) befunde.push(`Bereich ${i} überlappt oder steht vor Bereich ${i - 1}`)
+    })
+    expect(befunde).toEqual([])
+    expect(BILDZEICHEN_BEREICHE.some(([von, bis]) => von <= 0x2610 && 0x2610 <= bis)).toBe(true)
+  })
+
+  it('Gegenprobe: die Listenprüfung meldet einen unsortierten und einen überlappenden Bereich', () => {
+    const pruefe = (liste: ReadonlyArray<readonly [number, number]>): boolean =>
+      liste.every(([von, bis], i) => von <= bis && (i === 0 || von > liste[i - 1][1]))
+    expect(pruefe([[0x10, 0x20], [0x30, 0x40]])).toBe(true)
+    expect(pruefe([[0x30, 0x40], [0x10, 0x20]])).toBe(false)
+    expect(pruefe([[0x10, 0x30], [0x20, 0x40]])).toBe(false)
   })
 
   it('kein Emoji in Oberfläche, Mails, WhatsApp-Nachricht und Story-Grafik', () => {

@@ -1,0 +1,36 @@
+name: Sicherheitsmeldungen
+
+# Wöchentlicher Abgleich der Pakete gegen bekannte Sicherheitsmeldungen (Nr. 285):
+# `pnpm pruefen:audit` meldet kritische Lücken in den Paketen für Produktion.
+# Scheitert der Lauf, schickt GitHub die Mail an die Projektleitung (wie beim
+# Lebenszeichen).
+#
+# Nur Zeitplan (montags 5:17 UTC) und Handstart — bewusst kein PR-Auslöser und
+# kein Schritt in ci.yml: Eine neue Meldung würde sonst jeden offenen PR rot
+# machen, ohne dass der PR etwas dafür kann. Kein Secret, nur Leserechte, kein
+# automatisches Update. Nie pull_request_target (CLAUDE.md §2).
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version kommt aus dem "packageManager"-Feld der package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Sicherheitsmeldungen prüfen
+        run: pnpm pruefen:audit

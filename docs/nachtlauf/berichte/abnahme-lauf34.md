@@ -10,3 +10,9 @@ Abnahme nach Rahmen §4 (freigabe.md §38): Geld- und Sicherheitsnummern über T
 | A | 283, 284, 286, 289 | – | – | ohne Oberfläche (4.1): Tests, pruefer, Gegenlesen, Integration – siehe Berichte und PR-Texte | – |
 
 Bilder: `.nachtlauf/screens/287/r1/` im Container (nicht committet), je Bild Messung und axe als JSON, dazu ein Fokus-Belegbild.
+
+## Abschnitt B
+
+| Abschnitt | Nummer | Route | Fassung | Ergebnis | Rest |
+|---|---|---|---|---|---|
+| B | 285 | Packliste `/orders/today/print` (Hof Müller, Prüf-Seed, vier Bestellungen mit Abholtag heute) gegen Board w2-druck | 1440 hell (Stand 3fc459ab09b6) | gegen das Board bestanden: vor jeder Position das Lucide-Symbol `Square` (14 px, Strich 1,7, `aria-hidden`, Farbe aus dem Text-Token) statt „☐“, kein „☐“ mehr im Markup; einziger Unterschied: leicht gerundete Ecken des Symbols. Messpunkte: Schrift unter 12 px 0, Ziele unter 44 px 0 (der Fließtext-Link „Mehr erfahren“ im Cookie-Hinweis zählt getrennt), genau eine h1 („Packliste“), keine Felder, axe ohne serious und critical, Fokus sichtbar | vorbestehend, nicht 285: axe moderate „landmark-one-main“ und „region“ (Druckseite ohne `<main>`); „Gesamt inkl. Plattformgebühr.“ (Nr. 277), Positionszeile G14, Bildschirmleiste „Zurück“ und „Drucken“ nicht im Board; Aufnahme unter `next dev` |
