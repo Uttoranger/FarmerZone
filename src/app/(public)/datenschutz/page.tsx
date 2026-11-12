@@ -594,8 +594,8 @@ export default function DatenschutzPage() {
               Monatsrechnungen; du findest sie unter „Deine Konditionen“. Vor dem ersten Einzug bekommst du
               eine Nachricht im Postfach und eine E-Mail.
             </li>
-            {/* Der Satz zur Rückbuchung steht auf einer Zeile: Lauf 34 Nr. 290 sucht und ersetzt ihn
-                wörtlich (tests/datenschutz-struktur.test.ts). */}
+            {/* Der Satz zur Rückbuchung (Wortlaut von Recht, Lauf 34 Nr. 290) steht auf einer Zeile —
+                tests/datenschutz-struktur.test.ts sucht ihn dort. */}
             <li>
               <strong className={FETT}>Wenn der Einzug scheitert:</strong> Stripe versucht es erneut,
               und du bekommst eine Nachricht. Bleibt ein Betrag länger offen, als in deinen Konditionen

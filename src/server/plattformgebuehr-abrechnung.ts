@@ -587,11 +587,15 @@ async function setzeNachforderungBezahlt(abrechnungId: string, farmId: string, j
  *    `invoice.paid` (holt ein verlorenes Ereignis nach), Entwurf → mit ihm weiter;
  *  - Stripe-Schlüssel `abr-<farmId>-<yyyy-mm>-nachforderung`; gesendet wird nur
  *    in dem Aufruf, der finalisiert.
- * Wache „im Zweifel nichts buchen“: Weicht der Betrag der Rechnung bar bei Stripe
- * von `summeCents` ab, Warnung und nichts. Fehler von Stripe werden geworfen —
- * die Aufrufer machen eine Warnung daraus; der nächste tägliche Lauf holt es nach.
+ * Wachen „im Zweifel nichts buchen“ (dieselben für Webhook und täglichen Lauf):
+ * Der zurückgebuchte Betrag (`zurueckgebuchtCents` aus dem Webhook, sonst nur
+ * lesend bei Stripe über `zurueckgebuchtCentsZu`) und der Betrag der Rechnung
+ * bar müssen beide `summeCents` sein. Ist einer nicht eindeutig oder weicht er
+ * ab: Warnung `nachforderung-betrag`, nichts angelegt, nichts gesendet — das
+ * Team klärt den Fall (Notweg oder Rechnung von Hand). Fehler von Stripe werden
+ * geworfen; die Aufrufer machen eine Warnung daraus.
  */
-export async function stelleNachforderung(abrechnungId: string, jetzt: Date): Promise<void> {
+export async function stelleNachforderung(abrechnungId: string, jetzt: Date, zurueckgebuchtCents?: number): Promise<void> {
   const abr = await prisma.monatsabrechnung.findUnique({
     where: { id: abrechnungId },
     select: { farmId: true, monat: true, summeCents: true, rechnungBarId: true, stand: true, farm: { select: { stripeKundeId: true, barSperreNachTagen: true } } },
@@ -608,6 +612,11 @@ export async function stelleNachforderung(abrechnungId: string, jetzt: Date): Pr
   }
   if (vorhanden && vorhanden.status !== 'draft') return
 
+  const streitCents = zurueckgebuchtCents ?? (await zurueckgebuchtCentsZu(abr.rechnungBarId))
+  if (streitCents !== abr.summeCents) {
+    warnung('Nachforderung: zurückgebuchter Betrag unklar oder abweichend — nicht angelegt', 'nachforderung-betrag', { ...extra, streitCents: streitCents ?? 'unbekannt', sollCents: abr.summeCents })
+    return
+  }
   const bar = await stripe.invoices.retrieve(abr.rechnungBarId)
   if (bar.total !== abr.summeCents) {
     warnung('Nachforderung: Betrag der Rechnung bar weicht von der Summe ab — nicht angelegt', 'nachforderung-betrag', { ...extra, rechnungCents: bar.total, sollCents: abr.summeCents })
@@ -634,6 +643,25 @@ export async function stelleNachforderung(abrechnungId: string, jetzt: Date): Pr
   await stripe.invoices.finalizeInvoice(rechnung.id, { auto_advance: false }, { idempotencyKey: `${rechnung.schluessel}-fertig` })
   await stripe.invoices.sendInvoice(rechnung.id, {}, { idempotencyKey: `${rechnung.schluessel}-senden` })
   await protokolliere({ wer: null, art: 'lastschrift_nachforderung_erstellt', bezugArt: 'hof', bezugId: abr.farmId, mitPasskey: false, grund: `Monatsabrechnung ${monat}` })
+}
+
+/**
+ * Der zurückgebuchte Betrag zur Rechnung bar — nur lesend, derselbe Weg wie die
+ * Zuordnung Streitfall → Rechnung, umgekehrt: Rechnungszahlungen der Rechnung →
+ * genau eine Zahlung (PaymentIntent) → genau ein Streitfall mit Betrag. Sonst
+ * null (nicht eindeutig): Dann legt `stelleNachforderung` nichts an.
+ */
+async function zurueckgebuchtCentsZu(rechnungBarId: string): Promise<number | null> {
+  const zahlungen = await stripe.invoicePayments.list({ invoice: rechnungBarId, limit: 10 })
+  const intents = new Set(
+    zahlungen.data.map((z) => kennung(z.payment?.payment_intent as string | { id: string } | undefined)).filter((k): k is string => k !== null)
+  )
+  if (intents.size !== 1) return null
+  const [zahlung] = [...intents]
+  const streitfaelle = await stripe.disputes.list({ payment_intent: zahlung, limit: 10 })
+  if (streitfaelle.data.length !== 1) return null
+  const betrag = streitfaelle.data[0]?.amount
+  return typeof betrag === 'number' ? betrag : null
 }
 
 /** Schritt 5 des täglichen Laufs: jede zurückgebuchte Abrechnung bekommt ihre Nachforderung (fehlt sie, wird sie angelegt). */
@@ -743,7 +771,7 @@ export async function behandleRueckbuchung(streit: Stripe.Dispute, jetzt = new D
   const liste = await stripe.invoicePayments.list({ payment: { type: 'payment_intent', payment_intent: zahlung }, limit: 1 })
   const rechnungId = kennung(liste.data[0]?.invoice as string | { id: string } | undefined)
   if (!rechnungId) return kundenzahlungZurueckgebucht(streit, zahlung, jetzt)
-  const abr = await prisma.monatsabrechnung.findFirst({ where: { rechnungBarId: rechnungId }, select: { id: true, farmId: true, monat: true, summeCents: true } })
+  const abr = await prisma.monatsabrechnung.findFirst({ where: { rechnungBarId: rechnungId }, select: { id: true, farmId: true, monat: true } })
   if (!abr) {
     // Auch die Rückbuchung einer schon bezahlten Nachforderung landet hier (ihre Kennung steht an keiner Abrechnung).
     warnung('Rückbuchung zu einer Rechnung ohne Monatsabrechnung', 'rueckbuchung-unbekannt')
@@ -755,12 +783,8 @@ export async function behandleRueckbuchung(streit: Stripe.Dispute, jetzt = new D
   try {
     const monat = monatText(abr.monat.toISOString().slice(0, 7))
     await schreibeHofNachricht(abr.farmId, LASTSCHRIFT_TEXT.zurueckgebuchtSatz(monat), LASTSCHRIFT_HREF, 'zurueckgebucht')
-    // Stripe nennt den zurückgebuchten Betrag; weicht er von der Summe ab, bucht die App nichts (im Zweifel nichts buchen).
-    if (typeof streit.amount === 'number' && streit.amount !== abr.summeCents) {
-      warnung('Nachforderung: Betrag der Rückbuchung weicht von der Summe ab — nicht angelegt', 'nachforderung-betrag', { abrechnungId: abr.id, streitCents: streit.amount, sollCents: abr.summeCents })
-      return
-    }
-    await stelleNachforderung(abr.id, jetzt)
+    // Den Betrag nennt Stripe am Streitfall; die Wache dagegen steht in stelleNachforderung (auch für den täglichen Lauf).
+    await stelleNachforderung(abr.id, jetzt, typeof streit.amount === 'number' ? streit.amount : undefined)
   } catch (err) {
     warnung('Nachforderung nach einer Rückbuchung nicht angelegt', 'nachforderung', { abrechnungId: abr.id }, err)
   }

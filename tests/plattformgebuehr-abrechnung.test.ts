@@ -39,7 +39,8 @@ const stripeAttrappe = vi.hoisted(() => ({
   // Nr. 289: nur da, damit ein Aufruf auffiele — die Rückbuchung einer Kundenzahlung bewegt kein Geld.
   refunds: { create: vi.fn() },
   transfers: { createReversal: vi.fn() },
-  disputes: { update: vi.fn(), close: vi.fn() },
+  // Nr. 290: `list` liest den zurückgebuchten Betrag zur Rechnung bar (nur lesend).
+  disputes: { update: vi.fn(), close: vi.fn(), list: vi.fn() },
 }))
 vi.mock('@/lib/stripe', () => ({ stripe: stripeAttrappe }))
 
@@ -575,7 +576,7 @@ describe('Webhooks der Monatsabrechnung', () => {
 
   it('charge.dispute.created zur Rechnungszahlung → zurückgebucht; eine Rückbuchung ohne Rechnung und ohne Bestellung: eine Warnung, nichts geschrieben', async () => {
     stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
-    // Nr. 290: Monat und Summe braucht der Nachlauf (Nachricht, Nachforderung).
+    // Nr. 290: Den Monat braucht der Nachlauf (Nachricht); die Summe liest die Nachforderung selbst.
     db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1', monat: new Date('2027-02-01T00:00:00.000Z'), summeCents: 342 })
     await ereignis('charge.dispute.created', { id: 'dp_1', payment_intent: 'pi_rechnung' })
     expect(stripeAttrappe.invoicePayments.list).toHaveBeenCalledWith({ payment: { type: 'payment_intent', payment_intent: 'pi_rechnung' }, limit: 1 })
@@ -665,7 +666,7 @@ describe('Rückbuchung einer Kundenzahlung (Nr. 289, E-022): sichtbar machen, ke
 
   it('(a) created zu einer Rechnungszahlung: zurückgebucht wie bisher, kein Eintrag zur Kundenzahlung, keine Zeile', async () => {
     stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
-    // Nr. 290: Monat und Summe braucht der Nachlauf (Nachricht, Nachforderung).
+    // Nr. 290: Den Monat braucht der Nachlauf (Nachricht); die Summe liest die Nachforderung selbst.
     db.monatsabrechnung.findFirst.mockResolvedValue({ id: 'abr_1', farmId: 'hof_1', monat: new Date('2027-02-01T00:00:00.000Z'), summeCents: BETRAG })
     await ereignis('charge.dispute.created', streit({ payment_intent: 'pi_rechnung' }))
     expect(db.monatsabrechnung.updateMany).toHaveBeenCalledWith({ where: { id: 'abr_1', stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: STREIT_JETZT } })
@@ -855,6 +856,8 @@ describe('Rücklastschrift: Nachforderung und Notweg (Nr. 290)', () => {
     return Object.fromEntries(Object.keys(select).filter((k) => k !== 'farm').map((k) => [k, z[k]])) as Partial<T>
   }
   const HOF_ZUR_ABRECHNUNG = { stripeKundeId: 'cus_1', barSperreNachTagen: 14 }
+  /** Der Betrag, den Stripe am Streitfall zur Rechnung bar nennt. */
+  let streitBetrag: number
 
   function warnungen(): string[] {
     return vi.mocked(captureException).mock.calls.map(([, k]) => (k as { tags: { aufgabe: string } }).tags.aufgabe)
@@ -878,7 +881,12 @@ describe('Rücklastschrift: Nachforderung und Notweg (Nr. 290)', () => {
       data: p.customer === 'cus_1' ? [...metadaten].map(([id, metadata]) => ({ id, status: rechnungen.get(id)?.status ?? 'void', metadata, hosted_invoice_url: `https://rechnung.example.com/${id}`, invoice_pdf: `https://rechnung.example.com/${id}.pdf` })) : [],
       has_more: false,
     }))
-    stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar' }] })
+    // Beide Richtungen wie bei Stripe: Zahlung → Rechnung (Webhook) und Rechnung → Zahlung (Betrag im täglichen Lauf).
+    stripeAttrappe.invoicePayments.list.mockImplementation(async (p: { invoice?: string }) =>
+      p.invoice ? { data: p.invoice === 'in_bar' ? [{ invoice: 'in_bar', payment: { type: 'payment_intent', payment_intent: 'pi_rechnung' } }] : [] } : { data: [{ invoice: 'in_bar' }] }
+    )
+    streitBetrag = 342
+    stripeAttrappe.disputes.list.mockImplementation(async (p: { payment_intent?: string }) => ({ data: p.payment_intent === 'pi_rechnung' ? [{ id: 'dp_1', amount: streitBetrag }] : [], has_more: false }))
     db.monatsabrechnung.findFirst.mockImplementation(async (a: { where: Record<string, unknown>; select?: Record<string, unknown> }) => {
       const oder = a.where.OR as Record<string, unknown>[] | undefined
       const gefunden = oder ? oder.some((o) => o.rechnungBarId === zeile.rechnungBarId) : trifft(a.where)
@@ -903,6 +911,7 @@ describe('Rücklastschrift: Nachforderung und Notweg (Nr. 290)', () => {
       db.farm.findMany.mockReset()
       stripeAttrappe.invoices.list.mockReset()
       stripeAttrappe.invoicePayments.list.mockReset()
+      stripeAttrappe.disputes.list.mockReset()
     }
   })
 
@@ -954,6 +963,14 @@ describe('Rücklastschrift: Nachforderung und Notweg (Nr. 290)', () => {
       expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
       expect(warnungen()).toEqual(['nachforderung-betrag'])
       expect(arten()).toEqual(['lastschrift_zurueckgebucht'])
+
+      // Runde 1, G1: Auch der tägliche Lauf legt bei abweichendem Betrag nichts an — dieselbe Wache.
+      streitBetrag = 341
+      await rechneMonatsabrechnungen(JETZT)
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+      expect(warnungen()).toEqual(['nachforderung-betrag', 'nachforderung-betrag'])
+      expect(zeile.stand).toBe('zurueckgebucht')
     })
 
     it('(a3) Rechnung bar bei Stripe über einen anderen Betrag als die Summe: nichts angelegt, Warnung („im Zweifel nichts buchen“)', async () => {
@@ -991,6 +1008,40 @@ describe('Rücklastschrift: Nachforderung und Notweg (Nr. 290)', () => {
   })
 
   describe('täglicher Lauf holt Fehlendes nach', () => {
+    it('Betrag gleich: der tägliche Lauf liest den zurückgebuchten Betrag nur lesend bei Stripe (Rechnung → Zahlung → Streitfall) und legt an', async () => {
+      zeile.stand = 'zurueckgebucht'
+      await rechneMonatsabrechnungen(JETZT)
+      expect(stripeAttrappe.invoicePayments.list).toHaveBeenCalledWith(expect.objectContaining({ invoice: 'in_bar' }))
+      expect(stripeAttrappe.disputes.list).toHaveBeenCalledWith(expect.objectContaining({ payment_intent: 'pi_rechnung' }))
+      expect(stripeAttrappe.invoices.create).toHaveBeenCalledTimes(1)
+      expect(stripeAttrappe.invoices.sendInvoice).toHaveBeenCalledTimes(1)
+      expect(warnungen()).toEqual([])
+      for (const schreiben of [stripeAttrappe.disputes.update, stripeAttrappe.disputes.close]) expect(schreiben).not.toHaveBeenCalled()
+    })
+
+    it('Betrag nicht bestimmbar (kein Streitfall, zwei Streitfälle, Streitfall ohne Betrag, keine Zahlung): nichts angelegt, nichts gesendet, Warnung', async () => {
+      zeile.stand = 'zurueckgebucht'
+      const faelle: Array<() => void> = [
+        () => stripeAttrappe.disputes.list.mockResolvedValue({ data: [], has_more: false }),
+        () => stripeAttrappe.disputes.list.mockResolvedValue({ data: [{ id: 'dp_1', amount: 342 }, { id: 'dp_2', amount: 342 }], has_more: false }),
+        () => stripeAttrappe.disputes.list.mockResolvedValue({ data: [{ id: 'dp_1' }], has_more: false }),
+        () => stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [] }),
+      ]
+      // Jeden Fall einzeln: die Attrappen je Fall auf den Gutfall zurücksetzen, dann den einen Mangel.
+      let n = 0
+      for (const fall of faelle) {
+        stripeAttrappe.invoicePayments.list.mockResolvedValue({ data: [{ invoice: 'in_bar', payment: { type: 'payment_intent', payment_intent: 'pi_rechnung' } }] })
+        stripeAttrappe.disputes.list.mockResolvedValue({ data: [{ id: 'dp_1', amount: 342 }], has_more: false })
+        fall()
+        await stelleNachforderung('abr_1', JETZT)
+        n += 1
+        expect(warnungen()).toHaveLength(n)
+      }
+      expect(new Set(warnungen())).toEqual(new Set(['nachforderung-betrag']))
+      expect(stripeAttrappe.invoices.create).not.toHaveBeenCalled()
+      expect(stripeAttrappe.invoices.sendInvoice).not.toHaveBeenCalled()
+    })
+
     it('(f) vorhandene offene Nachforderung: kein invoices.create, kein sendInvoice', async () => {
       zeile.stand = 'zurueckgebucht'
       rechnungen.set('in_nf_alt', { status: 'open', posten: [{ id: 'ii_nf', schluessel: 'nachforderung', amount: 342 }] })
