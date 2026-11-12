@@ -366,7 +366,7 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 306 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
 | 307 | Titel in `freigabe.md` §38.6 | offen | – | – | vom Zwischenstand `integration/lauf34g` | – | 11.11.2026 |
 | 308 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
-| 309 | Kaufknopf ohne Betrag | läuft (B) | `nacht/2026-11-11/309-kaufknopf` | – | vom Zwischenstand `integration/lauf34b` (6703b03b1ba5) | Startsatz ja | 12.11.2026 |
+| 309 | Kaufknopf ohne Betrag | fertig (B) | `nacht/2026-11-11/309-kaufknopf` | #542 | vom Zwischenstand `integration/lauf34b` (6703b03b1ba5) | 0 Runden; Startsatz ja, ganze Nummer; Bild Formular bar und online abgenommen, Zahlungsschritt online nicht prüfbar ohne Stripe; Nacharbeit: Wache für JSX-Kinder, Probelauf-Checkliste | 12.11.2026 |
 | Sammel 34 A | Sammel-PR `integration/lauf34` (283, 286, 284, 287, 289) | fertig, PR bereit | `integration/lauf34` | #536 | main | per --no-ff 286, 284, 287, 289 auf 283; voller Lauf 758 Dateien, 14089 Tests; Integration 106 Dateien, 851 Tests; keine Migration; Zwischen-Morgenbericht `morgenbericht-2026-11-11-lauf34-a.md` | 11.11.2026 |
 | Sammel 34 B | Sammel-PR `integration/lauf34b` (Entwurf bis „bereit“ am Haltepunkt B) | läuft (Abschnitt B) | `integration/lauf34b` | #541 (Entwurf) | main (f3c2a22b6b66, nach Merge von #536) | – | 12.11.2026 |
 | Sammel 34 C | Sammel-PR `integration/lauf34c` (Entwurf bis „bereit“ am Haltepunkt C) | offen | – | – | main bzw. voriger Integrationszweig (Rahmen §1 3.2) | – | 11.11.2026 |
