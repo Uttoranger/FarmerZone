@@ -196,3 +196,5 @@ Zeitbudget (Wanduhr ab Start, a013-lauf34-c.md „Plan“): Vorprüfung und Doku
 - 13:41 304 gestartet (Opus, Platz 1, /home/user/wt/304, Branch nacht/2026-11-11/304-stille-ereignisse, vom Zwischenstand fb9d7e03ebdf mit 304a und 303, DB fz_int_304). T3 greift (Umsetzung 1 und 2 entfallen, Webhook ohne Diff), T4 greift nicht, Punkt 6 mit Startsatz.
 - Wiederaufnahme 304: Branch nacht/2026-11-11/304-stille-ereignisse, /home/user/wt/304, Basis fb9d7e03ebdf, Runde 0, DB fz_int_304.
 - Uhrzeiten mit Spanne: Ende eines Prüfers zwischen Commit und nächstem Commit; nur Commit-Zeiten und `date -u`.
+- 13:40–13:48 voller Lauf auf dem Zwischenstand fb9d7e03ebdf (304a, 303; n=1, 3 Worker, unter schwer.lock, mit Warten 492 s): `pnpm install --frozen-lockfile`, Typecheck grün, Lint 0 Fehler, 770 Dateien, 14269 Tests, Doku-Wachen grün.
+- 13:48 pruefer 306 voller Durchgang: 0 Blocker, 3 Sollte (hofseite-vorschau.test.ts prüft den Aufruf von `korbErlaubt` nicht mehr am Quelltext; paket-hofseite.mjs meldet einen fehlenden Chunk nur als Stacktrace; Kopfkommentar hofseite-vorschau.test.ts:9) → Nacharbeit (kein Durchgang nur für Teststärke).
