@@ -7,6 +7,7 @@ import { eingangMeldungAdresse } from '@/lib/postfach'
 import { seitenPfad } from '@/lib/fremdtext'
 import { wienKalendertag } from '@/lib/kalender'
 import { datumKurz } from '@/lib/verkauf-eintragen'
+import { maskiereAdresse } from '@/lib/betrieb-mails'
 import { cn } from '@/lib/utils'
 import type { AdminMeldungDetail, getDuplikateVon } from '@/server/queries/meldung'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -147,7 +148,7 @@ export function MeldungEntscheidenSpalte({
                 {m.farm.name}
               </a>
             ) : m.customerEmail ? (
-              <span className="break-all">Kundin · {m.customerEmail}</span>
+              <span className="break-all">Kundin · {maskiereAdresse(m.customerEmail)}</span>
             ) : (
               'Anonym'
             )}
