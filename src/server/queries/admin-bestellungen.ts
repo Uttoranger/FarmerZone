@@ -74,11 +74,12 @@ export async function ladeBestellListe(suche: MailSuche, f: BestellFilter, jetzt
   if (suche.art === 'ungueltig') return []
   let nurIds: string[] | null = null
   if (suche.art === 'bestellung' || suche.art === 'adresse') {
-    nurIds = (await sucheMails(suche, jetzt)).bestellungen.map((b) => b.id)
+    nurIds = (await sucheMails(suche, jetzt, { ohneZeitgrenze: true })).bestellungen.map((b) => b.id)
     if (nurIds.length === 0) return []
   }
   const zeilen = await prisma.order.findMany({
-    where: { ...bestellFilterBedingung(f, jetzt), ...(nurIds ? { id: { in: nurIds } } : {}) },
+    // Register N32: Bei einer Suche gilt der Zeitraum nicht (`undefined` heißt für Prisma „keine Bedingung“); Stand, Hof und „Erstattung offen“ gelten weiter.
+    where: { ...bestellFilterBedingung(f, jetzt), ...(nurIds ? { id: { in: nurIds }, createdAt: undefined } : {}) },
     orderBy: { createdAt: 'desc' },
     take: BESTELL_LISTE_HOECHSTENS,
     select: ZEILE_FELDER,
@@ -146,7 +147,7 @@ export async function ladeBestellDetail(id: string, jetzt: Date): Promise<Bestel
       select: { wann: true, art: true, grund: true, mitPasskey: true },
     }),
     // Die Mails zur Bestellung: dieselbe Suche wie Admin › Betrieb › E-Mails (Nr. 167).
-    sucheMails({ art: 'bestellung', nummer: roh.orderNumber }, jetzt),
+    sucheMails({ art: 'bestellung', nummer: roh.orderNumber }, jetzt, { ohneZeitgrenze: true }),
     prisma.unterhaltung.findFirst({ where: { farmId: roh.farmId }, orderBy: { letzteNachrichtAm: 'desc' }, select: { id: true } }),
     ladeWiderrufeZurBestellung(roh.id, roh.items),
   ])

@@ -336,10 +336,10 @@ describe('Suche — dieselbe Abfrage wie Admin › Betrieb › E-Mails', () => {
   it('Nummer und ganze Adresse gehen über sucheMails; die Liste nimmt nur deren Treffer', async () => {
     vi.mocked(sucheMails).mockResolvedValue({ bestellungen: [{ id: BESTELLUNG } as never], mails: [] })
     await ladeBestellListe(mailSucheAus('kundin@example.com'), filter, jetzt)
-    expect(sucheMails).toHaveBeenCalledWith({ art: 'adresse', adresse: 'kundin@example.com' }, jetzt)
+    expect(sucheMails).toHaveBeenCalledWith({ art: 'adresse', adresse: 'kundin@example.com' }, jetzt, { ohneZeitgrenze: true })
     expect(db.order.findMany.mock.calls[0]?.[0]).toMatchObject({ where: { id: { in: [BESTELLUNG] } } })
     await ladeBestellListe(mailSucheAus('HM-2610-B7C2'), filter, jetzt)
-    expect(sucheMails).toHaveBeenLastCalledWith({ art: 'bestellung', nummer: 'HM-2610-B7C2' }, jetzt)
+    expect(sucheMails).toHaveBeenLastCalledWith({ art: 'bestellung', nummer: 'HM-2610-B7C2' }, jetzt, { ohneZeitgrenze: true })
   })
 
   it('Teiladresse: ungültig, keine Abfrage, keine Zeile; kein Treffer: keine Liste', async () => {
