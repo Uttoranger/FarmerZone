@@ -358,12 +358,12 @@ Vom Dirigenten gepflegt. Eine Zeile je Nummer aus `docs/nachtlauf.md`. Status: o
 | 300 | Titel in `freigabe.md` §38.3 | offen | – | – | vom Zwischenstand `integration/lauf34d` | – | 11.11.2026 |
 | 301 | Titel in `freigabe.md` §38.6 | offen | – | – | vom Zwischenstand `integration/lauf34g` | – | 11.11.2026 |
 | 302 | Handbuch | offen | – | – | vom Zwischenstand `integration/lauf34d` | – | 11.11.2026 |
-| 303 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
+| 303 | Admin-Texte: Eingriffe sagen ihre Folgen, keine Kürzel, keine Technikwörter | läuft (C) | `nacht/2026-11-11/303-admin-texte` | – | vom Zwischenstand `integration/lauf34c` (7792085236c9) | Gruppe A und B (Startsatz ja); A6 nicht (T2); A7 zweiter Teil nicht (T5, Startsatz fehlt) | 13.11.2026 |
 | 304 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
-| 304a | Zwei Abweichungen von N32 und N33 schließen | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
+| 304a | Bestellung über die Nummer immer auffindbar; Adresse der Kundin in der Meldung gekürzt (N32, N33) | fertig (C) | `nacht/2026-11-11/304a-bestellung-auffindbar` | #545 | vom Zwischenstand `integration/lauf34c` (7792085236c9) | 0 Runden; Nacharbeit: Detail-Test ohne `ohneZeitgrenze`, Zählung im Detail weiter 90 Tage | 13.11.2026 |
 | 304b | Tägliche Mail „Braucht dich“ | offen | – | – | vom Zwischenstand `integration/lauf34g` | – | 11.11.2026 |
 | 305 | Titel in `freigabe.md` §38.5 | offen | – | – | vom Zwischenstand `integration/lauf34f` | – | 11.11.2026 |
-| 306 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
+| 306 | Kundschaft lädt keinen Hof-Code: toter Bearbeitungsmodus weg, Titelbild-Knopf in eigene Datei | läuft (C) | `nacht/2026-11-11/306-hofseite-paket` | – | vom Zwischenstand `integration/lauf34c` (770eb253d5ba) | – | 13.11.2026 |
 | 307 | Titel in `freigabe.md` §38.6 | offen | – | – | vom Zwischenstand `integration/lauf34g` | – | 11.11.2026 |
 | 308 | Titel in `freigabe.md` §38.2 | offen | – | – | vom Zwischenstand `integration/lauf34c` | – | 11.11.2026 |
 | 309 | Kaufknopf ohne Betrag | fertig (B) | `nacht/2026-11-11/309-kaufknopf` | #542 | vom Zwischenstand `integration/lauf34b` (6703b03b1ba5) | 0 Runden; Startsatz ja, ganze Nummer; Bild Formular bar und online abgenommen, Zahlungsschritt online nicht prüfbar ohne Stripe; Nacharbeit: Wache für JSX-Kinder, Probelauf-Checkliste | 12.11.2026 |
