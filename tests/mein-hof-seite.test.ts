@@ -385,11 +385,3 @@ describe('Bestandsteile im Geltungsbereich', () => {
     expect(quelle('src/components/farmer/hofseite-editor.tsx')).toContain('data-app-palette="neu"')
   })
 })
-
-describe('dnd-kit ohne Hydration-Fehler', () => {
-  it('DndContext bekommt eine feste Kennung aus useId', () => {
-    const text = quelle('src/components/shared/reorder-context.tsx')
-    expect(text).toContain('const id = useId()')
-    expect(text).toMatch(/<DndContext id=\{id\}/)
-  })
-})

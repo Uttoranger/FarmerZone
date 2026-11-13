@@ -16,9 +16,14 @@
  *    N7): höchstens 2 000 px, die Vorschau nie breiter als die Seite (1 440 px),
  *    die Liste 400 bis 560 px neben Web, höchstens 720 px neben Handy.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createElement, type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import type { Warenkorb } from '@/lib/use-cart'
+import { ProductGrid } from '@/components/farm/product-grid'
+import { publicProduct } from './fabrik/public-product'
 import { BEREIT_TYP, MARKIERUNG_TYP, markierungSchema } from '@/schemas/hofseite-vorschau'
 import {
   EDITOR_ABSTAND,
@@ -38,6 +43,37 @@ import {
   vorschauMassstab,
   VORSCHAU_BEARBEITUNG_BREITE,
 } from '@/lib/hofseite-vorschau'
+
+// Das Produktraster ohne DOM (TESTING_GUIDELINES §1): Bild, Link und Navigation als schlichte
+// Elemente, das Korb-Blatt als Merkmal. Der Korb im Browser ist schon geladen und trägt eine
+// Position (`useCart` liefert ihn fertig) — so stünde die Korb-Leiste da, wenn sie dürfte.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh() {}, push() {}, replace() {}, back() {}, prefetch() {} }),
+  usePathname: () => '/hof-test',
+  useSearchParams: () => new URLSearchParams(),
+}))
+vi.mock('next/image', () => ({
+  default: (p: { src: string; alt: string }) => createElement('img', { src: p.src, alt: p.alt }),
+}))
+vi.mock('next/link', () => ({
+  default: ({ href, children, ...rest }: { href: string; children?: ReactNode }) => createElement('a', { href, ...rest }, children),
+}))
+vi.mock('@/components/farm/cart-sheet', () => ({ CartSheet: () => createElement('div', { 'data-merkmal': 'korb' }) }))
+vi.mock('@/lib/use-cart', async (importOriginal) => {
+  const echt = await importOriginal<typeof import('@/lib/use-cart')>()
+  const geladen: Warenkorb = {
+    items: [{ productId: 'p_eier', name: 'Eier', price: 3.5, unit: 'STUECK', unitSize: null, imageUrl: null, quantity: 2 }],
+    count: 2,
+    total: 7,
+    isHydrated: true,
+    addItem: async () => ({ ok: true }),
+    updateQuantity: async () => ({ ok: true }),
+    removeItem: () => {},
+    clearCart: () => {},
+    ersetzeKorb: () => {},
+  }
+  return { ...echt, useCart: (): Warenkorb => geladen }
+})
 
 const quelltext = (pfad: string) => readFileSync(join(process.cwd(), pfad), 'utf8')
 
@@ -233,7 +269,6 @@ describe('am Quelltext', () => {
 
   it('jeder Weg in den Korb läuft über korbErlaubt — Kaufknopf, Nachbestell-Link, Anker, Knopf, Sheet', () => {
     const raster = quelltext('src/components/farm/product-grid.tsx')
-    expect(raster).toContain('const mitKorb = korbErlaubt({ isEditMode, kaufen })')
     // Kein zweiter Maßstab neben der Regel.
     expect(raster).not.toMatch(/!isEditMode && kaufen/)
     expect(raster).not.toMatch(/if \(!?kaufen\)/)
@@ -252,5 +287,28 @@ describe('am Quelltext', () => {
     expect(raster).toMatch(/const korbLeiste = mitKorb && isHydrated && count > 0 &&/)
     expect(raster).toMatch(/\{korbLeiste && \(/)
     expect(raster).toMatch(/\{mitKorb && \(\s*<CartSheet/)
+  })
+})
+
+describe('Produktraster in der Vorschau des Hofs (Nr. 306: Verhalten statt Quelltext-Anker)', () => {
+  const EIER = publicProduct({ id: 'p_eier', name: 'Eier', price: 3.5, stock: 10 })
+  const raster = (kaufen: boolean): string =>
+    renderToStaticMarkup(
+      createElement(ProductGrid, { products: [EIER], farmId: 'farm_test', farmSlug: 'hof-test', hofName: 'Hof Test', pauseMessage: null, kaufen })
+    )
+
+  it('Gegenprobe: wo Kaufen wirkt, hängen Korb-Blatt und Korb-Leiste in der Seite', () => {
+    const html = raster(true)
+    expect(html).toContain('data-merkmal="korb"')
+    expect(html).toContain('Zum Warenkorb')
+    expect(html).toContain('Eier in den Korb legen')
+  })
+
+  it('mit `kaufen: false` kein Korb-Blatt und keine Korb-Leiste, auch mit Korb im Browser', () => {
+    const html = raster(false)
+    expect(html).not.toContain('data-merkmal="korb"')
+    expect(html).not.toContain('Zum Warenkorb')
+    // Die Karte bleibt, wie die Kundin sie sieht; ihr Knopf sagt in der Vorschau nur den Hinweis (Anker oben).
+    expect(html).toContain('Eier')
   })
 })

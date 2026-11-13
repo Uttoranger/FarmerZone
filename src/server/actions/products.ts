@@ -406,27 +406,6 @@ export async function pruefeDualUse(eingabe: unknown): Promise<DualUseErgebnis> 
   return { hinweis: dualUseHinweis({ name, category }, vorhandene) }
 }
 
-export async function updateProductImageAction(
-  productId: string,
-  imageUrl: string | null,
-): Promise<{ error?: string }> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Nicht angemeldet' }
-
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) return { error: 'Kein Hof gefunden' }
-
-  const existing = await prisma.product.findFirst({ where: { id: productId, farmId: farm.id } })
-  if (!existing) return { error: 'Produkt nicht gefunden' }
-  if (!(await bildUrlErlaubt(imageUrl, farm.id, async () => existing.imageUrl))) return { error: BILD_NICHT_UEBERNOMMEN }
-
-  await prisma.product.update({ where: { id: productId }, data: { imageUrl } })
-  await entferneAltesBild(existing.imageUrl, imageUrl, farm.id, 'produktbild')
-
-  revalidate(farm.slug)
-  return {}
-}
-
 export type VorratErgebnis =
   | { ok: true; vorrat: number; wiederDa: boolean }
   | { error: string; code?: 'GEAENDERT'; vorrat?: number }
@@ -526,38 +505,4 @@ export async function deleteProduct(productId: string): Promise<ProduktLoeschErg
 
   revalidate(farm.slug)
   return { archiviert }
-}
-
-// Sprint 18: manuelle Reihenfolge per Drag & Drop.
-// ids muss GENAU die Produktmenge der eigenen Farm sein (Permutation) —
-// fremde, fehlende oder doppelte IDs → Fehler ohne Teiländerung (Transaktion).
-export async function reorderProductsAction(ids: string[]): Promise<{ error?: string }> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return { error: 'Nicht eingeloggt' }
-  const farm = await getFarmForUser(session.user.id)
-  if (!farm) return { error: 'Kein Hof gefunden' }
-
-  const own = await prisma.product.findMany({
-    where: { farmId: farm.id },
-    select: { id: true },
-  })
-  const ownIds = new Set(own.map((p) => p.id))
-  const uniqueIds = new Set(ids)
-
-  if (
-    ids.length !== uniqueIds.size ||
-    ids.length !== ownIds.size ||
-    ids.some((id) => !ownIds.has(id))
-  ) {
-    return { error: 'Ungültige Produktliste' }
-  }
-
-  await prisma.$transaction(
-    ids.map((id, index) =>
-      prisma.product.update({ where: { id }, data: { sortOrder: index } })
-    )
-  )
-
-  revalidate(farm.slug)
-  return {}
 }

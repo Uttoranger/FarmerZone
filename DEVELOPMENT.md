@@ -6944,3 +6944,13 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - `ladeBestellListe`: Bei einer Suche gilt der Zeitraum nicht; Stand, Hof und „Erstattung offen“ gelten weiter. Ohne Suche bleibt der Zeitraum.
 - Die Meldung zeigt „Kundin · k•••@example.com“ (`maskiereAdresse`, die EINE Stelle). Einen Knopf „Adresse anzeigen“ gibt es dort nicht; die Antwort an die Kundin geht über den Bescheid der App.
 - Tests: `tests/integration/bestellung-auffindbar.int.test.ts`, `tests/meldung-adresse-gekuerzt.test.ts`.
+
+## Lauf 34 · Nr. 306: Kundschaft lädt keinen Hof-Code (13.11.2026)
+
+**Anlass.** Das Paket der Hofseite (Client-Manifest von `/(public)/[farmSlug]/page`) trug rund 100 KB Code, den keine Kundin braucht: den Bearbeitungsmodus des Produktrasters mit dnd-kit (seit Nr. 50 ohne Aufrufer, `ownerMode` war immer `false`) und den Titelbild-Knopf von Mein Hof, der in farm-page-view.tsx stand.
+
+**Was gilt.**
+- Toter Code wird gelöscht, nicht nachgeladen. product-grid.tsx kennt nur noch die Kundenansicht; `korbErlaubt({ isEditMode: false, kaufen })` bleibt der eine Maßstab für jeden Weg in den Korb (wie in hofseite-kunde.tsx und produktdetail-kunde.tsx).
+- Produkte per Ziehen sortieren gab es seit Nr. 50 in keiner Oberfläche; mit dem Modus fallen `reorderProductsAction` und `updateProductImageAction` weg (eine Action ohne Aufrufer ist ein offener Endpunkt, Nr. 199), ebenso reorder-context.tsx und use-reorder-sensors.ts. Aus git wiederherstellbar. `@dnd-kit/*` bleibt in package.json (Vorschlag für den Auftrag „Abhängigkeiten“).
+- Der Titelbild-Knopf (`CoverEditButton`) steht in src/components/farm/titelbild-knopf.tsx; farm-page-view.tsx exportiert nur noch `TITELBILD_KNOPF_STIL` und bindet die neue Datei nie ein.
+- CI-Schritt „Kein Hof-Code im Paket der Hofseite“ nach „Build“: `scripts/pruefung/paket-hofseite.mjs` liest das Manifest in einem `node:vm`-Kontext, misst die Chunks (roh, gzip je Chunk) und endet mit 1 bei „DndDescribedBy“, „Produktbild aktualisiert“ oder „Titelbild ersetzen“ in einem Chunk — und bei einem unlesbaren Manifest (kein stilles Grün nach einem Next-Update).

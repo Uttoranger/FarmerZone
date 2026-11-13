@@ -54,7 +54,7 @@ import * as Sentry from '@sentry/nextjs'
 import { auth } from '@/lib/auth'
 import { getFarmForUser } from '@/server/queries/dashboard'
 import { saveAppearanceAction, updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
-import { deleteProduct, updateProduct, updateProductImageAction } from '@/server/actions/products'
+import { deleteProduct, updateProduct } from '@/server/actions/products'
 import type { ProductFormData } from '@/schemas/product'
 
 const HOF = 'farm_meiner'
@@ -177,14 +177,6 @@ describe('Ersetzen löscht das alte Bild — nach dem Schreiben', () => {
     expect(delMock).not.toHaveBeenCalled()
   })
 
-  it('Produktbild (Hofseite): altes Bild gelöscht, nach dem Update', async () => {
-    const alt = bild('product/1.webp')
-    db.product.findFirst.mockResolvedValue({ id: 'p_1', imageUrl: alt })
-    expect(await updateProductImageAction('p_1', bild('product/2.webp'))).toEqual({})
-    expect(delMock).toHaveBeenCalledWith(alt, { token: SCHLUESSEL })
-    expect(reihenfolge).toEqual(['db', 'del'])
-  })
-
   it('Produkt bearbeiten mit neuem Bild: altes Bild gelöscht, nach dem Schreiben', async () => {
     const alt = bild('product/1.webp')
     db.product.findFirst.mockResolvedValue({ imageUrl: alt })
@@ -206,12 +198,6 @@ describe('fremder Pfad wird nie gelöscht', () => {
   it.each(FREMDE)('Logo: %s', async (_name, fremd) => {
     hofMit({ logoUrl: fremd })
     expect(await updateFarmLogoAction(NEU)).toEqual({})
-    expect(delMock).not.toHaveBeenCalled()
-  })
-
-  it.each(FREMDE)('Produktbild (Hofseite): %s', async (_name, fremd) => {
-    db.product.findFirst.mockResolvedValue({ id: 'p_1', imageUrl: fremd })
-    expect(await updateProductImageAction('p_1', bild('product/2.webp'))).toEqual({})
     expect(delMock).not.toHaveBeenCalled()
   })
 

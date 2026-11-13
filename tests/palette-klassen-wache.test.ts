@@ -38,7 +38,6 @@ const BESTAND: Ausnahme[] = [
   { datei: 'src/components/farmer/archived-farm-banner.tsx', grund: 'Bestand: Hinweiskasten für stillgelegte Höfe in Bernstein mit dark-Kopien, zieht mit dem Hofbereich auf die Hinweis-Tokens um' },
   { datei: 'src/components/farmer/pending-approval-banner.tsx', grund: 'Bestand: Hinweiskasten für Höfe vor der Freischaltung in Himmelblau mit dark-Kopien, zieht auf die Hinweis-Tokens um' },
   { datei: 'src/components/products/product-dialog.tsx', grund: 'Bestand: Hinweise und Symbole im Produktdialog in Bernstein und Grün, ziehen auf die Hinweis-Tokens und die Marke um' },
-  { datei: 'src/components/farm/product-grid.tsx', grund: 'Bestand: Kühl- und Tiefkühl-Symbole auf dem Produktfoto in Blau, Fotos folgen dem Modus nicht (Abschnitt „Was dem Modus NICHT folgt“)' },
 ]
 
 function* dateien(ordner: string): Generator<string> {
