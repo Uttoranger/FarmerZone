@@ -20,7 +20,9 @@ import {
   alteHoefeAdresse,
   aufgabenLeiste,
   aufgabenZahl,
+  QUELLE_NAME,
   fristText,
+  hofpreisAbTag,
   kommtEintraege,
   lageKacheln,
   wochenZeile,
@@ -35,6 +37,7 @@ import type { HofAufgabeRoh, ErstattungAufgabeRoh } from '@/lib/postfach'
 import type { ProblemAuftrag } from '@/lib/betrieb-mails'
 import { MAIL_WARN_TEXT } from '@/lib/betrieb'
 import { MARKE } from '@/lib/marke'
+import { formatTagKurz } from '@/lib/format'
 
 // Montag, 26. Okt 2026, 09:42 in Wien (MEZ).
 const JETZT = new Date('2026-10-26T08:42:00.000Z')
@@ -100,8 +103,8 @@ const VOLL: AufgabenStand = {
   ],
   // Zwei Felder derselben Bestellung sind EINE Aufgabe (Nr. 191).
   geldAbweichungen: [
-    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'betrag', differenzCents: 120, seit: vor(30 * STUNDE) },
-    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'gebuehr', differenzCents: -50, seit: vor(2 * STUNDE) },
+    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'betrag', differenzCents: 120, seit: vor(30 * STUNDE), gebuehrModell: null },
+    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'gebuehr', differenzCents: -50, seit: vor(2 * STUNDE), gebuehrModell: null },
   ],
   // Nr. 198: je Quelle der Plattformgebühr ein Fall (erfunden). Die Quote: 11 bar, 3 nicht abgeholt (27 %) — und ein Hof unter der Schwelle.
   plattformgebuehr: {
@@ -119,6 +122,12 @@ const VOLL: AufgabenStand = {
   liveSignal: { umgebung: { art: 'produktion', stripe: 'live' }, einstellung: { hofpreisModellAb: new Date('2027-02-01T00:00:00.000+01:00') }, liveSeit: vor(2 * STUNDE) },
   // Nr. 200: ein zugeordneter Widerruf (erfunden); der nicht zugeordnete steht in tests/widerruf.test.ts.
   widerrufe: [{ id: 'widerruf-1', orderId: 'bestellung-2', bestellnummer: 'HM-2610-W1D3', hofName: 'Hof am Bach', eingegangenAm: vor(3 * TAG) }],
+  // Nr. 304: je stilles Ereignis ein Hof (erfunden) — nur Kennung, Hofname und seit wann.
+  hofSignale: {
+    lastschrift: [{ farmId: 'hof-mandat', hofName: 'Hof Mandat', seit: vor(2 * TAG) }],
+    agb: [{ farmId: 'hof-agb', hofName: 'Hof Agb', seit: vor(2 * TAG) }],
+    konto: [{ farmId: 'hof-zu', hofName: 'Hof Zu', seit: vor(STUNDE) }],
+  },
 }
 
 /** Was „erledigt“ je Quelle heißt: die Ursache fehlt im Stand. */
@@ -149,6 +158,10 @@ const ERLEDIGT: Record<AufgabeQuelle, Partial<AufgabenStand>> = {
   widerruf_offen: { widerrufe: [] },
   // Register N49: Stripe hat freigegeben — die Aufgabe verschwindet von selbst.
   hof_online_haengt: { hoefeAktiv: VOLL.hoefeAktiv.map((h) => ({ ...h, stripeAnzeige: 'bereit' as const })) },
+  // Nr. 304: neues Mandat, zugestimmt, gelöscht bzw. endgültig — der Hof fehlt im Stand.
+  lastschrift_beendet: { hofSignale: { ...VOLL.hofSignale, lastschrift: [] } },
+  agb_offen: { hofSignale: { ...VOLL.hofSignale, agb: [] } },
+  konto_frist_um: { hofSignale: { ...VOLL.hofSignale, konto: [] } },
 }
 
 describe('Plattformgebühr (Nr. 198): Fristen der neuen Quellen', () => {
@@ -449,10 +462,10 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
   })
 
   it('Kommt: geplante Fassung, Festschreiben vor dem Stichtag, eigene Termine — nach Tag sortiert; festgeschrieben fällt weg', () => {
-    const e = kommtEintraege({ naechsteFassung: new Date('2026-10-29T08:00:00.000Z'), gruendungAktionBisTag: '2026-12-31', gruendungFest: false }, JETZT)
-    expect(e.map((x) => x.titel)).toEqual(['Startseite: geplante Fassung', 'Gründungsaktion festschreiben', 'Plattformgebühr im Hofpreis (Register N38)'])
+    const e = kommtEintraege({ naechsteFassung: new Date('2026-10-29T08:00:00.000Z'), gruendungAktionBisTag: '2026-12-31', gruendungFest: false, hofpreisAbTag: '2027-02-01' }, JETZT)
+    expect(e.map((x) => x.titel)).toEqual(['Startseite: geplante Fassung', 'Gründungsaktion festschreiben', 'Plattformgebühr im Preis beginnt'])
     expect(e[0].wann).toBe('Do, 29. Okt, 09:00 · geht von selbst live')
-    expect(kommtEintraege({ naechsteFassung: null, gruendungAktionBisTag: '2026-12-31', gruendungFest: true }, JETZT).map((x) => x.titel)).not.toContain('Gründungsaktion festschreiben')
+    expect(kommtEintraege({ naechsteFassung: null, gruendungAktionBisTag: '2026-12-31', gruendungFest: true, hofpreisAbTag: '2027-02-01' }, JETZT).map((x) => x.titel)).not.toContain('Gründungsaktion festschreiben')
   })
 
   it('Protokoll: „Du“, „Team“ oder „System“, nie ein Name; unbekannte Art heißt „Admin-Aktion“', () => {
@@ -472,7 +485,7 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
     ])
   })
 
-  it('Lage: „Bestellungen heute“ mit „Im Rahmen“ und zwei Zeilen, „Geld · Woche“ mit der Servicegebühr (Mockup admin-heute)', () => {
+  it('Lage: „Bestellungen heute“ ohne Marke (Nr. 303) und zwei Zeilen, „Geld · Woche“ mit der Servicegebühr (Mockup admin-heute)', () => {
     const k = lageKacheln(
       {
         bestellungen: { zurAbholung: 23, nichtGepackt: 4, storniert: 1 },
@@ -483,7 +496,7 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
       []
     )
     const bestellungen = k.find((x) => x.id === 'bestellungen')!
-    expect(bestellungen.marke).toEqual({ wort: 'Im Rahmen', art: 'laeuft' })
+    expect(bestellungen.marke).toBeNull()
     expect(bestellungen.zeilen).toEqual(['4 noch nicht gepackt · 1 Storno', 'Woche: 118 (+9 % zur Vorwoche)'])
     const geld = k.find((x) => x.id === 'geld')!
     expect(geld.wert).toMatch(/^€ 1\D840$/)
@@ -525,5 +538,135 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
     expect(wochenZeile({ anzahl: 90, anzahlVorwoche: 100 })).toBe('Woche: 90 (−10 % zur Vorwoche)')
     expect(wochenZeile({ anzahl: 100, anzahlVorwoche: 100 })).toBe('Woche: 100 (±0 % zur Vorwoche)')
     expect(wochenZeile({ anzahl: 3, anzahlVorwoche: 0 })).toBe('Woche: 3 (Vorwoche: keine)')
+  })
+})
+
+describe('Stille Ereignisse eines Hofs (Nr. 304): Lastschrift beendet, AGB offen, Konto-Frist um', () => {
+  const FAELLE = [
+    {
+      quelle: 'lastschrift_beendet',
+      liste: 'lastschrift',
+      hof: VOLL.hofSignale.lastschrift[0]!,
+      titel: 'Lastschrift beendet',
+      bereich: 'Geld',
+      dauer: 3 * TAG,
+      satz: 'Der Hof hat keine gültige Lastschrift mehr. Sobald der Einzug der Gebühr aus Barbestellungen für ihn begonnen hat, kann bei ihm niemand mehr bar bestellen. Schreib dem Hof: Er richtet die Lastschrift unter „Deine Konditionen“ neu ein.',
+    },
+    {
+      quelle: 'agb_offen',
+      liste: 'agb',
+      hof: VOLL.hofSignale.agb[0]!,
+      titel: 'AGB noch nicht zugestimmt',
+      bereich: 'Höfe',
+      dauer: 7 * TAG,
+      satz: 'Der Hof verkauft, hat der Fassung 1.0 der AGB aber noch nicht zugestimmt. In seinem Heute steht dazu eine Karte. Schreib ihm im Postfach.',
+    },
+    {
+      quelle: 'konto_frist_um',
+      liste: 'konto',
+      hof: VOLL.hofSignale.konto[0]!,
+      titel: 'Konto seit 30 Tagen geschlossen',
+      bereich: 'Höfe',
+      dauer: 7 * TAG,
+      satz: 'Die 30 Tage zum Wieder-Öffnen sind um. Jetzt sind Kontakt, Fotos und Texte des Hofs zu löschen (AGB 29.3). Das läuft noch nicht von selbst – gib das Löschen in Auftrag.',
+    },
+  ] as const
+
+  it.each(FAELLE)('$quelle: genau eine Aufgabe mit Titel, Bereich, Satz, Frist und Akte als Ziel', (f) => {
+    const aufgaben = ADMIN_AUFGABEN[f.quelle](VOLL, JETZT)
+    expect(aufgaben).toHaveLength(1)
+    expect(aufgaben[0]).toEqual({
+      quelle: f.quelle,
+      bereich: f.bereich,
+      titel: f.titel,
+      bezug: { kennung: f.hof.farmId, text: f.hof.hofName },
+      satz: f.satz,
+      seit: f.hof.seit,
+      frist: { ziel: new Date(f.hof.seit.getTime() + f.dauer), dauerMs: f.dauer, ueberfaellig: false },
+      wasTun: 'hofAnsehen',
+      ziel: `/admin/hoefe/${f.hof.farmId}`,
+    })
+    expect(AUFGABE_ZIEL_MS[f.quelle]).toBe(f.dauer)
+    expect(WAS_TUN[aufgaben[0]!.wasTun]).toBe('Hof ansehen')
+  })
+
+  it.each(FAELLE)('$quelle: nach Ablauf der Frist „überfällig“, eine Minute davor nicht', (f) => {
+    const mitSeit = (seit: Date): AufgabenStand => ({ ...VOLL, hofSignale: { ...VOLL.hofSignale, [f.liste]: [{ ...f.hof, seit }] } })
+    const [spaet] = ADMIN_AUFGABEN[f.quelle](mitSeit(vor(f.dauer + 60_000)), JETZT)
+    expect(spaet!.frist.ueberfaellig).toBe(true)
+    expect(fristText(spaet!, JETZT)).toMatch(/^überfällig · seit /)
+    const [knapp] = ADMIN_AUFGABEN[f.quelle](mitSeit(vor(f.dauer - 60_000)), JETZT)
+    expect(knapp!.frist.ueberfaellig).toBe(false)
+  })
+
+  it('leerer Stand: keine der drei; zwei Höfe in einer Quelle: zwei Aufgaben', () => {
+    for (const f of FAELLE) expect(ADMIN_AUFGABEN[f.quelle](LEERER_STAND, JETZT)).toEqual([])
+    expect(LEERER_STAND.hofSignale).toEqual({ lastschrift: [], agb: [], konto: [] })
+    const zwei = ADMIN_AUFGABEN.agb_offen({ ...VOLL, hofSignale: { ...VOLL.hofSignale, agb: [...VOLL.hofSignale.agb, { farmId: 'hof-agb-2', hofName: 'Hof Zwei', seit: vor(TAG) }] } }, JETZT)
+    expect(zwei.map((a) => a.bezug.kennung)).toEqual(['hof-agb', 'hof-agb-2'])
+  })
+
+  it('kein „@“ in Titel, Bezug oder Satz — der Bezug ist nur der Hofname (Gegenprobe: der Hofname steht wirklich da)', () => {
+    const aufgaben = FAELLE.flatMap((f) => ADMIN_AUFGABEN[f.quelle](VOLL, JETZT))
+    expect(aufgaben).toHaveLength(3)
+    for (const a of aufgaben) {
+      expect(JSON.stringify([a.titel, a.bezug, a.satz]), a.quelle).not.toContain('@')
+      expect(a.bezug.text, a.quelle).toMatch(/^Hof /)
+    }
+  })
+})
+
+describe('QUELLE_NAME (Nr. 304): ein fester Name je Quelle, ohne Daten', () => {
+  it('jede Quelle hat genau einen Namen, auch hof_online_haengt (A012) und kundenstreit (289)', () => {
+    expect(Object.keys(QUELLE_NAME).sort()).toEqual([...AUFGABE_QUELLEN].sort())
+    expect(QUELLE_NAME.hof_online_haengt).toBe('Online-Zahlung eines Hofs hängt bei Stripe')
+    expect(QUELLE_NAME.kundenstreit).toBe('Rückbuchung einer Kundenzahlung')
+    expect(QUELLE_NAME.stripe_live_ohne_hofpreis).toBe('Echte Zahlungen ohne Plattformgebühr im Preis')
+    expect(QUELLE_NAME.uptime_still).toBe('Die Überwachung von außen meldet sich nicht')
+    expect([QUELLE_NAME.meldung_neu, QUELLE_NAME.mail_gescheitert, QUELLE_NAME.mail_haengt, QUELLE_NAME.betrieb_warnung]).toEqual([
+      'Neue Meldung',
+      'Mail gescheitert',
+      'Wichtige Mail hängt',
+      'Warnung des Betriebs',
+    ])
+  })
+
+  it('kein Name trägt Daten: keine Ziffer außer der festen Zahl der Tage, kein „@“, keine Anführungszeichen, nicht leer', () => {
+    for (const q of AUFGABE_QUELLEN) {
+      const name = QUELLE_NAME[q]
+      expect(name.trim(), q).not.toBe('')
+      expect(name, q).not.toMatch(/[@„“"]/)
+      expect(name.replace(/\b(14|30) Tagen\b/, ''), q).not.toMatch(/\d/)
+    }
+  })
+
+  it('wo der Titel fest ist, ist der Name der Titel (aus dem vollen Stand)', () => {
+    const mitDaten: readonly AufgabeQuelle[] = ['meldung_neu', 'mail_gescheitert', 'mail_haengt', 'betrieb_warnung', 'stripe_live_ohne_hofpreis']
+    for (const q of AUFGABE_QUELLEN) {
+      if (mitDaten.includes(q)) continue
+      expect(ADMIN_AUFGABEN[q](VOLL, JETZT)[0]!.titel, q).toBe(QUELLE_NAME[q])
+    }
+  })
+})
+
+describe('Kommt (Nr. 304): der Stichtag aus der Einstellung', () => {
+  const OHNE = { naechsteFassung: null, gruendungAktionBisTag: null, gruendungFest: true }
+
+  it('Einstellung 24.11.2026, jetzt 10.11.2026: „Plattformgebühr im Preis beginnt“ am 24.11. mit AGB-Fassung', () => {
+    const e = kommtEintraege({ ...OHNE, hofpreisAbTag: '2026-11-24' }, new Date('2026-11-10T09:00:00.000Z'))
+    expect(e).toEqual([
+      { titel: 'Plattformgebühr im Preis beginnt', wann: `${formatTagKurz('2026-11-24')} · AGB 1.0 gelten ab diesem Tag`, marke: { wort: 'Termin', art: 'erledigt' }, kalendertag: '2026-11-24' },
+    ])
+  })
+
+  it('am Tag selbst steht er noch da; jetzt 25.11.2026 fehlt er', () => {
+    expect(kommtEintraege({ ...OHNE, hofpreisAbTag: '2026-11-24' }, new Date('2026-11-24T20:00:00.000Z')).map((x) => x.kalendertag)).toEqual(['2026-11-24'])
+    expect(kommtEintraege({ ...OHNE, hofpreisAbTag: '2026-11-24' }, new Date('2026-11-25T09:00:00.000Z'))).toEqual([])
+  })
+
+  it('der Tag: aus der Einstellung (Mitternacht in Wien), ohne Einstellung der Tag aus der Vorgabe', () => {
+    expect(hofpreisAbTag({ hofpreisModellAb: new Date('2026-11-24T00:00:00.000+01:00') })).toBe('2026-11-24')
+    expect(hofpreisAbTag({ hofpreisModellAb: null })).toBe('2027-02-01')
+    expect(hofpreisAbTag(null)).toBe('2027-02-01')
   })
 })

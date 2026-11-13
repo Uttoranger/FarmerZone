@@ -85,6 +85,12 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Nr. 306: Die Hofseite lädt jede Kundin. Trägt ihr Paket wieder Code, den nur der
+      # Hof braucht (dnd-kit, Produktbild- oder Titelbild-Knopf), wird die CI rot — auch,
+      # wenn das Manifest nach einem Next-Update fehlt (scripts/pruefung/paket-hofseite.mjs).
+      - name: Kein Hof-Code im Paket der Hofseite
+        run: node scripts/pruefung/paket-hofseite.mjs
+
       # Regelvorschlag 74, gebaut in Nr. 75: Die Hofseite liest die Illustrationen
       # der Unterkategorien vom Dateisystem (product-image.ts, assetExists). Fehlen
       # sie in ihrer Trace-Datei, fehlen sie in Produktion still — dann wird die CI rot.

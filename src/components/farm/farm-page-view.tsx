@@ -19,20 +19,16 @@
  * Stiften (am Handy unter lg auf /farm-page). Seit Nr. 50 bearbeitet Mein Hof
  * mit der Liste der Abschnitte und dem Blatt von unten
  * (components/mein-hof/abschnitte-liste.tsx); der Bearbeitungsmodus ist seit
- * Nr. 50 Runde 1 entfernt. Geblieben ist der Titelbild-Knopf
- * (CoverEditButton), den Mein Hof weiter nutzt; den Ausschnitt wählt seit
+ * Nr. 50 Runde 1 entfernt. Geblieben ist hier nur der Stil der Knöpfe auf
+ * dem Titelbild (TITELBILD_KNOPF_STIL); den Knopf selbst (CoverEditButton)
+ * trägt seit Nr. 306 components/farm/titelbild-knopf.tsx, damit er nicht im
+ * Paket der Hofseite landet — diese Datei bindet ihn nie ein. Den Ausschnitt wählt seit
  * Nr. 97 der Bild-Baustein (components/shared/bild-ausschnitt.tsx), das
  * frühere CoverFocusAdjust (nur senkrecht) ist entfallen.
  */
 
-import { useEffect, useTransition } from 'react'
 import { PreisAnzeigeRahmen } from '@/components/shared/preis-anzeige'
-import { useRouter } from 'next/navigation'
-import { Camera } from 'lucide-react'
-import { toast } from 'sonner'
 import type { ActiveStatusPost } from '@/server/queries/status-posts'
-import { updateFarmBannerAction } from '@/server/actions/appearance'
-import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { HofseiteKunde, type HofseiteHof } from '@/components/hofseite/hofseite-kunde'
 import type { SeitenAnsicht } from '@/lib/ansichts-modus'
 import type { KaufSperre } from '@/lib/bereiche-anzeige'
@@ -50,72 +46,6 @@ export const TITELBILD_KNOPF_STIL = {
   color: 'var(--foto-knopf-ink)',
   boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
 } as const
-
-/**
- * „Titelbild ersetzen" — im Baustein „Titelbild" von Mein Hof
- * (components/mein-hof/bild-bausteine.tsx: ab lg im Editor, unter lg seit
- * Nr. 50 im Blatt), der über `onGespeichert`
- * seine Vorschau neu lädt. `meldeErfolg` ersetzt den eigenen Toast — in Mein
- * Hof unter lg durch „Gespeichert · Ansehen" (Nr. 49). `onHochladen` meldet,
- * solange hochgeladen und gespeichert wird: Das Blatt bleibt dann offen,
- * sonst hinge das Datei-Feld mitten im Upload aus (CODING_STANDARDS §8).
- * `gross` macht den Knopf 44 px hoch (Touch-Ziel im Blatt, Nr. 50).
- */
-export function CoverEditButton({
-  onGespeichert,
-  meldeErfolg,
-  onHochladen,
-  gross = false,
-}: {
-  onGespeichert?: () => void
-  meldeErfolg?: () => void
-  onHochladen?: (laeuft: boolean) => void
-  gross?: boolean
-}): React.JSX.Element {
-  const [speichert, startTransition] = useTransition()
-  const router = useRouter()
-
-  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
-    variant: 'banner',
-    onUploaded: (url) => {
-      startTransition(async () => {
-        const result = await updateFarmBannerAction('PHOTO', url)
-        if (result.error) {
-          toast.error(result.error)
-        } else {
-          if (meldeErfolg) meldeErfolg()
-          else toast.success('Titelbild aktualisiert')
-          router.refresh()
-          onGespeichert?.()
-        }
-      })
-    },
-  })
-  const laeuft = isUploading || speichert
-  useEffect(() => {
-    if (!onHochladen) return
-    onHochladen(laeuft)
-    return () => {
-      if (laeuft) onHochladen(false)
-    }
-  }, [laeuft, onHochladen])
-
-  return (
-    <>
-      {fileInput}
-      <button
-        type="button"
-        onClick={openFilePicker}
-        disabled={isUploading}
-        className={`flex items-center gap-1.5 ${gross ? 'min-h-11' : 'h-9'} px-3.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-60`}
-        style={TITELBILD_KNOPF_STIL}
-      >
-        <Camera className="size-3.5" strokeWidth={1.7} />
-        {isUploading ? (progress ? stufenText(progress) : 'Lädt…') : 'Titelbild ersetzen'}
-      </button>
-    </>
-  )
-}
 
 // ── Die Hofseite ──────────────────────────────────────────────────────────────
 

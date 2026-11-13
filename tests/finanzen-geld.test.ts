@@ -64,7 +64,7 @@ describe('Monatsabschluss', () => {
   it('je offener Punkt ein Grund; der Abgleich zählt erst nach einem Lauf nach dem Monatsende', () => {
     expect(monatsabschlussMoeglich(monatsabschlussPruefliste({ ...ALLES_ERLEDIGT, abweichungen: 2, csvGeladen: false }))).toEqual({
       moeglich: false,
-      grund: 'Geht erst, wenn alles erledigt ist: 2 Abweichungen ungeklärt, die CSV ist nach dem Monatsende noch nicht geladen.',
+      grund: 'Geht erst, wenn alles erledigt ist: 2 Bestellungen weichen ab – sie stehen in Heute, die CSV ist nach dem Monatsende noch nicht geladen.',
     })
     const ungeprueft = monatsabschlussPruefliste({ ...ALLES_ERLEDIGT, abgleichNachMonatsende: false })
     expect(ungeprueft[0]).toMatchObject({ erledigt: false, offen: 'der Abgleich ist nach dem Monatsende noch nicht gelaufen' })

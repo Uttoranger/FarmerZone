@@ -262,17 +262,25 @@ function alsBestellung(o: Prisma.OrderGetPayload<{ select: typeof SUCH_BESTELLUN
  *  - Adresse: die Bestellungen der letzten 90 Tage mit genau dieser Adresse
  *    und alle Aufträge mit ihrem Fingerabdruck (auch ohne Bestellung, etwa
  *    Anmeldecodes); dazu die Bestellungen, auf die diese Aufträge zeigen.
+ *  - `ohneZeitgrenze` (Admin › Bestellungen, N32): die 90 Tage entfallen an
+ *    der Bestellung; `take: 20` und die Grenze an den Aufträgen bleiben.
  */
-export async function sucheMails(suche: Extract<MailSuche, { art: 'bestellung' | 'adresse' }>, jetzt: Date): Promise<{ bestellungen: SuchBestellung[]; mails: SuchMail[] }> {
+export async function sucheMails(
+  suche: Extract<MailSuche, { art: 'bestellung' | 'adresse' }>,
+  jetzt: Date,
+  optionen: { ohneZeitgrenze?: boolean } = {},
+): Promise<{ bestellungen: SuchBestellung[]; mails: SuchMail[] }> {
   const ab = new Date(jetzt.getTime() - MAIL_PROTOKOLL_AUFBEWAHREN_TAGE * TAG_MS)
+  // Register N32: Für Admin › Bestellungen gilt die Grenze nicht an der Bestellung (die Mail-Aufträge behalten sie, Aufbewahrung unverändert).
+  const bestellZeit = optionen.ohneZeitgrenze ? {} : { createdAt: { gte: ab } }
   if (suche.art === 'bestellung') {
-    const bestellung = await prisma.order.findFirst({ where: { orderNumber: suche.nummer, createdAt: { gte: ab } }, select: SUCH_BESTELLUNG_FELDER })
+    const bestellung = await prisma.order.findFirst({ where: { orderNumber: suche.nummer, ...bestellZeit }, select: SUCH_BESTELLUNG_FELDER })
     if (!bestellung) return { bestellungen: [], mails: [] }
     const mails = await prisma.mailAuftrag.findMany({ where: { bestellungId: bestellung.id }, orderBy: { erstelltAm: 'asc' }, select: SUCH_MAIL_FELDER })
     return { bestellungen: [alsBestellung(bestellung)], mails }
   }
   const [vonAdresse, mails] = await Promise.all([
-    prisma.order.findMany({ where: { customerEmail: suche.adresse, createdAt: { gte: ab } }, orderBy: { createdAt: 'desc' }, take: 20, select: SUCH_BESTELLUNG_FELDER }),
+    prisma.order.findMany({ where: { customerEmail: suche.adresse, ...bestellZeit }, orderBy: { createdAt: 'desc' }, take: 20, select: SUCH_BESTELLUNG_FELDER }),
     prisma.mailAuftrag.findMany({
       where: { empfaengerHash: empfaengerFingerabdruck(suche.adresse), erstelltAm: { gte: ab } },
       orderBy: { erstelltAm: 'asc' },

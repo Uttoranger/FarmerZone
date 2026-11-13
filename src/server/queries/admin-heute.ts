@@ -17,9 +17,10 @@ import { umsatzfenster, type Umsatzfenster } from '@/lib/umsatz'
 import { ohneTestzahlungenWhere } from '@/lib/testzahlung'
 import { gruendungEinstellungAus, hofpreisEinstellungAus } from '@/lib/plattform-einstellung'
 import type { AblaufLaufDaten } from '@/lib/betrieb'
-import { sammleAufgaben, LEERER_STAND, type Aufgabe, type AufgabeHof, type AufgabenStand, type LiveSignalStand, type HeuteWoche, type ProtokollRoh } from '@/lib/admin-aufgaben'
+import { hofpreisAbTag, sammleAufgaben, LEERER_STAND, type Aufgabe, type AufgabeHof, type AufgabenStand, type LiveSignalStand, type HeuteWoche, type ProtokollRoh } from '@/lib/admin-aufgaben'
 import { HOF_SICHTBAR_WO } from '@/lib/hof-sichtbar'
 import { ladeWiderrufAufgaben } from '@/server/widerruf'
+import { ladeHofSignale } from '@/server/queries/admin-signale'
 
 /*
  * Die Daten von Admin › Heute (Register N32, Nr. 185). Die Aufgaben kommen
@@ -89,7 +90,7 @@ async function ladeLiveSignal(): Promise<LiveSignalStand | null> {
  * wäre ein Fehlalarm (dieselbe Regel wie bisher Punkt und Betriebsleiste).
  */
 export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrieb: boolean }): Promise<AufgabenStand> {
-  const [hoefeWartend, erstattungen, mailProbleme, meldungen, hoefeAktiv, bestellstopp, plattformgebuehr, liveSignal, betrieb, widerrufe] = await Promise.all([
+  const [hoefeWartend, erstattungen, mailProbleme, meldungen, hoefeAktiv, bestellstopp, plattformgebuehr, liveSignal, betrieb, widerrufe, hofSignale] = await Promise.all([
     ladeHofAufgaben(jetzt),
     ladeErstattungAufgaben(),
     ladeProbleme(jetzt),
@@ -111,6 +112,8 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
       : null,
     // Widerruf offen (Nr. 200, N39): nur Kennungen, Bestellnummer, Hofname.
     ladeWiderrufAufgaben(),
+    // Stille Ereignisse eines Hofs (Nr. 304): am Ende, damit der erste Aufruf von prisma.farm.findMany der von ladeHoefeAktiv bleibt.
+    ladeHofSignale(jetzt),
   ])
   return {
     ...LEERER_STAND,
@@ -123,6 +126,7 @@ export async function ladeAufgabenStand(jetzt: Date, { mitBetrieb }: { mitBetrie
     bestellstopp,
     plattformgebuehr,
     liveSignal,
+    hofSignale,
     ...(betrieb ? { wartendeMail: betrieb[0], warnungen: betrieb[1], laeufe: betrieb[2], geldAbweichungen: betrieb[3] } : {}),
   }
 }
@@ -140,6 +144,8 @@ export type HeuteRoh = {
   hoefe: { verkaufen: number; warten: number }
   naechsteFassung: Date | null
   gruendung: { aktionBisTag: string | null; fest: boolean }
+  /** Ab welchem Wiener Kalendertag die Plattformgebühr im Preis gilt (Einstellung, sonst Vorgabe) — für „Kommt“ (Nr. 304). */
+  hofpreisAbTag: string
   protokoll: ProtokollRoh[]
   /** Die Antwortzeit von `SELECT 1` beim Aufbau, null wenn sie scheiterte (Karte Dienste). */
   antwortMs: number | null
@@ -248,6 +254,7 @@ export async function ladeHeute(jetzt: Date, optionen: { mitBetrieb: boolean }, 
     hoefe: { verkaufen, warten: stand.hoefeWartend.length },
     naechsteFassung,
     gruendung: { aktionBisTag: gruendung.aktionBisTag, fest: gruendung.festAm !== null },
+    hofpreisAbTag: hofpreisAbTag(hofpreisEinstellungAus(einstellung)),
     protokoll,
     antwortMs,
     laeufe: laeufe ?? stand.laeufe,

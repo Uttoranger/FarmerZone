@@ -64,6 +64,8 @@ vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () =
 vi.mock('@/server/queries/plattformgebuehr', () => ({
   ladePlattformgebuehrAufgaben: vi.fn(async () => ({ gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [], kundenstreit: [] })),
 }))
+// Nr. 304: die stillen Ereignisse eines Hofs haben eigene Tests (tests/integration/admin-signale.int.test.ts).
+vi.mock('@/server/queries/admin-signale', () => ({ ladeHofSignale: vi.fn(async () => ({ lastschrift: [], agb: [], konto: [] })) }))
 vi.mock('@/server/queries/startseite', () => ({ naechsterTermin: vi.fn(async () => null) }))
 // Nr. 200: „Widerruf offen“ — hier ohne Widerrufe (die Quelle prüft tests/widerruf.test.ts).
 vi.mock('@/server/widerruf', () => ({ ladeWiderrufAufgaben: vi.fn(async () => []) }))
@@ -184,8 +186,8 @@ describe('Admin › Heute', () => {
     // Lage aus den Attrappen: 6 offen (4 bezahlt + 2 bereit), davon 4 nicht gepackt, 1 Storno; € 1.840 Umsatz.
     expect(html).toContain('4 noch nicht gepackt · 1 Storno')
     expect(html).toMatch(/€ 1\D840</)
-    // Zwei leise Zeilen und das Zustandswort wie im Mockup; Servicegebühr der Woche in Euro.
-    expect(html).toContain('Im Rahmen')
+    // Zwei leise Zeilen wie im Mockup, ohne Zustandswort (Nr. 303: kein Rahmen dahinter); Servicegebühr der Woche in Euro.
+    expect(html).not.toContain('Im Rahmen')
     expect(html).toContain('Woche: 118 (+9 % zur Vorwoche)')
     expect(html).toMatch(/Servicegebühr € 92,00/)
     expect(db.order.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ serviceFeeRefundedAt: null, status: { not: 'CANCELLED' } }) }))
@@ -266,7 +268,7 @@ describe('Betriebsleiste: dieselbe Zahl wie „Braucht dich“', () => {
 })
 
 describe('Stripe live ohne Hofpreis-Modell (Nr. 201, N40): Aufgabe und Betriebsleiste aus derselben Liste', () => {
-  const SATZ = 'Stripe ist live, aber das Hofpreis-Modell beginnt erst am 1.\u00a0Februar 2027 – Stichtag vorziehen'
+  const SATZ = 'Echte Zahlungen laufen, aber die Plattformgebühr im Preis beginnt erst am 1.\u00a0Februar 2027 – Tag vorziehen'
 
   it('live und Stichtag in der Zukunft (Vorgabe 1.2.2027): Aufgabe ganz oben in „Braucht dich“ und dieselbe Warnung in der Betriebsleiste', async () => {
     modus.stripe = 'live'
@@ -280,7 +282,7 @@ describe('Stripe live ohne Hofpreis-Modell (Nr. 201, N40): Aufgabe und Betriebsl
   it('live und Stichtag erreicht → weder Aufgabe noch Warnung', async () => {
     modus.stripe = 'live'
     vi.mocked(lesePlattformEinstellung).mockResolvedValue({ hofpreisModellAb: new Date(JETZT.getTime() - STUNDE).toISOString() } as Awaited<ReturnType<typeof lesePlattformEinstellung>>)
-    expect(await seite()).not.toContain('Stripe ist live')
+    expect(await seite()).not.toContain('Echte Zahlungen laufen')
     expect((await ladeAdminbereich()).stripeLiveWarnung).toBeNull()
   })
 

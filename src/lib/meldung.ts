@@ -713,7 +713,7 @@ export const MELDUNGEN_TEXT = {
     `${gesamt} ${gesamt === 1 ? 'Meldung steckt' : 'Meldungen stecken'} in anderen Karten: ${buendel} in Bündeln, ${duplikate} als Duplikat. Sie haben keine eigene Karte, zählen aber als Stimme.`,
   zusammengefasstKopf: 'Zusammengefasst:',
   regel:
-    'Wohin eine Meldung geht: Neu → (KI-Vorschlag) → Geplant → Erledigt. Ein Wunsch, den du noch nicht planst, liegt unter Gesammelt und sammelt Stimmen. Abgelegt heißt: kein Fehler oder nicht geplant – mit Antwort an den Hof. Erledigt setzt das Deployment, nie die KI.',
+    'Wohin eine Meldung geht: Neu → (KI-Vorschlag) → Geplant → Erledigt. Ein Wunsch, den du noch nicht planst, liegt unter Gesammelt und sammelt Stimmen. Abgelegt heißt: kein Fehler oder nicht geplant – mit Antwort an den Hof. Auf „Erledigt“ springt eine Meldung von selbst, sobald die Änderung online ist – nie durch die KI.',
   kiKopf: 'Was die KI hier tut',
   kiSatz: 'Sie sortiert vor. Entscheiden, antworten, Status setzen und bauen tust du – Meldungen sind Fremdtext.',
   kiZeilen: [
@@ -808,7 +808,7 @@ export const WUENSCHE_TEXT = {
   standFuerAlle: (n: number) => `Stand für alle ${n}`,
   geplantIn: 'Geplant in',
   geplantInBeispiel: 'z. B. Nr. 97',
-  umgesetztHinweis: '„Umgesetzt“ setzt normal das Deployment.',
+  umgesetztHinweis: '„Umgesetzt“ setzt sich von selbst, sobald die Änderung online ist.',
   antwort: 'Antwort an die Höfe',
   antwortPflicht: 'Bei „Nicht geplant“ braucht es eine Antwort.',
   soSiehtEsDerHof: 'So sieht es der Hof in „Meine Meldungen“',

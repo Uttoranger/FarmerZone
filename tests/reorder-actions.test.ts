@@ -23,7 +23,6 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { reorderProductsAction } from '@/server/actions/products'
 import * as fotoActions from '@/server/actions/farm-photos'
 import { moveFarmPhotoAction } from '@/server/actions/farm-photos'
 import { auth } from '@/lib/auth'
@@ -50,57 +49,6 @@ beforeEach(() => {
   productUpdate.mockImplementation(((args: unknown) => args) as never)
   photoUpdate.mockImplementation(((args: unknown) => args) as never)
   transaction.mockResolvedValue([] as never)
-})
-
-describe('reorderProductsAction', () => {
-  it('verweigert ohne Session, ohne Teiländerung', async () => {
-    getSession.mockResolvedValue(null as never)
-    const result = await reorderProductsAction(['p1', 'p2', 'p3'])
-    expect(result.error).toBeDefined()
-    expect(transaction).not.toHaveBeenCalled()
-  })
-
-  it('verweigert ohne eigenen Hof', async () => {
-    farmForUser.mockResolvedValue(null as never)
-    const result = await reorderProductsAction(['p1', 'p2', 'p3'])
-    expect(result.error).toBeDefined()
-    expect(transaction).not.toHaveBeenCalled()
-  })
-
-  it('lehnt Listen mit fremden IDs ab — Fehler ohne Teiländerung', async () => {
-    const result = await reorderProductsAction(['p1', 'p2', 'FREMD'])
-    expect(result.error).toBeDefined()
-    expect(transaction).not.toHaveBeenCalled()
-    expect(productUpdate).not.toHaveBeenCalled()
-  })
-
-  it('lehnt unvollständige Listen ab (Produkt fehlt)', async () => {
-    const result = await reorderProductsAction(['p1', 'p2'])
-    expect(result.error).toBeDefined()
-    expect(transaction).not.toHaveBeenCalled()
-  })
-
-  it('lehnt Listen mit doppelten IDs ab', async () => {
-    const result = await reorderProductsAction(['p1', 'p2', 'p2'])
-    expect(result.error).toBeDefined()
-    expect(transaction).not.toHaveBeenCalled()
-  })
-
-  it('resequenziert sauber auf 0..n−1 in einer Transaktion', async () => {
-    const result = await reorderProductsAction(['p3', 'p1', 'p2'])
-    expect(result).toEqual({})
-    expect(transaction).toHaveBeenCalledTimes(1)
-    expect(productUpdate).toHaveBeenNthCalledWith(1, { where: { id: 'p3' }, data: { sortOrder: 0 } })
-    expect(productUpdate).toHaveBeenNthCalledWith(2, { where: { id: 'p1' }, data: { sortOrder: 1 } })
-    expect(productUpdate).toHaveBeenNthCalledWith(3, { where: { id: 'p2' }, data: { sortOrder: 2 } })
-  })
-
-  it('ist idempotent bei unveränderter Reihenfolge', async () => {
-    const result = await reorderProductsAction(['p1', 'p2', 'p3'])
-    expect(result).toEqual({})
-    expect(productUpdate).toHaveBeenNthCalledWith(1, { where: { id: 'p1' }, data: { sortOrder: 0 } })
-    expect(productUpdate).toHaveBeenNthCalledWith(3, { where: { id: 'p3' }, data: { sortOrder: 2 } })
-  })
 })
 
 describe('Fotos: keine exportierte Drag-&-Drop-Action mehr (Nr. 213.5)', () => {

@@ -13,7 +13,7 @@ export const GELD_TEXT = {
   kennzahlen: 'Geld in Zahlen',
   abgleich: 'Abgleich mit Stripe',
   abgleichZusatz: 'täglich, nur lesend',
-  stripeGebuehrTraeger: `trägt ${MARKE} (Destination Charges)`,
+  stripeGebuehrTraeger: `trägt ${MARKE}`,
   abschluss: (bezeichnung: string): string => `Monatsabschluss ${bezeichnung}`,
   abschliessen: (monatName: string): string => `${monatName} abschließen …`,
   abgeschlossen: 'abgeschlossen',

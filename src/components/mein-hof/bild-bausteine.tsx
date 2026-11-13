@@ -14,7 +14,8 @@ import {
 } from '@/server/actions/farm-photos'
 import type { FarmPhotoData } from '@/server/queries/appearance'
 import { stufenText, useImageUpload } from '@/components/shared/image-upload'
-import { CoverEditButton, TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
+import { TITELBILD_KNOPF_STIL } from '@/components/farm/farm-page-view'
+import { CoverEditButton } from '@/components/farm/titelbild-knopf'
 import { BildAusschnitt } from '@/components/shared/bild-ausschnitt'
 import { titelbildFoto, titelbildVerlauf } from '@/lib/mein-hof'
 import {

@@ -123,7 +123,10 @@ export default async function AdminHeutePage({
     },
     aufgaben
   )
-  const kommt = kommtEintraege({ naechsteFassung: roh.naechsteFassung, gruendungAktionBisTag: roh.gruendung.aktionBisTag, gruendungFest: roh.gruendung.fest }, jetzt)
+  const kommt = kommtEintraege(
+    { naechsteFassung: roh.naechsteFassung, gruendungAktionBisTag: roh.gruendung.aktionBisTag, gruendungFest: roh.gruendung.fest, hofpreisAbTag: roh.hofpreisAbTag },
+    jetzt
+  )
   const protokoll = protokollZeilen(roh.protokoll, userId, jetzt)
   const schluessel = routineSchluessel(jetzt)
   const puenktlich = `${ablaeufe.filter((z) => z.stand === 'puenktlich').length} von ${ablaeufe.length} pünktlich`

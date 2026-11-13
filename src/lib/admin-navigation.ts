@@ -85,7 +85,7 @@ export const ADMIN_MEHR_ZEILE: Partial<Record<AdminReiterId, string>> = {
   startseite: 'Entwurf, Vorschau, Zeitplan',
   geld: 'Abgleich, Monatsabschluss, Kosten',
   betrieb: 'Abläufe, E-Mails, Protokoll',
-  einstellungen: 'Team, Benachrichtigungen, Notfallzugang',
+  einstellungen: 'Team, Benachrichtigungen',
 }
 
 /** Für Screenreader an der Zahl des Reiters „Heute“ (Zaehler, `sr-only`). */

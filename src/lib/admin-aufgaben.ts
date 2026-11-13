@@ -18,7 +18,6 @@ import { eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } 
 import { MELDUNG_ART_LABEL } from '@/lib/meldung'
 import { kurznummerAus } from '@/lib/kurznummer'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
-import { TARIFE_AB_TAG } from '@/lib/konditionen'
 import { wienWochenbeginn, wienWochenMontag } from '@/lib/kalender'
 import { VORRANG } from '@/schemas/mail-auftrag'
 import { kalendertagInWien } from '@/lib/wiener-tag'
@@ -28,7 +27,7 @@ import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/sch
 import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
-import { ABWEICHUNG_FELD_TEXT, type KundenstreitArt, type OffeneAbweichung } from '@/lib/geld-abgleich'
+import { abweichungFeldText, type KundenstreitArt, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { MARKE } from '@/lib/marke'
 import { bestellungenHref } from '@/lib/admin-bestellung'
 import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
@@ -36,6 +35,7 @@ import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeh
 import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import type { Umgebung } from '@/lib/umgebung'
 import { istHofOnlineHaengtStand, stripeGrundAdmin, type HofOnlineHaengtStand, type StripeAnzeige } from '@/lib/stripe-konto'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -79,6 +79,9 @@ export const AUFGABE_QUELLEN = [
   'widerruf_offen',
   'hof_online_haengt',
   'kundenstreit',
+  'lastschrift_beendet',
+  'agb_offen',
+  'konto_frist_um',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -159,7 +162,20 @@ export type AufgabenStand = {
   liveSignal: LiveSignalStand | null
   /** Offene Widerrufe (Nr. 200, N39) — nur Kennungen, Bestellnummer und Hofname, nie Name, Adresse oder Nachricht. */
   widerrufe: readonly WiderrufAufgabeRoh[]
+  /** Stille Ereignisse eines Hofs (Nr. 304), geladen von ladeHofSignale — nur Kennung, Hofname und seit wann. */
+  hofSignale: HofSignaleStand
 }
+
+/** Ein Hof mit einem stillen Ereignis: nie Adresse oder Name einer Person. */
+export type HofSignalRoh = { farmId: string; hofName: string; seit: Date }
+
+/**
+ * Was ohne eigene Nachricht an das Team geschieht (Nr. 304, F047 Nr. 11 und 14):
+ * Lastschrift beendet (verkaufender Hof, bar mit Mandatspflicht, kein Mandat
+ * mehr), AGB offen (verkaufender Hof ohne Zustimmung zur neuesten Fassung) und
+ * Konto-Frist um (seit über 30 Tagen geschlossen, Stufe 2 noch nicht gelaufen).
+ */
+export type HofSignaleStand = { lastschrift: readonly HofSignalRoh[]; agb: readonly HofSignalRoh[]; konto: readonly HofSignalRoh[] }
 
 /** Was die Quelle „Stripe live ohne Hofpreis-Modell“ braucht: den Modus aus `bestimmeUmgebung`, den Stichtag und seit wann live (STRIPE_LIVE_AB). */
 export type LiveSignalStand = { umgebung: Pick<Umgebung, 'art' | 'stripe'>; einstellung: HofpreisEinstellung; liveSeit: Date | null }
@@ -199,6 +215,7 @@ export const LEERER_STAND: AufgabenStand = {
   plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [], kundenstreit: [] },
   liveSignal: null,
   widerrufe: [],
+  hofSignale: { lastschrift: [], agb: [], konto: [] },
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -236,6 +253,10 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   hof_online_haengt: 24 * STUNDE_MS,
   // Nr. 289 (E-022): nur der Rahmen — die Frist je Fall ist die Antwortfrist bei Stripe (kundenstreitQuelle).
   kundenstreit: 7 * TAG_MS,
+  // Nr. 304 (an die Alarm-Matrix angelehnt): Lastschrift beendet wie „Lastschrift gescheitert“ 3 Tage; AGB und Konto-Frist die Woche.
+  lastschrift_beendet: 3 * TAG_MS,
+  agb_offen: 7 * TAG_MS,
+  konto_frist_um: 7 * TAG_MS,
 }
 
 /** Ein Widerruf ohne Bestellung braucht das Team schneller: 2 Tage (Freigabe 200 Punkt 6). */
@@ -261,6 +282,9 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   widerruf_offen: 'Geld',
   hof_online_haengt: 'Höfe',
   kundenstreit: 'Geld',
+  lastschrift_beendet: 'Geld',
+  agb_offen: 'Höfe',
+  konto_frist_um: 'Höfe',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -388,7 +412,7 @@ function meldungNeu(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       {
         titel: meldungTitel(m),
         bezug: { kennung: m.id, text: `${m.von} · ${MELDUNG_ART_LABEL[m.art]} · Nr. ${kurznummerAus(m.id)}` },
-        satz: 'Lesen, einordnen und dem Hof antworten.',
+        satz: 'Lesen, einordnen und antworten.',
         seit: m.createdAt,
         wasTun: 'oeffnen',
         ziel: eingangMeldungAdresse(m.id),
@@ -448,9 +472,9 @@ function uptimeStill(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
     aufgabe(
       'uptime_still',
       {
-        titel: 'Uptime-Dienst ist still',
+        titel: 'Die Überwachung von außen meldet sich nicht',
         bezug: { kennung: 'von-aussen', text: `zuletzt ${zuletztText(lauf.gestartetAm, jetzt)}` },
-        satz: 'Seit über 30 Minuten kein Aufruf von /api/gesund. Sieh beim Uptime-Dienst nach – solange er still ist, merkt niemand einen Ausfall.',
+        satz: `Seit über 30 Minuten hat der Dienst, der von außen prüft, ob ${MARKE} erreichbar ist, nicht mehr nachgesehen. Sieh dort nach. Solange er still ist, merkt niemand einen Ausfall.`,
         seit: warnung?.seit ?? new Date(lauf.gestartetAm.getTime() + UEBERFAELLIG_NACH_MS.vonAussen),
         wasTun: 'ansehen',
         ziel: ADMIN_BETRIEB_HREF,
@@ -586,13 +610,13 @@ function geldAbweichung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   for (const a of stand.geldAbweichungen) jeBestellung.set(a.orderId, [...(jeBestellung.get(a.orderId) ?? []), a])
   return [...jeBestellung.values()].map((liste) => {
     const erste = liste.reduce((a, b) => (b.seit.getTime() < a.seit.getTime() ? b : a))
-    const teile = liste.map((a) => `${ABWEICHUNG_FELD_TEXT[a.feld]} ${a.differenzCents > 0 ? '+' : '−'}${formatEuro(centsAlsEuro(Math.abs(a.differenzCents)))}`)
+    const teile = liste.map((a) => `${abweichungFeldText(a)} ${a.differenzCents > 0 ? '+' : '−'}${formatEuro(centsAlsEuro(Math.abs(a.differenzCents)))}`)
     return aufgabe(
       'geld_abweichung',
       {
         titel: 'Abweichung beim Geld',
         bezug: { kennung: erste.orderNumber, text: [erste.orderNumber, ...teile].join(' · ') },
-        satz: 'Die Datenbank und Stripe sagen nicht dasselbe (Plus: die Datenbank hat mehr). Bei Stripe nachsehen und die Bestellung prüfen.',
+        satz: `${MARKE} und Stripe haben für diese Bestellung verschiedene Beträge (Plus: bei ${MARKE} steht mehr). Öffne die Bestellung und daneben die Zahlung in Stripe. Solange das offen ist, lässt sich der Monat der Bestellung nicht abschließen.`,
         seit: erste.seit,
         wasTun: 'pruefen',
         ziel: bestellungenHref({}, { suche: erste.orderNumber }),
@@ -715,7 +739,7 @@ function nichtAbgeholtAuffaelligQuelle(stand: AufgabenStand, jetzt: Date): Aufga
 
 /** Titel der Aufgabe und Satz der Betriebsleiste (N40) — ein Satz für beide. */
 export function stripeLiveOhneHofpreisTitel(ab: Date): string {
-  return `Stripe ist live, aber das Hofpreis-Modell beginnt erst am ${formatDatumLang(ab)} – Stichtag vorziehen`
+  return `Echte Zahlungen laufen, aber die Plattformgebühr im Preis beginnt erst am ${formatDatumLang(ab)} – Tag vorziehen`
 }
 
 /**
@@ -737,7 +761,7 @@ function stripeLiveOhneHofpreis(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       {
         titel: stripeLiveOhneHofpreisTitel(ab),
         bezug: { kennung: 'stripe', text: 'Stripe LIVE · Hofpreis-Modell ab' },
-        satz: 'Die Bestellungen laufen weiter, bis zum Stichtag nach dem bisherigen Modell. In den Einstellungen den Stichtag „Hofpreis-Modell ab“ so früh wie möglich setzen.',
+        satz: 'Bis dahin gilt für neue Bestellungen das bisherige Modell: Online zahlt die Kundschaft die Gebühr zusätzlich zum Preis, bar fällt keine an. Setz den Tag in den Einstellungen bei „Hofpreis-Modell ab“ so früh wie möglich.',
         seit,
         wasTun: 'oeffnen',
         ziel: `${ADMIN_EINSTELLUNGEN_HREF}#${HOFPREIS_KARTE_ID}`,
@@ -791,6 +815,39 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   )
 }
 
+/** Die Sätze der stillen Ereignisse eines Hofs (Nr. 304) — wörtlich aus dem Auftrag. */
+const HOF_SIGNAL_SATZ = {
+  lastschrift_beendet:
+    'Der Hof hat keine gültige Lastschrift mehr. Sobald der Einzug der Gebühr aus Barbestellungen für ihn begonnen hat, kann bei ihm niemand mehr bar bestellen. Schreib dem Hof: Er richtet die Lastschrift unter „Deine Konditionen“ neu ein.',
+  agb_offen: `Der Hof verkauft, hat der Fassung ${AGB_NEUESTE} der AGB aber noch nicht zugestimmt. In seinem Heute steht dazu eine Karte. Schreib ihm im Postfach.`,
+  konto_frist_um: 'Die 30 Tage zum Wieder-Öffnen sind um. Jetzt sind Kontakt, Fotos und Texte des Hofs zu löschen (AGB 29.3). Das läuft noch nicht von selbst – gib das Löschen in Auftrag.',
+} as const
+
+type HofSignalQuelle = keyof typeof HOF_SIGNAL_SATZ
+
+/**
+ * Stille Ereignisse eines Hofs (Nr. 304): je Hof eine Aufgabe, Ziel seine Akte.
+ * Nur zeigen — keine Mail, keine Nachricht, keine Sperre. Ist die Ursache weg
+ * (neues Mandat, Zustimmung, gelöscht), fehlt der Hof im Stand (N32).
+ */
+function hofSignal(quelle: HofSignalQuelle, liste: keyof HofSignaleStand): (stand: AufgabenStand, jetzt: Date) => Aufgabe[] {
+  return (stand, jetzt) =>
+    stand.hofSignale[liste].map((h) =>
+      aufgabe(
+        quelle,
+        {
+          titel: QUELLE_NAME[quelle],
+          bezug: { kennung: h.farmId, text: h.hofName },
+          satz: HOF_SIGNAL_SATZ[quelle],
+          seit: h.seit,
+          wasTun: 'hofAnsehen',
+          ziel: adminHofHref(h.farmId),
+        },
+        jetzt
+      )
+    )
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   notbremse_aktiv: notbremseAktiv,
@@ -812,6 +869,39 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   widerruf_offen: widerrufOffen,
   hof_online_haengt: hofOnlineHaengt,
   kundenstreit: kundenstreitQuelle,
+  lastschrift_beendet: hofSignal('lastschrift_beendet', 'lastschrift'),
+  agb_offen: hofSignal('agb_offen', 'agb'),
+  konto_frist_um: hofSignal('konto_frist_um', 'konto'),
+}
+
+/**
+ * Ein fester Name je Quelle, ohne Daten (Nr. 304; für das Handbuch und die
+ * tägliche Mail): der Titel der Aufgabe, wo er fest ist, sonst ein fester
+ * Ersatz. Spätere Quellen tragen ihren Namen hier selbst ein.
+ */
+export const QUELLE_NAME: Record<AufgabeQuelle, string> = {
+  notbremse_aktiv: NOTBREMSE_ADMIN_TEXT.aufgabe,
+  hof_wartet: 'Hof wartet auf Freischaltung',
+  erstattung_offen: 'Erstattung offen',
+  mail_gescheitert: 'Mail gescheitert',
+  mail_haengt: 'Wichtige Mail hängt',
+  meldung_neu: 'Neue Meldung',
+  betrieb_warnung: 'Warnung des Betriebs',
+  uptime_still: 'Die Überwachung von außen meldet sich nicht',
+  hof_ohne_abholzeit: 'Hof ohne Abholzeit nächste Woche',
+  hof_ohne_bestellung: `Seit ${OHNE_BESTELLUNG_TAGE} Tagen ohne Bestellung`,
+  geld_abweichung: 'Abweichung beim Geld',
+  einzug_gescheitert: 'Lastschrift gescheitert',
+  rueckbuchung: 'Lastschrift zurückgebucht',
+  rechnungsangaben_fehlen: 'Rechnungsangaben fehlen',
+  nicht_abgeholt_auffaellig: 'Viele Barbestellungen nicht abgeholt',
+  stripe_live_ohne_hofpreis: 'Echte Zahlungen ohne Plattformgebühr im Preis',
+  widerruf_offen: 'Rücktritt offen',
+  hof_online_haengt: HOF_ONLINE_HAENGT_TITEL,
+  kundenstreit: 'Rückbuchung einer Kundenzahlung',
+  lastschrift_beendet: 'Lastschrift beendet',
+  agb_offen: 'AGB noch nicht zugestimmt',
+  konto_frist_um: 'Konto seit 30 Tagen geschlossen',
 }
 
 /**
@@ -968,8 +1058,8 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       titel: 'Bestellungen heute',
       wert: formatZahl(b.zurAbholung),
       einheit: 'zur Abholung',
-      // Wort aus dem Mockup; einen Rahmen, der „zu viel“ meldet, gibt es (noch) nicht — darum kein `tun`.
-      marke: { wort: 'Im Rahmen', art: 'laeuft' },
+      // Keine Marke (Nr. 303, F047): Einen Rahmen, der „zu viel“ meldet, gibt es nicht — „Im Rahmen“ hätte nichts geprüft.
+      marke: null,
       zeilen: [`${formatZahl(b.nichtGepackt)} noch nicht gepackt · ${mitAnzahlWort(b.storniert, 'Storno', 'Stornos')}`, wochenZeile(lage.woche)],
     },
     {
@@ -1008,20 +1098,29 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
 
 // ─── Kommt ───────────────────────────────────────────────────────────────────
 
-/** Eigene Termine (Freigabe 185: „aus einer Konstante“). Vergangene fallen von selbst weg. */
-export const HEUTE_TERMINE: readonly { titel: string; am: string; satz: string }[] = [
-  // Der Stichtag nur aus src/lib/konditionen.ts (tests/konditionen-uebergang.test.ts).
-  { titel: 'Plattformgebühr im Hofpreis (Register N38)', am: TARIFE_AB_TAG, satz: 'Vorgabe-Stichtag · Rechtstexte müssen vorher stehen' },
-]
+/**
+ * Eigene Termine (Freigabe 185: „aus einer Konstante“). Vergangene fallen von selbst weg. Seit Nr. 304 leer:
+ * Der Stichtag „Plattformgebühr im Preis“ kommt aus der Einstellung (`hofpreisAbTag`), nicht aus der Vorgabe.
+ */
+export const HEUTE_TERMINE: readonly { titel: string; am: string; satz: string }[] = []
+
+/** Der Wiener Kalendertag, ab dem das Hofpreis-Modell gilt: die Einstellung, ohne sie die Vorgabe (`hofpreisModellAb`). */
+export function hofpreisAbTag(einstellung: HofpreisEinstellung | null): string {
+  return kalendertagInWien(hofpreisModellAb(einstellung))
+}
 
 export type KommtEintrag = { titel: string; wann: string; marke: { wort: string; art: MarkeArt }; kalendertag: string }
 
 /**
  * „Kommt“: die nächste geplante Fassung der Startseite, das Festschreiben der
- * Gründungsaktion (solange nicht festgeschrieben) und die eigenen Termine —
- * nach Tag sortiert.
+ * Gründungsaktion (solange nicht festgeschrieben), der Beginn der
+ * Plattformgebühr im Preis (Tag aus der Einstellung, bis einschließlich zu
+ * diesem Tag) und die eigenen Termine — nach Tag sortiert.
  */
-export function kommtEintraege(e: { naechsteFassung: Date | null; gruendungAktionBisTag: string | null; gruendungFest: boolean }, jetzt: Date): KommtEintrag[] {
+export function kommtEintraege(
+  e: { naechsteFassung: Date | null; gruendungAktionBisTag: string | null; gruendungFest: boolean; hofpreisAbTag: string },
+  jetzt: Date
+): KommtEintrag[] {
   const heute = kalendertagInWien(jetzt)
   const eintraege: KommtEintrag[] = []
   if (e.naechsteFassung) {
@@ -1041,6 +1140,14 @@ export function kommtEintraege(e: { naechsteFassung: Date | null; gruendungAktio
       kalendertag: e.gruendungAktionBisTag,
     })
   }
+  if (e.hofpreisAbTag >= heute) {
+    eintraege.push({
+      titel: 'Plattformgebühr im Preis beginnt',
+      wann: `${formatTagKurz(e.hofpreisAbTag)} · AGB ${AGB_NEUESTE} gelten ab diesem Tag`,
+      marke: { wort: 'Termin', art: 'erledigt' },
+      kalendertag: e.hofpreisAbTag,
+    })
+  }
   for (const t of HEUTE_TERMINE) {
     if (t.am >= heute) eintraege.push({ titel: t.titel, wann: `${formatTagKurz(t.am)} · ${t.satz}`, marke: { wort: 'Termin', art: 'erledigt' }, kalendertag: t.am })
   }
@@ -1058,8 +1165,8 @@ export function kommtEintraege(e: { naechsteFassung: Date | null; gruendungAktio
 export const MONTAGS_ROUTINE = [
   { id: 'braucht-dich', text: 'Braucht dich leer oder geplant' },
   { id: 'abholzeit', text: 'Höfe ohne Abholzeit angeschrieben' },
-  { id: 'sentry', text: 'Sentry: neue Fehler angesehen' },
-  { id: 'geld', text: 'Geld: Woche mit Stripe-Auszahlung abgeglichen' },
+  { id: 'sentry', text: 'Fehlermeldungen der Woche angesehen (Sentry)' },
+  { id: 'geld', text: 'Geld: Abgleich mit Stripe ohne Abweichung, Auszahlung in Stripe angesehen' },
   { id: 'notfall', text: 'Betriebshandbuch: ein Notfall gelesen' },
 ] as const
 

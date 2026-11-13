@@ -79,7 +79,7 @@ export const TEAM_TEXT = {
   notfallSatz:
     'Fällst du aus, kommt deine Vertretung mit versiegelten Ersatzcodes an den Admin-Bereich. Ersatzcodes für dein eigenes Konto erzeugst du unter „Anmeldung“.',
   notfallLink: 'Ersatzcodes unter „Anmeldung“',
-  notfallOffen: 'Ersatzcodes für eine Vertrauensperson kommen mit einem späteren Lauf.',
+  notfallOffen: 'Einen eigenen Notfallzugang für eine Vertrauensperson gibt es noch nicht. Bis dahin: Lade deine Vertretung als Person ins Team ein.',
   leer: 'Außer dir ist noch niemand im Team.',
 } as const
 

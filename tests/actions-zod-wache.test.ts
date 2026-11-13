@@ -49,9 +49,7 @@ const ZOD_BESTAND: readonly Eintrag[] = [
   { datei: 'orders.ts', name: 'revertOrderStatus', grund: ALTBESTAND },
   { datei: 'orders.ts', name: 'markAsNotPickedUp', grund: ALTBESTAND },
   { datei: 'postfach.ts', name: 'sendeRundschreiben', grund: 'Prüft mit Zod in verschickeRundschreiben (src/server/rundschreiben.ts), außerhalb dieser Datei; davor die frische Admin-Bestätigung' },
-  { datei: 'products.ts', name: 'updateProductImageAction', grund: 'Altbestand vor Nr. 178: Besitz in der Abfrage, Adresse über bildUrlErlaubt; Schema nachziehen' },
   { datei: 'products.ts', name: 'deleteProduct', grund: ALTBESTAND },
-  { datei: 'products.ts', name: 'reorderProductsAction', grund: 'Altbestand vor Nr. 178: die Liste muss genau die eigenen Produkte sein; Schema nachziehen' },
 ]
 
 type Funktion = { exportiert: boolean; knoten: ts.FunctionLikeDeclaration }

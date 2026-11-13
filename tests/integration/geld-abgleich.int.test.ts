@@ -104,7 +104,8 @@ describe('gleicheGeldAb gegen Postgres', () => {
     expect(await prisma.betriebMessung.findUnique({ where: { tag_art: { tag: TAG_2001, art: 'stripeGebuehrCents' } } })).toMatchObject({ wert: BigInt(77) })
 
     const offen = (await ladeOffeneAbweichungen()).filter((o) => o.orderId === anders.id)
-    expect(offen).toEqual([{ orderId: anders.id, orderNumber: anders.orderNumber, feld: 'gebuehr', differenzCents: 50, seit: expect.any(Date) }])
+    // Die Bestellung entsteht ohne gebuehrModell (bisher) — das Feld kommt aus derselben Abfrage mit (Nr. 303).
+    expect(offen).toEqual([{ orderId: anders.id, orderNumber: anders.orderNumber, feld: 'gebuehr', differenzCents: 50, seit: expect.any(Date), gebuehrModell: null }])
     expect((await ladeGeldMonat('2001-03', null)).stripeGebuehrCents).toBe(77)
 
     // Nächster Lauf: Stripe stimmt jetzt, der Tag hat neu 80 Cent (überschrieben, nicht addiert).

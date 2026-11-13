@@ -243,7 +243,7 @@ export const GRUENDUNG_AUSNEHMEN_TEXT = {
   nummerFest: 'Die Nummern stehen fest – niemand rückt auf, ein freier Platz geht an die nächste Freischaltung.',
   endeAbHeute: 'Das Ende rechnet sich ab dem Tag der Wiederaufnahme – nie kürzer als ein noch gespeichertes Ende.',
   haken: 'Das ist ein Testhof – oder der Hof hat zugestimmt.',
-  hakenGrund: 'Nötig, weil er gerade einen Platz hält (K1).',
+  hakenGrund: 'Nötig, weil der Hof gerade einen Gründungsplatz hat und ihn dadurch verliert.',
   zuletzt: (person: string, am: string): string => `zuletzt geändert von ${person} am ${am}`,
   unbekannt: 'einem gelöschten Konto',
 } as const

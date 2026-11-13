@@ -460,7 +460,7 @@ export const ABLAEUFE: readonly Ablauf[] = [
   {
     name: 'aufraeumen',
     text: 'Aufräumen',
-    zweck: 'Er räumt abgelaufene Reservierungen, alte Zähler der Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse, alte Messungen und alte Zeilen der Mail-Warteschlange weg.',
+    zweck: 'Er räumt abgelaufene Reservierungen, alte Zähler der Bremse, abgelaufene Sitzungen und Codes, alte Ereignisse von Stripe, alte Messungen und alte Zeilen der Mail-Warteschlange weg.',
     pfad: '/api/cron/cleanup-reservations',
     zeitplan: '0 3 * * *',
     rhythmus: 'taeglich',
@@ -1023,7 +1023,7 @@ export const BETRIEB_TEXT = {
   verlaufWarnung: 'Warnung ab 80 %',
   verlaufLeer: 'Noch keine Messung – der Verlauf beginnt mit der ersten.',
   tarifeTitel: 'Tarife und Grenzen',
-  tarifeFuss: 'Die Grenzen stehen an einer Stelle im Code (wie Name und Adresse, Register M1) – nach einem Tarifwechsel dort ändern lassen.',
+  tarifeFuss: 'Die Grenzen sind fest hinterlegt. Nach einem Tarifwechsel bitte ändern lassen.',
   stripeDienst: 'Stripe',
   stripeSatz: 'Bestimmt der Schlüssel der Umgebung.',
   ohneStripe: 'kein Schlüssel eingerichtet',
@@ -1034,8 +1034,8 @@ export const BETRIEB_TEXT = {
   ablaeufeRegel:
     '= mehr als 26 Stunden (täglich) bzw. 8 Tage (wöchentlich) ohne Lauf – zwei Stunden Spielraum, falls Vercel einen Lauf verzögert.',
   ablaeufeRegelFehler:
-    '= der Lauf ist gescheitert (Fehlerklasse in Sentry, ohne Inhalt). Beides schickt eine Warn-Mail; jeder Ablauf prüft nach seinem Lauf die anderen.',
-  ablaeufeAufraeumen: '„Aufräumen“ = Reservierungen, Bremse, abgelaufene Sitzungen und Codes, alte Webhook-Ereignisse und Messungen.',
+    '= der Lauf ist gescheitert; der Fehler steht in Sentry, ohne Inhalt. Beides schickt eine Warn-Mail; jeder Ablauf prüft nach seinem Lauf die anderen.',
+  ablaeufeAufraeumen: '„Aufräumen“ = Reservierungen, Bremse, abgelaufene Sitzungen und Codes, alte Ereignisse von Stripe und Messungen.',
   dashboardTitel: 'Nur im Dashboard',
   dashboardSatz: `Das kann ${MARKE} selbst nicht messen – einmal im Monat ansehen.`,
   dashboardKurz: 'Vercel, Supabase, Sentry, Resend',
@@ -1053,7 +1053,7 @@ export const BETRIEB_TEXT = {
   ohneVerwendungGetrennt: 'Getrennt geführt, nicht mitgezählt',
   ohneVerwendungDateien: 'Dateien',
   ohneVerwendungCsv: 'Liste als CSV',
-  ohneVerwendungFuss: `Gelöscht wird nichts. In die Liste kommt nur, was älter als ${BILDER_OHNE_VERWENDUNG_AB_TAGE} Tage ist – jüngere Bilder können noch in einem offenen Formular hängen. Löschen kommt nach deiner Durchsicht in einer eigenen Nummer.`,
+  ohneVerwendungFuss: `Gelöscht wird nichts. In die Liste kommt nur, was älter als ${BILDER_OHNE_VERWENDUNG_AB_TAGE} Tage ist – jüngere Bilder können noch in einem offenen Formular hängen. Gelöscht wird erst nach deiner Durchsicht.`,
   ohneVerwendungVorschau: 'Nur in der Produktion – Vorschau und Produktion teilen sich den Bild-Speicher.',
   ohneVerwendungLeer: 'Die Liste kommt mit der nächsten Messung am Morgen.',
   ohneVerwendungAnsehen: 'Bilder ohne Verwendung ansehen',

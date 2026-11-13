@@ -608,7 +608,6 @@ export function HofseiteKunde({
               hofName={farm.name}
               pauseMessage={farm.pauseMessage}
               initialReorderItems={reorderItems && reorderItems.length > 0 ? reorderItems : undefined}
-              ownerMode={false}
               sperre={sperre}
               kaufen={ansicht.kaufen}
               teil={offen === 'uebersicht' ? 'auswahl' : offen === 'produkte' ? 'alle' : 'keins'}

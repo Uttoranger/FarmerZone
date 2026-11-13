@@ -6934,3 +6934,56 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 ## Vorschau-Build bricht ab, wenn er auf die Produktions-Datenbank zeigt (M7; CLAUDE.md §2 „Datenbank“; Nr. 294a, Lauf 34, 12.11.2026)
 
 **Anlass.** Der Build jeder Umgebung spielt zuerst die Migrationen ein, in die Datenbank aus `DIRECT_URL`, sonst `DATABASE_URL` (prisma.config.ts). Zeigte eine Vorschau durch einen Fehlgriff bei den Variablen auf die Produktion, landete die Migration eines ungemergten Branches dort; bisher entstand nur ein Satz im Banner. **Regel.** `scripts/vorschau-db-wache.mjs` ist der erste Schritt von `vercel-build`, mit `&&` vor der Migration. Bei `VERCEL_ENV` genau `preview` und der Referenz der Produktions-Datenbank im Host oder Benutzer von `DATABASE_URL` oder `DIRECT_URL` schreibt es „Abbruch: <Name> dieser Vorschau zeigt auf die Produktions-Datenbank. Variablen in Vercel prüfen.“ (nur der Name der Variable, nie Wert oder Host) und endet mit Ausgang 1. Jeder andere Weg, auch ein Fehler im Skript, endet mit 0: Eine Schutzprüfung darf nie eine Auslieferung der Produktion verhindern (Grundsatz aus scripts/vercel-ignore.sh). Das Skript ist reines Node ohne Import aus src/; dass es die Produktion an denselben Adressen erkennt wie `erkannteFernDatenbank` (src/lib/umgebung.ts), prüft tests/vorschau-db-wache.test.ts. **Notfall.** Einen Schalter zum Abschalten gibt es bewusst nicht: Bricht eine Vorschau ab, wird die Variable in Vercel auf die Entwicklungsdatenbank berichtigt und der Build neu gestartet. Die Gegenrichtung (Produktion zeigt auf die Entwicklungsdatenbank) bleibt eine Warnung im Banner; ein Abbruch dort könnte die Produktion aufhalten.
+
+## Lauf 34 · Nr. 304a: Bestellung über die Nummer immer auffindbar, Adresse in der Meldung gekürzt (N32, N33; 13.11.2026)
+
+**Anlass.** Zwei Abweichungen vom Register (F047, „Register gilt“): N32 „jede Bestellung ist im Admin auffindbar (Nummer oder genaue Adresse)“ – die Suche schnitt bei 90 Tagen ab und der Zeitraum-Filter lag auch über einer Suche; N33 „jedes Ansehen einer vollen Kundenadresse steht im Protokoll“ – die Meldung im Briefkasten zeigte die volle Adresse ohne Eintrag.
+
+**Fachregel.**
+- `sucheMails(suche, jetzt, { ohneZeitgrenze: true })` lässt die 90 Tage an der Bestellung weg (Nummer und Adresse); `take: 20` bei der Adresse und die Grenze an den Mail-Aufträgen bleiben. Ohne den Parameter (Admin › Betrieb › E-Mails) ändert sich nichts. Admin › Bestellungen (Liste und Detail) ruft immer mit `ohneZeitgrenze`.
+- `ladeBestellListe`: Bei einer Suche gilt der Zeitraum nicht; Stand, Hof und „Erstattung offen“ gelten weiter. Ohne Suche bleibt der Zeitraum.
+- Die Meldung zeigt „Kundin · k•••@example.com“ (`maskiereAdresse`, die EINE Stelle). Einen Knopf „Adresse anzeigen“ gibt es dort nicht; die Antwort an die Kundin geht über den Bescheid der App.
+- Tests: `tests/integration/bestellung-auffindbar.int.test.ts`, `tests/meldung-adresse-gekuerzt.test.ts`.
+
+## Admin-Texte: Eingriffe sagen ihre Folgen, keine Kürzel, keine Technikwörter (F047 „Verständlichkeit“; Register N38, N40; Nr. 303, Lauf 34, 13.11.2026)
+
+**Anlass.** Admin-Texte nannten Register-Kürzel („Register K2“, „(K1)“), Technik („Deployment“, „Destination Charges“, „/api/gesund“, „Webhook-Ereignisse“) oder ließen offen, was ein Eingriff bewirkt — vor allem der Stichtag „Hofpreis-Modell ab“, der Preis, AGB-Fassung und Monatsabrechnung zugleich schaltet und erreicht nicht mehr änderbar ist.
+
+**Fachregel.**
+- Eine Abweichung beim Geld nennt die Gebühr mit dem Wort der Bestellung (`abweichungFeldText` → `gebuehrBezeichnungFuer`); `ladeOffeneAbweichungen` liest `gebuehrModell` in derselben Abfrage mit. `ABWEICHUNG_FELD_TEXT.gebuehr` ist nur noch Rückfall („Gebühr“).
+- „Stichtag speichern“ öffnet erst eine Rückfrage (BestellDialog, `HOFPREIS_RUECKFRAGE_TEXT`) mit dem, was der Tag schaltet; erst „Mit Passkey speichern“ ruft die Action, „Abbrechen“ ruft nichts. Die Action und ihre Regel sind unverändert.
+- Die Akte › Plattformgebühr sagt je Feld, was das Speichern bewirkt; der Satz unter dem Knopf nennt die Ankündigungsfristen (30 Tage zum Nachteil, sonst 15 Tage; AGB 19.9 und 32.3) im Wortlaut von Recht (Gegenlesen Fund 8).
+- `tests/admin-kuerzel-wache.test.ts` hält die Dateien der Gruppe B frei von Register-Kürzeln, „Deployment“, „Destination Charges“ und „Webhook“ (außer dem Tabellennamen in `TABELLEN_NAME`), ohne Bestandsliste.
+- Nicht gebaut: der zweite Teil der Auskunft an eine Adresse der Kundschaft (Tor T5: Kein Ort im Admin zeigt die IP-Adressen; der Startsatz „Auskunft ohne IP von Recht bestätigt“ fehlte) und der neue Satz zu „Lastschrift zurückgebucht“ (Tor T2: Es gilt der Satz aus Nr. 290).
+
+## Lauf 34 · Nr. 306: Kundschaft lädt keinen Hof-Code (13.11.2026)
+
+**Anlass.** Das Paket der Hofseite (Client-Manifest von `/(public)/[farmSlug]/page`) trug rund 100 KB Code, den keine Kundin braucht: den Bearbeitungsmodus des Produktrasters mit dnd-kit (seit Nr. 50 ohne Aufrufer, `ownerMode` war immer `false`) und den Titelbild-Knopf von Mein Hof, der in farm-page-view.tsx stand.
+
+**Was gilt.**
+- Toter Code wird gelöscht, nicht nachgeladen. product-grid.tsx kennt nur noch die Kundenansicht; `korbErlaubt({ isEditMode: false, kaufen })` bleibt der eine Maßstab für jeden Weg in den Korb (wie in hofseite-kunde.tsx und produktdetail-kunde.tsx).
+- Produkte per Ziehen sortieren gab es seit Nr. 50 in keiner Oberfläche; mit dem Modus fallen `reorderProductsAction` und `updateProductImageAction` weg (eine Action ohne Aufrufer ist ein offener Endpunkt, Nr. 199), ebenso reorder-context.tsx und use-reorder-sensors.ts. Aus git wiederherstellbar. `@dnd-kit/*` bleibt in package.json (Vorschlag für den Auftrag „Abhängigkeiten“).
+- Der Titelbild-Knopf (`CoverEditButton`) steht in src/components/farm/titelbild-knopf.tsx; farm-page-view.tsx exportiert nur noch `TITELBILD_KNOPF_STIL` und bindet die neue Datei nie ein.
+- CI-Schritt „Kein Hof-Code im Paket der Hofseite“ nach „Build“: `scripts/pruefung/paket-hofseite.mjs` liest das Manifest in einem `node:vm`-Kontext, misst die Chunks (roh, gzip je Chunk) und endet mit 1 bei „DndDescribedBy“, „Produktbild aktualisiert“ oder „Titelbild ersetzen“ in einem Chunk — und bei einem unlesbaren Manifest (kein stilles Grün nach einem Next-Update).
+
+## Lauf 34 · Nr. 304: Stille Ereignisse werden Aufgaben; Stichtag in „Kommt“ aus der Einstellung (F047 Nr. 11 und 14; Register N32, N33, N36; 13.11.2026)
+
+**Anlass.** Drei Zustände eines Hofs ändern sich ohne Nachricht an das Team: die Lastschrift endet (Stripe `mandate.updated`), ein verkaufender Hof hat den neuen AGB nicht zugestimmt, und nach 30 Tagen ist ein geschlossenes Konto zu löschen, während Stufe 2 noch nicht läuft. „Kommt“ zeigte den Stichtag aus der Vorgabe, nicht aus der Einstellung.
+
+**Fachregel.**
+- Drei Quellen in „Braucht dich“ (`lastschrift_beendet` Geld 3 Tage, `agb_offen` Höfe 7 Tage, `konto_frist_um` Höfe 7 Tage), je Hof eine Aufgabe, Ziel die Akte. Gelesen von `ladeHofSignale` (`src/server/queries/admin-signale.ts`): Lastschrift = verkaufender Hof, bar an, Mandatspflicht, `sepaMandatAm` null und mindestens ein Protokolleintrag `lastschrift_mandat_beendet` (seit = der jüngste); AGB = verkaufender Hof mit `brauchtAgbZustimmung` (seit = Freischaltung); Konto = kein Testhof, `geschlossenAm` vor `endgueltigGrenze(jetzt)`, `endgueltigAm` null (seit = Ende der 30 Tage; auch pausiert). Nur Kennung, Hofname, Zeitpunkt; keine Mail, keine Nachricht, keine Sperre.
+- `QUELLE_NAME`: ein fester Name je Quelle ohne Daten, für Handbuch und tägliche Mail; wo der Titel fest ist, ist der Name der Titel (Test).
+- „Kommt“: „Plattformgebühr im Preis beginnt“ am Tag aus der Einstellung (`hofpreisAbTag`, ohne Einstellung die Vorgabe), bis einschließlich zu diesem Tag; `HEUTE_TERMINE` ist leer.
+- Konto schließen sagt jetzt, dass das Löschen nach 30 Tagen eine Aufgabe in Heute ist (Wortlaut von Recht, ohne „Name“).
+- Nicht gebaut: eigenes Protokoll je Wechsel von `stripeAccountReady` im Webhook (Tor T3: schreibt schon `schreibeStripeKontoStand` aus A012 mit `online_zahlung_aktiv`/`online_zahlung_pausiert`).
+- Tests: `tests/admin-aufgaben.test.ts`, `tests/konto-schliessen-satz.test.ts`, `tests/integration/admin-signale.int.test.ts`.
+
+## Lauf 34 · Nr. 308: Postfach – eigene Antwort nicht von der Leiste verdeckt (F052 Hürde 10; 13.11.2026)
+
+**Anlass.** Am Handy klebt das Antwortfeld über der Unterleiste. Nach dem Senden erschien die eigene Antwort am Ende des Fadens – hinter Feld und Leiste; die Seite rollte nicht (gemessen am Stand vor dem Umbau: Unterkante der neuen Blase 133 bis 221 px unter der Oberkante des Felds, in allen vier Fassungen).
+
+**Was gilt.**
+- Unter dem Faden steht ein leerer Anker (`FADEN_ENDE_ID` aus src/lib/postfach-rollen.ts) mit `scroll-margin-bottom` in Höhe von Feld plus Leiste (280 px plus sichere Zone; am Computer 220 px, nur das Feld). Gemessen: Feld 202 px hoch bei 390 px, 187 px bei 1440 px.
+- Nach erfolgreichem Senden rollt das Formular per `scrollIntoView({ block: 'end' })` zum Anker – gleitend, bei „weniger Bewegung“ sofort (`rollVerhalten`). Ohne Zeitschaltung; der Fokus bleibt, wo er ist.
+- Der Zähler, auf den der Effekt hört, wird nach dem `await` wieder in `startTransition` gesetzt. Grund: Next schreibt den neu geladenen Faden als Übergang fest; ein gewöhnliches Setzen nach dem `await` kam vorher an, der Effekt rollte zum alten Fadenende, und die neue Nachricht lag am Computer wieder 40 px unter dem Feld (Messung im Prüf-Bau). Als Übergang landen beide im selben Festschreiben.
+- Der Zähler heißt `antworten`, nicht `gesendet`: Die Quelltext-Wache in tests/whatsapp-versand.test.ts liest „Gesendet“ als Satz, der eine Zustellung behauptet.

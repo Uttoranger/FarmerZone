@@ -364,12 +364,6 @@ const NACHARBEIT: Fest[] = [
     text: '+ Servicegebühr',
     grund: 'SERVICEGEBUEHR_ZUSATZ: in src/ ungenutzt (ein Leser würde über RUECKFALL_WERTE rot), aber von tests/kasse-formular.test.ts geprüft — streichen oder je Modell, eigener Auftrag',
   },
-  {
-    // ABWEICHUNG_FELD_TEXT.gebuehr: das Wort je Bestellung über gebuehrBezeichnungFuer (V62/V63), kein neutrales Wort (Bericht 230, Runde 1).
-    datei: 'src/lib/geld-abgleich.ts',
-    text: 'Servicegebühr',
-    grund: 'braucht gebuehrModell in der Abweichungs-Abfrage (src/server/geld-abgleich.ts, keine Nummer in Lauf 30)',
-  },
 ]
 
 const deckt = (f: Fest, fund: Fund): boolean =>

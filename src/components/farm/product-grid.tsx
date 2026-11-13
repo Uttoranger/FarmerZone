@@ -1,26 +1,19 @@
 'use client'
 
-import { useState, useEffect, useImperativeHandle, useMemo, useOptimistic, useTransition, type Ref } from 'react'
+import { useState, useEffect, useImperativeHandle, type Ref } from 'react'
 import { usePreisAnzeige } from '@/components/shared/preis-anzeige'
 import { mitEndpreis } from '@/lib/plattformgebuehr'
 import Link from 'next/link'
-import Image from 'next/image'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { DragEndEvent } from '@dnd-kit/core'
-import { arrayMove, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { ShoppingCart, Leaf, Thermometer, Snowflake, Package, X, Plus, EyeOff, Camera, Loader2, GripVertical, ChevronRight, Check, WifiOff } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { X, ChevronRight, Check, WifiOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart, useKorbHinweis, zeigeKorbHinweis } from '@/lib/use-cart'
 import { gleicheKorbMitHofseite } from '@/lib/reservierung'
 import { entfernteNamen, korbHinweisMitNamen } from '@/lib/korb-hinweis'
 import { WARENKORB_ANKER } from '@/lib/warenkorb-speicher'
-import { MONTH_SHORT, centsAlsEuro, formatEuro, formatGrundpreis, formatGrundpreisNetto, mitAnzahl, seasonLabel } from '@/lib/format'
-import { GrundpreisZeile } from '@/components/shared/grundpreis-zeile'
+import { centsAlsEuro, formatEuro, mitAnzahl } from '@/lib/format'
 import { VORSCHAU_KAUF_HINWEIS, korbErlaubt } from '@/lib/hofseite-vorschau'
-import { produktZustand, streifenText, type ProduktZustand } from '@/lib/produkt-sichtbarkeit'
-import { ImShopSchalter } from '@/components/products/im-shop-schalter'
-import { kartenZustand, kategorieAbschnitte, ruhenderKnopfText, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
+import { kartenZustand, kategorieAbschnitte, zeigeKaufknopf, type KaufSperre } from '@/lib/bereiche-anzeige'
 import { sperreMitBestellstopp } from '@/lib/notbremse'
 import { useBestellstopp } from '@/components/notbremse-band'
 import { SCHAUFENSTER_PRODUKTE, korbBetraege, oeffnetKorbHier, stehtNurAmHandy, uebersichtProdukte } from '@/lib/hofseite-kunde'
@@ -29,9 +22,6 @@ import { NETZ_KNOPF } from '@/lib/netz'
 import { bereichAusParameter } from '@/schemas/hoefe-filter'
 import type { AnzeigeBereich } from '@/lib/taxonomie'
 import type { PublicProduct } from '@/server/queries/farm'
-import { updateProductImageAction, reorderProductsAction } from '@/server/actions/products'
-import { ReorderContext } from '@/components/shared/reorder-context'
-import { stufenText, useImageUpload } from '@/components/shared/image-upload'
 import { CartSheet } from './cart-sheet'
 import { futterVerantwortungImKorb } from '@/lib/futter-registrierung'
 import { produktPfad } from '@/lib/produktdetail'
@@ -40,7 +30,6 @@ import { ProduktAbschnitte } from '@/components/hofseite/produkt-abschnitte'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
-import { ILLUSTRATION_HUELLE } from '@/components/ui/bild-dunkel'
 
 type ReorderItem = { productId: string; productName: string; quantity: number }
 
@@ -49,8 +38,6 @@ type Props = {
   farmId: string
   farmSlug: string
   initialReorderItems?: ReorderItem[]
-  ownerMode?: boolean
-  mode?: 'edit' | 'preview'
   /**
    * Die Kaufsperre (Pause, keine Abholzeit, ausgebucht — kaufSperre, Register N24):
    * Kauf-Schaltflächen und der Nachbestell-Link sind tot (Durchsetzung liegt am Server).
@@ -60,13 +47,6 @@ type Props = {
   /** Hofname und Pausen-Nachricht (Farm.pauseMessage) für den Hinweis zur Kaufsperre im Korb-Blatt. */
   hofName: string
   pauseMessage: string | null
-  /**
-   * Wechselt in die Kundenansicht — aus dem Bearbeitungsmodus der Hofseite
-   * (bis Nr. 49 aus farm-page-client.tsx, wo `mode` lebte; seit Nr. 50 ohne
-   * Aufrufer). Der Zustand floss nur nach unten, für diesen Knopf brauchte es
-   * den Rückweg.
-   */
-  onVorschau?: () => void
   /**
    * Ob Kaufen wirkt — entschieden von `ansichtsModus` (src/lib/ansichts-modus.ts).
    * In der Vorschau des Hofs (?vorschau=1) nicht: kein Korb, keine
@@ -113,381 +93,6 @@ type Props = {
 // Zeile), damit Hofübersicht, Warenkorb und Bauern-Bereich dieselbe Schreib-
 // weise zeigen. Die Warenkorb-Summe nimmt formatEuro aus derselben Datei.
 
-function SeasonBadge({ start, end }: { start: number; end: number }) {
-  const s = MONTH_SHORT[start - 1]
-  const e = MONTH_SHORT[end - 1]
-  // title (Desktop-Hover) + aria-label (Screenreader) erklären das kompakte
-  // "Okt–Mär" in Klartext — gleicher Wortlaut wie im Produkt-Dialog
-  const label = seasonLabel(start, end)
-  return (
-    <span
-      title={label}
-      aria-label={label}
-      className="inline-flex items-center gap-1 text-[10px] text-notice-icon bg-notice border border-notice-line rounded-full px-2 py-0.5"
-    >
-      <Leaf className="size-2.5" aria-hidden="true" />
-      {s}–{e}
-    </span>
-  )
-}
-
-/**
- * Der Streifen über dem Produktbild — nur im Bearbeitungsmodus.
- *
- * WAS ER SAGT, entscheidet die reine Funktion in
- * src/lib/produkt-sichtbarkeit.ts; hier wird nur gezeichnet. Vorher lag dieselbe
- * Ableitung auch in der Produktliste, mit anderen Wörtern.
- *
- * FARBEN AUS TOKENS (CODING_STANDARDS §7). Vorher standen hier vier harte
- * Hex-Werte ohne dunkle Entsprechung — im dunklen Modus saß dunkelgraue Schrift
- * auf beigem Grund. „Nicht im Shop" nimmt den ruhigen Chip-Ton, „Ausverkauft"
- * und „knapp" die Handlungsfarbe, weil sie den Hof etwas tun lassen wollen.
- */
-function StockStrip({ zustand }: { zustand: ProduktZustand }) {
-  const warnung = zustand.art === 'ausverkauft' || zustand.art === 'knapp'
-  return (
-    <div
-      className="absolute left-0 right-0 bottom-0 h-7 flex items-center justify-center gap-1.5 text-[11px] font-bold"
-      style={
-        warnung
-          ? { background: 'var(--accent)', color: 'var(--accent-foreground)' }
-          : { background: 'var(--app-chip)', color: 'var(--app-chip-ink)' }
-      }
-    >
-      {zustand.art === 'nicht-im-shop' && <EyeOff className="size-3" strokeWidth={1.7} />}
-      {streifenText(zustand)}
-    </div>
-  )
-}
-
-// ── Product image area with optional edit-mode upload overlay ─────────────────
-
-function ProductImageArea({
-  product,
-  dim,
-  isEditMode,
-}: {
-  product: PublicProduct
-  dim: number
-  isEditMode: boolean
-}) {
-  const [, startTransition] = useTransition()
-  const router = useRouter()
-
-  const { isUploading, progress, openFilePicker, fileInput } = useImageUpload({
-    variant: 'product',
-    onUploaded: (url) => {
-      startTransition(async () => {
-        const result = await updateProductImageAction(product.id, url)
-        if (result.error) {
-          toast.error(result.error)
-        } else {
-          toast.success('Produktbild aktualisiert')
-          router.refresh()
-        }
-      })
-    },
-  })
-
-  return (
-    <div className="relative flex-shrink-0 group" style={{ height: 170, background: 'var(--app-chip)' }}>
-      {fileInput}
-
-      {/* Gedimmter Bildrahmen — Foto ?? Illustration (Unterkategorie, sonst Kategorie, sonst „Sonstiges", categoryImageUrl) ?? Sand-Platzhalter */}
-      <div className={cn('absolute inset-0', !product.imageUrl && product.categoryImageUrl && 'dark:ring-1 dark:ring-border dark:ring-inset')} style={{ opacity: dim }}>
-        {(product.imageUrl ?? product.categoryImageUrl) ? (
-          <Image
-            src={(product.imageUrl ?? product.categoryImageUrl)!}
-            alt={product.name}
-            fill
-            sizes="(min-width: 768px) 33vw, 50vw"
-            // Die Kategorie-Illustration steht im Dunkeln wie ein Foto: gedämpft aus der einen Quelle
-            // (ILLUSTRATION_HUELLE, F041) und gerahmt; Fotos bleiben, wie sie sind (CODING_STANDARDS §7).
-            className={cn('object-contain', !product.imageUrl && ILLUSTRATION_HUELLE)}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Package className="w-10 h-10" style={{ color: 'var(--app-line-firm)' }} />
-          </div>
-        )}
-        {/* Bio badge */}
-        {product.isOrganic && (
-          <div className="absolute top-2.5 left-2.5">
-            <span className="inline-flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
-              <Leaf className="w-2.5 h-2.5" />
-              Bio
-            </span>
-          </div>
-        )}
-        {/* Storage icons */}
-        {(product.requiresCool || product.requiresFreezer) && (
-          <div className="absolute top-2.5 right-2.5 flex gap-1">
-            {product.requiresCool && <Thermometer className="w-4 h-4 text-blue-500 drop-shadow" />}
-            {product.requiresFreezer && <Snowflake className="w-4 h-4 text-sky-400 drop-shadow" />}
-          </div>
-        )}
-      </div>
-
-      {/* Streifen — immer volle Deckkraft, nur im Bearbeitungsmodus */}
-      {isEditMode && <StockStrip zustand={produktZustand(product)} />}
-
-      {/* Edit-mode hover overlay */}
-      {isEditMode && (
-        <button
-          type="button"
-          onClick={openFilePicker}
-          disabled={isUploading}
-          aria-label={(product.imageUrl ?? product.categoryImageUrl) ? 'Bild ersetzen' : 'Bild hinzufügen'}
-          className="absolute inset-0 flex items-end justify-center pb-9 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity disabled:cursor-wait"
-          style={{ background: 'rgba(20,30,22,0.35)' }}
-        >
-          <span
-            className="flex items-center gap-1.5 rounded-full text-xs font-semibold text-white px-3 py-1.5"
-            style={{ background: 'rgba(45,48,39,0.80)' }}
-          >
-            {isUploading
-              ? <Loader2 className="size-3 animate-spin" />
-              : <Camera className="size-3" strokeWidth={1.7} />
-            }
-            {isUploading
-              ? progress
-                ? stufenText(progress)
-                : 'Lädt…'
-              : (product.imageUrl ?? product.categoryImageUrl)
-                ? 'Ersetzen'
-                : 'Bild hinzufügen'}
-          </span>
-        </button>
-      )}
-    </div>
-  )
-}
-
-// Sortable-Hülle (nur Edit-Modus): Grip-Handle oben links, Drag-Feedback per Schatten
-function SortableProductCard({
-  product,
-  children,
-}: {
-  product: PublicProduct
-  children: React.ReactNode
-}) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: product.id })
-
-  return (
-    <div
-      ref={setNodeRef}
-      className="relative"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 30 : undefined,
-        boxShadow: isDragging ? '0 14px 32px rgba(45,95,63,0.28)' : undefined,
-        scale: isDragging ? '1.02' : undefined,
-        borderRadius: 12,
-      }}
-    >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        aria-label={`${product.name} verschieben`}
-        className="absolute top-2 left-2 z-20 flex items-center justify-center size-8 rounded-lg cursor-grab active:cursor-grabbing"
-        style={{
-          touchAction: 'none',
-          // Der Ziehgriff liegt auf dem Produktfoto, nicht auf der Karte:
-          // weiße Marke mit dunkler Schrift, in beiden Modi gleich.
-          background: 'rgba(255,255,255,0.94)',
-          color: 'var(--foto-knopf-ink-soft)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-        }}
-      >
-        <GripVertical className="size-4" strokeWidth={1.7} />
-      </button>
-      {children}
-    </div>
-  )
-}
-
-function ProductCard({
-  product,
-  onAddToCart,
-  onDetails,
-  isAddingId,
-  isEditMode = false,
-  sperre = null,
-  setzeSichtbarkeit,
-}: {
-  product: PublicProduct
-  onAddToCart: (product: PublicProduct) => void
-  /** Öffnet das Produktdetail — nicht im Bearbeitungsmodus. */
-  onDetails?: (product: PublicProduct) => void
-  isAddingId: string | null
-  ownerMode?: boolean
-  isEditMode?: boolean
-  sperre?: KaufSperre
-  /** Vorgezogener Sichtbarkeitsstand im Eltern-Bauteil — nur im Bearbeitungsmodus. */
-  setzeSichtbarkeit?: (imShop: boolean) => void
-}) {
-  const canBuy = zeigeKaufknopf(product, sperre)
-  const isAdding = isAddingId === product.id
-  const zustand = produktZustand(product)
-  const dim = isEditMode && !product.isAvailable ? 0.55 : 1
-  // Futter: Kilopreis aus der Nettomenge (Bereiche 2) — Ballen und Big Bags
-  // haben keine Gebindegröße und bekämen sonst gar keinen Grundpreis.
-  // Im Hofpreis-Modell (N38) Endpreis je Stück, Grund- und Kilopreis aus dem Endpreis — nur Anzeige.
-  const preis = mitEndpreis(product, usePreisAnzeige())
-  const kilopreis = product.futter
-    ? formatGrundpreisNetto(preis.price, product.futter.nettoMenge, product.futter.nettoEinheit)
-    : null
-
-  const kopf = (
-    <>
-      <ProductImageArea product={product} dim={dim} isEditMode={isEditMode} />
-      <div className="px-[15px] pt-[14px]" style={{ opacity: dim }}>
-        {/* Höchstens zwei Zeilen: Ein langer Name schöbe sonst Preis und
-            Kaufknopf aus der Flucht der Nachbarkarten. Voller Name im title. */}
-        <p
-          className="line-clamp-2 font-semibold text-sm leading-snug break-words"
-          style={{ color: 'var(--app-ink)' }}
-          title={product.name}
-        >
-          {product.name}
-        </p>
-        <p className="text-[17px] font-bold mt-[5px]" style={{ color: 'var(--app-ink)' }}>
-          {formatGrundpreis(preis.price, product.unit, product.unitSize)}
-        </p>
-        {kilopreis ? (
-          <p className="mt-0.5 text-[12px]" style={{ color: 'var(--app-ink-soft)' }}>{kilopreis}</p>
-        ) : (
-          <GrundpreisZeile
-            price={preis.price}
-            unit={product.unit}
-            unitSize={product.unitSize}
-            className="mt-0.5 text-[12px]"
-            style={{ color: 'var(--app-ink-soft)' }}
-          />
-        )}
-      </div>
-    </>
-  )
-
-  return (
-    <div
-      className="bg-card rounded-[12px] overflow-hidden flex flex-col dark:ring-1 dark:ring-border"
-      style={{ boxShadow: '0 2px 10px rgba(45,95,63,0.06)' }}
-    >
-      {/* Bild, Name und Preis öffnen das Produktdetail; der Kaufknopf
-          darunter bleibt ein eigener Knopf. Im Bearbeitungsmodus liegt auf
-          dem Bild der Foto-Knopf — dort gibt es kein Detail. */}
-      {onDetails && !isEditMode ? (
-        <button
-          type="button"
-          onClick={() => onDetails(product)}
-          aria-label={`${product.name} — Details ansehen`}
-          className="block w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        >
-          {kopf}
-        </button>
-      ) : (
-        kopf
-      )}
-
-      {/* Body */}
-      <div className="px-[15px] pb-[14px] flex flex-col flex-1">
-
-        {/* Die Blässe sitzt NICHT mehr an der Hülle, sondern an den Teilen, die
-            blass werden sollen: Deckkraft wirkt auf den ganzen Teilbaum, und der
-            Schalter darunter muss voll deckend bleiben. Er ist das
-            Bedienelement, das die Blässe erklärt — halb durchsichtig sähe er
-            selbst abgeschaltet aus, und seine Schiene fiele unter den
-            Mindestkontrast. */}
-        <div className="flex flex-col flex-1" style={{ opacity: dim }}>
-
-        {product.seasonStart && product.seasonEnd && (
-          <div className="mt-2">
-            <SeasonBadge start={product.seasonStart} end={product.seasonEnd} />
-          </div>
-        )}
-
-        {product.allergens.length > 0 && (
-          <p className="text-[10px] mt-2 leading-tight" style={{ color: 'var(--app-ink-faint)' }}>
-            Enthält: {product.allergens.join(', ')}
-          </p>
-        )}
-
-        <div className="flex-1" />
-        </div>
-
-        {/* Zwischen Preis und den Knöpfen — die ganze Zeile ist der Schalter. */}
-        {isEditMode && setzeSichtbarkeit && (
-          <div className="mt-3 border-t pt-1" style={{ borderColor: 'var(--border)' }}>
-            <ImShopSchalter
-              productId={product.id}
-              name={product.name}
-              imShop={product.isAvailable}
-              setzeOptimistisch={setzeSichtbarkeit}
-            />
-            {/* Im Shop, aber nichts da: Der Schalter bleibt AN, und der Hof
-                erfährt, was die Kundin stattdessen liest. */}
-            {zustand.art === 'ausverkauft' && (
-              <p className="px-1 pb-1.5 text-[11px] leading-snug" style={{ color: 'var(--app-ink-faint)' }}>
-                {'Vorrat 0 — deine Kundinnen sehen \u201eAusverkauft\u201c'}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Footer — mode-aware */}
-        <div className="mt-3 pt-2" style={{ opacity: dim }}>
-          {isEditMode ? (
-            <div className="flex gap-2">
-              <Link
-                href={`/products?edit=${product.id}`}
-                className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold transition-opacity hover:opacity-90"
-                style={{ background: 'var(--app-button)', color: '#fff' }}
-              >
-                Bearbeiten
-              </Link>
-              <Link
-                href="/products"
-                className="flex-1 flex items-center justify-center gap-1.5 py-[11px] rounded-lg text-[13px] font-semibold border transition-colors hover:bg-muted"
-                style={{ borderColor: 'var(--border)', color: 'var(--brand-text)', background: 'var(--card)' }}
-              >
-                Vorrat
-              </Link>
-            </div>
-          ) : canBuy ? (
-            <button
-              onClick={() => onAddToCart(product)}
-              disabled={isAdding}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-opacity disabled:opacity-60 hover:opacity-90 active:scale-[0.98]"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              {isAdding ? (
-                <span className="animate-pulse">…</span>
-              ) : (
-                <>
-                  <ShoppingCart className="size-[15px]" strokeWidth={1.7} />
-                  In den Warenkorb
-                </>
-              )}
-            </button>
-          ) : (
-            <div
-              className="w-full h-10 flex items-center justify-center rounded-lg text-xs px-2 text-center"
-              style={{ background: 'color-mix(in srgb, var(--app-chip) 95%, transparent)', color: 'var(--app-chip-ink)' }}
-            >
-              {ruhenderKnopfText(kartenZustand(product, sperre))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /**
  * Der gewünschte Bereich aus der URL (?bereich=futter) — null, wenn keiner
  * gewählt ist. Welcher dann wirklich angezeigt wird, entscheidet
@@ -520,12 +125,9 @@ export function ProductGrid({
   farmId,
   farmSlug,
   initialReorderItems,
-  ownerMode = false,
-  mode = 'preview',
   sperre: sperreDesHofs = null,
   hofName,
   pauseMessage,
-  onVorschau,
   kaufen = true,
   teil = 'alle',
   gebuehrHinweis = null,
@@ -536,67 +138,12 @@ export function ProductGrid({
   platzUnten = true,
   inDenKorb,
 }: Props) {
-  const isEditMode = ownerMode && mode !== 'preview'
   // Notbremse (Register N34, Nr. 189): Kaufknöpfe und Nachbestell-Link ruhen wie
   // bei einer Kaufsperre, der Korb bleibt; den Grund sagt das Band unter dem Kopf.
   const sperre = sperreMitBestellstopp(sperreDesHofs, useBestellstopp())
   // EINE Regel für jeden Weg in den Korb (Kaufknopf, Nachbestell-Link,
   // #warenkorb-Anker, Korb-Knopf, Sheet) — src/lib/hofseite-vorschau.ts.
-  const mitKorb = korbErlaubt({ isEditMode, kaufen })
-
-  // Sprint 18: optimistische Sortier-Reihenfolge (null = Server-Stand)
-  const [orderedIds, setOrderedIds] = useState<string[] | null>(null)
-  const [, startReorderTransition] = useTransition()
-
-  // Neuer Server-Stand (props) macht den optimistischen Zustand obsolet —
-  // zurückgesetzt beim Rendern (Zustand bei neuen Props anpassen), nicht in einem Effekt.
-  const [produkteDerSortierung, setProdukteDerSortierung] = useState(products)
-  if (products !== produkteDerSortierung) {
-    setProdukteDerSortierung(products)
-    setOrderedIds(null)
-  }
-
-  // Sprint Sichtbarkeits-Schalter: der vorgezogene Sichtbarkeitsstand.
-  //
-  // Grundzustand ist ABSICHTLICH leer: Sobald die Transition durch ist, hat
-  // revalidatePath neue Props geliefert, und die sind die Wahrheit. Der Eintrag
-  // gilt nur solange die Aktion läuft — scheitert sie, fällt React von selbst
-  // auf die Props zurück, ohne dass irgendwo ein Zurückschalten steht.
-  const [vorgezogen, setzeVorgezogen] = useOptimistic<
-    Record<string, boolean>,
-    { id: string; imShop: boolean }
-  >({}, (stand, aenderung) => ({ ...stand, [aenderung.id]: aenderung.imShop }))
-
-  const sichtbareProdukte = useMemo(
-    () =>
-      products.map((p) => {
-        const neu = vorgezogen[p.id]
-        return neu === undefined ? p : { ...p, isAvailable: neu }
-      }),
-    [products, vorgezogen]
-  )
-
-  const displayProducts = useMemo(() => {
-    if (!isEditMode || !orderedIds) return sichtbareProdukte
-    const byId = new Map(sichtbareProdukte.map((p) => [p.id, p]))
-    const ordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as PublicProduct[]
-    return ordered.length === sichtbareProdukte.length ? ordered : sichtbareProdukte
-  }, [sichtbareProdukte, orderedIds, isEditMode])
-
-  function handleReorderDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const current = displayProducts.map((p) => p.id)
-    const next = arrayMove(current, current.indexOf(String(active.id)), current.indexOf(String(over.id)))
-    setOrderedIds(next)
-    startReorderTransition(async () => {
-      const result = await reorderProductsAction(next)
-      if (result.error) {
-        toast.error(result.error)
-        setOrderedIds(null) // Revert auf Server-Stand
-      }
-    })
-  }
+  const mitKorb = korbErlaubt({ isEditMode: false, kaufen })
 
   const [cartOpen, setCartOpen] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -805,11 +352,8 @@ export function ProductGrid({
       )}
 
       {/* Kundenansicht (und Vorschau des Hofs): Abschnitte je Kategorie (E1)
-          bzw. die Auswahl der Übersicht. Der Bearbeitungsmodus bleibt EINE
-          flache, ziehbare Liste — ihre Reihenfolge bestimmt auch die der
-          Abschnitte. */}
-      {!isEditMode ? (
-        teil === 'keins' ? null : products.length === 0 ? (
+          bzw. die Auswahl der Übersicht. */}
+      {teil === 'keins' ? null : products.length === 0 ? (
           // Leer, mit Ausweg (DESIGN_SYSTEM, „Zustände").
           <EmptyState
             titel="Gerade keine Produkte"
@@ -828,7 +372,7 @@ export function ProductGrid({
           // eine Reihe aus drei Kacheln, ab lg wie bisher — die Anzahl je
           // Breite über Klassen (stehtNurAmHandy), nie gemessen.
           <ul className={PRODUKT_LISTE}>
-            {uebersichtProdukte(displayProducts, sperre, SCHAUFENSTER_PRODUKTE).map((p, i) => (
+            {uebersichtProdukte(products, sperre, SCHAUFENSTER_PRODUKTE).map((p, i) => (
               <li key={p.id} className={stehtNurAmHandy(i) ? 'md:hidden' : undefined}>
                 {karte(p)}
               </li>
@@ -836,99 +380,15 @@ export function ProductGrid({
           </ul>
         ) : (
           <ProduktAbschnitte
-            abschnitte={kategorieAbschnitte(displayProducts)}
+            abschnitte={kategorieAbschnitte(products)}
             gebuehrHinweis={gebuehrHinweis}
             springeZu={springeZu}
             onGesprungen={onGesprungen}
             renderKarte={karte}
           />
-        )
-      ) : (
-      <>
-      {/* Aus dem Hinweissatz ist ein Knopf geworden: Er beschreibt die
-          Kundenansicht — dann soll er sie auch zeigen können, statt den Hof
-          oben im Umschalter danach suchen zu lassen. Ohne Rückweg (öffentliche
-          Hofseite) bleibt es ein Satz. */}
-      {onVorschau ? (
-        <button
-          type="button"
-          onClick={onVorschau}
-          className="mb-4 flex min-h-11 w-full items-center gap-1.5 rounded-lg px-1 text-left text-sm transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          style={{ color: 'var(--app-ink-soft)' }}
-        >
-          <span>
-            Kunden sehen deine Produkte nach Kategorien geordnet.{' '}
-            <span className="font-semibold whitespace-nowrap" style={{ color: 'var(--brand-text)' }}>
-              Ansehen →
-            </span>
-          </span>
-        </button>
-      ) : (
-        <p className="mb-4 text-sm" style={{ color: 'var(--app-ink-soft)' }}>
-          Kunden sehen deine Produkte nach Kategorien geordnet.
-        </p>
-      )}
-      {/* Grid — 3 cols, 20px gap; im Edit-Modus sortierbar */}
-      <ReorderContext
-        enabled={isEditMode}
-        items={displayProducts.map((p) => p.id)}
-        onDragEnd={handleReorderDragEnd}
-      >
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-        {/* "Produkt anlegen" tile — edit mode only */}
-        {isEditMode && (
-          <Link
-            href="/products"
-            className="flex flex-col items-center justify-center rounded-[12px] transition-colors hover:bg-card/70"
-            style={{
-              border: '2px dashed var(--app-line-firm)',
-              background: 'color-mix(in srgb, var(--card) 50%, transparent)',
-              minHeight: 330,
-            }}
-          >
-            <span
-              className="flex items-center justify-center rounded-full mb-3"
-              style={{ width: 52, height: 52, background: 'var(--app-chip-green)', color: 'var(--brand-text)' }}
-            >
-              <Plus className="size-[22px]" strokeWidth={1.9} />
-            </span>
-            <span className="text-[15px] font-semibold" style={{ color: 'var(--brand-text)' }}>Produkt anlegen</span>
-            <span className="text-[13px] mt-1" style={{ color: 'var(--app-ink-faint)' }}>Foto, Preis, Menge</span>
-          </Link>
-        )}
-
-        {displayProducts.map((p) =>
-          isEditMode ? (
-            <SortableProductCard key={p.id} product={p}>
-              <ProductCard
-                product={p}
-                onAddToCart={handleAddToCart}
-                isAddingId={addingId}
-                ownerMode={ownerMode}
-                isEditMode={isEditMode}
-                sperre={sperre}
-                setzeSichtbarkeit={(imShop) => setzeVorgezogen({ id: p.id, imShop })}
-              />
-            </SortableProductCard>
-          ) : (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onAddToCart={handleAddToCart}
-              isAddingId={addingId}
-              ownerMode={ownerMode}
-              isEditMode={isEditMode}
-              sperre={sperre}
-              setzeSichtbarkeit={(imShop) => setzeVorgezogen({ id: p.id, imShop })}
-            />
-          )
-        )}
-      </div>
-      </ReorderContext>
-      </>
       )}
 
-      {/* Die Korb-Leiste — nicht im Bearbeitungsmodus, nicht in der Vorschau.
+      {/* Die Korb-Leiste — nicht in der Vorschau des Hofs.
           Am Handy über der Unterleiste der Shell (68 px + Home-Balken), bis
           1024 px unten rechts; ab 1024 px trägt der Mini-Warenkorb der
           rechten Spalte den Korb (hofseite-seitenspalte.tsx). */}
