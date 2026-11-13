@@ -178,3 +178,5 @@ Zeitbudget (Wanduhr ab Start, a013-lauf34-c.md „Plan“): Vorprüfung und Doku
 - 13:03 Welle 1 gestartet: 303 (Opus, Platz 1, /home/user/wt/303, Branch nacht/2026-11-11/303-admin-texte, DB fz_int_303; Gruppe A und B, A6 nicht (T2), A7 zweiter Teil nicht (T5, Startsatz fehlt)) und 304a (Sonnet, Platz 2, /home/user/wt/304a, Branch nacht/2026-11-11/304a-bestellung-auffindbar, DB fz_int_304a), beide von 7792085236c9.
 - Wiederaufnahme 303: Branch nacht/2026-11-11/303-admin-texte, /home/user/wt/303, Basis 7792085236c9, Runde 0, DB fz_int_303.
 - Wiederaufnahme 304a: Branch nacht/2026-11-11/304a-bestellung-auffindbar, /home/user/wt/304a, Basis 7792085236c9, Runde 0, DB fz_int_304a.
+- 13:13 304a fertig (4fee5016bae7; voller Lauf 767 Dateien, 14221 Tests; Integration bestellung-auffindbar, admin-bestellung, betrieb-mails 19 Tests; T1, T2 greifen nicht; alle drei Teile gebaut). tester (Sonnet, gezielt, ohne vollen Lauf) und pruefer (Opus, gezielt, mit Gegenlesen „Sicherheit“) gestartet (Bereich 7792085236c9..4fee5016bae7).
+- Wiederaufnahme 304a: Branch nacht/2026-11-11/304a-bestellung-auffindbar, /home/user/wt/304a, 4fee5016bae7, Runde 0 in Prüfung, DB fz_int_304a.
