@@ -46,7 +46,7 @@ vi.mock('@/lib/prisma', () => {
 import { blobSpeicherAusSchluessel, istEigeneBildUrl } from '@/lib/upload-pfade'
 import { addFarmPhotoAction, updateFarmPhotoCaptionAction } from '@/server/actions/farm-photos'
 import { saveAppearanceAction, updateFarmBannerAction, updateFarmLogoAction } from '@/server/actions/appearance'
-import { createProduct, updateProduct, updateProductImageAction } from '@/server/actions/products'
+import { createProduct, updateProduct } from '@/server/actions/products'
 import { publishStatusPost } from '@/server/actions/status-posts'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -238,20 +238,8 @@ describe('saveAppearanceAction (Hofseiten-Editor schickt Logo und Titelbild mit)
   })
 })
 
-describe('Produktbild: updateProductImageAction, createProduct, updateProduct', () => {
+describe('Produktbild: createProduct, updateProduct', () => {
   const produkt = { name: 'Rindfleisch-Paket', price: 89, unit: 'KG' as const, category: 'FLEISCH', subcategory: 'RIND', labels: [] }
-
-  it.each(FREMDE)('updateProductImageAction: keine fremde Adresse (%s)', async (_fall, url) => {
-    vi.mocked(prisma.product.findFirst).mockResolvedValue({ id: 'prod_1', imageUrl: null } as never)
-    expect((await updateProductImageAction('prod_1', url)).error).toBeTruthy()
-    expect(prisma.product.update).not.toHaveBeenCalled()
-  })
-
-  it('updateProductImageAction — Gegenprobe: eigenes Bild geht durch', async () => {
-    vi.mocked(prisma.product.findFirst).mockResolvedValue({ id: 'prod_1', imageUrl: null } as never)
-    expect(await updateProductImageAction('prod_1', EIGEN)).toEqual({})
-    expect(prisma.product.update).toHaveBeenCalledTimes(1)
-  })
 
   it('createProduct: fremde Adresse wird nicht angelegt, eigene schon', async () => {
     expect('error' in (await createProduct({ ...produkt, imageUrl: FREMDER_SERVER } as never))).toBe(true)
