@@ -46,7 +46,10 @@ export function AntwortFormular({ unterhaltungId }: { unterhaltungId: string }):
       }
       setFehler(null)
       setText('')
-      setAntworten((n) => n + 1)
+      // Nach dem await wieder als Übergang: React schreibt das dann zusammen mit
+      // dem neu geladenen Faden fest — sonst rollt der Effekt, bevor die neue
+      // Nachricht im Faden steht, und sie läge wieder unter dem Feld.
+      starte(() => setAntworten((n) => n + 1))
     })
   }
 
