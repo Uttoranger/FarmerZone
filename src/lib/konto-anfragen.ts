@@ -75,7 +75,7 @@ export const KONTO_ANFRAGE_TEXT = {
   titel: 'Konto-Anfragen des Hofs',
   satz: 'fragt jeweils nach deinem Passkey',
   erklaerung:
-    'E-Mail ändern schickt einen Bestätigungslink an die neue Adresse. Schließen nimmt die Hofseite offline; nach 30 Tagen wird das Konto unkenntlich gemacht, sobald die Liste dafür freigegeben ist. Bestellungen bleiben, solange die Aufbewahrungspflicht gilt.',
+    'E-Mail ändern schickt einen Bestätigungslink an die neue Adresse. Schließen nimmt die Hofseite offline; nach 30 Tagen sind Kontakt, Fotos und Texte des Hofs zu löschen. Das läuft noch nicht von selbst: Du bekommst dann eine Aufgabe in Heute. Bestellungen bleiben, solange die Aufbewahrungspflicht gilt.',
   knopfEmail: 'Anmelde-E-Mail ändern …',
   knopfAuskunft: 'Auskunft exportieren …',
   knopfSchliessen: 'Konto schließen …',
@@ -128,7 +128,7 @@ export const KONTO_ANFRAGE_TEXT = {
     ],
     spaeter: `Nach ${WIEDER_OEFFNEN_TAGE} Tagen, endgültig`,
     spaeterPunkte: [
-      'Name, Kontakt, Fotos und Texte des Hofs werden gelöscht bzw. unkenntlich – erst, wenn die Liste dafür freigegeben ist.',
+      'Kontakt, Fotos und Texte des Hofs werden gelöscht bzw. unkenntlich; Bestellungen und Abrechnungen bleiben, solange das Gesetz es verlangt. Das läuft noch nicht von selbst: Nach 30 Tagen bekommst du eine Aufgabe in Heute.',
       'Bestellungen und Beträge bleiben, solange die Aufbewahrungspflicht gilt – ohne Kontakt des Hofs.',
       'Das Stripe-Konto gehört dem Hof; offene Auszahlungen laufen dort weiter.',
     ],

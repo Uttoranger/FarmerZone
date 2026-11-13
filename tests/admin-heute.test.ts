@@ -64,6 +64,8 @@ vi.mock('@/server/queries/admin', () => ({ zaehleWartendeHoefe: vi.fn(async () =
 vi.mock('@/server/queries/plattformgebuehr', () => ({
   ladePlattformgebuehrAufgaben: vi.fn(async () => ({ gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [], kundenstreit: [] })),
 }))
+// Nr. 304: die stillen Ereignisse eines Hofs haben eigene Tests (tests/integration/admin-signale.int.test.ts).
+vi.mock('@/server/queries/admin-signale', () => ({ ladeHofSignale: vi.fn(async () => ({ lastschrift: [], agb: [], konto: [] })) }))
 vi.mock('@/server/queries/startseite', () => ({ naechsterTermin: vi.fn(async () => null) }))
 // Nr. 200: „Widerruf offen“ — hier ohne Widerrufe (die Quelle prüft tests/widerruf.test.ts).
 vi.mock('@/server/widerruf', () => ({ ladeWiderrufAufgaben: vi.fn(async () => []) }))

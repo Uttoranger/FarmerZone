@@ -6955,3 +6955,15 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - Die Akte › Plattformgebühr sagt je Feld, was das Speichern bewirkt; der Satz unter dem Knopf nennt die Ankündigungsfristen (30 Tage zum Nachteil, sonst 15 Tage; AGB 19.9 und 32.3) im Wortlaut von Recht (Gegenlesen Fund 8).
 - `tests/admin-kuerzel-wache.test.ts` hält die Dateien der Gruppe B frei von Register-Kürzeln, „Deployment“, „Destination Charges“ und „Webhook“ (außer dem Tabellennamen in `TABELLEN_NAME`), ohne Bestandsliste.
 - Nicht gebaut: der zweite Teil der Auskunft an eine Adresse der Kundschaft (Tor T5: Kein Ort im Admin zeigt die IP-Adressen; der Startsatz „Auskunft ohne IP von Recht bestätigt“ fehlte) und der neue Satz zu „Lastschrift zurückgebucht“ (Tor T2: Es gilt der Satz aus Nr. 290).
+
+## Lauf 34 · Nr. 304: Stille Ereignisse werden Aufgaben; Stichtag in „Kommt“ aus der Einstellung (F047 Nr. 11 und 14; Register N32, N33, N36; 13.11.2026)
+
+**Anlass.** Drei Zustände eines Hofs ändern sich ohne Nachricht an das Team: die Lastschrift endet (Stripe `mandate.updated`), ein verkaufender Hof hat den neuen AGB nicht zugestimmt, und nach 30 Tagen ist ein geschlossenes Konto zu löschen, während Stufe 2 noch nicht läuft. „Kommt“ zeigte den Stichtag aus der Vorgabe, nicht aus der Einstellung.
+
+**Fachregel.**
+- Drei Quellen in „Braucht dich“ (`lastschrift_beendet` Geld 3 Tage, `agb_offen` Höfe 7 Tage, `konto_frist_um` Höfe 7 Tage), je Hof eine Aufgabe, Ziel die Akte. Gelesen von `ladeHofSignale` (`src/server/queries/admin-signale.ts`): Lastschrift = verkaufender Hof, bar an, Mandatspflicht, `sepaMandatAm` null und mindestens ein Protokolleintrag `lastschrift_mandat_beendet` (seit = der jüngste); AGB = verkaufender Hof mit `brauchtAgbZustimmung` (seit = Freischaltung); Konto = kein Testhof, `geschlossenAm` vor `endgueltigGrenze(jetzt)`, `endgueltigAm` null (seit = Ende der 30 Tage; auch pausiert). Nur Kennung, Hofname, Zeitpunkt; keine Mail, keine Nachricht, keine Sperre.
+- `QUELLE_NAME`: ein fester Name je Quelle ohne Daten, für Handbuch und tägliche Mail; wo der Titel fest ist, ist der Name der Titel (Test).
+- „Kommt“: „Plattformgebühr im Preis beginnt“ am Tag aus der Einstellung (`hofpreisAbTag`, ohne Einstellung die Vorgabe), bis einschließlich zu diesem Tag; `HEUTE_TERMINE` ist leer.
+- Konto schließen sagt jetzt, dass das Löschen nach 30 Tagen eine Aufgabe in Heute ist (Wortlaut von Recht, ohne „Name“).
+- Nicht gebaut: eigenes Protokoll je Wechsel von `stripeAccountReady` im Webhook (Tor T3: schreibt schon `schreibeStripeKontoStand` aus A012 mit `online_zahlung_aktiv`/`online_zahlung_pausiert`).
+- Tests: `tests/admin-aufgaben.test.ts`, `tests/konto-schliessen-satz.test.ts`, `tests/integration/admin-signale.int.test.ts`.

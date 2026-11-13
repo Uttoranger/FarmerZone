@@ -18,7 +18,6 @@ import { eingangMeldungAdresse, type ErstattungAufgabeRoh, type HofAufgabeRoh } 
 import { MELDUNG_ART_LABEL } from '@/lib/meldung'
 import { kurznummerAus } from '@/lib/kurznummer'
 import { centsAlsEuro, formatDatumLang, formatEuro, formatTagKurz, formatZahl } from '@/lib/format'
-import { TARIFE_AB_TAG } from '@/lib/konditionen'
 import { wienWochenbeginn, wienWochenMontag } from '@/lib/kalender'
 import { VORRANG } from '@/schemas/mail-auftrag'
 import { kalendertagInWien } from '@/lib/wiener-tag'
@@ -36,6 +35,7 @@ import { HOFPREIS_KARTE_ID, hofpreisModellAb, liveOhneHofpreisModell, nichtAbgeh
 import { ADMIN_EINSTELLUNGEN_HREF } from '@/lib/plattform-einstellung'
 import type { Umgebung } from '@/lib/umgebung'
 import { istHofOnlineHaengtStand, stripeGrundAdmin, type HofOnlineHaengtStand, type StripeAnzeige } from '@/lib/stripe-konto'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
 
 /*
  * Admin › Heute (Register N32, Nr. 185): die EINE Liste „Braucht dich“ aus
@@ -79,6 +79,9 @@ export const AUFGABE_QUELLEN = [
   'widerruf_offen',
   'hof_online_haengt',
   'kundenstreit',
+  'lastschrift_beendet',
+  'agb_offen',
+  'konto_frist_um',
 ] as const
 
 export type AufgabeQuelle = (typeof AUFGABE_QUELLEN)[number]
@@ -159,7 +162,20 @@ export type AufgabenStand = {
   liveSignal: LiveSignalStand | null
   /** Offene Widerrufe (Nr. 200, N39) — nur Kennungen, Bestellnummer und Hofname, nie Name, Adresse oder Nachricht. */
   widerrufe: readonly WiderrufAufgabeRoh[]
+  /** Stille Ereignisse eines Hofs (Nr. 304), geladen von ladeHofSignale — nur Kennung, Hofname und seit wann. */
+  hofSignale: HofSignaleStand
 }
+
+/** Ein Hof mit einem stillen Ereignis: nie Adresse oder Name einer Person. */
+export type HofSignalRoh = { farmId: string; hofName: string; seit: Date }
+
+/**
+ * Was ohne eigene Nachricht an das Team geschieht (Nr. 304, F047 Nr. 11 und 14):
+ * Lastschrift beendet (verkaufender Hof, bar mit Mandatspflicht, kein Mandat
+ * mehr), AGB offen (verkaufender Hof ohne Zustimmung zur neuesten Fassung) und
+ * Konto-Frist um (seit über 30 Tagen geschlossen, Stufe 2 noch nicht gelaufen).
+ */
+export type HofSignaleStand = { lastschrift: readonly HofSignalRoh[]; agb: readonly HofSignalRoh[]; konto: readonly HofSignalRoh[] }
 
 /** Was die Quelle „Stripe live ohne Hofpreis-Modell“ braucht: den Modus aus `bestimmeUmgebung`, den Stichtag und seit wann live (STRIPE_LIVE_AB). */
 export type LiveSignalStand = { umgebung: Pick<Umgebung, 'art' | 'stripe'>; einstellung: HofpreisEinstellung; liveSeit: Date | null }
@@ -199,6 +215,7 @@ export const LEERER_STAND: AufgabenStand = {
   plattformgebuehr: { gescheitert: [], zurueckgebucht: [], rechnungsangabenFehlenSeit: null, nichtAbgeholt: [], kundenstreit: [] },
   liveSignal: null,
   widerrufe: [],
+  hofSignale: { lastschrift: [], agb: [], konto: [] },
 }
 
 /** Ab wann ein verkaufender Hof ohne Bestellung auffällt (Register N32: „seit 14 Tagen ohne Bestellung“). */
@@ -236,6 +253,10 @@ export const AUFGABE_ZIEL_MS: Record<AufgabeQuelle, number> = {
   hof_online_haengt: 24 * STUNDE_MS,
   // Nr. 289 (E-022): nur der Rahmen — die Frist je Fall ist die Antwortfrist bei Stripe (kundenstreitQuelle).
   kundenstreit: 7 * TAG_MS,
+  // Nr. 304 (an die Alarm-Matrix angelehnt): Lastschrift beendet wie „Lastschrift gescheitert“ 3 Tage; AGB und Konto-Frist die Woche.
+  lastschrift_beendet: 3 * TAG_MS,
+  agb_offen: 7 * TAG_MS,
+  konto_frist_um: 7 * TAG_MS,
 }
 
 /** Ein Widerruf ohne Bestellung braucht das Team schneller: 2 Tage (Freigabe 200 Punkt 6). */
@@ -261,6 +282,9 @@ const BEREICH: Record<AufgabeQuelle, AufgabeBereich> = {
   widerruf_offen: 'Geld',
   hof_online_haengt: 'Höfe',
   kundenstreit: 'Geld',
+  lastschrift_beendet: 'Geld',
+  agb_offen: 'Höfe',
+  konto_frist_um: 'Höfe',
 }
 
 // Die Höfe-Liste steht seit Nr. 185 unter /admin/hoefe; seit Nr. 187 hat jeder Hof eine Akte —
@@ -791,6 +815,39 @@ function widerrufOffen(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   )
 }
 
+/** Die Sätze der stillen Ereignisse eines Hofs (Nr. 304) — wörtlich aus dem Auftrag. */
+const HOF_SIGNAL_SATZ = {
+  lastschrift_beendet:
+    'Der Hof hat keine gültige Lastschrift mehr. Sobald der Einzug der Gebühr aus Barbestellungen für ihn begonnen hat, kann bei ihm niemand mehr bar bestellen. Schreib dem Hof: Er richtet die Lastschrift unter „Deine Konditionen“ neu ein.',
+  agb_offen: `Der Hof verkauft, hat der Fassung ${AGB_NEUESTE} der AGB aber noch nicht zugestimmt. In seinem Heute steht dazu eine Karte. Schreib ihm im Postfach.`,
+  konto_frist_um: 'Die 30 Tage zum Wieder-Öffnen sind um. Jetzt sind Kontakt, Fotos und Texte des Hofs zu löschen (AGB 29.3). Das läuft noch nicht von selbst – gib das Löschen in Auftrag.',
+} as const
+
+type HofSignalQuelle = keyof typeof HOF_SIGNAL_SATZ
+
+/**
+ * Stille Ereignisse eines Hofs (Nr. 304): je Hof eine Aufgabe, Ziel seine Akte.
+ * Nur zeigen — keine Mail, keine Nachricht, keine Sperre. Ist die Ursache weg
+ * (neues Mandat, Zustimmung, gelöscht), fehlt der Hof im Stand (N32).
+ */
+function hofSignal(quelle: HofSignalQuelle, liste: keyof HofSignaleStand): (stand: AufgabenStand, jetzt: Date) => Aufgabe[] {
+  return (stand, jetzt) =>
+    stand.hofSignale[liste].map((h) =>
+      aufgabe(
+        quelle,
+        {
+          titel: QUELLE_NAME[quelle],
+          bezug: { kennung: h.farmId, text: h.hofName },
+          satz: HOF_SIGNAL_SATZ[quelle],
+          seit: h.seit,
+          wasTun: 'hofAnsehen',
+          ziel: adminHofHref(h.farmId),
+        },
+        jetzt
+      )
+    )
+}
+
 /** Das Register: je Quelle eine reine Funktion `(stand, jetzt) → Aufgabe[]`. */
 export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt: Date) => Aufgabe[]> = {
   notbremse_aktiv: notbremseAktiv,
@@ -812,6 +869,39 @@ export const ADMIN_AUFGABEN: Record<AufgabeQuelle, (stand: AufgabenStand, jetzt:
   widerruf_offen: widerrufOffen,
   hof_online_haengt: hofOnlineHaengt,
   kundenstreit: kundenstreitQuelle,
+  lastschrift_beendet: hofSignal('lastschrift_beendet', 'lastschrift'),
+  agb_offen: hofSignal('agb_offen', 'agb'),
+  konto_frist_um: hofSignal('konto_frist_um', 'konto'),
+}
+
+/**
+ * Ein fester Name je Quelle, ohne Daten (Nr. 304; für das Handbuch und die
+ * tägliche Mail): der Titel der Aufgabe, wo er fest ist, sonst ein fester
+ * Ersatz. Spätere Quellen tragen ihren Namen hier selbst ein.
+ */
+export const QUELLE_NAME: Record<AufgabeQuelle, string> = {
+  notbremse_aktiv: NOTBREMSE_ADMIN_TEXT.aufgabe,
+  hof_wartet: 'Hof wartet auf Freischaltung',
+  erstattung_offen: 'Erstattung offen',
+  mail_gescheitert: 'Mail gescheitert',
+  mail_haengt: 'Wichtige Mail hängt',
+  meldung_neu: 'Neue Meldung',
+  betrieb_warnung: 'Warnung des Betriebs',
+  uptime_still: 'Die Überwachung von außen meldet sich nicht',
+  hof_ohne_abholzeit: 'Hof ohne Abholzeit nächste Woche',
+  hof_ohne_bestellung: `Seit ${OHNE_BESTELLUNG_TAGE} Tagen ohne Bestellung`,
+  geld_abweichung: 'Abweichung beim Geld',
+  einzug_gescheitert: 'Lastschrift gescheitert',
+  rueckbuchung: 'Lastschrift zurückgebucht',
+  rechnungsangaben_fehlen: 'Rechnungsangaben fehlen',
+  nicht_abgeholt_auffaellig: 'Viele Barbestellungen nicht abgeholt',
+  stripe_live_ohne_hofpreis: 'Echte Zahlungen ohne Plattformgebühr im Preis',
+  widerruf_offen: 'Rücktritt offen',
+  hof_online_haengt: HOF_ONLINE_HAENGT_TITEL,
+  kundenstreit: 'Rückbuchung einer Kundenzahlung',
+  lastschrift_beendet: 'Lastschrift beendet',
+  agb_offen: 'AGB noch nicht zugestimmt',
+  konto_frist_um: 'Konto seit 30 Tagen geschlossen',
 }
 
 /**
@@ -1008,20 +1098,29 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
 
 // ─── Kommt ───────────────────────────────────────────────────────────────────
 
-/** Eigene Termine (Freigabe 185: „aus einer Konstante“). Vergangene fallen von selbst weg. */
-export const HEUTE_TERMINE: readonly { titel: string; am: string; satz: string }[] = [
-  // Der Stichtag nur aus src/lib/konditionen.ts (tests/konditionen-uebergang.test.ts).
-  { titel: 'Plattformgebühr im Hofpreis (Register N38)', am: TARIFE_AB_TAG, satz: 'Vorgabe-Stichtag · Rechtstexte müssen vorher stehen' },
-]
+/**
+ * Eigene Termine (Freigabe 185: „aus einer Konstante“). Vergangene fallen von selbst weg. Seit Nr. 304 leer:
+ * Der Stichtag „Plattformgebühr im Preis“ kommt aus der Einstellung (`hofpreisAbTag`), nicht aus der Vorgabe.
+ */
+export const HEUTE_TERMINE: readonly { titel: string; am: string; satz: string }[] = []
+
+/** Der Wiener Kalendertag, ab dem das Hofpreis-Modell gilt: die Einstellung, ohne sie die Vorgabe (`hofpreisModellAb`). */
+export function hofpreisAbTag(einstellung: HofpreisEinstellung | null): string {
+  return kalendertagInWien(hofpreisModellAb(einstellung))
+}
 
 export type KommtEintrag = { titel: string; wann: string; marke: { wort: string; art: MarkeArt }; kalendertag: string }
 
 /**
  * „Kommt“: die nächste geplante Fassung der Startseite, das Festschreiben der
- * Gründungsaktion (solange nicht festgeschrieben) und die eigenen Termine —
- * nach Tag sortiert.
+ * Gründungsaktion (solange nicht festgeschrieben), der Beginn der
+ * Plattformgebühr im Preis (Tag aus der Einstellung, bis einschließlich zu
+ * diesem Tag) und die eigenen Termine — nach Tag sortiert.
  */
-export function kommtEintraege(e: { naechsteFassung: Date | null; gruendungAktionBisTag: string | null; gruendungFest: boolean }, jetzt: Date): KommtEintrag[] {
+export function kommtEintraege(
+  e: { naechsteFassung: Date | null; gruendungAktionBisTag: string | null; gruendungFest: boolean; hofpreisAbTag: string },
+  jetzt: Date
+): KommtEintrag[] {
   const heute = kalendertagInWien(jetzt)
   const eintraege: KommtEintrag[] = []
   if (e.naechsteFassung) {
@@ -1039,6 +1138,14 @@ export function kommtEintraege(e: { naechsteFassung: Date | null; gruendungAktio
       wann: `${formatTagKurz(e.gruendungAktionBisTag)} · Einstellungen`,
       marke: { wort: 'Termin', art: 'erledigt' },
       kalendertag: e.gruendungAktionBisTag,
+    })
+  }
+  if (e.hofpreisAbTag >= heute) {
+    eintraege.push({
+      titel: 'Plattformgebühr im Preis beginnt',
+      wann: `${formatTagKurz(e.hofpreisAbTag)} · AGB ${AGB_NEUESTE} gelten ab diesem Tag`,
+      marke: { wort: 'Termin', art: 'erledigt' },
+      kalendertag: e.hofpreisAbTag,
     })
   }
   for (const t of HEUTE_TERMINE) {
