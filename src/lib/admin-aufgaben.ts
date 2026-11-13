@@ -28,7 +28,7 @@ import { adminAktionSchema, ohnePersonendaten, type AdminAktionArt } from '@/sch
 import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
 import { ADMIN_HOEFE_HREF, adminHofHref } from '@/lib/admin-hof-akte'
 import { NOTBREMSE_ADMIN_TEXT, bestellstoppAktiv, bestellstoppBisText, notbremseGrundLabel, type BestellstoppStand } from '@/lib/notbremse'
-import { ABWEICHUNG_FELD_TEXT, type KundenstreitArt, type OffeneAbweichung } from '@/lib/geld-abgleich'
+import { abweichungFeldText, type KundenstreitArt, type OffeneAbweichung } from '@/lib/geld-abgleich'
 import { MARKE } from '@/lib/marke'
 import { bestellungenHref } from '@/lib/admin-bestellung'
 import { WIDERRUF_OHNE_BESTELLUNG_ANKER } from '@/lib/widerruf'
@@ -388,7 +388,7 @@ function meldungNeu(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       {
         titel: meldungTitel(m),
         bezug: { kennung: m.id, text: `${m.von} · ${MELDUNG_ART_LABEL[m.art]} · Nr. ${kurznummerAus(m.id)}` },
-        satz: 'Lesen, einordnen und dem Hof antworten.',
+        satz: 'Lesen, einordnen und antworten.',
         seit: m.createdAt,
         wasTun: 'oeffnen',
         ziel: eingangMeldungAdresse(m.id),
@@ -448,9 +448,9 @@ function uptimeStill(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
     aufgabe(
       'uptime_still',
       {
-        titel: 'Uptime-Dienst ist still',
+        titel: 'Die Überwachung von außen meldet sich nicht',
         bezug: { kennung: 'von-aussen', text: `zuletzt ${zuletztText(lauf.gestartetAm, jetzt)}` },
-        satz: 'Seit über 30 Minuten kein Aufruf von /api/gesund. Sieh beim Uptime-Dienst nach – solange er still ist, merkt niemand einen Ausfall.',
+        satz: `Seit über 30 Minuten hat der Dienst, der von außen prüft, ob ${MARKE} erreichbar ist, nicht mehr nachgesehen. Sieh dort nach. Solange er still ist, merkt niemand einen Ausfall.`,
         seit: warnung?.seit ?? new Date(lauf.gestartetAm.getTime() + UEBERFAELLIG_NACH_MS.vonAussen),
         wasTun: 'ansehen',
         ziel: ADMIN_BETRIEB_HREF,
@@ -586,13 +586,13 @@ function geldAbweichung(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
   for (const a of stand.geldAbweichungen) jeBestellung.set(a.orderId, [...(jeBestellung.get(a.orderId) ?? []), a])
   return [...jeBestellung.values()].map((liste) => {
     const erste = liste.reduce((a, b) => (b.seit.getTime() < a.seit.getTime() ? b : a))
-    const teile = liste.map((a) => `${ABWEICHUNG_FELD_TEXT[a.feld]} ${a.differenzCents > 0 ? '+' : '−'}${formatEuro(centsAlsEuro(Math.abs(a.differenzCents)))}`)
+    const teile = liste.map((a) => `${abweichungFeldText(a)} ${a.differenzCents > 0 ? '+' : '−'}${formatEuro(centsAlsEuro(Math.abs(a.differenzCents)))}`)
     return aufgabe(
       'geld_abweichung',
       {
         titel: 'Abweichung beim Geld',
         bezug: { kennung: erste.orderNumber, text: [erste.orderNumber, ...teile].join(' · ') },
-        satz: 'Die Datenbank und Stripe sagen nicht dasselbe (Plus: die Datenbank hat mehr). Bei Stripe nachsehen und die Bestellung prüfen.',
+        satz: `${MARKE} und Stripe haben für diese Bestellung verschiedene Beträge (Plus: bei ${MARKE} steht mehr). Öffne die Bestellung und daneben die Zahlung in Stripe. Solange das offen ist, lässt sich der Monat der Bestellung nicht abschließen.`,
         seit: erste.seit,
         wasTun: 'pruefen',
         ziel: bestellungenHref({}, { suche: erste.orderNumber }),
@@ -715,7 +715,7 @@ function nichtAbgeholtAuffaelligQuelle(stand: AufgabenStand, jetzt: Date): Aufga
 
 /** Titel der Aufgabe und Satz der Betriebsleiste (N40) — ein Satz für beide. */
 export function stripeLiveOhneHofpreisTitel(ab: Date): string {
-  return `Stripe ist live, aber das Hofpreis-Modell beginnt erst am ${formatDatumLang(ab)} – Stichtag vorziehen`
+  return `Echte Zahlungen laufen, aber die Plattformgebühr im Preis beginnt erst am ${formatDatumLang(ab)} – Tag vorziehen`
 }
 
 /**
@@ -737,7 +737,7 @@ function stripeLiveOhneHofpreis(stand: AufgabenStand, jetzt: Date): Aufgabe[] {
       {
         titel: stripeLiveOhneHofpreisTitel(ab),
         bezug: { kennung: 'stripe', text: 'Stripe LIVE · Hofpreis-Modell ab' },
-        satz: 'Die Bestellungen laufen weiter, bis zum Stichtag nach dem bisherigen Modell. In den Einstellungen den Stichtag „Hofpreis-Modell ab“ so früh wie möglich setzen.',
+        satz: 'Bis dahin gilt für neue Bestellungen das bisherige Modell: Online zahlt die Kundschaft die Gebühr zusätzlich zum Preis, bar fällt keine an. Setz den Tag in den Einstellungen bei „Hofpreis-Modell ab“ so früh wie möglich.',
         seit,
         wasTun: 'oeffnen',
         ziel: `${ADMIN_EINSTELLUNGEN_HREF}#${HOFPREIS_KARTE_ID}`,
@@ -968,8 +968,8 @@ export function lageKacheln(lage: HeuteLage, aufgaben: readonly Aufgabe[]): Lage
       titel: 'Bestellungen heute',
       wert: formatZahl(b.zurAbholung),
       einheit: 'zur Abholung',
-      // Wort aus dem Mockup; einen Rahmen, der „zu viel“ meldet, gibt es (noch) nicht — darum kein `tun`.
-      marke: { wort: 'Im Rahmen', art: 'laeuft' },
+      // Keine Marke (Nr. 303, F047): Einen Rahmen, der „zu viel“ meldet, gibt es nicht — „Im Rahmen“ hätte nichts geprüft.
+      marke: null,
       zeilen: [`${formatZahl(b.nichtGepackt)} noch nicht gepackt · ${mitAnzahlWort(b.storniert, 'Storno', 'Stornos')}`, wochenZeile(lage.woche)],
     },
     {
@@ -1058,8 +1058,8 @@ export function kommtEintraege(e: { naechsteFassung: Date | null; gruendungAktio
 export const MONTAGS_ROUTINE = [
   { id: 'braucht-dich', text: 'Braucht dich leer oder geplant' },
   { id: 'abholzeit', text: 'Höfe ohne Abholzeit angeschrieben' },
-  { id: 'sentry', text: 'Sentry: neue Fehler angesehen' },
-  { id: 'geld', text: 'Geld: Woche mit Stripe-Auszahlung abgeglichen' },
+  { id: 'sentry', text: 'Fehlermeldungen der Woche angesehen (Sentry)' },
+  { id: 'geld', text: 'Geld: Abgleich mit Stripe ohne Abweichung, Auszahlung in Stripe angesehen' },
   { id: 'notfall', text: 'Betriebshandbuch: ein Notfall gelesen' },
 ] as const
 

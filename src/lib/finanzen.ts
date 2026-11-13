@@ -1154,11 +1154,11 @@ export function monatsabschlussPruefliste(e: MonatsabschlussEingabe): Monatsabsc
   return [
     {
       id: 'abgleich',
-      text: 'Abgleich mit Stripe ohne ungeklärte Abweichung',
+      text: 'Abgleich mit Stripe ohne Abweichung',
       erledigt: e.abgleichNachMonatsende && e.abweichungen === 0,
       offen: !e.abgleichNachMonatsende
         ? 'der Abgleich ist nach dem Monatsende noch nicht gelaufen'
-        : `${mitAnzahl(e.abweichungen, 'Abweichung', 'Abweichungen')} ungeklärt`,
+        : `${mitAnzahl(e.abweichungen, 'Bestellung weicht ab', 'Bestellungen weichen ab')} – sie stehen in Heute`,
     },
     {
       id: 'erstattung',

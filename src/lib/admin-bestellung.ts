@@ -296,7 +296,7 @@ export const ADMIN_BESTELLUNG_TEXT = {
   kundinAdresse: 'Adresse der Kundin',
   kundinMail: 'Mail schreiben',
   hofSchreiben: 'Hof schreiben',
-  hofOhneFaden: 'Im Postfach steht für diesen Hof bisher kein Faden.',
+  hofOhneFaden: 'Mit diesem Hof gibt es im Postfach bisher keine Unterhaltung. Schreib ihm ein Rundschreiben an „Ausgewählte“.',
   notfallStorno: 'Notfall-Storno …',
   notfallTitel: (nummer: string): string => `Bestellung ${nummer} im Notfall stornieren?`,
   notfallSatz:

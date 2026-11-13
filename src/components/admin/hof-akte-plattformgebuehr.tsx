@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { speichereHofPlattformgebuehr } from '@/server/actions/admin-plattformgebuehr'
 import { abrechnungStandWort } from '@/lib/plattformgebuehr'
-import { centsAlsEuro, formatEuro, formatZahl } from '@/lib/format'
+import { centsAlsEuro, formatDatumLang, formatEuro, formatZahl } from '@/lib/format'
+import { MARKE } from '@/lib/marke'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { FELD, FELD_LABEL, KARTE, KNOPF_GRUEN, KNOPF_RAHMEN, LEISE } from '@/components/hof-bestellungen/stil'
@@ -27,6 +28,29 @@ export type PlattformgebuehrAkteAnzeige = {
 
 const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
 
+/**
+ * Je Feld ein Satz, was das Speichern bewirkt (Nr. 303 B2; „Satz in %“ und der
+ * Satz unter dem Knopf im Wortlaut von Recht, Gegenlesen Fund 8: AGB 19.9 und
+ * 32.3, Art. 3 Abs. 2 P2B-VO — jede Änderung mit Frist, auch eine günstigere).
+ */
+const HILFE = {
+  satz: 'Gilt ab dem Speichern für neue Bestellungen dieses Hofs – darum erst am angekündigten Tag speichern.',
+  tage: 'So lange darf eine Abrechnung offen sein. Danach nimmt der Hof keine Barbestellungen an.',
+  einzug: `Vorher verzichtet ${MARKE} auf die Gebühr aus Barbestellungen.`,
+  mandat: 'Mit Haken geht bar nur mit eingerichteter Lastschrift, sobald der Einzug begonnen hat. Ohne Haken bekommt der Hof ohne Lastschrift die Rechnung zur Überweisung.',
+  speichern:
+    'Satz und Einzug gelten ab dem Speichern für neue Bestellungen. Jede Änderung an Satz, Einzug, Frist bis zur Sperre, Lastschrift-Pflicht oder Abrechnungstag kündigst du dem Hof vorher im Postfach und per E-Mail an: zu seinem Nachteil mindestens 30 Tage, sonst mindestens 15 Tage (AGB 19.9 und 32.3). Verzichtet der Hof nach der Ankündigung in Textform auf die Frist, darfst du früher speichern. Sonst speicherst du erst am angekündigten Tag.',
+} as const
+
+/** Die Klasse des Satzes unter dem Knopf — dieselbe für jeden Hilfssatz. */
+const HILFE_SATZ = cn('mt-1 text-[12.5px]', LEISE)
+
+/** Der Kalendertag der Vorgabe ausgeschrieben („1. Februar 2028“) — um 12:00 UTC, damit er in Wien derselbe Tag bleibt. */
+function vorgabeText(kalendertag: string): string {
+  const zeitpunkt = new Date(`${kalendertag}T12:00:00.000Z`)
+  return Number.isNaN(zeitpunkt.getTime()) ? kalendertag : formatDatumLang(zeitpunkt)
+}
+
 /** „3 von 20 (15 %)“ — ganze Prozent, abgerundet, ohne Gleitkomma. */
 function quoteText(bar: number, nicht: number): string {
   if (bar === 0) return 'keine Barbestellungen'
@@ -38,7 +62,7 @@ function quoteText(bar: number, nicht: number): string {
  * Nr. 187): Mandat, die letzten Abrechnungen, die Quote „nicht abgeholt bei
  * bar, 90 Tage“ und die Einstellungen je Hof. Speichern verlangt das Recht
  * „Geld“ und frischen Passkey (`speichereHofPlattformgebuehr`); Satz und
- * Einzug gelten nur für neue Bestellungen. Eine zurückgebuchte Abrechnung trägt
+ * Einzug gelten ab dem Speichern für neue Bestellungen. Eine zurückgebuchte Abrechnung trägt
  * den Notweg „Sperre nach Rückbuchung aufheben …“ (Nr. 290) — der Knopf steht
  * allen, die die Akte sehen; das Recht „Geld“ prüft der Server.
  */
@@ -120,7 +144,17 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
           <label htmlFor={`${id}-satz`} className={FELD_LABEL}>
             Satz in %
           </label>
-          <input id={`${id}-satz`} inputMode="decimal" value={werte.satz} onChange={(e) => setWerte({ ...werte, satz: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')} />
+          <input
+            id={`${id}-satz`}
+            inputMode="decimal"
+            value={werte.satz}
+            onChange={(e) => setWerte({ ...werte, satz: e.target.value })}
+            aria-describedby={`${id}-satz-hilfe`}
+            className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
+          />
+          <p id={`${id}-satz-hilfe`} className={HILFE_SATZ}>
+            {HILFE.satz}
+          </p>
         </div>
         <div>
           <label htmlFor={`${id}-tage`} className={FELD_LABEL}>
@@ -133,8 +167,12 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
             max={90}
             value={werte.sperreTage}
             onChange={(e) => setWerte({ ...werte, sperreTage: Number.parseInt(e.target.value || '0', 10) })}
+            aria-describedby={`${id}-tage-hilfe`}
             className={cn(FELD, FOKUS_RAHMEN, 'min-h-11')}
           />
+          <p id={`${id}-tage-hilfe`} className={HILFE_SATZ}>
+            {HILFE.tage}
+          </p>
         </div>
         <div>
           <label htmlFor={`${id}-tag`} className={FELD_LABEL}>
@@ -152,24 +190,45 @@ export function HofAktePlattformgebuehr({ daten }: { daten: PlattformgebuehrAkte
         </div>
         <div>
           <label htmlFor={`${id}-einzug`} className={FELD_LABEL}>
-            Einzug ab (Vorgabe {daten.einstellungen.vorgabeEinzugAb})
+            Einzug ab (Vorgabe {vorgabeText(daten.einstellungen.vorgabeEinzugAb)})
           </label>
           <div className="flex gap-2">
-            <input id={`${id}-einzug`} type="date" value={werte.einzugAb} onChange={(e) => setWerte({ ...werte, einzugAb: e.target.value })} className={cn(FELD, FOKUS_RAHMEN, 'min-h-11 min-w-0 flex-1')} />
+            <input
+              id={`${id}-einzug`}
+              type="date"
+              value={werte.einzugAb}
+              onChange={(e) => setWerte({ ...werte, einzugAb: e.target.value })}
+              aria-describedby={`${id}-einzug-hilfe`}
+              className={cn(FELD, FOKUS_RAHMEN, 'min-h-11 min-w-0 flex-1')}
+            />
             <button type="button" className={KNOPF_RAHMEN} onClick={() => setWerte({ ...werte, einzugAb: '' })} disabled={werte.einzugAb === ''}>
               zurücksetzen
             </button>
           </div>
+          <p id={`${id}-einzug-hilfe`} className={HILFE_SATZ}>
+            {HILFE.einzug}
+          </p>
         </div>
-        <label className="flex min-h-11 items-center gap-2 text-[14px] text-foreground sm:col-span-2 lg:col-span-1 lg:self-end">
-          <input type="checkbox" checked={werte.mandatPflicht} onChange={(e) => setWerte({ ...werte, mandatPflicht: e.target.checked })} className={cn('size-5', FOKUS_RAHMEN)} />
-          Lastschrift Pflicht für bar
-        </label>
+        <div className="sm:col-span-2 lg:col-span-1 lg:self-end">
+          <label className="flex min-h-11 items-center gap-2 text-[14px] text-foreground">
+            <input
+              type="checkbox"
+              checked={werte.mandatPflicht}
+              onChange={(e) => setWerte({ ...werte, mandatPflicht: e.target.checked })}
+              aria-describedby={`${id}-mandat-hilfe`}
+              className={cn('size-5', FOKUS_RAHMEN)}
+            />
+            Lastschrift Pflicht für bar
+          </label>
+          <p id={`${id}-mandat-hilfe`} className={HILFE_SATZ}>
+            {HILFE.mandat}
+          </p>
+        </div>
         <div className="sm:col-span-2 lg:col-span-3">
           <button type="submit" disabled={laeuft} aria-busy={laeuft || undefined} className={KNOPF_GRUEN}>
             {laeuft ? 'Speichert …' : 'Mit Passkey speichern'}
           </button>
-          <p className={cn('mt-1 text-[12.5px]', LEISE)}>Satz und Einzug gelten nur für neue Bestellungen.</p>
+          <p className={HILFE_SATZ}>{HILFE.speichern}</p>
         </div>
       </form>
       <DialogFehler text={fehler} />

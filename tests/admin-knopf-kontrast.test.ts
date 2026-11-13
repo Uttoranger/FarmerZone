@@ -50,7 +50,7 @@ const DUNKEL = '[data-theme="dark"]'
 
 describe('„Ablehnen" — Kontrast in beiden Themes', () => {
   it('der Knopf ist ein Umriss-Knopf in normaler Textfarbe, ohne eigene Fläche und ohne rote Schrift', () => {
-    expect(klassenDesKnopfs(ansicht, 'Ablehnen')).toBe('KNOPF_RAHMEN')
+    expect(klassenDesKnopfs(ansicht, 'Ablehnen und löschen …')).toBe('KNOPF_RAHMEN')
     const klassen = KNOPF_RAHMEN.split(/\s+/)
     expect(klassen).toContain('text-foreground')
     // Rand in Textfarbe nach Board (Nr. 269, „So geht’s“ auf Heute; vorher der blasse Kartenrand border-border).

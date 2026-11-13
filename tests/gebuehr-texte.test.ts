@@ -215,10 +215,12 @@ describe('Konditionen je Modell (V62)', () => {
 })
 
 describe('Admin › Einstellungen: Hofpreis-Stichtag nach Erreichen', () => {
-  it('„Seit diesem Tag gilt …“ ohne „Vorher bleibt alles wie heute.“; davor der bisherige Satz', () => {
-    expect(hofpreisStichtagSatz(true)).toBe('Seit diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis (6 %, Mindestbestellwert 10 €).')
+  it('„Seit diesem Tag steht …“ ohne „Vorher bleibt alles wie heute.“; davor der Satz mit „Ab diesem Tag“', () => {
+    expect(hofpreisStichtagSatz(true)).toBe(
+      'Seit diesem Tag steht die Plattformgebühr (6 %) im Preis, den die Kundschaft sieht – online und bar gleich, Mindestbestellwert 10 €. Seitdem gelten für neue Bestellungen die AGB 1.0 und die Monatsabrechnung der Gebühr.'
+    )
     expect(hofpreisStichtagSatz(false)).toBe(
-      'Ab diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis (6 %, Mindestbestellwert 10 €). Vorher bleibt alles wie heute.'
+      'Ab diesem Tag steht die Plattformgebühr (6 %) im Preis, den die Kundschaft sieht – online und bar gleich, Mindestbestellwert 10 €. Für neue Bestellungen gelten ab diesem Tag die AGB 1.0, und die Monatsabrechnung der Gebühr beginnt. Ist der Tag erreicht, lässt er sich nicht mehr ändern.'
     )
     expect(HOFPREIS_STICHTAG_TEXT.satzErreicht).not.toContain('Vorher')
   })

@@ -35,7 +35,8 @@ import { hofpreisModellAb, type HofpreisEinstellung } from '@/lib/plattformgebue
 import { MARKE } from '@/lib/marke'
 import { PRODUKTION_HOST } from '@/lib/umgebung'
 import { MINDESTBESTELLWERT_TEXT, PLATTFORMGEBUEHR_BEZEICHNUNG, PLATTFORMGEBUEHR_PROZENT } from '@/lib/konditionen'
-import { formatZahl } from '@/lib/format'
+import { formatDatumLang, formatZahl } from '@/lib/format'
+import { AGB_NEUESTE } from '@/lib/rechtstexte/agb-fassung'
 
 /** Die Kennung der einen Zeile. */
 export const PLATTFORM_EINSTELLUNG_ID = 'plattform'
@@ -270,13 +271,12 @@ export const EINSTELLUNGEN_TEXT = {
   ladefehler: 'Wir konnten die Einstellungen gerade nicht laden.',
   gruppe: {
     gruendung: { titel: 'Gründungshöfe', zeile: 'Plätze, Monate, Aktion, Anzeige' },
-    team: { titel: 'Team und Rechte', zeile: 'Personen, Rechte, Notfallzugang' },
+    team: { titel: 'Team und Rechte', zeile: 'Personen, Rechte' },
     benachrichtigungen: { titel: 'Benachrichtigungen', zeile: 'Wer welche Mails des Betriebs bekommt' },
     plattform: { titel: 'Plattform', zeile: 'Name und Adresse' },
     anmeldung: { titel: 'Anmeldung', zeile: 'Passkeys, Ersatzcodes, Geräte', satz: 'Deine Passkeys, Ersatzcodes und angemeldeten Geräte.', link: 'Anmeldung öffnen' },
   },
   gruendung: {
-    register: 'Register K2',
     satz: 'Wie viele Höfe ohne Grundgebühr starten dürfen, wie lange und bis wann die Aktion läuft.',
     kachelPlaetze: 'Plätze gesamt',
     kachelVergeben: 'Vergeben',
@@ -331,7 +331,7 @@ export const EINSTELLUNGEN_TEXT = {
     gespeichert: 'Gespeichert. Die Seiten zeigen die neuen Zahlen.',
   },
   plattform: {
-    satz: 'Nur zum Nachsehen: Name und Adresse stehen an einer Stelle im Code (Register M1).',
+    satz: 'Nur zum Nachsehen: Name und Adresse sind fest hinterlegt. Ändern lässt du sie per Auftrag.',
     name: 'Name',
     adresse: 'Adresse',
   },
@@ -377,21 +377,45 @@ export function gruendungZeileKurz(zahlen: Pick<GruendungZahlen, 'gesamt' | 'fre
 
 // ─── Stichtag „Hofpreis-Modell ab“ (Register N38, Nr. 197) ──────────────────
 
-/** Was ab dem Stichtag gilt — Zahlen aus konditionen.ts, nie als Literal. */
-const HOFPREIS_GILT = `für neue Bestellungen die ${PLATTFORMGEBUEHR_BEZEICHNUNG} im Hofpreis (${formatZahl(PLATTFORMGEBUEHR_PROZENT)} %, Mindestbestellwert ${MINDESTBESTELLWERT_TEXT})`
+/**
+ * Was der Stichtag schaltet (Nr. 303, F047; am Code belegt): das Gebührenmodell
+ * (`gebuehrModellFuer`), die AGB-Fassung neuer Bestellungen
+ * (src/lib/rechtstexte/agb-fassung.ts) und die Monatsabrechnung der Gebühr — und
+ * erreicht ist er fest (`pruefeHofpreisStichtag`). Zahlen aus konditionen.ts, nie als Literal.
+ */
+const HOFPREIS_IM_PREIS = `die ${PLATTFORMGEBUEHR_BEZEICHNUNG} (${formatZahl(PLATTFORMGEBUEHR_PROZENT)} %) im Preis, den die Kundschaft sieht – online und bar gleich, Mindestbestellwert ${MINDESTBESTELLWERT_TEXT}`
 
 /** Die Texte der Karte in Admin › Einstellungen. */
 export const HOFPREIS_STICHTAG_TEXT = {
   titel: 'Hofpreis-Modell ab',
   /** Vor dem Stichtag. */
-  satz: `Ab diesem Tag gilt ${HOFPREIS_GILT}. Vorher bleibt alles wie heute.`,
-  /** Nach Erreichen (V62, Board s3/w3-admin-einstellungen Bild 4): „Vorher bleibt alles wie heute.“ wäre sinnlos. */
-  satzErreicht: `Seit diesem Tag gilt ${HOFPREIS_GILT}.`,
+  satz: `Ab diesem Tag steht ${HOFPREIS_IM_PREIS}. Für neue Bestellungen gelten ab diesem Tag die AGB ${AGB_NEUESTE}, und die Monatsabrechnung der Gebühr beginnt. Ist der Tag erreicht, lässt er sich nicht mehr ändern.`,
+  /** Nach Erreichen (V62, Board s3/w3-admin-einstellungen Bild 4): ohne „lässt sich ändern“, im Perfekt. */
+  satzErreicht: `Seit diesem Tag steht ${HOFPREIS_IM_PREIS}. Seitdem gelten für neue Bestellungen die AGB ${AGB_NEUESTE} und die Monatsabrechnung der Gebühr.`,
   feld: 'Stichtag',
   speichern: 'Stichtag speichern',
   speichert: 'Speichert …',
   gespeichert: 'Stichtag gespeichert.',
   erreicht: 'Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.',
+} as const
+
+/**
+ * Die Rückfrage vor dem Passkey (Nr. 303 B1): „Stichtag speichern“ öffnet sie,
+ * erst „Mit Passkey speichern“ ruft die Action. Sie sagt, was der Tag schaltet.
+ */
+export const HOFPREIS_RUECKFRAGE_TEXT = {
+  /** `tag` ist der Wiener Kalendertag (JJJJ-MM-TT), schon von `pruefeHofpreisStichtag` geprüft. */
+  titel: (tag: string): string => {
+    const tagDatum = wienerMitternacht(tag)
+    return `„${HOFPREIS_STICHTAG_TEXT.titel}“ auf den ${tagDatum ? formatDatumLang(tagDatum) : tag} setzen?`
+  },
+  punkte: [
+    `Ab diesem Tag zahlt die Kundschaft den Preis mit ${PLATTFORMGEBUEHR_BEZEICHNUNG}, online und bar.`,
+    `Für neue Bestellungen gelten ab diesem Tag die AGB ${AGB_NEUESTE}.`,
+    'Die Monatsabrechnung der Gebühr beginnt mit den Bestellungen ab diesem Tag.',
+  ],
+  satz: 'Bis der Tag erreicht ist, kannst du ihn noch verschieben. Danach nicht mehr.',
+  knopf: 'Mit Passkey speichern',
 } as const
 
 /** Der Satz der Karte: vor dem Stichtag `satz`, danach `satzErreicht` — `erreicht` kommt von der Seite wie heute. */
