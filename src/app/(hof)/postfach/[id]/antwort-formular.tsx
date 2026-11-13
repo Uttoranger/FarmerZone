@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition, type FormEvent } from 'react'
+import { useEffect, useState, useTransition, type FormEvent } from 'react'
 import { antworteAlsHof } from '@/server/actions/postfach'
 import { POSTFACH_TEXT, TEXT_MAX } from '@/lib/postfach'
 import { ZeichenZaehler } from '@/components/shared/zeichen-zaehler'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
 import { cn } from '@/lib/utils'
+import { FADEN_ENDE_ID, rollVerhalten } from '@/lib/postfach-rollen'
 
 /**
  * Das Feld „Antwort an das Team …" unter dem Faden (Mockup
@@ -14,11 +15,25 @@ import { cn } from '@/lib/utils'
  * Lesen nicht suchen muss; unten 28 px Luft, weil der Neu-Knopf 20 px über die
  * Leiste ragt (`-mt-5` in ui/bottom-nav.tsx) und sonst den Hinweis verdeckte. Kein maxLength: Der Zähler sagt ab 80 % Bescheid,
  * die Grenze prüft der Server (CODING_STANDARDS §8). Fehler stehen am Feld.
+ *
+ * Nach dem Senden rollt die Seite zum Anker unter dem Faden (Nr. 308): Sonst
+ * läge die eigene Antwort hinter dem klebenden Feld. Ohne Zeitschaltung, bei
+ * „weniger Bewegung“ ohne Gleiten; der Fokus bleibt im Feld.
  */
 export function AntwortFormular({ unterhaltungId }: { unterhaltungId: string }): React.JSX.Element {
   const [text, setText] = useState('')
   const [fehler, setFehler] = useState<string | null>(null)
   const [laeuft, starte] = useTransition()
+  // Zählt erfolgreiche Antworten; 0 = noch keine, dann wird nicht gerollt.
+  const [antworten, setAntworten] = useState(0)
+
+  useEffect(() => {
+    if (antworten === 0) return
+    document.getElementById(FADEN_ENDE_ID)?.scrollIntoView({
+      block: 'end',
+      behavior: rollVerhalten(window.matchMedia('(prefers-reduced-motion: reduce)').matches),
+    })
+  }, [antworten])
 
   function absenden(ereignis: FormEvent<HTMLFormElement>): void {
     ereignis.preventDefault()
@@ -31,6 +46,10 @@ export function AntwortFormular({ unterhaltungId }: { unterhaltungId: string }):
       }
       setFehler(null)
       setText('')
+      // Nach dem await wieder als Übergang: React schreibt das dann zusammen mit
+      // dem neu geladenen Faden fest — sonst rollt der Effekt, bevor die neue
+      // Nachricht im Faden steht, und sie läge wieder unter dem Feld.
+      starte(() => setAntworten((n) => n + 1))
     })
   }
 

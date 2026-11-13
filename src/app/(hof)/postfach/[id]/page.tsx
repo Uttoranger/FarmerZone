@@ -10,6 +10,7 @@ import { Textlink } from '@/components/ui/textlink'
 import { RUNDUNG } from '@/components/ui/rundung'
 import { cn } from '@/lib/utils'
 import { MARKE } from '@/lib/marke'
+import { FADEN_ENDE_ID } from '@/lib/postfach-rollen'
 import { FadenVerlauf, POSTFACH_RAHMEN, TeamZeichen } from '../teile'
 import { AntwortFormular } from './antwort-formular'
 import { FadenNachladen } from './faden-nachladen'
@@ -75,6 +76,8 @@ export default async function FadenPage({ params }: { params: Promise<{ id: stri
       </header>
 
       <FadenVerlauf eintraege={eintraege} seite="HOF" fussErste={fuss} nameAndereSeite={POSTFACH_TEXT.absender} />
+      {/* Ziel des Rollens nach dem Senden (Nr. 308): Der Rand ist so hoch wie Antwortfeld plus Unterleiste (am Computer nur das Feld), damit die neue Nachricht darüber endet. */}
+      <div id={FADEN_ENDE_ID} aria-hidden="true" className="scroll-mb-[calc(280px+env(safe-area-inset-bottom))] md:scroll-mb-[220px]" />
 
       {faden.rundschreiben && !faden.rundschreiben.antwortMoeglich ? (
         // Grau gefüllt, Link unterstrichen ohne Anführungszeichen (Liste Lauf 32 postfach).
