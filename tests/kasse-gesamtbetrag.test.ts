@@ -6,8 +6,8 @@
  * Beweist:
  *  - Schema: `gesamtCents` ist optional (alter Tab), ganze Cent zwischen 0 und 100 000 000.
  *  - Die Kette: Die Kasse schickt den Gesamtbetrag, den sie zeigt; auf 409 GESAMT_GEAENDERT lädt sie die Seite nach,
- *    zeigt danach den Betrag des Servers (Zusammenfassung, „Weiter zur Zahlung“ bzw. „Zahlungspflichtig bestellen“,
- *    Hinweis am Korb), und der nächste Klick schickt genau ihn.
+ *    zeigt danach den Betrag des Servers (Zusammenfassung, „Weiter zur Zahlung“, Hinweis am Korb; bar steht er seit
+ *    Nr. 309 nur in der Zusammenfassung über „Zahlungspflichtig bestellen“), und der nächste Klick schickt genau ihn.
  *  - Ändern sich Menge oder Zahlart, wird der Betrag des Servers leer: auch nach dem Zurückstellen gilt wieder der
  *    eigene (Runde 1, B2).
  *
@@ -221,14 +221,15 @@ describe('Kasse: die Kette nach GESAMT_GEAENDERT', () => {
     expect(await absendenMitGesamtGeaendert()).toMatchObject({ gesamtCents: 1050 })
   })
 
-  it('bar: „Zahlungspflichtig bestellen“ zeigt danach den Betrag des Servers', async () => {
+  it('bar: die Zusammenfassung über „Zahlungspflichtig bestellen“ zeigt danach den Betrag des Servers (Nr. 309: nicht der Knopf)', async () => {
     kasse('ONSITE_CASH')
     expect(await absendenMitGesamtGeaendert()).toMatchObject({ gesamtCents: 980, paymentMethod: 'ONSITE_CASH' })
 
     const danach = kasse('ONSITE_CASH')
 
-    expect(danach).toContain('Zahlungspflichtig bestellen · € 10,50')
+    expect(danach).toContain('>Zahlungspflichtig bestellen</button>')
     expect(zusammenfassung(danach)).toContain('€ 10,50')
+    expect(danach.indexOf('data-kauf-zusammenfassung')).toBeLessThan(danach.indexOf('>Zahlungspflichtig bestellen</button>'))
   })
 })
 
@@ -256,7 +257,8 @@ describe('Kasse: der Betrag des Servers wird leer, sobald sich Korb oder Zahlart
     const online = kasse('ONLINE')
 
     // Bar vor dem Stichtag: ohne Gebühr, € 9,80.
-    expect(bar).toContain('Zahlungspflichtig bestellen · € 9,80')
+    expect(bar).toContain('>Zahlungspflichtig bestellen</button>')
+    expect(zusammenfassung(bar)).toContain('€ 9,80')
     expect(bar).not.toContain('€ 10,50')
     expect(online).toContain('Weiter zur Zahlung · € 10,30')
     expect(online).not.toContain('€ 10,50')

@@ -31,7 +31,7 @@ export type BarzahlungAnzeige = {
 
 /** Der Ton des Stands — das Wort steht immer daneben, nie nur die Farbe. */
 function standTon(stand: string): StatusTon {
-  if (stand === 'bezahlt' || stand === 'nichts') return 'fertig'
+  if (stand === 'bezahlt' || stand === 'nichts' || stand === 'geklaert') return 'fertig'
   if (stand === 'offen' || stand === 'gescheitert' || stand === 'zurueckgebucht') return 'offen'
   return 'neutral'
 }
@@ -44,7 +44,8 @@ const euro = (cents: number): string => formatEuro(centsAlsEuro(cents))
  * Element über `@stripe/stripe-js/pure`, erst nach dem Klick geladen); gültig
  * wird sie erst über den Webhook — darum sagt die Seite danach „die Bank
  * bestätigt …“ und zeigt das Mandat nach dem Neuladen. Die Rechnung als PDF
- * holt der Server erst beim Klick bei Stripe.
+ * holt der Server erst beim Klick bei Stripe. Nach einer Rückbuchung steht bei
+ * der Abrechnung „Jetzt bezahlen“: die Nachforderung über den Betrag (Nr. 290).
  */
 export function Barzahlung({ daten }: { daten: BarzahlungAnzeige }): React.JSX.Element {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -144,6 +145,37 @@ function LastschriftFormular({ onFertig, onFehler }: { onFertig: () => void; onF
   )
 }
 
+/** „Jetzt bezahlen“ der Nachforderung nach einer Rückbuchung (Nr. 290) — die gehostete Rechnung, beim Klick bei Stripe gesucht. */
+function NachforderungKnopf({ abrechnungId }: { abrechnungId: string }): React.JSX.Element {
+  const [laeuft, starte] = useTransition()
+  const [fehler, setFehler] = useState<string | null>(null)
+  return (
+    <span className="inline-flex flex-col">
+      <button
+        type="button"
+        disabled={laeuft}
+        aria-busy={laeuft || undefined}
+        className={KNOPF_GRUEN}
+        onClick={() =>
+          starte(async () => {
+            setFehler(null)
+            const antwort = await oeffneRechnung({ abrechnungId, art: 'nachforderung', ziel: 'bezahlen' })
+            if ('error' in antwort) setFehler(antwort.error)
+            else window.location.assign(antwort.url)
+          })
+        }
+      >
+        {T.bezahlen}
+      </button>
+      {fehler && (
+        <span role="alert" className="text-[12.5px] text-destructive">
+          {fehler}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function RechnungKnopf({ abrechnungId, art }: { abrechnungId: string; art: 'bar' | 'online' }): React.JSX.Element {
   const [laeuft, starte] = useTransition()
   const [fehler, setFehler] = useState<string | null>(null)
@@ -196,6 +228,7 @@ function Monatsabrechnungen({ zeilen }: { zeilen: BarzahlungAnzeige['abrechnunge
               <span className="flex flex-wrap gap-1">
                 {z.rechnungBar && <RechnungKnopf abrechnungId={z.id} art="bar" />}
                 {z.rechnungOnline && <RechnungKnopf abrechnungId={z.id} art="online" />}
+                {z.stand === 'zurueckgebucht' && <NachforderungKnopf abrechnungId={z.id} />}
               </span>
             </li>
           ))}

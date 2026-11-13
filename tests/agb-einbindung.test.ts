@@ -110,7 +110,7 @@ describe('Kasse: der Satz unter dem Kaufknopf', () => {
 
   for (const [art, knopf] of [
     ['online', 'Weiter zur Zahlung · € 14,91'],
-    ['bar', 'Zahlungspflichtig bestellen · € 14,91'],
+    ['bar', '>Zahlungspflichtig bestellen</button>'],
   ] as const) {
     it(`${art}: der Satz mit Link auf die AGB steht nach dem Knopf „${knopf}", in derselben festen Leiste`, () => {
       const html = abschluss(art === 'online')

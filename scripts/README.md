@@ -1,6 +1,6 @@
 # scripts/ — Diagnose- und Reparatur-Skripte
 
-Alle Skripte laufen gegen die in `.env.local` konfigurierte Datenbank bzw. den
+Die Diagnose- und Reparatur-Skripte laufen gegen die in `.env.local` konfigurierte Datenbank bzw. den
 Stripe-Account. Ausführen mit:
 
 ```bash
@@ -22,3 +22,10 @@ pnpm dotenv -e .env.local -- tsx scripts/<name>.ts
 | `fix-pending-online-orders.ts` | Setzt ONLINE-Bestellungen, die in `PENDING_CONFIRMATION` feststecken, auf `PAID` — aber nur, wenn der PaymentIntent bei Stripe wirklich `succeeded` ist | Historische Reparatur (Webhook erreichte localhost nicht). Nur erneut ausführen, wenn genau dieses Symptom wieder auftritt |
 | `eps-faehigkeit-nachfordern.ts` | Fordert für bestehende Stripe-Konten der Höfe die Fähigkeit `eps_payments` an (EPS im Hofpreis-Modell, `on_behalf_of`); idempotent, ohne `--ausfuehren` nur lesend | Einmal vor dem Stichtag des Hofpreis-Modells; danach nur, wenn ein Konto ohne EPS auffällt |
 | `fix-test-emails.ts` | Überschreibt alle Kunden-E-Mails in Bestellungen mit einer Test-Adresse | **NUR lokale Entwicklung** (Resend-Testmodus mit `onboarding@resend.dev`). Niemals gegen die Produktions-DB |
+
+## Build (läuft bei Vercel, nicht von Hand)
+
+| Skript | Zweck | Wann ausführen |
+|---|---|---|
+| `vercel-ignore.sh` | `ignoreCommand` in vercel.json: keine Vorschau für einen Commit, dessen Betreff mit `WIP:` beginnt; die Produktion baut immer | Ruft Vercel vor jedem Build |
+| `vorschau-db-wache.mjs` | Erster Schritt von `vercel-build`, vor der Migration: Eine Vorschau (`VERCEL_ENV` genau `preview`), deren `DATABASE_URL` oder `DIRECT_URL` auf die Produktions-Datenbank zeigt, bricht mit Ausgang 1 ab; die Meldung nennt nur den Namen der Variable. Jeder andere Weg, auch ein Fehler im Skript, endet mit 0, damit die Produktion immer baut. Einen Schalter zum Abschalten gibt es bewusst nicht: Im Notfall die Variable in Vercel auf die Entwicklungsdatenbank berichtigen und neu bauen (Nr. 294a) | Läuft in jedem Build über `vercel-build`; lokal nur ohne Datenbank-Werte, etwa `node scripts/vorschau-db-wache.mjs` |

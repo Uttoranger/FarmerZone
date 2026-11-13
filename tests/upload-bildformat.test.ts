@@ -26,7 +26,7 @@
  * nicht, ein echtes HEIC-Original endet an sharp mit 415.
  */
 import { adminSitzung } from './admin-sitzung'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const s = vi.hoisted(() => {
   const kette = {
@@ -132,6 +132,8 @@ function alsAdminOhneHof(): void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Seit Nr. 294b (N7) verarbeitet die Route nur Originale aus dem eigenen Speicher — der kommt aus dem Blob-Schlüssel.
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_speicher_nurFuerTests')
   // clearAllMocks lässt Einmal-Antworten stehen; ein nicht verbrauchtes
   // mockRejectedValueOnce träfe sonst den nächsten Test.
   s.kette.toBuffer.mockReset()
@@ -140,6 +142,10 @@ beforeEach(() => {
   s.kette.metadata.mockResolvedValue({ width: 4000, height: 3000 })
   s.pfad.wert = 'originals/farm-1/product/foto.jpg'
   s.token.optionen = null
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('a) Upload-Token: nur erlaubte Typen', () => {

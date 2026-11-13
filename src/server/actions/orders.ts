@@ -11,6 +11,9 @@ import type { OrderStatus } from '@prisma/client'
 import { zahlungNachRueckweg } from '@/lib/hof-bestellungen'
 import { artikelFehltEingabeSchema, stornoEingabeSchema } from '@/schemas/hof-bestellungen'
 import { meldeFehlendenArtikel } from '@/server/artikel-fehlt'
+import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
+import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
+import { fehlerArt } from '@/lib/fehler-art'
 import { StripeStandUnklar, type UnklarGrund } from '@/server/teilerstattung'
 // Die innere Storno-Funktion liegt ohne 'use server' daneben (Nr. 186): Hof und Team (Notfall-Storno) nutzen dieselbe.
 import { storniere, type StornoErgebnis } from '@/server/stornieren'
@@ -474,7 +477,9 @@ export async function meldeArtikelFehlt(input: unknown): Promise<ArtikelFehltErg
  *   online → Teilerstattung in Höhe der Gebühr über Stripe, danach der Vermerk.
  *            Ein Fehler beim Erstatten blockiert den Statuswechsel NICHT: Der
  *            Status ist dann gesetzt, die Erstattung steht aus — sichtbar im
- *            Bauern-Bereich (gebuehrErstattungOffen) und im Log.
+ *            Bauern-Bereich (gebuehrErstattungOffen) und seit Nr. 288 wie beim
+ *            Storno als Aufgabe „Erstattung offen“ (Sentry, erstattungOffenSeit,
+ *            Mail an den Betreiber).
  */
 export async function markAsNotPickedUp(
   orderId: string
@@ -510,7 +515,7 @@ export async function markAsNotPickedUp(
   if (count === 0) return { error: BESTELLUNG_INZWISCHEN_GEAENDERT }
 
   // 2. Die Gebühr entfällt.
-  const gebuehr = await lasseServicegebuehrEntfallen(order)
+  const gebuehr = await lasseServicegebuehrEntfallen(order, farm.id)
 
   revalidatePath('/orders')
   revalidatePath(`/orders/${orderId}`)
@@ -518,14 +523,18 @@ export async function markAsNotPickedUp(
   return gebuehr.offen ? { gebuehrErstattungOffen: true } : {}
 }
 
-async function lasseServicegebuehrEntfallen(order: {
-  id: string
-  paymentMethod: string
-  paymentStatus: string
-  stripePaymentIntentId: string | null
-  serviceFeeCents: number
-  serviceFeeRefundedAt: Date | null
-}): Promise<{ offen: boolean }> {
+async function lasseServicegebuehrEntfallen(
+  order: {
+    id: string
+    paymentMethod: string
+    paymentStatus: string
+    stripePaymentIntentId: string | null
+    serviceFeeCents: number
+    serviceFeeRefundedAt: Date | null
+  },
+  /** Der Hof aus der Sitzung, mit dem markAsNotPickedUp gelesen und den Status gesetzt hat. */
+  farmId: string
+): Promise<{ offen: boolean }> {
   // Ohne Gebühr oder bereits entfallen: nichts zu tun (auch bei Wiederholung).
   if (order.serviceFeeCents <= 0 || order.serviceFeeRefundedAt) return { offen: false }
 
@@ -552,10 +561,8 @@ async function lasseServicegebuehrEntfallen(order: {
         { idempotencyKey: `servicegebuehr-nicht-abgeholt-${order.id}` }
       )
     } catch (err) {
-      console.error(
-        `[markAsNotPickedUp] Servicegebühr-Erstattung fehlgeschlagen (Bestellung ${order.id}):`,
-        err instanceof Error ? err.message : err
-      )
+      console.error(`[markAsNotPickedUp] Servicegebühr-Erstattung fehlgeschlagen (Bestellung ${order.id}):`, fehlerArt(err))
+      await meldeGebuehrErstattungOffen(order.id, order.serviceFeeCents, farmId, err)
       return { offen: true }
     }
   }
@@ -566,4 +573,39 @@ async function lasseServicegebuehrEntfallen(order: {
     data: { serviceFeeRefundedAt: new Date() },
   })
   return { offen: false }
+}
+
+/**
+ * Die Gebühr nach „Nicht abgeholt“ ist nicht zurück (Nr. 288, M2): Ein
+ * zweiter Weg in der App fehlt (der Status ist gesetzt, markAsNotPickedUp
+ * nimmt die Bestellung nicht mehr an), erstatten kann nur der Betreiber über
+ * das Plattformkonto. Deshalb wie beim Storno (src/server/stornieren.ts):
+ * Sentry mit Betrag und Anweisung, die Aufgabe „Erstattung offen“
+ * (erstattungOffenSeit, bedingt — die erste Zeit bleibt) und die Mail an den
+ * Betreiber. Kein automatischer zweiter Versuch: Der Idempotenz-Schlüssel bei
+ * Stripe gilt 24 Stunden, ein späterer Versuch könnte doppelt erstatten.
+ * Alles ist Nachlauf — der Status bleibt gesetzt, was hier scheitert, meldet
+ * sich selbst (CLAUDE.md §2). Keine Daten der Kundin, nur Kennungen.
+ */
+async function meldeGebuehrErstattungOffen(orderId: string, gebuehrCents: number, farmId: string, err: unknown): Promise<void> {
+  Sentry.captureException(err, {
+    tags: { aktion: 'markAsNotPickedUp', grund: 'gebuehr_erstattung_offen' },
+    extra: { orderId, gebuehrCents, handerstattung: erstattungOffenInhalt('gebuehr_nicht_abgeholt', { kundinCents: gebuehrCents }).handanweisung },
+  })
+  try {
+    // farmId in der WHERE (tests/hof-schreiben-farmid-wache.test.ts): der Hof der Sitzung.
+    await prisma.order.updateMany({ where: { id: orderId, farmId, erstattungOffenSeit: null }, data: { erstattungOffenSeit: new Date() } })
+  } catch (vermerkFehler) {
+    Sentry.captureException(vermerkFehler, { tags: { aktion: 'markAsNotPickedUp', grund: 'gebuehr_erstattung_offen_vermerk' }, extra: { orderId } })
+  }
+  // Empfänger aus der Zustellung (Register N14): „Erstattung offen“ geht immer, auch bei Regel „aus“.
+  await stelleEinOhneRisiko('erstattung-offen', orderId, async () =>
+    betreiberAuftraege(
+      'erstattung-offen',
+      `gebuehr-${orderId}`,
+      await betreiberKennungen('erstattungOffen'),
+      erstattungOffenBezug({ fall: 'gebuehr_nicht_abgeholt', orderId, refundId: null, kundinCents: gebuehrCents }),
+      { bestellungId: orderId, farmId }
+    )
+  )
 }

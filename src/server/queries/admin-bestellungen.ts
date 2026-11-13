@@ -34,6 +34,9 @@ const ZEILE_FELDER = {
   paymentMethod: true,
   paymentStatus: true,
   erstattungOffenSeit: true,
+  // Für den Fall „Gebühr-Erstattung gescheitert“ (bestellFall, Nr. 288).
+  serviceFeeCents: true,
+  serviceFeeRefundedAt: true,
   farm: { select: { name: true } },
 } as const satisfies Prisma.OrderSelect
 
@@ -46,6 +49,8 @@ export type BestellZeile = {
   paymentMethod: string
   paymentStatus: string
   erstattungOffenSeit: Date | null
+  serviceFeeCents: number
+  serviceFeeRefundedAt: Date | null
   hofName: string
 }
 
@@ -105,6 +110,8 @@ const DETAIL_FELDER = {
   cancelledAt: true,
   cancelReason: true,
   erstattungOffenSeit: true,
+  // Mit serviceFeeCents für den Fall „Gebühr-Erstattung gescheitert“ (bestellFall, Nr. 288).
+  serviceFeeRefundedAt: true,
   farm: { select: { name: true } },
   items: {
     orderBy: { id: 'asc' },

@@ -99,6 +99,15 @@ export function erstattungOffenInhalt(fall: ErstattungOffenFall, cents: { kundin
         handanweisung: 'In Stripe prüfen, was zu dieser Zahlung wirklich erstattet ist, der Kundin den offenen Betrag von Hand erstatten und den Stand der Bestellung klären.',
         betraege: gescheitert,
       }
+    case 'gebuehr_nicht_abgeholt':
+      // Nr. 288 (M2): Nur die Gebühr geht zurück, der Warenpreis bleibt beim Hof
+      // (markAsNotPickedUp). `kundinCents` ist die Gebühr.
+      return {
+        was: 'Der Hof hat die Bestellung als nicht abgeholt vermerkt. Die Erstattung der Gebühr an die Kundin über Stripe hat nicht geklappt – die Gebühr steht noch aus.',
+        handanweisung:
+          'Nur die Gebühr erstatten, NICHT den Warenpreis: in Stripe eine Teilerstattung über genau diesen Betrag, ohne reverse_transfer und ohne refund_application_fee. Vorher in Stripe prüfen, ob sie schon gebucht ist. Danach in der Bestellung ‚Außerhalb erstattet‘ klicken.',
+        betraege: [{ label: 'Gebühr an die Kundin erstatten', cents: kundin }],
+      }
     case 'fremd':
       return {
         was: `Stripe meldet eine Erstattung über ${betrag} als gescheitert, die die App keiner ihrer Buchungen zuordnen kann (z. B. ein älterer Vollstorno ohne Merkmale oder eine Erstattung von Hand). In der App wurde nichts geändert.`,

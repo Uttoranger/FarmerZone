@@ -8,7 +8,7 @@ import { kundenstreitAnfang, kundenstreitArt, kundenstreitArtVonStand } from '@/
 import { adminGrundSchema } from '@/schemas/admin-aktion'
 import type { StripeStreitfall } from '@/schemas/stripe-ereignis'
 import { kalendertagInWien } from '@/lib/wiener-tag'
-import { LASTSCHRIFT_HREF, ankuendigungText, lastschriftGescheitertText } from '@/lib/konditionen'
+import { LASTSCHRIFT_HREF, LASTSCHRIFT_TEXT, ankuendigungText, lastschriftGescheitertText } from '@/lib/konditionen'
 import {
   ankuendigungFaellig,
   barEinzugsweg,
@@ -51,7 +51,19 @@ import { RECHNUNGSANGABEN_FEHLEN_ART, monatsGrenzen } from '@/server/queries/pla
  *  4. Jede Abrechnung, die noch im Entwurf steht (gleich welcher Monat), wird
  *     täglich nachgezogen; fehlende Positionen kommen dazu, finalisiert wird
  *     nur, wenn der Rechnungsbetrag der Summe entspricht.
+ *  5. Jede Abrechnung im Stand „zurueckgebucht“ bekommt ihre Nachforderung,
+ *     falls sie noch fehlt (`stelleNachforderung`, Nr. 290).
  * Fehler bei einem Hof → Warnung, die anderen laufen weiter.
+ *
+ * Rückbuchung (Nr. 290, A007): Die Abrechnung steht auf „zurueckgebucht“ und
+ * sperrt bar sofort. Der Hof bekommt eine Nachricht im Postfach und eine
+ * Rechnung zur Überweisung über genau den zurückgebuchten Betrag (ohne Kosten
+ * der Rücklastschrift, E-012 (6)) — die Nachforderung. Ihre Kennung steht an
+ * keiner Spalte (keine Migration): Sie trägt ihre Abrechnung in den Metadaten
+ * und wird über die Rechnungsliste des Kunden gefunden. Wird sie bezahlt
+ * (`invoice.paid`), ist der Hof von selbst frei („bezahlt“). Der Notweg des
+ * Teams (`klaereRueckbuchung`) setzt „geklaert“ und lässt eine offene
+ * Nachforderung bei Stripe stehen — das Team storniert sie von Hand.
  *
  * Webhooks (src/app/api/stripe/webhook/route.ts, nur die Verteilung):
  * `invoice.paid`, `invoice.payment_failed`, `charge.dispute.created`,
@@ -117,8 +129,11 @@ export async function ankuendigungDaten(farmId: string): Promise<{ text: string;
   }
 }
 
-/** Eine Nachricht des Teams an den Hof (Art SYSTEM, eigener Faden) — Nachlauf, nie geworfen. */
-async function schreibeHofNachricht(farmId: string, text: string, linkUrl: string, aufgabe: string): Promise<void> {
+/**
+ * Eine Nachricht des Teams an den Hof (Art SYSTEM, eigener Faden) — Nachlauf, nie geworfen.
+ * Exportiert für den Notweg (`klaereRueckbuchung`, nur über `await import`: dieses Modul zieht Stripe statisch).
+ */
+export async function schreibeHofNachricht(farmId: string, text: string, linkUrl: string, aufgabe: string): Promise<void> {
   try {
     const jetzt = new Date()
     await prisma.unterhaltung.create({
@@ -518,7 +533,172 @@ export async function rechneMonatsabrechnungen(jetzt: Date): Promise<Abrechnungs
       warnung('Monatsabrechnung: Hof nicht abgerechnet', 'hof', { farmId: a.hof.id, monat: a.monat }, err)
     }
   }
+  await zieheNachforderungenNach(jetzt)
   return { monat, hoefe: hoefe.length, neu, fehler, angekuendigt, rechnungsangabenFehlen, nachgezogen: auftraege.length - hoefe.length }
+}
+
+// ─── Nachforderung nach einer Rückbuchung (Nr. 290, A007) ────────────────────
+
+/** Höchstens so viele Seiten der Rechnungsliste eines Kunden (je 100) — ein Hof hat höchstens zwei Rechnungen im Monat. */
+const NACHFORDERUNG_SEITEN = 5
+
+type NachforderungBei = Pick<Stripe.Invoice, 'id' | 'status' | 'hosted_invoice_url' | 'invoice_pdf'>
+
+/**
+ * Die Nachforderung zu einer Abrechnung bei Stripe: `metadata.art` „nachforderung“
+ * und `metadata.abrechnungId`, nicht storniert (void). Über die Liste des Kunden,
+ * nicht über die Suche — die Suche bei Stripe hinkt einige Minuten nach, und
+ * ein zweiter Lauf legte sonst eine zweite an. Null, wenn es keine gibt.
+ */
+export async function findeNachforderung(kunde: string, abrechnungId: string): Promise<NachforderungBei | null> {
+  let nach: string | undefined
+  for (let seite = 0; seite < NACHFORDERUNG_SEITEN; seite += 1) {
+    const liste = await stripe.invoices.list({ customer: kunde, limit: 100, ...(nach ? { starting_after: nach } : {}) })
+    const treffer = liste.data.find((r) => r.metadata?.art === 'nachforderung' && r.metadata?.abrechnungId === abrechnungId && r.status !== 'void')
+    if (treffer?.id) return { id: treffer.id, status: treffer.status, hosted_invoice_url: treffer.hosted_invoice_url, invoice_pdf: treffer.invoice_pdf }
+    const letzte = liste.data[liste.data.length - 1]?.id
+    if (!liste.has_more || !letzte) return null
+    nach = letzte
+  }
+  return null
+}
+
+/**
+ * Bedingt von „zurueckgebucht“ auf „bezahlt“ — mit dem Hof der Abrechnung in der
+ * Bedingung. Nur wer wirklich wechselt, schreibt ins Protokoll. Rückgabe: gewechselt?
+ */
+async function setzeNachforderungBezahlt(abrechnungId: string, farmId: string, jetzt: Date): Promise<boolean> {
+  const { count } = await prisma.monatsabrechnung.updateMany({
+    where: { id: abrechnungId, farmId, stand: 'zurueckgebucht' },
+    data: { stand: 'bezahlt', eingezogenAm: jetzt, offenSeit: null },
+  })
+  if (count !== 1) return false
+  await protokolliere({ wer: null, art: 'lastschrift_nachforderung_bezahlt', bezugArt: 'hof', bezugId: farmId, mitPasskey: false })
+  return true
+}
+
+/**
+ * Die Nachforderung nach einer Rückbuchung: eine Rechnung zur Überweisung über
+ * genau `summeCents` der Abrechnung (ohne Kosten der Rücklastschrift, E-012 (6)),
+ * fällig nach `barSperreNachTagen`. Idempotent:
+ *  - nur im Stand „zurueckgebucht“, mit Rechnung bar und Stripe-Kunde;
+ *  - gibt es sie schon: offen → nichts (nie noch einmal senden, sonst bekäme der
+ *    Hof bei jedem Lauf eine Mail), bezahlt → derselbe bedingte Wechsel wie bei
+ *    `invoice.paid` (holt ein verlorenes Ereignis nach), Entwurf → mit ihm weiter;
+ *  - Stripe-Schlüssel `abr-<farmId>-<yyyy-mm>-nachforderung`; gesendet wird nur
+ *    in dem Aufruf, der finalisiert.
+ * Wachen „im Zweifel nichts buchen“ (dieselben für Webhook und täglichen Lauf):
+ * Der zurückgebuchte Betrag (`zurueckgebuchtCents` aus dem Webhook, sonst nur
+ * lesend bei Stripe über `zurueckgebuchtCentsZu`) und der Betrag der Rechnung
+ * bar müssen beide `summeCents` sein. Ist einer nicht eindeutig oder weicht er
+ * ab: Warnung `nachforderung-betrag`, nichts angelegt, nichts gesendet — das
+ * Team klärt den Fall (Notweg oder Rechnung von Hand). Fehler von Stripe werden
+ * geworfen; die Aufrufer machen eine Warnung daraus.
+ */
+export async function stelleNachforderung(abrechnungId: string, jetzt: Date, zurueckgebuchtCents?: number): Promise<void> {
+  const abr = await prisma.monatsabrechnung.findUnique({
+    where: { id: abrechnungId },
+    select: { farmId: true, monat: true, summeCents: true, rechnungBarId: true, stand: true, farm: { select: { stripeKundeId: true, barSperreNachTagen: true } } },
+  })
+  if (!abr || abr.stand !== 'zurueckgebucht' || !abr.rechnungBarId || !abr.farm.stripeKundeId) return
+  const kunde = abr.farm.stripeKundeId
+  const monat = abr.monat.toISOString().slice(0, 7)
+  const extra = { farmId: abr.farmId, monat, art: 'nachforderung' }
+
+  const vorhanden = await findeNachforderung(kunde, abrechnungId)
+  if (vorhanden && vorhanden.status === 'paid') {
+    await setzeNachforderungBezahlt(abrechnungId, abr.farmId, jetzt)
+    return
+  }
+  if (vorhanden && vorhanden.status !== 'draft') return
+
+  const streitCents = zurueckgebuchtCents ?? (await zurueckgebuchtCentsZu(abr.rechnungBarId))
+  if (streitCents !== abr.summeCents) {
+    warnung('Nachforderung: zurückgebuchter Betrag unklar oder abweichend — nicht angelegt', 'nachforderung-betrag', { ...extra, streitCents: streitCents ?? 'unbekannt', sollCents: abr.summeCents })
+    return
+  }
+  const bar = await stripe.invoices.retrieve(abr.rechnungBarId)
+  if (bar.total !== abr.summeCents) {
+    warnung('Nachforderung: Betrag der Rechnung bar weicht von der Summe ab — nicht angelegt', 'nachforderung-betrag', { ...extra, rechnungCents: bar.total, sollCents: abr.summeCents })
+    return
+  }
+  const text = `Plattformgebühr ${monatText(monat)} · zurückgebuchte Lastschrift`
+  const rechnung = await bereiteRechnungVor(
+    `abr-${abr.farmId}-${monat}-nachforderung`,
+    kunde,
+    vorhanden?.id ?? null,
+    {
+      collection_method: 'send_invoice',
+      days_until_due: Math.max(1, abr.farm.barSperreNachTagen),
+      description: text,
+      metadata: { farmId: abr.farmId, monat, art: 'nachforderung', abrechnungId },
+    },
+    [{ schluessel: 'nachforderung', cents: abr.summeCents, text }],
+    abr.summeCents,
+    // Keine Spalte für die Kennung (keine Migration): gefunden wird sie über die Metadaten.
+    async () => {},
+    extra
+  )
+  if (!rechnung || rechnung.status !== 'draft') return
+  await stripe.invoices.finalizeInvoice(rechnung.id, { auto_advance: false }, { idempotencyKey: `${rechnung.schluessel}-fertig` })
+  await stripe.invoices.sendInvoice(rechnung.id, {}, { idempotencyKey: `${rechnung.schluessel}-senden` })
+  await protokolliere({ wer: null, art: 'lastschrift_nachforderung_erstellt', bezugArt: 'hof', bezugId: abr.farmId, mitPasskey: false, grund: `Monatsabrechnung ${monat}` })
+}
+
+/**
+ * Der zurückgebuchte Betrag zur Rechnung bar — nur lesend, derselbe Weg wie die
+ * Zuordnung Streitfall → Rechnung, umgekehrt: Rechnungszahlungen der Rechnung →
+ * genau eine Zahlung (PaymentIntent) → genau ein Streitfall mit Betrag. Sonst
+ * null (nicht eindeutig): Dann legt `stelleNachforderung` nichts an.
+ */
+async function zurueckgebuchtCentsZu(rechnungBarId: string): Promise<number | null> {
+  const zahlungen = await stripe.invoicePayments.list({ invoice: rechnungBarId, limit: 10 })
+  const intents = new Set(
+    zahlungen.data.map((z) => kennung(z.payment?.payment_intent as string | { id: string } | undefined)).filter((k): k is string => k !== null)
+  )
+  if (intents.size !== 1) return null
+  const [zahlung] = [...intents]
+  const streitfaelle = await stripe.disputes.list({ payment_intent: zahlung, limit: 10 })
+  if (streitfaelle.data.length !== 1) return null
+  const betrag = streitfaelle.data[0]?.amount
+  return typeof betrag === 'number' ? betrag : null
+}
+
+/** Schritt 5 des täglichen Laufs: jede zurückgebuchte Abrechnung bekommt ihre Nachforderung (fehlt sie, wird sie angelegt). */
+async function zieheNachforderungenNach(jetzt: Date): Promise<void> {
+  let offen: { id: string }[]
+  try {
+    offen = await prisma.monatsabrechnung.findMany({ where: { stand: 'zurueckgebucht' }, select: { id: true } })
+  } catch (err) {
+    warnung('Nachforderung: zurückgebuchte Abrechnungen nicht gelesen', 'nachforderung', {}, err)
+    return
+  }
+  for (const a of offen) {
+    try {
+      await stelleNachforderung(a.id, jetzt)
+    } catch (err) {
+      warnung('Nachforderung: nicht angelegt', 'nachforderung', { abrechnungId: a.id }, err)
+    }
+  }
+}
+
+/**
+ * `invoice.paid` einer Nachforderung (ihre Kennung steht an keiner Abrechnung):
+ * bedingt auf „bezahlt“ — nur mit passendem Hof und nur aus „zurueckgebucht“.
+ * Trifft das nichts: schon bezahlt (der Lauf war schneller) → nichts; sonst eine
+ * Warnung, und nach dem Notweg („geklaert“) ein Eintrag im Protokoll — der Hof
+ * hat dann doppelt bezahlt, das Team erstattet in Stripe von Hand.
+ */
+async function behandleNachforderungBezahlt(metadaten: Record<string, string>, jetzt: Date): Promise<void> {
+  const abrechnungId = metadaten.abrechnungId ?? ''
+  const farmId = metadaten.farmId ?? ''
+  if (abrechnungId && farmId && (await setzeNachforderungBezahlt(abrechnungId, farmId, jetzt))) return
+  const jetztDa = abrechnungId && farmId ? await prisma.monatsabrechnung.findFirst({ where: { id: abrechnungId, farmId }, select: { stand: true } }) : null
+  if (jetztDa?.stand === 'bezahlt') return
+  warnung('Nachforderung bezahlt, aber keine passende Abrechnung', 'nachforderung-bezahlt')
+  if (jetztDa?.stand === 'geklaert') {
+    await protokolliere({ wer: null, art: 'lastschrift_nachforderung_bezahlt', bezugArt: 'hof', bezugId: farmId, mitPasskey: false, grund: 'Nach dem Notweg bezahlt – Betrag an den Hof zurück' })
+  }
 }
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
@@ -533,10 +713,16 @@ function unbekannt(typ: string, id: string): void {
   console.warn(`[Webhook] ${typ}: Rechnung ${id} gehört zu keiner Monatsabrechnung — nichts geändert`)
 }
 
-/** `invoice.paid` → bezahlt, eingezogen, nicht mehr offen. Damit ist der Hof von selbst wieder frei. */
+/**
+ * `invoice.paid` → bezahlt, eingezogen, nicht mehr offen. Damit ist der Hof von selbst wieder frei.
+ * Eine Nachforderung nach einer Rückbuchung (Nr. 290) steht an keiner Abrechnung — sie kommt über ihre Metadaten.
+ */
 export async function behandleRechnungBezahlt(rechnung: Stripe.Invoice, jetzt = new Date()): Promise<void> {
   const abr = await prisma.monatsabrechnung.findFirst({ where: { OR: [{ rechnungBarId: rechnung.id }, { rechnungOnlineId: rechnung.id }] }, select: { id: true, farmId: true, rechnungBarId: true } })
-  if (!abr) return unbekannt('invoice.paid', rechnung.id)
+  if (!abr) {
+    if (rechnung.metadata?.art === 'nachforderung') return behandleNachforderungBezahlt(rechnung.metadata, jetzt)
+    return unbekannt('invoice.paid', rechnung.id)
+  }
   // Die Rechnung online ist von Anfang an „bezahlt außerhalb“ — der Stand hängt an der Rechnung bar.
   if (abr.rechnungBarId !== rechnung.id) return
   const { count } = await prisma.monatsabrechnung.updateMany({
@@ -573,6 +759,11 @@ export async function behandleRechnungGescheitert(rechnung: Stripe.Invoice, jetz
  * (`invoicePayments`, nur lesend); eine Rückbuchung einer Bestellung der
  * Kundschaft gehört zu keiner Rechnung und wird nur sichtbar gemacht
  * (`kundenzahlungZurueckgebucht`, Nr. 289, E-022).
+ *
+ * Nur wer den Stand wirklich setzt (count 1), schreibt danach als Nachlauf die
+ * Nachricht an den Hof und legt die Nachforderung an (Nr. 290). Ein Fehler im
+ * Nachlauf wird zur Warnung, die Antwort an Stripe bleibt 200: Der Stand gilt,
+ * die Nachforderung holt der tägliche Lauf nach.
  */
 export async function behandleRueckbuchung(streit: Stripe.Dispute, jetzt = new Date()): Promise<void> {
   const zahlung = kennung(streit.payment_intent)
@@ -580,10 +771,23 @@ export async function behandleRueckbuchung(streit: Stripe.Dispute, jetzt = new D
   const liste = await stripe.invoicePayments.list({ payment: { type: 'payment_intent', payment_intent: zahlung }, limit: 1 })
   const rechnungId = kennung(liste.data[0]?.invoice as string | { id: string } | undefined)
   if (!rechnungId) return kundenzahlungZurueckgebucht(streit, zahlung, jetzt)
-  const abr = await prisma.monatsabrechnung.findFirst({ where: { rechnungBarId: rechnungId }, select: { id: true, farmId: true } })
-  if (!abr) return unbekannt('charge.dispute.created', rechnungId)
+  const abr = await prisma.monatsabrechnung.findFirst({ where: { rechnungBarId: rechnungId }, select: { id: true, farmId: true, monat: true } })
+  if (!abr) {
+    // Auch die Rückbuchung einer schon bezahlten Nachforderung landet hier (ihre Kennung steht an keiner Abrechnung).
+    warnung('Rückbuchung zu einer Rechnung ohne Monatsabrechnung', 'rueckbuchung-unbekannt')
+    return unbekannt('charge.dispute.created', rechnungId)
+  }
   const { count } = await prisma.monatsabrechnung.updateMany({ where: { id: abr.id, stand: { not: 'zurueckgebucht' } }, data: { stand: 'zurueckgebucht', zurueckgebuchtAm: jetzt } })
-  if (count === 1) await protokolliere({ wer: null, art: 'lastschrift_zurueckgebucht', bezugArt: 'hof', bezugId: abr.farmId, mitPasskey: false })
+  if (count !== 1) return
+  await protokolliere({ wer: null, art: 'lastschrift_zurueckgebucht', bezugArt: 'hof', bezugId: abr.farmId, mitPasskey: false })
+  try {
+    const monat = monatText(abr.monat.toISOString().slice(0, 7))
+    await schreibeHofNachricht(abr.farmId, LASTSCHRIFT_TEXT.zurueckgebuchtSatz(monat), LASTSCHRIFT_HREF, 'zurueckgebucht')
+    // Den Betrag nennt Stripe am Streitfall; die Wache dagegen steht in stelleNachforderung (auch für den täglichen Lauf).
+    await stelleNachforderung(abr.id, jetzt, typeof streit.amount === 'number' ? streit.amount : undefined)
+  } catch (err) {
+    warnung('Nachforderung nach einer Rückbuchung nicht angelegt', 'nachforderung', { abrechnungId: abr.id }, err)
+  }
 }
 
 // ─── Rückbuchung einer Kundenzahlung (Nr. 289, E-022) ───────────────────────

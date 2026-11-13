@@ -189,6 +189,7 @@ export const ERSTATTUNG_OFFEN_FAELLE = [
   'zurueckgenommen',
   'unklar',
   'fremd',
+  'gebuehr_nicht_abgeholt',
 ] as const
 export type ErstattungOffenFall = (typeof ERSTATTUNG_OFFEN_FAELLE)[number]
 

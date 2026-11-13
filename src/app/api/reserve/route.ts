@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { bremseReservieren } from '@/server/bremse-datenbank'
 import { z } from 'zod'
+import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
+import { fehlerArt } from '@/lib/fehler-art'
 import { gibVerwaisteFreiFuerProdukte } from '@/server/verwaiste-bestellungen'
 import { HOF_KAUFBARKEIT_AUSWAHL, loescheHalte, pruefeKaufbarkeitHof } from '@/server/warenkorb'
 import { MAX_MENGE, neueFrist } from '@/lib/reservierung'
@@ -57,7 +59,9 @@ export async function DELETE(request: NextRequest) {
     await loescheHalte([productId], sessionId)
     return NextResponse.json({ ok: true })
   } catch (e) {
-    console.error('[/api/reserve DELETE]', e)
+    // Nr. 288: Sentry bekommt den Fehler, das Log nur seine Art.
+    Sentry.captureException(e, { tags: { aufgabe: 'reserve', grund: 'freigeben_fehlgeschlagen' }, extra: { productId } })
+    console.error('[/api/reserve DELETE]', fehlerArt(e))
     return NextResponse.json({ error: 'Serverfehler bei der Reservierung' }, { status: 500 })
   }
 }
@@ -166,7 +170,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, expiresAt: expiresAt.toISOString() })
   } catch (e) {
-    console.error('[/api/reserve]', e)
+    Sentry.captureException(e, { tags: { aufgabe: 'reserve', grund: 'reservieren_fehlgeschlagen' }, extra: { productId } })
+    console.error('[/api/reserve]', fehlerArt(e))
     return NextResponse.json({ error: 'Serverfehler bei der Reservierung' }, { status: 500 })
   }
 }

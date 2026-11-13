@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "vercel-build": "prisma migrate deploy && prisma generate && next build",
+    "vercel-build": "node scripts/vorschau-db-wache.mjs && prisma migrate deploy && prisma generate && next build",
     "start": "next start",
     "lint": "eslint --cache --cache-strategy content --cache-location node_modules/.cache/eslint/",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node --max-old-space-size=6144 node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "dotenv -e .env.test -- vitest run --config vitest.integration.config.ts",

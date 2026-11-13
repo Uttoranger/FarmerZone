@@ -18,7 +18,7 @@ import { formatTagKurz } from '@/lib/format'
 import { kalendertagInWien } from '@/lib/wiener-tag'
 import { uhrzeitInWien } from '@/lib/fristen'
 import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
-import { SERVICEGEBUEHR_BEZEICHNUNG } from '@/lib/servicegebuehr'
+import { SERVICEGEBUEHR_BEZEICHNUNG, gebuehrErstattungOffen } from '@/lib/servicegebuehr'
 
 // ─── Adressen ────────────────────────────────────────────────────────────────
 
@@ -81,6 +81,7 @@ export function notfallStornoStand(b: { status: string }): { moeglich: true } | 
 
 /** Was eine Bestellung für den Support ist — mit Titel und „Was tun“ (eine Liste, BESTELL_FAELLE). */
 export type BestellFall =
+  | 'gebuehr_erstattung_offen'
   | 'erstattung_offen'
   | 'zahlung_offen'
   | 'wartet_auf_bestaetigung'
@@ -92,6 +93,12 @@ export type BestellFall =
   | 'storniert'
 
 export const BESTELL_FAELLE: Record<BestellFall, { titel: string; wasTun: string; ton: 'tun' | 'ruhig' }> = {
+  gebuehr_erstattung_offen: {
+    titel: 'Gebühr-Erstattung gescheitert',
+    wasTun:
+      'Der Hof hat ‚Nicht abgeholt‘ vermerkt. Die Kundin bekommt nur die Gebühr zurück, nicht den Warenpreis. Erstatte in Stripe genau die Gebühr als Teilerstattung und klick dann ‚Außerhalb erstattet‘.',
+    ton: 'tun',
+  },
   erstattung_offen: {
     titel: 'Erstattung gescheitert',
     wasTun:
@@ -125,10 +132,17 @@ export type BestellungFuerFall = {
   paymentMethod: string
   paymentStatus: string
   erstattungOffenSeit: Date | null
+  serviceFeeCents: number
+  serviceFeeRefundedAt: Date | null
 }
 
-/** Welcher Fall vorliegt — die offene Erstattung zuerst, weil nur sie Geld schuldet. */
+/**
+ * Welcher Fall vorliegt — die offene Erstattung zuerst, weil nur sie Geld
+ * schuldet. Steht nach „Nicht abgeholt“ nur die Gebühr aus (Nr. 288), sagt
+ * das ein eigener Fall: Dort wird nur die Gebühr erstattet, nie der Warenpreis.
+ */
 export function bestellFall(b: BestellungFuerFall): BestellFall {
+  if (b.erstattungOffenSeit !== null && gebuehrErstattungOffen(b)) return 'gebuehr_erstattung_offen'
   if (b.erstattungOffenSeit !== null) return 'erstattung_offen'
   if (b.status === 'CANCELLED') {
     if (b.paymentStatus === 'REFUNDED') return 'storniert_erstattet'

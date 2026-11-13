@@ -4,14 +4,13 @@ import { useState, type ReactNode } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { Loader2, Lock } from 'lucide-react'
 import { getStripePromise } from '@/lib/stripe-client'
-import { formatEuro } from '@/lib/format'
-import { centsAlsEuro } from '@/lib/servicegebuehr'
 import { NETZ_SATZ_UNSICHER } from '@/lib/netz'
 import { GEWAEHRLEISTUNG_MITTEILUNG } from '@/lib/rechtstexte/gewaehrleistung-mitteilung'
 import { cn } from '@/lib/utils'
 import {
   KASSE_ZAHLART_UEBERSCHRIFT,
   bestaetigungMitStatus,
+  gesamtAnzeige,
   reservierungsStand,
   zahlungsBetraege,
   zahlungsFehlerArt,
@@ -34,8 +33,9 @@ import {
  * Der Zahlungsschritt der Kasse (Nachtlauf Nr. 12; Mockups
  * web-k3-zahlung-abgelehnt, mobil-k3-zahlung-abgelehnt). Er erscheint, wenn
  * /api/checkout die Bestellung samt Zahlungsvorgang angelegt hat. Zahlungsvorgang
- * UND angezeigter Betrag kommen vom Server: Knopf und Übersicht zeigen genau
- * `amountCents` aus der Antwort — den Betrag, den Stripe abbucht. Hier wird
+ * UND angezeigter Betrag kommen vom Server: Übersicht und Zusammenfassung zeigen
+ * genau `amountCents` aus der Antwort — den Betrag, den Stripe abbucht (der Knopf
+ * trägt seit Nr. 309 nur sein Wort, § 8 Abs. 2 FAGG). Hier wird
  * nichts gerechnet (keine Uhr, keine Hofeinstellung), nur Stripes Zahlungsfeld
  * gezeigt und bestätigt.
  *
@@ -64,10 +64,12 @@ export type StripeZahlungProps = {
   korb: ReactNode
   angaben: ReactNode
   /**
-   * Ware, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210;
-   * `KaufZusammenfassung`, vom Formular gebaut). Ersetzt die Fußzeile unter dem Knopf.
+   * Ware, Gesamtpreis, Abholtermin und Vertragspartner unmittelbar über dem Knopf (§ 8 Abs. 1 FAGG, Nr. 210;
+   * `KaufZusammenfassung`, vom Formular gebaut). Ersetzt die Fußzeile unter dem Knopf. Eine Funktion, weil der
+   * Gesamtbetrag hier entsteht — aus `betrag`, dem Betrag bei Stripe (`gesamtAnzeige`, Nr. 309); das Formular
+   * rechnet ihn nicht ein zweites Mal.
    */
-  zusammenfassung: ReactNode
+  zusammenfassung: (gesamt: { betrag: string; zusatz: string | null }) => ReactNode
   /**
    * Verbraucherin (Käuferart PRIVAT): nur dann die Gewährleistungs-Mitteilung über dem Knopf
    * (Anhang II FAGG, Nr. 211) — bei „Betrieb“ entfällt sie. Pflicht, damit kein Einstieg sie vergisst.
@@ -83,8 +85,9 @@ export type StripeZahlungProps = {
 
 /**
  * Die harmonisierte Mitteilung über das gesetzliche Gewährleistungsrecht (§ 4 Abs. 1 Z 12 und
- * Anhang II FAGG, Nr. 211): unter der Zusammenfassung, über dem Kaufknopf — im Zahlungsschritt
- * als Abschnitt der Übersicht, im Formular (`KassenAbschluss`) als eigene Karte. Ob sie steht
+ * Anhang II FAGG, Nr. 211): über der Zusammenfassung, die unmittelbar über dem Kaufknopf steht (Nr. 309,
+ * Register N2 mit der Ergänzung aus F027) — im Zahlungsschritt als Abschnitt der Übersicht, im Formular
+ * (`KassenAbschluss`) als eigene Karte. Ob sie steht
  * (nur bei Privat), entscheidet der Aufrufer.
  *
  * Die amtliche Grafik bleibt, wie sie ist (DESIGN_SYSTEM, „Amtliche Grafiken“): ein schlichtes
@@ -169,7 +172,8 @@ function ZahlungsInhalt({
   const abgelaufen = abgebrochen || stand.zustand === 'abgelaufen'
   const bisUhrzeit = stand.zustand === 'laeuft' ? stand.uhrzeit : null
   const betraege = zahlungsBetraege(betrag)
-  const gesamt = formatEuro(centsAlsEuro(betraege.gesamtCents))
+  // Derselbe Betrag wie in der Übersicht und bei Stripe; der Titel der Gebühr ist der beim Anlegen festgehaltene.
+  const gesamt = gesamtAnzeige({ gesamtCents: betraege.gesamtCents, gebuehrCents: betraege.gebuehrCents, hofpreis, gebuehrTitel: gebuehrText })
 
   async function bezahle() {
     if (!stripe || !elements || abgelaufen) return
@@ -229,10 +233,11 @@ function ZahlungsInhalt({
               <ReservierungsHinweis stand={abgelaufen ? { zustand: 'abgelaufen' } : stand} schritt="zahlung" farmSlug={farmSlug} />
             }
           >
-            {/* Zwischen Gesamtbetrag und Knopf: Ware, Abholtermin, Vertragspartner, bei Privat die
-                Gewährleistungs-Mitteilung (Nr. 211) — dann ein Fehler, direkt am Knopf. */}
-            {zusammenfassung}
+            {/* Zwischen Gesamtbetrag der Übersicht und Knopf (Nr. 309, Register N2 mit der Ergänzung aus F027): bei Privat
+                die Gewährleistungs-Mitteilung (Nr. 211), dann die Zusammenfassung mit Gesamt unmittelbar über dem Knopf —
+                dazwischen höchstens ein Zahlungsfehler. */}
             {privat && <GewaehrleistungsMitteilung />}
+            {zusammenfassung(gesamt)}
             {fehler && (
               <p role="alert" className="text-[13px] leading-snug font-medium text-status-offen">
                 {fehler}
@@ -252,7 +257,8 @@ function ZahlungsInhalt({
                     Wird bezahlt …
                   </>
                 ) : (
-                  `${abgelehnt ? 'Erneut bezahlen' : 'Jetzt bezahlen'} · ${gesamt}`
+                  // § 8 Abs. 2 FAGG: Der Knopf trägt nur sein Wort; der Gesamtpreis steht in der Zusammenfassung darüber (Nr. 309).
+                  abgelehnt ? 'Erneut bezahlen' : 'Jetzt bezahlen'
                 )}
               </button>
               {kaufknopfSaetze}

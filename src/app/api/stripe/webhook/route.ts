@@ -12,6 +12,7 @@ import { stelleEinOhneRisiko, stelleMailEinInTransaktion, type EinstellAuftrag }
 import { bestellMailAuftrag, zahlungZuSpaetMailAuftrag } from '@/server/mail-arten/bestellung'
 import { betreiberAuftraege, betreiberKennungen, erstattungOffenBezug } from '@/server/mail-arten/betreiber'
 import { erstattungOffenInhalt } from '@/lib/erstattung-offen'
+import { fehlerArt } from '@/lib/fehler-art'
 import type { ErstattungOffenFall } from '@/schemas/mail-auftrag'
 import { storniereUnbezahlteBestellung } from '@/server/unbezahlte-bestellung'
 import { ANLASS_VOLLSTORNO } from '@/server/teilerstattung'
@@ -158,8 +159,10 @@ export async function POST(request: NextRequest) {
       await behandleMandatGeaendert(event.data.object as Stripe.Mandate)
     }
   } catch (err) {
-    // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet
-    console.error(`[Webhook] Error handling ${event.type}:`, err)
+    // 500 → Stripe retried das Event; es wurde noch nicht persistiert und gilt als unverarbeitet.
+    // Sentry bekommt den Fehler (Nr. 288), das Log nur seine Art — die Meldung kann Daten tragen.
+    Sentry.captureException(err, { tags: { webhook: event.type, grund: 'verarbeitung_fehlgeschlagen' }, extra: { eventId: event.id } })
+    console.error(`[Webhook] Error handling ${event.type}:`, fehlerArt(err))
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 
@@ -173,7 +176,8 @@ export async function POST(request: NextRequest) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return NextResponse.json({ received: true, skipped: true })
     }
-    console.error('[Webhook] Event verarbeitet, aber Persistierung fehlgeschlagen:', err)
+    Sentry.captureException(err, { tags: { webhook: event.type, grund: 'vermerk_fehlgeschlagen' }, extra: { eventId: event.id } })
+    console.error('[Webhook] Event verarbeitet, aber Persistierung fehlgeschlagen:', fehlerArt(err))
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 
@@ -460,6 +464,11 @@ async function setzeErstattungOffen(orderId: string): Promise<void> {
  * Plattformkonto nachholt. Gelöscht wird die Aufgabe nur, wenn die
  * Erstattung NACH dem Vermerk entstand: Eine ältere Teilerstattung derselben
  * Zahlung erledigt das offene Geld nicht. Nachlauf wie beim Setzen.
+ *
+ * Offene Gebühr nach „Nicht abgeholt“ (Nr. 288): zuerst dieser Fall — er
+ * setzt zusätzlich `serviceFeeRefundedAt`, damit der Vermerk beim Hof
+ * verschwindet und die Gebühr nicht als Einnahme zählt. Nur wenn er nichts
+ * trifft, das bisherige Schreiben (offener Storno).
  */
 async function loescheErstattungOffen(refund: Stripe.Refund): Promise<void> {
   const zahlung = typeof refund.payment_intent === 'string' ? refund.payment_intent : (refund.payment_intent?.id ?? null)
@@ -467,6 +476,18 @@ async function loescheErstattungOffen(refund: Stripe.Refund): Promise<void> {
   const erstellt = new Date(refund.created * 1000)
   if (!zahlung || Number.isNaN(erstellt.getTime())) return
   try {
+    const gebuehr = await prisma.order.updateMany({
+      where: {
+        stripePaymentIntentId: zahlung,
+        erstattungOffenSeit: { lte: erstellt },
+        status: 'NOT_PICKED_UP',
+        paymentMethod: 'ONLINE',
+        serviceFeeCents: { gt: 0 },
+        serviceFeeRefundedAt: null,
+      },
+      data: { erstattungOffenSeit: null, serviceFeeRefundedAt: new Date() },
+    })
+    if (gebuehr.count > 0) return
     await prisma.order.updateMany({
       where: { stripePaymentIntentId: zahlung, erstattungOffenSeit: { lte: erstellt } },
       data: { erstattungOffenSeit: null },

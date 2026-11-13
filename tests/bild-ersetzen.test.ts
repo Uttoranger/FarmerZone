@@ -123,6 +123,8 @@ const echteRoute = (init: RequestInit): Promise<Response> =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Seit Nr. 294b (N7) verarbeitet die Route nur Originale aus dem eigenen Speicher — der kommt aus dem Blob-Schlüssel.
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_speicher_nurFuerTests')
   s.speicher.clear()
   s.speicher.add(ALT)
   s.kette.metadata.mockResolvedValue({ width: 2400, height: 1800 })
@@ -133,6 +135,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('Verarbeitungs-Route — das ersetzte Bild bleibt liegen', () => {

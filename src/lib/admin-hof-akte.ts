@@ -66,6 +66,25 @@ export function sperreKarteSatz(grund: string | null): string {
 
 export const SPERRE_KARTE_TITEL = 'Bestellungen gestoppt'
 
+// ─── Sperre nach Rückbuchung aufheben (Notweg, Nr. 290, A007) ─────────────────
+
+/** Texte des Notwegs in der Akte (Wortlaut der Nummer 290, gegen die Wortliste geprüft). */
+export const RUECKBUCHUNG_TEXT = {
+  knopf: 'Sperre nach Rückbuchung aufheben …',
+  titel: 'Sperre nach Rückbuchung aufheben',
+  erklaerung:
+    'Nur wenn der Hof den Betrag anders bezahlt hat oder die Rückbuchung nicht berechtigt war. Der Hof nimmt danach wieder Barbestellungen an. Eine offene Rechnung über den Betrag bleibt bei Stripe stehen – storniere sie dort von Hand, wenn sie nicht mehr gilt.',
+  grundLabel: 'Grund (steht im Protokoll)',
+  bestaetigen: 'Sperre aufheben',
+  erledigt: 'Sperre aufgehoben. Der Hof hat eine Nachricht im Postfach.',
+  nichtMehr: 'Diese Abrechnung ist nicht mehr zurückgebucht. Lade die Seite neu.',
+} as const
+
+/** Die Nachricht ins Postfach des Hofs nach dem Notweg — `monat` als Wort („März 2028“). */
+export function rueckbuchungGeklaertNachricht(monat: string): string {
+  return `Die zurückgebuchte Lastschrift für ${monat} ist geklärt. Sie sperrt deine Barzahlung nicht mehr.`
+}
+
 /** Der Leerzustand der Akte aus dem Protokoll (N33). */
 export const AKTE_PROTOKOLL_LEER = {
   titel: 'Noch kein Eintrag',
@@ -236,6 +255,9 @@ export const PROTOKOLL_ART_TEXT: Partial<Record<AdminAktionArt, string>> = {
   lastschrift_bezahlt: 'Monatsabrechnung bezahlt',
   lastschrift_gescheitert: 'Lastschrift gescheitert',
   lastschrift_zurueckgebucht: 'Lastschrift zurückgebucht',
+  lastschrift_nachforderung_erstellt: 'Nachforderung nach Rückbuchung erstellt',
+  lastschrift_nachforderung_bezahlt: 'Nachforderung bezahlt',
+  lastschrift_rueckbuchung_geklaert: 'Sperre nach Rückbuchung aufgehoben',
   online_zahlung_aktiv: 'Online-Zahlung aktiv (Stripe)',
   online_zahlung_pausiert: 'Online-Zahlung pausiert (Stripe)',
 }

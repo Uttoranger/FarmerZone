@@ -20,6 +20,8 @@ vi.mock('@/lib/email', () => ({ sendOnsiteConfirmation: vi.fn() }))
 // Die Freigabe verwaister Bestellungen hat eigene Tests
 // (tests/integration/verwaiste-bestellungen.int.test.ts); hier zählt nur der Checkout.
 vi.mock('@/server/verwaiste-bestellungen', () => ({ gibVerwaisteFreiOhneRisiko: vi.fn() }))
+// Nr. 290: Das Protokoll der bezahlten Nachforderung hat eigene Tests (tests/plattformgebuehr-abrechnung.test.ts).
+vi.mock('@/server/admin-protokoll', () => ({ protokolliere: vi.fn(async () => true) }))
 // Der Abholtermin hat eigene Tests (tests/checkout-abholfenster.test.ts):
 // Hier gilt jedes Fenster als angeboten und unbegrenzt, der Rest des Moduls läuft echt.
 vi.mock('@/server/abholfenster', async (original) => ({
@@ -47,8 +49,8 @@ vi.mock('@/lib/prisma', () => ({
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     customerFarmSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
-    // Sperre nach offener Monatsabrechnung (Nr. 198) — ohne Zeile frei.
-    monatsabrechnung: { findMany: vi.fn(async () => []) },
+    // Sperre nach offener Monatsabrechnung (Nr. 198) — ohne Zeile frei. findFirst und updateMany: invoice.paid der Nachforderung (Nr. 290).
+    monatsabrechnung: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null), updateMany: vi.fn(async () => ({ count: 0 })) },
   },
 }))
 
@@ -60,6 +62,7 @@ import { artikelFehltRechnung } from '@/lib/artikel-fehlt'
 import { CODE_BAR_NICHT_MOEGLICH, CODE_MINDESTBESTELLWERT } from '@/lib/kasse'
 import { BAR_NICHT_MOEGLICH_SATZ, MINDESTBESTELLWERT_SATZ } from '@/lib/konditionen'
 import { einstellungsZeile } from './fabrik/plattform-einstellung'
+import { behandleRechnungBezahlt } from '@/server/plattformgebuehr-abrechnung'
 
 /** Der Stichtag liegt in der Vergangenheit (Admin-Einstellung), die Uhr steht danach. */
 const STICHTAG = new Date('2026-10-01T00:00:00.000Z')
@@ -390,12 +393,33 @@ describe('Sperre nach offener Monatsabrechnung (Nr. 198): bar → 409, online ge
     expect((await POST(anfrage())).status).toBe(200)
   })
 
-  it('Rückbuchung: sofort gesperrt; nach invoice.paid (Stand bezahlt, nicht mehr gelesen) wieder frei', async () => {
+  it('Rückbuchung: sofort gesperrt; leere Liste = frei', async () => {
     farmFindUnique.mockResolvedValue(MIT_MANDAT as never)
     abrechnungen.mockResolvedValue([{ stand: 'zurueckgebucht', offenSeit: null }] as never)
     expect((await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))).status).toBe(409)
     abrechnungen.mockResolvedValue([] as never)
     expect((await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))).status).toBe(200)
+  })
+
+  it('Ablauf (Nr. 290): Rückbuchung → Kasse bar 409 → Nachforderung bezahlt (invoice.paid) → Kasse bar 200', async () => {
+    farmFindUnique.mockResolvedValue(MIT_MANDAT as never)
+    // Eine Abrechnung, wie die Datenbank sie hält: Die Kasse liest die sperrenden Stände, invoice.paid schreibt bedingt.
+    const zeile = { id: 'abr_1', farmId: 'farm_1', stand: 'zurueckgebucht', offenSeit: null as Date | null }
+    abrechnungen.mockImplementation((async (a: { where: { stand: { in: string[] } } }) => (a.where.stand.in.includes(zeile.stand) ? [zeile] : [])) as never)
+    vi.mocked(prisma.monatsabrechnung.updateMany).mockImplementation((async (a: { where: { id: string; farmId: string; stand: string }; data: Partial<typeof zeile> }) => {
+      if (a.where.id !== zeile.id || a.where.farmId !== zeile.farmId || a.where.stand !== zeile.stand) return { count: 0 }
+      Object.assign(zeile, a.data)
+      return { count: 1 }
+    }) as never)
+    expect((await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))).status).toBe(409)
+    expect(orderCreate).not.toHaveBeenCalled()
+
+    await behandleRechnungBezahlt({ id: 'in_nachforderung', metadata: { art: 'nachforderung', abrechnungId: 'abr_1', farmId: 'farm_1', monat: '2026-10' } } as never, JETZT)
+    expect(zeile.stand).toBe('bezahlt')
+
+    const res = await POST(anfrage({ paymentMethod: 'ONSITE_CASH' }))
+    expect(res.status).toBe(200)
+    expect(createData()).toEqual(expect.objectContaining({ gebuehrEinzug: 'sepa' }))
   })
 })
 
