@@ -41,6 +41,8 @@ const DATEIEN = [
   'src/components/admin/hof-akte-ansicht.tsx',
   'src/components/admin/hof-akte-plattformgebuehr.tsx',
   'src/app/admin/einstellungen/hofpreis-stichtag.tsx',
+  // Nr. 304 Punkt 5: Der Termin „Plattformgebühr im Hofpreis (Register N38)“ in „Kommt“ ist weg — die Datei ist sauber.
+  'src/lib/admin-aufgaben.ts',
 ] as const
 
 const MUSTER: { name: string; muster: RegExp }[] = [

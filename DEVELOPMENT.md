@@ -6965,3 +6965,15 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - Produkte per Ziehen sortieren gab es seit Nr. 50 in keiner Oberfläche; mit dem Modus fallen `reorderProductsAction` und `updateProductImageAction` weg (eine Action ohne Aufrufer ist ein offener Endpunkt, Nr. 199), ebenso reorder-context.tsx und use-reorder-sensors.ts. Aus git wiederherstellbar. `@dnd-kit/*` bleibt in package.json (Vorschlag für den Auftrag „Abhängigkeiten“).
 - Der Titelbild-Knopf (`CoverEditButton`) steht in src/components/farm/titelbild-knopf.tsx; farm-page-view.tsx exportiert nur noch `TITELBILD_KNOPF_STIL` und bindet die neue Datei nie ein.
 - CI-Schritt „Kein Hof-Code im Paket der Hofseite“ nach „Build“: `scripts/pruefung/paket-hofseite.mjs` liest das Manifest in einem `node:vm`-Kontext, misst die Chunks (roh, gzip je Chunk) und endet mit 1 bei „DndDescribedBy“, „Produktbild aktualisiert“ oder „Titelbild ersetzen“ in einem Chunk — und bei einem unlesbaren Manifest (kein stilles Grün nach einem Next-Update).
+
+## Lauf 34 · Nr. 304: Stille Ereignisse werden Aufgaben; Stichtag in „Kommt“ aus der Einstellung (F047 Nr. 11 und 14; Register N32, N33, N36; 13.11.2026)
+
+**Anlass.** Drei Zustände eines Hofs ändern sich ohne Nachricht an das Team: die Lastschrift endet (Stripe `mandate.updated`), ein verkaufender Hof hat den neuen AGB nicht zugestimmt, und nach 30 Tagen ist ein geschlossenes Konto zu löschen, während Stufe 2 noch nicht läuft. „Kommt“ zeigte den Stichtag aus der Vorgabe, nicht aus der Einstellung.
+
+**Fachregel.**
+- Drei Quellen in „Braucht dich“ (`lastschrift_beendet` Geld 3 Tage, `agb_offen` Höfe 7 Tage, `konto_frist_um` Höfe 7 Tage), je Hof eine Aufgabe, Ziel die Akte. Gelesen von `ladeHofSignale` (`src/server/queries/admin-signale.ts`): Lastschrift = verkaufender Hof, bar an, Mandatspflicht, `sepaMandatAm` null und mindestens ein Protokolleintrag `lastschrift_mandat_beendet` (seit = der jüngste); AGB = verkaufender Hof mit `brauchtAgbZustimmung` (seit = Freischaltung); Konto = kein Testhof, `geschlossenAm` vor `endgueltigGrenze(jetzt)`, `endgueltigAm` null (seit = Ende der 30 Tage; auch pausiert). Nur Kennung, Hofname, Zeitpunkt; keine Mail, keine Nachricht, keine Sperre.
+- `QUELLE_NAME`: ein fester Name je Quelle ohne Daten, für Handbuch und tägliche Mail; wo der Titel fest ist, ist der Name der Titel (Test).
+- „Kommt“: „Plattformgebühr im Preis beginnt“ am Tag aus der Einstellung (`hofpreisAbTag`, ohne Einstellung die Vorgabe), bis einschließlich zu diesem Tag; `HEUTE_TERMINE` ist leer.
+- Konto schließen sagt jetzt, dass das Löschen nach 30 Tagen eine Aufgabe in Heute ist (Wortlaut von Recht, ohne „Name“).
+- Nicht gebaut: eigenes Protokoll je Wechsel von `stripeAccountReady` im Webhook (Tor T3: schreibt schon `schreibeStripeKontoStand` aus A012 mit `online_zahlung_aktiv`/`online_zahlung_pausiert`).
+- Tests: `tests/admin-aufgaben.test.ts`, `tests/konto-schliessen-satz.test.ts`, `tests/integration/admin-signale.int.test.ts`.
