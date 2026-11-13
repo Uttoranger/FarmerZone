@@ -134,7 +134,7 @@ export const ZUSTELL_REGEL_TEXT: Record<ZustellArt, string> = {
   erstattungOffen: 'Erstattung offen – sofort; Geld, deshalb immer an (nicht abschaltbar)',
   betrieb: 'Betrieb – Warnung ab 80 % oder bei einem ausgefallenen Ablauf; immer an (nicht abschaltbar)',
   // Die Drossel kam mit Nr. 105 (Register N14, Ergänzung): höchstens eine Mail je Faden und voller Stunde.
-  antwortHof: 'Antwort eines Hofs – sofort, höchstens eine Mail je Faden und Stunde; aus heißt nur der Zähler im Eingang',
+  antwortHof: 'Antwort eines Hofs – sofort, höchstens eine Mail je Unterhaltung und Stunde; aus heißt nur der Zähler im Eingang',
   wunschFrage: 'Wünsche und Fragen – nur im Eingang, gesammelt in der Wochenlage',
   // Seit Nr. 192 kommt die Wochenlage jede Woche (nur diese Regel entscheidet); der Schlüssel heißt weiter `wochenbericht`.
   wochenbericht: 'Wochenlage – montags früh',

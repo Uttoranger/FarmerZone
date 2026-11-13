@@ -6944,3 +6944,14 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - `ladeBestellListe`: Bei einer Suche gilt der Zeitraum nicht; Stand, Hof und „Erstattung offen“ gelten weiter. Ohne Suche bleibt der Zeitraum.
 - Die Meldung zeigt „Kundin · k•••@example.com“ (`maskiereAdresse`, die EINE Stelle). Einen Knopf „Adresse anzeigen“ gibt es dort nicht; die Antwort an die Kundin geht über den Bescheid der App.
 - Tests: `tests/integration/bestellung-auffindbar.int.test.ts`, `tests/meldung-adresse-gekuerzt.test.ts`.
+
+## Admin-Texte: Eingriffe sagen ihre Folgen, keine Kürzel, keine Technikwörter (F047 „Verständlichkeit“; Register N38, N40; Nr. 303, Lauf 34, 13.11.2026)
+
+**Anlass.** Admin-Texte nannten Register-Kürzel („Register K2“, „(K1)“), Technik („Deployment“, „Destination Charges“, „/api/gesund“, „Webhook-Ereignisse“) oder ließen offen, was ein Eingriff bewirkt — vor allem der Stichtag „Hofpreis-Modell ab“, der Preis, AGB-Fassung und Monatsabrechnung zugleich schaltet und erreicht nicht mehr änderbar ist.
+
+**Fachregel.**
+- Eine Abweichung beim Geld nennt die Gebühr mit dem Wort der Bestellung (`abweichungFeldText` → `gebuehrBezeichnungFuer`); `ladeOffeneAbweichungen` liest `gebuehrModell` in derselben Abfrage mit. `ABWEICHUNG_FELD_TEXT.gebuehr` ist nur noch Rückfall („Gebühr“).
+- „Stichtag speichern“ öffnet erst eine Rückfrage (BestellDialog, `HOFPREIS_RUECKFRAGE_TEXT`) mit dem, was der Tag schaltet; erst „Mit Passkey speichern“ ruft die Action, „Abbrechen“ ruft nichts. Die Action und ihre Regel sind unverändert.
+- Die Akte › Plattformgebühr sagt je Feld, was das Speichern bewirkt; der Satz unter dem Knopf nennt die Ankündigungsfristen (30 Tage zum Nachteil, sonst 15 Tage; AGB 19.9 und 32.3) im Wortlaut von Recht (Gegenlesen Fund 8).
+- `tests/admin-kuerzel-wache.test.ts` hält die Dateien der Gruppe B frei von Register-Kürzeln, „Deployment“, „Destination Charges“ und „Webhook“ (außer dem Tabellennamen in `TABELLEN_NAME`), ohne Bestandsliste.
+- Nicht gebaut: der zweite Teil der Auskunft an eine Adresse der Kundschaft (Tor T5: Kein Ort im Admin zeigt die IP-Adressen; der Startsatz „Auskunft ohne IP von Recht bestätigt“ fehlte) und der neue Satz zu „Lastschrift zurückgebucht“ (Tor T2: Es gilt der Satz aus Nr. 290).

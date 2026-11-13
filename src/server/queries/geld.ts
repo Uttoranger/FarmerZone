@@ -92,11 +92,17 @@ export async function ladeOffeneAbweichungen(): Promise<OffeneAbweichung[]> {
     return g ? [{ ...g, tag: z.tag, wert: z.wert }] : []
   })
   if (gelesen.length === 0) return []
-  const nummern = await prisma.order.findMany({ where: { id: { in: [...new Set(gelesen.map((g) => g.orderId))] } }, select: { id: true, orderNumber: true } })
-  const nummer = new Map(nummern.map((n) => [n.id, n.orderNumber]))
+  // Das Gebührenmodell gleich mit: Das Wort der Gebühr steht je Bestellung (abweichungFeldText, Nr. 303).
+  const bestellungen = await prisma.order.findMany({
+    where: { id: { in: [...new Set(gelesen.map((g) => g.orderId))] } },
+    select: { id: true, orderNumber: true, gebuehrModell: true },
+  })
+  const jeId = new Map(bestellungen.map((b) => [b.id, b]))
   return gelesen.flatMap((g) => {
-    const orderNumber = nummer.get(g.orderId)
-    return orderNumber ? [{ orderId: g.orderId, orderNumber, feld: g.feld, differenzCents: Number(g.wert), seit: g.tag }] : []
+    const bestellung = jeId.get(g.orderId)
+    return bestellung
+      ? [{ orderId: g.orderId, orderNumber: bestellung.orderNumber, feld: g.feld, differenzCents: Number(g.wert), seit: g.tag, gebuehrModell: bestellung.gebuehrModell }]
+      : []
   })
 }
 

@@ -105,7 +105,7 @@ export const KONTO_ANFRAGE_TEXT = {
   },
   auskunft: {
     titel: (hof: string): string => `Auskunft für ${hof} exportieren`,
-    satz: 'Eine JSON-Datei mit Konto, Hof, Produkten, Abholzeiten, Beiträgen, Postfach, eigenen Meldungen und den Bestellungen als Verkäufer – ohne Daten der Kundschaft.',
+    satz: 'Eine Datei mit allen gespeicherten Daten zu Konto, Hof, Produkten, Abholzeiten, Beiträgen, Postfach, eigenen Meldungen und den Bestellungen als Verkäufer – ohne Daten der Kundschaft (Format JSON, mit jedem Texteditor lesbar). Schick sie dem Hof innerhalb eines Monats, nur an seine Anmelde-Adresse.',
     knopf: 'Mit Passkey exportieren',
     erledigt: 'Die Datei ist geladen.',
   },

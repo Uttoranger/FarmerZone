@@ -297,7 +297,7 @@ export const GRUENDUNG_BIS_DIALOG = {
   feld: 'Letzter Tag als Gründungshof',
   leer: `Leer = Standard (${GRUENDUNG_BIS_STANDARD_TEXT})`,
   zuruecksetzen: 'Auf Standard zurücksetzen',
-  zustimmung: 'Nur mit Zustimmung des Hofs (K1)',
+  zustimmung: 'Nur mit Zustimmung des Hofs',
   frueher: (bisherText: string): string => `Das neue Ende liegt vor dem bisherigen (${bisherText}).`,
   zugestimmt: 'Der Hof hat dem früheren Ende zugestimmt.',
 } as const

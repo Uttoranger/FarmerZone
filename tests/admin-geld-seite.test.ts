@@ -147,7 +147,7 @@ describe('Admin › Geld', () => {
 
   it('Gegenprobe: mit Abweichung kein „stimmt“, sondern die Zahl; ohne Lauf „noch kein Lauf“', async () => {
     abfragen.ladeGeldMonat.mockResolvedValueOnce(
-      geld({ abweichungen: [{ orderId: 'b1', orderNumber: 'HM-2609-A1B2', feld: 'betrag', differenzCents: 120, seit: NACH_MONATSENDE }], abgleichNachMonatsende: true })
+      geld({ abweichungen: [{ orderId: 'b1', orderNumber: 'HM-2609-A1B2', feld: 'betrag', differenzCents: 120, seit: NACH_MONATSENDE, gebuehrModell: null }], abgleichNachMonatsende: true })
     )
     const mit = await seite()
     expect(mit).toContain('1 Abweichung – steht in Heute')

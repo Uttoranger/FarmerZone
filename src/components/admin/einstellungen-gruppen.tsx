@@ -10,7 +10,6 @@ import {
 } from '@/lib/plattform-einstellung'
 import { cn } from '@/lib/utils'
 import { FOKUS_RAHMEN } from '@/components/ui/fokus'
-import { Chip } from '@/components/ui/chip'
 import { LadeInhalt, LadePunkt, LadeRahmen } from '@/components/ui/lade-punkt'
 import { EinstellungenGruendung, type GruendungFormularDaten } from '@/components/admin/einstellungen-gruendung'
 import { EinstellungenTeam } from '@/components/admin/einstellungen-team'
@@ -152,7 +151,6 @@ export function EinstellungenGruppen({ daten }: { daten: EinstellungenDaten }): 
                 <section aria-label={titel} className="hidden flex-col gap-3.5 border-t border-border p-3.5 group-open:flex lg:border-t-0 lg:p-5">
                   <div className="hidden flex-wrap items-center gap-2.5 lg:flex">
                     <h2 className={H2}>{titel}</h2>
-                    {gruppe === 'gruendung' && <Chip>{EINSTELLUNGEN_TEXT.gruendung.register}</Chip>}
                   </div>
                   {gruppe === 'gruendung' && (
                     <>

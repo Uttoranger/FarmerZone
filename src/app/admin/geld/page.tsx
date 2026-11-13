@@ -273,7 +273,7 @@ export default async function AdminGeldPage({
                   <StatusBadge status={plattformgebuehr.gescheitert + plattformgebuehr.zurueckgebucht > 0 ? 'offen' : 'neutral'}>
                     {`${plattformgebuehr.offen} offen · ${plattformgebuehr.gescheitert} gescheitert · ${plattformgebuehr.zurueckgebucht} zurückgebucht`}
                   </StatusBadge>
-                  <span className={cn('text-[13px]', LEISE)}>Einzüge aller Monate</span>
+                  <span className={cn('text-[13px]', LEISE)}>Lastschriften aller Monate. Gescheiterte und zurückgebuchte stehen mit Hof in Heute.</span>
                 </li>
               </ul>
             </section>

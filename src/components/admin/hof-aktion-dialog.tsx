@@ -115,7 +115,8 @@ export function HofAktionDialog({
           <p>
             Die Hofseite von <strong className="font-semibold break-words text-foreground">{hof?.name}</strong> ist
             danach nicht mehr erreichbar und Bestellungen werden abgelehnt. Es wird nichts gelöscht — der Hof behält
-            Zugang zu allen Daten.
+            Zugang zu allen Daten. Laufende Bestellungen bleiben und werden abgeholt. Der Hof bekommt keine Nachricht von
+            selbst – schreib ihm vorher im Postfach.
             {hof?.gruendungsplatz != null &&
               (hof.gruendungFest ? (
                 <> Sein Gründungsplatz und das Ende bleiben festgeschrieben.</>
@@ -132,7 +133,7 @@ export function HofAktionDialog({
             <Hinweiskarte ton="orange">
               Endgültig, nicht umkehrbar. Für echte Höfe gibt es das Zurücknehmen der Freigabe — das löscht nichts.
             </Hinweiskarte>
-            <p>Höfe mit Bestellungen oder Verkäufen lehnt der Server ab.</p>
+            <p>Hat der Hof schon Bestellungen oder Verkäufe, geht das nicht. Nimm dann die Freigabe zurück oder schließ das Konto.</p>
           </>
         )}
         <DialogFehler text={fehler} />

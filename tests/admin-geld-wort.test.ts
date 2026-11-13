@@ -95,19 +95,19 @@ describe('Karte „Hofpreis-Modell ab“ (V62, Board s3/w3-admin-einstellungen B
       })
     )
 
-  it('erreicht: „Seit diesem Tag gilt …“, ohne „Vorher bleibt alles wie heute.“, Feld gesperrt, kein Knopf', () => {
+  it('erreicht: „Seit diesem Tag steht …“, ohne „Vorher bleibt alles wie heute.“, Feld gesperrt, kein Knopf', () => {
     const html = karte(true)
-    expect(html).toContain('Seit diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis')
+    expect(html).toContain('Seit diesem Tag steht die Plattformgebühr (6 %) im Preis, den die Kundschaft sieht')
     expect(html).not.toContain('Vorher bleibt alles wie heute.')
     expect(html).not.toContain('Ab diesem Tag')
     expect(html).toContain('Der Stichtag ist erreicht – er lässt sich nicht mehr ändern.')
     expect(html).not.toContain('Stichtag speichern')
   })
 
-  it('Gegenprobe: vor dem Stichtag der Satz von heute mit „Vorher bleibt alles wie heute.“ und dem Knopf', () => {
+  it('Gegenprobe: vor dem Stichtag der Satz mit „Ab diesem Tag“, „lässt er sich nicht mehr ändern“ und dem Knopf', () => {
     const html = karte(false)
-    expect(html).toContain('Ab diesem Tag gilt für neue Bestellungen die Plattformgebühr im Hofpreis')
-    expect(html).toContain('Vorher bleibt alles wie heute.')
+    expect(html).toContain('Ab diesem Tag steht die Plattformgebühr (6 %) im Preis, den die Kundschaft sieht')
+    expect(html).toContain('Ist der Tag erreicht, lässt er sich nicht mehr ändern.')
     expect(html).toContain('Stichtag speichern')
   })
 })

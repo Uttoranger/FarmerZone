@@ -100,8 +100,8 @@ const VOLL: AufgabenStand = {
   ],
   // Zwei Felder derselben Bestellung sind EINE Aufgabe (Nr. 191).
   geldAbweichungen: [
-    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'betrag', differenzCents: 120, seit: vor(30 * STUNDE) },
-    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'gebuehr', differenzCents: -50, seit: vor(2 * STUNDE) },
+    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'betrag', differenzCents: 120, seit: vor(30 * STUNDE), gebuehrModell: null },
+    { orderId: 'bestellung-1', orderNumber: 'HM-2610-C3D4', feld: 'gebuehr', differenzCents: -50, seit: vor(2 * STUNDE), gebuehrModell: null },
   ],
   // Nr. 198: je Quelle der Plattformgebühr ein Fall (erfunden). Die Quote: 11 bar, 3 nicht abgeholt (27 %) — und ein Hof unter der Schwelle.
   plattformgebuehr: {
@@ -472,7 +472,7 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
     ])
   })
 
-  it('Lage: „Bestellungen heute“ mit „Im Rahmen“ und zwei Zeilen, „Geld · Woche“ mit der Servicegebühr (Mockup admin-heute)', () => {
+  it('Lage: „Bestellungen heute“ ohne Marke (Nr. 303) und zwei Zeilen, „Geld · Woche“ mit der Servicegebühr (Mockup admin-heute)', () => {
     const k = lageKacheln(
       {
         bestellungen: { zurAbholung: 23, nichtGepackt: 4, storniert: 1 },
@@ -483,7 +483,7 @@ describe('Alte Adresse der Höfe, Routine, Kommt, Protokoll', () => {
       []
     )
     const bestellungen = k.find((x) => x.id === 'bestellungen')!
-    expect(bestellungen.marke).toEqual({ wort: 'Im Rahmen', art: 'laeuft' })
+    expect(bestellungen.marke).toBeNull()
     expect(bestellungen.zeilen).toEqual(['4 noch nicht gepackt · 1 Storno', 'Woche: 118 (+9 % zur Vorwoche)'])
     const geld = k.find((x) => x.id === 'geld')!
     expect(geld.wert).toMatch(/^€ 1\D840$/)

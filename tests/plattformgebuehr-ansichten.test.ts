@@ -109,9 +109,11 @@ describe('Admin › Hof-Akte: Abschnitt Plattformgebühr', () => {
     expect(h).toContain('3 von 20 (15 %)')
     expect(h).toContain('keine')
     expect(h).toContain('bar € 3,42 · online € 1,20')
-    expect(h).toContain('Einzug ab (Vorgabe 2028-02-01)')
+    expect(h).toContain('Einzug ab (Vorgabe 1. Februar 2028)')
     expect(h).toContain('Mit Passkey speichern')
-    expect(h).toContain('Satz und Einzug gelten nur für neue Bestellungen.')
+    expect(h).toContain(
+      'Satz und Einzug gelten ab dem Speichern für neue Bestellungen. Jede Änderung an Satz, Einzug, Frist bis zur Sperre, Lastschrift-Pflicht oder Abrechnungstag kündigst du dem Hof vorher im Postfach und per E-Mail an: zu seinem Nachteil mindestens 30 Tage, sonst mindestens 15 Tage (AGB 19.9 und 32.3). Verzichtet der Hof nach der Ankündigung in Textform auf die Frist, darfst du früher speichern. Sonst speicherst du erst am angekündigten Tag.'
+    )
   })
 })
 

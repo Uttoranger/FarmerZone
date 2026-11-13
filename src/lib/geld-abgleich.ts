@@ -44,6 +44,7 @@
  * wieder übereinstimmen — der Ablauf prüft offene Abweichungen bei jedem Lauf
  * mit, auch wenn die Zahlung älter als 48 Stunden ist.
  */
+import { gebuehrBezeichnungFuer } from '@/lib/plattformgebuehr'
 
 /** Wie weit der Ablauf zurückliest (N37: die letzten 48 Stunden). */
 export const GELD_ABGLEICH_FENSTER_MS = 48 * 60 * 60 * 1000
@@ -64,9 +65,10 @@ export const STRIPE_GEBUEHR_ART = 'stripeGebuehrCents'
 export const ABWEICHUNG_FELDER = ['betrag', 'gebuehr', 'erstattung', 'zahlung'] as const
 export type AbweichungFeld = (typeof ABWEICHUNG_FELDER)[number]
 
+/** Das Wort je Feld. `gebuehr` ist nur Rückfall — gelesen wird über `abweichungFeldText` (das Wort der Bestellung, Nr. 303). */
 export const ABWEICHUNG_FELD_TEXT: Record<AbweichungFeld, string> = {
   betrag: 'Betrag',
-  gebuehr: 'Servicegebühr',
+  gebuehr: 'Gebühr',
   erstattung: 'Erstattung',
   zahlung: 'Zahlung fehlt bei Stripe',
 }
@@ -266,5 +268,14 @@ export function stripeGebuehrenJeTag(buchungen: readonly SaldoBuchung[]): Map<st
   return jeTag
 }
 
-/** Eine offene Abweichung aus BetriebMessung, für Heute und Geld. */
-export type OffeneAbweichung = { orderId: string; orderNumber: string; feld: AbweichungFeld; differenzCents: number; seit: Date }
+/** Eine offene Abweichung aus BetriebMessung, für Heute und Geld — mit dem Gebührenmodell der Bestellung (Nr. 303). */
+export type OffeneAbweichung = { orderId: string; orderNumber: string; feld: AbweichungFeld; differenzCents: number; seit: Date; gebuehrModell: string | null }
+
+/**
+ * Das Wort für das Feld einer Abweichung (Nr. 303, V62/V63): Die Gebühr heißt
+ * wie in der Bestellung selbst — im Hofpreis-Modell „Plattformgebühr“, sonst
+ * „Servicegebühr“ —, nie ein Wort, das die Bestellung nicht kennt.
+ */
+export function abweichungFeldText(a: Pick<OffeneAbweichung, 'feld' | 'gebuehrModell'>): string {
+  return a.feld === 'gebuehr' ? gebuehrBezeichnungFuer(a) : ABWEICHUNG_FELD_TEXT[a.feld]
+}

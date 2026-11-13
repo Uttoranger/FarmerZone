@@ -33,7 +33,7 @@ const STICHTAG = new Date('2027-02-01T00:00:00.000+01:00')
 const ERREICHT = new Date(JETZT.getTime() - STUNDE)
 const LIVE = { art: 'produktion', stripe: 'live' } as const
 // formatDatumLang hält „1.“ und den Monat mit einem geschützten Leerzeichen zusammen.
-const SATZ = 'Stripe ist live, aber das Hofpreis-Modell beginnt erst am 1.\u00a0Februar 2027 – Stichtag vorziehen'
+const SATZ = 'Echte Zahlungen laufen, aber die Plattformgebühr im Preis beginnt erst am 1.\u00a0Februar 2027 – Tag vorziehen'
 
 const stand = (signal: Partial<LiveSignalStand> | null): AufgabenStand => ({
   ...LEERER_STAND,
@@ -116,7 +116,7 @@ describe('Betriebsleiste: derselbe Satz als Warnung', () => {
     expect(liveSignalLeiste(sammleAufgaben(stand({ einstellung: { hofpreisModellAb: ERREICHT } }), JETZT))).toBeNull()
     expect(liveSignalLeiste(sammleAufgaben(stand({ umgebung: { art: 'produktion', stripe: 'test' } }), JETZT))).toBeNull()
     const html = shell({ stripeLiveWarnung: null })
-    expect(html).not.toContain('Stripe ist live')
+    expect(html).not.toContain('Echte Zahlungen laufen')
   })
 })
 

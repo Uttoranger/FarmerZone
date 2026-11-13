@@ -177,7 +177,7 @@ export function HofAkteAnsicht({
                   Freischalten
                 </button>
                 <button type="button" onClick={() => setAktion({ hof, art: 'reject' })} className={KNOPF_RAHMEN}>
-                  Ablehnen
+                  Ablehnen und löschen …
                 </button>
               </>
             )}
