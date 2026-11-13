@@ -6965,3 +6965,13 @@ Liste Lauf 32 (kunden, auswertung), Abnahme Lauf 32 (auswertung Z. 912 ff., kund
 - Produkte per Ziehen sortieren gab es seit Nr. 50 in keiner Oberfläche; mit dem Modus fallen `reorderProductsAction` und `updateProductImageAction` weg (eine Action ohne Aufrufer ist ein offener Endpunkt, Nr. 199), ebenso reorder-context.tsx und use-reorder-sensors.ts. Aus git wiederherstellbar. `@dnd-kit/*` bleibt in package.json (Vorschlag für den Auftrag „Abhängigkeiten“).
 - Der Titelbild-Knopf (`CoverEditButton`) steht in src/components/farm/titelbild-knopf.tsx; farm-page-view.tsx exportiert nur noch `TITELBILD_KNOPF_STIL` und bindet die neue Datei nie ein.
 - CI-Schritt „Kein Hof-Code im Paket der Hofseite“ nach „Build“: `scripts/pruefung/paket-hofseite.mjs` liest das Manifest in einem `node:vm`-Kontext, misst die Chunks (roh, gzip je Chunk) und endet mit 1 bei „DndDescribedBy“, „Produktbild aktualisiert“ oder „Titelbild ersetzen“ in einem Chunk — und bei einem unlesbaren Manifest (kein stilles Grün nach einem Next-Update).
+
+## Lauf 34 · Nr. 308: Postfach – eigene Antwort nicht von der Leiste verdeckt (F052 Hürde 10; 13.11.2026)
+
+**Anlass.** Am Handy klebt das Antwortfeld über der Unterleiste. Nach dem Senden erschien die eigene Antwort am Ende des Fadens – hinter Feld und Leiste; die Seite rollte nicht (gemessen am Stand vor dem Umbau: Unterkante der neuen Blase 133 bis 221 px unter der Oberkante des Felds, in allen vier Fassungen).
+
+**Was gilt.**
+- Unter dem Faden steht ein leerer Anker (`FADEN_ENDE_ID` aus src/lib/postfach-rollen.ts) mit `scroll-margin-bottom` in Höhe von Feld plus Leiste (280 px plus sichere Zone; am Computer 220 px, nur das Feld). Gemessen: Feld 202 px hoch bei 390 px, 187 px bei 1440 px.
+- Nach erfolgreichem Senden rollt das Formular per `scrollIntoView({ block: 'end' })` zum Anker – gleitend, bei „weniger Bewegung“ sofort (`rollVerhalten`). Ohne Zeitschaltung; der Fokus bleibt, wo er ist.
+- Der Zähler, auf den der Effekt hört, wird nach dem `await` wieder in `startTransition` gesetzt. Grund: Next schreibt den neu geladenen Faden als Übergang fest; ein gewöhnliches Setzen nach dem `await` kam vorher an, der Effekt rollte zum alten Fadenende, und die neue Nachricht lag am Computer wieder 40 px unter dem Feld (Messung im Prüf-Bau). Als Übergang landen beide im selben Festschreiben.
+- Der Zähler heißt `antworten`, nicht `gesendet`: Die Quelltext-Wache in tests/whatsapp-versand.test.ts liest „Gesendet“ als Satz, der eine Zustellung behauptet.
